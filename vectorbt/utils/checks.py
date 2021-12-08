@@ -34,6 +34,11 @@ def is_index(arg: tp.Any) -> bool:
     return isinstance(arg, pd.Index)
 
 
+def is_multi_index(arg: tp.Any) -> bool:
+    """Check whether the argument is `pd.MultiIndex`."""
+    return isinstance(arg, pd.MultiIndex)
+
+
 def is_frame(arg: tp.Any) -> bool:
     """Check whether the argument is `pd.DataFrame`."""
     return isinstance(arg, pd.DataFrame)

@@ -563,8 +563,11 @@ def ohlc_stop_place_nb(out: tp.Array1d,
     !!! note
         We don't have intra-candle data. If there was a huge price fluctuation in both directions,
         we can't determine whether SL was triggered before TP and vice versa. So some assumptions
-        need to be made: 1) trailing stop can only be based on previous close/high, and
-        2) we pessimistically assume that SL comes before TP.
+        need to be made:
+
+        1) if stop has been hit before open, stop price becomes current open,
+        2) trailing stop can only be based on previous close/high, and
+        3) we pessimistically assume that SL comes before TP.
     
     Args:
         out (array): Boolean array to write.
@@ -611,11 +614,11 @@ def ohlc_stop_place_nb(out: tp.Array1d,
     init_open = flex_select_auto_nb(open, init_i, col, flex_2d)
     init_sl_stop = flex_select_auto_nb(sl_stop, init_i, col, flex_2d)
     if init_sl_stop < 0:
-        raise ValueError("Stop value must be 0 or greater")
+        raise ValueError("Stop value must be nan, 0, or greater than 0")
     init_sl_trail = flex_select_auto_nb(sl_trail, init_i, col, flex_2d)
     init_tp_stop = flex_select_auto_nb(tp_stop, init_i, col, flex_2d)
     if init_tp_stop < 0:
-        raise ValueError("Stop value must be 0 or greater")
+        raise ValueError("Stop value must be nan, 0, or greater than 0")
     init_reverse = flex_select_auto_nb(reverse, init_i, col, flex_2d)
     max_p = min_p = init_open
 
@@ -625,12 +628,20 @@ def ohlc_stop_place_nb(out: tp.Array1d,
         _high = flex_select_auto_nb(high, i, col, flex_2d)
         _low = flex_select_auto_nb(low, i, col, flex_2d)
         _close = flex_select_auto_nb(close, i, col, flex_2d)
-        if np.isnan(_open):
-            _open = _close
-        if np.isnan(_low):
-            _low = min(_open, _close)
         if np.isnan(_high):
-            _high = max(_open, _close)
+            if np.isnan(_open):
+                _high = _close
+            elif np.isnan(_close):
+                _high = _open
+            else:
+                _high = max(_open, _close)
+        if np.isnan(_low):
+            if np.isnan(_open):
+                _low = _close
+            elif np.isnan(_close):
+                _low = _open
+            else:
+                _low = min(_open, _close)
 
         # Calculate stop price
         if not np.isnan(init_sl_stop):
@@ -662,20 +673,44 @@ def ohlc_stop_place_nb(out: tp.Array1d,
 
         exit_signal = False
         if not np.isnan(init_sl_stop):
-            if (not init_reverse and curr_low <= curr_sl_stop_price) or \
-                    (init_reverse and curr_high >= curr_sl_stop_price):
-                exit_signal = True
-                stop_price_out[i, col] = curr_sl_stop_price
+            # SL/TSL hit?
+            stop_price = np.nan
+            if not init_reverse:
+                if _open <= curr_sl_stop_price:
+                    stop_price = _open
+                if curr_low <= curr_sl_stop_price:
+                    stop_price = curr_sl_stop_price
+            else:
+                if _open >= curr_sl_stop_price:
+                    stop_price = _open
+                if curr_high >= curr_sl_stop_price:
+                    stop_price = curr_sl_stop_price
+            if not np.isnan(stop_price):
+                stop_price_out[i, col] = stop_price
                 if init_sl_trail:
                     stop_type_out[i, col] = StopType.TrailStop
                 else:
                     stop_type_out[i, col] = StopType.StopLoss
-        if not exit_signal and not np.isnan(init_tp_stop):
-            if (not init_reverse and curr_high >= curr_tp_stop_price) or \
-                    (init_reverse and curr_low <= curr_tp_stop_price):
                 exit_signal = True
-                stop_price_out[i, col] = curr_tp_stop_price
+
+        if not exit_signal and not np.isnan(init_tp_stop):
+            # TP hit?
+            stop_price = np.nan
+            if not init_reverse:
+                if _open >= curr_tp_stop_price:
+                    stop_price = _open
+                if curr_high >= curr_tp_stop_price:
+                    stop_price = curr_tp_stop_price
+            else:
+                if _open <= curr_tp_stop_price:
+                    stop_price = _open
+                if curr_low <= curr_tp_stop_price:
+                    stop_price = curr_tp_stop_price
+            if not np.isnan(stop_price):
+                stop_price_out[i, col] = stop_price
                 stop_type_out[i, col] = StopType.TakeProfit
+                exit_signal = True
+
         if exit_signal:
             out[i - from_i] = True
             if pick_first:

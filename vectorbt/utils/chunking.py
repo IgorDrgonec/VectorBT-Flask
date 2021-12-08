@@ -132,7 +132,7 @@ class ArraySizer(ShapeSizer):
 
 @attr.s(frozen=True)
 class ChunkMeta:
-    """Class representing a chunk metadata."""
+    """Class that represents a chunk metadata."""
 
     uuid: str = attr.ib()
     """Unique identifier of the chunk.

@@ -62,8 +62,8 @@ MaybeTupleList = Union[T, List[T], Tuple[T, ...]]
 MaybeIterable = Union[T, Iterable[T]]
 MaybeSequence = Union[T, Sequence[T]]
 MaybeCollection = Union[T, Collection[T]]
-MappingSequence = Union[Mapping[str, T], Sequence[T]]
-MaybeMappingSequence = Union[T, Mapping[str, T], Sequence[T]]
+MappingSequence = Union[Mapping[Hashable, T], Sequence[T]]
+MaybeMappingSequence = Union[T, Mapping[Hashable, T], Sequence[T]]
 SetLike = Union[None, Set[T]]
 
 
@@ -178,7 +178,7 @@ MappedReduceToArrayMetaFunc = Callable[[Array1d, int, VarArg()], Array1d]
 
 # Indicators
 Param = Any
-Params = Union[List[Param], Tuple[Param, ...], NumbaList, Array1d]
+Params = Sequence[Param]
 
 # Mappings
 Enum = NamedTuple

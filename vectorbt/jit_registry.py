@@ -391,10 +391,10 @@ class JitableSetup(Hashable):
     py_func: tp.Callable = attr.ib()
     """Python function to be jitted."""
 
-    jitter_kwargs: tp.KwargsLike = attr.ib(factory=dict)
+    jitter_kwargs: tp.KwargsLike = attr.ib(default=None)
     """Keyword arguments passed to `vectorbt.utils.jitting.resolve_jitter`."""
 
-    tags: tp.SetLike = attr.ib(factory=set)
+    tags: tp.SetLike = attr.ib(default=None)
     """Set of tags."""
 
     @staticmethod

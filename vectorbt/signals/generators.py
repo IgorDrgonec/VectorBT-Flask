@@ -561,13 +561,16 @@ ohlcstx_func_config = ReadonlyConfig(
             tp_stop=flex_elem_param_config,
             reverse=flex_elem_param_config
         ),
-        is_open_safe=True,
+        high=np.nan,
+        low=np.nan,
+        close=np.nan,
+        stop_price=np.nan,
+        stop_type=-1,
         sl_stop=np.nan,
         sl_trail=False,
         tp_stop=np.nan,
         reverse=False,
-        stop_price=np.nan,
-        stop_type=-1
+        is_open_safe=True
     )
 )
 """Exit function config for `OHLCSTX`."""

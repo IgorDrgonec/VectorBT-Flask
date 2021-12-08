@@ -494,7 +494,7 @@ class CAQuery(Hashable):
     base_cls: tp.Optional[tp.TypeLike] = attr.ib(default=None)
     """Base class of the instance or its name (case-sensitive) `CAQuery.cacheable` is bound to."""
 
-    options: tp.Optional[dict] = attr.ib(factory=dict)
+    options: tp.Optional[dict] = attr.ib(default=None)
     """Options to match."""
 
     @classmethod

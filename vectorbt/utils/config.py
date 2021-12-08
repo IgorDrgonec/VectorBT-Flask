@@ -3,7 +3,6 @@
 
 """Utilities for configuration."""
 
-import attr
 import inspect
 from collections import namedtuple
 from copy import copy, deepcopy
@@ -15,46 +14,6 @@ from vectorbt.utils.caching import Cacheable
 from vectorbt.utils.decorators import class_or_instancemethod
 from vectorbt.utils.docs import Documented, stringify
 from vectorbt.utils.pickling import Pickleable
-
-
-@attr.s(frozen=True)
-class Default:
-    """Class for wrapping default values."""
-
-    value: tp.Any = attr.ib()
-    """Default value."""
-
-
-@attr.s(frozen=True)
-class Ref:
-    """Class for wrapping references to other keys."""
-
-    key: tp.Hashable = attr.ib()
-    """Reference to another key."""
-
-
-def resolve_ref(dct: dict, k: tp.Hashable, keep_defaults: bool = True) -> tp.Any:
-    """Resolve a potential reference."""
-    v = dct[k]
-    is_default = False
-    if isinstance(v, Default):
-        v = v.value
-        is_default = True
-    if isinstance(v, Ref):
-        new_v = resolve_ref(dct, v.key)
-    else:
-        new_v = v
-    if is_default and keep_defaults:
-        new_v = Default(new_v)
-    return new_v
-
-
-def resolve_refs(dct: dict, keep_defaults: bool = True) -> dict:
-    """Resolve all references of type `Ref` in a dictionary."""
-    new_dct = dict()
-    for k in dct:
-        new_dct[k] = resolve_ref(dct, k, keep_defaults=keep_defaults)
-    return new_dct
 
 
 def resolve_dict(dct: tp.DictLikeSequence, i: tp.Optional[int] = None) -> dict:

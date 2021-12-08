@@ -260,7 +260,7 @@ Date
 `Portfolio` is very flexible towards inputs:
 
 * Accepts both Series and DataFrames as inputs
-* Broadcasts inputs to the same shape using vectorbt's own broadcasting rules
+* Broadcasts inputs to the same shape using `vectorbt.base.reshaping.broadcast`
 * Many inputs (such as `fees`) can be passed as a single value, value per column/row, or as a matrix
 * Implements flexible indexing wherever possible to save memory
 
@@ -1659,7 +1659,7 @@ from vectorbt.utils.enum_ import map_enum_fields
 from vectorbt.utils.mapping import to_mapping
 from vectorbt.utils.parsing import get_func_kwargs
 from vectorbt.utils.random_ import set_seed
-from vectorbt.utils.template import Rep, RepEval, deep_substitute
+from vectorbt.utils.template import Rep, RepEval, RepFunc, deep_substitute
 
 try:
     import quantstats as qs
@@ -2522,31 +2522,6 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         dtype: float64
         ```
 
-        * Equal-weighted portfolio as in `vectorbt.portfolio.nb.from_order_func.simulate_nb` example
-        (it's more compact but has less control over execution):
-
-        ```python-repl
-        >>> np.random.seed(42)
-        >>> close = pd.DataFrame(np.random.uniform(1, 10, size=(5, 3)))
-        >>> size = pd.Series(np.full(5, 1/3))  # each column 33.3%
-        >>> size[1::2] = np.nan  # skip every second tick
-
-        >>> pf = vbt.Portfolio.from_orders(
-        ...     close,  # acts both as reference and order price here
-        ...     size,
-        ...     size_type='targetpercent',
-        ...     direction='longonly',
-        ...     call_seq='auto',  # first sell then buy
-        ...     group_by=True,  # one group
-        ...     cash_sharing=True,  # assets share the same cash
-        ...     fees=0.001, fixed_fees=1., slippage=0.001  # costs
-        ... )
-
-        >>> pf.get_asset_value(group_by=False).vbt.plot()
-        ```
-
-        ![](/docs/img/simulate_nb.svg)
-
         * Regularly deposit cash at open and invest it within the same bar at close:
 
         ```python-repl
@@ -2575,6 +2550,97 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         4     2.000000
         dtype: float64
         ```
+
+        * Equal-weighted portfolio as in `vectorbt.portfolio.nb.from_order_func.simulate_nb` example
+        (it's more compact but has less control over execution):
+
+        ```python-repl
+        >>> np.random.seed(42)
+        >>> close = pd.DataFrame(np.random.uniform(1, 10, size=(5, 3)))
+        >>> size = pd.Series(np.full(5, 1/3))  # each column 33.3%
+        >>> size[1::2] = np.nan  # skip every second tick
+
+        >>> pf = vbt.Portfolio.from_orders(
+        ...     close,  # acts both as reference and order price here
+        ...     size,
+        ...     size_type='targetpercent',
+        ...     direction='longonly',
+        ...     call_seq='auto',  # first sell then buy
+        ...     group_by=True,  # one group
+        ...     cash_sharing=True,  # assets share the same cash
+        ...     fees=0.001, fixed_fees=1., slippage=0.001  # costs
+        ... )
+
+        >>> pf.get_asset_value(group_by=False).vbt.plot()
+        ```
+
+        ![](/docs/img/simulate_nb.svg)
+
+        * Test 10 random weight combinations:
+
+        ```python-repl
+        >>> np.random.seed(42)
+        >>> close = pd.DataFrame(
+        ...     np.random.uniform(1, 10, size=(5, 3)),
+        ...     columns=pd.Index(['a', 'b', 'c'], name='asset'))
+
+        >>> # Generate random weight combinations
+        >>> rand_weights = []
+        >>> for i in range(10):
+        ...     rand_weights.append(np.random.dirichlet(np.ones(close.shape[1]), size=1)[0])
+        >>> rand_weights
+        [array([0.15474873, 0.27706078, 0.5681905 ]),
+         array([0.30468598, 0.18545189, 0.50986213]),
+         array([0.15780486, 0.36292607, 0.47926907]),
+         array([0.25697713, 0.64902589, 0.09399698]),
+         array([0.43310548, 0.53836359, 0.02853093]),
+         array([0.78628605, 0.15716865, 0.0565453 ]),
+         array([0.37186671, 0.42150531, 0.20662798]),
+         array([0.22441579, 0.06348919, 0.71209502]),
+         array([0.41619664, 0.09338007, 0.49042329]),
+         array([0.01279537, 0.87770864, 0.10949599])]
+
+        >>> # Bring close and rand_weights to the same shape
+        >>> rand_weights = np.concatenate(rand_weights)
+        >>> close = close.vbt.tile(10, keys=pd.Index(np.arange(10), name='weights_vector'))
+        >>> size = vbt.broadcast_to(weights, close).copy()
+        >>> size[1::2] = np.nan
+        >>> size
+        weights_vector                            0  ...                               9
+        asset                  a         b        c  ...           a         b         c
+        0               0.154749  0.277061  0.56819  ...    0.012795  0.877709  0.109496
+        1                    NaN       NaN      NaN  ...         NaN       NaN       NaN
+        2               0.154749  0.277061  0.56819  ...    0.012795  0.877709  0.109496
+        3                    NaN       NaN      NaN  ...         NaN       NaN       NaN
+        4               0.154749  0.277061  0.56819  ...    0.012795  0.877709  0.109496
+
+        [5 rows x 30 columns]
+
+        >>> pf = vbt.Portfolio.from_orders(
+        ...     close,
+        ...     size,
+        ...     size_type='targetpercent',
+        ...     direction='longonly',
+        ...     call_seq='auto',
+        ...     group_by='weights_vector',  # group by column level
+        ...     cash_sharing=True,
+        ...     fees=0.001, fixed_fees=1., slippage=0.001
+        ... )
+
+        >>> pf.total_return
+        weights_vector
+        0   -0.294372
+        1    0.139207
+        2   -0.281739
+        3    0.041242
+        4    0.467566
+        5    0.829925
+        6    0.320672
+        7   -0.087452
+        8    0.376681
+        9   -0.702773
+        Name: total_return, dtype: float64
+        ```
         """
         # Get defaults
         from vectorbt._settings import settings
@@ -2584,12 +2650,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             size = portfolio_cfg['size']
         if size_type is None:
             size_type = portfolio_cfg['size_type']
-        size_type = map_enum_fields(size_type, SizeType)
         if direction is None:
             direction = portfolio_cfg['order_direction']
-        direction = map_enum_fields(direction, Direction)
         if price is None:
-            price = np.inf
+            price = portfolio_cfg['price']
         if size is None:
             size = portfolio_cfg['size']
         if fees is None:
@@ -2608,7 +2672,6 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             reject_prob = portfolio_cfg['reject_prob']
         if price_area_vio_mode is None:
             price_area_vio_mode = portfolio_cfg['price_area_vio_mode']
-        price_area_vio_mode = map_enum_fields(price_area_vio_mode, PriceAreaVioMode)
         if lock_cash is None:
             lock_cash = portfolio_cfg['lock_cash']
         if allow_partial is None:
@@ -2697,7 +2760,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             low=low,
             close=close
         )
-        broadcast_kwargs = merge_dicts(dict(keep_raw=dict(close=False, _default=True)), broadcast_kwargs)
+        broadcast_kwargs = merge_dicts(dict(keep_flex=dict(close=False, _default=True)), broadcast_kwargs)
         broadcasted_args = broadcast(broadcastable_args, **broadcast_kwargs)
         cash_earnings = broadcasted_args.pop('cash_earnings')
         cash_dividends = broadcasted_args.pop('cash_dividends')
@@ -2716,7 +2779,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             to_2d_array(cash_deposits, expand_axis=int(not flex_2d)),
             to_shape=(target_shape_2d[0], len(cs_group_lens)),
             to_pd=False,
-            keep_raw=True,
+            keep_flex=True,
             **require_kwargs
         )
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
@@ -2727,7 +2790,15 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         if not np.any(log):
             max_logs = 0
 
-        # Check types
+        # Convert strings to numbers
+        broadcasted_args['size_type'] = map_enum_fields(
+            broadcasted_args['size_type'], SizeType)
+        broadcasted_args['direction'] = map_enum_fields(
+            broadcasted_args['direction'], Direction)
+        broadcasted_args['price_area_vio_mode'] = map_enum_fields(
+            broadcasted_args['price_area_vio_mode'], PriceAreaVioMode)
+
+        # Check data types
         checks.assert_subdtype(cs_group_lens, np.int_)
         checks.assert_subdtype(call_seq, np.int_)
         checks.assert_subdtype(init_cash, np.number)
@@ -3081,7 +3152,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         ## Example
 
         * By default, if all signal arrays are None, `entries` becomes True,
-            which opens a position at the very first tick and does nothing else:
+        which opens a position at the very first tick and does nothing else:
 
         ```python-repl
         >>> close = pd.Series([1, 2, 3, 4, 5])
@@ -3207,7 +3278,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         ```
 
         * More complex signal combinations are best expressed using direction-aware arrays.
-            For example, ignore opposite signals as long as the current position is open:
+        For example, ignore opposite signals as long as the current position is open:
 
         ```python-repl
         >>> pf = vbt.Portfolio.from_signals(
@@ -3314,7 +3385,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         ```
 
         * Turn on accumulation of signals. Entry means long order, exit means short order
-            (acts similar to `from_orders`):
+        (acts similar to `from_orders`):
 
         ```python-repl
         >>> pf = vbt.Portfolio.from_signals(
@@ -3352,7 +3423,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         dtype: float64
         ```
 
-        * Testing multiple parameters (via broadcasting):
+        * Test multiple parameters via regular broadcasting:
 
         ```python-repl
         >>> pf = vbt.Portfolio.from_signals(
@@ -3360,14 +3431,31 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         ...     entries=pd.Series([True, True, True, False, False]),
         ...     exits=pd.Series([False, False, True, True, True]),
         ...     direction=[list(Direction)],
-        ...     broadcast_kwargs=dict(columns_from=Direction._fields))
+        ...     broadcast_kwargs=dict(columns_from=pd.Index(Direction._fields, name='direction')))
         >>> pf.asset_flow
-            Long  Short    All
-        0  100.0 -100.0  100.0
-        1    0.0    0.0    0.0
-        2    0.0    0.0    0.0
-        3 -100.0   50.0 -200.0
-        4    0.0    0.0    0.0
+        direction  LongOnly  ShortOnly   Both
+        0             100.0     -100.0  100.0
+        1               0.0        0.0    0.0
+        2               0.0        0.0    0.0
+        3            -100.0       50.0 -200.0
+        4               0.0        0.0    0.0
+        ```
+
+        * Test multiple parameters via `vectorbt.base.reshaping.BCO`:
+
+        ```python-repl
+        >>> pf = vbt.Portfolio.from_signals(
+        ...     close,
+        ...     entries=pd.Series([True, True, True, False, False]),
+        ...     exits=pd.Series([False, False, True, True, True]),
+        ...     direction=vbt.BCO(Direction, product=True))
+        >>> pf.asset_flow
+        direction  LongOnly  ShortOnly   Both
+        0             100.0     -100.0  100.0
+        1               0.0        0.0    0.0
+        2               0.0        0.0    0.0
+        3            -100.0       50.0 -200.0
+        4               0.0        0.0    0.0
         ```
 
         * Set risk/reward ratio by passing trailing stop loss and take profit thresholds:
@@ -3413,12 +3501,29 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         dtype: float64
         ```
 
-        !!! note
-            When the stop price is hit, the stop signal invalidates any other signal defined for this bar.
-            Thus, make sure that your signaling logic happens at the very end of the bar
-            (for example, by using the closing price), otherwise you may expose yourself to a look-ahead bias.
+        * Test all stop combinations:
 
-            See `vectorbt.portfolio.enums.StopExitPrice` for more details.
+        ```python-repl
+        >>> pf = vbt.Portfolio.from_signals(
+        ...     close, entries, exits,
+        ...     sl_stop=pd.Index([0.1, 0.2]),
+        ...     sl_trail=pd.Index([False, True]),
+        ...     tp_stop=pd.Index([0.2, 0.3])
+        ... )
+        >>> pf.asset_flow
+        sl_stop                      0.1                     0.2
+        sl_trail       False        True       False        True
+        tp_stop    0.2   0.3   0.2   0.3   0.2   0.3   0.2   0.3
+        0         10.0  10.0  10.0  10.0  10.0  10.0  10.0  10.0
+        1          0.0   0.0   0.0   0.0   0.0   0.0   0.0   0.0
+        2        -10.0   0.0 -10.0   0.0 -10.0   0.0 -10.0   0.0
+        3          0.0   0.0   0.0   0.0   0.0   0.0   0.0   0.0
+        4          0.0   0.0   0.0 -10.0   0.0   0.0   0.0   0.0
+        5          0.0 -10.0   0.0   0.0   0.0 -10.0   0.0 -10.0
+        ```
+
+        This works because `pd.Index` automatically translates into `vectorbt.base.reshaping.BCO`
+        with `product` set to True.
 
         * We can implement our own stop loss or take profit, or adjust the existing one at each time step.
         Let's implement [stepped stop-loss](https://www.freqtrade.io/en/stable/strategy-advanced/#stepped-stoploss):
@@ -3513,9 +3618,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             size = portfolio_cfg['size']
         if size_type is None:
             size_type = portfolio_cfg['size_type']
-        size_type = map_enum_fields(size_type, SizeType)
         if price is None:
-            price = np.inf
+            price = portfolio_cfg['price']
         if fees is None:
             fees = portfolio_cfg['fees']
         if fixed_fees is None:
@@ -3532,7 +3636,6 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             reject_prob = portfolio_cfg['reject_prob']
         if price_area_vio_mode is None:
             price_area_vio_mode = portfolio_cfg['price_area_vio_mode']
-        price_area_vio_mode = map_enum_fields(price_area_vio_mode, PriceAreaVioMode)
         if lock_cash is None:
             lock_cash = portfolio_cfg['lock_cash']
         if allow_partial is None:
@@ -3543,24 +3646,18 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             log = portfolio_cfg['log']
         if accumulate is None:
             accumulate = portfolio_cfg['accumulate']
-        accumulate = map_enum_fields(accumulate, AccumulationMode, ignore_type=(int, bool))
         if upon_long_conflict is None:
             upon_long_conflict = portfolio_cfg['upon_long_conflict']
-        upon_long_conflict = map_enum_fields(upon_long_conflict, ConflictMode)
         if upon_short_conflict is None:
             upon_short_conflict = portfolio_cfg['upon_short_conflict']
-        upon_short_conflict = map_enum_fields(upon_short_conflict, ConflictMode)
         if upon_dir_conflict is None:
             upon_dir_conflict = portfolio_cfg['upon_dir_conflict']
-        upon_dir_conflict = map_enum_fields(upon_dir_conflict, DirectionConflictMode)
         if upon_opposite_entry is None:
             upon_opposite_entry = portfolio_cfg['upon_opposite_entry']
-        upon_opposite_entry = map_enum_fields(upon_opposite_entry, OppositeEntryMode)
         if direction is not None and ls_mode:
             warnings.warn("direction has no effect if short_entries and short_exits are set", stacklevel=2)
         if direction is None:
             direction = portfolio_cfg['signal_direction']
-        direction = map_enum_fields(direction, Direction)
         if val_price is None:
             val_price = portfolio_cfg['val_price']
         if sl_stop is None:
@@ -3571,19 +3668,14 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             tp_stop = portfolio_cfg['tp_stop']
         if stop_entry_price is None:
             stop_entry_price = portfolio_cfg['stop_entry_price']
-        stop_entry_price = map_enum_fields(stop_entry_price, StopEntryPrice)
         if stop_exit_price is None:
             stop_exit_price = portfolio_cfg['stop_exit_price']
-        stop_exit_price = map_enum_fields(stop_exit_price, StopExitPrice)
         if upon_stop_exit is None:
             upon_stop_exit = portfolio_cfg['upon_stop_exit']
-        upon_stop_exit = map_enum_fields(upon_stop_exit, StopExitMode)
         if upon_stop_update is None:
             upon_stop_update = portfolio_cfg['upon_stop_update']
-        upon_stop_update = map_enum_fields(upon_stop_update, StopUpdateMode)
         if signal_priority is None:
             signal_priority = portfolio_cfg['signal_priority']
-        signal_priority = map_enum_fields(signal_priority, SignalPriority)
         if use_stops is None:
             use_stops = portfolio_cfg['use_stops']
         if use_stops is None:
@@ -3701,7 +3793,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 broadcastable_args['direction'] = direction
         broadcastable_args = {**broadcastable_args, **broadcast_named_args}
         # Only close is broadcast, others can remain unchanged thanks to flexible indexing
-        broadcast_kwargs = merge_dicts(dict(keep_raw=dict(close=False, _default=True)), broadcast_kwargs)
+        broadcast_kwargs = merge_dicts(dict(keep_flex=dict(close=False, _default=True)), broadcast_kwargs)
         broadcasted_args = broadcast(broadcastable_args, **broadcast_kwargs)
         cash_earnings = broadcasted_args.pop('cash_earnings')
         cash_dividends = broadcasted_args.pop('cash_dividends')
@@ -3720,7 +3812,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             to_2d_array(cash_deposits, expand_axis=int(not flex_2d)),
             to_shape=(target_shape_2d[0], len(cs_group_lens)),
             to_pd=False,
-            keep_raw=True,
+            keep_flex=True,
             **require_kwargs
         )
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
@@ -3731,7 +3823,36 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         if not np.any(log):
             max_logs = 0
 
-        # Check types
+        # Convert strings to numbers
+        broadcasted_args['size_type'] = map_enum_fields(
+            broadcasted_args['size_type'], SizeType)
+        broadcasted_args['price_area_vio_mode'] = map_enum_fields(
+            broadcasted_args['price_area_vio_mode'], PriceAreaVioMode)
+        broadcasted_args['accumulate'] = map_enum_fields(
+            broadcasted_args['accumulate'], AccumulationMode, ignore_type=(int, bool))
+        broadcasted_args['upon_long_conflict'] = map_enum_fields(
+            broadcasted_args['upon_long_conflict'], ConflictMode)
+        broadcasted_args['upon_short_conflict'] = map_enum_fields(
+            broadcasted_args['upon_short_conflict'], ConflictMode)
+        broadcasted_args['upon_dir_conflict'] = map_enum_fields(
+            broadcasted_args['upon_dir_conflict'], DirectionConflictMode)
+        broadcasted_args['upon_opposite_entry'] = map_enum_fields(
+            broadcasted_args['upon_opposite_entry'], OppositeEntryMode)
+        broadcasted_args['stop_entry_price'] = map_enum_fields(
+            broadcasted_args['stop_entry_price'], StopEntryPrice)
+        broadcasted_args['stop_exit_price'] = map_enum_fields(
+            broadcasted_args['stop_exit_price'], StopExitPrice)
+        broadcasted_args['upon_stop_exit'] = map_enum_fields(
+            broadcasted_args['upon_stop_exit'], StopExitMode)
+        broadcasted_args['upon_stop_update'] = map_enum_fields(
+            broadcasted_args['upon_stop_update'], StopUpdateMode)
+        broadcasted_args['signal_priority'] = map_enum_fields(
+            broadcasted_args['signal_priority'], SignalPriority)
+        if 'direction' in broadcasted_args:
+            broadcasted_args['direction'] = map_enum_fields(
+                broadcasted_args['direction'], Direction)
+
+        # Check data types
         checks.assert_subdtype(cs_group_lens, np.int_)
         checks.assert_subdtype(call_seq, np.int_)
         checks.assert_subdtype(init_cash, np.number)
@@ -4477,19 +4598,19 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         ...             # Position exited: Remove stop condition
         ...             stop_price[c.col] = np.nan
 
-        >>> def simulate(close, entries, exits, size, threshold):
+        >>> def simulate(close, entries, exits, size, stop):
         ...     return vbt.Portfolio.from_order_func(
         ...         close,
         ...         order_func_nb,
         ...         vbt.Rep('entries'), vbt.Rep('exits'), vbt.Rep('size'),  # order_args
         ...         pre_sim_func_nb=pre_sim_func_nb,
         ...         post_order_func_nb=post_order_func_nb,
-        ...         post_order_args=(vbt.Rep('threshold'),),
+        ...         post_order_args=(vbt.Rep('stop'),),
         ...         broadcast_named_args=dict(  # broadcast against each other
         ...             entries=entries,
         ...             exits=exits,
         ...             size=size,
-        ...             threshold=threshold
+        ...             stop=stop
         ...         )
         ...     )
 
@@ -4512,7 +4633,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         4     0.0
         dtype: float64
 
-        >>> simulate(close, entries, exits, np.nan).asset_flow
+        >>> simulate(close, entries, exits, np.inf, np.nan).asset_flow
         0    10.0
         1     0.0
         2     0.0
@@ -4527,21 +4648,35 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         an exit regardless if an entry is present (similar to using `ConflictMode.Opposite` in
         `Portfolio.from_signals`).
 
-        We can also test the parameter combinations above all at once (thanks to broadcasting):
+        We can also test the parameter combinations above all at once (thanks to broadcasting
+        using `vectorbt.base.reshaping.broadcast`):
 
         ```python-repl
-        >>> size = pd.DataFrame(
-        ...     [[0.1, 0.2, np.nan]],
-        ...     columns=pd.Index(['0.1', '0.2', 'nan'], name='size')
-        ... )
-        >>> simulate(close, entries, exits, np.inf, size).asset_flow
-        size   0.1   0.2   nan
-        0     10.0  10.0  10.0
-        1      0.0   0.0   0.0
-        2    -10.0 -10.0   0.0
-        3      0.0   0.0 -10.0
-        4      0.0   0.0   0.0
+        >>> stop = pd.DataFrame([[0.1, 0.2, np.nan]])
+        >>> simulate(close, entries, exits, np.inf, stop).asset_flow
+              0     1     2
+        0  10.0  10.0  10.0
+        1   0.0   0.0   0.0
+        2 -10.0 -10.0   0.0
+        3   0.0   0.0 -10.0
+        4   0.0   0.0   0.0
         ```
+
+        Or much simpler using Cartesian product:
+
+        ```python-repl
+        >>> stop = pd.Index([0.1, 0.2, np.nan])
+        >>> simulate(close, entries, exits, np.inf, stop).asset_flow
+        threshold   0.1   0.2   NaN
+        0          10.0  10.0  10.0
+        1           0.0   0.0   0.0
+        2         -10.0 -10.0   0.0
+        3           0.0   0.0 -10.0
+        4           0.0   0.0   0.0
+        ```
+
+        This works because `pd.Index` automatically translates into `vectorbt.base.reshaping.BCO`
+        with `product` set to True.
 
         * Let's illustrate how to generate multiple orders per symbol and bar.
         For each bar, buy at open and sell at close:
@@ -4672,7 +4807,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         )
         broadcastable_args = {**broadcastable_args, **broadcast_named_args}
         # Only close is broadcast, others can remain unchanged thanks to flexible indexing
-        broadcast_kwargs = merge_dicts(dict(keep_raw=dict(close=False, _default=True)), broadcast_kwargs)
+        broadcast_kwargs = merge_dicts(dict(keep_flex=dict(close=False, _default=True)), broadcast_kwargs)
         broadcasted_args = broadcast(broadcastable_args, **broadcast_kwargs)
         cash_earnings = broadcasted_args.pop('cash_earnings')
         close = broadcasted_args['close']
@@ -4690,7 +4825,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             to_2d_array(cash_deposits, expand_axis=int(not flex_2d)),
             to_shape=(target_shape_2d[0], len(cs_group_lens)),
             to_pd=False,
-            keep_raw=keep_inout_raw,
+            keep_flex=keep_inout_raw,
             **require_kwargs
         )
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
@@ -4706,7 +4841,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 to_2d_array(segment_mask, expand_axis=int(not flex_2d)),
                 to_shape=(target_shape_2d[0], len(group_lens)),
                 to_pd=False,
-                keep_raw=keep_inout_raw,
+                keep_flex=keep_inout_raw,
                 **require_kwargs
             )
         if not flexible:
@@ -4715,7 +4850,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             else:
                 call_seq = build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
 
-        # Check types
+        # Check data types
         checks.assert_subdtype(cs_group_lens, np.int_)
         if call_seq is not None:
             checks.assert_subdtype(call_seq, np.int_)
@@ -5033,7 +5168,30 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
         ## Example
 
-        Equal-weighted portfolio as in the example under `Portfolio.from_order_func`
+        * Working with `Portfolio.from_def_order_func` is a similar experience as working
+        with `Portfolio.from_orders`:
+
+        ```python-repl
+        >>> close = pd.Series([1, 2, 3, 4, 5])
+        >>> pf = vbt.Portfolio.from_def_order_func(close, 10)
+
+        >>> pf.assets
+        0    10.0
+        1    20.0
+        2    30.0
+        3    40.0
+        4    40.0
+        dtype: float64
+        >>> pf.cash
+        0    90.0
+        1    70.0
+        2    40.0
+        3     0.0
+        4     0.0
+        dtype: float64
+        ```
+
+        * Equal-weighted portfolio as in the example under `Portfolio.from_order_func`
         but much less verbose and with asset value pre-computed during the simulation (= faster):
 
         ```python-repl
@@ -5078,12 +5236,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             size = portfolio_cfg['size']
         if size_type is None:
             size_type = portfolio_cfg['size_type']
-        size_type = map_enum_fields(size_type, SizeType)
         if direction is None:
             direction = portfolio_cfg['order_direction']
-        direction = map_enum_fields(direction, Direction)
         if price is None:
-            price = np.inf
+            price = portfolio_cfg['price']
         if size is None:
             size = portfolio_cfg['size']
         if fees is None:
@@ -5102,7 +5258,6 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             reject_prob = portfolio_cfg['reject_prob']
         if price_area_vio_mode is None:
             price_area_vio_mode = portfolio_cfg['price_area_vio_mode']
-        price_area_vio_mode = map_enum_fields(price_area_vio_mode, PriceAreaVioMode)
         if lock_cash is None:
             lock_cash = portfolio_cfg['lock_cash']
         if allow_partial is None:
@@ -5147,11 +5302,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             **broadcast_named_args
         }
 
-        # Check types
+        # Check data types
         checks.assert_subdtype(size, np.number)
         checks.assert_subdtype(price, np.number)
-        checks.assert_subdtype(size_type, np.int_)
-        checks.assert_subdtype(direction, np.int_)
         checks.assert_subdtype(fees, np.number)
         checks.assert_subdtype(fixed_fees, np.number)
         checks.assert_subdtype(slippage, np.number)
@@ -5159,12 +5312,26 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         checks.assert_subdtype(max_size, np.number)
         checks.assert_subdtype(size_granularity, np.number)
         checks.assert_subdtype(reject_prob, np.number)
-        checks.assert_subdtype(price_area_vio_mode, np.int_)
         checks.assert_subdtype(lock_cash, np.bool_)
         checks.assert_subdtype(allow_partial, np.bool_)
         checks.assert_subdtype(raise_reject, np.bool_)
         checks.assert_subdtype(log, np.bool_)
         checks.assert_subdtype(val_price, np.number)
+
+        def _postprocess_size_type(size_type):
+            size_type = map_enum_fields(size_type, SizeType)
+            checks.assert_subdtype(size_type, np.int_)
+            return size_type
+
+        def _postprocess_direction(direction):
+            direction = map_enum_fields(direction, Direction)
+            checks.assert_subdtype(direction, np.int_)
+            return direction
+
+        def _postprocess_price_area_vio_mode(price_area_vio_mode):
+            price_area_vio_mode = map_enum_fields(price_area_vio_mode, PriceAreaVioMode)
+            checks.assert_subdtype(price_area_vio_mode, np.int_)
+            return price_area_vio_mode
 
         # Prepare arguments and pass to from_order_func
         if flexible:
@@ -5180,8 +5347,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         order_args = (
             Rep('size'),
             Rep('price'),
-            Rep('size_type'),
-            Rep('direction'),
+            RepFunc(_postprocess_size_type),
+            RepFunc(_postprocess_direction),
             Rep('fees'),
             Rep('fixed_fees'),
             Rep('slippage'),
@@ -5189,7 +5356,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             Rep('max_size'),
             Rep('size_granularity'),
             Rep('reject_prob'),
-            Rep('price_area_vio_mode'),
+            RepFunc(_postprocess_price_area_vio_mode),
             Rep('lock_cash'),
             Rep('allow_partial'),
             Rep('raise_reject'),
@@ -5199,8 +5366,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             Rep('val_price'),
             Rep('price'),
             Rep('size'),
-            Rep('size_type'),
-            Rep('direction'),
+            RepFunc(_postprocess_size_type),
+            RepFunc(_postprocess_direction),
             auto_call_seq
         )
         arg_take_spec = dict(
@@ -5702,14 +5869,14 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                           cash_sharing: tp.Optional[bool] = None,
                           split_shared: bool = False,
                           flex_2d: bool = False,
-                          keep_raw: bool = False,
+                          keep_flex: bool = False,
                           jitted: tp.JittedOption = None,
                           chunked: tp.ChunkedOption = None,
                           wrapper: tp.Optional[ArrayWrapper] = None,
                           wrap_kwargs: tp.KwargsLike = None) -> tp.ArrayLike:
         """Get cash deposit series per column/group.
 
-        Set `keep_raw` to True to keep format suitable for flexible indexing.
+        Set `keep_flex` to True to keep format suitable for flexible indexing.
         This consumes less memory."""
         if not isinstance(cls_or_self, type):
             if cash_deposits_raw is None:
@@ -5726,7 +5893,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
         cash_deposits_raw = to_2d_array(cash_deposits_raw)
         if wrapper.grouper.is_grouped(group_by=group_by):
-            if keep_raw and cash_sharing:
+            if keep_flex and cash_sharing:
                 return cash_deposits_raw
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
             func = jit_registry.resolve_option(nb.cash_deposits_grouped_nb, jitted)
@@ -5739,7 +5906,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 flex_2d=flex_2d
             )
         else:
-            if keep_raw and not cash_sharing:
+            if keep_flex and not cash_sharing:
                 return cash_deposits_raw
             group_lens = wrapper.grouper.get_group_lens()
             func = jit_registry.resolve_option(nb.cash_deposits_nb, jitted)
@@ -5752,7 +5919,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 split_shared=split_shared,
                 flex_2d=flex_2d
             )
-        if keep_raw:
+        if keep_flex:
             return cash_deposits
         return wrapper.wrap(cash_deposits, group_by=group_by, **resolve_dict(wrap_kwargs))
 
@@ -5760,14 +5927,14 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
     def get_cash_earnings(cls_or_self,
                           group_by: tp.GroupByLike = None,
                           cash_earnings_raw: tp.Optional[tp.ArrayLike] = None,
-                          keep_raw: bool = False,
+                          keep_flex: bool = False,
                           jitted: tp.JittedOption = None,
                           chunked: tp.ChunkedOption = None,
                           wrapper: tp.Optional[ArrayWrapper] = None,
                           wrap_kwargs: tp.KwargsLike = None) -> tp.ArrayLike:
         """Get earnings in cash series per column/group.
 
-        Set `keep_raw` to True to keep format suitable for flexible indexing.
+        Set `keep_flex` to True to keep format suitable for flexible indexing.
         This consumes less memory."""
         if not isinstance(cls_or_self, type):
             if cash_earnings_raw is None:
@@ -5787,10 +5954,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             func = ch_registry.resolve_option(func, chunked)
             cash_earnings = func(cash_earnings, group_lens)
         else:
-            if keep_raw:
+            if keep_flex:
                 return cash_earnings_raw
             cash_earnings = np.broadcast_to(cash_earnings_raw, wrapper.shape_2d)
-        if keep_raw:
+        if keep_flex:
             return cash_earnings
         return wrapper.wrap(cash_earnings, group_by=group_by, **resolve_dict(wrap_kwargs))
 
@@ -5895,7 +6062,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                         group_by=group_by,
                         jitted=jitted,
                         chunked=chunked,
-                        keep_raw=True
+                        keep_flex=True
                     )
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
             func = jit_registry.resolve_option(nb.cash_grouped_nb, jitted)
@@ -5923,7 +6090,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                         group_by=False,
                         jitted=jitted,
                         chunked=chunked,
-                        keep_raw=True
+                        keep_flex=True
                     )
             func = jit_registry.resolve_option(nb.cash_nb, jitted)
             func = ch_registry.resolve_option(func, chunked)
@@ -6383,7 +6550,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                     group_by=group_by,
                     jitted=jitted,
                     chunked=chunked,
-                    keep_raw=True
+                    keep_flex=True
                 )
             if value is None:
                 value = cls_or_self.resolve_shortcut_attr(
@@ -6510,7 +6677,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                         split_shared=True,
                         jitted=jitted,
                         chunked=chunked,
-                        keep_raw=True
+                        keep_flex=True
                     )
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
             func = jit_registry.resolve_option(nb.market_value_grouped_nb, jitted)
@@ -6537,7 +6704,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                         group_by=False,
                         jitted=jitted,
                         chunked=chunked,
-                        keep_raw=True
+                        keep_flex=True
                     )
             func = jit_registry.resolve_option(nb.market_value_nb, jitted)
             func = ch_registry.resolve_option(func, chunked)
@@ -6575,7 +6742,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                     group_by=group_by,
                     jitted=jitted,
                     chunked=chunked,
-                    keep_raw=True
+                    keep_flex=True
                 )
             if market_value is None:
                 market_value = cls_or_self.resolve_shortcut_attr(

@@ -22,7 +22,9 @@ def to_any_index(index_like: tp.IndexLike) -> tp.Index:
     """Convert any index-like object to an index.
 
     Index objects are kept as-is."""
-    if not isinstance(index_like, pd.Index):
+    if checks.is_np_array(index_like) and index_like.ndim == 0:
+        index_like = index_like[None]
+    if not checks.is_index(index_like):
         return pd.Index(index_like)
     return index_like
 
@@ -63,34 +65,34 @@ def index_from_values(values: tp.Sequence, name: tp.Optional[str] = None) -> tp.
     return pd.Index(value_names, name=name)
 
 
-def repeat_index(index: tp.IndexLike, n: int, ignore_default: tp.Optional[bool] = None) -> tp.Index:
+def repeat_index(index: tp.IndexLike, n: int, ignore_ranges: tp.Optional[bool] = None) -> tp.Index:
     """Repeat each element in `index` `n` times.
 
-    Set `ignore_default` to None to use the default."""
+    Set `ignore_ranges` to True to ignore indexes of type `pd.RangeIndex`."""
     from vectorbt._settings import settings
     broadcasting_cfg = settings['broadcasting']
 
-    if ignore_default is None:
-        ignore_default = broadcasting_cfg['ignore_default']
+    if ignore_ranges is None:
+        ignore_ranges = broadcasting_cfg['ignore_ranges']
 
     index = to_any_index(index)
-    if checks.is_default_index(index) and ignore_default:  # ignore simple ranges without name
+    if checks.is_default_index(index) and ignore_ranges:  # ignore simple ranges without name
         return pd.RangeIndex(start=0, stop=len(index) * n, step=1)
     return index.repeat(n)
 
 
-def tile_index(index: tp.IndexLike, n: int, ignore_default: tp.Optional[bool] = None) -> tp.Index:
+def tile_index(index: tp.IndexLike, n: int, ignore_ranges: tp.Optional[bool] = None) -> tp.Index:
     """Tile the whole `index` `n` times.
 
-    Set `ignore_default` to None to use the default."""
+    Set `ignore_ranges` to True to ignore indexes of type `pd.RangeIndex`."""
     from vectorbt._settings import settings
     broadcasting_cfg = settings['broadcasting']
 
-    if ignore_default is None:
-        ignore_default = broadcasting_cfg['ignore_default']
+    if ignore_ranges is None:
+        ignore_ranges = broadcasting_cfg['ignore_ranges']
 
     index = to_any_index(index)
-    if checks.is_default_index(index) and ignore_default:  # ignore simple ranges without name
+    if checks.is_default_index(index) and ignore_ranges:  # ignore simple ranges without name
         return pd.RangeIndex(start=0, stop=len(index) * n, step=1)
     if isinstance(index, pd.MultiIndex):
         return pd.MultiIndex.from_tuples(np.tile(index, n), names=index.names)
@@ -103,7 +105,11 @@ def stack_indexes(indexes: tp.Sequence[tp.IndexLike],
                   drop_redundant: tp.Optional[bool] = None) -> tp.Index:
     """Stack each index in `indexes` on top of each other, from top to bottom.
 
-    Set `drop_duplicates`, `keep`, or `drop_redundant` to None to use the default."""
+    Set `drop_duplicates` to True to remove duplicate levels.
+
+    For details on `keep`, see `drop_duplicate_levels`.
+
+    Set `drop_redundant` to True to use `drop_redundant_levels`."""
     from vectorbt._settings import settings
     broadcasting_cfg = settings['broadcasting']
 
@@ -128,7 +134,7 @@ def stack_indexes(indexes: tp.Sequence[tp.IndexLike],
         if len(levels[i]) < max_len:
             if len(levels[i]) != 1:
                 raise ValueError(f"Index at level {i} could not be broadcast to shape ({max_len},) ")
-            levels[i] = repeat_index(levels[i], max_len, ignore_default=False)
+            levels[i] = repeat_index(levels[i], max_len, ignore_ranges=False)
     new_index = pd.MultiIndex.from_arrays(levels)
     if drop_duplicates:
         new_index = drop_duplicate_levels(new_index, keep=keep)
@@ -138,15 +144,15 @@ def stack_indexes(indexes: tp.Sequence[tp.IndexLike],
 
 
 def combine_indexes(indexes: tp.Sequence[tp.IndexLike],
-                    ignore_default: tp.Optional[bool] = None, **kwargs) -> tp.Index:
+                    ignore_ranges: tp.Optional[bool] = None, **kwargs) -> tp.Index:
     """Combine each index in `indexes` using Cartesian product.
 
     Keyword arguments will be passed to `stack_indexes`."""
     new_index = to_any_index(indexes[0])
     for i in range(1, len(indexes)):
         index1, index2 = new_index, to_any_index(indexes[i])
-        new_index1 = repeat_index(index1, len(index2), ignore_default=ignore_default)
-        new_index2 = tile_index(index2, len(index1), ignore_default=ignore_default)
+        new_index1 = repeat_index(index1, len(index2), ignore_ranges=ignore_ranges)
+        new_index2 = tile_index(index2, len(index1), ignore_ranges=ignore_ranges)
         new_index = stack_indexes([new_index1, new_index2], **kwargs)
     return new_index
 

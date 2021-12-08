@@ -287,26 +287,26 @@ def get_stop_price_nb(position_now: float,
                       stop_price: float,
                       stop: float,
                       open: float,
-                      low: float,
                       high: float,
+                      low: float,
                       hit_below: bool) -> float:
     """Get stop price.
 
     If hit before open, returns open."""
     if stop < 0:
-        raise ValueError("Stop value must be 0 or greater")
+        raise ValueError("Stop value must be nan, 0, or greater than 0")
     if (position_now > 0 and hit_below) or (position_now < 0 and not hit_below):
         stop_price = stop_price * (1 - stop)
         if open <= stop_price:
             return open
-        if low <= stop_price <= high:
+        if low <= stop_price:
             return stop_price
         return np.nan
     if (position_now < 0 and hit_below) or (position_now > 0 and not hit_below):
         stop_price = stop_price * (1 + stop)
-        if stop_price <= open:
+        if open >= stop_price:
             return open
-        if low <= stop_price <= high:
+        if high >= stop_price:
             return stop_price
         return np.nan
     return np.nan
@@ -624,12 +624,20 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                         _high = flex_select_auto_nb(high, i, col, flex_2d)
                         _low = flex_select_auto_nb(low, i, col, flex_2d)
                         _close = flex_select_auto_nb(close, i, col, flex_2d)
-                        if np.isnan(_open):
-                            _open = _close
-                        if np.isnan(_low):
-                            _low = min(_open, _close)
                         if np.isnan(_high):
-                            _high = max(_open, _close)
+                            if np.isnan(_open):
+                                _high = _close
+                            elif np.isnan(_close):
+                                _high = _open
+                            else:
+                                _high = max(_open, _close)
+                        if np.isnan(_low):
+                            if np.isnan(_open):
+                                _low = _close
+                            elif np.isnan(_close):
+                                _low = _open
+                            else:
+                                _low = min(_open, _close)
 
                         # Get stop price
                         if not np.isnan(sl_curr_stop[col]):
@@ -637,7 +645,7 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                                 position_now,
                                 sl_curr_price[col],
                                 sl_curr_stop[col],
-                                _open, _low, _high,
+                                _open, _high, _low,
                                 True
                             )
                         if np.isnan(stop_price) and not np.isnan(tp_curr_stop[col]):
@@ -645,7 +653,7 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                                 position_now,
                                 tp_init_price[col],
                                 tp_curr_stop[col],
-                                _open, _low, _high,
+                                _open, _high, _low,
                                 False
                             )
 

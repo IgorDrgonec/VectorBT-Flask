@@ -52,13 +52,11 @@ Many methods such as `BaseAccessor.broadcast` are both class and instance method
 
 >>> # Same as sr.vbt.broadcast(df)
 >>> new_sr, new_df = BaseAccessor.broadcast(sr, df)
-
 >>> new_sr
    0
 0  1
 1  1
 2  1
-
 >>> new_df
    0
 0  1
@@ -71,13 +69,11 @@ Instead of explicitly importing `BaseAccessor` or any other accessor, we can use
 
 ```python-repl
 >>> vbt.pd_acc.broadcast(sr, df)
-
 >>> new_sr
    0
 0  1
 1  1
 2  1
-
 >>> new_df
    0
 0  1
@@ -97,14 +93,26 @@ logical operators (such as `&`) by forwarding the operation to `BaseAccessor.com
 ```
 
 Many interesting use cases can be implemented this way. For example, let's compare an array
-with 10 different thresholds:
+with 3 different thresholds (index is treated as multiple values by `BaseAccessor.combine`):
 
 ```python-repl
->>> df.vbt > pd.Index(np.arange(10), name='threshold')
-threshold     0      1      2      3      4      5      6      7      8      9
-0          True  False  False  False  False  False  False  False  False  False
-1          True   True  False  False  False  False  False  False  False  False
-2          True   True   True  False  False  False  False  False  False  False
+>>> df.vbt > pd.Index(np.arange(3), name='threshold')
+threshold     0                  1                  2
+             a2    b2    c2     a2    b2    c2     a2     b2    c2
+x2         True  True  True  False  True  True  False  False  True
+y2         True  True  True   True  True  True   True   True  True
+z2         True  True  True   True  True  True   True   True  True
+```
+
+The same using broadcasting mechanism:
+
+```python-repl
+>>> df.vbt > vbt.BCO(np.arange(3), name='threshold', product=True)
+threshold     0                  1                  2
+             a2    b2    c2     a2    b2    c2     a2     b2    c2
+x2         True  True  True  False  True  True  False  False  True
+y2         True  True  True   True  True  True   True   True  True
+z2         True  True  True   True  True  True   True   True  True
 ```
 
 !!! note
@@ -731,7 +739,6 @@ class BaseAccessor(Wrapping):
                 combine_func: tp.Callable,
                 *args,
                 allow_multiple: bool = True,
-                index_as_multiple: bool = True,
                 keep_pd: bool = False,
                 to_2d: bool = False,
                 concat: tp.Optional[bool] = None,
@@ -752,7 +759,6 @@ class BaseAccessor(Wrapping):
             allow_multiple (bool): Whether a tuple/list/Index will be considered as multiple objects in `other`.
 
                 Takes effect only when using the instance method.
-            index_as_multiple (bool): Whether index should be considered as multiple objects.
             keep_pd (bool): Whether to keep inputs as pandas objects, otherwise convert to NumPy arrays.
             to_2d (bool): Whether to reshape inputs to 2-dim arrays, otherwise keep as-is.
             concat (bool): Whether to concatenate the results along the column axis.
@@ -867,10 +873,6 @@ class BaseAccessor(Wrapping):
         else:
             if allow_multiple and isinstance(obj, (tuple, list)):
                 objs = obj
-            elif allow_multiple and index_as_multiple and isinstance(obj, pd.Index):
-                objs = obj
-                if keys is None:
-                    keys = obj
             else:
                 objs = (obj,)
         objs = tuple(map(lambda x: x.obj if isinstance(x, BaseAccessor) else x, objs))

@@ -1918,18 +1918,18 @@ class TestEnum:
 
 class TestParams:
     def test_create_param_combs(self):
-        assert params.create_param_combs(
+        assert params.generate_param_combs(
             (combinations, [0, 1, 2, 3], 2)) == [
                    [0, 0, 0, 1, 1, 2],
                    [1, 2, 3, 2, 3, 3]
                ]
-        assert params.create_param_combs(
+        assert params.generate_param_combs(
             (product, (combinations, [0, 1, 2, 3], 2), [4, 5])) == [
                    [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2],
                    [1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 3, 3],
                    [4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5]
                ]
-        assert params.create_param_combs(
+        assert params.generate_param_combs(
             (product, (combinations, [0, 1, 2], 2), (combinations, [3, 4, 5], 2))) == [
                    [0, 0, 0, 0, 0, 0, 1, 1, 1],
                    [1, 1, 1, 2, 2, 2, 2, 2, 2],

@@ -555,7 +555,9 @@ class SignalsAccessor(GenericAccessor):
         if len(args) == 2:
             if broadcast_kwargs is None:
                 broadcast_kwargs = {}
-            entries, exits = reshaping.broadcast(*args, **broadcast_kwargs)
+            broadcasted_args = reshaping.broadcast(dict(entries=args[0], exits=args[1]), **broadcast_kwargs)
+            entries = broadcasted_args['entries']
+            exits = broadcasted_args['exits']
             func = jit_registry.resolve_option(nb.clean_enex_nb, jitted)
             func = ch_registry.resolve_option(func, chunked)
             entries_out, exits_out = func(
@@ -869,7 +871,10 @@ class SignalsAccessor(GenericAccessor):
         if seed is not None:
             set_seed_nb(seed)
         if prob is not None:
-            obj, prob = reshaping.broadcast(self.obj, prob, keep_raw=[False, True], **broadcast_kwargs)
+            broadcast_kwargs = merge_dicts(dict(keep_flex=dict(obj=False, prob=True)), broadcast_kwargs)
+            broadcasted_args = reshaping.broadcast(dict(obj=self.obj, prob=prob), **broadcast_kwargs)
+            obj = broadcasted_args['obj']
+            prob = broadcasted_args['prob']
             flex_2d = obj.ndim == 2
             chunked = ch.specialize_chunked_option(
                 chunked,
@@ -947,10 +952,11 @@ class SignalsAccessor(GenericAccessor):
 
         ## Example
 
+        * Regular stop loss:
+
         ```python-repl
         >>> ts = pd.Series([1, 2, 3, 2, 1])
 
-        >>> # stop loss
         >>> mask.vbt.signals.generate_stop_exits(ts, -0.1)
                         a      b      c
         2020-01-01  False  False  False
@@ -958,8 +964,11 @@ class SignalsAccessor(GenericAccessor):
         2020-01-03  False  False  False
         2020-01-04  False   True   True
         2020-01-05  False  False  False
+        ```
 
-        >>> # trailing stop loss
+        * Trailing stop loss:
+
+        ```python-repl
         >>> mask.vbt.signals.generate_stop_exits(ts, -0.1, trailing=True)
                         a      b      c
         2020-01-01  False  False  False
@@ -968,15 +977,41 @@ class SignalsAccessor(GenericAccessor):
         2020-01-04   True   True   True
         2020-01-05  False  False  False
         ```
+
+        * Testing multiple take profit stops:
+
+        ```python-repl
+        >>> mask.vbt.signals.generate_stop_exits(ts, pd.Index([1.0, 1.5]))
+        stop                        1.0                  1.5
+                        a      b      c      a      b      c
+        2020-01-01  False  False  False  False  False  False
+        2020-01-02   True   True  False  False  False  False
+        2020-01-03  False  False  False   True  False  False
+        2020-01-04  False  False  False  False  False  False
+        2020-01-05  False  False  False  False  False  False
+        ```
         """
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
         entries = self.obj
 
-        keep_raw = (False, True, True, True)
-        broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
-        entries, ts, stop, trailing = reshaping.broadcast(
-            entries, ts, stop, trailing, **broadcast_kwargs, keep_raw=keep_raw)
+        broadcastable_args = dict(
+            entries=entries,
+            ts=ts,
+            stop=stop,
+            trailing=trailing
+        )
+        broadcast_kwargs = merge_dicts(dict(
+            keep_flex=dict(
+                entries=False,
+                _default=True
+            ),
+            require_kwargs=dict(
+                requirements='W'
+            )
+        ), broadcast_kwargs)
+        broadcasted_args = reshaping.broadcast(broadcastable_args, **broadcast_kwargs)
+        entries = broadcasted_args['entries']
         flex_2d = entries.ndim == 2
 
         entries_arr = reshaping.to_2d_array(entries)
@@ -1008,9 +1043,9 @@ class SignalsAccessor(GenericAccessor):
                 entry_args=(entries_arr,),
                 exit_place_func_nb=jit_registry.resolve_option(nb.stop_place_nb, jitted),
                 exit_args=(
-                    ts,
-                    stop,
-                    trailing,
+                    broadcasted_args['ts'],
+                    broadcasted_args['stop'],
+                    broadcasted_args['trailing'],
                     exit_wait,
                     pick_first,
                     flex_2d
@@ -1043,9 +1078,9 @@ class SignalsAccessor(GenericAccessor):
                 warnings.warn("skip_until_exit=True has only effect when until_next=False", stacklevel=2)
             return entries.vbt.signals.generate_exits(
                 jit_registry.resolve_option(nb.stop_place_nb, jitted),
-                ts,
-                stop,
-                trailing,
+                broadcasted_args['ts'],
+                broadcasted_args['stop'],
+                broadcasted_args['trailing'],
                 exit_wait,
                 pick_first,
                 flex_2d,
@@ -1060,9 +1095,9 @@ class SignalsAccessor(GenericAccessor):
 
     def generate_ohlc_stop_exits(self,
                                  open: tp.ArrayLike,
-                                 high: tp.Optional[tp.ArrayLike] = None,
-                                 low: tp.Optional[tp.ArrayLike] = None,
-                                 close: tp.Optional[tp.ArrayLike] = None,
+                                 high: tp.ArrayLike = np.nan,
+                                 low: tp.ArrayLike = np.nan,
+                                 close: tp.ArrayLike = np.nan,
                                  is_open_safe: bool = True,
                                  out_dict: tp.Optional[tp.Dict[str, tp.ArrayLike]] = None,
                                  sl_stop: tp.ArrayLike = np.nan,
@@ -1085,8 +1120,6 @@ class SignalsAccessor(GenericAccessor):
         !!! hint
             This function is meant for signal analysis. For backtesting, consider using
             the stop logic integrated into `vectorbt.portfolio.base.Portfolio.from_signals`.
-
-        If any of `high`, `low` or `close` is None, it will be set to `open`.
 
         Use `out_dict` as a dict to pass `stop_price` and `stop_type` arrays. You can also
         set `out_dict` to {} to produce these arrays automatically and still have access to them.
@@ -1186,6 +1219,7 @@ class SignalsAccessor(GenericAccessor):
         2020-01-05  False  False  False
 
         >>> out_dict['stop_price']
+                       a     b     c
         2020-01-01   NaN   NaN   NaN
         2020-01-02  11.0  11.0  11.0
         2020-01-03   NaN   NaN   NaN
@@ -1239,48 +1273,86 @@ class SignalsAccessor(GenericAccessor):
         !!! warning
             The last two examples above make entries dependent upon exits - this makes only sense
             if you have no other exit arrays to combine this stop exit array with.
+
+        Test multiple parameter combinations:
+
+        ```python-repl
+        >>> exits = mask.vbt.signals.generate_ohlc_stop_exits(
+        ...     price['open'],
+        ...     price['high'],
+        ...     price['low'],
+        ...     price['close'],
+        ...     sl_stop=pd.Index([0.1, 0.2]),
+        ...     sl_trail=pd.Index([False, True])
+        ... )
+        >>> exits
+        sl_stop                                          0.1                       \\
+        sl_trail                  False                 True                False
+                        a      b      c      a      b      c      a      b      c
+        2020-01-01  False  False  False  False  False  False  False  False  False
+        2020-01-02  False  False  False  False  False  False  False  False  False
+        2020-01-03  False  False  False  False  False  False  False  False  False
+        2020-01-04  False   True   True   True   True   True  False  False  False
+        2020-01-05   True  False  False  False  False  False  False  False   True
+
+        sl_stop                     0.2
+        sl_trail                   True
+                        a      b      c
+        2020-01-01  False  False  False
+        2020-01-02  False  False  False
+        2020-01-03  False  False  False
+        2020-01-04   True  False  False
+        2020-01-05  False  False   True
+        ```
         """
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
         entries = self.obj
-        if high is None:
-            high = open
-        if low is None:
-            low = open
-        if close is None:
-            close = open
         if out_dict is None:
             out_dict_passed = False
             out_dict = {}
         else:
             out_dict_passed = True
-        stop_price_out = out_dict.get('stop_price', np.nan if out_dict_passed else None)
-        stop_type_out = out_dict.get('stop_type', -1 if out_dict_passed else None)
-        out_args = ()
-        if stop_price_out is not None:
-            out_args += (stop_price_out,)
-        if stop_type_out is not None:
-            out_args += (stop_type_out,)
+        stop_price = out_dict.get('stop_price', np.nan if out_dict_passed else None)
+        stop_type = out_dict.get('stop_type', -1 if out_dict_passed else None)
         if wrap_kwargs is None:
             wrap_kwargs = {}
 
-        keep_raw = (False, True, True, True, True, True, True, True, True) + (False,) * len(out_args)
-        broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
-        entries, open, high, low, close, sl_stop, sl_trail, tp_stop, reverse, *out_args = reshaping.broadcast(
-            entries, open, high, low, close, sl_stop, sl_trail, tp_stop, reverse, *out_args,
-            **broadcast_kwargs, keep_raw=keep_raw)
+        broadcastable_args = dict(
+            entries=entries,
+            open=open,
+            high=high,
+            low=low,
+            close=close,
+            sl_stop=sl_stop,
+            sl_trail=sl_trail,
+            tp_stop=tp_stop,
+            reverse=reverse,
+            stop_price=stop_price,
+            stop_type=stop_type
+        )
+        broadcast_kwargs = merge_dicts(dict(
+            keep_flex=dict(
+                entries=False,
+                stop_price=False,
+                stop_type=False,
+                _default=True
+            ),
+            require_kwargs=dict(
+                requirements='W'
+            )
+        ), broadcast_kwargs)
+        broadcasted_args = reshaping.broadcast(broadcastable_args, **broadcast_kwargs)
+        entries = broadcasted_args['entries']
         flex_2d = entries.ndim == 2
-        if stop_price_out is None:
-            stop_price_out = np.empty_like(entries, dtype=np.float_)
-        else:
-            stop_price_out = out_args[0]
-            out_args = out_args[1:]
-        if stop_type_out is None:
-            stop_type_out = np.empty_like(entries, dtype=np.int_)
-        else:
-            stop_type_out = out_args[0]
-        stop_price_out = reshaping.to_2d_array(stop_price_out)
-        stop_type_out = reshaping.to_2d_array(stop_type_out)
+        stop_price = broadcasted_args['stop_price']
+        if stop_price is None:
+            stop_price = np.empty_like(entries, dtype=np.float_)
+        stop_price = reshaping.to_2d_array(stop_price)
+        stop_type = broadcasted_args['stop_type']
+        if stop_type is None:
+            stop_type = np.empty_like(entries, dtype=np.int_)
+        stop_type = reshaping.to_2d_array(stop_type)
 
         entries_arr = reshaping.to_2d_array(entries)
         wrapper = ArrayWrapper.from_obj(entries)
@@ -1319,16 +1391,16 @@ class SignalsAccessor(GenericAccessor):
                 entry_args=(entries_arr,),
                 exit_place_func_nb=jit_registry.resolve_option(nb.ohlc_stop_place_nb, jitted),
                 exit_args=(
-                    open,
-                    high,
-                    low,
-                    close,
-                    stop_price_out,
-                    stop_type_out,
-                    sl_stop,
-                    sl_trail,
-                    tp_stop,
-                    reverse,
+                    broadcasted_args['open'],
+                    broadcasted_args['high'],
+                    broadcasted_args['low'],
+                    broadcasted_args['close'],
+                    stop_price,
+                    stop_type,
+                    broadcasted_args['sl_stop'],
+                    broadcasted_args['sl_trail'],
+                    broadcasted_args['tp_stop'],
+                    broadcasted_args['reverse'],
                     is_open_safe,
                     exit_wait,
                     pick_first,
@@ -1344,8 +1416,8 @@ class SignalsAccessor(GenericAccessor):
                 wrap_kwargs=wrap_kwargs,
                 **kwargs
             )
-            out_dict['stop_price'] = wrapper.wrap(stop_price_out, group_by=False, **wrap_kwargs)
-            out_dict['stop_type'] = wrapper.wrap(stop_type_out, group_by=False, **wrap_kwargs)
+            out_dict['stop_price'] = wrapper.wrap(stop_price, group_by=False, **wrap_kwargs)
+            out_dict['stop_type'] = wrapper.wrap(stop_type, group_by=False, **wrap_kwargs)
             return new_entries, exits
         else:
             if skip_until_exit and until_next:
@@ -1373,16 +1445,16 @@ class SignalsAccessor(GenericAccessor):
             )
             exits = entries.vbt.signals.generate_exits(
                 jit_registry.resolve_option(nb.ohlc_stop_place_nb, jitted),
-                open,
-                high,
-                low,
-                close,
-                stop_price_out,
-                stop_type_out,
-                sl_stop,
-                sl_trail,
-                tp_stop,
-                reverse,
+                broadcasted_args['open'],
+                broadcasted_args['high'],
+                broadcasted_args['low'],
+                broadcasted_args['close'],
+                stop_price,
+                stop_type,
+                broadcasted_args['sl_stop'],
+                broadcasted_args['sl_trail'],
+                broadcasted_args['tp_stop'],
+                broadcasted_args['reverse'],
                 is_open_safe,
                 exit_wait,
                 pick_first,
@@ -1395,8 +1467,8 @@ class SignalsAccessor(GenericAccessor):
                 wrap_kwargs=wrap_kwargs,
                 **kwargs
             )
-            out_dict['stop_price'] = wrapper.wrap(stop_price_out, group_by=False, **wrap_kwargs)
-            out_dict['stop_type'] = wrapper.wrap(stop_type_out, group_by=False, **wrap_kwargs)
+            out_dict['stop_price'] = wrapper.wrap(stop_price, group_by=False, **wrap_kwargs)
+            out_dict['stop_type'] = wrapper.wrap(stop_type, group_by=False, **wrap_kwargs)
             return exits
 
     # ############# Ranges ############# #
@@ -1484,7 +1556,9 @@ class SignalsAccessor(GenericAccessor):
             to_attach = self.obj
         else:
             # Two input arrays
-            obj, other = reshaping.broadcast(self.obj, other, **broadcast_kwargs)
+            broadcasted_args = reshaping.broadcast(dict(obj=self.obj, other=other), **broadcast_kwargs)
+            obj = broadcasted_args['obj']
+            other = broadcasted_args['other']
             func = jit_registry.resolve_option(nb.between_two_ranges_nb, jitted)
             func = ch_registry.resolve_option(func, chunked)
             range_records = func(

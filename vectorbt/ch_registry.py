@@ -26,10 +26,10 @@ class ChunkedSetup(Hashable):
     func: tp.Callable = attr.ib()
     """Chunkable function."""
 
-    options: tp.DictLike = attr.ib(factory=dict)
+    options: tp.DictLike = attr.ib(default=None)
     """Options dictionary."""
 
-    tags: tp.SetLike = attr.ib(factory=set)
+    tags: tp.SetLike = attr.ib(default=None)
     """Set of tags."""
 
     @staticmethod

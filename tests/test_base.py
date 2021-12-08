@@ -1920,7 +1920,7 @@ class TestReshapeFns:
         assert not np.isfortran(a)
         assert not np.isfortran(b)
 
-    def test_broadcast_mmapping(self):
+    def test_broadcast_mapping(self):
         result = reshaping.broadcast(dict(zero=0, a2=a2, sr2=sr2))
         assert type(result) == dict
         pd.testing.assert_series_equal(
@@ -1939,7 +1939,7 @@ class TestReshapeFns:
     def test_broadcast_individual(self):
         result = reshaping.broadcast(
             dict(zero=0, a2=a2, sr2=sr2),
-            keep_raw={'_default': True, 'sr2': False},
+            keep_flex={'_default': True, 'sr2': False},
             min_one_dim={'a2': False},
             require_kwargs={'_default': dict(dtype=float), 'a2': dict(dtype=int)},
         )
@@ -1956,8 +1956,29 @@ class TestReshapeFns:
             pd.Series([1., 2., 3.], name=sr2.name, index=sr2.index)
         )
         result = reshaping.broadcast(
+            dict(
+                zero=vbt.BCO(0),
+                a2=vbt.BCO(a2, min_one_dim=False, require_kwargs=dict(dtype=int)),
+                sr2=vbt.BCO(sr2, keep_flex=False)
+            ),
+            keep_flex=True,
+            require_kwargs=dict(dtype=float),
+        )
+        np.testing.assert_array_equal(
+            result['zero'],
+            np.array([0.])
+        )
+        np.testing.assert_array_equal(
+            result['a2'],
+            np.array([1, 2, 3])
+        )
+        pd.testing.assert_series_equal(
+            result['sr2'],
+            pd.Series([1., 2., 3.], name=sr2.name, index=sr2.index)
+        )
+        result = reshaping.broadcast(
             0, a2, sr2,
-            keep_raw={'_default': True, 2: False},
+            keep_flex={'_default': True, 2: False},
             min_one_dim={1: False},
             require_kwargs={'_default': dict(dtype=float), 1: dict(dtype=int)},
         )
@@ -1975,7 +1996,7 @@ class TestReshapeFns:
         )
         result = reshaping.broadcast(
             0, a2, sr2,
-            keep_raw=[True, True, False],
+            keep_flex=[True, True, False],
             min_one_dim=[True, False, True],
             require_kwargs=[dict(dtype=float), dict(dtype=int), dict(dtype=float)],
         )
@@ -1992,13 +2013,374 @@ class TestReshapeFns:
             pd.Series([1., 2., 3.], name=sr2.name, index=sr2.index)
         )
 
+    def test_broadcast_refs(self):
+        result = reshaping.broadcast(
+            dict(
+                a=vbt.Ref('b'),
+                b=vbt.Ref('c'),
+                c=vbt.BCO(vbt.Ref('d'), keep_flex=True),
+                d=vbt.BCO(sr2, keep_flex=False)
+            )
+        )
+        np.testing.assert_array_equal(
+            result['a'],
+            sr2.values
+        )
+        np.testing.assert_array_equal(
+            result['b'],
+            sr2.values
+        )
+        np.testing.assert_array_equal(
+            result['c'],
+            sr2.values
+        )
+        pd.testing.assert_series_equal(
+            result['d'],
+            sr2
+        )
+
+    def test_broadcast_defaults(self):
+        result = reshaping.broadcast(
+            dict(
+                a=vbt.Ref('b'),
+                b=vbt.Ref('c'),
+                c=vbt.Default(vbt.BCO(vbt.Ref('d'), keep_flex=True)),
+                d=vbt.BCO(vbt.Default(sr2), keep_flex=False)
+            ),
+            keep_wrap_default=False
+        )
+        assert not isinstance(result['a'], vbt.Default)
+        assert not isinstance(result['b'], vbt.Default)
+        assert not isinstance(result['c'], vbt.Default)
+        assert not isinstance(result['d'], vbt.Default)
+
+        result = reshaping.broadcast(
+            dict(
+                a=vbt.Ref('b'),
+                b=vbt.Ref('c'),
+                c=vbt.Default(vbt.BCO(vbt.Ref('d'), keep_flex=True)),
+                d=vbt.BCO(vbt.Default(sr2), keep_flex=False)
+            ),
+            keep_wrap_default=True
+        )
+        assert not isinstance(result['a'], vbt.Default)
+        assert not isinstance(result['b'], vbt.Default)
+        assert isinstance(result['c'], vbt.Default)
+        assert isinstance(result['d'], vbt.Default)
+        np.testing.assert_array_equal(
+            result['a'],
+            sr2.values
+        )
+        np.testing.assert_array_equal(
+            result['b'],
+            sr2.values
+        )
+        np.testing.assert_array_equal(
+            result['c'].value,
+            sr2.values
+        )
+        pd.testing.assert_series_equal(
+            result['d'].value,
+            sr2
+        )
+
+    def test_broadcast_none(self):
+        result = reshaping.broadcast(
+            dict(
+                a=None,
+                b=vbt.Default(None),
+                c=vbt.BCO(vbt.Ref('d')),
+                d=vbt.BCO(None)
+            ),
+            keep_wrap_default=True
+        )
+        assert result['a'] is None
+        assert isinstance(result['b'], vbt.Default)
+        assert result['b'].value is None
+        assert result['c'] is None
+        assert result['d'] is None
+
+    def test_broadcast_product(self):
+        p = pd.Index([1, 2, 3], name='p')
+
+        _0, _a2, _sr2 = reshaping.broadcast(0, a2, sr2)
+        _0_p, _a2_p, _sr2_p, _p = reshaping.broadcast(0, a2, sr2, p)
+        pd.testing.assert_frame_equal(_0_p, _0.vbt.tile(len(p), keys=p))
+        pd.testing.assert_frame_equal(_a2_p, _a2.vbt.tile(len(p), keys=p))
+        pd.testing.assert_frame_equal(_sr2_p, _sr2.vbt.tile(len(p), keys=p))
+        pd.testing.assert_frame_equal(_p, reshaping.broadcast_to(p.values, _sr2_p))
+
+        _0, _a2, _sr2, _df2 = reshaping.broadcast(0, a2, sr2, df2)
+        _0_p, _a2_p, _sr2_p, _df2_p, _p = reshaping.broadcast(0, a2, sr2, df2, p)
+        pd.testing.assert_frame_equal(_0_p, _0.vbt.tile(len(p), keys=p))
+        pd.testing.assert_frame_equal(_a2_p, _a2.vbt.tile(len(p), keys=p))
+        pd.testing.assert_frame_equal(_sr2_p, _sr2.vbt.tile(len(p), keys=p))
+        pd.testing.assert_frame_equal(_df2_p, _df2.vbt.tile(len(p), keys=p))
+        pd.testing.assert_frame_equal(_p, reshaping.broadcast_to(np.repeat(p.values, 3), _df2_p))
+
+        _0, _a2, _sr2 = reshaping.broadcast(0, a2, sr2, keep_flex=True)
+        _0_p, _a2_p, _sr2_p, _p = reshaping.broadcast(0, a2, sr2, p, keep_flex=True)
+        np.testing.assert_array_equal(_0_p, _0)
+        np.testing.assert_array_equal(_a2_p, _a2[:, None])
+        np.testing.assert_array_equal(_sr2_p, _sr2[:, None])
+        np.testing.assert_array_equal(_p, p.values)
+
+        _0, _a2, _sr2, _df2 = reshaping.broadcast(0, a2, sr2, df2, keep_flex=True)
+        _0_p, _a2_p, _sr2_p, _df2_p, _p = reshaping.broadcast(0, a2, sr2, df2, p, keep_flex=True)
+        np.testing.assert_array_equal(_0_p, _0)
+        np.testing.assert_array_equal(_a2_p, np.tile(_a2, 3))
+        np.testing.assert_array_equal(_sr2_p, _sr2)
+        np.testing.assert_array_equal(_sr2_p, _df2)
+        np.testing.assert_array_equal(_p, np.repeat(p.values, 3))
+
+    def test_broadcast_product_idx(self):
+        result, wrapper = reshaping.broadcast(
+            dict(
+                a=vbt.BCO([1, 2], product=True),
+                b=vbt.BCO([False, True], product=True),
+                c=vbt.BCO(['x', 'y'], product=True),
+                sr=pd.Series([1, 2, 3])
+            ),
+            keep_flex=True,
+            return_wrapper=True
+        )
+        np.testing.assert_array_equal(
+            result['a'],
+            np.array([1, 1, 1, 1, 2, 2, 2, 2])
+        )
+        np.testing.assert_array_equal(
+            result['b'],
+            np.array([False, False, True, True, False, False, True, True])
+        )
+        np.testing.assert_array_equal(
+            result['c'],
+            np.array(['x', 'y', 'x', 'y', 'x', 'y', 'x', 'y'])
+        )
+        pd.testing.assert_index_equal(
+            wrapper.columns,
+            pd.MultiIndex.from_tuples([
+                (1, False, 'x'),
+                (1, False, 'y'),
+                (1, True, 'x'),
+                (1, True, 'y'),
+                (2, False, 'x'),
+                (2, False, 'y'),
+                (2, True, 'x'),
+                (2, True, 'y')
+            ], names=['a', 'b', 'c'])
+        )
+
+        result, wrapper = reshaping.broadcast(
+            dict(
+                a=vbt.BCO(1, product=True),
+                b=vbt.BCO([False, True], product=True),
+                c=vbt.BCO(['x', 'y', 'z'], product=True),
+                sr=pd.Series([1, 2, 3])
+            ),
+            keep_flex=True,
+            return_wrapper=True
+        )
+        np.testing.assert_array_equal(
+            result['a'],
+            np.array([1, 1, 1, 1, 1, 1])
+        )
+        np.testing.assert_array_equal(
+            result['b'],
+            np.array([False, False, False, True, True, True])
+        )
+        np.testing.assert_array_equal(
+            result['c'],
+            np.array(['x', 'y', 'z', 'x', 'y', 'z'])
+        )
+        pd.testing.assert_index_equal(
+            wrapper.columns,
+            pd.MultiIndex.from_tuples([
+                (1, False, 'x'),
+                (1, False, 'y'),
+                (1, False, 'z'),
+                (1, True, 'x'),
+                (1, True, 'y'),
+                (1, True, 'z')
+            ], names=['a', 'b', 'c'])
+        )
+
+        result2, wrapper2 = reshaping.broadcast(
+            dict(
+                a=vbt.BCO(1, product=True, product_idx=0),
+                b=vbt.BCO([False, True], product=True, product_idx=1),
+                c=vbt.BCO(['x', 'y', 'z'], product=True, product_idx=2),
+                sr=pd.Series([1, 2, 3])
+            ),
+            keep_flex=True,
+            return_wrapper=True
+        )
+        np.testing.assert_array_equal(
+            result['a'],
+            result2['a']
+        )
+        np.testing.assert_array_equal(
+            result['b'],
+            result2['b']
+        )
+        np.testing.assert_array_equal(
+            result['c'],
+            result2['c']
+        )
+        pd.testing.assert_index_equal(
+            wrapper.columns,
+            wrapper2.columns
+        )
+
+        result, wrapper = reshaping.broadcast(
+            dict(
+                a=vbt.BCO(1, product=True, product_idx=0),
+                b=vbt.BCO([False, True], product=True, product_idx=1),
+                c=vbt.BCO(['x', 'y', 'z'], product=True, product_idx=0),
+                sr=pd.Series([1, 2, 3])
+            ),
+            keep_flex=True,
+            return_wrapper=True
+        )
+        np.testing.assert_array_equal(
+            result['a'],
+            np.array([1, 1, 1, 1, 1, 1])
+        )
+        np.testing.assert_array_equal(
+            result['b'],
+            np.array([False, True, False, True, False, True])
+        )
+        np.testing.assert_array_equal(
+            result['c'],
+            np.array(['x', 'x', 'y', 'y', 'z', 'z'])
+        )
+        pd.testing.assert_index_equal(
+            wrapper.columns,
+            pd.MultiIndex.from_tuples([
+                (1, 'x', False),
+                (1, 'x', True),
+                (1, 'y', False),
+                (1, 'y', True),
+                (1, 'z', False),
+                (1, 'z', True)
+            ], names=['a', 'c', 'b'])
+        )
+
+        with pytest.raises(Exception):
+            reshaping.broadcast(
+                dict(
+                    a=vbt.BCO(1, product=True),
+                    b=vbt.BCO([False, True], product=True, product_idx=0),
+                    c=vbt.BCO(['x', 'y', 'z'], product=True, product_idx=1)
+                )
+            )
+        with pytest.raises(Exception):
+            reshaping.broadcast(
+                dict(
+                    a=vbt.BCO(1, product=True, product_idx=0),
+                    b=vbt.BCO([False, True], product=True, product_idx=1),
+                    c=vbt.BCO(['x', 'y', 'z'], product=True)
+                )
+            )
+        with pytest.raises(Exception):
+            reshaping.broadcast(
+                dict(
+                    a=vbt.BCO(1, product=True, product_idx=-1),
+                    b=vbt.BCO([False, True], product=True, product_idx=0),
+                    c=vbt.BCO(['x', 'y', 'z'], product=True, product_idx=1)
+                )
+            )
+        with pytest.raises(Exception):
+            reshaping.broadcast(
+                dict(
+                    a=vbt.BCO(1, product=True, product_idx=0),
+                    b=vbt.BCO([False, True], product=True, product_idx=1),
+                    c=vbt.BCO(['x', 'y', 'z'], product=True, product_idx=3)
+                )
+            )
+
+    def test_broadcast_product_keys(self):
+        _, wrapper = reshaping.broadcast(
+            dict(
+                a=vbt.BCO(
+                    pd.Series([1, 2, 3], index=pd.Index(['a', 'b', 'c'], name='a3'), name='a2'),
+                    product=True,
+                    keys=pd.Index(['x', 'y', 'z'], name='a4')
+                ),
+                sr=pd.Series([1, 2, 3])
+            ),
+            return_wrapper=True
+        )
+        pd.testing.assert_index_equal(
+            wrapper.columns,
+            pd.Index(['x', 'y', 'z'], dtype='object', name='a4')
+        )
+        _, wrapper = reshaping.broadcast(
+            dict(
+                a=vbt.BCO(
+                    pd.Series([1, 2, 3], index=pd.Index(['a', 'b', 'c'], name='a3'), name='a2'),
+                    product=True,
+                    keys=pd.Index(['x', 'y', 'z'])
+                ),
+                sr=pd.Series([1, 2, 3])
+            ),
+            return_wrapper=True
+        )
+        pd.testing.assert_index_equal(
+            wrapper.columns,
+            pd.Index(['x', 'y', 'z'], dtype='object', name='a2')
+        )
+        _, wrapper = reshaping.broadcast(
+            dict(
+                a=vbt.BCO(pd.Series([1, 2, 3], index=pd.Index(['a', 'b', 'c'], name='a3'), name='a2'), product=True),
+                sr=pd.Series([1, 2, 3])
+            ),
+            return_wrapper=True
+        )
+        pd.testing.assert_index_equal(
+            wrapper.columns,
+            pd.Index(['a', 'b', 'c'], dtype='object', name='a3')
+        )
+        _, wrapper = reshaping.broadcast(
+            dict(
+                a=vbt.BCO(pd.Series([1, 2, 3], index=pd.Index(['a', 'b', 'c']), name='a2'), product=True),
+                sr=pd.Series([1, 2, 3])
+            ),
+            return_wrapper=True
+        )
+        pd.testing.assert_index_equal(
+            wrapper.columns,
+            pd.Index(['a', 'b', 'c'], dtype='object', name='a2')
+        )
+        _, wrapper = reshaping.broadcast(
+            dict(
+                a=vbt.BCO(pd.Series([1, 2, 3], index=pd.Index(['a', 'b', 'c'])), product=True),
+                sr=pd.Series([1, 2, 3])
+            ),
+            return_wrapper=True
+        )
+        pd.testing.assert_index_equal(
+            wrapper.columns,
+            pd.Index(['a', 'b', 'c'], dtype='object', name='a')
+        )
+        _, wrapper = reshaping.broadcast(
+            dict(
+                a=vbt.BCO(pd.Series([1, 2, 3], name='a2'), product=True),
+                sr=pd.Series([1, 2, 3])
+            ),
+            return_wrapper=True
+        )
+        pd.testing.assert_index_equal(
+            wrapper.columns,
+            pd.Int64Index([1, 2, 3], dtype='int64', name='a2')
+        )
+
     def test_broadcast_meta(self):
-        _0, _a2, _sr2, _df2 = reshaping.broadcast(0, a2, sr2, df2, keep_raw=True)
+        _0, _a2, _sr2, _df2 = reshaping.broadcast(0, a2, sr2, df2, keep_flex=True)
         assert _0 == 0
         np.testing.assert_array_equal(_a2, a2)
         np.testing.assert_array_equal(_sr2, sr2.values[:, None])
         np.testing.assert_array_equal(_df2, df2.values)
-        _0, _a2, _sr2, _df2 = reshaping.broadcast(0, a2, sr2, df2, keep_raw=[False, True, True, True])
+        _0, _a2, _sr2, _df2 = reshaping.broadcast(0, a2, sr2, df2, keep_flex=[False, True, True, True])
         test_shape = (3, 3)
         test_index = pd.MultiIndex.from_tuples([
             ('x2', 'x4'),
@@ -2532,8 +2914,8 @@ class TestIndexing:
         ],
     )
     def test_flex(self, test_inputs):
-        raw_args = reshaping.broadcast(*test_inputs, keep_raw=True)
-        bc_args = reshaping.broadcast(*test_inputs, keep_raw=False)
+        raw_args = reshaping.broadcast(*test_inputs, keep_flex=True)
+        bc_args = reshaping.broadcast(*test_inputs, keep_flex=False)
         for r in range(len(test_inputs)):
             raw_arg = raw_args[r]
             bc_arg = np.array(bc_args[r])

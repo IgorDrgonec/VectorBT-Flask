@@ -3031,8 +3031,8 @@ class TestFromSignals:
                 sl_stop=[[np.nan, 0.1, 0.5, np.inf]]).order_records,
             np.array([
                 (0, 0, 0, 20.0, 5.0, 0.0, 0),
-                (0, 1, 0, 20.0, 5.0, 0.0, 0), (1, 1, 1, 20.0, 4.0, 0.0, 1),
-                (0, 2, 0, 20.0, 5.0, 0.0, 0), (1, 2, 3, 20.0, 2.0, 0.0, 1),
+                (0, 1, 0, 20.0, 5.0, 0.0, 0), (1, 1, 1, 20.0, 4.5, 0.0, 1),
+                (0, 2, 0, 20.0, 5.0, 0.0, 0), (1, 2, 3, 20.0, 2.5, 0.0, 1),
                 (0, 3, 0, 20.0, 5.0, 0.0, 0)
             ], dtype=order_dt)
         )
@@ -3111,7 +3111,7 @@ class TestFromSignals:
                 sl_stop=[[np.nan, 0.5, 3., np.inf]]).order_records,
             np.array([
                 (0, 0, 0, 100.0, 1.0, 0.0, 1),
-                (0, 1, 0, 100.0, 1.0, 0.0, 1), (1, 1, 1, 100.0, 2.0, 0.0, 0),
+                (0, 1, 0, 100.0, 1.0, 0.0, 1), (1, 1, 1, 100.0, 1.5, 0.0, 0),
                 (0, 2, 0, 100.0, 1.0, 0.0, 1), (1, 2, 3, 50.0, 4.0, 0.0, 0),
                 (0, 3, 0, 100.0, 1.0, 0.0, 1)
             ], dtype=order_dt)
@@ -3176,8 +3176,8 @@ class TestFromSignals:
                 sl_stop=[[np.nan, 0.1, 0.5, np.inf]], sl_trail=True).order_records,
             np.array([
                 (0, 0, 0, 25.0, 4.0, 0.0, 0),
-                (0, 1, 0, 25.0, 4.0, 0.0, 0), (1, 1, 2, 25.0, 4.0, 0.0, 1),
-                (0, 2, 0, 25.0, 4.0, 0.0, 0), (1, 2, 4, 25.0, 2.0, 0.0, 1),
+                (0, 1, 0, 25.0, 4.0, 0.0, 0), (1, 1, 2, 25.0, 4.5, 0.0, 1),
+                (0, 2, 0, 25.0, 4.0, 0.0, 0), (1, 2, 4, 25.0, 2.5, 0.0, 1),
                 (0, 3, 0, 25.0, 4.0, 0.0, 0)
             ], dtype=order_dt)
         )
@@ -3187,7 +3187,7 @@ class TestFromSignals:
                 sl_stop=[[np.nan, 0.1, 0.5, np.inf]], sl_trail=True).order_records,
             np.array([
                 (0, 0, 0, 25.0, 4.0, 0.0, 1),
-                (0, 1, 0, 25.0, 4.0, 0.0, 1), (1, 1, 1, 25.0, 5.0, 0.0, 0),
+                (0, 1, 0, 25.0, 4.0, 0.0, 1), (1, 1, 1, 25.0, 4.4, 0.0, 0),
                 (0, 2, 0, 25.0, 4.0, 0.0, 1),
                 (0, 3, 0, 25.0, 4.0, 0.0, 1)
             ], dtype=order_dt)
@@ -3256,7 +3256,7 @@ class TestFromSignals:
                 sl_stop=[[np.nan, 0.5, 3., np.inf]], sl_trail=True).order_records,
             np.array([
                 (0, 0, 0, 50.0, 2.0, 0.0, 1),
-                (0, 1, 0, 50.0, 2.0, 0.0, 1), (1, 1, 2, 50.0, 2.0, 0.0, 0),
+                (0, 1, 0, 50.0, 2.0, 0.0, 1), (1, 1, 2, 50.0, 1.5, 0.0, 0),
                 (0, 2, 0, 50.0, 2.0, 0.0, 1), (1, 2, 4, 50.0, 4.0, 0.0, 0),
                 (0, 3, 0, 50.0, 2.0, 0.0, 1)
             ], dtype=order_dt)
@@ -3332,8 +3332,8 @@ class TestFromSignals:
                 tp_stop=[[np.nan, 0.1, 0.5, np.inf]]).order_records,
             np.array([
                 (0, 0, 0, 20.0, 5.0, 0.0, 1),
-                (0, 1, 0, 20.0, 5.0, 0.0, 1), (1, 1, 1, 20.0, 4.0, 0.0, 0),
-                (0, 2, 0, 20.0, 5.0, 0.0, 1), (1, 2, 3, 20.0, 2.0, 0.0, 0),
+                (0, 1, 0, 20.0, 5.0, 0.0, 1), (1, 1, 1, 20.0, 4.5, 0.0, 0),
+                (0, 2, 0, 20.0, 5.0, 0.0, 1), (1, 2, 3, 20.0, 2.5, 0.0, 0),
                 (0, 3, 0, 20.0, 5.0, 0.0, 1)
             ], dtype=order_dt)
         )
@@ -3390,7 +3390,7 @@ class TestFromSignals:
                 tp_stop=[[np.nan, 0.5, 3., np.inf]]).order_records,
             np.array([
                 (0, 0, 0, 100.0, 1.0, 0.0, 0),
-                (0, 1, 0, 100.0, 1.0, 0.0, 0), (1, 1, 1, 100.0, 2.0, 0.0, 1),
+                (0, 1, 0, 100.0, 1.0, 0.0, 0), (1, 1, 1, 100.0, 1.5, 0.0, 1),
                 (0, 2, 0, 100.0, 1.0, 0.0, 0), (1, 2, 3, 100.0, 4.0, 0.0, 1),
                 (0, 3, 0, 100.0, 1.0, 0.0, 0)
             ], dtype=order_dt)
@@ -3589,10 +3589,10 @@ class TestFromSignals:
                 sl_stop=0.1, upon_stop_exit=[['close', 'closereduce', 'reverse', 'reversereduce']],
                 accumulate=True).order_records,
             np.array([
-                (0, 0, 0, 1.0, 5.0, 0.0, 0), (1, 0, 1, 1.0, 4.0, 0.0, 1),
-                (0, 1, 0, 1.0, 5.0, 0.0, 0), (1, 1, 1, 1.0, 4.0, 0.0, 1),
-                (0, 2, 0, 1.0, 5.0, 0.0, 0), (1, 2, 1, 2.0, 4.0, 0.0, 1),
-                (0, 3, 0, 1.0, 5.0, 0.0, 0), (1, 3, 1, 1.0, 4.0, 0.0, 1)
+                (0, 0, 0, 1.0, 5.0, 0.0, 0), (1, 0, 1, 1.0, 4.5, 0.0, 1),
+                (0, 1, 0, 1.0, 5.0, 0.0, 0), (1, 1, 1, 1.0, 4.5, 0.0, 1),
+                (0, 2, 0, 1.0, 5.0, 0.0, 0), (1, 2, 1, 2.0, 4.5, 0.0, 1),
+                (0, 3, 0, 1.0, 5.0, 0.0, 0), (1, 3, 1, 1.0, 4.5, 0.0, 1)
             ], dtype=order_dt)
         )
         assert_records_close(
@@ -3600,10 +3600,10 @@ class TestFromSignals:
                 close=close, entries=entries, exits=exits, size=1,
                 sl_stop=0.1, upon_stop_exit=[['close', 'closereduce', 'reverse', 'reversereduce']]).order_records,
             np.array([
-                (0, 0, 0, 1.0, 5.0, 0.0, 0), (1, 0, 1, 1.0, 4.0, 0.0, 1),
-                (0, 1, 0, 1.0, 5.0, 0.0, 0), (1, 1, 1, 1.0, 4.0, 0.0, 1),
-                (0, 2, 0, 1.0, 5.0, 0.0, 0), (1, 2, 1, 2.0, 4.0, 0.0, 1),
-                (0, 3, 0, 1.0, 5.0, 0.0, 0), (1, 3, 1, 2.0, 4.0, 0.0, 1)
+                (0, 0, 0, 1.0, 5.0, 0.0, 0), (1, 0, 1, 1.0, 4.5, 0.0, 1),
+                (0, 1, 0, 1.0, 5.0, 0.0, 0), (1, 1, 1, 1.0, 4.5, 0.0, 1),
+                (0, 2, 0, 1.0, 5.0, 0.0, 0), (1, 2, 1, 2.0, 4.5, 0.0, 1),
+                (0, 3, 0, 1.0, 5.0, 0.0, 0), (1, 3, 1, 2.0, 4.5, 0.0, 1)
             ], dtype=order_dt)
         )
 
@@ -3629,7 +3629,7 @@ class TestFromSignals:
                 sl_stop=sl_stop, upon_stop_update=[['keep', 'override']]).order_records,
             np.array([
                 (0, 0, 0, 1.0, 5.0, 0.0, 0), (1, 0, 1, 1.0, 4.0, 0.0, 0), (2, 0, 2, 2.0, 3.0, 0.0, 1),
-                (0, 1, 0, 1.0, 5.0, 0.0, 0), (1, 1, 1, 1.0, 4.0, 0.0, 0), (2, 1, 3, 2.0, 2.0, 0.0, 1)
+                (0, 1, 0, 1.0, 5.0, 0.0, 0), (1, 1, 1, 1.0, 4.0, 0.0, 0), (2, 1, 3, 2.0, 2.4, 0.0, 1)
             ], dtype=order_dt)
         )
 
@@ -3646,8 +3646,8 @@ class TestFromSignals:
                 close=close, entries=entries, exits=exits,
                 sl_stop=[[0.1, 0.5]], signal_priority='stop').order_records,
             np.array([
-                (0, 0, 0, 20.0, 5.0, 0.0, 0), (1, 0, 1, 20.0, 4.0, 0.0, 1), (2, 0, 3, 40.0, 2.0, 0.0, 1),
-                (0, 1, 0, 20.0, 5.0, 0.0, 0), (1, 1, 3, 20.0, 2.0, 0.0, 1)
+                (0, 0, 0, 20.0, 5.0, 0.0, 0), (1, 0, 1, 20.0, 4.5, 0.0, 1), (2, 0, 3, 45.0, 2.0, 0.0, 1),
+                (0, 1, 0, 20.0, 5.0, 0.0, 0), (1, 1, 3, 20.0, 2.5, 0.0, 1)
             ], dtype=order_dt)
         )
         assert_records_close(
@@ -3655,7 +3655,7 @@ class TestFromSignals:
                 close=close, entries=entries, exits=exits,
                 sl_stop=[[0.1, 0.5]], signal_priority='user').order_records,
             np.array([
-                (0, 0, 0, 20.0, 5.0, 0.0, 0), (1, 0, 1, 20.0, 4.0, 0.0, 1), (2, 0, 3, 40.0, 2.0, 0.0, 1),
+                (0, 0, 0, 20.0, 5.0, 0.0, 0), (1, 0, 1, 20.0, 4.5, 0.0, 1), (2, 0, 3, 45.0, 2.0, 0.0, 1),
                 (0, 1, 0, 20.0, 5.0, 0.0, 0), (1, 1, 3, 40.0, 2.0, 0.0, 1)
             ], dtype=order_dt)
         )
@@ -3674,7 +3674,7 @@ class TestFromSignals:
                 close=close, entries=entries, exits=exits,
                 sl_stop=np.inf, adjust_sl_func_nb=adjust_sl_func_nb, adjust_sl_args=(2,)).order_records,
             np.array([
-                (0, 0, 0, 20.0, 5.0, 0.0, 0), (1, 0, 2, 20.0, 3.0, 0.0, 1)
+                (0, 0, 0, 20.0, 5.0, 0.0, 0), (1, 0, 2, 20.0, 5.0, 0.0, 1)
             ], dtype=order_dt)
         )
 
@@ -3710,7 +3710,7 @@ class TestFromSignals:
                 close=close, entries=entries, exits=exits,
                 tp_stop=np.inf, adjust_tp_func_nb=adjust_tp_func_nb, adjust_tp_args=(2,)).order_records,
             np.array([
-                (0, 0, 0, 100.0, 1.0, 0.0, 0), (1, 0, 2, 100.0, 3.0, 0.0, 1)
+                (0, 0, 0, 100.0, 1.0, 0.0, 0), (1, 0, 2, 100.0, 1.0, 0.0, 1)
             ], dtype=order_dt)
         )
 
@@ -7812,12 +7812,12 @@ class TestPortfolio:
         )
         np.testing.assert_array_equal(
             vbt.Portfolio.get_cash_deposits(
-                cash_deposits_raw=1, keep_raw=True, cash_sharing=True, wrapper=pf_grouped.wrapper),
+                cash_deposits_raw=1, keep_flex=True, cash_sharing=True, wrapper=pf_grouped.wrapper),
             np.array([[1]])
         )
         np.testing.assert_array_equal(
             vbt.Portfolio.get_cash_deposits(
-                cash_deposits_raw=1, keep_raw=True, cash_sharing=False, wrapper=pf_grouped.wrapper),
+                cash_deposits_raw=1, keep_flex=True, cash_sharing=False, wrapper=pf_grouped.wrapper),
             np.array([
                 [2., 1.],
                 [2., 1.],
@@ -7828,12 +7828,12 @@ class TestPortfolio:
         )
         np.testing.assert_array_equal(
             vbt.Portfolio.get_cash_deposits(
-                cash_deposits_raw=1, keep_raw=True, cash_sharing=False, wrapper=pf.wrapper),
+                cash_deposits_raw=1, keep_flex=True, cash_sharing=False, wrapper=pf.wrapper),
             np.array([[1]])
         )
         np.testing.assert_array_equal(
             vbt.Portfolio.get_cash_deposits(
-                cash_deposits_raw=1, keep_raw=True, cash_sharing=True, wrapper=pf.wrapper),
+                cash_deposits_raw=1, keep_flex=True, cash_sharing=True, wrapper=pf.wrapper),
             np.array([
                 [1., 1., 1.],
                 [1., 1., 1.],
@@ -7915,12 +7915,12 @@ class TestPortfolio:
         )
         np.testing.assert_array_equal(
             vbt.Portfolio.get_cash_earnings(
-                cash_earnings_raw=1, keep_raw=True, wrapper=pf.wrapper),
+                cash_earnings_raw=1, keep_flex=True, wrapper=pf.wrapper),
             np.array([[1]])
         )
         np.testing.assert_array_equal(
             vbt.Portfolio.get_cash_earnings(
-                cash_earnings_raw=1, keep_raw=True, wrapper=pf_grouped.wrapper),
+                cash_earnings_raw=1, keep_flex=True, wrapper=pf_grouped.wrapper),
             np.array([
                 [2., 1.],
                 [2., 1.],

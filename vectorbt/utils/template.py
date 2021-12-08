@@ -25,7 +25,7 @@ class CustomTemplate:
     template: tp.Any = attr.ib()
     """Template to be processed."""
 
-    mapping: tp.Optional[tp.Mapping] = attr.ib(factory=dict)
+    mapping: tp.Optional[tp.Mapping] = attr.ib(default=None)
     """Mapping object passed to the initializer."""
 
     strict: tp.Optional[bool] = attr.ib(default=None)

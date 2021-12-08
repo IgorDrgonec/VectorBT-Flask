@@ -27,8 +27,6 @@ from vectorbt.utils.chunking import (
     chunked
 )
 from vectorbt.utils.config import (
-    Default,
-    Ref,
     atomic_dict,
     merge_dicts,
     Config,
@@ -54,8 +52,6 @@ from vectorbt.utils.schedule_ import AsyncJob, AsyncScheduler, CancelledError, S
 from vectorbt.utils.template import Sub, Rep, RepEval, RepFunc, deep_substitute
 
 __all__ = [
-    'Default',
-    'Ref',
     'atomic_dict',
     'merge_dicts',
     'Config',

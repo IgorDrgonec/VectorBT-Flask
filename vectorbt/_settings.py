@@ -347,8 +347,12 @@ broadcasting = dict(
     drop_duplicates=True,
     keep='last',
     drop_redundant=True,
-    ignore_default=True,
-    keep_defaults=False
+    ignore_ranges=True,
+    keep_wrap_default=False,
+    keep_flex=False,
+    min_one_dim=True,
+    index_to_product=True,
+    keys_from_sr_index=True
 )
 """_"""
 
@@ -943,6 +947,9 @@ portfolio = dict(
     cash_dividends=0.,
     size=np.inf,
     size_type='amount',
+    signal_direction='longonly',
+    order_direction='both',
+    price=np.inf,
     fees=0.,
     fixed_fees=0.,
     slippage=0.,
@@ -971,8 +978,6 @@ portfolio = dict(
     upon_short_conflict='ignore',
     upon_dir_conflict='ignore',
     upon_opposite_entry='reversereduce',
-    signal_direction='longonly',
-    order_direction='both',
     cash_sharing=False,
     call_pre_segment=False,
     call_post_segment=False,
