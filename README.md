@@ -10,7 +10,7 @@ vectorbt PRO is next-gen framework for backtesting, algorithmic trading, and res
 
 ### Important Notes
 
-```diff
+```plaintext
 * It is illegal to publish, distribute, or sell the vectorbt PRO source code without a separate permission.
 * Violation of the licensing terms will trigger a ban followed by a legal pursuit.
 ```
@@ -62,6 +62,6 @@ Read the [vectorbt PRO documentation](https://vectorbt.pro/docs) for more detail
 
 ## Support
 
-## [Documentation](https://vectorbt.pro/docs) · [New issue](https://github.com/vectorbt/vectorbt.pro/issues) · <sub>[![Discord](https://img.shields.io/discord/690203284119617602?logo=discord&logoColor=white)](https://discord.gg/dhzSKYU)</sub> · [info@vectorbt.pro](mailto:info@vectorbt.pro)
+## [Documentation](https://vectorbt.pro/docs) · [New issue](https://github.com/vectorbt/vectorbt.pro/issues) · <sub>[![Discord](https://img.shields.io/discord/918629562441695344?logo=discord&logoColor=white)](https://discord.gg/63jZZzCwzp)</sub> · [info@vectorbt.pro](mailto:info@vectorbt.pro)
 
 © 2021 vectorbt PRO
