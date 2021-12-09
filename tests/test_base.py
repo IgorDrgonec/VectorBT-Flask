@@ -2133,6 +2133,15 @@ class TestReshapeFns:
         np.testing.assert_array_equal(_sr2_p, _df2)
         np.testing.assert_array_equal(_p, np.repeat(p.values, 3))
 
+        _, _, _, _p1 = reshaping.broadcast(0, a2, sr2, p, repeat_product=False)
+        _, _, _, _, _p2 = reshaping.broadcast(0, a2, sr2, df2, p, repeat_product=False)
+        _, _, _, _p3 = reshaping.broadcast(0, a2, sr2, p, keep_flex=True, repeat_product=False)
+        _, _, _, _df2_p, _p4 = reshaping.broadcast(0, a2, sr2, df2, p, keep_flex=True, repeat_product=False)
+
+        np.testing.assert_array_equal(_p1.values, _p2.values)
+        np.testing.assert_array_equal(_p1.columns, _p2.columns)
+        np.testing.assert_array_equal(_p3, _p4)
+
     def test_broadcast_product_idx(self):
         result, wrapper = reshaping.broadcast(
             dict(

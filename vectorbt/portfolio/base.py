@@ -2651,7 +2651,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         if size_type is None:
             size_type = portfolio_cfg['size_type']
         if direction is None:
-            direction = portfolio_cfg['order_direction']
+            direction = portfolio_cfg['direction']
         if price is None:
             price = portfolio_cfg['price']
         if size is None:
@@ -4021,6 +4021,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
     def from_holding(cls: tp.Type[PortfolioT],
                      close: tp.ArrayLike,
                      size: tp.Optional[tp.ArrayLike] = None,
+                     direction: tp.Optional[tp.ArrayLike] = None,
+                     sell_at_end: tp.Optional[bool] = None,
                      base_method: tp.Optional[str] = None,
                      **kwargs) -> PortfolioT:
         """Simulate portfolio from plain holding.
@@ -4036,7 +4038,11 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
         `**kwargs` are passed to the underlying class method.
 
-        For the default base method, see `portfolio.holding_base_method` in `vectorbt._settings.settings`.
+        For the default base method, see `portfolio.hold_base_method` in `vectorbt._settings.settings`.
+
+        !!! note
+            If `sell_at_end` is True, will place an opposite signal at the very end.
+            Be careful when using both directions, since this will most likely reverse the position.
 
         ## Example
 
@@ -4053,17 +4059,51 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         from vectorbt._settings import settings
         portfolio_cfg = settings['portfolio']
 
+        if direction is None:
+            direction = portfolio_cfg['hold_direction']
+        if sell_at_end is None:
+            sell_at_end = portfolio_cfg['sell_at_end']
         if base_method is None:
-            base_method = portfolio_cfg['holding_base_method']
+            base_method = portfolio_cfg['hold_base_method']
+
         if base_method.lower() == 'from_signals':
-            return cls.from_signals(close, entries=True, exits=False, accumulate=False, size=size, **kwargs)
-        elif base_method.lower() == 'from_orders':
+            if sell_at_end:
+                entries = broadcast_to(True, close, require_kwargs=dict(requirements='W'))
+                exits = broadcast_to(False, close, require_kwargs=dict(requirements='W'))
+                if checks.is_pandas(entries):
+                    entries.iloc[1:] = False
+                else:
+                    entries[1:] = False
+                if checks.is_pandas(exits):
+                    exits.iloc[-1] = True
+                else:
+                    exits[-1] = True
+            else:
+                entries = True
+                exits = False
+            return cls.from_signals(
+                close,
+                entries=entries,
+                exits=exits,
+                accumulate=False,
+                size=size,
+                direction=direction,
+                **kwargs
+            )
+        if base_method.lower() == 'from_orders':
             if size is None:
                 size = portfolio_cfg['size']
             close = to_pd_array(close)
-            size = broadcast_to(size, close, require_kwargs=dict(requirements='W'))
-            size.iloc[1:] = np.nan
-            return cls.from_orders(close, size=size, **kwargs)
+            size_arr = broadcast_to(size, close, require_kwargs=dict(requirements='W'))
+            if checks.is_pandas(size_arr):
+                size_arr.iloc[1:] = np.nan
+                if sell_at_end:
+                    size_arr.iloc[-1] = -size
+            else:
+                size_arr[1:] = np.nan
+                if sell_at_end:
+                    size_arr[-1] = -size
+            return cls.from_orders(close, size=size_arr, direction=direction, **kwargs)
         raise ValueError(f"Unknown base method '{base_method}'")
 
     @classmethod
@@ -5237,7 +5277,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         if size_type is None:
             size_type = portfolio_cfg['size_type']
         if direction is None:
-            direction = portfolio_cfg['order_direction']
+            direction = portfolio_cfg['direction']
         if price is None:
             price = portfolio_cfg['price']
         if size is None:
@@ -5684,8 +5724,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             wrapper.shape_2d,
             orders.values,
             orders.col_mapper.col_map,
-            init_position=to_1d_array(init_position),
-            direction=direction
+            direction=direction,
+            init_position=to_1d_array(init_position)
         )
         return wrapper.wrap(asset_flow, group_by=False, **resolve_dict(wrap_kwargs))
 

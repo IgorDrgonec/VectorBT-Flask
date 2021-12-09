@@ -115,11 +115,11 @@ def is_hashable(arg: tp.Any) -> bool:
     return True
 
 
-def is_index_equal(arg1: tp.Any, arg2: tp.Any, strict: bool = True) -> bool:
+def is_index_equal(arg1: tp.Any, arg2: tp.Any, check_names: bool = True) -> bool:
     """Check whether indexes are equal.
 
-    Introduces naming tests on top of `pd.Index.equals`, but still doesn't check for types."""
-    if not strict:
+    If `check_names` is True, checks whether names are equal on top of `pd.Index.equals`."""
+    if not check_names:
         return pd.Index.equals(arg1, arg2)
     if isinstance(arg1, pd.MultiIndex) and isinstance(arg2, pd.MultiIndex):
         if arg1.names != arg2.names:
@@ -132,9 +132,9 @@ def is_index_equal(arg1: tp.Any, arg2: tp.Any, strict: bool = True) -> bool:
     return pd.Index.equals(arg1, arg2)
 
 
-def is_default_index(arg: tp.Any) -> bool:
+def is_default_index(arg: tp.Any, check_names: bool = True) -> bool:
     """Check whether index is a basic range."""
-    return is_index_equal(arg, pd.RangeIndex(start=0, stop=len(arg), step=1))
+    return is_index_equal(arg, pd.RangeIndex(start=0, stop=len(arg), step=1), check_names=check_names)
 
 
 def is_namedtuple(x: tp.Any) -> bool:
@@ -460,9 +460,9 @@ def assert_shape_equal(arg1: tp.ArrayLike, arg2: tp.ArrayLike,
                 raise AssertionError(f"Axis {axis} of {arg1.shape} and {arg2.shape} do not match")
 
 
-def assert_index_equal(arg1: pd.Index, arg2: pd.Index, **kwargs) -> None:
+def assert_index_equal(arg1: pd.Index, arg2: pd.Index, check_names: bool = True) -> None:
     """Raise exception if the first argument and the second argument have different index/columns."""
-    if not is_index_equal(arg1, arg2, **kwargs):
+    if not is_index_equal(arg1, arg2, check_names=check_names):
         raise AssertionError(f"Indexes {arg1} and {arg2} do not match")
 
 

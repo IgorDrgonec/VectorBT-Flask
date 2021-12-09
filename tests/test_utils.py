@@ -1147,7 +1147,7 @@ class TestChecks:
         assert checks.is_index_equal(
             pd.Index([0], name='name'),
             pd.Index([0]),
-            strict=False
+            check_names=False
         )
         assert not checks.is_index_equal(
             pd.MultiIndex.from_arrays([[0], [1]]),

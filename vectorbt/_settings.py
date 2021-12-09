@@ -344,6 +344,7 @@ broadcasting = dict(
     index_from='strict',
     columns_from='stack',
     ignore_sr_names=True,
+    check_index_names=True,
     drop_duplicates=True,
     keep='last',
     drop_redundant=True,
@@ -352,6 +353,7 @@ broadcasting = dict(
     keep_flex=False,
     min_one_dim=True,
     index_to_product=True,
+    repeat_product=True,
     keys_from_sr_index=True
 )
 """_"""
@@ -939,16 +941,10 @@ ${config_doc}
 _settings['logs'] = logs
 
 portfolio = dict(
-    call_seq='default',
-    init_cash=100.,
-    init_position=0.,
-    cash_deposits=0.,
-    cash_earnings=0.,
-    cash_dividends=0.,
+    # Orders
     size=np.inf,
     size_type='amount',
-    signal_direction='longonly',
-    order_direction='both',
+    direction='both',
     price=np.inf,
     fees=0.,
     fixed_fees=0.,
@@ -961,7 +957,10 @@ portfolio = dict(
     lock_cash=False,
     allow_partial=True,
     raise_reject=False,
-    val_price=np.inf,
+    log=False,
+
+    # Signals
+    signal_direction='longonly',
     accumulate=False,
     sl_stop=np.nan,
     sl_trail=False,
@@ -973,11 +972,23 @@ portfolio = dict(
     upon_stop_update='override',
     signal_priority='stop',
     use_stops=None,
-    log=False,
     upon_long_conflict='ignore',
     upon_short_conflict='ignore',
     upon_dir_conflict='ignore',
     upon_opposite_entry='reversereduce',
+
+    # Holding
+    hold_direction='longonly',
+    sell_at_end=False,
+    hold_base_method='from_signals',
+
+    # Setup
+    init_cash=100.,
+    init_position=0.,
+    cash_deposits=0.,
+    cash_earnings=0.,
+    cash_dividends=0.,
+    val_price=np.inf,
     cash_sharing=False,
     call_pre_segment=False,
     call_post_segment=False,
@@ -1000,9 +1011,11 @@ portfolio = dict(
         dict()
     ),
     keep_inout_raw=True,
-    freq=None,
+    call_seq='default',
     attach_call_seq=False,
-    holding_base_method='from_signals',
+
+    # Portfolio
+    freq=None,
     use_in_outputs=True,
     fillna_close=True,
     trades_type='exittrades',

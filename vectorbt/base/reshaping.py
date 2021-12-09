@@ -204,6 +204,7 @@ def broadcast_index(args: tp.Sequence[tp.AnyArray],
                     axis: int = 0,
                     ignore_sr_names: tp.Optional[bool] = None,
                     ignore_ranges: tp.Optional[bool] = None,
+                    check_index_names: tp.Optional[bool] = None,
                     **stack_kwargs) -> tp.Optional[tp.Index]:
     """Produce a broadcast index/columns.
 
@@ -226,6 +227,7 @@ def broadcast_index(args: tp.Sequence[tp.AnyArray],
 
             Conflicting Series names are those that are different but not None.
         ignore_ranges (bool): Whether to ignore indexes of type `pd.RangeIndex`.
+        check_index_names (bool): See `vectorbt.utils.checks.is_index_equal`.
         **stack_kwargs: Keyword arguments passed to `vectorbt.base.indexes.stack_indexes`.
 
     For defaults, see `broadcasting` in `vectorbt._settings.settings`.
@@ -241,6 +243,9 @@ def broadcast_index(args: tp.Sequence[tp.AnyArray],
 
     if ignore_sr_names is None:
         ignore_sr_names = broadcasting_cfg['ignore_sr_names']
+    if check_index_names is None:
+        check_index_names = broadcasting_cfg['check_index_names']
+
     index_str = 'columns' if axis == 1 else 'index'
     to_shape_2d = (to_shape[0], 1) if len(to_shape) == 1 else to_shape
     # maxlen stores the length of the longest index
@@ -267,7 +272,7 @@ def broadcast_index(args: tp.Sequence[tp.AnyArray],
                 if checks.is_pandas(arg):
                     index = indexes.get_index(arg, axis)
                     if last_index is not None:
-                        if not checks.is_index_equal(index, last_index):
+                        if not checks.is_index_equal(index, last_index, check_names=check_index_names):
                             index_conflict = True
                     last_index = index
                     continue
@@ -287,18 +292,17 @@ def broadcast_index(args: tp.Sequence[tp.AnyArray],
                         if new_index is None:
                             new_index = index
                         else:
+                            if checks.is_index_equal(index, new_index, check_names=check_index_names):
+                                continue
                             if index_from.lower() == 'strict':
                                 # If pandas objects have different index/columns, raise an exception
-                                if not checks.is_index_equal(index, new_index):
-                                    raise ValueError(
-                                        f"Broadcasting {index_str} is not allowed when {index_str}_from=strict")
+                                raise ValueError(f"Arrays have different index. Broadcasting {index_str} "
+                                                 f"is not allowed when {index_str}_from=strict")
+
                             # Broadcasting index must follow the rules of a regular broadcasting operation
                             # https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html#general-broadcasting-rules
                             # 1. rule: if indexes are of the same length, they are simply stacked
                             # 2. rule: if index has one element, it gets repeated and then stacked
-
-                            if checks.is_index_equal(index, new_index):
-                                continue
                             if len(index) != len(new_index):
                                 if len(index) > 1 and len(new_index) > 1:
                                     raise ValueError("Indexes could not be broadcast together")
@@ -455,6 +459,9 @@ class BCO:
     If None, becomes the index of `BCO.value` if `BCO.value` is a Series and 
     `keys_from_sr_index` is True, otherwise the values of `BCO.value`."""
 
+    repeat_product: tp.Optional[bool] = attr.ib(default=None)
+    """Whether to repeat every parameter value to match the number of columns in regular arrays."""
+
 
 @attr.s(frozen=True)
 class Default:
@@ -513,6 +520,7 @@ def broadcast(*args,
               index_to_product: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
               product: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
               product_idx: tp.MaybeMappingSequence[tp.Optional[int]] = None,
+              repeat_product: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
               keys_from_sr_index: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
               keys: tp.MaybeMappingSequence[tp.Optional[tp.IndexLike]] = None,
               random_subset: tp.Optional[int] = None,
@@ -521,6 +529,7 @@ def broadcast(*args,
               wrapper_kwargs: tp.KwargsLike = None,
               ignore_sr_names: tp.Optional[bool] = None,
               ignore_ranges: tp.Optional[bool] = None,
+              check_index_names: tp.Optional[bool] = None,
               **stack_kwargs) -> tp.Any:
     """Bring any array-like object in `args` to the same shape by using NumPy broadcasting.
 
@@ -563,6 +572,7 @@ def broadcast(*args,
         index_to_product (bool, sequence or mapping): See `BCO.index_to_product`.
         product (bool, sequence or mapping): See `BCO.product`.
         product_idx (int, sequence or mapping): See `BCO.product_idx`.
+        repeat_product (bool, sequence or mapping): See `BCO.repeat`.
         keys_from_sr_index (bool, sequence or mapping): See `BCO.keys_from_sr_index`.
         keys (index_like, sequence or mapping): See `BCO.keys`.
         random_subset (int): Select a random subset of product parameter values.
@@ -573,6 +583,7 @@ def broadcast(*args,
         wrapper_kwargs (dict): Keyword arguments passed to `vectorbt.base.wrapping.ArrayWrapper`.
         ignore_sr_names (bool): See `broadcast_index`.
         ignore_ranges (bool): See `broadcast_index`.
+        check_index_names (bool): See `broadcast_index`.
         **stack_kwargs: Keyword arguments passed to `vectorbt.base.indexes.stack_indexes`.
 
     For defaults, see `broadcasting` in `vectorbt._settings.settings`.
@@ -971,6 +982,10 @@ def broadcast(*args,
 
         _product_idx = _resolve_arg(obj, 'product_idx', product_idx, None)
 
+        _repeat_product = _resolve_arg(obj, 'repeat_product', repeat_product, None)
+        if _repeat_product is None:
+            _repeat_product = broadcasting_cfg['repeat_product']
+
         _keys_from_sr_index = _resolve_arg(obj, 'keys_from_sr_index', keys_from_sr_index, None)
         if _keys_from_sr_index is None:
             _keys_from_sr_index = broadcasting_cfg['keys_from_sr_index']
@@ -1000,6 +1015,7 @@ def broadcast(*args,
             index_to_product=_index_to_product,
             product=_product,
             product_idx=_product_idx,
+            repeat_product=_repeat_product,
             keys_from_sr_index=_keys_from_sr_index,
             keys=_keys
         )
@@ -1074,6 +1090,7 @@ def broadcast(*args,
             axis=0,
             ignore_sr_names=ignore_sr_names,
             ignore_ranges=ignore_ranges,
+            check_index_names=check_index_names,
             **stack_kwargs
         )
         new_columns = broadcast_index(
@@ -1083,6 +1100,7 @@ def broadcast(*args,
             axis=1,
             ignore_sr_names=ignore_sr_names,
             ignore_ranges=ignore_ranges,
+            check_index_names=check_index_names,
             **stack_kwargs
         )
     else:
@@ -1090,6 +1108,7 @@ def broadcast(*args,
 
     # Build a product
     param_product = None
+    param_columns = None
     n_params = 0
     if len(product_keys) > 0:
         # Prepare and group parameters
@@ -1125,7 +1144,6 @@ def broadcast(*args,
         # Build an operation tree and parameter columns
         op_tree_operands = []
         param_keys = []
-        param_columns = None
         for product_idx in range(max_idx + 1):
             if product_idx not in product_idx_values:
                 raise ValueError("Group index must come in a strict order starting with 0 and without gaps")
@@ -1188,14 +1206,19 @@ def broadcast(*args,
     for i, k in enumerate(all_keys):
         if k in none_keys:
             continue
-
         _keep_flex = bco_instances[k].keep_flex
+        _repeat_product = bco_instances[k].repeat_product
+
         if k in product_keys:
             # Broadcast parameters
             obj = param_product[k]
-            obj = np.repeat(obj, shape_2d[1])
+            if _repeat_product:
+                obj = np.repeat(obj, shape_2d[1])
             if not _keep_flex:
-                obj = np.broadcast_to(obj, (to_shape[0], len(obj)))
+                if _repeat_product:
+                    obj = np.broadcast_to(obj, (to_shape[0], len(obj)))
+                else:
+                    obj = np.broadcast_to(obj, (to_shape[0], n_params))
             old_obj = obj
             new_obj = obj
         else:
@@ -1233,14 +1256,24 @@ def broadcast(*args,
             _is_pd = bco_instances[k].to_pd
             if _is_pd is None:
                 _is_pd = is_pd
-            wrapped_arr = wrap_broadcasted(
-                old_obj,
-                new_obj,
-                is_pd=_is_pd,
-                new_index=new_index,
-                new_columns=new_columns,
-                ignore_ranges=ignore_ranges
-            )
+            if k in product_keys and not _repeat_product:
+                wrapped_arr = wrap_broadcasted(
+                    old_obj,
+                    new_obj,
+                    is_pd=_is_pd,
+                    new_index=new_index,
+                    new_columns=param_columns,
+                    ignore_ranges=ignore_ranges
+                )
+            else:
+                wrapped_arr = wrap_broadcasted(
+                    old_obj,
+                    new_obj,
+                    is_pd=_is_pd,
+                    new_index=new_index,
+                    new_columns=new_columns,
+                    ignore_ranges=ignore_ranges
+                )
             _post_func = bco_instances[k].post_func
             if _post_func is not None:
                 wrapped_arr = _post_func(wrapped_arr)

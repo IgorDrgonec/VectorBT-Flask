@@ -102,8 +102,8 @@ def get_short_size_nb(position_before: float, position_now: float) -> float:
 def asset_flow_nb(target_shape: tp.Shape,
                   order_records: tp.RecordArray,
                   col_map: tp.ColMap,
-                  init_position: tp.FlexArray = np.asarray(0.),
-                  direction: int = Direction.Both) -> tp.Array2d:
+                  direction: int = Direction.Both,
+                  init_position: tp.FlexArray = np.asarray(0.)) -> tp.Array2d:
     """Get asset flow series per column.
 
     Returns the total transacted amount of assets at each time step."""

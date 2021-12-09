@@ -669,6 +669,9 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
             raise TypeError("Symbols must be either a hashable or a sequence of hashable")
         else:
             single_symbol = False
+        show_symbol_progress = show_progress
+        if show_symbol_progress is None:
+            show_symbol_progress = data_cfg['show_progress']
         if show_progress is None:
             show_progress = data_cfg['show_progress'] and not single_symbol
         pbar_kwargs = merge_dicts(data_cfg['pbar_kwargs'], pbar_kwargs)
@@ -683,7 +686,7 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
                 _kwargs = cls.select_symbol_kwargs(symbol, kwargs)
                 func_arg_names = get_func_arg_names(cls.fetch_symbol)
                 if 'show_progress' in func_arg_names:
-                    _kwargs['show_progress'] = show_progress
+                    _kwargs['show_progress'] = show_symbol_progress
                 if 'pbar_kwargs' in func_arg_names:
                     _kwargs['pbar_kwargs'] = pbar_kwargs
                 out = cls.fetch_symbol(symbol, **_kwargs)
