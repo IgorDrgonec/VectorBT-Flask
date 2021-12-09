@@ -1,4 +1,4 @@
-vectorbt PRO is next-gen framework for backtesting, algorithmic trading, and research. It is a high-performance superset of the vectorbt library, one of the world's leading open-source backtesting frameworks. vectorbt PRO includes the standard vectorbt library and wraps it with powerful new features and useful enhancements.
+> vectorbt PRO is next-gen framework for backtesting, algorithmic trading, and research. It is a high-performance superset of the vectorbt library, one of the world's leading open-source backtesting frameworks. vectorbt PRO includes the standard vectorbt library and wraps it with powerful new features and useful enhancements.
 
 ## [Home](https://vectorbt.pro) · [Features](#features) · [License](#license) · [Installation](#install) · [Support](#support)
 
@@ -10,10 +10,10 @@ vectorbt PRO is next-gen framework for backtesting, algorithmic trading, and res
 
 ### Important Notes
 
-> ```plaintext
-> * It is illegal to publish, distribute, or sell the vectorbt PRO source code without a separate permission.
-> * Violation of the licensing terms will trigger a ban followed by a legal pursuit.
-> ```
+```plaintext
+* It is illegal to publish, distribute, or sell the vectorbt PRO source code without a separate permission.
+* Violation of the licensing terms will trigger a ban followed by a legal pursuit.
+```
 
 > The vectorbt PRO is hosted in a private repository on GitHub. The access to the repository is licensed and granted by invitation only on a paid basis. In order to access the repository, the users must obtain prepaid subscription plans at https://vectorbt.pro. The users pay for the continued access to the repository, including updates, support and maintenance (new exchanges, improvements, bugfixes and so on).
 
@@ -31,7 +31,7 @@ vectorbt PRO is next-gen framework for backtesting, algorithmic trading, and res
 
 ## Installation
 
-Installing vectorbt PRO requires visiting the https://vectorbt.pro website and obtaining a vectorbt PRO license. The license gives the access to the vectorbt PRO codebase in a private GitHub repository.
+> Installing vectorbt PRO requires visiting the https://vectorbt.pro website and obtaining a vectorbt PRO license. The license gives the access to the vectorbt PRO codebase in a private GitHub repository.
 
 ```bash
 # if you're using Git/HTTPS authentication
@@ -43,7 +43,7 @@ pip3 install git+ssh://git@github.com/vectorbt/vectorbt.pro.git
 
 ### Python Dependency
 
-With [setuptools](https://setuptools.readthedocs.io/en/latest/) adding vectorbt PRO as a dependency to your Python package can be done by listing it in setup.py or in your [Requirements Files](https://pip.pypa.io/en/latest/user_guide/#requirements-files):
+> With [setuptools](https://setuptools.readthedocs.io/en/latest/) adding vectorbt PRO as a dependency to your Python package can be done by listing it in setup.py or in your [Requirements Files](https://pip.pypa.io/en/latest/user_guide/#requirements-files):
 
 ```python
 # setup.py
