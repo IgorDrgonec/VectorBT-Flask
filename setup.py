@@ -42,7 +42,8 @@ setup(
         'data': [
             'yfinance>=0.1.63',
             'python-binance',
-            'ccxt'
+            'ccxt',
+            'tables'
         ],
         'ta': [
             'ta',
@@ -63,11 +64,11 @@ setup(
             'ipywidgets>=7.0.0'
         ],
         'stats': [
-            'quantstats',
+            'quantstats>=0.0.37',
             'PyPortfolioOpt'
         ],
         'misc': [
-            'python-telegram-bot>=13.4',  # LGPLv3
+            'python-telegram-bot>=13.4',
             'dill'
         ],
         'cov': [
@@ -76,7 +77,7 @@ setup(
             'codecov'
         ],
         'docs': [
-            'pdoc3'  # AGPL-3.0
+            'pdoc3'
         ]
     },
     python_requires='>=3.6, <3.10',
