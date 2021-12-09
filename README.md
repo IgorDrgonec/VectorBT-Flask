@@ -35,13 +35,13 @@ With vectorbt, you can
 ## Installation
 
 ```bash
-pip install vectorbt
+pip install --upgrade vectorbt
 ```
 
 To also install optional dependencies:
 
 ```bash
-pip install vectorbt[full]
+pip install --upgrade "vectorbt[full]"
 ```
 
 See [License](https://github.com/polakowo/vectorbt#license) notes on optional dependencies.
@@ -83,10 +83,10 @@ Here is how much profit we would have made if we invested $100 into Bitcoin in 2
 ```python
 import vectorbt as vbt
 
-price = vbt.YFData.download('BTC-USD').get('Close')
+price = vbt.YFData.fetch('BTC-USD').get('Close')
 
 pf = vbt.Portfolio.from_holding(price, init_cash=100)
-pf.total_profit()
+print(pf.total_profit)
 ```
 
 ```plaintext
@@ -98,11 +98,11 @@ The crossover of 10-day SMA and 50-day SMA:
 ```python
 fast_ma = vbt.MA.run(price, 10)
 slow_ma = vbt.MA.run(price, 50)
-entries = fast_ma.ma_above(slow_ma, crossover=True)
-exits = fast_ma.ma_below(slow_ma, crossover=True)
+entries = fast_ma.ma_crossed_above(slow_ma)
+exits = fast_ma.ma_crossed_below(slow_ma)
 
 pf = vbt.Portfolio.from_signals(price, entries, exits, init_cash=100)
-pf.total_profit()
+print(pf.total_profit)
 ```
 
 ```plaintext
@@ -115,13 +115,17 @@ Generate 1,000 random strategies and test them on BTC and ETH:
 import numpy as np
 
 symbols = ["BTC-USD", "ETH-USD"]
-price = vbt.YFData.download(symbols, missing_index='drop').get('Close')
+price = vbt.YFData.fetch(symbols, missing_index='drop').get('Close')
 
 n = np.random.randint(10, 101, size=1000).tolist()
 pf = vbt.Portfolio.from_random_signals(price, n=n, init_cash=100, seed=42)
 
-mean_expectancy = pf.trades.expectancy().groupby(['randnx_n', 'symbol']).mean()
-fig = mean_expectancy.unstack().vbt.scatterplot(xaxis_title='randnx_n', yaxis_title='mean_expectancy')
+fig = pf.trades \
+    .expectancy \
+    .groupby(['randnx_n', 'symbol']) \
+    .mean() \
+    .unstack() \
+    .vbt.scatterplot(xaxis_title='randnx_n', yaxis_title='mean_expectancy')
 fig.show()
 ```
 
@@ -132,17 +136,17 @@ dual SMA crossover strategy on BTC, USD, and LTC:
 
 ```python
 symbols = ["BTC-USD", "ETH-USD", "LTC-USD"]
-price = vbt.YFData.download(symbols, missing_index='drop').get('Close')
+price = vbt.YFData.fetch(symbols, missing_index='drop').get('Close')
 
 windows = np.arange(2, 101)
 fast_ma, slow_ma = vbt.MA.run_combs(price, window=windows, r=2, short_names=['fast', 'slow'])
-entries = fast_ma.ma_above(slow_ma, crossover=True)
-exits = fast_ma.ma_below(slow_ma, crossover=True)
+entries = fast_ma.ma_crossed_above(slow_ma)
+exits = fast_ma.ma_crossed_below(slow_ma)
 
 pf_kwargs = dict(size=np.inf, fees=0.001, freq='1D')
 pf = vbt.Portfolio.from_signals(price, entries, exits, **pf_kwargs)
 
-fig = pf.total_return().vbt.heatmap(
+fig = pf.total_return.vbt.heatmap(
     x_level='fast_window', y_level='slow_window', slider_level='symbol', symmetric=True,
     trace_kwargs=dict(colorbar=dict(title='Total return', tickformat='%')))
 fig.show()
@@ -153,7 +157,7 @@ fig.show()
 Digging into each strategy configuration is as simple as indexing with pandas:
 
 ```python
-pf[(10, 20, 'ETH-USD')].stats()
+print(pf[(10, 20, 'ETH-USD')].stats())
 ```
 
 ```plaintext
@@ -201,7 +205,7 @@ Let's generate a GIF that animates the %B and bandwidth of Bollinger Bands for d
 
 ```python
 symbols = ["BTC-USD", "ETH-USD", "ADA-USD"]
-price = vbt.YFData.download(symbols, period='6mo', missing_index='drop').get('Close')
+price = vbt.YFData.fetch(symbols, period='6mo', missing_index='drop').get('Close')
 bbands = vbt.BBANDS.run(price)
 
 def plot(index, bbands):
@@ -298,7 +302,7 @@ method is flexible towards inputs and can work on both Series and DataFrames.
 7.32 s ± 431 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
 
 # vectorbt
->>> mean_nb = njit(lambda col, i, x: np.mean(x))
+>>> mean_nb = njit(lambda x: np.mean(x))
 >>> %timeit big_ts.vbt.rolling_apply(2, mean_nb)
 86.2 ms ± 7.97 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
 ```
@@ -538,7 +542,7 @@ Please note: contribution to this project requires signing a Contributor Licence
 
 This work is [fair-code](http://faircode.io/) distributed under [Apache 2.0 with Commons Clause](https://github.com/polakowo/vectorbt/blob/master/LICENSE.md) license. 
 The source code is open and everyone (individuals and organizations) can use it for free. 
-However, it is not allowed to sell products and services that are mostly just this software.
+However, it is not allowed to sell products and services whose value derives mostly from this software.
 
 If you have any questions about this or want to apply for a license exception, please [contact the author](mailto:olegpolakow@gmail.com).
 

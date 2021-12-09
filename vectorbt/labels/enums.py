@@ -6,7 +6,7 @@
 Defines enums and other schemas for `vectorbt.labels`."""
 
 from vectorbt import _typing as tp
-from vectorbt.utils.docs import to_doc
+from vectorbt.utils.docs import stringify
 
 __all__ = [
     'TrendMode'
@@ -29,7 +29,7 @@ TrendMode = TrendModeT()
 __pdoc__['TrendMode'] = f"""Trend mode.
 
 ```json
-{to_doc(TrendMode)}
+{stringify(TrendMode)}
 ```
 
 Attributes:

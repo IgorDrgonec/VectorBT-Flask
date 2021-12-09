@@ -7,8 +7,7 @@ Technical indicators are used to see past trends and anticipate future moves.
 See [Using Technical Indicators to Develop Trading Strategies](https://www.investopedia.com/articles/trading/11/indicators-and-strategies-explained.asp)."""
 
 from vectorbt import _typing as tp
-from vectorbt.indicators.factory import IndicatorFactory, IndicatorBase
-from vectorbt.indicators.basic import (
+from vectorbt.indicators.custom import (
     MA,
     MSTD,
     BBANDS,
@@ -18,6 +17,7 @@ from vectorbt.indicators.basic import (
     ATR,
     OBV
 )
+from vectorbt.indicators.factory import IndicatorFactory, IndicatorBase
 
 
 def talib(*args, **kwargs) -> tp.Type[IndicatorBase]:

@@ -106,21 +106,19 @@ Name: group, dtype: object
 
 import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
 
 from vectorbt import _typing as tp
-from vectorbt.utils.colors import adjust_lightness
-from vectorbt.utils.figure import make_figure
-from vectorbt.utils.config import merge_dicts, Config
-from vectorbt.base.reshape_fns import to_2d_array
-from vectorbt.base.array_wrapper import ArrayWrapper
+from vectorbt.base.reshaping import to_2d_array
+from vectorbt.base.wrapping import ArrayWrapper
+from vectorbt.portfolio.enums import order_dt, OrderSide
 from vectorbt.records.base import Records
 from vectorbt.records.decorators import attach_fields, override_field_config
-from vectorbt.portfolio.enums import order_dt, OrderSide
+from vectorbt.utils.colors import adjust_lightness
+from vectorbt.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig
 
 __pdoc__ = {}
 
-orders_field_config = Config(
+orders_field_config = ReadonlyConfig(
     dict(
         dtype=order_dt,
         settings=dict(
@@ -141,34 +139,30 @@ orders_field_config = Config(
                 mapping=OrderSide
             )
         )
-    ),
-    readonly=True,
-    as_attrs=False
+    )
 )
 """_"""
 
 __pdoc__['orders_field_config'] = f"""Field config for `Orders`.
 
 ```json
-{orders_field_config.to_doc()}
+{orders_field_config.stringify()}
 ```
 """
 
-orders_attach_field_config = Config(
+orders_attach_field_config = ReadonlyConfig(
     dict(
         side=dict(
             attach_filters=True
         )
-    ),
-    readonly=True,
-    as_attrs=False
+    )
 )
 """_"""
 
 __pdoc__['orders_attach_field_config'] = f"""Config of fields to be attached to `Orders`.
 
 ```json
-{orders_attach_field_config.to_doc()}
+{orders_attach_field_config.stringify()}
 ```
 """
 
@@ -214,8 +208,10 @@ class Orders(Records):
 
     @property
     def close(self) -> tp.Optional[tp.SeriesFrame]:
-        """Reference price such as close (optional)."""
-        return self._close
+        """Closing price."""
+        if self._close is None:
+            return None
+        return self.wrapper.wrap(self._close, group_by=False)
 
     # ############# Stats ############# #
 
@@ -233,7 +229,7 @@ class Orders(Records):
             orders_stats_cfg
         )
 
-    _metrics: tp.ClassVar[Config] = Config(
+    _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
             start=dict(
                 title='Start',
@@ -334,8 +330,7 @@ class Orders(Records):
                 calc_func='sell.fees.mean',
                 tags=['orders', 'sell', 'fees']
             ),
-        ),
-        copy_kwargs=dict(copy_mode='deep')
+        )
     )
 
     @property
@@ -379,6 +374,10 @@ class Orders(Records):
         ```
 
         ![](/docs/img/orders_plot.svg)"""
+        from vectorbt.opt_packages import assert_can_import
+        assert_can_import('plotly')
+        import plotly.graph_objects as go
+        from vectorbt.utils.figure import make_figure
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']
 
@@ -515,8 +514,7 @@ class Orders(Records):
                 plot_func='plot',
                 tags='orders'
             )
-        ),
-        copy_kwargs=dict(copy_mode='deep')
+        )
     )
 
     @property

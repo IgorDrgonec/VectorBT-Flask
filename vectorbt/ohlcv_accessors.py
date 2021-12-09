@@ -89,24 +89,22 @@ Name: agg_func_mean, dtype: object
 
 import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
 
 from vectorbt import _typing as tp
-from vectorbt.root_accessors import register_dataframe_vbt_accessor
-from vectorbt.utils.figure import make_figure, make_subplots
-from vectorbt.utils.config import merge_dicts, Config
-from vectorbt.generic.accessors import GenericAccessor, GenericDFAccessor
 from vectorbt.generic import nb
+from vectorbt.generic.accessors import GenericAccessor, GenericDFAccessor
+from vectorbt.root_accessors import register_df_vbt_accessor
+from vectorbt.utils.config import merge_dicts, Config, HybridConfig
 
 __pdoc__ = {}
 
 
-@register_dataframe_vbt_accessor('ohlc')
-@register_dataframe_vbt_accessor('ohlcv')
+@register_df_vbt_accessor('ohlc')
+@register_df_vbt_accessor('ohlcv')
 class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
     """Accessor on top of OHLCV data. For DataFrames only.
 
-    Accessible through `pd.DataFrame.vbt.ohlcv`."""
+    Accessible via `pd.DataFrame.vbt.ohlcv`."""
 
     def __init__(self, obj: tp.Frame, column_names: tp.KwargsLike = None, **kwargs) -> None:
         self._column_names = column_names
@@ -165,7 +163,6 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             return None
         return pd.concat(to_concat, axis=1)
 
-
     @property
     def volume(self) -> tp.Optional[tp.Series]:
         """Volume series."""
@@ -187,7 +184,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             ohlcv_stats_cfg
         )
 
-    _metrics: tp.ClassVar[Config] = Config(
+    _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
             start=dict(
                 title='Start',
@@ -256,8 +253,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
                 resolve_volume=True,
                 tags=['ohlcv', 'volume']
             ),
-        ),
-        copy_kwargs=dict(copy_mode='deep')
+        )
     )
 
     @property
@@ -294,11 +290,15 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
         ```python-repl
         >>> import vectorbt as vbt
 
-        >>> vbt.YFData.download("BTC-USD").get().vbt.ohlcv.plot()
+        >>> vbt.YFData.fetch("BTC-USD").get().vbt.ohlcv.plot()
         ```
 
         ![](/docs/img/ohlcv_plot.svg)
         """
+        from vectorbt.opt_packages import assert_can_import
+        assert_can_import('plotly')
+        import plotly.graph_objects as go
+        from vectorbt.utils.figure import make_figure, make_subplots
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']
         ohlcv_cfg = settings['ohlcv']
@@ -428,8 +428,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
                 show_volume=False,
                 tags='ohlcv'
             )
-        ),
-        copy_kwargs=dict(copy_mode='deep')
+        )
     )
 
     @property

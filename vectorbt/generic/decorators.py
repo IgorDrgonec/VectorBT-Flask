@@ -6,36 +6,39 @@
 import inspect
 
 from vectorbt import _typing as tp
+from vectorbt.ch_registry import ch_registry
+from vectorbt.jit_registry import jit_registry
 from vectorbt.utils import checks
-from vectorbt.utils.config import merge_dicts, Config, get_func_arg_names
+from vectorbt.utils.config import merge_dicts, Config
+from vectorbt.utils.parsing import get_func_arg_names
 
-WrapperFuncT = tp.Callable[[tp.Type[tp.T]], tp.Type[tp.T]]
 
+def attach_nb_methods(config: Config) -> tp.ClassWrapper:
+    """Class decorator to attach Numba methods.
 
-def attach_nb_methods(config: Config) -> WrapperFuncT:
-    """Class decorator to add Numba methods.
+    `config` must contain target method names (keys) and dictionaries (values) with the following keys:
 
-    `config` should contain target method names (keys) and dictionaries (values) with the following keys:
-
-    * `func`: Function that should be wrapped. The first argument should expect a 2-dim array.
+    * `func`: Function that must be wrapped. The first argument must expect a 2-dim array.
     * `is_reducing`: Whether the function is reducing. Defaults to False.
-    * `path`: Path to the function for documentation. Defaults to `func.__name__`.
+    * `disable_jitted`: Whether to disable the `jitted` option.
+    * `disable_chunked`: Whether to disable the `chunked` option.
     * `replace_signature`: Whether to replace the target signature with the source signature. Defaults to True.
     * `wrap_kwargs`: Default keyword arguments for wrapping. Will be merged with the dict supplied by the user.
         Defaults to `dict(name_or_index=target_name)` for reducing functions.
 
-    The class should be a subclass of `vectorbt.base.array_wrapper.Wrapping`.
+    The class must be a subclass of `vectorbt.base.wrapping.Wrapping`.
     """
 
     def wrapper(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
-        from vectorbt.base.array_wrapper import Wrapping
+        from vectorbt.base.wrapping import Wrapping
 
         checks.assert_subclass_of(cls, Wrapping)
 
         for target_name, settings in config.items():
             func = settings['func']
             is_reducing = settings.get('is_reducing', False)
-            path = settings.get('path', func.__name__)
+            disable_jitted = settings.get('disable_jitted', False)
+            disable_chunked = settings.get('disable_chunked', False)
             replace_signature = settings.get('replace_signature', True)
             default_wrap_kwargs = settings.get('wrap_kwargs', dict(name_or_index=target_name) if is_reducing else None)
 
@@ -44,12 +47,24 @@ def attach_nb_methods(config: Config) -> WrapperFuncT:
                            _target_name: str = target_name,
                            _func: tp.Callable = func,
                            _is_reducing: bool = is_reducing,
+                           _disable_jitted: bool = disable_jitted,
+                           _disable_chunked: bool = disable_chunked,
                            _default_wrap_kwargs: tp.KwargsLike = default_wrap_kwargs,
+                           jitted: tp.JittedOption = None,
+                           chunked: tp.ChunkedOption = None,
                            wrap_kwargs: tp.KwargsLike = None,
                            **kwargs) -> tp.SeriesFrame:
                 args = (self.to_2d_array(),) + args
                 inspect.signature(_func).bind(*args, **kwargs)
 
+                if not _disable_jitted:
+                    _func = jit_registry.resolve_option(_func, jitted)
+                elif jitted is not None:
+                    raise ValueError("This method doesn't support jitting")
+                if not _disable_chunked:
+                    _func = ch_registry.resolve_option(_func, chunked)
+                elif chunked is not None:
+                    raise ValueError("This method doesn't support chunking")
                 a = _func(*args, **kwargs)
                 wrap_kwargs = merge_dicts(_default_wrap_kwargs, wrap_kwargs)
                 if _is_reducing:
@@ -61,12 +76,18 @@ def attach_nb_methods(config: Config) -> WrapperFuncT:
                 source_sig = inspect.signature(func)
                 new_method_params = tuple(inspect.signature(new_method).parameters.values())
                 self_arg = new_method_params[0]
+                jitted_arg = new_method_params[-4]
+                chunked_arg = new_method_params[-3]
                 wrap_kwargs_arg = new_method_params[-2]
-                source_sig = source_sig.replace(
-                    parameters=(self_arg,) + tuple(source_sig.parameters.values())[1:] + (wrap_kwargs_arg,))
+                new_parameters = (self_arg,) + tuple(source_sig.parameters.values())[1:]
+                if not disable_jitted:
+                    new_parameters += (jitted_arg,)
+                if not disable_chunked:
+                    new_parameters += (chunked_arg,)
+                new_parameters += (wrap_kwargs_arg,)
                 new_method.__signature__ = source_sig
 
-            new_method.__doc__ = f"See `{path}`."
+            new_method.__doc__ = f"See `{func.__module__ + '.' + func.__name__}`."
             new_method.__qualname__ = f"{cls.__name__}.{target_name}"
             new_method.__name__ = target_name
             setattr(cls, target_name, new_method)
@@ -75,16 +96,16 @@ def attach_nb_methods(config: Config) -> WrapperFuncT:
     return wrapper
 
 
-def attach_transform_methods(config: Config) -> WrapperFuncT:
+def attach_transform_methods(config: Config) -> tp.ClassWrapper:
     """Class decorator to add transformation methods.
 
-    `config` should contain target method names (keys) and dictionaries (values) with the following keys:
+    `config` must contain target method names (keys) and dictionaries (values) with the following keys:
 
     * `transformer`: Transformer class/object.
     * `docstring`: Method docstring. Defaults to "See `{transformer}.__name__`.".
     * `replace_signature`: Whether to replace the target signature. Defaults to True.
 
-    The class should be a subclass of `vectorbt.generic.accessors.GenericAccessor`.
+    The class must be a subclass of `vectorbt.generic.accessors.GenericAccessor`.
     """
 
     def wrapper(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:

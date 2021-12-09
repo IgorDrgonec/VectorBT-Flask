@@ -1,22 +1,14 @@
+import os
+from collections import namedtuple
+from datetime import datetime
+from itertools import product
+
 import numpy as np
 import pandas as pd
-from numba import njit
-from datetime import datetime
 import pytest
-from itertools import product
-from collections import namedtuple
+from numba import njit
 
 import vectorbt as vbt
-
-ray_available = True
-try:
-    import ray
-
-    if ray.is_initialized():
-        ray.shutdown()
-    ray.init()
-except:
-    ray_available = False
 
 ta_available = True
 try:
@@ -42,10 +34,10 @@ seed = 42
 # ############# Global ############# #
 
 def setup_module():
+    if os.environ.get('VBT_DISABLE_CACHING', '0') == '1':
+        vbt.settings.caching['disable_machinery'] = True
+    vbt.settings.pbar['disable'] = True
     vbt.settings.numba['check_func_suffix'] = True
-    vbt.settings.caching.enabled = False
-    vbt.settings.caching.whitelist = []
-    vbt.settings.caching.blacklist = []
 
 
 def teardown_module():
@@ -91,11 +83,11 @@ class TestFactory:
             return ts * p[i] + a + b  # numba doesn't support **kwargs
 
         def custom_func(ts, p, *args, **kwargs):
-            return vbt.base.combine_fns.apply_and_concat_one(len(p), apply_func, ts, p, *args, **kwargs)
+            return vbt.base.combining.apply_and_concat(len(p), apply_func, ts, p, *args, **kwargs)
 
         @njit
         def custom_func_nb(ts, p, *args):
-            return vbt.base.combine_fns.apply_and_concat_one_nb(len(p), apply_func_nb, ts, p, *args)
+            return vbt.base.combining.apply_and_concat_one_nb(len(p), apply_func_nb, ts, p, *args)
 
         target = pd.DataFrame(
             np.array([
@@ -281,7 +273,7 @@ class TestFactory:
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True, var_args=True).run(ts['a'], [0, 1], 10, 100).out,
+            F.from_apply_func(apply_func_nb, jitted_loop=True, var_args=True).run(ts['a'], [0, 1], 10, 100).out,
             target
         )
         target = pd.DataFrame(
@@ -313,7 +305,7 @@ class TestFactory:
             target
         )
         pd.testing.assert_series_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True, var_args=True)
+            F.from_apply_func(apply_func_nb, jitted_loop=True, var_args=True)
                 .run(ts['a'], 0, 10, 100).out,
             target
         )
@@ -322,24 +314,40 @@ class TestFactory:
             target
         )
         pd.testing.assert_series_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True, var_args=True)
+            F.from_apply_func(apply_func_nb, jitted_loop=True, var_args=True)
                 .run(ts['a'], 0, 10, 100, per_column=True).out,
             target
         )
 
-    def test_use_ray(self):
-        if ray_available:
-            F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p'], output_names=['out'])
+    def test_templates(self):
+        F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p'], output_names=['out'])
 
-            def apply_func(ts, p, a, b=10):
-                return ts * p + a + b
+        def apply_func(ts, p, a, b=10):
+            return ts * p + a + b
 
-            pd.testing.assert_frame_equal(
-                F.from_apply_func(apply_func, var_args=True)
-                    .run(ts, np.arange(10), 10, b=100).out,
-                F.from_apply_func(apply_func, var_args=True)
-                    .run(ts, np.arange(10), 10, b=100, use_ray=True, ray_shutdown=True).out,
-            )
+        target = pd.DataFrame(
+            np.array([
+                [110., 110., 110., 111., 115., 111.],
+                [110., 110., 110., 112., 114., 112.],
+                [110., 110., 110., 113., 113., 113.],
+                [110., 110., 110., 114., 112., 112.],
+                [110., 110., 110., 115., 111., 111.]
+            ]),
+            index=ts.index,
+            columns=pd.MultiIndex.from_tuples([
+                (0, 'a'),
+                (0, 'b'),
+                (0, 'c'),
+                (1, 'a'),
+                (1, 'b'),
+                (1, 'c')
+            ], names=['custom_p', None])
+        )
+        pd.testing.assert_frame_equal(
+            F.from_apply_func(apply_func, var_args=True).run(
+                ts, [0, 1], vbt.RepEval('10'), b=vbt.Rep('b'), template_mapping=dict(b=100)).out,
+            target
+        )
 
     def test_no_inputs(self):
         F = vbt.IndicatorFactory(param_names=['p'], output_names=['out'])
@@ -372,7 +380,7 @@ class TestFactory:
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True).run([0, 1]).out,
+            F.from_apply_func(apply_func_nb, jitted_loop=True).run([0, 1]).out,
             target
         )
         with pytest.raises(Exception):
@@ -397,7 +405,7 @@ class TestFactory:
             target
         )
         pd.testing.assert_series_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True, require_input_shape=True).run(5, 0).out,
+            F.from_apply_func(apply_func_nb, jitted_loop=True, require_input_shape=True).run(5, 0).out,
             target
         )
         target = pd.DataFrame(
@@ -416,7 +424,7 @@ class TestFactory:
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True, require_input_shape=True).run(5, [0, 1]).out,
+            F.from_apply_func(apply_func_nb, jitted_loop=True, require_input_shape=True).run(5, [0, 1]).out,
             target
         )
         target = pd.DataFrame(
@@ -443,7 +451,7 @@ class TestFactory:
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True, require_input_shape=True).run(
+            F.from_apply_func(apply_func_nb, jitted_loop=True, require_input_shape=True).run(
                 (5, 3), [0, 1], input_index=ts.index, input_columns=ts.columns).out,
             target
         )
@@ -468,7 +476,7 @@ class TestFactory:
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True, require_input_shape=True).run(
+            F.from_apply_func(apply_func_nb, jitted_loop=True, require_input_shape=True).run(
                 (5, 3), [0, 1, 2], input_index=ts.index, input_columns=ts.columns, per_column=True).out,
             target
         )
@@ -506,7 +514,7 @@ class TestFactory:
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True).run(ts, ts, [0, 1]).out,
+            F.from_apply_func(apply_func_nb, jitted_loop=True).run(ts, ts, [0, 1]).out,
             target
         )
         target = pd.DataFrame(
@@ -529,7 +537,7 @@ class TestFactory:
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True).run(ts, ts, [0, 1, 2], per_column=True).out,
+            F.from_apply_func(apply_func_nb, jitted_loop=True).run(ts, ts, [0, 1, 2], per_column=True).out,
             target
         )
 
@@ -548,7 +556,7 @@ class TestFactory:
             ts * 2
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True).run(ts).out,
+            F.from_apply_func(apply_func_nb, jitted_loop=True).run(ts).out,
             ts * 2
         )
         pd.testing.assert_frame_equal(
@@ -556,7 +564,7 @@ class TestFactory:
             ts * 2
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True).run(ts, per_column=True).out,
+            F.from_apply_func(apply_func_nb, jitted_loop=True).run(ts, per_column=True).out,
             ts * 2
         )
 
@@ -575,7 +583,7 @@ class TestFactory:
             pd.DataFrame(np.full((3, 3), 1))
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True).run().out,
+            F.from_apply_func(apply_func_nb, jitted_loop=True).run().out,
             pd.DataFrame(np.full((3, 3), 1))
         )
         with pytest.raises(Exception):
@@ -614,7 +622,7 @@ class TestFactory:
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True).run(ts, np.asarray([0, 1]), 2).out,
+            F.from_apply_func(apply_func_nb, jitted_loop=True).run(ts, np.asarray([0, 1]), 2).out,
             target
         )
         target = pd.DataFrame(
@@ -637,7 +645,7 @@ class TestFactory:
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True).run(ts, np.asarray([0, 1, 2]), 2, per_column=True).out,
+            F.from_apply_func(apply_func_nb, jitted_loop=True).run(ts, np.asarray([0, 1, 2]), 2, per_column=True).out,
             target
         )
         pd.testing.assert_frame_equal(
@@ -685,7 +693,7 @@ class TestFactory:
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True).run(ts, np.asarray([0, 1, 2]), param_settings={'p': {
+            F.from_apply_func(apply_func_nb, jitted_loop=True).run(ts, np.asarray([0, 1, 2]), param_settings={'p': {
                 'is_array_like': True
             }}).out,
             target
@@ -714,7 +722,7 @@ class TestFactory:
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True).run(ts, np.asarray([0, 1, 2]), param_settings={'p': {
+            F.from_apply_func(apply_func_nb, jitted_loop=True).run(ts, np.asarray([0, 1, 2]), param_settings={'p': {
                 'is_array_like': True,
                 'bc_to_input': 1,
                 'per_column': True
@@ -833,7 +841,7 @@ class TestFactory:
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True).run(ts, [0, 1], [2, 3], param_product=True).out,
+            F.from_apply_func(apply_func_nb, jitted_loop=True).run(ts, [0, 1], [2, 3], param_product=True).out,
             target
         )
 
@@ -856,7 +864,7 @@ class TestFactory:
             F.from_apply_func(apply_func).run(ts, 0, [1, 2], 3).out
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func, ts2='ts1').run(ts, [1, 2], 3).out,
+            F.from_apply_func(apply_func, ts2=vbt.Ref('ts1')).run(ts, [1, 2], 3).out,
             F.from_apply_func(apply_func).run(ts, ts, [1, 2], 3).out
         )
         # default params
@@ -867,7 +875,7 @@ class TestFactory:
                 .run(ts, ts, [1, 2], 0).out
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func, p2='p1', hide_default=False)
+            F.from_apply_func(apply_func, p2=vbt.Ref('p1'), hide_default=False)
                 .run(ts, ts, [1, 2]).out,
             F.from_apply_func(apply_func, hide_default=False)
                 .run(ts, ts, [1, 2], [1, 2]).out
@@ -880,13 +888,13 @@ class TestFactory:
                     .run(ts, ts, [1, 2], 3).in_out2
             )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func, in_out1=1, in_out2='in_out1')
+            F.from_apply_func(apply_func, in_out1=1, in_out2=vbt.Ref('in_out1'))
                 .run(ts, ts, [1, 2], 3).in_out2,
             F.from_apply_func(apply_func, in_out1=1, in_out2=1)
                 .run(ts, ts, [1, 2], 3).in_out2
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func, in_out1=1, in_out2='ts1')
+            F.from_apply_func(apply_func, in_out1=1, in_out2=vbt.Ref('ts1'))
                 .run(ts, ts, [1, 2], 3).in_out2,
             F.from_apply_func(apply_func, in_out1=1, in_out2=ts)
                 .run(ts, ts, [1, 2], 3).in_out2
@@ -945,7 +953,7 @@ class TestFactory:
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True).run(ts, [0, 1]).o1,
+            F.from_apply_func(apply_func_nb, jitted_loop=True).run(ts, [0, 1]).o1,
             target
         )
         pd.testing.assert_frame_equal(
@@ -953,7 +961,7 @@ class TestFactory:
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True)
+            F.from_apply_func(apply_func_nb, jitted_loop=True)
                 .run(ts.vbt.tile(2), [0, 0, 0, 1, 1, 1], per_column=True).o1,
             target
         )
@@ -973,7 +981,7 @@ class TestFactory:
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True).run(ts, [0, 1]).o2,
+            F.from_apply_func(apply_func_nb, jitted_loop=True).run(ts, [0, 1]).o2,
             target
         )
         pd.testing.assert_frame_equal(
@@ -981,7 +989,7 @@ class TestFactory:
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True)
+            F.from_apply_func(apply_func_nb, jitted_loop=True)
                 .run(ts.vbt.tile(2), [0, 0, 0, 1, 1, 1], per_column=True).o2,
             target
         )
@@ -1027,7 +1035,7 @@ class TestFactory:
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True, in_out=-1).run(ts, [0, 1]).in_out,
+            F.from_apply_func(apply_func_nb, jitted_loop=True, in_out=-1).run(ts, [0, 1]).in_out,
             target
         )
         pd.testing.assert_frame_equal(
@@ -1035,7 +1043,7 @@ class TestFactory:
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True).run(ts, [0, 1], in_out=-1).in_out,
+            F.from_apply_func(apply_func_nb, jitted_loop=True).run(ts, [0, 1], in_out=-1).in_out,
             target
         )
         pd.testing.assert_frame_equal(
@@ -1043,7 +1051,7 @@ class TestFactory:
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True)
+            F.from_apply_func(apply_func_nb, jitted_loop=True)
                 .run(ts, [0, 1], in_out=np.full(ts.shape, -1, dtype=int)).in_out,
             target
         )
@@ -1067,7 +1075,7 @@ class TestFactory:
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True).run(ts, [0, 1, 2], in_out=-1, per_column=True).in_out,
+            F.from_apply_func(apply_func_nb, jitted_loop=True).run(ts, [0, 1, 2], in_out=-1, per_column=True).in_out,
             target
         )
         pd.testing.assert_frame_equal(
@@ -1076,7 +1084,7 @@ class TestFactory:
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True)
+            F.from_apply_func(apply_func_nb, jitted_loop=True)
                 .run(ts, [0, 1, 2], in_out=np.full(ts.shape, -1, dtype=int), per_column=True).in_out,
             target
         )
@@ -1117,7 +1125,7 @@ class TestFactory:
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True, in_output_settings=dict(in_out=dict(dtype=np.int_)))
+            F.from_apply_func(apply_func_nb, jitted_loop=True, in_output_settings=dict(in_out=dict(dtype=np.int_)))
                 .run([0, 1], input_shape=ts.shape, input_index=ts.index, input_columns=ts.columns).in_out,
             target
         )
@@ -1137,7 +1145,7 @@ class TestFactory:
             ts * 2
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, numba_loop=True, kwargs_to_args=['kw']).run(ts, kw=2).out,
+            F.from_apply_func(apply_func_nb, jitted_loop=True, kwargs_to_args=['kw']).run(ts, kw=2).out,
             ts * 2
         )
 
@@ -1434,9 +1442,9 @@ class TestFactory:
                     pd.testing.assert_series_equal(_in_out, ts['a'].vbt.wrapper.wrap(_in_out.values))
             return _ts
 
-        _ = F.from_custom_func(custom_func, to_2d=test_to_2d, keep_pd=test_keep_pd, var_args=True) \
+        F.from_custom_func(custom_func, to_2d=test_to_2d, keep_pd=test_keep_pd, var_args=True) \
             .run(ts['a'])
-        _ = F.from_apply_func(apply_func, to_2d=test_to_2d, keep_pd=test_keep_pd, var_args=True) \
+        F.from_apply_func(apply_func, to_2d=test_to_2d, keep_pd=test_keep_pd, var_args=True) \
             .run(ts['a'])
 
         def custom_func(_ts, _in_out, col=None):
@@ -1473,12 +1481,12 @@ class TestFactory:
                     pd.testing.assert_series_equal(_in_out, ts.iloc[:, col].vbt.wrapper.wrap(_in_out.values))
             return _ts
 
-        _ = F.from_custom_func(custom_func, to_2d=test_to_2d, keep_pd=test_keep_pd, var_args=True) \
+        F.from_custom_func(custom_func, to_2d=test_to_2d, keep_pd=test_keep_pd, var_args=True) \
             .run(ts['a'], per_column=True, pass_col=True)
-        _ = F.from_apply_func(apply_func, to_2d=test_to_2d, keep_pd=test_keep_pd, var_args=True) \
+        F.from_apply_func(apply_func, to_2d=test_to_2d, keep_pd=test_keep_pd, var_args=True) \
             .run(ts['a'], per_column=True, pass_col=True)
 
-    def test_as_lists(self):
+    def test_pass_packed(self):
         F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p'], output_names=['out'])
 
         def custom_func(input_list, in_output_list, param_list):
@@ -1498,19 +1506,19 @@ class TestFactory:
             ], names=['custom_p', None])
         )
         pd.testing.assert_frame_equal(
-            F.from_custom_func(custom_func, as_lists=True).run(ts, 2).out,
+            F.from_custom_func(custom_func, pass_packed=True).run(ts, 2).out,
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_custom_func(custom_func_nb, as_lists=True).run(ts, 2).out,
+            F.from_custom_func(custom_func_nb, pass_packed=True).run(ts, 2).out,
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_custom_func(custom_func, as_lists=True).run(ts, 2, per_column=True).out,
+            F.from_custom_func(custom_func, pass_packed=True).run(ts, 2, per_column=True).out,
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_custom_func(custom_func_nb, as_lists=True).run(ts, 2, per_column=True).out,
+            F.from_custom_func(custom_func_nb, pass_packed=True).run(ts, 2, per_column=True).out,
             target
         )
 
@@ -1952,7 +1960,7 @@ class TestFactory:
             )
         )
         pd.testing.assert_frame_equal(
-            obj.out_above(2, crossover=True),
+            obj.out_crossed_above(2),
             pd.DataFrame(
                 np.array([
                     [False, False, False],
@@ -2168,14 +2176,19 @@ class TestFactory:
             '_tuple_loc',
             '_tuple_mapper',
             '_wrapper',
+            '_writeable_attrs',
             'apply_func',
             'build_metrics_doc',
             'build_subplots_doc',
+            'cls_dir',
             'config',
             'copy',
             'custom_func',
             'deep_getattr',
             'dumps',
+            'get_ca_setup',
+            'get_writeable_attrs',
+            'getsize',
             'iloc',
             'in_out',
             'in_out_readable',
@@ -2192,6 +2205,8 @@ class TestFactory:
             'o1',
             'o1_above',
             'o1_below',
+            'o1_crossed_above',
+            'o1_crossed_below',
             'o1_equal',
             'o1_stats',
             'o2',
@@ -2216,6 +2231,7 @@ class TestFactory:
             'replace',
             'resolve_attr',
             'resolve_self',
+            'resolve_shortcut_attr',
             'run',
             'run_combs',
             'save',
@@ -2225,17 +2241,18 @@ class TestFactory:
             'short_name',
             'stats',
             'stats_defaults',
+            'stringify',
             'subplots',
-            'to_doc',
             'ts',
             'ts_above',
             'ts_below',
+            'ts_crossed_above',
+            'ts_crossed_below',
             'ts_equal',
             'ts_stats',
             'tuple_loc',
             'update_config',
             'wrapper',
-            'writeable_attrs',
             'xs'
         ]
 
@@ -2406,7 +2423,7 @@ class TestFactory:
             )
 
 
-# ############# basic.py ############# #
+# ############# custom.py ############# #
 
 close_ts = pd.Series([1, 2, 3, 4, 3, 2, 1], index=pd.DatetimeIndex([
     datetime(2018, 1, 1),

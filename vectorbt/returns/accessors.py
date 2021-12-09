@@ -134,36 +134,36 @@ dtype: object
 This class inherits subplots from `vectorbt.generic.accessors.GenericAccessor`.
 """
 
+import warnings
+
 import numpy as np
 import pandas as pd
 from scipy.stats import skew, kurtosis
-import warnings
 
 from vectorbt import _typing as tp
-from vectorbt.root_accessors import register_dataframe_vbt_accessor, register_series_vbt_accessor
-from vectorbt.utils import checks
-from vectorbt.utils.config import merge_dicts, Config
-from vectorbt.utils.figure import make_figure, get_domain
-from vectorbt.utils.datetime_ import freq_to_timedelta, DatetimeIndexes
-from vectorbt.base.reshape_fns import to_1d_array, to_2d_array, broadcast, broadcast_to
-from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
+from vectorbt.base.reshaping import to_1d_array, to_2d_array, broadcast, broadcast_to
+from vectorbt.base.wrapping import ArrayWrapper, Wrapping
+from vectorbt.ch_registry import ch_registry
+from vectorbt.generic.accessors import GenericAccessor, GenericSRAccessor, GenericDFAccessor
 from vectorbt.generic.drawdowns import Drawdowns
-from vectorbt.generic.accessors import (
-    GenericAccessor,
-    GenericSRAccessor,
-    GenericDFAccessor
-)
+from vectorbt.jit_registry import jit_registry
 from vectorbt.returns import nb, metrics
+from vectorbt.root_accessors import register_vbt_accessor, register_df_vbt_accessor, register_sr_vbt_accessor
+from vectorbt.utils import checks
+from vectorbt.utils import chunking as ch
+from vectorbt.utils.config import resolve_dict, merge_dicts, HybridConfig, Config
+from vectorbt.utils.datetime_ import freq_to_timedelta, DatetimeIndexes
 
 __pdoc__ = {}
 
 ReturnsAccessorT = tp.TypeVar("ReturnsAccessorT", bound="ReturnsAccessor")
 
 
+@register_vbt_accessor('returns')
 class ReturnsAccessor(GenericAccessor):
     """Accessor on top of return series. For both, Series and DataFrames.
 
-    Accessible through `pd.Series.vbt.returns` and `pd.DataFrame.vbt.returns`.
+    Accessible via `pd.Series.vbt.returns` and `pd.DataFrame.vbt.returns`.
 
     Args:
         obj (pd.Series or pd.DataFrame): Pandas object representing returns.
@@ -233,6 +233,8 @@ class ReturnsAccessor(GenericAccessor):
                    value: tp.SeriesFrame,
                    init_value: tp.MaybeSeries = np.nan,
                    broadcast_kwargs: tp.KwargsLike = None,
+                   jitted: tp.JittedOption = None,
+                   chunked: tp.ChunkedOption = None,
                    wrap_kwargs: tp.KwargsLike = None,
                    **kwargs) -> ReturnsAccessorT:
         """Returns a new `ReturnsAccessor` instance with returns calculated from `value`."""
@@ -245,7 +247,9 @@ class ReturnsAccessor(GenericAccessor):
         value_2d = to_2d_array(value)
         init_value = broadcast(init_value, to_shape=value_2d.shape[1], **broadcast_kwargs)
 
-        returns = nb.returns_nb(value_2d, init_value)
+        func = jit_registry.resolve_option(nb.returns_nb, jitted)
+        func = ch_registry.resolve_option(func, chunked)
+        returns = func(value_2d, init_value)
         returns = ArrayWrapper.from_obj(value).wrap(returns, **wrap_kwargs)
         return cls(returns, **kwargs)
 
@@ -272,7 +276,7 @@ class ReturnsAccessor(GenericAccessor):
         """Get annualization factor."""
         if self.wrapper.freq is None:
             raise ValueError("Index frequency is None. "
-                             "Pass it as `freq` or define it globally under `settings.array_wrapper`.")
+                             "Pass it as `freq` or define it globally under `settings.wrapping`.")
         if self.year_freq is None:
             raise ValueError("Year frequency is None. "
                              "Pass `year_freq` or define it globally under `settings.returns`.")
@@ -292,89 +296,132 @@ class ReturnsAccessor(GenericAccessor):
             self._defaults
         )
 
-    def daily(self, **kwargs) -> tp.SeriesFrame:
+    def daily(self, jitted: tp.JittedOption = None, **kwargs) -> tp.SeriesFrame:
         """Daily returns."""
         checks.assert_instance_of(self.wrapper.index, DatetimeIndexes)
 
         if self.wrapper.freq == pd.Timedelta('1D'):
             return self.obj
-        return self.resample_apply('1D', nb.total_return_apply_nb, **kwargs)
+        func = jit_registry.resolve_option(nb.cum_returns_final_1d_nb, jitted)
+        return self.resample_apply('1D', func, jitted=jitted, **kwargs)
 
-    def annual(self, **kwargs) -> tp.SeriesFrame:
+    def annual(self, jitted: tp.JittedOption = None, **kwargs) -> tp.SeriesFrame:
         """Annual returns."""
         checks.assert_instance_of(self.obj.index, DatetimeIndexes)
 
         if self.wrapper.freq == self.year_freq:
             return self.obj
-        return self.resample_apply(self.year_freq, nb.total_return_apply_nb, **kwargs)
+        func = jit_registry.resolve_option(nb.cum_returns_final_1d_nb, jitted)
+        return self.resample_apply(self.year_freq, func, jitted=jitted, **kwargs)
 
     def cumulative(self,
                    start_value: tp.Optional[float] = None,
+                   jitted: tp.JittedOption = None,
+                   chunked: tp.ChunkedOption = None,
                    wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """See `vectorbt.returns.nb.cum_returns_nb`."""
         if start_value is None:
             start_value = self.defaults['start_value']
-        cumulative = nb.cum_returns_nb(self.to_2d_array(), start_value)
-        wrap_kwargs = merge_dicts({}, wrap_kwargs)
+        func = jit_registry.resolve_option(nb.cum_returns_nb, jitted)
+        func = ch_registry.resolve_option(func, chunked)
+        cumulative = func(self.to_2d_array(), start_value)
+        wrap_kwargs = resolve_dict(wrap_kwargs)
         return self.wrapper.wrap(cumulative, group_by=False, **wrap_kwargs)
 
-    def total(self, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def total(self,
+              jitted: tp.JittedOption = None,
+              chunked: tp.ChunkedOption = None,
+              wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.cum_returns_final_nb`."""
-        result = nb.cum_returns_final_nb(self.to_2d_array(), 0.)
+        func = jit_registry.resolve_option(nb.cum_returns_final_nb, jitted)
+        func = ch_registry.resolve_option(func, chunked)
+        out = func(self.to_2d_array(), 0.)
         wrap_kwargs = merge_dicts(dict(name_or_index='total_return'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
+        return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def rolling_total(self,
                       window: tp.Optional[int] = None,
                       minp: tp.Optional[int] = None,
-                      wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+                      chunked: tp.ChunkedOption = None,
+                      **kwargs) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.total`."""
         if window is None:
             window = self.defaults['window']
         if minp is None:
             minp = self.defaults['minp']
-        result = nb.rolling_cum_returns_final_nb(self.to_2d_array(), window, minp, 0.)
-        wrap_kwargs = merge_dicts({}, wrap_kwargs)
-        return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
+        chunked = ch.specialize_chunked_option(
+            chunked,
+            arg_take_spec=dict(args=ch.ArgsTaker(None, ))
+        )
+        return self.rolling_apply(
+            window,
+            nb.cum_returns_final_1d_nb, 0.,
+            minp=minp,
+            chunked=chunked,
+            **kwargs
+        )
 
-    def annualized(self, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def annualized(self,
+                   jitted: tp.JittedOption = None,
+                   chunked: tp.ChunkedOption = None,
+                   wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.annualized_return_nb`."""
-        result = nb.annualized_return_nb(self.to_2d_array(), self.ann_factor)
+        func = jit_registry.resolve_option(nb.annualized_return_nb, jitted)
+        func = ch_registry.resolve_option(func, chunked)
+        out = func(self.to_2d_array(), self.ann_factor, period=self.wrapper.dt_period)
         wrap_kwargs = merge_dicts(dict(name_or_index='annualized_return'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
+        return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def rolling_annualized(self,
                            window: tp.Optional[int] = None,
                            minp: tp.Optional[int] = None,
-                           wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+                           jitted: tp.JittedOption = None,
+                           chunked: tp.ChunkedOption = None,
+                           **kwargs) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.annualized`."""
         if window is None:
             window = self.defaults['window']
         if minp is None:
             minp = self.defaults['minp']
-        result = nb.rolling_annualized_return_nb(self.to_2d_array(), window, minp, self.ann_factor)
-        wrap_kwargs = merge_dicts({}, wrap_kwargs)
-        return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
+        chunked = ch.specialize_chunked_option(
+            chunked,
+            arg_take_spec=dict(args=ch.ArgsTaker(None, None))
+        )
+        return self.rolling_apply(
+            window,
+            jit_registry.resolve_option(nb.annualized_return_1d_nb, jitted),
+            self.ann_factor, None,
+            minp=minp,
+            jitted=jitted,
+            chunked=chunked,
+            **kwargs
+        )
 
     def annualized_volatility(self,
                               levy_alpha: tp.Optional[float] = None,
                               ddof: tp.Optional[int] = None,
+                              jitted: tp.JittedOption = None,
+                              chunked: tp.ChunkedOption = None,
                               wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.annualized_volatility_nb`."""
         if levy_alpha is None:
             levy_alpha = self.defaults['levy_alpha']
         if ddof is None:
             ddof = self.defaults['ddof']
-        result = nb.annualized_volatility_nb(self.to_2d_array(), self.ann_factor, levy_alpha, ddof)
+        func = jit_registry.resolve_option(nb.annualized_volatility_nb, jitted)
+        func = ch_registry.resolve_option(func, chunked)
+        out = func(self.to_2d_array(), self.ann_factor, levy_alpha, ddof)
         wrap_kwargs = merge_dicts(dict(name_or_index='annualized_volatility'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
+        return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def rolling_annualized_volatility(self,
                                       window: tp.Optional[int] = None,
                                       minp: tp.Optional[int] = None,
                                       levy_alpha: tp.Optional[float] = None,
                                       ddof: tp.Optional[int] = None,
-                                      wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+                                      jitted: tp.JittedOption = None,
+                                      chunked: tp.ChunkedOption = None,
+                                      **kwargs) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.annualized_volatility`."""
         if window is None:
             window = self.defaults['window']
@@ -384,49 +431,82 @@ class ReturnsAccessor(GenericAccessor):
             levy_alpha = self.defaults['levy_alpha']
         if ddof is None:
             ddof = self.defaults['ddof']
-        result = nb.rolling_annualized_volatility_nb(
-            self.to_2d_array(), window, minp, self.ann_factor, levy_alpha, ddof)
-        wrap_kwargs = merge_dicts({}, wrap_kwargs)
-        return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
+        chunked = ch.specialize_chunked_option(
+            chunked,
+            arg_take_spec=dict(args=ch.ArgsTaker(None, None, None))
+        )
+        return self.rolling_apply(
+            window,
+            jit_registry.resolve_option(nb.annualized_volatility_1d_nb, jitted),
+            self.ann_factor, levy_alpha, ddof,
+            minp=minp,
+            jitted=jitted,
+            chunked=chunked,
+            **kwargs
+        )
 
-    def calmar_ratio(self, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def calmar_ratio(self,
+                     jitted: tp.JittedOption = None,
+                     chunked: tp.ChunkedOption = None,
+                     wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.calmar_ratio_nb`."""
-        result = nb.calmar_ratio_nb(self.to_2d_array(), self.ann_factor)
+        func = jit_registry.resolve_option(nb.calmar_ratio_nb, jitted)
+        func = ch_registry.resolve_option(func, chunked)
+        out = func(self.to_2d_array(), self.ann_factor, period=self.wrapper.dt_period)
         wrap_kwargs = merge_dicts(dict(name_or_index='calmar_ratio'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
+        return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def rolling_calmar_ratio(self,
                              window: tp.Optional[int] = None,
                              minp: tp.Optional[int] = None,
-                             wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+                             jitted: tp.JittedOption = None,
+                             chunked: tp.ChunkedOption = None,
+                             **kwargs) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.calmar_ratio`."""
         if window is None:
             window = self.defaults['window']
         if minp is None:
             minp = self.defaults['minp']
-        result = nb.rolling_calmar_ratio_nb(self.to_2d_array(), window, minp, self.ann_factor)
-        wrap_kwargs = merge_dicts({}, wrap_kwargs)
-        return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
+        chunked = ch.specialize_chunked_option(
+            chunked,
+            arg_take_spec=dict(args=ch.ArgsTaker(None, None))
+        )
+        return self.rolling_apply(
+            window,
+            jit_registry.resolve_option(nb.calmar_ratio_1d_nb, jitted),
+            self.ann_factor, None,
+            minp=minp,
+            jitted=jitted,
+            chunked=chunked,
+            **kwargs
+        )
 
     def omega_ratio(self,
                     risk_free: tp.Optional[float] = None,
                     required_return: tp.Optional[float] = None,
+                    jitted: tp.JittedOption = None,
+                    chunked: tp.ChunkedOption = None,
                     wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.omega_ratio_nb`."""
         if risk_free is None:
             risk_free = self.defaults['risk_free']
         if required_return is None:
             required_return = self.defaults['required_return']
-        result = nb.omega_ratio_nb(self.to_2d_array(), self.ann_factor, risk_free, required_return)
+        func = jit_registry.resolve_option(nb.deannualized_return_nb, jitted)
+        required_return = func(required_return, self.ann_factor)
+        func = jit_registry.resolve_option(nb.omega_ratio_nb, jitted)
+        func = ch_registry.resolve_option(func, chunked)
+        out = func(self.to_2d_array() - risk_free - required_return)
         wrap_kwargs = merge_dicts(dict(name_or_index='omega_ratio'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
+        return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def rolling_omega_ratio(self,
                             window: tp.Optional[int] = None,
                             minp: tp.Optional[int] = None,
                             risk_free: tp.Optional[float] = None,
                             required_return: tp.Optional[float] = None,
-                            wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+                            jitted: tp.JittedOption = None,
+                            **kwargs) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.omega_ratio`."""
         if window is None:
             window = self.defaults['window']
@@ -436,30 +516,41 @@ class ReturnsAccessor(GenericAccessor):
             risk_free = self.defaults['risk_free']
         if required_return is None:
             required_return = self.defaults['required_return']
-        result = nb.rolling_omega_ratio_nb(
-            self.to_2d_array(), window, minp, self.ann_factor, risk_free, required_return)
-        wrap_kwargs = merge_dicts({}, wrap_kwargs)
-        return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
+        func = jit_registry.resolve_option(nb.deannualized_return_nb, jitted)
+        required_return = func(required_return, self.ann_factor)
+        return (self - risk_free - required_return).vbt.rolling_apply(
+            window,
+            jit_registry.resolve_option(nb.omega_ratio_1d_nb, jitted),
+            minp=minp,
+            jitted=jitted,
+            **kwargs
+        )
 
     def sharpe_ratio(self,
                      risk_free: tp.Optional[float] = None,
                      ddof: tp.Optional[int] = None,
+                     jitted: tp.JittedOption = None,
+                     chunked: tp.ChunkedOption = None,
                      wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.sharpe_ratio_nb`."""
         if risk_free is None:
             risk_free = self.defaults['risk_free']
         if ddof is None:
             ddof = self.defaults['ddof']
-        result = nb.sharpe_ratio_nb(self.to_2d_array(), self.ann_factor, risk_free, ddof)
+        func = jit_registry.resolve_option(nb.sharpe_ratio_nb, jitted)
+        func = ch_registry.resolve_option(func, chunked)
+        out = func(self.to_2d_array() - risk_free, self.ann_factor, ddof)
         wrap_kwargs = merge_dicts(dict(name_or_index='sharpe_ratio'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
+        return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def rolling_sharpe_ratio(self,
                              window: tp.Optional[int] = None,
                              minp: tp.Optional[int] = None,
                              risk_free: tp.Optional[float] = None,
                              ddof: tp.Optional[int] = None,
-                             wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+                             jitted: tp.JittedOption = None,
+                             chunked: tp.ChunkedOption = None,
+                             **kwargs) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.sharpe_ratio`."""
         if window is None:
             window = self.defaults['window']
@@ -469,9 +560,19 @@ class ReturnsAccessor(GenericAccessor):
             risk_free = self.defaults['risk_free']
         if ddof is None:
             ddof = self.defaults['ddof']
-        result = nb.rolling_sharpe_ratio_nb(self.to_2d_array(), window, minp, self.ann_factor, risk_free, ddof)
-        wrap_kwargs = merge_dicts({}, wrap_kwargs)
-        return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
+        chunked = ch.specialize_chunked_option(
+            chunked,
+            arg_take_spec=dict(args=ch.ArgsTaker(None, None))
+        )
+        return (self - risk_free).vbt.rolling_apply(
+            window,
+            jit_registry.resolve_option(nb.sharpe_ratio_1d_nb, jitted),
+            self.ann_factor, ddof,
+            minp=minp,
+            jitted=jitted,
+            chunked=chunked,
+            **kwargs
+        )
 
     def deflated_sharpe_ratio(self,
                               risk_free: tp.Optional[float] = None,
@@ -500,7 +601,7 @@ class ReturnsAccessor(GenericAccessor):
         if nanmask.any():
             returns = returns.copy()
             returns[nanmask] = 0.
-        result = metrics.deflated_sharpe_ratio(
+        out = metrics.deflated_sharpe_ratio(
             est_sharpe=sharpe_ratio / np.sqrt(self.ann_factor),
             var_sharpe=var_sharpe / self.ann_factor,
             nb_trials=nb_trials,
@@ -509,23 +610,29 @@ class ReturnsAccessor(GenericAccessor):
             kurtosis=kurtosis(returns, axis=0, bias=bias)
         )
         wrap_kwargs = merge_dicts(dict(name_or_index='deflated_sharpe_ratio'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
+        return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def downside_risk(self,
                       required_return: tp.Optional[float] = None,
+                      jitted: tp.JittedOption = None,
+                      chunked: tp.ChunkedOption = None,
                       wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.downside_risk_nb`."""
         if required_return is None:
             required_return = self.defaults['required_return']
-        result = nb.downside_risk_nb(self.to_2d_array(), self.ann_factor, required_return)
+        func = jit_registry.resolve_option(nb.downside_risk_nb, jitted)
+        func = ch_registry.resolve_option(func, chunked)
+        out = func(self.to_2d_array() - required_return, self.ann_factor)
         wrap_kwargs = merge_dicts(dict(name_or_index='downside_risk'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
+        return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def rolling_downside_risk(self,
                               window: tp.Optional[int] = None,
                               minp: tp.Optional[int] = None,
                               required_return: tp.Optional[float] = None,
-                              wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+                              jitted: tp.JittedOption = None,
+                              chunked: tp.ChunkedOption = None,
+                              **kwargs) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.downside_risk`."""
         if window is None:
             window = self.defaults['window']
@@ -533,25 +640,41 @@ class ReturnsAccessor(GenericAccessor):
             minp = self.defaults['minp']
         if required_return is None:
             required_return = self.defaults['required_return']
-        result = nb.rolling_downside_risk_nb(self.to_2d_array(), window, minp, self.ann_factor, required_return)
-        wrap_kwargs = merge_dicts({}, wrap_kwargs)
-        return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
+        chunked = ch.specialize_chunked_option(
+            chunked,
+            arg_take_spec=dict(args=ch.ArgsTaker(None, ))
+        )
+        return (self - required_return).vbt.rolling_apply(
+            window,
+            jit_registry.resolve_option(nb.downside_risk_1d_nb, jitted),
+            self.ann_factor,
+            minp=minp,
+            jitted=jitted,
+            chunked=chunked,
+            **kwargs
+        )
 
     def sortino_ratio(self,
                       required_return: tp.Optional[float] = None,
+                      jitted: tp.JittedOption = None,
+                      chunked: tp.ChunkedOption = None,
                       wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.sortino_ratio_nb`."""
         if required_return is None:
             required_return = self.defaults['required_return']
-        result = nb.sortino_ratio_nb(self.to_2d_array(), self.ann_factor, required_return)
+        func = jit_registry.resolve_option(nb.sortino_ratio_nb, jitted)
+        func = ch_registry.resolve_option(func, chunked)
+        out = func(self.to_2d_array() - required_return, self.ann_factor)
         wrap_kwargs = merge_dicts(dict(name_or_index='sortino_ratio'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
+        return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def rolling_sortino_ratio(self,
                               window: tp.Optional[int] = None,
                               minp: tp.Optional[int] = None,
                               required_return: tp.Optional[float] = None,
-                              wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+                              jitted: tp.JittedOption = None,
+                              chunked: tp.ChunkedOption = None,
+                              **kwargs) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.sortino_ratio`."""
         if window is None:
             window = self.defaults['window']
@@ -559,161 +682,264 @@ class ReturnsAccessor(GenericAccessor):
             minp = self.defaults['minp']
         if required_return is None:
             required_return = self.defaults['required_return']
-        result = nb.rolling_sortino_ratio_nb(self.to_2d_array(), window, minp, self.ann_factor, required_return)
-        wrap_kwargs = merge_dicts({}, wrap_kwargs)
-        return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
+        chunked = ch.specialize_chunked_option(
+            chunked,
+            arg_take_spec=dict(args=ch.ArgsTaker(None, ))
+        )
+        return (self - required_return).vbt.rolling_apply(
+            window,
+            jit_registry.resolve_option(nb.sortino_ratio_1d_nb, jitted),
+            self.ann_factor,
+            minp=minp,
+            jitted=jitted,
+            chunked=chunked,
+            **kwargs
+        )
 
     def information_ratio(self,
                           benchmark_rets: tp.Optional[tp.ArrayLike] = None,
                           ddof: tp.Optional[int] = None,
+                          jitted: tp.JittedOption = None,
+                          chunked: tp.ChunkedOption = None,
                           wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.information_ratio_nb`."""
-        if benchmark_rets is None:
-            benchmark_rets = self.benchmark_rets
         if ddof is None:
             ddof = self.defaults['ddof']
-        benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
-        result = nb.information_ratio_nb(self.to_2d_array(), benchmark_rets, ddof)
+        if benchmark_rets is None:
+            benchmark_rets = self.benchmark_rets
+        checks.assert_not_none(benchmark_rets)
+        benchmark_rets = broadcast_to(benchmark_rets, self.obj)
+        func = jit_registry.resolve_option(nb.information_ratio_nb, jitted)
+        func = ch_registry.resolve_option(func, chunked)
+        out = func(self.to_2d_array() - to_2d_array(benchmark_rets), ddof)
         wrap_kwargs = merge_dicts(dict(name_or_index='information_ratio'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
+        return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def rolling_information_ratio(self,
                                   benchmark_rets: tp.Optional[tp.ArrayLike] = None,
                                   window: tp.Optional[int] = None,
                                   minp: tp.Optional[int] = None,
                                   ddof: tp.Optional[int] = None,
-                                  wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+                                  jitted: tp.JittedOption = None,
+                                  chunked: tp.ChunkedOption = None,
+                                  **kwargs) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.information_ratio`."""
-        if benchmark_rets is None:
-            benchmark_rets = self.benchmark_rets
         if window is None:
             window = self.defaults['window']
         if minp is None:
             minp = self.defaults['minp']
         if ddof is None:
             ddof = self.defaults['ddof']
-        wrap_kwargs = merge_dicts({}, wrap_kwargs)
-        benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
-        result = nb.rolling_information_ratio_nb(self.to_2d_array(), window, minp, benchmark_rets, ddof)
-        return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
+        if benchmark_rets is None:
+            benchmark_rets = self.benchmark_rets
+        checks.assert_not_none(benchmark_rets)
+        benchmark_rets = broadcast_to(benchmark_rets, self.obj)
+        chunked = ch.specialize_chunked_option(
+            chunked,
+            arg_take_spec=dict(args=ch.ArgsTaker(None, ))
+        )
+        return (self - benchmark_rets).vbt.rolling_apply(
+            window,
+            jit_registry.resolve_option(nb.information_ratio_1d_nb, jitted),
+            ddof,
+            minp=minp,
+            jitted=jitted,
+            chunked=chunked,
+            **kwargs
+        )
 
     def beta(self,
              benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+             ddof: tp.Optional[int] = None,
+             jitted: tp.JittedOption = None,
+             chunked: tp.ChunkedOption = None,
              wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.beta_nb`."""
+        if ddof is None:
+            ddof = self.defaults['ddof']
         if benchmark_rets is None:
             benchmark_rets = self.benchmark_rets
-        benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
-        result = nb.beta_nb(self.to_2d_array(), benchmark_rets)
+        checks.assert_not_none(benchmark_rets)
+        benchmark_rets = broadcast_to(benchmark_rets, self.obj)
+        func = jit_registry.resolve_option(nb.beta_nb, jitted)
+        func = ch_registry.resolve_option(func, chunked)
+        out = func(self.to_2d_array(), to_2d_array(benchmark_rets), ddof)
         wrap_kwargs = merge_dicts(dict(name_or_index='beta'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
+        return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def rolling_beta(self,
                      benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+                     ddof: tp.Optional[int] = None,
                      window: tp.Optional[int] = None,
                      minp: tp.Optional[int] = None,
-                     wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+                     jitted: tp.JittedOption = None,
+                     chunked: tp.ChunkedOption = None,
+                     **kwargs) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.beta`."""
-        if benchmark_rets is None:
-            benchmark_rets = self.benchmark_rets
         if window is None:
             window = self.defaults['window']
         if minp is None:
             minp = self.defaults['minp']
-        benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
-        result = nb.rolling_beta_nb(self.to_2d_array(), window, minp, benchmark_rets)
-        wrap_kwargs = merge_dicts({}, wrap_kwargs)
-        return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
+        if ddof is None:
+            ddof = self.defaults['ddof']
+        if benchmark_rets is None:
+            benchmark_rets = self.benchmark_rets
+        checks.assert_not_none(benchmark_rets)
+        benchmark_rets = broadcast_to(benchmark_rets, self.obj)
+        chunked = ch.specialize_chunked_option(
+            chunked,
+            arg_take_spec=dict(args=ch.ArgsTaker(ch.ArraySlicer(axis=1), ch.ArraySlicer(axis=1), None))
+        )
+        return type(self).rolling_apply(
+            window,
+            jit_registry.resolve_option(nb.beta_rollmeta_nb, jitted),
+            to_2d_array(self.obj), to_2d_array(benchmark_rets), ddof,
+            minp=minp,
+            wrapper=self.wrapper,
+            jitted=jitted,
+            chunked=chunked,
+            **kwargs
+        )
 
     def alpha(self,
               benchmark_rets: tp.Optional[tp.ArrayLike] = None,
               risk_free: tp.Optional[float] = None,
+              jitted: tp.JittedOption = None,
+              chunked: tp.ChunkedOption = None,
               wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.alpha_nb`."""
-        if benchmark_rets is None:
-            benchmark_rets = self.benchmark_rets
         if risk_free is None:
             risk_free = self.defaults['risk_free']
-        benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
-        result = nb.alpha_nb(self.to_2d_array(), benchmark_rets, self.ann_factor, risk_free)
+        if benchmark_rets is None:
+            benchmark_rets = self.benchmark_rets
+        checks.assert_not_none(benchmark_rets)
+        benchmark_rets = broadcast_to(benchmark_rets, self.obj)
+        func = jit_registry.resolve_option(nb.alpha_nb, jitted)
+        func = ch_registry.resolve_option(func, chunked)
+        out = func(self.to_2d_array() - risk_free, to_2d_array(benchmark_rets) - risk_free, self.ann_factor)
         wrap_kwargs = merge_dicts(dict(name_or_index='alpha'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
+        return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def rolling_alpha(self,
                       benchmark_rets: tp.Optional[tp.ArrayLike] = None,
                       window: tp.Optional[int] = None,
                       minp: tp.Optional[int] = None,
                       risk_free: tp.Optional[float] = None,
-                      wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+                      jitted: tp.JittedOption = None,
+                      chunked: tp.ChunkedOption = None,
+                      **kwargs) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.alpha`."""
-        if benchmark_rets is None:
-            benchmark_rets = self.benchmark_rets
         if window is None:
             window = self.defaults['window']
         if minp is None:
             minp = self.defaults['minp']
         if risk_free is None:
             risk_free = self.defaults['risk_free']
-        benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
-        result = nb.rolling_alpha_nb(self.to_2d_array(), window, minp, benchmark_rets, self.ann_factor, risk_free)
-        wrap_kwargs = merge_dicts({}, wrap_kwargs)
-        return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
+        if benchmark_rets is None:
+            benchmark_rets = self.benchmark_rets
+        checks.assert_not_none(benchmark_rets)
+        benchmark_rets = broadcast_to(benchmark_rets, self.obj)
+        chunked = ch.specialize_chunked_option(
+            chunked,
+            arg_take_spec=dict(args=ch.ArgsTaker(ch.ArraySlicer(axis=1), ch.ArraySlicer(axis=1), None))
+        )
+        return type(self).rolling_apply(
+            window,
+            jit_registry.resolve_option(nb.alpha_rollmeta_nb, jitted),
+            to_2d_array(self.obj) - risk_free, to_2d_array(benchmark_rets) - risk_free, self.ann_factor,
+            minp=minp,
+            wrapper=self.wrapper,
+            jitted=jitted,
+            chunked=chunked,
+            **kwargs
+        )
 
-    def tail_ratio(self, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def tail_ratio(self,
+                   jitted: tp.JittedOption = None,
+                   chunked: tp.ChunkedOption = None,
+                   wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.tail_ratio_nb`."""
-        result = nb.tail_ratio_nb(self.to_2d_array())
+        func = jit_registry.resolve_option(nb.tail_ratio_nb, jitted)
+        func = ch_registry.resolve_option(func, chunked)
+        out = func(self.to_2d_array())
         wrap_kwargs = merge_dicts(dict(name_or_index='tail_ratio'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
+        return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def rolling_tail_ratio(self,
                            window: tp.Optional[int] = None,
                            minp: tp.Optional[int] = None,
-                           wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+                           noarr_mode: bool = True,
+                           jitted: tp.JittedOption = None,
+                           **kwargs) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.tail_ratio`."""
         if window is None:
             window = self.defaults['window']
         if minp is None:
             minp = self.defaults['minp']
-        result = nb.rolling_tail_ratio_nb(self.to_2d_array(), window, minp)
-        wrap_kwargs = merge_dicts({}, wrap_kwargs)
-        return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
+        if noarr_mode:
+            func = jit_registry.resolve_option(nb.tail_ratio_noarr_1d_nb, jitted)
+        else:
+            func = jit_registry.resolve_option(nb.tail_ratio_1d_nb, jitted)
+        return self.rolling_apply(
+            window,
+            func,
+            minp=minp,
+            jitted=jitted,
+            **kwargs
+        )
 
-    def common_sense_ratio(self, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def common_sense_ratio(self,
+                           jitted: tp.JittedOption = None,
+                           chunked: tp.ChunkedOption = None,
+                           wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Common Sense Ratio."""
-        result = to_1d_array(self.tail_ratio()) * (1 + to_1d_array(self.annualized()))
+        tail_ratio = to_1d_array(self.tail_ratio(jitted=jitted, chunked=chunked))
+        annualized = to_1d_array(self.annualized(jitted=jitted, chunked=chunked))
+        out = tail_ratio * (1 + annualized)
         wrap_kwargs = merge_dicts(dict(name_or_index='common_sense_ratio'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
+        return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def rolling_common_sense_ratio(self,
                                    window: tp.Optional[int] = None,
                                    minp: tp.Optional[int] = None,
+                                   jitted: tp.JittedOption = None,
+                                   chunked: tp.ChunkedOption = None,
                                    wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.common_sense_ratio`."""
         if window is None:
             window = self.defaults['window']
         if minp is None:
             minp = self.defaults['minp']
-        rolling_tail_ratio = to_2d_array(self.rolling_tail_ratio(window, minp=minp))
-        rolling_annualized = to_2d_array(self.rolling_annualized(window, minp=minp))
-        result = rolling_tail_ratio * (1 + rolling_annualized)
-        wrap_kwargs = merge_dicts({}, wrap_kwargs)
-        return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
+        rolling_tail_ratio = to_2d_array(self.rolling_tail_ratio(
+            window, minp=minp, jitted=jitted, chunked=chunked))
+        rolling_annualized = to_2d_array(self.rolling_annualized(
+            window, minp=minp, jitted=jitted, chunked=chunked))
+        out = rolling_tail_ratio * (1 + rolling_annualized)
+        wrap_kwargs = resolve_dict(wrap_kwargs)
+        return self.wrapper.wrap(out, group_by=False, **wrap_kwargs)
 
     def value_at_risk(self,
                       cutoff: tp.Optional[float] = None,
+                      jitted: tp.JittedOption = None,
+                      chunked: tp.ChunkedOption = None,
                       wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.value_at_risk_nb`."""
         if cutoff is None:
             cutoff = self.defaults['cutoff']
-        result = nb.value_at_risk_nb(self.to_2d_array(), cutoff)
+        func = jit_registry.resolve_option(nb.value_at_risk_nb, jitted)
+        func = ch_registry.resolve_option(func, chunked)
+        out = func(self.to_2d_array(), cutoff)
         wrap_kwargs = merge_dicts(dict(name_or_index='value_at_risk'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
+        return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def rolling_value_at_risk(self,
                               window: tp.Optional[int] = None,
                               minp: tp.Optional[int] = None,
                               cutoff: tp.Optional[float] = None,
-                              wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+                              noarr_mode: bool = True,
+                              jitted: tp.JittedOption = None,
+                              chunked: tp.ChunkedOption = None,
+                              **kwargs) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.value_at_risk`."""
         if window is None:
             window = self.defaults['window']
@@ -721,25 +947,45 @@ class ReturnsAccessor(GenericAccessor):
             minp = self.defaults['minp']
         if cutoff is None:
             cutoff = self.defaults['cutoff']
-        result = nb.rolling_value_at_risk_nb(self.to_2d_array(), window, minp, cutoff)
-        wrap_kwargs = merge_dicts({}, wrap_kwargs)
-        return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
+        if noarr_mode:
+            func = jit_registry.resolve_option(nb.value_at_risk_noarr_1d_nb, jitted)
+        else:
+            func = jit_registry.resolve_option(nb.value_at_risk_1d_nb, jitted)
+        chunked = ch.specialize_chunked_option(
+            chunked,
+            arg_take_spec=dict(args=ch.ArgsTaker(None, ))
+        )
+        return self.rolling_apply(
+            window,
+            func, cutoff,
+            minp=minp,
+            jitted=jitted,
+            chunked=chunked,
+            **kwargs
+        )
 
     def cond_value_at_risk(self,
                            cutoff: tp.Optional[float] = None,
+                           jitted: tp.JittedOption = None,
+                           chunked: tp.ChunkedOption = None,
                            wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.cond_value_at_risk_nb`."""
         if cutoff is None:
             cutoff = self.defaults['cutoff']
-        result = nb.cond_value_at_risk_nb(self.to_2d_array(), cutoff)
+        func = jit_registry.resolve_option(nb.cond_value_at_risk_nb, jitted)
+        func = ch_registry.resolve_option(func, chunked)
+        out = func(self.to_2d_array(), cutoff)
         wrap_kwargs = merge_dicts(dict(name_or_index='cond_value_at_risk'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
+        return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def rolling_cond_value_at_risk(self,
                                    window: tp.Optional[int] = None,
                                    minp: tp.Optional[int] = None,
                                    cutoff: tp.Optional[float] = None,
-                                   wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+                                   noarr_mode: bool = True,
+                                   jitted: tp.JittedOption = None,
+                                   chunked: tp.ChunkedOption = None,
+                                   **kwargs) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.cond_value_at_risk`."""
         if window is None:
             window = self.defaults['window']
@@ -747,135 +993,247 @@ class ReturnsAccessor(GenericAccessor):
             minp = self.defaults['minp']
         if cutoff is None:
             cutoff = self.defaults['cutoff']
-        result = nb.rolling_cond_value_at_risk_nb(self.to_2d_array(), window, minp, cutoff)
-        wrap_kwargs = merge_dicts({}, wrap_kwargs)
-        return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
+        if noarr_mode:
+            func = jit_registry.resolve_option(nb.cond_value_at_risk_noarr_1d_nb, jitted)
+        else:
+            func = jit_registry.resolve_option(nb.cond_value_at_risk_1d_nb, jitted)
+        chunked = ch.specialize_chunked_option(
+            chunked,
+            arg_take_spec=dict(args=ch.ArgsTaker(None, ))
+        )
+        return self.rolling_apply(
+            window,
+            func, cutoff,
+            minp=minp,
+            jitted=jitted,
+            chunked=chunked,
+            **kwargs
+        )
 
     def capture(self,
                 benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+                jitted: tp.JittedOption = None,
+                chunked: tp.ChunkedOption = None,
                 wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.capture_nb`."""
         if benchmark_rets is None:
             benchmark_rets = self.benchmark_rets
-        benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
-        result = nb.capture_nb(self.to_2d_array(), benchmark_rets, self.ann_factor)
+        checks.assert_not_none(benchmark_rets)
+        benchmark_rets = broadcast_to(benchmark_rets, self.obj)
+        func = jit_registry.resolve_option(nb.capture_nb, jitted)
+        func = ch_registry.resolve_option(func, chunked)
+        out = func(
+            self.to_2d_array(),
+            to_2d_array(benchmark_rets),
+            self.ann_factor,
+            period=self.wrapper.dt_period
+        )
         wrap_kwargs = merge_dicts(dict(name_or_index='capture'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
+        return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def rolling_capture(self,
                         benchmark_rets: tp.Optional[tp.ArrayLike] = None,
                         window: tp.Optional[int] = None,
                         minp: tp.Optional[int] = None,
-                        wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+                        jitted: tp.JittedOption = None,
+                        chunked: tp.ChunkedOption = None,
+                        **kwargs) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.capture`."""
-        if benchmark_rets is None:
-            benchmark_rets = self.benchmark_rets
         if window is None:
             window = self.defaults['window']
         if minp is None:
             minp = self.defaults['minp']
-        benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
-        result = nb.rolling_capture_nb(self.to_2d_array(), window, minp, benchmark_rets, self.ann_factor)
-        wrap_kwargs = merge_dicts({}, wrap_kwargs)
-        return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
+        if benchmark_rets is None:
+            benchmark_rets = self.benchmark_rets
+        checks.assert_not_none(benchmark_rets)
+        benchmark_rets = broadcast_to(benchmark_rets, self.obj)
+        chunked = ch.specialize_chunked_option(
+            chunked,
+            arg_take_spec=dict(args=ch.ArgsTaker(ch.ArraySlicer(axis=1), ch.ArraySlicer(axis=1), None, None))
+        )
+        return type(self).rolling_apply(
+            window,
+            jit_registry.resolve_option(nb.capture_rollmeta_nb, jitted),
+            to_2d_array(self.obj), to_2d_array(benchmark_rets), self.ann_factor, None,
+            minp=minp,
+            wrapper=self.wrapper,
+            jitted=jitted,
+            chunked=chunked,
+            **kwargs
+        )
 
     def up_capture(self,
                    benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+                   jitted: tp.JittedOption = None,
+                   chunked: tp.ChunkedOption = None,
                    wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.up_capture_nb`."""
         if benchmark_rets is None:
             benchmark_rets = self.benchmark_rets
-        benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
-        result = nb.up_capture_nb(self.to_2d_array(), benchmark_rets, self.ann_factor)
+        checks.assert_not_none(benchmark_rets)
+        benchmark_rets = broadcast_to(benchmark_rets, self.obj)
+        func = jit_registry.resolve_option(nb.up_capture_nb, jitted)
+        func = ch_registry.resolve_option(func, chunked)
+        out = func(
+            self.to_2d_array(),
+            to_2d_array(benchmark_rets),
+            self.ann_factor,
+            period=self.wrapper.dt_period
+        )
         wrap_kwargs = merge_dicts(dict(name_or_index='up_capture'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
+        return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def rolling_up_capture(self,
                            benchmark_rets: tp.Optional[tp.ArrayLike] = None,
                            window: tp.Optional[int] = None,
                            minp: tp.Optional[int] = None,
-                           wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+                           jitted: tp.JittedOption = None,
+                           chunked: tp.ChunkedOption = None,
+                           **kwargs) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.up_capture`."""
-        if benchmark_rets is None:
-            benchmark_rets = self.benchmark_rets
         if window is None:
             window = self.defaults['window']
         if minp is None:
             minp = self.defaults['minp']
-        benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
-        result = nb.rolling_up_capture_nb(self.to_2d_array(), window, minp, benchmark_rets, self.ann_factor)
-        wrap_kwargs = merge_dicts({}, wrap_kwargs)
-        return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
+        if benchmark_rets is None:
+            benchmark_rets = self.benchmark_rets
+        checks.assert_not_none(benchmark_rets)
+        benchmark_rets = broadcast_to(benchmark_rets, self.obj)
+        chunked = ch.specialize_chunked_option(
+            chunked,
+            arg_take_spec=dict(args=ch.ArgsTaker(ch.ArraySlicer(axis=1), ch.ArraySlicer(axis=1), None, None))
+        )
+        return type(self).rolling_apply(
+            window,
+            jit_registry.resolve_option(nb.up_capture_rollmeta_nb, jitted),
+            to_2d_array(self.obj), to_2d_array(benchmark_rets), self.ann_factor, None,
+            minp=minp,
+            wrapper=self.wrapper,
+            jitted=jitted,
+            chunked=chunked,
+            **kwargs
+        )
 
     def down_capture(self,
                      benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+                     jitted: tp.JittedOption = None,
+                     chunked: tp.ChunkedOption = None,
                      wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.down_capture_nb`."""
         if benchmark_rets is None:
             benchmark_rets = self.benchmark_rets
-        benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
-        result = nb.down_capture_nb(self.to_2d_array(), benchmark_rets, self.ann_factor)
+        checks.assert_not_none(benchmark_rets)
+        benchmark_rets = broadcast_to(benchmark_rets, self.obj)
+        func = jit_registry.resolve_option(nb.down_capture_nb, jitted)
+        func = ch_registry.resolve_option(func, chunked)
+        out = func(
+            self.to_2d_array(),
+            to_2d_array(benchmark_rets),
+            self.ann_factor,
+            period=self.wrapper.dt_period
+        )
         wrap_kwargs = merge_dicts(dict(name_or_index='down_capture'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
+        return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def rolling_down_capture(self,
                              benchmark_rets: tp.Optional[tp.ArrayLike] = None,
                              window: tp.Optional[int] = None,
                              minp: tp.Optional[int] = None,
-                             wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+                             jitted: tp.JittedOption = None,
+                             chunked: tp.ChunkedOption = None,
+                             **kwargs) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.down_capture`."""
-        if benchmark_rets is None:
-            benchmark_rets = self.benchmark_rets
         if window is None:
             window = self.defaults['window']
         if minp is None:
             minp = self.defaults['minp']
-        benchmark_rets = broadcast_to(to_2d_array(benchmark_rets), to_2d_array(self.obj))
-        result = nb.rolling_down_capture_nb(self.to_2d_array(), window, minp, benchmark_rets, self.ann_factor)
-        wrap_kwargs = merge_dicts({}, wrap_kwargs)
-        return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
+        if benchmark_rets is None:
+            benchmark_rets = self.benchmark_rets
+        checks.assert_not_none(benchmark_rets)
+        benchmark_rets = broadcast_to(benchmark_rets, self.obj)
+        chunked = ch.specialize_chunked_option(
+            chunked,
+            arg_take_spec=dict(args=ch.ArgsTaker(ch.ArraySlicer(axis=1), ch.ArraySlicer(axis=1), None, None))
+        )
+        return type(self).rolling_apply(
+            window,
+            jit_registry.resolve_option(nb.down_capture_rollmeta_nb, jitted),
+            to_2d_array(self.obj), to_2d_array(benchmark_rets), self.ann_factor, None,
+            minp=minp,
+            wrapper=self.wrapper,
+            jitted=jitted,
+            chunked=chunked,
+            **kwargs
+        )
 
-    def drawdown(self, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def drawdown(self,
+                 jitted: tp.JittedOption = None,
+                 chunked: tp.ChunkedOption = None,
+                 wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Relative decline from a peak."""
-        result = nb.drawdown_nb(self.to_2d_array())
-        wrap_kwargs = merge_dicts({}, wrap_kwargs)
-        return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
+        return self.cumulative(
+            start_value=1,
+            jitted=jitted,
+            chunked=chunked
+        ).vbt.drawdown(
+            jitted=jitted,
+            chunked=chunked,
+            wrap_kwargs=wrap_kwargs
+        )
 
-    def max_drawdown(self, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def max_drawdown(self,
+                     jitted: tp.JittedOption = None,
+                     chunked: tp.ChunkedOption = None,
+                     wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.returns.nb.max_drawdown_nb`.
 
-        Yields the same result as `max_drawdown` of `ReturnsAccessor.drawdowns`."""
-        result = nb.max_drawdown_nb(self.to_2d_array())
+        Yields the same out as `max_drawdown` of `ReturnsAccessor.drawdowns`."""
+        func = jit_registry.resolve_option(nb.max_drawdown_nb, jitted)
+        func = ch_registry.resolve_option(func, chunked)
+        out = func(self.to_2d_array())
         wrap_kwargs = merge_dicts(dict(name_or_index='max_drawdown'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(result, group_by=False, **wrap_kwargs)
+        return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def rolling_max_drawdown(self,
                              window: tp.Optional[int] = None,
                              minp: tp.Optional[int] = None,
-                             wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+                             jitted: tp.JittedOption = None,
+                             **kwargs) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.max_drawdown`."""
         if window is None:
             window = self.defaults['window']
         if minp is None:
             minp = self.defaults['minp']
-        result = nb.rolling_max_drawdown_nb(self.to_2d_array(), window, minp)
-        wrap_kwargs = merge_dicts({}, wrap_kwargs)
-        return self.wrapper.wrap(result, group_by=False, **wrap_kwargs)
+        return self.rolling_apply(
+            window,
+            jit_registry.resolve_option(nb.max_drawdown_1d_nb, jitted),
+            minp=minp,
+            jitted=jitted,
+            **kwargs
+        )
 
     @property
     def drawdowns(self) -> Drawdowns:
         """`ReturnsAccessor.get_drawdowns` with default arguments."""
         return self.get_drawdowns()
 
-    def get_drawdowns(self, wrapper_kwargs: tp.KwargsLike = None, **kwargs) -> Drawdowns:
+    def get_drawdowns(self,
+                      jitted: tp.JittedOption = None,
+                      chunked: tp.ChunkedOption = None,
+                      wrapper_kwargs: tp.KwargsLike = None,
+                      **kwargs) -> Drawdowns:
         """Generate drawdown records of cumulative returns.
 
         See `vectorbt.generic.drawdowns.Drawdowns`."""
         wrapper_kwargs = merge_dicts(self.wrapper.config, wrapper_kwargs)
-        return Drawdowns.from_ts(self.cumulative(start_value=1.), wrapper_kwargs=wrapper_kwargs, **kwargs)
+        return Drawdowns.from_ts(
+            self.cumulative(start_value=1., jitted=jitted),
+            wrapper_kwargs=wrapper_kwargs,
+            **kwargs
+        )
 
     @property
-    def qs(self):
+    def qs(self) -> "QSAdapter":
         """Quantstats adapter."""
         from vectorbt.returns.qs_adapter import QSAdapter
 
@@ -885,12 +1243,12 @@ class ReturnsAccessor(GenericAccessor):
 
     def resolve_self(self: ReturnsAccessorT,
                      cond_kwargs: tp.KwargsLike = None,
-                     custom_arg_names: tp.Optional[tp.Set[str]] = None,
+                     custom_arg_names: tp.ClassVar[tp.Optional[tp.Set[str]]] = None,
                      impacts_caching: bool = True,
                      silence_warnings: bool = False) -> ReturnsAccessorT:
         """Resolve self.
 
-        See `vectorbt.base.array_wrapper.Wrapping.resolve_self`.
+        See `vectorbt.base.wrapping.Wrapping.resolve_self`.
 
         Creates a copy of this instance `year_freq` is different in `cond_kwargs`."""
         if cond_kwargs is None:
@@ -940,7 +1298,7 @@ class ReturnsAccessor(GenericAccessor):
             returns_stats_cfg
         )
 
-    _metrics: tp.ClassVar[Config] = Config(
+    _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
             start=dict(
                 title='Start',
@@ -995,13 +1353,13 @@ class ReturnsAccessor(GenericAccessor):
             ),
             max_dd=dict(
                 title='Max Drawdown [%]',
-                calc_func='drawdowns.max_drawdown',
+                calc_func='drawdowns.get_max_drawdown',
                 post_calc_func=lambda self, out, settings: -out * 100,
                 tags=['returns', 'drawdowns']
             ),
             max_dd_duration=dict(
                 title='Max Drawdown Duration',
-                calc_func='drawdowns.max_duration',
+                calc_func='drawdowns.get_max_duration',
                 fill_wrap_kwargs=True,
                 tags=['returns', 'drawdowns', 'duration']
             ),
@@ -1074,8 +1432,7 @@ class ReturnsAccessor(GenericAccessor):
                 check_has_benchmark_rets=True,
                 tags='returns'
             )
-        ),
-        copy_kwargs=dict(copy_mode='deep')
+        )
     )
 
     @property
@@ -1110,11 +1467,11 @@ ReturnsAccessor.override_metrics_doc(__pdoc__)
 ReturnsAccessor.override_subplots_doc(__pdoc__)
 
 
-@register_series_vbt_accessor('returns')
+@register_sr_vbt_accessor('returns')
 class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
     """Accessor on top of return series. For Series only.
 
-    Accessible through `pd.Series.vbt.returns`."""
+    Accessible via `pd.Series.vbt.returns`."""
 
     def __init__(self,
                  obj: tp.Series,
@@ -1174,6 +1531,7 @@ class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
 
         ![](/docs/img/plot_cumulative.svg)
         """
+        from vectorbt.utils.figure import make_figure, get_domain
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']
 
@@ -1240,11 +1598,11 @@ class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
         return fig
 
 
-@register_dataframe_vbt_accessor('returns')
+@register_df_vbt_accessor('returns')
 class ReturnsDFAccessor(ReturnsAccessor, GenericDFAccessor):
     """Accessor on top of return series. For DataFrames only.
 
-    Accessible through `pd.DataFrame.vbt.returns`."""
+    Accessible via `pd.DataFrame.vbt.returns`."""
 
     def __init__(self,
                  obj: tp.Frame,

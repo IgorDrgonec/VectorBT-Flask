@@ -10,6 +10,8 @@ from vectorbt import _typing as tp
 
 def rgb_from_cmap(cmap_name: str, value: float, value_range: tp.Tuple[float, float]) -> str:
     """Map `value_range` to colormap with name `cmap_name` and get RGB of the `value` from that range."""
+    from vectorbt.opt_packages import assert_can_import
+    assert_can_import('matplotlib')
     import matplotlib.pyplot as plt
 
     if value_range[0] == value_range[1]:
@@ -22,6 +24,8 @@ def rgb_from_cmap(cmap_name: str, value: float, value_range: tp.Tuple[float, flo
 
 def adjust_opacity(color: tp.Any, opacity: float) -> str:
     """Adjust opacity of color."""
+    from vectorbt.opt_packages import assert_can_import
+    assert_can_import('matplotlib')
     import matplotlib.colors as mc
 
     rgb = mc.to_rgb(color)
@@ -33,6 +37,8 @@ def adjust_lightness(color: tp.Any, amount: float = 0.7) -> str:
 
     Input can be matplotlib color string, hex string, or RGB tuple.
     Output will be an RGB string."""
+    from vectorbt.opt_packages import assert_can_import
+    assert_can_import('matplotlib')
     import matplotlib.colors as mc
     import colorsys
 
@@ -42,4 +48,4 @@ def adjust_lightness(color: tp.Any, amount: float = 0.7) -> str:
         c = color
     c = colorsys.rgb_to_hls(*mc.to_rgb(c))
     rgb = colorsys.hls_to_rgb(c[0], max(0, min(1, amount * c[1])), c[2])
-    return 'rgb(%d,%d,%d)' % (int(rgb[0]*255), int(rgb[1]*255), int(rgb[2]*255))
+    return 'rgb(%d,%d,%d)' % (int(rgb[0] * 255), int(rgb[1] * 255), int(rgb[2] * 255))

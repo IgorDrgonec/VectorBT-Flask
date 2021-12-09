@@ -3,9 +3,15 @@
 
 """Messaging using `python-telegram-bot`."""
 
+from vectorbt.opt_packages import assert_can_import
+
+assert_can_import('telegram')
+
 import logging
 from functools import wraps
+
 from telegram import Update
+from telegram.error import Unauthorized, ChatMigrated
 from telegram.ext import (
     Handler,
     CallbackContext,
@@ -18,10 +24,10 @@ from telegram.ext import (
     Defaults
 )
 from telegram.utils.helpers import effective_message_type
-from telegram.error import Unauthorized, ChatMigrated
 
 from vectorbt import _typing as tp
-from vectorbt.utils.config import merge_dicts, get_func_kwargs, Configured
+from vectorbt.utils.config import merge_dicts, Configured
+from vectorbt.utils.parsing import get_func_kwargs
 from vectorbt.utils.requests_ import text_to_giphy_url
 
 logger = logging.getLogger(__name__)
@@ -152,7 +158,7 @@ class TelegramBot(Configured):
         self.giphy_kwargs = giphy_kwargs
         default_kwargs = dict()
         passed_kwargs = dict()
-        for k in get_func_kwargs(Updater):
+        for k in get_func_kwargs(Updater.__init__):
             if k in telegram_cfg:
                 default_kwargs[k] = telegram_cfg[k]
             if k in kwargs:
@@ -180,7 +186,7 @@ class TelegramBot(Configured):
             self.dispatcher.add_handler(handler)
         self.dispatcher.add_handler(MessageHandler(Filters.status_update.migrate, self.chat_migration_callback))
         self.dispatcher.add_handler(MessageHandler(Filters.command, self.unknown_callback))
-        self.dispatcher.add_error_handler(self_decorator(self, self.__class__.error_callback))
+        self.dispatcher.add_error_handler(self_decorator(self, type(self).error_callback))
 
         # Set up data
         if 'chat_ids' not in self.dispatcher.bot_data:

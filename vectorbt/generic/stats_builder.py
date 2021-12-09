@@ -3,20 +3,22 @@
 
 """Mixin for building statistics out of performance metrics."""
 
-import pandas as pd
-import numpy as np
-from collections import Counter
-import warnings
 import inspect
 import string
+import warnings
+from collections import Counter
+
+import numpy as np
+import pandas as pd
 
 from vectorbt import _typing as tp
+from vectorbt.base.wrapping import Wrapping
 from vectorbt.utils import checks
-from vectorbt.utils.config import Config, merge_dicts, get_func_arg_names
+from vectorbt.utils.attr_ import get_dict_attr, AttrResolver
+from vectorbt.utils.config import merge_dicts, Config, HybridConfig
+from vectorbt.utils.parsing import get_func_arg_names
+from vectorbt.utils.tagging import match_tags
 from vectorbt.utils.template import deep_substitute
-from vectorbt.utils.tags import match_tags
-from vectorbt.utils.attr_ import get_dict_attr
-from vectorbt.base.array_wrapper import Wrapping
 
 
 class MetaStatsBuilderMixin(type):
@@ -31,18 +33,15 @@ class MetaStatsBuilderMixin(type):
 class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
     """Mixin that implements `StatsBuilderMixin.stats`.
 
-    Required to be a subclass of `vectorbt.base.array_wrapper.Wrapping`."""
+    Required to be a subclass of `vectorbt.base.wrapping.Wrapping`."""
+
+    _writeable_attrs: tp.ClassVar[tp.Optional[tp.Set[str]]] = {'_metrics'}
 
     def __init__(self) -> None:
         checks.assert_instance_of(self, Wrapping)
 
         # Copy writeable attrs
-        self._metrics = self.__class__._metrics.copy()
-
-    @property
-    def writeable_attrs(self) -> tp.Set[str]:
-        """Set of writeable attributes that will be saved/copied along with the config."""
-        return {'_metrics'}
+        self._metrics = type(self)._metrics.copy()
 
     @property
     def stats_defaults(self) -> tp.Kwargs:
@@ -57,7 +56,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
             dict(settings=dict(freq=self.wrapper.freq))
         )
 
-    _metrics: tp.ClassVar[Config] = Config(
+    _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
             start=dict(
                 title='Start',
@@ -78,8 +77,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                 agg_func=None,
                 tags='wrapper'
             )
-        ),
-        copy_kwargs=dict(copy_mode='deep')
+        )
     )
 
     @property
@@ -90,7 +88,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
         ${metrics}
         ```
 
-        Returns `${cls_name}._metrics`, which gets (deep) copied upon creation of each instance.
+        Returns `${cls_name}._metrics`, which gets (hybrid-) copied upon creation of each instance.
         Thus, changing this config won't affect the class.
 
         To change metrics, you can either change the config in-place, override this property,
@@ -126,21 +124,23 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                 * `check_{filter}` and `inv_check_{filter}`: Whether to check this metric against a
                     filter defined in `filters`. True (or False for inverse) means to keep this metric.
                 * `calc_func` (required): Calculation function for custom metrics.
-                    Should return either a scalar for one column/group, pd.Series for multiple columns/groups,
+                    Must return either a scalar for one column/group, pd.Series for multiple columns/groups,
                     or a dict of such for multiple sub-metrics.
                 * `resolve_calc_func`: whether to resolve `calc_func`. If the function can be accessed
                     by traversing attributes of this object, you can specify the path to this function
-                    as a string (see `vectorbt.utils.attr.deep_getattr` for the path format).
+                    as a string (see `vectorbt.utils.attr_.deep_getattr` for the path format).
                     If `calc_func` is a function, arguments from merged metric settings are matched with
                     arguments in the signature (see below). If `resolve_calc_func` is False, `calc_func`
-                    should accept (resolved) self and dictionary of merged metric settings.
+                    must accept (resolved) self and dictionary of merged metric settings.
                     Defaults to True.
+                * `use_shortcuts`: Whether to use shortcut properties whenever possible when
+                    resolving `calc_func`. Defaults to True.
                 * `post_calc_func`: Function to post-process the result of `calc_func`.
-                    Should accept (resolved) self, output of `calc_func`, and dictionary of merged metric settings,
+                    Must accept (resolved) self, output of `calc_func`, and dictionary of merged metric settings,
                     and return whatever is acceptable to be returned by `calc_func`. Defaults to None.
                 * `fill_wrap_kwargs`: Whether to fill `wrap_kwargs` with `to_timedelta` and `silence_warnings`.
                     Defaults to False.
-                * `apply_to_timedelta`: Whether to apply `vectorbt.base.array_wrapper.ArrayWrapper.to_timedelta`
+                * `apply_to_timedelta`: Whether to apply `vectorbt.base.wrapping.ArrayWrapper.to_timedelta`
                     on the result. To disable this globally, pass `to_timedelta=False` in `settings`.
                     Defaults to False.
                 * `pass_{arg}`: Whether to pass any argument from the settings (see below). Defaults to True if
@@ -148,17 +148,19 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                     If argument to be passed was not found, `pass_{arg}` is removed.
                 * `resolve_path_{arg}`: Whether to resolve an argument that is meant to be an attribute of
                     this object and is the first part of the path of `calc_func`. Passes only optional arguments.
-                    Defaults to True. See `vectorbt.utils.attr.AttrResolver.resolve_attr`.
+                    Defaults to True. See `vectorbt.utils.attr_.AttrResolver.resolve_attr`.
                 * `resolve_{arg}`: Whether to resolve an argument that is meant to be an attribute of
                     this object and is present in the function's signature. Defaults to False.
-                    See `vectorbt.utils.attr.AttrResolver.resolve_attr`.
+                    See `vectorbt.utils.attr_.AttrResolver.resolve_attr`.
+                * `use_shortcuts_{arg}`: Whether to use shortcut properties whenever possible when resolving
+                    an argument. Defaults to True.
                 * `template_mapping`: Mapping to replace templates in metric settings. Used across all settings.
                 * Any other keyword argument that overrides the settings or is passed directly to `calc_func`.
 
                 If `resolve_calc_func` is True, the calculation function may "request" any of the
                 following arguments by accepting them or if `pass_{arg}` was found in the settings dict:
 
-                * Each of `vectorbt.utils.attr.AttrResolver.self_aliases`: original object
+                * Each of `vectorbt.utils.attr_.AttrResolver.self_aliases`: original object
                     (ungrouped, with no column selected)
                 * `group_by`: won't be passed if it was used in resolving the first attribute of `calc_func`
                     specified as a path, use `pass_group_by=True` to pass anyway
@@ -169,12 +171,12 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                 * `to_timedelta`: replaced by True if None and frequency is set
                 * Any argument from `settings`
                 * Any attribute of this object if it meant to be resolved
-                    (see `vectorbt.utils.attr.AttrResolver.resolve_attr`)
+                    (see `vectorbt.utils.attr_.AttrResolver.resolve_attr`)
 
                 Pass `metrics='all'` to calculate all supported metrics.
             tags (str or iterable): Tags to select.
 
-                See `vectorbt.utils.tags.match_tags`.
+                See `vectorbt.utils.tagging.match_tags`.
             column (str): Name of the column/group.
 
                 !!! hint
@@ -184,11 +186,11 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                     all columns first and only then selects the column 'a'. The first method is preferred
                     when you have a lot of data or caching is disabled. The second method is preferred when
                     most attributes have already been cached.
-            group_by (any): Group or ungroup columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
+            group_by (any): Group or ungroup columns. See `vectorbt.base.grouping.Grouper`.
             agg_func (callable): Aggregation function to aggregate statistics across all columns.
                 Defaults to mean.
 
-                Should take `pd.Series` and return a const.
+                Must take `pd.Series` and return a const.
 
                 Has only effect if `column` was specified or this object contains only one column of data.
 
@@ -208,7 +210,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
                 The settings dict can contain the following keys:
 
-                * `filter_func`: Filter function that should accept resolved self and
+                * `filter_func`: Filter function that must accept resolved self and
                     merged settings for a metric, and return either True or False.
                 * `warning_message`: Warning message to be shown when skipping a metric.
                     Can be a template that will be substituted using merged metric settings as mapping.
@@ -254,7 +256,12 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
         # Replace templates globally (not used at metric level)
         if len(template_mapping) > 0:
-            sub_settings = deep_substitute(settings, mapping=template_mapping)
+            sub_settings = deep_substitute(
+                settings,
+                mapping=template_mapping,
+                sub_id='sub_settings',
+                strict=False
+            )
         else:
             sub_settings = settings
 
@@ -335,9 +342,13 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
             )
             metric_template_mapping = merged_settings.pop('template_mapping', {})
             template_mapping_merged = merge_dicts(template_mapping, metric_template_mapping)
-            template_mapping_merged = deep_substitute(template_mapping_merged, mapping=merged_settings)
+            template_mapping_merged = deep_substitute(
+                template_mapping_merged,
+                mapping=merged_settings,
+                sub_id='template_mapping_merged'
+            )
             mapping = merge_dicts(template_mapping_merged, merged_settings)
-            merged_settings = deep_substitute(merged_settings, mapping=mapping)
+            merged_settings = deep_substitute(merged_settings, mapping=mapping, sub_id='merged_settings')
 
             # Filter by tag
             if tags is not None:
@@ -381,7 +392,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
             for filter_name in metric_filters:
                 filter_settings = filters[filter_name]
-                _filter_settings = deep_substitute(filter_settings, mapping=mapping)
+                _filter_settings = deep_substitute(filter_settings, mapping=mapping, sub_id='filter_settings')
                 filter_func = _filter_settings['filter_func']
                 warning_message = _filter_settings.get('warning_message', None)
                 inv_warning_message = _filter_settings.get('inv_warning_message', None)
@@ -438,6 +449,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                 calc_func = final_kwargs.pop('calc_func')
                 resolve_calc_func = final_kwargs.pop('resolve_calc_func', True)
                 post_calc_func = final_kwargs.pop('post_calc_func', None)
+                use_shortcuts = final_kwargs.pop('use_shortcuts', True)
                 use_caching = final_kwargs.pop('use_caching', True)
                 fill_wrap_kwargs = final_kwargs.pop('fill_wrap_kwargs', False)
                 if fill_wrap_kwargs:
@@ -460,26 +472,39 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                                           _final_kwargs: tp.Kwargs = final_kwargs,
                                           _opt_arg_names: tp.Set[str] = opt_arg_names,
                                           _custom_arg_names: tp.Set[str] = custom_arg_names,
-                                          _arg_cache_dct: tp.Kwargs = arg_cache_dct) -> tp.Any:
-                            if attr in final_kwargs:
-                                return final_kwargs[attr]
+                                          _arg_cache_dct: tp.Kwargs = arg_cache_dct,
+                                          _use_shortcuts: bool = use_shortcuts,
+                                          _use_caching: bool = use_caching) -> tp.Any:
+                            if attr in _final_kwargs:
+                                return _final_kwargs[attr]
                             if args is None:
                                 args = ()
                             if kwargs is None:
                                 kwargs = {}
+
                             if obj is custom_reself and _final_kwargs.pop('resolve_path_' + attr, True):
                                 if call_attr:
                                     return custom_reself.resolve_attr(
-                                        attr,
+                                        attr,  # do not pass _attr, important for caching
                                         args=args,
                                         cond_kwargs={k: v for k, v in _final_kwargs.items() if k in _opt_arg_names},
                                         kwargs=kwargs,
                                         custom_arg_names=_custom_arg_names,
                                         cache_dct=_arg_cache_dct,
-                                        use_caching=use_caching,
-                                        passed_kwargs_out=passed_kwargs_out
+                                        use_caching=_use_caching,
+                                        passed_kwargs_out=passed_kwargs_out,
+                                        use_shortcuts=_use_shortcuts
                                     )
-                                return getattr(obj, attr)
+                                if isinstance(obj, AttrResolver):
+                                    cls_dir = obj.cls_dir
+                                else:
+                                    cls_dir = dir(type(obj))
+                                if 'get_' + attr in cls_dir:
+                                    _attr = 'get_' + attr
+                                else:
+                                    _attr = attr
+                                return getattr(obj, _attr)
+
                             out = getattr(obj, attr)
                             if callable(out) and call_attr:
                                 return out(*args, **kwargs)
@@ -500,14 +525,17 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                         func_arg_names = get_func_arg_names(calc_func)
                         for k in func_arg_names:
                             if k not in final_kwargs:
-                                if final_kwargs.pop('resolve_' + k, False):
+                                resolve_arg = final_kwargs.pop('resolve_' + k, False)
+                                use_shortcuts_arg = final_kwargs.pop('use_shortcuts_' + k, True)
+                                if resolve_arg:
                                     try:
                                         arg_out = custom_reself.resolve_attr(
                                             k,
                                             cond_kwargs=final_kwargs,
                                             custom_arg_names=custom_arg_names,
                                             cache_dct=arg_cache_dct,
-                                            use_caching=use_caching
+                                            use_caching=use_caching,
+                                            use_shortcuts=use_shortcuts_arg
                                         )
                                     except AttributeError:
                                         continue
@@ -594,7 +622,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                 warnings.warn(f"Object has multiple columns. Aggregating using {agg_func}. "
                               f"Pass column to select a single column/group.", stacklevel=2)
             return pd.Series(stats_dct, name='agg_func_' + agg_func.__name__)
-        new_index = reself.wrapper.grouper.get_columns(group_by=group_by)
+        new_index = reself.wrapper.grouper.get_index(group_by=group_by)
         stats_df = pd.DataFrame(stats_dct, index=new_index)
         return stats_df
 
@@ -608,7 +636,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
         return string.Template(
             inspect.cleandoc(get_dict_attr(source_cls, 'metrics').__doc__)
         ).substitute(
-            {'metrics': cls.metrics.to_doc(), 'cls_name': cls.__name__}
+            {'metrics': cls.metrics.stringify(), 'cls_name': cls.__name__}
         )
 
     @classmethod

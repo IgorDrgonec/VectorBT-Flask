@@ -8,27 +8,30 @@ Each creates a figure widget that is compatible with ipywidgets and enables inte
 data visualization in Jupyter Notebook and JupyterLab environments. For more details
 on using Plotly, see [Getting Started with Plotly in Python](https://plotly.com/python/getting-started/).
 
-The module can be accessed directly via `vbt.plotting`.
-
 !!! warning
-    In case of errors, it won't be visible in the notebook cell, but in the logs."""
+    Errors related to plotting in Jupyter environment usually appear in the logs, not under the cell."""
+
+from vectorbt.opt_packages import assert_can_import
+
+assert_can_import('plotly')
+
+import math
 
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.basedatatypes import BaseTraceType
-import math
 
 from vectorbt import _typing as tp
+from vectorbt.base import reshaping
 from vectorbt.utils import checks
-from vectorbt.utils.figure import make_figure
 from vectorbt.utils.array_ import renormalize
 from vectorbt.utils.colors import rgb_from_cmap
 from vectorbt.utils.config import Configured, resolve_dict
-from vectorbt.base import reshape_fns
+from vectorbt.utils.figure import make_figure
 
 
-def clean_labels(labels: tp.ArrayLikeSequence) -> tp.ArrayLikeSequence:
+def clean_labels(labels: tp.Labels) -> tp.Labels:
     """Clean labels.
 
     Plotly doesn't support multi-indexes."""
@@ -224,7 +227,7 @@ class Bar(Configured, TraceUpdater):
         if add_trace_kwargs is None:
             add_trace_kwargs = {}
         if data is not None:
-            data = reshape_fns.to_2d_array(data)
+            data = reshaping.to_2d_array(data)
             if trace_names is not None:
                 checks.assert_shape_equal(data, trace_names, (1, 0))
         else:
@@ -270,7 +273,7 @@ class Bar(Configured, TraceUpdater):
         ```
         ![](/docs/img/Bar_updated.svg)
         """
-        data = reshape_fns.to_2d_array(data)
+        data = reshaping.to_2d_array(data)
         with self.fig.batch_update():
             for i, bar in enumerate(self.traces):
                 bar.y = data[:, i]
@@ -286,6 +289,7 @@ class Scatter(Configured, TraceUpdater):
                  trace_kwargs: tp.KwargsLikeSequence = None,
                  add_trace_kwargs: tp.KwargsLike = None,
                  fig: tp.Optional[tp.BaseFigure] = None,
+                 use_gl: tp.Optional[bool] = None,
                  **layout_kwargs) -> None:
         """Create a scatter plot.
 
@@ -300,6 +304,10 @@ class Scatter(Configured, TraceUpdater):
                 Can be specified per trace as a sequence of dicts.
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             fig (Figure or FigureWidget): Figure to add traces to.
+            use_gl (bool): Whether to use `plotly.graph_objects.Scattergl`.
+
+                Defaults to the global setting. If the global setting is None, becomes True
+                if there are more than 10,000 data points.
             **layout_kwargs: Keyword arguments for layout.
 
         ## Example
@@ -327,12 +335,15 @@ class Scatter(Configured, TraceUpdater):
             **layout_kwargs
         )
 
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
+
         if trace_kwargs is None:
             trace_kwargs = {}
         if add_trace_kwargs is None:
             add_trace_kwargs = {}
         if data is not None:
-            data = reshape_fns.to_2d_array(data)
+            data = reshaping.to_2d_array(data)
             if trace_names is not None:
                 checks.assert_shape_equal(data, trace_names, (1, 0))
         else:
@@ -344,6 +355,10 @@ class Scatter(Configured, TraceUpdater):
             trace_names = [trace_names]
         if x_labels is not None:
             x_labels = clean_labels(x_labels)
+        if use_gl is None:
+            use_gl = plotting_cfg['use_gl']
+        if use_gl is None:
+            use_gl = use_gl is None and data is not None and data.size >= 10000
 
         if fig is None:
             fig = make_figure()
@@ -354,7 +369,11 @@ class Scatter(Configured, TraceUpdater):
             trace_name = _trace_kwargs.pop('name', trace_name)
             if trace_name is not None:
                 trace_name = str(trace_name)
-            scatter = go.Scatter(
+            if use_gl:
+                scatter_obj = go.Scattergl
+            else:
+                scatter_obj = go.Scatter
+            scatter = scatter_obj(
                 x=x_labels,
                 name=trace_name,
                 showlegend=trace_name is not None
@@ -369,7 +388,7 @@ class Scatter(Configured, TraceUpdater):
 
     def update(self, data: tp.ArrayLike) -> None:
         """Update the trace data."""
-        data = reshape_fns.to_2d_array(data)
+        data = reshaping.to_2d_array(data)
 
         with self.fig.batch_update():
             for i, trace in enumerate(self.traces):
@@ -399,10 +418,10 @@ class Histogram(Configured, TraceUpdater):
             remove_nan (bool): Whether to remove NaN values.
             from_quantile (float): Filter out data points before this quantile.
 
-                Should be in range `[0, 1]`.
+                Must be in range `[0, 1]`.
             to_quantile (float): Filter out data points after this quantile.
 
-                Should be in range `[0, 1]`.
+                Must be in range `[0, 1]`.
             trace_kwargs (dict or list of dict): Keyword arguments passed to `plotly.graph_objects.Histogram`.
 
                 Can be specified per trace as a sequence of dicts.
@@ -442,7 +461,7 @@ class Histogram(Configured, TraceUpdater):
         if add_trace_kwargs is None:
             add_trace_kwargs = {}
         if data is not None:
-            data = reshape_fns.to_2d_array(data)
+            data = reshaping.to_2d_array(data)
             if trace_names is not None:
                 checks.assert_shape_equal(data, trace_names, (1, 0))
         else:
@@ -481,28 +500,28 @@ class Histogram(Configured, TraceUpdater):
             self.update(data)
 
     @property
-    def horizontal(self):
+    def horizontal(self) -> bool:
         """Whether to plot horizontally."""
         return self._horizontal
 
     @property
-    def remove_nan(self):
+    def remove_nan(self) -> bool:
         """Whether to remove NaN values."""
         return self._remove_nan
 
     @property
-    def from_quantile(self):
+    def from_quantile(self) -> float:
         """Filter out data points before this quantile."""
         return self._from_quantile
 
     @property
-    def to_quantile(self):
+    def to_quantile(self) -> float:
         """Filter out data points after this quantile."""
         return self._to_quantile
 
     def update(self, data: tp.ArrayLike) -> None:
         """Update the trace data."""
-        data = reshape_fns.to_2d_array(data)
+        data = reshaping.to_2d_array(data)
 
         with self.fig.batch_update():
             for i, trace in enumerate(self.traces):
@@ -571,7 +590,7 @@ class Box(Configured, TraceUpdater):
         if add_trace_kwargs is None:
             add_trace_kwargs = {}
         if data is not None:
-            data = reshape_fns.to_2d_array(data)
+            data = reshaping.to_2d_array(data)
             if trace_names is not None:
                 checks.assert_shape_equal(data, trace_names, (1, 0))
         else:
@@ -608,28 +627,28 @@ class Box(Configured, TraceUpdater):
             self.update(data)
 
     @property
-    def horizontal(self):
+    def horizontal(self) -> bool:
         """Whether to plot horizontally."""
         return self._horizontal
 
     @property
-    def remove_nan(self):
+    def remove_nan(self) -> bool:
         """Whether to remove NaN values."""
         return self._remove_nan
 
     @property
-    def from_quantile(self):
+    def from_quantile(self) -> float:
         """Filter out data points before this quantile."""
         return self._from_quantile
 
     @property
-    def to_quantile(self):
+    def to_quantile(self) -> float:
         """Filter out data points after this quantile."""
         return self._to_quantile
 
     def update(self, data: tp.ArrayLike) -> None:
         """Update the trace data."""
-        data = reshape_fns.to_2d_array(data)
+        data = reshaping.to_2d_array(data)
 
         with self.fig.batch_update():
             for i, trace in enumerate(self.traces):
@@ -709,7 +728,7 @@ class Heatmap(Configured, TraceUpdater):
         if add_trace_kwargs is None:
             add_trace_kwargs = {}
         if data is not None:
-            data = reshape_fns.to_2d_array(data)
+            data = reshaping.to_2d_array(data)
             if x_labels is not None:
                 checks.assert_shape_equal(data, x_labels, (1, 0))
             if y_labels is not None:
@@ -780,7 +799,7 @@ class Heatmap(Configured, TraceUpdater):
 
     def update(self, data: tp.ArrayLike) -> None:
         """Update the trace data."""
-        data = reshape_fns.to_2d_array(data)
+        data = reshaping.to_2d_array(data)
 
         with self.fig.batch_update():
             self.traces[0].z = data

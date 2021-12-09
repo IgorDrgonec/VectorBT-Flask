@@ -482,29 +482,28 @@ Name: group, dtype: object
 
 import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
 
 from vectorbt import _typing as tp
-from vectorbt.utils.colors import adjust_lightness
-from vectorbt.utils.config import merge_dicts, Config
-from vectorbt.utils.figure import make_figure, get_domain
-from vectorbt.utils.array_ import min_rel_rescale, max_rel_rescale
-from vectorbt.utils.template import RepEval
-from vectorbt.utils.decorators import cached_method, cached_property
-from vectorbt.base.reshape_fns import to_1d_array, to_2d_array
-from vectorbt.base.array_wrapper import ArrayWrapper
+from vectorbt.base.reshaping import to_1d_array, to_2d_array
+from vectorbt.base.wrapping import ArrayWrapper
+from vectorbt.ch_registry import ch_registry
 from vectorbt.generic.ranges import Ranges
-from vectorbt.records.decorators import attach_fields, override_field_config
-from vectorbt.records.mapped_array import MappedArray
-from vectorbt.portfolio.enums import TradeDirection, TradeStatus, trade_dt
+from vectorbt.jit_registry import jit_registry
 from vectorbt.portfolio import nb
+from vectorbt.portfolio.enums import TradeDirection, TradeStatus, trade_dt
 from vectorbt.portfolio.orders import Orders
+from vectorbt.records.decorators import attach_fields, override_field_config, attach_shortcut_properties
+from vectorbt.records.mapped_array import MappedArray
+from vectorbt.utils.array_ import min_rel_rescale, max_rel_rescale
+from vectorbt.utils.colors import adjust_lightness
+from vectorbt.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig
+from vectorbt.utils.template import RepEval
 
 __pdoc__ = {}
 
 # ############# Trades ############# #
 
-trades_field_config = Config(
+trades_field_config = ReadonlyConfig(
     dict(
         dtype=trade_dt,
         settings={
@@ -561,20 +560,18 @@ trades_field_config = Config(
                 title='Position Id'
             )
         }
-    ),
-    readonly=True,
-    as_attrs=False
+    )
 )
 """_"""
 
 __pdoc__['trades_field_config'] = f"""Field config for `Trades`.
 
 ```json
-{trades_field_config.to_doc()}
+{trades_field_config.stringify()}
 ```
 """
 
-trades_attach_field_config = Config(
+trades_attach_field_config = ReadonlyConfig(
     {
         'return': dict(
             attach='returns'
@@ -586,22 +583,54 @@ trades_attach_field_config = Config(
             attach_filters=True,
             on_conflict='ignore'
         )
-    },
-    readonly=True,
-    as_attrs=False
+    }
 )
 """_"""
 
 __pdoc__['trades_attach_field_config'] = f"""Config of fields to be attached to `Trades`.
 
 ```json
-{trades_attach_field_config.to_doc()}
+{trades_attach_field_config.stringify()}
+```
+"""
+
+trades_shortcut_config = ReadonlyConfig(
+    dict(
+        winning=dict(),
+        losing=dict(),
+        winning_streak=dict(
+            obj_type='mapped_array'
+        ),
+        losing_streak=dict(
+            obj_type='mapped_array'
+        ),
+        win_rate=dict(
+            obj_type='red_array'
+        ),
+        profit_factor=dict(
+            obj_type='red_array'
+        ),
+        expectancy=dict(
+            obj_type='red_array'
+        ),
+        sqn=dict(
+            obj_type='red_array'
+        )
+    )
+)
+"""_"""
+
+__pdoc__['trades_shortcut_config'] = f"""Config of shortcut properties to be attached to `Trades`.
+
+```json
+{trades_shortcut_config.stringify()}
 ```
 """
 
 TradesT = tp.TypeVar("TradesT", bound="Trades")
 
 
+@attach_shortcut_properties(trades_shortcut_config)
 @attach_fields(trades_attach_field_config)
 @override_field_config(trades_field_config)
 class Trades(Ranges):
@@ -612,10 +641,20 @@ class Trades(Ranges):
     def field_config(self) -> Config:
         return self._field_config
 
+    @classmethod
+    def from_records(cls: tp.Type[TradesT],
+                     wrapper: ArrayWrapper,
+                     records: tp.RecordArray,
+                     close: tp.Optional[tp.ArrayLike] = None,
+                     attach_close: bool = True,
+                     **kwargs) -> TradesT:
+        """Build `Trades` from records."""
+        return cls(wrapper, records, close=close if attach_close else None, **kwargs)
+
     def __init__(self,
                  wrapper: ArrayWrapper,
                  records_arr: tp.RecordArray,
-                 close: tp.ArrayLike,
+                 close: tp.Optional[tp.SeriesFrame],
                  **kwargs) -> None:
         Ranges.__init__(
             self,
@@ -631,7 +670,7 @@ class Trades(Ranges):
         new_wrapper, new_records_arr, group_idxs, col_idxs = \
             Ranges.indexing_func_meta(self, pd_indexing_func, **kwargs)
         if self.close is not None:
-            new_close = new_wrapper.wrap(to_2d_array(self.close)[:, col_idxs], group_by=False)
+            new_close = to_2d_array(self.close)[:, col_idxs]
         else:
             new_close = None
         return self.replace(
@@ -642,94 +681,105 @@ class Trades(Ranges):
 
     @property
     def close(self) -> tp.Optional[tp.SeriesFrame]:
-        """Reference price such as close (optional)."""
-        return self._close
+        """Closing price."""
+        if self._close is None:
+            return None
+        return self.wrapper.wrap(self._close, group_by=False)
 
     @classmethod
     def from_ts(cls: tp.Type[TradesT], *args, **kwargs) -> TradesT:
         raise NotImplementedError
 
-    @cached_property
-    def winning(self: TradesT) -> TradesT:
-        """Winning trades."""
+    def get_winning(self: TradesT, **kwargs) -> TradesT:
+        """Get winning trades."""
         filter_mask = self.values['pnl'] > 0.
-        return self.apply_mask(filter_mask)
+        return self.apply_mask(filter_mask, **kwargs)
 
-    @cached_property
-    def losing(self: TradesT) -> TradesT:
-        """Losing trades."""
+    def get_losing(self: TradesT, **kwargs) -> TradesT:
+        """Get losing trades."""
         filter_mask = self.values['pnl'] < 0.
-        return self.apply_mask(filter_mask)
+        return self.apply_mask(filter_mask, **kwargs)
 
-    @cached_property
-    def winning_streak(self) -> MappedArray:
-        """Winning streak at each trade in the current column.
+    def get_winning_streak(self, **kwargs) -> MappedArray:
+        """Get winning streak at each trade in the current column.
 
-        See `vectorbt.portfolio.nb.trade_winning_streak_nb`."""
-        return self.apply(nb.trade_winning_streak_nb, dtype=np.int_)
+        See `vectorbt.portfolio.nb.records.trade_winning_streak_nb`."""
+        return self.apply(nb.trade_winning_streak_nb, dtype=np.int_, **kwargs)
 
-    @cached_property
-    def losing_streak(self) -> MappedArray:
-        """Losing streak at each trade in the current column.
+    def get_losing_streak(self, **kwargs) -> MappedArray:
+        """Get losing streak at each trade in the current column.
 
-        See `vectorbt.portfolio.nb.trade_losing_streak_nb`."""
-        return self.apply(nb.trade_losing_streak_nb, dtype=np.int_)
+        See `vectorbt.portfolio.nb.records.trade_losing_streak_nb`."""
+        return self.apply(nb.trade_losing_streak_nb, dtype=np.int_, **kwargs)
 
-    @cached_method
-    def win_rate(self, group_by: tp.GroupByLike = None,
-                 wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Rate of winning trades."""
-        win_count = to_1d_array(self.winning.count(group_by=group_by))
-        total_count = to_1d_array(self.count(group_by=group_by))
-        with np.errstate(divide='ignore', invalid='ignore'):
-            win_rate = win_count / total_count
+    def get_win_rate(self,
+                     group_by: tp.GroupByLike = None,
+                     jitted: tp.JittedOption = None,
+                     chunked: tp.ChunkedOption = None,
+                     wrap_kwargs: tp.KwargsLike = None,
+                     **kwargs) -> tp.MaybeSeries:
+        """Get rate of winning trades."""
         wrap_kwargs = merge_dicts(dict(name_or_index='win_rate'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(win_rate, group_by=group_by, **wrap_kwargs)
+        return self.get_map_field('pnl').reduce(
+            nb.win_rate_1d_nb,
+            group_by=group_by,
+            jitted=jitted,
+            chunked=chunked,
+            wrap_kwargs=wrap_kwargs,
+            **kwargs
+        )
 
-    @cached_method
-    def profit_factor(self, group_by: tp.GroupByLike = None,
-                      wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Profit factor."""
-        total_win = to_1d_array(self.winning.pnl.sum(group_by=group_by))
-        total_loss = to_1d_array(self.losing.pnl.sum(group_by=group_by))
-
-        # Otherwise columns with only wins or losses will become NaNs
-        has_values = to_1d_array(self.count(group_by=group_by)) > 0
-        total_win[np.isnan(total_win) & has_values] = 0.
-        total_loss[np.isnan(total_loss) & has_values] = 0.
-
-        with np.errstate(divide='ignore', invalid='ignore'):
-            profit_factor = total_win / np.abs(total_loss)
+    def get_profit_factor(self,
+                          group_by: tp.GroupByLike = None,
+                          jitted: tp.JittedOption = None,
+                          chunked: tp.ChunkedOption = None,
+                          wrap_kwargs: tp.KwargsLike = None,
+                          **kwargs) -> tp.MaybeSeries:
+        """Get profit factor."""
         wrap_kwargs = merge_dicts(dict(name_or_index='profit_factor'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(profit_factor, group_by=group_by, **wrap_kwargs)
+        return self.get_map_field('pnl').reduce(
+            nb.profit_factor_1d_nb,
+            group_by=group_by,
+            jitted=jitted,
+            chunked=chunked,
+            wrap_kwargs=wrap_kwargs,
+            **kwargs
+        )
 
-    @cached_method
-    def expectancy(self, group_by: tp.GroupByLike = None,
-                   wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Average profitability."""
-        win_rate = to_1d_array(self.win_rate(group_by=group_by))
-        avg_win = to_1d_array(self.winning.pnl.mean(group_by=group_by))
-        avg_loss = to_1d_array(self.losing.pnl.mean(group_by=group_by))
-
-        # Otherwise columns with only wins or losses will become NaNs
-        has_values = to_1d_array(self.count(group_by=group_by)) > 0
-        avg_win[np.isnan(avg_win) & has_values] = 0.
-        avg_loss[np.isnan(avg_loss) & has_values] = 0.
-
-        expectancy = win_rate * avg_win - (1 - win_rate) * np.abs(avg_loss)
+    def get_expectancy(self,
+                       group_by: tp.GroupByLike = None,
+                       jitted: tp.JittedOption = None,
+                       chunked: tp.ChunkedOption = None,
+                       wrap_kwargs: tp.KwargsLike = None,
+                       **kwargs) -> tp.MaybeSeries:
+        """Get average profitability."""
         wrap_kwargs = merge_dicts(dict(name_or_index='expectancy'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(expectancy, group_by=group_by, **wrap_kwargs)
+        return self.get_map_field('pnl').reduce(
+            nb.expectancy_1d_nb,
+            group_by=group_by,
+            jitted=jitted,
+            chunked=chunked,
+            wrap_kwargs=wrap_kwargs,
+            **kwargs
+        )
 
-    @cached_method
-    def sqn(self, group_by: tp.GroupByLike = None,
-            wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """System Quality Number (SQN)."""
-        count = to_1d_array(self.count(group_by=group_by))
-        pnl_mean = to_1d_array(self.pnl.mean(group_by=group_by))
-        pnl_std = to_1d_array(self.pnl.std(group_by=group_by))
-        sqn = np.sqrt(count) * pnl_mean / pnl_std
+    def get_sqn(self,
+                ddof: int = 1,
+                group_by: tp.GroupByLike = None,
+                jitted: tp.JittedOption = None,
+                chunked: tp.ChunkedOption = None,
+                wrap_kwargs: tp.KwargsLike = None,
+                **kwargs) -> tp.MaybeSeries:
+        """Get System Quality Number (SQN)."""
         wrap_kwargs = merge_dicts(dict(name_or_index='sqn'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(sqn, group_by=group_by, **wrap_kwargs)
+        return self.get_map_field('pnl').reduce(
+            nb.sqn_1d_nb, ddof,
+            group_by=group_by,
+            jitted=jitted,
+            chunked=chunked,
+            wrap_kwargs=wrap_kwargs,
+            **kwargs
+        )
 
     # ############# Stats ############# #
 
@@ -747,7 +797,7 @@ class Trades(Ranges):
             trades_stats_cfg
         )
 
-    _metrics: tp.ClassVar[Config] = Config(
+    _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
             start=dict(
                 title='Start',
@@ -830,7 +880,7 @@ class Trades(Ranges):
             ),
             win_rate=dict(
                 title='Win Rate [%]',
-                calc_func='closed.win_rate',
+                calc_func='closed.get_win_rate',
                 post_calc_func=lambda self, out, settings: out * 100,
                 tags=RepEval("['trades', *incl_open_tags]")
             ),
@@ -872,33 +922,32 @@ class Trades(Ranges):
             ),
             avg_winning_trade_duration=dict(
                 title='Avg Winning Trade Duration',
-                calc_func=RepEval("'winning.avg_duration' if incl_open else 'closed.winning.avg_duration'"),
+                calc_func=RepEval("'winning.avg_duration' if incl_open else 'closed.winning.get_avg_duration'"),
                 fill_wrap_kwargs=True,
                 tags=RepEval("['trades', *incl_open_tags, 'winning', 'duration']")
             ),
             avg_losing_trade_duration=dict(
                 title='Avg Losing Trade Duration',
-                calc_func=RepEval("'losing.avg_duration' if incl_open else 'closed.losing.avg_duration'"),
+                calc_func=RepEval("'losing.avg_duration' if incl_open else 'closed.losing.get_avg_duration'"),
                 fill_wrap_kwargs=True,
                 tags=RepEval("['trades', *incl_open_tags, 'losing', 'duration']")
             ),
             profit_factor=dict(
                 title='Profit Factor',
-                calc_func=RepEval("'profit_factor' if incl_open else 'closed.profit_factor'"),
+                calc_func=RepEval("'profit_factor' if incl_open else 'closed.get_profit_factor'"),
                 tags=RepEval("['trades', *incl_open_tags]")
             ),
             expectancy=dict(
                 title='Expectancy',
-                calc_func=RepEval("'expectancy' if incl_open else 'closed.expectancy'"),
+                calc_func=RepEval("'expectancy' if incl_open else 'closed.get_expectancy'"),
                 tags=RepEval("['trades', *incl_open_tags]")
             ),
             sqn=dict(
                 title='SQN',
-                calc_func=RepEval("'sqn' if incl_open else 'closed.sqn'"),
+                calc_func=RepEval("'sqn' if incl_open else 'closed.get_sqn'"),
                 tags=RepEval("['trades', *incl_open_tags]")
             )
-        ),
-        copy_kwargs=dict(copy_mode='deep')
+        )
     )
 
     @property
@@ -912,6 +961,7 @@ class Trades(Ranges):
                  pct_scale: bool = True,
                  marker_size_range: tp.Tuple[float, float] = (7, 14),
                  opacity_range: tp.Tuple[float, float] = (0.75, 0.9),
+                 closed_trace_kwargs: tp.KwargsLike = None,
                  closed_profit_trace_kwargs: tp.KwargsLike = None,
                  closed_loss_trace_kwargs: tp.KwargsLike = None,
                  open_trace_kwargs: tp.KwargsLike = None,
@@ -928,6 +978,7 @@ class Trades(Ranges):
             pct_scale (bool): Whether to set y-axis to `Trades.returns`, otherwise to `Trades.pnl`.
             marker_size_range (tuple): Range of marker size.
             opacity_range (tuple): Range of marker opacity.
+            closed_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Closed" markers.
             closed_profit_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Closed - Profit" markers.
             closed_loss_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Closed - Loss" markers.
             open_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Open" markers.
@@ -954,11 +1005,17 @@ class Trades(Ranges):
 
         ![](/docs/img/trades_plot_pnl.svg)
         """
+        from vectorbt.opt_packages import assert_can_import
+        assert_can_import('plotly')
+        import plotly.graph_objects as go
+        from vectorbt.utils.figure import make_figure, get_domain
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']
 
         self_col = self.select_one(column=column, group_by=False)
 
+        if closed_trace_kwargs is None:
+            closed_trace_kwargs = {}
         if closed_profit_trace_kwargs is None:
             closed_profit_trace_kwargs = {}
         if closed_loss_trace_kwargs is None:
@@ -998,9 +1055,10 @@ class Trades(Ranges):
 
             status = self_col.get_field_arr('status')
 
-            neutral_mask = pnl == 0
-            profit_mask = pnl > 0
-            loss_mask = pnl < 0
+            valid_mask = ~np.isnan(returns)
+            neutral_mask = (pnl == 0) & valid_mask
+            profit_mask = (pnl > 0) & valid_mask
+            loss_mask = (pnl < 0) & valid_mask
 
             marker_size = min_rel_rescale(np.abs(returns), marker_size_range)
             opacity = max_rel_rescale(np.abs(returns), opacity_range)
@@ -1056,6 +1114,14 @@ class Trades(Ranges):
                     )
                     scatter.update(**kwargs)
                     fig.add_trace(scatter, **add_trace_kwargs)
+
+            # Plot Closed - Neutral scatter
+            _plot_scatter(
+                neutral_mask,
+                'Closed',
+                plotting_cfg['contrast_color_schema']['gray'],
+                closed_trace_kwargs
+            )
 
             # Plot Closed - Profit scatter
             _plot_scatter(
@@ -1149,6 +1215,10 @@ class Trades(Ranges):
         ```
 
         ![](/docs/img/trades_plot.svg)"""
+        from vectorbt.opt_packages import assert_can_import
+        assert_can_import('plotly')
+        import plotly.graph_objects as go
+        from vectorbt.utils.figure import make_figure
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']
 
@@ -1195,7 +1265,7 @@ class Trades(Ranges):
             size = self_col.get_field_arr('size')
             size_title = self_col.get_field_title('size')
 
-            entry_idx = self_col.get_map_field_to_index('entry_idx')
+            entry_idx = self_col.get_map_field_to_index('entry_idx', minus_one_to_zero=True)
             entry_idx_title = self_col.get_field_title('entry_idx')
 
             entry_price = self_col.get_field_arr('entry_price')
@@ -1444,8 +1514,7 @@ class Trades(Ranges):
                 plot_func='plot_pnl',
                 tags='trades'
             )
-        ),
-        copy_kwargs=dict(copy_mode='deep')
+        )
     )
 
     @property
@@ -1459,23 +1528,21 @@ Trades.override_subplots_doc(__pdoc__)
 
 # ############# EntryTrades ############# #
 
-entry_trades_field_config = Config(
+entry_trades_field_config = ReadonlyConfig(
     dict(
         settings={
             'id': dict(
                 title='Entry Trade Id'
             )
         }
-    ),
-    readonly=True,
-    as_attrs=False
+    )
 )
 """_"""
 
 __pdoc__['entry_trades_field_config'] = f"""Field config for `EntryTrades`.
 
 ```json
-{entry_trades_field_config.to_doc()}
+{entry_trades_field_config.stringify()}
 ```
 """
 
@@ -1490,38 +1557,42 @@ class EntryTrades(Trades):
     def from_orders(cls: tp.Type[EntryTradesT],
                     orders: Orders,
                     close: tp.Optional[tp.ArrayLike] = None,
+                    init_position: tp.ArrayLike = 0.,
                     attach_close: bool = True,
+                    jitted: tp.JittedOption = None,
+                    chunked: tp.ChunkedOption = None,
                     **kwargs) -> EntryTradesT:
         """Build `EntryTrades` from `vectorbt.portfolio.orders.Orders`."""
         if close is None:
             close = orders.close
-        trade_records_arr = nb.get_entry_trades_nb(
+        func = jit_registry.resolve_option(nb.get_entry_trades_nb, jitted)
+        func = ch_registry.resolve_option(func, chunked)
+        trade_records_arr = func(
             orders.values,
             to_2d_array(close),
-            orders.col_mapper.col_map
+            orders.col_mapper.col_map,
+            init_position=to_1d_array(init_position)
         )
         return cls(orders.wrapper, trade_records_arr, close=close if attach_close else None, **kwargs)
 
 
 # ############# ExitTrades ############# #
 
-exit_trades_field_config = Config(
+exit_trades_field_config = ReadonlyConfig(
     dict(
         settings={
             'id': dict(
                 title='Exit Trade Id'
             )
         }
-    ),
-    readonly=True,
-    as_attrs=False
+    )
 )
 """_"""
 
 __pdoc__['exit_trades_field_config'] = f"""Field config for `ExitTrades`.
 
 ```json
-{exit_trades_field_config.to_doc()}
+{exit_trades_field_config.stringify()}
 ```
 """
 
@@ -1536,22 +1607,28 @@ class ExitTrades(Trades):
     def from_orders(cls: tp.Type[ExitTradesT],
                     orders: Orders,
                     close: tp.Optional[tp.ArrayLike] = None,
+                    init_position: tp.ArrayLike = 0.,
                     attach_close: bool = True,
+                    jitted: tp.JittedOption = None,
+                    chunked: tp.ChunkedOption = None,
                     **kwargs) -> ExitTradesT:
         """Build `ExitTrades` from `vectorbt.portfolio.orders.Orders`."""
         if close is None:
             close = orders.close
-        trade_records_arr = nb.get_exit_trades_nb(
+        func = jit_registry.resolve_option(nb.get_exit_trades_nb, jitted)
+        func = ch_registry.resolve_option(func, chunked)
+        trade_records_arr = func(
             orders.values,
             to_2d_array(close),
-            orders.col_mapper.col_map
+            orders.col_mapper.col_map,
+            init_position=to_1d_array(init_position)
         )
         return cls(orders.wrapper, trade_records_arr, close=close if attach_close else None, **kwargs)
 
 
 # ############# Positions ############# #
 
-positions_field_config = Config(
+positions_field_config = ReadonlyConfig(
     dict(
         settings={
             'id': dict(
@@ -1562,16 +1639,14 @@ positions_field_config = Config(
                 ignore=True
             )
         }
-    ),
-    readonly=True,
-    as_attrs=False
+    )
 )
 """_"""
 
 __pdoc__['positions_field_config'] = f"""Field config for `Positions`.
 
 ```json
-{positions_field_config.to_doc()}
+{positions_field_config.stringify()}
 ```
 """
 
@@ -1591,9 +1666,13 @@ class Positions(Trades):
                     trades: Trades,
                     close: tp.Optional[tp.ArrayLike] = None,
                     attach_close: bool = True,
+                    jitted: tp.JittedOption = None,
+                    chunked: tp.ChunkedOption = None,
                     **kwargs) -> PositionsT:
         """Build `Positions` from `Trades`."""
         if close is None:
             close = trades.close
-        position_records_arr = nb.get_positions_nb(trades.values, trades.col_mapper.col_map)
+        func = jit_registry.resolve_option(nb.get_positions_nb, jitted)
+        func = ch_registry.resolve_option(func, chunked)
+        position_records_arr = func(trades.values, trades.col_mapper.col_map)
         return cls(trades.wrapper, position_records_arr, close=close if attach_close else None, **kwargs)

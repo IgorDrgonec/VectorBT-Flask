@@ -1,6 +1,8 @@
+import os
+from datetime import datetime
+
 import numpy as np
 import pandas as pd
-from datetime import datetime
 
 import vectorbt as vbt
 
@@ -23,10 +25,10 @@ neg_ths = [np.array([1 / 2, 1 / 3]), np.array([1 / 2, 2 / 3]), np.array([1 / 2, 
 # ############# Global ############# #
 
 def setup_module():
+    if os.environ.get('VBT_DISABLE_CACHING', '0') == '1':
+        vbt.settings.caching['disable_machinery'] = True
+    vbt.settings.pbar['disable'] = True
     vbt.settings.numba['check_func_suffix'] = True
-    vbt.settings.caching.enabled = False
-    vbt.settings.caching.whitelist = []
-    vbt.settings.caching.blacklist = []
 
 
 def teardown_module():

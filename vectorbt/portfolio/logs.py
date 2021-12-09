@@ -88,10 +88,7 @@ This class does not have any subplots.
 import pandas as pd
 
 from vectorbt import _typing as tp
-from vectorbt.utils.config import merge_dicts, Config
-from vectorbt.base.reshape_fns import to_dict
-from vectorbt.records.base import Records
-from vectorbt.records.decorators import attach_fields, override_field_config
+from vectorbt.base.reshaping import to_dict
 from vectorbt.portfolio.enums import (
     log_dt,
     SizeType,
@@ -100,138 +97,163 @@ from vectorbt.portfolio.enums import (
     OrderStatus,
     OrderStatusInfo
 )
+from vectorbt.records.base import Records
+from vectorbt.records.decorators import attach_fields, override_field_config
+from vectorbt.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig
 
 __pdoc__ = {}
 
-logs_field_config = Config(
+logs_field_config = ReadonlyConfig(
     dict(
         dtype=log_dt,
         settings=dict(
             id=dict(
-                title='Log Id'
+                title=('Meta', 'Log Id')
+            ),
+            col=dict(
+                title=('Meta', 'Column')
+            ),
+            idx=dict(
+                title=('Meta', 'Timestamp')
             ),
             group=dict(
-                title='Group'
+                title=('Meta', 'Group')
+            ),
+            open=dict(
+                title=('Price Area', 'Open')
+            ),
+            high=dict(
+                title=('Price Area', 'High')
+            ),
+            low=dict(
+                title=('Price Area', 'Low')
+            ),
+            close=dict(
+                title=('Price Area', 'Close')
             ),
             cash=dict(
-                title='Cash'
+                title=('State', 'Cash')
             ),
             position=dict(
-                title='Position'
+                title=('State', 'Position')
             ),
             debt=dict(
-                title='Debt'
+                title=('State', 'Debt')
             ),
             free_cash=dict(
-                title='Free Cash'
+                title=('State', 'Free Cash')
             ),
             val_price=dict(
-                title='Val Price'
+                title=('State', 'Valuation Price')
             ),
             value=dict(
-                title='Value'
+                title=('State', 'Value')
             ),
             req_size=dict(
-                title='Request Size'
+                title=('Request', 'Size')
             ),
             req_price=dict(
-                title='Request Price'
+                title=('Request', 'Price')
             ),
             req_size_type=dict(
-                title='Request Size Type',
+                title=('Request', 'Size Type'),
                 mapping=SizeType
             ),
             req_direction=dict(
-                title='Request Direction',
+                title=('Request', 'Direction'),
                 mapping=Direction
             ),
             req_fees=dict(
-                title='Request Fees'
+                title=('Request', 'Fees')
             ),
             req_fixed_fees=dict(
-                title='Request Fixed Fees'
+                title=('Request', 'Fixed Fees')
             ),
             req_slippage=dict(
-                title='Request Slippage'
+                title=('Request', 'Slippage')
             ),
             req_min_size=dict(
-                title='Request Min Size'
+                title=('Request', 'Min Size')
             ),
             req_max_size=dict(
-                title='Request Max Size'
+                title=('Request', 'Max Size')
+            ),
+            req_size_granularity=dict(
+                title=('Request', 'Size Granularity')
             ),
             req_reject_prob=dict(
-                title='Request Rejection Prob'
+                title=('Request', 'Rejection Prob')
+            ),
+            req_price_area_vio_mode=dict(
+                title=('Request', 'Price Area Violation Mode')
             ),
             req_lock_cash=dict(
-                title='Request Lock Cash'
+                title=('Request', 'Lock Cash')
             ),
             req_allow_partial=dict(
-                title='Request Allow Partial'
+                title=('Request', 'Allow Partial')
             ),
             req_raise_reject=dict(
-                title='Request Raise Rejection'
+                title=('Request', 'Raise Rejection')
             ),
             req_log=dict(
-                title='Request Log'
+                title=('Request', 'Log')
             ),
             new_cash=dict(
-                title='New Cash'
+                title=('New State', 'Cash')
             ),
             new_position=dict(
-                title='New Position'
+                title=('New State', 'Position')
             ),
             new_debt=dict(
-                title='New Debt'
+                title=('New State', 'Debt')
             ),
             new_free_cash=dict(
-                title='New Free Cash'
+                title=('New State', 'Free Cash')
             ),
             new_val_price=dict(
-                title='New Val Price'
+                title=('New State', 'Valuation Price')
             ),
             new_value=dict(
-                title='New Value'
+                title=('New State', 'Value')
             ),
             res_size=dict(
-                title='Result Size'
+                title=('Result', 'Size')
             ),
             res_price=dict(
-                title='Result Price'
+                title=('Result', 'Price')
             ),
             res_fees=dict(
-                title='Result Fees'
+                title=('Result', 'Fees')
             ),
             res_side=dict(
-                title='Result Side',
+                title=('Result', 'Side'),
                 mapping=OrderSide
             ),
             res_status=dict(
-                title='Result Status',
+                title=('Result', 'Status'),
                 mapping=OrderStatus
             ),
             res_status_info=dict(
-                title='Result Status Info',
+                title=('Result', 'Status Info'),
                 mapping=OrderStatusInfo
             ),
             order_id=dict(
-                title='Order Id'
+                title=('Result', 'Order Id')
             )
         )
-    ),
-    readonly=True,
-    as_attrs=False
+    )
 )
 """_"""
 
 __pdoc__['logs_field_config'] = f"""Field config for `Logs`.
 
 ```json
-{logs_field_config.to_doc()}
+{logs_field_config.stringify()}
 ```
 """
 
-logs_attach_field_config = Config(
+logs_attach_field_config = ReadonlyConfig(
     dict(
         res_side=dict(
             attach_filters=True
@@ -242,16 +264,14 @@ logs_attach_field_config = Config(
         res_status_info=dict(
             attach_filters=True
         )
-    ),
-    readonly=True,
-    as_attrs=False
+    )
 )
 """_"""
 
 __pdoc__['logs_attach_field_config'] = f"""Config of fields to be attached to `Logs`.
 
 ```json
-{logs_attach_field_config.to_doc()}
+{logs_attach_field_config.stringify()}
 ```
 """
 
@@ -283,7 +303,7 @@ class Logs(Records):
             logs_stats_cfg
         )
 
-    _metrics: tp.ClassVar[Config] = Config(
+    _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
             start=dict(
                 title='Start',
@@ -322,8 +342,7 @@ class Logs(Records):
                 post_calc_func=lambda self, out, settings: to_dict(out, orient='index_series'),
                 tags=['logs', 'res_status_info', 'value_counts']
             )
-        ),
-        copy_kwargs=dict(copy_mode='deep')
+        )
     )
 
     @property

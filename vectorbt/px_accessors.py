@@ -6,18 +6,23 @@
 !!! note
     Accessors do not utilize caching."""
 
-import pandas as pd
+from vectorbt.opt_packages import assert_can_import
+
+assert_can_import('plotly')
+
 from inspect import getmembers, isfunction
+
+import pandas as pd
 import plotly.express as px
 
 from vectorbt import _typing as tp
-from vectorbt.root_accessors import register_dataframe_vbt_accessor, register_series_vbt_accessor
-from vectorbt.utils import checks
-from vectorbt.utils.figure import make_figure
-from vectorbt.utils.config import merge_dicts
 from vectorbt.base.accessors import BaseAccessor, BaseDFAccessor, BaseSRAccessor
-from vectorbt.base.reshape_fns import to_2d_array
+from vectorbt.base.reshaping import to_2d_array
 from vectorbt.generic.plotting import clean_labels
+from vectorbt.root_accessors import register_vbt_accessor, register_df_vbt_accessor, register_sr_vbt_accessor
+from vectorbt.utils import checks
+from vectorbt.utils.config import merge_dicts
+from vectorbt.utils.figure import make_figure
 
 
 def attach_px_methods(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
@@ -65,11 +70,12 @@ def attach_px_methods(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
     return cls
 
 
+@register_vbt_accessor('px')
 @attach_px_methods
 class PXAccessor(BaseAccessor):
     """Accessor for running Plotly Express functions.
 
-    Accessible through `pd.Series.vbt.px` and `pd.DataFrame.vbt.px`.
+    Accessible via `pd.Series.vbt.px` and `pd.DataFrame.vbt.px`.
 
     ## Example
 
@@ -89,22 +95,22 @@ class PXAccessor(BaseAccessor):
         BaseAccessor.__init__(self, obj, **kwargs)
 
 
-@register_series_vbt_accessor('px')
+@register_sr_vbt_accessor('px')
 class PXSRAccessor(PXAccessor, BaseSRAccessor):
     """Accessor for running Plotly Express functions. For Series only.
 
-    Accessible through `pd.Series.vbt.px`."""
+    Accessible via `pd.Series.vbt.px`."""
 
     def __init__(self, obj: tp.Series, **kwargs) -> None:
         BaseSRAccessor.__init__(self, obj, **kwargs)
         PXAccessor.__init__(self, obj, **kwargs)
 
 
-@register_dataframe_vbt_accessor('px')
+@register_df_vbt_accessor('px')
 class PXDFAccessor(PXAccessor, BaseDFAccessor):
     """Accessor for running Plotly Express functions. For DataFrames only.
 
-    Accessible through `pd.DataFrame.vbt.px`."""
+    Accessible via `pd.DataFrame.vbt.px`."""
 
     def __init__(self, obj: tp.Frame, **kwargs) -> None:
         BaseDFAccessor.__init__(self, obj, **kwargs)

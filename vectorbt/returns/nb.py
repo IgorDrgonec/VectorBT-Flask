@@ -23,751 +23,723 @@ array([0., 0.09090909, 0.18181818, 0.09090909, 0.])
     2-dim, unless function has suffix `_1d` or is meant to be input to another function.
     Data is processed along index (axis 0).
 
-    All functions passed as argument should be Numba-compiled."""
+    All functions passed as argument must be Numba-compiled."""
 
 import numpy as np
-from numba import njit
+from numba import prange
 
 from vectorbt import _typing as tp
+from vectorbt.base import chunking as base_ch
+from vectorbt.ch_registry import register_chunkable
 from vectorbt.generic import nb as generic_nb
+from vectorbt.jit_registry import register_jitted
+from vectorbt.utils import chunking as ch
+from vectorbt.utils.math_ import add_nb
 
 
-@njit(cache=True)
+@register_jitted(cache=True)
 def get_return_nb(input_value: float, output_value: float) -> float:
     """Calculate return from input and output value."""
     if input_value == 0:
         if output_value == 0:
             return 0.
         return np.inf * np.sign(output_value)
-    return_value = (output_value - input_value) / input_value
+    return_value = add_nb(output_value, -input_value) / input_value
     if input_value < 0:
         return_value *= -1
     return return_value
 
 
-@njit(cache=True)
-def returns_1d_nb(value: tp.Array1d, init_value: float) -> tp.Array1d:
-    """Calculate returns from value."""
-    out = np.empty(value.shape, dtype=np.float_)
+@register_jitted(cache=True)
+def returns_1d_nb(arr: tp.Array1d, init_value: float) -> tp.Array1d:
+    """Calculate returns."""
+    out = np.empty(arr.shape, dtype=np.float_)
     input_value = init_value
     for i in range(out.shape[0]):
-        output_value = value[i]
+        output_value = arr[i]
         out[i] = get_return_nb(input_value, output_value)
         input_value = output_value
     return out
 
 
-@njit(cache=True)
-def returns_nb(value: tp.Array2d, init_value: tp.Array1d) -> tp.Array2d:
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='arr', axis=1),
+    arg_take_spec=dict(
+        arr=ch.ArraySlicer(axis=1),
+        init_value=ch.ArraySlicer(axis=0)
+    ),
+    merge_func=base_ch.column_stack
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def returns_nb(arr: tp.Array2d, init_value: tp.Array1d) -> tp.Array2d:
     """2-dim version of `returns_1d_nb`."""
-    out = np.empty(value.shape, dtype=np.float_)
-    for col in range(out.shape[1]):
-        out[:, col] = returns_1d_nb(value[:, col], init_value[col])
+    out = np.empty(arr.shape, dtype=np.float_)
+    for col in prange(out.shape[1]):
+        out[:, col] = returns_1d_nb(arr[:, col], init_value[col])
     return out
 
 
-@njit(cache=True)
-def total_return_apply_nb(idxs: tp.Array1d, col: int, returns: tp.Array1d) -> float:
-    """Calculate total return from returns."""
-    return np.nanprod(returns + 1) - 1
-
-
-@njit(cache=True)
-def cum_returns_1d_nb(returns: tp.Array1d, start_value: float) -> tp.Array1d:
+@register_jitted(cache=True)
+def cum_returns_1d_nb(rets: tp.Array1d, start_value: float) -> tp.Array1d:
     """Cumulative returns."""
-    out = np.empty_like(returns, dtype=np.float_)
+    out = np.empty_like(rets, dtype=np.float_)
     cumprod = 1
-    for i in range(returns.shape[0]):
-        if not np.isnan(returns[i]):
-            cumprod *= returns[i] + 1
+    for i in range(rets.shape[0]):
+        if not np.isnan(rets[i]):
+            cumprod *= rets[i] + 1
         out[i] = cumprod
-    if start_value == 0.:
+    if start_value == 0:
         return out - 1.
     return out * start_value
 
 
-@njit(cache=True)
-def cum_returns_nb(returns: tp.Array2d, start_value: float) -> tp.Array2d:
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='rets', axis=1),
+    arg_take_spec=dict(
+        rets=ch.ArraySlicer(axis=1),
+        start_value=None
+    ),
+    merge_func=base_ch.column_stack
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def cum_returns_nb(rets: tp.Array2d, start_value: float) -> tp.Array2d:
     """2-dim version of `cum_returns_1d_nb`."""
-    out = np.empty_like(returns, dtype=np.float_)
-    for col in range(returns.shape[1]):
-        out[:, col] = cum_returns_1d_nb(returns[:, col], start_value)
+    out = np.empty_like(rets, dtype=np.float_)
+    for col in prange(rets.shape[1]):
+        out[:, col] = cum_returns_1d_nb(rets[:, col], start_value)
     return out
 
 
-@njit(cache=True)
-def cum_returns_final_1d_nb(returns: tp.Array1d, start_value: float = 0.) -> float:
+@register_jitted(cache=True)
+def cum_returns_final_1d_nb(rets: tp.Array1d, start_value: float = 0.) -> float:
     """Total return."""
-    out = np.nanprod(returns + 1.)
-    if start_value == 0.:
+    out = np.nan
+    for i in range(rets.shape[0]):
+        if not np.isnan(rets[i]):
+            if np.isnan(out):
+                out = 1.
+            out *= rets[i] + 1.
+    if start_value == 0:
         return out - 1.
     return out * start_value
 
 
-@njit(cache=True)
-def cum_returns_final_nb(returns: tp.Array2d, start_value: float = 0.) -> tp.Array1d:
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='rets', axis=1),
+    arg_take_spec=dict(
+        rets=ch.ArraySlicer(axis=1),
+        start_value=None
+    ),
+    merge_func=base_ch.concat
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def cum_returns_final_nb(rets: tp.Array2d, start_value: float = 0.) -> tp.Array1d:
     """2-dim version of `cum_returns_final_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
-    for col in range(returns.shape[1]):
-        out[col] = cum_returns_final_1d_nb(returns[:, col], start_value)
+    out = np.empty(rets.shape[1], dtype=np.float_)
+    for col in prange(rets.shape[1]):
+        out[col] = cum_returns_final_1d_nb(rets[:, col], start_value)
     return out
 
 
-@njit
-def rolling_cum_returns_final_nb(returns: tp.Array2d,
-                                 window: int,
-                                 minp: tp.Optional[int],
-                                 start_value: float = 0.) -> tp.Array2d:
-    """Rolling version of `cum_returns_final_nb`."""
-
-    def _apply_func_nb(i, col, _returns, _start_value):
-        return cum_returns_final_1d_nb(_returns, _start_value)
-
-    return generic_nb.rolling_apply_nb(
-        returns, window, minp, _apply_func_nb, start_value)
-
-
-@njit(cache=True)
-def annualized_return_1d_nb(returns: tp.Array1d, ann_factor: float) -> float:
-    """Mean annual growth rate of returns.
+@register_jitted(cache=True)
+def annualized_return_1d_nb(rets: tp.Array1d, ann_factor: float, period: tp.Optional[float] = None) -> float:
+    """Annualized total return.
 
     This is equivalent to the compound annual growth rate."""
-    end_value = cum_returns_final_1d_nb(returns, 1.)
-    return end_value ** (ann_factor / returns.shape[0]) - 1
+    if period is None:
+        period = rets.shape[0]
+    cum_return = cum_returns_final_1d_nb(rets, 1.)
+    return cum_return ** (ann_factor / period) - 1
 
 
-@njit(cache=True)
-def annualized_return_nb(returns: tp.Array2d, ann_factor: float) -> tp.Array1d:
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='rets', axis=1),
+    arg_take_spec=dict(
+        rets=ch.ArraySlicer(axis=1),
+        ann_factor=None,
+        period=None
+    ),
+    merge_func=base_ch.concat
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def annualized_return_nb(rets: tp.Array2d, ann_factor: float, period: tp.Optional[float] = None) -> tp.Array1d:
     """2-dim version of `annualized_return_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
-    for col in range(returns.shape[1]):
-        out[col] = annualized_return_1d_nb(returns[:, col], ann_factor)
+    out = np.empty(rets.shape[1], dtype=np.float_)
+    for col in prange(rets.shape[1]):
+        out[col] = annualized_return_1d_nb(rets[:, col], ann_factor, period=period)
     return out
 
 
-@njit
-def rolling_annualized_return_nb(returns: tp.Array2d,
-                                 window: int,
-                                 minp: tp.Optional[int],
-                                 ann_factor: float) -> tp.Array2d:
-    """Rolling version of `annualized_return_nb`."""
-
-    def _apply_func_nb(i, col, _returns, _ann_factor):
-        return annualized_return_1d_nb(_returns, _ann_factor)
-
-    return generic_nb.rolling_apply_nb(
-        returns, window, minp, _apply_func_nb, ann_factor)
-
-
-@njit(cache=True)
-def annualized_volatility_1d_nb(returns: tp.Array1d,
+@register_jitted(cache=True)
+def annualized_volatility_1d_nb(rets: tp.Array1d,
                                 ann_factor: float,
                                 levy_alpha: float = 2.0,
-                                ddof: int = 1) -> float:
+                                ddof: int = 0) -> float:
     """Annualized volatility of a strategy."""
-    if returns.shape[0] < 2:
-        return np.nan
-
-    return generic_nb.nanstd_1d_nb(returns, ddof) * ann_factor ** (1.0 / levy_alpha)
+    return generic_nb.nanstd_1d_nb(rets, ddof) * ann_factor ** (1.0 / levy_alpha)
 
 
-@njit(cache=True)
-def annualized_volatility_nb(returns: tp.Array2d,
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='rets', axis=1),
+    arg_take_spec=dict(
+        rets=ch.ArraySlicer(axis=1),
+        ann_factor=None,
+        levy_alpha=None,
+        ddof=None
+    ),
+    merge_func=base_ch.concat
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def annualized_volatility_nb(rets: tp.Array2d,
                              ann_factor: float,
                              levy_alpha: float = 2.0,
-                             ddof: int = 1) -> tp.Array1d:
+                             ddof: int = 0) -> tp.Array1d:
     """2-dim version of `annualized_volatility_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
-    for col in range(returns.shape[1]):
-        out[col] = annualized_volatility_1d_nb(returns[:, col], ann_factor, levy_alpha, ddof)
+    out = np.empty(rets.shape[1], dtype=np.float_)
+    for col in prange(rets.shape[1]):
+        out[col] = annualized_volatility_1d_nb(rets[:, col], ann_factor, levy_alpha, ddof)
     return out
 
 
-@njit
-def rolling_annualized_volatility_nb(returns: tp.Array2d,
-                                     window: int,
-                                     minp: tp.Optional[int],
-                                     ann_factor: float,
-                                     levy_alpha: float = 2.0,
-                                     ddof: int = 1) -> tp.Array2d:
-    """Rolling version of `annualized_volatility_nb`."""
-
-    def _apply_func_nb(i, col, _returns, _ann_factor, _levy_alpha, _ddof):
-        return annualized_volatility_1d_nb(_returns, _ann_factor, _levy_alpha, _ddof)
-
-    return generic_nb.rolling_apply_nb(
-        returns, window, minp, _apply_func_nb, ann_factor, levy_alpha, ddof)
-
-
-@njit(cache=True)
-def drawdown_1d_nb(returns: tp.Array1d) -> tp.Array1d:
-    """Drawdown of cumulative returns."""
-    cum_returns = cum_returns_1d_nb(returns, start_value=100.)
-    max_returns = generic_nb.expanding_max_1d_nb(cum_returns, minp=1)
-    return cum_returns / max_returns - 1
-
-
-@njit(cache=True)
-def drawdown_nb(returns: tp.Array2d) -> tp.Array2d:
-    """2-dim version of `drawdown_1d_nb`."""
-    out = np.empty_like(returns, dtype=np.float_)
-    for col in range(returns.shape[1]):
-        out[:, col] = drawdown_1d_nb(returns[:, col])
-    return out
-
-
-@njit(cache=True)
-def max_drawdown_1d_nb(returns: tp.Array1d) -> float:
+@register_jitted(cache=True)
+def max_drawdown_1d_nb(rets: tp.Array1d) -> float:
     """Total maximum drawdown (MDD)."""
-    return np.min(drawdown_1d_nb(returns))
-
-
-@njit(cache=True)
-def max_drawdown_nb(returns: tp.Array2d) -> tp.Array1d:
-    """2-dim version of `max_drawdown_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
-    for col in range(returns.shape[1]):
-        out[col] = max_drawdown_1d_nb(returns[:, col])
+    cum_ret = np.nan
+    value_max = 1.
+    out = 0.
+    for i in range(rets.shape[0]):
+        if not np.isnan(rets[i]):
+            if np.isnan(cum_ret):
+                cum_ret = 1.
+            cum_ret *= rets[i] + 1.
+        if cum_ret > value_max:
+            value_max = cum_ret
+        elif cum_ret < value_max:
+            dd = cum_ret / value_max - 1
+            if dd < out:
+                out = dd
+    if np.isnan(cum_ret):
+        return np.nan
     return out
 
 
-@njit
-def rolling_max_drawdown_nb(returns: tp.Array2d, window: int, minp: tp.Optional[int]) -> tp.Array2d:
-    """Rolling version of `max_drawdown_nb`."""
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='rets', axis=1),
+    arg_take_spec=dict(
+        rets=ch.ArraySlicer(axis=1)
+    ),
+    merge_func=base_ch.concat
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def max_drawdown_nb(rets: tp.Array2d) -> tp.Array1d:
+    """2-dim version of `max_drawdown_1d_nb`."""
+    out = np.empty(rets.shape[1], dtype=np.float_)
+    for col in prange(rets.shape[1]):
+        out[col] = max_drawdown_1d_nb(rets[:, col])
+    return out
 
-    def _apply_func_nb(i, col, _returns):
-        return max_drawdown_1d_nb(_returns)
 
-    return generic_nb.rolling_apply_nb(
-        returns, window, minp, _apply_func_nb)
-
-
-@njit(cache=True)
-def calmar_ratio_1d_nb(returns: tp.Array1d, ann_factor: float) -> float:
+@register_jitted(cache=True)
+def calmar_ratio_1d_nb(rets: tp.Array1d, ann_factor: float, period: tp.Optional[float] = None) -> float:
     """Calmar ratio, or drawdown ratio, of a strategy."""
-    max_drawdown = max_drawdown_1d_nb(returns)
-    if max_drawdown == 0.:
+    max_drawdown = max_drawdown_1d_nb(rets)
+    if max_drawdown == 0:
         return np.nan
-    annualized_return = annualized_return_1d_nb(returns, ann_factor)
-    if max_drawdown == 0.:
+    annualized_return = annualized_return_1d_nb(rets, ann_factor, period=period)
+    if max_drawdown == 0:
         return np.inf
     return annualized_return / np.abs(max_drawdown)
 
 
-@njit(cache=True)
-def calmar_ratio_nb(returns: tp.Array2d, ann_factor: float) -> tp.Array1d:
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='rets', axis=1),
+    arg_take_spec=dict(
+        rets=ch.ArraySlicer(axis=1),
+        ann_factor=None,
+        period=None
+    ),
+    merge_func=base_ch.concat
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def calmar_ratio_nb(rets: tp.Array2d, ann_factor: float, period: tp.Optional[float] = None) -> tp.Array1d:
     """2-dim version of `calmar_ratio_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
-    for col in range(returns.shape[1]):
-        out[col] = calmar_ratio_1d_nb(returns[:, col], ann_factor)
+    out = np.empty(rets.shape[1], dtype=np.float_)
+    for col in prange(rets.shape[1]):
+        out[col] = calmar_ratio_1d_nb(rets[:, col], ann_factor, period=period)
     return out
 
 
-@njit
-def rolling_calmar_ratio_nb(returns: tp.Array2d,
-                            window: int,
-                            minp: tp.Optional[int],
-                            ann_factor: float) -> tp.Array2d:
-    """Rolling version of `calmar_ratio_nb`."""
-
-    def _apply_func_nb(i, col, _returns, _ann_factor):
-        return calmar_ratio_1d_nb(_returns, _ann_factor)
-
-    return generic_nb.rolling_apply_nb(
-        returns, window, minp, _apply_func_nb, ann_factor)
-
-
-@njit(cache=True)
-def omega_ratio_1d_nb(returns: tp.Array1d,
-                      ann_factor: float,
-                      risk_free: float = 0.,
-                      required_return: float = 0.) -> float:
-    """Omega ratio of a strategy.."""
+@register_jitted(cache=True)
+def deannualized_return_nb(ret: float, ann_factor: float) -> float:
+    """Deannualized return."""
     if ann_factor == 1:
-        return_threshold = required_return
-    elif ann_factor <= -1:
+        return ret
+    if ann_factor <= -1:
         return np.nan
-    else:
-        return_threshold = (1 + required_return) ** (1. / ann_factor) - 1
-    returns_less_thresh = returns - risk_free - return_threshold
-    numer = np.sum(returns_less_thresh[returns_less_thresh > 0.0])
-    denom = -1.0 * np.sum(returns_less_thresh[returns_less_thresh < 0.0])
-    if denom == 0.:
+    return (1 + ret) ** (1. / ann_factor) - 1
+
+
+@register_jitted(cache=True)
+def omega_ratio_1d_nb(adj_rets: tp.Array1d) -> float:
+    """Omega ratio of a strategy."""
+    numer = 0.
+    denom = 0.
+    for i in range(adj_rets.shape[0]):
+        ret = adj_rets[i]
+        if ret > 0:
+            numer += ret
+        elif ret < 0:
+            denom -= ret
+    if denom == 0:
         return np.inf
     return numer / denom
 
 
-@njit(cache=True)
-def omega_ratio_nb(returns: tp.Array2d,
-                   ann_factor: float,
-                   risk_free: float = 0.,
-                   required_return: float = 0.) -> tp.Array1d:
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='adj_rets', axis=1),
+    arg_take_spec=dict(
+        adj_rets=ch.ArraySlicer(axis=1)
+    ),
+    merge_func=base_ch.concat
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def omega_ratio_nb(adj_rets: tp.Array2d) -> tp.Array1d:
     """2-dim version of `omega_ratio_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
-    for col in range(returns.shape[1]):
-        out[col] = omega_ratio_1d_nb(
-            returns[:, col], ann_factor, risk_free, required_return)
+    out = np.empty(adj_rets.shape[1], dtype=np.float_)
+    for col in prange(adj_rets.shape[1]):
+        out[col] = omega_ratio_1d_nb(adj_rets[:, col])
     return out
 
 
-@njit
-def rolling_omega_ratio_nb(returns: tp.Array2d,
-                           window: int,
-                           minp: tp.Optional[int],
-                           ann_factor: float,
-                           risk_free: float = 0.,
-                           required_return: float = 0.) -> tp.Array2d:
-    """Rolling version of `omega_ratio_nb`."""
-
-    def _apply_func_nb(i, col, _returns, _ann_factor, _risk_free, _required_return):
-        return omega_ratio_1d_nb(_returns, _ann_factor, _risk_free, _required_return)
-
-    return generic_nb.rolling_apply_nb(
-        returns, window, minp, _apply_func_nb, ann_factor, risk_free, required_return)
-
-
-@njit(cache=True)
-def sharpe_ratio_1d_nb(returns: tp.Array1d,
+@register_jitted(cache=True)
+def sharpe_ratio_1d_nb(adj_rets: tp.Array1d,
                        ann_factor: float,
-                       risk_free: float = 0.,
-                       ddof: int = 1) -> float:
+                       ddof: int = 0) -> float:
     """Sharpe ratio of a strategy."""
-    if returns.shape[0] < 2:
-        return np.nan
-
-    returns_risk_adj = returns - risk_free
-    mean = np.nanmean(returns_risk_adj)
-    std = generic_nb.nanstd_1d_nb(returns_risk_adj, ddof)
-    if std == 0.:
+    mean = np.nanmean(adj_rets)
+    std = generic_nb.nanstd_1d_nb(adj_rets, ddof)
+    if std == 0:
         return np.inf
     return mean / std * np.sqrt(ann_factor)
 
 
-@njit(cache=True)
-def sharpe_ratio_nb(returns: tp.Array2d,
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='adj_rets', axis=1),
+    arg_take_spec=dict(
+        adj_rets=ch.ArraySlicer(axis=1),
+        ann_factor=None,
+        ddof=None
+    ),
+    merge_func=base_ch.concat
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def sharpe_ratio_nb(adj_rets: tp.Array2d,
                     ann_factor: float,
-                    risk_free: float = 0.,
-                    ddof: int = 1) -> tp.Array1d:
+                    ddof: int = 0) -> tp.Array1d:
     """2-dim version of `sharpe_ratio_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
-    for col in range(returns.shape[1]):
-        out[col] = sharpe_ratio_1d_nb(returns[:, col], ann_factor, risk_free, ddof)
+    out = np.empty(adj_rets.shape[1], dtype=np.float_)
+    for col in prange(adj_rets.shape[1]):
+        out[col] = sharpe_ratio_1d_nb(adj_rets[:, col], ann_factor, ddof)
     return out
 
 
-@njit
-def rolling_sharpe_ratio_nb(returns: tp.Array2d,
-                            window: int,
-                            minp: tp.Optional[int],
-                            ann_factor: float,
-                            risk_free: float = 0.,
-                            ddof: int = 1) -> tp.Array2d:
-    """Rolling version of `sharpe_ratio_nb`."""
-
-    def _apply_func_nb(i, col, _returns, _ann_factor, _risk_free, _ddof):
-        return sharpe_ratio_1d_nb(_returns, _ann_factor, _risk_free, _ddof)
-
-    return generic_nb.rolling_apply_nb(
-        returns, window, minp, _apply_func_nb, ann_factor, risk_free, ddof)
-
-
-@njit(cache=True)
-def downside_risk_1d_nb(returns: tp.Array1d, ann_factor: float, required_return: float = 0.) -> float:
+@register_jitted(cache=True)
+def downside_risk_1d_nb(adj_rets: tp.Array1d, ann_factor: float) -> float:
     """Downside deviation below a threshold."""
-    adj_returns = returns - required_return
-    adj_returns[adj_returns > 0] = 0
-    return np.sqrt(np.nanmean(adj_returns ** 2)) * np.sqrt(ann_factor)
+    cnt = 0
+    adj_ret_sqrd_sum = np.nan
+    for i in range(adj_rets.shape[0]):
+        if not np.isnan(adj_rets[i]):
+            cnt += 1
+            if np.isnan(adj_ret_sqrd_sum):
+                adj_ret_sqrd_sum = 0.
+            if adj_rets[i] <= 0:
+                adj_ret_sqrd_sum += adj_rets[i] ** 2
+    adj_ret_sqrd_mean = adj_ret_sqrd_sum / cnt
+    return np.sqrt(adj_ret_sqrd_mean) * np.sqrt(ann_factor)
 
 
-@njit(cache=True)
-def downside_risk_nb(returns: tp.Array2d, ann_factor: float, required_return: float = 0.) -> tp.Array1d:
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='adj_rets', axis=1),
+    arg_take_spec=dict(
+        adj_rets=ch.ArraySlicer(axis=1),
+        ann_factor=None
+    ),
+    merge_func=base_ch.concat
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def downside_risk_nb(adj_rets: tp.Array2d, ann_factor: float) -> tp.Array1d:
     """2-dim version of `downside_risk_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
-    for col in range(returns.shape[1]):
-        out[col] = downside_risk_1d_nb(returns[:, col], ann_factor, required_return)
+    out = np.empty(adj_rets.shape[1], dtype=np.float_)
+    for col in prange(adj_rets.shape[1]):
+        out[col] = downside_risk_1d_nb(adj_rets[:, col], ann_factor)
     return out
 
 
-@njit
-def rolling_downside_risk_nb(returns: tp.Array2d,
-                             window: int,
-                             minp: tp.Optional[int],
-                             ann_factor: float,
-                             required_return: float = 0.) -> tp.Array2d:
-    """Rolling version of `downside_risk_nb`."""
-
-    def _apply_func_nb(i, col, _returns, _ann_factor, _required_return):
-        return downside_risk_1d_nb(_returns, _ann_factor, _required_return)
-
-    return generic_nb.rolling_apply_nb(
-        returns, window, minp, _apply_func_nb, ann_factor, required_return)
-
-
-@njit(cache=True)
-def sortino_ratio_1d_nb(returns: tp.Array1d, ann_factor: float, required_return: float = 0.) -> float:
+@register_jitted(cache=True)
+def sortino_ratio_1d_nb(adj_rets: tp.Array1d, ann_factor: float) -> float:
     """Sortino ratio of a strategy."""
-    if returns.shape[0] < 2:
-        return np.nan
-
-    adj_returns = returns - required_return
-    average_annualized_return = np.nanmean(adj_returns) * ann_factor
-    downside_risk = downside_risk_1d_nb(returns, ann_factor, required_return)
-    if downside_risk == 0.:
+    avg_annualized_return = np.nanmean(adj_rets) * ann_factor
+    downside_risk = downside_risk_1d_nb(adj_rets, ann_factor)
+    if downside_risk == 0:
         return np.inf
-    return average_annualized_return / downside_risk
+    return avg_annualized_return / downside_risk
 
 
-@njit(cache=True)
-def sortino_ratio_nb(returns: tp.Array2d, ann_factor: float, required_return: float = 0.) -> tp.Array1d:
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='adj_rets', axis=1),
+    arg_take_spec=dict(
+        adj_rets=ch.ArraySlicer(axis=1),
+        ann_factor=None
+    ),
+    merge_func=base_ch.concat
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def sortino_ratio_nb(adj_rets: tp.Array2d, ann_factor: float) -> tp.Array1d:
     """2-dim version of `sortino_ratio_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
-    for col in range(returns.shape[1]):
-        out[col] = sortino_ratio_1d_nb(returns[:, col], ann_factor, required_return)
+    out = np.empty(adj_rets.shape[1], dtype=np.float_)
+    for col in prange(adj_rets.shape[1]):
+        out[col] = sortino_ratio_1d_nb(adj_rets[:, col], ann_factor)
     return out
 
 
-@njit
-def rolling_sortino_ratio_nb(returns: tp.Array2d,
-                             window: int,
-                             minp: tp.Optional[int],
-                             ann_factor: float,
-                             required_return: float = 0.) -> tp.Array2d:
-    """Rolling version of `sortino_ratio_nb`."""
-
-    def _apply_func_nb(i, col, _returns, _ann_factor, _required_return):
-        return sortino_ratio_1d_nb(_returns, _ann_factor, _required_return)
-
-    return generic_nb.rolling_apply_nb(
-        returns, window, minp, _apply_func_nb, ann_factor, required_return)
-
-
-@njit(cache=True)
-def information_ratio_1d_nb(returns: tp.Array1d, benchmark_rets: tp.Array1d, ddof: int = 1) -> float:
+@register_jitted(cache=True)
+def information_ratio_1d_nb(adj_rets: tp.Array1d, ddof: int = 0) -> float:
     """Information ratio of a strategy."""
-    if returns.shape[0] < 2:
-        return np.nan
-
-    active_return = returns - benchmark_rets
-    mean = np.nanmean(active_return)
-    std = generic_nb.nanstd_1d_nb(active_return, ddof)
-    if std == 0.:
+    mean = np.nanmean(adj_rets)
+    std = generic_nb.nanstd_1d_nb(adj_rets, ddof)
+    if std == 0:
         return np.inf
     return mean / std
 
 
-@njit(cache=True)
-def information_ratio_nb(returns: tp.Array2d, benchmark_rets: tp.Array2d, ddof: int = 1) -> tp.Array1d:
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='adj_rets', axis=1),
+    arg_take_spec=dict(
+        adj_rets=ch.ArraySlicer(axis=1),
+        ddof=None
+    ),
+    merge_func=base_ch.concat
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def information_ratio_nb(adj_rets: tp.Array2d, ddof: int = 0) -> tp.Array1d:
     """2-dim version of `information_ratio_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
-    for col in range(returns.shape[1]):
-        out[col] = information_ratio_1d_nb(returns[:, col], benchmark_rets[:, col], ddof)
+    out = np.empty(adj_rets.shape[1], dtype=np.float_)
+    for col in prange(adj_rets.shape[1]):
+        out[col] = information_ratio_1d_nb(adj_rets[:, col], ddof)
     return out
 
 
-@njit
-def rolling_information_ratio_nb(returns: tp.Array2d,
-                                 window: int,
-                                 minp: tp.Optional[int],
-                                 benchmark_rets: tp.Array2d,
-                                 ddof: int = 1) -> tp.Array2d:
-    """Rolling version of `information_ratio_nb`."""
-
-    def _apply_func_nb(i, col, _returns, _benchmark_rets, _ddof):
-        return information_ratio_1d_nb(_returns, _benchmark_rets[i + 1 - len(_returns):i + 1, col], _ddof)
-
-    return generic_nb.rolling_apply_nb(
-        returns, window, minp, _apply_func_nb, benchmark_rets, ddof)
-
-
-@njit(cache=True)
-def beta_1d_nb(returns: tp.Array1d, benchmark_rets: tp.Array1d) -> float:
+@register_jitted(cache=True)
+def beta_1d_nb(rets: tp.Array1d, benchmark_rets: tp.Array1d, ddof: int = 0) -> float:
     """Beta."""
-    if benchmark_rets.shape[0] < 2:
-        return np.nan
-
-    independent = np.where(
-        np.isnan(returns),
-        np.nan,
-        benchmark_rets,
-    )
-    ind_residual = independent - np.nanmean(independent)
-    covariances = np.nanmean(ind_residual * returns)
-    ind_residual = ind_residual ** 2
-    ind_variances = np.nanmean(ind_residual)
-    if ind_variances < 1.0e-30:
-        ind_variances = np.nan
-    if ind_variances == 0.:
+    cov = generic_nb.nancov_1d_nb(rets, benchmark_rets, ddof=ddof)
+    var = generic_nb.nanvar_1d_nb(benchmark_rets, ddof=ddof)
+    if var == 0:
         return np.inf
-    return covariances / ind_variances
+    return cov / var
 
 
-@njit(cache=True)
-def beta_nb(returns: tp.Array2d, benchmark_rets: tp.Array2d) -> tp.Array1d:
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='rets', axis=1),
+    arg_take_spec=dict(
+        rets=ch.ArraySlicer(axis=1),
+        benchmark_rets=ch.ArraySlicer(axis=1),
+        ddof=None
+    ),
+    merge_func=base_ch.concat
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def beta_nb(rets: tp.Array2d, benchmark_rets: tp.Array2d, ddof: int = 0) -> tp.Array1d:
     """2-dim version of `beta_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
-    for col in range(returns.shape[1]):
-        out[col] = beta_1d_nb(returns[:, col], benchmark_rets[:, col])
+    out = np.empty(rets.shape[1], dtype=np.float_)
+    for col in prange(rets.shape[1]):
+        out[col] = beta_1d_nb(rets[:, col], benchmark_rets[:, col], ddof=ddof)
     return out
 
 
-@njit
-def rolling_beta_nb(returns: tp.Array2d,
-                    window: int,
-                    minp: tp.Optional[int],
-                    benchmark_rets: tp.Array2d) -> tp.Array2d:
-    """Rolling version of `beta_nb`."""
-
-    def _apply_func_nb(i, col, _returns, _benchmark_rets):
-        return beta_1d_nb(_returns, _benchmark_rets[i + 1 - len(_returns):i + 1, col])
-
-    return generic_nb.rolling_apply_nb(
-        returns, window, minp, _apply_func_nb, benchmark_rets)
+@register_jitted
+def beta_rollmeta_nb(from_i: int, to_i: int, col: int, rets: tp.Array2d,
+                     benchmark_rets: tp.Array1d, ddof: int = 0) -> float:
+    """Rolling apply meta function based on `beta_1d_nb`."""
+    return beta_1d_nb(rets[from_i:to_i, col], benchmark_rets[from_i:to_i, col], ddof)
 
 
-@njit(cache=True)
-def alpha_1d_nb(returns: tp.Array1d,
-                benchmark_rets: tp.Array1d,
-                ann_factor: float,
-                risk_free: float = 0.) -> float:
+@register_jitted(cache=True)
+def alpha_1d_nb(adj_rets: tp.Array1d,
+                adj_benchmark_rets: tp.Array1d,
+                ann_factor: float) -> float:
     """Annualized alpha."""
-    if returns.shape[0] < 2:
-        return np.nan
-
-    adj_returns = returns - risk_free
-    adj_benchmark_rets = benchmark_rets - risk_free
-    beta = beta_1d_nb(returns, benchmark_rets)
-    alpha_series = adj_returns - (beta * adj_benchmark_rets)
-    return (np.nanmean(alpha_series) + 1) ** ann_factor - 1
+    beta = beta_1d_nb(adj_rets, adj_benchmark_rets)
+    return (np.nanmean(adj_rets) - beta * np.nanmean(adj_benchmark_rets) + 1) ** ann_factor - 1
 
 
-@njit(cache=True)
-def alpha_nb(returns: tp.Array2d,
-             benchmark_rets: tp.Array2d,
-             ann_factor: float,
-             risk_free: float = 0.) -> tp.Array1d:
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='adj_rets', axis=1),
+    arg_take_spec=dict(
+        adj_rets=ch.ArraySlicer(axis=1),
+        adj_benchmark_rets=ch.ArraySlicer(axis=1),
+        ann_factor=None
+    ),
+    merge_func=base_ch.concat
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def alpha_nb(adj_rets: tp.Array2d, adj_benchmark_rets: tp.Array2d, ann_factor: float) -> tp.Array1d:
     """2-dim version of `alpha_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
-    for col in range(returns.shape[1]):
-        out[col] = alpha_1d_nb(returns[:, col], benchmark_rets[:, col], ann_factor, risk_free)
+    out = np.empty(adj_rets.shape[1], dtype=np.float_)
+    for col in prange(adj_rets.shape[1]):
+        out[col] = alpha_1d_nb(adj_rets[:, col], adj_benchmark_rets[:, col], ann_factor)
     return out
 
 
-@njit
-def rolling_alpha_nb(returns: tp.Array2d,
-                     window: int,
-                     minp: tp.Optional[int],
-                     benchmark_rets: tp.Array2d,
-                     ann_factor: float,
-                     risk_free: float = 0.) -> tp.Array2d:
-    """Rolling version of `alpha_nb`."""
-
-    def _apply_func_nb(i, col, _returns, _benchmark_rets, _ann_factor, _risk_free):
-        return alpha_1d_nb(_returns, _benchmark_rets[i + 1 - len(_returns):i + 1, col], _ann_factor, _risk_free)
-
-    return generic_nb.rolling_apply_nb(
-        returns, window, minp, _apply_func_nb, benchmark_rets, ann_factor, risk_free)
+@register_jitted
+def alpha_rollmeta_nb(from_i: int, to_i: int, col: int, adj_rets: tp.Array2d,
+                      adj_benchmark_rets: tp.Array1d, ann_factor: float) -> float:
+    """Rolling apply meta function based on `alpha_1d_nb`."""
+    return alpha_1d_nb(adj_rets[from_i:to_i, col], adj_benchmark_rets[from_i:to_i, col], ann_factor)
 
 
-@njit(cache=True)
-def tail_ratio_1d_nb(returns: tp.Array1d) -> float:
+@register_jitted(cache=True)
+def tail_ratio_1d_nb(rets: tp.Array1d) -> float:
     """Ratio between the right (95%) and left tail (5%)."""
-    returns = returns[~np.isnan(returns)]
-    if len(returns) < 1:
-        return np.nan
-    perc_95 = np.abs(np.percentile(returns, 95))
-    perc_5 = np.abs(np.percentile(returns, 5))
-    if perc_5 == 0.:
+    perc_95 = np.abs(np.nanpercentile(rets, 95))
+    perc_5 = np.abs(np.nanpercentile(rets, 5))
+    if perc_5 == 0:
         return np.inf
     return perc_95 / perc_5
 
 
-@njit(cache=True)
-def tail_ratio_nb(returns: tp.Array2d) -> tp.Array1d:
+@register_jitted(cache=True)
+def tail_ratio_noarr_1d_nb(rets: tp.Array1d) -> float:
+    """`tail_ratio_1d_nb` that does not allocate any arrays."""
+    perc_95 = np.abs(generic_nb.nanpercentile_noarr_1d_nb(rets, 95))
+    perc_5 = np.abs(generic_nb.nanpercentile_noarr_1d_nb(rets, 5))
+    if perc_5 == 0:
+        return np.inf
+    return perc_95 / perc_5
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='rets', axis=1),
+    arg_take_spec=dict(
+        rets=ch.ArraySlicer(axis=1)
+    ),
+    merge_func=base_ch.concat
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def tail_ratio_nb(rets: tp.Array2d) -> tp.Array1d:
     """2-dim version of `tail_ratio_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
-    for col in range(returns.shape[1]):
-        out[col] = tail_ratio_1d_nb(returns[:, col])
+    out = np.empty(rets.shape[1], dtype=np.float_)
+    for col in prange(rets.shape[1]):
+        out[col] = tail_ratio_1d_nb(rets[:, col])
     return out
 
 
-@njit
-def rolling_tail_ratio_nb(returns: tp.Array2d, window: int, minp: tp.Optional[int]) -> tp.Array2d:
-    """Rolling version of `tail_ratio_nb`."""
-
-    def _apply_func_nb(i, col, _returns):
-        return tail_ratio_1d_nb(_returns)
-
-    return generic_nb.rolling_apply_nb(
-        returns, window, minp, _apply_func_nb)
-
-
-@njit(cache=True)
-def value_at_risk_1d_nb(returns: tp.Array1d, cutoff: float = 0.05) -> float:
+@register_jitted(cache=True)
+def value_at_risk_1d_nb(rets: tp.Array1d, cutoff: float = 0.05) -> float:
     """Value at risk (VaR) of a returns stream."""
-    returns = returns[~np.isnan(returns)]
-    if len(returns) < 1:
-        return np.nan
-    return np.percentile(returns, 100 * cutoff)
+    return np.nanpercentile(rets, 100 * cutoff)
 
 
-@njit(cache=True)
-def value_at_risk_nb(returns: tp.Array2d, cutoff: float = 0.05) -> tp.Array1d:
+@register_jitted(cache=True)
+def value_at_risk_noarr_1d_nb(rets: tp.Array1d, cutoff: float = 0.05) -> float:
+    """`value_at_risk_1d_nb` that does not allocate any arrays."""
+    return generic_nb.nanpercentile_noarr_1d_nb(rets, 100 * cutoff)
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='rets', axis=1),
+    arg_take_spec=dict(
+        rets=ch.ArraySlicer(axis=1),
+        cutoff=None
+    ),
+    merge_func=base_ch.concat
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def value_at_risk_nb(rets: tp.Array2d, cutoff: float = 0.05) -> tp.Array1d:
     """2-dim version of `value_at_risk_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
-    for col in range(returns.shape[1]):
-        out[col] = value_at_risk_1d_nb(returns[:, col], cutoff)
+    out = np.empty(rets.shape[1], dtype=np.float_)
+    for col in prange(rets.shape[1]):
+        out[col] = value_at_risk_1d_nb(rets[:, col], cutoff)
     return out
 
 
-@njit
-def rolling_value_at_risk_nb(returns: tp.Array2d,
-                             window: int,
-                             minp: tp.Optional[int],
-                             cutoff: float = 0.05) -> tp.Array2d:
-    """Rolling version of `value_at_risk_nb`."""
-
-    def _apply_func_nb(i, col, _returns, _cutoff):
-        return value_at_risk_1d_nb(_returns, _cutoff)
-
-    return generic_nb.rolling_apply_nb(
-        returns, window, minp, _apply_func_nb, cutoff)
-
-
-@njit(cache=True)
-def cond_value_at_risk_1d_nb(returns: tp.Array1d, cutoff: float = 0.05) -> float:
+@register_jitted(cache=True)
+def cond_value_at_risk_1d_nb(rets: tp.Array1d, cutoff: float = 0.05) -> float:
     """Conditional value at risk (CVaR) of a returns stream."""
-    cutoff_index = int((len(returns) - 1) * cutoff)
-    return np.mean(np.partition(returns, cutoff_index)[:cutoff_index + 1])
+    cutoff_index = int((len(rets) - 1) * cutoff)
+    return np.mean(np.partition(rets, cutoff_index)[:cutoff_index + 1])
 
 
-@njit(cache=True)
-def cond_value_at_risk_nb(returns: tp.Array2d, cutoff: float = 0.05) -> tp.Array1d:
+@register_jitted(cache=True)
+def cond_value_at_risk_noarr_1d_nb(rets: tp.Array1d, cutoff: float = 0.05) -> float:
+    """`cond_value_at_risk_1d_nb` that does not allocate any arrays."""
+    return generic_nb.nanpartition_mean_noarr_1d_nb(rets, cutoff * 100)
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='rets', axis=1),
+    arg_take_spec=dict(
+        rets=ch.ArraySlicer(axis=1),
+        cutoff=None
+    ),
+    merge_func=base_ch.concat
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def cond_value_at_risk_nb(rets: tp.Array2d, cutoff: float = 0.05) -> tp.Array1d:
     """2-dim version of `cond_value_at_risk_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
-    for col in range(returns.shape[1]):
-        out[col] = cond_value_at_risk_1d_nb(returns[:, col], cutoff)
+    out = np.empty(rets.shape[1], dtype=np.float_)
+    for col in prange(rets.shape[1]):
+        out[col] = cond_value_at_risk_1d_nb(rets[:, col], cutoff)
     return out
 
 
-@njit
-def rolling_cond_value_at_risk_nb(returns: tp.Array2d,
-                                  window: int,
-                                  minp: tp.Optional[int],
-                                  cutoff: float = 0.05) -> tp.Array2d:
-    """Rolling version of `cond_value_at_risk_nb`."""
-
-    def _apply_func_nb(i, col, _returns, _cutoff):
-        return cond_value_at_risk_1d_nb(_returns, _cutoff)
-
-    return generic_nb.rolling_apply_nb(
-        returns, window, minp, _apply_func_nb, cutoff)
-
-
-@njit(cache=True)
-def capture_1d_nb(returns: tp.Array1d, benchmark_rets: tp.Array1d, ann_factor: float) -> float:
+@register_jitted(cache=True)
+def capture_1d_nb(rets: tp.Array1d, benchmark_rets: tp.Array1d,
+                  ann_factor: float, period: tp.Optional[float] = None) -> float:
     """Capture ratio."""
-    annualized_return1 = annualized_return_1d_nb(returns, ann_factor)
-    annualized_return2 = annualized_return_1d_nb(benchmark_rets, ann_factor)
-    if annualized_return2 == 0.:
+    annualized_return1 = annualized_return_1d_nb(rets, ann_factor, period=period)
+    annualized_return2 = annualized_return_1d_nb(benchmark_rets, ann_factor, period=period)
+    if annualized_return2 == 0:
         return np.inf
     return annualized_return1 / annualized_return2
 
 
-@njit(cache=True)
-def capture_nb(returns: tp.Array2d, benchmark_rets: tp.Array2d, ann_factor: float) -> tp.Array1d:
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='rets', axis=1),
+    arg_take_spec=dict(
+        rets=ch.ArraySlicer(axis=1),
+        benchmark_rets=ch.ArraySlicer(axis=1),
+        ann_factor=None,
+        period=None
+    ),
+    merge_func=base_ch.concat
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def capture_nb(rets: tp.Array2d, benchmark_rets: tp.Array2d,
+               ann_factor: float, period: tp.Optional[float] = None) -> tp.Array1d:
     """2-dim version of `capture_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
-    for col in range(returns.shape[1]):
-        out[col] = capture_1d_nb(returns[:, col], benchmark_rets[:, col], ann_factor)
+    out = np.empty(rets.shape[1], dtype=np.float_)
+    for col in prange(rets.shape[1]):
+        out[col] = capture_1d_nb(rets[:, col], benchmark_rets[:, col], ann_factor, period=period)
     return out
 
 
-@njit
-def rolling_capture_nb(returns: tp.Array2d,
-                       window: int,
-                       minp: tp.Optional[int],
-                       benchmark_rets: tp.Array2d,
-                       ann_factor: float) -> tp.Array2d:
-    """Rolling version of `capture_nb`."""
-
-    def _apply_func_nb(i, col, _returns, _benchmark_rets, _ann_factor):
-        return capture_1d_nb(_returns, _benchmark_rets[i + 1 - len(_returns):i + 1, col], _ann_factor)
-
-    return generic_nb.rolling_apply_nb(
-        returns, window, minp, _apply_func_nb, benchmark_rets, ann_factor)
+@register_jitted
+def capture_rollmeta_nb(from_i: int, to_i: int, col: int, rets: tp.Array2d,
+                        benchmark_rets: tp.Array1d, ann_factor: float,
+                        period: tp.Optional[float] = None) -> float:
+    """Rolling apply meta function based on `capture_1d_nb`."""
+    return capture_1d_nb(rets[from_i:to_i, col], benchmark_rets[from_i:to_i, col], ann_factor, period=period)
 
 
-@njit(cache=True)
-def up_capture_1d_nb(returns: tp.Array1d, benchmark_rets: tp.Array1d, ann_factor: float) -> float:
+@register_jitted(cache=True)
+def up_capture_1d_nb(rets: tp.Array1d, benchmark_rets: tp.Array1d,
+                     ann_factor: float, period: tp.Optional[float] = None) -> float:
     """Capture ratio for periods when the benchmark return is positive."""
-    returns = returns[benchmark_rets > 0]
-    benchmark_rets = benchmark_rets[benchmark_rets > 0]
-    if returns.shape[0] < 1:
-        return np.nan
-    annualized_return1 = annualized_return_1d_nb(returns, ann_factor)
-    annualized_return2 = annualized_return_1d_nb(benchmark_rets, ann_factor)
-    if annualized_return2 == 0.:
+    if period is None:
+        period = rets.shape[0]
+
+    def _annualized_pos_return(a):
+        ann_ret = np.nan
+        ret_cnt = 0
+        for i in range(a.shape[0]):
+            if not np.isnan(a[i]):
+                if np.isnan(ann_ret):
+                    ann_ret = 1.
+                if a[i] > 0:
+                    ann_ret *= a[i] + 1.
+                    ret_cnt += 1
+        if ret_cnt == 0:
+            return np.nan
+        return ann_ret ** (ann_factor / period) - 1
+
+    annualized_return = _annualized_pos_return(rets)
+    annualized_benchmark_return = _annualized_pos_return(benchmark_rets)
+    if annualized_benchmark_return == 0:
         return np.inf
-    return annualized_return1 / annualized_return2
+    return annualized_return / annualized_benchmark_return
 
 
-@njit(cache=True)
-def up_capture_nb(returns: tp.Array2d, benchmark_rets: tp.Array2d, ann_factor: float) -> tp.Array1d:
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='rets', axis=1),
+    arg_take_spec=dict(
+        rets=ch.ArraySlicer(axis=1),
+        benchmark_rets=ch.ArraySlicer(axis=1),
+        ann_factor=None,
+        period=None
+    ),
+    merge_func=base_ch.concat
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def up_capture_nb(rets: tp.Array2d, benchmark_rets: tp.Array2d,
+                  ann_factor: float, period: tp.Optional[float] = None) -> tp.Array1d:
     """2-dim version of `up_capture_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
-    for col in range(returns.shape[1]):
-        out[col] = up_capture_1d_nb(returns[:, col], benchmark_rets[:, col], ann_factor)
+    out = np.empty(rets.shape[1], dtype=np.float_)
+    for col in prange(rets.shape[1]):
+        out[col] = up_capture_1d_nb(rets[:, col], benchmark_rets[:, col], ann_factor, period=period)
     return out
 
 
-@njit
-def rolling_up_capture_nb(returns: tp.Array2d,
-                          window: int,
-                          minp: tp.Optional[int],
-                          benchmark_rets: tp.Array2d,
-                          ann_factor: float) -> tp.Array2d:
-    """Rolling version of `up_capture_nb`."""
-
-    def _apply_func_nb(i, col, _returns, _benchmark_rets, _ann_factor):
-        return up_capture_1d_nb(_returns, _benchmark_rets[i + 1 - len(_returns):i + 1, col], _ann_factor)
-
-    return generic_nb.rolling_apply_nb(
-        returns, window, minp, _apply_func_nb, benchmark_rets, ann_factor)
+@register_jitted
+def up_capture_rollmeta_nb(from_i: int, to_i: int, col: int, rets: tp.Array2d,
+                           benchmark_rets: tp.Array1d, ann_factor: float,
+                           period: tp.Optional[float] = None) -> float:
+    """Rolling apply meta function based on `up_capture_1d_nb`."""
+    return up_capture_1d_nb(rets[from_i:to_i, col], benchmark_rets[from_i:to_i, col], ann_factor, period=period)
 
 
-@njit(cache=True)
-def down_capture_1d_nb(returns: tp.Array1d, benchmark_rets: tp.Array1d, ann_factor: float) -> float:
+@register_jitted(cache=True)
+def down_capture_1d_nb(rets: tp.Array1d, benchmark_rets: tp.Array1d,
+                       ann_factor: float, period: tp.Optional[float] = None) -> float:
     """Capture ratio for periods when the benchmark return is negative."""
-    returns = returns[benchmark_rets < 0]
-    benchmark_rets = benchmark_rets[benchmark_rets < 0]
-    if returns.shape[0] < 1:
-        return np.nan
-    annualized_return1 = annualized_return_1d_nb(returns, ann_factor)
-    annualized_return2 = annualized_return_1d_nb(benchmark_rets, ann_factor)
-    if annualized_return2 == 0.:
+    if period is None:
+        period = rets.shape[0]
+
+    def _annualized_neg_return(a):
+        ann_ret = np.nan
+        ret_cnt = 0
+        for i in range(a.shape[0]):
+            if not np.isnan(a[i]):
+                if np.isnan(ann_ret):
+                    ann_ret = 1.
+                if a[i] < 0:
+                    ann_ret *= a[i] + 1.
+                    ret_cnt += 1
+        if ret_cnt == 0:
+            return np.nan
+        return ann_ret ** (ann_factor / period) - 1
+
+    annualized_return = _annualized_neg_return(rets)
+    annualized_benchmark_return = _annualized_neg_return(benchmark_rets)
+    if annualized_benchmark_return == 0:
         return np.inf
-    return annualized_return1 / annualized_return2
+    return annualized_return / annualized_benchmark_return
 
 
-@njit(cache=True)
-def down_capture_nb(returns: tp.Array2d, benchmark_rets: tp.Array2d, ann_factor: float) -> tp.Array1d:
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='rets', axis=1),
+    arg_take_spec=dict(
+        rets=ch.ArraySlicer(axis=1),
+        benchmark_rets=ch.ArraySlicer(axis=1),
+        ann_factor=None,
+        period=None
+    ),
+    merge_func=base_ch.concat
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def down_capture_nb(rets: tp.Array2d, benchmark_rets: tp.Array2d,
+                    ann_factor: float, period: tp.Optional[float] = None) -> tp.Array1d:
     """2-dim version of `down_capture_1d_nb`."""
-    out = np.empty(returns.shape[1], dtype=np.float_)
-    for col in range(returns.shape[1]):
-        out[col] = down_capture_1d_nb(returns[:, col], benchmark_rets[:, col], ann_factor)
+    out = np.empty(rets.shape[1], dtype=np.float_)
+    for col in prange(rets.shape[1]):
+        out[col] = down_capture_1d_nb(rets[:, col], benchmark_rets[:, col], ann_factor, period=period)
     return out
 
 
-@njit
-def rolling_down_capture_nb(returns: tp.Array2d,
-                            window: int,
-                            minp: tp.Optional[int],
-                            benchmark_rets: tp.Array2d,
-                            ann_factor: float) -> tp.Array2d:
-    """Rolling version of `down_capture_nb`."""
-
-    def _apply_func_nb(i, col, _returns, _benchmark_rets, _ann_factor):
-        return down_capture_1d_nb(_returns, _benchmark_rets[i + 1 - len(_returns):i + 1, col], _ann_factor)
-
-    return generic_nb.rolling_apply_nb(
-        returns, window, minp, _apply_func_nb, benchmark_rets, ann_factor)
+@register_jitted
+def down_capture_rollmeta_nb(from_i: int, to_i: int, col: int, rets: tp.Array2d,
+                             benchmark_rets: tp.Array1d, ann_factor: float,
+                             period: tp.Optional[float] = None) -> float:
+    """Rolling apply meta function based on `down_capture_1d_nb`."""
+    return down_capture_1d_nb(rets[from_i:to_i, col], benchmark_rets[from_i:to_i, col], ann_factor, period=period)

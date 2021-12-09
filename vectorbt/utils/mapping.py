@@ -27,7 +27,7 @@ def to_mapping(mapping_like: tp.MappingLike, reverse: bool = False) -> dict:
             mapping[-1] = None
     elif not checks.is_mapping(mapping_like):
         if checks.is_index(mapping_like):
-            mapping_like = pd.Series(mapping_like)
+            mapping_like = mapping_like.to_series().reset_index(drop=True)
         if checks.is_series(mapping_like):
             mapping = mapping_like.to_dict()
         else:
@@ -44,7 +44,7 @@ def apply_mapping(obj: tp.Any,
                   reverse: bool = False,
                   ignore_case: bool = True,
                   ignore_underscores: bool = True,
-                  ignore_type: tp.MaybeTuple[tp.DTypeLike] = None,
+                  ignore_type: tp.Optional[tp.MaybeTuple[tp.DTypeLike]] = None,
                   ignore_missing: bool = False,
                   na_sentinel: tp.Any = None) -> tp.Any:
     """Apply mapping on object using a mapping-like object.

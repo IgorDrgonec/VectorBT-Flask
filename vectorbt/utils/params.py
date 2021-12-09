@@ -3,9 +3,11 @@
 
 """Utilities for working with parameters."""
 
-from numba.typed import List
 import itertools
 from collections.abc import Callable
+
+import numpy as np
+from numba.typed import List
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
@@ -35,11 +37,11 @@ def flatten_param_tuples(param_tuples: tp.Sequence) -> tp.List[tp.List]:
     return param_list
 
 
-def create_param_combs(op_tree: tp.Tuple, depth: int = 0) -> tp.List[tp.List]:
-    """Create arbitrary parameter combinations from the operation tree `op_tree`.
+def generate_param_combs(op_tree: tp.Tuple, depth: int = 0) -> tp.List[tp.List]:
+    """Generate arbitrary parameter combinations from the operation tree `op_tree`.
 
     `op_tree` is a tuple with nested instructions to generate parameters.
-    The first element of the tuple should be a callable that takes remaining elements as arguments.
+    The first element of the tuple must be a callable that takes remaining elements as arguments.
     If one of the elements is a tuple itself and its first argument is a callable, it will be
     unfolded in the same way as above.
 
@@ -48,19 +50,23 @@ def create_param_combs(op_tree: tp.Tuple, depth: int = 0) -> tp.List[tp.List]:
     ```python-repl
     >>> import numpy as np
     >>> from itertools import combinations, product
+    >>> from vectorbt.utils.params import generate_param_combs
 
-    >>> create_param_combs((product, (combinations, [0, 1, 2, 3], 2), [4, 5]))
+    >>> generate_param_combs((product, (combinations, [0, 1, 2, 3], 2), [4, 5]))
     [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2],
      [1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 3, 3],
      [4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5]]
+
+    >>> generate_param_combs((product, (zip, [0, 1, 2, 3], [4, 5, 6, 7]), [8, 9]))
+    [[0, 0, 1, 1, 2, 2, 3, 3], [4, 4, 5, 5, 6, 6, 7, 7], [8, 9, 8, 9, 8, 9, 8, 9]]
     ```
     """
     checks.assert_instance_of(op_tree, tuple)
     checks.assert_instance_of(op_tree[0], Callable)
-    new_op_tree: tp.Tuple = (op_tree[0],)
+    new_op_tree = (op_tree[0],)
     for elem in op_tree[1:]:
         if isinstance(elem, tuple) and isinstance(elem[0], Callable):
-            new_op_tree += (create_param_combs(elem, depth=depth + 1),)
+            new_op_tree += (generate_param_combs(elem, depth=depth + 1),)
         else:
             new_op_tree += (elem,)
     out = list(new_op_tree[0](*new_op_tree[1:]))
@@ -89,4 +95,18 @@ def broadcast_params(param_list: tp.Sequence[tp.Sequence], to_n: tp.Optional[int
 
 def create_param_product(param_list: tp.Sequence[tp.Sequence]) -> tp.List[tp.List]:
     """Make Cartesian product out of all params in `param_list`."""
-    return list(map(list, zip(*list(itertools.product(*param_list)))))
+    return list(map(list, zip(*itertools.product(*param_list))))
+
+
+def params_to_list(params: tp.Params, is_tuple: bool, is_array_like: bool) -> list:
+    """Cast parameters to a list."""
+    check_against = [list, List]
+    if not is_tuple:
+        check_against.append(tuple)
+    if not is_array_like:
+        check_against.append(np.ndarray)
+    if isinstance(params, tuple(check_against)):
+        new_params = list(params)
+    else:
+        new_params = [params]
+    return new_params

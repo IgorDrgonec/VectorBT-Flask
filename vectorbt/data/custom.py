@@ -1,24 +1,32 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
-"""Custom data classes that subclass `vectorbt.data.base.Data`."""
+"""Custom data classes that subclass `vectorbt.data.base.Data`.
 
-import numpy as np
-import pandas as pd
-from tqdm.auto import tqdm
+!!! note
+    Use absolute start and end dates instead of relative ones when fetching multiple
+    symbols of data: some symbols may take a considerable amount of time to fetch
+    such that they may shift the time period for the symbols coming next.
+
+    This happens when relative dates are parsed in `vectorbt.data.base.Data.fetch_symbol`
+    instead of parsing them once and for all symbols in `vectorbt.data.base.Data.fetch`."""
+
 import time
+import traceback
 import warnings
 from functools import wraps
 
+import pandas as pd
+
 from vectorbt import _typing as tp
-from vectorbt.utils.datetime_ import (
-    get_utc_tz,
-    get_local_tz,
-    to_tzaware_datetime,
-    datetime_to_ms
-)
-from vectorbt.utils.config import merge_dicts, get_func_kwargs
+from vectorbt.data import nb
 from vectorbt.data.base import Data
+from vectorbt.jit_registry import jit_registry
+from vectorbt.utils.config import merge_dicts
+from vectorbt.utils.datetime_ import get_utc_tz, get_local_tz, to_tzaware_datetime, datetime_to_ms
+from vectorbt.utils.parsing import get_func_kwargs
+from vectorbt.utils.pbar import get_pbar
+from vectorbt.utils.random_ import set_seed
 
 try:
     from binance.client import Client as ClientT
@@ -29,24 +37,206 @@ try:
 except ImportError:
     ExchangeT = tp.Any
 
+CSVDataT = tp.TypeVar("CSVDatat", bound="CSVData")
 
-class SyntheticData(Data):
-    """`Data` for synthetically generated data."""
+
+class CSVData(Data):
+    """`Data` for data that can be fetched and updated using `pd.read_csv`.
+
+    ## Example
+
+    ```python-repl
+    >>> import vectorbt as vbt
+
+    >>> rand_data = vbt.RandomData.fetch(start='5 seconds ago', freq='1s')
+    >>> rand_data.get().to_csv('rand_data.csv')
+
+    >>> csv_data = vbt.CSVData.fetch('rand_data.csv')
+    >>> csv_data.get()
+    2021-10-30 11:19:32.168721+00:00    101.223837
+    2021-10-30 11:19:33.168721+00:00    101.580351
+    2021-10-30 11:19:34.168721+00:00    101.409540
+    2021-10-30 11:19:35.168721+00:00    101.198202
+    2021-10-30 11:19:36.168721+00:00    102.308458
+    2021-10-30 11:19:37.168721+00:00    102.692657
+    Freq: S, dtype: float64
+
+    >>> import time
+    >>> time.sleep(2)
+
+    >>> rand_data = rand_data.update()
+    >>> rand_data.get().to_csv('rand_data.csv')  # saves all data
+
+    >>> csv_data = csv_data.update()  # loads only subset of data
+    >>> csv_data.get()
+    2021-10-30 11:19:32.168721+00:00    101.223837
+    2021-10-30 11:19:33.168721+00:00    101.580351
+    2021-10-30 11:19:34.168721+00:00    101.409540
+    2021-10-30 11:19:35.168721+00:00    101.198202
+    2021-10-30 11:19:36.168721+00:00    102.308458
+    2021-10-30 11:19:37.168721+00:00    100.941811  << updated last
+    2021-10-30 11:19:38.168721+00:00    100.935500  << added new
+    2021-10-30 11:19:39.168721+00:00    100.618909  << added new
+    Freq: S, dtype: float64
+    ```"""
 
     @classmethod
-    def generate_symbol(cls, symbol: tp.Label, index: tp.Index, **kwargs) -> tp.SeriesFrame:
-        """Abstract method to generate a symbol."""
+    def fetch_symbol(cls,
+                     symbol: tp.Symbol,
+                     path: tp.Optional[tp.Any] = None,
+                     header: tp.MaybeSequence[int] = 0,
+                     index_col: int = 0,
+                     parse_dates: bool = True,
+                     start_row: int = 0,
+                     end_row: tp.Optional[int] = None,
+                     squeeze: bool = True,
+                     **kwargs) -> tp.Tuple[tp.SeriesFrame, tp.Kwargs]:
+        """Fetch a symbol.
+
+        If `path` is None, uses `symbol` as path.
+
+        `skiprows` and `nrows` will be automatically calculated based on `start_row` and `end_row`.
+
+        !!! note
+            `start_row` and `end_row` must exclude header rows, while `end_row` must include the last row.
+
+        See https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html for other arguments."""
+        if path is None:
+            path = symbol
+        if isinstance(header, int):
+            header = [header]
+        header_rows = header[-1] + 1
+        start_row += header_rows
+        if end_row is not None:
+            end_row += header_rows
+        skiprows = range(header_rows, start_row)
+        if end_row is not None:
+            nrows = end_row - start_row + 1
+        else:
+            nrows = None
+        obj = pd.read_csv(
+            path,
+            header=header,
+            index_col=index_col,
+            parse_dates=parse_dates,
+            skiprows=skiprows,
+            nrows=nrows,
+            squeeze=squeeze,
+            **kwargs
+        )
+        if isinstance(obj, pd.Series) and obj.name == '0':
+            obj.name = None
+        returned_kwargs = dict(last_row=start_row - header_rows + len(obj.index) - 1)
+        return obj, returned_kwargs
+
+    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.Tuple[tp.SeriesFrame, tp.Kwargs]:
+        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
+        fetch_kwargs['start_row'] = self.returned_kwargs[symbol]['last_row']
+        kwargs = merge_dicts(fetch_kwargs, kwargs)
+        return self.fetch_symbol(symbol, **kwargs)
+
+
+class HDFData(Data):
+    """`Data` for data that can be fetched and updated using `pd.read_hdf`.
+
+    ## Example
+
+    ```python-repl
+    >>> import vectorbt as vbt
+
+    >>> rand_data = vbt.RandomData.fetch(start='5 seconds ago', freq='1s')
+    >>> rand_data.get().to_hdf('rand_data.h5', 's')
+
+    >>> h5_data = vbt.HDFData.fetch('s', path='rand_data.h5')
+    >>> h5_data.get()
+    2021-10-30 17:53:14.243189+00:00    100.119015
+    2021-10-30 17:53:15.243189+00:00    100.798207
+    2021-10-30 17:53:16.243189+00:00    101.928613
+    2021-10-30 17:53:17.243189+00:00    102.828592
+    2021-10-30 17:53:18.243189+00:00    104.505259
+    2021-10-30 17:53:19.243189+00:00    106.384834
+    Freq: S, dtype: float64
+
+    >>> import time
+    >>> time.sleep(2)
+
+    >>> rand_data = rand_data.update()
+    >>> rand_data.get().to_hdf('rand_data.h5', 's')  # saves all data
+
+    >>> h5_data = h5_data.update()  # loads only subset of data
+    >>> h5_data.get()
+    2021-10-30 17:53:14.243189+00:00    100.119015
+    2021-10-30 17:53:15.243189+00:00    100.798207
+    2021-10-30 17:53:16.243189+00:00    101.928613
+    2021-10-30 17:53:17.243189+00:00    102.828592
+    2021-10-30 17:53:18.243189+00:00    104.505259
+    2021-10-30 17:53:19.243189+00:00    104.143708
+    2021-10-30 17:53:20.243189+00:00    104.661706
+    2021-10-30 17:53:21.243189+00:00    105.294653
+    Freq: S, dtype: float64
+    ```"""
+
+    @classmethod
+    def fetch_symbol(cls,
+                     symbol: tp.Symbol,
+                     path: tp.Optional[tp.Any] = None,
+                     start_row: int = 0,
+                     end_row: tp.Optional[int] = None,
+                     **kwargs) -> tp.Tuple[tp.SeriesFrame, tp.Kwargs]:
+        """Fetch a symbol.
+
+        If `path` is None, uses `symbol` as path to an HDF file with a single pandas object.
+
+        !!! note
+            `end_row` must include the last row.
+
+        See https://pandas.pydata.org/docs/reference/api/pandas.read_hdf.html for other arguments."""
+        if path is None:
+            path = symbol
+            key = None
+        else:
+            key = symbol
+        if end_row is not None:
+            stop = end_row + 1
+        else:
+            stop = None
+        obj = pd.read_hdf(
+            path,
+            key=key,
+            start=start_row,
+            stop=stop,
+            **kwargs
+        )
+        returned_kwargs = dict(last_row=start_row + len(obj.index) - 1)
+        return obj, returned_kwargs
+
+    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.Tuple[tp.SeriesFrame, tp.Kwargs]:
+        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
+        fetch_kwargs['start_row'] = self.returned_kwargs[symbol]['last_row']
+        kwargs = merge_dicts(fetch_kwargs, kwargs)
+        return self.fetch_symbol(symbol, **kwargs)
+
+
+class SyntheticData(Data):
+    """`Data` for synthetically generated data.
+
+    Exposes an abstract class method `SyntheticData.generate_symbol`.
+    Everything else is taken care of."""
+
+    @classmethod
+    def generate_symbol(cls, symbol: tp.Symbol, index: tp.Index, **kwargs) -> tp.SeriesFrame:
+        """Abstract method to generate data of a symbol."""
         raise NotImplementedError
 
     @classmethod
-    def download_symbol(cls,
-                        symbol: tp.Label,
-                        start: tp.DatetimeLike = 0,
-                        end: tp.DatetimeLike = 'now',
-                        freq: tp.Union[None, str, pd.DateOffset] = None,
-                        date_range_kwargs: tp.KwargsLike = None,
-                        **kwargs) -> tp.SeriesFrame:
-        """Download the symbol.
+    def fetch_symbol(cls,
+                     symbol: tp.Symbol,
+                     start: tp.DatetimeLike = 0,
+                     end: tp.DatetimeLike = 'now',
+                     freq: tp.Union[None, str, pd.DateOffset] = None,
+                     date_range_kwargs: tp.KwargsLike = None,
+                     **kwargs) -> tp.SeriesFrame:
+        """Fetch a symbol.
 
         Generates datetime index and passes it to `SyntheticData.generate_symbol` to fill
         the Series/DataFrame with generated data."""
@@ -62,118 +252,143 @@ class SyntheticData(Data):
             raise ValueError("Date range is empty")
         return cls.generate_symbol(symbol, index, **kwargs)
 
-    def update_symbol(self, symbol: tp.Label, **kwargs) -> tp.SeriesFrame:
-        """Update the symbol.
-
-        `**kwargs` will override keyword arguments passed to `SyntheticData.download_symbol`."""
-        download_kwargs = self.select_symbol_kwargs(symbol, self.download_kwargs)
-        download_kwargs['start'] = self.data[symbol].index[-1]
-        kwargs = merge_dicts(download_kwargs, kwargs)
-        return self.download_symbol(symbol, **kwargs)
+    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
+        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
+        fetch_kwargs['start'] = self.last_index[symbol]
+        kwargs = merge_dicts(fetch_kwargs, kwargs)
+        return self.fetch_symbol(symbol, **kwargs)
 
 
-def generate_gbm_paths(S0: float, mu: float, sigma: float, T: int, M: int, I: int,
-                       seed: tp.Optional[int] = None) -> tp.Array2d:
-    """Generate using Geometric Brownian Motion (GBM).
+class RandomData(SyntheticData):
+    """`SyntheticData` for data generated using `vectorbt.data.nb.generate_random_data_nb`.
 
-    See https://stackoverflow.com/a/45036114/8141780."""
-    if seed is not None:
-        np.random.seed(seed)
-
-    dt = float(T) / M
-    paths = np.zeros((M + 1, I), np.float64)
-    paths[0] = S0
-    for t in range(1, M + 1):
-        rand = np.random.standard_normal(I)
-        paths[t] = paths[t - 1] * np.exp((mu - 0.5 * sigma ** 2) * dt + sigma * np.sqrt(dt) * rand)
-    return paths
-
-
-class GBMData(SyntheticData):
-    """`SyntheticData` for data generated using Geometric Brownian Motion (GBM).
+    !!! note
+        When setting a seed, remember to pass a seed per symbol using `vectorbt.data.base.symbol_dict`.
 
     ## Example
-
-    See the example under `BinanceData`.
 
     ```python-repl
     >>> import vectorbt as vbt
 
-    >>> gbm_data = vbt.GBMData.download('GBM', start='2 hours ago', end='now', freq='1min', seed=42)
-    >>> gbm_data.get()
-    2021-05-02 14:14:15.182089+00:00    102.386605
-    2021-05-02 14:15:15.182089+00:00    101.554203
-    2021-05-02 14:16:15.182089+00:00    104.765771
-    ...                                        ...
-    2021-05-02 16:12:15.182089+00:00     51.614839
-    2021-05-02 16:13:15.182089+00:00     53.525376
-    2021-05-02 16:14:15.182089+00:00     55.615250
-    Freq: T, Length: 121, dtype: float64
+    >>> rand_data = vbt.RandomData.fetch(
+    ...     list(range(10)),
+    ...     start='2010-01-01',
+    ...     end='2020-01-01'
+    ... )
 
-    >>> import time
-    >>> time.sleep(60)
+    >>> rand_data.plot(showlegend=False)
+    ```
 
-    >>> gbm_data = gbm_data.update()
-    >>> gbm_data.get()
-    2021-05-02 14:14:15.182089+00:00    102.386605
-    2021-05-02 14:15:15.182089+00:00    101.554203
-    2021-05-02 14:16:15.182089+00:00    104.765771
-    ...                                        ...
-    2021-05-02 16:13:15.182089+00:00     53.525376
-    2021-05-02 16:14:15.182089+00:00     51.082220
-    2021-05-02 16:15:15.182089+00:00     54.725304
-    Freq: T, Length: 122, dtype: float64
-    ```"""
+    ![](/docs/img/RandomData.svg)
+    """
 
     @classmethod
     def generate_symbol(cls,
-                        symbol: tp.Label,
+                        symbol: tp.Symbol,
                         index: tp.Index,
-                        S0: float = 100.,
-                        mu: float = 0.,
-                        sigma: float = 0.05,
-                        T: tp.Optional[int] = None,
-                        I: int = 1,
-                        seed: tp.Optional[int] = None) -> tp.SeriesFrame:
-        """Generate the symbol using `generate_gbm_paths`.
+                        num_paths: int = 1,
+                        start_value: float = 100.,
+                        mean: float = 0.,
+                        std: float = 0.01,
+                        seed: tp.Optional[int] = None,
+                        jitted: tp.JittedOption = None) -> tp.SeriesFrame:
+        """Generate a symbol.
 
         Args:
             symbol (str): Symbol.
             index (pd.Index): Pandas index.
-            S0 (float): Value at time 0.
+            num_paths (int): Number of generated paths (columns in our case).
+            start_value (float): Value at time 0.
 
                 Does not appear as the first value in the output data.
-            mu (float): Drift, or mean of the percentage change.
-            sigma (float): Standard deviation of the percentage change.
-            T (int): Number of time steps.
-
-                Defaults to the length of `index`.
-            I (int): Number of generated paths (columns in our case).
-            seed (int): Set seed to make the results deterministic.
+            mean (float): Drift, or mean of the percentage change.
+            std (float): Standard deviation of the percentage change.
+            seed (int): Set seed to make output deterministic.
+            jitted (any): See `vectorbt.utils.jitting.resolve_jitted_option`.
         """
-        if T is None:
-            T = len(index)
-        out = generate_gbm_paths(S0, mu, sigma, T, len(index), I, seed=seed)[1:]
+        if seed is not None:
+            set_seed(seed)
+
+        func = jit_registry.resolve_option(nb.generate_random_data_nb, jitted)
+        out = func((len(index), num_paths), start_value, mean, std)
+
         if out.shape[1] == 1:
             return pd.Series(out[:, 0], index=index)
         columns = pd.RangeIndex(stop=out.shape[1], name='path')
         return pd.DataFrame(out, index=index, columns=columns)
 
-    def update_symbol(self, symbol: tp.Label, **kwargs) -> tp.SeriesFrame:
-        """Update the symbol.
-
-        `**kwargs` will override keyword arguments passed to `GBMData.download_symbol`."""
-        download_kwargs = self.select_symbol_kwargs(symbol, self.download_kwargs)
-        download_kwargs['start'] = self.data[symbol].index[-1]
-        _ = download_kwargs.pop('S0', None)
-        S0 = self.data[symbol].iloc[-2]
-        _ = download_kwargs.pop('T', None)
-        download_kwargs['seed'] = None
-        kwargs = merge_dicts(download_kwargs, kwargs)
-        return self.download_symbol(symbol, S0=S0, **kwargs)
+    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
+        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
+        fetch_kwargs['start'] = self.last_index[symbol]
+        _ = fetch_kwargs.pop('start_value', None)
+        start_value = self.data[symbol].iloc[-2]
+        fetch_kwargs['seed'] = None
+        kwargs = merge_dicts(fetch_kwargs, kwargs)
+        return self.fetch_symbol(symbol, start_value=start_value, **kwargs)
 
 
-class YFData(Data):
+class GBMData(RandomData):
+    """`RandomData` for data generated using `vectorbt.data.nb.generate_gbm_data_nb`.
+
+    !!! note
+        When setting a seed, remember to pass a seed per symbol using `vectorbt.data.base.symbol_dict`.
+
+    ## Example
+
+    ```python-repl
+    >>> import vectorbt as vbt
+
+    >>> gbm_data = vbt.GBMData.fetch(
+    ...     list(range(10)),
+    ...     start='2010-01-01',
+    ...     end='2020-01-01'
+    ... )
+
+    >>> gbm_data.plot(showlegend=False)
+    ```
+
+    ![](/docs/img/GBMData.svg)
+    """
+
+    @classmethod
+    def generate_symbol(cls,
+                        symbol: tp.Symbol,
+                        index: tp.Index,
+                        num_paths: int = 1,
+                        start_value: float = 100.,
+                        mean: float = 0.,
+                        std: float = 0.01,
+                        dt: float = 1.,
+                        seed: tp.Optional[int] = None,
+                        jitted: tp.JittedOption = None) -> tp.SeriesFrame:
+        """Generate a symbol.
+
+        Args:
+            symbol (str): Symbol.
+            index (pd.Index): Pandas index.
+            num_paths (int): Number of generated paths (columns in our case).
+            start_value (float): Value at time 0.
+
+                Does not appear as the first value in the output data.
+            mean (float): Drift, or mean of the percentage change.
+            std (float): Standard deviation of the percentage change.
+            dt (float): Time change (one period of time).
+            seed (int): Set seed to make output deterministic.
+            jitted (any): See `vectorbt.utils.jitting.resolve_jitted_option`.
+        """
+        if seed is not None:
+            set_seed(seed)
+
+        func = jit_registry.resolve_option(nb.generate_gbm_data_nb, jitted)
+        out = func((len(index), num_paths), start_value, mean, std, dt)
+
+        if out.shape[1] == 1:
+            return pd.Series(out[:, 0], index=index)
+        columns = pd.RangeIndex(stop=out.shape[1], name='path')
+        return pd.DataFrame(out, index=index, columns=columns)
+
+
+class YFData(Data):  # pragma: no cover
     """`Data` for data coming from `yfinance`.
 
     Stocks are usually in the timezone "+0500" and cryptocurrencies in UTC.
@@ -190,13 +405,13 @@ class YFData(Data):
     ```python-repl
     >>> import vectorbt as vbt
 
-    >>> yf_data = vbt.YFData.download(
+    >>> yf_data = vbt.YFData.fetch(
     ...     "TSLA",
     ...     start='2021-04-12 09:30:00 -0400',
     ...     end='2021-04-12 09:35:00 -0400',
     ...     interval='1m'
     ... )
-    >>> yf_data.get())
+    >>> yf_data.get()
                                      Open        High         Low       Close  \\
     Datetime
     2021-04-12 13:30:00+00:00  685.080017  685.679993  684.765015  685.679993
@@ -244,25 +459,27 @@ class YFData(Data):
     """
 
     @classmethod
-    def download_symbol(cls,
-                        symbol: tp.Label,
-                        period: str = 'max',
-                        start: tp.Optional[tp.DatetimeLike] = None,
-                        end: tp.Optional[tp.DatetimeLike] = None,
-                        **kwargs) -> tp.Frame:
-        """Download the symbol.
+    def fetch_symbol(cls,
+                     symbol: str,
+                     period: str = 'max',
+                     start: tp.Optional[tp.DatetimeLike] = None,
+                     end: tp.Optional[tp.DatetimeLike] = None,
+                     **kwargs) -> tp.Frame:
+        """Fetch a symbol.
 
         Args:
             symbol (str): Symbol.
             period (str): Period.
             start (any): Start datetime.
 
-                See `vectorbt.utils.datetime.to_tzaware_datetime`.
+                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
             end (any): End datetime.
 
-                See `vectorbt.utils.datetime.to_tzaware_datetime`.
+                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
             **kwargs: Keyword arguments passed to `yfinance.base.TickerBase.history`.
         """
+        from vectorbt.opt_packages import assert_can_import
+        assert_can_import('yfinance')
         import yfinance as yf
 
         # yfinance still uses mktime, which assumes that the passed date is in local time
@@ -273,20 +490,17 @@ class YFData(Data):
 
         return yf.Ticker(symbol).history(period=period, start=start, end=end, **kwargs)
 
-    def update_symbol(self, symbol: tp.Label, **kwargs) -> tp.Frame:
-        """Update the symbol.
-
-        `**kwargs` will override keyword arguments passed to `YFData.download_symbol`."""
-        download_kwargs = self.select_symbol_kwargs(symbol, self.download_kwargs)
-        download_kwargs['start'] = self.data[symbol].index[-1]
-        kwargs = merge_dicts(download_kwargs, kwargs)
-        return self.download_symbol(symbol, **kwargs)
+    def update_symbol(self, symbol: str, **kwargs) -> tp.SeriesFrame:
+        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
+        fetch_kwargs['start'] = self.last_index[symbol]
+        kwargs = merge_dicts(fetch_kwargs, kwargs)
+        return self.fetch_symbol(symbol, **kwargs)
 
 
 BinanceDataT = tp.TypeVar("BinanceDataT", bound="BinanceData")
 
 
-class BinanceData(Data):
+class BinanceData(Data):  # pragma: no cover
     """`Data` for data coming from `python-binance`.
 
     ## Example
@@ -296,7 +510,7 @@ class BinanceData(Data):
     ```python-repl
     >>> import vectorbt as vbt
 
-    >>> binance_data = vbt.BinanceData.download(
+    >>> binance_data = vbt.BinanceData.fetch(
     ...     "BTCUSDT",
     ...     start='2 hours ago UTC',
     ...     end='now UTC',
@@ -395,14 +609,17 @@ class BinanceData(Data):
     ```"""
 
     @classmethod
-    def download(cls: tp.Type[BinanceDataT],
-                 symbols: tp.Labels,
-                 client: tp.Optional["ClientT"] = None,
-                 **kwargs) -> BinanceDataT:
-        """Override `vectorbt.data.base.Data.download` to instantiate a Binance client."""
+    def fetch(cls: tp.Type[BinanceDataT],
+              symbols: tp.Sequence[str],
+              client: tp.Optional["ClientT"] = None,
+              **kwargs) -> BinanceDataT:
+        """Override `vectorbt.data.base.Data.fetch` to instantiate a Binance client."""
+        from vectorbt.opt_packages import assert_can_import
+        assert_can_import('binance')
         from binance.client import Client
+
         from vectorbt._settings import settings
-        binance_cfg = settings['data']['binance']
+        binance_cfg = settings['data']['custom']['binance']
 
         client_kwargs = dict()
         for k in get_func_kwargs(Client):
@@ -411,20 +628,20 @@ class BinanceData(Data):
         client_kwargs = merge_dicts(binance_cfg, client_kwargs)
         if client is None:
             client = Client(**client_kwargs)
-        return super(BinanceData, cls).download(symbols, client=client, **kwargs)
+        return super(BinanceData, cls).fetch(symbols, client=client, **kwargs)
 
     @classmethod
-    def download_symbol(cls,
-                        symbol: str,
-                        client: tp.Optional["ClientT"] = None,
-                        interval: str = '1d',
-                        start: tp.DatetimeLike = 0,
-                        end: tp.DatetimeLike = 'now UTC',
-                        delay: tp.Optional[float] = 500,
-                        limit: int = 500,
-                        show_progress: bool = True,
-                        tqdm_kwargs: tp.KwargsLike = None) -> tp.Frame:
-        """Download the symbol.
+    def fetch_symbol(cls,
+                     symbol: str,
+                     client: tp.Optional["ClientT"] = None,
+                     interval: str = '1d',
+                     start: tp.DatetimeLike = 0,
+                     end: tp.DatetimeLike = 'now UTC',
+                     delay: tp.Optional[float] = 500,
+                     limit: int = 500,
+                     show_progress: bool = True,
+                     pbar_kwargs: tp.KwargsLike = None) -> tp.Frame:
+        """Fetch a symbol.
 
         Args:
             symbol (str): Symbol.
@@ -434,22 +651,22 @@ class BinanceData(Data):
                 See `binance.enums`.
             start (any): Start datetime.
 
-                See `vectorbt.utils.datetime.to_tzaware_datetime`.
+                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
             end (any): End datetime.
 
-                See `vectorbt.utils.datetime.to_tzaware_datetime`.
+                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
             delay (float): Time to sleep after each request (in milliseconds).
             limit (int): The maximum number of returned items.
             show_progress (bool): Whether to show the progress bar.
-            tqdm_kwargs (dict): Keyword arguments passed to `tqdm`.
+            pbar_kwargs (dict): Keyword arguments passed to `vectorbt.utils.pbar.get_pbar`.
 
-        For defaults, see `data.binance` in `vectorbt._settings.settings`.
+        For defaults, see `data.custom.binance` in `vectorbt._settings.settings`.
         """
         if client is None:
             raise ValueError("client must be provided")
 
-        if tqdm_kwargs is None:
-            tqdm_kwargs = {}
+        if pbar_kwargs is None:
+            pbar_kwargs = {}
         # Establish the timestamps
         start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
         try:
@@ -470,35 +687,40 @@ class BinanceData(Data):
             return str(pd.Timestamp(to_tzaware_datetime(ts, tz=get_utc_tz())))
 
         # Iteratively collect the data
-        data: tp.List[list] = []
-        with tqdm(disable=not show_progress, **tqdm_kwargs) as pbar:
-            pbar.set_description(_ts_to_str(start_ts))
-            while True:
-                # Fetch the klines for the next interval
-                next_data = client.get_klines(
-                    symbol=symbol,
-                    interval=interval,
-                    limit=limit,
-                    startTime=next_start_ts,
-                    endTime=end_ts
-                )
-                if len(data) > 0:
-                    next_data = list(filter(lambda d: next_start_ts < d[0] < end_ts, next_data))
-                else:
-                    next_data = list(filter(lambda d: d[0] < end_ts, next_data))
+        data = []
+        try:
+            with get_pbar(show_progress=show_progress, **pbar_kwargs) as pbar:
+                pbar.set_description(_ts_to_str(start_ts))
+                while True:
+                    # Fetch the klines for the next interval
+                    next_data = client.get_klines(
+                        symbol=symbol,
+                        interval=interval,
+                        limit=limit,
+                        startTime=next_start_ts,
+                        endTime=end_ts
+                    )
+                    if len(data) > 0:
+                        next_data = list(filter(lambda d: next_start_ts < d[0] < end_ts, next_data))
+                    else:
+                        next_data = list(filter(lambda d: d[0] < end_ts, next_data))
 
-                # Update the timestamps and the progress bar
-                if not len(next_data):
-                    break
-                data += next_data
-                pbar.set_description("{} - {}".format(
-                    _ts_to_str(start_ts),
-                    _ts_to_str(next_data[-1][0])
-                ))
-                pbar.update(1)
-                next_start_ts = next_data[-1][0]
-                if delay is not None:
-                    time.sleep(delay / 1000)  # be kind to api
+                    # Update the timestamps and the progress bar
+                    if not len(next_data):
+                        break
+                    data += next_data
+                    pbar.set_description("{} - {}".format(
+                        _ts_to_str(start_ts),
+                        _ts_to_str(next_data[-1][0])
+                    ))
+                    pbar.update(1)
+                    next_start_ts = next_data[-1][0]
+                    if delay is not None:
+                        time.sleep(delay / 1000)  # be kind to api
+        except Exception as e:
+            warnings.warn(traceback.format_exc())
+            warnings.warn(f"Symbol '{str(symbol)}' raised an exception. Returning incomplete data. "
+                          f"Use update() method to fetch missing data.", stacklevel=2)
 
         # Convert data to a DataFrame
         df = pd.DataFrame(data, columns=[
@@ -532,17 +754,13 @@ class BinanceData(Data):
         return df
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.Frame:
-        """Update the symbol.
-
-        `**kwargs` will override keyword arguments passed to `BinanceData.download_symbol`."""
-        download_kwargs = self.select_symbol_kwargs(symbol, self.download_kwargs)
-        download_kwargs['start'] = self.data[symbol].index[-1]
-        download_kwargs['show_progress'] = False
-        kwargs = merge_dicts(download_kwargs, kwargs)
-        return self.download_symbol(symbol, **kwargs)
+        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
+        fetch_kwargs['start'] = self.last_index[symbol]
+        kwargs = merge_dicts(fetch_kwargs, kwargs)
+        return self.fetch_symbol(symbol, **kwargs)
 
 
-class CCXTData(Data):
+class CCXTData(Data):  # pragma: no cover
     """`Data` for data coming from `ccxt`.
 
     ## Example
@@ -552,7 +770,7 @@ class CCXTData(Data):
     ```python-repl
     >>> import vectorbt as vbt
 
-    >>> ccxt_data = vbt.CCXTData.download(
+    >>> ccxt_data = vbt.CCXTData.fetch(
     ...     "BTC/USDT",
     ...     start='2 hours ago UTC',
     ...     end='now UTC',
@@ -591,20 +809,20 @@ class CCXTData(Data):
     ```"""
 
     @classmethod
-    def download_symbol(cls,
-                        symbol: str,
-                        exchange: tp.Union[str, "ExchangeT"] = 'binance',
-                        config: tp.Optional[dict] = None,
-                        timeframe: str = '1d',
-                        start: tp.DatetimeLike = 0,
-                        end: tp.DatetimeLike = 'now UTC',
-                        delay: tp.Optional[float] = None,
-                        limit: tp.Optional[int] = 500,
-                        retries: int = 3,
-                        show_progress: bool = True,
-                        params: tp.Optional[dict] = None,
-                        tqdm_kwargs: tp.KwargsLike = None) -> tp.Frame:
-        """Download the symbol.
+    def fetch_symbol(cls,
+                     symbol: str,
+                     exchange: tp.Union[str, "ExchangeT"] = 'binance',
+                     config: tp.Optional[dict] = None,
+                     timeframe: str = '1d',
+                     start: tp.DatetimeLike = 0,
+                     end: tp.DatetimeLike = 'now UTC',
+                     delay: tp.Optional[float] = None,
+                     limit: tp.Optional[int] = 500,
+                     retries: int = 3,
+                     show_progress: bool = True,
+                     params: tp.Optional[dict] = None,
+                     pbar_kwargs: tp.KwargsLike = None) -> tp.Frame:
+        """Fetch a symbol.
 
         Args:
             symbol (str): Symbol.
@@ -616,10 +834,10 @@ class CCXTData(Data):
             timeframe (str): Timeframe supported by the exchange.
             start (any): Start datetime.
 
-                See `vectorbt.utils.datetime.to_tzaware_datetime`.
+                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
             end (any): End datetime.
 
-                See `vectorbt.utils.datetime.to_tzaware_datetime`.
+                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
             delay (float): Time to sleep after each request (in milliseconds).
 
                 !!! note
@@ -627,19 +845,22 @@ class CCXTData(Data):
             limit (int): The maximum number of returned items.
             retries (int): The number of retries on failure to fetch data.
             show_progress (bool): Whether to show the progress bar.
-            tqdm_kwargs (dict): Keyword arguments passed to `tqdm`.
+            pbar_kwargs (dict): Keyword arguments passed to `vectorbt.utils.pbar.get_pbar`.
             params (dict): Exchange-specific key-value parameters.
 
-        For defaults, see `data.ccxt` in `vectorbt._settings.settings`.
+        For defaults, see `custom.data.ccxt` in `vectorbt._settings.settings`.
         """
+        from vectorbt.opt_packages import assert_can_import
+        assert_can_import('ccxt')
         import ccxt
+
         from vectorbt._settings import settings
-        ccxt_cfg = settings['data']['ccxt']
+        ccxt_cfg = settings['data']['custom']['ccxt']
 
         if config is None:
             config = {}
-        if tqdm_kwargs is None:
-            tqdm_kwargs = {}
+        if pbar_kwargs is None:
+            pbar_kwargs = {}
         if params is None:
             params = {}
         if isinstance(exchange, str):
@@ -704,29 +925,34 @@ class CCXTData(Data):
             return str(pd.Timestamp(to_tzaware_datetime(ts, tz=get_utc_tz())))
 
         # Iteratively collect the data
-        data: tp.List[list] = []
-        with tqdm(disable=not show_progress, **tqdm_kwargs) as pbar:
-            pbar.set_description(_ts_to_str(start_ts))
-            while True:
-                # Fetch the klines for the next interval
-                next_data = _fetch(next_start_ts, limit)
-                if len(data) > 0:
-                    next_data = list(filter(lambda d: next_start_ts < d[0] < end_ts, next_data))
-                else:
-                    next_data = list(filter(lambda d: d[0] < end_ts, next_data))
+        data = []
+        try:
+            with get_pbar(show_progress=show_progress, **pbar_kwargs) as pbar:
+                pbar.set_description(_ts_to_str(start_ts))
+                while True:
+                    # Fetch the klines for the next interval
+                    next_data = _fetch(next_start_ts, limit)
+                    if len(data) > 0:
+                        next_data = list(filter(lambda d: next_start_ts < d[0] < end_ts, next_data))
+                    else:
+                        next_data = list(filter(lambda d: d[0] < end_ts, next_data))
 
-                # Update the timestamps and the progress bar
-                if not len(next_data):
-                    break
-                data += next_data
-                pbar.set_description("{} - {}".format(
-                    _ts_to_str(start_ts),
-                    _ts_to_str(next_data[-1][0])
-                ))
-                pbar.update(1)
-                next_start_ts = next_data[-1][0]
-                if delay is not None:
-                    time.sleep(delay / 1000)  # be kind to api
+                    # Update the timestamps and the progress bar
+                    if not len(next_data):
+                        break
+                    data += next_data
+                    pbar.set_description("{} - {}".format(
+                        _ts_to_str(start_ts),
+                        _ts_to_str(next_data[-1][0])
+                    ))
+                    pbar.update(1)
+                    next_start_ts = next_data[-1][0]
+                    if delay is not None:
+                        time.sleep(delay / 1000)  # be kind to api
+        except Exception as e:
+            warnings.warn(traceback.format_exc())
+            warnings.warn(f"Symbol '{str(symbol)}' raised an exception. Returning incomplete data. "
+                          f"Use update() method to fetch missing data.", stacklevel=2)
 
         # Convert data to a DataFrame
         df = pd.DataFrame(data, columns=[
@@ -748,11 +974,7 @@ class CCXTData(Data):
         return df
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.Frame:
-        """Update the symbol.
-
-        `**kwargs` will override keyword arguments passed to `CCXTData.download_symbol`."""
-        download_kwargs = self.select_symbol_kwargs(symbol, self.download_kwargs)
-        download_kwargs['start'] = self.data[symbol].index[-1]
-        download_kwargs['show_progress'] = False
-        kwargs = merge_dicts(download_kwargs, kwargs)
-        return self.download_symbol(symbol, **kwargs)
+        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
+        fetch_kwargs['start'] = self.last_index[symbol]
+        kwargs = merge_dicts(fetch_kwargs, kwargs)
+        return self.fetch_symbol(symbol, **kwargs)

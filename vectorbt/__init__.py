@@ -12,13 +12,13 @@ Accessing and analyzing this information for yourself could give you an informat
 ## Installation
 
 ```bash
-pip install vectorbt
+pip install --upgrade vectorbt
 ```
 
 To also install optional dependencies:
 
 ```bash
-pip install vectorbt[full]
+pip install --upgrade "vectorbt[full]"
 ```
 
 See [License](https://github.com/polakowo/vectorbt#license) notes on optional dependencies.
@@ -281,7 +281,7 @@ Let's start with fetching the daily price of Bitcoin:
 >>> # Prepare data
 >>> start = '2019-01-01 UTC'  # crypto is in UTC
 >>> end = '2020-01-01 UTC'
->>> btc_price = vbt.YFData.download('BTC-USD', start=start, end=end).get('Close')
+>>> btc_price = vbt.YFData.fetch('BTC-USD', start=start, end=end).get('Close')
 
 >>> btc_price
 Date
@@ -296,7 +296,7 @@ Freq: D, Name: Close, Length: 366, dtype: float64
 ```
 
 We are going to test a simple Dual Moving Average Crossover (DMAC) strategy. For this, we are going to
-use `vectorbt.indicators.basic.MA` class for calculating moving averages and generating signals.
+use `vectorbt.indicators.custom.MA` class for calculating moving averages and generating signals.
 
 Our first test is rather simple: buy when the 10-day moving average crosses above the 20-day moving
 average, and sell when opposite.
@@ -305,7 +305,7 @@ average, and sell when opposite.
 >>> fast_ma = vbt.MA.run(btc_price, 10, short_name='fast')
 >>> slow_ma = vbt.MA.run(btc_price, 20, short_name='slow')
 
->>> entries = fast_ma.ma_above(slow_ma, crossover=True)
+>>> entries = fast_ma.ma_crossed_above(slow_ma)
 >>> entries
 Date
 2019-01-01 00:00:00+00:00    False
@@ -317,7 +317,7 @@ Date
 2020-01-01 00:00:00+00:00    False
 Freq: D, Length: 366, dtype: bool
 
->>> exits = fast_ma.ma_below(slow_ma, crossover=True)
+>>> exits = fast_ma.ma_crossed_below(slow_ma)
 >>> exits
 Date
 2019-01-01 00:00:00+00:00    False
@@ -330,7 +330,7 @@ Date
 Freq: D, Length: 366, dtype: bool
 
 >>> pf = vbt.Portfolio.from_signals(btc_price, entries, exits)
->>> pf.total_return()
+>>> pf.total_return
 0.636680693047752
 ```
 
@@ -345,7 +345,7 @@ average over the entire price series and stores it as a distinct column.
 >>> fast_ma = vbt.MA.run(btc_price, [10, 20], short_name='fast')
 >>> slow_ma = vbt.MA.run(btc_price, [30, 30], short_name='slow')
 
->>> entries = fast_ma.ma_above(slow_ma, crossover=True)
+>>> entries = fast_ma.ma_crossed_above(slow_ma)
 >>> entries
 fast_window                   10     20
 slow_window                   30     30
@@ -360,7 +360,7 @@ Date
 
 [366 rows x 2 columns]
 
->>> exits = fast_ma.ma_below(slow_ma, crossover=True)
+>>> exits = fast_ma.ma_crossed_below(slow_ma)
 >>> exits
 fast_window                   10     20
 slow_window                   30     30
@@ -376,7 +376,7 @@ Date
 [366 rows x 2 columns]
 
 >>> pf = vbt.Portfolio.from_signals(btc_price, entries, exits)
->>> pf.total_return()
+>>> pf.total_return
 fast_window  slow_window
 10           30             0.848840
 20           30             0.543411
@@ -395,9 +395,8 @@ combine price series for Bitcoin and Ethereum into one DataFrame and run the sam
 
 ```python-repl
 >>> # Multiple strategy instances and instruments
->>> eth_price = vbt.YFData.download('ETH-USD', start=start, end=end).get('Close')
->>> comb_price = btc_price.vbt.concat(eth_price,
-...     keys=pd.Index(['BTC', 'ETH'], name='symbol'))
+>>> eth_price = vbt.YFData.fetch('ETH-USD', start=start, end=end).get('Close')
+>>> comb_price = btc_price.vbt.concat(eth_price, keys=pd.Index(['BTC', 'ETH'], name='symbol'))
 >>> comb_price.vbt.drop_levels(-1, inplace=True)
 >>> comb_price
 symbol                             BTC         ETH
@@ -415,7 +414,7 @@ Date
 >>> fast_ma = vbt.MA.run(comb_price, [10, 20], short_name='fast')
 >>> slow_ma = vbt.MA.run(comb_price, [30, 30], short_name='slow')
 
->>> entries = fast_ma.ma_above(slow_ma, crossover=True)
+>>> entries = fast_ma.ma_crossed_above(slow_ma)
 >>> entries
 fast_window                          10            20
 slow_window                          30            30
@@ -431,7 +430,7 @@ Date
 
 [366 rows x 4 columns]
 
->>> exits = fast_ma.ma_below(slow_ma, crossover=True)
+>>> exits = fast_ma.ma_crossed_below(slow_ma)
 >>> exits
 fast_window                          10            20
 slow_window                          30            30
@@ -448,7 +447,7 @@ Date
 [366 rows x 4 columns]
 
 >>> pf = vbt.Portfolio.from_signals(comb_price, entries, exits)
->>> pf.total_return()
+>>> pf.total_return
 fast_window  slow_window  symbol
 10           30           BTC       0.848840
                           ETH       0.244204
@@ -456,7 +455,7 @@ fast_window  slow_window  symbol
                           ETH      -0.319102
 Name: total_return, dtype: float64
 
->>> mean_return = pf.total_return().groupby('symbol').mean()
+>>> mean_return = pf.total_return.groupby('symbol').mean()
 >>> mean_return.vbt.barplot(xaxis_title='Symbol', yaxis_title='Mean total return')
 ```
 
@@ -487,11 +486,11 @@ symbol              BTC         ETH           BTC         ETH
 >>> fast_ma = vbt.MA.run(mult_comb_price, [10, 20], short_name='fast')
 >>> slow_ma = vbt.MA.run(mult_comb_price, [30, 30], short_name='slow')
 
->>> entries = fast_ma.ma_above(slow_ma, crossover=True)
->>> exits = fast_ma.ma_below(slow_ma, crossover=True)
+>>> entries = fast_ma.ma_crossed_above(slow_ma)
+>>> exits = fast_ma.ma_crossed_below(slow_ma)
 
 >>> pf = vbt.Portfolio.from_signals(mult_comb_price, entries, exits, freq='1D')
->>> pf.total_return()
+>>> pf.total_return
 fast_window  slow_window  split_idx  symbol
 10           30           0          BTC       1.632259
                                      ETH       0.946786
@@ -512,7 +511,7 @@ The index hierarchy of the final performance series can be then used to group th
 by any feature, such as window pair, symbol, and time period.
 
 ```python-repl
->>> mean_return = pf.total_return().groupby(['split_idx', 'symbol']).mean()
+>>> mean_return = pf.total_return.groupby(['split_idx', 'symbol']).mean()
 >>> mean_return.unstack(level=-1).vbt.barplot(
 ...     xaxis_title='Split index',
 ...     yaxis_title='Mean total return',
@@ -537,12 +536,12 @@ reduce the memory footprint, and you as a user always have 90-95% control over m
 (just like a market order, but you can easily build upon it to implement limit and stop orders).
 This means order execution is effectively state-less - it simply receives a command with inputs and gives you the
 result of the execution including the new cash balance and other metrics. There is no list of pending orders.
-
-    Update: `Portfolio.from_signals` now supports stop orders.
+**Update**: `Portfolio.from_signals` now supports stop orders.
 - *One order limit*: Only one order command per symbol and bar - although this can (and probably will) be expanded.
-
-    Update: `Portfolio.from_order_func` with `flexible` option supports multiple orders.
+**Update**: `Portfolio.from_order_func` with `flexible` option supports multiple orders.
 - *Limited support for parallelization*: Read [this](https://github.com/polakowo/vectorbt/issues/129#issuecomment-823596039).
+**Update**: Parallelization with Numba can now be turned on/off and all functions
+by default release GIL to be used by a multi-threading backend.
 - *Python skills required*: Having an intermediate knowledge of Pandas, NumPy, and broadcasting principles is a must.
 
 ## Resources
@@ -605,7 +604,7 @@ Please note: contribution to this project requires signing a Contributor Licence
 
 This work is [fair-code](http://faircode.io/) distributed under [Apache 2.0 with Commons Clause](https://github.com/polakowo/vectorbt/blob/master/LICENSE.md) license.
 The source code is open and everyone (individuals and organizations) can use it for free.
-However, it is not allowed to sell products and services that are mostly just this software.
+However, it is not allowed to sell products and services whose value derives mostly from this software.
 
 If you have any questions about this or want to apply for a license exception, please [contact the author](mailto:olegpolakow@gmail.com).
 
@@ -621,11 +620,8 @@ __pdoc__ = {}
 
 # Import version
 from vectorbt._version import __version__ as _version
-__version__ = _version
 
-# Most important modules
-from vectorbt.generic import nb, plotting
-from vectorbt._settings import settings
+__version__ = _version
 
 # Most important classes
 from vectorbt.utils import *
@@ -639,6 +635,15 @@ from vectorbt.portfolio import *
 from vectorbt.labels import *
 from vectorbt.messaging import *
 
+# Most important modules and objects
+from vectorbt import _typing as tp
+from vectorbt._settings import settings
+from vectorbt.jit_registry import register_jitted
+from vectorbt.ch_registry import register_chunkable
+from vectorbt.ca_registry import CAQuery, CAQueryDelegator
+from vectorbt.jit_registry import register_jitted
+from vectorbt.root_accessors import pd_acc, sr_acc, df_acc
+
 # Import all submodules
 from vectorbt.utils.module_ import import_submodules
 
@@ -647,6 +652,13 @@ import warnings
 from numba.core.errors import NumbaExperimentalFeatureWarning
 
 warnings.filterwarnings("ignore", category=NumbaExperimentalFeatureWarning)
+
+__blacklist__ = []
+
+try:
+    import plotly
+except ImportError:
+    __blacklist__.append('px_accessors')
 
 import_submodules(__name__)
 

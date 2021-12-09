@@ -67,7 +67,7 @@ crossover with price. In particular, we want to test two different window sizes:
 A naive way of doing this:
 
 ```python-repl
->>> ma_df = pd.DataFrame.vbt.concat(
+>>> ma_df = vbt.pd_acc.concat(
 ...     price.rolling(window=2).mean(),
 ...     price.rolling(window=3).mean(),
 ...     keys=pd.Index([2, 3], name='ma_window'))
@@ -113,8 +113,8 @@ Now the same using `IndicatorFactory`:
 ... ).from_apply_func(vbt.nb.rolling_mean_nb)
 
 >>> myind = MyInd.run(price, [2, 3])
->>> above_signals = myind.price_above(myind.ma, crossover=True)
->>> below_signals = myind.price_below(myind.ma, crossover=True)
+>>> above_signals = myind.price_crossed_above(myind.ma)
+>>> below_signals = myind.price_crossed_below(myind.ma)
 ```
 
 The `IndicatorFactory` class is used to construct indicator classes from UDFs. First, we provide
@@ -155,7 +155,7 @@ myind_2_window        3                   4
 2020-01-04     3.0  3.0  2.5  3.5  2.5  3.5
 2020-01-05     4.0  2.0  3.5  2.5  3.5  2.5
 
->>> myind1.ma_above(myind2.ma, crossover=True)
+>>> myind1.ma_crossed_above(myind2.ma)
 myind_1_window                          2             3
 myind_2_window            3             4             4
                    a      b      a      b      a      b
@@ -382,13 +382,13 @@ custom_upper  array_0 array_0 array_1 array_1
 Broadcasting a huge number of parameters to the input shape can consume lots of memory,
 especially when the array materializes. Luckily, vectorbt implements flexible broadcasting,
 which preserves the original dimensions of the parameter. This requires two changes:
-setting `keep_raw` to True in `broadcast_kwargs` and passing `flex_2d` to the apply function.
+setting `keep_flex` to True in `broadcast_kwargs` and passing `flex_2d` to the apply function.
 
 There are two configs in `vectorbt.indicators.configs` exactly for this purpose: one for column-wise
 broadcasting and one for element-wise broadcasting:
 
 ```python-repl
->>> from vectorbt.base.reshape_fns import flex_select_auto_nb
+>>> from vectorbt.base.indexing import flex_select_auto_nb
 >>> from vectorbt.indicators.configs import flex_col_param_config, flex_elem_param_config
 
 >>> @njit
@@ -444,7 +444,7 @@ custom_upper  array_0 array_0 array_1 array_1
 2020-01-05        1.0     1.0     1.0     1.0
 ```
 
-Indicators can also be parameterless. See `vectorbt.indicators.basic.OBV`.
+Indicators can also be parameterless. See `vectorbt.indicators.custom.OBV`.
 
 ## Inputs
 
@@ -494,7 +494,7 @@ By default, if a Series was passed, it's automatically expanded into a 2-dimensi
 To keep it as 1-dimensional, set `to_2d` to False.
 
 Similar to parameters, we can also define defaults for inputs. In addition to using scalars
-and arrays as default values, we can reference other inputs:
+and arrays as default values, we can reference other inputs using `vectorbt.base.reshaping.Ref`:
 
 ```python-repl
 >>> @njit
@@ -504,7 +504,11 @@ and arrays as default values, we can reference other inputs:
 >>> MyInd = vbt.IndicatorFactory(
 ...     input_names=['ts1', 'ts2', 'ts3'],
 ...     output_names=['output']
-... ).from_apply_func(apply_func_nb, ts2='ts1', ts3='ts1')
+... ).from_apply_func(
+...     apply_func_nb,
+...     ts2=vbt.Ref('ts1'),
+...     ts3=vbt.Ref('ts2')
+... )
 
 >>> MyInd.run(price).output
                a     b
@@ -516,11 +520,11 @@ and arrays as default values, we can reference other inputs:
 
 >>> MyInd.run(price, ts2=price * 2).output
                a     b
-2020-01-01   4.0  20.0
-2020-01-02   8.0  16.0
-2020-01-03  12.0  12.0
-2020-01-04  16.0   8.0
-2020-01-05  20.0   4.0
+2020-01-01   5.0  25.0
+2020-01-02  10.0  20.0
+2020-01-03  15.0  15.0
+2020-01-04  20.0  10.0
+2020-01-05  25.0   5.0
 ```
 
 What if an indicator doesn't take any input arrays? In that case, we can force the user to
@@ -574,7 +578,7 @@ custom_sigma        0.01        0.01
 One can even build input-less indicator that decides on the output shape dynamically:
 
 ```python-repl
->>> from vectorbt.base.combine_fns import apply_and_concat_one
+>>> from vectorbt.base.combining import apply_and_concat
 
 >>> def apply_func(i, ps, input_shape):
 ...      out = np.full(input_shape, 0)
@@ -583,7 +587,7 @@ One can even build input-less indicator that decides on the output shape dynamic
 
 >>> def custom_func(ps):
 ...     input_shape = (np.max(ps),)
-...     return apply_and_concat_one(len(ps), apply_func, ps, input_shape)
+...     return apply_and_concat(len(ps), apply_func, ps, input_shape)
 
 >>> MyInd = vbt.IndicatorFactory(
 ...     param_names=['p'],
@@ -603,7 +607,7 @@ custom_p  1  2  3  4  5
 
 There are two types of outputs: regular and in-place outputs:
 
-* Regular outputs are one or more arrays returned by the function. Each should have an exact
+* Regular outputs are one or more arrays returned by the function. Each must have an exact
 same shape and match the number of columns in the input multiplied by the number of parameter values.
 * In-place outputs are not returned but modified in-place. They broadcast together with inputs
 and are passed to the calculation function as a list, one per parameter.
@@ -702,7 +706,7 @@ Another advantage of in-place outputs is that we can provide their initial state
 ... ).from_apply_func(
 ...     apply_func_nb,
 ...     in_out1=100,
-...     in_out2='price'
+...     in_out2=vbt.Ref('price')
 ... )
 
 >>> myind = MyInd.run(price)
@@ -949,7 +953,7 @@ which gives us more granularity in managing performance.
 ## Custom properties and methods
 
 Use `custom_output_props` argument when constructing an indicator to define lazy outputs -
-outputs that are processed only when explicitly called. They will become cached properties
+outputs that are processed only when explicitly called. They will become cacheable properties
 and, in contrast to regular outputs, they can have an arbitrary shape. For example, let's
 attach a property that will calculate the distance between the moving average and the price.
 
@@ -1059,7 +1063,7 @@ custom_price_above           1.5           2.5
 ## Indexing
 
 `IndicatorFactory` attaches pandas indexing to the indicator class thanks to
-`vectorbt.base.array_wrapper.ArrayWrapper`. Supported are `iloc`, `loc`,
+`vectorbt.base.wrapping.ArrayWrapper`. Supported are `iloc`, `loc`,
 `*param_name*_loc`, `xs`, and `__getitem__`.
 
 This makes possible accessing rows and columns by labels, integer positions, and parameters.
@@ -1068,7 +1072,7 @@ This makes possible accessing rows and columns by labels, integer positions, and
 >>> ma = vbt.MA.run(price, [2, 3])
 
 >>> ma[(2, 'b')]
-<vectorbt.indicators.basic.MA at 0x7fe4d10ddcc0>
+<vectorbt.indicators.custom.MA at 0x7fe4d10ddcc0>
 
 >>> ma[(2, 'b')].ma
 2020-01-01    NaN
@@ -1160,33 +1164,38 @@ Similarly to stats, we can attach subplots to any new indicator class:
 ![](/docs/img/IndicatorFactory_plots.svg)
 """
 
+import inspect
+import itertools
+import warnings
+from collections import Counter
+from collections import OrderedDict
+from datetime import datetime, timedelta
+from types import ModuleType
+
 import numpy as np
 import pandas as pd
 from numba import njit
 from numba.typed import List
-import itertools
-import inspect
-from collections import OrderedDict
-import warnings
-from datetime import datetime, timedelta
-from types import ModuleType
-from collections import Counter
 
 from vectorbt import _typing as tp
+from vectorbt.base import indexes, reshaping, combining
+from vectorbt.base.indexing import build_param_indexer
+from vectorbt.base.reshaping import Default, resolve_ref
+from vectorbt.base.wrapping import ArrayWrapper, Wrapping
+from vectorbt.generic import nb as generic_nb
+from vectorbt.generic.accessors import BaseAccessor
+from vectorbt.generic.plots_builder import PlotsBuilderMixin
+from vectorbt.generic.stats_builder import StatsBuilderMixin
+from vectorbt.jit_registry import jit_registry
 from vectorbt.utils import checks
-from vectorbt.utils.decorators import classproperty, cached_property
-from vectorbt.utils.config import merge_dicts, resolve_dict, Config, Default
-from vectorbt.utils.random_ import set_seed
-from vectorbt.utils.params import to_typed_list, broadcast_params, create_param_product
+from vectorbt.utils.config import merge_dicts, resolve_dict, Config
+from vectorbt.utils.decorators import classproperty, cacheable_property
+from vectorbt.utils.docs import stringify
 from vectorbt.utils.enum_ import map_enum_fields
 from vectorbt.utils.mapping import to_mapping, apply_mapping
-from vectorbt.utils.docs import to_doc
-from vectorbt.base import index_fns, reshape_fns, combine_fns
-from vectorbt.base.indexing import build_param_indexer
-from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
-from vectorbt.generic.accessors import BaseAccessor
-from vectorbt.generic.stats_builder import StatsBuilderMixin
-from vectorbt.generic.plots_builder import PlotsBuilderMixin
+from vectorbt.utils.params import to_typed_list, broadcast_params, create_param_product, params_to_list
+from vectorbt.utils.random_ import set_seed
+from vectorbt.utils.template import has_templates, deep_substitute
 
 try:
     from ta.utils import IndicatorMixin as IndicatorMixinT
@@ -1194,40 +1203,39 @@ except ImportError:
     IndicatorMixinT = tp.Any
 
 
-def params_to_list(params: tp.Params, is_tuple: bool, is_array_like: bool) -> list:
-    """Cast parameters to a list."""
-    check_against = [list, List]
-    if not is_tuple:
-        check_against.append(tuple)
-    if not is_array_like:
-        check_against.append(np.ndarray)
-    if isinstance(params, tuple(check_against)):
-        new_params = list(params)
-    else:
-        new_params = [params]
-    return new_params
-
-
 def prepare_params(param_list: tp.Sequence[tp.Params],
-                   param_settings: tp.KwargsLikeSequence = None,
+                   param_names: tp.Sequence[str],
+                   param_settings: tp.Sequence[tp.KwargsLike],
                    input_shape: tp.Optional[tp.Shape] = None,
-                   to_2d: bool = False) -> tp.List[tp.List]:
-    """Prepare parameters."""
+                   to_2d: bool = False) -> tp.List[tp.Params]:
+    """Prepare parameters.
+
+    Resolves references and performs broadcasting to the input shape."""
+    # Resolve references
+    pool = dict(zip(param_names, param_list))
+    for k in pool:
+        pool[k] = resolve_ref(pool, k)
+    param_list = [pool[k] for k in param_names]
+
     new_param_list = []
-    for i, params in enumerate(param_list):
-        _param_settings = resolve_dict(param_settings, i=i)
+    for i, p_values in enumerate(param_list):
+        # Resolve settings
+        _param_settings = resolve_dict(param_settings[i])
         is_tuple = _param_settings.get('is_tuple', False)
         dtype = _param_settings.get('dtype', None)
         if checks.is_mapping_like(dtype):
             if checks.is_namedtuple(dtype):
-                params = map_enum_fields(params, dtype)
+                p_values = map_enum_fields(p_values, dtype)
             else:
-                params = apply_mapping(params, dtype)
+                p_values = apply_mapping(p_values, dtype)
         is_array_like = _param_settings.get('is_array_like', False)
         bc_to_input = _param_settings.get('bc_to_input', False)
-        broadcast_kwargs = _param_settings.get('broadcast_kwargs', dict(require_kwargs=dict(requirements='W')))
+        broadcast_kwargs = merge_dicts(
+            dict(require_kwargs=dict(requirements='W')),
+            _param_settings.get('broadcast_kwargs', None)
+        )
 
-        new_params = params_to_list(params, is_tuple, is_array_like)
+        new_p_values = params_to_list(p_values, is_tuple, is_array_like)
         if bc_to_input is not False:
             # Broadcast to input or its axis
             if is_tuple:
@@ -1243,37 +1251,37 @@ def prepare_params(param_list: tp.Sequence[tp.Params],
                     to_shape = (input_shape[0],)
                 else:
                     to_shape = (input_shape[1],) if len(input_shape) > 1 else (1,)
-            _new_params = reshape_fns.broadcast(
-                *new_params,
+            _new_p_values = reshaping.broadcast(
+                *new_p_values,
                 to_shape=to_shape,
                 **broadcast_kwargs
             )
-            if len(new_params) == 1:
-                _new_params = [_new_params]
+            if len(new_p_values) == 1:
+                _new_p_values = [_new_p_values]
             else:
-                _new_params = list(_new_params)
+                _new_p_values = list(_new_p_values)
             if to_2d and bc_to_input is True:
                 # If inputs are meant to reshape to 2D, do the same to parameters
                 # But only to those that fully resemble inputs (= not raw)
-                __new_params = _new_params.copy()
-                for j, param in enumerate(__new_params):
-                    keep_raw = broadcast_kwargs.get('keep_raw', False)
-                    if keep_raw is False or (isinstance(keep_raw, (tuple, list)) and not keep_raw[j]):
-                        __new_params[j] = reshape_fns.to_2d(param)
-                new_params = __new_params
+                __new_p_values = _new_p_values.copy()
+                for j, param in enumerate(__new_p_values):
+                    keep_flex = broadcast_kwargs.get('keep_flex', False)
+                    if keep_flex is False or (isinstance(keep_flex, (tuple, list)) and not keep_flex[j]):
+                        __new_p_values[j] = reshaping.to_2d(param)
+                new_p_values = __new_p_values
             else:
-                new_params = _new_params
-        new_param_list.append(new_params)
+                new_p_values = _new_p_values
+        new_param_list.append(new_p_values)
     return new_param_list
 
 
-def build_columns(param_list: tp.Sequence[tp.Sequence[tp.Param]],
+def build_columns(param_list: tp.Sequence[tp.Params],
                   input_columns: tp.IndexLike,
                   level_names: tp.Optional[tp.Sequence[str]] = None,
-                  hide_levels: tp.Optional[tp.Sequence[int]] = None,
+                  hide_levels: tp.Optional[tp.Sequence[tp.Union[str, int]]] = None,
                   param_settings: tp.KwargsLikeSequence = None,
                   per_column: bool = False,
-                  ignore_default: bool = False,
+                  ignore_ranges: bool = False,
                   **kwargs) -> tp.Tuple[tp.List[tp.Index], tp.Index]:
     """For each parameter in `param_list`, create a new column level with parameter values
     and stack it on top of `input_columns`.
@@ -1283,57 +1291,58 @@ def build_columns(param_list: tp.Sequence[tp.Sequence[tp.Param]],
         checks.assert_len_equal(param_list, level_names)
     if hide_levels is None:
         hide_levels = []
-    input_columns = index_fns.to_any_index(input_columns)
+    input_columns = indexes.to_any_index(input_columns)
 
     param_indexes = []
     shown_param_indexes = []
     for i in range(len(param_list)):
-        params = param_list[i]
+        p_values = param_list[i]
         level_name = None
         if level_names is not None:
             level_name = level_names[i]
         if per_column:
-            param_index = index_fns.index_from_values(params, name=level_name)
+            param_index = indexes.index_from_values(p_values, name=level_name)
         else:
             _param_settings = resolve_dict(param_settings, i=i)
             _per_column = _param_settings.get('per_column', False)
             if _per_column:
                 param_index = None
-                for param in params:
-                    bc_param = np.broadcast_to(param, (len(input_columns),))
-                    _param_index = index_fns.index_from_values(bc_param, name=level_name)
+                for p in p_values:
+                    bc_param = np.broadcast_to(p, (len(input_columns),))
+                    _param_index = indexes.index_from_values(bc_param, name=level_name)
                     if param_index is None:
                         param_index = _param_index
                     else:
                         param_index = param_index.append(_param_index)
                 if len(param_index) == 1 and len(input_columns) > 1:
                     # When using flexible column-wise parameters
-                    param_index = index_fns.repeat_index(
+                    param_index = indexes.repeat_index(
                         param_index,
                         len(input_columns),
-                        ignore_default=ignore_default
+                        ignore_ranges=ignore_ranges
                     )
             else:
-                param_index = index_fns.index_from_values(param_list[i], name=level_name)
-                param_index = index_fns.repeat_index(
+                param_index = indexes.index_from_values(param_list[i], name=level_name)
+                param_index = indexes.repeat_index(
                     param_index,
                     len(input_columns),
-                    ignore_default=ignore_default
+                    ignore_ranges=ignore_ranges
                 )
         param_indexes.append(param_index)
-        if i not in hide_levels:
+        if i not in hide_levels and (level_names is None or level_names[i] not in hide_levels):
             shown_param_indexes.append(param_index)
+    if not per_column:
+        n_param_values = len(param_list[0]) if len(param_list) > 0 else 1
+        input_columns = indexes.tile_index(
+            input_columns,
+            n_param_values,
+            ignore_ranges=ignore_ranges
+        )
     if len(shown_param_indexes) > 0:
-        if not per_column:
-            n_param_values = len(param_list[0]) if len(param_list) > 0 else 1
-            input_columns = index_fns.tile_index(
-                input_columns,
-                n_param_values,
-                ignore_default=ignore_default
-            )
-        stacked_columns = index_fns.stack_indexes([*shown_param_indexes, input_columns], **kwargs)
-        return param_indexes, stacked_columns
-    return param_indexes, input_columns
+        stacked_columns = indexes.stack_indexes([*shown_param_indexes, input_columns], **kwargs)
+    else:
+        stacked_columns = input_columns
+    return param_indexes, stacked_columns
 
 
 CacheOutputT = tp.Any
@@ -1362,28 +1371,30 @@ def run_pipeline(
         custom_func: tp.Callable,
         *args,
         require_input_shape: bool = False,
-        input_shape: tp.Optional[tp.RelaxedShape] = None,
+        input_shape: tp.Optional[tp.ShapeLike] = None,
         input_index: tp.Optional[tp.IndexLike] = None,
         input_columns: tp.Optional[tp.IndexLike] = None,
-        input_list: tp.Optional[tp.Sequence[tp.ArrayLike]] = None,
-        in_output_list: tp.Optional[tp.Sequence[tp.ArrayLike]] = None,
-        in_output_settings: tp.KwargsLikeSequence = None,
+        inputs: tp.Optional[tp.MappingSequence[tp.ArrayLike]] = None,
+        in_outputs: tp.Optional[tp.MappingSequence[tp.ArrayLike]] = None,
+        in_output_settings: tp.Optional[tp.MappingSequence[tp.KwargsLike]] = None,
+        broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
-        param_list: tp.Optional[tp.Sequence[tp.Param]] = None,
+        template_mapping: tp.Optional[tp.Mapping] = None,
+        params: tp.Optional[tp.MappingSequence[tp.Params]] = None,
         param_product: bool = False,
-        param_settings: tp.KwargsLikeSequence = None,
+        param_settings: tp.Optional[tp.MappingSequence[tp.KwargsLike]] = None,
         run_unique: bool = False,
         silence_warnings: bool = False,
         per_column: bool = False,
         pass_col: bool = False,
         keep_pd: bool = False,
         to_2d: bool = True,
-        as_lists: bool = False,
-        pass_input_shape: bool = False,
+        pass_packed: bool = False,
+        pass_input_shape: tp.Optional[bool] = None,
         pass_flex_2d: bool = False,
         level_names: tp.Optional[tp.Sequence[str]] = None,
-        hide_levels: tp.Optional[tp.Sequence[int]] = None,
-        stacking_kwargs: tp.KwargsLike = None,
+        hide_levels: tp.Optional[tp.Sequence[tp.Union[str, int]]] = None,
+        build_col_kwargs: tp.KwargsLike = None,
         return_raw: bool = False,
         use_raw: tp.Optional[RawOutputT] = None,
         wrapper_kwargs: tp.KwargsLike = None,
@@ -1409,22 +1420,35 @@ def run_pipeline(
         input_columns (index_like): Sets columns of each input.
 
             Can be used to label columns if no inputs passed.
-        input_list (list of array_like): A list of input arrays.
-        in_output_list (list of array_like): A list of in-place output arrays.
-            
-            If an array should be generated, pass None.
-        in_output_settings (dict or list of dict): Settings corresponding to each in-place output.
+        inputs (mapping or sequence of array_like): A mapping or sequence of input arrays.
+
+            Use mapping to also supply names. If sequence, will convert to a mapping using `input_{i}` key.
+        in_outputs (mapping or sequence of array_like): A mapping or sequence of in-place output arrays.
+
+            Use mapping to also supply names. If sequence, will convert to a mapping using `in_output_{i}` key.
+        in_output_settings (dict or sequence of dict): Settings corresponding to each in-place output.
+
+            If mapping, should contain keys from `in_outputs`.
 
             Following keys are accepted:
 
             * `dtype`: Create this array using this data type and `np.empty`. Default is None.
-        broadcast_kwargs (dict): Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`
+        broadcast_named_args (dict): Dictionary with named arguments to broadcast together with inputs.
+
+            You can then pass argument names wrapped with `vectorbt.utils.template.Rep`
+            and this method will substitute them by their corresponding broadcasted objects.
+        broadcast_kwargs (dict): Keyword arguments passed to `vectorbt.base.reshaping.broadcast`
             to broadcast inputs.
-        param_list (list of any): A list of parameters.
+        template_mapping (dict): Mapping used to substitute templates in `args` and `kwargs`.
+        params (mapping or sequence of any): A mapping or sequence of parameters.
+
+            Use mapping to also supply names. If sequence, will convert to a mapping using `param_{i}` key.
 
             Each element is either an array-like object or a single value of any type.
         param_product (bool): Whether to build a Cartesian product out of all parameters.
-        param_settings (dict or list of dict): Settings corresponding to each parameter.
+        param_settings (dict or sequence of dict): Settings corresponding to each parameter.
+
+            If mapping, should contain keys from `params`.
 
             Following keys are accepted:
 
@@ -1436,7 +1460,7 @@ def run_pipeline(
                 To treat it as multiple values, pack it into a list.
             * `bc_to_input`: Whether to broadcast parameter to input size. You can also broadcast
                 parameter to an axis by passing an integer.
-            * `broadcast_kwargs`: Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
+            * `broadcast_kwargs`: Keyword arguments passed to `vectorbt.base.reshaping.broadcast`.
             * `per_column`: Whether each parameter value can be split per column such that it can
                 be better reflected in a multi-index. Does not affect broadcasting.
         run_unique (bool): Whether to run only on unique parameter combinations.
@@ -1457,28 +1481,28 @@ def run_pipeline(
         pass_col (bool): Whether to pass column index as keyword argument if `per_column` is set to True.
         keep_pd (bool): Whether to keep inputs as pandas objects, otherwise convert to NumPy arrays.
         to_2d (bool): Whether to reshape inputs to 2-dim arrays, otherwise keep as-is.
-        as_lists (bool): Whether to pass inputs and parameters to `custom_func` as lists.
+        pass_packed (bool): Whether to pass inputs and parameters to `custom_func` as lists.
 
             If `custom_func` is Numba-compiled, passes tuples.
         pass_input_shape (bool): Whether to pass `input_shape` to `custom_func` as keyword argument.
+
+            Defaults to True if `require_input_shape` is True, otherwise to False.
         pass_flex_2d (bool): Whether to pass `flex_2d` to `custom_func` as keyword argument.
         level_names (list of str): A list of column level names corresponding to each parameter.
 
-            Should have the same length as `param_list`.
-        hide_levels (list of int): A list of indices of parameter levels to hide.
-        stacking_kwargs (dict): Keyword arguments passed to `vectorbt.base.index_fns.repeat_index`,
-            `vectorbt.base.index_fns.tile_index`, and `vectorbt.base.index_fns.stack_indexes`
-            when stacking parameter and input column levels.
+            Must have the same length as `param_list`.
+        hide_levels (list of int or str): A list of level names or indices of parameter levels to hide.
+        build_col_kwargs (dict): Keyword arguments passed to `build_columns`.
         return_raw (bool): Whether to return raw output without post-processing and hashed parameter tuples.
         use_raw (bool): Takes the raw results and uses them instead of running `custom_func`.
-        wrapper_kwargs (dict): Keyword arguments passed to `vectorbt.base.array_wrapper.ArrayWrapper`.
+        wrapper_kwargs (dict): Keyword arguments passed to `vectorbt.base.wrapping.ArrayWrapper`.
         seed (int): Set seed to make output deterministic.
         **kwargs: Keyword arguments passed to the `custom_func`.
 
             Some common arguments include `return_cache` to return cache and `use_cache` to use cache.
             Those are only applicable to `custom_func` that supports it (`custom_func` created using
             `IndicatorFactory.from_apply_func` are supported by default).
-            
+
     Returns:
         Array wrapper, list of inputs (`np.ndarray`), input mapper (`np.ndarray`), list of outputs
         (`np.ndarray`), list of parameter arrays (`np.ndarray`), list of parameter mappers (`np.ndarray`),
@@ -1488,33 +1512,33 @@ def run_pipeline(
 
     Here is a subset of tasks that the function `run_pipeline` does:
 
-    * Takes one or multiple array objects in `input_list` and broadcasts them.
+    * Takes one or multiple array objects in `inputs` and broadcasts them.
 
     ```python-repl
     >>> sr = pd.Series([1, 2], index=['x', 'y'])
     >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
-    >>> input_list = vbt.base.reshape_fns.broadcast(sr, df)
-    >>> input_list[0]
+    >>> inputs = vbt.base.reshaping.broadcast(sr, df)
+    >>> inputs[0]
        a  b
     x  1  1
     y  2  2
-    >>> input_list[1]
+    >>> inputs[1]
        a  b
     x  3  4
     y  5  6
     ```
 
-    * Takes one or multiple parameters in `param_list`, converts them to NumPy arrays and
+    * Takes one or multiple parameters in `params`, converts them to NumPy arrays and
         broadcasts them.
 
     ```python-repl
     >>> p1, p2, p3 = 1, [2, 3, 4], [False]
-    >>> param_list = vbt.base.reshape_fns.broadcast(p1, p2, p3)
-    >>> param_list[0]
+    >>> params = vbt.base.reshaping.broadcast(p1, p2, p3)
+    >>> params[0]
     array([1, 1, 1])
-    >>> param_list[1]
+    >>> params[1]
     array([2, 3, 4])
-    >>> param_list[2]
+    >>> params[2]
     array([False, False, False])
     ```
 
@@ -1529,7 +1553,7 @@ def run_pipeline(
     ...         ts1 + ts2 + p1[2] * p2[2],
     ...     ))
 
-    >>> output = custom_func(*input_list, *param_list)
+    >>> output = custom_func(*inputs, *params)
     >>> output
     array([[ 6,  7,  7,  8,  8,  9],
            [ 9, 10, 10, 11, 11, 12]])
@@ -1538,11 +1562,11 @@ def run_pipeline(
     * Creates new column hierarchy based on parameters and level names.
 
     ```python-repl
-    >>> p1_columns = pd.Index(param_list[0], name='p1')
-    >>> p2_columns = pd.Index(param_list[1], name='p2')
-    >>> p3_columns = pd.Index(param_list[2], name='p3')
-    >>> p_columns = vbt.base.index_fns.stack_indexes([p1_columns, p2_columns, p3_columns])
-    >>> new_columns = vbt.base.index_fns.combine_indexes([p_columns, input_list[0].columns])
+    >>> p1_columns = pd.Index(params[0], name='p1')
+    >>> p2_columns = pd.Index(params[1], name='p2')
+    >>> p3_columns = pd.Index(params[2], name='p3')
+    >>> p_columns = vbt.base.indexes.stack_indexes([p1_columns, p2_columns, p3_columns])
+    >>> new_columns = vbt.base.indexes.combine_indexes([p_columns, inputs[0].columns])
 
     >>> output_df = pd.DataFrame(output, columns=new_columns)
     >>> output_df
@@ -1554,16 +1578,16 @@ def run_pipeline(
     1       9     10     10     11     11     12
     ```
 
-    * Broadcasts objects in `input_list` to match the shape of objects in `output_list` through tiling.
+    * Broadcasts objects in `inputs` to match the shape of objects in `output_list` through tiling.
         This is done to be able to compare them and generate signals, since we cannot compare NumPy
         arrays that have totally different shapes, such as (2, 2) and (2, 6).
 
     ```python-repl
-    >>> new_input_list = [
-    ...     input_list[0].vbt.tile(len(param_list[0]), keys=p_columns),
-    ...     input_list[1].vbt.tile(len(param_list[0]), keys=p_columns)
+    >>> new_inputs = [
+    ...     inputs[0].vbt.tile(len(params[0]), keys=p_columns),
+    ...     inputs[1].vbt.tile(len(params[0]), keys=p_columns)
     ... ]
-    >>> new_input_list[0]
+    >>> new_inputs[0]
     p1                                         1
     p2             2             3             4
     p3  False  False  False  False  False  False
@@ -1572,85 +1596,98 @@ def run_pipeline(
     1       2      2      2      2      2      2
     ```
 
-    * Builds parameter mappers that will link parameters from `param_list` to columns in
-        `input_list` and `output_list`. This is done to enable column indexing using parameter values.
+    * Builds parameter mappers that will link parameters from `params` to columns in
+        `inputs` and `output_list`. This is done to enable column indexing using parameter values.
     """
     if require_input_shape:
         checks.assert_not_none(input_shape)
-        pass_input_shape = True
+        if pass_input_shape is None:
+            pass_input_shape = True
+    if pass_input_shape is None:
+        pass_input_shape = False
     if input_index is not None:
-        input_index = index_fns.to_any_index(input_index)
+        input_index = indexes.to_any_index(input_index)
     if input_columns is not None:
-        input_columns = index_fns.to_any_index(input_columns)
-    if input_list is None:
-        input_list = []
-    else:
-        input_list = list(input_list)
-    if in_output_list is None:
-        in_output_list = []
-    else:
-        in_output_list = list(in_output_list)
+        input_columns = indexes.to_any_index(input_columns)
+    if inputs is None:
+        inputs = {}
+    if not checks.is_mapping(inputs):
+        inputs = {'input_' + str(i): input for i, input in enumerate(inputs)}
+    input_names = list(inputs.keys())
+    input_list = list(inputs.values())
+    if in_outputs is None:
+        in_outputs = {}
+    if not checks.is_mapping(in_outputs):
+        in_outputs = {'in_output_' + str(i): in_output for i, in_output in enumerate(in_outputs)}
+    in_output_names = list(in_outputs.keys())
+    in_output_list = list(in_outputs.values())
     if in_output_settings is None:
         in_output_settings = {}
-    checks.assert_dict_sequence_valid(in_output_settings, ['dtype'])
+    if checks.is_mapping(in_output_settings):
+        checks.assert_dict_valid(in_output_settings, [in_output_names, 'dtype'])
+        in_output_settings = [in_output_settings.get(k, None) for k in in_output_names]
+    if broadcast_named_args is None:
+        broadcast_named_args = {}
     if broadcast_kwargs is None:
         broadcast_kwargs = {}
-    if param_list is None:
-        param_list = []
-    else:
-        param_list = list(param_list)
+    if template_mapping is None:
+        template_mapping = {}
+    if params is None:
+        params = {}
+    if not checks.is_mapping(params):
+        params = {'param_' + str(i): param for i, param in enumerate(params)}
+    param_names = list(params.keys())
+    param_list = list(params.values())
     if param_settings is None:
         param_settings = {}
-    checks.assert_dict_sequence_valid(param_settings, [
-        'dtype',
-        'is_tuple',
-        'is_array_like',
-        'bc_to_input',
-        'broadcast_kwargs',
-        'per_column'
-    ])
+    if checks.is_mapping(param_settings):
+        checks.assert_dict_valid(param_settings, [param_names, [
+            'dtype',
+            'is_tuple',
+            'is_array_like',
+            'bc_to_input',
+            'broadcast_kwargs',
+            'per_column'
+        ]])
+        param_settings = [param_settings.get(k, None) for k in param_names]
     if hide_levels is None:
         hide_levels = []
-    if stacking_kwargs is None:
-        stacking_kwargs = {}
+    if build_col_kwargs is None:
+        build_col_kwargs = {}
     if wrapper_kwargs is None:
         wrapper_kwargs = {}
     if keep_pd and checks.is_numba_func(custom_func):
         raise ValueError("Cannot pass pandas objects to a Numba-compiled custom_func. Set keep_pd to False.")
 
-    in_output_idxs = [i for i, x in enumerate(in_output_list) if x is not None]
-    if len(in_output_idxs) > 0:
-        # In-place outputs should broadcast together with inputs
-        input_list += [in_output_list[i] for i in in_output_idxs]
-    if len(input_list) > 0:
-        # Broadcast inputs
+    if input_shape is not None:
+        input_shape = reshaping.shape_to_tuple(input_shape)
+    if len(inputs) > 0 or len(in_outputs) > 0 or len(broadcast_named_args) > 0:
+        # Broadcast inputs, in-outputs, and named args
         # If input_shape is provided, will broadcast all inputs to this shape
+        broadcast_args = merge_dicts(inputs, in_outputs, broadcast_named_args)
         broadcast_kwargs = merge_dicts(dict(
             to_shape=input_shape,
             index_from=input_index,
             columns_from=input_columns,
-            require_kwargs=dict(requirements='W')
+            require_kwargs=dict(requirements='W'),
+            post_func=np.asarray,
+            to_pd=True
         ), broadcast_kwargs)
-        bc_input_list, input_shape, input_index, input_columns = reshape_fns.broadcast(
-            *input_list,
-            return_meta=True,
+        broadcast_args, wrapper = reshaping.broadcast(
+            broadcast_args,
+            return_wrapper=True,
             **broadcast_kwargs
         )
+        input_shape, input_index, input_columns = wrapper.shape, wrapper.index, wrapper.columns
         if input_index is None:
             input_index = pd.RangeIndex(start=0, step=1, stop=input_shape[0])
         if input_columns is None:
             input_columns = pd.RangeIndex(start=0, step=1, stop=input_shape[1] if len(input_shape) > 1 else 1)
-        if len(input_list) == 1:
-            bc_input_list = (bc_input_list,)
-        input_list = list(map(np.asarray, bc_input_list))
-    if len(in_output_idxs) > 0:
-        # Separate inputs and in-place outputs
-        in_output_list = input_list[-len(in_output_idxs):]
-        input_list = input_list[:-len(in_output_idxs)]
+        input_list = [broadcast_args[input_name] for input_name in input_names]
+        in_output_list = [broadcast_args[in_output_name] for in_output_name in in_output_names]
+        broadcast_named_args = {arg_name: broadcast_args[arg_name] for arg_name in broadcast_named_args}
 
     # Reshape input shape
-    if input_shape is not None and not isinstance(input_shape, tuple):
-        input_shape = (input_shape,)
     # Keep original input_shape for per_column=True
     orig_input_shape = input_shape
     orig_input_shape_2d = input_shape
@@ -1672,7 +1709,13 @@ def run_pipeline(
     # Prepare parameters
     # NOTE: input_shape instead of input_shape_ready since parameters should
     # broadcast by the same rules as inputs
-    param_list = prepare_params(param_list, param_settings, input_shape=input_shape, to_2d=to_2d)
+    param_list = prepare_params(
+        param_list,
+        param_names,
+        param_settings,
+        input_shape=input_shape,
+        to_2d=to_2d
+    )
     if len(param_list) > 1:
         if level_names is not None:
             # Check level names
@@ -1717,7 +1760,7 @@ def run_pipeline(
         # Split each input into Series/1-dim arrays, one per column
         input_list_ready = []
         for input in input_list:
-            input_2d = reshape_fns.to_2d(input)
+            input_2d = reshaping.to_2d(input)
             col_inputs = []
             for i in range(input_2d.shape[1]):
                 if to_2d:
@@ -1734,7 +1777,7 @@ def run_pipeline(
         for input in input_list:
             new_input = input
             if to_2d:
-                new_input = reshape_fns.to_2d(input)
+                new_input = reshaping.to_2d(input)
             if keep_pd:
                 # Keep as pandas object
                 new_input = ArrayWrapper(input_index, input_columns, new_input.ndim).wrap(new_input)
@@ -1742,20 +1785,18 @@ def run_pipeline(
 
     # Prepare in-place outputs
     in_output_list_ready = []
-    j = 0
     for i in range(len(in_output_list)):
         if input_shape_2d is None:
             raise ValueError("input_shape is required when using in-place outputs")
-        if i in in_output_idxs:
+        if in_output_list[i] is not None:
             # This in-place output has been already broadcast with inputs
-            in_output_wide = np.require(in_output_list[j], requirements='W')
+            in_output_wide = np.require(in_output_list[i], requirements='W')
             if not per_column:
                 # One per parameter combination
-                in_output_wide = reshape_fns.tile(in_output_wide, n_unique_param_values, axis=1)
-            j += 1
+                in_output_wide = reshaping.tile(in_output_wide, n_unique_param_values, axis=1)
         else:
             # This in-place output hasn't been provided, so create empty
-            _in_output_settings = in_output_settings if isinstance(in_output_settings, dict) else in_output_settings[i]
+            _in_output_settings = resolve_dict(in_output_settings[i])
             dtype = _in_output_settings.get('dtype', None)
             in_output_shape = (input_shape_2d[0], input_shape_2d[1] * n_unique_param_values)
             in_output_wide = np.empty(in_output_shape, dtype=dtype)
@@ -1808,26 +1849,46 @@ def run_pipeline(
             set_seed(seed)
 
         def _call_custom_func(_input_list_ready, _in_output_list_ready, _param_list_ready, *_func_args, **_func_kwargs):
+            # Substitute templates
+            if has_templates(_func_args) or has_templates(_func_kwargs):
+                _template_mapping = merge_dicts(
+                    broadcast_named_args,
+                    dict(
+                        input_shape=input_shape_ready,
+                        **dict(zip(input_names, _input_list_ready)),
+                        **dict(zip(in_output_names, _in_output_list_ready)),
+                        **dict(zip(param_names, _param_list_ready)),
+                        pre_sub_args=_func_args,
+                        pre_sub_kwargs=_func_kwargs
+                    ),
+                    template_mapping
+                )
+                _func_args = deep_substitute(_func_args, _template_mapping, sub_id='custom_func_args')
+                _func_kwargs = deep_substitute(_func_kwargs, _template_mapping, sub_id='custom_func_kwargs')
+
             # Run the function
-            if as_lists:
+            if pass_packed:
                 if checks.is_numba_func(custom_func):
                     return custom_func(
                         tuple(_input_list_ready),
                         tuple(_in_output_list_ready),
                         tuple(_param_list_ready),
-                        *_func_args, **_func_kwargs
+                        *_func_args,
+                        **_func_kwargs
                     )
                 return custom_func(
                     _input_list_ready,
                     _in_output_list_ready,
                     _param_list_ready,
-                    *_func_args, **_func_kwargs
+                    *_func_args,
+                    **_func_kwargs
                 )
             return custom_func(
                 *_input_list_ready,
                 *_in_output_list_ready,
                 *_param_list_ready,
-                *_func_args, **_func_kwargs
+                *_func_args,
+                **_func_kwargs
             )
 
         if per_column:
@@ -1914,7 +1975,7 @@ def run_pipeline(
                 _output_list = _output_list[:num_ret_outputs]
             if len(_output_list) != num_ret_outputs:
                 raise ValueError("Number of returned outputs other than expected")
-            _output_list = list(map(lambda x: reshape_fns.to_2d_array(x), _output_list))
+            _output_list = list(map(lambda x: reshaping.to_2d_array(x), _output_list))
             return _output_list, _other_list
 
         if per_column:
@@ -1981,7 +2042,7 @@ def run_pipeline(
             hide_levels=hide_levels,
             param_settings=param_settings,
             per_column=per_column,
-            **stacking_kwargs
+            **build_col_kwargs
         )
         # Build a mapper that maps old columns in inputs to new columns
         # Instead of tiling all inputs to the shape of outputs and wasting memory,
@@ -2016,6 +2077,7 @@ def run_pipeline(
 
 def combine_objs(obj: tp.SeriesFrame,
                  other: tp.MaybeTupleList[tp.Union[tp.ArrayLike, BaseAccessor]],
+                 combine_func: tp.Callable,
                  *args, level_name: tp.Optional[str] = None,
                  keys: tp.Optional[tp.IndexLike] = None,
                  allow_multiple: bool = True,
@@ -2029,8 +2091,8 @@ def combine_objs(obj: tp.SeriesFrame,
     See `vectorbt.base.accessors.BaseAccessor.combine`."""
     if allow_multiple and isinstance(other, (tuple, list)):
         if keys is None:
-            keys = index_fns.index_from_values(other, name=level_name)
-    return obj.vbt.combine(other, *args, keys=keys, concat=True, allow_multiple=allow_multiple, **kwargs)
+            keys = indexes.index_from_values(other, name=level_name)
+    return obj.vbt.combine(other, combine_func, *args, keys=keys, allow_multiple=allow_multiple, **kwargs)
 
 
 IndicatorBaseT = tp.TypeVar("IndicatorBaseT", bound="IndicatorBase")
@@ -2046,6 +2108,7 @@ class IndicatorBase(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Me
     """Indicator base class.
 
     Properties should be set before instantiation."""
+
     _short_name: str
     _level_names: tp.Tuple[str, ...]
     _input_names: tp.Tuple[str, ...]
@@ -2098,22 +2161,8 @@ class IndicatorBase(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Me
                  param_list: ParamListT,
                  mapper_list: MapperListT,
                  short_name: str,
-                 level_names: tp.Tuple[str, ...]) -> None:
-        Wrapping.__init__(
-            self,
-            wrapper,
-            input_list=input_list,
-            input_mapper=input_mapper,
-            in_output_list=in_output_list,
-            output_list=output_list,
-            param_list=param_list,
-            mapper_list=mapper_list,
-            short_name=short_name,
-            level_names=level_names
-        )
-        StatsBuilderMixin.__init__(self)
-        PlotsBuilderMixin.__init__(self)
-
+                 level_names: tp.Tuple[str, ...],
+                 **kwargs) -> None:
         if input_mapper is not None:
             checks.assert_equal(input_mapper.shape[0], wrapper.shape_2d[1])
         for ts in input_list:
@@ -2126,6 +2175,22 @@ class IndicatorBase(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Me
             checks.assert_equal(len(mapper), wrapper.shape_2d[1])
         checks.assert_instance_of(short_name, str)
         checks.assert_len_equal(level_names, param_list)
+
+        Wrapping.__init__(
+            self,
+            wrapper,
+            input_list=input_list,
+            input_mapper=input_mapper,
+            in_output_list=in_output_list,
+            output_list=output_list,
+            param_list=param_list,
+            mapper_list=mapper_list,
+            short_name=short_name,
+            level_names=level_names,
+            **kwargs
+        )
+        StatsBuilderMixin.__init__(self)
+        PlotsBuilderMixin.__init__(self)
 
         setattr(self, '_short_name', short_name)
         setattr(self, '_level_names', level_names)
@@ -2147,8 +2212,8 @@ class IndicatorBase(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Me
     def indexing_func(self: IndicatorBaseT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> IndicatorBaseT:
         """Perform indexing on `IndicatorBase`."""
         new_wrapper, idx_idxs, _, col_idxs = self.wrapper.indexing_func_meta(pd_indexing_func, **kwargs)
-        idx_idxs_arr = reshape_fns.to_1d_array(idx_idxs)
-        col_idxs_arr = reshape_fns.to_1d_array(col_idxs)
+        idx_idxs_arr = reshaping.to_1d_array(idx_idxs)
+        col_idxs_arr = reshaping.to_1d_array(col_idxs)
         if np.array_equal(idx_idxs_arr, np.arange(self.wrapper.shape_2d[0])):
             idx_idxs_arr = slice(None, None, None)
         if np.array_equal(col_idxs_arr, np.arange(self.wrapper.shape_2d[1])):
@@ -2250,7 +2315,7 @@ class IndicatorFactory:
             output_names (list of str): A list of names of output arrays.
             output_flags (dict): A dictionary of in-place and regular output flags.
             custom_output_props (dict): A dictionary with user-defined functions that will be
-                bound to the indicator class and wrapped with `@cached_property`.
+                bound to the indicator class and wrapped with `vectorbt.utils.decorators.cacheable_property`.
             attr_settings (dict): A dictionary of settings by attribute name.
 
                 Attributes can be `input_names`, `in_output_names`, `output_names` and `custom_output_props`.
@@ -2276,7 +2341,7 @@ class IndicatorFactory:
 
         !!! note
             The `__init__` method is not used for running the indicator, for this use `run`.
-            The reason for this is indexing, which requires a clean `__init__` method for creating 
+            The reason for this is indexing, which requires a clean `__init__` method for creating
             a new indicator object with newly indexed attributes.
         """
         # Check and save parameters
@@ -2380,14 +2445,14 @@ class IndicatorFactory:
         for input_name in input_names:
             def input_prop(self, _input_name: str = input_name) -> tp.SeriesFrame:
                 """Input array."""
-                old_input = reshape_fns.to_2d_array(getattr(self, '_' + _input_name))
+                old_input = reshaping.to_2d_array(getattr(self, '_' + _input_name))
                 input_mapper = getattr(self, '_input_mapper')
                 if input_mapper is None:
                     return self.wrapper.wrap(old_input)
                 return self.wrapper.wrap(old_input[:, input_mapper])
 
             input_prop.__name__ = input_name
-            setattr(Indicator, input_name, cached_property(input_prop))
+            setattr(Indicator, input_name, cacheable_property(input_prop))
 
         for output_name in all_output_names:
             def output_prop(self, _output_name: str = output_name) -> tp.SeriesFrame:
@@ -2449,19 +2514,17 @@ class IndicatorFactory:
             if prop.__doc__ is None:
                 prop.__doc__ = f"""Custom property."""
             prop.__name__ = prop_name
-            prop = cached_property(prop)
+            prop = cacheable_property(prop)
             setattr(Indicator, prop_name, prop)
 
         # Add comparison & combination methods for all inputs, outputs, and user-defined properties
         def assign_combine_method(func_name: str,
                                   combine_func: tp.Callable,
+                                  def_kwargs: tp.Kwargs,
                                   attr_name: str,
                                   docstring: str) -> None:
             def combine_method(self: IndicatorBaseT,
                                other: tp.MaybeTupleList[tp.Union[IndicatorBaseT, tp.ArrayLike, BaseAccessor]],
-                               crossover: bool = False,
-                               wait: int = 0,
-                               after_false: bool = True,
                                level_name: tp.Optional[str] = None,
                                allow_multiple: bool = True,
                                _prepend_name: bool = prepend_name,
@@ -2485,13 +2548,11 @@ class IndicatorFactory:
                 out = combine_objs(
                     getattr(self, attr_name),
                     other,
-                    combine_func=combine_func,
+                    combine_func,
                     level_name=level_name,
                     allow_multiple=allow_multiple,
-                    **kwargs
+                    **merge_dicts(def_kwargs, kwargs)
                 )
-                if crossover:
-                    return out.vbt.signals.nth(wait, after_false=after_false)
                 return out
 
             combine_method.__qualname__ = f'{Indicator.__name__}.{attr_name}_{func_name}'
@@ -2518,7 +2579,7 @@ class IndicatorFactory:
                     ```"""
                 ).format(
                     attr_name=attr_name,
-                    dtype=to_doc(to_mapping(dtype))
+                    dtype=stringify(to_mapping(dtype))
                 )
                 setattr(Indicator, f'{attr_name}_readable', property(attr_readable))
 
@@ -2537,24 +2598,29 @@ class IndicatorFactory:
                     ```"""
                 ).format(
                     attr_name=attr_name,
-                    dtype=to_doc(to_mapping(dtype))
+                    dtype=stringify(to_mapping(dtype))
                 )
                 setattr(Indicator, f'{attr_name}_stats', attr_stats)
 
             elif np.issubdtype(dtype, np.number):
                 func_info = [
-                    ('above', np.greater),
-                    ('below', np.less),
-                    ('equal', np.equal)
+                    ('above', np.greater, dict()),
+                    ('below', np.less, dict()),
+                    ('equal', np.equal, dict()),
+                    ('crossed_above',
+                     lambda x, y, wait=0:
+                     jit_registry.resolve(generic_nb.crossed_above_nb)(x, y, wait),
+                     dict(to_2d=True)),
+                    ('crossed_below',
+                     lambda x, y, wait=0:
+                     jit_registry.resolve(generic_nb.crossed_above_nb)(y, x, wait),
+                     dict(to_2d=True))
                 ]
-                for func_name, np_func in func_info:
+                for func_name, np_func, def_kwargs in func_info:
                     method_docstring = f"""Return True for each element where `{attr_name}` is {func_name} `other`. 
-        
-                    Set `crossover` to True to return the first True after crossover. Specify `wait` to return 
-                    True only when `{attr_name}` is {func_name} for a number of time steps in a row after crossover.
                 
                     See `vectorbt.indicators.factory.combine_objs`."""
-                    assign_combine_method(func_name, np_func, attr_name, method_docstring)
+                    assign_combine_method(func_name, np_func, def_kwargs, attr_name, method_docstring)
 
                 def attr_stats(self, *args, _attr_name: str = attr_name, **kwargs) -> tp.SeriesFrame:
                     return getattr(self, _attr_name).vbt.stats(*args, **kwargs)
@@ -2565,15 +2631,15 @@ class IndicatorFactory:
 
             elif np.issubdtype(dtype, np.bool_):
                 func_info = [
-                    ('and', np.logical_and),
-                    ('or', np.logical_or),
-                    ('xor', np.logical_xor)
+                    ('and', np.logical_and, dict()),
+                    ('or', np.logical_or, dict()),
+                    ('xor', np.logical_xor, dict())
                 ]
-                for func_name, np_func in func_info:
+                for func_name, np_func, def_kwargs in func_info:
                     method_docstring = f"""Return `{attr_name} {func_name.upper()} other`. 
 
                     See `vectorbt.indicators.factory.combine_objs`."""
-                    assign_combine_method(func_name, np_func, attr_name, method_docstring)
+                    assign_combine_method(func_name, np_func, def_kwargs, attr_name, method_docstring)
 
                 def attr_stats(self, *args, _attr_name: str = attr_name, **kwargs) -> tp.SeriesFrame:
                     return getattr(self, _attr_name).vbt.signals.stats(*args, **kwargs)
@@ -2585,7 +2651,7 @@ class IndicatorFactory:
         # Prepare stats
         if metrics is not None:
             if not isinstance(metrics, Config):
-                metrics = Config(metrics, copy_kwargs=dict(copy_mode='deep'))
+                metrics = Config(metrics, copy_kwargs_=dict(copy_mode='deep'))
             setattr(Indicator, "_metrics", metrics.copy())
 
         if stats_defaults is not None:
@@ -2601,7 +2667,7 @@ class IndicatorFactory:
         # Prepare plots
         if subplots is not None:
             if not isinstance(subplots, Config):
-                subplots = Config(subplots, copy_kwargs=dict(copy_mode='deep'))
+                subplots = Config(subplots, copy_kwargs_=dict(copy_mode='deep'))
             setattr(Indicator, "_subplots", subplots.copy())
 
         if plots_defaults is not None:
@@ -2631,7 +2697,7 @@ class IndicatorFactory:
 
         In contrast to `IndicatorFactory.from_apply_func`, this method offers full flexbility.
         It's up to we to handle caching and concatenate columns for each parameter (for example,
-        by using `vectorbt.base.combine_fns.apply_and_concat_one`). Also, you should ensure that
+        by using `vectorbt.base.combining.apply_and_concat`). Also, you must ensure that
         each output array has an appropriate number of columns, which is the number of columns in
         input arrays multiplied by the number of parameter combinations.
 
@@ -2645,7 +2711,7 @@ class IndicatorFactory:
                 Can be Numba-compiled.
 
                 !!! note
-                    Shape of each output should be the same and match the shape of each input stacked
+                    Shape of each output must be the same and match the shape of each input stacked
                     n times (= the number of parameter values) along the column axis.
             require_input_shape (bool): Whether to input shape is required.
             param_settings (dict): A dictionary of parameter settings keyed by name.
@@ -2672,8 +2738,8 @@ class IndicatorFactory:
 
                 Can be overwritten by any run method.
 
-                Can contain default values for `param_names` and `in_output_names`,
-                but also custom positional and keyword arguments passed to the `custom_func`.
+                Can contain default values and also references to other arguments wrapped
+                with `vectorbt.base.reshaping.Ref`.
 
         Returns:
             `Indicator`, and optionally other objects that are returned by `custom_func`
@@ -2690,7 +2756,7 @@ class IndicatorFactory:
 
         >>> @njit
         ... def custom_func(ts1, ts2, p1, p2, arg1, arg2):
-        ...     return vbt.base.combine_fns.apply_and_concat_multiple_nb(
+        ...     return vbt.base.combining.apply_and_concat_multiple_nb(
         ...         len(p1), apply_func_nb, ts1, ts2, p1, p2, arg1, arg2)
 
         >>> MyInd = vbt.IndicatorFactory(
@@ -2753,58 +2819,28 @@ class IndicatorFactory:
 
         setattr(Indicator, 'custom_func', custom_func)
 
-        def _merge_settings(old_settings: tp.KwargsLike,
-                            new_settings: tp.KwargsLike,
-                            allowed_keys: tp.Optional[tp.Sequence[tp.MaybeSequence[str]]] = None) -> tp.Kwargs:
-            new_settings = merge_dicts(old_settings, new_settings)
-            if len(new_settings) > 0 and allowed_keys is not None:
-                checks.assert_dict_valid(new_settings, allowed_keys)
-            return new_settings
-
-        def _resolve_refs(input_list: tp.Sequence[tp.ArrayLike],
-                          param_list: tp.Sequence[tp.Param],
-                          in_output_list: tp.Sequence[tp.ArrayLike]) \
-                -> tp.Tuple[tp.List[tp.ArrayLike], tp.List[tp.Param], tp.List[tp.ArrayLike]]:
-            # You can reference anything between inputs, parameters, and in-place outputs
-            # even parameter to input (thanks to broadcasting)
-            all_inputs = list(input_list) + list(param_list) + list(in_output_list)
-            for i in range(len(all_inputs)):
-                input = all_inputs[i]
-                is_default = False
-                if isinstance(input, Default):
-                    input = input.value
-                    is_default = True
-                if isinstance(input, str):
-                    if input in all_input_names:
-                        new_input = all_inputs[all_input_names.index(input)]
-                        if is_default:
-                            new_input = Default(new_input)
-                        all_inputs[i] = new_input
-            input_list = all_inputs[:len(input_list)]
-            all_inputs = all_inputs[len(input_list):]
-            param_list = all_inputs[:len(param_list)]
-            in_output_list = all_inputs[len(param_list):]
-            return input_list, param_list, in_output_list
-
-        def _extract_inputs(args: tp.Sequence) \
-                -> tp.Tuple[tp.List[tp.ArrayLike], tp.List[tp.Param], tp.List[tp.ArrayLike], tuple]:
-            input_list = args[:len(input_names)]
-            checks.assert_len_equal(input_list, input_names)
+        def _split_args(args: tp.Sequence) -> tp.Tuple[
+            tp.Dict[str, tp.ArrayLike],
+            tp.Dict[str, tp.ArrayLike],
+            tp.Dict[str, tp.Params],
+            tp.Args
+        ]:
+            inputs = dict(zip(input_names, args[:len(input_names)]))
+            checks.assert_len_equal(inputs, input_names)
             args = args[len(input_names):]
 
-            param_list = args[:len(param_names)]
-            checks.assert_len_equal(param_list, param_names)
+            params = dict(zip(param_names, args[:len(param_names)]))
+            checks.assert_len_equal(params, param_names)
             args = args[len(param_names):]
 
-            in_output_list = args[:len(in_output_names)]
-            checks.assert_len_equal(in_output_list, in_output_names)
+            in_outputs = dict(zip(in_output_names, args[:len(in_output_names)]))
+            checks.assert_len_equal(in_outputs, in_output_names)
             args = args[len(in_output_names):]
             if not var_args and len(args) > 0:
                 raise TypeError("Variable length arguments are not supported by this function "
                                 "(var_args is set to False)")
 
-            input_list, param_list, in_output_list = _resolve_refs(input_list, param_list, in_output_list)
-            return input_list, param_list, in_output_list, args
+            return inputs, in_outputs, params, args
 
         for k, v in pipeline_kwargs.items():
             if k in param_names and not isinstance(v, Default):
@@ -2832,15 +2868,13 @@ class IndicatorFactory:
             _short_name = kwargs.pop('short_name', def_run_kwargs['short_name'])
             _hide_params = kwargs.pop('hide_params', def_run_kwargs['hide_params'])
             _hide_default = kwargs.pop('hide_default', def_run_kwargs['hide_default'])
-            _param_settings = _merge_settings(
+            _param_settings = merge_dicts(
                 param_settings,
-                kwargs.pop('param_settings', {}),
-                [param_names]
+                kwargs.pop('param_settings', {})
             )
-            _in_output_settings = _merge_settings(
+            _in_output_settings = merge_dicts(
                 in_output_settings,
-                kwargs.pop('in_output_settings', {}),
-                [in_output_names]
+                kwargs.pop('in_output_settings', {})
             )
 
             if _hide_params is None:
@@ -2848,18 +2882,20 @@ class IndicatorFactory:
 
             args = list(args)
 
-            # Extract inputs
-            input_list, param_list, in_output_list, args = _extract_inputs(args)
+            # Split arguments
+            inputs, in_outputs, params, args = _split_args(args)
 
             # Prepare column levels
             level_names = []
             hide_levels = []
-            for i, pname in enumerate(param_names):
+            for pname in param_names:
                 level_name = _short_name + '_' + pname if prepend_name else pname
                 level_names.append(level_name)
-                if pname in _hide_params or (_hide_default and isinstance(param_list[i], Default)):
-                    hide_levels.append(i)
-            param_list = [params.value if isinstance(params, Default) else params for params in param_list]
+                if pname in _hide_params or (_hide_default and isinstance(params[pname], Default)):
+                    hide_levels.append(level_name)
+            for k, v in params.items():
+                if isinstance(v, Default):
+                    params[k] = v.value
 
             # Run the pipeline
             results = run_pipeline(
@@ -2867,13 +2903,13 @@ class IndicatorFactory:
                 custom_func,
                 *args,
                 require_input_shape=require_input_shape,
-                input_list=input_list,
-                in_output_list=in_output_list,
-                param_list=param_list,
+                inputs=inputs,
+                in_outputs=in_outputs,
+                params=params,
                 level_names=level_names,
                 hide_levels=hide_levels,
-                param_settings=[_param_settings.get(n, {}) for n in param_names],
-                in_output_settings=[_in_output_settings.get(n, {}) for n in in_output_names],
+                param_settings=_param_settings,
+                in_output_settings=_in_output_settings,
                 **merge_dicts(pipeline_kwargs, kwargs)
             )
 
@@ -2999,10 +3035,9 @@ Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`
                 _short_names = kwargs.pop('short_names', def_run_combs_kwargs['short_names'])
                 _hide_params = kwargs.pop('hide_params', def_run_kwargs['hide_params'])
                 _hide_default = kwargs.pop('hide_default', def_run_kwargs['hide_default'])
-                _param_settings = _merge_settings(
+                _param_settings = merge_dicts(
                     param_settings,
-                    kwargs.get('param_settings', {}),  # get, not pop
-                    [param_names]
+                    kwargs.get('param_settings', {})
                 )
 
                 if _hide_params is None:
@@ -3012,29 +3047,31 @@ Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`
 
                 args = list(args)
 
-                # Extract inputs
-                input_list, param_list, in_output_list, args = _extract_inputs(args)
+                # Split arguments
+                inputs, in_outputs, params, args = _split_args(args)
 
                 # Hide params
-                for i, pname in enumerate(param_names):
-                    if _hide_default and isinstance(param_list[i], Default):
+                for pname in param_names:
+                    if _hide_default and isinstance(params[pname], Default):
+                        params[pname] = params[pname].value
                         if pname not in _hide_params:
                             _hide_params.append(pname)
-                        param_list[i] = param_list[i].value
-                checks.assert_len_equal(param_list, param_names)
+                checks.assert_len_equal(params, param_names)
+
+                # Bring argument to list format
+                input_list = list(inputs.values())
+                in_output_list = list(in_outputs.values())
+                param_list = list(params.values())
 
                 # Prepare params
-                param_settings_list = [_param_settings.get(n, {}) for n in param_names]
-                for i in range(len(param_list)):
-                    is_tuple = param_settings_list[i].get('is_tuple', False)
-                    is_array_like = param_settings_list[i].get('is_array_like', False)
-                    param_list[i] = params_to_list(param_list[i], is_tuple, is_array_like)
+                for i, pname in enumerate(param_names):
+                    is_tuple = _param_settings.get(pname, {}).get('is_tuple', False)
+                    is_array_like = _param_settings.get(pname, {}).get('is_array_like', False)
+                    param_list[i] = params_to_list(params[pname], is_tuple, is_array_like)
                 if _param_product:
                     param_list = create_param_product(param_list)
                 else:
                     param_list = broadcast_params(param_list)
-                if not isinstance(param_list, (tuple, list)):
-                    param_list = [param_list]
 
                 # Speed up by pre-calculating raw outputs
                 if _run_unique:
@@ -3103,7 +3140,8 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
                         cache_func: tp.Optional[tp.Callable] = None,
                         pass_packed: bool = False,
                         kwargs_to_args: tp.Optional[tp.Sequence[str]] = None,
-                        numba_loop: bool = False,
+                        jitted_loop: bool = False,
+                        remove_kwargs: tp.Optional[bool] = None,
                         **kwargs) -> tp.Type[IndicatorBase]:
         """Build indicator class around a custom apply function.
 
@@ -3114,8 +3152,9 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
         the resulting arrays into a single array per output.
 
         While this approach is simpler, it's also less flexible, since we can only work with
-        one parameter selection at a time and can't view all parameters. The UDF `apply_func` also can't
-        take keyword arguments, nor it can return anything other than outputs listed in `output_names`.
+        one parameter selection at a time and can't view all parameters.
+
+        The execution and concatenation is performed using `vectorbt.base.combining.apply_and_concat`.
 
         !!! note
             If `apply_func` is a Numba-compiled function:
@@ -3133,9 +3172,9 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
 
                 * `input_shape` if `pass_input_shape` is set to True and `input_shape` not in `kwargs_to_args`
                 * `col` if `per_column` and `pass_col` are set to True and `col` not in `kwargs_to_args`
-                * broadcast time-series arrays corresponding to `input_names`
-                * broadcast in-place output arrays corresponding to `in_output_names`
-                * single parameter selection corresponding to `param_names`
+                * broadcast time-series arrays corresponding to `input_names` (one-dimensional)
+                * broadcast in-place output arrays corresponding to `in_output_names` (one-dimensional)
+                * single parameter selection corresponding to `param_names` (single values)
                 * variable arguments if `var_args` is set to True
                 * arguments listed in `kwargs_to_args`
                 * `flex_2d` if `pass_flex_2d` is set to True and `flex_2d` not in `kwargs_to_args`
@@ -3144,10 +3183,10 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
                 Can be Numba-compiled.
 
                 !!! note
-                    Shape of each output should be the same and match the shape of each input.
+                    Shape of each output must be the same and match the shape of each input.
             cache_func (callable): A caching function to preprocess data beforehand.
 
-                Takes the same arguments as `apply_func`. Should return a single object or a tuple of objects.
+                Takes the same arguments as `apply_func`. Must return a single object or a tuple of objects.
                 All returned objects will be passed unpacked as last arguments to `apply_func`.
 
                 Can be Numba-compiled.
@@ -3155,22 +3194,24 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
             kwargs_to_args (list of str): Keyword arguments from `kwargs` dict to pass as
                 positional arguments to the apply function.
 
-                Should be used together with `numba_loop` set to True since Numba doesn't support
+                Should be used together with `jitted_loop` set to True since Numba doesn't support
                 variable keyword arguments.
 
                 Defaults to []. Order matters.
-            numba_loop (bool): Whether to loop using Numba.
+            jitted_loop (bool): Whether to loop using a jitter.
+
+                Parameter selector will be automatically compiled using Numba.
 
                 Set to True when iterating large number of times over small input,
                 but note that Numba doesn't support variable keyword arguments.
-            **kwargs: Keyword arguments passed to `IndicatorFactory.from_custom_func`.
+            remove_kwargs (bool): Whether to remove keyword arguments when selecting parameters.
+
+                If None, gets set to True if `jitted_loop` is True.
+            **kwargs: Keyword arguments passed to `IndicatorFactory.from_custom_func`, all the way down
+                to `vectorbt.base.combining.apply_and_concat`.
 
         Returns:
             Indicator
-
-        Additionally, each run method now supports `use_ray` argument, which indicates
-        whether to use Ray to execute `apply_func` in parallel. Only works with `numba_loop` set to False.
-        See `vectorbt.base.combine_fns.ray_apply` for related keyword arguments.
 
         ## Example
 
@@ -3184,13 +3225,13 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
         >>> MyInd = vbt.IndicatorFactory(
         ...     input_names=['ts1', 'ts2'],
         ...     param_names=['p1', 'p2'],
-        ...     output_names=['o1', 'o2']
+        ...     output_names=['out1', 'out2']
         ... ).from_apply_func(
         ...     apply_func_nb, var_args=True,
         ...     kwargs_to_args=['arg2'], arg2=200)
 
         >>> myInd = MyInd.run(price, price * 2, [1, 2], [3, 4], 100)
-        >>> myInd.o1
+        >>> myInd.out1
         custom_p1              1             2
         custom_p2              3             4
                         a      b      a      b
@@ -3199,7 +3240,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
         2020-01-03  103.0  103.0  106.0  106.0
         2020-01-04  104.0  102.0  108.0  104.0
         2020-01-05  105.0  101.0  110.0  102.0
-        >>> myInd.o2
+        >>> myInd.out2
         custom_p1              1             2
         custom_p2              3             4
                         a      b      a      b
@@ -3209,53 +3250,83 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
         2020-01-04  224.0  212.0  232.0  216.0
         2020-01-05  230.0  206.0  240.0  208.0
         ```
+
+        To change the execution engine or specify other engine-related arguments, use `execute_kwargs`:
+
+        ```python-repl
+        >>> import time
+
+        >>> def apply_func(ts, p):
+        ...     time.sleep(1)
+        ...     return ts * p
+
+        >>> MyInd = vbt.IndicatorFactory(
+        ...     input_names=['ts'],
+        ...     param_names=['p'],
+        ...     output_names=['out']
+        ... ).from_apply_func(apply_func)
+
+        >>> %timeit MyInd.run(price, [1, 2, 3])
+        3.02 s ± 3.47 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+
+        >>> %timeit MyInd.run(price, [1, 2, 3], execute_kwargs=dict(engine='dask'))
+        1.02 s ± 2.67 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+        ```
         """
         Indicator = self.Indicator
 
         setattr(Indicator, 'apply_func', apply_func)
 
-        if kwargs_to_args is None:
-            kwargs_to_args = []
-
         module_name = self.module_name
+        input_names = self.input_names
         output_names = self.output_names
         in_output_names = self.in_output_names
         param_names = self.param_names
 
         num_ret_outputs = len(output_names)
 
+        if kwargs_to_args is None:
+            kwargs_to_args = []
+        if remove_kwargs is None:
+            remove_kwargs = jitted_loop
+
         # Build a function that selects a parameter tuple
         # Do it here to avoid compilation with Numba every time custom_func is run
         _0 = "i"
         _0 += ", args_before"
-        _0 += ", input_tuple"
+        if len(input_names) > 0:
+            _0 += ', ' + ', '.join(input_names)
         if len(in_output_names) > 0:
-            _0 += ", in_output_tuples"
+            _0 += ', ' + ', '.join(in_output_names)
         if len(param_names) > 0:
-            _0 += ", param_tuples"
+            _0 += ', ' + ', '.join(param_names)
         _0 += ", *args"
-        if not numba_loop:
-            _0 += ", **_kwargs"
+        if not remove_kwargs:
+            _0 += ", **kwargs"
         _1 = "*args_before"
         if pass_packed:
-            _1 += ", input_tuple"
+            if len(input_names) > 0:
+                _1 += ', (' + ', '.join(input_names) + ',)'
+            else:
+                _1 += ', ()'
             if len(in_output_names) > 0:
-                _1 += ", in_output_tuples[i]"
+                _1 += ', (' + ', '.join(map(lambda x: x + '[i]', in_output_names)) + ',)'
             else:
-                _1 += ", ()"
+                _1 += ', ()'
             if len(param_names) > 0:
-                _1 += ", param_tuples[i]"
+                _1 += ', (' + ', '.join(map(lambda x: x + '[i]', param_names)) + ',)'
             else:
-                _1 += ", ()"
+                _1 += ', ()'
         else:
-            _1 += ", *input_tuple"
+            if len(input_names) > 0:
+                _1 += ', ' + ', '.join(input_names)
             if len(in_output_names) > 0:
-                _1 += ", *in_output_tuples[i]"
+                _1 += ', ' + ', '.join(map(lambda x: x + '[i]', in_output_names))
             if len(param_names) > 0:
-                _1 += ", *param_tuples[i]"
+                _1 += ', ' + ', '.join(map(lambda x: x + '[i]', param_names))
         _1 += ", *args"
-        if not numba_loop:
-            _1 += ", **_kwargs"
+        if not remove_kwargs:
+            _1 += ", **kwargs"
         func_str = "def select_params_func({0}):\n   return apply_func({1})".format(_0, _1)
         scope = {'apply_func': apply_func}
         filename = inspect.getfile(lambda: None)
@@ -3264,7 +3335,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
         select_params_func = scope['select_params_func']
         if module_name is not None:
             select_params_func.__module__ = module_name
-        if numba_loop:
+        if jitted_loop:
             select_params_func = njit(select_params_func)
 
         def custom_func(input_list: tp.List[tp.AnyArray],
@@ -3276,42 +3347,10 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
                         flex_2d: tp.Optional[bool] = None,
                         return_cache: bool = False,
                         use_cache: tp.Optional[CacheOutputT] = None,
-                        use_ray: bool = False,
                         **_kwargs) -> tp.Union[None, CacheOutputT, tp.Array2d, tp.List[tp.Array2d]]:
             """Custom function that forwards inputs and parameters to `apply_func`."""
 
-            if use_ray:
-                if len(in_output_names) > 0:
-                    raise ValueError("Ray doesn't support in-place outputs")
-            if numba_loop:
-                if use_ray:
-                    raise ValueError("Ray cannot be used within Numba")
-                if num_ret_outputs > 1:
-                    apply_and_concat_func = combine_fns.apply_and_concat_multiple_nb
-                elif num_ret_outputs == 1:
-                    apply_and_concat_func = combine_fns.apply_and_concat_one_nb
-                else:
-                    apply_and_concat_func = combine_fns.apply_and_concat_none_nb
-            else:
-                if num_ret_outputs > 1:
-                    if use_ray:
-                        apply_and_concat_func = combine_fns.apply_and_concat_multiple_ray
-                    else:
-                        apply_and_concat_func = combine_fns.apply_and_concat_multiple
-                elif num_ret_outputs == 1:
-                    if use_ray:
-                        apply_and_concat_func = combine_fns.apply_and_concat_one_ray
-                    else:
-                        apply_and_concat_func = combine_fns.apply_and_concat_one
-                else:
-                    if use_ray:
-                        raise ValueError("Ray requires regular outputs")
-                    apply_and_concat_func = combine_fns.apply_and_concat_none
-
             n_params = len(param_list[0]) if len(param_list) > 0 else 1
-            input_tuple = tuple(input_list)
-            in_output_tuples = list(zip(*in_output_list))
-            param_tuples = list(zip(*param_list))
             args_before = ()
             if input_shape is not None and 'input_shape' not in kwargs_to_args:
                 args_before += (input_shape,)
@@ -3329,22 +3368,32 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
             # Caching
             cache = use_cache
             if cache is None and cache_func is not None:
-                _in_output_list = in_output_list
-                _param_list = param_list
                 if checks.is_numba_func(cache_func):
-                    if len(in_output_list) > 0:
-                        _in_output_list = [to_typed_list(in_outputs) for in_outputs in in_output_list]
-                    if len(param_list) > 0:
-                        _param_list = [to_typed_list(params) for params in param_list]
-                cache = cache_func(
-                    *args_before,
-                    *input_tuple,
-                    *_in_output_list,
-                    *_param_list,
-                    *args,
-                    *more_args,
-                    **_kwargs
-                )
+                    _in_output_list = list(map(to_typed_list, in_output_list))
+                    _param_list = list(map(to_typed_list, param_list))
+                else:
+                    _in_output_list = in_output_list
+                    _param_list = param_list
+                if pass_packed:
+                    cache = cache_func(
+                        *args_before,
+                        input_list,
+                        _in_output_list,
+                        _param_list,
+                        *args,
+                        *more_args,
+                        **_kwargs
+                    )
+                else:
+                    cache = cache_func(
+                        *args_before,
+                        *input_list,
+                        *_in_output_list,
+                        *_param_list,
+                        *args,
+                        *more_args,
+                        **_kwargs
+                    )
             if return_cache:
                 return cache
             if cache is None:
@@ -3352,39 +3401,34 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
             if not isinstance(cache, tuple):
                 cache = (cache,)
 
-            if len(in_output_names) > 0:
-                _in_output_tuples = in_output_tuples
-                if numba_loop:
-                    _in_output_tuples = to_typed_list(_in_output_tuples)
-                _in_output_tuples = (_in_output_tuples,)
+            if jitted_loop:
+                _in_output_list = list(map(to_typed_list, in_output_list))
+                _param_list = list(map(to_typed_list, param_list))
             else:
-                _in_output_tuples = ()
-            if len(param_names) > 0:
-                _param_tuples = param_tuples
-                if numba_loop:
-                    _param_tuples = to_typed_list(_param_tuples)
-                _param_tuples = (_param_tuples,)
-            else:
-                _param_tuples = ()
-
-            return apply_and_concat_func(
+                _in_output_list = in_output_list
+                _param_list = param_list
+            return combining.apply_and_concat(
                 n_params,
                 select_params_func,
                 args_before,
-                input_tuple,
-                *_in_output_tuples,
-                *_param_tuples,
+                *input_list,
+                *_in_output_list,
+                *_param_list,
                 *args,
                 *more_args,
                 *cache,
-                **_kwargs
+                **_kwargs,
+                n_outputs=num_ret_outputs,
+                jitted_loop=jitted_loop
             )
 
-        return self.from_custom_func(custom_func, as_lists=True, **kwargs)
+        return self.from_custom_func(custom_func, pass_packed=True, **kwargs)
 
     @classmethod
     def get_talib_indicators(cls) -> tp.Set[str]:
         """Get all TA-Lib indicators."""
+        from vectorbt.opt_packages import assert_can_import
+        assert_can_import('talib')
         import talib
 
         return set(talib.get_functions())
@@ -3440,6 +3484,8 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
             Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`.
         ```
         """
+        from vectorbt.opt_packages import assert_can_import
+        assert_can_import('talib')
         import talib
         from talib import abstract
 
@@ -3591,6 +3637,8 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
 
         !!! note
             Returns only the indicators that have been successfully parsed."""
+        from vectorbt.opt_packages import assert_can_import
+        assert_can_import('pandas_ta')
         import pandas_ta
 
         indicators = set()
@@ -3686,6 +3734,8 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
             pd.Series: New feature generated.
         ```
         """
+        from vectorbt.opt_packages import assert_can_import
+        assert_can_import('pandas_ta')
         import pandas_ta
 
         func_name = func_name.lower()
@@ -3752,6 +3802,8 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
     @classmethod
     def get_ta_indicators(cls) -> tp.Set[str]:
         """Get all ta indicators."""
+        from vectorbt.opt_packages import assert_can_import
+        assert_can_import('ta')
         import ta
 
         ta_module_names = [k for k in dir(ta) if isinstance(getattr(ta, k), ModuleType)]
@@ -3769,6 +3821,8 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
     @classmethod
     def find_ta_indicator(cls, cls_name: str) -> IndicatorMixinT:
         """Get ta indicator class by its name."""
+        from vectorbt.opt_packages import assert_can_import
+        assert_can_import('ta')
         import ta
 
         ta_module_names = [k for k in dir(ta) if isinstance(getattr(ta, k), ModuleType)]
@@ -3877,7 +3931,8 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
                 fillna(bool): if True, fill nan values.
         ```
         """
-        import ta
+        from vectorbt.opt_packages import assert_can_import
+        assert_can_import('ta')
 
         ind_cls = cls.find_ta_indicator(cls_name)
         config = cls.parse_ta_config(ind_cls)

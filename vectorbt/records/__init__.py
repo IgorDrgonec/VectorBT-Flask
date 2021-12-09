@@ -7,12 +7,24 @@ Records are the second form of data representation in vectorbt. They allow stori
 such as drawdowns, orders, trades, and positions, without converting them back to the matrix form and
 occupying the user's memory."""
 
-from vectorbt.records.mapped_array import MappedArray
 from vectorbt.records.base import Records
+from vectorbt.records.chunking import (
+    ColLensSizer,
+    ColLensSlicer,
+    ColLensMapper,
+    ColMapSlicer,
+    ColIdxsMapper
+)
+from vectorbt.records.mapped_array import MappedArray
 
 __all__ = [
     'MappedArray',
-    'Records'
+    'Records',
+    'ColLensSizer',
+    'ColLensSlicer',
+    'ColLensMapper',
+    'ColMapSlicer',
+    'ColIdxsMapper'
 ]
 
 __pdoc__ = {k: False for k in __all__}

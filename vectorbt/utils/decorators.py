@@ -3,24 +3,13 @@
 
 """Class and function decorators."""
 
-from functools import wraps, lru_cache
+from functools import wraps
 from threading import RLock
-import inspect
-import numpy as np
 
 from vectorbt import _typing as tp
-from vectorbt.utils import checks
-from vectorbt.utils.config import Config
 
 
-class class_or_instancemethod(classmethod):
-    """Function decorator that binds `self` to a class if the function is called as class method,
-    otherwise to an instance."""
-
-    def __get__(self, instance: object, owner: tp.Optional[tp.Type] = None) -> tp.Any:
-        descr_get = super().__get__ if instance is None else self.__func__.__get__
-        return descr_get(instance, owner)
-
+# ############# Generic ############# #
 
 class classproperty(object):
     """Property that can be called on a class."""
@@ -53,281 +42,52 @@ class class_or_instanceproperty(object):
         raise AttributeError("can't set attribute")
 
 
-custom_propertyT = tp.TypeVar("custom_propertyT", bound="custom_property")
-
-
-class custom_property:
-    """Custom property that stores function and flags as attributes.
-
-    Can be called both as
-    ```python-repl
-    >>> @custom_property
-    ... def user_function(self): pass
-    ```
-    and
-    ```plaintext
-    >>> @custom_property(a=0, b=0)  # flags
-    ... def user_function(self): pass
-    ```
-
-    !!! note
-        `custom_property` instances belong to classes, not class instances. Thus changing the property,
-        for example, by disabling caching, will do the same for each instance of the class where
-        the property has been defined."""
-
-    def __new__(cls: tp.Type[custom_propertyT], *args, **flags) -> tp.Union[tp.Callable, custom_propertyT]:
-        if len(args) == 0:
-            return lambda func: cls(func, **flags)
-        elif len(args) == 1:
-            return super().__new__(cls)
-        raise ValueError("Either function or keyword arguments must be passed")
-
-    def __init__(self, func: tp.Callable, **flags) -> None:
-        self.func = func
-        self.name = func.__name__
-        self.flags = flags
-        self.__doc__ = getattr(func, '__doc__')
+class class_or_instancemethod(classmethod):
+    """Function decorator that binds `self` to a class if the function is called as class method,
+    otherwise to an instance."""
 
     def __get__(self, instance: object, owner: tp.Optional[tp.Type] = None) -> tp.Any:
-        if instance is None:
-            return self
-        return self.func(instance)
-
-    def __set__(self, instance: object, value: tp.Any) -> None:
-        raise AttributeError("can't set attribute")
-
-    def __call__(self, *args, **kwargs) -> tp.Any:
-        pass
-
-
-class CacheCondition(tp.NamedTuple):
-    """Caching condition for the use in `should_cache`."""
-
-    instance: tp.Optional[object] = None
-    """Class instance the method/property is bound to."""
-
-    func: tp.Optional[tp.Union[tp.Callable, "cached_property", str]] = None
-    """Method/property or its name (case-sensitive)."""
-
-    cls: tp.Optional[tp.Union[type, str]] = None
-    """Class of the instance or its name (case-sensitive)."""
-
-    base_cls: tp.Optional[tp.Union[type, str]] = None
-    """Base class of the class or its name (case-sensitive)."""
-
-    flags: tp.Optional[dict] = None
-    """Flags to check for in method/property's flags."""
-
-    rank: tp.Optional[int] = None
-    """Rank to override the default rank."""
-
-
-def should_cache(func_name: str, instance: object, func: tp.Optional[tp.Callable] = None, **flags) -> bool:
-    """Check whether to cache the method/property based on a range of conditions defined under
-    `caching` in `vectorbt._settings.settings`.
-
-    Each condition has its own rank. A narrower condition has a lower (better) rank than a broader condition.
-    All supplied keys are checked, and if any condition fails, it's assigned to the highest (worst) rank.
-
-    Here's the condition ranking:
-
-    0) `instance` and `func`
-    1) `instance` and `flags`
-    2) `instance`
-    3) `cls` and `func`
-    4) `cls` and `flags`
-    5) `cls`
-    6) `base_cls` and `func`
-    7) `base_cls` and `flags`
-    8) `base_cls`
-    9) `func` and `flags`
-    10) `func`
-    11) `flags`
-    
-    This function goes through all conditions of type `CacheCondition` in `whitelist` and `blacklist`
-    and finds the one with the lowest (best) rank. If the search yields the same rank for both lists,
-    global caching flag `enabled` decides.
-
-    ## Example
-
-    Let's evaluate various caching conditions:
-
-    ```python-repl
-    >>> import vectorbt as vbt
-
-    >>> class A:
-    ...     @cached_property(my_flag=True)
-    ...     def f(self):
-    ...         return None
-
-    >>> class B(A):
-    ...     @cached_property(my_flag=False)
-    ...     def f(self):
-    ...         return None
-
-    >>> a = A()
-    >>> b = B()
-
-    >>> vbt.CacheCondition(instance=a, func='f')  # A.f
-    >>> vbt.CacheCondition(instance=b, func='f')  # B.f
-    >>> vbt.CacheCondition(instance=a, flags=dict(my_flag=True))  # A.f
-    >>> vbt.CacheCondition(instance=a, flags=dict(my_flag=False))  # none
-    >>> vbt.CacheCondition(instance=b, flags=dict(my_flag=False))  # B.f
-    >>> vbt.CacheCondition(instance=a)  # A.f
-    >>> vbt.CacheCondition(instance=b)  # B.f
-    >>> vbt.CacheCondition(cls=A)  # A.f
-    >>> vbt.CacheCondition(cls=B)  # B.f
-    >>> vbt.CacheCondition(base_cls=A)  # A.f and B.f
-    >>> vbt.CacheCondition(base_cls=B)  # B.f
-    >>> vbt.CacheCondition(base_cls=A, flags=dict(my_flag=False))  # B.f
-    >>> vbt.CacheCondition(func=A.f)  # A.f
-    >>> vbt.CacheCondition(func=B.f)  # B.f
-    >>> vbt.CacheCondition(func='f')  # A.f and B.f
-    >>> vbt.CacheCondition(func='f', flags=dict(my_flag=False))  # B.f
-    >>> vbt.CacheCondition(flags=dict(my_flag=True))  # A.f
-    ```
-    """
-    from vectorbt._settings import settings
-    caching_cfg = settings['caching']
-
-    start_rank = 100
-
-    def _get_condition_rank(cond: CacheCondition) -> int:
-        # Perform initial checks
-        checks.assert_instance_of(cond, CacheCondition)
-
-        if cond.instance is not None:
-            if instance is not cond.instance:
-                return start_rank
-        if cond.func is not None:
-            if isinstance(cond.func, cached_property):  # cached_property
-                if func != cond.func.func:
-                    return start_rank
-            elif callable(cond.func) and hasattr(func, 'func') and hasattr(cond.func, 'func'):  # cached_method
-                if func.func != cond.func.func:
-                    return start_rank
-            elif isinstance(cond.func, str):
-                if func_name != cond.func:
-                    return start_rank
-            else:
-                raise TypeError(f"Caching condition {cond}: func must be either a callable or a string")
-        if cond.cls is not None:
-            if inspect.isclass(cond.cls):
-                if type(instance) != cond.cls:
-                    return start_rank
-            elif isinstance(cond.cls, str):
-                if type(instance).__name__ != cond.cls:
-                    return start_rank
-            else:
-                raise TypeError(f"Caching condition {cond}: cls must be either a class or a string")
-        if cond.base_cls is not None:
-            if inspect.isclass(cond.base_cls) or isinstance(cond.base_cls, str):
-                if not checks.is_instance_of(instance, cond.base_cls):
-                    return start_rank
-            else:
-                raise TypeError(f"Caching condition {cond}: base_cls must be either a class or a string")
-        if cond.flags is not None:
-            if not isinstance(cond.flags, dict):
-                raise TypeError(f"Caching condition {cond}: flags must be a dict")
-            for k, v in cond.flags.items():
-                if k not in flags or flags[k] != v:
-                    return start_rank
-        if cond.rank is not None:
-            if not isinstance(cond.rank, int):
-                raise TypeError(f"Caching condition {cond}: rank must be an integer")
-            ranks = [cond.rank for _ in range(12)]
-        else:
-            ranks = list(range(12))
-
-        # Rank instance conditions
-        if cond.instance is not None and cond.func is not None:
-            return ranks[0]
-        if cond.instance is not None and cond.flags is not None:
-            return ranks[1]
-        if cond.instance is not None:
-            return ranks[2]
-
-        # Rank class conditions
-        if cond.cls is not None and cond.func is not None:
-            return ranks[3]
-        if cond.cls is not None and cond.flags is not None:
-            return ranks[4]
-        if cond.cls is not None:
-            return ranks[5]
-
-        # Rank base class conditions
-        if cond.base_cls is not None and cond.func is not None:
-            return ranks[6]
-        if cond.base_cls is not None and cond.flags is not None:
-            return ranks[7]
-        if cond.base_cls is not None:
-            return ranks[8]
-
-        # Rank function conditions
-        if cond.func is not None and cond.flags is not None:
-            return ranks[9]
-        if cond.func is not None:
-            return ranks[10]
-        if cond.flags is not None:
-            return ranks[11]
-
-        return start_rank
-
-    white_rank = start_rank
-    if len(caching_cfg['whitelist']) > 0:
-        for cond in caching_cfg['whitelist']:
-            white_rank = min(white_rank, _get_condition_rank(cond))
-
-    black_rank = start_rank
-    if len(caching_cfg['blacklist']) > 0:
-        for cond in caching_cfg['blacklist']:
-            black_rank = min(black_rank, _get_condition_rank(cond))
-
-    if white_rank == black_rank:  # none of the conditions met
-        return caching_cfg['enabled']  # global caching decides
-    return white_rank < black_rank
+        descr_get = super().__get__ if instance is None else self.__func__.__get__
+        return descr_get(instance, owner)
 
 
 _NOT_FOUND = object()
 
 
-class cached_property(custom_property):
-    """Extends `custom_property` with caching.
+class cachedproperty:
+    """See https://docs.python.org/3/library/functools.html#functools.cached_property.
 
-    Similar to `functools.cached_property`, but without replacing the original attribute
-    to be able to re-compute whenever needed.
+    In contrast to `cached_property`, persistent and cannot be disabled."""
 
-    Disables caching if `should_cache` yields False.
-
-    Cache can be cleared by calling `clear_cache` with instance as argument.
-
-    !!! note:
-        Assumes that the instance (provided as `self`) won't change. If calculation depends
-        upon object attributes that can be changed, it won't notice the change."""
-
-    def __init__(self, func: tp.Callable, **flags) -> None:
-        super().__init__(func, **flags)
+    def __init__(self, func):
+        self.func = func
+        self.attrname = None
+        self.__doc__ = func.__doc__
         self.lock = RLock()
 
-    def clear_cache(self, instance: object) -> None:
-        """Clear the cache for this property belonging to `instance`."""
-        if hasattr(instance, self.attrname):
-            delattr(instance, self.attrname)
+    def __set_name__(self, owner, name):
+        if self.attrname is None:
+            self.attrname = name
+        elif name != self.attrname:
+            raise TypeError(
+                "Cannot assign the same cached_property to two different names "
+                f"({self.attrname!r} and {name!r})."
+            )
 
-    @property
-    def attrname(self) -> str:
-        """Get name of cached attribute."""
-        return '__cached_' + self.name
-
-    def __set_name__(self, owner: tp.Type, name: str) -> None:
-        self.name = name
-
-    def __get__(self, instance: object, owner: tp.Optional[tp.Type] = None) -> tp.Any:
+    def __get__(self, instance, owner=None):
         if instance is None:
             return self
-        if not should_cache(self.name, instance, func=self.func, **self.flags):
-            return super().__get__(instance, owner=owner)
-        cache = instance.__dict__
+        if self.attrname is None:
+            raise TypeError(
+                "Cannot use cached_property instance without calling __set_name__ on it.")
+        try:
+            cache = instance.__dict__
+        except AttributeError:  # not all objects have __dict__ (e.g. class defines slots)
+            msg = (
+                f"No '__dict__' attribute on {type(instance).__name__!r} "
+                f"instance to cache {self.attrname!r} property."
+            )
+            raise TypeError(msg) from None
         val = cache.get(self.attrname, _NOT_FOUND)
         if val is _NOT_FOUND:
             with self.lock:
@@ -335,43 +95,154 @@ class cached_property(custom_property):
                 val = cache.get(self.attrname, _NOT_FOUND)
                 if val is _NOT_FOUND:
                     val = self.func(instance)
-                    cache[self.attrname] = val
+                    try:
+                        cache[self.attrname] = val
+                    except TypeError:
+                        msg = (
+                            f"The '__dict__' attribute on {type(instance).__name__!r} instance "
+                            f"does not support item assignment for caching {self.attrname!r} property."
+                        )
+                        raise TypeError(msg) from None
         return val
 
+
+# ############# Custom properties ############# #
+
+custom_propertyT = tp.TypeVar("custom_propertyT", bound="custom_property")
+
+
+class custom_property(property):
+    """Custom extensible property that stores function and options as attributes.
+
+    !!! note
+        `custom_property` instances belong to classes, not class instances. Thus changing the property
+        will do the same for each instance of the class where the property has been defined initially."""
+
+    def __new__(cls: tp.Type[custom_propertyT], *args, **options) -> tp.Union[tp.Callable, custom_propertyT]:
+        if len(args) == 0:
+            return lambda func: cls(func, **options)
+        elif len(args) == 1:
+            return super().__new__(cls)
+        raise ValueError("Either function or keyword arguments must be passed")
+
+    def __init__(self, func: tp.Callable, **options) -> None:
+        property.__init__(self)
+
+        self._func = func
+        self._name = func.__name__
+        self._options = options
+        self.__doc__ = getattr(func, '__doc__')
+
+    @property
+    def func(self) -> tp.Callable:
+        """Wrapped function."""
+        return self._func
+
+    @property
+    def name(self) -> str:
+        """Wrapped function name."""
+        return self._name
+
+    @property
+    def options(self) -> tp.Kwargs:
+        """Options."""
+        return self._options
+
+    def __set_name__(self, owner: tp.Type, name: str) -> None:
+        self._name = name
+
+    def __get__(self, instance: object, owner: tp.Optional[tp.Type] = None) -> tp.Any:
+        if instance is None:
+            return self
+        return self.func(instance)
+
+    def __set__(self, instance: object, value: tp.Any) -> None:
+        raise AttributeError("Can't set attribute")
+
     def __call__(self, *args, **kwargs) -> tp.Any:
-        ...
+        pass
 
 
-class custom_methodT(tp.Protocol):
+class cacheable_property(custom_property):
+    """Extends `custom_property` for cacheable properties.
+
+    !!! note
+        Assumes that the instance (provided as `self`) won't change. If calculation depends
+        upon object attributes that can be changed, it won't notice the change."""
+
+    def __init__(self, func: tp.Callable, use_cache: bool = False, whitelist: bool = False, **options) -> None:
+        from vectorbt._settings import settings
+        caching_cfg = settings['caching']
+
+        super().__init__(func, **options)
+
+        self._init_use_cache = use_cache
+        self._init_whitelist = whitelist
+        if not caching_cfg['register_lazily']:
+            self.get_ca_setup()
+
+    @property
+    def init_use_cache(self) -> bool:
+        """Initial value for `use_cache`."""
+        return self._init_use_cache
+
+    @property
+    def init_whitelist(self) -> bool:
+        """Initial value for `whitelist`."""
+        return self._init_whitelist
+
+    def get_ca_setup(self, instance: tp.Optional[object] = None) -> tp.Optional['CARunSetup']:
+        """Get setup of type `vectorbt.ca_registry.CARunSetup` if instance is known,
+        or `vectorbt.ca_registry.CAUnboundSetup` otherwise.
+
+        See `vectorbt.ca_registry` for details on the caching procedure."""
+        from vectorbt.ca_registry import CAUnboundSetup, CARunSetup
+
+        unbound_setup = CAUnboundSetup.get(self, use_cache=self.init_use_cache, whitelist=self.init_whitelist)
+        if instance is None:
+            return unbound_setup
+        return CARunSetup.get(self, instance=instance)
+
+    def __get__(self, instance: object, owner: tp.Optional[tp.Type] = None) -> tp.Any:
+        if instance is None:
+            return self
+        run_setup = self.get_ca_setup(instance)
+        if run_setup is None:
+            return self.func(instance)
+        return run_setup.run()
+
+
+class cached_property(cacheable_property):
+    """`cacheable_property` with `use_cache` set to True."""
+
+    def __init__(self, func: tp.Callable, **options) -> None:
+        cacheable_property.__init__(self, func, use_cache=True, **options)
+
+
+# ############# Custom functions ############# #
+
+class custom_functionT(tp.Protocol):
     func: tp.Callable
-    flags: tp.Dict
+    name: str
+    options: tp.Kwargs
+    is_method: bool
 
-    def __call__(self, *args, **kwargs) -> tp.Any:
-        ...
+    def __call__(*args, **kwargs) -> tp.Any:
+        pass
 
 
-def custom_method(*args, **flags) -> tp.Union[tp.Callable, custom_methodT]:
-    """Custom extensible method that stores function and flags as attributes.
+def custom_function(*args, **options) -> tp.Union[tp.Callable, custom_functionT]:
+    """Custom function decorator."""
 
-    Can be called both as
-    ```python-repl
-    >>> @cached_method
-    ... def user_function(): pass
-    ```
-    and
-    ```python-repl
-    >>> @cached_method(maxsize=128, typed=False, a=0, b=0)  # flags
-    ... def user_function(): pass
-    ```
-    """
-
-    def decorator(func: tp.Callable) -> custom_methodT:
+    def decorator(func: tp.Callable) -> custom_functionT:
         @wraps(func)
         def wrapper(*args, **kwargs) -> tp.Any:
             return func(*args, **kwargs)
 
         wrapper.func = func
-        wrapper.flags = flags
+        wrapper.name = func.__name__
+        wrapper.options = options
+        wrapper.is_method = False
 
         return wrapper
 
@@ -382,79 +253,56 @@ def custom_method(*args, **flags) -> tp.Union[tp.Callable, custom_methodT]:
     raise ValueError("Either function or keyword arguments must be passed")
 
 
-class cached_methodT(custom_methodT):
-    maxsize: int
-    typed: bool
-    name: str
-    attrname: str
-    lock: RLock
-    clear_cache: tp.Callable[[object], None]
-
-    def __call__(self, *args, **kwargs) -> tp.Any:
-        ...
+class cacheable_functionT(custom_functionT):
+    is_cacheable: bool
+    get_ca_setup: tp.Callable[[], tp.Optional['CARunSetup']]
 
 
-def cached_method(*args, maxsize: int = 128, typed: bool = False,
-                  **flags) -> tp.Union[tp.Callable, cached_methodT]:
-    """Extends `custom_method` with caching.
+def cacheable(*args,
+              use_cache: bool = False,
+              whitelist: bool = False,
+              max_size: tp.Optional[int] = None,
+              ignore_args: tp.Optional[tp.Iterable[tp.AnnArgQuery]] = None,
+              **options) -> tp.Union[tp.Callable, cacheable_functionT]:
+    """Cacheable function decorator.
 
-    Internally uses `functools.lru_cache`.
+    See notes on `cacheable_property`.
 
-    Disables caching if `should_cache` yields False or a non-hashable object
-    as argument has been passed.
+    !!! note
+        To decorate an instance method, use `cacheable_method`."""
 
-    See notes on `cached_property`."""
+    def decorator(func: tp.Callable) -> cacheable_functionT:
+        from vectorbt.ca_registry import CARunSetup
+        from vectorbt._settings import settings
+        caching_cfg = settings['caching']
 
-    def decorator(func: tp.Callable) -> cached_methodT:
         @wraps(func)
-        def wrapper(instance: object, *args, **kwargs) -> tp.Any:
-            def partial_func(*args, **kwargs) -> tp.Any:
-                # Ignores non-hashable instances
-                return func(instance, *args, **kwargs)
+        def wrapper(*args, **kwargs) -> tp.Any:
+            run_setup = wrapper.get_ca_setup()
+            if run_setup is None:
+                return func(*args, **kwargs)
+            return run_setup.run(*args, **kwargs)
 
-            _func = None
-            if hasattr(instance, wrapper.name):
-                _func = getattr(instance, wrapper.name)
-            if not should_cache(wrapper.name, instance, func=_func, **wrapper.flags):
-                return func(instance, *args, **kwargs)
-            cache = instance.__dict__
-            cached_func = cache.get(wrapper.attrname, _NOT_FOUND)
-            if cached_func is _NOT_FOUND:
-                with wrapper.lock:
-                    # check if another thread filled cache while we awaited lock
-                    cached_func = cache.get(wrapper.attrname, _NOT_FOUND)
-                    if cached_func is _NOT_FOUND:
-                        cached_func = lru_cache(maxsize=wrapper.maxsize, typed=wrapper.typed)(partial_func)
-                        cache[wrapper.attrname] = cached_func  # store function instead of output
+        def get_ca_setup() -> tp.Optional[CARunSetup]:
+            """Get setup of type `vectorbt.ca_registry.CARunSetup`.
 
-            # Check if object can be hashed
-            hashable = True
-            for arg in args:
-                if not checks.is_hashable(arg):
-                    hashable = False
-                    break
-            for k, v in kwargs.items():
-                if not checks.is_hashable(v):
-                    hashable = False
-                    break
-            if not hashable:
-                # If not, do not invoke lru_cache
-                return func(instance, *args, **kwargs)
-            return cached_func(*args, **kwargs)
-
-        def clear_cache(instance):
-            """Clear the cache for this method belonging to `instance`."""
-            if hasattr(instance, wrapper.attrname):
-                delattr(instance, wrapper.attrname)
+            See `vectorbt.ca_registry` for details on the caching procedure."""
+            return CARunSetup.get(
+                wrapper,
+                use_cache=use_cache,
+                whitelist=whitelist,
+                max_size=max_size,
+                ignore_args=ignore_args
+            )
 
         wrapper.func = func
-        wrapper.flags = flags
-        wrapper.maxsize = maxsize
-        wrapper.typed = typed
         wrapper.name = func.__name__
-        wrapper.attrname = '__cached_' + func.__name__
-        wrapper.lock = RLock()
-        wrapper.clear_cache = clear_cache
+        wrapper.options = options
+        wrapper.is_method = False
+        wrapper.is_cacheable = True
+        wrapper.get_ca_setup = get_ca_setup
+        if not caching_cfg['register_lazily']:
+            wrapper.get_ca_setup()
 
         return wrapper
 
@@ -465,146 +313,109 @@ def cached_method(*args, maxsize: int = 128, typed: bool = False,
     raise ValueError("Either function or keyword arguments must be passed")
 
 
-# ############# Magic methods ############# #
+def cached(*args, **options) -> tp.Union[tp.Callable, cacheable_functionT]:
+    """`cacheable` with `use_cache` set to True.
 
-WrapperFuncT = tp.Callable[[tp.Type[tp.T]], tp.Type[tp.T]]
-
-__pdoc__ = {}
-
-binary_magic_config = Config(
-    {
-        '__eq__': dict(func=np.equal),
-        '__ne__': dict(func=np.not_equal),
-        '__lt__': dict(func=np.less),
-        '__gt__': dict(func=np.greater),
-        '__le__': dict(func=np.less_equal),
-        '__ge__': dict(func=np.greater_equal),
-        # arithmetic ops
-        '__add__': dict(func=np.add),
-        '__sub__': dict(func=np.subtract),
-        '__mul__': dict(func=np.multiply),
-        '__pow__': dict(func=np.power),
-        '__mod__': dict(func=np.mod),
-        '__floordiv__': dict(func=np.floor_divide),
-        '__truediv__': dict(func=np.true_divide),
-        '__radd__': dict(func=lambda x, y: np.add(y, x)),
-        '__rsub__': dict(func=lambda x, y: np.subtract(y, x)),
-        '__rmul__': dict(func=lambda x, y: np.multiply(y, x)),
-        '__rpow__': dict(func=lambda x, y: np.power(y, x)),
-        '__rmod__': dict(func=lambda x, y: np.mod(y, x)),
-        '__rfloordiv__': dict(func=lambda x, y: np.floor_divide(y, x)),
-        '__rtruediv__': dict(func=lambda x, y: np.true_divide(y, x)),
-        # mask ops
-        '__and__': dict(func=np.bitwise_and),
-        '__or__': dict(func=np.bitwise_or),
-        '__xor__': dict(func=np.bitwise_xor),
-        '__rand__': dict(func=lambda x, y: np.bitwise_and(y, x)),
-        '__ror__': dict(func=lambda x, y: np.bitwise_or(y, x)),
-        '__rxor__': dict(func=lambda x, y: np.bitwise_xor(y, x))
-    },
-    readonly=True,
-    as_attrs=False
-)
-"""_"""
-
-__pdoc__['binary_magic_config'] = f"""Config of binary magic methods to be added to a class.
-
-```json
-{binary_magic_config.to_doc()}
-```
-"""
-
-BinaryTranslateFuncT = tp.Callable[[tp.Any, tp.Any, tp.Callable], tp.Any]
+    !!! note
+        To decorate an instance method, use `cached_method`."""
+    return cacheable(*args, use_cache=True, **options)
 
 
-def attach_binary_magic_methods(translate_func: BinaryTranslateFuncT,
-                             config: tp.Optional[Config] = None) -> WrapperFuncT:
-    """Class decorator to add binary magic methods to a class.
+# ############# Custom methods ############# #
 
-    `translate_func` should
-
-    * take `self`, `other`, and unary function,
-    * perform computation, and
-    * return the result.
-
-    `config` defaults to `binary_magic_config` and should contain target method names (keys)
-    and dictionaries (values) with the following keys:
-
-    * `func`: Function that combines two array-like objects.
-    """
-    if config is None:
-        config = binary_magic_config
-
-    def wrapper(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
-        for target_name, settings in config.items():
-            func = settings['func']
-
-            def new_method(self,
-                           other: tp.Any,
-                           _translate_func: BinaryTranslateFuncT = translate_func,
-                           _func: tp.Callable = func) -> tp.SeriesFrame:
-                return _translate_func(self, other, _func)
-
-            new_method.__qualname__ = f"{cls.__name__}.{target_name}"
-            new_method.__name__ = target_name
-            setattr(cls, target_name, new_method)
-        return cls
-
-    return wrapper
+class custom_methodT(custom_functionT):
+    def __call__(instance: object, *args, **kwargs) -> tp.Any:
+        pass
 
 
-unary_magic_config = Config(
-    {
-        '__neg__': dict(func=np.negative),
-        '__pos__': dict(func=np.positive),
-        '__abs__': dict(func=np.absolute),
-        '__invert__': dict(func=np.invert)
-    },
-    readonly=True,
-    as_attrs=False
-)
-"""_"""
+def custom_method(*args, **options) -> tp.Union[tp.Callable, custom_methodT]:
+    """Custom method decorator."""
 
-__pdoc__['unary_magic_config'] = f"""Config of unary magic methods to be added to a class.
+    def decorator(func: tp.Callable) -> custom_methodT:
+        @wraps(func)
+        def wrapper(instance: object, *args, **kwargs) -> tp.Any:
+            return func(instance, *args, **kwargs)
 
-```json
-{unary_magic_config.to_doc()}
-```
-"""
+        wrapper.func = func
+        wrapper.name = func.__name__
+        wrapper.options = options
+        wrapper.is_method = True
 
-UnaryTranslateFuncT = tp.Callable[[tp.Any, tp.Callable], tp.Any]
+        return wrapper
+
+    if len(args) == 0:
+        return decorator
+    elif len(args) == 1:
+        return decorator(args[0])
+    raise ValueError("Either function or keyword arguments must be passed")
 
 
-def attach_unary_magic_methods(translate_func: UnaryTranslateFuncT,
-                            config: tp.Optional[Config] = None) -> WrapperFuncT:
-    """Class decorator to add unary magic methods to a class.
+class cacheable_methodT(custom_methodT):
+    get_ca_setup: tp.Callable[[tp.Optional[object]], tp.Optional['CARunSetup']]
 
-    `translate_func` should
 
-    * take `self` and unary function,
-    * perform computation, and
-    * return the result.
+def cacheable_method(*args,
+                     use_cache: bool = False,
+                     whitelist: bool = False,
+                     max_size: tp.Optional[int] = None,
+                     ignore_args: tp.Optional[tp.Iterable[tp.AnnArgQuery]] = None,
+                     **options) -> tp.Union[tp.Callable, cacheable_methodT]:
+    """Cacheable method decorator.
 
-    `config` defaults to `unary_magic_config` and should contain target method names (keys)
-    and dictionaries (values) with the following keys:
+    See notes on `cacheable_property`."""
 
-    * `func`: Function that transforms one array-like object.
-    """
-    if config is None:
-        config = unary_magic_config
+    def decorator(func: tp.Callable) -> cacheable_methodT:
+        from vectorbt.ca_registry import CAUnboundSetup, CARunSetup
+        from vectorbt._settings import settings
+        caching_cfg = settings['caching']
 
-    def wrapper(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
-        for target_name, settings in config.items():
-            func = settings['func']
+        @wraps(func)
+        def wrapper(instance: object, *args, **kwargs) -> tp.Any:
+            run_setup = wrapper.get_ca_setup(instance)
+            if run_setup is None:
+                return func(instance, *args, **kwargs)
+            return run_setup.run(*args, **kwargs)
 
-            def new_method(self,
-                           _translate_func: UnaryTranslateFuncT = translate_func,
-                           _func: tp.Callable = func) -> tp.SeriesFrame:
-                return _translate_func(self, _func)
+        def get_ca_setup(instance: tp.Optional[object] = None) -> tp.Optional[CARunSetup]:
+            """Get setup of type `vectorbt.ca_registry.CARunSetup` if instance is known,
+            or `vectorbt.ca_registry.CAUnboundSetup` otherwise.
 
-            new_method.__qualname__ = f"{cls.__name__}.{target_name}"
-            new_method.__name__ = target_name
-            setattr(cls, target_name, new_method)
-        return cls
+            See `vectorbt.ca_registry` for details on the caching procedure."""
+            unbound_setup = CAUnboundSetup.get(
+                wrapper,
+                use_cache=use_cache,
+                whitelist=whitelist
+            )
+            if instance is None:
+                return unbound_setup
+            return CARunSetup.get(
+                wrapper,
+                instance=instance,
+                max_size=max_size,
+                ignore_args=ignore_args
+            )
 
-    return wrapper
+        wrapper.func = func
+        wrapper.name = func.__name__
+        wrapper.options = options
+        wrapper.is_method = True
+        wrapper.is_cacheable = True
+        wrapper.get_ca_setup = get_ca_setup
+        if not caching_cfg['register_lazily']:
+            wrapper.get_ca_setup()
+
+        return wrapper
+
+    if len(args) == 0:
+        return decorator
+    elif len(args) == 1:
+        return decorator(args[0])
+    raise ValueError("Either function or keyword arguments must be passed")
+
+
+def cached_method(*args, **options) -> tp.Union[tp.Callable, cacheable_methodT]:
+    """`cacheable_method` with `use_cache` set to True."""
+    return cacheable_method(*args, use_cache=True, **options)
+
+
+cacheableT = tp.Union[cacheable_property, cacheable_functionT, cacheable_methodT]

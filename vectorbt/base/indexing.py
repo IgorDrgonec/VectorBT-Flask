@@ -1,7 +1,7 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 # This code is licensed under Apache 2.0 with Commons Clause license (see LICENSE.md for details)
 
-"""Classes for indexing.
+"""Classes and functions for indexing.
 
 The main purpose of indexing classes is to provide pandas-like indexing to user-defined classes
 holding objects that have rows and/or columns. This is done by forwarding indexing commands
@@ -12,8 +12,9 @@ import numpy as np
 import pandas as pd
 
 from vectorbt import _typing as tp
+from vectorbt.base import indexes, reshaping
+from vectorbt.jit_registry import register_jitted
 from vectorbt.utils import checks
-from vectorbt.base import index_fns, reshape_fns
 
 
 class IndexingError(Exception):
@@ -89,7 +90,7 @@ class PandasIndexer(IndexingBase):
     ...         super().__init__()
     ...
     ...     def indexing_func(self, pd_indexing_func):
-    ...         return self.__class__(
+    ...         return type(self)(
     ...             pd_indexing_func(self.df1),
     ...             pd_indexing_func(self.df2)
     ...         )
@@ -204,7 +205,7 @@ class ParamLoc(LocBase):
                 if self.level_name is not None:
                     if checks.is_frame(new_obj):
                         if isinstance(new_obj.columns, pd.MultiIndex):
-                            new_obj.columns = index_fns.drop_levels(new_obj.columns, self.level_name)
+                            new_obj.columns = indexes.drop_levels(new_obj.columns, self.level_name)
             return new_obj
 
         return self.indexing_func(pd_indexing_func, **self.indexing_kwargs)
@@ -216,7 +217,7 @@ def indexing_on_mapper(mapper: tp.Series, ref_obj: tp.SeriesFrame,
     checks.assert_instance_of(mapper, pd.Series)
     checks.assert_instance_of(ref_obj, (pd.Series, pd.DataFrame))
 
-    df_range_mapper = reshape_fns.broadcast_to(np.arange(len(mapper.index)), ref_obj)
+    df_range_mapper = reshaping.broadcast_to(np.arange(len(mapper.index)), ref_obj)
     loced_range_mapper = pd_indexing_func(df_range_mapper)
     new_mapper = mapper.iloc[loced_range_mapper.values[0]]
     if checks.is_frame(loced_range_mapper):
@@ -256,7 +257,7 @@ def build_param_indexer(param_names: tp.Sequence[str], class_name: str = 'ParamI
     ...         super().__init__([param_mapper])
     ...
     ...     def indexing_func(self, pd_indexing_func):
-    ...         return self.__class__(
+    ...         return type(self)(
     ...             pd_indexing_func(self.df),
     ...             indexing_on_mapper(self._my_param_mapper, self.df, pd_indexing_func)
     ...         )
@@ -281,6 +282,7 @@ def build_param_indexer(param_names: tp.Sequence[str], class_name: str = 'ParamI
     1  2  2  4  4
     ```
     """
+
     class ParamIndexer(IndexingBase):
         def __init__(self, param_mappers: tp.Sequence[tp.Series],
                      level_names: tp.Optional[tp.LevelSequence] = None, **kwargs) -> None:
@@ -308,3 +310,59 @@ def build_param_indexer(param_names: tp.Sequence[str], class_name: str = 'ParamI
         ParamIndexer.__module__ = module_name
 
     return ParamIndexer
+
+
+@register_jitted(cache=True)
+def flex_choose_i_and_col_nb(a: tp.Array, flex_2d: bool = True) -> tp.Tuple[int, int]:
+    """Choose selection index and column based on the array's shape.
+
+    Instead of expensive broadcasting, keep the original shape and do indexing in a smart way.
+    A nice feature of this is that it has almost no memory footprint and can broadcast in
+    any direction infinitely.
+
+    Call it once before using `flex_select_nb`.
+
+    if `flex_2d` is True, 1-dim array will correspond to columns, otherwise to rows."""
+    i = -1
+    col = -1
+    if a.ndim == 0:
+        i = 0
+        col = 0
+    elif a.ndim == 1:
+        if flex_2d:
+            i = 0
+            if a.shape[0] == 1:
+                col = 0
+        else:
+            col = 0
+            if a.shape[0] == 1:
+                i = 0
+    else:
+        if a.shape[0] == 1:
+            i = 0
+        if a.shape[1] == 1:
+            col = 0
+    return i, col
+
+
+@register_jitted(cache=True)
+def flex_select_nb(a: tp.Array, i: int, col: int, flex_i: int, flex_col: int, flex_2d: bool = True) -> tp.Any:
+    """Select element of `a` as if it has been broadcast."""
+    if flex_i == -1:
+        flex_i = i
+    if flex_col == -1:
+        flex_col = col
+    if a.ndim == 0:
+        return a.item()
+    if a.ndim == 1:
+        if flex_2d:
+            return a[int(flex_col)]
+        return a[flex_i]
+    return a[flex_i, int(flex_col)]
+
+
+@register_jitted(cache=True)
+def flex_select_auto_nb(a: tp.Array, i: int, col: int, flex_2d: bool = True) -> tp.Any:
+    """Combines `flex_choose_i_and_col_nb` and `flex_select_nb`."""
+    flex_i, flex_col = flex_choose_i_and_col_nb(a, flex_2d)
+    return flex_select_nb(a, i, col, flex_i, flex_col, flex_2d)

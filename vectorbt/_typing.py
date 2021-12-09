@@ -3,23 +3,45 @@
 
 """General types used in vectorbt."""
 
+from datetime import datetime, timedelta, tzinfo
+from pathlib import Path
+from typing import *
+
 import numpy as np
 import pandas as pd
-from pandas import Series, DataFrame as Frame, Index
-from typing import *
-from datetime import datetime, timedelta, tzinfo
-from mypy_extensions import VarArg, KwArg
-from pandas.tseries.offsets import DateOffset
-from plotly.graph_objects import Figure, FigureWidget
-from plotly.basedatatypes import BaseFigure, BaseTraceType
-from numba.core.registry import CPUDispatcher
+from mypy_extensions import VarArg
 from numba.typed import List as NumbaList
-from pathlib import Path
+from pandas import Series, DataFrame as Frame, Index
+from pandas.tseries.offsets import DateOffset
+
+try:
+    from plotly.graph_objects import Figure, FigureWidget
+    from plotly.basedatatypes import BaseFigure, BaseTraceType
+except ImportError:
+    Figure = Any
+    FigureWidget = Any
+    BaseFigure = Any
+    BaseTraceType = Any
 
 try:
     from typing import Protocol
 except ImportError:
     from typing_extensions import Protocol
+
+if TYPE_CHECKING:
+    from vectorbt.utils.parsing import Regex
+    from vectorbt.utils.execution import ExecutionEngine
+    from vectorbt.utils.chunking import Sizer, ChunkTaker, ChunkMeta, ChunkMetaGenerator
+    from vectorbt.utils.jitting import Jitter
+else:
+    Regex = 'Regex'
+    ExecutionEngine = 'ExecutionEngine'
+    Sizer = 'Sizer'
+    ChunkTaker = 'ChunkTaker'
+    ChunkMeta = 'ChunkMeta'
+    ChunkMetaGenerator = 'ChunkMetaGenerator'
+    TraceUpdater = 'TraceUpdater'
+    Jitter = 'Jitter'
 
 # Generic types
 T = TypeVar("T")
@@ -39,6 +61,10 @@ TupleList = Union[List[T], Tuple[T, ...]]
 MaybeTupleList = Union[T, List[T], Tuple[T, ...]]
 MaybeIterable = Union[T, Iterable[T]]
 MaybeSequence = Union[T, Sequence[T]]
+MaybeCollection = Union[T, Collection[T]]
+MappingSequence = Union[Mapping[Hashable, T], Sequence[T]]
+MaybeMappingSequence = Union[T, Mapping[Hashable, T], Sequence[T]]
+SetLike = Union[None, Set[T]]
 
 
 # Arrays
@@ -48,30 +74,32 @@ class SupportsArray(Protocol):
 
 DTypeLike = Any
 PandasDTypeLike = Any
+TypeLike = MaybeTuple[Union[Type, str, Regex]]
 Shape = Tuple[int, ...]
-RelaxedShape = Union[int, Shape]
+ShapeLike = Union[int, Shape]
 Array = np.ndarray  # ready to be used for n-dim data
 Array1d = np.ndarray
 Array2d = np.ndarray
 Array3d = np.ndarray
 Record = np.void
 RecordArray = np.ndarray
+RecordArray2d = np.ndarray
 RecArray = np.recarray
 MaybeArray = Union[T, Array]
 SeriesFrame = Union[Series, Frame]
 MaybeSeries = Union[T, Series]
 MaybeSeriesFrame = Union[T, Series, Frame]
-AnyArray = Union[Array, Series, Frame]
-AnyArray1d = Union[Array1d, Series]
+PandasArray = Union[Index, Series, Frame]
+AnyArray = Union[Array, PandasArray]
+AnyArray1d = Union[Array1d, Index, Series]
 AnyArray2d = Union[Array2d, Frame]
-_ArrayLike = Union[Scalar, Sequence[Scalar], Sequence[Sequence[Any]], SupportsArray]
-ArrayLike = Union[_ArrayLike, Array, Index, Series, Frame]  # must be converted
-IndexLike = Union[_ArrayLike, Array1d, Index, Series]
-ArrayLikeSequence = Union[Sequence[T], Array1d, Index, Series]  # sequence for 1-dim data
+ArrayLike = Union[Scalar, Sequence[Scalar], Sequence[Sequence[Any]], SupportsArray]
+IndexLike = Union[range, Sequence[Scalar], SupportsArray]
+FlexArray = Array
 
 # Labels
 Label = Hashable
-Labels = ArrayLikeSequence[Label]
+Labels = Sequence[Label]
 Level = Union[str, int]
 LevelSequence = Sequence[Level]
 MaybeLevelSequence = Union[Level, LevelSequence]
@@ -94,6 +122,7 @@ PandasIndexingFunc = Callable[[SeriesFrame], MaybeSeriesFrame]
 # Grouping
 GroupByLike = Union[None, bool, MaybeLevelSequence, IndexLike]
 PandasGroupByLike = Union[Label, Labels, Callable, Mapping[Label, Any]]
+GroupMap = Tuple[Array1d, Array1d]
 
 # Wrapping
 NameIndex = Union[None, Any, Index]
@@ -106,50 +135,83 @@ ArgsLike = Union[None, Args]
 Kwargs = Dict[str, Any]
 KwargsLike = Union[None, Kwargs]
 KwargsLikeSequence = MaybeSequence[KwargsLike]
-FileName = Union[str, Path]
+PathLike = Union[str, Path]
 
 # Data
-Data = Dict[Label, SeriesFrame]
+Symbol = Hashable
+Symbols = Sequence[Symbol]
+DataDict = Dict[Symbol, SeriesFrame]
 
 # Plotting
 TraceName = Union[str, None]
 TraceNames = MaybeSequence[TraceName]
 
 # Generic
-I = TypeVar("I")
-R = TypeVar("R")
-ApplyFunc = Callable[[int, Array1d, VarArg()], MaybeArray]
-RowApplyFunc = Callable[[int, Array1d, VarArg()], MaybeArray]
-RollApplyFunc = Callable[[int, int, Array1d, VarArg()], Scalar]
-RollMatrixApplyFunc = Callable[[int, Array2d, VarArg()], MaybeArray]
-GroupByApplyFunc = Callable[[Array1d, int, Array1d, VarArg()], Scalar]
-GroupByMatrixApplyFunc = Callable[[Array1d, Array2d, VarArg()], MaybeArray]
-ApplyMapFunc = Callable[[int, int, I, VarArg()], Scalar]
-FilterFunc = Callable[[int, int, I, VarArg()], bool]
-ReduceFunc = Callable[[int, Array1d, VarArg()], Scalar]
-ReduceArrayFunc = Callable[[int, Array1d, VarArg()], Array1d]
-GroupReduceFunc = Callable[[int, Array2d, VarArg()], Scalar]
-FlatGroupReduceFunc = Callable[[int, Array1d, VarArg()], Scalar]
-GroupReduceArrayFunc = Callable[[int, Array2d, VarArg()], Array1d]
-FlatGroupReduceArrayFunc = Callable[[int, Array1d, VarArg()], Array1d]
-GroupSqueezeFunc = Callable[[int, int, Array1d, VarArg()], R]
+MapFunc = Callable[[Scalar, VarArg()], Scalar]
+MapMetaFunc = Callable[[int, int, Scalar, VarArg()], Scalar]
+ApplyFunc = Callable[[Array1d, VarArg()], MaybeArray]
+ApplyMetaFunc = Callable[[int, VarArg()], MaybeArray]
+RollApplyMetaFunc = Callable[[int, int, int, VarArg()], Scalar]
+GroupByApplyMetaFunc = Callable[[Array1d, int, int, VarArg()], Scalar]
+ReduceFunc = Callable[[Array1d, VarArg()], Scalar]
+ReduceMetaFunc = Callable[[int, VarArg()], Scalar]
+ReduceToArrayFunc = Callable[[Array1d, VarArg()], Array1d]
+ReduceToArrayMetaFunc = Callable[[int, VarArg()], Array1d]
+ReduceGroupedFunc = Callable[[Array2d, VarArg()], Scalar]
+ReduceGroupedMetaFunc = Callable[[int, int, int, VarArg()], Scalar]
+ReduceGroupedToArrayFunc = Callable[[Array2d, VarArg()], Array1d]
+ReduceGroupedToArrayMetaFunc = Callable[[int, int, int, VarArg()], Array1d]
+GroupSqueezeMetaFunc = Callable[[int, int, int, int, VarArg()], Scalar]
 
 # Signals
-ChoiceFunc = Callable[[int, int, int, VarArg()], Array1d]
+PlaceFunc = Callable[[Array1d, int, int, int, VarArg()], None]
 RankFunc = Callable[[int, int, int, int, int, VarArg()], int]
 
 # Records
-ColRange = Array2d
-ColMap = Tuple[Array1d, Array1d]
-MappedApplyFunc = Callable[[Array1d, int, Array1d, VarArg()], Array1d]
-RecordApplyFunc = Callable[[RecordArray, VarArg()], Array1d]
-RecordMapFunc = Callable[[np.void, VarArg()], R]
-MaskInOutMapFunc = Callable[[Array1d, Array1d, int, Array1d, VarArg()], None]
+ColIdxs = Array1d
+ColLens = Array1d
+ColMap = Tuple[ColIdxs, ColLens]
+RecordsMapFunc = Callable[[np.void, VarArg()], Scalar]
+RecordsMapMetaFunc = Callable[[int, VarArg()], Scalar]
+MappedReduceMetaFunc = Callable[[Array1d, int, VarArg()], Scalar]
+MappedReduceToArrayMetaFunc = Callable[[Array1d, int, VarArg()], Array1d]
 
 # Indicators
 Param = Any
-Params = Union[List[Param], Tuple[Param, ...], NumbaList, Array1d]
+Params = Sequence[Param]
 
 # Mappings
 Enum = NamedTuple
 MappingLike = Union[str, Mapping, Enum, IndexLike]
+
+# Parsing
+AnnArgs = Dict[str, Kwargs]
+FlatAnnArgs = List[Kwargs]
+AnnArgQuery = Union[int, str, Regex]
+
+# Execution
+FuncArgs = Tuple[Callable, Args, Kwargs]
+FuncsArgs = Iterable[FuncArgs]
+EngineLike = Union[str, type, ExecutionEngine, Callable]
+
+# Chunking
+SizeFunc = Callable[[AnnArgs], int]
+SizeLike = Union[int, Sizer, SizeFunc]
+ChunkMetaFunc = Callable[[AnnArgs], Iterable[ChunkMeta]]
+ChunkMetaLike = Union[Iterable[ChunkMeta], ChunkMetaGenerator, ChunkMetaFunc]
+TakeSpec = Union[None, ChunkTaker]
+ArgTakeSpec = Mapping[AnnArgQuery, TakeSpec]
+ArgTakeSpecFunc = Callable[[AnnArgs, ChunkMeta], Tuple[Args, Kwargs]]
+ArgTakeSpecLike = Union[Sequence[TakeSpec], ArgTakeSpec, ArgTakeSpecFunc]
+MappingTakeSpec = Mapping[Hashable, TakeSpec]
+SequenceTakeSpec = Sequence[TakeSpec]
+ContainerTakeSpec = Union[MappingTakeSpec, SequenceTakeSpec]
+ChunkedOption = Union[None, bool, str, Kwargs]
+
+# JIT
+JittedOption = Union[None, bool, str, Kwargs]
+JitterLike = Union[str, Jitter, Type[Jitter]]
+
+# Decorators
+ClassWrapper = Callable[[Type[T]], Type[T]]
+FlexClassWrapper = Union[Callable[[Type[T]], Type[T]], Type[T]]

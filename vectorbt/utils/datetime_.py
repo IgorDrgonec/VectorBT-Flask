@@ -3,12 +3,12 @@
 
 """Utilities for working with dates and time."""
 
+from datetime import datetime, timezone, timedelta, tzinfo, time
+
+import dateparser
 import numpy as np
 import pandas as pd
-import dateparser
-from datetime import datetime, timezone, timedelta, tzinfo, time
 import pytz
-import copy
 
 from vectorbt import _typing as tp
 
@@ -36,28 +36,28 @@ def get_local_tz() -> timezone:
 def convert_tzaware_time(t: time, tz_out: tp.Optional[tzinfo]) -> time:
     """Return as non-naive time.
 
-    `datetime.time` should have `tzinfo` set."""
+    `datetime.time` must have `tzinfo` set."""
     return datetime.combine(datetime.today(), t).astimezone(tz_out).timetz()
 
 
 def tzaware_to_naive_time(t: time, tz_out: tp.Optional[tzinfo]) -> time:
     """Return as naive time.
 
-    `datetime.time` should have `tzinfo` set."""
+    `datetime.time` must have `tzinfo` set."""
     return datetime.combine(datetime.today(), t).astimezone(tz_out).time()
 
 
 def naive_to_tzaware_time(t: time, tz_out: tp.Optional[tzinfo]) -> time:
     """Return as non-naive time.
 
-    `datetime.time` should not have `tzinfo` set."""
+    `datetime.time` must not have `tzinfo` set."""
     return datetime.combine(datetime.today(), t).astimezone(tz_out).time().replace(tzinfo=tz_out)
 
 
 def convert_naive_time(t: time, tz_out: tp.Optional[tzinfo]) -> time:
     """Return as naive time.
 
-    `datetime.time` should not have `tzinfo` set."""
+    `datetime.time` must not have `tzinfo` set."""
     return datetime.combine(datetime.today(), t).astimezone(tz_out).time()
 
 
@@ -77,7 +77,7 @@ def to_timezone(tz: tp.TimezoneLike, to_py_timezone: tp.Optional[bool] = None, *
     If the timezone object can't be checked for equality based on its properties,
     it's automatically converted to `datetime.timezone`.
 
-    If `to_py_timezone` is set to True, will convert to `datetime.timezone`.
+    If `to_py_timezone` is set to True, will convert to `datetime.timezone`. See global settings.
 
     `**kwargs` are passed to `dateparser.parse`."""
     from vectorbt._settings import settings
@@ -87,6 +87,7 @@ def to_timezone(tz: tp.TimezoneLike, to_py_timezone: tp.Optional[bool] = None, *
         return get_local_tz()
     if to_py_timezone is None:
         to_py_timezone = datetime_cfg['to_py_timezone']
+
     if isinstance(tz, str):
         try:
             tz = pytz.timezone(tz)
@@ -99,7 +100,7 @@ def to_timezone(tz: tp.TimezoneLike, to_py_timezone: tp.Optional[bool] = None, *
     if isinstance(tz, timedelta):
         tz = timezone(tz)
     if isinstance(tz, tzinfo):
-        if to_py_timezone or tz != copy.copy(tz):
+        if to_py_timezone:
             return timezone(tz.utcoffset(datetime.now()))
         return tz
     raise TypeError("Couldn't parse the timezone")
@@ -115,8 +116,8 @@ def to_tzaware_datetime(dt_like: tp.DatetimeLike,
 
     Raw timestamps are localized to UTC, while naive datetime is localized to `naive_tz`.
     Set `naive_tz` to None to use the default value defined under `datetime` settings
-    in `vectorbt._settings.settings`.
-    To explicitly convert the datetime to a timezone, use `tz` (uses `to_timezone`)."""
+    in `vectorbt._settings.settings`. To explicitly convert the datetime to a timezone,
+    use `tz` (uses `to_timezone`)."""
     from vectorbt._settings import settings
     datetime_cfg = settings['datetime']
 
@@ -148,6 +149,11 @@ def to_tzaware_datetime(dt_like: tp.DatetimeLike,
     if tz is not None:
         dt = dt.astimezone(to_timezone(tz))
     return dt
+
+
+def to_naive_datetime(dt: datetime) -> datetime:
+    """Return the timezone info from a datetime."""
+    return dt.astimezone().replace(tzinfo=None)
 
 
 def datetime_to_ms(dt: datetime) -> int:

@@ -1,14 +1,15 @@
-import vectorbt as vbt
+import os
+from datetime import datetime
+
 import numpy as np
 import pandas as pd
-from numba import njit
-from datetime import datetime
 import pytest
+from numba import njit
 
+import vectorbt as vbt
+from tests.utils import assert_records_close
 from vectorbt.generic import nb as generic_nb
 from vectorbt.generic.enums import range_dt
-
-from tests.utils import record_arrays_close
 
 seed = 42
 
@@ -43,10 +44,10 @@ group_by = pd.Index(['g1', 'g1', 'g2'])
 # ############# Global ############# #
 
 def setup_module():
+    if os.environ.get('VBT_DISABLE_CACHING', '0') == '1':
+        vbt.settings.caching['disable_machinery'] = True
+    vbt.settings.pbar['disable'] = True
     vbt.settings.numba['check_func_suffix'] = True
-    vbt.settings.caching.enabled = False
-    vbt.settings.caching.whitelist = []
-    vbt.settings.caching.blacklist = []
 
 
 def teardown_module():
@@ -106,7 +107,7 @@ class TestAccessors:
         )
         pd.testing.assert_series_equal(
             pd.Series.vbt.signals.empty_like(mask['a']),
-            pd.Series(np.full(mask['a'].shape, False), index=mask['a'].index, name=mask['a'].name)
+            pd.Series(np.full(mask['a'].shape, False), index=mask['a'].index, name='a')
         )
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.empty_like(mask),
@@ -115,77 +116,82 @@ class TestAccessors:
 
     def test_generate(self):
         @njit
-        def choice_func_nb(from_i, to_i, col, n):
-            if col == 0:
-                return np.arange(from_i, to_i)
-            elif col == 1:
-                return np.full(1, from_i)
-            else:
-                return np.full(1, to_i - n)
+        def place_func_nb(out, from_i, to_i, col, n):
+            out[-n] = True
 
         pd.testing.assert_series_equal(
-            pd.Series.vbt.signals.generate(5, choice_func_nb, 1, index=mask['a'].index, name=mask['a'].name),
+            pd.Series.vbt.signals.generate(
+                5, place_func_nb, 1,
+                wrap_kwargs=dict(index=mask['a'].index, columns=['a'])),
             pd.Series(
-                np.array([True, True, True, True, True]),
+                np.array([False, False, False, False, True]),
                 index=mask['a'].index,
-                name=mask['a'].name
+                name='a'
             )
         )
         with pytest.raises(Exception):
-            _ = pd.Series.vbt.signals.generate((5, 2), choice_func_nb, 1)
+            pd.Series.vbt.signals.generate((5, 2), place_func_nb, 1)
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate(
-                (5, 3), choice_func_nb, 1, index=mask.index, columns=mask.columns),
+                (5, 3), place_func_nb, 1,
+                wrap_kwargs=dict(index=mask.index, columns=mask.columns)),
             pd.DataFrame(
                 np.array([
-                    [True, True, False],
-                    [True, False, False],
-                    [True, False, False],
-                    [True, False, False],
-                    [True, False, True]
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [True, True, True]
                 ]),
                 index=mask.index,
                 columns=mask.columns
             )
         )
         pd.testing.assert_frame_equal(
-            pd.DataFrame.vbt.signals.generate(
-                (5, 3), choice_func_nb, 1, pick_first=True, index=mask.index, columns=mask.columns),
-            pd.DataFrame(
-                np.array([
-                    [True, True, False],
-                    [False, False, False],
-                    [False, False, False],
-                    [False, False, False],
-                    [False, False, True]
-                ]),
-                index=mask.index,
-                columns=mask.columns
+            pd.DataFrame.vbt.signals.generate((5, 3), place_func_nb, 1, jitted=dict(parallel=True)),
+            pd.DataFrame.vbt.signals.generate((5, 3), place_func_nb, 1, jitted=dict(parallel=False))
+        )
+        chunked = dict(arg_take_spec=dict(args=vbt.ArgsTaker(None)))
+        pd.testing.assert_frame_equal(
+            pd.DataFrame.vbt.signals.generate((5, 3), place_func_nb, 1, chunked=chunked),
+            pd.DataFrame.vbt.signals.generate((5, 3), place_func_nb, 1, chunked=False)
+        )
+
+        @njit
+        def place_func2_nb(out, from_i, to_i, col, temp):
+            out[temp[from_i, col]] = True
+
+        pd.testing.assert_series_equal(
+            pd.Series.vbt.signals.generate(
+                5, place_func2_nb, vbt.Rep('temp'),
+                broadcast_named_args=dict(temp=0),
+                wrap_kwargs=dict(index=mask['a'].index, columns=['a'])),
+            pd.Series(
+                np.array([True, False, False, False, False]),
+                index=mask['a'].index,
+                name='a'
             )
         )
 
     def test_generate_both(self):
         @njit
-        def entry_func_nb(from_i, to_i, col, temp_int):
-            temp_int[0] = from_i
-            return temp_int[:1]
+        def entry_place_func_nb(out, from_i, to_i, col):
+            out[0] = True
 
         @njit
-        def exit_func_nb(from_i, to_i, col, temp_int):
-            temp_int[0] = from_i
-            return temp_int[:1]
-
-        temp_int = np.empty((mask.shape[0],), dtype=np.int_)
+        def exit_place_func_nb(out, from_i, to_i, col):
+            out[0] = True
 
         en, ex = pd.Series.vbt.signals.generate_both(
-            5, entry_func_nb, (temp_int,), exit_func_nb, (temp_int,),
-            index=mask['a'].index, name=mask['a'].name)
+            5, entry_place_func_nb=entry_place_func_nb, exit_place_func_nb=exit_place_func_nb,
+            max_one_entry=True, max_one_exit=True,
+            wrap_kwargs=dict(index=mask['a'].index, columns=['a']))
         pd.testing.assert_series_equal(
             en,
             pd.Series(
                 np.array([True, False, True, False, True]),
                 index=mask['a'].index,
-                name=mask['a'].name
+                name='a'
             )
         )
         pd.testing.assert_series_equal(
@@ -193,12 +199,13 @@ class TestAccessors:
             pd.Series(
                 np.array([False, True, False, True, False]),
                 index=mask['a'].index,
-                name=mask['a'].name
+                name='a'
             )
         )
         en, ex = pd.DataFrame.vbt.signals.generate_both(
-            (5, 3), entry_func_nb, (temp_int,), exit_func_nb, (temp_int,),
-            index=mask.index, columns=mask.columns)
+            (5, 3), entry_place_func_nb=entry_place_func_nb, exit_place_func_nb=exit_place_func_nb,
+            max_one_entry=True, max_one_exit=True,
+            wrap_kwargs=dict(index=mask.index, columns=mask.columns))
         pd.testing.assert_frame_equal(
             en,
             pd.DataFrame(
@@ -228,14 +235,15 @@ class TestAccessors:
             )
         )
         en, ex = pd.Series.vbt.signals.generate_both(
-            (5,), entry_func_nb, (temp_int,), exit_func_nb, (temp_int,),
-            index=mask['a'].index, name=mask['a'].name, entry_wait=1, exit_wait=0)
+            (5,), entry_place_func_nb=entry_place_func_nb, exit_place_func_nb=exit_place_func_nb,
+            entry_wait=1, exit_wait=0, max_one_entry=True, max_one_exit=True,
+            wrap_kwargs=dict(index=mask['a'].index, columns=['a']))
         pd.testing.assert_series_equal(
             en,
             pd.Series(
                 np.array([True, True, True, True, True]),
                 index=mask['a'].index,
-                name=mask['a'].name
+                name='a'
             )
         )
         pd.testing.assert_series_equal(
@@ -243,18 +251,19 @@ class TestAccessors:
             pd.Series(
                 np.array([True, True, True, True, True]),
                 index=mask['a'].index,
-                name=mask['a'].name
+                name='a'
             )
         )
         en, ex = pd.Series.vbt.signals.generate_both(
-            (5,), entry_func_nb, (temp_int,), exit_func_nb, (temp_int,),
-            index=mask['a'].index, name=mask['a'].name, entry_wait=0, exit_wait=1)
+            (5,), entry_place_func_nb=entry_place_func_nb, exit_place_func_nb=exit_place_func_nb,
+            entry_wait=0, exit_wait=1, max_one_entry=True, max_one_exit=True,
+            wrap_kwargs=dict(index=mask['a'].index, columns=['a']))
         pd.testing.assert_series_equal(
             en,
             pd.Series(
                 np.array([True, True, True, True, True]),
                 index=mask['a'].index,
-                name=mask['a'].name
+                name='a'
             )
         )
         pd.testing.assert_series_equal(
@@ -262,30 +271,26 @@ class TestAccessors:
             pd.Series(
                 np.array([False, True, True, True, True]),
                 index=mask['a'].index,
-                name=mask['a'].name
+                name='a'
             )
         )
 
         @njit
-        def entry_func2_nb(from_i, to_i, col, temp_int):
-            temp_int[0] = from_i
+        def entry_place_func2_nb(out, from_i, to_i, col):
+            out[0] = True
             if from_i + 1 < to_i:
-                temp_int[1] = from_i + 1
-                return temp_int[:2]
-            return temp_int[:1]
+                out[1] = True
 
         @njit
-        def exit_func2_nb(from_i, to_i, col, temp_int):
-            temp_int[0] = from_i
+        def exit_place_func2_nb(out, from_i, to_i, col):
+            out[0] = True
             if from_i + 1 < to_i:
-                temp_int[1] = from_i + 1
-                return temp_int[:2]
-            return temp_int[:1]
+                out[1] = True
 
         en, ex = pd.DataFrame.vbt.signals.generate_both(
-            (5, 3), entry_func2_nb, (temp_int,), exit_func2_nb, (temp_int,),
-            entry_pick_first=False, exit_pick_first=False,
-            index=mask.index, columns=mask.columns)
+            (5, 3), entry_place_func_nb=entry_place_func2_nb, exit_place_func_nb=exit_place_func2_nb,
+            max_one_entry=False, max_one_exit=False,
+            wrap_kwargs=dict(index=mask.index, columns=mask.columns))
         pd.testing.assert_frame_equal(
             en,
             pd.DataFrame(
@@ -314,25 +319,86 @@ class TestAccessors:
                 columns=mask.columns
             )
         )
+        pd.testing.assert_frame_equal(
+            pd.DataFrame.vbt.signals.generate_both(
+                (5, 3), entry_place_func_nb=entry_place_func2_nb, exit_place_func_nb=exit_place_func2_nb,
+                max_one_entry=False, max_one_exit=False, jitted=dict(parallel=True))[0],
+            pd.DataFrame.vbt.signals.generate_both(
+                (5, 3), entry_place_func_nb=entry_place_func2_nb, exit_place_func_nb=exit_place_func2_nb,
+                max_one_entry=False, max_one_exit=False, jitted=dict(parallel=False))[0]
+        )
+        pd.testing.assert_frame_equal(
+            pd.DataFrame.vbt.signals.generate_both(
+                (5, 3), entry_place_func_nb=entry_place_func2_nb, exit_place_func_nb=exit_place_func2_nb,
+                max_one_entry=False, max_one_exit=False, jitted=dict(parallel=True))[1],
+            pd.DataFrame.vbt.signals.generate_both(
+                (5, 3), entry_place_func_nb=entry_place_func2_nb, exit_place_func_nb=exit_place_func2_nb,
+                max_one_entry=False, max_one_exit=False, jitted=dict(parallel=False))[1]
+        )
+        pd.testing.assert_frame_equal(
+            pd.DataFrame.vbt.signals.generate_both(
+                (5, 3), entry_place_func_nb=entry_place_func2_nb, exit_place_func_nb=exit_place_func2_nb,
+                max_one_entry=False, max_one_exit=False, chunked=True)[0],
+            pd.DataFrame.vbt.signals.generate_both(
+                (5, 3), entry_place_func_nb=entry_place_func2_nb, exit_place_func_nb=exit_place_func2_nb,
+                max_one_entry=False, max_one_exit=False, chunked=False)[0]
+        )
+        pd.testing.assert_frame_equal(
+            pd.DataFrame.vbt.signals.generate_both(
+                (5, 3), entry_place_func_nb=entry_place_func2_nb, exit_place_func_nb=exit_place_func2_nb,
+                max_one_entry=False, max_one_exit=False, chunked=True)[1],
+            pd.DataFrame.vbt.signals.generate_both(
+                (5, 3), entry_place_func_nb=entry_place_func2_nb, exit_place_func_nb=exit_place_func2_nb,
+                max_one_entry=False, max_one_exit=False, chunked=False)[1]
+        )
+
+        @njit
+        def entry_place_func3_nb(out, from_i, to_i, col, temp):
+            out[temp[from_i, col]] = True
+
+        @njit
+        def exit_place_func3_nb(out, from_i, to_i, col, temp):
+            out[temp[from_i, col]] = True
+
+        en, ex = pd.Series.vbt.signals.generate_both(
+            5,
+            entry_place_func_nb=entry_place_func3_nb, entry_args=(vbt.Rep('temp'),),
+            exit_place_func_nb=exit_place_func3_nb, exit_args=(vbt.Rep('temp'),),
+            max_one_entry=True, max_one_exit=True,
+            broadcast_named_args=dict(temp=0),
+            wrap_kwargs=dict(index=mask['a'].index, columns=['a']))
+        pd.testing.assert_series_equal(
+            en,
+            pd.Series(
+                np.array([True, False, True, False, True]),
+                index=mask['a'].index,
+                name='a'
+            )
+        )
+        pd.testing.assert_series_equal(
+            ex,
+            pd.Series(
+                np.array([False, True, False, True, False]),
+                index=mask['a'].index,
+                name='a'
+            )
+        )
 
     def test_generate_exits(self):
         @njit
-        def choice_func_nb(from_i, to_i, col, temp_int):
-            temp_int[0] = from_i
-            return temp_int[:1]
-
-        temp_int = np.empty((mask.shape[0],), dtype=np.int_)
+        def place_func_nb(out, from_i, to_i, col):
+            out[0] = True
 
         pd.testing.assert_series_equal(
-            mask['a'].vbt.signals.generate_exits(choice_func_nb, temp_int),
+            mask['a'].vbt.signals.generate_exits(place_func_nb),
             pd.Series(
                 np.array([False, True, False, False, True]),
                 index=mask['a'].index,
-                name=mask['a'].name
+                name='a'
             )
         )
         pd.testing.assert_frame_equal(
-            mask.vbt.signals.generate_exits(choice_func_nb, temp_int),
+            mask.vbt.signals.generate_exits(place_func_nb),
             pd.DataFrame(
                 np.array([
                     [False, False, False],
@@ -346,7 +412,7 @@ class TestAccessors:
             )
         )
         pd.testing.assert_frame_equal(
-            mask.vbt.signals.generate_exits(choice_func_nb, temp_int, wait=0),
+            mask.vbt.signals.generate_exits(place_func_nb, wait=0),
             pd.DataFrame(
                 np.array([
                     [True, False, False],
@@ -361,13 +427,11 @@ class TestAccessors:
         )
 
         @njit
-        def choice_func2_nb(from_i, to_i, col, temp_int):
-            for i in range(from_i, to_i):
-                temp_int[i - from_i] = i
-            return temp_int[:to_i - from_i]
+        def place_func2_nb(out, from_i, to_i, col):
+            out[:] = True
 
         pd.testing.assert_frame_equal(
-            mask.vbt.signals.generate_exits(choice_func2_nb, temp_int, until_next=False, pick_first=False),
+            mask.vbt.signals.generate_exits(place_func2_nb, until_next=False),
             pd.DataFrame(
                 np.array([
                     [False, False, False],
@@ -383,10 +447,33 @@ class TestAccessors:
 
         mask2 = pd.Series([True, True, True, True, True], index=mask.index)
         pd.testing.assert_series_equal(
-            mask2.vbt.signals.generate_exits(choice_func_nb, temp_int, until_next=False, skip_until_exit=True),
+            mask2.vbt.signals.generate_exits(place_func_nb, until_next=False, skip_until_exit=True),
             pd.Series(
                 np.array([False, True, False, True, False]),
                 index=mask.index
+            )
+        )
+        pd.testing.assert_frame_equal(
+            mask.vbt.signals.generate_exits(place_func_nb, jitted=dict(parallel=True)),
+            mask.vbt.signals.generate_exits(place_func_nb, jitted=dict(parallel=False))
+        )
+        pd.testing.assert_frame_equal(
+            mask.vbt.signals.generate_exits(place_func_nb, chunked=True),
+            mask.vbt.signals.generate_exits(place_func_nb, chunked=False)
+        )
+
+        @njit
+        def place_func3_nb(out, from_i, to_i, col, temp):
+            out[temp[from_i, col]] = True
+
+        pd.testing.assert_series_equal(
+            mask['a'].vbt.signals.generate_exits(
+                place_func3_nb, vbt.RepEval('temp[:, None]'), broadcast_named_args=dict(temp=0)
+            ),
+            pd.Series(
+                np.array([False, True, False, False, True]),
+                index=mask['a'].index,
+                name='a'
             )
         )
 
@@ -512,30 +599,56 @@ class TestAccessors:
             )
         )
         with pytest.raises(Exception):
-            _ = pd.Series.vbt.signals.clean(entries, entries, entries)
+            pd.Series.vbt.signals.clean(entries, entries, entries)
+        pd.testing.assert_frame_equal(
+            entries.vbt.signals.clean(jitted=dict(parallel=True)),
+            entries.vbt.signals.clean(jitted=dict(parallel=False))
+        )
+        pd.testing.assert_frame_equal(
+            entries.vbt.signals.clean(exits, jitted=dict(parallel=True))[0],
+            entries.vbt.signals.clean(exits, jitted=dict(parallel=False))[0]
+        )
+        pd.testing.assert_frame_equal(
+            entries.vbt.signals.clean(exits, jitted=dict(parallel=True))[1],
+            entries.vbt.signals.clean(exits, jitted=dict(parallel=False))[1]
+        )
+        pd.testing.assert_frame_equal(
+            entries.vbt.signals.clean(chunked=True),
+            entries.vbt.signals.clean(chunked=False)
+        )
+        pd.testing.assert_frame_equal(
+            entries.vbt.signals.clean(exits, chunked=True)[0],
+            entries.vbt.signals.clean(exits, chunked=False)[0]
+        )
+        pd.testing.assert_frame_equal(
+            entries.vbt.signals.clean(exits, chunked=True)[1],
+            entries.vbt.signals.clean(exits, chunked=False)[1]
+        )
 
     def test_generate_random(self):
         pd.testing.assert_series_equal(
             pd.Series.vbt.signals.generate_random(
-                5, n=3, seed=seed, index=mask['a'].index, name=mask['a'].name),
+                5, n=3, seed=seed,
+                wrap_kwargs=dict(index=mask['a'].index, columns=['a'])),
             pd.Series(
-                np.array([False, True, True, False, True]),
+                np.array([False, False, True, True, True]),
                 index=mask['a'].index,
-                name=mask['a'].name
+                name='a'
             )
         )
         with pytest.raises(Exception):
-            _ = pd.Series.vbt.signals.generate_random((5, 2), n=3)
+            pd.Series.vbt.signals.generate_random((5, 2), n=3)
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate_random(
-                (5, 3), n=3, seed=seed, index=mask.index, columns=mask.columns),
+                (5, 3), n=3, seed=seed,
+                wrap_kwargs=dict(index=mask.index, columns=mask.columns)),
             pd.DataFrame(
                 np.array([
-                    [False, False, True],
+                    [False, False, False],
+                    [False, True, False],
                     [True, True, True],
-                    [True, True, False],
-                    [False, True, True],
-                    [True, False, False]
+                    [True, False, True],
+                    [True, True, True]
                 ]),
                 index=mask.index,
                 columns=mask.columns
@@ -543,33 +656,44 @@ class TestAccessors:
         )
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate_random(
-                (5, 3), n=[0, 1, 2], seed=seed, index=mask.index, columns=mask.columns),
+                (5, 3), n=[0, 1, 2], seed=seed,
+                wrap_kwargs=dict(index=mask.index, columns=mask.columns)),
             pd.DataFrame(
                 np.array([
-                    [False, False, True],
-                    [False, False, True],
                     [False, False, False],
+                    [False, False, False],
+                    [False, False, True],
                     [False, True, False],
-                    [False, False, False]
+                    [False, False, True]
                 ]),
                 index=mask.index,
                 columns=mask.columns
             )
+        )
+        pd.testing.assert_frame_equal(
+            pd.DataFrame.vbt.signals.generate_random(
+                (5, 3), n=[0, 1, 2], seed=seed,
+                wrap_kwargs=dict(index=mask.index, columns=mask.columns), chunked=True),
+            pd.DataFrame.vbt.signals.generate_random(
+                (5, 3), n=[0, 1, 2], seed=seed,
+                wrap_kwargs=dict(index=mask.index, columns=mask.columns), chunked=False)
         )
         pd.testing.assert_series_equal(
             pd.Series.vbt.signals.generate_random(
-                5, prob=0.5, seed=seed, index=mask['a'].index, name=mask['a'].name),
+                5, prob=0.5, seed=seed,
+                wrap_kwargs=dict(index=mask['a'].index, columns=['a'])),
             pd.Series(
                 np.array([True, False, False, False, True]),
                 index=mask['a'].index,
-                name=mask['a'].name
+                name='a'
             )
         )
         with pytest.raises(Exception):
-            _ = pd.Series.vbt.signals.generate_random((5, 2), prob=3)
+            pd.Series.vbt.signals.generate_random((5, 2), prob=3)
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate_random(
-                (5, 3), prob=0.5, seed=seed, index=mask.index, columns=mask.columns),
+                (5, 3), prob=0.5, seed=seed,
+                wrap_kwargs=dict(index=mask.index, columns=mask.columns)),
             pd.DataFrame(
                 np.array([
                     [True, True, True],
@@ -584,7 +708,8 @@ class TestAccessors:
         )
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate_random(
-                (5, 3), prob=[0., 0.5, 1.], seed=seed, index=mask.index, columns=mask.columns),
+                (5, 3), prob=[0., 0.5, 1.], seed=seed,
+                wrap_kwargs=dict(index=mask.index, columns=mask.columns)),
             pd.DataFrame(
                 np.array([
                     [False, True, True],
@@ -601,7 +726,8 @@ class TestAccessors:
             pd.DataFrame.vbt.signals.generate_random((5, 3))
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate_random(
-                (5, 3), prob=[0., 0.5, 1.], pick_first=True, seed=seed, index=mask.index, columns=mask.columns),
+                (5, 3), prob=[0., 0.5, 1.], pick_first=True, seed=seed,
+                wrap_kwargs=dict(index=mask.index, columns=mask.columns)),
             pd.DataFrame(
                 np.array([
                     [False, True, True],
@@ -614,37 +740,47 @@ class TestAccessors:
                 columns=mask.columns
             )
         )
+        pd.testing.assert_frame_equal(
+            pd.DataFrame.vbt.signals.generate_random(
+                (5, 3), prob=[0., 0.5, 1.], pick_first=True, seed=seed,
+                wrap_kwargs=dict(index=mask.index, columns=mask.columns), chunked=True),
+            pd.DataFrame.vbt.signals.generate_random(
+                (5, 3), prob=[0., 0.5, 1.], pick_first=True, seed=seed,
+                wrap_kwargs=dict(index=mask.index, columns=mask.columns), chunked=False)
+        )
 
     def test_generate_random_both(self):
         # n
         en, ex = pd.Series.vbt.signals.generate_random_both(
-            5, n=2, seed=seed, index=mask['a'].index, name=mask['a'].name)
+            5, n=2, seed=seed,
+            wrap_kwargs=dict(index=mask['a'].index, columns=['a']))
         pd.testing.assert_series_equal(
             en,
             pd.Series(
-                np.array([True, False, True, False, False]),
+                np.array([False, True, False, True, False]),
                 index=mask['a'].index,
-                name=mask['a'].name
+                name='a'
             )
         )
         pd.testing.assert_series_equal(
             ex,
             pd.Series(
-                np.array([False, True, False, False, True]),
+                np.array([False, False, True, False, True]),
                 index=mask['a'].index,
-                name=mask['a'].name
+                name='a'
             )
         )
         en, ex = pd.DataFrame.vbt.signals.generate_random_both(
-            (5, 3), n=2, seed=seed, index=mask.index, columns=mask.columns)
+            (5, 3), n=2, seed=seed,
+            wrap_kwargs=dict(index=mask.index, columns=mask.columns))
         pd.testing.assert_frame_equal(
             en,
             pd.DataFrame(
                 np.array([
-                    [True, True, True],
-                    [False, False, False],
+                    [False, False, True],
                     [True, True, False],
-                    [False, False, True],
+                    [False, False, False],
+                    [True, True, True],
                     [False, False, False]
                 ]),
                 index=mask.index,
@@ -656,25 +792,26 @@ class TestAccessors:
             pd.DataFrame(
                 np.array([
                     [False, False, False],
-                    [True, True, True],
+                    [False, False, True],
+                    [True, True, False],
                     [False, False, False],
-                    [False, True, False],
-                    [True, False, True]
+                    [True, True, True]
                 ]),
                 index=mask.index,
                 columns=mask.columns
             )
         )
         en, ex = pd.DataFrame.vbt.signals.generate_random_both(
-            (5, 3), n=[0, 1, 2], seed=seed, index=mask.index, columns=mask.columns)
+            (5, 3), n=[0, 1, 2], seed=seed,
+            wrap_kwargs=dict(index=mask.index, columns=mask.columns))
         pd.testing.assert_frame_equal(
             en,
             pd.DataFrame(
                 np.array([
-                    [False, False, True],
-                    [False, True, False],
                     [False, False, False],
                     [False, False, True],
+                    [False, False, False],
+                    [False, True, True],
                     [False, False, False]
                 ]),
                 index=mask.index,
@@ -686,22 +823,26 @@ class TestAccessors:
             pd.DataFrame(
                 np.array([
                     [False, False, False],
+                    [False, False, False],
                     [False, False, True],
                     [False, False, False],
-                    [False, True, False],
-                    [False, False, True]
+                    [False, True, True]
                 ]),
                 index=mask.index,
                 columns=mask.columns
             )
         )
+        en2, ex2 = pd.DataFrame.vbt.signals.generate_random_both(
+            (5, 3), n=[0, 1, 2], seed=seed,
+            wrap_kwargs=dict(index=mask.index, columns=mask.columns), chunked=True)
+        pd.testing.assert_frame_equal(en2, en)
+        pd.testing.assert_frame_equal(ex2, ex)
         en, ex = pd.DataFrame.vbt.signals.generate_random_both((2, 3), n=2, seed=seed, entry_wait=1, exit_wait=0)
         pd.testing.assert_frame_equal(
             en,
             pd.DataFrame(
                 np.array([
-                    [True, True, True],
-                    [True, True, True],
+                    [True, True, True], [True, True, True]
                 ])
             )
         )
@@ -709,8 +850,7 @@ class TestAccessors:
             ex,
             pd.DataFrame(
                 np.array([
-                    [True, True, True],
-                    [True, True, True]
+                    [True, True, True], [True, True, True]
                 ])
             )
         )
@@ -778,13 +918,14 @@ class TestAccessors:
 
         # probs
         en, ex = pd.Series.vbt.signals.generate_random_both(
-            5, entry_prob=0.5, exit_prob=1., seed=seed, index=mask['a'].index, name=mask['a'].name)
+            5, entry_prob=0.5, exit_prob=1., seed=seed,
+            wrap_kwargs=dict(index=mask['a'].index, columns=['a']))
         pd.testing.assert_series_equal(
             en,
             pd.Series(
                 np.array([True, False, False, False, True]),
                 index=mask['a'].index,
-                name=mask['a'].name
+                name='a'
             )
         )
         pd.testing.assert_series_equal(
@@ -792,11 +933,12 @@ class TestAccessors:
             pd.Series(
                 np.array([False, True, False, False, False]),
                 index=mask['a'].index,
-                name=mask['a'].name
+                name='a'
             )
         )
         en, ex = pd.DataFrame.vbt.signals.generate_random_both(
-            (5, 3), entry_prob=0.5, exit_prob=1., seed=seed, index=mask.index, columns=mask.columns)
+            (5, 3), entry_prob=0.5, exit_prob=1., seed=seed,
+            wrap_kwargs=dict(index=mask.index, columns=mask.columns))
         pd.testing.assert_frame_equal(
             en,
             pd.DataFrame(
@@ -827,7 +969,7 @@ class TestAccessors:
         )
         en, ex = pd.DataFrame.vbt.signals.generate_random_both(
             (5, 3), entry_prob=[0., 0.5, 1.], exit_prob=[0., 0.5, 1.],
-            seed=seed, index=mask.index, columns=mask.columns)
+            seed=seed, wrap_kwargs=dict(index=mask.index, columns=mask.columns))
         pd.testing.assert_frame_equal(
             en,
             pd.DataFrame(
@@ -856,9 +998,14 @@ class TestAccessors:
                 columns=mask.columns
             )
         )
+        en2, ex2 = pd.DataFrame.vbt.signals.generate_random_both(
+            (5, 3), entry_prob=[0., 0.5, 1.], exit_prob=[0., 0.5, 1.],
+            seed=seed, wrap_kwargs=dict(index=mask.index, columns=mask.columns), chunked=True)
+        pd.testing.assert_frame_equal(en2, en)
+        pd.testing.assert_frame_equal(ex2, ex)
         en, ex = pd.DataFrame.vbt.signals.generate_random_both(
             (5, 3), entry_prob=1., exit_prob=1., exit_wait=0,
-            seed=seed, index=mask.index, columns=mask.columns)
+            seed=seed, wrap_kwargs=dict(index=mask.index, columns=mask.columns))
         pd.testing.assert_frame_equal(
             en,
             pd.DataFrame(
@@ -889,7 +1036,7 @@ class TestAccessors:
         )
         en, ex = pd.DataFrame.vbt.signals.generate_random_both(
             (5, 3), entry_prob=1., exit_prob=1., entry_pick_first=False, exit_pick_first=True,
-            seed=seed, index=mask.index, columns=mask.columns)
+            seed=seed, wrap_kwargs=dict(index=mask.index, columns=mask.columns))
         pd.testing.assert_frame_equal(
             en,
             pd.DataFrame(
@@ -920,7 +1067,7 @@ class TestAccessors:
         )
         en, ex = pd.DataFrame.vbt.signals.generate_random_both(
             (5, 3), entry_prob=1., exit_prob=1., entry_pick_first=True, exit_pick_first=False,
-            seed=seed, index=mask.index, columns=mask.columns)
+            seed=seed, wrap_kwargs=dict(index=mask.index, columns=mask.columns))
         pd.testing.assert_frame_equal(
             en,
             pd.DataFrame(
@@ -957,9 +1104,9 @@ class TestAccessors:
         pd.testing.assert_series_equal(
             mask['a'].vbt.signals.generate_random_exits(seed=seed),
             pd.Series(
-                np.array([False, False, True, False, True]),
+                np.array([False, True, False, False, True]),
                 index=mask['a'].index,
-                name=mask['a'].name
+                name='a'
             )
         )
         pd.testing.assert_frame_equal(
@@ -967,24 +1114,28 @@ class TestAccessors:
             pd.DataFrame(
                 np.array([
                     [False, False, False],
+                    [True, False, False],
                     [False, False, False],
-                    [True, True, False],
-                    [False, False, False],
-                    [True, False, True]
+                    [False, True, True],
+                    [True, False, False]
                 ]),
                 index=mask.index,
                 columns=mask.columns
             )
         )
         pd.testing.assert_frame_equal(
+            mask.vbt.signals.generate_random_exits(seed=seed, chunked=True),
+            mask.vbt.signals.generate_random_exits(seed=seed, chunked=False)
+        )
+        pd.testing.assert_frame_equal(
             mask.vbt.signals.generate_random_exits(seed=seed, wait=0),
             pd.DataFrame(
                 np.array([
-                    [True, False, False],
                     [False, False, False],
                     [False, True, False],
-                    [False, False, True],
-                    [True, True, False]
+                    [True, False, False],
+                    [False, False, False],
+                    [True, True, True]
                 ]),
                 index=mask.index,
                 columns=mask.columns
@@ -995,7 +1146,7 @@ class TestAccessors:
             pd.Series(
                 np.array([False, True, False, False, True]),
                 index=mask['a'].index,
-                name=mask['a'].name
+                name='a'
             )
         )
         pd.testing.assert_frame_equal(
@@ -1025,6 +1176,10 @@ class TestAccessors:
                 index=mask.index,
                 columns=mask.columns
             )
+        )
+        pd.testing.assert_frame_equal(
+            mask.vbt.signals.generate_random_exits(prob=[0., 0.5, 1.], seed=seed, chunked=True),
+            mask.vbt.signals.generate_random_exits(prob=[0., 0.5, 1.], seed=seed, chunked=False)
         )
         pd.testing.assert_frame_equal(
             mask.vbt.signals.generate_random_exits(prob=1., wait=0, seed=seed),
@@ -1115,6 +1270,12 @@ class TestAccessors:
             e.vbt.signals.generate_stop_exits(4 - t, 0.1, trailing=True, exit_wait=3),
             pd.Series(np.array([False, False, False, False, True, False]))
         )
+        pd.testing.assert_frame_equal(
+            e.vbt.signals.generate_stop_exits(
+                t.vbt.tile(3), [np.nan, -0.5, -1.], trailing=True, pick_first=False, chunked=True),
+            e.vbt.signals.generate_stop_exits(
+                t.vbt.tile(3), [np.nan, -0.5, -1.], trailing=True, pick_first=False, chunked=False)
+        )
         # chain
         e = pd.Series([True, True, True, True, True, True])
         en, ex = e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, chain=True)
@@ -1152,12 +1313,24 @@ class TestAccessors:
             ex,
             pd.Series(np.array([False, True, True, True, True, True]))
         )
+        pd.testing.assert_frame_equal(
+            e.vbt.signals.generate_stop_exits(
+                t.vbt.tile(3), [np.nan, -0.5, -1.], trailing=True, chain=True, chunked=True)[0],
+            e.vbt.signals.generate_stop_exits(
+                t.vbt.tile(3), [np.nan, -0.5, -1.], trailing=True, chain=True, chunked=False)[0]
+        )
+        pd.testing.assert_frame_equal(
+            e.vbt.signals.generate_stop_exits(
+                t.vbt.tile(3), [np.nan, -0.5, -1.], trailing=True, chain=True, chunked=True)[1],
+            e.vbt.signals.generate_stop_exits(
+                t.vbt.tile(3), [np.nan, -0.5, -1.], trailing=True, chain=True, chunked=False)[1]
+        )
 
     def test_generate_ohlc_stop_exits(self):
         with pytest.raises(Exception):
-            _ = mask.vbt.signals.generate_ohlc_stop_exits(ts, sl_stop=-0.1)
+            mask.vbt.signals.generate_ohlc_stop_exits(ts, sl_stop=-0.1)
         with pytest.raises(Exception):
-            _ = mask.vbt.signals.generate_ohlc_stop_exits(ts, tp_stop=-0.1)
+            mask.vbt.signals.generate_ohlc_stop_exits(ts, tp_stop=-0.1)
 
         pd.testing.assert_frame_equal(
             mask.vbt.signals.generate_stop_exits(ts, -0.1),
@@ -1383,6 +1556,24 @@ class TestAccessors:
                 [-1, -1, 1]
             ]), index=mask.index, columns=mask.columns)
         )
+        pd.testing.assert_frame_equal(
+            _test_ohlc_stop_exits(
+                sl_stop=[np.nan, 0.1, 0.2], sl_trail=True, tp_stop=[np.nan, 0.1, 0.2], chunked=True)[0],
+            _test_ohlc_stop_exits(
+                sl_stop=[np.nan, 0.1, 0.2], sl_trail=True, tp_stop=[np.nan, 0.1, 0.2], chunked=False)[0]
+        )
+        pd.testing.assert_frame_equal(
+            _test_ohlc_stop_exits(
+                sl_stop=[np.nan, 0.1, 0.2], sl_trail=True, tp_stop=[np.nan, 0.1, 0.2], chunked=True)[1],
+            _test_ohlc_stop_exits(
+                sl_stop=[np.nan, 0.1, 0.2], sl_trail=True, tp_stop=[np.nan, 0.1, 0.2], chunked=False)[1]
+        )
+        pd.testing.assert_frame_equal(
+            _test_ohlc_stop_exits(
+                sl_stop=[np.nan, 0.1, 0.2], sl_trail=True, tp_stop=[np.nan, 0.1, 0.2], chunked=True)[2],
+            _test_ohlc_stop_exits(
+                sl_stop=[np.nan, 0.1, 0.2], sl_trail=True, tp_stop=[np.nan, 0.1, 0.2], chunked=False)[2]
+        )
         ex, stop_price, stop_type = _test_ohlc_stop_exits(sl_stop=0.1, sl_trail=True, tp_stop=0.1, exit_wait=0)
         pd.testing.assert_frame_equal(
             ex,
@@ -1456,13 +1647,37 @@ class TestAccessors:
                 [1, -1, -1]
             ]), index=mask.index, columns=mask.columns)
         )
+        pd.testing.assert_frame_equal(
+            _test_ohlc_stop_exits(
+                sl_stop=[np.nan, 0.1, 0.2], sl_trail=True, chain=True, tp_stop=[np.nan, 0.1, 0.2], chunked=True)[0][0],
+            _test_ohlc_stop_exits(
+                sl_stop=[np.nan, 0.1, 0.2], sl_trail=True, chain=True, tp_stop=[np.nan, 0.1, 0.2], chunked=False)[0][0]
+        )
+        pd.testing.assert_frame_equal(
+            _test_ohlc_stop_exits(
+                sl_stop=[np.nan, 0.1, 0.2], sl_trail=True, chain=True, tp_stop=[np.nan, 0.1, 0.2], chunked=True)[0][0],
+            _test_ohlc_stop_exits(
+                sl_stop=[np.nan, 0.1, 0.2], sl_trail=True, chain=True, tp_stop=[np.nan, 0.1, 0.2], chunked=False)[0][0]
+        )
+        pd.testing.assert_frame_equal(
+            _test_ohlc_stop_exits(
+                sl_stop=[np.nan, 0.1, 0.2], sl_trail=True, chain=True, tp_stop=[np.nan, 0.1, 0.2], chunked=True)[1],
+            _test_ohlc_stop_exits(
+                sl_stop=[np.nan, 0.1, 0.2], sl_trail=True, chain=True, tp_stop=[np.nan, 0.1, 0.2], chunked=False)[1]
+        )
+        pd.testing.assert_frame_equal(
+            _test_ohlc_stop_exits(
+                sl_stop=[np.nan, 0.1, 0.2], sl_trail=True, chain=True, tp_stop=[np.nan, 0.1, 0.2], chunked=True)[2],
+            _test_ohlc_stop_exits(
+                sl_stop=[np.nan, 0.1, 0.2], sl_trail=True, chain=True, tp_stop=[np.nan, 0.1, 0.2], chunked=False)[2]
+        )
 
     def test_between_ranges(self):
         ranges = mask.vbt.signals.between_ranges()
-        record_arrays_close(
+        assert_records_close(
             ranges.values,
             np.array([
-                (0, 0, 0, 3, 1), (1, 1, 1, 4, 1)
+                (0, 0, 0, 3, 1), (0, 1, 1, 4, 1)
             ], dtype=range_dt)
         )
         assert ranges.wrapper == mask.vbt.wrapper
@@ -1484,24 +1699,41 @@ class TestAccessors:
         ], index=mask.index, columns=mask.columns)
 
         ranges = mask2.vbt.signals.between_ranges(other=other_mask)
-        record_arrays_close(
+        assert_records_close(
             ranges.values,
             np.array([
-                (0, 0, 0, 1, 1), (1, 0, 1, 1, 1), (2, 1, 0, 2, 1),
-                (3, 1, 1, 2, 1), (4, 2, 0, 3, 1), (5, 2, 1, 3, 1)
+                (0, 0, 1, 1, 1), (1, 0, 1, 2, 1), (0, 1, 1, 2, 1), (1, 1, 1, 3, 1),
+                (0, 2, 1, 3, 1), (1, 2, 1, 4, 1)
             ], dtype=range_dt)
         )
         assert ranges.wrapper == mask2.vbt.wrapper
 
         ranges = mask2.vbt.signals.between_ranges(other=other_mask, from_other=True)
-        record_arrays_close(
+        assert_records_close(
             ranges.values,
             np.array([
-                (0, 0, 1, 1, 1), (1, 0, 1, 2, 1), (2, 1, 1, 2, 1),
-                (3, 1, 1, 3, 1), (4, 2, 1, 3, 1), (5, 2, 1, 4, 1)
+                (0, 0, 1, 1, 1), (1, 0, 0, 1, 1), (0, 1, 1, 2, 1), (1, 1, 0, 2, 1),
+                (0, 2, 1, 3, 1), (1, 2, 0, 3, 1)
             ], dtype=range_dt)
         )
         assert ranges.wrapper == mask2.vbt.wrapper
+
+        assert_records_close(
+            mask.vbt.signals.between_ranges(jitted=dict(parallel=True)).values,
+            mask.vbt.signals.between_ranges(jitted=dict(parallel=False)).values
+        )
+        assert_records_close(
+            mask.vbt.signals.between_ranges(chunked=True).values,
+            mask.vbt.signals.between_ranges(chunked=False).values
+        )
+        assert_records_close(
+            mask.vbt.signals.between_ranges(other=other_mask, jitted=dict(parallel=True)).values,
+            mask.vbt.signals.between_ranges(other=other_mask, jitted=dict(parallel=False)).values
+        )
+        assert_records_close(
+            mask.vbt.signals.between_ranges(other=other_mask, chunked=True).values,
+            mask.vbt.signals.between_ranges(other=other_mask, chunked=False).values
+        )
 
     def test_partition_ranges(self):
         mask2 = pd.DataFrame([
@@ -1513,13 +1745,22 @@ class TestAccessors:
         ], index=mask.index, columns=mask.columns)
 
         ranges = mask2.vbt.signals.partition_ranges()
-        record_arrays_close(
+        assert_records_close(
             ranges.values,
             np.array([
-                (0, 0, 1, 3, 1), (1, 0, 4, 4, 0), (2, 1, 2, 4, 1), (3, 2, 3, 4, 0)
+                (0, 0, 1, 3, 1), (1, 0, 4, 4, 0), (0, 1, 2, 4, 1), (0, 2, 3, 4, 0)
             ], dtype=range_dt)
         )
         assert ranges.wrapper == mask2.vbt.wrapper
+
+        assert_records_close(
+            mask.vbt.signals.partition_ranges(jitted=dict(parallel=True)).values,
+            mask.vbt.signals.partition_ranges(jitted=dict(parallel=False)).values
+        )
+        assert_records_close(
+            mask.vbt.signals.partition_ranges(chunked=True).values,
+            mask.vbt.signals.partition_ranges(chunked=False).values
+        )
 
     def test_between_partition_ranges(self):
         mask2 = pd.DataFrame([
@@ -1531,18 +1772,27 @@ class TestAccessors:
         ], index=mask.index, columns=mask.columns)
 
         ranges = mask2.vbt.signals.between_partition_ranges()
-        record_arrays_close(
+        assert_records_close(
             ranges.values,
             np.array([
-                (0, 0, 1, 3, 1), (1, 1, 2, 4, 1)
+                (0, 0, 1, 3, 1), (0, 1, 2, 4, 1)
             ], dtype=range_dt)
         )
         assert ranges.wrapper == mask2.vbt.wrapper
 
+        assert_records_close(
+            mask.vbt.signals.between_partition_ranges(jitted=dict(parallel=True)).values,
+            mask.vbt.signals.between_partition_ranges(jitted=dict(parallel=False)).values
+        )
+        assert_records_close(
+            mask.vbt.signals.between_partition_ranges(chunked=True).values,
+            mask.vbt.signals.between_partition_ranges(chunked=False).values
+        )
+
     def test_pos_rank(self):
         pd.testing.assert_series_equal(
             (~mask['a']).vbt.signals.pos_rank(),
-            pd.Series([-1, 0, 1, -1, 0], index=mask['a'].index, name=mask['a'].name)
+            pd.Series([-1, 0, 1, -1, 0], index=mask['a'].index, name='a')
         )
         pd.testing.assert_frame_equal(
             (~mask).vbt.signals.pos_rank(),
@@ -1614,11 +1864,19 @@ class TestAccessors:
                 columns=mask.columns
             )
         )
+        pd.testing.assert_frame_equal(
+            (~mask).vbt.signals.pos_rank(jitted=dict(parallel=True)),
+            (~mask).vbt.signals.pos_rank(jitted=dict(parallel=False))
+        )
+        pd.testing.assert_frame_equal(
+            (~mask).vbt.signals.pos_rank(chunked=True),
+            (~mask).vbt.signals.pos_rank(chunked=False)
+        )
 
     def test_partition_pos_rank(self):
         pd.testing.assert_series_equal(
             (~mask['a']).vbt.signals.partition_pos_rank(),
-            pd.Series([-1, 0, 0, -1, 1], index=mask['a'].index, name=mask['a'].name)
+            pd.Series([-1, 0, 0, -1, 1], index=mask['a'].index, name='a')
         )
         pd.testing.assert_frame_equal(
             (~mask).vbt.signals.partition_pos_rank(),
@@ -1675,6 +1933,14 @@ class TestAccessors:
                 index=mask.index,
                 columns=mask.columns
             )
+        )
+        pd.testing.assert_frame_equal(
+            (~mask).vbt.signals.partition_pos_rank(jitted=dict(parallel=True)),
+            (~mask).vbt.signals.partition_pos_rank(jitted=dict(parallel=False))
+        )
+        pd.testing.assert_frame_equal(
+            (~mask).vbt.signals.partition_pos_rank(chunked=True),
+            (~mask).vbt.signals.partition_pos_rank(chunked=False)
         )
 
     def test_pos_rank_fns(self):
@@ -1810,6 +2076,10 @@ class TestAccessors:
             ], index=mask.columns, name='nth_index', dtype='datetime64[ns]')
         )
         pd.testing.assert_series_equal(
+            mask.vbt.signals.nth_index(-1, jitted=dict(parallel=True)),
+            mask.vbt.signals.nth_index(-1, jitted=dict(parallel=False))
+        )
+        pd.testing.assert_series_equal(
             mask.vbt.signals.nth_index(0, group_by=group_by),
             pd.Series([
                 pd.Timestamp('2020-01-01 00:00:00'),
@@ -1823,6 +2093,14 @@ class TestAccessors:
                 pd.Timestamp('2020-01-03 00:00:00')
             ], index=['g1', 'g2'], name='nth_index', dtype='datetime64[ns]')
         )
+        pd.testing.assert_series_equal(
+            mask.vbt.signals.nth_index(-1, group_by=group_by, jitted=dict(parallel=True)),
+            mask.vbt.signals.nth_index(-1, group_by=group_by, jitted=dict(parallel=False))
+        )
+        pd.testing.assert_series_equal(
+            mask.vbt.signals.nth_index(-1, group_by=group_by, chunked=True),
+            mask.vbt.signals.nth_index(-1, group_by=group_by, chunked=False)
+        )
 
     def test_norm_avg_index(self):
         assert mask['a'].vbt.signals.norm_avg_index() == -0.25
@@ -1831,8 +2109,24 @@ class TestAccessors:
             pd.Series([-0.25, 0.25, 0.0], index=mask.columns, name='norm_avg_index')
         )
         pd.testing.assert_series_equal(
+            mask.vbt.signals.norm_avg_index(jitted=dict(parallel=True)),
+            mask.vbt.signals.norm_avg_index(jitted=dict(parallel=False))
+        )
+        pd.testing.assert_series_equal(
+            mask.vbt.signals.norm_avg_index(chunked=True),
+            mask.vbt.signals.norm_avg_index(chunked=False)
+        )
+        pd.testing.assert_series_equal(
             mask.vbt.signals.norm_avg_index(group_by=group_by),
             pd.Series([0.0, 0.0], index=['g1', 'g2'], name='norm_avg_index')
+        )
+        pd.testing.assert_series_equal(
+            mask.vbt.signals.norm_avg_index(group_by=group_by, jitted=dict(parallel=True)),
+            mask.vbt.signals.norm_avg_index(group_by=group_by, jitted=dict(parallel=False))
+        )
+        pd.testing.assert_series_equal(
+            mask.vbt.signals.norm_avg_index(group_by=group_by, chunked=True),
+            mask.vbt.signals.norm_avg_index(group_by=group_by, chunked=False)
         )
 
     def test_index_mapped(self):
@@ -2069,39 +2363,6 @@ class TestAccessors:
         pd.testing.assert_index_equal(stats_df.index, mask.vbt.wrapper.columns)
         pd.testing.assert_index_equal(stats_df.columns, stats_index)
 
-    @pytest.mark.parametrize(
-        "test_func,test_func_pd",
-        [
-            (lambda x, *args, **kwargs: x.AND(args, **kwargs), lambda x, y: x & y),
-            (lambda x, *args, **kwargs: x.OR(args, **kwargs), lambda x, y: x | y),
-            (lambda x, *args, **kwargs: x.XOR(args, **kwargs), lambda x, y: x ^ y)
-        ],
-    )
-    def test_logical_funcs(self, test_func, test_func_pd):
-        pd.testing.assert_series_equal(
-            test_func(mask['a'].vbt.signals, True, [True, False, False, False, False]),
-            test_func_pd(test_func_pd(mask['a'], True), [True, False, False, False, False])
-        )
-        pd.testing.assert_frame_equal(
-            test_func(mask['a'].vbt.signals, True, [True, False, False, False, False], concat=True),
-            pd.concat((
-                test_func_pd(mask['a'], True),
-                test_func_pd(mask['a'], [True, False, False, False, False])
-            ), axis=1, keys=[0, 1], names=['combine_idx'])
-        )
-        pd.testing.assert_frame_equal(
-            test_func(mask.vbt.signals, True, [[True], [False], [False], [False], [False]]),
-            test_func_pd(test_func_pd(mask, True),
-                         np.broadcast_to([[True], [False], [False], [False], [False]], (5, 3)))
-        )
-        pd.testing.assert_frame_equal(
-            test_func(mask.vbt.signals, True, [[True], [False], [False], [False], [False]], concat=True),
-            pd.concat((
-                test_func_pd(mask, True),
-                test_func_pd(mask, np.broadcast_to([[True], [False], [False], [False], [False]], (5, 3)))
-            ), axis=1, keys=[0, 1], names=['combine_idx'])
-        )
-
 
 # ############# factory.py ############# #
 
@@ -2109,18 +2370,17 @@ class TestAccessors:
 class TestFactory:
     def test_entries(self):
         @njit
-        def choice_nb(from_i, to_i, col, ts, in_out, n, arg, temp_idx_arr, kw):
+        def place_nb(out, from_i, to_i, col, ts, in_out, n, arg, temp_idx_arr, kw):
             in_out[from_i, col] = ts[from_i, col] * n + arg + kw
-            temp_idx_arr[0] = from_i
-            return temp_idx_arr[:1]
+            out[0] = True
 
         MySignals = vbt.SignalFactory(
             mode='entries',
             input_names=['ts2'],
             in_output_names=['in_out2'],
             param_names=['n2']
-        ).from_choice_func(
-            entry_choice_func=choice_nb,
+        ).from_place_func(
+            entry_place_func=place_nb,
             entry_settings=dict(
                 pass_inputs=['ts2'],
                 pass_in_outputs=['in_out2'],
@@ -2162,18 +2422,17 @@ class TestFactory:
 
     def test_exits(self):
         @njit
-        def choice_nb(from_i, to_i, col, ts, in_out, n, arg, temp_idx_arr, kw):
+        def place_nb(out, from_i, to_i, col, ts, in_out, n, arg, temp_idx_arr, kw):
             in_out[from_i, col] = ts[from_i, col] * n + arg + kw
-            temp_idx_arr[0] = from_i
-            return temp_idx_arr[:1]
+            out[0] = True
 
         MySignals = vbt.SignalFactory(
             mode='exits',
             input_names=['ts2'],
             in_output_names=['in_out2'],
             param_names=['n2']
-        ).from_choice_func(
-            exit_choice_func=choice_nb,
+        ).from_place_func(
+            exit_place_func=place_nb,
             exit_settings=dict(
                 pass_inputs=['ts2'],
                 pass_in_outputs=['in_out2'],
@@ -2265,18 +2524,17 @@ class TestFactory:
 
     def test_chain(self):
         @njit
-        def choice_nb(from_i, to_i, col, ts, in_out, n, arg, temp_idx_arr, kw):
+        def place_nb(out, from_i, to_i, col, ts, in_out, n, arg, temp_idx_arr, kw):
             in_out[from_i, col] = ts[from_i, col] * n + arg + kw
-            temp_idx_arr[0] = from_i
-            return temp_idx_arr[:1]
+            out[0] = True
 
         MySignals = vbt.SignalFactory(
             mode='chain',
             input_names=['ts2'],
             in_output_names=['in_out2'],
             param_names=['n2']
-        ).from_choice_func(
-            exit_choice_func=choice_nb,
+        ).from_place_func(
+            exit_place_func=place_nb,
             exit_settings=dict(
                 pass_inputs=['ts2'],
                 pass_in_outputs=['in_out2'],
@@ -2395,16 +2653,15 @@ class TestFactory:
             return arg0
 
         @njit
-        def choice_nb(from_i, to_i, col, ts, in_out, n, arg, temp_idx_arr, kw, cache):
+        def place_nb(out, from_i, to_i, col, ts, in_out, n, arg, temp_idx_arr, kw, cache):
             in_out[from_i, col] = ts[from_i, col] * n + arg + kw + cache
-            temp_idx_arr[0] = from_i
-            return temp_idx_arr[:1]
+            out[0] = True
 
         MySignals = vbt.SignalFactory(
             input_names=['ts1', 'ts2'],
             in_output_names=['in_out1', 'in_out2'],
             param_names=['n1', 'n2']
-        ).from_choice_func(
+        ).from_place_func(
             cache_func=cache_nb,
             cache_settings=dict(
                 pass_inputs=['ts1', 'ts2'],
@@ -2412,7 +2669,7 @@ class TestFactory:
                 pass_params=['n1', 'n2'],
                 pass_kwargs=['temp_idx_arr0', ('kw0', 1000)]
             ),
-            entry_choice_func=choice_nb,
+            entry_place_func=place_nb,
             entry_settings=dict(
                 pass_inputs=['ts1'],
                 pass_in_outputs=['in_out1'],
@@ -2420,7 +2677,7 @@ class TestFactory:
                 pass_kwargs=['temp_idx_arr1', ('kw1', 1000)],
                 pass_cache=True
             ),
-            exit_choice_func=choice_nb,
+            exit_place_func=place_nb,
             exit_settings=dict(
                 pass_inputs=['ts2'],
                 pass_in_outputs=['in_out2'],
@@ -2571,17 +2828,17 @@ class TestGenerators:
         rand = vbt.RAND.run(n=1, input_shape=(6,), seed=seed)
         pd.testing.assert_series_equal(
             rand.entries,
-            pd.Series(np.array([True, False, False, False, False, False]), name=1)
+            pd.Series(np.array([False, False, False, True, False, False]), name=1)
         )
         rand = vbt.RAND.run(n=[1, 2, 3], input_shape=(6,), seed=seed)
         pd.testing.assert_frame_equal(
             rand.entries,
             pd.DataFrame(np.array([
-                [True, True, True],
-                [False, False, True],
                 [False, False, False],
-                [False, True, False],
                 [False, False, True],
+                [False, True, True],
+                [True, False, False],
+                [False, True, True],
                 [False, False, False]
             ]), columns=pd.Int64Index([1, 2, 3], dtype='int64', name='rand_n')
             )
@@ -2590,14 +2847,14 @@ class TestGenerators:
         pd.testing.assert_frame_equal(
             rand.entries,
             pd.DataFrame(np.array([
-                [False, False, True, False],
-                [True, False, False, False],
-                [False, False, False, True],
-                [False, True, True, False],
                 [False, False, False, False],
                 [False, False, False, True],
                 [False, False, True, True],
-                [False, True, False, True]
+                [False, True, False, False],
+                [False, True, False, True],
+                [False, False, False, False],
+                [True, False, True, True],
+                [False, False, True, False]
             ]), columns=pd.MultiIndex.from_tuples([
                 (1, 0),
                 (2, 1),
@@ -2613,10 +2870,10 @@ class TestGenerators:
             randx.exits,
             pd.DataFrame(np.array([
                 [False, False, False],
+                [True, False, False],
                 [False, False, False],
-                [True, True, False],
-                [False, False, False],
-                [True, False, True]
+                [False, True, True],
+                [True, False, False]
             ]), columns=mask.columns, index=mask.index)
         )
 
@@ -2624,20 +2881,20 @@ class TestGenerators:
         randnx = vbt.RANDNX.run(n=1, input_shape=(6,), seed=seed)
         pd.testing.assert_series_equal(
             randnx.entries,
-            pd.Series(np.array([True, False, False, False, False, False]), name=1)
+            pd.Series(np.array([False, False, False, True, False, False]), name=1)
         )
         pd.testing.assert_series_equal(
             randnx.exits,
-            pd.Series(np.array([False, True, False, False, False, False]), name=1)
+            pd.Series(np.array([False, False, False, False, True, False]), name=1)
         )
         randnx = vbt.RANDNX.run(n=[1, 2, 3], input_shape=(6,), seed=seed)
         pd.testing.assert_frame_equal(
             randnx.entries,
             pd.DataFrame(np.array([
-                [True, True, True],
-                [False, False, False],
-                [False, True, True],
-                [False, False, False],
+                [False, False, True],
+                [False, True, False],
+                [False, False, True],
+                [True, True, False],
                 [False, False, True],
                 [False, False, False]
             ]), columns=pd.Int64Index([1, 2, 3], dtype='int64', name='randnx_n')
@@ -2647,10 +2904,10 @@ class TestGenerators:
             randnx.exits,
             pd.DataFrame(np.array([
                 [False, False, False],
-                [True, True, True],
-                [False, False, False],
-                [False, True, True],
-                [False, False, False],
+                [False, False, True],
+                [False, True, False],
+                [False, False, True],
+                [True, True, False],
                 [False, False, True]
             ]), columns=pd.Int64Index([1, 2, 3], dtype='int64', name='randnx_n')
             )
@@ -2659,13 +2916,13 @@ class TestGenerators:
         pd.testing.assert_frame_equal(
             randnx.entries,
             pd.DataFrame(np.array([
-                [False, True, True, True],
-                [True, False, False, False],
                 [False, False, False, True],
                 [False, False, True, False],
                 [False, True, False, True],
-                [False, False, True, False],
+                [True, False, True, False],
                 [False, False, False, True],
+                [False, False, False, False],
+                [False, True, True, True],
                 [False, False, False, False]
             ]), columns=pd.MultiIndex.from_tuples([
                 (1, 0),
@@ -2679,13 +2936,13 @@ class TestGenerators:
             randnx.exits,
             pd.DataFrame(np.array([
                 [False, False, False, False],
-                [False, False, True, True],
-                [False, False, False, False],
-                [False, True, False, True],
+                [False, False, False, True],
                 [False, False, True, False],
-                [True, False, False, True],
-                [False, False, True, False],
-                [False, True, False, True]
+                [False, False, False, True],
+                [False, True, True, False],
+                [False, False, False, True],
+                [True, False, False, False],
+                [False, True, True, True]
             ]), columns=pd.MultiIndex.from_tuples([
                 (1, 0),
                 (2, 1),

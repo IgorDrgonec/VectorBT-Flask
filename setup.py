@@ -10,7 +10,7 @@ with open("vectorbt/_version.py", encoding="utf-8") as fp:
 setup(
     name='vectorbt',
     version=version['__version__'],
-    description='Python library for backtesting and analyzing trading strategies at scale',
+    description='Supercharged backtesting and technical analysis for quants',
     author='Oleg Polakow',
     author_email='olegpolakow@gmail.com',
     long_description=long_description,
@@ -23,35 +23,52 @@ setup(
     install_requires=[
         'numpy>=1.16.5',
         'pandas',
-        'scipy',
-        'matplotlib',
-        'plotly>=4.12.0',
-        'ipywidgets>=7.0.0',
         'numba==0.53.1; python_version == "3.7"',
         'numba>=0.53.1; python_version != "3.7"',
-        'dill',
-        'tqdm',
-        'dateparser',
-        'imageio',
+        'scipy',
         'scikit-learn',
         'schedule',
         'requests',
+        'tqdm',
+        'dateparser',
+        'imageio',
         'pytz',
         'typing_extensions; python_version < "3.8"',
         'mypy_extensions',
-        'kaleido'
+        'humanize',
+        'attrs'
     ],
     extras_require={
-        'full': [
+        'data': [
             'yfinance>=0.1.63',
             'python-binance',
-            'ccxt',
-            'ray>=1.4.1',
+            'ccxt'
+        ],
+        'ta': [
             'ta',
             'pandas_ta',
             'TA-Lib',
+        ],
+        'acc': [
+            'Bottleneck',
+            'numexpr',
+        ],
+        'exec': [
+            'ray>=1.4.1',
+            'dask'
+        ],
+        'plot': [
+            'matplotlib',
+            'plotly>=4.12.0',
+            'ipywidgets>=7.0.0'
+        ],
+        'stats': [
+            'quantstats',
+            'PyPortfolioOpt'
+        ],
+        'misc': [
             'python-telegram-bot>=13.4',  # LGPLv3
-            'quantstats'
+            'dill'
         ],
         'cov': [
             'pytest',

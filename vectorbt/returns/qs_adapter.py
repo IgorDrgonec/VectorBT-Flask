@@ -75,7 +75,7 @@ For example, the `periods` and `trading_year_days` arguments default to the annu
 produced by quantstats and vectorbt at least somewhat similar.
 
 ```python-repl
->>> vbt.settings.array_wrapper['freq'] = 'h'
+>>> vbt.settings.wrapping['freq'] = 'h'
 >>> vbt.settings.returns['year_freq'] = '365d'
 
 >>> rets.vbt.returns.sharpe_ratio()  # ReturnsAccessor
@@ -98,15 +98,21 @@ We can still override any argument by overriding its default or by passing it di
 -1.5912029345745982
 ```
 """
-import pandas as pd
+
+from vectorbt.opt_packages import assert_can_import
+
+assert_can_import('quantstats')
+
 from inspect import getmembers, isfunction, signature, Parameter
-import warnings
+
+import pandas as pd
 import quantstats as qs
 
 from vectorbt import _typing as tp
-from vectorbt.utils import checks
-from vectorbt.utils.config import merge_dicts, get_func_arg_names, Configured
 from vectorbt.returns.accessors import ReturnsAccessor
+from vectorbt.utils import checks
+from vectorbt.utils.config import merge_dicts, Configured
+from vectorbt.utils.parsing import get_func_arg_names
 
 
 def attach_qs_methods(cls: tp.Type[tp.T], replace_signature: bool = True) -> tp.Type[tp.T]:
@@ -191,10 +197,15 @@ class QSAdapter(Configured):
     def __init__(self, returns_accessor: ReturnsAccessor, defaults: tp.KwargsLike = None, **kwargs) -> None:
         checks.assert_instance_of(returns_accessor, ReturnsAccessor)
 
-        Configured.__init__(self, returns_accessor=returns_accessor, defaults=defaults, **kwargs)
-
         self._returns_accessor = returns_accessor
         self._defaults = defaults
+
+        Configured.__init__(
+            self,
+            returns_accessor=returns_accessor,
+            defaults=defaults,
+            **kwargs
+        )
 
     def __call__(self: QSAdapterT, **kwargs) -> QSAdapterT:
         """Allows passing arguments to the initializer."""

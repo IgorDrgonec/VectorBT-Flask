@@ -6,9 +6,9 @@
 import logging
 
 from vectorbt import _typing as tp
-from vectorbt.utils.schedule_ import ScheduleManager
-from vectorbt.utils.config import Configured
 from vectorbt.data.base import Data
+from vectorbt.utils.config import Configured
+from vectorbt.utils.schedule_ import ScheduleManager
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class DataUpdater(Configured):
     ...         if count_limit is not None and self.update_count >= count_limit:
     ...             raise vbt.CancelledError
 
-    >>> data = vbt.GBMData.download('SYMBOL', start='1 minute ago', freq='1s')
+    >>> data = vbt.GBMData.fetch('SYMBOL', start='1 minute ago', freq='1s')
     >>> my_updater = MyDataUpdater(data)
     >>> my_updater.update_every(count_limit=10)
     Data updated with 1 data points
@@ -95,17 +95,19 @@ class DataUpdater(Configured):
     Freq: S, Length: 81, dtype: float64
     ```
     """
+
     def __init__(self, data: Data, schedule_manager: tp.Optional[ScheduleManager] = None, **kwargs) -> None:
+        self._data = data
+        if schedule_manager is None:
+            schedule_manager = ScheduleManager()
+        self._schedule_manager = schedule_manager
+
         Configured.__init__(
             self,
             data=data,
             schedule_manager=schedule_manager,
             **kwargs
         )
-        self._data = data
-        if schedule_manager is None:
-            schedule_manager = ScheduleManager()
-        self._schedule_manager = schedule_manager
 
     @property
     def data(self) -> Data:
@@ -118,7 +120,7 @@ class DataUpdater(Configured):
     def schedule_manager(self) -> ScheduleManager:
         """Schedule manager instance.
 
-        See `vectorbt.utils.schedule.ScheduleManager`."""
+        See `vectorbt.utils.schedule_.ScheduleManager`."""
         return self._schedule_manager
 
     def update(self, **kwargs) -> None:
@@ -126,7 +128,7 @@ class DataUpdater(Configured):
 
         Override to do pre- and postprocessing.
 
-        To stop this method from running again, raise `vectorbt.utils.schedule.CancelledError`."""
+        To stop this method from running again, raise `vectorbt.utils.schedule_.CancelledError`."""
         self._data = self.data.update(**kwargs)
         self.update_config(data=self.data)
         new_index = self.data.wrapper.index
@@ -136,10 +138,10 @@ class DataUpdater(Configured):
                      in_background: bool = False, start_kwargs: dict = None, **kwargs) -> None:
         """Schedule `DataUpdater.update`.
 
-        For `*args`, `to` and `tags`, see `vectorbt.utils.schedule.ScheduleManager.every`.
+        For `*args`, `to` and `tags`, see `vectorbt.utils.schedule_.ScheduleManager.every`.
 
         If `in_background` is set to True, starts in the background as an `asyncio` task.
-        The task can be stopped with `vectorbt.utils.schedule.ScheduleManager.stop`.
+        The task can be stopped with `vectorbt.utils.schedule_.ScheduleManager.stop`.
 
         `**kwargs` are passed to `DataUpdater.update`."""
         if start_kwargs is None:

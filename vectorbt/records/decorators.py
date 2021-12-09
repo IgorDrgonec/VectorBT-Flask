@@ -3,21 +3,19 @@
 
 """Class and function decorators."""
 
-from functools import partial
-import re
 import keyword
+import re
+from functools import partial
 
 from vectorbt import _typing as tp
-from vectorbt.utils import checks
-from vectorbt.utils.config import merge_dicts, Config
-from vectorbt.utils.decorators import cached_property
-from vectorbt.utils.mapping import to_mapping
 from vectorbt.records.mapped_array import MappedArray
+from vectorbt.utils import checks
+from vectorbt.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
+from vectorbt.utils.decorators import cacheable_property, cached_property
+from vectorbt.utils.mapping import to_mapping
 
-WrapperFuncT = tp.Callable[[tp.Type[tp.T]], tp.Type[tp.T]]
 
-
-def override_field_config(*args, merge_configs: bool = True) -> tp.Union[WrapperFuncT, tp.Type[tp.T]]:
+def override_field_config(*args, merge_configs: bool = True) -> tp.FlexClassWrapper:
     """Class decorator to override field configs of all base classes in MRO that subclass
     `vectorbt.records.base.Records`.
     
@@ -30,8 +28,6 @@ def override_field_config(*args, merge_configs: bool = True) -> tp.Union[Wrapper
 
         if config is None:
             config = cls.field_config
-        if not isinstance(config, Config):
-            config = Config(config, readonly=True, as_attrs=False)
         if merge_configs:
             configs = []
             for base_cls in cls.mro()[::-1]:
@@ -39,7 +35,9 @@ def override_field_config(*args, merge_configs: bool = True) -> tp.Union[Wrapper
                     if checks.is_subclass_of(base_cls, "Records"):
                         configs.append(base_cls.field_config)
             configs.append(config)
-            config = merge_dicts(*configs, to_dict=False)
+            config = merge_dicts(*configs)
+        if not isinstance(config, Config):
+            config = HybridConfig(config)
 
         setattr(cls, "_field_config", config)
         return cls
@@ -55,7 +53,7 @@ def override_field_config(*args, merge_configs: bool = True) -> tp.Union[Wrapper
     raise ValueError("Either class, config, class and config, or keyword arguments must be passed")
 
 
-def attach_fields(*args, on_conflict: str = 'raise') -> tp.Union[WrapperFuncT, tp.Type[tp.T]]:
+def attach_fields(*args, on_conflict: str = 'raise') -> tp.FlexClassWrapper:
     """Class decorator to attach field properties in a `vectorbt.records.base.Records` class.
 
     Will extract `dtype` and other relevant information from `vectorbt.records.base.Records.field_config`
@@ -64,7 +62,7 @@ def attach_fields(*args, on_conflict: str = 'raise') -> tp.Union[WrapperFuncT, t
     !!! note
         Make sure to run `attach_fields` after `override_field_config`.
 
-    `config` should contain fields (keys) and dictionaries (values) with the following keys:
+    `config` must contain fields (keys) and dictionaries (values) with the following keys:
 
     * `attach`: Whether to attach the field property. Can be provided as a string to be used
         as a target attribute name. Defaults to True.
@@ -199,3 +197,62 @@ def attach_fields(*args, on_conflict: str = 'raise') -> tp.Union[WrapperFuncT, t
     elif len(args) == 2:
         return wrapper(args[0], config=args[1])
     raise ValueError("Either class, config, class and config, or keyword arguments must be passed")
+
+
+def attach_shortcut_properties(config: Config) -> tp.ClassWrapper:
+    """Class decorator to attach shortcut properties.
+
+    `config` must contain target property names (keys) and settings (values) with the following keys:
+
+    * `method_name`: Name of the source method. Defaults to the target name prepended with the prefix `get_`.
+    * `obj_type`: Type of the returned object. Can be 'array' for 2-dim arrays, 'red_array' for 1-dim arrays,
+        'records' for record arrays, and 'mapped_array' for mapped arrays. Defaults to 'records'.
+    * `group_aware`: Whether the returned object is aligned based on the current grouping.
+        Defaults to True.
+    * `method_kwargs`: Keyword arguments passed to the source method. Defaults to None.
+    * `decorator`: Defaults to `vectorbt.utils.decorators.cached_property` for object types
+        'records' and 'red_array'. Otherwise, to `vectorbt.utils.decorators.cacheable_property`.
+    * `decorator_kwargs`: Keyword arguments passed to the decorator. By default,
+        includes options `obj_type` and `group_aware`.
+    * `docstring`: Method docstring. Defaults to "`{cls.__name__}.{source_name}` with default arguments.".
+
+    The class must be a subclass of `vectorbt.records.base.Records`."""
+
+    def wrapper(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
+        checks.assert_subclass_of(cls, "Records")
+
+        for target_name, settings in config.items():
+            if target_name.startswith('get_'):
+                raise ValueError(f"Property names cannot have prefix 'get_' ('{target_name}')")
+            method_name = settings.get('method_name', 'get_' + target_name)
+            obj_type = settings.get('obj_type', 'records')
+            group_by_aware = settings.get('group_by_aware', True)
+            method_kwargs = settings.get('method_kwargs', None)
+            method_kwargs = resolve_dict(method_kwargs)
+            decorator = settings.get('decorator', None)
+            if decorator is None:
+                if obj_type in ('red_array', 'records'):
+                    decorator = cached_property
+                else:
+                    decorator = cacheable_property
+            decorator_kwargs = merge_dicts(
+                dict(obj_type=obj_type, group_by_aware=group_by_aware),
+                settings.get('decorator_kwargs', None)
+            )
+            docstring = settings.get('docstring', None)
+            if docstring is None:
+                if len(method_kwargs) == 0:
+                    docstring = f"`{cls.__name__}.{method_name}` with default arguments."
+                else:
+                    docstring = f"`{cls.__name__}.{method_name}` with arguments `{method_kwargs}`."
+
+            def new_prop(self, _method_name: str = method_name, _method_kwargs: tp.Kwargs = method_kwargs) -> tp.Any:
+                return getattr(self, _method_name)(**_method_kwargs)
+
+            new_prop.__name__ = target_name
+            new_prop.__qualname__ = f"{cls.__name__}.{target_name}"
+            new_prop.__doc__ = docstring
+            setattr(cls, new_prop.__name__, decorator(new_prop, **decorator_kwargs))
+        return cls
+
+    return wrapper

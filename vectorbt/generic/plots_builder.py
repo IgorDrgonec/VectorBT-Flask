@@ -3,19 +3,19 @@
 
 """Mixin for building plots out of subplots."""
 
-from collections import Counter
-import warnings
 import inspect
 import string
+import warnings
+from collections import Counter
 
 from vectorbt import _typing as tp
+from vectorbt.base.wrapping import Wrapping
 from vectorbt.utils import checks
-from vectorbt.utils.config import Config, merge_dicts, get_func_arg_names
+from vectorbt.utils.attr_ import get_dict_attr, AttrResolver
+from vectorbt.utils.config import Config, merge_dicts
+from vectorbt.utils.parsing import get_func_arg_names
+from vectorbt.utils.tagging import match_tags
 from vectorbt.utils.template import deep_substitute
-from vectorbt.utils.tags import match_tags
-from vectorbt.utils.attr_ import get_dict_attr
-from vectorbt.utils.figure import make_subplots, get_domain
-from vectorbt.base.array_wrapper import Wrapping
 
 
 class MetaPlotsBuilderMixin(type):
@@ -30,18 +30,15 @@ class MetaPlotsBuilderMixin(type):
 class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
     """Mixin that implements `PlotsBuilderMixin.plots`.
 
-    Required to be a subclass of `vectorbt.base.array_wrapper.Wrapping`."""
+    Required to be a subclass of `vectorbt.base.wrapping.Wrapping`."""
 
-    def __init__(self):
+    _writeable_attrs: tp.ClassVar[tp.Optional[tp.Set[str]]] = {'_subplots'}
+
+    def __init__(self) -> None:
         checks.assert_instance_of(self, Wrapping)
 
         # Copy writeable attrs
-        self._subplots = self.__class__._subplots.copy()
-
-    @property
-    def writeable_attrs(self) -> tp.Set[str]:
-        """Set of writeable attributes that will be saved/copied along with the config."""
-        return {'_subplots'}
+        self._subplots = type(self)._subplots.copy()
 
     @property
     def plots_defaults(self) -> tp.Kwargs:
@@ -57,8 +54,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
         )
 
     _subplots: tp.ClassVar[Config] = Config(
-        dict(),
-        copy_kwargs=dict(copy_mode='deep')
+        dict()
     )
 
     @property
@@ -69,7 +65,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
         ${subplots}
         ```
 
-        Returns `${cls_name}._subplots`, which gets (deep) copied upon creation of each instance.
+        Returns `${cls_name}._subplots`, which gets (hybrid-) copied upon creation of each instance.
         Thus, changing this config won't affect the class.
 
         To change subplots, you can either change the config in-place, override this property,
@@ -105,7 +101,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
 
                 * `title`: Title of the subplot. Defaults to the name.
                 * `plot_func` (required): Plotting function for custom subplots.
-                    Should write the supplied figure `fig` in-place and can return anything (it won't be used).
+                    Must write the supplied figure `fig` in-place and can return anything (it won't be used).
                 * `xaxis_kwargs`: Layout keyword arguments for the x-axis. Defaults to `dict(title='Index')`.
                 * `yaxis_kwargs`: Layout keyword arguments for the y-axis. Defaults to empty dict.
                 * `tags`, `check_{filter}`, `inv_check_{filter}`, `resolve_plot_func`, `pass_{arg}`,
@@ -116,7 +112,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                 If `resolve_plot_func` is True, the plotting function may "request" any of the
                 following arguments by accepting them or if `pass_{arg}` was found in the settings dict:
 
-                * Each of `vectorbt.utils.attr.AttrResolver.self_aliases`: original object
+                * Each of `vectorbt.utils.attr_.AttrResolver.self_aliases`: original object
                     (ungrouped, with no column selected)
                 * `group_by`: won't be passed if it was used in resolving the first attribute of `plot_func`
                     specified as a path, use `pass_group_by=True` to pass anyway
@@ -134,7 +130,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                 * `silence_warnings`
                 * Any argument from `settings`
                 * Any attribute of this object if it meant to be resolved
-                    (see `vectorbt.utils.attr.AttrResolver.resolve_attr`)
+                    (see `vectorbt.utils.attr_.AttrResolver.resolve_attr`)
 
                 !!! note
                     Layout-related resolution arguments such as `add_trace_kwargs` are unavailable
@@ -173,6 +169,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
 
         See `vectorbt.portfolio.base` for examples.
         """
+        from vectorbt.utils.figure import make_subplots, get_domain
         from vectorbt._settings import settings as _settings
         plotting_cfg = _settings['plotting']
 
@@ -194,9 +191,22 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
 
         # Replace templates globally (not used at subplot level)
         if len(template_mapping) > 0:
-            sub_settings = deep_substitute(settings, mapping=template_mapping)
-            sub_make_subplots_kwargs = deep_substitute(make_subplots_kwargs, mapping=template_mapping)
-            sub_layout_kwargs = deep_substitute(layout_kwargs, mapping=template_mapping)
+            sub_settings = deep_substitute(
+                settings,
+                mapping=template_mapping,
+                sub_id='sub_settings',
+                strict=False
+            )
+            sub_make_subplots_kwargs = deep_substitute(
+                make_subplots_kwargs,
+                mapping=template_mapping,
+                sub_id='sub_make_subplots_kwargs'
+            )
+            sub_layout_kwargs = deep_substitute(
+                layout_kwargs,
+                mapping=template_mapping,
+                sub_id='sub_layout_kwargs'
+            )
         else:
             sub_settings = settings
             sub_make_subplots_kwargs = make_subplots_kwargs
@@ -278,10 +288,14 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
             )
             subplot_template_mapping = merged_settings.pop('template_mapping', {})
             template_mapping_merged = merge_dicts(template_mapping, subplot_template_mapping)
-            template_mapping_merged = deep_substitute(template_mapping_merged, mapping=merged_settings)
+            template_mapping_merged = deep_substitute(
+                template_mapping_merged,
+                mapping=merged_settings,
+                sub_id='template_mapping_merged'
+            )
             mapping = merge_dicts(template_mapping_merged, merged_settings)
             # safe because we will use deep_substitute again once layout params are known
-            merged_settings = deep_substitute(merged_settings, mapping=mapping, safe=True)
+            merged_settings = deep_substitute(merged_settings, mapping=mapping, sub_id='merged_settings')
 
             # Filter by tag
             if tags is not None:
@@ -325,7 +339,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
 
             for filter_name in subplot_filters:
                 filter_settings = filters[filter_name]
-                _filter_settings = deep_substitute(filter_settings, mapping=mapping)
+                _filter_settings = deep_substitute(filter_settings, mapping=mapping, sub_id='filter_settings')
                 filter_func = _filter_settings['filter_func']
                 warning_message = _filter_settings.get('warning_message', None)
                 inv_warning_message = _filter_settings.get('inv_warning_message', None)
@@ -490,7 +504,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                         custom_arg_names.add(k)
                 final_kwargs = merge_dicts(subplot_layout_kwargs, final_kwargs)
                 mapping = merge_dicts(subplot_layout_kwargs, mapping)
-                final_kwargs = deep_substitute(final_kwargs, mapping=mapping)
+                final_kwargs = deep_substitute(final_kwargs, mapping=mapping, sub_id='final_kwargs')
 
                 # Clean up keys
                 for k, v in list(final_kwargs.items()):
@@ -506,6 +520,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                 xaxis_kwargs = final_kwargs.pop('xaxis_kwargs', None)
                 yaxis_kwargs = final_kwargs.pop('yaxis_kwargs', None)
                 resolve_plot_func = final_kwargs.pop('resolve_plot_func', True)
+                use_shortcuts = final_kwargs.pop('use_shortcuts', True)
                 use_caching = final_kwargs.pop('use_caching', True)
 
                 if plot_func is not None:
@@ -522,26 +537,39 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                                               _final_kwargs: tp.Kwargs = final_kwargs,
                                               _opt_arg_names: tp.Set[str] = opt_arg_names,
                                               _custom_arg_names: tp.Set[str] = custom_arg_names,
-                                              _arg_cache_dct: tp.Kwargs = arg_cache_dct) -> tp.Any:
-                                if attr in final_kwargs:
-                                    return final_kwargs[attr]
+                                              _arg_cache_dct: tp.Kwargs = arg_cache_dct,
+                                              _use_shortcuts: bool = use_shortcuts,
+                                              _use_caching: bool = use_caching) -> tp.Any:
+                                if attr in _final_kwargs:
+                                    return _final_kwargs[attr]
                                 if args is None:
                                     args = ()
                                 if kwargs is None:
                                     kwargs = {}
+
                                 if obj is custom_reself and _final_kwargs.pop('resolve_path_' + attr, True):
                                     if call_attr:
                                         return custom_reself.resolve_attr(
-                                            attr,
+                                            attr,  # do not pass _attr, important for caching
                                             args=args,
                                             cond_kwargs={k: v for k, v in _final_kwargs.items() if k in _opt_arg_names},
                                             kwargs=kwargs,
                                             custom_arg_names=_custom_arg_names,
                                             cache_dct=_arg_cache_dct,
-                                            use_caching=use_caching,
-                                            passed_kwargs_out=passed_kwargs_out
+                                            use_caching=_use_caching,
+                                            passed_kwargs_out=passed_kwargs_out,
+                                            use_shortcuts=_use_shortcuts
                                         )
-                                    return getattr(obj, attr)
+                                    if isinstance(obj, AttrResolver):
+                                        cls_dir = obj.cls_dir
+                                    else:
+                                        cls_dir = dir(type(obj))
+                                    if 'get_' + attr in cls_dir:
+                                        _attr = 'get_' + attr
+                                    else:
+                                        _attr = attr
+                                    return getattr(obj, _attr)
+
                                 out = getattr(obj, attr)
                                 if callable(out) and call_attr:
                                     return out(*args, **kwargs)
@@ -563,14 +591,17 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                         func_arg_names = get_func_arg_names(plot_func)
                         for k in func_arg_names:
                             if k not in final_kwargs:
-                                if final_kwargs.pop('resolve_' + k, False):
+                                resolve_arg = final_kwargs.pop('resolve_' + k, False)
+                                use_shortcuts_arg = final_kwargs.pop('use_shortcuts_' + k, True)
+                                if resolve_arg:
                                     try:
                                         arg_out = custom_reself.resolve_attr(
                                             k,
                                             cond_kwargs=final_kwargs,
                                             custom_arg_names=custom_arg_names,
                                             cache_dct=arg_cache_dct,
-                                            use_caching=use_caching
+                                            use_caching=use_caching,
+                                            use_shortcuts=use_shortcuts_arg
                                         )
                                     except AttributeError:
                                         continue
@@ -682,7 +713,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
         return string.Template(
             inspect.cleandoc(get_dict_attr(source_cls, 'subplots').__doc__)
         ).substitute(
-            {'subplots': cls.subplots.to_doc(), 'cls_name': cls.__name__}
+            {'subplots': cls.subplots.stringify(), 'cls_name': cls.__name__}
         )
 
     @classmethod

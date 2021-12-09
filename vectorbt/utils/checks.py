@@ -4,13 +4,14 @@
 """Utilities for validation during runtime."""
 
 import os
+from collections.abc import Hashable, Mapping
+from inspect import signature, getmro
+from keyword import iskeyword
+
+import dill
 import numpy as np
 import pandas as pd
 from numba.core.registry import CPUDispatcher
-from inspect import signature, getmro
-import dill
-from collections.abc import Hashable, Mapping
-from keyword import iskeyword
 
 from vectorbt import _typing as tp
 
@@ -33,18 +34,23 @@ def is_index(arg: tp.Any) -> bool:
     return isinstance(arg, pd.Index)
 
 
+def is_multi_index(arg: tp.Any) -> bool:
+    """Check whether the argument is `pd.MultiIndex`."""
+    return isinstance(arg, pd.MultiIndex)
+
+
 def is_frame(arg: tp.Any) -> bool:
     """Check whether the argument is `pd.DataFrame`."""
     return isinstance(arg, pd.DataFrame)
 
 
 def is_pandas(arg: tp.Any) -> bool:
-    """Check whether the argument is `pd.Series` or `pd.DataFrame`."""
-    return is_series(arg) or is_frame(arg)
+    """Check whether the argument is `pd.Series`, `pd.Index`, or `pd.DataFrame`."""
+    return is_series(arg) or is_index(arg) or is_frame(arg)
 
 
 def is_any_array(arg: tp.Any) -> bool:
-    """Check whether the argument is any of `np.ndarray`, `pd.Series` or `pd.DataFrame`."""
+    """Check whether the argument is a NumPy array or a Pandas object."""
     return is_pandas(arg) or isinstance(arg, np.ndarray)
 
 
@@ -76,6 +82,11 @@ def is_iterable(arg: tp.Any) -> bool:
         return False
 
 
+def is_numba_enabled() -> bool:
+    """Check whether Numba is enabled globally."""
+    return not os.environ.get('NUMBA_DISABLE_JIT', '0') == '1'
+
+
 def is_numba_func(arg: tp.Any) -> bool:
     """Check whether the argument is a Numba-compiled function."""
     from vectorbt._settings import settings
@@ -84,7 +95,7 @@ def is_numba_func(arg: tp.Any) -> bool:
     if not numba_cfg['check_func_type']:
         return True
     if 'NUMBA_DISABLE_JIT' in os.environ:
-        if os.environ['NUMBA_DISABLE_JIT'] == '1':
+        if not is_numba_enabled():
             if not numba_cfg['check_func_suffix']:
                 return True
             if arg.__name__.endswith('_nb'):
@@ -104,11 +115,11 @@ def is_hashable(arg: tp.Any) -> bool:
     return True
 
 
-def is_index_equal(arg1: tp.Any, arg2: tp.Any, strict: bool = True) -> bool:
+def is_index_equal(arg1: tp.Any, arg2: tp.Any, check_names: bool = True) -> bool:
     """Check whether indexes are equal.
 
-    Introduces naming tests on top of `pd.Index.equals`, but still doesn't check for types."""
-    if not strict:
+    If `check_names` is True, checks whether names are equal on top of `pd.Index.equals`."""
+    if not check_names:
         return pd.Index.equals(arg1, arg2)
     if isinstance(arg1, pd.MultiIndex) and isinstance(arg2, pd.MultiIndex):
         if arg1.names != arg2.names:
@@ -121,9 +132,9 @@ def is_index_equal(arg1: tp.Any, arg2: tp.Any, strict: bool = True) -> bool:
     return pd.Index.equals(arg1, arg2)
 
 
-def is_default_index(arg: tp.Any) -> bool:
+def is_default_index(arg: tp.Any, check_names: bool = True) -> bool:
     """Check whether index is a basic range."""
-    return is_index_equal(arg, pd.RangeIndex(start=0, stop=len(arg), step=1))
+    return is_index_equal(arg, pd.RangeIndex(start=0, stop=len(arg), step=1), check_names=check_names)
 
 
 def is_namedtuple(x: tp.Any) -> bool:
@@ -237,15 +248,39 @@ def is_deep_equal(arg1: tp.Any, arg2: tp.Any, check_exact: bool = False, **kwarg
     return True
 
 
-def is_subclass_of(arg: tp.Any, types: tp.MaybeTuple[tp.Union[tp.Type, str]]) -> bool:
+def is_class(arg: type, types: tp.TypeLike) -> bool:
+    """Check whether the argument is `types`.
+
+    `types` can be one or multiple types, strings, or patterns of type `vectorbt.utils.parsing.Regex`."""
+    from vectorbt.utils.parsing import Regex
+
+    if isinstance(types, str):
+        return str(arg) == types or arg.__name__ == types
+    if isinstance(types, Regex):
+        return types.matches(str(arg)) or types.matches(arg.__name__)
+    if isinstance(types, tuple):
+        for t in types:
+            if is_class(arg, t):
+                return True
+        return False
+    return arg is types
+
+
+def is_subclass_of(arg: tp.Any, types: tp.TypeLike) -> bool:
     """Check whether the argument is a subclass of `types`.
 
-    `types` can be one or multiple types or strings."""
+    `types` can be one or multiple types, strings, or patterns of type `vectorbt.utils.parsing.Regex`."""
+    from vectorbt.utils.parsing import Regex
+
     if isinstance(types, type):
         return issubclass(arg, types)
     if isinstance(types, str):
         for base_t in getmro(arg):
             if str(base_t) == types or base_t.__name__ == types:
+                return True
+    if isinstance(types, Regex):
+        for base_t in getmro(arg):
+            if types.matches(str(base_t)) or types.matches(base_t.__name__):
                 return True
     if isinstance(types, tuple):
         for t in types:
@@ -254,7 +289,7 @@ def is_subclass_of(arg: tp.Any, types: tp.MaybeTuple[tp.Union[tp.Type, str]]) ->
     return False
 
 
-def is_instance_of(arg: tp.Any, types: tp.MaybeTuple[tp.Union[tp.Type, str]]) -> bool:
+def is_instance_of(arg: tp.Any, types: tp.TypeLike) -> bool:
     """Check whether the argument is an instance of `types`.
 
     `types` can be one or multiple types or strings."""
@@ -301,22 +336,22 @@ def assert_not_none(arg: tp.Any) -> None:
         raise AssertionError(f"Argument cannot be None")
 
 
-def assert_instance_of(arg: tp.Any, types: tp.MaybeTuple[tp.Type]) -> None:
+def assert_instance_of(arg: tp.Any, types: tp.TypeLike) -> None:
     """Raise exception if the argument is none of types `types`."""
     if not is_instance_of(arg, types):
         if isinstance(types, tuple):
-            raise AssertionError(f"Type must be one of {types}, not {type(arg)}")
+            raise AssertionError(f"Instance must be of one of {types}")
         else:
-            raise AssertionError(f"Type must be {types}, not {type(arg)}")
+            raise AssertionError(f"Instance must be of {types}")
 
 
-def assert_subclass_of(arg: tp.Type, classes: tp.MaybeTuple[tp.Type]) -> None:
+def assert_subclass_of(arg: tp.Type, classes: tp.TypeLike) -> None:
     """Raise exception if the argument is not a subclass of classes `classes`."""
     if not is_subclass_of(arg, classes):
         if isinstance(classes, tuple):
-            raise AssertionError(f"Class must be a subclass of one of {classes}, not {arg}")
+            raise AssertionError(f"Class must be a subclass of one of {classes}")
         else:
-            raise AssertionError(f"Class must be a subclass of {classes}, not {arg}")
+            raise AssertionError(f"Class must be a subclass of {classes}")
 
 
 def assert_type_equal(arg1: tp.Any, arg2: tp.Any) -> None:
@@ -325,28 +360,46 @@ def assert_type_equal(arg1: tp.Any, arg2: tp.Any) -> None:
         raise AssertionError(f"Types {type(arg1)} and {type(arg2)} do not match")
 
 
-def assert_dtype(arg: tp.ArrayLike, dtype: tp.DTypeLike) -> None:
+def assert_dtype(arg: tp.ArrayLike, dtype: tp.MaybeTuple[tp.DTypeLike]) -> None:
     """Raise exception if the argument is not of data type `dtype`."""
     arg = _to_any_array(arg)
-    if isinstance(arg, pd.DataFrame):
-        for i, col_dtype in enumerate(arg.dtypes):
-            if col_dtype != dtype:
-                raise AssertionError(f"Data type of column {i} must be {dtype}, not {col_dtype}")
+    if isinstance(dtype, tuple):
+        if isinstance(arg, pd.DataFrame):
+            for i, col_dtype in enumerate(arg.dtypes):
+                if not any([col_dtype == _dtype for _dtype in dtype]):
+                    raise AssertionError(f"Data type of column {i} must be one of {dtype}, not {col_dtype}")
+        else:
+            if not any([arg.dtype == _dtype for _dtype in dtype]):
+                raise AssertionError(f"Data type must be one of {dtype}, not {arg.dtype}")
     else:
-        if arg.dtype != dtype:
-            raise AssertionError(f"Data type must be {dtype}, not {arg.dtype}")
+        if isinstance(arg, pd.DataFrame):
+            for i, col_dtype in enumerate(arg.dtypes):
+                if col_dtype != dtype:
+                    raise AssertionError(f"Data type of column {i} must be {dtype}, not {col_dtype}")
+        else:
+            if arg.dtype != dtype:
+                raise AssertionError(f"Data type must be {dtype}, not {arg.dtype}")
 
 
-def assert_subdtype(arg: tp.ArrayLike, dtype: tp.DTypeLike) -> None:
+def assert_subdtype(arg: tp.ArrayLike, dtype: tp.MaybeTuple[tp.DTypeLike]) -> None:
     """Raise exception if the argument is not a sub data type of `dtype`."""
     arg = _to_any_array(arg)
-    if isinstance(arg, pd.DataFrame):
-        for i, col_dtype in enumerate(arg.dtypes):
-            if not np.issubdtype(col_dtype, dtype):
-                raise AssertionError(f"Data type of column {i} must be {dtype}, not {col_dtype}")
+    if isinstance(dtype, tuple):
+        if isinstance(arg, pd.DataFrame):
+            for i, col_dtype in enumerate(arg.dtypes):
+                if not any([np.issubdtype(col_dtype, _dtype) for _dtype in dtype]):
+                    raise AssertionError(f"Data type of column {i} must be one of {dtype}, not {col_dtype}")
+        else:
+            if not any([np.issubdtype(arg.dtype, _dtype) for _dtype in dtype]):
+                raise AssertionError(f"Data type must be one of {dtype}, not {arg.dtype}")
     else:
-        if not np.issubdtype(arg.dtype, dtype):
-            raise AssertionError(f"Data type must be {dtype}, not {arg.dtype}")
+        if isinstance(arg, pd.DataFrame):
+            for i, col_dtype in enumerate(arg.dtypes):
+                if not np.issubdtype(col_dtype, dtype):
+                    raise AssertionError(f"Data type of column {i} must be {dtype}, not {col_dtype}")
+        else:
+            if not np.issubdtype(arg.dtype, dtype):
+                raise AssertionError(f"Data type must be {dtype}, not {arg.dtype}")
 
 
 def assert_dtype_equal(arg1: tp.ArrayLike, arg2: tp.ArrayLike) -> None:
@@ -407,9 +460,9 @@ def assert_shape_equal(arg1: tp.ArrayLike, arg2: tp.ArrayLike,
                 raise AssertionError(f"Axis {axis} of {arg1.shape} and {arg2.shape} do not match")
 
 
-def assert_index_equal(arg1: pd.Index, arg2: pd.Index, **kwargs) -> None:
+def assert_index_equal(arg1: pd.Index, arg2: pd.Index, check_names: bool = True) -> None:
     """Raise exception if the first argument and the second argument have different index/columns."""
-    if not is_index_equal(arg1, arg2, **kwargs):
+    if not is_index_equal(arg1, arg2, check_names=check_names):
         raise AssertionError(f"Indexes {arg1} and {arg2} do not match")
 
 
@@ -462,7 +515,7 @@ def assert_equal(arg1: tp.Any, arg2: tp.Any, deep: bool = False) -> None:
 def assert_dict_valid(arg: tp.DictLike, lvl_keys: tp.Sequence[tp.MaybeSequence[str]]) -> None:
     """Raise exception if dict the argument has keys that are not in `lvl_keys`.
 
-    `lvl_keys` should be a list of lists, each corresponding to a level in the dict."""
+    `lvl_keys` must be a list of lists, each corresponding to a level in the dict."""
     if arg is None:
         arg = {}
     if len(lvl_keys) == 0:

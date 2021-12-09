@@ -8,7 +8,7 @@ Defines enums and other schemas for `vectorbt.generic`."""
 import numpy as np
 
 from vectorbt import _typing as tp
-from vectorbt.utils.docs import to_doc
+from vectorbt.utils.docs import stringify
 
 __all__ = [
     'RangeStatus',
@@ -33,7 +33,7 @@ RangeStatus = RangeStatusT(*range(2))
 __pdoc__['RangeStatus'] = f"""Range status.
 
 ```json
-{to_doc(RangeStatus)}
+{stringify(RangeStatus)}
 ```
 """
 
@@ -49,7 +49,7 @@ DrawdownStatus = DrawdownStatusT(*range(2))
 __pdoc__['DrawdownStatus'] = f"""Drawdown status.
 
 ```json
-{to_doc(DrawdownStatus)}
+{stringify(DrawdownStatus)}
 ```
 """
 
@@ -67,7 +67,7 @@ range_dt = np.dtype([
 __pdoc__['range_dt'] = f"""`np.dtype` of range records.
 
 ```json
-{to_doc(range_dt)}
+{stringify(range_dt)}
 ```
 """
 
@@ -88,6 +88,6 @@ drawdown_dt = np.dtype([
 __pdoc__['drawdown_dt'] = f"""`np.dtype` of drawdown records.
 
 ```json
-{to_doc(drawdown_dt)}
+{stringify(drawdown_dt)}
 ```
 """

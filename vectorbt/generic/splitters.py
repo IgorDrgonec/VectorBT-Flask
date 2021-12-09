@@ -5,16 +5,17 @@
 
 Defines splitter classes similar (but may not compatible) to `sklearn.model_selection.BaseCrossValidator`."""
 
-import numpy as np
-import pandas as pd
 import math
 
-from vectorbt import _typing as tp
-from vectorbt.utils import checks
-from vectorbt.base.index_fns import find_first_occurrence
-from vectorbt.base.reshape_fns import to_any_array
+import numpy as np
+import pandas as pd
 
-RangesT = tp.Generator[tp.Sequence[tp.ArrayLikeSequence], None, None]
+from vectorbt import _typing as tp
+from vectorbt.base.indexes import find_first_occurrence
+from vectorbt.base.reshaping import to_any_array
+from vectorbt.utils import checks
+
+RangesT = tp.Generator[tp.Tuple[tp.Array1d, ...], None, None]
 
 
 def split_ranges_into_sets(start_idxs: tp.ArrayLike,
@@ -123,8 +124,8 @@ class RangeSplitter(BaseSplitter):
         * If `range_len` is None, are split evenly into `n` ranges.
         * If `n` is None, returns the maximum number of ranges of length `range_len` (can be a percentage).
         * If `start_idxs` and `end_idxs`, splits into ranges between both arrays.
-        Both index arrays should be either NumPy arrays with absolute positions or
-        pandas indexes with labels. The last index should be inclusive. The distance
+        Both index arrays must be either NumPy arrays with absolute positions or
+        pandas indexes with labels. The last index must be inclusive. The distance
         between each start and end index can be different, and smaller ranges are filled with NaNs.
 
         `range_len` can be a floating number between 0 and 1 to indicate a fraction of the total range.
