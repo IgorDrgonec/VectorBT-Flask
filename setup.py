@@ -15,7 +15,7 @@ setup(
     author_email='olegpolakow@gmail.com',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    url='https://github.com/vectorbt/vectorbt.pro',
+    url='https://github.com/polakowo/vectorbt.pro',
     packages=find_packages(),
     package_data={
         'vectorbtpro': ['templates/*.json']

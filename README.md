@@ -6,7 +6,7 @@
 
 ## License
 
-### See [LICENSE.md](https://github.com/vectorbt/vectorbt.pro/tree/master/LICENSE.md) for details
+### See [LICENSE.md](https://github.com/polakowo/vectorbt.pro/tree/master/LICENSE.md) for details
 
 ### Important Notes
 
@@ -35,10 +35,10 @@
 
 ```bash
 # if you're using Git/HTTPS authentication
-pip3 install git+https://github.com/vectorbt/vectorbt.pro.git
+pip3 install git+https://github.com/polakowo/vectorbt.pro.git
 
 # if you are connecting to GitHub with SSH
-pip3 install git+ssh://git@github.com/vectorbt/vectorbt.pro.git
+pip3 install git+ssh://git@github.com/polakowo/vectorbt.pro.git
 ```
 
 ### Python Dependency
@@ -50,7 +50,7 @@ pip3 install git+ssh://git@github.com/vectorbt/vectorbt.pro.git
 setup(
     # ...
     install_requires=[
-        'vectorbtpro @ git+https://github.com/vectorbt/vectorbt.pro.git'
+        'vectorbtpro @ git+https://github.com/polakowo/vectorbt.pro.git'
     ]
     # ...
 )
@@ -58,6 +58,6 @@ setup(
 
 ## Support
 
-## [Documentation](https://vectorbt.pro/docs) · [New issue](https://github.com/vectorbt/vectorbt.pro/issues) · <sub>[![Discord](https://img.shields.io/discord/918629562441695344?logo=discord&logoColor=white)](https://discord.gg/63jZZzCwzp)</sub> · [info@vectorbt.pro](mailto:info@vectorbt.pro)
+## [Documentation](https://vectorbt.pro/docs) · [New issue](https://github.com/polakowo/vectorbt.pro/issues) · <sub>[![Discord](https://img.shields.io/discord/918629562441695344?logo=discord&logoColor=white)](https://discord.gg/63jZZzCwzp)</sub> · [info@vectorbt.pro](mailto:info@vectorbt.pro)
 
 © 2021 vectorbt PRO
