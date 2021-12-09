@@ -1131,14 +1131,14 @@ class TestAccessors:
         if qs_available:
             pd.testing.assert_series_equal(
                 ret_acc.qs.sharpe(),
-                qs.stats.sharpe(rets.dropna(), periods=365, trading_year_days=365, rf=0.001)
+                qs.stats.sharpe(rets.dropna(), periods=365, rf=0.001)
             )
             pd.testing.assert_series_equal(
                 ret_acc(freq='h', year_freq='252d').qs.sharpe(),
-                qs.stats.sharpe(rets.dropna(), periods=252 * 24, trading_year_days=252 * 24, rf=0.001)
+                qs.stats.sharpe(rets.dropna(), periods=252 * 24, rf=0.001)
             )
             pd.testing.assert_series_equal(
-                ret_acc(freq='h', year_freq='252d').qs.sharpe(periods=252, trading_year_days=252, rf=0),
+                ret_acc(freq='h', year_freq='252d').qs.sharpe(periods=252, periods_per_year=252, rf=0),
                 qs.stats.sharpe(rets.dropna())
             )
             assert ret_acc['a'].qs.r_squared() == 0.8038014307754487
