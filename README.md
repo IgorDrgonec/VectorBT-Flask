@@ -1,6 +1,6 @@
 vectorbt PRO is next-gen framework for backtesting, algorithmic trading, and research. It is a high-performance superset of the vectorbt library, one of the world's leading open-source backtesting frameworks. vectorbt PRO includes the standard vectorbt library and wraps it with powerful new features and useful enhancements.
 
-## [Home](https://vectorbt.pro) · [License](#license) · [Install](#install) · [Examples](https://github.com/vectorbt/vectorbt.pro/tree/main/examples) · [Support](#support)
+## [Home](https://vectorbt.pro) · [License](#license) · [Installation](#install) · [Support](#support)
 
 ## Features
 
@@ -29,7 +29,7 @@ If you are a software developer you should specify vectorbt PRO as your requirem
 
 Thank you for using vectorbt PRO legally!
 
-## Install
+## Installation
 
 Installing vectorbt PRO requires visiting the https://vectorbt.pro website and obtaining a vectorbt PRO license. The license gives the access to the vectorbt PRO codebase in a private GitHub repository.
 
@@ -55,10 +55,6 @@ setup(
     # ...
 )
 ```
-
-## Documentation
-
-Read the [vectorbt PRO documentation](https://vectorbt.pro/docs) for more details.
 
 ## Support
 
