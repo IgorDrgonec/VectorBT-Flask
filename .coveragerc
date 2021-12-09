@@ -1,6 +1,6 @@
 [run]
 branch = True
-source = vectorbt
+source = vectorbtpro
 
 [report]
 exclude_lines =

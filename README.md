@@ -11,11 +11,11 @@ vectorbt PRO is next-gen framework for backtesting, algorithmic trading, and res
 ### Important Notes
 
 ```diff
-It is illegal to publish, distribute, or sell the vectorbt PRO source code without a separate permission.
-Violation of the licensing terms will trigger a ban followed by a legal pursuit.
+* It is illegal to publish, distribute, or sell the vectorbt PRO source code without a separate permission.
+* Violation of the licensing terms will trigger a ban followed by a legal pursuit.
 ```
 
-The vectorbt PRO is hosted in a private repository on GitHub. The access to the repository is licensed and granted by invitation only on a paid basis. In order to access the repository, the users must obtain prepaid subscription plans at https://ccxt.pro. The users pay for the continued access to the repository, including updates, support and maintenance (new exchanges, improvements, bugfixes and so on).
+The vectorbt PRO is hosted in a private repository on GitHub. The access to the repository is licensed and granted by invitation only on a paid basis. In order to access the repository, the users must obtain prepaid subscription plans at https://vectorbt.pro. The users pay for the continued access to the repository, including updates, support and maintenance (new exchanges, improvements, bugfixes and so on).
 
 If your vectorbt PRO license expires, your software or system will not break down and will keep working fine with your most recent version by that time. However, if you discontinue your paid license you will lose the updates that will follow.
 
@@ -50,10 +50,7 @@ With [setuptools](https://setuptools.readthedocs.io/en/latest/) adding vectorbt 
 setup(
     # ...
     install_requires=[
-        # install the most recent version
         'vectorbtpro @ git+https://github.com/vectorbt/vectorbt.pro.git'
-        # install a specific version number
-        # 'vectorbtpro @ git+https://github.com/vectorbt/vectorbt.pro.git@0.1.13#subdirectory=python'
     ]
     # ...
 )

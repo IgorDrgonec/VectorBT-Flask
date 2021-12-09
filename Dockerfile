@@ -8,8 +8,8 @@ RUN apt-get update && \
  apt-get clean && \
  rm -rf /var/lib/apt/lists/*
 
-COPY . vectorbt
-WORKDIR vectorbt
+COPY . vectorbtpro
+WORKDIR vectorbtpro
 RUN chmod -R +x scripts
 
 ARG FULL="yes"
