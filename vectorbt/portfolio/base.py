@@ -5445,7 +5445,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
     @custom_property(obj_type='array', group_by_aware=False)
     def call_seq(self) -> tp.Optional[tp.SeriesFrame]:
         """Sequence of calls per row and group."""
-        if self.use_in_outputs and self.in_outputs is not None and 'call_seq' in self.in_outputs._fields:
+        if self.use_in_outputs and self.in_outputs is not None and hasattr(self.in_outputs, 'call_seq'):
             call_seq = self.in_outputs.call_seq
         else:
             call_seq = self._call_seq
@@ -5459,7 +5459,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
     @custom_property(obj_type='array', group_by_aware=False)
     def close(self) -> tp.SeriesFrame:
         """Price per unit series."""
-        if self.use_in_outputs and self.in_outputs is not None and 'close' in self.in_outputs._fields:
+        if self.use_in_outputs and self.in_outputs is not None and hasattr(self.in_outputs, 'close'):
             close = self.in_outputs.close
         else:
             close = self._close
@@ -5531,7 +5531,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                  log_records: tp.Optional[tp.RecordArray] = None,
                  group_by: tp.GroupByLike = None,
                  wrapper: tp.Optional[ArrayWrapper] = None,
-                 **kwargs) -> Orders:
+                 **kwargs) -> Logs:
         """Get log records.
 
         See `vectorbt.portfolio.logs.Logs`."""
@@ -5592,7 +5592,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
     def get_positions(cls_or_self,
                       trades: tp.Optional[Trades] = None,
                       group_by: tp.GroupByLike = None,
-                      **kwargs) -> ExitTrades:
+                      **kwargs) -> Positions:
         """Get position records.
 
         See `vectorbt.portfolio.trades.Positions`."""
