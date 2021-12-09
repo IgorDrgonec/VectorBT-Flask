@@ -4,22 +4,25 @@ with open('README.md', 'r', encoding="utf-8", errors='ignore') as fh:
     long_description = fh.read()
 
 version = {}
-with open("vectorbt/_version.py", encoding="utf-8") as fp:
+with open("vectorbtpro/_version.py", encoding="utf-8") as fp:
     exec(fp.read(), version)
 
 setup(
-    name='vectorbt',
+    name='vectorbtpro',
     version=version['__version__'],
-    description='Supercharged backtesting and technical analysis for quants',
+    description='Next-gen framework for backtesting, algorithmic trading, and research',
     author='Oleg Polakow',
     author_email='olegpolakow@gmail.com',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    url='https://github.com/polakowo/vectorbt',
+    url='https://github.com/vectorbt/vectorbt.pro',
     packages=find_packages(),
     package_data={
-        'vectorbt': ['templates/*.json']
+        'vectorbtpro': ['templates/*.json']
     },
+    python_requires='>=3.6, <3.10',
+    license='LICENSE.md',
+    data_files=[('', ['LICENSE.md'])],
     install_requires=[
         'numpy>=1.16.5',
         'pandas',
@@ -80,19 +83,18 @@ setup(
             'pdoc3'
         ]
     },
-    python_requires='>=3.6, <3.10',
-    license='Apache 2.0 with Commons Clause',
     classifiers=[
-        'Development Status :: 5 - Production/Stable',
+        'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'Intended Audience :: Financial and Insurance Industry',
-        'License :: Free for non-commercial use',
+        'Intended Audience :: Information Technology',
+        'Intended Audience :: Science/Research',
+        'License :: Other/Proprietary License',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
         'Operating System :: OS Independent',
-        'Intended Audience :: Science/Research',
         'Topic :: Software Development',
         'Topic :: Office/Business :: Financial',
         'Topic :: Scientific/Engineering :: Information Analysis'

@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 from numba import njit
 
-import vectorbt as vbt
+import vectorbtpro as vbt
 
 ta_available = True
 try:

@@ -7,8 +7,8 @@ import pytest
 from numba import njit
 from sklearn.model_selection import TimeSeriesSplit
 
-import vectorbt as vbt
-from vectorbt.generic import nb
+import vectorbtpro as vbt
+from vectorbtpro.generic import nb
 
 seed = 42
 

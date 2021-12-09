@@ -6,8 +6,8 @@ import pandas as pd
 import pytest
 from numba import njit
 
-import vectorbt as vbt
-from vectorbt.base import (
+import vectorbtpro as vbt
+from vectorbtpro.base import (
     wrapping,
     grouping,
     combining,

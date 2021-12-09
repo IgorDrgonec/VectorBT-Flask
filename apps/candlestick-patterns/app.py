@@ -27,11 +27,11 @@ from talib._ta_lib import (
     RangeType,
     _ta_set_candle_settings
 )
-from vectorbt import settings
-from vectorbt.utils.config import merge_dicts
-from vectorbt.utils.colors import adjust_opacity
-from vectorbt.portfolio.enums import Direction, DirectionConflictMode
-from vectorbt.portfolio.base import Portfolio
+from vectorbtpro import settings
+from vectorbtpro.utils.config import merge_dicts
+from vectorbtpro.utils.colors import adjust_opacity
+from vectorbtpro.portfolio.enums import Direction, DirectionConflictMode
+from vectorbtpro.portfolio.base import Portfolio
 
 USE_CACHING = os.environ.get(
     "USE_CACHING",

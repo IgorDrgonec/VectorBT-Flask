@@ -6,11 +6,11 @@ import pandas as pd
 import pytest
 from numba import njit
 
-import vectorbt as vbt
+import vectorbtpro as vbt
 from tests.utils import assert_records_close
-from vectorbt.generic.enums import range_dt, drawdown_dt
-from vectorbt.portfolio.enums import order_dt, trade_dt, log_dt
-from vectorbt.records.base import Records
+from vectorbtpro.generic.enums import range_dt, drawdown_dt
+from vectorbtpro.portfolio.enums import order_dt, trade_dt, log_dt
+from vectorbtpro.records.base import Records
 
 day_dt = np.timedelta64(86400000000000)
 

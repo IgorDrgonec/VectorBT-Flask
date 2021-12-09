@@ -5,9 +5,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import vectorbt as vbt
-from vectorbt.ca_registry import ca_registry, CAQuery, CARunSetup, CARunResult
-from vectorbt.utils.caching import Cacheable
+import vectorbtpro as vbt
+from vectorbtpro.ca_registry import ca_registry, CAQuery, CARunSetup, CARunResult
+from vectorbtpro.utils.caching import Cacheable
 
 
 # ############# Global ############# #

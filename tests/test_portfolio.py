@@ -10,13 +10,13 @@ import pytest
 from numba import njit, typeof
 from numba.typed import List
 
-import vectorbt as vbt
+import vectorbtpro as vbt
 from tests.utils import assert_records_close
-from vectorbt.generic.enums import drawdown_dt
-from vectorbt.portfolio import nb
-from vectorbt.portfolio.call_seq import build_call_seq, build_call_seq_nb
-from vectorbt.portfolio.enums import *
-from vectorbt.utils.random_ import set_seed
+from vectorbtpro.generic.enums import drawdown_dt
+from vectorbtpro.portfolio import nb
+from vectorbtpro.portfolio.call_seq import build_call_seq, build_call_seq_nb
+from vectorbtpro.portfolio.enums import *
+from vectorbtpro.utils.random_ import set_seed
 
 qs_available = True
 try:

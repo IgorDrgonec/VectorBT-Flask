@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import vectorbt as vbt
+import vectorbtpro as vbt
 from tests.utils import isclose
 
 qs_available = True

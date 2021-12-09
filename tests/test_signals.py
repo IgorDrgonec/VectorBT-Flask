@@ -6,10 +6,10 @@ import pandas as pd
 import pytest
 from numba import njit
 
-import vectorbt as vbt
+import vectorbtpro as vbt
 from tests.utils import assert_records_close
-from vectorbt.generic import nb as generic_nb
-from vectorbt.generic.enums import range_dt
+from vectorbtpro.generic import nb as generic_nb
+from vectorbtpro.generic.enums import range_dt
 
 seed = 42
 

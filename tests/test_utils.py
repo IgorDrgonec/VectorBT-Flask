@@ -14,9 +14,9 @@ import pytz
 from numba import njit
 from numba.core.registry import CPUDispatcher
 
-import vectorbt as vbt
+import vectorbtpro as vbt
 from tests.utils import chunk_meta_equal
-from vectorbt.utils import (
+from vectorbtpro.utils import (
     checks,
     config,
     decorators,

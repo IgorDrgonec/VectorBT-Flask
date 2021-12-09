@@ -4,7 +4,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
-import vectorbt as vbt
+import vectorbtpro as vbt
 
 close_ts = pd.DataFrame({
     'a': [1, 2, 1, 2, 3, 2],

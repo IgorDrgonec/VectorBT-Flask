@@ -6,9 +6,9 @@ import pandas as pd
 import pytest
 import pytz
 
-import vectorbt as vbt
-from vectorbt.utils.config import merge_dicts
-from vectorbt.utils.datetime_ import to_timezone
+import vectorbtpro as vbt
+from vectorbtpro.utils.config import merge_dicts
+from vectorbtpro.utils.datetime_ import to_timezone
 
 seed = 42
 

@@ -2,9 +2,9 @@ from functools import wraps
 
 import pytest
 
-import vectorbt as vbt
-from vectorbt.jit_registry import jit_registry
-from vectorbt.utils import jitting
+import vectorbtpro as vbt
+from vectorbtpro.jit_registry import jit_registry
+from vectorbtpro.utils import jitting
 
 
 # ############# Global ############# #

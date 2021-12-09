@@ -1,4 +1,4 @@
-import vectorbt as vbt
+import vectorbtpro as vbt
 
 
 # ############# Global ############# #
