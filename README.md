@@ -10,24 +10,24 @@ vectorbt PRO is next-gen framework for backtesting, algorithmic trading, and res
 
 ### Important Notes
 
-```plaintext
-* It is illegal to publish, distribute, or sell the vectorbt PRO source code without a separate permission.
-* Violation of the licensing terms will trigger a ban followed by a legal pursuit.
-```
+> ```plaintext
+> * It is illegal to publish, distribute, or sell the vectorbt PRO source code without a separate permission.
+> * Violation of the licensing terms will trigger a ban followed by a legal pursuit.
+> ```
 
-The vectorbt PRO is hosted in a private repository on GitHub. The access to the repository is licensed and granted by invitation only on a paid basis. In order to access the repository, the users must obtain prepaid subscription plans at https://vectorbt.pro. The users pay for the continued access to the repository, including updates, support and maintenance (new exchanges, improvements, bugfixes and so on).
+> The vectorbt PRO is hosted in a private repository on GitHub. The access to the repository is licensed and granted by invitation only on a paid basis. In order to access the repository, the users must obtain prepaid subscription plans at https://vectorbt.pro. The users pay for the continued access to the repository, including updates, support and maintenance (new exchanges, improvements, bugfixes and so on).
 
-If your vectorbt PRO license expires, your software or system will not break down and will keep working fine with your most recent version by that time. However, if you discontinue your paid license you will lose the updates that will follow.
+> If your vectorbt PRO license expires, your software or system will not break down and will keep working fine with your most recent version by that time. However, if you discontinue your paid license you will lose the updates that will follow.
 
-Any licensed user, developer, team, or company, having obtained paid access to the vectorbt PRO repository from us, can use vectorbt PRO as a dependency, subject to the terms and limitations of the vectorbt PRO paid subscription plans.
+> Any licensed user, developer, team, or company, having obtained paid access to the vectorbt PRO repository from us, can use vectorbt PRO as a dependency, subject to the terms and limitations of the vectorbt PRO paid subscription plans.
 
-Licensees can use, copy, and modify vectorbt PRO as long as they<br />**DO NOT VENDOR, PUBLISH, SELL, OR DISTRIBUTE THE SOURCE CODE OF VECTORBT PRO**.
+> Licensees can use, copy, and modify vectorbt PRO as long as they<br />**DO NOT VENDOR, PUBLISH, SELL, OR DISTRIBUTE THE SOURCE CODE OF VECTORBT PRO**.
 
-It is allowed to specify vectorbt PRO as a dependency of your software as long as you<br />**DO NOT INCLUDE A COPY OF THE VECTORBT PRO SOURCE CODE IN YOUR SOFTWARE**.
+> It is allowed to specify vectorbt PRO as a dependency of your software as long as you<br />**DO NOT INCLUDE A COPY OF THE VECTORBT PRO SOURCE CODE IN YOUR SOFTWARE**.
 
-If you are a software developer you should specify vectorbt PRO as your requirement. The end-user of your software is responsible for obtaining his own individual vectorbt PRO license. The best practice is to make it clear in your docs or on your website. Since vectorbt and vectorbt PRO are interchangeable, auto-detection can be factored-in to let the end-user choose between the free vectorbt and the paid vectorbt PRO.
+> If you are a software developer you should specify vectorbt PRO as your requirement. The end-user of your software is responsible for obtaining his own individual vectorbt PRO license. The best practice is to make it clear in your docs or on your website. Since vectorbt and vectorbt PRO are interchangeable, auto-detection can be factored-in to let the end-user choose between the free vectorbt and the paid vectorbt PRO.
 
-Thank you for using vectorbt PRO legally!
+> Thank you for using vectorbt PRO legally!
 
 ## Installation
 
