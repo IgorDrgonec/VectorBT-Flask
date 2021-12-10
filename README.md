@@ -1,3 +1,8 @@
+[![Python Versions](https://img.shields.io/pypi/pyversions/vectorbt.svg?logo=python&logoColor=white)](https://github.com/polakowo/vectorbt.pro/blob/main/setup.py)
+[![License](https://img.shields.io/badge/license-Proprietary-important)](https://github.com/polakowo/vectorbt/blob/master/LICENSE.md)
+[![Website](https://img.shields.io/website?url=https://vectorbt.pro/)](https://vectorbt.pro/)
+[![Discord](https://img.shields.io/discord/918629562441695344?logo=discord&logoColor=white)](https://discord.gg/63jZZzCwzp)
+
 vectorbt PRO is next-gen framework for backtesting, algorithmic trading, and research. It is a high-performance superset of the [vectorbt](https://github.com/polakowo/vectorbt) library, one of the world's most innovative open-source backtesting frameworks. vectorbt PRO extends the standard vectorbt library with powerful new features and useful enhancements.
 
 ## [Home](https://vectorbt.pro) · [Features](#features) · [License](#license) · [Installation](#install) · [Support](#support)
