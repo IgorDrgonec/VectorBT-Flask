@@ -43,13 +43,13 @@ pip install -U git+ssh://git@github.com/polakowo/vectorbt.pro.git
 > Base version:
 
 ```bash
-pip install -U "git+https://github.com/polakowo/vectorbt.pro.git[base]"
+pip install -U "vectorbtpro[base] @ git+https://github.com/polakowo/vectorbt.pro.git"
 ```
 
 > Full version:
 
 ```bash
-pip install -U "git+https://github.com/polakowo/vectorbt.pro.git[full]"
+pip install -U "vectorbtpro[full] @ git+https://github.com/polakowo/vectorbt.pro.git"
 ```
 
 For more details, see [extra-requirements.txt](https://github.com/polakowo/vectorbt.pro/blob/main/extra-requirements.txt).
