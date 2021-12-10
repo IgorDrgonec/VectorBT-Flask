@@ -1,4 +1,4 @@
-> vectorbt PRO is next-gen framework for backtesting, algorithmic trading, and research. It is a high-performance superset of the [vectorbt](https://github.com/polakowo/vectorbt) library, one of the world's most innovative open-source backtesting frameworks. vectorbt PRO includes the standard vectorbt library and wraps it with powerful new features and useful enhancements.
+vectorbt PRO is next-gen framework for backtesting, algorithmic trading, and research. It is a high-performance superset of the [vectorbt](https://github.com/polakowo/vectorbt) library, one of the world's most innovative open-source backtesting frameworks. vectorbt PRO includes the standard vectorbt library and wraps it with powerful new features and useful enhancements.
 
 ## [Home](https://vectorbt.pro) · [Features](#features) · [License](#license) · [Installation](#install) · [Support](#support)
 
@@ -28,9 +28,9 @@
 
 ## Installation
 
-> Installing vectorbt PRO requires visiting the https://vectorbt.pro website and obtaining a vectorbt PRO license. The license gives the access to the vectorbt PRO codebase in a private GitHub repository.
->
-> Lightweight version:
+Installing vectorbt PRO requires visiting the https://vectorbt.pro website and obtaining a vectorbt PRO license. The license gives the access to the vectorbt PRO codebase in a private GitHub repository.
+
+Lightweight version:
 
 ```bash
 # if you're using Git/HTTPS authentication
@@ -40,13 +40,13 @@ pip install -U git+https://github.com/polakowo/vectorbt.pro.git
 pip install -U git+ssh://git@github.com/polakowo/vectorbt.pro.git
 ```
 
-> Base version:
+Base version:
 
 ```bash
 pip install -U "vectorbtpro[base] @ git+https://github.com/polakowo/vectorbt.pro.git"
 ```
 
-> Full version:
+Full version:
 
 ```bash
 pip install -U "vectorbtpro[full] @ git+https://github.com/polakowo/vectorbt.pro.git"
@@ -56,14 +56,14 @@ For more details, see [extra-requirements.txt](https://github.com/polakowo/vecto
 
 ### Python dependency
 
-> With [setuptools](https://setuptools.readthedocs.io/en/latest/) adding vectorbt PRO as a dependency to your Python package can be done by listing it in setup.py or in your [requirements files](https://pip.pypa.io/en/latest/user_guide/#requirements-files):
+With [setuptools](https://setuptools.readthedocs.io/en/latest/) adding vectorbt PRO as a dependency to your Python package can be done by listing it in setup.py or in your [requirements files](https://pip.pypa.io/en/latest/user_guide/#requirements-files):
 
 ```python
 # setup.py
 setup(
     # ...
     install_requires=[
-        'vectorbtpro @ git+https://github.com/polakowo/vectorbt.pro.git'
+        "vectorbtpro @ git+https://github.com/polakowo/vectorbt.pro.git"
     ]
     # ...
 )
