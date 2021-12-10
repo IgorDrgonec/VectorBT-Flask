@@ -29,8 +29,8 @@
 ## Installation
 
 > Installing vectorbt PRO requires visiting the https://vectorbt.pro website and obtaining a vectorbt PRO license. The license gives the access to the vectorbt PRO codebase in a private GitHub repository.
-> 
-> Minimal version:
+>
+> Lightweight version:
 
 ```bash
 # if you're using Git/HTTPS authentication
@@ -39,6 +39,20 @@ pip install -U git+https://github.com/polakowo/vectorbt.pro.git
 # if you are connecting to GitHub with SSH
 pip install -U git+ssh://git@github.com/polakowo/vectorbt.pro.git
 ```
+
+> Base version:
+
+```bash
+pip install -U "git+https://github.com/polakowo/vectorbt.pro.git[base]"
+```
+
+> Full version:
+
+```bash
+pip install -U "git+https://github.com/polakowo/vectorbt.pro.git[full]"
+```
+
+For more details, see [extra-requirements.txt](https://github.com/polakowo/vectorbt.pro/blob/main/extra-requirements.txt).
 
 ### Python dependency
 

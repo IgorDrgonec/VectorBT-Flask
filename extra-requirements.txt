@@ -3,24 +3,24 @@
 #
 # package[version_required]: tag1, tag2, ...
 
-yfinance>=0.1.63:           data, recommend
+yfinance>=0.1.63:           data, base
 python-binance:             data
 ccxt:                       data
 tables:                     data
 ta:                         ta
 pandas_ta:                  ta
-TA-Lib:                     ta, recommend
+TA-Lib:                     ta, base
 Bottleneck:                 compute
-numexpr:                    compute, recommend
+numexpr:                    compute, base
 ray>=1.4.1:                 distribute
-dask:                       distribute, recommend
-matplotlib:                 plot, recommend
-plotly>=4.12.0:             plot, recommend
-ipywidgets>=7.0.0:          plot, recommend
-quantstats>=0.0.37:         stats, recommend
-PyPortfolioOpt:             stats, recommend
+dask:                       distribute, base
+matplotlib:                 plot, base
+plotly>=4.12.0:             plot, base
+ipywidgets>=7.0.0:          plot, base
+quantstats>=0.0.37:         stats, base
+PyPortfolioOpt:             stats, base
 python-telegram-bot>=13.4:  notify
-dill:                       io, recommend
+dill:                       io, base
 pytest:                     test
 pytest-cov:                 test
 codecov:                    test
