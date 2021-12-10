@@ -55,6 +55,6 @@ setup(
 
 ## Support
 
-## [Documentation](https://vectorbt.pro/docs) · [New issue](https://github.com/polakowo/vectorbt.pro/issues) · <sub>[![Discord](https://img.shields.io/discord/918629562441695344?logo=discord&logoColor=white)](https://discord.gg/63jZZzCwzp)</sub> · [info@vectorbt.pro](mailto:info@vectorbt.pro)
+## [Wiki](https://github.com/polakowo/vectorbt.pro/wiki) · [Documentation](https://vectorbt.pro/docs) · [New issue](https://github.com/polakowo/vectorbt.pro/issues) · <sub>[![Discord](https://img.shields.io/discord/918629562441695344?logo=discord&logoColor=white)](https://discord.gg/63jZZzCwzp)</sub> · [info@vectorbt.pro](mailto:info@vectorbt.pro)
 
 © 2021 vectorbt PRO
