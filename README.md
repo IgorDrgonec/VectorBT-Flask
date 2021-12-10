@@ -1,4 +1,4 @@
-> vectorbt PRO is next-gen framework for backtesting, algorithmic trading, and research. It is a high-performance superset of the vectorbt library, one of the world's leading open-source backtesting frameworks. vectorbt PRO includes the standard vectorbt library and wraps it with powerful new features and useful enhancements.
+> vectorbt PRO is next-gen framework for backtesting, algorithmic trading, and research. It is a high-performance superset of the [vectorbt](https://github.com/polakowo/vectorbt) library, one of the world's most innovative open-source backtesting frameworks. vectorbt PRO includes the standard vectorbt library and wraps it with powerful new features and useful enhancements.
 
 ## [Home](https://vectorbt.pro) · [Features](#features) · [License](#license) · [Installation](#install) · [Support](#support)
 
