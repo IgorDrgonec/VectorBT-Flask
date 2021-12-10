@@ -7,6 +7,30 @@ version = {}
 with open("vectorbtpro/_version.py", encoding="utf-8") as fp:
     exec(fp.read(), version)
 
+
+def get_extra_requires(path, add_all=True):
+    """Parse extra requirements."""
+    import re
+    from collections import defaultdict
+
+    with open(path, encoding="utf-8") as fp:
+        extra_deps = defaultdict(set)
+        for k in fp:
+            if k.strip() and not k.startswith('#'):
+                tags = set()
+                if ':' in k:
+                    k, v = k.split(':')
+                    tags.update(vv.strip() for vv in v.split(','))
+                tags.add(re.split('[<=>]', k)[0])
+                for t in tags:
+                    extra_deps[t].add(k)
+
+        # add tag `all` at the end
+        if add_all:
+            extra_deps['all'] = set(vv for v in extra_deps.values() for vv in v)
+
+    return extra_deps
+
 setup(
     name='vectorbtpro',
     version=version['__version__'],
@@ -41,48 +65,7 @@ setup(
         'humanize',
         'attrs'
     ],
-    extras_require={
-        'data': [
-            'yfinance>=0.1.63',
-            'python-binance',
-            'ccxt',
-            'tables'
-        ],
-        'ta': [
-            'ta',
-            'pandas_ta',
-            'TA-Lib',
-        ],
-        'acc': [
-            'Bottleneck',
-            'numexpr',
-        ],
-        'exec': [
-            'ray>=1.4.1',
-            'dask'
-        ],
-        'plot': [
-            'matplotlib',
-            'plotly>=4.12.0',
-            'ipywidgets>=7.0.0'
-        ],
-        'stats': [
-            'quantstats>=0.0.37',
-            'PyPortfolioOpt'
-        ],
-        'misc': [
-            'python-telegram-bot>=13.4',
-            'dill'
-        ],
-        'cov': [
-            'pytest',
-            'pytest-cov',
-            'codecov'
-        ],
-        'docs': [
-            'pdoc3'
-        ]
-    },
+    extras_require=get_extra_requires('extra-requirements.txt'),
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
