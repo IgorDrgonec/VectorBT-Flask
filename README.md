@@ -32,10 +32,10 @@
 
 ```bash
 # if you're using Git/HTTPS authentication
-pip3 install git+https://github.com/polakowo/vectorbt.pro.git
+pip install -U git+https://github.com/polakowo/vectorbt.pro.git
 
 # if you are connecting to GitHub with SSH
-pip3 install git+ssh://git@github.com/polakowo/vectorbt.pro.git
+pip install -U git+ssh://git@github.com/polakowo/vectorbt.pro.git
 ```
 
 ### Python Dependency
