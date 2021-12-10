@@ -27,7 +27,7 @@
 
 > If you are a software developer you should specify vectorbt PRO as your requirement. The end-user of your software is responsible for obtaining his own individual vectorbt PRO license. The best practice is to make it clear in your docs or on your website. Since vectorbt and vectorbt PRO are interchangeable, auto-detection can be factored-in to let the end-user choose between the free vectorbt and the paid vectorbt PRO.
 
-> Thank you for using vectorbt PRO legally!
+> Thank you for using vectorbt PRO legally :heart:
 
 ## Installation
 

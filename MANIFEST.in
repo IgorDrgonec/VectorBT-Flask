@@ -1,1 +1,1 @@
-recursive-include vectorbt/templates *.json
+recursive-include vectorbtpro/templates *.json
