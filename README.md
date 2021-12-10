@@ -7,7 +7,7 @@
         <img src="https://img.shields.io/discord/918629562441695344?logo=discord" /></a>
 </p>
 
-vectorbt PRO is next-gen framework for backtesting, algorithmic trading, and research. It is a high-performance superset of the [vectorbt](https://github.com/polakowo/vectorbt) library, one of the world's most innovative open-source backtesting frameworks. vectorbt PRO extends the standard vectorbt library with powerful new features and useful enhancements.
+vectorbt PRO is next-gen framework for backtesting, algorithmic trading, and research. It is a high-performance superset of the **[vectorbt](https://github.com/polakowo/vectorbt)** library, one of the world's most innovative open-source backtesting frameworks. vectorbt PRO extends the standard vectorbt library with powerful new features and useful enhancements.
 
 ## [Home](https://vectorbt.pro) · [Features](#features) · [License](#license) · [Installation](#install) · [Support](#support)
 
@@ -21,7 +21,7 @@ vectorbt PRO is next-gen framework for backtesting, algorithmic trading, and res
 
 > **It is illegal to publish, distribute, or sell the vectorbt PRO source code without a separate permission. Violation of the licensing terms will trigger a ban followed by a legal pursuit.**
 >
-> The vectorbt PRO is hosted in a private repository on GitHub. The access to the repository is licensed and granted by invitation only on a paid basis. In order to access the repository, the users must obtain prepaid subscription plans at https://vectorbt.pro. The users pay for the continued access to the repository, including updates, support and maintenance (new exchanges, improvements, bugfixes and so on).
+> The vectorbt PRO is hosted in a private repository on GitHub. The access to the repository is licensed and granted by invitation only on a paid basis. In order to access the repository, the users must obtain prepaid subscription plans at **https://vectorbt.pro**. The users pay for the continued access to the repository, including updates, support and maintenance (new exchanges, improvements, bugfixes and so on).
 >
 > If your vectorbt PRO license expires, your software or system will not break down and will keep working fine with your most recent version by that time. However, if you discontinue your paid license you will lose the updates that will follow.
 >
@@ -37,7 +37,7 @@ vectorbt PRO is next-gen framework for backtesting, algorithmic trading, and res
 
 ## Installation
 
-Installing vectorbt PRO requires visiting the https://vectorbt.pro website and obtaining a vectorbt PRO license. The license gives the access to the vectorbt PRO codebase in a private GitHub repository.
+Installing vectorbt PRO requires visiting the **https://vectorbt.pro** website and obtaining a vectorbt PRO license. The license gives the access to the vectorbt PRO codebase in a private GitHub repository.
 
 Lightweight version:
 
