@@ -10,10 +10,7 @@
 
 ### Important Notes
 
-```plaintext
-* It is illegal to publish, distribute, or sell the vectorbt PRO source code without a separate permission.
-* Violation of the licensing terms will trigger a ban followed by a legal pursuit.
-```
+> **It is illegal to publish, distribute, or sell the vectorbt PRO source code without a separate permission. Violation of the licensing terms will trigger a ban followed by a legal pursuit.**
 
 > The vectorbt PRO is hosted in a private repository on GitHub. The access to the repository is licensed and granted by invitation only on a paid basis. In order to access the repository, the users must obtain prepaid subscription plans at https://vectorbt.pro. The users pay for the continued access to the repository, including updates, support and maintenance (new exchanges, improvements, bugfixes and so on).
 
