@@ -3,7 +3,7 @@
 	<img src="static/header.svg">
 	<br>
 </div>
-
+<br>
 <p align="center">
     <a href="https://github.com/polakowo/vectorbt.pro/blob/main/setup.py" alt="Python Versions">
         <img src="https://github.com/polakowo/vectorbt.pro/blob/main/static/badges/python_version.svg" /></a>
