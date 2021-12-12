@@ -7,7 +7,7 @@
 <p align="center">
     <a href="https://github.com/polakowo/vectorbt.pro/blob/main/setup.py" alt="Python Versions">
         <img src="https://github.com/polakowo/vectorbt.pro/blob/main/static/badges/python_version.svg" /></a>
-    <a href="https://github.com/polakowo/vectorbt/blob/master/LICENSE.md" alt="License">
+    <a href="https://github.com/polakowo/vectorbt.pro/blob/master/LICENSE.md" alt="License">
         <img src="https://github.com/polakowo/vectorbt.pro/blob/main/static/badges/license.svg" /></a>
     <a href="https://discord.gg/63jZZzCwzp" alt="Discord">
         <img src="https://img.shields.io/discord/918629562441695344?logo=discord" /></a>
