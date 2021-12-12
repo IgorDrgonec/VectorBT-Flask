@@ -40,7 +40,7 @@
 					line-height: 1.3;
 					letter-spacing: 5px;
 					text-shadow: 
-						0 1px 0 #efefef,
+						0 1px 0 #cbcbcb,
 						0 12px 5px rgba(0, 0, 0, 0.15);
 				}
 			</style>
