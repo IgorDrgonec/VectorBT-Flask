@@ -19,7 +19,12 @@ vectorbt PRO is the most powerful toolkit for backtesting, algorithmic trading, 
 
 ## Features
 
-- [x] **Pandas acceleration**: 
+- [x] **Parallelization with Numba**: Most Numba-compiled functions have been refactored to process columns in parallel using [Explicit Parallel Loops](https://numba.pydata.org/numba-doc/0.37.0/user/parallel.html#explicit-parallel-loops), which can be enabled by simply passing `parallel=True`.
+- [x] **Chunking**: Innovative chunking mechanism that takes a specification of how arguments should be chunked, automatically splits them, passes each chunk to the function, and merges back the results. This way, you can run any function in a distributed manner! Additionally, vectorbt PRO provides the chunking specification for all arguments of most Numba-compiled functions. Chunking can be enabled by simply passing `chunked=True`. No more out-of-memory errors!
+- [x] **Multithreading**: Integration of the Dask backend for running multiple chunks across multiple threads. Cuts down execution time on Apple M1 by 3-4x, and even more, depending on the number of cores. Dask + Numba = :muscle:
+- [x] **Multiprocessing**: Integration of the Ray backend for running multiple chunks across multiple processes. Ever wanted to test billions of hyperparameter combinations in a matter of minutes? This is now possible by scaling the simulation up in the cloud.
+- [x] **Smart broadcasting**: Broadcasting mechanism has been completely refactored and now supports parameters - almost every function can build a product of multiple hyperparameter combinations with a single line of code.
+- [x] **Config**: Config classes have been optimized. The time overhead of using the top-level API has shrunk by 25%.
 
 ## License
 
@@ -72,7 +77,7 @@ pip install -U "vectorbtpro[full] @ git+https://github.com/polakowo/vectorbt.pro
 pip install -U "vectorbtpro[full] @ git+ssh://github.com/polakowo/vectorbt.pro.git"
 ```
 
-Base version (minimal version to complete most examples):
+Base version (minimal version for completing most examples):
 
 ```bash
 pip install -U "vectorbtpro[base] @ git+https://github.com/polakowo/vectorbt.pro.git"
