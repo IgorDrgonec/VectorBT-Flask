@@ -19,7 +19,7 @@ vectorbt PRO is the most powerful toolkit for backtesting, algorithmic trading, 
 
 ## :zap: Features
 
-Additionally to the [features](https://github.com/polakowo/vectorbt#zap-features) offered by the vanilla version of vectorbt, vectorbt PRO implements the following enhancements:
+On top of the [features](https://github.com/polakowo/vectorbt#zap-features) offered by the vanilla version of vectorbt, vectorbt PRO implements the following enhancements:
 
 ### Performance
 
