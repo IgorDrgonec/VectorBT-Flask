@@ -88,7 +88,7 @@ Installing vectorbt PRO requires visiting the **https://vectorbt.pro** website a
 ---
 **NOTE**
 
-vectorbt PRO is a totally different beast compared to vectorbt - a vanilla version available publicly. In fact, the PRO version redesigns the underlying core to enable groundbreaking features. 
+vectorbt PRO is a totally different beast compared to the open-source version of vectorbt. In fact, the PRO version redesigns the underlying core to enable groundbreaking features. 
 
 To avoid using an outdated code, make sure to only use **vectorbtpro**!
 
