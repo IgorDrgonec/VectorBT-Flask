@@ -27,12 +27,12 @@ Additionally to the [features](https://github.com/polakowo/vectorbt#zap-features
 - [x] **Chunking**: Innovative chunking mechanism that takes a specification of how arguments should be chunked, automatically splits them, passes each chunk to the function, and merges back the results. This way, you can run any function in a distributed manner! Additionally, vectorbt PRO provides the chunking specification for all arguments of most Numba-compiled functions. Chunking can be enabled by a single command. No more out-of-memory errors!
 - [x] **Multithreading**: Integration of the Dask backend for running multiple chunks across multiple threads. Cuts down execution time on Apple M1 by 3-4x, and even more depending on the number of cores. Dask + Numba = :muscle:
 - [x] **Multiprocessing**: Integration of the Ray backend for running multiple chunks across multiple processes. Ever wanted to test billions of hyperparameter combinations in a matter of minutes? This is now possible by scaling functions and entire applications up in the cloud using the Ray cluster. :eyes:
-- [x] **Jitting**: Jitting means just-in-time compiling. Although Numba remains the main jitter in vectorbt, vectorbt PRO now enables implementation of custom jitter classes such as that for [JAX](https://github.com/google/jax) with GPU support. Every jitted function is registered globally so you can switch between implementations using a single command.
+- [x] **Jitting**: Jitting means just-in-time compiling. Although Numba remains the primary jitter in vectorbt, vectorbt PRO now enables implementation of custom jitter classes such as that for [JAX](https://github.com/google/jax) with GPU support. Every jitted function is registered globally so you can switch between implementations using a single command.
 - [x] **Caching**: Caching has been reimplemented from the ground up and now it's being managed by a single registry. This allows for tracking useful statistics of all cacheable parts of vectorbt, such as to display the total cached size in MB. Full control and transparency.
 
 ### Flexibility
 
-- [x] **Smart broadcasting**: Broadcasting mechanism has been completely refactored and now supports parameters - almost every function can build a product of multiple hyperparameter combinations with a single line of code. :magic_wand:
+- [x] **Smart broadcasting**: Broadcasting mechanism has been completely refactored and now supports parameters. Build a product of multiple hyperparameter combinations with a single line of code. :magic_wand:
 - [x] **Meta methods**: Many methods such as rolling apply are now available in two flavors: regular (instance methods) and meta (class methods). Regular methods work as usual, while meta methods are not bound to any array and act as micro-pipelines with their own broadcasting and templating logic.
 
 ### Data
@@ -46,7 +46,7 @@ Additionally to the [features](https://github.com/polakowo/vectorbt#zap-features
 - [x] **Initial position**: Similar to initial cash, initial position can now be specified.
 - [x] **Cash deposits**: Cash can now be deposited/withdrawn at any time. 
 - [x] **Cash earnings**: Cash earnings and dividends can now be added/removed at any time.
-- [x] **Shortcut properties**: Portfolio simulation based on order functions can take user-defined arrays, write them in place during the simulation, and use them directly instead of calculating them during the analysis phase. This is the new, very convinient way to pre-calculate attributes such as returns. Most attributes in Portfolio and Records have also become properties, while their respective methods now have a "get_" prefix.
+- [x] **Shortcut properties**: Portfolio simulation based on order functions can take user-defined arrays, write them in place during the simulation, and use them directly instead of calculating them during the analysis phase. This is the new, very convinient way to pre-calculate and utilize attributes such as returns. Most attributes in Portfolio and Records have also become properties, while their respective methods have got a "get_" prefix.
 
 ### Analysis
 
