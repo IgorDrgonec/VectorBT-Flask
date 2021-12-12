@@ -43,20 +43,20 @@
 				h1 {
 					font-size: 50px;
 					line-height: 1.3;
+				}
+				.vectorbt {
+					font-family: 'audiowideregular', sans-serif;
 					letter-spacing: 5px;
 					text-shadow: 
 						0 1px 0 #cbcbcb,
 						0 12px 5px rgba(0, 0, 0, 0.15);
-				}
-				.vectorbt {
-					font-family: 'audiowideregular', sans-serif;
 				}
 				.pro {
 					font-family: 'arizoniaregular', sans-serif;
 				}
 			</style>
 			<div class="container">
-				<h1><span class="vectorbt">V€CTOR<i>BT</i></span>&nbsp;&nbsp;<span class="pro">PRO</span></h1>
+				<h1><span class="vectorbt">V€CTOR<i>BT</i></span> <span class="pro">PRO</span></h1>
 			</div>
 		</div>
 	</foreignObject>
