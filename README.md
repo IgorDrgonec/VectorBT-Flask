@@ -19,11 +19,15 @@ vectorbt PRO is the most powerful toolkit for backtesting, algorithmic trading, 
 
 ## Features
 
+- [x] **Pandas acceleration**: 
+
 ## License
 
 ### See [LICENSE.md](https://github.com/polakowo/vectorbt.pro/tree/master/LICENSE.md) for details
 
 ### Important notes
+
+Installing vectorbt PRO requires visiting the **https://vectorbt.pro** website and obtaining a vectorbt PRO license. The license gives the access to the vectorbt PRO codebase in a private GitHub repository.
 
 > **It is illegal to publish, distribute, or sell the vectorbt PRO source code without a separate permission. Violation of the licensing terms will trigger a ban followed by a legal pursuit.**
 >
@@ -43,28 +47,41 @@ vectorbt PRO is the most powerful toolkit for backtesting, algorithmic trading, 
 
 ## Installation
 
-Installing vectorbt PRO requires visiting the **https://vectorbt.pro** website and obtaining a vectorbt PRO license. The license gives the access to the vectorbt PRO codebase in a private GitHub repository.
+---
+**NOTE**
 
-Lightweight version:
+vectorbt PRO is a totally different beast compared to vectorbt - a vanilla version available publicly. In fact, the PRO version redesigns the underlying core to enable groundbreaking features. 
+
+To avoid using an outdated code, make sure to only use **vectorbtpro**!
+
+---
+
+Uninstall the vanilla version (if installed):
+
+```bash
+pip uninstall vectorbt
+```
+
+Install the PRO version:
 
 ```bash
 # if you're using Git/HTTPS authentication
-pip install -U git+https://github.com/polakowo/vectorbt.pro.git
+pip install -U "vectorbtpro[full] @ git+https://github.com/polakowo/vectorbt.pro.git"
 
 # if you are connecting to GitHub with SSH
-pip install -U git+ssh://git@github.com/polakowo/vectorbt.pro.git
+pip install -U "vectorbtpro[full] @ git+ssh://github.com/polakowo/vectorbt.pro.git"
 ```
 
-Base version:
+Base version (minimal version to complete most examples):
 
 ```bash
 pip install -U "vectorbtpro[base] @ git+https://github.com/polakowo/vectorbt.pro.git"
 ```
 
-Full version:
+Lightweight version (minimal version for running vectorbt):
 
 ```bash
-pip install -U "vectorbtpro[full] @ git+https://github.com/polakowo/vectorbt.pro.git"
+pip install -U git+https://github.com/polakowo/vectorbt.pro.git
 ```
 
 For more details, see [extra-requirements.txt](https://github.com/polakowo/vectorbt.pro/blob/main/extra-requirements.txt).
