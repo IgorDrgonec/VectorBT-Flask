@@ -14,7 +14,7 @@ of the entire symbol.
 
 !!! warning
     All classes return both closed AND open trades/positions, which may skew your performance results.
-    To only consider closed trades/positions, you should explicitly query the `closed` attribute.
+    To only consider closed trades/positions, you should explicitly query the `Trades.closed` attribute.
 
 ## Trade types
 
