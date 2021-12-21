@@ -1,6 +1,6 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Modules for working with signals, such as entry and exit signals."""
+"""Modules for working with signals."""
 
 from vectorbtpro.signals.enums import *
 from vectorbtpro.signals.factory import SignalFactory

@@ -32,7 +32,7 @@ class ExecutionEngine(Configured):
 class SequenceEngine(ExecutionEngine):
     """Class for executing functions sequentially.
 
-    For defaults, see `execution.engines.sequence` in `vectorbtpro._settings.settings`."""
+    For defaults, see `engines.sequence` in `vectorbtpro._settings.execution`."""
 
     def __init__(self,
                  show_progress: tp.Optional[bool] = None,
@@ -75,7 +75,7 @@ class SequenceEngine(ExecutionEngine):
 class DaskEngine(ExecutionEngine):
     """Class for executing functions in parallel using Dask.
 
-    For defaults, see `execution.engines.dask` in `vectorbtpro._settings.settings`.
+    For defaults, see `engines.dask` in `vectorbtpro._settings.execution`.
 
     !!! note
         Use multi-threading mainly on numeric code that releases the GIL
@@ -100,7 +100,7 @@ class DaskEngine(ExecutionEngine):
         return self._compute_kwargs
 
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
-        from vectorbtpro.opt_packages import assert_can_import
+        from vectorbtpro.utils.opt_packages import assert_can_import
         assert_can_import('dask')
         import dask
 
@@ -113,7 +113,7 @@ class DaskEngine(ExecutionEngine):
 class RayEngine(ExecutionEngine):
     """Class for executing functions in parallel using Ray.
 
-    For defaults, see `execution.engines.ray` in `vectorbtpro._settings.settings`.
+    For defaults, see `engines.ray` in `vectorbtpro._settings.execution`.
 
     !!! note
         Ray spawns multiple processes as opposed to threads, so any argument and keyword argument must first
@@ -199,7 +199,7 @@ class RayEngine(ExecutionEngine):
         and invoking the remote decorator on each function using Ray.
 
         If `reuse_refs` is True, will generate one reference per unique object id."""
-        from vectorbtpro.opt_packages import assert_can_import
+        from vectorbtpro.utils.opt_packages import assert_can_import
         assert_can_import('ray')
         import ray
         from ray.remote_function import RemoteFunction
@@ -261,7 +261,7 @@ class RayEngine(ExecutionEngine):
         return funcs_args_refs
 
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
-        from vectorbtpro.opt_packages import assert_can_import
+        from vectorbtpro.utils.opt_packages import assert_can_import
         assert_can_import('ray')
         import ray
 
@@ -302,7 +302,7 @@ def execute(funcs_args: tp.FuncsArgs,
     * Instance of `ExecutionEngine` - will call `ExecutionEngine.execute` with `n_calls`
     * Callable - will pass `funcs_args`, `n_calls` (if not None), and `**kwargs`
 
-    Supported engines can be found in `execution.engines` in `vectorbtpro._settings.settings`."""
+    Supported engines can be found in `engines` in `vectorbtpro._settings.execution`."""
     from vectorbtpro._settings import settings
     engines_cfg = settings['execution']['engines']
 

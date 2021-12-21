@@ -2,10 +2,10 @@
 
 """Utilities for working with templates."""
 
-import attr
 from copy import copy
 from string import Template
 
+import attr
 import numpy as np
 import pandas as pd
 
@@ -52,7 +52,7 @@ class CustomTemplate:
                         sub_id: tp.Optional[Hashable] = None) -> tp.Kwargs:
         """Resolve `CustomTemplate.mapping`.
 
-        Merges `template.mapping` in `vectorbtpro._settings.settings`, `CustomTemplate.mapping`, and `mapping`.
+        Merges `mapping` in `vectorbtpro._settings.template`, `CustomTemplate.mapping`, and `mapping`.
         Automatically appends `sub_id`, `np` (NumPy), `pd` (Pandas), and `vbt` (vectorbt)."""
         from vectorbtpro._settings import settings
         template_cfg = settings['template']
@@ -72,7 +72,7 @@ class CustomTemplate:
     def resolve_strict(self, strict: tp.Optional[bool] = None) -> bool:
         """Resolve `CustomTemplate.strict`.
 
-        If `strict` is None, uses `template.strict` in `vectorbtpro._settings.settings`."""
+        If `strict` is None, uses `strict` in `vectorbtpro._settings.template`."""
         if strict is None:
             strict = self.strict
         if strict is None:
@@ -214,30 +214,29 @@ def deep_substitute(obj: tp.Any,
         thus loosing the reference to the original. Make sure to do a deep or hybrid copy of the object
         before proceeding for consistent behavior, or disable `make_copy` to override the original in place.
 
-    ## Example
+    Usage:
+        ```pycon
+        >>> import vectorbtpro as vbt
 
-    ```python-repl
-    >>> import vectorbtpro as vbt
-
-    >>> vbt.deep_substitute(vbt.Sub('$key', {'key': 100}))
-    100
-    >>> vbt.deep_substitute(vbt.Sub('$key', {'key': 100}), {'key': 200})
-    200
-    >>> vbt.deep_substitute(vbt.Sub('$key$key'), {'key': 100})
-    100100
-    >>> vbt.deep_substitute(vbt.Rep('key'), {'key': 100})
-    100
-    >>> vbt.deep_substitute([vbt.Rep('key'), vbt.Sub('$key$key')], {'key': 100})
-    [100, '100100']
-    >>> vbt.deep_substitute(vbt.RepFunc(lambda key: key == 100), {'key': 100})
-    True
-    >>> vbt.deep_substitute(vbt.RepEval('key == 100'), {'key': 100})
-    True
-    >>> vbt.deep_substitute(vbt.RepEval('key == 100', strict=True))
-    NameError: name 'key' is not defined
-    >>> vbt.deep_substitute(vbt.RepEval('key == 100', strict=False))
-    <vectorbtpro.utils.template.RepEval at 0x7fe3ad2ab668>
-    ```
+        >>> vbt.deep_substitute(vbt.Sub('$key', {'key': 100}))
+        100
+        >>> vbt.deep_substitute(vbt.Sub('$key', {'key': 100}), {'key': 200})
+        200
+        >>> vbt.deep_substitute(vbt.Sub('$key$key'), {'key': 100})
+        100100
+        >>> vbt.deep_substitute(vbt.Rep('key'), {'key': 100})
+        100
+        >>> vbt.deep_substitute([vbt.Rep('key'), vbt.Sub('$key$key')], {'key': 100})
+        [100, '100100']
+        >>> vbt.deep_substitute(vbt.RepFunc(lambda key: key == 100), {'key': 100})
+        True
+        >>> vbt.deep_substitute(vbt.RepEval('key == 100'), {'key': 100})
+        True
+        >>> vbt.deep_substitute(vbt.RepEval('key == 100', strict=True))
+        NameError: name 'key' is not defined
+        >>> vbt.deep_substitute(vbt.RepEval('key == 100', strict=False))
+        <vectorbtpro.utils.template.RepEval at 0x7fe3ad2ab668>
+        ```
     """
     if mapping is None:
         mapping = {}

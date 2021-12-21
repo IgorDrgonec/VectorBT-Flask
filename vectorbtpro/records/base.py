@@ -47,7 +47,7 @@ which is impossible to represent in a matrix form without duplicating index entr
 
 Consider the following example:
 
-```python-repl
+```pycon
 >>> import numpy as np
 >>> import pandas as pd
 >>> from numba import njit
@@ -82,7 +82,7 @@ There are two ways to print records:
 
 * Raw dataframe that preserves field names and data types:
 
-```python-repl
+```pycon
 >>> records.records
    id  col  idx  some_field
 0   0    0    0        10.0
@@ -98,7 +98,7 @@ There are two ways to print records:
 
 * Readable dataframe that takes into consideration `Records.field_config`:
 
-```python-repl
+```pycon
 >>> records.records_readable
    Id Column Timestamp  some_field
 0   0      a         x        10.0
@@ -123,7 +123,7 @@ without conversion to the matrix form and wasting memory resources.
 
 * Use `Records.map_field` to map a record field:
 
-```python-repl
+```pycon
 >>> records.map_field('some_field')
 <vectorbtpro.records.mapped_array.MappedArray at 0x7ff49bd31a58>
 
@@ -133,7 +133,7 @@ array([10., 11., 12., 13., 14., 15., 16., 17., 18.])
 
 * Use `Records.map` to map records using a custom function.
 
-```python-repl
+```pycon
 >>> @njit
 ... def power_map_nb(record, pow):
 ...     return record.some_field ** pow
@@ -156,7 +156,7 @@ array([100., 121., 144., 169., 196., 225., 256., 289., 324.])
 
 * Use `Records.map_array` to convert an array to `vectorbtpro.records.mapped_array.MappedArray`.
 
-```python-repl
+```pycon
 >>> records.map_array(records_arr['some_field'] ** 2)
 <vectorbtpro.records.mapped_array.MappedArray object at 0x7fe9bccf2978>
 
@@ -166,7 +166,7 @@ array([100., 121., 144., 169., 196., 225., 256., 289., 324.])
 
 * Use `Records.apply` to apply a function on each column/group:
 
-```python-repl
+```pycon
 >>> @njit
 ... def cumsum_apply_nb(records):
 ...     return np.cumsum(records.some_field)
@@ -197,7 +197,7 @@ Notice how cumsum resets at each column in the first example and at each group i
 
 Use `Records.apply_mask` to filter elements per column/group:
 
-```python-repl
+```pycon
 >>> mask = [True, False, True, False, True, False, True, False, True]
 >>> filtered_records = records.apply_mask(mask)
 >>> filtered_records.records
@@ -219,7 +219,7 @@ There are multiple ways of define grouping:
 
 * When creating `Records`, pass `group_by` to `vectorbtpro.base.wrapping.ArrayWrapper`:
 
-```python-repl
+```pycon
 >>> group_by = np.array(['first', 'first', 'second'])
 >>> grouped_wrapper = wrapper.replace(group_by=group_by)
 >>> grouped_records = vbt.Records(grouped_wrapper, records_arr)
@@ -232,7 +232,7 @@ dtype: float64
 
 * Regroup an existing `Records`:
 
-```python-repl
+```pycon
 >>> records.regroup(group_by).map_field('some_field').mean()
 first     12.5
 second    17.0
@@ -241,7 +241,7 @@ dtype: float64
 
 * Pass `group_by` directly to the mapping method:
 
-```python-repl
+```pycon
 >>> records.map_field('some_field', group_by=group_by).mean()
 first     12.5
 second    17.0
@@ -250,7 +250,7 @@ dtype: float64
 
 * Pass `group_by` directly to the reducing method:
 
-```python-repl
+```pycon
 >>> records.map_field('some_field').mean(group_by=group_by)
 a    11.0
 b    14.0
@@ -266,7 +266,7 @@ dtype: float64
 Like any other class subclassing `vectorbtpro.base.wrapping.Wrapping`, we can do pandas indexing
 on a `Records` instance, which forwards indexing operation to each object with columns:
 
-```python-repl
+```pycon
 >>> records['a'].records
    id  col  idx  some_field
 0   0    0    0        10.0
@@ -296,7 +296,7 @@ on a `Records` instance, which forwards indexing operation to each object with c
 
 `Records` supports caching. If a method or a property requires heavy computation, it's wrapped
 with `vectorbtpro.utils.decorators.cached_method` and `vectorbtpro.utils.decorators.cached_property`
-respectively. Caching can be disabled globally via `caching` in `vectorbtpro._settings.settings`.
+respectively. Caching can be disabled globally via `vectorbtpro._settings.caching`.
 
 !!! note
     Because of caching, class is meant to be immutable and all properties are read-only.
@@ -312,7 +312,7 @@ instance to the disk with `Records.save` and load it with `Records.load`.
 !!! hint
     See `vectorbtpro.generic.stats_builder.StatsBuilderMixin.stats` and `Records.metrics`.
 
-```python-repl
+```pycon
 >>> records.stats(column='a')
 Start                          x
 End                            z
@@ -323,7 +323,7 @@ Name: a, dtype: object
 
 `Records.stats` also supports (re-)grouping:
 
-```python-repl
+```pycon
 >>> grouped_records.stats(column='first')
 Start                          x
 End                            z
@@ -348,7 +348,7 @@ or other properties, we can override `field_config` using `vectorbtpro.records.d
 It will look for configs of all base classes and merge our config on top of them. This preserves
 any base class property that is not explicitly listed in our config.
 
-```python-repl
+```pycon
 >>> from vectorbtpro.records.decorators import override_field_config
 
 >>> my_dt = np.dtype([
@@ -391,7 +391,7 @@ array([0, 1, 0, 1])
 
 Alternatively, we can override the `_field_config` class attribute.
 
-```python-repl
+```pycon
 >>> @override_field_config
 ... class MyRecords(vbt.Records):
 ...     _field_config = dict(
@@ -419,16 +419,16 @@ import pandas as pd
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_1d_array
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
-from vectorbtpro.ch_registry import ch_registry
 from vectorbtpro.generic.plots_builder import PlotsBuilderMixin
 from vectorbtpro.generic.stats_builder import StatsBuilderMixin
-from vectorbtpro.jit_registry import jit_registry
 from vectorbtpro.records import nb
 from vectorbtpro.records.col_mapper import ColumnMapper
 from vectorbtpro.records.mapped_array import MappedArray
+from vectorbtpro.registries.ch_registry import ch_registry
+from vectorbtpro.registries.jit_registry import jit_registry
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import get_dict_attr
-from vectorbtpro.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig, Configured
+from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.decorators import cached_method, class_or_instancemethod
 
 __pdoc__ = {}
@@ -880,7 +880,7 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         """Defaults for `Records.stats`.
 
         Merges `vectorbtpro.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
-        `records.stats` from `vectorbtpro._settings.settings`."""
+        `stats` from `vectorbtpro._settings.records`."""
         from vectorbtpro._settings import settings
         records_stats_cfg = settings['records']['stats']
 
@@ -929,7 +929,7 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         """Defaults for `Records.plots`.
 
         Merges `vectorbtpro.generic.plots_builder.PlotsBuilderMixin.plots_defaults` and
-        `records.plots` from `vectorbtpro._settings.settings`."""
+        `plots` from `vectorbtpro._settings.records`."""
         from vectorbtpro._settings import settings
         records_plots_cfg = settings['records']['plots']
 

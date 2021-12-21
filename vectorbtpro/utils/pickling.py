@@ -14,7 +14,7 @@ class Pickleable:
 
     def dumps(self, **kwargs) -> bytes:
         """Pickle to bytes."""
-        from vectorbtpro.opt_packages import warn_cannot_import
+        from vectorbtpro.utils.opt_packages import warn_cannot_import
         warn_cannot_import('dill')
         try:
             import dill as pickle
@@ -26,7 +26,7 @@ class Pickleable:
     @classmethod
     def loads(cls: tp.Type[PickleableT], dumps: bytes, **kwargs) -> PickleableT:
         """Unpickle from bytes."""
-        from vectorbtpro.opt_packages import warn_cannot_import
+        from vectorbtpro.utils.opt_packages import warn_cannot_import
         warn_cannot_import('dill')
         try:
             import dill as pickle

@@ -2,9 +2,9 @@
 
 """Utilities for documentation."""
 
-import attr
 import json
 
+import attr
 import numpy as np
 
 from vectorbtpro import _typing as tp
@@ -59,6 +59,13 @@ def prepare_for_doc(obj: tp.Any, replace: tp.DictLike = None, path: str = None) 
         if len(obj.shape) == 0:
             return obj.item()
         return "{} of shape {}".format(object.__repr__(obj), obj.shape)
+    if isinstance(obj, float):
+        if np.isnan(obj):
+            return "np.nan"
+        if np.isposinf(obj):
+            return "np.inf"
+        if np.isneginf(obj):
+            return "-np.inf"
     return obj
 
 

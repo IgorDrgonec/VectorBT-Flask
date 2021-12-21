@@ -1,0 +1,218 @@
+# Project information
+site_name: vectorbt PRO
+site_description: Powerful toolkit for quants
+site_author: Oleg Polakow
+
+# Repository
+repo_name: vectorbt.pro (invite-only)
+repo_url: https://github.com/polakowo/vectorbt.pro
+edit_uri: ""
+
+# Copyright
+copyright: Copyright &copy; 2021 Oleg Polakow. All rights reserved.
+
+# Configuration
+theme:
+  name: material
+  include_search_page: false
+  search_index_only: true
+  language: en
+  features:
+    - navigation.tracking
+    - navigation.indexes
+    - navigation.tabs
+    - navigation.instant
+    - search.suggest
+    - search.share
+  palette:
+    scheme: slate
+    primary: deep orange
+    accent: amber
+  icon:
+    repo: fontawesome/brands/github
+  font:
+    text: Roboto
+    code: Roboto Mono
+  logo: assets/logo/logo.svg
+  favicon: assets/logo/favicon.ico
+
+# Customization
+markdown_extensions:
+  - meta
+  - admonition
+  - def_list
+  - attr_list
+  - tables
+  - footnotes
+  - toc:
+      permalink: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.progressbar
+  - pymdownx.magiclink:
+      repo_url_shorthand: true
+      user: polakowo
+      repo: vectorbt.pro
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - pymdownx.highlight:
+      extend_pygments_lang:
+        - name: pycon3
+          lang: pycon
+          options:
+            python3: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/polakowo
+    - icon: fontawesome/brands/discord
+      link: https://discord.gg/63jZZzCwzp
+extra_javascript:
+  - assets/javascripts/extra.js
+extra_css:
+  - assets/stylesheets/extra.css
+  - assets/stylesheets/monokai.css
+
+# Page tree
+nav:
+  - Home: index.md
+  - Getting started:
+    - getting-started/index.md
+    - Features: getting-started/features.md
+    - Installation: getting-started/installation.md
+  - API:
+    - api/index.md
+    - _settings: api/_settings.md
+    - accessors: api/accessors.md
+    - base:
+      - api/base/index.md
+      - accessors: api/base/accessors.md
+      - chunking: api/base/chunking.md
+      - combining: api/base/combining.md
+      - grouping: api/base/grouping.md
+      - indexes: api/base/indexes.md
+      - indexing: api/base/indexing.md
+      - reshaping: api/base/reshaping.md
+      - wrapping: api/base/wrapping.md
+    - data:
+      - api/data/index.md
+      - base: api/data/base.md
+      - custom: api/data/custom.md
+      - nb: api/data/nb.md
+      - updater: api/data/updater.md
+    - generic:
+      - api/generic/index.md
+      - accessors: api/generic/accessors.md
+      - decorators: api/generic/decorators.md
+      - drawdowns: api/generic/drawdowns.md
+      - enums: api/generic/enums.md
+      - nb: api/generic/nb.md
+      - plots_builder: api/generic/plots_builder.md
+      - plotting: api/generic/plotting.md
+      - ranges: api/generic/ranges.md
+      - splitters: api/generic/splitters.md
+      - stats_builder: api/generic/stats_builder.md
+    - indicators:
+      - api/indicators/index.md
+      - configs: api/indicators/configs.md
+      - custom: api/indicators/custom.md
+      - factory: api/indicators/factory.md
+      - nb: api/indicators/nb.md
+    - labels:
+      - api/labels/index.md
+      - enums: api/labels/enums.md
+      - generators: api/labels/generators.md
+      - nb: api/labels/nb.md
+    - messaging:
+      - api/messaging/index.md
+      - telegram: api/messaging/telegram.md
+    - ohlcv:
+      - api/ohlcv/index.md
+      - accessors: api/ohlcv/accessors.md
+    - portfolio:
+      - api/portfolio/index.md
+      - base: api/portfolio/base.md
+      - call_seq: api/portfolio/call_seq.md
+      - chunking: api/portfolio/chunking.md
+      - decorators: api/portfolio/decorators.md
+      - enums: api/portfolio/enums.md
+      - logs: api/portfolio/logs.md
+      - nb:
+        - api/portfolio/nb/index.md
+        - analysis: api/portfolio/nb/analysis.md
+        - core: api/portfolio/nb/core.md
+        - from_order_func: api/portfolio/nb/from_order_func.md
+        - from_orders: api/portfolio/nb/from_orders.md
+        - from_signals: api/portfolio/nb/from_signals.md
+        - records: api/portfolio/nb/records.md
+      - orders: api/portfolio/orders.md
+      - trades: api/portfolio/trades.md
+    - px:
+      - api/px/index.md
+      - accessors: api/px/accessors.md
+    - records:
+      - api/records/index.md
+      - base: api/records/base.md
+      - chunking: api/records/chunking.md
+      - col_mapper: api/records/col_mapper.md
+      - decorators: api/records/decorators.md
+      - mapped_array: api/records/mapped_array.md
+      - nb: api/records/nb.md
+    - registries:
+      - api/registries/index.md
+      - ca_registry: api/registries/ca_registry.md
+      - ch_registry: api/registries/ch_registry.md
+      - jit_registry: api/registries/jit_registry.md
+    - returns:
+      - api/returns/index.md
+      - accessors: api/returns/accessors.md
+      - metrics: api/returns/metrics.md
+      - nb: api/returns/nb.md
+      - qs_adapter: api/returns/qs_adapter.md
+    - signals:
+      - api/signals/index.md
+      - accessors: api/signals/accessors.md
+      - enums: api/signals/enums.md
+      - factory: api/signals/factory.md
+      - generators: api/signals/generators.md
+      - nb: api/signals/nb.md
+    - utils:
+      - api/utils/index.md
+      - array_: api/utils/array_.md
+      - attr_: api/utils/attr_.md
+      - caching: api/utils/caching.md
+      - checks: api/utils/checks.md
+      - chunking: api/utils/chunking.md
+      - colors: api/utils/colors.md
+      - config: api/utils/config.md
+      - datetime_: api/utils/datetime_.md
+      - decorators: api/utils/decorators.md
+      - docs: api/utils/docs.md
+      - enum_: api/utils/enum_.md
+      - execution: api/utils/execution.md
+      - figure: api/utils/figure.md
+      - hashing: api/utils/hashing.md
+      - image_: api/utils/image_.md
+      - jitting: api/utils/jitting.md
+      - magic_decorators: api/utils/magic_decorators.md
+      - mapping: api/utils/mapping.md
+      - math_: api/utils/math_.md
+      - module_: api/utils/module_.md
+      - opt_packages: api/utils/opt_packages.md
+      - params: api/utils/params.md
+      - parsing: api/utils/parsing.md
+      - pbar: api/utils/pbar.md
+      - pickling: api/utils/pickling.md
+      - profiling: api/utils/profiling.md
+      - random_: api/utils/random_.md
+      - requests_: api/utils/requests_.md
+      - schedule_: api/utils/schedule_.md
+      - tagging: api/utils/tagging.md
+      - template: api/utils/template.md
+  - Terms:
+    - terms/index.md
+    - License: terms/license.md

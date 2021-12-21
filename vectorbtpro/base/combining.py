@@ -11,8 +11,8 @@ import numpy as np
 from numba.typed import List
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.jit_registry import jit_registry
-from vectorbtpro.jit_registry import register_jitted
+from vectorbtpro.registries.jit_registry import jit_registry
+from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils.execution import execute
 
 
@@ -86,7 +86,7 @@ def apply_and_concat(ntimes: int,
 
     Set `jitted_loop` to True to use the JIT-compiled version.
 
-    All jitted iteration functions are resolved using `vectorbtpro.jit_registry.JITRegistry.resolve`.
+    All jitted iteration functions are resolved using `vectorbtpro.registries.jit_registry.JITRegistry.resolve`.
 
     !!! note
         `n_outputs` must be set when `jitted_loop` is True.
@@ -154,7 +154,7 @@ def combine_and_concat(obj: tp.Any,
                        **kwargs) -> tp.Array2d:
     """Combine `obj` with each in `others` using `combine_func` and concatenate.
 
-    `select_and_combine_nb` is resolved using `vectorbtpro.jit_registry.JITRegistry.resolve`."""
+    `select_and_combine_nb` is resolved using `vectorbtpro.registries.jit_registry.JITRegistry.resolve`."""
     if jitted_loop:
         apply_func = jit_registry.resolve(select_and_combine_nb)
     else:
@@ -185,7 +185,7 @@ def combine_multiple(objs: tp.Sequence,
 
     Set `jitted_loop` to True to use the JIT-compiled version.
 
-    `combine_multiple_nb` is resolved using `vectorbtpro.jit_registry.JITRegistry.resolve`.
+    `combine_multiple_nb` is resolved using `vectorbtpro.registries.jit_registry.JITRegistry.resolve`.
 
     !!! note
         Numba doesn't support variable keyword arguments."""

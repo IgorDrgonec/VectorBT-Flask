@@ -6,7 +6,7 @@ import random
 
 import numpy as np
 
-from vectorbtpro.jit_registry import register_jitted
+from vectorbtpro.registries.jit_registry import register_jitted
 
 
 @register_jitted(cache=True)

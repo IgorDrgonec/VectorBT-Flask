@@ -52,7 +52,7 @@ Also available as `vectorbtpro.portfolio.base.Portfolio.positions`.
 
 * Increasing position:
 
-```python-repl
+```pycon
 >>> import pandas as pd
 >>> import numpy as np
 >>> from datetime import datetime, timedelta
@@ -114,7 +114,7 @@ True
 
 * Decreasing position:
 
-```python-repl
+```pycon
 >>> # Entry trades
 >>> pf_kwargs = dict(
 ...     close=pd.Series([1., 2., 3., 4., 5.]),
@@ -171,7 +171,7 @@ True
 
 * Multiple reversing positions:
 
-```python-repl
+```pycon
 >>> # Entry trades
 >>> pf_kwargs = dict(
 ...     close=pd.Series([1., 2., 3., 4., 5.]),
@@ -246,7 +246,7 @@ True
 
 * Open position:
 
-```python-repl
+```pycon
 >>> # Entry trades
 >>> pf_kwargs = dict(
 ...     close=pd.Series([1., 2., 3., 4., 5.]),
@@ -294,7 +294,7 @@ True
 
 Get trade count, trade PnL, and winning trade PnL:
 
-```python-repl
+```pycon
 >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.])
 >>> size = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5])
 >>> trades = vbt.Portfolio.from_orders(price, size).trades
@@ -314,7 +314,7 @@ Get trade count, trade PnL, and winning trade PnL:
 
 Get count and PnL of trades with duration of more than 2 days:
 
-```python-repl
+```pycon
 >>> mask = (trades.records['exit_idx'] - trades.records['entry_idx']) > 2
 >>> trades_filtered = trades.apply_mask(mask)
 >>> trades_filtered.count()
@@ -329,139 +329,146 @@ Get count and PnL of trades with duration of more than 2 days:
 !!! hint
     See `vectorbtpro.generic.stats_builder.StatsBuilderMixin.stats` and `Trades.metrics`.
 
-```python-repl
->>> np.random.seed(42)
->>> price = pd.DataFrame({
-...     'a': np.random.uniform(1, 2, size=100),
-...     'b': np.random.uniform(1, 2, size=100)
-... }, index=[datetime(2020, 1, 1) + timedelta(days=i) for i in range(100)])
+```pycon
+>>> price = vbt.RandomData.fetch(
+...     ['a', 'b'],
+...     start=datetime(2020, 1, 1),
+...     end=datetime(2020, 3, 1),
+...     seed=vbt.symbol_dict(a=42, b=43)
+... ).get()
+```
+
+[=100% "100%"]{: .candystripe}
+
+```pycon
 >>> size = pd.DataFrame({
-...     'a': np.random.uniform(-1, 1, size=100),
-...     'b': np.random.uniform(-1, 1, size=100),
-... }, index=[datetime(2020, 1, 1) + timedelta(days=i) for i in range(100)])
+...     'a': np.random.randint(-1, 2, size=len(price.index)),
+...     'b': np.random.randint(-1, 2, size=len(price.index)),
+... }, index=price.index, columns=price.columns)
 >>> pf = vbt.Portfolio.from_orders(price, size, fees=0.01, freq='d')
 
 >>> pf.trades['a'].stats()
-Start                                2020-01-01 00:00:00
-End                                  2020-04-09 00:00:00
-Period                                 100 days 00:00:00
-First Trade Start                    2020-01-01 00:00:00
-Last Trade End                       2020-04-09 00:00:00
-Coverage                               100 days 00:00:00
-Overlap Coverage                        97 days 00:00:00
-Total Records                                         48
-Total Long Trades                                     22
-Total Short Trades                                    26
-Total Closed Trades                                   47
-Total Open Trades                                      1
-Open Trade PnL                                 -1.290981
-Win Rate [%]                                    51.06383
-Max Win Streak                                         3
-Max Loss Streak                                        3
-Best Trade [%]                                 43.326077
-Worst Trade [%]                               -59.478304
-Avg Winning Trade [%]                          21.418522
-Avg Losing Trade [%]                          -18.856792
-Avg Winning Trade Duration              22 days 22:00:00
-Avg Losing Trade Duration     29 days 01:02:36.521739130
-Profit Factor                                   0.976634
-Expectancy                                     -0.001569
-SQN                                            -0.064929
-Name: a, dtype: object
+Start                          2019-12-31 23:00:00+00:00
+End                            2020-02-29 23:00:00+00:00
+Period                                  61 days 00:00:00
+First Trade Start              2019-12-31 23:00:00+00:00
+Last Trade End                 2020-02-29 23:00:00+00:00
+Coverage                                60 days 00:00:00
+Overlap Coverage                        49 days 00:00:00
+Total Records                                       19.0
+Total Long Trades                                    2.0
+Total Short Trades                                  17.0
+Total Closed Trades                                 18.0
+Total Open Trades                                    1.0
+Open Trade PnL                                    16.063
+Win Rate [%]                                   61.111111
+Max Win Streak                                      11.0
+Max Loss Streak                                      7.0
+Best Trade [%]                                  3.526377
+Worst Trade [%]                                -6.543679
+Avg Winning Trade [%]                           2.225861
+Avg Losing Trade [%]                           -3.601313
+Avg Winning Trade Duration    32 days 19:38:10.909090909
+Avg Losing Trade Duration                5 days 00:00:00
+Profit Factor                                   1.022425
+Expectancy                                      0.028157
+SQN                                             0.039174
+Name: agg_func_mean, dtype: object
 ```
 
 Positions share almost identical metrics with trades:
 
-```python-repl
+```pycon
 >>> pf.positions['a'].stats()
-Start                            2020-01-01 00:00:00
-End                              2020-04-09 00:00:00
-Period                             100 days 00:00:00
-Coverage [%]                                   100.0
-First Position Start             2020-01-01 00:00:00
-Last Position End                2020-04-09 00:00:00
-Total Records                                      3
-Total Long Positions                               2
-Total Short Positions                              1
-Total Closed Positions                             2
-Total Open Positions                               1
-Open Position PnL                          -0.929746
-Win Rate [%]                                    50.0
-Max Win Streak                                     1
-Max Loss Streak                                    1
-Best Position [%]                          39.498421
-Worst Position [%]                          -3.32533
-Avg Winning Position [%]                   39.498421
-Avg Losing Position [%]                     -3.32533
-Avg Winning Position Duration        1 days 00:00:00
-Avg Losing Position Duration        47 days 00:00:00
-Profit Factor                               0.261748
-Expectancy                                 -0.217492
-SQN                                        -0.585103
-Name: a, dtype: object
+Start                         2019-12-31 23:00:00+00:00
+End                           2020-02-29 23:00:00+00:00
+Period                                 61 days 00:00:00
+First Trade Start             2019-12-31 23:00:00+00:00
+Last Trade End                2020-02-29 23:00:00+00:00
+Coverage                               60 days 00:00:00
+Overlap Coverage                        0 days 00:00:00
+Total Records                                       5.0
+Total Long Trades                                   2.0
+Total Short Trades                                  3.0
+Total Closed Trades                                 4.0
+Total Open Trades                                   1.0
+Open Trade PnL                                38.356823
+Win Rate [%]                                        0.0
+Max Win Streak                                      0.0
+Max Loss Streak                                     4.0
+Best Trade [%]                                -1.529613
+Worst Trade [%]                               -6.543679
+Avg Winning Trade [%]                               NaN
+Avg Losing Trade [%]                          -3.786739
+Avg Winning Trade Duration                          NaT
+Avg Losing Trade Duration               4 days 00:00:00
+Profit Factor                                       0.0
+Expectancy                                    -5.446748
+SQN                                           -1.794214
+Name: agg_func_mean, dtype: object
 ```
 
 To also include open trades/positions when calculating metrics such as win rate, pass `incl_open=True`:
 
-```python-repl
+```pycon
 >>> pf.trades['a'].stats(settings=dict(incl_open=True))
-Start                         2020-01-01 00:00:00
-End                           2020-04-09 00:00:00
-Period                          100 days 00:00:00
-First Trade Start             2020-01-01 00:00:00
-Last Trade End                2020-04-09 00:00:00
-Coverage                        100 days 00:00:00
-Overlap Coverage                 97 days 00:00:00
-Total Records                                  48
-Total Long Trades                              22
-Total Short Trades                             26
-Total Closed Trades                            47
-Total Open Trades                               1
-Open Trade PnL                          -1.290981
-Win Rate [%]                             51.06383
-Max Win Streak                                  3
-Max Loss Streak                                 3
-Best Trade [%]                          43.326077
-Worst Trade [%]                        -59.478304
-Avg Winning Trade [%]                   21.418522
-Avg Losing Trade [%]                   -19.117677
-Avg Winning Trade Duration       22 days 22:00:00
-Avg Losing Trade Duration        30 days 00:00:00
-Profit Factor                            0.693135
-Expectancy                              -0.028432
-SQN                                     -0.794284
-Name: a, dtype: object
+Start                         2019-12-31 23:00:00+00:00
+End                           2020-02-29 23:00:00+00:00
+Period                                 61 days 00:00:00
+First Trade Start             2019-12-31 23:00:00+00:00
+Last Trade End                2020-02-29 23:00:00+00:00
+Coverage                               60 days 00:00:00
+Overlap Coverage                       49 days 00:00:00
+Total Records                                      19.0
+Total Long Trades                                   2.0
+Total Short Trades                                 17.0
+Total Closed Trades                                18.0
+Total Open Trades                                   1.0
+Open Trade PnL                                   16.063
+Win Rate [%]                                  61.111111
+Max Win Streak                                     12.0
+Max Loss Streak                                     7.0
+Best Trade [%]                                 3.526377
+Worst Trade [%]                               -6.543679
+Avg Winning Trade [%]                          2.238896
+Avg Losing Trade [%]                          -3.601313
+Avg Winning Trade Duration             33 days 18:00:00
+Avg Losing Trade Duration               5 days 00:00:00
+Profit Factor                                  1.733143
+Expectancy                                     0.872096
+SQN                                            0.804714
+Name: agg_func_mean, dtype: object
 ```
 
 `Trades.stats` also supports (re-)grouping:
 
-```python-repl
+```pycon
 >>> pf.trades.stats(group_by=True)
-Start                                2020-01-01 00:00:00
-End                                  2020-04-09 00:00:00
-Period                                 100 days 00:00:00
-First Trade Start                    2020-01-01 00:00:00
-Last Trade End                       2020-04-09 00:00:00
-Coverage                               100 days 00:00:00
-Overlap Coverage                       100 days 00:00:00
-Total Records                                        104
-Total Long Trades                                     32
-Total Short Trades                                    72
-Total Closed Trades                                  102
+Start                          2019-12-31 23:00:00+00:00
+End                            2020-02-29 23:00:00+00:00
+Period                                  61 days 00:00:00
+First Trade Start              2019-12-31 23:00:00+00:00
+Last Trade End                 2020-02-29 23:00:00+00:00
+Coverage                                61 days 00:00:00
+Overlap Coverage                        61 days 00:00:00
+Total Records                                         37
+Total Long Trades                                      5
+Total Short Trades                                    32
+Total Closed Trades                                   35
 Total Open Trades                                      2
-Open Trade PnL                                 -1.790938
-Win Rate [%]                                   46.078431
-Max Win Streak                                         5
-Max Loss Streak                                        5
-Best Trade [%]                                 43.326077
-Worst Trade [%]                               -87.793448
-Avg Winning Trade [%]                          19.023926
-Avg Losing Trade [%]                          -20.605892
-Avg Winning Trade Duration    24 days 08:40:51.063829787
-Avg Losing Trade Duration     25 days 11:20:43.636363636
-Profit Factor                                   0.909581
-Expectancy                                     -0.006035
-SQN                                            -0.365593
+Open Trade PnL                                  1.336259
+Win Rate [%]                                   37.142857
+Max Win Streak                                        11
+Max Loss Streak                                       10
+Best Trade [%]                                  3.526377
+Worst Trade [%]                                -8.710238
+Avg Winning Trade [%]                           1.907799
+Avg Losing Trade [%]                           -3.259135
+Avg Winning Trade Duration    28 days 14:46:09.230769231
+Avg Losing Trade Duration               14 days 00:00:00
+Profit Factor                                   0.340493
+Expectancy                                     -1.292596
+SQN                                            -2.509223
 Name: group, dtype: object
 ```
 
@@ -472,11 +479,11 @@ Name: group, dtype: object
 
 `Trades` class has two subplots based on `Trades.plot` and `Trades.plot_pnl`:
 
-```python-repl
->>> pf.trades['a'].plots(settings=dict(plot_zones=False)).show_svg()
+```pycon
+>>> pf.trades['a'].plots(settings=dict(plot_zones=False)).show()
 ```
 
-![](/docs/img/trades_plots.svg)
+![](/assets/images/trades_plots.svg)
 """
 
 import numpy as np
@@ -485,14 +492,14 @@ import pandas as pd
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_1d_array, to_2d_array
 from vectorbtpro.base.wrapping import ArrayWrapper
-from vectorbtpro.ch_registry import ch_registry
 from vectorbtpro.generic.ranges import Ranges
-from vectorbtpro.jit_registry import jit_registry
 from vectorbtpro.portfolio import nb
 from vectorbtpro.portfolio.enums import TradeDirection, TradeStatus, trade_dt
 from vectorbtpro.portfolio.orders import Orders
 from vectorbtpro.records.decorators import attach_fields, override_field_config, attach_shortcut_properties
 from vectorbtpro.records.mapped_array import MappedArray
+from vectorbtpro.registries.ch_registry import ch_registry
+from vectorbtpro.registries.jit_registry import jit_registry
 from vectorbtpro.utils.array_ import min_rel_rescale, max_rel_rescale
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig
@@ -787,7 +794,7 @@ class Trades(Ranges):
         """Defaults for `Trades.stats`.
 
         Merges `vectorbtpro.generic.ranges.Ranges.stats_defaults` and
-        `trades.stats` from `vectorbtpro._settings.settings`."""
+        `stats` from `vectorbtpro._settings.trades`."""
         from vectorbtpro._settings import settings
         trades_stats_cfg = settings['trades']['stats']
 
@@ -988,23 +995,18 @@ class Trades(Ranges):
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.])
+            >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
+            >>> orders = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5])
+            >>> pf = vbt.Portfolio.from_orders(price, orders)
+            >>> pf.trades.plot_pnl()
+            ```
 
-        ```python-repl
-        >>> import pandas as pd
-        >>> from datetime import datetime, timedelta
-        >>> import vectorbtpro as vbt
-
-        >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.])
-        >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
-        >>> orders = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5])
-        >>> pf = vbt.Portfolio.from_orders(price, orders)
-        >>> pf.trades.plot_pnl()
-        ```
-
-        ![](/docs/img/trades_plot_pnl.svg)
+            ![](/assets/images/trades_plot_pnl.svg)
         """
-        from vectorbtpro.opt_packages import assert_can_import
+        from vectorbtpro.utils.opt_packages import assert_can_import
         assert_can_import('plotly')
         import plotly.graph_objects as go
         from vectorbtpro.utils.figure import make_figure, get_domain
@@ -1199,22 +1201,22 @@ class Trades(Ranges):
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> import pandas as pd
+            >>> from datetime import datetime, timedelta
+            >>> import vectorbtpro as vbt
 
-        ```python-repl
-        >>> import pandas as pd
-        >>> from datetime import datetime, timedelta
-        >>> import vectorbtpro as vbt
+            >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.], name='Price')
+            >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
+            >>> orders = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5])
+            >>> pf = vbt.Portfolio.from_orders(price, orders)
+            >>> pf.trades.plot()
+            ```
 
-        >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.], name='Price')
-        >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
-        >>> orders = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5])
-        >>> pf = vbt.Portfolio.from_orders(price, orders)
-        >>> pf.trades.plot()
-        ```
-
-        ![](/docs/img/trades_plot.svg)"""
-        from vectorbtpro.opt_packages import assert_can_import
+            ![](/assets/images/trades_plot.svg)
+        """
+        from vectorbtpro.utils.opt_packages import assert_can_import
         assert_can_import('plotly')
         import plotly.graph_objects as go
         from vectorbtpro.utils.figure import make_figure
@@ -1488,7 +1490,7 @@ class Trades(Ranges):
         """Defaults for `Trades.plots`.
 
         Merges `vectorbtpro.generic.ranges.Ranges.plots_defaults` and
-        `trades.plots` from `vectorbtpro._settings.settings`."""
+        `plots` from `vectorbtpro._settings.trades`."""
         from vectorbtpro._settings import settings
         trades_plots_cfg = settings['trades']['plots']
 

@@ -1,11 +1,11 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Global settings.
+"""Global settings of vectorbtpro.
 
 `settings` config is also accessible via `vectorbtpro.settings`.
 
 !!! note
-    All places in vectorbt import `settings` from `vectorbtpro._settings.settings`, not from `vectorbtpro`.
+    All places in vectorbt import `vectorbtpro._settings.settings`, not `vectorbtpro.settings`.
     Overwriting `vectorbtpro.settings` only overwrites the reference created for the user.
     Consider updating the settings config instead of replacing it.
 
@@ -21,7 +21,7 @@ Here are the main properties of the `settings` config:
 
 For example, you can change default width and height of each plot:
 
-```python-repl
+```pycon
 >>> import vectorbtpro as vbt
 
 >>> vbt.settings['plotting']['layout']['width'] = 800
@@ -59,7 +59,7 @@ Since this is only visible when looking at the source code, the advice is to alw
 Like any other class subclassing `vectorbtpro.utils.config.Config`, we can save settings to the disk,
 load it back, and replace in-place:
 
-```python-repl
+```pycon
 >>> vbt.settings.save('my_settings')
 >>> vbt.settings['caching']['disable'] = True
 >>> vbt.settings['caching']['disable']
@@ -117,7 +117,7 @@ caching = dict(
 )
 """_"""
 
-__pdoc__['caching'] = Sub("""Sub-config with settings applied across `vectorbtpro.ca_registry`, 
+__pdoc__['caching'] = Sub("""Sub-config with settings applied across `vectorbtpro.registries.ca_registry`, 
 `vectorbtpro.utils.caching`, and cacheable decorators in `vectorbtpro.utils.decorators`.
 
 !!! hint
@@ -164,7 +164,7 @@ jitting = dict(
 )
 """_"""
 
-__pdoc__['jitting'] = Sub("""Sub-config with settings applied across `vectorbtpro.jit_registry` and 
+__pdoc__['jitting'] = Sub("""Sub-config with settings applied across `vectorbtpro.registries.jit_registry` and 
 `vectorbtpro.utils.jitting`.
 
 !!! note
@@ -279,7 +279,7 @@ chunking = dict(
 )
 """_"""
 
-__pdoc__['chunking'] = Sub("""Sub-config with settings applied across `vectorbtpro.ch_registry` 
+__pdoc__['chunking'] = Sub("""Sub-config with settings applied across `vectorbtpro.registries.ch_registry` 
 and `vectorbtpro.utils.chunking`.
 
 !!! note
@@ -434,14 +434,13 @@ __pdoc__['data'] = Sub("""Sub-config with settings applied across `vectorbtpro.d
 ${config_doc}
 ```
 
-## Binance
+Binance:
+    See `binance.client.Client`.
 
-See `binance.client.Client`.
-
-## CCXT
-
-See [Configuring API Keys](https://ccxt.readthedocs.io/en/latest/manual.html#configuring-api-keys).
-Keys can be defined per exchange. If a key is defined at the root, it applies to all exchanges.""")
+CCXT:
+    See [Configuring API Keys](https://ccxt.readthedocs.io/en/latest/manual.html#configuring-api-keys).
+    Keys can be defined per exchange. If a key is defined at the root, it applies to all exchanges.
+""")
 
 _settings['data'] = data
 
@@ -582,12 +581,12 @@ stats_builder = dict(
 )
 """_"""
 
-__pdoc__['stats_builder'] = """Sub-config with settings applied to 
+__pdoc__['stats_builder'] = Sub("""Sub-config with settings applied to 
 `vectorbtpro.generic.stats_builder.StatsBuilderMixin`.
 
 ```json
 ${config_doc}
-```"""
+```""")
 
 _settings['stats_builder'] = stats_builder
 
@@ -735,7 +734,7 @@ ohlcv = dict(
 )
 """_"""
 
-__pdoc__['ohlcv'] = Sub("""Sub-config with settings applied to `vectorbtpro.ohlcv_accessors.OHLCVDFAccessor`.
+__pdoc__['ohlcv'] = Sub("""Sub-config with settings applied across `vectorbtpro.ohlcv`.
 
 ```json
 ${config_doc}
@@ -1080,19 +1079,18 @@ __pdoc__['messaging'] = Sub("""Sub-config with settings applied across `vectorbt
 ${config_doc}
 ```
 
-## python-telegram-bot
+python-telegram-bot:
+    Sub-config with settings applied to 
+    [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot).
+    
+    Set `persistence` to string to use as `filename` in `telegram.ext.PicklePersistence`.
+    For `defaults`, see `telegram.ext.Defaults`. Other settings will be distributed across 
+    `telegram.ext.Updater` and `telegram.ext.updater.Updater.start_polling`.
 
-Sub-config with settings applied to 
-[python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot).
-
-Set `persistence` to string to use as `filename` in `telegram.ext.PicklePersistence`.
-For `defaults`, see `telegram.ext.Defaults`. Other settings will be distributed across 
-`telegram.ext.Updater` and `telegram.ext.updater.Updater.start_polling`.
-
-## GIPHY
-
-Sub-config with settings applied to 
-[GIPHY Translate Endpoint](https://developers.giphy.com/docs/api/endpoint#translate).""")
+GIPHY:
+    Sub-config with settings applied to 
+    [GIPHY Translate Endpoint](https://developers.giphy.com/docs/api/endpoint#translate).
+""")
 
 _settings['messaging'] = messaging
 

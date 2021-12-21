@@ -1,6 +1,6 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Numba-compiled functions.
+"""Numba-compiled functions for records and mapped arrays.
 
 Provides an arsenal of Numba-compiled functions for records and mapped arrays.
 These only accept NumPy arrays and other Numba-compatible types.
@@ -20,10 +20,10 @@ from numba.np.numpy_support import as_dtype
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import chunking as base_ch
-from vectorbtpro.ch_registry import register_chunkable
 from vectorbtpro.generic import nb as generic_nb
-from vectorbtpro.jit_registry import register_jitted
 from vectorbtpro.records import chunking as records_ch
+from vectorbtpro.registries.ch_registry import register_chunkable
+from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import chunking as ch
 
 

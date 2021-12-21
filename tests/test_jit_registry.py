@@ -3,7 +3,7 @@ from functools import wraps
 import pytest
 
 import vectorbtpro as vbt
-from vectorbtpro.jit_registry import jit_registry
+from vectorbtpro.registries.jit_registry import jit_registry
 from vectorbtpro.utils import jitting
 
 

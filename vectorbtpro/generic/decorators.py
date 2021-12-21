@@ -1,12 +1,12 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Class and function decorators."""
+"""Class decorators for generic accessors."""
 
 import inspect
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.ch_registry import ch_registry
-from vectorbtpro.jit_registry import jit_registry
+from vectorbtpro.registries.ch_registry import ch_registry
+from vectorbtpro.registries.jit_registry import jit_registry
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts, Config
 from vectorbtpro.utils.parsing import get_func_arg_names
@@ -101,7 +101,7 @@ def attach_transform_methods(config: Config) -> tp.ClassWrapper:
     `config` must contain target method names (keys) and dictionaries (values) with the following keys:
 
     * `transformer`: Transformer class/object.
-    * `docstring`: Method docstring. Defaults to "See `{transformer}.__name__`.".
+    * `docstring`: Method docstring.
     * `replace_signature`: Whether to replace the target signature. Defaults to True.
 
     The class must be a subclass of `vectorbtpro.generic.accessors.GenericAccessor`.

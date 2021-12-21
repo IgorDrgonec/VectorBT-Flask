@@ -1,6 +1,6 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Class decorators for adding magic methods."""
+"""Class decorators for attaching magic methods."""
 
 import numpy as np
 
@@ -55,7 +55,7 @@ BinaryTranslateFuncT = tp.Callable[[tp.Any, tp.Any, tp.Callable], tp.Any]
 
 def attach_binary_magic_methods(translate_func: BinaryTranslateFuncT,
                                 config: tp.Optional[Config] = None) -> tp.ClassWrapper:
-    """Class decorator to add binary magic methods to a class.
+    """Class decorator to attach binary magic methods to a class.
 
     `translate_func` must
 
@@ -111,7 +111,7 @@ UnaryTranslateFuncT = tp.Callable[[tp.Any, tp.Callable], tp.Any]
 
 def attach_unary_magic_methods(translate_func: UnaryTranslateFuncT,
                                config: tp.Optional[Config] = None) -> tp.ClassWrapper:
-    """Class decorator to add unary magic methods to a class.
+    """Class decorator to attach unary magic methods to a class.
 
     `translate_func` must
 

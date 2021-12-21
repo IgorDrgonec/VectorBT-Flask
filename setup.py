@@ -50,8 +50,7 @@ setup(
     install_requires=[
         'numpy>=1.16.5',
         'pandas',
-        'numba==0.53.1; python_version == "3.7"',
-        'numba>=0.53.1; python_version != "3.7"',
+        'numba>=0.54.1',
         'scipy',
         'scikit-learn',
         'schedule',

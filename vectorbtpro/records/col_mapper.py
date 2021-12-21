@@ -5,8 +5,8 @@
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_1d_array
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
-from vectorbtpro.jit_registry import jit_registry
 from vectorbtpro.records import nb
+from vectorbtpro.registries.jit_registry import jit_registry
 from vectorbtpro.utils.decorators import cached_property, cached_method
 
 

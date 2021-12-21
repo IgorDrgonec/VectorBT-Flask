@@ -1,11 +1,11 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Numba-compiled functions.
+"""Numba-compiled functions for returns.
 
 Provides an arsenal of Numba-compiled functions that are used by accessors and for measuring
 portfolio performance. These only accept NumPy arrays and other Numba-compatible types.
 
-```python-repl
+```pycon
 >>> import numpy as np
 >>> import vectorbtpro as vbt
 
@@ -29,9 +29,9 @@ from numba import prange
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import chunking as base_ch
-from vectorbtpro.ch_registry import register_chunkable
 from vectorbtpro.generic import nb as generic_nb
-from vectorbtpro.jit_registry import register_jitted
+from vectorbtpro.registries.ch_registry import register_chunkable
+from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.math_ import add_nb
 

@@ -1,13 +1,13 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Numba-compiled functions for records."""
+"""Numba-compiled functions for portfolio records."""
 
 from numba import prange
 
 from vectorbtpro.base import chunking as base_ch
-from vectorbtpro.ch_registry import register_chunkable
 from vectorbtpro.portfolio.nb.core import *
 from vectorbtpro.records import chunking as records_ch
+from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.math_ import (
     is_close_nb,
@@ -160,69 +160,69 @@ def get_entry_trades_nb(order_records: tp.RecordArray,
 
     Entry trade records are buy orders in a long position and sell orders in a short position.
 
-    ## Example
+    Usage:
+        ```pycon
+        >>> import numpy as np
+        >>> import pandas as pd
+        >>> from vectorbtpro.records.nb import col_map_nb
+        >>> from vectorbtpro.portfolio.nb import simulate_from_orders_nb, get_entry_trades_nb
 
-    ```python-repl
-    >>> import numpy as np
-    >>> import pandas as pd
-    >>> from vectorbtpro.records.nb import col_map_nb
-    >>> from vectorbtpro.portfolio.nb import simulate_from_orders_nb, get_entry_trades_nb
+        >>> close = order_price = np.array([
+        ...     [1, 6],
+        ...     [2, 5],
+        ...     [3, 4],
+        ...     [4, 3],
+        ...     [5, 2],
+        ...     [6, 1]
+        ... ])
+        >>> size = np.asarray([
+        ...     [1, -1],
+        ...     [0.1, -0.1],
+        ...     [-1, 1],
+        ...     [-0.1, 0.1],
+        ...     [1, -1],
+        ...     [-2, 2]
+        ... ])
+        >>> target_shape = close.shape
+        >>> group_lens = np.full(target_shape[1], 1)
+        >>> init_cash = np.full(target_shape[1], 100)
+        >>> call_seq = np.full(target_shape, 0)
 
-    >>> close = order_price = np.array([
-    ...     [1, 6],
-    ...     [2, 5],
-    ...     [3, 4],
-    ...     [4, 3],
-    ...     [5, 2],
-    ...     [6, 1]
-    ... ])
-    >>> size = np.asarray([
-    ...     [1, -1],
-    ...     [0.1, -0.1],
-    ...     [-1, 1],
-    ...     [-0.1, 0.1],
-    ...     [1, -1],
-    ...     [-2, 2]
-    ... ])
-    >>> target_shape = close.shape
-    >>> group_lens = np.full(target_shape[1], 1)
-    >>> init_cash = np.full(target_shape[1], 100)
-    >>> call_seq = np.full(target_shape, 0)
+        >>> sim_out = simulate_from_orders_nb(
+        ...     target_shape,
+        ...     group_lens,
+        ...     init_cash,
+        ...     call_seq,
+        ...     size=size,
+        ...     price=close,
+        ...     fees=np.asarray(0.01),
+        ...     slippage=np.asarray(0.01)
+        ... )
 
-    >>> sim_out = simulate_from_orders_nb(
-    ...     target_shape,
-    ...     group_lens,
-    ...     init_cash,
-    ...     call_seq,
-    ...     size=size,
-    ...     price=close,
-    ...     fees=np.asarray(0.01),
-    ...     slippage=np.asarray(0.01)
-    ... )
+        >>> col_map = col_map_nb(sim_out.order_records['col'], target_shape[1])
+        >>> entry_trade_records = get_entry_trades_nb(sim_out.order_records, close, col_map)
+        >>> pd.DataFrame.from_records(entry_trade_records)
+           id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
+        0   0    0   1.0          0         1.01     0.01010         3    3.060000
+        1   1    0   0.1          1         2.02     0.00202         3    3.060000
+        2   2    0   1.0          4         5.05     0.05050         5    5.940000
+        3   3    0   1.0          5         5.94     0.05940         5    6.000000
+        4   0    1   1.0          0         5.94     0.05940         3    3.948182
+        5   1    1   0.1          1         4.95     0.00495         3    3.948182
+        6   2    1   1.0          4         1.98     0.01980         5    1.010000
+        7   3    1   1.0          5         1.01     0.01010         5    1.000000
 
-    >>> col_map = col_map_nb(sim_out.order_records['col'], target_shape[1])
-    >>> entry_trade_records = get_entry_trades_nb(sim_out.order_records, close, col_map)
-    >>> pd.DataFrame.from_records(entry_trade_records)
-       id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-    0   0    0   1.0          0         1.01     0.01010         3    3.060000
-    1   1    0   0.1          1         2.02     0.00202         3    3.060000
-    2   2    0   1.0          4         5.05     0.05050         5    5.940000
-    3   3    0   1.0          5         5.94     0.05940         5    6.000000
-    4   0    1   1.0          0         5.94     0.05940         3    3.948182
-    5   1    1   0.1          1         4.95     0.00495         3    3.948182
-    6   2    1   1.0          4         1.98     0.01980         5    1.010000
-    7   3    1   1.0          5         1.01     0.01010         5    1.000000
-
-       exit_fees       pnl    return  direction  status  parent_id
-    0   0.030600  2.009300  1.989406          0       1          0
-    1   0.003060  0.098920  0.489703          0       1          0
-    2   0.059400  0.780100  0.154475          0       1          1
-    3   0.000000 -0.119400 -0.020101          1       0          2
-    4   0.039482  1.892936  0.318676          1       1          0
-    5   0.003948  0.091284  0.184411          1       1          0
-    6   0.010100  0.940100  0.474798          1       1          1
-    7   0.000000 -0.020100 -0.019901          0       0          2
-    ```"""
+           exit_fees       pnl    return  direction  status  parent_id
+        0   0.030600  2.009300  1.989406          0       1          0
+        1   0.003060  0.098920  0.489703          0       1          0
+        2   0.059400  0.780100  0.154475          0       1          1
+        3   0.000000 -0.119400 -0.020101          1       0          2
+        4   0.039482  1.892936  0.318676          1       1          0
+        5   0.003948  0.091284  0.184411          1       1          0
+        6   0.010100  0.940100  0.474798          1       1          1
+        7   0.000000 -0.020100 -0.019901          0       0          2
+        ```
+    """
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
     max_records = np.max(col_lens) + int((init_position != 0).any())
@@ -437,35 +437,35 @@ def get_exit_trades_nb(order_records: tp.RecordArray,
 
     Exit trade records are sell orders in a long position and buy orders in a short position.
 
-    ## Example
+    Usage:
+        * Building upon the example in `get_exit_trades_nb`:
 
-    Building upon the example in `get_exit_trades_nb`:
+        ```pycon
+        >>> from vectorbtpro.portfolio.nb import get_exit_trades_nb
 
-    ```python-repl
-    >>> from vectorbtpro.portfolio.nb import get_exit_trades_nb
+        >>> exit_trade_records = get_exit_trades_nb(sim_out.order_records, close, col_map)
+        >>> pd.DataFrame.from_records(exit_trade_records)
+           id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
+        0   0    0   1.0          0     1.101818    0.011018         2        2.97
+        1   1    0   0.1          0     1.101818    0.001102         3        3.96
+        2   2    0   1.0          4     5.050000    0.050500         5        5.94
+        3   3    0   1.0          5     5.940000    0.059400         5        6.00
+        4   0    1   1.0          0     5.850000    0.058500         2        4.04
+        5   1    1   0.1          0     5.850000    0.005850         3        3.03
+        6   2    1   1.0          4     1.980000    0.019800         5        1.01
+        7   3    1   1.0          5     1.010000    0.010100         5        1.00
 
-    >>> exit_trade_records = get_exit_trades_nb(sim_out.order_records, close, col_map)
-    >>> pd.DataFrame.from_records(exit_trade_records)
-       id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-    0   0    0   1.0          0     1.101818    0.011018         2        2.97
-    1   1    0   0.1          0     1.101818    0.001102         3        3.96
-    2   2    0   1.0          4     5.050000    0.050500         5        5.94
-    3   3    0   1.0          5     5.940000    0.059400         5        6.00
-    4   0    1   1.0          0     5.850000    0.058500         2        4.04
-    5   1    1   0.1          0     5.850000    0.005850         3        3.03
-    6   2    1   1.0          4     1.980000    0.019800         5        1.01
-    7   3    1   1.0          5     1.010000    0.010100         5        1.00
-
-       exit_fees       pnl    return  direction  status  parent_id
-    0    0.02970  1.827464  1.658589          0       1          0
-    1    0.00396  0.280756  2.548119          0       1          0
-    2    0.05940  0.780100  0.154475          0       1          1
-    3    0.00000 -0.119400 -0.020101          1       0          2
-    4    0.04040  1.711100  0.292496          1       1          0
-    5    0.00303  0.273120  0.466872          1       1          0
-    6    0.01010  0.940100  0.474798          1       1          1
-    7    0.00000 -0.020100 -0.019901          0       0          2
-    ```"""
+           exit_fees       pnl    return  direction  status  parent_id
+        0    0.02970  1.827464  1.658589          0       1          0
+        1    0.00396  0.280756  2.548119          0       1          0
+        2    0.05940  0.780100  0.154475          0       1          1
+        3    0.00000 -0.119400 -0.020101          1       0          2
+        4    0.04040  1.711100  0.292496          1       1          0
+        5    0.00303  0.273120  0.466872          1       1          0
+        6    0.01010  0.940100  0.474798          1       1          1
+        7    0.00000 -0.020100 -0.019901          0       0          2
+        ```
+    """
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
     max_records = np.max(col_lens) + int((init_position != 0).any())
@@ -736,32 +736,31 @@ def get_positions_nb(trade_records: tp.RecordArray, col_map: tp.ColMap) -> tp.Re
 
     Trades can be entry trades, exit trades, and even positions themselves - all will produce the same results.
 
-    ## Example
+    Usage:
+        * Building upon the example in `get_exit_trades_nb`:
 
-    Building upon the example in `get_exit_trades_nb`:
+        ```pycon
+        >>> from vectorbtpro.portfolio.nb import get_positions_nb
 
-    ```python-repl
-    >>> from vectorbtpro.portfolio.nb import get_positions_nb
+        >>> col_map = col_map_nb(exit_trade_records['col'], target_shape[1])
+        >>> position_records = get_positions_nb(exit_trade_records, col_map)
+        >>> pd.DataFrame.from_records(position_records)
+           id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
+        0   0    0   1.1          0     1.101818     0.01212         3    3.060000
+        1   1    0   1.0          4     5.050000     0.05050         5    5.940000
+        2   2    0   1.0          5     5.940000     0.05940         5    6.000000
+        3   0    1   1.1          0     5.850000     0.06435         3    3.948182
+        4   1    1   1.0          4     1.980000     0.01980         5    1.010000
+        5   2    1   1.0          5     1.010000     0.01010         5    1.000000
 
-    >>> col_map = col_map_nb(exit_trade_records['col'], target_shape[1])
-    >>> position_records = get_positions_nb(exit_trade_records, col_map)
-    >>> pd.DataFrame.from_records(position_records)
-       id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-    0   0    0   1.1          0     1.101818     0.01212         3    3.060000
-    1   1    0   1.0          4     5.050000     0.05050         5    5.940000
-    2   2    0   1.0          5     5.940000     0.05940         5    6.000000
-    3   0    1   1.1          0     5.850000     0.06435         3    3.948182
-    4   1    1   1.0          4     1.980000     0.01980         5    1.010000
-    5   2    1   1.0          5     1.010000     0.01010         5    1.000000
-
-       exit_fees      pnl    return  direction  status  parent_id
-    0    0.03366  2.10822  1.739455          0       1          0
-    1    0.05940  0.78010  0.154475          0       1          1
-    2    0.00000 -0.11940 -0.020101          1       0          2
-    3    0.04343  1.98422  0.308348          1       1          0
-    4    0.01010  0.94010  0.474798          1       1          1
-    5    0.00000 -0.02010 -0.019901          0       0          2
-    ```
+           exit_fees      pnl    return  direction  status  parent_id
+        0    0.03366  2.10822  1.739455          0       1          0
+        1    0.05940  0.78010  0.154475          0       1          1
+        2    0.00000 -0.11940 -0.020101          1       0          2
+        3    0.04343  1.98422  0.308348          1       1          0
+        4    0.01010  0.94010  0.474798          1       1          1
+        5    0.00000 -0.02010 -0.019901          0       0          2
+        ```
     """
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens

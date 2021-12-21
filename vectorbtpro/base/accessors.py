@@ -1,6 +1,6 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Custom pandas accessors.
+"""Custom pandas accessors for base operations.
 
 Methods can be accessed as follows:
 
@@ -9,7 +9,7 @@ Methods can be accessed as follows:
 
 For example:
 
-```python-repl
+```pycon
 >>> import numpy as np
 >>> import pandas as pd
 >>> import vectorbtpro as vbt
@@ -27,7 +27,7 @@ of combine/reshape/index functions that can work with pandas objects. For exampl
 `vectorbtpro.base.reshaping.broadcast` can take an arbitrary number of pandas objects, thus
 you can find its variations as accessor methods.
 
-```python-repl
+```pycon
 >>> sr = pd.Series([1])
 >>> df = pd.DataFrame([1, 2, 3])
 
@@ -46,7 +46,7 @@ you can find its variations as accessor methods.
 
 Many methods such as `BaseAccessor.broadcast` are both class and instance methods:
 
-```python-repl
+```pycon
 >>> from vectorbtpro.base.accessors import BaseAccessor
 
 >>> # Same as sr.vbt.broadcast(df)
@@ -64,9 +64,9 @@ Many methods such as `BaseAccessor.broadcast` are both class and instance method
 ```
 
 Instead of explicitly importing `BaseAccessor` or any other accessor, we can use
-`vectorbtpro.root_accessors.pd_acc` instead:
+`vectorbtpro.accessors.pd_acc` instead:
 
-```python-repl
+```pycon
 >>> vbt.pd_acc.broadcast(sr, df)
 >>> new_sr
    0
@@ -83,7 +83,7 @@ Instead of explicitly importing `BaseAccessor` or any other accessor, we can use
 Additionally, `BaseAccessor` implements arithmetic (such as `+`), comparison (such as `>`) and
 logical operators (such as `&`) by forwarding the operation to `BaseAccessor.combine`:
 
-```python-repl
+```pycon
 >>> sr.vbt + df
    0
 0  2
@@ -94,7 +94,7 @@ logical operators (such as `&`) by forwarding the operation to `BaseAccessor.com
 Many interesting use cases can be implemented this way. For example, let's compare an array
 with 3 different thresholds (index is treated as multiple values by `BaseAccessor.combine`):
 
-```python-repl
+```pycon
 >>> df.vbt > pd.Index(np.arange(3), name='threshold')
 threshold     0                  1                  2
              a2    b2    c2     a2    b2    c2     a2     b2    c2
@@ -105,7 +105,7 @@ z2         True  True  True   True  True  True   True   True  True
 
 The same using broadcasting mechanism:
 
-```python-repl
+```pycon
 >>> df.vbt > vbt.BCO(np.arange(3), name='threshold', product=True)
 threshold     0                  1                  2
              a2    b2    c2     a2    b2    c2     a2     b2    c2
@@ -420,29 +420,28 @@ class BaseAccessor(Wrapping):
     def align_to(self, other: tp.SeriesFrame, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Align to `other` on their axes.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> df1 = pd.DataFrame([[1, 2], [3, 4]], index=['x', 'y'], columns=['a', 'b'])
+            >>> df1
+               a  b
+            x  1  2
+            y  3  4
 
-        ```python-repl
-        >>> df1 = pd.DataFrame([[1, 2], [3, 4]], index=['x', 'y'], columns=['a', 'b'])
-        >>> df1
-           a  b
-        x  1  2
-        y  3  4
+            >>> df2 = pd.DataFrame([[5, 6, 7, 8], [9, 10, 11, 12]], index=['x', 'y'],
+            ...     columns=pd.MultiIndex.from_arrays([[1, 1, 2, 2], ['a', 'b', 'a', 'b']]))
+            >>> df2
+                   1       2
+               a   b   a   b
+            x  5   6   7   8
+            y  9  10  11  12
 
-        >>> df2 = pd.DataFrame([[5, 6, 7, 8], [9, 10, 11, 12]], index=['x', 'y'],
-        ...     columns=pd.MultiIndex.from_arrays([[1, 1, 2, 2], ['a', 'b', 'a', 'b']]))
-        >>> df2
-               1       2
-           a   b   a   b
-        x  5   6   7   8
-        y  9  10  11  12
-
-        >>> df1.vbt.align_to(df2)
-              1     2
-           a  b  a  b
-        x  1  2  1  2
-        y  3  4  3  4
-        ```
+            >>> df1.vbt.align_to(df2)
+                  1     2
+               a  b  a  b
+            x  1  2  1  2
+            y  3  4  3  4
+            ```
         """
         checks.assert_instance_of(other, (pd.Series, pd.DataFrame))
         obj = reshaping.to_2d(self.obj)
@@ -515,30 +514,31 @@ class BaseAccessor(Wrapping):
         !!! note
             The resulted array must have the same shape as the original array.
 
-        ## Example
+        Usage:
+            * Using instance method:
 
-        ```python-repl
-        >>> sr = pd.Series([1, 2], index=['x', 'y'])
-        >>> sr.vbt.apply(lambda x: x ** 2)
-        x    1
-        y    4
-        dtype: int64
-        ```
+            ```pycon
+            >>> sr = pd.Series([1, 2], index=['x', 'y'])
+            >>> sr.vbt.apply(lambda x: x ** 2)
+            x    1
+            y    4
+            dtype: int64
+            ```
 
-        Using templates and broadcasting:
+            * Using class method, templates, and broadcasting:
 
-        ```python-repl
-        >>> sr.vbt.apply(
-        ...     lambda x, y: x + y,
-        ...     vbt.Rep('y'),
-        ...     broadcast_named_args=dict(
-        ...         y=pd.DataFrame([[3, 4]], columns=['a', 'b'])
-        ...     )
-        ... )
-           a  b
-        x  4  5
-        y  5  6
-        ```
+            ```pycon
+            >>> sr.vbt.apply(
+            ...     lambda x, y: x + y,
+            ...     vbt.Rep('y'),
+            ...     broadcast_named_args=dict(
+            ...         y=pd.DataFrame([[3, 4]], columns=['a', 'b'])
+            ...     )
+            ... )
+               a  b
+            x  4  5
+            y  5  6
+            ```
         """
         if broadcast_named_args is None:
             broadcast_named_args = {}
@@ -580,17 +580,16 @@ class BaseAccessor(Wrapping):
                keys: tp.Optional[tp.IndexLike] = None) -> tp.Frame:
         """Concatenate with `others` along columns.
 
-        ## Example
-
-        ```python-repl
-        >>> sr = pd.Series([1, 2], index=['x', 'y'])
-        >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
-        >>> sr.vbt.concat(df, keys=['c', 'd'])
-              c     d
-           a  b  a  b
-        x  1  1  3  4
-        y  2  2  5  6
-        ```
+        Usage:
+            ```pycon
+            >>> sr = pd.Series([1, 2], index=['x', 'y'])
+            >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
+            >>> sr.vbt.concat(df, keys=['c', 'd'])
+                  c     d
+               a  b  a  b
+            x  1  1  3  4
+            y  2  2  5  6
+            ```
         """
         others = tuple(map(lambda x: x.obj if isinstance(x, BaseAccessor) else x, others))
         if isinstance(cls_or_self, type):
@@ -629,58 +628,59 @@ class BaseAccessor(Wrapping):
         !!! note
             The resulted arrays to be concatenated must have the same shape as broadcast input arrays.
 
-        ## Example
+        Usage:
+            * Using instance method:
 
-        ```python-repl
-        >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
-        >>> df.vbt.apply_and_concat(
-        ...     3,
-        ...     lambda i, a, b: a * b[i],
-        ...     [1, 2, 3],
-        ...     keys=['c', 'd', 'e']
-        ... )
-              c       d       e
-           a  b   a   b   a   b
-        x  3  4   6   8   9  12
-        y  5  6  10  12  15  18
-        ```
+            ```pycon
+            >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
+            >>> df.vbt.apply_and_concat(
+            ...     3,
+            ...     lambda i, a, b: a * b[i],
+            ...     [1, 2, 3],
+            ...     keys=['c', 'd', 'e']
+            ... )
+                  c       d       e
+               a  b   a   b   a   b
+            x  3  4   6   8   9  12
+            y  5  6  10  12  15  18
+            ```
 
-        Using templates and broadcasting:
+            * Using class method, templates, and broadcasting:
 
-        ```python-repl
-        >>> sr = pd.Series([1, 2, 3], index=['x', 'y', 'z'])
-        >>> sr.vbt.apply_and_concat(
-        ...     3,
-        ...     lambda i, a, b: a * b + i,
-        ...     vbt.Rep('df'),
-        ...     broadcast_named_args=dict(
-        ...         df=pd.DataFrame([[1, 2, 3]], columns=['a', 'b', 'c'])
-        ...     )
-        ... )
-        apply_idx        0         1         2
-                   a  b  c  a  b   c  a  b   c
-        x          1  2  3  2  3   4  3  4   5
-        y          2  4  6  3  5   7  4  6   8
-        z          3  6  9  4  7  10  5  8  11
-        ```
+            ```pycon
+            >>> sr = pd.Series([1, 2, 3], index=['x', 'y', 'z'])
+            >>> sr.vbt.apply_and_concat(
+            ...     3,
+            ...     lambda i, a, b: a * b + i,
+            ...     vbt.Rep('df'),
+            ...     broadcast_named_args=dict(
+            ...         df=pd.DataFrame([[1, 2, 3]], columns=['a', 'b', 'c'])
+            ...     )
+            ... )
+            apply_idx        0         1         2
+                       a  b  c  a  b   c  a  b   c
+            x          1  2  3  2  3   4  3  4   5
+            y          2  4  6  3  5   7  4  6   8
+            z          3  6  9  4  7  10  5  8  11
+            ```
 
-        To change the execution engine or specify other engine-related arguments, use `execute_kwargs`:
+            * To change the execution engine or specify other engine-related arguments, use `execute_kwargs`:
 
-        ```python-repl
-        >>> import time
+            ```pycon
+            >>> import time
 
-        >>> def apply_func(i, a):
-        ...     time.sleep(1)
-        ...     return a
+            >>> def apply_func(i, a):
+            ...     time.sleep(1)
+            ...     return a
 
-        >>> sr = pd.Series([1, 2, 3])
+            >>> sr = pd.Series([1, 2, 3])
 
-        >>> %timeit sr.vbt.apply_and_concat(3, apply_func)
-        3.02 s ± 3.76 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+            >>> %timeit sr.vbt.apply_and_concat(3, apply_func)
+            3.02 s ± 3.76 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
 
-        >>> %timeit sr.vbt.apply_and_concat(3, apply_func, execute_kwargs=dict(engine='dask'))
-        1.02 s ± 927 µs per loop (mean ± std. dev. of 7 runs, 1 loop each)
-        ```
+            >>> %timeit sr.vbt.apply_and_concat(3, apply_func, execute_kwargs=dict(engine='dask'))
+            1.02 s ± 927 µs per loop (mean ± std. dev. of 7 runs, 1 loop each)
+            ```
         """
         checks.assert_not_none(apply_func)
         if broadcast_named_args is None:
@@ -782,83 +782,84 @@ class BaseAccessor(Wrapping):
 
             Also remember to bring each in `*args` to a Numba-compatible format.
 
-        ## Example
+        Usage:
+            * Using instance method:
 
-        ```python-repl
-        >>> sr = pd.Series([1, 2], index=['x', 'y'])
-        >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
+            ```pycon
+            >>> sr = pd.Series([1, 2], index=['x', 'y'])
+            >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
 
-        >>> # using instance method
-        >>> sr.vbt.combine(df, np.add)
-           a  b
-        x  4  5
-        y  7  8
+            >>> # using instance method
+            >>> sr.vbt.combine(df, np.add)
+               a  b
+            x  4  5
+            y  7  8
 
-        >>> sr.vbt.combine([df, df * 2], np.add, concat=False)
-            a   b
-        x  10  13
-        y  17  20
+            >>> sr.vbt.combine([df, df * 2], np.add, concat=False)
+                a   b
+            x  10  13
+            y  17  20
 
-        >>> sr.vbt.combine([df, df * 2], np.add)
-        combine_idx     0       1
-                     a  b   a   b
-        x            4  5   7   9
-        y            7  8  12  14
+            >>> sr.vbt.combine([df, df * 2], np.add)
+            combine_idx     0       1
+                         a  b   a   b
+            x            4  5   7   9
+            y            7  8  12  14
 
-        >>> sr.vbt.combine([df, df * 2], np.add, keys=['c', 'd'])
-              c       d
-           a  b   a   b
-        x  4  5   7   9
-        y  7  8  12  14
+            >>> sr.vbt.combine([df, df * 2], np.add, keys=['c', 'd'])
+                  c       d
+               a  b   a   b
+            x  4  5   7   9
+            y  7  8  12  14
 
-        >>> sr.vbt.combine(pd.Index([1, 2], name='param'), np.add)
-        param  1  2
-        x      2  3
-        y      3  4
+            >>> sr.vbt.combine(pd.Index([1, 2], name='param'), np.add)
+            param  1  2
+            x      2  3
+            y      3  4
 
-        >>> # using class method
-        >>> sr.vbt.combine([df, df * 2], np.add, concat=False)
-            a   b
-        x  10  13
-        y  17  20
-        ```
+            >>> # using class method
+            >>> sr.vbt.combine([df, df * 2], np.add, concat=False)
+                a   b
+            x  10  13
+            y  17  20
+            ```
 
-        Using templates and broadcasting:
+            * Using class method, templates, and broadcasting:
 
-        ```python-repl
-        >>> sr = pd.Series([1, 2, 3], index=['x', 'y', 'z'])
-        >>> sr.vbt.combine(
-        ...     [1, 2, 3],
-        ...     lambda x, y, z: x + y + z,
-        ...     vbt.Rep('df'),
-        ...     broadcast_named_args=dict(
-        ...         df=pd.DataFrame([[1, 2, 3]], columns=['a', 'b', 'c'])
-        ...     )
-        ... )
-        ```
-        combine_idx        0        1        2
-                     a  b  c  a  b  c  a  b  c
-        x            3  4  5  4  5  6  5  6  7
-        y            4  5  6  5  6  7  6  7  8
-        z            5  6  7  6  7  8  7  8  9
+            ```pycon
+            >>> sr = pd.Series([1, 2, 3], index=['x', 'y', 'z'])
+            >>> sr.vbt.combine(
+            ...     [1, 2, 3],
+            ...     lambda x, y, z: x + y + z,
+            ...     vbt.Rep('df'),
+            ...     broadcast_named_args=dict(
+            ...         df=pd.DataFrame([[1, 2, 3]], columns=['a', 'b', 'c'])
+            ...     )
+            ... )
+            ```
+            combine_idx        0        1        2
+                         a  b  c  a  b  c  a  b  c
+            x            3  4  5  4  5  6  5  6  7
+            y            4  5  6  5  6  7  6  7  8
+            z            5  6  7  6  7  8  7  8  9
 
-        To change the execution engine or specify other engine-related arguments, use `execute_kwargs`:
+            * To change the execution engine or specify other engine-related arguments, use `execute_kwargs`:
 
-        ```python-repl
-        >>> import time
+            ```pycon
+            >>> import time
 
-        >>> def combine_func(a, b):
-        ...     time.sleep(1)
-        ...     return a + b
+            >>> def combine_func(a, b):
+            ...     time.sleep(1)
+            ...     return a + b
 
-        >>> sr = pd.Series([1, 2, 3])
+            >>> sr = pd.Series([1, 2, 3])
 
-        >>> %timeit sr.vbt.combine([1, 1, 1], combine_func)
-        3.01 s ± 2.98 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+            >>> %timeit sr.vbt.combine([1, 1, 1], combine_func)
+            3.01 s ± 2.98 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
 
-        >>> %timeit sr.vbt.combine([1, 1, 1], combine_func, execute_kwargs=dict(engine='dask'))
-        1.02 s ± 2.18 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
-        ```
+            >>> %timeit sr.vbt.combine([1, 1, 1], combine_func, execute_kwargs=dict(engine='dask'))
+            1.02 s ± 2.18 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+            ```
         """
         if broadcast_named_args is None:
             broadcast_named_args = {}
@@ -931,39 +932,38 @@ class BaseAccessor(Wrapping):
         !!! note
             All variables will broadcast against each other prior to the evaluation.
 
-        ## Example
+        Usage:
+            * A bit slower than `pd.eval`:
 
-        A bit slower than `pd.eval`:
+            ```pycon
+            >>> df = pd.DataFrame(np.full((1000, 1000), 0))
+            >>> sr = pd.Series(np.full(1000, 1))
+            >>> a = np.full(1000, 2)
 
-        ```python-repl
-        >>> df = pd.DataFrame(np.full((1000, 1000), 0))
-        >>> sr = pd.Series(np.full(1000, 1))
-        >>> a = np.full(1000, 2)
+            >>> %timeit pd.eval('df + sr + a')
+            1.12 ms ± 12.1 µs per loop (mean ± std. dev. of 7 runs, 1000 loops each)
 
-        >>> %timeit pd.eval('df + sr + a')
-        1.12 ms ± 12.1 µs per loop (mean ± std. dev. of 7 runs, 1000 loops each)
+            >>> %timeit vbt.pd_acc.eval('df + sr + a')
+            1.3 ms ± 5.3 µs per loop (mean ± std. dev. of 7 runs, 1000 loops each)
+            ```
 
-        >>> %timeit vbt.pd_acc.eval('df + sr + a')
-        1.3 ms ± 5.3 µs per loop (mean ± std. dev. of 7 runs, 1000 loops each)
-        ```
+            * But broadcasts nicely:
 
-        But broadcasts nicely:
+            ```pycon
+            >>> sr = pd.Series([1, 2, 3], index=['x', 'y', 'z'])
+            >>> df = pd.DataFrame([[4, 5, 6]], index=['x', 'y', 'z'], columns=['a', 'b', 'c'])
+            >>> pd.eval('sr + df')
+                a   b   c   x   y   z
+            x NaN NaN NaN NaN NaN NaN
+            y NaN NaN NaN NaN NaN NaN
+            z NaN NaN NaN NaN NaN NaN
 
-        ```python-repl
-        >>> sr = pd.Series([1, 2, 3], index=['x', 'y', 'z'])
-        >>> df = pd.DataFrame([[4, 5, 6]], index=['x', 'y', 'z'], columns=['a', 'b', 'c'])
-        >>> pd.eval('sr + df')
-            a   b   c   x   y   z
-        x NaN NaN NaN NaN NaN NaN
-        y NaN NaN NaN NaN NaN NaN
-        z NaN NaN NaN NaN NaN NaN
-
-        >>> vbt.pd_acc.eval('sr + df')
-           a  b  c
-        x  5  6  7
-        y  6  7  8
-        z  7  8  9
-        ```
+            >>> vbt.pd_acc.eval('sr + df')
+               a  b  c
+            x  5  6  7
+            y  6  7  8
+            z  7  8  9
+            ```
         """
         if numexpr_kwargs is None:
             numexpr_kwargs = {}
@@ -980,7 +980,7 @@ class BaseAccessor(Wrapping):
             vars_by_name[var_names[i]] = np.asarray(obj)
         if use_numexpr is None:
             if objs[0].size >= 100000:
-                from vectorbtpro.opt_packages import warn_cannot_import
+                from vectorbtpro.utils.opt_packages import warn_cannot_import
                 warn_cannot_import('numexpr')
                 try:
                     import numexpr
@@ -991,7 +991,7 @@ class BaseAccessor(Wrapping):
             else:
                 use_numexpr = False
         if use_numexpr:
-            from vectorbtpro.opt_packages import assert_can_import
+            from vectorbtpro.utils.opt_packages import assert_can_import
             assert_can_import('numexpr')
             import numexpr
 

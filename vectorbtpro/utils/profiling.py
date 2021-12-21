@@ -16,21 +16,21 @@ TimerT = tp.TypeVar("TimerT", bound="Timer")
 class Timer:
     """Context manager to measure execution time using `timeit`.
 
-    ## Example
+    Usage:
+        ```pycon
+        >>> import vectorbtpro as vbt
+        >>> import time
 
-    ```python-repl
-    >>> import vectorbtpro as vbt
-    >>> import time
+        >>> with vbt.Timer() as timer:
+        >>>     time.sleep(1)
 
-    >>> with vbt.Timer() as timer:
-    >>>     time.sleep(1)
+        >>> timer.elapsed()
+        '1.01 seconds'
 
-    >>> timer.elapsed()
-    '1.01 seconds'
-
-    >>> timer.elapsed(readable=False)
-    datetime.timedelta(seconds=1, microseconds=5110)
-    ```"""
+        >>> timer.elapsed(readable=False)
+        datetime.timedelta(seconds=1, microseconds=5110)
+        ```
+    """
 
     def __init__(self) -> None:
         self._start_time = default_timer()
@@ -74,21 +74,21 @@ MemTracerT = tp.TypeVar("MemTracerT", bound="MemTracer")
 class MemTracer:
     """Context manager to trace peak and final memory usage using `tracemalloc`.
 
-    ## Example
+    Usage:
+        ```pycon
+        >>> import vectorbtpro as vbt
+        >>> import numpy as np
 
-    ```python-repl
-    >>> import vectorbtpro as vbt
-    >>> import numpy as np
+        >>> with vbt.MemTracer() as tracer:
+        >>>     np.random.uniform(size=1000000)
 
-    >>> with vbt.MemTracer() as tracer:
-    >>>     np.random.uniform(size=1000000)
+        >>> tracer.peak_usage()
+        '8.0 MB'
 
-    >>> tracer.peak_usage()
-    '8.0 MB'
-
-    >>> tracer.peak_usage(readable=False)
-    8005360
-    ```"""
+        >>> tracer.peak_usage(readable=False)
+        8005360
+        ```
+    """
 
     def __init__(self) -> None:
         self._final_usage = None

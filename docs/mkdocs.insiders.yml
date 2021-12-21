@@ -1,0 +1,21 @@
+INHERIT: mkdocs.yml
+
+# Plugins
+plugins:
+  - search
+  - tags
+  - minify:
+      minify_html: true
+  - redirects:
+      redirect_maps:
+        index.md: getting-started/index.md
+
+# Customization
+extra:
+  consent:
+    title: Cookie consent
+    description: >-
+      We use cookies to recognize your repeated visits and preferences, as well
+      as to measure the effectiveness of our documentation and whether users
+      find what they're searching for. With your consent, you're helping us to
+      make our documentation better.

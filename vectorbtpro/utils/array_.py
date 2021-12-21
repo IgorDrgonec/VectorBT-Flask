@@ -5,7 +5,7 @@
 import numpy as np
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.jit_registry import register_jitted
+from vectorbtpro.registries.jit_registry import register_jitted
 
 
 def is_sorted(a: tp.Array1d) -> np.bool_:

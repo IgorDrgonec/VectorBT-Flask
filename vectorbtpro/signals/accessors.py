@@ -1,13 +1,13 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Custom pandas accessors for signals data.
+"""Custom pandas accessors for signals.
 
 Methods can be accessed as follows:
 
 * `SignalsSRAccessor` -> `pd.Series.vbt.signals.*`
 * `SignalsDFAccessor` -> `pd.DataFrame.vbt.signals.*`
 
-```python-repl
+```pycon
 >>> import vectorbtpro as vbt
 >>> from vectorbtpro.signals.enums import StopType
 >>> import numpy as np
@@ -36,7 +36,7 @@ The accessors extend `vectorbtpro.generic.accessors`.
 
 Run for the examples below:
     
-```python-repl
+```pycon
 >>> mask = pd.DataFrame({
 ...     'a': [True, False, False, False, False],
 ...     'b': [True, False, True, False, True],
@@ -62,7 +62,7 @@ Run for the examples below:
 !!! hint
     See `vectorbtpro.generic.stats_builder.StatsBuilderMixin.stats` and `SignalsAccessor.metrics`.
 
-```python-repl
+```pycon
 >>> mask.vbt.signals.stats(column='a')
 Start                       2020-01-01 00:00:00
 End                         2020-01-05 00:00:00
@@ -91,7 +91,7 @@ Name: a, dtype: object
 
 We can pass another signal array to compare this array with:
 
-```python-repl
+```pycon
 >>> mask.vbt.signals.stats(column='a', settings=dict(other=mask['b']))
 Start                       2020-01-01 00:00:00
 End                         2020-01-05 00:00:00
@@ -122,7 +122,7 @@ Name: a, dtype: object
 
 We can also return duration as a floating number rather than a timedelta:
 
-```python-repl
+```pycon
 >>> mask.vbt.signals.stats(column='a', settings=dict(to_timedelta=False))
 Start                       2020-01-01 00:00:00
 End                         2020-01-05 00:00:00
@@ -151,7 +151,7 @@ Name: a, dtype: object
 
 `SignalsAccessor.stats` also supports (re-)grouping:
 
-```python-repl
+```pycon
 >>> mask.vbt.signals.stats(column=0, group_by=[0, 0, 1])
 Start                       2020-01-01 00:00:00
 End                         2020-01-05 00:00:00
@@ -192,16 +192,16 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.accessors import register_vbt_accessor, register_df_vbt_accessor, register_sr_vbt_accessor
 from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.base import reshaping
 from vectorbtpro.base.wrapping import ArrayWrapper
-from vectorbtpro.ch_registry import ch_registry
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.accessors import GenericAccessor, GenericSRAccessor, GenericDFAccessor
 from vectorbtpro.generic.ranges import Ranges
-from vectorbtpro.jit_registry import jit_registry
 from vectorbtpro.records.mapped_array import MappedArray
-from vectorbtpro.root_accessors import register_vbt_accessor, register_df_vbt_accessor, register_sr_vbt_accessor
+from vectorbtpro.registries.ch_registry import ch_registry
+from vectorbtpro.registries.jit_registry import jit_registry
 from vectorbtpro.signals import nb
 from vectorbtpro.utils import checks
 from vectorbtpro.utils import chunking as ch
@@ -270,30 +270,29 @@ class SignalsAccessor(GenericAccessor):
                  wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """See `vectorbtpro.signals.nb.generate_nb`.
 
-        ## Example
+        Usage:
+            * Generate random signals manually:
 
-        Generate random signals manually:
+            ```pycon
+            >>> @njit
+            ... def place_func_nb(out, from_i, to_i, col):
+            ...     out[np.random.choice(len(out))] = True
 
-        ```python-repl
-        >>> @njit
-        ... def place_func_nb(out, from_i, to_i, col):
-        ...     out[np.random.choice(len(out))] = True
-
-        >>> vbt.pd_acc.signals.generate(
-        ...     (5, 3),
-        ...     place_func_nb,
-        ...     wrap_kwargs=dict(
-        ...         index=mask.index,
-        ...         columns=mask.columns
-        ...     )
-        ... )
-                        a      b      c
-        2020-01-01   True  False  False
-        2020-01-02  False   True  False
-        2020-01-03  False  False   True
-        2020-01-04  False  False  False
-        2020-01-05  False  False  False
-        ```
+            >>> vbt.pd_acc.signals.generate(
+            ...     (5, 3),
+            ...     place_func_nb,
+            ...     wrap_kwargs=dict(
+            ...         index=mask.index,
+            ...         columns=mask.columns
+            ...     )
+            ... )
+                            a      b      c
+            2020-01-01   True  False  False
+            2020-01-02  False   True  False
+            2020-01-03  False  False   True
+            2020-01-04  False  False  False
+            2020-01-05  False  False  False
+            ```
         """
         if broadcast_named_args is None:
             broadcast_named_args = {}
@@ -346,79 +345,78 @@ class SignalsAccessor(GenericAccessor):
             `max_one_exit` to False. In this case, the generator will search for the last signal and proceed
             with placing opposite signals right after it. This makes generation slower.
 
-        ## Example
+        Usage:
+            * Generate entry and exit signals one after another:
 
-        Generate entry and exit signals one after another:
+            ```pycon
+            >>> @njit
+            ... def place_func_nb(out, from_i, to_i, col):
+            ...     out[0] = True
 
-        ```python-repl
-        >>> @njit
-        ... def place_func_nb(out, from_i, to_i, col):
-        ...     out[0] = True
+            >>> en, ex = vbt.pd_acc.signals.generate_both(
+            ...     (5, 3),
+            ...     entry_place_func_nb=place_func_nb,
+            ...     exit_place_func_nb=place_func_nb,
+            ...     max_one_entry=True,
+            ...     max_one_exit=True,
+            ...     wrap_kwargs=dict(
+            ...         index=mask.index,
+            ...         columns=mask.columns
+            ...     )
+            ... )
+            >>> en
+                            a      b      c
+            2020-01-01   True   True   True
+            2020-01-02  False  False  False
+            2020-01-03   True   True   True
+            2020-01-04  False  False  False
+            2020-01-05   True   True   True
+            >>> ex
+                            a      b      c
+            2020-01-01  False  False  False
+            2020-01-02   True   True   True
+            2020-01-03  False  False  False
+            2020-01-04   True   True   True
+            2020-01-05  False  False  False
+            ```
 
-        >>> en, ex = vbt.pd_acc.signals.generate_both(
-        ...     (5, 3),
-        ...     entry_place_func_nb=place_func_nb,
-        ...     exit_place_func_nb=place_func_nb,
-        ...     max_one_entry=True,
-        ...     max_one_exit=True,
-        ...     wrap_kwargs=dict(
-        ...         index=mask.index,
-        ...         columns=mask.columns
-        ...     )
-        ... )
-        >>> en
-                        a      b      c
-        2020-01-01   True   True   True
-        2020-01-02  False  False  False
-        2020-01-03   True   True   True
-        2020-01-04  False  False  False
-        2020-01-05   True   True   True
-        >>> ex
-                        a      b      c
-        2020-01-01  False  False  False
-        2020-01-02   True   True   True
-        2020-01-03  False  False  False
-        2020-01-04   True   True   True
-        2020-01-05  False  False  False
-        ```
+            * Generate three entries and one exit one after another:
 
-        Generate three entries and one exit one after another:
+            ```pycon
+            >>> @njit
+            ... def entry_place_func_nb(out, from_i, to_i, col, n):
+            ...     out[:n] = True
 
-        ```python-repl
-        >>> @njit
-        ... def entry_place_func_nb(out, from_i, to_i, col, n):
-        ...     out[:n] = True
+            >>> @njit
+            ... def exit_place_func_nb(out, from_i, to_i, col, n):
+            ...     out[:n] = True
 
-        >>> @njit
-        ... def exit_place_func_nb(out, from_i, to_i, col, n):
-        ...     out[:n] = True
-
-        >>> en, ex = vbt.pd_acc.signals.generate_both(
-        ...     (5, 3),
-        ...     entry_place_func_nb=entry_place_func_nb,
-        ...     entry_args=(3,),
-        ...     exit_place_func_nb=exit_place_func_nb,
-        ...     exit_args=(1,),
-        ...     wrap_kwargs=dict(
-        ...         index=mask.index,
-        ...         columns=mask.columns
-        ...     )
-        ... )
-        >>> en
-                        a      b      c
-        2020-01-01   True   True   True
-        2020-01-02   True   True   True
-        2020-01-03   True   True   True
-        2020-01-04  False  False  False
-        2020-01-05   True   True   True
-        >>> ex
-                        a      b      c
-        2020-01-01  False  False  False
-        2020-01-02  False  False  False
-        2020-01-03  False  False  False
-        2020-01-04   True   True   True
-        2020-01-05  False  False  False
-        ```
+            >>> en, ex = vbt.pd_acc.signals.generate_both(
+            ...     (5, 3),
+            ...     entry_place_func_nb=entry_place_func_nb,
+            ...     entry_args=(3,),
+            ...     exit_place_func_nb=exit_place_func_nb,
+            ...     exit_args=(1,),
+            ...     wrap_kwargs=dict(
+            ...         index=mask.index,
+            ...         columns=mask.columns
+            ...     )
+            ... )
+            >>> en
+                            a      b      c
+            2020-01-01   True   True   True
+            2020-01-02   True   True   True
+            2020-01-03   True   True   True
+            2020-01-04  False  False  False
+            2020-01-05   True   True   True
+            >>> ex
+                            a      b      c
+            2020-01-01  False  False  False
+            2020-01-02  False  False  False
+            2020-01-03  False  False  False
+            2020-01-04   True   True   True
+            2020-01-05  False  False  False
+            ```
         """
         if entry_args is None:
             entry_args = ()
@@ -475,23 +473,22 @@ class SignalsAccessor(GenericAccessor):
                        wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """See `vectorbtpro.signals.nb.generate_ex_nb`.
 
-        ## Example
+        Usage:
+            * Generate an exit just before the next entry:
 
-        Generate an exit just before the next entry:
+            ```pycon
+            >>> @njit
+            ... def exit_place_func_nb(out, from_i, to_i, col):
+            ...     out[-1] = True
 
-        ```python-repl
-        >>> @njit
-        ... def exit_place_func_nb(out, from_i, to_i, col):
-        ...     out[-1] = True
-
-        >>> mask.vbt.signals.generate_exits(exit_place_func_nb)
-                        a      b      c
-        2020-01-01  False  False  False
-        2020-01-02  False   True  False
-        2020-01-03  False  False  False
-        2020-01-04  False   True  False
-        2020-01-05   True  False   True
-        ```
+            >>> mask.vbt.signals.generate_exits(exit_place_func_nb)
+                            a      b      c
+            2020-01-01  False  False  False
+            2020-01-02  False   True  False
+            2020-01-03  False  False  False
+            2020-01-04  False   True  False
+            2020-01-05   True  False   True
+            ```
         """
         if broadcast_named_args is None:
             broadcast_named_args = {}
@@ -594,47 +591,46 @@ class SignalsAccessor(GenericAccessor):
 
         Specify `seed` to make output deterministic.
 
-        ## Example
+        Usage:
+            * For each column, generate a variable number of signals:
 
-        For each column, generate a variable number of signals:
+            ```pycon
+            >>> vbt.pd_acc.signals.generate_random(
+            ...     (5, 3),
+            ...     n=[0, 1, 2],
+            ...     seed=42,
+            ...     wrap_kwargs=dict(
+            ...         index=mask.index,
+            ...         columns=mask.columns
+            ...     )
+            ... )
+                            a      b      c
+            2020-01-01  False  False  False
+            2020-01-02  False  False  False
+            2020-01-03  False  False   True
+            2020-01-04  False   True  False
+            2020-01-05  False  False   True
+            ```
 
-        ```python-repl
-        >>> vbt.pd_acc.signals.generate_random(
-        ...     (5, 3),
-        ...     n=[0, 1, 2],
-        ...     seed=42,
-        ...     wrap_kwargs=dict(
-        ...         index=mask.index,
-        ...         columns=mask.columns
-        ...     )
-        ... )
-                        a      b      c
-        2020-01-01  False  False  False
-        2020-01-02  False  False  False
-        2020-01-03  False  False   True
-        2020-01-04  False   True  False
-        2020-01-05  False  False   True
-        ```
+            * For each column and time step, pick a signal with 50% probability:
 
-        For each column and time step, pick a signal with 50% probability:
-
-        ```python-repl
-        >>> vbt.pd_acc.signals.generate_random(
-        ...     (5, 3),
-        ...     prob=0.5,
-        ...     seed=42,
-        ...     wrap_kwargs=dict(
-        ...         index=mask.index,
-        ...         columns=mask.columns
-        ...     )
-        ... )
-                        a      b      c
-        2020-01-01   True   True   True
-        2020-01-02  False   True  False
-        2020-01-03  False  False  False
-        2020-01-04  False  False   True
-        2020-01-05   True  False   True
-        ```
+            ```pycon
+            >>> vbt.pd_acc.signals.generate_random(
+            ...     (5, 3),
+            ...     prob=0.5,
+            ...     seed=42,
+            ...     wrap_kwargs=dict(
+            ...         index=mask.index,
+            ...         columns=mask.columns
+            ...     )
+            ... )
+                            a      b      c
+            2020-01-01   True   True   True
+            2020-01-02  False   True  False
+            2020-01-03  False  False  False
+            2020-01-04  False  False   True
+            2020-01-05   True  False   True
+            ```
         """
         shape_2d = cls.resolve_shape(shape)
         if n is not None and prob is not None:
@@ -700,64 +696,63 @@ class SignalsAccessor(GenericAccessor):
         If `entry_prob` and `exit_prob` are set, uses `SignalsAccessor.generate_both` with
         `vectorbtpro.signals.nb.rand_by_prob_place_nb`.
 
-        ## Example
+        Usage:
+            * For each column, generate two entries and exits randomly:
 
-        For each column, generate two entries and exits randomly:
+            ```pycon
+            >>> en, ex = vbt.pd_acc.signals.generate_random_both(
+            ...     (5, 3),
+            ...     n=2,
+            ...     seed=42,
+            ...     wrap_kwargs=dict(
+            ...         index=mask.index,
+            ...         columns=mask.columns
+            ...     )
+            ... )
+            >>> en
+                            a      b      c
+            2020-01-01  False  False   True
+            2020-01-02   True   True  False
+            2020-01-03  False  False  False
+            2020-01-04   True   True   True
+            2020-01-05  False  False  False
+            >>> ex
+                            a      b      c
+            2020-01-01  False  False  False
+            2020-01-02  False  False   True
+            2020-01-03   True   True  False
+            2020-01-04  False  False  False
+            2020-01-05   True   True   True
+            ```
 
-        ```python-repl
-        >>> en, ex = vbt.pd_acc.signals.generate_random_both(
-        ...     (5, 3),
-        ...     n=2,
-        ...     seed=42,
-        ...     wrap_kwargs=dict(
-        ...         index=mask.index,
-        ...         columns=mask.columns
-        ...     )
-        ... )
-        >>> en
-                        a      b      c
-        2020-01-01  False  False   True
-        2020-01-02   True   True  False
-        2020-01-03  False  False  False
-        2020-01-04   True   True   True
-        2020-01-05  False  False  False
-        >>> ex
-                        a      b      c
-        2020-01-01  False  False  False
-        2020-01-02  False  False   True
-        2020-01-03   True   True  False
-        2020-01-04  False  False  False
-        2020-01-05   True   True   True
-        ```
+            * For each column and time step, pick entry with 50% probability and exit right after:
 
-        For each column and time step, pick entry with 50% probability and exit right after:
-
-        ```python-repl
-        >>> en, ex = vbt.pd_acc.signals.generate_random_both(
-        ...     (5, 3),
-        ...     entry_prob=0.5,
-        ...     exit_prob=1.,
-        ...     seed=42,
-        ...     wrap_kwargs=dict(
-        ...         index=mask.index,
-        ...         columns=mask.columns
-        ...     )
-        ... )
-        >>> en
-                        a      b      c
-        2020-01-01   True   True   True
-        2020-01-02  False  False  False
-        2020-01-03  False  False  False
-        2020-01-04  False  False   True
-        2020-01-05   True  False  False
-        >>> ex
-                        a      b      c
-        2020-01-01  False  False  False
-        2020-01-02   True   True   True
-        2020-01-03  False  False  False
-        2020-01-04  False  False  False
-        2020-01-05  False  False   True
-        ```
+            ```pycon
+            >>> en, ex = vbt.pd_acc.signals.generate_random_both(
+            ...     (5, 3),
+            ...     entry_prob=0.5,
+            ...     exit_prob=1.,
+            ...     seed=42,
+            ...     wrap_kwargs=dict(
+            ...         index=mask.index,
+            ...         columns=mask.columns
+            ...     )
+            ... )
+            >>> en
+                            a      b      c
+            2020-01-01   True   True   True
+            2020-01-02  False  False  False
+            2020-01-03  False  False  False
+            2020-01-04  False  False   True
+            2020-01-05   True  False  False
+            >>> ex
+                            a      b      c
+            2020-01-01  False  False  False
+            2020-01-02   True   True   True
+            2020-01-03  False  False  False
+            2020-01-04  False  False  False
+            2020-01-05  False  False   True
+            ```
         """
         shape_2d = cls.resolve_shape(shape)
         if n is not None and (entry_prob is not None or exit_prob is not None):
@@ -839,31 +834,30 @@ class SignalsAccessor(GenericAccessor):
 
         Specify `seed` to make output deterministic.
 
-        ## Example
+        Usage:
+            * After each entry in `mask`, generate exactly one exit:
 
-        After each entry in `mask`, generate exactly one exit:
+            ```pycon
+            >>> mask.vbt.signals.generate_random_exits(seed=42)
+                            a      b      c
+            2020-01-01  False  False  False
+            2020-01-02  False   True  False
+            2020-01-03  False  False  False
+            2020-01-04   True   True  False
+            2020-01-05  False  False   True
+            ```
 
-        ```python-repl
-        >>> mask.vbt.signals.generate_random_exits(seed=42)
-                        a      b      c
-        2020-01-01  False  False  False
-        2020-01-02  False   True  False
-        2020-01-03  False  False  False
-        2020-01-04   True   True  False
-        2020-01-05  False  False   True
-        ```
+            * After each entry in `mask` and at each time step, generate exit with 50% probability:
 
-        After each entry in `mask` and at each time step, generate exit with 50% probability:
-
-        ```python-repl
-        >>> mask.vbt.signals.generate_random_exits(prob=0.5, seed=42)
-                        a      b      c
-        2020-01-01  False  False  False
-        2020-01-02   True  False  False
-        2020-01-03  False  False  False
-        2020-01-04  False  False  False
-        2020-01-05  False  False   True
-        ```
+            ```pycon
+            >>> mask.vbt.signals.generate_random_exits(prob=0.5, seed=42)
+                            a      b      c
+            2020-01-01  False  False  False
+            2020-01-02   True  False  False
+            2020-01-03  False  False  False
+            2020-01-04  False  False  False
+            2020-01-05  False  False   True
+            ```
         """
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
@@ -949,46 +943,45 @@ class SignalsAccessor(GenericAccessor):
             To remove all entries that come between an entry and its exit,
             set `chain` to True. This will return two arrays: new entries and exits.
 
-        ## Example
+        Usage:
+            * Regular stop loss:
 
-        * Regular stop loss:
+            ```pycon
+            >>> ts = pd.Series([1, 2, 3, 2, 1])
 
-        ```python-repl
-        >>> ts = pd.Series([1, 2, 3, 2, 1])
+            >>> mask.vbt.signals.generate_stop_exits(ts, -0.1)
+                            a      b      c
+            2020-01-01  False  False  False
+            2020-01-02  False  False  False
+            2020-01-03  False  False  False
+            2020-01-04  False   True   True
+            2020-01-05  False  False  False
+            ```
 
-        >>> mask.vbt.signals.generate_stop_exits(ts, -0.1)
-                        a      b      c
-        2020-01-01  False  False  False
-        2020-01-02  False  False  False
-        2020-01-03  False  False  False
-        2020-01-04  False   True   True
-        2020-01-05  False  False  False
-        ```
+            * Trailing stop loss:
 
-        * Trailing stop loss:
+            ```pycon
+            >>> mask.vbt.signals.generate_stop_exits(ts, -0.1, trailing=True)
+                            a      b      c
+            2020-01-01  False  False  False
+            2020-01-02  False  False  False
+            2020-01-03  False  False  False
+            2020-01-04   True   True   True
+            2020-01-05  False  False  False
+            ```
 
-        ```python-repl
-        >>> mask.vbt.signals.generate_stop_exits(ts, -0.1, trailing=True)
-                        a      b      c
-        2020-01-01  False  False  False
-        2020-01-02  False  False  False
-        2020-01-03  False  False  False
-        2020-01-04   True   True   True
-        2020-01-05  False  False  False
-        ```
+            * Testing multiple take profit stops:
 
-        * Testing multiple take profit stops:
-
-        ```python-repl
-        >>> mask.vbt.signals.generate_stop_exits(ts, pd.Index([1.0, 1.5]))
-        stop                        1.0                  1.5
-                        a      b      c      a      b      c
-        2020-01-01  False  False  False  False  False  False
-        2020-01-02   True   True  False  False  False  False
-        2020-01-03  False  False  False   True  False  False
-        2020-01-04  False  False  False  False  False  False
-        2020-01-05  False  False  False  False  False  False
-        ```
+            ```pycon
+            >>> mask.vbt.signals.generate_stop_exits(ts, pd.Index([1.0, 1.5]))
+            stop                        1.0                  1.5
+                            a      b      c      a      b      c
+            2020-01-01  False  False  False  False  False  False
+            2020-01-02   True   True  False  False  False  False
+            2020-01-03  False  False  False   True  False  False
+            2020-01-04  False  False  False  False  False  False
+            2020-01-05  False  False  False  False  False  False
+            ```
         """
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
@@ -1146,163 +1139,166 @@ class SignalsAccessor(GenericAccessor):
             To remove all entries that come between an entry and its exit,
             set `chain` to True. This will return two arrays: new entries and exits.
 
-        ## Example
+        Usage:
+            * Generate exits for TSL and TP of 10%:
 
-        ```python-repl
-        >>> price = pd.DataFrame({
-        ...     'open': [10, 11, 12, 11, 10],
-        ...     'high': [11, 12, 13, 12, 11],
-        ...     'low': [9, 10, 11, 10, 9],
-        ...     'close': [10, 11, 12, 11, 10]
-        ... })
-        >>> out_dict = {}
-        >>> exits = mask.vbt.signals.generate_ohlc_stop_exits(
-        ...     price['open'],
-        ...     price['high'],
-        ...     price['low'],
-        ...     price['close'],
-        ...     sl_stop=0.1,
-        ...     sl_trail=True,
-        ...     tp_stop=0.1,
-        ...     out_dict=out_dict
-        ... )
-        >>> exits
-                        a      b      c
-        2020-01-01  False  False  False
-        2020-01-02   True   True  False
-        2020-01-03  False  False  False
-        2020-01-04  False   True   True
-        2020-01-05  False  False  False
+            ```pycon
+            >>> price = pd.DataFrame({
+            ...     'open': [10, 11, 12, 11, 10],
+            ...     'high': [11, 12, 13, 12, 11],
+            ...     'low': [9, 10, 11, 10, 9],
+            ...     'close': [10, 11, 12, 11, 10]
+            ... })
+            >>> out_dict = {}
+            >>> exits = mask.vbt.signals.generate_ohlc_stop_exits(
+            ...     price['open'],
+            ...     price['high'],
+            ...     price['low'],
+            ...     price['close'],
+            ...     sl_stop=0.1,
+            ...     sl_trail=True,
+            ...     tp_stop=0.1,
+            ...     out_dict=out_dict
+            ... )
+            >>> exits
+                            a      b      c
+            2020-01-01  False  False  False
+            2020-01-02   True   True  False
+            2020-01-03  False  False  False
+            2020-01-04  False   True   True
+            2020-01-05  False  False  False
 
-        >>> out_dict['stop_price']
-                       a     b     c
-        2020-01-01   NaN   NaN   NaN
-        2020-01-02  11.0  11.0   NaN
-        2020-01-03   NaN   NaN   NaN
-        2020-01-04   NaN  10.8  10.8
-        2020-01-05   NaN   NaN   NaN
+            >>> out_dict['stop_price']
+                           a     b     c
+            2020-01-01   NaN   NaN   NaN
+            2020-01-02  11.0  11.0   NaN
+            2020-01-03   NaN   NaN   NaN
+            2020-01-04   NaN  10.8  10.8
+            2020-01-05   NaN   NaN   NaN
 
-        >>> out_dict['stop_type'].vbt(mapping=StopType).apply_mapping()
-                             a           b          c
-        2020-01-01        None        None       None
-        2020-01-02  TakeProfit  TakeProfit       None
-        2020-01-03        None        None       None
-        2020-01-04        None   TrailStop  TrailStop
-        2020-01-05        None        None       None
-        ```
+            >>> out_dict['stop_type'].vbt(mapping=StopType).apply_mapping()
+                                 a           b          c
+            2020-01-01        None        None       None
+            2020-01-02  TakeProfit  TakeProfit       None
+            2020-01-03        None        None       None
+            2020-01-04        None   TrailStop  TrailStop
+            2020-01-05        None        None       None
+            ```
 
-        Notice how the first two entry signals in the third column have no exit signal - there is
-        no room between them for an exit signal. To find an exit for the first entry and ignore all
-        entries that are in-between them, we can pass `until_next=False` and `skip_until_exit=True`:
+            Notice how the first two entry signals in the third column have no exit signal -
+            there is no room between them for an exit signal.
 
-        ```python-repl
-        >>> out_dict = {}
-        >>> exits = mask.vbt.signals.generate_ohlc_stop_exits(
-        ...     price['open'],
-        ...     price['high'],
-        ...     price['low'],
-        ...     price['close'],
-        ...     sl_stop=0.1,
-        ...     sl_trail=True,
-        ...     tp_stop=0.1,
-        ...     out_dict=out_dict,
-        ...     until_next=False,
-        ...     skip_until_exit=True
-        ... )
-        >>> exits
-                        a      b      c
-        2020-01-01  False  False  False
-        2020-01-02   True   True   True
-        2020-01-03  False  False  False
-        2020-01-04  False   True   True
-        2020-01-05  False  False  False
+            * To find an exit for the first entry and ignore all entries that are in-between them,
+            we can pass `until_next=False` and `skip_until_exit=True`:
 
-        >>> out_dict['stop_price']
-                       a     b     c
-        2020-01-01   NaN   NaN   NaN
-        2020-01-02  11.0  11.0  11.0
-        2020-01-03   NaN   NaN   NaN
-        2020-01-04   NaN  10.8  10.8
-        2020-01-05   NaN   NaN   NaN
+            ```pycon
+            >>> out_dict = {}
+            >>> exits = mask.vbt.signals.generate_ohlc_stop_exits(
+            ...     price['open'],
+            ...     price['high'],
+            ...     price['low'],
+            ...     price['close'],
+            ...     sl_stop=0.1,
+            ...     sl_trail=True,
+            ...     tp_stop=0.1,
+            ...     out_dict=out_dict,
+            ...     until_next=False,
+            ...     skip_until_exit=True
+            ... )
+            >>> exits
+                            a      b      c
+            2020-01-01  False  False  False
+            2020-01-02   True   True   True
+            2020-01-03  False  False  False
+            2020-01-04  False   True   True
+            2020-01-05  False  False  False
 
-        >>> out_dict['stop_type'].vbt(mapping=StopType).apply_mapping()
-                             a           b           c
-        2020-01-01        None        None        None
-        2020-01-02  TakeProfit  TakeProfit  TakeProfit
-        2020-01-03        None        None        None
-        2020-01-04        None   TrailStop   TrailStop
-        2020-01-05        None        None        None
-        ```
+            >>> out_dict['stop_price']
+                           a     b     c
+            2020-01-01   NaN   NaN   NaN
+            2020-01-02  11.0  11.0  11.0
+            2020-01-03   NaN   NaN   NaN
+            2020-01-04   NaN  10.8  10.8
+            2020-01-05   NaN   NaN   NaN
 
-        Now, the first signal in the third column gets executed regardless of the entries that come next,
-        which is very similar to the logic that is implemented in `vectorbtpro.portfolio.base.Portfolio.from_signals`.
+            >>> out_dict['stop_type'].vbt(mapping=StopType).apply_mapping()
+                                 a           b           c
+            2020-01-01        None        None        None
+            2020-01-02  TakeProfit  TakeProfit  TakeProfit
+            2020-01-03        None        None        None
+            2020-01-04        None   TrailStop   TrailStop
+            2020-01-05        None        None        None
+            ```
 
-        To automatically remove all ignored entry signals, pass `chain=True`.
-        This will return a new entries array:
+            Now, the first signal in the third column gets executed regardless of the entries that come next,
+            which is very similar to the logic that is implemented in `vectorbtpro.portfolio.base.Portfolio.from_signals`.
 
-        ```python-repl
-        >>> out_dict = {}
-        >>> new_entries, exits = mask.vbt.signals.generate_ohlc_stop_exits(
-        ...     price['open'],
-        ...     price['high'],
-        ...     price['low'],
-        ...     price['close'],
-        ...     sl_stop=0.1,
-        ...     sl_trail=True,
-        ...     tp_stop=0.1,
-        ...     out_dict=out_dict,
-        ...     chain=True
-        ... )
-        >>> new_entries
-                        a      b      c
-        2020-01-01   True   True   True
-        2020-01-02  False  False  False  << removed entry in the third column
-        2020-01-03  False   True   True
-        2020-01-04  False  False  False
-        2020-01-05  False   True  False
-        >>> exits
-                        a      b      c
-        2020-01-01  False  False  False
-        2020-01-02   True   True   True
-        2020-01-03  False  False  False
-        2020-01-04  False   True   True
-        2020-01-05  False  False  False
-        ```
+            * To automatically remove all ignored entry signals, pass `chain=True`.
+            This will return a new entries array:
 
-        !!! warning
-            The last two examples above make entries dependent upon exits - this makes only sense
-            if you have no other exit arrays to combine this stop exit array with.
+            ```pycon
+            >>> out_dict = {}
+            >>> new_entries, exits = mask.vbt.signals.generate_ohlc_stop_exits(
+            ...     price['open'],
+            ...     price['high'],
+            ...     price['low'],
+            ...     price['close'],
+            ...     sl_stop=0.1,
+            ...     sl_trail=True,
+            ...     tp_stop=0.1,
+            ...     out_dict=out_dict,
+            ...     chain=True
+            ... )
+            >>> new_entries
+                            a      b      c
+            2020-01-01   True   True   True
+            2020-01-02  False  False  False  << removed entry in the third column
+            2020-01-03  False   True   True
+            2020-01-04  False  False  False
+            2020-01-05  False   True  False
+            >>> exits
+                            a      b      c
+            2020-01-01  False  False  False
+            2020-01-02   True   True   True
+            2020-01-03  False  False  False
+            2020-01-04  False   True   True
+            2020-01-05  False  False  False
+            ```
 
-        Test multiple parameter combinations:
+            !!! warning
+                The last two examples above make entries dependent upon exits - this makes only sense
+                if you have no other exit arrays to combine this stop exit array with.
 
-        ```python-repl
-        >>> exits = mask.vbt.signals.generate_ohlc_stop_exits(
-        ...     price['open'],
-        ...     price['high'],
-        ...     price['low'],
-        ...     price['close'],
-        ...     sl_stop=pd.Index([0.1, 0.2]),
-        ...     sl_trail=pd.Index([False, True])
-        ... )
-        >>> exits
-        sl_stop                                          0.1                       \\
-        sl_trail                  False                 True                False
-                        a      b      c      a      b      c      a      b      c
-        2020-01-01  False  False  False  False  False  False  False  False  False
-        2020-01-02  False  False  False  False  False  False  False  False  False
-        2020-01-03  False  False  False  False  False  False  False  False  False
-        2020-01-04  False   True   True   True   True   True  False  False  False
-        2020-01-05   True  False  False  False  False  False  False  False   True
+            * Test multiple parameter combinations:
 
-        sl_stop                     0.2
-        sl_trail                   True
-                        a      b      c
-        2020-01-01  False  False  False
-        2020-01-02  False  False  False
-        2020-01-03  False  False  False
-        2020-01-04   True  False  False
-        2020-01-05  False  False   True
-        ```
+            ```pycon
+            >>> exits = mask.vbt.signals.generate_ohlc_stop_exits(
+            ...     price['open'],
+            ...     price['high'],
+            ...     price['low'],
+            ...     price['close'],
+            ...     sl_stop=pd.Index([0.1, 0.2]),
+            ...     sl_trail=pd.Index([False, True])
+            ... )
+            >>> exits
+            sl_stop                                          0.1                       \\
+            sl_trail                  False                 True                False
+                            a      b      c      a      b      c      a      b      c
+            2020-01-01  False  False  False  False  False  False  False  False  False
+            2020-01-02  False  False  False  False  False  False  False  False  False
+            2020-01-03  False  False  False  False  False  False  False  False  False
+            2020-01-04  False   True   True   True   True   True  False  False  False
+            2020-01-05   True  False  False  False  False  False  False  False   True
+
+            sl_stop                     0.2
+            sl_trail                   True
+                            a      b      c
+            2020-01-01  False  False  False
+            2020-01-02  False  False  False
+            2020-01-03  False  False  False
+            2020-01-04   True  False  False
+            2020-01-05  False  False   True
+            ```
         """
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
@@ -1488,60 +1484,59 @@ class SignalsAccessor(GenericAccessor):
         If `other` specified, see `vectorbtpro.signals.nb.between_two_ranges_nb`.
         Both will broadcast using `vectorbtpro.base.reshaping.broadcast` and `broadcast_kwargs`.
 
-        ## Example
+        Usage:
+            * One array:
 
-        One array:
+            ```pycon
+            >>> mask_sr = pd.Series([True, False, False, True, False, True, True])
+            >>> ranges = mask_sr.vbt.signals.between_ranges()
+            >>> ranges
+            <vectorbtpro.generic.ranges.Ranges at 0x7ff29ea7c7b8>
 
-        ```python-repl
-        >>> mask_sr = pd.Series([True, False, False, True, False, True, True])
-        >>> ranges = mask_sr.vbt.signals.between_ranges()
-        >>> ranges
-        <vectorbtpro.generic.ranges.Ranges at 0x7ff29ea7c7b8>
+            >>> ranges.records_readable
+               Range Id  Column  Start Timestamp  End Timestamp  Status
+            0         0       0                0              3  Closed
+            1         1       0                3              5  Closed
+            2         2       0                5              6  Closed
 
-        >>> ranges.records_readable
-           Range Id  Column  Start Timestamp  End Timestamp  Status
-        0         0       0                0              3  Closed
-        1         1       0                3              5  Closed
-        2         2       0                5              6  Closed
+            >>> ranges.duration.values
+            array([3, 2, 1])
+            ```
 
-        >>> ranges.duration.values
-        array([3, 2, 1])
-        ```
+            * Two arrays, traversing the signals of the first array:
 
-        Two arrays, traversing the signals of the first array:
+            ```pycon
+            >>> mask_sr = pd.Series([True, True, True, False, False])
+            >>> mask_sr2 = pd.Series([False, False, True, False, True])
+            >>> ranges = mask_sr.vbt.signals.between_ranges(other=mask_sr2)
+            >>> ranges
+            <vectorbtpro.generic.ranges.Ranges at 0x7ff29e3b80f0>
 
-        ```python-repl
-        >>> mask_sr = pd.Series([True, True, True, False, False])
-        >>> mask_sr2 = pd.Series([False, False, True, False, True])
-        >>> ranges = mask_sr.vbt.signals.between_ranges(other=mask_sr2)
-        >>> ranges
-        <vectorbtpro.generic.ranges.Ranges at 0x7ff29e3b80f0>
+            >>> ranges.records_readable
+               Range Id  Column  Start Timestamp  End Timestamp  Status
+            0         0       0                0              2  Closed
+            1         1       0                1              2  Closed
+            2         2       0                2              2  Closed
 
-        >>> ranges.records_readable
-           Range Id  Column  Start Timestamp  End Timestamp  Status
-        0         0       0                0              2  Closed
-        1         1       0                1              2  Closed
-        2         2       0                2              2  Closed
+            >>> ranges.duration.values
+            array([2, 1, 0])
+            ```
 
-        >>> ranges.duration.values
-        array([2, 1, 0])
-        ```
+            * Two arrays, traversing the signals of the second array:
 
-        Two arrays, traversing the signals of the second array:
+            ```pycon
+            >>> ranges = mask_sr.vbt.signals.between_ranges(other=mask_sr2, from_other=True)
+            >>> ranges
+            <vectorbtpro.generic.ranges.Ranges at 0x7ff29eccbd68>
 
-        ```python-repl
-        >>> ranges = mask_sr.vbt.signals.between_ranges(other=mask_sr2, from_other=True)
-        >>> ranges
-        <vectorbtpro.generic.ranges.Ranges at 0x7ff29eccbd68>
+            >>> ranges.records_readable
+               Range Id  Column  Start Timestamp  End Timestamp  Status
+            0         0       0                2              2  Closed
+            1         1       0                2              4  Closed
 
-        >>> ranges.records_readable
-           Range Id  Column  Start Timestamp  End Timestamp  Status
-        0         0       0                2              2  Closed
-        1         1       0                2              4  Closed
-
-        >>> ranges.duration.values
-        array([0, 2])
-        ```
+            >>> ranges.duration.values
+            array([0, 2])
+            ```
         """
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
@@ -1586,15 +1581,15 @@ class SignalsAccessor(GenericAccessor):
         If `use_end_idxs` is True, uses the index of the last signal in each partition as `idx_arr`.
         Otherwise, uses the index of the first signal.
 
-        ## Example
-
-        ```python-repl
-        >>> mask_sr = pd.Series([True, True, True, False, True, True])
-        >>> mask_sr.vbt.signals.partition_ranges().records_readable
-           Range Id  Column  Start Timestamp  End Timestamp  Status
-        0         0       0                0              3  Closed
-        1         1       0                4              5    Open
-        ```"""
+        Usage:
+            ```pycon
+            >>> mask_sr = pd.Series([True, True, True, False, True, True])
+            >>> mask_sr.vbt.signals.partition_ranges().records_readable
+               Range Id  Column  Start Timestamp  End Timestamp  Status
+            0         0       0                0              3  Closed
+            1         1       0                4              5    Open
+            ```
+        """
         func = jit_registry.resolve_option(nb.partition_ranges_nb, jitted)
         func = ch_registry.resolve_option(func, chunked)
         range_records = func(self.to_2d_array())
@@ -1614,15 +1609,15 @@ class SignalsAccessor(GenericAccessor):
         """Wrap the result of `vectorbtpro.signals.nb.between_partition_ranges_nb`
         with `vectorbtpro.generic.ranges.Ranges`.
 
-        ## Example
-
-        ```python-repl
-        >>> mask_sr = pd.Series([True, False, False, True, False, True, True])
-        >>> mask_sr.vbt.signals.between_partition_ranges().records_readable
-           Range Id  Column  Start Timestamp  End Timestamp  Status
-        0         0       0                0              3  Closed
-        1         1       0                3              5  Closed
-         ```"""
+        Usage:
+            ```pycon
+            >>> mask_sr = pd.Series([True, False, False, True, False, True, True])
+            >>> mask_sr.vbt.signals.between_partition_ranges().records_readable
+               Range Id  Column  Start Timestamp  End Timestamp  Status
+            0         0       0                0              3  Closed
+            1         1       0                3              5  Closed
+             ```
+         """
         func = jit_registry.resolve_option(nb.between_partition_ranges_nb, jitted)
         func = ch_registry.resolve_option(func, chunked)
         range_records = func(self.to_2d_array())
@@ -1717,43 +1712,42 @@ class SignalsAccessor(GenericAccessor):
 
         Uses `SignalsAccessor.rank` with `vectorbtpro.signals.nb.sig_pos_rank_nb`.
 
-        ## Example
+        Usage:
+            * Rank each True value in each partition in `mask`:
 
-        Rank each True value in each partition in `mask`:
+            ```pycon
+            >>> mask.vbt.signals.pos_rank()
+                        a  b  c
+            2020-01-01  0  0  0
+            2020-01-02 -1 -1  1
+            2020-01-03 -1  0  2
+            2020-01-04 -1 -1 -1
+            2020-01-05 -1  0 -1
 
-        ```python-repl
-        >>> mask.vbt.signals.pos_rank()
-                    a  b  c
-        2020-01-01  0  0  0
-        2020-01-02 -1 -1  1
-        2020-01-03 -1  0  2
-        2020-01-04 -1 -1 -1
-        2020-01-05 -1  0 -1
+            >>> mask.vbt.signals.pos_rank(after_false=True)
+                        a  b  c
+            2020-01-01 -1 -1 -1
+            2020-01-02 -1 -1 -1
+            2020-01-03 -1  0 -1
+            2020-01-04 -1 -1 -1
+            2020-01-05 -1  0 -1
 
-        >>> mask.vbt.signals.pos_rank(after_false=True)
-                    a  b  c
-        2020-01-01 -1 -1 -1
-        2020-01-02 -1 -1 -1
-        2020-01-03 -1  0 -1
-        2020-01-04 -1 -1 -1
-        2020-01-05 -1  0 -1
+            >>> mask.vbt.signals.pos_rank(allow_gaps=True)
+                        a  b  c
+            2020-01-01  0  0  0
+            2020-01-02 -1 -1  1
+            2020-01-03 -1  1  2
+            2020-01-04 -1 -1 -1
+            2020-01-05 -1  2 -1
 
-        >>> mask.vbt.signals.pos_rank(allow_gaps=True)
-                    a  b  c
-        2020-01-01  0  0  0
-        2020-01-02 -1 -1  1
-        2020-01-03 -1  1  2
-        2020-01-04 -1 -1 -1
-        2020-01-05 -1  2 -1
-
-        >>> mask.vbt.signals.pos_rank(reset_by=~mask, allow_gaps=True)
-                    a  b  c
-        2020-01-01  0  0  0
-        2020-01-02 -1 -1  1
-        2020-01-03 -1  0  2
-        2020-01-04 -1 -1 -1
-        2020-01-05 -1  0 -1
-        ```
+            >>> mask.vbt.signals.pos_rank(reset_by=~mask, allow_gaps=True)
+                        a  b  c
+            2020-01-01  0  0  0
+            2020-01-02 -1 -1  1
+            2020-01-03 -1  0  2
+            2020-01-04 -1 -1 -1
+            2020-01-05 -1  0 -1
+            ```
         """
         prepare_func = lambda obj, reset_by: (np.full(obj.shape[1], -1, dtype=np.int_),)
         chunked = ch.specialize_chunked_option(
@@ -1777,35 +1771,34 @@ class SignalsAccessor(GenericAccessor):
 
         Uses `SignalsAccessor.rank` with `vectorbtpro.signals.nb.part_pos_rank_nb`.
 
-        ## Example
+        Usage:
+            * Rank each partition of True values in `mask`:
 
-        Rank each partition of True values in `mask`:
+            ```pycon
+            >>> mask.vbt.signals.partition_pos_rank()
+                        a  b  c
+            2020-01-01  0  0  0
+            2020-01-02 -1 -1  0
+            2020-01-03 -1  1  0
+            2020-01-04 -1 -1 -1
+            2020-01-05 -1  2 -1
 
-        ```python-repl
-        >>> mask.vbt.signals.partition_pos_rank()
-                    a  b  c
-        2020-01-01  0  0  0
-        2020-01-02 -1 -1  0
-        2020-01-03 -1  1  0
-        2020-01-04 -1 -1 -1
-        2020-01-05 -1  2 -1
+            >>> mask.vbt.signals.partition_pos_rank(after_false=True)
+                        a  b  c
+            2020-01-01 -1 -1 -1
+            2020-01-02 -1 -1 -1
+            2020-01-03 -1  0 -1
+            2020-01-04 -1 -1 -1
+            2020-01-05 -1  1 -1
 
-        >>> mask.vbt.signals.partition_pos_rank(after_false=True)
-                    a  b  c
-        2020-01-01 -1 -1 -1
-        2020-01-02 -1 -1 -1
-        2020-01-03 -1  0 -1
-        2020-01-04 -1 -1 -1
-        2020-01-05 -1  1 -1
-
-        >>> mask.vbt.signals.partition_pos_rank(reset_by=mask)
-                    a  b  c
-        2020-01-01  0  0  0
-        2020-01-02 -1 -1  0
-        2020-01-03 -1  0  0
-        2020-01-04 -1 -1 -1
-        2020-01-05 -1  0 -1
-        ```
+            >>> mask.vbt.signals.partition_pos_rank(reset_by=mask)
+                        a  b  c
+            2020-01-01  0  0  0
+            2020-01-02 -1 -1  0
+            2020-01-03 -1  0  0
+            2020-01-04 -1 -1 -1
+            2020-01-05 -1  0 -1
+            ```
         """
         prepare_func = lambda obj, reset_by: (np.full(obj.shape[1], -1, dtype=np.int_),)
         chunked = ch.specialize_chunked_option(
@@ -1857,30 +1850,30 @@ class SignalsAccessor(GenericAccessor):
                   wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbtpro.signals.nb.nth_index_nb`.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> mask.vbt.signals.nth_index(0)
+            a   2020-01-01
+            b   2020-01-01
+            c   2020-01-01
+            Name: nth_index, dtype: datetime64[ns]
 
-        ```python-repl
-        >>> mask.vbt.signals.nth_index(0)
-        a   2020-01-01
-        b   2020-01-01
-        c   2020-01-01
-        Name: nth_index, dtype: datetime64[ns]
+            >>> mask.vbt.signals.nth_index(2)
+            a          NaT
+            b   2020-01-05
+            c   2020-01-03
+            Name: nth_index, dtype: datetime64[ns]
 
-        >>> mask.vbt.signals.nth_index(2)
-        a          NaT
-        b   2020-01-05
-        c   2020-01-03
-        Name: nth_index, dtype: datetime64[ns]
+            >>> mask.vbt.signals.nth_index(-1)
+            a   2020-01-01
+            b   2020-01-05
+            c   2020-01-03
+            Name: nth_index, dtype: datetime64[ns]
 
-        >>> mask.vbt.signals.nth_index(-1)
-        a   2020-01-01
-        b   2020-01-05
-        c   2020-01-03
-        Name: nth_index, dtype: datetime64[ns]
-
-        >>> mask.vbt.signals.nth_index(-1, group_by=True)
-        Timestamp('2020-01-05 00:00:00')
-        ```"""
+            >>> mask.vbt.signals.nth_index(-1, group_by=True)
+            Timestamp('2020-01-05 00:00:00')
+            ```
+        """
         if self.is_frame() and self.wrapper.grouper.is_grouped(group_by=group_by):
             squeezed = self.squeeze_grouped(
                 jit_registry.resolve_option(generic_nb.any_reduce_nb, jitted),
@@ -1915,18 +1908,18 @@ class SignalsAccessor(GenericAccessor):
         * [-1.0, 0.0): average signal is on the left
         * (0.0, 1.0]: average signal is on the right
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> pd.Series([True, False, False, False]).vbt.signals.norm_avg_index()
+            -1.0
 
-        ```python-repl
-        >>> pd.Series([True, False, False, False]).vbt.signals.norm_avg_index()
-        -1.0
+            >>> pd.Series([False, False, False, True]).vbt.signals.norm_avg_index()
+            1.0
 
-        >>> pd.Series([False, False, False, True]).vbt.signals.norm_avg_index()
-        1.0
-
-        >>> pd.Series([True, False, False, True]).vbt.signals.norm_avg_index()
-        0.0
-        ```"""
+            >>> pd.Series([True, False, False, True]).vbt.signals.norm_avg_index()
+            0.0
+            ```
+        """
         if self.is_frame() and self.wrapper.grouper.is_grouped(group_by=group_by):
             group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
             func = jit_registry.resolve_option(nb.norm_avg_index_grouped_nb, jitted)
@@ -1991,7 +1984,7 @@ class SignalsAccessor(GenericAccessor):
         """Defaults for `SignalsAccessor.stats`.
 
         Merges `vectorbtpro.generic.accessors.GenericAccessor.stats_defaults` and
-        `signals.stats` from `vectorbtpro._settings.settings`."""
+        `stats` from `vectorbtpro._settings.signals`."""
         from vectorbtpro._settings import settings
         signals_stats_cfg = settings['signals']['stats']
 
@@ -2131,13 +2124,12 @@ class SignalsAccessor(GenericAccessor):
             yref (str): Y coordinate axis.
             **kwargs: Keyword arguments passed to `vectorbtpro.generic.accessors.GenericAccessor.lineplot`.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> mask[['a', 'c']].vbt.signals.plot()
+            ```
 
-        ```python-repl
-        >>> mask[['a', 'c']].vbt.signals.plot()
-        ```
-
-        ![](/docs/img/signals_df_plot.svg)
+            ![](/assets/images/signals_df_plot.svg)
         """
         default_layout = dict()
         default_layout['yaxis' + yref[1:]] = dict(
@@ -2152,7 +2144,7 @@ class SignalsAccessor(GenericAccessor):
         """Defaults for `SignalsAccessor.plots`.
 
         Merges `vectorbtpro.generic.accessors.GenericAccessor.plots_defaults` and
-        `signals.plots` from `vectorbtpro._settings.settings`."""
+        `plots` from `vectorbtpro._settings.signals`."""
         from vectorbtpro._settings import settings
         signals_plots_cfg = settings['signals']['plots']
 
@@ -2188,16 +2180,15 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
             y (array_like): Y-axis values to plot markers on.
             **kwargs: Keyword arguments passed to `vectorbtpro.generic.accessors.GenericAccessor.scatterplot`.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> ts = pd.Series([1, 2, 3, 2, 1], index=mask.index)
+            >>> fig = ts.vbt.lineplot()
+            >>> mask['b'].vbt.signals.plot_as_entry_markers(y=ts, fig=fig)
+            >>> (~mask['b']).vbt.signals.plot_as_exit_markers(y=ts, fig=fig)
+            ```
 
-        ```python-repl
-        >>> ts = pd.Series([1, 2, 3, 2, 1], index=mask.index)
-        >>> fig = ts.vbt.lineplot()
-        >>> mask['b'].vbt.signals.plot_as_entry_markers(y=ts, fig=fig)
-        >>> (~mask['b']).vbt.signals.plot_as_exit_markers(y=ts, fig=fig)
-        ```
-
-        ![](/docs/img/signals_plot_as_markers.svg)
+            ![](/assets/images/signals_plot_as_markers.svg)
         """
         from vectorbtpro._settings import settings
         plotting_cfg = settings['plotting']

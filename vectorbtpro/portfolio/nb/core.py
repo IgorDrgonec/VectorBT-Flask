@@ -1,14 +1,14 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Core Numba-compiled functions."""
+"""Core Numba-compiled functions for portfolio modeling."""
 
 import numpy as np
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.indexing import flex_select_auto_nb
 from vectorbtpro.generic import nb as generic_nb
-from vectorbtpro.jit_registry import register_jitted
 from vectorbtpro.portfolio.enums import *
+from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils.array_ import insert_argsort_nb
 from vectorbtpro.utils.math_ import (
     is_close_nb,
@@ -878,40 +878,6 @@ def is_grouped_nb(group_lens: tp.Array1d) -> bool:
 
 
 @register_jitted(cache=True)
-def get_elem_nb(ctx: tp.Union[
-    OrderContext,
-    PostOrderContext,
-    SignalContext
-], arr: tp.FlexArray) -> tp.Scalar:
-    """Get the current element using flexible indexing given the context's `i` and `col`."""
-    return flex_select_auto_nb(arr, ctx.i, ctx.col, ctx.flex_2d)
-
-
-@register_jitted(cache=True)
-def get_grouped_elem_nb(ctx: tp.Union[
-    SegmentContext,
-    OrderContext,
-    PostOrderContext,
-    FlexOrderContext
-], arr: tp.FlexArray) -> tp.Scalar:
-    """Get the current element using flexible indexing given the context's `i` and `group`."""
-    return flex_select_auto_nb(arr, ctx.i, ctx.group, ctx.flex_2d)
-
-
-@register_jitted(cache=True)
-def get_col_elem_nb(ctx: tp.Union[
-    RowContext,
-    SegmentContext,
-    OrderContext,
-    FlexOrderContext,
-    PostOrderContext,
-    SignalContext
-], col_or_group: int, arr: tp.FlexArray) -> tp.Scalar:
-    """Get the current element using flexible indexing given a column/group and the context's `i`."""
-    return flex_select_auto_nb(arr, ctx.i, col_or_group, ctx.flex_2d)
-
-
-@register_jitted(cache=True)
 def get_group_value_nb(from_col: int,
                        to_col: int,
                        cash_now: float,
@@ -925,28 +891,6 @@ def get_group_value_nb(from_col: int,
         if last_position[col] != 0:
             group_value += last_position[col] * last_val_price[col]
     return group_value
-
-
-@register_jitted(cache=True)
-def get_group_value_ctx_nb(seg_ctx: SegmentContext) -> float:
-    """Get group value from context.
-
-    Accepts `vectorbtpro.portfolio.enums.SegmentContext`.
-
-    Best called once from `pre_segment_func_nb`.
-    To set the valuation price, change `last_val_price` of the context in-place.
-
-    !!! note
-        Cash sharing must be enabled."""
-    if not seg_ctx.cash_sharing:
-        raise ValueError("Cash sharing must be enabled")
-    return get_group_value_nb(
-        seg_ctx.from_col,
-        seg_ctx.to_col,
-        seg_ctx.last_cash[seg_ctx.group],
-        seg_ctx.last_position,
-        seg_ctx.last_val_price
-    )
 
 
 @register_jitted(cache=True)
@@ -980,123 +924,6 @@ def approx_order_value_nb(size: float,
     if size_type == SizeType.TargetPercent:
         return size * value_now - asset_value_now
     return np.nan
-
-
-@register_jitted(cache=True)
-def sort_call_seq_out_nb(ctx: SegmentContext,
-                         size: tp.FlexArray,
-                         size_type: tp.FlexArray,
-                         direction: tp.FlexArray,
-                         order_value_out: tp.Array1d,
-                         call_seq_out: tp.Array1d,
-                         ctx_select: bool = True) -> None:
-    """Sort call sequence `call_seq_out` based on the value of each potential order.
-
-    Accepts `vectorbtpro.portfolio.enums.SegmentContext` and other arguments, sorts `call_seq_out` in place,
-    and returns nothing.
-
-    Arrays `size`, `size_type`, and `direction` utilize flexible indexing and must have at least 0 dimensions.
-    If `ctx_select` is True, selects the elements of each `size`, `size_type`, and `direction`
-    using `get_col_elem_nb` assuming that each array can broadcast to `target_shape`.
-    Otherwise, selects using `vectorbtpro.base.indexing.flex_select_auto_nb` assuming that each array
-    can broadcast to `group_len`.
-
-    The lengths of `order_value_out` and `call_seq_out` must match the number of columns in the group.
-    Array `order_value_out` must be empty and will contain sorted order values after execution.
-    Array `call_seq_out` must be filled with integers ranging from 0 to the number of columns in the group
-    (in this exact order).
-
-    Best called once from `pre_segment_func_nb`.
-
-    !!! note
-        Cash sharing must be enabled and `call_seq_out` must follow `CallSeqType.Default`.
-
-        Should be used in flexible simulation functions."""
-    if not ctx.cash_sharing:
-        raise ValueError("Cash sharing must be enabled")
-
-    group_value_now = get_group_value_ctx_nb(ctx)
-    group_len = ctx.to_col - ctx.from_col
-    for k in range(group_len):
-        if call_seq_out[k] != k:
-            raise ValueError("call_seq_out must follow CallSeqType.Default")
-        col = ctx.from_col + k
-        if ctx_select:
-            _size = get_col_elem_nb(ctx, col, size)
-            _size_type = get_col_elem_nb(ctx, col, size_type)
-            _direction = get_col_elem_nb(ctx, col, direction)
-        else:
-            _size = flex_select_auto_nb(size, k, 0, False)
-            _size_type = flex_select_auto_nb(size_type, k, 0, False)
-            _direction = flex_select_auto_nb(direction, k, 0, False)
-        if ctx.cash_sharing:
-            cash_now = ctx.last_cash[ctx.group]
-            free_cash_now = ctx.last_free_cash[ctx.group]
-        else:
-            cash_now = ctx.last_cash[col]
-            free_cash_now = ctx.last_free_cash[col]
-        order_value_out[k] = approx_order_value_nb(
-            _size,
-            _size_type,
-            _direction,
-            cash_now,
-            ctx.last_position[col],
-            free_cash_now,
-            ctx.last_val_price[col],
-            group_value_now
-        )
-    # Sort by order value
-    insert_argsort_nb(order_value_out, call_seq_out)
-
-
-@register_jitted(cache=True)
-def sort_call_seq_nb(ctx: SegmentContext,
-                     size: tp.FlexArray,
-                     size_type: tp.FlexArray,
-                     direction: tp.FlexArray,
-                     order_value_out: tp.Array1d,
-                     ctx_select: bool = True) -> None:
-    """Sort call sequence attached to `vectorbtpro.portfolio.enums.SegmentContext`.
-
-    See `sort_call_seq_out_nb`.
-
-    !!! note
-        Can only be used in non-flexible simulation functions."""
-    if ctx.call_seq_now is None:
-        raise ValueError("Call sequence array is None. Use sort_call_seq_out_nb to sort a custom array.")
-    sort_call_seq_out_nb(
-        ctx,
-        size,
-        size_type,
-        direction,
-        order_value_out,
-        ctx.call_seq_now,
-        ctx_select=ctx_select
-    )
-
-
-@register_jitted(cache=True)
-def try_order_nb(ctx: OrderContext, order: Order) -> tp.Tuple[ExecuteOrderState, OrderResult]:
-    """Execute an order without persistence."""
-    state = ProcessOrderState(
-        cash=ctx.cash_now,
-        position=ctx.position_now,
-        debt=ctx.debt_now,
-        free_cash=ctx.free_cash_now,
-        val_price=ctx.val_price_now,
-        value=ctx.value_now
-    )
-    price_area = PriceArea(
-        open=flex_select_auto_nb(ctx.open, ctx.i, ctx.col, ctx.flex_2d),
-        high=flex_select_auto_nb(ctx.high, ctx.i, ctx.col, ctx.flex_2d),
-        low=flex_select_auto_nb(ctx.low, ctx.i, ctx.col, ctx.flex_2d),
-        close=flex_select_auto_nb(ctx.close, ctx.i, ctx.col, ctx.flex_2d)
-    )
-    return execute_order_nb(
-        state=state,
-        order=order,
-        price_area=price_area
-    )
 
 
 @register_jitted(cache=True)
@@ -1188,7 +1015,7 @@ def prepare_last_pos_record_nb(target_shape: tp.Shape,
     return last_pos_record
 
 
-@register_jitted(cache=True)
+@register_jitted
 def prepare_simout_nb(order_records: tp.RecordArray2d,
                       last_oidx: tp.Array1d,
                       log_records: tp.RecordArray2d,

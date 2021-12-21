@@ -1,6 +1,6 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Modules for working with portfolios."""
+"""Modules for working with portfolio."""
 
 from vectorbtpro.portfolio.base import Portfolio
 from vectorbtpro.portfolio.enums import *

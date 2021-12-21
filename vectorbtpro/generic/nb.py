@@ -1,6 +1,6 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Numba-compiled functions.
+"""Numba-compiled functions for generic data.
 
 Provides an arsenal of Numba-compiled functions that are used by accessors
 and in many other parts of the backtesting pipeline, such as technical indicators.
@@ -26,10 +26,10 @@ from numba.np.numpy_support import as_dtype
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import chunking as base_ch
-from vectorbtpro.ch_registry import register_chunkable
 from vectorbtpro.generic.enums import RangeStatus, DrawdownStatus, range_dt, drawdown_dt
-from vectorbtpro.jit_registry import register_jitted
 from vectorbtpro.records import chunking as records_ch
+from vectorbtpro.registries.ch_registry import register_chunkable
+from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.template import Rep
 
@@ -2339,34 +2339,33 @@ def repartition_nb(arr: tp.Array2d, counts: tp.Array1d) -> tp.Array1d:
 def get_ranges_nb(arr: tp.Array2d, gap_value: tp.Scalar) -> tp.RecordArray:
     """Fill range records between gaps.
 
-    ## Example
+    Usage:
+        * Find ranges in time series:
 
-    Find ranges in time series:
+        ```pycon
+        >>> import numpy as np
+        >>> import pandas as pd
+        >>> from vectorbtpro.generic.nb import get_ranges_nb
 
-    ```python-repl
-    >>> import numpy as np
-    >>> import pandas as pd
-    >>> from vectorbtpro.generic.nb import get_ranges_nb
+        >>> a = np.asarray([
+        ...     [np.nan, np.nan, np.nan, np.nan],
+        ...     [     2, np.nan, np.nan, np.nan],
+        ...     [     3,      3, np.nan, np.nan],
+        ...     [np.nan,      4,      4, np.nan],
+        ...     [     5, np.nan,      5,      5],
+        ...     [     6,      6, np.nan,      6]
+        ... ])
+        >>> records = get_ranges_nb(a, np.nan)
 
-    >>> a = np.asarray([
-    ...     [np.nan, np.nan, np.nan, np.nan],
-    ...     [     2, np.nan, np.nan, np.nan],
-    ...     [     3,      3, np.nan, np.nan],
-    ...     [np.nan,      4,      4, np.nan],
-    ...     [     5, np.nan,      5,      5],
-    ...     [     6,      6, np.nan,      6]
-    ... ])
-    >>> records = get_ranges_nb(a, np.nan)
-
-    >>> pd.DataFrame.from_records(records)
-       id  col  start_idx  end_idx  status
-    0   0    0          1        3       1
-    1   1    0          4        5       0
-    2   0    1          2        4       1
-    3   1    1          5        5       0
-    4   0    2          3        5       1
-    5   0    3          4        5       0
-    ```
+        >>> pd.DataFrame.from_records(records)
+           id  col  start_idx  end_idx  status
+        0   0    0          1        3       1
+        1   1    0          4        5       0
+        2   0    1          2        4       1
+        3   1    1          5        5       0
+        4   0    2          3        5       1
+        5   0    3          4        5       0
+        ```
     """
     new_records = np.empty(arr.shape, dtype=range_dt)
     counts = np.full(arr.shape[1], 0, dtype=np.int_)
@@ -2575,33 +2574,32 @@ def drawdown_nb(arr: tp.Array2d) -> tp.Array2d:
 def get_drawdowns_nb(arr: tp.Array2d) -> tp.RecordArray:
     """Fill drawdown records by analyzing a time series.
 
-    ## Example
+    Usage:
+        ```pycon
+        >>> import numpy as np
+        >>> import pandas as pd
+        >>> from vectorbtpro.generic.nb import get_drawdowns_nb
 
-    ```python-repl
-    >>> import numpy as np
-    >>> import pandas as pd
-    >>> from vectorbtpro.generic.nb import get_drawdowns_nb
+        >>> a = np.asarray([
+        ...     [1, 5, 1, 3],
+        ...     [2, 4, 2, 2],
+        ...     [3, 3, 3, 1],
+        ...     [4, 2, 2, 2],
+        ...     [5, 1, 1, 3]
+        ... ])
+        >>> records = get_drawdowns_nb(a)
 
-    >>> a = np.asarray([
-    ...     [1, 5, 1, 3],
-    ...     [2, 4, 2, 2],
-    ...     [3, 3, 3, 1],
-    ...     [4, 2, 2, 2],
-    ...     [5, 1, 1, 3]
-    ... ])
-    >>> records = get_drawdowns_nb(a)
+        >>> pd.DataFrame.from_records(records)
+           id  col  peak_idx  start_idx  valley_idx  end_idx  peak_val  valley_val  \\
+        0   0    1         0          1           4        4       5.0         1.0
+        1   0    2         2          3           4        4       3.0         1.0
+        2   0    3         0          1           2        4       3.0         1.0
 
-    >>> pd.DataFrame.from_records(records)
-       id  col  peak_idx  start_idx  valley_idx  end_idx  peak_val  valley_val  \\
-    0   0    1         0          1           4        4       5.0         1.0
-    1   0    2         2          3           4        4       3.0         1.0
-    2   0    3         0          1           2        4       3.0         1.0
-
-       end_val  status
-    0      1.0       0
-    1      1.0       0
-    2      3.0       1
-    ```
+           end_val  status
+        0      1.0       0
+        1      1.0       0
+        2      3.0       1
+        ```
     """
     new_records = np.empty(arr.shape, dtype=drawdown_dt)
     counts = np.full(arr.shape[1], 0, dtype=np.int_)

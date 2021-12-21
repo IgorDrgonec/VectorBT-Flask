@@ -1,12 +1,12 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Numba-compiled functions.
+"""Numba-compiled functions for signals.
 
 Provides an arsenal of Numba-compiled functions that are used by accessors
 and in many other parts of the backtesting pipeline, such as technical indicators.
 These only accept NumPy arrays and other Numba-compatible types.
 
-```python-repl
+```pycon
 >>> import numpy as np
 >>> import vectorbtpro as vbt
 
@@ -28,11 +28,11 @@ from numba import prange
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.base.indexing import flex_select_auto_nb
-from vectorbtpro.ch_registry import register_chunkable
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.enums import range_dt, RangeStatus
-from vectorbtpro.jit_registry import register_jitted
 from vectorbtpro.records import chunking as records_ch
+from vectorbtpro.registries.ch_registry import register_chunkable
+from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.signals.enums import StopType
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.array_ import uniform_summing_to_one_nb, rescale_float_to_int_nb, renormalize_nb

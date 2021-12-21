@@ -191,11 +191,11 @@ class cacheable_property(custom_property):
         return self._init_whitelist
 
     def get_ca_setup(self, instance: tp.Optional[object] = None) -> tp.Optional['CARunSetup']:
-        """Get setup of type `vectorbtpro.ca_registry.CARunSetup` if instance is known,
-        or `vectorbtpro.ca_registry.CAUnboundSetup` otherwise.
+        """Get setup of type `vectorbtpro.registries.ca_registry.CARunSetup` if instance is known,
+        or `vectorbtpro.registries.ca_registry.CAUnboundSetup` otherwise.
 
-        See `vectorbtpro.ca_registry` for details on the caching procedure."""
-        from vectorbtpro.ca_registry import CAUnboundSetup, CARunSetup
+        See `vectorbtpro.registries.ca_registry` for details on the caching procedure."""
+        from vectorbtpro.registries.ca_registry import CAUnboundSetup, CARunSetup
 
         unbound_setup = CAUnboundSetup.get(self, use_cache=self.init_use_cache, whitelist=self.init_whitelist)
         if instance is None:
@@ -271,7 +271,7 @@ def cacheable(*args,
         To decorate an instance method, use `cacheable_method`."""
 
     def decorator(func: tp.Callable) -> cacheable_functionT:
-        from vectorbtpro.ca_registry import CARunSetup
+        from vectorbtpro.registries.ca_registry import CARunSetup
         from vectorbtpro._settings import settings
         caching_cfg = settings['caching']
 
@@ -283,9 +283,9 @@ def cacheable(*args,
             return run_setup.run(*args, **kwargs)
 
         def get_ca_setup() -> tp.Optional[CARunSetup]:
-            """Get setup of type `vectorbtpro.ca_registry.CARunSetup`.
+            """Get setup of type `vectorbtpro.registries.ca_registry.CARunSetup`.
 
-            See `vectorbtpro.ca_registry` for details on the caching procedure."""
+            See `vectorbtpro.registries.ca_registry` for details on the caching procedure."""
             return CARunSetup.get(
                 wrapper,
                 use_cache=use_cache,
@@ -364,7 +364,7 @@ def cacheable_method(*args,
     See notes on `cacheable_property`."""
 
     def decorator(func: tp.Callable) -> cacheable_methodT:
-        from vectorbtpro.ca_registry import CAUnboundSetup, CARunSetup
+        from vectorbtpro.registries.ca_registry import CAUnboundSetup, CARunSetup
         from vectorbtpro._settings import settings
         caching_cfg = settings['caching']
 
@@ -376,10 +376,10 @@ def cacheable_method(*args,
             return run_setup.run(*args, **kwargs)
 
         def get_ca_setup(instance: tp.Optional[object] = None) -> tp.Optional[CARunSetup]:
-            """Get setup of type `vectorbtpro.ca_registry.CARunSetup` if instance is known,
-            or `vectorbtpro.ca_registry.CAUnboundSetup` otherwise.
+            """Get setup of type `vectorbtpro.registries.ca_registry.CARunSetup` if instance is known,
+            or `vectorbtpro.registries.ca_registry.CAUnboundSetup` otherwise.
 
-            See `vectorbtpro.ca_registry` for details on the caching procedure."""
+            See `vectorbtpro.registries.ca_registry` for details on the caching procedure."""
             unbound_setup = CAUnboundSetup.get(
                 wrapper,
                 use_cache=use_cache,

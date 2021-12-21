@@ -12,7 +12,7 @@ class Cacheable:
     Required to register `vectorbtpro.utils.decorators.cacheable_property` and
     `vectorbtpro.utils.decorators.cacheable_method`.
 
-    See `vectorbtpro.ca_registry` for details on the caching procedure."""
+    See `vectorbtpro.registries.ca_registry` for details on the caching procedure."""
 
     def __init__(self) -> None:
         from vectorbtpro._settings import settings
@@ -26,9 +26,9 @@ class Cacheable:
 
     @class_or_instancemethod
     def get_ca_setup(cls_or_self) -> tp.Union['CAClassSetup', 'CAInstanceSetup']:
-        """Get instance setup of type `vectorbtpro.ca_registry.CAInstanceSetup` if the instance method
-        was called and class setup of type `vectorbtpro.ca_registry.CAClassSetup` otherwise."""
-        from vectorbtpro.ca_registry import CAClassSetup, CAInstanceSetup
+        """Get instance setup of type `vectorbtpro.registries.ca_registry.CAInstanceSetup` if the instance method
+        was called and class setup of type `vectorbtpro.registries.ca_registry.CAClassSetup` otherwise."""
+        from vectorbtpro.registries.ca_registry import CAClassSetup, CAInstanceSetup
 
         if isinstance(cls_or_self, type):
             return CAClassSetup.get(cls_or_self)

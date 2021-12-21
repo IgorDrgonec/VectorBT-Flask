@@ -1,6 +1,6 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Class and function decorators."""
+"""Class decorators for records."""
 
 import keyword
 import re
@@ -213,7 +213,7 @@ def attach_shortcut_properties(config: Config) -> tp.ClassWrapper:
         'records' and 'red_array'. Otherwise, to `vectorbtpro.utils.decorators.cacheable_property`.
     * `decorator_kwargs`: Keyword arguments passed to the decorator. By default,
         includes options `obj_type` and `group_aware`.
-    * `docstring`: Method docstring. Defaults to "`{cls.__name__}.{source_name}` with default arguments.".
+    * `docstring`: Method docstring.
 
     The class must be a subclass of `vectorbtpro.records.base.Records`."""
 

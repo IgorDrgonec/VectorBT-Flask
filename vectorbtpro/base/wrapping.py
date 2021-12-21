@@ -10,7 +10,7 @@ the computation, and put the array back into the pandas format. The last step is
 It stores metadata of the original pandas object and offers methods `wrap` and `wrap_reduced`
 for wrapping NumPy arrays to match the stored metadata as closest as possible.
 
-```python-repl
+```pycon
 >>> import numpy as np
 >>> import pandas as pd
 >>> import vectorbtpro as vbt
@@ -49,7 +49,7 @@ dtype: float64
 
 It can also be indexed as a regular pandas object and integrates `vectorbtpro.base.grouping.Grouper`:
 
-```python-repl
+```pycon
 >>> aw.loc['x':'y', 'a']._config
 {
     'columns': Index(['a'], dtype='object'),

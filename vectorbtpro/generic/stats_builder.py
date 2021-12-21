@@ -46,7 +46,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
     def stats_defaults(self) -> tp.Kwargs:
         """Defaults for `StatsBuilderMixin.stats`.
 
-        See `stats_builder` in `vectorbtpro._settings.settings`."""
+        See `vectorbtpro._settings.stats_builder`."""
         from vectorbtpro._settings import settings
         stats_builder_cfg = settings['stats_builder']
 
@@ -241,9 +241,8 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
             Make sure to resolve and then to re-use as many object attributes as possible to
             utilize built-in caching (even if global caching is disabled).
 
-        ## Example
-
-        See `vectorbtpro.portfolio.base` for examples.
+        Usage:
+            See `vectorbtpro.portfolio.base`.
         """
         # Resolve defaults
         if silence_warnings is None:

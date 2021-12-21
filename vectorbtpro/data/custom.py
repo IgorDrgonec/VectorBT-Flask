@@ -1,6 +1,6 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Custom data classes that subclass `vectorbtpro.data.base.Data`.
+"""Custom data source classes.
 
 !!! note
     Use absolute start and end dates instead of relative ones when fetching multiple
@@ -20,7 +20,7 @@ import pandas as pd
 from vectorbtpro import _typing as tp
 from vectorbtpro.data import nb
 from vectorbtpro.data.base import Data
-from vectorbtpro.jit_registry import jit_registry
+from vectorbtpro.registries.jit_registry import jit_registry
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.datetime_ import get_utc_tz, get_local_tz, to_tzaware_datetime, datetime_to_ms
 from vectorbtpro.utils.parsing import get_func_kwargs
@@ -42,42 +42,58 @@ CSVDataT = tp.TypeVar("CSVDatat", bound="CSVData")
 class CSVData(Data):
     """`Data` for data that can be fetched and updated using `pd.read_csv`.
 
-    ## Example
+    Usage:
+        * Generate 5 seconds of random data, save it to the disk, and load using `CSVData`:
 
-    ```python-repl
-    >>> import vectorbtpro as vbt
+        ```pycon
+        >>> import vectorbtpro as vbt
 
-    >>> rand_data = vbt.RandomData.fetch(start='5 seconds ago', freq='1s')
-    >>> rand_data.get().to_csv('rand_data.csv')
+        >>> rand_data = vbt.RandomData.fetch(start='5 seconds ago', freq='1s')
+        ```
 
-    >>> csv_data = vbt.CSVData.fetch('rand_data.csv')
-    >>> csv_data.get()
-    2021-10-30 11:19:32.168721+00:00    101.223837
-    2021-10-30 11:19:33.168721+00:00    101.580351
-    2021-10-30 11:19:34.168721+00:00    101.409540
-    2021-10-30 11:19:35.168721+00:00    101.198202
-    2021-10-30 11:19:36.168721+00:00    102.308458
-    2021-10-30 11:19:37.168721+00:00    102.692657
-    Freq: S, dtype: float64
+        [=100% "100%"]{: .candystripe}
 
-    >>> import time
-    >>> time.sleep(2)
+        ```pycon
+        >>> rand_data.get().to_csv('rand_data.csv')
 
-    >>> rand_data = rand_data.update()
-    >>> rand_data.get().to_csv('rand_data.csv')  # saves all data
+        >>> csv_data = vbt.CSVData.fetch('rand_data.csv')
+        ```
 
-    >>> csv_data = csv_data.update()  # loads only subset of data
-    >>> csv_data.get()
-    2021-10-30 11:19:32.168721+00:00    101.223837
-    2021-10-30 11:19:33.168721+00:00    101.580351
-    2021-10-30 11:19:34.168721+00:00    101.409540
-    2021-10-30 11:19:35.168721+00:00    101.198202
-    2021-10-30 11:19:36.168721+00:00    102.308458
-    2021-10-30 11:19:37.168721+00:00    100.941811  << updated last
-    2021-10-30 11:19:38.168721+00:00    100.935500  << added new
-    2021-10-30 11:19:39.168721+00:00    100.618909  << added new
-    Freq: S, dtype: float64
-    ```"""
+        [=100% "100%"]{: .candystripe}
+
+        ```pycon
+        >>> csv_data.get()
+        2021-10-30 11:19:32.168721+00:00    101.223837
+        2021-10-30 11:19:33.168721+00:00    101.580351
+        2021-10-30 11:19:34.168721+00:00    101.409540
+        2021-10-30 11:19:35.168721+00:00    101.198202
+        2021-10-30 11:19:36.168721+00:00    102.308458
+        2021-10-30 11:19:37.168721+00:00    102.692657
+        Freq: S, dtype: float64
+        ```
+
+        * Wait 2 seconds, generate new data, save it to the disk, and update using `CSVData`:
+
+        ```pycon
+        >>> import time
+        >>> time.sleep(2)
+
+        >>> rand_data = rand_data.update()
+        >>> rand_data.get().to_csv('rand_data.csv')  # saves all data
+
+        >>> csv_data = csv_data.update()  # loads only subset of data
+        >>> csv_data.get()
+        2021-10-30 11:19:32.168721+00:00    101.223837
+        2021-10-30 11:19:33.168721+00:00    101.580351
+        2021-10-30 11:19:34.168721+00:00    101.409540
+        2021-10-30 11:19:35.168721+00:00    101.198202
+        2021-10-30 11:19:36.168721+00:00    102.308458
+        2021-10-30 11:19:37.168721+00:00    100.941811  << updated last
+        2021-10-30 11:19:38.168721+00:00    100.935500  << added new
+        2021-10-30 11:19:39.168721+00:00    100.618909  << added new
+        Freq: S, dtype: float64
+        ```
+    """
 
     @classmethod
     def fetch_symbol(cls,
@@ -138,42 +154,58 @@ class CSVData(Data):
 class HDFData(Data):
     """`Data` for data that can be fetched and updated using `pd.read_hdf`.
 
-    ## Example
+    Usage:
+        * Generate 5 seconds of random data, save it to the disk, and load using `HDFData`:
 
-    ```python-repl
-    >>> import vectorbtpro as vbt
+        ```pycon
+        >>> import vectorbtpro as vbt
 
-    >>> rand_data = vbt.RandomData.fetch(start='5 seconds ago', freq='1s')
-    >>> rand_data.get().to_hdf('rand_data.h5', 's')
+        >>> rand_data = vbt.RandomData.fetch(start='5 seconds ago', freq='1s')
+        ```
 
-    >>> h5_data = vbt.HDFData.fetch('s', path='rand_data.h5')
-    >>> h5_data.get()
-    2021-10-30 17:53:14.243189+00:00    100.119015
-    2021-10-30 17:53:15.243189+00:00    100.798207
-    2021-10-30 17:53:16.243189+00:00    101.928613
-    2021-10-30 17:53:17.243189+00:00    102.828592
-    2021-10-30 17:53:18.243189+00:00    104.505259
-    2021-10-30 17:53:19.243189+00:00    106.384834
-    Freq: S, dtype: float64
+        [=100% "100%"]{: .candystripe}
 
-    >>> import time
-    >>> time.sleep(2)
+        ```pycon
+        >>> rand_data.get().to_hdf('rand_data.h5', 's')
 
-    >>> rand_data = rand_data.update()
-    >>> rand_data.get().to_hdf('rand_data.h5', 's')  # saves all data
+        >>> h5_data = vbt.HDFData.fetch('s', path='rand_data.h5')
+        ```
 
-    >>> h5_data = h5_data.update()  # loads only subset of data
-    >>> h5_data.get()
-    2021-10-30 17:53:14.243189+00:00    100.119015
-    2021-10-30 17:53:15.243189+00:00    100.798207
-    2021-10-30 17:53:16.243189+00:00    101.928613
-    2021-10-30 17:53:17.243189+00:00    102.828592
-    2021-10-30 17:53:18.243189+00:00    104.505259
-    2021-10-30 17:53:19.243189+00:00    104.143708
-    2021-10-30 17:53:20.243189+00:00    104.661706
-    2021-10-30 17:53:21.243189+00:00    105.294653
-    Freq: S, dtype: float64
-    ```"""
+        [=100% "100%"]{: .candystripe}
+
+        ```pycon
+        >>> h5_data.get()
+        2021-10-30 17:53:14.243189+00:00    100.119015
+        2021-10-30 17:53:15.243189+00:00    100.798207
+        2021-10-30 17:53:16.243189+00:00    101.928613
+        2021-10-30 17:53:17.243189+00:00    102.828592
+        2021-10-30 17:53:18.243189+00:00    104.505259
+        2021-10-30 17:53:19.243189+00:00    106.384834
+        Freq: S, dtype: float64
+        ```
+
+        * Wait 2 seconds, generate new data, save it to the disk, and update using `HDFData`:
+
+        ```pycon
+        >>> import time
+        >>> time.sleep(2)
+
+        >>> rand_data = rand_data.update()
+        >>> rand_data.get().to_hdf('rand_data.h5', 's')  # saves all data
+
+        >>> h5_data = h5_data.update()  # loads only subset of data
+        >>> h5_data.get()
+        2021-10-30 17:53:14.243189+00:00    100.119015
+        2021-10-30 17:53:15.243189+00:00    100.798207
+        2021-10-30 17:53:16.243189+00:00    101.928613
+        2021-10-30 17:53:17.243189+00:00    102.828592
+        2021-10-30 17:53:18.243189+00:00    104.505259
+        2021-10-30 17:53:19.243189+00:00    104.143708
+        2021-10-30 17:53:20.243189+00:00    104.661706
+        2021-10-30 17:53:21.243189+00:00    105.294653
+        Freq: S, dtype: float64
+        ```
+    """
 
     @classmethod
     def fetch_symbol(cls,
@@ -264,21 +296,26 @@ class RandomData(SyntheticData):
     !!! note
         When setting a seed, remember to pass a seed per symbol using `vectorbtpro.data.base.symbol_dict`.
 
-    ## Example
+    Usage:
+        * Generate random data:
 
-    ```python-repl
-    >>> import vectorbtpro as vbt
+        ```pycon
+        >>> import vectorbtpro as vbt
 
-    >>> rand_data = vbt.RandomData.fetch(
-    ...     list(range(10)),
-    ...     start='2010-01-01',
-    ...     end='2020-01-01'
-    ... )
+        >>> rand_data = vbt.RandomData.fetch(
+        ...     list(range(5)),
+        ...     start='2010-01-01',
+        ...     end='2020-01-01'
+        ... )
+        ```
 
-    >>> rand_data.plot(showlegend=False)
-    ```
+        [=100% "100%"]{: .candystripe}
 
-    ![](/docs/img/RandomData.svg)
+        ```pycon
+        >>> rand_data.plot(showlegend=False)
+        ```
+
+        ![](/assets/images/RandomData.svg)
     """
 
     @classmethod
@@ -332,21 +369,26 @@ class GBMData(RandomData):
     !!! note
         When setting a seed, remember to pass a seed per symbol using `vectorbtpro.data.base.symbol_dict`.
 
-    ## Example
+    Usage:
+        * Generate random data:
 
-    ```python-repl
-    >>> import vectorbtpro as vbt
+        ```pycon
+        >>> import vectorbtpro as vbt
 
-    >>> gbm_data = vbt.GBMData.fetch(
-    ...     list(range(10)),
-    ...     start='2010-01-01',
-    ...     end='2020-01-01'
-    ... )
+        >>> gbm_data = vbt.GBMData.fetch(
+        ...     list(range(5)),
+        ...     start='2010-01-01',
+        ...     end='2020-01-01'
+        ... )
+        ```
 
-    >>> gbm_data.plot(showlegend=False)
-    ```
+        [=100% "100%"]{: .candystripe}
 
-    ![](/docs/img/GBMData.svg)
+        ```pycon
+        >>> gbm_data.plot(showlegend=False)
+        ```
+
+        ![](/assets/images/GBMData.svg)
     """
 
     @classmethod
@@ -397,64 +439,72 @@ class YFData(Data):  # pragma: no cover
         how they want, add noise, return missing data points (see volume in the example below), etc.
         It's only used in vectorbt for demonstration purposes.
 
-    ## Example
+    Usage:
+        * Fetch the business day except the last 5 minutes of trading data:
 
-    Fetch the business day except the last 5 minutes of trading data, and then update with the missing 5 minutes:
+        ```pycon
+        >>> import vectorbtpro as vbt
 
-    ```python-repl
-    >>> import vectorbtpro as vbt
+        >>> yf_data = vbt.YFData.fetch(
+        ...     "TSLA",
+        ...     start='2021-04-12 09:30:00 -0400',
+        ...     end='2021-04-12 09:35:00 -0400',
+        ...     interval='1m'
+        ... )
+        ```
 
-    >>> yf_data = vbt.YFData.fetch(
-    ...     "TSLA",
-    ...     start='2021-04-12 09:30:00 -0400',
-    ...     end='2021-04-12 09:35:00 -0400',
-    ...     interval='1m'
-    ... )
-    >>> yf_data.get()
-                                     Open        High         Low       Close  \\
-    Datetime
-    2021-04-12 13:30:00+00:00  685.080017  685.679993  684.765015  685.679993
-    2021-04-12 13:31:00+00:00  684.625000  686.500000  684.010010  685.500000
-    2021-04-12 13:32:00+00:00  685.646790  686.820007  683.190002  686.455017
-    2021-04-12 13:33:00+00:00  686.455017  687.000000  685.000000  685.565002
-    2021-04-12 13:34:00+00:00  685.690002  686.400024  683.200012  683.715027
+        [=100% "100%"]{: .candystripe}
 
-                               Volume  Dividends  Stock Splits
-    Datetime
-    2021-04-12 13:30:00+00:00       0          0             0
-    2021-04-12 13:31:00+00:00  152276          0             0
-    2021-04-12 13:32:00+00:00  168363          0             0
-    2021-04-12 13:33:00+00:00  129607          0             0
-    2021-04-12 13:34:00+00:00  134620          0             0
+        ```pycon
+        >>> yf_data.get()
+                                         Open        High         Low       Close  \\
+        Datetime
+        2021-04-12 13:30:00+00:00  685.080017  685.679993  684.765015  685.679993
+        2021-04-12 13:31:00+00:00  684.625000  686.500000  684.010010  685.500000
+        2021-04-12 13:32:00+00:00  685.646790  686.820007  683.190002  686.455017
+        2021-04-12 13:33:00+00:00  686.455017  687.000000  685.000000  685.565002
+        2021-04-12 13:34:00+00:00  685.690002  686.400024  683.200012  683.715027
 
-    >>> yf_data = yf_data.update(end='2021-04-12 09:40:00 -0400')
-    >>> yf_data.get()
-                                     Open        High         Low       Close  \\
-    Datetime
-    2021-04-12 13:30:00+00:00  685.080017  685.679993  684.765015  685.679993
-    2021-04-12 13:31:00+00:00  684.625000  686.500000  684.010010  685.500000
-    2021-04-12 13:32:00+00:00  685.646790  686.820007  683.190002  686.455017
-    2021-04-12 13:33:00+00:00  686.455017  687.000000  685.000000  685.565002
-    2021-04-12 13:34:00+00:00  685.690002  686.400024  683.200012  683.715027
-    2021-04-12 13:35:00+00:00  683.604980  684.340027  682.760071  684.135010
-    2021-04-12 13:36:00+00:00  684.130005  686.640015  683.333984  686.563904
-    2021-04-12 13:37:00+00:00  686.530029  688.549988  686.000000  686.635010
-    2021-04-12 13:38:00+00:00  686.593201  689.500000  686.409973  688.179993
-    2021-04-12 13:39:00+00:00  688.500000  689.347595  687.710022  688.070007
+                                   Volume  Dividends  Stock Splits
+        Datetime
+        2021-04-12 13:30:00+00:00       0          0             0
+        2021-04-12 13:31:00+00:00  152276          0             0
+        2021-04-12 13:32:00+00:00  168363          0             0
+        2021-04-12 13:33:00+00:00  129607          0             0
+        2021-04-12 13:34:00+00:00  134620          0             0
+        ```
 
-                               Volume  Dividends  Stock Splits
-    Datetime
-    2021-04-12 13:30:00+00:00       0          0             0
-    2021-04-12 13:31:00+00:00  152276          0             0
-    2021-04-12 13:32:00+00:00  168363          0             0
-    2021-04-12 13:33:00+00:00  129607          0             0
-    2021-04-12 13:34:00+00:00       0          0             0
-    2021-04-12 13:35:00+00:00  110500          0             0
-    2021-04-12 13:36:00+00:00  148384          0             0
-    2021-04-12 13:37:00+00:00  243851          0             0
-    2021-04-12 13:38:00+00:00  203569          0             0
-    2021-04-12 13:39:00+00:00   93308          0             0
-    ```
+        * Update with the missing 5 minutes:
+
+        ```pycon
+        >>> yf_data = yf_data.update(end='2021-04-12 09:40:00 -0400')
+        >>> yf_data.get()
+                                         Open        High         Low       Close  \\
+        Datetime
+        2021-04-12 13:30:00+00:00  685.080017  685.679993  684.765015  685.679993
+        2021-04-12 13:31:00+00:00  684.625000  686.500000  684.010010  685.500000
+        2021-04-12 13:32:00+00:00  685.646790  686.820007  683.190002  686.455017
+        2021-04-12 13:33:00+00:00  686.455017  687.000000  685.000000  685.565002
+        2021-04-12 13:34:00+00:00  685.690002  686.400024  683.200012  683.715027
+        2021-04-12 13:35:00+00:00  683.604980  684.340027  682.760071  684.135010
+        2021-04-12 13:36:00+00:00  684.130005  686.640015  683.333984  686.563904
+        2021-04-12 13:37:00+00:00  686.530029  688.549988  686.000000  686.635010
+        2021-04-12 13:38:00+00:00  686.593201  689.500000  686.409973  688.179993
+        2021-04-12 13:39:00+00:00  688.500000  689.347595  687.710022  688.070007
+
+                                   Volume  Dividends  Stock Splits
+        Datetime
+        2021-04-12 13:30:00+00:00       0          0             0
+        2021-04-12 13:31:00+00:00  152276          0             0
+        2021-04-12 13:32:00+00:00  168363          0             0
+        2021-04-12 13:33:00+00:00  129607          0             0
+        2021-04-12 13:34:00+00:00       0          0             0
+        2021-04-12 13:35:00+00:00  110500          0             0
+        2021-04-12 13:36:00+00:00  148384          0             0
+        2021-04-12 13:37:00+00:00  243851          0             0
+        2021-04-12 13:38:00+00:00  203569          0             0
+        2021-04-12 13:39:00+00:00   93308          0             0
+        ```
     """
 
     @classmethod
@@ -477,7 +527,7 @@ class YFData(Data):  # pragma: no cover
                 See `vectorbtpro.utils.datetime_.to_tzaware_datetime`.
             **kwargs: Keyword arguments passed to `yfinance.base.TickerBase.history`.
         """
-        from vectorbtpro.opt_packages import assert_can_import
+        from vectorbtpro.utils.opt_packages import assert_can_import
         assert_can_import('yfinance')
         import yfinance as yf
 
@@ -502,110 +552,119 @@ BinanceDataT = tp.TypeVar("BinanceDataT", bound="BinanceData")
 class BinanceData(Data):  # pragma: no cover
     """`Data` for data coming from `python-binance`.
 
-    ## Example
+    Usage:
+        * Fetch the 1-minute data of the last 2 hours, wait 1 minute:
 
-    Fetch the 1-minute data of the last 2 hours, wait 1 minute, and update:
+        ```pycon
+        >>> import vectorbtpro as vbt
 
-    ```python-repl
-    >>> import vectorbtpro as vbt
+        >>> binance_data = vbt.BinanceData.fetch(
+        ...     "BTCUSDT",
+        ...     start='2 hours ago UTC',
+        ...     end='now UTC',
+        ...     interval='1m'
+        ... )
+        ```
 
-    >>> binance_data = vbt.BinanceData.fetch(
-    ...     "BTCUSDT",
-    ...     start='2 hours ago UTC',
-    ...     end='now UTC',
-    ...     interval='1m'
-    ... )
-    >>> binance_data.get()
-    2021-05-02 14:47:20.478000+00:00 - 2021-05-02 16:47:00+00:00: : 1it [00:00,  3.42it/s]
-                                   Open      High       Low     Close     Volume  \\
-    Open time
-    2021-05-02 14:48:00+00:00  56867.44  56913.57  56857.40  56913.56  28.709976
-    2021-05-02 14:49:00+00:00  56913.56  56913.57  56845.94  56888.00  19.734841
-    2021-05-02 14:50:00+00:00  56888.00  56947.32  56879.78  56934.71  23.150163
-    ...                             ...       ...       ...       ...        ...
-    2021-05-02 16:45:00+00:00  56664.13  56666.77  56641.11  56644.03  40.852719
-    2021-05-02 16:46:00+00:00  56644.02  56663.43  56605.17  56605.18  27.573654
-    2021-05-02 16:47:00+00:00  56605.18  56657.55  56605.17  56627.12   7.719933
+        [=100% "100%"]{: .candystripe}
 
-                                                    Close time  Quote volume  \\
-    Open time
-    2021-05-02 14:48:00+00:00 2021-05-02 14:48:59.999000+00:00  1.633534e+06
-    2021-05-02 14:49:00+00:00 2021-05-02 14:49:59.999000+00:00  1.122519e+06
-    2021-05-02 14:50:00+00:00 2021-05-02 14:50:59.999000+00:00  1.317969e+06
-    ...                                                    ...           ...
-    2021-05-02 16:45:00+00:00 2021-05-02 16:45:59.999000+00:00  2.314579e+06
-    2021-05-02 16:46:00+00:00 2021-05-02 16:46:59.999000+00:00  1.561548e+06
-    2021-05-02 16:47:00+00:00 2021-05-02 16:47:59.999000+00:00  4.371848e+05
+        ```pycon
+        >>> binance_data.get()
+        2021-05-02 14:47:20.478000+00:00 - 2021-05-02 16:47:00+00:00: : 1it [00:00,  3.42it/s]
+                                       Open      High       Low     Close     Volume  \\
+        Open time
+        2021-05-02 14:48:00+00:00  56867.44  56913.57  56857.40  56913.56  28.709976
+        2021-05-02 14:49:00+00:00  56913.56  56913.57  56845.94  56888.00  19.734841
+        2021-05-02 14:50:00+00:00  56888.00  56947.32  56879.78  56934.71  23.150163
+        ...                             ...       ...       ...       ...        ...
+        2021-05-02 16:45:00+00:00  56664.13  56666.77  56641.11  56644.03  40.852719
+        2021-05-02 16:46:00+00:00  56644.02  56663.43  56605.17  56605.18  27.573654
+        2021-05-02 16:47:00+00:00  56605.18  56657.55  56605.17  56627.12   7.719933
 
-                               Number of trades  Taker base volume  \\
-    Open time
-    2021-05-02 14:48:00+00:00               991          13.771152
-    2021-05-02 14:49:00+00:00               816           5.981942
-    2021-05-02 14:50:00+00:00              1086          10.813757
-    ...                                     ...                ...
-    2021-05-02 16:45:00+00:00              1006          18.106933
-    2021-05-02 16:46:00+00:00               916          14.869411
-    2021-05-02 16:47:00+00:00               353           3.903321
+                                                        Close time  Quote volume  \\
+        Open time
+        2021-05-02 14:48:00+00:00 2021-05-02 14:48:59.999000+00:00  1.633534e+06
+        2021-05-02 14:49:00+00:00 2021-05-02 14:49:59.999000+00:00  1.122519e+06
+        2021-05-02 14:50:00+00:00 2021-05-02 14:50:59.999000+00:00  1.317969e+06
+        ...                                                    ...           ...
+        2021-05-02 16:45:00+00:00 2021-05-02 16:45:59.999000+00:00  2.314579e+06
+        2021-05-02 16:46:00+00:00 2021-05-02 16:46:59.999000+00:00  1.561548e+06
+        2021-05-02 16:47:00+00:00 2021-05-02 16:47:59.999000+00:00  4.371848e+05
 
-                               Taker quote volume
-    Open time
-    2021-05-02 14:48:00+00:00        7.835391e+05
-    2021-05-02 14:49:00+00:00        3.402170e+05
-    2021-05-02 14:50:00+00:00        6.156418e+05
-    ...                                       ...
-    2021-05-02 16:45:00+00:00        1.025892e+06
-    2021-05-02 16:46:00+00:00        8.421173e+05
-    2021-05-02 16:47:00+00:00        2.210323e+05
+                                   Number of trades  Taker base volume  \\
+        Open time
+        2021-05-02 14:48:00+00:00               991          13.771152
+        2021-05-02 14:49:00+00:00               816           5.981942
+        2021-05-02 14:50:00+00:00              1086          10.813757
+        ...                                     ...                ...
+        2021-05-02 16:45:00+00:00              1006          18.106933
+        2021-05-02 16:46:00+00:00               916          14.869411
+        2021-05-02 16:47:00+00:00               353           3.903321
 
-    [120 rows x 10 columns]
+                                   Taker quote volume
+        Open time
+        2021-05-02 14:48:00+00:00        7.835391e+05
+        2021-05-02 14:49:00+00:00        3.402170e+05
+        2021-05-02 14:50:00+00:00        6.156418e+05
+        ...                                       ...
+        2021-05-02 16:45:00+00:00        1.025892e+06
+        2021-05-02 16:46:00+00:00        8.421173e+05
+        2021-05-02 16:47:00+00:00        2.210323e+05
 
-    >>> import time
-    >>> time.sleep(60)
+        [120 rows x 10 columns]
+        ```
 
-    >>> binance_data = binance_data.update()
-    >>> binance_data.get()
-                                   Open      High       Low     Close     Volume  \\
-    Open time
-    2021-05-02 14:48:00+00:00  56867.44  56913.57  56857.40  56913.56  28.709976
-    2021-05-02 14:49:00+00:00  56913.56  56913.57  56845.94  56888.00  19.734841
-    2021-05-02 14:50:00+00:00  56888.00  56947.32  56879.78  56934.71  23.150163
-    ...                             ...       ...       ...       ...        ...
-    2021-05-02 16:46:00+00:00  56644.02  56663.43  56605.17  56605.18  27.573654
-    2021-05-02 16:47:00+00:00  56605.18  56657.55  56605.17  56625.76  14.615437
-    2021-05-02 16:48:00+00:00  56625.75  56643.60  56614.32  56623.01   5.895843
+        * Update data:
 
-                                                    Close time  Quote volume  \\
-    Open time
-    2021-05-02 14:48:00+00:00 2021-05-02 14:48:59.999000+00:00  1.633534e+06
-    2021-05-02 14:49:00+00:00 2021-05-02 14:49:59.999000+00:00  1.122519e+06
-    2021-05-02 14:50:00+00:00 2021-05-02 14:50:59.999000+00:00  1.317969e+06
-    ...                                                    ...           ...
-    2021-05-02 16:46:00+00:00 2021-05-02 16:46:59.999000+00:00  1.561548e+06
-    2021-05-02 16:47:00+00:00 2021-05-02 16:47:59.999000+00:00  8.276017e+05
-    2021-05-02 16:48:00+00:00 2021-05-02 16:48:59.999000+00:00  3.338702e+05
+        ```pycon
+        >>> import time
+        >>> time.sleep(60)
 
-                               Number of trades  Taker base volume  \\
-    Open time
-    2021-05-02 14:48:00+00:00               991          13.771152
-    2021-05-02 14:49:00+00:00               816           5.981942
-    2021-05-02 14:50:00+00:00              1086          10.813757
-    ...                                     ...                ...
-    2021-05-02 16:46:00+00:00               916          14.869411
-    2021-05-02 16:47:00+00:00               912           7.778489
-    2021-05-02 16:48:00+00:00               308           2.358130
+        >>> binance_data = binance_data.update()
+        >>> binance_data.get()
+                                       Open      High       Low     Close     Volume  \\
+        Open time
+        2021-05-02 14:48:00+00:00  56867.44  56913.57  56857.40  56913.56  28.709976
+        2021-05-02 14:49:00+00:00  56913.56  56913.57  56845.94  56888.00  19.734841
+        2021-05-02 14:50:00+00:00  56888.00  56947.32  56879.78  56934.71  23.150163
+        ...                             ...       ...       ...       ...        ...
+        2021-05-02 16:46:00+00:00  56644.02  56663.43  56605.17  56605.18  27.573654
+        2021-05-02 16:47:00+00:00  56605.18  56657.55  56605.17  56625.76  14.615437
+        2021-05-02 16:48:00+00:00  56625.75  56643.60  56614.32  56623.01   5.895843
 
-                               Taker quote volume
-    Open time
-    2021-05-02 14:48:00+00:00        7.835391e+05
-    2021-05-02 14:49:00+00:00        3.402170e+05
-    2021-05-02 14:50:00+00:00        6.156418e+05
-    ...                                       ...
-    2021-05-02 16:46:00+00:00        8.421173e+05
-    2021-05-02 16:47:00+00:00        4.404362e+05
-    2021-05-02 16:48:00+00:00        1.335474e+05
+                                                        Close time  Quote volume  \\
+        Open time
+        2021-05-02 14:48:00+00:00 2021-05-02 14:48:59.999000+00:00  1.633534e+06
+        2021-05-02 14:49:00+00:00 2021-05-02 14:49:59.999000+00:00  1.122519e+06
+        2021-05-02 14:50:00+00:00 2021-05-02 14:50:59.999000+00:00  1.317969e+06
+        ...                                                    ...           ...
+        2021-05-02 16:46:00+00:00 2021-05-02 16:46:59.999000+00:00  1.561548e+06
+        2021-05-02 16:47:00+00:00 2021-05-02 16:47:59.999000+00:00  8.276017e+05
+        2021-05-02 16:48:00+00:00 2021-05-02 16:48:59.999000+00:00  3.338702e+05
 
-    [121 rows x 10 columns]
-    ```"""
+                                   Number of trades  Taker base volume  \\
+        Open time
+        2021-05-02 14:48:00+00:00               991          13.771152
+        2021-05-02 14:49:00+00:00               816           5.981942
+        2021-05-02 14:50:00+00:00              1086          10.813757
+        ...                                     ...                ...
+        2021-05-02 16:46:00+00:00               916          14.869411
+        2021-05-02 16:47:00+00:00               912           7.778489
+        2021-05-02 16:48:00+00:00               308           2.358130
+
+                                   Taker quote volume
+        Open time
+        2021-05-02 14:48:00+00:00        7.835391e+05
+        2021-05-02 14:49:00+00:00        3.402170e+05
+        2021-05-02 14:50:00+00:00        6.156418e+05
+        ...                                       ...
+        2021-05-02 16:46:00+00:00        8.421173e+05
+        2021-05-02 16:47:00+00:00        4.404362e+05
+        2021-05-02 16:48:00+00:00        1.335474e+05
+
+        [121 rows x 10 columns]
+        ```
+    """
 
     @classmethod
     def fetch(cls: tp.Type[BinanceDataT],
@@ -613,7 +672,7 @@ class BinanceData(Data):  # pragma: no cover
               client: tp.Optional["ClientT"] = None,
               **kwargs) -> BinanceDataT:
         """Override `vectorbtpro.data.base.Data.fetch` to instantiate a Binance client."""
-        from vectorbtpro.opt_packages import assert_can_import
+        from vectorbtpro.utils.opt_packages import assert_can_import
         assert_can_import('binance')
         from binance.client import Client
 
@@ -659,7 +718,7 @@ class BinanceData(Data):  # pragma: no cover
             show_progress (bool): Whether to show the progress bar.
             pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`.
 
-        For defaults, see `data.custom.binance` in `vectorbtpro._settings.settings`.
+        For defaults, see `custom.binance` in `vectorbtpro._settings.data`.
         """
         if client is None:
             raise ValueError("client must be provided")
@@ -762,50 +821,59 @@ class BinanceData(Data):  # pragma: no cover
 class CCXTData(Data):  # pragma: no cover
     """`Data` for data coming from `ccxt`.
 
-    ## Example
+    Usage:
+        * Fetch the 1-minute data of the last 2 hours, wait 1 minute:
 
-    Fetch the 1-minute data of the last 2 hours, wait 1 minute, and update:
+        ```pycon
+        >>> import vectorbtpro as vbt
 
-    ```python-repl
-    >>> import vectorbtpro as vbt
+        >>> ccxt_data = vbt.CCXTData.fetch(
+        ...     "BTC/USDT",
+        ...     start='2 hours ago UTC',
+        ...     end='now UTC',
+        ...     timeframe='1m'
+        ... )
+        ```
 
-    >>> ccxt_data = vbt.CCXTData.fetch(
-    ...     "BTC/USDT",
-    ...     start='2 hours ago UTC',
-    ...     end='now UTC',
-    ...     timeframe='1m'
-    ... )
-    >>> ccxt_data.get()
-    2021-05-02 14:50:26.305000+00:00 - 2021-05-02 16:50:00+00:00: : 1it [00:00,  1.96it/s]
-                                   Open      High       Low     Close     Volume
-    Open time
-    2021-05-02 14:51:00+00:00  56934.70  56964.59  56910.00  56948.99  22.158319
-    2021-05-02 14:52:00+00:00  56948.99  56999.00  56940.04  56977.62  46.958464
-    2021-05-02 14:53:00+00:00  56977.61  56987.09  56882.98  56885.42  27.752200
-    ...                             ...       ...       ...       ...        ...
-    2021-05-02 16:48:00+00:00  56625.75  56643.60  56595.47  56596.01  15.452510
-    2021-05-02 16:49:00+00:00  56596.00  56664.14  56596.00  56640.35  12.777475
-    2021-05-02 16:50:00+00:00  56640.35  56675.82  56640.35  56670.65   6.882321
+        [=100% "100%"]{: .candystripe}
 
-    [120 rows x 5 columns]
+        ```pycon
+        >>> ccxt_data.get()
+        2021-05-02 14:50:26.305000+00:00 - 2021-05-02 16:50:00+00:00: : 1it [00:00,  1.96it/s]
+                                       Open      High       Low     Close     Volume
+        Open time
+        2021-05-02 14:51:00+00:00  56934.70  56964.59  56910.00  56948.99  22.158319
+        2021-05-02 14:52:00+00:00  56948.99  56999.00  56940.04  56977.62  46.958464
+        2021-05-02 14:53:00+00:00  56977.61  56987.09  56882.98  56885.42  27.752200
+        ...                             ...       ...       ...       ...        ...
+        2021-05-02 16:48:00+00:00  56625.75  56643.60  56595.47  56596.01  15.452510
+        2021-05-02 16:49:00+00:00  56596.00  56664.14  56596.00  56640.35  12.777475
+        2021-05-02 16:50:00+00:00  56640.35  56675.82  56640.35  56670.65   6.882321
 
-    >>> import time
-    >>> time.sleep(60)
+        [120 rows x 5 columns]
+        ```
 
-    >>> ccxt_data = ccxt_data.update()
-    >>> ccxt_data.get()
-                                   Open      High       Low     Close     Volume
-    Open time
-    2021-05-02 14:51:00+00:00  56934.70  56964.59  56910.00  56948.99  22.158319
-    2021-05-02 14:52:00+00:00  56948.99  56999.00  56940.04  56977.62  46.958464
-    2021-05-02 14:53:00+00:00  56977.61  56987.09  56882.98  56885.42  27.752200
-    ...                             ...       ...       ...       ...        ...
-    2021-05-02 16:49:00+00:00  56596.00  56664.14  56596.00  56640.35  12.777475
-    2021-05-02 16:50:00+00:00  56640.35  56689.99  56640.35  56678.33  14.610231
-    2021-05-02 16:51:00+00:00  56678.33  56688.99  56636.89  56653.42  11.647158
+        * Update data:
 
-    [121 rows x 5 columns]
-    ```"""
+        ```pycon
+        >>> import time
+        >>> time.sleep(60)
+
+        >>> ccxt_data = ccxt_data.update()
+        >>> ccxt_data.get()
+                                       Open      High       Low     Close     Volume
+        Open time
+        2021-05-02 14:51:00+00:00  56934.70  56964.59  56910.00  56948.99  22.158319
+        2021-05-02 14:52:00+00:00  56948.99  56999.00  56940.04  56977.62  46.958464
+        2021-05-02 14:53:00+00:00  56977.61  56987.09  56882.98  56885.42  27.752200
+        ...                             ...       ...       ...       ...        ...
+        2021-05-02 16:49:00+00:00  56596.00  56664.14  56596.00  56640.35  12.777475
+        2021-05-02 16:50:00+00:00  56640.35  56689.99  56640.35  56678.33  14.610231
+        2021-05-02 16:51:00+00:00  56678.33  56688.99  56636.89  56653.42  11.647158
+
+        [121 rows x 5 columns]
+        ```
+    """
 
     @classmethod
     def fetch_symbol(cls,
@@ -847,9 +915,9 @@ class CCXTData(Data):  # pragma: no cover
             pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`.
             params (dict): Exchange-specific key-value parameters.
 
-        For defaults, see `custom.data.ccxt` in `vectorbtpro._settings.settings`.
+        For defaults, see `custom.ccxt` in `vectorbtpro._settings.data`.
         """
-        from vectorbtpro.opt_packages import assert_can_import
+        from vectorbtpro.utils.opt_packages import assert_can_import
         assert_can_import('ccxt')
         import ccxt
 

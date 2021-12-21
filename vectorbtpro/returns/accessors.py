@@ -1,6 +1,6 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Custom pandas accessors for returns data.
+"""Custom pandas accessors for returns.
 
 Methods can be accessed as follows:
 
@@ -17,7 +17,7 @@ Methods can be accessed as follows:
 
 There are three options to compute returns and get the accessor:
 
-```python-repl
+```pycon
 >>> import numpy as np
 >>> import pandas as pd
 >>> import vectorbtpro as vbt
@@ -42,7 +42,7 @@ There are three options to compute returns and get the accessor:
 
 The accessors extend `vectorbtpro.generic.accessors`.
 
-```python-repl
+```pycon
 >>> # inherited from GenericAccessor
 >>> ret_acc.max()
 0.09090909090909083
@@ -67,7 +67,7 @@ defaults for arguments used throughout the accessor, such as
 !!! hint
     See `vectorbtpro.generic.stats_builder.StatsBuilderMixin.stats` and `ReturnsAccessor.metrics`.
 
-```python-repl
+```pycon
 >>> ret_acc.stats()
 UserWarning: Metric 'benchmark_return' requires benchmark_rets to be set
 UserWarning: Metric 'alpha' requires benchmark_rets to be set
@@ -95,7 +95,7 @@ dtype: object
 The missing `benchmark_rets` can be either passed to the contrustor of the accessor
 or as a setting to `ReturnsAccessor.stats`:
 
-```python-repl
+```pycon
 >>> benchmark = pd.Series([1.05, 1.1, 1.15, 1.1, 1.05])
 >>> benchmark_rets = benchmark.vbt.to_returns()
 
@@ -140,14 +140,14 @@ import pandas as pd
 from scipy.stats import skew, kurtosis
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.accessors import register_vbt_accessor, register_df_vbt_accessor, register_sr_vbt_accessor
 from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, broadcast, broadcast_to
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
-from vectorbtpro.ch_registry import ch_registry
 from vectorbtpro.generic.accessors import GenericAccessor, GenericSRAccessor, GenericDFAccessor
 from vectorbtpro.generic.drawdowns import Drawdowns
-from vectorbtpro.jit_registry import jit_registry
+from vectorbtpro.registries.ch_registry import ch_registry
+from vectorbtpro.registries.jit_registry import jit_registry
 from vectorbtpro.returns import nb, metrics
-from vectorbtpro.root_accessors import register_vbt_accessor, register_df_vbt_accessor, register_sr_vbt_accessor
 from vectorbtpro.utils import checks
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, HybridConfig, Config
@@ -168,7 +168,7 @@ class ReturnsAccessor(GenericAccessor):
         obj (pd.Series or pd.DataFrame): Pandas object representing returns.
         benchmark_rets (array_like): Pandas object representing benchmark returns.
         year_freq (any): Year frequency for annualization purposes.
-        defaults (dict): Defaults that override `returns.defaults` in `vectorbtpro._settings.settings`.
+        defaults (dict): Defaults that override `defaults` in `vectorbtpro._settings.returns`.
         **kwargs: Keyword arguments that are passed down to `vectorbtpro.generic.accessors.GenericAccessor`."""
 
     def __init__(self,
@@ -285,7 +285,7 @@ class ReturnsAccessor(GenericAccessor):
     def defaults(self) -> tp.Kwargs:
         """Defaults for `ReturnsAccessor`.
 
-        Merges `returns.defaults` from `vectorbtpro._settings.settings` with `defaults`
+        Merges `defaults` from `vectorbtpro._settings.returns` with `defaults`
         from `ReturnsAccessor.__init__`."""
         from vectorbtpro._settings import settings
         returns_defaults_cfg = settings['returns']['defaults']
@@ -1286,7 +1286,7 @@ class ReturnsAccessor(GenericAccessor):
 
         Merges `vectorbtpro.generic.accessors.GenericAccessor.stats_defaults`,
         defaults from `ReturnsAccessor.defaults` (acting as `settings`), and
-        `returns.stats` from `vectorbtpro._settings.settings`"""
+        `stats` from `vectorbtpro._settings.returns`"""
         from vectorbtpro._settings import settings
         returns_stats_cfg = settings['returns']['stats']
 
@@ -1446,7 +1446,7 @@ class ReturnsAccessor(GenericAccessor):
 
         Merges `vectorbtpro.generic.accessors.GenericAccessor.plots_defaults`,
         defaults from `ReturnsAccessor.defaults` (acting as `settings`), and
-        `returns.plots` from `vectorbtpro._settings.settings`"""
+        `plots` from `vectorbtpro._settings.returns`"""
         from vectorbtpro._settings import settings
         returns_plots_cfg = settings['returns']['plots']
 
@@ -1516,19 +1516,18 @@ class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> import pandas as pd
+            >>> import numpy as np
 
-        ```python-repl
-        >>> import pandas as pd
-        >>> import numpy as np
+            >>> np.random.seed(0)
+            >>> rets = pd.Series(np.random.uniform(-0.05, 0.05, size=100))
+            >>> benchmark_rets = pd.Series(np.random.uniform(-0.05, 0.05, size=100))
+            >>> rets.vbt.returns.plot_cumulative(benchmark_rets=benchmark_rets)
+            ```
 
-        >>> np.random.seed(0)
-        >>> rets = pd.Series(np.random.uniform(-0.05, 0.05, size=100))
-        >>> benchmark_rets = pd.Series(np.random.uniform(-0.05, 0.05, size=100))
-        >>> rets.vbt.returns.plot_cumulative(benchmark_rets=benchmark_rets)
-        ```
-
-        ![](/docs/img/plot_cumulative.svg)
+            ![](/assets/images/plot_cumulative.svg)
         """
         from vectorbtpro.utils.figure import make_figure, get_domain
         from vectorbtpro._settings import settings

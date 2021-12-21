@@ -220,7 +220,6 @@ def broadcast_index(args: tp.Sequence[tp.AnyArray],
             * 'reset' - reset any index/columns (they become a simple range)
             * integer - use the index/columns of the i-th object in `args`
             * everything else will be converted to `pd.Index`
-
         axis (int): Set to 0 for index and 1 for columns.
         ignore_sr_names (bool): Whether to ignore Series names if they are in conflict.
 
@@ -229,7 +228,7 @@ def broadcast_index(args: tp.Sequence[tp.AnyArray],
         check_index_names (bool): See `vectorbtpro.utils.checks.is_index_equal`.
         **stack_kwargs: Keyword arguments passed to `vectorbtpro.base.indexes.stack_indexes`.
 
-    For defaults, see `broadcasting` in `vectorbtpro._settings.settings`.
+    For defaults, see `vectorbtpro._settings.broadcasting`.
 
     !!! note
         Series names are treated as columns with a single element but without a name.
@@ -571,7 +570,7 @@ def broadcast(*args,
         index_to_product (bool, sequence or mapping): See `BCO.index_to_product`.
         product (bool, sequence or mapping): See `BCO.product`.
         product_idx (int, sequence or mapping): See `BCO.product_idx`.
-        repeat_product (bool, sequence or mapping): See `BCO.repeat`.
+        repeat_product (bool, sequence or mapping): See `BCO.repeat_product`.
         keys_from_sr_index (bool, sequence or mapping): See `BCO.keys_from_sr_index`.
         keys (index_like, sequence or mapping): See `BCO.keys`.
         random_subset (int): Select a random subset of product parameter values.
@@ -585,7 +584,7 @@ def broadcast(*args,
         check_index_names (bool): See `broadcast_index`.
         **stack_kwargs: Keyword arguments passed to `vectorbtpro.base.indexes.stack_indexes`.
 
-    For defaults, see `broadcasting` in `vectorbtpro._settings.settings`.
+    For defaults, see `vectorbtpro._settings.broadcasting`.
 
     Any keyword argument that can be associated with an object can be passed as
 
@@ -596,277 +595,276 @@ def broadcast(*args,
     Additionally, any object can be passed wrapped with `BCO`, which attributes will override
     any of the above arguments if not None.
 
-    ## Example
+    Usage:
+        * Without broadcasting index and columns:
 
-    * Without broadcasting index and columns:
+        ```pycon
+        >>> import numpy as np
+        >>> import pandas as pd
+        >>> import vectorbtpro as vbt
 
-    ```python-repl
-    >>> import numpy as np
-    >>> import pandas as pd
-    >>> import vectorbtpro as vbt
+        >>> v = 0
+        >>> a = np.array([1, 2, 3])
+        >>> sr = pd.Series([1, 2, 3], index=pd.Index(['x', 'y', 'z']), name='a')
+        >>> df = pd.DataFrame(
+        ...     [[1, 2, 3], [4, 5, 6], [7, 8, 9]],
+        ...     index=pd.Index(['x2', 'y2', 'z2']),
+        ...     columns=pd.Index(['a2', 'b2', 'c2']))
 
-    >>> v = 0
-    >>> a = np.array([1, 2, 3])
-    >>> sr = pd.Series([1, 2, 3], index=pd.Index(['x', 'y', 'z']), name='a')
-    >>> df = pd.DataFrame(
-    ...     [[1, 2, 3], [4, 5, 6], [7, 8, 9]],
-    ...     index=pd.Index(['x2', 'y2', 'z2']),
-    ...     columns=pd.Index(['a2', 'b2', 'c2']))
+        >>> for i in vbt.broadcast(
+        ...     v, a, sr, df,
+        ...     index_from='keep',
+        ...     columns_from='keep',
+        ... ): print(i)
+           0  1  2
+        0  0  0  0
+        1  0  0  0
+        2  0  0  0
+           0  1  2
+        0  1  2  3
+        1  1  2  3
+        2  1  2  3
+           a  a  a
+        x  1  1  1
+        y  2  2  2
+        z  3  3  3
+            a2  b2  c2
+        x2   1   2   3
+        y2   4   5   6
+        z2   7   8   9
+        ```
 
-    >>> for i in vbt.broadcast(
-    ...     v, a, sr, df,
-    ...     index_from='keep',
-    ...     columns_from='keep',
-    ... ): print(i)
-       0  1  2
-    0  0  0  0
-    1  0  0  0
-    2  0  0  0
-       0  1  2
-    0  1  2  3
-    1  1  2  3
-    2  1  2  3
-       a  a  a
-    x  1  1  1
-    y  2  2  2
-    z  3  3  3
-        a2  b2  c2
-    x2   1   2   3
-    y2   4   5   6
-    z2   7   8   9
-    ```
+        * Take index and columns from the argument at specific position:
 
-    * Take index and columns from the argument at specific position:
+        ```pycon
+        >>> for i in vbt.broadcast(
+        ...     v, a, sr, df,
+        ...     index_from=2,
+        ...     columns_from=3
+        ... ): print(i)
+           a2  b2  c2
+        x   0   0   0
+        y   0   0   0
+        z   0   0   0
+           a2  b2  c2
+        x   1   2   3
+        y   1   2   3
+        z   1   2   3
+           a2  b2  c2
+        x   1   1   1
+        y   2   2   2
+        z   3   3   3
+           a2  b2  c2
+        x   1   2   3
+        y   4   5   6
+        z   7   8   9
+        ```
 
-    ```python-repl
-    >>> for i in vbt.broadcast(
-    ...     v, a, sr, df,
-    ...     index_from=2,
-    ...     columns_from=3
-    ... ): print(i)
-       a2  b2  c2
-    x   0   0   0
-    y   0   0   0
-    z   0   0   0
-       a2  b2  c2
-    x   1   2   3
-    y   1   2   3
-    z   1   2   3
-       a2  b2  c2
-    x   1   1   1
-    y   2   2   2
-    z   3   3   3
-       a2  b2  c2
-    x   1   2   3
-    y   4   5   6
-    z   7   8   9
-    ```
+        * Broadcast index and columns through stacking:
 
-    * Broadcast index and columns through stacking:
+        ```pycon
+        >>> for i in vbt.broadcast(
+        ...     v, a, sr, df,
+        ...     index_from='stack',
+        ...     columns_from='stack'
+        ... ): print(i)
+              a2  b2  c2
+        x x2   0   0   0
+        y y2   0   0   0
+        z z2   0   0   0
+              a2  b2  c2
+        x x2   1   2   3
+        y y2   1   2   3
+        z z2   1   2   3
+              a2  b2  c2
+        x x2   1   1   1
+        y y2   2   2   2
+        z z2   3   3   3
+              a2  b2  c2
+        x x2   1   2   3
+        y y2   4   5   6
+        z z2   7   8   9
+        ```
 
-    ```python-repl
-    >>> for i in vbt.broadcast(
-    ...     v, a, sr, df,
-    ...     index_from='stack',
-    ...     columns_from='stack'
-    ... ): print(i)
-          a2  b2  c2
-    x x2   0   0   0
-    y y2   0   0   0
-    z z2   0   0   0
-          a2  b2  c2
-    x x2   1   2   3
-    y y2   1   2   3
-    z z2   1   2   3
-          a2  b2  c2
-    x x2   1   1   1
-    y y2   2   2   2
-    z z2   3   3   3
-          a2  b2  c2
-    x x2   1   2   3
-    y y2   4   5   6
-    z z2   7   8   9
-    ```
+        * Set index and columns manually:
 
-    * Set index and columns manually:
+        ```pycon
+        >>> for i in vbt.broadcast(
+        ...     v, a, sr, df,
+        ...     index_from=['a', 'b', 'c'],
+        ...     columns_from=['d', 'e', 'f']
+        ... ): print(i)
+           d  e  f
+        a  0  0  0
+        b  0  0  0
+        c  0  0  0
+           d  e  f
+        a  1  2  3
+        b  1  2  3
+        c  1  2  3
+           d  e  f
+        a  1  1  1
+        b  2  2  2
+        c  3  3  3
+           d  e  f
+        a  1  2  3
+        b  4  5  6
+        c  7  8  9
+        ```
 
-    ```python-repl
-    >>> for i in vbt.broadcast(
-    ...     v, a, sr, df,
-    ...     index_from=['a', 'b', 'c'],
-    ...     columns_from=['d', 'e', 'f']
-    ... ): print(i)
-       d  e  f
-    a  0  0  0
-    b  0  0  0
-    c  0  0  0
-       d  e  f
-    a  1  2  3
-    b  1  2  3
-    c  1  2  3
-       d  e  f
-    a  1  1  1
-    b  2  2  2
-    c  3  3  3
-       d  e  f
-    a  1  2  3
-    b  4  5  6
-    c  7  8  9
-    ```
+        * Pass arguments as a mapping returns a mapping:
 
-    * Pass arguments as a mapping returns a mapping:
+        ```pycon
+        >>> vbt.broadcast(
+        ...     dict(v=v, a=a, sr=sr, df=df),
+        ...     index_from='stack'
+        ... )
+        {'v':       a2  b2  c2
+              x x2   0   0   0
+              y y2   0   0   0
+              z z2   0   0   0,
+         'a':       a2  b2  c2
+              x x2   1   2   3
+              y y2   1   2   3
+              z z2   1   2   3,
+         'sr':       a2  b2  c2
+               x x2   1   1   1
+               y y2   2   2   2
+               z z2   3   3   3,
+         'df':       a2  b2  c2
+               x x2   1   2   3
+               y y2   4   5   6
+               z z2   7   8   9}
+        ```
 
-    ```python-repl
-    >>> vbt.broadcast(
-    ...     dict(v=v, a=a, sr=sr, df=df),
-    ...     index_from='stack'
-    ... )
-    {'v':       a2  b2  c2
-          x x2   0   0   0
-          y y2   0   0   0
-          z z2   0   0   0,
-     'a':       a2  b2  c2
-          x x2   1   2   3
-          y y2   1   2   3
-          z z2   1   2   3,
-     'sr':       a2  b2  c2
-           x x2   1   1   1
-           y y2   2   2   2
-           z z2   3   3   3,
-     'df':       a2  b2  c2
-           x x2   1   2   3
-           y y2   4   5   6
-           z z2   7   8   9}
-    ```
+        * Keep all results in a format suitable for flexible indexing apart from one:
 
-    * Keep all results in a format suitable for flexible indexing apart from one:
+        ```pycon
+        >>> vbt.broadcast(
+        ...     dict(v=v, a=a, sr=sr, df=df),
+        ...     index_from='stack',
+        ...     keep_flex=dict(_default=True, df=False),
+        ...     require_kwargs=dict(df=dict(dtype=float))
+        ... )
+        {'v': array([0]),
+         'a': array([1, 2, 3]),
+         'sr': array([[1],
+                      [2],
+                      [3]]),
+         'df':        a2   b2   c2
+               x x2  1.0  2.0  3.0
+               y y2  4.0  5.0  6.0
+               z z2  7.0  8.0  9.0}
+        ```
 
-    ```python-repl
-    >>> vbt.broadcast(
-    ...     dict(v=v, a=a, sr=sr, df=df),
-    ...     index_from='stack',
-    ...     keep_flex=dict(_default=True, df=False),
-    ...     require_kwargs=dict(df=dict(dtype=float))
-    ... )
-    {'v': array([0]),
-     'a': array([1, 2, 3]),
-     'sr': array([[1],
-                  [2],
-                  [3]]),
-     'df':        a2   b2   c2
-           x x2  1.0  2.0  3.0
-           y y2  4.0  5.0  6.0
-           z z2  7.0  8.0  9.0}
-    ```
+        * Specify arguments per object using `BCO`:
 
-    * Specify arguments per object using `BCO`:
+        ```pycon
+        >>> df_bco = vbt.BCO(df, keep_flex=False, require_kwargs=dict(dtype=float))
+        >>> vbt.broadcast(
+        ...     dict(v=v, a=a, sr=sr, df=df_bco),
+        ...     index_from='stack',
+        ...     keep_flex=True
+        ... )
+        {'v': array([0]),
+         'a': array([1, 2, 3]),
+         'sr': array([[1],
+                      [2],
+                      [3]]),
+         'df':        a2   b2   c2
+               x x2  1.0  2.0  3.0
+               y y2  4.0  5.0  6.0
+               z z2  7.0  8.0  9.0}
+        ```
 
-    ```python-repl
-    >>> df_bco = vbt.BCO(df, keep_flex=False, require_kwargs=dict(dtype=float))
-    >>> vbt.broadcast(
-    ...     dict(v=v, a=a, sr=sr, df=df_bco),
-    ...     index_from='stack',
-    ...     keep_flex=True
-    ... )
-    {'v': array([0]),
-     'a': array([1, 2, 3]),
-     'sr': array([[1],
-                  [2],
-                  [3]]),
-     'df':        a2   b2   c2
-           x x2  1.0  2.0  3.0
-           y y2  4.0  5.0  6.0
-           z z2  7.0  8.0  9.0}
-    ```
+        * Introduce a parameter that should build a Cartesian product of its values and other objects:
 
-    * Introduce a parameter that should build a Cartesian product of its values and other objects:
+        ```pycon
+        >>> df_bco = vbt.BCO(df, keep_flex=False, require_kwargs=dict(dtype=float))
+        >>> p_bco = vbt.BCO(pd.Series([1, 2, 3], name='my_p'), product=True)
+        >>> vbt.broadcast(
+        ...     dict(v=v, a=a, sr=sr, df=df_bco, p=p_bco),
+        ...     index_from='stack',
+        ...     keep_flex=True
+        ... )
+        {'v': array([0]),
+         'a': array([1, 2, 3, 1, 2, 3, 1, 2, 3]),
+         'sr': array([[1],
+                [2],
+                [3]]),
+         'df': my_p        1              2              3
+                a2   b2   c2   a2   b2   c2   a2   b2   c2
+         x x2  1.0  2.0  3.0  1.0  2.0  3.0  1.0  2.0  3.0
+         y y2  4.0  5.0  6.0  4.0  5.0  6.0  4.0  5.0  6.0
+         z z2  7.0  8.0  9.0  7.0  8.0  9.0  7.0  8.0  9.0,
+         'p': array([[1, 1, 1, 2, 2, 2, 3, 3, 3],
+                [1, 1, 1, 2, 2, 2, 3, 3, 3],
+                [1, 1, 1, 2, 2, 2, 3, 3, 3]])}
+        ```
 
-    ```python-repl
-    >>> df_bco = vbt.BCO(df, keep_flex=False, require_kwargs=dict(dtype=float))
-    >>> p_bco = vbt.BCO(pd.Series([1, 2, 3], name='my_p'), product=True)
-    >>> vbt.broadcast(
-    ...     dict(v=v, a=a, sr=sr, df=df_bco, p=p_bco),
-    ...     index_from='stack',
-    ...     keep_flex=True
-    ... )
-    {'v': array([0]),
-     'a': array([1, 2, 3, 1, 2, 3, 1, 2, 3]),
-     'sr': array([[1],
-            [2],
-            [3]]),
-     'df': my_p        1              2              3
-            a2   b2   c2   a2   b2   c2   a2   b2   c2
-     x x2  1.0  2.0  3.0  1.0  2.0  3.0  1.0  2.0  3.0
-     y y2  4.0  5.0  6.0  4.0  5.0  6.0  4.0  5.0  6.0
-     z z2  7.0  8.0  9.0  7.0  8.0  9.0  7.0  8.0  9.0,
-     'p': array([[1, 1, 1, 2, 2, 2, 3, 3, 3],
-            [1, 1, 1, 2, 2, 2, 3, 3, 3],
-            [1, 1, 1, 2, 2, 2, 3, 3, 3]])}
-    ```
+        * Build a Cartesian product of all parameters:
 
-    * Build a Cartesian product of all parameters:
+        ```pycon
+        >>> vbt.broadcast(
+        ...     dict(
+        ...         a=vbt.BCO([1, 2, 3], product=True),
+        ...         b=vbt.BCO(['x', 'y'], product=True),
+        ...         c=vbt.BCO([False, True], product=True)
+        ...     )
+        ... )
+        {'a': array([[1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3]]),
+         'b': array([['x', 'x', 'y', 'y', 'x', 'x', 'y', 'y', 'x', 'x', 'y', 'y']], dtype='<U1'),
+         'c': array([[False, True, False, True, False, True, False, True, False, True, False, True]])}
+        ```
 
-    ```python-repl
-    >>> vbt.broadcast(
-    ...     dict(
-    ...         a=vbt.BCO([1, 2, 3], product=True),
-    ...         b=vbt.BCO(['x', 'y'], product=True),
-    ...         c=vbt.BCO([False, True], product=True)
-    ...     )
-    ... )
-    {'a': array([[1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3]]),
-     'b': array([['x', 'x', 'y', 'y', 'x', 'x', 'y', 'y', 'x', 'x', 'y', 'y']], dtype='<U1'),
-     'c': array([[False, True, False, True, False, True, False, True, False, True, False, True]])}
-    ```
+        * Or the same using `pd.Index`:
 
-    * Or the same using `pd.Index`:
+        ```pycon
+        >>> # or the same globally
+        >>> vbt.broadcast(
+        ...     dict(
+        ...         a=pd.Index([1, 2, 3]),
+        ...         b=pd.Index(['x', 'y']),
+        ...         c=pd.Index([False, True])
+        ...     )
+        ... )
+        {'a': array([[1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3]]),
+         'b': array([['x', 'x', 'y', 'y', 'x', 'x', 'y', 'y', 'x', 'x', 'y', 'y']], dtype='<U1'),
+         'c': array([[False, True, False, True, False, True, False, True, False, True, False, True]])}
+        ```
 
-    ```python-repl
-    >>> # or the same globally
-    >>> vbt.broadcast(
-    ...     dict(
-    ...         a=pd.Index([1, 2, 3]),
-    ...         b=pd.Index(['x', 'y']),
-    ...         c=pd.Index([False, True])
-    ...     )
-    ... )
-    {'a': array([[1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3]]),
-     'b': array([['x', 'x', 'y', 'y', 'x', 'x', 'y', 'y', 'x', 'x', 'y', 'y']], dtype='<U1'),
-     'c': array([[False, True, False, True, False, True, False, True, False, True, False, True]])}
-    ```
+        * Build a Cartesian product of two groups of parameters - (a, d) and (b, c):
 
-    * Build a Cartesian product of two groups of parameters - (a, d) and (b, c):
+        ```pycon
+        >>> vbt.broadcast(
+        ...     dict(
+        ...         a=vbt.BCO(pd.Index([1, 2, 3]), product_idx=0),
+        ...         b=vbt.BCO(pd.Index(['x', 'y']), product_idx=1),
+        ...         d=vbt.BCO(pd.Index([100., 200., 300.]), product_idx=0),
+        ...         c=vbt.BCO(pd.Index([False, True]), product_idx=1)
+        ...     )
+        ... )
+        {'a': array([[1, 1, 2, 2, 3, 3]]),
+         'b': array([['x', 'y', 'x', 'y', 'x', 'y']], dtype='<U1'),
+         'd': array([[100., 100., 200., 200., 300., 300.]]),
+         'c': array([[False,  True, False,  True, False,  True]])}
+        ```
 
-    ```python-repl
-    >>> vbt.broadcast(
-    ...     dict(
-    ...         a=vbt.BCO(pd.Index([1, 2, 3]), product_idx=0),
-    ...         b=vbt.BCO(pd.Index(['x', 'y']), product_idx=1),
-    ...         d=vbt.BCO(pd.Index([100., 200., 300.]), product_idx=0),
-    ...         c=vbt.BCO(pd.Index([False, True]), product_idx=1)
-    ...     )
-    ... )
-    {'a': array([[1, 1, 2, 2, 3, 3]]),
-     'b': array([['x', 'y', 'x', 'y', 'x', 'y']], dtype='<U1'),
-     'd': array([[100., 100., 200., 200., 300., 300.]]),
-     'c': array([[False,  True, False,  True, False,  True]])}
-    ```
+        * Select a random subset of parameter combinations:
 
-    * Select a random subset of parameter combinations:
-
-    ```python-repl
-    >>> vbt.broadcast(
-    ...     dict(
-    ...         a=pd.Index([1, 2, 3]),
-    ...         b=pd.Index(['x', 'y']),
-    ...         c=pd.Index([False, True])
-    ...     ),
-    ...     random_subset=5
-    ... )
-    {'a': array([[1, 1, 2, 2, 3]]),
-     'b': array([['x', 'y', 'x', 'x', 'x']], dtype='<U1'),
-     'c': array([[False, False, False,  True,  True]])}
-    ```
+        ```pycon
+        >>> vbt.broadcast(
+        ...     dict(
+        ...         a=pd.Index([1, 2, 3]),
+        ...         b=pd.Index(['x', 'y']),
+        ...         c=pd.Index([False, True])
+        ...     ),
+        ...     random_subset=5
+        ... )
+        {'a': array([[1, 1, 2, 2, 3]]),
+         'b': array([['x', 'y', 'x', 'x', 'x']], dtype='<U1'),
+         'c': array([[False, False, False,  True,  True]])}
+        ```
     """
     # Get defaults
     from vectorbtpro._settings import settings
@@ -1323,25 +1321,24 @@ def broadcast_to(arg1: tp.ArrayLike,
 
     Keyword arguments `**kwargs` are passed to `broadcast`.
 
-    ## Example
+    Usage:
+        ```pycon
+        >>> import numpy as np
+        >>> import pandas as pd
+        >>> from vectorbtpro.base.reshaping import broadcast_to
 
-    ```python-repl
-    >>> import numpy as np
-    >>> import pandas as pd
-    >>> from vectorbtpro.base.reshaping import broadcast_to
+        >>> a = np.array([1, 2, 3])
+        >>> sr = pd.Series([4, 5, 6], index=pd.Index(['x', 'y', 'z']), name='a')
 
-    >>> a = np.array([1, 2, 3])
-    >>> sr = pd.Series([4, 5, 6], index=pd.Index(['x', 'y', 'z']), name='a')
+        >>> broadcast_to(a, sr)
+        x    1
+        y    2
+        z    3
+        Name: a, dtype: int64
 
-    >>> broadcast_to(a, sr)
-    x    1
-    y    2
-    z    3
-    Name: a, dtype: int64
-
-    >>> broadcast_to(sr, a)
-    array([4, 5, 6])
-    ```
+        >>> broadcast_to(sr, a)
+        array([4, 5, 6])
+        ```
     """
     arg1 = to_any_array(arg1)
     arg2 = to_any_array(arg2)
@@ -1368,19 +1365,18 @@ def broadcast_to_array_of(arg1: tp.ArrayLike, arg2: tp.ArrayLike) -> tp.Array:
 
     `arg1` must be either a scalar, a 1-dim array, or have 1 dimension more than `arg2`.
 
-    ## Example
+    Usage:
+        ```pycon
+        >>> import numpy as np
+        >>> from vectorbtpro.base.reshaping import broadcast_to_array_of
 
-    ```python-repl
-    >>> import numpy as np
-    >>> from vectorbtpro.base.reshaping import broadcast_to_array_of
+        >>> broadcast_to_array_of([0.1, 0.2], np.empty((2, 2)))
+        [[[0.1 0.1]
+          [0.1 0.1]]
 
-    >>> broadcast_to_array_of([0.1, 0.2], np.empty((2, 2)))
-    [[[0.1 0.1]
-      [0.1 0.1]]
-
-     [[0.2 0.2]
-      [0.2 0.2]]]
-    ```
+         [[0.2 0.2]
+          [0.2 0.2]]]
+        ```
     """
     arg1 = np.asarray(arg1)
     arg2 = np.asarray(arg2)
@@ -1422,36 +1418,36 @@ def broadcast_combs(*args: tp.ArrayLike,
                     broadcast_kwargs: tp.KwargsLike = None) -> tp.Any:
     """Align an axis of each array using a combinatoric function and broadcast their indexes.
 
-    ## Example
+    Usage:
+        ```pycon
+        >>> import numpy as np
+        >>> from vectorbtpro.base.reshaping import broadcast_combs
 
-    ```python-repl
-    >>> import numpy as np
-    >>> from vectorbtpro.base.reshaping import broadcast_combs
+        >>> df = pd.DataFrame([[1, 2, 3], [3, 4, 5]], columns=pd.Index(['a', 'b', 'c'], name='df_param'))
+        >>> df2 = pd.DataFrame([[6, 7], [8, 9]], columns=pd.Index(['d', 'e'], name='df2_param'))
+        >>> sr = pd.Series([10, 11], name='f')
 
-    >>> df = pd.DataFrame([[1, 2, 3], [3, 4, 5]], columns=pd.Index(['a', 'b', 'c'], name='df_param'))
-    >>> df2 = pd.DataFrame([[6, 7], [8, 9]], columns=pd.Index(['d', 'e'], name='df2_param'))
-    >>> sr = pd.Series([10, 11], name='f')
+        >>> new_df, new_df2, new_sr = broadcast_combs((df, df2, sr))
 
-    >>> new_df, new_df2, new_sr = broadcast_combs((df, df2, sr))
+        >>> new_df
+        df_param   a     b     c
+        df2_param  d  e  d  e  d  e
+        0          1  1  2  2  3  3
+        1          3  3  4  4  5  5
 
-    >>> new_df
-    df_param   a     b     c
-    df2_param  d  e  d  e  d  e
-    0          1  1  2  2  3  3
-    1          3  3  4  4  5  5
+        >>> new_df2
+        df_param   a     b     c
+        df2_param  d  e  d  e  d  e
+        0          6  7  6  7  6  7
+        1          8  9  8  9  8  9
 
-    >>> new_df2
-    df_param   a     b     c
-    df2_param  d  e  d  e  d  e
-    0          6  7  6  7  6  7
-    1          8  9  8  9  8  9
-
-    >>> new_sr
-    df_param    a       b       c
-    df2_param   d   e   d   e   d   e
-    0          10  10  10  10  10  10
-    1          11  11  11  11  11  11
-    ```"""
+        >>> new_sr
+        df_param    a       b       c
+        df2_param   d   e   d   e   d   e
+        0          10  10  10  10  10  10
+        1          11  11  11  11  11  11
+        ```
+    """
     if broadcast_kwargs is None:
         broadcast_kwargs = {}
 
@@ -1507,32 +1503,31 @@ def unstack_to_array(arg: tp.SeriesFrame, levels: tp.Optional[tp.MaybeLevelSeque
 
     Use `levels` to specify what index levels to unstack and in which order.
 
-    ## Example
+    Usage:
+        ```pycon
+        >>> import pandas as pd
+        >>> from vectorbtpro.base.reshaping import unstack_to_array
 
-    ```python-repl
-    >>> import pandas as pd
-    >>> from vectorbtpro.base.reshaping import unstack_to_array
+        >>> index = pd.MultiIndex.from_arrays(
+        ...     [[1, 1, 2, 2], [3, 4, 3, 4], ['a', 'b', 'c', 'd']])
+        >>> sr = pd.Series([1, 2, 3, 4], index=index)
 
-    >>> index = pd.MultiIndex.from_arrays(
-    ...     [[1, 1, 2, 2], [3, 4, 3, 4], ['a', 'b', 'c', 'd']])
-    >>> sr = pd.Series([1, 2, 3, 4], index=index)
+        >>> unstack_to_array(sr).shape
+        (2, 2, 4)
 
-    >>> unstack_to_array(sr).shape
-    (2, 2, 4)
+        >>> unstack_to_array(sr)
+        [[[ 1. nan nan nan]
+         [nan  2. nan nan]]
 
-    >>> unstack_to_array(sr)
-    [[[ 1. nan nan nan]
-     [nan  2. nan nan]]
+         [[nan nan  3. nan]
+        [nan nan nan  4.]]]
 
-     [[nan nan  3. nan]
-    [nan nan nan  4.]]]
-
-    >>> unstack_to_array(sr, levels=(2, 0))
-    [[ 1. nan]
-     [ 2. nan]
-     [nan  3.]
-     [nan  4.]]
-    ```
+        >>> unstack_to_array(sr, levels=(2, 0))
+        [[ 1. nan]
+         [ 2. nan]
+         [nan  3.]
+         [nan  4.]]
+        ```
     """
     # Extract series
     sr: tp.Series = to_1d(get_multiindex_series(arg))
@@ -1568,21 +1563,20 @@ def make_symmetric(arg: tp.SeriesFrame, sort: bool = True) -> tp.Frame:
     Pass `sort=False` if index and columns should not be sorted, but concatenated
     and get duplicates removed.
 
-    ## Example
+    Usage:
+        ```pycon
+        >>> import pandas as pd
+        >>> from vectorbtpro.base.reshaping import make_symmetric
 
-    ```python-repl
-    >>> import pandas as pd
-    >>> from vectorbtpro.base.reshaping import make_symmetric
+        >>> df = pd.DataFrame([[1, 2], [3, 4]], index=['a', 'b'], columns=['c', 'd'])
 
-    >>> df = pd.DataFrame([[1, 2], [3, 4]], index=['a', 'b'], columns=['c', 'd'])
-
-    >>> make_symmetric(df)
-         a    b    c    d
-    a  NaN  NaN  1.0  2.0
-    b  NaN  NaN  3.0  4.0
-    c  1.0  3.0  NaN  NaN
-    d  2.0  4.0  NaN  NaN
-    ```
+        >>> make_symmetric(df)
+             a    b    c    d
+        a  NaN  NaN  1.0  2.0
+        b  NaN  NaN  3.0  4.0
+        c  1.0  3.0  NaN  NaN
+        d  2.0  4.0  NaN  NaN
+        ```
     """
     checks.assert_instance_of(arg, (pd.Series, pd.DataFrame))
     df: tp.Frame = to_2d(arg)
@@ -1635,25 +1629,24 @@ def unstack_to_df(arg: tp.SeriesFrame,
     Use `index_levels` to specify what index levels will form new index, and `column_levels` 
     for new columns. Set `symmetric` to True to make DataFrame symmetric.
 
-    ## Example
+    Usage:
+        ```pycon
+        >>> import pandas as pd
+        >>> from vectorbtpro.base.reshaping import unstack_to_df
 
-    ```python-repl
-    >>> import pandas as pd
-    >>> from vectorbtpro.base.reshaping import unstack_to_df
+        >>> index = pd.MultiIndex.from_arrays(
+        ...     [[1, 1, 2, 2], [3, 4, 3, 4], ['a', 'b', 'c', 'd']],
+        ...     names=['x', 'y', 'z'])
+        >>> sr = pd.Series([1, 2, 3, 4], index=index)
 
-    >>> index = pd.MultiIndex.from_arrays(
-    ...     [[1, 1, 2, 2], [3, 4, 3, 4], ['a', 'b', 'c', 'd']],
-    ...     names=['x', 'y', 'z'])
-    >>> sr = pd.Series([1, 2, 3, 4], index=index)
-
-    >>> unstack_to_df(sr, index_levels=(0, 1), column_levels=2)
-    z      a    b    c    d
-    x y
-    1 3  1.0  NaN  NaN  NaN
-    1 4  NaN  2.0  NaN  NaN
-    2 3  NaN  NaN  3.0  NaN
-    2 4  NaN  NaN  NaN  4.0
-    ```
+        >>> unstack_to_df(sr, index_levels=(0, 1), column_levels=2)
+        z      a    b    c    d
+        x y
+        1 3  1.0  NaN  NaN  NaN
+        1 4  NaN  2.0  NaN  NaN
+        2 3  NaN  NaN  3.0  NaN
+        2 4  NaN  NaN  NaN  4.0
+        ```
     """
     # Extract series
     sr: tp.Series = to_1d(get_multiindex_series(arg))

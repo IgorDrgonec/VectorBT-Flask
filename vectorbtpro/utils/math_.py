@@ -5,7 +5,7 @@
 import numpy as np
 
 from vectorbtpro._settings import settings
-from vectorbtpro.jit_registry import register_jitted
+from vectorbtpro.registries.jit_registry import register_jitted
 
 _use_tol = settings['math']['use_tol']
 _rel_tol = settings['math']['rel_tol']

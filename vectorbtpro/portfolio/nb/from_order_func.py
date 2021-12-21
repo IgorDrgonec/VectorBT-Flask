@@ -1,16 +1,189 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Numba-compiled functions for `vectorbtpro.portfolio.base.Portfolio.from_order_func`."""
+"""Numba-compiled functions for portfolio modeling based on an order function."""
 
 from numba import prange
 
 from vectorbtpro.base import chunking as base_ch
-from vectorbtpro.ch_registry import register_chunkable
 from vectorbtpro.portfolio import chunking as portfolio_ch
 from vectorbtpro.portfolio.nb.core import *
+from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.returns import nb as returns_nb_
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.template import RepFunc
+
+
+@register_jitted
+def get_elem_nb(ctx: tp.Union[
+    OrderContext,
+    PostOrderContext,
+    SignalContext
+], arr: tp.FlexArray) -> tp.Scalar:
+    """Get the current element using flexible indexing given the context's `i` and `col`."""
+    return flex_select_auto_nb(arr, ctx.i, ctx.col, ctx.flex_2d)
+
+
+@register_jitted
+def get_grouped_elem_nb(ctx: tp.Union[
+    SegmentContext,
+    OrderContext,
+    PostOrderContext,
+    FlexOrderContext
+], arr: tp.FlexArray) -> tp.Scalar:
+    """Get the current element using flexible indexing given the context's `i` and `group`."""
+    return flex_select_auto_nb(arr, ctx.i, ctx.group, ctx.flex_2d)
+
+
+@register_jitted
+def get_col_elem_nb(ctx: tp.Union[
+    RowContext,
+    SegmentContext,
+    OrderContext,
+    FlexOrderContext,
+    PostOrderContext,
+    SignalContext
+], col_or_group: int, arr: tp.FlexArray) -> tp.Scalar:
+    """Get the current element using flexible indexing given a column/group and the context's `i`."""
+    return flex_select_auto_nb(arr, ctx.i, col_or_group, ctx.flex_2d)
+
+
+@register_jitted
+def get_group_value_ctx_nb(seg_ctx: SegmentContext) -> float:
+    """Get group value from context.
+
+    Accepts `vectorbtpro.portfolio.enums.SegmentContext`.
+
+    Best called once from `pre_segment_func_nb`.
+    To set the valuation price, change `last_val_price` of the context in-place.
+
+    !!! note
+        Cash sharing must be enabled."""
+    if not seg_ctx.cash_sharing:
+        raise ValueError("Cash sharing must be enabled")
+    return get_group_value_nb(
+        seg_ctx.from_col,
+        seg_ctx.to_col,
+        seg_ctx.last_cash[seg_ctx.group],
+        seg_ctx.last_position,
+        seg_ctx.last_val_price
+    )
+
+
+@register_jitted
+def sort_call_seq_out_nb(ctx: SegmentContext,
+                         size: tp.FlexArray,
+                         size_type: tp.FlexArray,
+                         direction: tp.FlexArray,
+                         order_value_out: tp.Array1d,
+                         call_seq_out: tp.Array1d,
+                         ctx_select: bool = True) -> None:
+    """Sort call sequence `call_seq_out` based on the value of each potential order.
+
+    Accepts `vectorbtpro.portfolio.enums.SegmentContext` and other arguments, sorts `call_seq_out` in place,
+    and returns nothing.
+
+    Arrays `size`, `size_type`, and `direction` utilize flexible indexing and must have at least 0 dimensions.
+    If `ctx_select` is True, selects the elements of each `size`, `size_type`, and `direction`
+    using `get_col_elem_nb` assuming that each array can broadcast to `target_shape`.
+    Otherwise, selects using `vectorbtpro.base.indexing.flex_select_auto_nb` assuming that each array
+    can broadcast to `group_len`.
+
+    The lengths of `order_value_out` and `call_seq_out` must match the number of columns in the group.
+    Array `order_value_out` must be empty and will contain sorted order values after execution.
+    Array `call_seq_out` must be filled with integers ranging from 0 to the number of columns in the group
+    (in this exact order).
+
+    Best called once from `pre_segment_func_nb`.
+
+    !!! note
+        Cash sharing must be enabled and `call_seq_out` must follow `CallSeqType.Default`.
+
+        Should be used in flexible simulation functions."""
+    if not ctx.cash_sharing:
+        raise ValueError("Cash sharing must be enabled")
+
+    group_value_now = get_group_value_ctx_nb(ctx)
+    group_len = ctx.to_col - ctx.from_col
+    for k in range(group_len):
+        if call_seq_out[k] != k:
+            raise ValueError("call_seq_out must follow CallSeqType.Default")
+        col = ctx.from_col + k
+        if ctx_select:
+            _size = get_col_elem_nb(ctx, col, size)
+            _size_type = get_col_elem_nb(ctx, col, size_type)
+            _direction = get_col_elem_nb(ctx, col, direction)
+        else:
+            _size = flex_select_auto_nb(size, k, 0, False)
+            _size_type = flex_select_auto_nb(size_type, k, 0, False)
+            _direction = flex_select_auto_nb(direction, k, 0, False)
+        if ctx.cash_sharing:
+            cash_now = ctx.last_cash[ctx.group]
+            free_cash_now = ctx.last_free_cash[ctx.group]
+        else:
+            cash_now = ctx.last_cash[col]
+            free_cash_now = ctx.last_free_cash[col]
+        order_value_out[k] = approx_order_value_nb(
+            _size,
+            _size_type,
+            _direction,
+            cash_now,
+            ctx.last_position[col],
+            free_cash_now,
+            ctx.last_val_price[col],
+            group_value_now
+        )
+    # Sort by order value
+    insert_argsort_nb(order_value_out, call_seq_out)
+
+
+@register_jitted
+def sort_call_seq_nb(ctx: SegmentContext,
+                     size: tp.FlexArray,
+                     size_type: tp.FlexArray,
+                     direction: tp.FlexArray,
+                     order_value_out: tp.Array1d,
+                     ctx_select: bool = True) -> None:
+    """Sort call sequence attached to `vectorbtpro.portfolio.enums.SegmentContext`.
+
+    See `sort_call_seq_out_nb`.
+
+    !!! note
+        Can only be used in non-flexible simulation functions."""
+    if ctx.call_seq_now is None:
+        raise ValueError("Call sequence array is None. Use sort_call_seq_out_nb to sort a custom array.")
+    sort_call_seq_out_nb(
+        ctx,
+        size,
+        size_type,
+        direction,
+        order_value_out,
+        ctx.call_seq_now,
+        ctx_select=ctx_select
+    )
+
+
+@register_jitted
+def try_order_nb(ctx: OrderContext, order: Order) -> tp.Tuple[ExecuteOrderState, OrderResult]:
+    """Execute an order without persistence."""
+    state = ProcessOrderState(
+        cash=ctx.cash_now,
+        position=ctx.position_now,
+        debt=ctx.debt_now,
+        free_cash=ctx.free_cash_now,
+        val_price=ctx.val_price_now,
+        value=ctx.value_now
+    )
+    price_area = PriceArea(
+        open=flex_select_auto_nb(ctx.open, ctx.i, ctx.col, ctx.flex_2d),
+        high=flex_select_auto_nb(ctx.high, ctx.i, ctx.col, ctx.flex_2d),
+        low=flex_select_auto_nb(ctx.low, ctx.i, ctx.col, ctx.flex_2d),
+        close=flex_select_auto_nb(ctx.close, ctx.i, ctx.col, ctx.flex_2d)
+    )
+    return execute_order_nb(
+        state=state,
+        order=order,
+        price_area=price_area
+    )
 
 
 @register_jitted
@@ -31,7 +204,7 @@ def no_post_func_nb(c: tp.NamedTuple, *args) -> None:
     return None
 
 
-@register_jitted(cache=True)
+@register_jitted
 def set_val_price_nb(c: SegmentContext, val_price: tp.FlexArray, price: tp.FlexArray) -> None:
     """Override valuation price in a context.
 
@@ -54,7 +227,7 @@ def set_val_price_nb(c: SegmentContext, val_price: tp.FlexArray, price: tp.FlexA
             c.last_val_price[col] = _val_price
 
 
-@register_jitted(cache=True)
+@register_jitted
 def def_pre_segment_func_nb(c: SegmentContext,
                             val_price: tp.FlexArray,
                             price: tp.FlexArray,
@@ -70,7 +243,7 @@ def def_pre_segment_func_nb(c: SegmentContext,
     return ()
 
 
-@register_jitted(cache=True)
+@register_jitted
 def def_order_func_nb(c: OrderContext,
                       size: tp.FlexArray,
                       price: tp.FlexArray,
@@ -331,240 +504,238 @@ def simulate_nb(target_shape: tp.Shape,
         not been processed yet and thus empty. Accessing them will not trigger any errors or warnings,
         but provide you with arbitrary data (see [np.empty](https://numpy.org/doc/stable/reference/generated/numpy.empty.html)).
 
-    ## Call hierarchy
+    Call hierarchy:
+        Like most things in the vectorbt universe, simulation is also done by iterating over a (imaginary) frame.
+        This frame consists of two dimensions: time (rows) and assets/features (columns).
+        Each element of this frame is a potential order, which gets generated by calling an order function.
 
-    Like most things in the vectorbt universe, simulation is also done by iterating over a (imaginary) frame.
-    This frame consists of two dimensions: time (rows) and assets/features (columns).
-    Each element of this frame is a potential order, which gets generated by calling an order function.
+        The question is: how do we move across this frame to simulate trading? There are two movement patterns:
+        column-major (as done by `simulate_nb`) and row-major order (as done by `simulate_row_wise_nb`).
+        In each of these patterns, we are always moving from top to bottom (time axis) and from left to right
+        (asset/feature axis); the only difference between them is across which axis we are moving faster:
+        do we want to process each column first (thus assuming that columns are independent) or each row?
+        Choosing between them is mostly a matter of preference, but it also makes different data being
+        available when generating an order.
 
-    The question is: how do we move across this frame to simulate trading? There are two movement patterns:
-    column-major (as done by `simulate_nb`) and row-major order (as done by `simulate_row_wise_nb`).
-    In each of these patterns, we are always moving from top to bottom (time axis) and from left to right
-    (asset/feature axis); the only difference between them is across which axis we are moving faster:
-    do we want to process each column first (thus assuming that columns are independent) or each row?
-    Choosing between them is mostly a matter of preference, but it also makes different data being
-    available when generating an order.
+        The frame is further divided into "blocks": columns, groups, rows, segments, and elements.
+        For example, columns can be grouped into groups that may or may not share the same capital.
+        Regardless of capital sharing, each collection of elements within a group and a time step is called
+        a segment, which simply defines a single context (such as shared capital) for one or multiple orders.
+        Each segment can also define a custom sequence (a so-called call sequence) in which orders are executed.
 
-    The frame is further divided into "blocks": columns, groups, rows, segments, and elements.
-    For example, columns can be grouped into groups that may or may not share the same capital.
-    Regardless of capital sharing, each collection of elements within a group and a time step is called
-    a segment, which simply defines a single context (such as shared capital) for one or multiple orders.
-    Each segment can also define a custom sequence (a so-called call sequence) in which orders are executed.
+        You can imagine each of these blocks as a rectangle drawn over different parts of the frame,
+        and having its own context and pre/post-processing function. The pre-processing function is a
+        simple callback that is called before entering the block, and can be provided by the user to, for example,
+        prepare arrays or do some custom calculations. It must return a tuple (can be empty) that is then unpacked and
+        passed as arguments to the pre- and postprocessing function coming next in the call hierarchy.
+        The postprocessing function can be used, for example, to write user-defined arrays such as returns.
 
-    You can imagine each of these blocks as a rectangle drawn over different parts of the frame,
-    and having its own context and pre/post-processing function. The pre-processing function is a
-    simple callback that is called before entering the block, and can be provided by the user to, for example,
-    prepare arrays or do some custom calculations. It must return a tuple (can be empty) that is then unpacked and
-    passed as arguments to the pre- and postprocessing function coming next in the call hierarchy.
-    The postprocessing function can be used, for example, to write user-defined arrays such as returns.
-
-    ```plaintext
-    1. pre_sim_out = pre_sim_func_nb(SimulationContext, *pre_sim_args)
-        2. pre_group_out = pre_group_func_nb(GroupContext, *pre_sim_out, *pre_group_args)
-            3. if call_pre_segment or segment_mask: pre_segment_out = pre_segment_func_nb(SegmentContext, *pre_group_out, *pre_segment_args)
-                4. if segment_mask: order = order_func_nb(OrderContext, *pre_segment_out, *order_args)
-                5. if order: post_order_func_nb(PostOrderContext, *pre_segment_out, *post_order_args)
+        ```plaintext
+        1. pre_sim_out = pre_sim_func_nb(SimulationContext, *pre_sim_args)
+            2. pre_group_out = pre_group_func_nb(GroupContext, *pre_sim_out, *pre_group_args)
+                3. if call_pre_segment or segment_mask: pre_segment_out = pre_segment_func_nb(SegmentContext, *pre_group_out, *pre_segment_args)
+                    4. if segment_mask: order = order_func_nb(OrderContext, *pre_segment_out, *order_args)
+                    5. if order: post_order_func_nb(PostOrderContext, *pre_segment_out, *post_order_args)
+                    ...
+                6. if call_post_segment or segment_mask: post_segment_func_nb(SegmentContext, *pre_group_out, *post_segment_args)
                 ...
-            6. if call_post_segment or segment_mask: post_segment_func_nb(SegmentContext, *pre_group_out, *post_segment_args)
+            7. post_group_func_nb(GroupContext, *pre_sim_out, *post_group_args)
             ...
-        7. post_group_func_nb(GroupContext, *pre_sim_out, *post_group_args)
+        8. post_sim_func_nb(SimulationContext, *post_sim_args)
+        ```
+
+        Let's demonstrate a frame with one group of two columns and one group of one column, and the
+        following call sequence:
+
+        ```plaintext
+        array([[0, 1, 0],
+               [1, 0, 0]])
+        ```
+
+        ![](/assets/images/simulate_nb.svg)
+
+        And here is the context information available at each step:
+
+        ![](/assets/images/context_info.svg)
+
+    Usage:
+        * Create a group of three assets together sharing 100$ and simulate an equal-weighted portfolio
+        that rebalances every second tick, all without leaving Numba:
+
+        ```pycon
+        >>> import numpy as np
+        >>> import pandas as pd
+        >>> from collections import namedtuple
+        >>> from numba import njit
+        >>> from vectorbtpro.generic.plotting import Scatter
+        >>> from vectorbtpro.records.nb import col_map_nb
+        >>> from vectorbtpro.portfolio.enums import SizeType, Direction
+        >>> from vectorbtpro.portfolio.call_seq import build_call_seq
+        >>> from vectorbtpro.portfolio.nb import (
+        ...     get_col_elem_nb,
+        ...     get_elem_nb,
+        ...     order_nb,
+        ...     simulate_nb,
+        ...     simulate_row_wise_nb,
+        ...     sort_call_seq_nb,
+        ...     asset_flow_nb,
+        ...     assets_nb,
+        ...     asset_value_nb
+        ... )
+
+        >>> @njit
+        ... def pre_sim_func_nb(c):
+        ...     print('before simulation')
+        ...     # Create a temporary array and pass it down the stack
+        ...     order_value_out = np.empty(c.target_shape[1], dtype=np.float_)
+        ...     return (order_value_out,)
+
+        >>> @njit
+        ... def pre_group_func_nb(c, order_value_out):
+        ...     print('\\tbefore group', c.group)
+        ...     # Forward down the stack (you can omit pre_group_func_nb entirely)
+        ...     return (order_value_out,)
+
+        >>> @njit
+        ... def pre_segment_func_nb(c, order_value_out, size, price, size_type, direction):
+        ...     print('\\t\\tbefore segment', c.i)
+        ...     for col in range(c.from_col, c.to_col):
+        ...         # Here we use order price for group valuation
+        ...         c.last_val_price[col] = get_col_elem_nb(c, col, price)
         ...
-    8. post_sim_func_nb(SimulationContext, *post_sim_args)
-    ```
+        ...     # Reorder call sequence of this segment such that selling orders come first and buying last
+        ...     # Rearranges c.call_seq_now based on order value (size, size_type, direction, and val_price)
+        ...     # Utilizes flexible indexing using get_col_elem_nb (as we did above)
+        ...     sort_call_seq_nb(c, size, size_type, direction, order_value_out[c.from_col:c.to_col])
+        ...     # Forward nothing
+        ...     return ()
 
-    Let's demonstrate a frame with one group of two columns and one group of one column, and the
-    following call sequence:
+        >>> @njit
+        ... def order_func_nb(c, size, price, size_type, direction, fees, fixed_fees, slippage):
+        ...     print('\\t\\t\\tcreating order', c.call_idx, 'at column', c.col)
+        ...     # Create and return an order
+        ...     return order_nb(
+        ...         size=get_elem_nb(c, size),
+        ...         price=get_elem_nb(c, price),
+        ...         size_type=get_elem_nb(c, size_type),
+        ...         direction=get_elem_nb(c, direction),
+        ...         fees=get_elem_nb(c, fees),
+        ...         fixed_fees=get_elem_nb(c, fixed_fees),
+        ...         slippage=get_elem_nb(c, slippage)
+        ...     )
 
-    ```plaintext
-    array([[0, 1, 0],
-           [1, 0, 0]])
-    ```
+        >>> @njit
+        ... def post_order_func_nb(c):
+        ...     print('\\t\\t\\t\\torder status:', c.order_result.status)
+        ...     return None
 
-    ![](/docs/img/simulate_nb.svg)
+        >>> @njit
+        ... def post_segment_func_nb(c, order_value_out):
+        ...     print('\\t\\tafter segment', c.i)
+        ...     return None
 
-    And here is the context information available at each step:
+        >>> @njit
+        ... def post_group_func_nb(c, order_value_out):
+        ...     print('\\tafter group', c.group)
+        ...     return None
 
-    ![](/docs/img/context_info.svg)
+        >>> @njit
+        ... def post_sim_func_nb(c):
+        ...     print('after simulation')
+        ...     return None
 
-    ## Example
+        >>> target_shape = (5, 3)
+        >>> np.random.seed(42)
+        >>> group_lens = np.array([3])  # one group of three columns
+        >>> cash_sharing = True
+        >>> call_seq = build_call_seq(target_shape, group_lens)  # will be overridden
+        >>> segment_mask = np.array([True, False, True, False, True])[:, None]
+        >>> segment_mask = np.copy(np.broadcast_to(segment_mask, target_shape))
+        >>> size = np.asarray(1 / target_shape[1])  # scalars must become 0-dim arrays
+        >>> price = close = np.random.uniform(1, 10, size=target_shape)
+        >>> size_type = np.asarray(SizeType.TargetPercent)
+        >>> direction = np.asarray(Direction.LongOnly)
+        >>> fees = np.asarray(0.001)
+        >>> fixed_fees = np.asarray(1.)
+        >>> slippage = np.asarray(0.001)
 
-    Create a group of three assets together sharing 100$ and simulate an equal-weighted portfolio
-    that rebalances every second tick, all without leaving Numba:
+        >>> sim_out = simulate_nb(
+        ...     target_shape,
+        ...     group_lens,
+        ...     cash_sharing,
+        ...     call_seq,
+        ...     segment_mask=segment_mask,
+        ...     pre_sim_func_nb=pre_sim_func_nb,
+        ...     post_sim_func_nb=post_sim_func_nb,
+        ...     pre_group_func_nb=pre_group_func_nb,
+        ...     post_group_func_nb=post_group_func_nb,
+        ...     pre_segment_func_nb=pre_segment_func_nb,
+        ...     pre_segment_args=(size, price, size_type, direction),
+        ...     post_segment_func_nb=post_segment_func_nb,
+        ...     order_func_nb=order_func_nb,
+        ...     order_args=(size, price, size_type, direction, fees, fixed_fees, slippage),
+        ...     post_order_func_nb=post_order_func_nb
+        ... )
+        before simulation
+            before group 0
+                before segment 0
+                    creating order 0 at column 0
+                        order status: 0
+                    creating order 1 at column 1
+                        order status: 0
+                    creating order 2 at column 2
+                        order status: 0
+                after segment 0
+                before segment 2
+                    creating order 0 at column 1
+                        order status: 0
+                    creating order 1 at column 2
+                        order status: 0
+                    creating order 2 at column 0
+                        order status: 0
+                after segment 2
+                before segment 4
+                    creating order 0 at column 0
+                        order status: 0
+                    creating order 1 at column 2
+                        order status: 0
+                    creating order 2 at column 1
+                        order status: 0
+                after segment 4
+            after group 0
+        after simulation
 
-    ```python-repl
-    >>> import numpy as np
-    >>> import pandas as pd
-    >>> from collections import namedtuple
-    >>> from numba import njit
-    >>> from vectorbtpro.generic.plotting import Scatter
-    >>> from vectorbtpro.records.nb import col_map_nb
-    >>> from vectorbtpro.portfolio.enums import SizeType, Direction
-    >>> from vectorbtpro.portfolio.call_seq import build_call_seq
-    >>> from vectorbtpro.portfolio.nb import (
-    ...     get_col_elem_nb,
-    ...     get_elem_nb,
-    ...     order_nb,
-    ...     simulate_nb,
-    ...     simulate_row_wise_nb,
-    ...     sort_call_seq_nb,
-    ...     asset_flow_nb,
-    ...     assets_nb,
-    ...     asset_value_nb
-    ... )
+        >>> pd.DataFrame.from_records(sim_out.order_records)
+           id  col  idx       size     price      fees  side
+        0   0    0    0   7.626262  4.375232  1.033367     0
+        1   1    1    0   3.488053  9.565985  1.033367     0
+        2   2    2    0   3.972040  7.595533  1.030170     0
+        3   3    1    2   0.920352  8.786790  1.008087     1
+        4   4    2    2   0.448747  6.403625  1.002874     1
+        5   5    0    2   5.210115  1.524275  1.007942     0
+        6   6    0    4   7.899568  8.483492  1.067016     1
+        7   7    2    4  12.378281  2.639061  1.032667     0
+        8   8    1    4  10.713236  2.913963  1.031218     0
 
-    >>> @njit
-    ... def pre_sim_func_nb(c):
-    ...     print('before simulation')
-    ...     # Create a temporary array and pass it down the stack
-    ...     order_value_out = np.empty(c.target_shape[1], dtype=np.float_)
-    ...     return (order_value_out,)
+        >>> call_seq
+        array([[0, 1, 2],
+               [0, 1, 2],
+               [1, 2, 0],
+               [0, 1, 2],
+               [0, 2, 1]])
 
-    >>> @njit
-    ... def pre_group_func_nb(c, order_value_out):
-    ...     print('\\tbefore group', c.group)
-    ...     # Forward down the stack (you can omit pre_group_func_nb entirely)
-    ...     return (order_value_out,)
+        >>> col_map = col_map_nb(sim_out.order_records['col'], target_shape[1])
+        >>> asset_flow = asset_flow_nb(target_shape, sim_out.order_records, col_map)
+        >>> assets = assets_nb(asset_flow)
+        >>> asset_value = asset_value_nb(close, assets)
+        >>> Scatter(data=asset_value).fig.show()
+        ```
 
-    >>> @njit
-    ... def pre_segment_func_nb(c, order_value_out, size, price, size_type, direction):
-    ...     print('\\t\\tbefore segment', c.i)
-    ...     for col in range(c.from_col, c.to_col):
-    ...         # Here we use order price for group valuation
-    ...         c.last_val_price[col] = get_col_elem_nb(c, col, price)
-    ...
-    ...     # Reorder call sequence of this segment such that selling orders come first and buying last
-    ...     # Rearranges c.call_seq_now based on order value (size, size_type, direction, and val_price)
-    ...     # Utilizes flexible indexing using get_col_elem_nb (as we did above)
-    ...     sort_call_seq_nb(c, size, size_type, direction, order_value_out[c.from_col:c.to_col])
-    ...     # Forward nothing
-    ...     return ()
+        ![](/assets/images/simulate_nb_example.svg)
 
-    >>> @njit
-    ... def order_func_nb(c, size, price, size_type, direction, fees, fixed_fees, slippage):
-    ...     print('\\t\\t\\tcreating order', c.call_idx, 'at column', c.col)
-    ...     # Create and return an order
-    ...     return order_nb(
-    ...         size=get_elem_nb(c, size),
-    ...         price=get_elem_nb(c, price),
-    ...         size_type=get_elem_nb(c, size_type),
-    ...         direction=get_elem_nb(c, direction),
-    ...         fees=get_elem_nb(c, fees),
-    ...         fixed_fees=get_elem_nb(c, fixed_fees),
-    ...         slippage=get_elem_nb(c, slippage)
-    ...     )
-
-    >>> @njit
-    ... def post_order_func_nb(c):
-    ...     print('\\t\\t\\t\\torder status:', c.order_result.status)
-    ...     return None
-
-    >>> @njit
-    ... def post_segment_func_nb(c, order_value_out):
-    ...     print('\\t\\tafter segment', c.i)
-    ...     return None
-
-    >>> @njit
-    ... def post_group_func_nb(c, order_value_out):
-    ...     print('\\tafter group', c.group)
-    ...     return None
-
-    >>> @njit
-    ... def post_sim_func_nb(c):
-    ...     print('after simulation')
-    ...     return None
-
-    >>> target_shape = (5, 3)
-    >>> np.random.seed(42)
-    >>> group_lens = np.array([3])  # one group of three columns
-    >>> cash_sharing = True
-    >>> call_seq = build_call_seq(target_shape, group_lens)  # will be overridden
-    >>> segment_mask = np.array([True, False, True, False, True])[:, None]
-    >>> segment_mask = np.copy(np.broadcast_to(segment_mask, target_shape))
-    >>> size = np.asarray(1 / target_shape[1])  # scalars must become 0-dim arrays
-    >>> price = close = np.random.uniform(1, 10, size=target_shape)
-    >>> size_type = np.asarray(SizeType.TargetPercent)
-    >>> direction = np.asarray(Direction.LongOnly)
-    >>> fees = np.asarray(0.001)
-    >>> fixed_fees = np.asarray(1.)
-    >>> slippage = np.asarray(0.001)
-
-    >>> sim_out = simulate_nb(
-    ...     target_shape,
-    ...     group_lens,
-    ...     cash_sharing,
-    ...     call_seq,
-    ...     segment_mask=segment_mask,
-    ...     pre_sim_func_nb=pre_sim_func_nb,
-    ...     post_sim_func_nb=post_sim_func_nb,
-    ...     pre_group_func_nb=pre_group_func_nb,
-    ...     post_group_func_nb=post_group_func_nb,
-    ...     pre_segment_func_nb=pre_segment_func_nb,
-    ...     pre_segment_args=(size, price, size_type, direction),
-    ...     post_segment_func_nb=post_segment_func_nb,
-    ...     order_func_nb=order_func_nb,
-    ...     order_args=(size, price, size_type, direction, fees, fixed_fees, slippage),
-    ...     post_order_func_nb=post_order_func_nb
-    ... )
-    before simulation
-        before group 0
-            before segment 0
-                creating order 0 at column 0
-                    order status: 0
-                creating order 1 at column 1
-                    order status: 0
-                creating order 2 at column 2
-                    order status: 0
-            after segment 0
-            before segment 2
-                creating order 0 at column 1
-                    order status: 0
-                creating order 1 at column 2
-                    order status: 0
-                creating order 2 at column 0
-                    order status: 0
-            after segment 2
-            before segment 4
-                creating order 0 at column 0
-                    order status: 0
-                creating order 1 at column 2
-                    order status: 0
-                creating order 2 at column 1
-                    order status: 0
-            after segment 4
-        after group 0
-    after simulation
-
-    >>> pd.DataFrame.from_records(sim_out.order_records)
-       id  col  idx       size     price      fees  side
-    0   0    0    0   7.626262  4.375232  1.033367     0
-    1   1    1    0   3.488053  9.565985  1.033367     0
-    2   2    2    0   3.972040  7.595533  1.030170     0
-    3   3    1    2   0.920352  8.786790  1.008087     1
-    4   4    2    2   0.448747  6.403625  1.002874     1
-    5   5    0    2   5.210115  1.524275  1.007942     0
-    6   6    0    4   7.899568  8.483492  1.067016     1
-    7   7    2    4  12.378281  2.639061  1.032667     0
-    8   8    1    4  10.713236  2.913963  1.031218     0
-
-    >>> call_seq
-    array([[0, 1, 2],
-           [0, 1, 2],
-           [1, 2, 0],
-           [0, 1, 2],
-           [0, 2, 1]])
-
-    >>> col_map = col_map_nb(sim_out.order_records['col'], target_shape[1])
-    >>> asset_flow = asset_flow_nb(target_shape, sim_out.order_records, col_map)
-    >>> assets = assets_nb(asset_flow)
-    >>> asset_value = asset_value_nb(close, assets)
-    >>> Scatter(data=asset_value).fig.show()
-    ```
-
-    ![](/docs/img/simulate_nb_example.svg)
-
-    Note that the last order in a group with cash sharing is always disadvantaged
-    as it has a bit less funds than the previous orders due to costs, which are not
-    included when valuating the group.
+        Note that the last order in a group with cash sharing is always disadvantaged
+        as it has a bit less funds than the previous orders due to costs, which are not
+        included when valuating the group.
     """
     check_group_lens_nb(group_lens, target_shape[1])
 
@@ -1320,97 +1491,95 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
         You can only safely access data points that are to the left of the current group and
         rows that are to the top of the current row.
 
-    ## Call hierarchy
-
-    ```plaintext
-    1. pre_sim_out = pre_sim_func_nb(SimulationContext, *pre_sim_args)
-        2. pre_row_out = pre_row_func_nb(RowContext, *pre_sim_out, *pre_row_args)
-            3. if call_pre_segment or segment_mask: pre_segment_out = pre_segment_func_nb(SegmentContext, *pre_row_out, *pre_segment_args)
-                4. if segment_mask: order = order_func_nb(OrderContext, *pre_segment_out, *order_args)
-                5. if order: post_order_func_nb(PostOrderContext, *pre_segment_out, *post_order_args)
+    Call hierarchy:
+        ```plaintext
+        1. pre_sim_out = pre_sim_func_nb(SimulationContext, *pre_sim_args)
+            2. pre_row_out = pre_row_func_nb(RowContext, *pre_sim_out, *pre_row_args)
+                3. if call_pre_segment or segment_mask: pre_segment_out = pre_segment_func_nb(SegmentContext, *pre_row_out, *pre_segment_args)
+                    4. if segment_mask: order = order_func_nb(OrderContext, *pre_segment_out, *order_args)
+                    5. if order: post_order_func_nb(PostOrderContext, *pre_segment_out, *post_order_args)
+                    ...
+                6. if call_post_segment or segment_mask: post_segment_func_nb(SegmentContext, *pre_row_out, *post_segment_args)
                 ...
-            6. if call_post_segment or segment_mask: post_segment_func_nb(SegmentContext, *pre_row_out, *post_segment_args)
+            7. post_row_func_nb(RowContext, *pre_sim_out, *post_row_args)
             ...
-        7. post_row_func_nb(RowContext, *pre_sim_out, *post_row_args)
-        ...
-    8. post_sim_func_nb(SimulationContext, *post_sim_args)
-    ```
+        8. post_sim_func_nb(SimulationContext, *post_sim_args)
+        ```
 
-    Let's illustrate the same example as in `simulate_nb` but adapted for this function:
+        Let's illustrate the same example as in `simulate_nb` but adapted for this function:
 
-    ![](/docs/img/simulate_row_wise_nb.svg)
+        ![](/assets/images/simulate_row_wise_nb.svg)
 
-    ## Example
+    Usage:
+        * Running the same example as in `simulate_nb` but adapted for this function:
 
-    Running the same example as in `simulate_nb` but adapted for this function:
+        ```pycon
+        >>> @njit
+        ... def pre_row_func_nb(c, order_value_out):
+        ...     print('\\tbefore row', c.i)
+        ...     # Forward down the stack
+        ...     return (order_value_out,)
 
-    ```python-repl
-    >>> @njit
-    ... def pre_row_func_nb(c, order_value_out):
-    ...     print('\\tbefore row', c.i)
-    ...     # Forward down the stack
-    ...     return (order_value_out,)
+        >>> @njit
+        ... def post_row_func_nb(c, order_value_out):
+        ...     print('\\tafter row', c.i)
+        ...     return None
 
-    >>> @njit
-    ... def post_row_func_nb(c, order_value_out):
-    ...     print('\\tafter row', c.i)
-    ...     return None
-
-    >>> call_seq = build_call_seq(target_shape, group_lens)
-    >>> sim_out = simulate_row_wise_nb(
-    ...     target_shape,
-    ...     group_lens,
-    ...     cash_sharing,
-    ...     call_seq,
-    ...     segment_mask=segment_mask,
-    ...     pre_sim_func_nb=pre_sim_func_nb,
-    ...     post_sim_func_nb=post_sim_func_nb,
-    ...     pre_row_func_nb=pre_row_func_nb,
-    ...     post_row_func_nb=post_row_func_nb,
-    ...     pre_segment_func_nb=pre_segment_func_nb,
-    ...     pre_segment_args=(size, price, size_type, direction),
-    ...     post_segment_func_nb=post_segment_func_nb,
-    ...     order_func_nb=order_func_nb,
-    ...     order_args=(size, price, size_type, direction, fees, fixed_fees, slippage),
-    ...     post_order_func_nb=post_order_func_nb
-    ... )
-    before simulation
-        before row 0
-            before segment 0
-                creating order 0 at column 0
-                    order status: 0
-                creating order 1 at column 1
-                    order status: 0
-                creating order 2 at column 2
-                    order status: 0
-            after segment 0
-        after row 0
-        before row 1
-        after row 1
-        before row 2
-            before segment 2
-                creating order 0 at column 1
-                    order status: 0
-                creating order 1 at column 2
-                    order status: 0
-                creating order 2 at column 0
-                    order status: 0
-            after segment 2
-        after row 2
-        before row 3
-        after row 3
-        before row 4
-            before segment 4
-                creating order 0 at column 0
-                    order status: 0
-                creating order 1 at column 2
-                    order status: 0
-                creating order 2 at column 1
-                    order status: 0
-            after segment 4
-        after row 4
-    after simulation
-    ```
+        >>> call_seq = build_call_seq(target_shape, group_lens)
+        >>> sim_out = simulate_row_wise_nb(
+        ...     target_shape,
+        ...     group_lens,
+        ...     cash_sharing,
+        ...     call_seq,
+        ...     segment_mask=segment_mask,
+        ...     pre_sim_func_nb=pre_sim_func_nb,
+        ...     post_sim_func_nb=post_sim_func_nb,
+        ...     pre_row_func_nb=pre_row_func_nb,
+        ...     post_row_func_nb=post_row_func_nb,
+        ...     pre_segment_func_nb=pre_segment_func_nb,
+        ...     pre_segment_args=(size, price, size_type, direction),
+        ...     post_segment_func_nb=post_segment_func_nb,
+        ...     order_func_nb=order_func_nb,
+        ...     order_args=(size, price, size_type, direction, fees, fixed_fees, slippage),
+        ...     post_order_func_nb=post_order_func_nb
+        ... )
+        before simulation
+            before row 0
+                before segment 0
+                    creating order 0 at column 0
+                        order status: 0
+                    creating order 1 at column 1
+                        order status: 0
+                    creating order 2 at column 2
+                        order status: 0
+                after segment 0
+            after row 0
+            before row 1
+            after row 1
+            before row 2
+                before segment 2
+                    creating order 0 at column 1
+                        order status: 0
+                    creating order 1 at column 2
+                        order status: 0
+                    creating order 2 at column 0
+                        order status: 0
+                after segment 2
+            after row 2
+            before row 3
+            after row 3
+            before row 4
+                before segment 4
+                    creating order 0 at column 0
+                        order status: 0
+                    creating order 1 at column 2
+                        order status: 0
+                    creating order 2 at column 1
+                        order status: 0
+                after segment 4
+            after row 4
+        after simulation
+        ```
     """
     check_group_lens_nb(group_lens, target_shape[1])
 
@@ -2064,7 +2233,7 @@ def no_flex_order_func_nb(c: FlexOrderContext, *args) -> tp.Tuple[int, Order]:
     return -1, NoOrder
 
 
-@register_jitted(cache=True)
+@register_jitted
 def def_flex_pre_segment_func_nb(c: SegmentContext,
                                  val_price: tp.FlexArray,
                                  price: tp.FlexArray,
@@ -2081,7 +2250,7 @@ def def_flex_pre_segment_func_nb(c: SegmentContext,
     return (call_seq_out,)
 
 
-@register_jitted(cache=True)
+@register_jitted
 def def_flex_order_func_nb(c: FlexOrderContext,
                            call_seq_now: tp.Array1d,
                            size: tp.FlexArray,
@@ -2226,175 +2395,173 @@ def flex_simulate_nb(target_shape: tp.Shape,
         exception. In this case, you must increase `max_orders`. This cannot be done automatically and
         dynamically to avoid performance degradation.
 
-    ## Call hierarchy
-
-    ```plaintext
-    1. pre_sim_out = pre_sim_func_nb(SimulationContext, *pre_sim_args)
-        2. pre_group_out = pre_group_func_nb(GroupContext, *pre_sim_out, *pre_group_args)
-            3. if call_pre_segment or segment_mask: pre_segment_out = pre_segment_func_nb(SegmentContext, *pre_group_out, *pre_segment_args)
-                while col != -1:
-                    4. if segment_mask: col, order = flex_order_func_nb(FlexOrderContext, *pre_segment_out, *flex_order_args)
-                    5. if order: post_order_func_nb(PostOrderContext, *pre_segment_out, *post_order_args)
-                    ...
-            6. if call_post_segment or segment_mask: post_segment_func_nb(SegmentContext, *pre_group_out, *post_segment_args)
+    Call hierarchy:
+        ```plaintext
+        1. pre_sim_out = pre_sim_func_nb(SimulationContext, *pre_sim_args)
+            2. pre_group_out = pre_group_func_nb(GroupContext, *pre_sim_out, *pre_group_args)
+                3. if call_pre_segment or segment_mask: pre_segment_out = pre_segment_func_nb(SegmentContext, *pre_group_out, *pre_segment_args)
+                    while col != -1:
+                        4. if segment_mask: col, order = flex_order_func_nb(FlexOrderContext, *pre_segment_out, *flex_order_args)
+                        5. if order: post_order_func_nb(PostOrderContext, *pre_segment_out, *post_order_args)
+                        ...
+                6. if call_post_segment or segment_mask: post_segment_func_nb(SegmentContext, *pre_group_out, *post_segment_args)
+                ...
+            7. post_group_func_nb(GroupContext, *pre_sim_out, *post_group_args)
             ...
-        7. post_group_func_nb(GroupContext, *pre_sim_out, *post_group_args)
+        8. post_sim_func_nb(SimulationContext, *post_sim_args)
+        ```
+
+        Let's illustrate the same example as in `simulate_nb` but adapted for this function:
+
+        ![](/assets/images/flex_simulate_nb.svg)
+
+    Usage:
+        * The same example as in `simulate_nb`:
+
+        ```pycon
+        >>> import numpy as np
+        >>> from numba import njit
+        >>> from vectorbtpro.portfolio.enums import SizeType, Direction
+        >>> from vectorbtpro.portfolio.nb import (
+        ...     get_col_elem_nb,
+        ...     order_nb,
+        ...     order_nothing_nb,
+        ...     flex_simulate_nb,
+        ...     flex_simulate_row_wise_nb,
+        ...     sort_call_seq_out_nb
+        ... )
+
+        >>> @njit
+        ... def pre_sim_func_nb(c):
+        ...     print('before simulation')
+        ...     return ()
+
+        >>> @njit
+        ... def pre_group_func_nb(c):
+        ...     print('\\tbefore group', c.group)
+        ...     # Create temporary arrays and pass them down the stack
+        ...     order_value_out = np.empty(c.group_len, dtype=np.float_)
+        ...     call_seq_out = np.empty(c.group_len, dtype=np.int_)
+        ...     # Forward down the stack
+        ...     return (order_value_out, call_seq_out)
+
+        >>> @njit
+        ... def pre_segment_func_nb(c, order_value_out, call_seq_out, size, price, size_type, direction):
+        ...     print('\\t\\tbefore segment', c.i)
+        ...     for col in range(c.from_col, c.to_col):
+        ...         # Here we use order price for group valuation
+        ...         c.last_val_price[col] = get_col_elem_nb(c, col, price)
         ...
-    8. post_sim_func_nb(SimulationContext, *post_sim_args)
-    ```
+        ...     # Same as for simulate_nb, but since we don't have a predefined c.call_seq_now anymore,
+        ...     # we need to store our new call sequence somewhere else
+        ...     call_seq_out[:] = np.arange(c.group_len)
+        ...     sort_call_seq_out_nb(c, size, size_type, direction, order_value_out, call_seq_out)
+        ...
+        ...     # Forward the sorted call sequence
+        ...     return (call_seq_out,)
 
-    Let's illustrate the same example as in `simulate_nb` but adapted for this function:
+        >>> @njit
+        ... def flex_order_func_nb(c, call_seq_out, size, price, size_type, direction, fees, fixed_fees, slippage):
+        ...     if c.call_idx < c.group_len:
+        ...         col = c.from_col + call_seq_out[c.call_idx]
+        ...         print('\\t\\t\\tcreating order', c.call_idx, 'at column', col)
+        ...         # # Create and return an order
+        ...         return col, order_nb(
+        ...             size=get_col_elem_nb(c, col, size),
+        ...             price=get_col_elem_nb(c, col, price),
+        ...             size_type=get_col_elem_nb(c, col, size_type),
+        ...             direction=get_col_elem_nb(c, col, direction),
+        ...             fees=get_col_elem_nb(c, col, fees),
+        ...             fixed_fees=get_col_elem_nb(c, col, fixed_fees),
+        ...             slippage=get_col_elem_nb(c, col, slippage)
+        ...         )
+        ...     # All columns already processed -> break the loop
+        ...     print('\\t\\t\\tbreaking out of the loop')
+        ...     return -1, order_nothing_nb()
 
-    ![](/docs/img/flex_simulate_nb.svg)
+        >>> @njit
+        ... def post_order_func_nb(c, call_seq_out):
+        ...     print('\\t\\t\\t\\torder status:', c.order_result.status)
+        ...     return None
 
-    ## Example
+        >>> @njit
+        ... def post_segment_func_nb(c, order_value_out, call_seq_out):
+        ...     print('\\t\\tafter segment', c.i)
+        ...     return None
 
-    The same example as in `simulate_nb`:
+        >>> @njit
+        ... def post_group_func_nb(c):
+        ...     print('\\tafter group', c.group)
+        ...     return None
 
-    ```python-repl
-    >>> import numpy as np
-    >>> from numba import njit
-    >>> from vectorbtpro.portfolio.enums import SizeType, Direction
-    >>> from vectorbtpro.portfolio.nb import (
-    ...     get_col_elem_nb,
-    ...     order_nb,
-    ...     order_nothing_nb,
-    ...     flex_simulate_nb,
-    ...     flex_simulate_row_wise_nb,
-    ...     sort_call_seq_out_nb
-    ... )
+        >>> @njit
+        ... def post_sim_func_nb(c):
+        ...     print('after simulation')
+        ...     return None
 
-    >>> @njit
-    ... def pre_sim_func_nb(c):
-    ...     print('before simulation')
-    ...     return ()
+        >>> target_shape = (5, 3)
+        >>> np.random.seed(42)
+        >>> group_lens = np.array([3])  # one group of three columns
+        >>> cash_sharing = True
+        >>> call_seq = build_call_seq(target_shape, group_lens)  # will be overridden
+        >>> segment_mask = np.array([True, False, True, False, True])[:, None]
+        >>> segment_mask = np.copy(np.broadcast_to(segment_mask, target_shape))
+        >>> size = np.asarray(1 / target_shape[1])  # scalars must become 0-dim arrays
+        >>> price = close = np.random.uniform(1, 10, size=target_shape)
+        >>> size_type = np.asarray(SizeType.TargetPercent)
+        >>> direction = np.asarray(Direction.LongOnly)
+        >>> fees = np.asarray(0.001)
+        >>> fixed_fees = np.asarray(1.)
+        >>> slippage = np.asarray(0.001)
 
-    >>> @njit
-    ... def pre_group_func_nb(c):
-    ...     print('\\tbefore group', c.group)
-    ...     # Create temporary arrays and pass them down the stack
-    ...     order_value_out = np.empty(c.group_len, dtype=np.float_)
-    ...     call_seq_out = np.empty(c.group_len, dtype=np.int_)
-    ...     # Forward down the stack
-    ...     return (order_value_out, call_seq_out)
-
-    >>> @njit
-    ... def pre_segment_func_nb(c, order_value_out, call_seq_out, size, price, size_type, direction):
-    ...     print('\\t\\tbefore segment', c.i)
-    ...     for col in range(c.from_col, c.to_col):
-    ...         # Here we use order price for group valuation
-    ...         c.last_val_price[col] = get_col_elem_nb(c, col, price)
-    ...
-    ...     # Same as for simulate_nb, but since we don't have a predefined c.call_seq_now anymore,
-    ...     # we need to store our new call sequence somewhere else
-    ...     call_seq_out[:] = np.arange(c.group_len)
-    ...     sort_call_seq_out_nb(c, size, size_type, direction, order_value_out, call_seq_out)
-    ...
-    ...     # Forward the sorted call sequence
-    ...     return (call_seq_out,)
-
-    >>> @njit
-    ... def flex_order_func_nb(c, call_seq_out, size, price, size_type, direction, fees, fixed_fees, slippage):
-    ...     if c.call_idx < c.group_len:
-    ...         col = c.from_col + call_seq_out[c.call_idx]
-    ...         print('\\t\\t\\tcreating order', c.call_idx, 'at column', col)
-    ...         # # Create and return an order
-    ...         return col, order_nb(
-    ...             size=get_col_elem_nb(c, col, size),
-    ...             price=get_col_elem_nb(c, col, price),
-    ...             size_type=get_col_elem_nb(c, col, size_type),
-    ...             direction=get_col_elem_nb(c, col, direction),
-    ...             fees=get_col_elem_nb(c, col, fees),
-    ...             fixed_fees=get_col_elem_nb(c, col, fixed_fees),
-    ...             slippage=get_col_elem_nb(c, col, slippage)
-    ...         )
-    ...     # All columns already processed -> break the loop
-    ...     print('\\t\\t\\tbreaking out of the loop')
-    ...     return -1, order_nothing_nb()
-
-    >>> @njit
-    ... def post_order_func_nb(c, call_seq_out):
-    ...     print('\\t\\t\\t\\torder status:', c.order_result.status)
-    ...     return None
-
-    >>> @njit
-    ... def post_segment_func_nb(c, order_value_out, call_seq_out):
-    ...     print('\\t\\tafter segment', c.i)
-    ...     return None
-
-    >>> @njit
-    ... def post_group_func_nb(c):
-    ...     print('\\tafter group', c.group)
-    ...     return None
-
-    >>> @njit
-    ... def post_sim_func_nb(c):
-    ...     print('after simulation')
-    ...     return None
-
-    >>> target_shape = (5, 3)
-    >>> np.random.seed(42)
-    >>> group_lens = np.array([3])  # one group of three columns
-    >>> cash_sharing = True
-    >>> call_seq = build_call_seq(target_shape, group_lens)  # will be overridden
-    >>> segment_mask = np.array([True, False, True, False, True])[:, None]
-    >>> segment_mask = np.copy(np.broadcast_to(segment_mask, target_shape))
-    >>> size = np.asarray(1 / target_shape[1])  # scalars must become 0-dim arrays
-    >>> price = close = np.random.uniform(1, 10, size=target_shape)
-    >>> size_type = np.asarray(SizeType.TargetPercent)
-    >>> direction = np.asarray(Direction.LongOnly)
-    >>> fees = np.asarray(0.001)
-    >>> fixed_fees = np.asarray(1.)
-    >>> slippage = np.asarray(0.001)
-
-    >>> sim_out = flex_simulate_nb(
-    ...     target_shape,
-    ...     group_lens,
-    ...     cash_sharing,
-    ...     segment_mask=segment_mask,
-    ...     pre_sim_func_nb=pre_sim_func_nb,
-    ...     post_sim_func_nb=post_sim_func_nb,
-    ...     pre_group_func_nb=pre_group_func_nb,
-    ...     post_group_func_nb=post_group_func_nb,
-    ...     pre_segment_func_nb=pre_segment_func_nb,
-    ...     pre_segment_args=(size, price, size_type, direction),
-    ...     post_segment_func_nb=post_segment_func_nb,
-    ...     flex_order_func_nb=flex_order_func_nb,
-    ...     flex_order_args=(size, price, size_type, direction, fees, fixed_fees, slippage),
-    ...     post_order_func_nb=post_order_func_nb
-    ... )
-    before simulation
-        before group 0
-            before segment 0
-                creating order 0 at column 0
-                    order status: 0
-                creating order 1 at column 1
-                    order status: 0
-                creating order 2 at column 2
-                    order status: 0
-                breaking out of the loop
-            after segment 0
-            before segment 2
-                creating order 0 at column 1
-                    order status: 0
-                creating order 1 at column 2
-                    order status: 0
-                creating order 2 at column 0
-                    order status: 0
-                breaking out of the loop
-            after segment 2
-            before segment 4
-                creating order 0 at column 0
-                    order status: 0
-                creating order 1 at column 2
-                    order status: 0
-                creating order 2 at column 1
-                    order status: 0
-                breaking out of the loop
-            after segment 4
-        after group 0
-    after simulation
-    ```
+        >>> sim_out = flex_simulate_nb(
+        ...     target_shape,
+        ...     group_lens,
+        ...     cash_sharing,
+        ...     segment_mask=segment_mask,
+        ...     pre_sim_func_nb=pre_sim_func_nb,
+        ...     post_sim_func_nb=post_sim_func_nb,
+        ...     pre_group_func_nb=pre_group_func_nb,
+        ...     post_group_func_nb=post_group_func_nb,
+        ...     pre_segment_func_nb=pre_segment_func_nb,
+        ...     pre_segment_args=(size, price, size_type, direction),
+        ...     post_segment_func_nb=post_segment_func_nb,
+        ...     flex_order_func_nb=flex_order_func_nb,
+        ...     flex_order_args=(size, price, size_type, direction, fees, fixed_fees, slippage),
+        ...     post_order_func_nb=post_order_func_nb
+        ... )
+        before simulation
+            before group 0
+                before segment 0
+                    creating order 0 at column 0
+                        order status: 0
+                    creating order 1 at column 1
+                        order status: 0
+                    creating order 2 at column 2
+                        order status: 0
+                    breaking out of the loop
+                after segment 0
+                before segment 2
+                    creating order 0 at column 1
+                        order status: 0
+                    creating order 1 at column 2
+                        order status: 0
+                    creating order 2 at column 0
+                        order status: 0
+                    breaking out of the loop
+                after segment 2
+                before segment 4
+                    creating order 0 at column 0
+                        order status: 0
+                    creating order 1 at column 2
+                        order status: 0
+                    creating order 2 at column 1
+                        order status: 0
+                    breaking out of the loop
+                after segment 4
+            after group 0
+        after simulation
+        ```
     """
 
     check_group_lens_nb(group_lens, target_shape[1])
@@ -3134,26 +3301,26 @@ def flex_simulate_row_wise_nb(target_shape: tp.Shape,
     """Same as `flex_simulate_nb`, but iterates using row-major order, with the rows
     changing fastest, and the columns/groups changing slowest.
 
-    ## Call hierarchy
-
-    ```plaintext
-    1. pre_sim_out = pre_sim_func_nb(SimulationContext, *pre_sim_args)
-        2. pre_row_out = pre_row_func_nb(RowContext, *pre_sim_out, *pre_row_args)
-            3. if call_pre_segment or segment_mask: pre_segment_out = pre_segment_func_nb(SegmentContext, *pre_row_out, *pre_segment_args)
-                while col != -1:
-                    4. if segment_mask: col, order = flex_order_func_nb(FlexOrderContext, *pre_segment_out, *flex_order_args)
-                    5. if order: post_order_func_nb(PostOrderContext, *pre_segment_out, *post_order_args)
-                    ...
-            6. if call_post_segment or segment_mask: post_segment_func_nb(SegmentContext, *pre_row_out, *post_segment_args)
+    Call hierarchy:
+        ```plaintext
+        1. pre_sim_out = pre_sim_func_nb(SimulationContext, *pre_sim_args)
+            2. pre_row_out = pre_row_func_nb(RowContext, *pre_sim_out, *pre_row_args)
+                3. if call_pre_segment or segment_mask: pre_segment_out = pre_segment_func_nb(SegmentContext, *pre_row_out, *pre_segment_args)
+                    while col != -1:
+                        4. if segment_mask: col, order = flex_order_func_nb(FlexOrderContext, *pre_segment_out, *flex_order_args)
+                        5. if order: post_order_func_nb(PostOrderContext, *pre_segment_out, *post_order_args)
+                        ...
+                6. if call_post_segment or segment_mask: post_segment_func_nb(SegmentContext, *pre_row_out, *post_segment_args)
+                ...
+            7. post_row_func_nb(RowContext, *pre_sim_out, *post_row_args)
             ...
-        7. post_row_func_nb(RowContext, *pre_sim_out, *post_row_args)
-        ...
-    8. post_sim_func_nb(SimulationContext, *post_sim_args)
-    ```
+        8. post_sim_func_nb(SimulationContext, *post_sim_args)
+        ```
 
-    Let's illustrate the same example as in `simulate_nb` but adapted for this function:
+        Let's illustrate the same example as in `simulate_nb` but adapted for this function:
 
-    ![](/docs/img/flex_simulate_row_wise_nb.svg)"""
+        ![](/assets/images/flex_simulate_row_wise_nb.svg)
+    """
 
     check_group_lens_nb(group_lens, target_shape[1])
 

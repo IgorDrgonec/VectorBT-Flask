@@ -165,7 +165,7 @@ def resolve_jitter_type(jitter: tp.Optional[tp.JitterLike] = None,
     """Resolve `jitter`.
 
     * If `jitter` is None and `py_func` is not None, uses `get_func_suffix`
-    * If `jitter` is a string, looks in `jitting.jitters` in `vectorbtpro._settings.settings`
+    * If `jitter` is a string, looks in `jitters` in `vectorbtpro._settings.jitting`
     * If `jitter` is a subclass of `Jitter`, returns it
     * If `jitter` is an instance of `Jitter`, returns its class
     * Otherwise, throws an error"""
@@ -199,7 +199,7 @@ def resolve_jitter_type(jitter: tp.Optional[tp.JitterLike] = None,
 
 
 def get_id_of_jitter_type(jitter_type: tp.Type[Jitter]) -> tp.Optional[tp.Hashable]:
-    """Get id of a jitter type using `jitting.jitters` in `vectorbtpro._settings.settings`."""
+    """Get id of a jitter type using `jitters` in `vectorbtpro._settings.jitting`."""
     from vectorbtpro._settings import settings
     jitting_cfg = settings['jitting']
 
@@ -219,7 +219,7 @@ def resolve_jitted_option(option: tp.JittedOption = None) -> tp.KwargsLike:
     * string: Use `option` as the name of the jitter
     * dict: Use `option` as keyword arguments for jitting
 
-    For defaults, see `jitting.option` in `vectorbtpro._settings.settings`."""
+    For defaults, see `option` in `vectorbtpro._settings.jitting`."""
     from vectorbtpro._settings import settings
     jitting_cfg = settings['jitting']
 
@@ -287,23 +287,23 @@ def jitted(*args, tags: tp.Optional[set] = None, **jitted_kwargs) -> tp.Callable
     The wrapping mechanism can be disabled by using the global setting `disable_wrapping`
     (=> returns the wrapped function).
 
-    ## Example
+    Usage:
+        ```pycon
+        >>> import vectorbtpro as vbt
 
-    Jitter is automatically detected using the suffix of the wrapped function:
+        >>> @vbt.jitted
+        ... def my_func_nb():
+        ...     total = 0
+        ...     for i in range(1000000):
+        ...         total += 1
+        ...     return total
 
-    ```python-repl
-    >>> import vectorbtpro as vbt
+        >>> %timeit my_func_nb()
+        68.1 ns ± 0.32 ns per loop (mean ± std. dev. of 7 runs, 10000000 loops each)
+        ```
 
-    >>> @vbt.jitted
-    ... def my_func_nb():
-    ...     total = 0
-    ...     for i in range(1000000):
-    ...         total += 1
-    ...     return total
-
-    >>> %timeit my_func_nb()
-    68.1 ns ± 0.32 ns per loop (mean ± std. dev. of 7 runs, 10000000 loops each)
-    ```"""
+        Jitter is automatically detected using the suffix of the wrapped function.
+    """
 
     def decorator(py_func: tp.Callable) -> tp.Callable:
         jitter = resolve_jitter(py_func=py_func, **jitted_kwargs)

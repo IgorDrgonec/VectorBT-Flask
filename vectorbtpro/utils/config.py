@@ -2,10 +2,10 @@
 
 """Utilities for configuration."""
 
+import functools
 import inspect
 from collections import namedtuple
 from copy import copy, deepcopy
-import functools
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
@@ -223,7 +223,6 @@ _RaiseKeyError = object()
 
 DumpTuple = namedtuple('DumpTuple', ('cls', 'dumps'))
 
-
 PickleableDictT = tp.TypeVar("PickleableDictT", bound="PickleableDict")
 
 
@@ -232,7 +231,7 @@ class PickleableDict(Pickleable, dict):
 
     def dumps(self, **kwargs) -> bytes:
         """Pickle to bytes."""
-        from vectorbtpro.opt_packages import warn_cannot_import
+        from vectorbtpro.utils.opt_packages import warn_cannot_import
         warn_cannot_import('dill')
         try:
             import dill as pickle
@@ -250,7 +249,7 @@ class PickleableDict(Pickleable, dict):
     @classmethod
     def loads(cls: tp.Type[PickleableDictT], dumps: bytes, **kwargs) -> PickleableDictT:
         """Unpickle from bytes."""
-        from vectorbtpro.opt_packages import warn_cannot_import
+        from vectorbtpro.utils.opt_packages import warn_cannot_import
         warn_cannot_import('dill')
         try:
             import dill as pickle
@@ -313,7 +312,7 @@ class Config(PickleableDict, Documented):
             Defaults to True if `frozen_keys_` or `readonly_`, otherwise False.
         **kwargs: Keyword arguments to construct the dict from.
 
-    Defaults can be overridden with settings under `config` in `vectorbtpro._settings.settings`.
+    Defaults can be overridden with settings under `vectorbtpro._settings.config`.
 
     If another config is passed, its properties are copied over, but they can still be overridden
     with the arguments passed to the initializer.
@@ -670,7 +669,7 @@ class Config(PickleableDict, Documented):
 
     def dumps(self, dump_reset_dct: bool = False, **kwargs) -> bytes:
         """Pickle to bytes."""
-        from vectorbtpro.opt_packages import warn_cannot_import
+        from vectorbtpro.utils.opt_packages import warn_cannot_import
         warn_cannot_import('dill')
         try:
             import dill as pickle
@@ -696,7 +695,7 @@ class Config(PickleableDict, Documented):
     @classmethod
     def loads(cls: tp.Type[ConfigT], dumps: bytes, **kwargs) -> ConfigT:
         """Unpickle from bytes."""
-        from vectorbtpro.opt_packages import warn_cannot_import
+        from vectorbtpro.utils.opt_packages import warn_cannot_import
         warn_cannot_import('dill')
         try:
             import dill as pickle
@@ -735,21 +734,9 @@ class Config(PickleableDict, Documented):
             nested = self.nested_
         self.update(loaded, nested=nested, force=True)
 
-    def stringify(self, with_params: bool = False, **kwargs) -> str:
+    def stringify(self, **kwargs) -> str:
         """Stringify using JSON."""
-        doc = type(self).__name__ + "(" + stringify(dict(self), **kwargs) + ")"
-        if with_params:
-            doc += " with params " + stringify(dict(
-                copy_kwargs_=self.copy_kwargs_,
-                reset_dct_=self.reset_dct_,
-                reset_dct_copy_kwargs_=self.reset_dct_copy_kwargs_,
-                frozen_keys_=self.frozen_keys_,
-                readonly_=self.readonly_,
-                nested_=self.nested_,
-                convert_dicts_=self.convert_dicts_,
-                as_attrs_=self.as_attrs_
-            ), **kwargs)
-        return doc
+        return stringify(dict(self), **kwargs)
 
     def __eq__(self, other: tp.Any) -> bool:
         return checks.is_deep_equal(dict(self), dict(other))
@@ -766,7 +753,6 @@ ReadonlyConfig = functools.partial(Config, readonly_=True)
 HybridConfig = functools.partial(Config, copy_kwargs_=dict(copy_mode='hybrid'))
 """`Config` with `copy_kwargs_` set to `copy_mode='hybrid'`."""
 
-
 ConfiguredT = tp.TypeVar("ConfiguredT", bound="Configured")
 
 
@@ -775,7 +761,7 @@ class Configured(Cacheable, Pickleable, Documented):
 
     All subclasses of `Configured` are initialized using `Config`, which makes it easier to pickle.
 
-    Settings are defined under `configured` in `vectorbtpro._settings.settings`.
+    Settings are defined under `vectorbtpro._settings.configured`.
 
     !!! warning
         If any attribute has been overwritten that isn't listed in `Configured._writeable_attrs`,
@@ -853,7 +839,7 @@ class Configured(Cacheable, Pickleable, Documented):
 
     def dumps(self, **kwargs) -> bytes:
         """Pickle to bytes."""
-        from vectorbtpro.opt_packages import warn_cannot_import
+        from vectorbtpro.utils.opt_packages import warn_cannot_import
         warn_cannot_import('dill')
         try:
             import dill as pickle
@@ -868,7 +854,7 @@ class Configured(Cacheable, Pickleable, Documented):
     @classmethod
     def loads(cls: tp.Type[ConfiguredT], dumps: bytes, **kwargs) -> ConfiguredT:
         """Unpickle from bytes."""
-        from vectorbtpro.opt_packages import warn_cannot_import
+        from vectorbtpro.utils.opt_packages import warn_cannot_import
         warn_cannot_import('dill')
         try:
             import dill as pickle
@@ -900,4 +886,4 @@ class Configured(Cacheable, Pickleable, Documented):
 
     def stringify(self, **kwargs) -> str:
         """Stringify using JSON."""
-        return type(self).__name__ + "(**" + self.config.stringify(**kwargs) + ")"
+        return self.config.stringify(**kwargs)

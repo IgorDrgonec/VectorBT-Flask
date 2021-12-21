@@ -1,6 +1,6 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Class and function decorators."""
+"""Class decorators for portfolio."""
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
@@ -15,7 +15,7 @@ def attach_returns_acc_methods(config: Config) -> tp.ClassWrapper:
     `config` must contain target method names (keys) and settings (values) with the following keys:
 
     * `source_name`: Name of the source method. Defaults to the target name.
-    * `docstring`: Method docstring. Defaults to "See `vectorbtpro.returns.accessors.ReturnsAccessor.{source_name}`.".
+    * `docstring`: Method docstring.
 
     The class must be a subclass of `vectorbtpro.portfolio.base.Portfolio`."""
 
@@ -78,7 +78,7 @@ def attach_shortcut_properties(config: Config) -> tp.ClassWrapper:
         'records' and 'red_array'. Otherwise, to `vectorbtpro.utils.decorators.cacheable_property`.
     * `decorator_kwargs`: Keyword arguments passed to the decorator. By default,
         includes options `obj_type` and `group_aware`.
-    * `docstring`: Method docstring. Defaults to "`{cls.__name__}.{source_name}` with default arguments.".
+    * `docstring`: Method docstring.
 
     The class must be a subclass of `vectorbtpro.portfolio.base.Portfolio`."""
 

@@ -1,6 +1,6 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Numba-compiled functions.
+"""Numba-compiled functions for generating data.
 
 Provides an arsenal of Numba-compiled functions that are used to generate data.
 These only accept NumPy arrays and other Numba-compatible types."""
@@ -9,7 +9,7 @@ import numpy as np
 from numba import prange
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.jit_registry import register_jitted
+from vectorbtpro.registries.jit_registry import register_jitted
 
 
 @register_jitted(cache=True, tags={'can_parallel'})

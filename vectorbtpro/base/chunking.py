@@ -1,10 +1,10 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Extensions to `vectorbtpro.utils.chunking`."""
+"""Extensions for chunking of base operations."""
 
-import attr
 import uuid
 
+import attr
 import numpy as np
 from numba.typed import List
 

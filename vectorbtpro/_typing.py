@@ -1,6 +1,6 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""General types used in vectorbtpro."""
+"""General types used across vectorbtpro."""
 
 from datetime import datetime, timedelta, tzinfo
 from pathlib import Path
@@ -9,7 +9,6 @@ from typing import *
 import numpy as np
 import pandas as pd
 from mypy_extensions import VarArg
-from numba.typed import List as NumbaList
 from pandas import Series, DataFrame as Frame, Index
 from pandas.tseries.offsets import DateOffset
 

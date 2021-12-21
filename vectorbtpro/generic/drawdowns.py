@@ -11,14 +11,20 @@ they subclass `vectorbtpro.generic.ranges.Ranges`.
 
 Using `Drawdowns.from_ts`, you can generate drawdown records for any time series and analyze them right away.
 
-```python-repl
->>> import vectorbtpro as vbt
+```pycon
 >>> import numpy as np
 >>> import pandas as pd
+>>> from datetime import datetime, timedelta
+>>> import vectorbtpro as vbt
 
 >>> start = '2019-10-01 UTC'  # crypto is in UTC
 >>> end = '2020-01-01 UTC'
 >>> price = vbt.YFData.fetch('BTC-USD', start=start, end=end).get('Close')
+```
+
+[=100% "100%"]{: .candystripe}
+
+```pycon
 >>> price = price.rename(None)
 
 >>> drawdowns = vbt.Drawdowns.from_ts(price, wrapper_kwargs=dict(freq='d'))
@@ -47,7 +53,7 @@ Timedelta('66 days 00:00:00')
 
 Moreover, all generic accessors have a property `drawdowns` and a method `get_drawdowns`:
 
-```python-repl
+```pycon
 >>> # vectorbtpro.generic.accessors.GenericAccessor.drawdowns.coverage
 >>> price.vbt.drawdowns.coverage
 0.925531914893617
@@ -58,7 +64,7 @@ Moreover, all generic accessors have a property `drawdowns` and a method `get_dr
 !!! hint
     See `vectorbtpro.generic.stats_builder.StatsBuilderMixin.stats` and `Drawdowns.metrics`.
 
-```python-repl
+```pycon
 >>> df = pd.DataFrame({
 ...     'a': [1, 2, 1, 3, 2],
 ...     'b': [2, 3, 1, 2, 1]
@@ -94,7 +100,7 @@ Name: a, dtype: object
 By default, the metrics `max_dd`, `avg_dd`, `max_dd_duration`, and `avg_dd_duration` do
 not include active drawdowns. To change that, pass `incl_active=True`:
 
-```python-repl
+```pycon
 >>> drawdowns['a'].stats(settings=dict(incl_active=True))
 Start                                        0
 End                                          4
@@ -122,7 +128,7 @@ Name: a, dtype: object
 
 `Drawdowns.stats` also supports (re-)grouping:
 
-```python-repl
+```pycon
 >>> drawdowns['a'].stats(group_by=True)
 UserWarning: Metric 'active_dd' does not support grouped data
 UserWarning: Metric 'active_duration' does not support grouped data
@@ -156,11 +162,11 @@ Name: group, dtype: object
 
 `Drawdowns` class has a single subplot based on `Drawdowns.plot`:
 
-```python-repl
+```pycon
 >>> drawdowns['a'].plots()
 ```
 
-![](/docs/img/drawdowns_plots.svg)
+![](/assets/images/drawdowns_plots.svg)
 """
 
 import numpy as np
@@ -169,13 +175,13 @@ import pandas as pd
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_2d_array, to_pd_array
 from vectorbtpro.base.wrapping import ArrayWrapper
-from vectorbtpro.ch_registry import ch_registry
 from vectorbtpro.generic import nb
 from vectorbtpro.generic.enums import DrawdownStatus, drawdown_dt
 from vectorbtpro.generic.ranges import Ranges
-from vectorbtpro.jit_registry import jit_registry
 from vectorbtpro.records.decorators import override_field_config, attach_fields, attach_shortcut_properties
 from vectorbtpro.records.mapped_array import MappedArray
+from vectorbtpro.registries.ch_registry import ch_registry
+from vectorbtpro.registries.jit_registry import jit_registry
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig
 from vectorbtpro.utils.template import RepEval
@@ -602,7 +608,7 @@ class Drawdowns(Ranges):
         """Defaults for `Drawdowns.stats`.
 
         Merges `vectorbtpro.generic.ranges.Ranges.stats_defaults` and
-        `drawdowns.stats` from `vectorbtpro._settings.settings`."""
+        `stats` from `vectorbtpro._settings.drawdowns`."""
         from vectorbtpro._settings import settings
         drawdowns_stats_cfg = settings['drawdowns']['stats']
 
@@ -787,21 +793,16 @@ class Drawdowns(Ranges):
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> price = pd.Series([1, 2, 1, 2, 3, 2, 1, 2], name='Price')
+            >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
+            >>> vbt.Drawdowns.from_ts(price, wrapper_kwargs=dict(freq='1 day')).plot()
+            ```
 
-        ```python-repl
-        >>> import vectorbtpro as vbt
-        >>> from datetime import datetime, timedelta
-        >>> import pandas as pd
-
-        >>> price = pd.Series([1, 2, 1, 2, 3, 2, 1, 2], name='Price')
-        >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
-        >>> vbt.Drawdowns.from_ts(price, wrapper_kwargs=dict(freq='1 day')).plot()
-        ```
-
-        ![](/docs/img/drawdowns_plot.svg)
+            ![](/assets/images/drawdowns_plot.svg)
         """
-        from vectorbtpro.opt_packages import assert_can_import
+        from vectorbtpro.utils.opt_packages import assert_can_import
         assert_can_import('plotly')
         import plotly.graph_objects as go
         from vectorbtpro.utils.figure import make_figure, get_domain
@@ -1066,7 +1067,7 @@ class Drawdowns(Ranges):
         """Defaults for `Drawdowns.plots`.
 
         Merges `vectorbtpro.generic.ranges.Ranges.plots_defaults` and
-        `drawdowns.plots` from `vectorbtpro._settings.settings`."""
+        `plots` from `vectorbtpro._settings.drawdowns`."""
         from vectorbtpro._settings import settings
         drawdowns_plots_cfg = settings['drawdowns']['plots']
 

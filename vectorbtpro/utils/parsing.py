@@ -3,10 +3,11 @@
 """Utilities for parsing."""
 
 import ast
-import attr
 import inspect
 import re
 import sys
+
+import attr
 
 from vectorbtpro import _typing as tp
 

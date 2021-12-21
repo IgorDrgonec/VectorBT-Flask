@@ -43,7 +43,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
     def plots_defaults(self) -> tp.Kwargs:
         """Defaults for `PlotsBuilderMixin.plots`.
 
-        See `plots_builder` in `vectorbtpro._settings.settings`."""
+        See `vectorbtpro._settings.plots_builder`."""
         from vectorbtpro._settings import settings
         plots_builder_cfg = settings['plots_builder']
 
@@ -106,6 +106,9 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                 * `tags`, `check_{filter}`, `inv_check_{filter}`, `resolve_plot_func`, `pass_{arg}`,
                     `resolve_path_{arg}`, `resolve_{arg}` and `template_mapping`:
                     The same as in `vectorbtpro.generic.stats_builder.StatsBuilderMixin` for `calc_func`.
+                * `select_col_{arg}`: Whether to select the column from an argument that is meant to be
+                    an attribute of this object. If False, make sure that the plotting function
+                    accepts the argument `column` and does this manually. Defaults to False.
                 * Any other keyword argument that overrides the settings or is passed directly to `plot_func`.
 
                 If `resolve_plot_func` is True, the plotting function may "request" any of the
@@ -164,9 +167,8 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
 
             See further notes under `vectorbtpro.generic.stats_builder.StatsBuilderMixin`.
 
-        ## Example
-
-        See `vectorbtpro.portfolio.base` for examples.
+        Usage:
+            See `vectorbtpro.portfolio.base`.
         """
         from vectorbtpro.utils.figure import make_subplots, get_domain
         from vectorbtpro._settings import settings as _settings
@@ -546,28 +548,46 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                                 if kwargs is None:
                                     kwargs = {}
 
-                                if obj is custom_reself and _final_kwargs.pop('resolve_path_' + attr, True):
-                                    if call_attr:
-                                        return custom_reself.resolve_attr(
-                                            attr,  # do not pass _attr, important for caching
-                                            args=args,
-                                            cond_kwargs={k: v for k, v in _final_kwargs.items() if k in _opt_arg_names},
-                                            kwargs=kwargs,
-                                            custom_arg_names=_custom_arg_names,
-                                            cache_dct=_arg_cache_dct,
-                                            use_caching=_use_caching,
-                                            passed_kwargs_out=passed_kwargs_out,
-                                            use_shortcuts=_use_shortcuts
-                                        )
-                                    if isinstance(obj, AttrResolver):
-                                        cls_dir = obj.cls_dir
-                                    else:
-                                        cls_dir = dir(type(obj))
-                                    if 'get_' + attr in cls_dir:
-                                        _attr = 'get_' + attr
-                                    else:
-                                        _attr = attr
-                                    return getattr(obj, _attr)
+                                if obj is custom_reself:
+                                    resolve_path_arg = _final_kwargs.pop('resolve_path_' + attr, True)
+                                    if resolve_path_arg:
+                                        if call_attr:
+                                            cond_kwargs = {
+                                                k: v
+                                                for k, v in _final_kwargs.items()
+                                                if k in _opt_arg_names
+                                            }
+                                            out = custom_reself.resolve_attr(
+                                                attr,  # do not pass _attr, important for caching
+                                                args=args,
+                                                cond_kwargs=cond_kwargs,
+                                                kwargs=kwargs,
+                                                custom_arg_names=_custom_arg_names,
+                                                cache_dct=_arg_cache_dct,
+                                                use_caching=_use_caching,
+                                                passed_kwargs_out=passed_kwargs_out,
+                                                use_shortcuts=_use_shortcuts
+                                            )
+                                        else:
+                                            if isinstance(obj, AttrResolver):
+                                                cls_dir = obj.cls_dir
+                                            else:
+                                                cls_dir = dir(type(obj))
+                                            if 'get_' + attr in cls_dir:
+                                                _attr = 'get_' + attr
+                                            else:
+                                                _attr = attr
+                                            out = getattr(obj, _attr)
+                                        select_col_arg = _final_kwargs.pop('select_col_' + attr, False)
+                                        if select_col_arg:
+                                            out = custom_reself.select_one_from_obj(
+                                                out,
+                                                custom_reself.wrapper.regroup(_group_by),
+                                                column=_column
+                                            )
+                                            passed_kwargs_out['group_by'] = _group_by
+                                            passed_kwargs_out['column'] = _column
+                                        return out
 
                                 out = getattr(obj, attr)
                                 if callable(out) and call_attr:
@@ -583,6 +603,9 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                             if 'group_by' in passed_kwargs_out:
                                 if 'pass_group_by' not in final_kwargs:
                                     final_kwargs.pop('group_by', None)
+                            if 'column' in passed_kwargs_out:
+                                if 'pass_column' not in final_kwargs:
+                                    final_kwargs.pop('column', None)
                         if not callable(plot_func):
                             raise TypeError("plot_func must be callable")
 

@@ -1,13 +1,13 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Numba-compiled functions for `vectorbtpro.portfolio.base.Portfolio.from_orders`."""
+"""Numba-compiled functions for portfolio modeling based on orders."""
 
 from numba import prange
 
 from vectorbtpro.base import chunking as base_ch
-from vectorbtpro.ch_registry import register_chunkable
 from vectorbtpro.portfolio import chunking as portfolio_ch
 from vectorbtpro.portfolio.nb.core import *
+from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.array_ import insert_argsort_nb
 
@@ -101,31 +101,31 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
 
         Single value must be passed as a 0-dim array (for example, by using `np.asarray(value)`).
 
-    ## Example
+    Usage:
+        * Buy and hold using all cash and closing price (default):
 
-    Buy and hold using all cash and closing price (default):
+        ```pycon
+        >>> import numpy as np
+        >>> from vectorbtpro.records.nb import col_map_nb
+        >>> from vectorbtpro.portfolio.nb import simulate_from_orders_nb, asset_flow_nb
 
-    ```python-repl
-    >>> import numpy as np
-    >>> from vectorbtpro.records.nb import col_map_nb
-    >>> from vectorbtpro.portfolio.nb import simulate_from_orders_nb, asset_flow_nb
-
-    >>> close = np.array([1, 2, 3, 4, 5])[:, None]
-    >>> sim_out = simulate_from_orders_nb(
-    ...     target_shape=close.shape,
-    ...     group_lens=np.array([1]),
-    ...     call_seq=np.full(close.shape, 0),
-    ...     close=close
-    ... )
-    >>> col_map = col_map_nb(sim_out.order_records['col'], close.shape[1])
-    >>> asset_flow = asset_flow_nb(close.shape, sim_out.order_records, col_map)
-    >>> asset_flow
-    array([[100.],
-           [  0.],
-           [  0.],
-           [  0.],
-           [  0.]])
-    ```"""
+        >>> close = np.array([1, 2, 3, 4, 5])[:, None]
+        >>> sim_out = simulate_from_orders_nb(
+        ...     target_shape=close.shape,
+        ...     group_lens=np.array([1]),
+        ...     call_seq=np.full(close.shape, 0),
+        ...     close=close
+        ... )
+        >>> col_map = col_map_nb(sim_out.order_records['col'], close.shape[1])
+        >>> asset_flow = asset_flow_nb(close.shape, sim_out.order_records, col_map)
+        >>> asset_flow
+        array([[100.],
+               [  0.],
+               [  0.],
+               [  0.],
+               [  0.]])
+        ```
+    """
     check_group_lens_nb(group_lens, target_shape[1])
     cash_sharing = is_grouped_nb(group_lens)
 

@@ -1,6 +1,6 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Extensions to `vectorbtpro.utils.chunking`."""
+"""Extensions for chunking of portfolio."""
 
 import numpy as np
 

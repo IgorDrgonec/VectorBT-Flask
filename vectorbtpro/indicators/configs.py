@@ -1,6 +1,6 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Configs."""
+"""Configs for custom indicators."""
 
 from vectorbtpro.utils.config import ReadonlyConfig
 

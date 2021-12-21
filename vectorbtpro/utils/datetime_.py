@@ -114,9 +114,8 @@ def to_tzaware_datetime(dt_like: tp.DatetimeLike,
     See [dateparser docs](http://dateparser.readthedocs.io/en/latest/) for valid string formats and `**kwargs`.
 
     Raw timestamps are localized to UTC, while naive datetime is localized to `naive_tz`.
-    Set `naive_tz` to None to use the default value defined under `datetime` settings
-    in `vectorbtpro._settings.settings`. To explicitly convert the datetime to a timezone,
-    use `tz` (uses `to_timezone`)."""
+    Set `naive_tz` to None to use the default value defined under `vectorbtpro._settings.datetime`.
+    To explicitly convert the datetime to a timezone, use `tz` (uses `to_timezone`)."""
     from vectorbtpro._settings import settings
     datetime_cfg = settings['datetime']
 

@@ -1,7 +1,5 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Next-gen framework for backtesting, algorithmic trading, and research."""
-
 __pdoc__ = {}
 
 # Import version
@@ -20,15 +18,15 @@ from vectorbtpro.records import *
 from vectorbtpro.portfolio import *
 from vectorbtpro.labels import *
 from vectorbtpro.messaging import *
+from vectorbtpro.registries import *
+from vectorbtpro.ohlcv import *
+from vectorbtpro.px import *
 
 # Most important modules and objects
 from vectorbtpro import _typing as tp
 from vectorbtpro._settings import settings
-from vectorbtpro.jit_registry import register_jitted
-from vectorbtpro.ch_registry import register_chunkable
-from vectorbtpro.ca_registry import CAQuery, CAQueryDelegator
-from vectorbtpro.jit_registry import register_jitted
-from vectorbtpro.root_accessors import pd_acc, sr_acc, df_acc
+from vectorbtpro.accessors import pd_acc, sr_acc, df_acc
+from vectorbtpro.generic import nb
 
 # Import all submodules
 from vectorbtpro.utils.module_ import import_submodules

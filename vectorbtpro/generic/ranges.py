@@ -13,14 +13,20 @@ are 0 and 20 (not 19!) respectively.
     Be aware that if a range hasn't ended in a column, its `end_idx` will point at the latest index.
     Make sure to account for this when computing custom metrics involving duration.
 
-```python-repl
->>> import vectorbtpro as vbt
+```pycon
 >>> import numpy as np
 >>> import pandas as pd
+>>> from datetime import datetime, timedelta
+>>> import vectorbtpro as vbt
 
 >>> start = '2019-01-01 UTC'  # crypto is in UTC
 >>> end = '2020-01-01 UTC'
 >>> price = vbt.YFData.fetch('BTC-USD', start=start, end=end).get('Close')
+```
+
+[=100% "100%"]{: .candystripe}
+
+```pycon
 >>> fast_ma = vbt.MA.run(price, 10)
 >>> slow_ma = vbt.MA.run(price, 50)
 >>> fast_below_slow = fast_ma.ma_above(slow_ma)
@@ -46,7 +52,7 @@ Timedelta('156 days 00:00:00')
 
 Moreover, all generic accessors have a property `ranges` and a method `get_ranges`:
 
-```python-repl
+```pycon
 >>> # vectorbtpro.generic.accessors.GenericAccessor.ranges.coverage
 >>> fast_below_slow.vbt.ranges.coverage
 0.5081967213114754
@@ -57,7 +63,7 @@ Moreover, all generic accessors have a property `ranges` and a method `get_range
 !!! hint
     See `vectorbtpro.generic.stats_builder.StatsBuilderMixin.stats` and `Ranges.metrics`.
 
-```python-repl
+```pycon
 >>> df = pd.DataFrame({
 ...     'a': [1, 2, np.nan, np.nan, 5, 6],
 ...     'b': [np.nan, 2, np.nan, 4, np.nan, 6]
@@ -81,7 +87,7 @@ Name: a, dtype: object
 
 `Ranges.stats` also supports (re-)grouping:
 
-```python-repl
+```pycon
 >>> ranges.stats(group_by=True)
 Start                                       0
 End                                         5
@@ -104,11 +110,11 @@ Name: group, dtype: object
 
 `Ranges` class has a single subplot based on `Ranges.plot`:
 
-```python-repl
+```pycon
 >>> ranges['a'].plots()
 ```
 
-![](/docs/img/ranges_plots.svg)
+![](/assets/images/ranges_plots.svg)
 """
 
 import numpy as np
@@ -116,13 +122,13 @@ import numpy as np
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_pd_array, to_2d_array
 from vectorbtpro.base.wrapping import ArrayWrapper
-from vectorbtpro.ch_registry import ch_registry
 from vectorbtpro.generic import nb
 from vectorbtpro.generic.enums import RangeStatus, range_dt
-from vectorbtpro.jit_registry import jit_registry
 from vectorbtpro.records.base import Records
 from vectorbtpro.records.decorators import override_field_config, attach_fields, attach_shortcut_properties
 from vectorbtpro.records.mapped_array import MappedArray
+from vectorbtpro.registries.ch_registry import ch_registry
+from vectorbtpro.registries.jit_registry import jit_registry
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig
 
@@ -308,10 +314,10 @@ class Ranges(Records):
         return self.wrapper.wrap(self._ts, group_by=False)
 
     def get_mask(self,
-                group_by: tp.GroupByLike = None,
-                jitted: tp.JittedOption = None,
-                chunked: tp.ChunkedOption = None,
-                wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+                 group_by: tp.GroupByLike = None,
+                 jitted: tp.JittedOption = None,
+                 chunked: tp.ChunkedOption = None,
+                 wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get mask from ranges.
 
         See `vectorbtpro.generic.nb.ranges_to_mask_nb`."""
@@ -406,7 +412,7 @@ class Ranges(Records):
         """Defaults for `Ranges.stats`.
 
         Merges `vectorbtpro.records.base.Records.stats_defaults` and
-        `ranges.stats` from `vectorbtpro._settings.settings`."""
+        `stats` from `vectorbtpro._settings.ranges`."""
         from vectorbtpro._settings import settings
         ranges_stats_cfg = settings['ranges']['stats']
 
@@ -510,21 +516,16 @@ class Ranges(Records):
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> price = pd.Series([1, 2, 1, 2, 3, 2, 1, 2], name='Price')
+            >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
+            >>> vbt.Ranges.from_ts(price >= 2, wrapper_kwargs=dict(freq='1 day')).plot()
+            ```
 
-        ```python-repl
-        >>> import vectorbtpro as vbt
-        >>> from datetime import datetime, timedelta
-        >>> import pandas as pd
-
-        >>> price = pd.Series([1, 2, 1, 2, 3, 2, 1, 2], name='Price')
-        >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
-        >>> vbt.Ranges.from_ts(price >= 2, wrapper_kwargs=dict(freq='1 day')).plot()
-        ```
-
-        ![](/docs/img/ranges_plot.svg)
+            ![](/assets/images/ranges_plot.svg)
         """
-        from vectorbtpro.opt_packages import assert_can_import
+        from vectorbtpro.utils.opt_packages import assert_can_import
         assert_can_import('plotly')
         import plotly.graph_objects as go
         from vectorbtpro.utils.figure import make_figure, get_domain
@@ -707,7 +708,7 @@ class Ranges(Records):
         """Defaults for `Ranges.plots`.
 
         Merges `vectorbtpro.records.base.Records.plots_defaults` and
-        `ranges.plots` from `vectorbtpro._settings.settings`."""
+        `plots` from `vectorbtpro._settings.ranges`."""
         from vectorbtpro._settings import settings
         ranges_plots_cfg = settings['ranges']['plots']
 

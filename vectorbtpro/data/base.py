@@ -1,6 +1,6 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Base class for working with data.
+"""Base class for working with data sources.
 
 Class `Data` allows storing, downloading, updating, and managing data. It stores data
 as a dictionary of Series/DataFrames keyed by symbol, and makes sure that
@@ -14,7 +14,7 @@ under the hood is iterating over all symbols and calling this method.
 Let's create a simple data class `RandomSNData` that generates price based on
 standard-normally distributed returns:
 
-```python-repl
+```pycon
 >>> import numpy as np
 >>> import pandas as pd
 >>> import vectorbtpro as vbt
@@ -28,6 +28,11 @@ standard-normally distributed returns:
 ...         return pd.Series(rand_price, index=index)
 
 >>> rand_data = RandomSNData.fetch(['RANDNX1', 'RANDNX2'])
+```
+
+[=100% "100%"]{: .candystripe}
+
+```pycon
 >>> rand_data.get()
 symbol         RANDNX1     RANDNX2
 2021-01-01  101.042956  100.920462
@@ -44,9 +49,14 @@ symbol         RANDNX1     RANDNX2
 
 To provide different keyword arguments for different symbols, we can use `symbol_dict`:
 
-```python-repl
+```pycon
 >>> start_value = vbt.symbol_dict({'RANDNX2': 200})
 >>> rand_data = RandomSNData.fetch(['RANDNX1', 'RANDNX2'], start_value=start_value)
+```
+
+[=100% "100%"]{: .candystripe}
+
+```pycon
 >>> rand_data.get()
 symbol         RANDNX1     RANDNX2
 2021-01-01  101.083324  200.886078
@@ -62,14 +72,19 @@ symbol         RANDNX1     RANDNX2
 ```
 
 In case two symbols have different index or columns, they are automatically aligned based on
-`missing_index` and `missing_columns` respectively (see `data` in `vectorbtpro._settings.settings`):
+`missing_index` and `missing_columns` respectively (see `vectorbtpro._settings.data`):
 
-```python-repl
+```pycon
 >>> start_dt = vbt.symbol_dict({'RANDNX2': '2021-01-03'})
 >>> end_dt = vbt.symbol_dict({'RANDNX2': '2021-01-07'})
 >>> rand_data = RandomSNData.fetch(
 ...     ['RANDNX1', 'RANDNX2'], start_value=start_value,
 ...     start_dt=start_dt, end_dt=end_dt)
+```
+
+[=100% "100%"]{: .candystripe}
+
+```pycon
 >>> rand_data.get()
 UserWarning: Symbols have mismatching index. Setting missing data points to NaN.
 
@@ -105,7 +120,7 @@ Let's define an update method that updates the latest data point and adds a coup
 !!! note
     Updating data always returns a new `Data` instance.
 
-```python-repl
+```pycon
 >>> from datetime import timedelta
 >>> from vectorbtpro.utils.config import merge_dicts
 
@@ -125,6 +140,11 @@ Let's define an update method that updates the latest data point and adds a coup
 ...         return self.fetch_symbol(symbol, **kwargs)
 
 >>> rand_data = RandomSNData.fetch(['RANDNX1', 'RANDNX2'], end_dt='2021-01-05')
+```
+
+[=100% "100%"]{: .candystripe}
+
+```pycon
 >>> rand_data.get()
 symbol         RANDNX1     RANDNX2
 2021-01-01  100.956601  100.970865
@@ -173,9 +193,19 @@ You can merge symbols from different `Data` instances either by subclassing `Dat
 defining custom fetch and update methods, or by manually merging their data dicts
 into one data dict and passing it to the `Data.from_data` class method.
 
-```python-repl
+```pycon
 >>> rand_data1 = RandomSNData.fetch('RANDNX1')
+```
+
+[=100% "100%"]{: .candystripe}
+
+```pycon
 >>> rand_data2 = RandomSNData.fetch('RANDNX2', start_value=200, start_dt='2021-01-05')
+```
+
+[=100% "100%"]{: .candystripe}
+
+```pycon
 >>> merged_data = vbt.Data.from_data(vbt.merge_dicts(rand_data1.data, rand_data2.data))
 >>> merged_data.get()
 symbol         RANDNX1     RANDNX2
@@ -196,7 +226,7 @@ symbol         RANDNX1     RANDNX2
 Like any other class subclassing `vectorbtpro.base.wrapping.Wrapping`, we can do pandas indexing
 on a `Data` instance, which forwards indexing operation to each Series/DataFrame:
 
-```python-repl
+```pycon
 >>> rand_data.loc['2021-01-07':'2021-01-09']
 <__main__.RandomSNData at 0x7fdba4e36198>
 
@@ -212,7 +242,7 @@ symbol         RANDNX1     RANDNX2
 Like any other class subclassing `vectorbtpro.utils.pickling.Pickleable`, we can save a `Data`
 instance to the disk with `Data.save` and load it with `Data.load`:
 
-```python-repl
+```pycon
 >>> rand_data.save('rand_data')
 >>> rand_data = RandomSNData.load('rand_data')
 >>> rand_data.get()
@@ -233,9 +263,13 @@ symbol         RANDNX1     RANDNX2
 !!! hint
     See `vectorbtpro.generic.stats_builder.StatsBuilderMixin.stats` and `Data.metrics`.
 
-```python-repl
+```pycon
 >>> rand_data = RandomSNData.fetch(['RANDNX1', 'RANDNX2'])
+```
 
+[=100% "100%"]{: .candystripe}
+
+```pycon
 >>> rand_data.stats(column='a')
 Start                   2021-01-01 00:00:00+00:00
 End                     2021-01-10 00:00:00+00:00
@@ -248,7 +282,7 @@ dtype: object
 
 `Data.stats` also supports (re-)grouping:
 
-```python-repl
+```pycon
 >>> rand_data.stats(group_by=True)
 Start                   2021-01-01 00:00:00+00:00
 End                     2021-01-10 00:00:00+00:00
@@ -266,11 +300,11 @@ Name: group, dtype: object
 
 `Data` class has a single subplot based on `Data.plot`:
 
-```python-repl
->>> rand_data.plots(settings=dict(base=100)).show_svg()
+```pycon
+>>> rand_data.plots(settings=dict(base=100)).show()
 ```
 
-![](/docs/img/data_plots.svg)
+![](/assets/images/data_plots.svg)
 """
 
 import warnings
@@ -421,7 +455,7 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
         Convert the index from one timezone to another using `tz_convert`.
         See `vectorbtpro.utils.datetime_.to_timezone`.
 
-        For defaults, see `data` in `vectorbtpro._settings.settings`."""
+        For defaults, see `vectorbtpro._settings.data`."""
         from vectorbtpro._settings import settings
         data_cfg = settings['data']
 
@@ -448,7 +482,7 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
         * 'drop': remove missing data points
         * 'raise': raise an error
 
-        For defaults, see `data` in `vectorbtpro._settings.settings`."""
+        For defaults, see `vectorbtpro._settings.data`."""
         if len(data) == 1:
             return data
 
@@ -575,7 +609,7 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
             returned_kwargs (dict): Keyword arguments returned by `Data.fetch_symbol` along with the data.
             **kwargs: Keyword arguments passed to the `__init__` method.
 
-        For defaults, see `data` in `vectorbtpro._settings.settings`."""
+        For defaults, see `vectorbtpro._settings.data`."""
         if wrapper_kwargs is None:
             wrapper_kwargs = {}
         if fetch_kwargs is None:
@@ -896,7 +930,7 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
         """Defaults for `Data.stats`.
 
         Merges `vectorbtpro.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
-        `data.stats` from `vectorbtpro._settings.settings`."""
+        `stats` from `vectorbtpro._settings.data`."""
         from vectorbtpro._settings import settings
         data_stats_cfg = settings['data']['stats']
 
@@ -964,19 +998,23 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
                     The column must contain prices.
             kwargs (dict): Keyword arguments passed to `vectorbtpro.generic.accessors.GenericAccessor.plot`.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> import vectorbtpro as vbt
 
-        ```python-repl
-        >>> import vectorbtpro as vbt
+            >>> start = '2021-01-01 UTC'  # crypto is in UTC
+            >>> end = '2021-06-01 UTC'
+            >>> data = vbt.YFData.fetch(['BTC-USD', 'ETH-USD', 'ADA-USD'], start=start, end=end)
+            ```
 
-        >>> start = '2021-01-01 UTC'  # crypto is in UTC
-        >>> end = '2021-06-01 UTC'
-        >>> data = vbt.YFData.fetch(['BTC-USD', 'ETH-USD', 'ADA-USD'], start=start, end=end)
+            [=100% "100%"]{: .candystripe}
 
-        >>> data.plot(column='Close', base=1)
-        ```
+            ```pycon
+            >>> data.plot(column='Close', base=1)
+            ```
 
-        ![](/docs/img/data_plot.svg)"""
+            ![](/assets/images/data_plot.svg)
+        """
         self_col = self.select_one(column=column, group_by=False)
         data = self_col.get()
         if base is not None:
@@ -988,7 +1026,7 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
         """Defaults for `Data.plots`.
 
         Merges `vectorbtpro.generic.plots_builder.PlotsBuilderMixin.plots_defaults` and
-        `data.plots` from `vectorbtpro._settings.settings`."""
+        `plots` from `vectorbtpro._settings.data`."""
         from vectorbtpro._settings import settings
         data_plots_cfg = settings['data']['plots']
 

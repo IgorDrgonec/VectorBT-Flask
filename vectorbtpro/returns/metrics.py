@@ -1,6 +1,6 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Other metrics that are not compiled with Numba."""
+"""Metrics that are not compiled with Numba."""
 
 import numpy as np
 from scipy.stats import norm

@@ -5,8 +5,8 @@
 import numpy as np
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.jit_registry import register_jitted
 from vectorbtpro.portfolio.enums import CallSeqType
+from vectorbtpro.registries.jit_registry import register_jitted
 
 
 @register_jitted(cache=True)

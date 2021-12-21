@@ -1,10 +1,10 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Extensions to `vectorbtpro.utils.chunking`."""
+"""Extensions for chunking records and mapped arrays."""
 
-import attr
 import uuid
 
+import attr
 import numpy as np
 
 from vectorbtpro import _typing as tp

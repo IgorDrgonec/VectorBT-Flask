@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 import vectorbtpro as vbt
-from vectorbtpro.ca_registry import ca_registry, CAQuery, CARunSetup, CARunResult
+from vectorbtpro.registries.ca_registry import ca_registry, CAQuery, CARunSetup, CARunResult
 from vectorbtpro.utils.caching import Cacheable
 
 

@@ -14,7 +14,7 @@ from pandas.core.resample import Resampler as PandasResampler
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import indexes
-from vectorbtpro.jit_registry import jit_registry, register_jitted
+from vectorbtpro.registries.jit_registry import jit_registry, register_jitted
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.array_ import is_sorted
 from vectorbtpro.utils.config import Configured

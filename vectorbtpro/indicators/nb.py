@@ -1,6 +1,6 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Numba-compiled functions.
+"""Numba-compiled functions for custom indicators.
 
 Provides an arsenal of Numba-compiled functions that are used by indicator
 classes. These only accept NumPy arrays and other Numba-compatible types.
@@ -16,7 +16,7 @@ import numpy as np
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.generic import nb as generic_nb
-from vectorbtpro.jit_registry import register_jitted
+from vectorbtpro.registries.jit_registry import register_jitted
 
 
 @register_jitted(cache=True)

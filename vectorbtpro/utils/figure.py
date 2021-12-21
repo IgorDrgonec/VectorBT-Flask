@@ -2,7 +2,7 @@
 
 """Utilities for constructing and displaying figures."""
 
-from vectorbtpro.opt_packages import assert_can_import
+from vectorbtpro.utils.opt_packages import assert_can_import
 
 assert_can_import('plotly')
 
@@ -85,7 +85,7 @@ def make_figure(*args, **kwargs) -> tp.BaseFigure:
     """Make new figure.
 
     Returns either `Figure` or `FigureWidget`, depending on `use_widgets`
-    defined under `plotting` in `vectorbtpro._settings.settings`."""
+    defined under `vectorbtpro._settings.plotting`."""
     from vectorbtpro._settings import settings
     plotting_cfg = settings['plotting']
 

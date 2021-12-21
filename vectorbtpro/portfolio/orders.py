@@ -5,32 +5,39 @@
 Order records capture information on filled orders. Orders are mainly populated when simulating
 a portfolio and can be accessed as `vectorbtpro.portfolio.base.Portfolio.orders`.
 
-```python-repl
+```pycon
 >>> import pandas as pd
 >>> import numpy as np
 >>> from datetime import datetime, timedelta
 >>> import vectorbtpro as vbt
 
->>> np.random.seed(42)
->>> price = pd.DataFrame({
-...     'a': np.random.uniform(1, 2, size=100),
-...     'b': np.random.uniform(1, 2, size=100)
-... }, index=[datetime(2020, 1, 1) + timedelta(days=i) for i in range(100)])
->>> size = pd.DataFrame({
-...     'a': np.random.uniform(-1, 1, size=100),
-...     'b': np.random.uniform(-1, 1, size=100),
-... }, index=[datetime(2020, 1, 1) + timedelta(days=i) for i in range(100)])
->>> pf = vbt.Portfolio.from_orders(price, size, fees=0.01, freq='d')
->>> orders = pf.orders
+>>> price = vbt.RandomData.fetch(
+...     ['a', 'b'],
+...     start=datetime(2020, 1, 1),
+...     end=datetime(2020, 3, 1),
+...     seed=vbt.symbol_dict(a=42, b=43)
+... ).get()
+```
 
->>> orders.buy.count()
-a    58
-b    51
+[=100% "100%"]{: .candystripe}
+
+```pycon
+>>> size = pd.DataFrame({
+...     'a': np.random.randint(-1, 2, size=len(price.index)),
+...     'b': np.random.randint(-1, 2, size=len(price.index)),
+... }, index=price.index, columns=price.columns)
+>>> pf = vbt.Portfolio.from_orders(price, size, fees=0.01, freq='d')
+
+>>> pf.orders.buy.count()
+symbol
+a    17
+b    15
 Name: count, dtype: int64
 
->>> orders.sell.count()
-a    42
-b    49
+>>> pf.orders.sell.count()
+symbol
+a    24
+b    26
 Name: count, dtype: int64
 ```
 
@@ -39,53 +46,53 @@ Name: count, dtype: int64
 !!! hint
     See `vectorbtpro.generic.stats_builder.StatsBuilderMixin.stats` and `Orders.metrics`.
 
-```python-repl
->>> orders['a'].stats()
-Start                2020-01-01 00:00:00
-End                  2020-04-09 00:00:00
-Period                 100 days 00:00:00
-Total Records                        100
-Total Buy Orders                      58
-Total Sell Orders                     42
-Min Size                        0.003033
-Max Size                        0.989877
-Avg Size                        0.508608
-Avg Buy Size                    0.468802
-Avg Sell Size                   0.563577
-Avg Buy Price                   1.437037
-Avg Sell Price                  1.515951
-Total Fees                      0.740177
-Min Fees                        0.000052
-Max Fees                        0.016224
-Avg Fees                        0.007402
-Avg Buy Fees                    0.006771
-Avg Sell Fees                   0.008273
+```pycon
+>>> pf.orders['a'].stats()
+Start                2019-12-31 23:00:00+00:00
+End                  2020-02-29 23:00:00+00:00
+Period                        61 days 00:00:00
+Total Records                               41
+Total Buy Orders                            17
+Total Sell Orders                           24
+Min Size                              0.814641
+Max Size                                   1.0
+Avg Size                              0.995108
+Avg Buy Size                          0.988202
+Avg Sell Size                              1.0
+Avg Buy Price                        94.814501
+Avg Sell Price                       95.742148
+Total Fees                           38.887032
+Min Fees                              0.851689
+Max Fees                               1.04474
+Avg Fees                              0.948464
+Avg Buy Fees                          0.935819
+Avg Sell Fees                         0.957421
 Name: a, dtype: object
 ```
 
 `Orders.stats` also supports (re-)grouping:
 
-```python-repl
->>> orders.stats(group_by=True)
-Start                2020-01-01 00:00:00
-End                  2020-04-09 00:00:00
-Period                 100 days 00:00:00
-Total Records                        200
-Total Buy Orders                     109
-Total Sell Orders                     91
-Min Size                        0.003033
-Max Size                        0.989877
-Avg Size                        0.506279
-Avg Buy Size                    0.472504
-Avg Sell Size                   0.546735
-Avg Buy Price                    1.47336
-Avg Sell Price                  1.496759
-Total Fees                      1.483343
-Min Fees                        0.000052
-Max Fees                        0.018319
-Avg Fees                        0.007417
-Avg Buy Fees                    0.006881
-Avg Sell Fees                   0.008058
+```pycon
+>>> pf.orders.stats(group_by=True)
+Start                2019-12-31 23:00:00+00:00
+End                  2020-02-29 23:00:00+00:00
+Period                        61 days 00:00:00
+Total Records                               82
+Total Buy Orders                            32
+Total Sell Orders                           50
+Min Size                              0.814641
+Max Size                                   1.0
+Avg Size                              0.995936
+Avg Buy Size                          0.989587
+Avg Sell Size                              1.0
+Avg Buy Price                        98.843447
+Avg Sell Price                       99.969934
+Total Fees                            81.27316
+Min Fees                              0.851689
+Max Fees                              1.103575
+Avg Fees                              0.991136
+Avg Buy Fees                          0.977756
+Avg Sell Fees                         0.999699
 Name: group, dtype: object
 ```
 
@@ -96,11 +103,11 @@ Name: group, dtype: object
 
 `Orders` class has a single subplot based on `Orders.plot`:
 
-```python-repl
->>> orders['a'].plots()
+```pycon
+>>> pf.orders['a'].plots()
 ```
 
-![](/docs/img/orders_plots.svg)
+![](/assets/images/orders_plots.svg)
 """
 
 import numpy as np
@@ -219,7 +226,7 @@ class Orders(Records):
         """Defaults for `Orders.stats`.
 
         Merges `vectorbtpro.records.base.Records.stats_defaults` and
-        `orders.stats` from `vectorbtpro._settings.settings`."""
+        `stats` from `vectorbtpro._settings.orders`."""
         from vectorbtpro._settings import settings
         orders_stats_cfg = settings['orders']['stats']
 
@@ -357,23 +364,19 @@ class Orders(Records):
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
-        ## Example
+        Usage:
+            ```pycon
+            >>> price = pd.Series([1., 2., 3., 2., 1.], name='Price')
+            >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
+            >>> size = pd.Series([1., 1., 1., 1., -1.])
+            >>> orders = vbt.Portfolio.from_orders(price, size).orders
 
-        ```python-repl
-        >>> import pandas as pd
-        >>> from datetime import datetime, timedelta
-        >>> import vectorbtpro as vbt
+            >>> orders.plot()
+            ```
 
-        >>> price = pd.Series([1., 2., 3., 2., 1.], name='Price')
-        >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
-        >>> size = pd.Series([1., 1., 1., 1., -1.])
-        >>> orders = vbt.Portfolio.from_orders(price, size).orders
-
-        >>> orders.plot()
-        ```
-
-        ![](/docs/img/orders_plot.svg)"""
-        from vectorbtpro.opt_packages import assert_can_import
+            ![](/assets/images/orders_plot.svg)
+        """
+        from vectorbtpro.utils.opt_packages import assert_can_import
         assert_can_import('plotly')
         import plotly.graph_objects as go
         from vectorbtpro.utils.figure import make_figure
@@ -495,7 +498,7 @@ class Orders(Records):
         """Defaults for `Orders.plots`.
 
         Merges `vectorbtpro.records.base.Records.plots_defaults` and
-        `orders.plots` from `vectorbtpro._settings.settings`."""
+        `plots` from `vectorbtpro._settings.orders`."""
         from vectorbtpro._settings import settings
         orders_plots_cfg = settings['orders']['plots']
 

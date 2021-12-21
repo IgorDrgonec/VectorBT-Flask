@@ -24,4 +24,3 @@ dill:                       io, base
 pytest:                     test
 pytest-cov:                 test
 codecov:                    test
-pdoc3:                      docs

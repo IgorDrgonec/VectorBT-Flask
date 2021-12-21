@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.jit_registry import jit_registry, register_jitted
+from vectorbtpro.registries.jit_registry import jit_registry, register_jitted
 from vectorbtpro.utils import checks
 
 

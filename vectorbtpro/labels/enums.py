@@ -1,6 +1,6 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Named tuples and enumerated types.
+"""Named tuples and enumerated types for label generation.
 
 Defines enums and other schemas for `vectorbtpro.labels`."""
 

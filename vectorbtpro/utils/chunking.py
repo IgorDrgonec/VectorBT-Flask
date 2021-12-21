@@ -2,7 +2,6 @@
 
 """Utilities for chunking."""
 
-import attr
 import inspect
 import multiprocessing
 import re
@@ -10,6 +9,7 @@ import uuid
 import warnings
 from functools import wraps
 
+import attr
 import numpy as np
 import pandas as pd
 
@@ -162,7 +162,7 @@ def yield_chunk_meta(n_chunks: tp.Optional[int] = None,
     If both `n_chunks` and `chunk_len` are None (after resolving them from settings),
     sets `n_chunks` to the number of cores.
 
-    For defaults, see `chunking` in `vectorbtpro._settings.settings`."""
+    For defaults, see `vectorbtpro._settings.chunking`."""
     from vectorbtpro._settings import settings
     chunking_cfg = settings['chunking']
 
@@ -666,7 +666,7 @@ def yield_arg_chunks(func: tp.Callable,
         template_mapping (mapping): Mapping to replace templates in arguments and specification.
         **kwargs: Keyword arguments passed to `take_from_args` or to `arg_take_spec` if it's a callable.
 
-    For defaults, see `chunking` in `vectorbtpro._settings.settings`."""
+    For defaults, see `vectorbtpro._settings.chunking`."""
 
     from vectorbtpro._settings import settings
     chunking_cfg = settings['chunking']
@@ -730,10 +730,10 @@ def chunked(*args,
     Chunking can be disabled using `disable` argument. Additionally, the entire wrapping mechanism
     can be disabled by using the global setting `disable_wrapping` (=> returns the wrapped function).
 
-    For defaults, see `chunking` in `vectorbtpro._settings.settings`.
+    For defaults, see `vectorbtpro._settings.chunking`.
     For example, to change the engine globally:
 
-    ```python-repl
+    ```pycon
     >>> import vectorbtpro as vbt
 
     >>> vbt.settings.chunking['engine'] = 'dask'
@@ -743,174 +743,173 @@ def chunked(*args,
         If less than two chunks were generated and `skip_one_chunk` is True,
         executes the function without chunking.
 
-    ## Example
+    Usage:
+        For testing purposes, let's divide the input array into 2 chunks and compute the mean in a sequential manner:
 
-    For testing purposes, let's divide the input array into 2 chunks and compute the mean in a sequential manner:
+        ```pycon
+        >>> import vectorbtpro as vbt
+        >>> import numpy as np
 
-    ```python-repl
-    >>> import vectorbtpro as vbt
-    >>> import numpy as np
+        >>> @vbt.chunked(
+        ...     n_chunks=2,
+        ...     size=vbt.LenSizer(arg_query='a'),
+        ...     arg_take_spec=dict(a=vbt.ChunkSlicer()))
+        ... def f(a):
+        ...     return np.mean(a)
 
-    >>> @vbt.chunked(
-    ...     n_chunks=2,
-    ...     size=vbt.LenSizer(arg_query='a'),
-    ...     arg_take_spec=dict(a=vbt.ChunkSlicer()))
-    ... def f(a):
-    ...     return np.mean(a)
+        >>> f(np.arange(10))
+        [2.0, 7.0]
+        ```
 
-    >>> f(np.arange(10))
-    [2.0, 7.0]
-    ```
+        The `chunked` function is a decorator that takes `f` and creates a function that splits
+        passed arguments, runs each chunk using an engine, and optionally, merges the results.
+        It has the same signature as the original function:
 
-    The `chunked` function is a decorator that takes `f` and creates a function that splits
-    passed arguments, runs each chunk using an engine, and optionally, merges the results.
-    It has the same signature as the original function:
+        ```pycon
+        >>> f
+        <function __main__.f(a)>
+        ```
 
-    ```python-repl
-    >>> f
-    <function __main__.f(a)>
-    ```
+        We can change any option at any time:
 
-    We can change any option at any time:
+        ```pycon
+        >>> # Change the option directly on the function
+        >>> f.options.n_chunks = 3
 
-    ```python-repl
-    >>> # Change the option directly on the function
-    >>> f.options.n_chunks = 3
+        >>> f(np.arange(10))
+        [1.5, 5.0, 8.0]
 
-    >>> f(np.arange(10))
-    [1.5, 5.0, 8.0]
+        >>> # Pass a new option with a leading underscore
+        >>> f(np.arange(10), _n_chunks=4)
+        [1.0, 4.0, 6.5, 8.5]
+        ```
 
-    >>> # Pass a new option with a leading underscore
-    >>> f(np.arange(10), _n_chunks=4)
-    [1.0, 4.0, 6.5, 8.5]
-    ```
+        When we run the wrapped function, it first generates a list of chunk metadata of type `ChunkMeta`.
+        Chunk metadata contains the chunk index that can be used to split any input:
 
-    When we run the wrapped function, it first generates a list of chunk metadata of type `ChunkMeta`.
-    Chunk metadata contains the chunk index that can be used to split any input:
+        ```pycon
+        >>> from vectorbtpro.utils.chunking import yield_chunk_meta
 
-    ```python-repl
-    >>> from vectorbtpro.utils.chunking import yield_chunk_meta
+        >>> list(yield_chunk_meta(n_chunks=2))
+        [ChunkMeta(uuid='84d64eed-fbac-41e7-ad61-c917e809b3b8', idx=0, start=None, end=None, indices=None),
+         ChunkMeta(uuid='577817c4-fdee-4ceb-ab38-dcd663d9ab11', idx=1, start=None, end=None, indices=None)]
+        ```
 
-    >>> list(yield_chunk_meta(n_chunks=2))
-    [ChunkMeta(uuid='84d64eed-fbac-41e7-ad61-c917e809b3b8', idx=0, start=None, end=None, indices=None),
-     ChunkMeta(uuid='577817c4-fdee-4ceb-ab38-dcd663d9ab11', idx=1, start=None, end=None, indices=None)]
-    ```
+        Additionally, it may contain the start and end index of the space we want to split.
+        The space can be defined by the length of an input array, for example. In our case:
 
-    Additionally, it may contain the start and end index of the space we want to split.
-    The space can be defined by the length of an input array, for example. In our case:
+        ```pycon
+        >>> list(yield_chunk_meta(n_chunks=2, size=10))
+        [ChunkMeta(uuid='c1593842-dc31-474c-a089-e47200baa2be', idx=0, start=0, end=5, indices=None),
+         ChunkMeta(uuid='6d0265e7-1204-497f-bc2c-c7b7800ec57d', idx=1, start=5, end=10, indices=None)]
+        ```
 
-    ```python-repl
-    >>> list(yield_chunk_meta(n_chunks=2, size=10))
-    [ChunkMeta(uuid='c1593842-dc31-474c-a089-e47200baa2be', idx=0, start=0, end=5, indices=None),
-     ChunkMeta(uuid='6d0265e7-1204-497f-bc2c-c7b7800ec57d', idx=1, start=5, end=10, indices=None)]
-    ```
+        If we know the size of the space in advance, we can pass it as an integer constant.
+        Otherwise, we need to tell `chunked` to derive the size from the inputs dynamically
+        by passing any subclass of `Sizer`. In the example above, we instruct the wrapped function
+        to derive the size from the length of the input array `a`.
 
-    If we know the size of the space in advance, we can pass it as an integer constant.
-    Otherwise, we need to tell `chunked` to derive the size from the inputs dynamically
-    by passing any subclass of `Sizer`. In the example above, we instruct the wrapped function
-    to derive the size from the length of the input array `a`.
+        Once all chunks are generated, the wrapped function attempts to split inputs into chunks.
+        The specification for this operation can be provided by the `arg_take_spec` argument, which
+        in most cases is a dictionary of `ChunkTaker` instances keyed by the input name.
+        Here's an example of a complex specification:
 
-    Once all chunks are generated, the wrapped function attempts to split inputs into chunks.
-    The specification for this operation can be provided by the `arg_take_spec` argument, which
-    in most cases is a dictionary of `ChunkTaker` instances keyed by the input name.
-    Here's an example of a complex specification:
+        ```pycon
+        >>> arg_take_spec = dict(
+        ...     a=vbt.ChunkSelector(),
+        ...     args=vbt.ArgsTaker(
+        ...         None,
+        ...         vbt.ChunkSelector()
+        ...     ),
+        ...     b=vbt.SequenceTaker([
+        ...         None,
+        ...         vbt.ChunkSelector()
+        ...     ]),
+        ...     kwargs=vbt.KwargsTaker(
+        ...         c=vbt.MappingTaker(dict(
+        ...             d=vbt.ChunkSelector()
+        ...         ))
+        ...     )
+        ... )
 
-    ```python-repl
-    >>> arg_take_spec = dict(
-    ...     a=vbt.ChunkSelector(),
-    ...     args=vbt.ArgsTaker(
-    ...         None,
-    ...         vbt.ChunkSelector()
-    ...     ),
-    ...     b=vbt.SequenceTaker([
-    ...         None,
-    ...         vbt.ChunkSelector()
-    ...     ]),
-    ...     kwargs=vbt.KwargsTaker(
-    ...         c=vbt.MappingTaker(dict(
-    ...             d=vbt.ChunkSelector()
-    ...         ))
-    ...     )
-    ... )
+        >>> @vbt.chunked(
+        ...     n_chunks=vbt.LenSizer(arg_query='a'),
+        ...     arg_take_spec=arg_take_spec)
+        ... def f(a, *args, b=None, **kwargs):
+        ...     return a + sum(args) + sum(b) + sum(kwargs['c'].values())
 
-    >>> @vbt.chunked(
-    ...     n_chunks=vbt.LenSizer(arg_query='a'),
-    ...     arg_take_spec=arg_take_spec)
-    ... def f(a, *args, b=None, **kwargs):
-    ...     return a + sum(args) + sum(b) + sum(kwargs['c'].values())
+        >>> f([1, 2, 3], 10, [1, 2, 3], b=(100, [1, 2, 3]), c=dict(d=[1, 2, 3], e=1000))
+        [1114, 1118, 1122]
+        ```
 
-    >>> f([1, 2, 3], 10, [1, 2, 3], b=(100, [1, 2, 3]), c=dict(d=[1, 2, 3], e=1000))
-    [1114, 1118, 1122]
-    ```
+        After splitting all inputs into chunks, the wrapped function forwards them to the engine function.
+        The engine argument can be either the name of a supported engine, or a callable. Once the engine
+        has finished all tasks and returned a list of results, we can merge them back using `merge_func`:
 
-    After splitting all inputs into chunks, the wrapped function forwards them to the engine function.
-    The engine argument can be either the name of a supported engine, or a callable. Once the engine
-    has finished all tasks and returned a list of results, we can merge them back using `merge_func`:
+        ```pycon
+        >>> @vbt.chunked(
+        ...     n_chunks=2,
+        ...     size=vbt.LenSizer(arg_query='a'),
+        ...     arg_take_spec=dict(a=vbt.ChunkSlicer()),
+        ...     merge_func=np.concatenate)
+        ... def f(a):
+        ...     return a
 
-    ```python-repl
-    >>> @vbt.chunked(
-    ...     n_chunks=2,
-    ...     size=vbt.LenSizer(arg_query='a'),
-    ...     arg_take_spec=dict(a=vbt.ChunkSlicer()),
-    ...     merge_func=np.concatenate)
-    ... def f(a):
-    ...     return a
+        >>> f(np.arange(10))
+        array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        ```
 
-    >>> f(np.arange(10))
-    array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
-    ```
+        Instead of (or in addition to) specifying `arg_take_spec`, we can define our function with the
+        first argument being `chunk_meta` to be able to split the arguments during the execution.
+        The `chunked` decorator will automatically recognize and replace it with the actual `ChunkMeta` object:
 
-    Instead of (or in addition to) specifying `arg_take_spec`, we can define our function with the
-    first argument being `chunk_meta` to be able to split the arguments during the execution.
-    The `chunked` decorator will automatically recognize and replace it with the actual `ChunkMeta` object:
+        ```pycon
+        >>> @vbt.chunked(
+        ...     n_chunks=2,
+        ...     size=vbt.LenSizer(arg_query='a'),
+        ...     merge_func=np.concatenate)
+        ... def f(chunk_meta, a):
+        ...     return a[chunk_meta.start:chunk_meta.end]
 
-    ```python-repl
-    >>> @vbt.chunked(
-    ...     n_chunks=2,
-    ...     size=vbt.LenSizer(arg_query='a'),
-    ...     merge_func=np.concatenate)
-    ... def f(chunk_meta, a):
-    ...     return a[chunk_meta.start:chunk_meta.end]
+        >>> f(np.arange(10))
+        array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        ```
 
-    >>> f(np.arange(10))
-    array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
-    ```
+        This may be a good idea in multi-threading, but a bad idea in multi-processing.
 
-    This may be a good idea in multi-threading, but a bad idea in multi-processing.
+        The same can be accomplished by using templates (here we tell `chunked` to not replace
+        the first argument by setting `prepend_chunk_meta` to False):
 
-    The same can be accomplished by using templates (here we tell `chunked` to not replace
-    the first argument by setting `prepend_chunk_meta` to False):
+        ```pycon
+        >>> @vbt.chunked(
+        ...     n_chunks=2,
+        ...     size=vbt.LenSizer(arg_query='a'),
+        ...     merge_func=np.concatenate,
+        ...     prepend_chunk_meta=False)
+        ... def f(chunk_meta, a):
+        ...     return a[chunk_meta.start:chunk_meta.end]
 
-    ```python-repl
-    >>> @vbt.chunked(
-    ...     n_chunks=2,
-    ...     size=vbt.LenSizer(arg_query='a'),
-    ...     merge_func=np.concatenate,
-    ...     prepend_chunk_meta=False)
-    ... def f(chunk_meta, a):
-    ...     return a[chunk_meta.start:chunk_meta.end]
+        >>> f(vbt.Rep('chunk_meta'), np.arange(10))
+        array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        ```
 
-    >>> f(vbt.Rep('chunk_meta'), np.arange(10))
-    array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
-    ```
+        Templates in arguments are substituted right before taking a chunk from them.
 
-    Templates in arguments are substituted right before taking a chunk from them.
+        Keyword arguments to the engine can be provided using `engine_kwargs`:
 
-    Keyword arguments to the engine can be provided using `engine_kwargs`:
+        ```pycon
+        >>> @vbt.chunked(
+        ...     n_chunks=2,
+        ...     size=vbt.LenSizer(arg_query='a'),
+        ...     arg_take_spec=dict(a=vbt.ChunkSlicer()),
+        ...     engine_kwargs=dict(show_progress=True))  # see SequenceEngine
+        ... def f(a):
+        ...     return np.mean(a)
 
-    ```python-repl
-    >>> @vbt.chunked(
-    ...     n_chunks=2,
-    ...     size=vbt.LenSizer(arg_query='a'),
-    ...     arg_take_spec=dict(a=vbt.ChunkSlicer()),
-    ...     engine_kwargs=dict(show_progress=True))  # see SequenceEngine
-    ... def f(a):
-    ...     return np.mean(a)
-
-    >>> f(np.arange(10))
-    100% |█████████████████████████████████| 2/2 [00:00<00:00, 81.11it/s]
-    [2.0, 7.0]
-    ```
+        >>> f(np.arange(10))
+        100% |█████████████████████████████████| 2/2 [00:00<00:00, 81.11it/s]
+        [2.0, 7.0]
+        ```
     """
 
     def decorator(func: tp.Callable) -> tp.Callable:
@@ -1043,7 +1042,7 @@ def resolve_chunked_option(option: tp.ChunkedOption = None) -> tp.KwargsLike:
     * string: Use `option` as the name of an execution engine (see `vectorbtpro.utils.execution.execute`)
     * dict: Use `option` as keyword arguments passed to `chunked`
 
-    For defaults, see `chunking.option` in `vectorbtpro._settings.settings`."""
+    For defaults, see `option` in `vectorbtpro._settings.chunking`."""
     from vectorbtpro._settings import settings
     chunking_cfg = settings['chunking']
 
