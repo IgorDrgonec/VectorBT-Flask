@@ -7,3 +7,4 @@ __pycache__
 build
 vectorbtpro.egg-info
 docs/docs/api
+docs/site
