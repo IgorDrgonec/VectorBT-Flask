@@ -66,6 +66,9 @@ markdown_extensions:
   - pymdownx.tasklist:
       custom_checkbox: true
 extra:
+  analytics:
+    provider: google
+    property: G-0C5VNYCFHL
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/polakowo
