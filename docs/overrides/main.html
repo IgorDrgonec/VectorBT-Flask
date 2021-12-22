@@ -20,7 +20,7 @@
     {% elif page and page.meta and page.meta.og_image %}
         <meta property="og:image:url" content="{{ page.meta.og_image }}" />
     {% else %}
-        <meta property="og:image:url" content="{{ config.site_url ~ config.theme.favicon }}" />
+        <meta property="og:image:url" content="/assets/logo/social-512x512.png" />
     {% endif %}
 
     {% if page and page.meta and page.meta.og_image_type %}
@@ -39,7 +39,6 @@
 
     <link rel="apple-touch-icon" sizes="180x180" href="/assets/logo/apple-touch-icon.png">
     <link rel="icon" type="image/svg+xml" href="/assets/logo/favicon.svg">
-    <link rel="icon" type="image/png" sizes="48x48" href="/assets/logo/favicon-48x48.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/assets/logo/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/assets/logo/favicon-16x16.png">
     <link rel="manifest" href="/assets/logo/site.webmanifest">
