@@ -1,7 +1,8 @@
 # Project information
 site_name: vectorbt PRO
-site_description: Powerful toolkit for quants
+site_description: Find your trading edge, using the most powerful toolkit for backtesting, algorithmic trading, and research
 site_author: Oleg Polakow
+site_url: https://vectorbt.pro/
 
 # Repository
 repo_name: vectorbt.pro (invite-only)
@@ -14,6 +15,7 @@ copyright: Copyright &copy; 2021 Oleg Polakow. All rights reserved.
 # Configuration
 theme:
   name: material
+  custom_dir: overrides
   include_search_page: false
   search_index_only: true
   language: en
@@ -26,7 +28,6 @@ theme:
     - search.share
   palette:
     scheme: slate
-    primary: deep orange
     accent: amber
   icon:
     repo: fontawesome/brands/github
@@ -34,7 +35,6 @@ theme:
     text: Roboto
     code: Roboto Mono
   logo: assets/logo/logo.svg
-  favicon: assets/logo/favicon.ico
 
 # Customization
 markdown_extensions:

@@ -3,7 +3,11 @@
     --md-default-bg-color--darker: #252732;
     --md-default-bg-color--darkest: #1e2029;
     --md-default-bg-color--ultra-dark: #111217;
-    --md-header-bg-color: var(--md-default-bg-color--darkest);
+    --md-primary-fg-color: #ff6e42;
+    --md-primary-fg-color--light: #ff8a66;
+    --md-primary-fg-color--dark: #f4511f;
+    --md-primary-bg-color: #fff;
+    --md-primary-bg-color--light: hsla(0, 0%, 100%, .7);
     --md-progress: #546d78;
     --md-progress-stripe: rgba(0, 0, 0, 0.2);
 }
@@ -13,7 +17,7 @@
 }
 
 .md-header {
-    background-color: var(--md-header-bg-color);
+    background-color: var(--md-default-bg-color--darkest);
     border-bottom: 0.05rem solid #4051b5;
 }
 
@@ -37,6 +41,18 @@
 
 .githublink:hover {
     color: var(--md-accent-fg-color) !important;
+}
+
+@media screen and (max-width: 59.9375em) {
+    .md-nav__source {
+        background-color: var(--md-default-bg-color--darker);
+    }
+}
+
+@media screen and (max-width: 76.1875em) {
+    .md-nav--primary .md-nav__title[for=__drawer] {
+        background-color: var(--md-default-bg-color--darker);
+    }
 }
 
 /* Progress Bars */

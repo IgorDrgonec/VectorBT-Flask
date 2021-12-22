@@ -39,7 +39,7 @@ and complete a sponsorship of __$20 a month or more__. You can use your individu
 organization GitHub account for sponsoring.
 
 __Important__: If you're sponsoring @polakowo through a GitHub organization,
-please send a short email to sponsors@squidfunk.com with the name of your
+please send a short email to olegpolakow@gmail.com with the name of your
 organization and the GitHub account of the individual that should be added as a 
 collaborator.[^2]
 

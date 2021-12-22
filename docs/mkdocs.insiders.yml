@@ -6,9 +6,6 @@ plugins:
   - tags
   - minify:
       minify_html: true
-  - redirects:
-      redirect_maps:
-        index.md: getting-started/index.md
 
 # Customization
 extra:
