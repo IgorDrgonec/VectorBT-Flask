@@ -428,7 +428,7 @@ class BCO:
     """Keyword arguments passed to `np.require`."""
 
     index_to_product: tp.Optional[bool] = attr.ib(default=None)
-    """Whether to set `BCO.default` to True if `BCO.value` is an index."""
+    """Whether to set `BCO.product` to True if `BCO.value` is an index."""
 
     product: tp.Optional[bool] = attr.ib(default=None)
     """Build a Cartesian product of parameter combinations in `BCO.value` and other objects.
