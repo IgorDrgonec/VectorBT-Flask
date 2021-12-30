@@ -40,7 +40,7 @@ from vectorbtpro.utils.decorators import (
     cacheable_method,
     cached_method
 )
-from vectorbtpro.utils.docs import stringify
+from vectorbtpro.utils.formatting import prettify
 from vectorbtpro.utils.execution import SequenceEngine, DaskEngine, RayEngine
 from vectorbtpro.utils.image_ import save_animation
 from vectorbtpro.utils.jitting import jitted
@@ -100,7 +100,7 @@ __all__ = [
     'chunked',
     'Timer',
     'MemTracer',
-    'stringify',
+    'prettify',
     'jitted'
 ]
 

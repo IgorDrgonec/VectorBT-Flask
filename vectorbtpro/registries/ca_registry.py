@@ -210,7 +210,7 @@ The diagram above depicts the following setup hierarchy:
 >>> c1 = C()
 >>> c2 = C()
 
->>> print(vbt.stringify(A.get_ca_setup().get_setup_hierarchy()))
+>>> print(vbt.prettify(A.get_ca_setup().get_setup_hierarchy()))
 [
     {
         "parent": "<class __main__.B>",
@@ -244,14 +244,14 @@ The diagram above depicts the following setup hierarchy:
     }
 ]
 
->>> print(vbt.stringify(A.f1.get_ca_setup().get_setup_hierarchy()))
+>>> print(vbt.prettify(A.f1.get_ca_setup().get_setup_hierarchy()))
 [
     "<instance property __main__.C.f1>",
     "<instance property __main__.C.f1>",
     "<instance property __main__.B.f1>"
 ]
 
->>> print(vbt.stringify(C.f2.get_ca_setup().get_setup_hierarchy()))
+>>> print(vbt.prettify(C.f2.get_ca_setup().get_setup_hierarchy()))
 [
     "<instance method __main__.C.f2>",
     "<instance method __main__.C.f2>"

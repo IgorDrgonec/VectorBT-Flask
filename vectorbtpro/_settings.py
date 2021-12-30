@@ -125,7 +125,7 @@ __pdoc__['caching'] = Sub("""Sub-config with settings applied across `vectorbtpr
     
     Setting `use_cached_accessors` is applied only once.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -172,7 +172,7 @@ __pdoc__['jitting'] = Sub("""Sub-config with settings applied across `vectorbtpr
     
     Keyword arguments (with `_kwargs` suffix) are applied right away.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -188,7 +188,7 @@ numba = dict(
 
 __pdoc__['numba'] = Sub("""Sub-config with Numba-related settings.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -206,7 +206,7 @@ __pdoc__['math'] = Sub("""Sub-config with settings applied across `vectorbtpro.u
 !!! note
     All math settings are applied only once.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -248,7 +248,7 @@ execution = dict(
 
 __pdoc__['execution'] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.execution`.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -285,7 +285,7 @@ and `vectorbtpro.utils.chunking`.
 !!! note
     Options (with `_options` suffix) and setting `disable_machinery` are applied only once.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -301,7 +301,7 @@ template = dict(
 
 __pdoc__['template'] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.template`.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -314,7 +314,7 @@ config = Config(  # flex
 
 __pdoc__['config'] = Sub("""Sub-config with settings applied to `vectorbtpro.utils.config.Config`.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -331,7 +331,7 @@ configured = dict(
 
 __pdoc__['configured'] = Sub("""Sub-config with settings applied to `vectorbtpro.utils.config.Configured`.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -359,7 +359,7 @@ broadcasting = dict(
 
 __pdoc__['broadcasting'] = Sub("""Sub-config with settings applied to broadcasting functions across `vectorbtpro.base`.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -375,7 +375,7 @@ wrapping = dict(
 
 __pdoc__['wrapping'] = Sub("""Sub-config with settings applied across `vectorbtpro.base.wrapping`.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -389,7 +389,7 @@ datetime = dict(
 
 __pdoc__['datetime'] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.datetime_`.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -430,7 +430,7 @@ data = dict(
 
 __pdoc__['data'] = Sub("""Sub-config with settings applied across `vectorbtpro.data`.
 
-```json
+```python
 ${config_doc}
 ```
 
@@ -541,7 +541,7 @@ plotting = dict(
 __pdoc__['plotting'] = Sub("""Sub-config with settings applied to Plotly figures 
 created from `vectorbtpro.utils.figure`.
 
-```json
+```python
 ${config_doc}
 ```
 """)
@@ -584,7 +584,7 @@ stats_builder = dict(
 __pdoc__['stats_builder'] = Sub("""Sub-config with settings applied to 
 `vectorbtpro.generic.stats_builder.StatsBuilderMixin`.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -641,7 +641,7 @@ plots_builder = dict(
 __pdoc__['plots_builder'] = Sub("""Sub-config with settings applied to 
 `vectorbtpro.generic.plots_builder.PlotsBuilderMixin`.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -670,7 +670,7 @@ generic = dict(
 
 __pdoc__['generic'] = Sub("""Sub-config with settings applied to `vectorbtpro.generic.accessors.GenericAccessor`.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -688,7 +688,7 @@ ranges = dict(
 
 __pdoc__['ranges'] = Sub("""Sub-config with settings applied to `vectorbtpro.generic.ranges.Ranges`.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -710,7 +710,7 @@ drawdowns = dict(
 
 __pdoc__['drawdowns'] = Sub("""Sub-config with settings applied to `vectorbtpro.generic.drawdowns.Drawdowns`.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -736,7 +736,7 @@ ohlcv = dict(
 
 __pdoc__['ohlcv'] = Sub("""Sub-config with settings applied across `vectorbtpro.ohlcv`.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -766,7 +766,7 @@ signals = dict(
 
 __pdoc__['signals'] = Sub("""Sub-config with settings applied to `vectorbtpro.signals.accessors.SignalsAccessor`.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -813,7 +813,7 @@ returns = dict(
 
 __pdoc__['returns'] = Sub("""Sub-config with settings applied to `vectorbtpro.returns.accessors.ReturnsAccessor`.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -828,7 +828,7 @@ qs_adapter = dict(
 
 __pdoc__['qs_adapter'] = Sub("""Sub-config with settings applied to `vectorbtpro.returns.qs_adapter.QSAdapter`.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -846,7 +846,7 @@ records = dict(
 
 __pdoc__['records'] = Sub("""Sub-config with settings applied to `vectorbtpro.records.base.Records`.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -874,7 +874,7 @@ mapped_array = dict(
 
 __pdoc__['mapped_array'] = Sub("""Sub-config with settings applied to `vectorbtpro.records.mapped_array.MappedArray`.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -892,7 +892,7 @@ orders = dict(
 
 __pdoc__['orders'] = Sub("""Sub-config with settings applied to `vectorbtpro.portfolio.orders.Orders`.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -917,7 +917,7 @@ trades = dict(
 
 __pdoc__['trades'] = Sub("""Sub-config with settings applied to `vectorbtpro.portfolio.trades.Trades`.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -932,7 +932,7 @@ logs = dict(
 
 __pdoc__['logs'] = Sub("""Sub-config with settings applied to `vectorbtpro.portfolio.logs.Logs`.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -1048,7 +1048,7 @@ portfolio = dict(
 
 __pdoc__['portfolio'] = Sub("""Sub-config with settings applied to `vectorbtpro.portfolio.base.Portfolio`.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -1075,7 +1075,7 @@ messaging = dict(
 
 __pdoc__['messaging'] = Sub("""Sub-config with settings applied across `vectorbtpro.messaging`.
 
-```json
+```python
 ${config_doc}
 ```
 
@@ -1105,7 +1105,7 @@ pbar = dict(
 
 __pdoc__['pbar'] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.pbar`.
 
-```json
+```python
 ${config_doc}
 ```""")
 
@@ -1145,11 +1145,11 @@ class SettingsConfig(Config):
         """Reset to default theme."""
         self.set_theme('light')
 
-    def substitute_sub_config_docs(self, __pdoc__: dict, to_doc_kwargs) -> None:
-        """Substitute templiates in sub-config docs."""
+    def substitute_sub_config_docs(self, __pdoc__: dict, prettify_kwargs) -> None:
+        """Substitute templates in sub-config docs."""
         for k, v in __pdoc__.items():
             if k in self:
-                config_doc = self[k].stringify(**to_doc_kwargs.get(k, {}))
+                config_doc = self[k].prettify(**prettify_kwargs.get(k, {}))
                 __pdoc__[k] = deep_substitute(v, mapping=dict(config_doc=config_doc), sub_id='__pdoc__')
 
 
@@ -1187,12 +1187,12 @@ settings.make_checkpoint()
 
 settings.substitute_sub_config_docs(
     __pdoc__,
-    to_doc_kwargs=dict(
+    prettify_kwargs=dict(
         plotting=dict(
             replace={
-                'settings.plotting.themes.light.template': '{ ... templates/light.json ... }',
-                'settings.plotting.themes.dark.template': '{ ... templates/dark.json ... }',
-                'settings.plotting.themes.seaborn.template': '{ ... templates/seaborn.json ... }'
+                'settings.plotting.themes.light.template': 'Template(\'templates/light.json\')',
+                'settings.plotting.themes.dark.template': 'Template(\'templates/dark.json\')',
+                'settings.plotting.themes.seaborn.template': 'Template(\'templates/seaborn.json\')'
             },
             path='settings.plotting'
         )

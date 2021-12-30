@@ -163,8 +163,8 @@ ranges_field_config = ReadonlyConfig(
 
 __pdoc__['ranges_field_config'] = f"""Field config for `Ranges`.
 
-```json
-{ranges_field_config.stringify()}
+```python
+{ranges_field_config.prettify()}
 ```
 """
 
@@ -179,8 +179,8 @@ ranges_attach_field_config = ReadonlyConfig(
 
 __pdoc__['ranges_attach_field_config'] = f"""Config of fields to be attached to `Ranges`.
 
-```json
-{ranges_attach_field_config.stringify()}
+```python
+{ranges_attach_field_config.prettify()}
 ```
 """
 
@@ -212,8 +212,8 @@ ranges_shortcut_config = ReadonlyConfig(
 
 __pdoc__['ranges_shortcut_config'] = f"""Config of shortcut properties to be attached to `Ranges`.
 
-```json
-{ranges_shortcut_config.stringify()}
+```python
+{ranges_shortcut_config.prettify()}
 ```
 """
 

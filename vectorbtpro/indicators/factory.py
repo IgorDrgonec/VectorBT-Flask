@@ -1189,7 +1189,7 @@ from vectorbtpro.registries.jit_registry import jit_registry
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config
 from vectorbtpro.utils.decorators import classproperty, cacheable_property
-from vectorbtpro.utils.docs import stringify
+from vectorbtpro.utils.formatting import prettify
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.mapping import to_mapping, apply_mapping
 from vectorbtpro.utils.params import to_typed_list, broadcast_params, create_param_product, params_to_list
@@ -2571,12 +2571,12 @@ class IndicatorFactory:
                 attr_readable.__doc__ = inspect.cleandoc(
                     """`{attr_name}` in readable format based on the following mapping: 
                                 
-                    ```json
+                    ```python
                     {dtype}
                     ```"""
                 ).format(
                     attr_name=attr_name,
-                    dtype=stringify(to_mapping(dtype))
+                    dtype=prettify(to_mapping(dtype))
                 )
                 setattr(Indicator, f'{attr_name}_readable', property(attr_readable))
 
@@ -2590,12 +2590,12 @@ class IndicatorFactory:
                 attr_stats.__doc__ = inspect.cleandoc(
                     """Stats of `{attr_name}` based on the following mapping: 
 
-                    ```json
+                    ```python
                     {dtype}
                     ```"""
                 ).format(
                     attr_name=attr_name,
-                    dtype=stringify(to_mapping(dtype))
+                    dtype=prettify(to_mapping(dtype))
                 )
                 setattr(Indicator, f'{attr_name}_stats', attr_stats)
 

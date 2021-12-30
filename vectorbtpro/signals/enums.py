@@ -5,7 +5,7 @@
 Defines enums and other schemas for `vectorbtpro.signals`."""
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils.docs import stringify
+from vectorbtpro.utils.formatting import prettify
 
 __all__ = [
     'StopType',
@@ -29,8 +29,8 @@ StopType = StopTypeT()
 
 __pdoc__['StopType'] = f"""Stop type.
 
-```json
-{stringify(StopType)}
+```python
+{prettify(StopType)}
 ```
 """
 
@@ -47,8 +47,8 @@ FactoryMode = FactoryModeT()
 
 __pdoc__['FactoryMode'] = f"""Factory mode.
 
-```json
-{stringify(FactoryMode)}
+```python
+{prettify(FactoryMode)}
 ```
 
 Attributes:

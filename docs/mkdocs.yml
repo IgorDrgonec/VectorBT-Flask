@@ -195,10 +195,10 @@ nav:
       - config: api/utils/config.md
       - datetime_: api/utils/datetime_.md
       - decorators: api/utils/decorators.md
-      - docs: api/utils/docs.md
       - enum_: api/utils/enum_.md
       - execution: api/utils/execution.md
       - figure: api/utils/figure.md
+      - formatting: api/utils/formatting.md
       - hashing: api/utils/hashing.md
       - image_: api/utils/image_.md
       - jitting: api/utils/jitting.md

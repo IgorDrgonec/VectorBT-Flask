@@ -83,7 +83,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
     def metrics(self) -> Config:
         """Metrics supported by `${cls_name}`.
 
-        ```json
+        ```python
         ${metrics}
         ```
 
@@ -634,7 +634,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
         return string.Template(
             inspect.cleandoc(get_dict_attr(source_cls, 'metrics').__doc__)
         ).substitute(
-            {'metrics': cls.metrics.stringify(), 'cls_name': cls.__name__}
+            {'metrics': cls.metrics.prettify(), 'cls_name': cls.__name__}
         )
 
     @classmethod

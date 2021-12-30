@@ -572,8 +572,8 @@ trades_field_config = ReadonlyConfig(
 
 __pdoc__['trades_field_config'] = f"""Field config for `Trades`.
 
-```json
-{trades_field_config.stringify()}
+```python
+{trades_field_config.prettify()}
 ```
 """
 
@@ -595,8 +595,8 @@ trades_attach_field_config = ReadonlyConfig(
 
 __pdoc__['trades_attach_field_config'] = f"""Config of fields to be attached to `Trades`.
 
-```json
-{trades_attach_field_config.stringify()}
+```python
+{trades_attach_field_config.prettify()}
 ```
 """
 
@@ -628,8 +628,8 @@ trades_shortcut_config = ReadonlyConfig(
 
 __pdoc__['trades_shortcut_config'] = f"""Config of shortcut properties to be attached to `Trades`.
 
-```json
-{trades_shortcut_config.stringify()}
+```python
+{trades_shortcut_config.prettify()}
 ```
 """
 
@@ -1542,8 +1542,8 @@ entry_trades_field_config = ReadonlyConfig(
 
 __pdoc__['entry_trades_field_config'] = f"""Field config for `EntryTrades`.
 
-```json
-{entry_trades_field_config.stringify()}
+```python
+{entry_trades_field_config.prettify()}
 ```
 """
 
@@ -1592,8 +1592,8 @@ exit_trades_field_config = ReadonlyConfig(
 
 __pdoc__['exit_trades_field_config'] = f"""Field config for `ExitTrades`.
 
-```json
-{exit_trades_field_config.stringify()}
+```python
+{exit_trades_field_config.prettify()}
 ```
 """
 
@@ -1646,8 +1646,8 @@ positions_field_config = ReadonlyConfig(
 
 __pdoc__['positions_field_config'] = f"""Field config for `Positions`.
 
-```json
-{positions_field_config.stringify()}
+```python
+{positions_field_config.prettify()}
 ```
 """
 

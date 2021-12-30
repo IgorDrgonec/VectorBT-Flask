@@ -1739,8 +1739,8 @@ returns_acc_config = ReadonlyConfig(
 
 __pdoc__['returns_acc_config'] = f"""Config of returns accessor methods to be attached to `Portfolio`.
 
-```json
-{returns_acc_config.stringify()}
+```python
+{returns_acc_config.prettify()}
 ```
 """
 
@@ -1963,8 +1963,8 @@ shortcut_config = ReadonlyConfig(
 
 __pdoc__['shortcut_config'] = f"""Config of shortcut properties to be attached to `Portfolio`.
 
-```json
-{shortcut_config.stringify()}
+```python
+{shortcut_config.prettify()}
 ```
 """
 

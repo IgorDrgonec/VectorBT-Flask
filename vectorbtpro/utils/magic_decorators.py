@@ -45,8 +45,8 @@ binary_magic_config = ReadonlyConfig(
 
 __pdoc__['binary_magic_config'] = f"""Config of binary magic methods to be attached to a class.
 
-```json
-{binary_magic_config.stringify()}
+```python
+{binary_magic_config.prettify()}
 ```
 """
 
@@ -101,8 +101,8 @@ unary_magic_config = ReadonlyConfig(
 
 __pdoc__['unary_magic_config'] = f"""Config of unary magic methods to be attached to a class.
 
-```json
-{unary_magic_config.stringify()}
+```python
+{unary_magic_config.prettify()}
 ```
 """
 

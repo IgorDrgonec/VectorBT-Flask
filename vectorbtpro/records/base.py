@@ -453,7 +453,7 @@ class RecordsWithFields(metaclass=MetaFields):
     def field_config(self) -> Config:
         """Field config of `${cls_name}`.
 
-        ```json
+        ```python
         ${field_config}
         ```
         """
@@ -515,7 +515,7 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
     def field_config(self) -> Config:
         """Field config of `${cls_name}`.
 
-        ```json
+        ```python
         ${field_config}
         ```
 
@@ -952,7 +952,7 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         return string.Template(
             inspect.cleandoc(get_dict_attr(source_cls, 'field_config').__doc__)
         ).substitute(
-            {'field_config': cls.field_config.stringify(), 'cls_name': cls.__name__}
+            {'field_config': cls.field_config.prettify(), 'cls_name': cls.__name__}
         )
 
     @classmethod

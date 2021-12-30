@@ -11,7 +11,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.caching import Cacheable
 from vectorbtpro.utils.decorators import class_or_instancemethod
-from vectorbtpro.utils.docs import Documented, stringify
+from vectorbtpro.utils.formatting import Prettified, prettify, prettify_inited
 from vectorbtpro.utils.pickling import Pickleable
 
 
@@ -272,7 +272,7 @@ class PickleableDict(Pickleable, dict):
 ConfigT = tp.TypeVar("ConfigT", bound="Config")
 
 
-class Config(PickleableDict, Documented):
+class Config(PickleableDict, Prettified):
     """Extends pickleable dict with config features such as nested updates, freezing, and resetting.
 
     Args:
@@ -734,9 +734,38 @@ class Config(PickleableDict, Documented):
             nested = self.nested_
         self.update(loaded, nested=nested, force=True)
 
-    def stringify(self, **kwargs) -> str:
-        """Stringify using JSON."""
-        return stringify(dict(self), **kwargs)
+    def prettify(self,
+                 with_params: bool = False,
+                 replace: tp.DictLike = None,
+                 path: str = None,
+                 htchar: str = '    ',
+                 lfchar: str = '\n',
+                 indent: int = 0) -> str:
+        if with_params:
+            dct = {
+                **dict(self),
+                **dict(
+                    copy_kwargs=self.copy_kwargs_,
+                    reset_dct=self.reset_dct_,
+                    reset_dct_copy_kwargs=self.reset_dct_copy_kwargs_,
+                    frozen_keys=self.frozen_keys_,
+                    readonly=self.readonly_,
+                    nested=self.nested_,
+                    convert_dicts=self.convert_dicts_,
+                    as_attrs=self.as_attrs_
+                )
+            }
+        else:
+            dct = dict(self)
+        return prettify_inited(
+            type(self),
+            dct,
+            replace=replace,
+            path=path,
+            htchar=htchar,
+            lfchar=lfchar,
+            indent=indent
+        )
 
     def __eq__(self, other: tp.Any) -> bool:
         return checks.is_deep_equal(dict(self), dict(other))
@@ -756,7 +785,7 @@ HybridConfig = functools.partial(Config, copy_kwargs_=dict(copy_mode='hybrid'))
 ConfiguredT = tp.TypeVar("ConfiguredT", bound="Configured")
 
 
-class Configured(Cacheable, Pickleable, Documented):
+class Configured(Cacheable, Pickleable, Prettified):
     """Class with an initialization config.
 
     All subclasses of `Configured` are initialized using `Config`, which makes it easier to pickle.
@@ -884,6 +913,5 @@ class Configured(Cacheable, Pickleable, Documented):
         """Force-update the config."""
         self.config.update(*args, **kwargs, force=True)
 
-    def stringify(self, **kwargs) -> str:
-        """Stringify using JSON."""
-        return self.config.stringify(**kwargs)
+    def prettify(self, **kwargs) -> str:
+        return "%s(%s)" % (type(self).__name__, self.config.prettify(**kwargs)[7:-1])

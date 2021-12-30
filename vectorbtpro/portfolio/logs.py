@@ -247,8 +247,8 @@ logs_field_config = ReadonlyConfig(
 
 __pdoc__['logs_field_config'] = f"""Field config for `Logs`.
 
-```json
-{logs_field_config.stringify()}
+```python
+{logs_field_config.prettify()}
 ```
 """
 
@@ -269,8 +269,8 @@ logs_attach_field_config = ReadonlyConfig(
 
 __pdoc__['logs_attach_field_config'] = f"""Config of fields to be attached to `Logs`.
 
-```json
-{logs_attach_field_config.stringify()}
+```python
+{logs_attach_field_config.prettify()}
 ```
 """
 

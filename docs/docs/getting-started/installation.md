@@ -108,3 +108,8 @@ Install the package:
 ```sh
 pip install -e vectorbtpro
 ```
+
+## Troubleshooting
+
+* [TA-Lib support](https://github.com/mrjbq7/ta-lib#dependencies)
+* [Jupyter Notebook and JupyterLab support](https://plotly.com/python/getting-started/#jupyter-notebook-support)

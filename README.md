@@ -1,7 +1,7 @@
 <div align="center">
 	<br>
-    <a href="https://vectorbt.pro/" alt="Discord">
-        <img src="assets/header.svg" />
+    <a href="https://vectorbt.pro/" alt="https://vectorbt.pro/">
+        <img src="docs/docs/assets/logo/header.svg" />
     </a>
 	<br>
 </div>

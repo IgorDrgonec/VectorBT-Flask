@@ -222,8 +222,8 @@ dd_field_config = ReadonlyConfig(
 
 __pdoc__['dd_field_config'] = f"""Field config for `Drawdowns`.
 
-```json
-{dd_field_config.stringify()}
+```python
+{dd_field_config.prettify()}
 ```
 """
 
@@ -238,8 +238,8 @@ dd_attach_field_config = ReadonlyConfig(
 
 __pdoc__['dd_attach_field_config'] = f"""Config of fields to be attached to `Drawdowns`.
 
-```json
-{dd_attach_field_config.stringify()}
+```python
+{dd_attach_field_config.prettify()}
 ```
 """
 
@@ -293,8 +293,8 @@ dd_shortcut_config = ReadonlyConfig(
 
 __pdoc__['dd_shortcut_config'] = f"""Config of shortcut properties to be attached to `Drawdowns`.
 
-```json
-{dd_shortcut_config.stringify()}
+```python
+{dd_shortcut_config.prettify()}
 ```
 """
 

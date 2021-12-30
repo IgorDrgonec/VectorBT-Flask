@@ -308,8 +308,8 @@ nb_config = ReadonlyConfig(
 
 __pdoc__['nb_config'] = f"""Config of Numba methods to be attached to `GenericAccessor`.
 
-```json
-{nb_config.stringify()}
+```python
+{nb_config.prettify()}
 ```
 """
 
@@ -353,8 +353,8 @@ transform_config = ReadonlyConfig(
 
 __pdoc__['transform_config'] = f"""Config of transform methods to be attached to `GenericAccessor`.
 
-```json
-{transform_config.stringify()}
+```python
+{transform_config.prettify()}
 ```
 """
 

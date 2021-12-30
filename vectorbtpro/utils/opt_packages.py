@@ -86,8 +86,8 @@ opt_package_config = ReadonlyConfig(
 
 __pdoc__['opt_package_config'] = f"""Config for optional packages.
 
-```json
-{opt_package_config.stringify()}
+```python
+{opt_package_config.prettify()}
 ```
 """
 

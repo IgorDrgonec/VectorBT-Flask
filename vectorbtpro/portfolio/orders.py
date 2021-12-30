@@ -151,8 +151,8 @@ orders_field_config = ReadonlyConfig(
 
 __pdoc__['orders_field_config'] = f"""Field config for `Orders`.
 
-```json
-{orders_field_config.stringify()}
+```python
+{orders_field_config.prettify()}
 ```
 """
 
@@ -167,8 +167,8 @@ orders_attach_field_config = ReadonlyConfig(
 
 __pdoc__['orders_attach_field_config'] = f"""Config of fields to be attached to `Orders`.
 
-```json
-{orders_attach_field_config.stringify()}
+```python
+{orders_attach_field_config.prettify()}
 ```
 """
 
