@@ -416,6 +416,12 @@ data = dict(
                 dict(
                     enableRateLimit=True
                 )
+            ),
+            alpaca=Config(
+                dict(
+                    key_id=None,
+                    secret_key=None
+                )
             )
         )
     ),
@@ -440,6 +446,9 @@ Binance:
 CCXT:
     See [Configuring API Keys](https://ccxt.readthedocs.io/en/latest/manual.html#configuring-api-keys).
     Keys can be defined per exchange. If a key is defined at the root, it applies to all exchanges.
+    
+Alpaca:
+    Sign up for Alpaca API keys under https://app.alpaca.markets/signup.
 """)
 
 _settings['data'] = data

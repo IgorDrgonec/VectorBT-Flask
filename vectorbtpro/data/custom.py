@@ -28,13 +28,17 @@ from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.random_ import set_seed
 
 try:
-    from binance.client import Client as ClientT
+    from binance.client import Client as BinanceClientT
 except ImportError:
-    ClientT = tp.Any
+    BinanceClientT = tp.Any
 try:
     from ccxt.base.exchange import Exchange as ExchangeT
 except ImportError:
     ExchangeT = tp.Any
+try:
+    from alpaca_trade_api.rest import REST as AlpacaClientT
+except ImportError:
+    AlpacaClientT = tp.Any
 
 CSVDataT = tp.TypeVar("CSVDatat", bound="CSVData")
 
@@ -669,7 +673,7 @@ class BinanceData(Data):  # pragma: no cover
     @classmethod
     def fetch(cls: tp.Type[BinanceDataT],
               symbols: tp.Sequence[str],
-              client: tp.Optional["ClientT"] = None,
+              client: tp.Optional["BinanceClientT"] = None,
               **kwargs) -> BinanceDataT:
         """Override `vectorbtpro.data.base.Data.fetch` to instantiate a Binance client."""
         from vectorbtpro.utils.opt_packages import assert_can_import
@@ -680,7 +684,7 @@ class BinanceData(Data):  # pragma: no cover
         binance_cfg = settings['data']['custom']['binance']
 
         client_kwargs = dict()
-        for k in get_func_kwargs(Client):
+        for k in get_func_kwargs(Client.__init__):
             if k in kwargs:
                 client_kwargs[k] = kwargs.pop(k)
         client_kwargs = merge_dicts(binance_cfg, client_kwargs)
@@ -691,7 +695,7 @@ class BinanceData(Data):  # pragma: no cover
     @classmethod
     def fetch_symbol(cls,
                      symbol: str,
-                     client: tp.Optional["ClientT"] = None,
+                     client: tp.Optional["BinanceClientT"] = None,
                      interval: str = '1d',
                      start: tp.DatetimeLike = 0,
                      end: tp.DatetimeLike = 'now UTC',
@@ -703,7 +707,7 @@ class BinanceData(Data):  # pragma: no cover
 
         Args:
             symbol (str): Symbol.
-            client (binance.client.Client): Binance client of type `binance.client.Client`.
+            client (binance.client.Client): Client of type `binance.client.Client`.
             interval (str): Kline interval.
 
                 See `binance.enums`.
@@ -1032,6 +1036,200 @@ class CCXTData(Data):  # pragma: no cover
         ])
         df.index = pd.to_datetime(df['Open time'], unit='ms', utc=True)
         del df['Open time']
+        df['Open'] = df['Open'].astype(float)
+        df['High'] = df['High'].astype(float)
+        df['Low'] = df['Low'].astype(float)
+        df['Close'] = df['Close'].astype(float)
+        df['Volume'] = df['Volume'].astype(float)
+
+        return df
+
+    def update_symbol(self, symbol: str, **kwargs) -> tp.Frame:
+        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
+        fetch_kwargs['start'] = self.last_index[symbol]
+        kwargs = merge_dicts(fetch_kwargs, kwargs)
+        return self.fetch_symbol(symbol, **kwargs)
+
+
+AlpacaDataT = tp.TypeVar("AlpacaDataT", bound="AlpacaData")
+
+
+class AlpacaData(Data):
+    """`Data` for data coming from `alpaca-trade-api`.
+
+    Sign up for Alpaca API keys under https://app.alpaca.markets/signup.
+
+    Contributed to vectorbt by @haxdds. Licensed under Apache 2.0 with Commons Clause license.
+    Adapted to vectorbtpro by @polakowo.
+
+    Usage:
+        * Fetch the 1-minute data of the last 2 hours, wait 1 minute, and update:
+
+        ```pycon
+        >>> import vectorbtpro as vbt
+
+        >>> vbt.settings['data']['custom']['alpaca']['key_id'] = "{API Key ID}"
+        >>> vbt.settings['data']['custom']['alpaca']['secret_key'] = "{Secret Key}"
+
+        >>> alpaca_data = vbt.AlpacaData.fetch(
+        ...     "AAPL",
+        ...     start='2 hours ago UTC',
+        ...     end='15 minutes ago UTC',
+        ...     interval='1m'
+        ... )
+        >>> alpaca_data.get()
+                                    Open      High       Low     Close      Volume
+        timestamp
+        2021-12-27 14:04:00+00:00  177.0500  177.0500  177.0500  177.0500    1967
+        2021-12-27 14:05:00+00:00  177.0500  177.0500  177.0300  177.0500    3218
+        2021-12-27 14:06:00+00:00  177.0400  177.0400  177.0400  177.0400     873
+        ...                             ...       ...       ...       ...     ...
+        2021-12-27 15:46:00+00:00  177.9500  178.0000  177.8289  177.8850  162778
+        2021-12-27 15:47:00+00:00  177.8810  177.9600  177.8400  177.9515  123284
+        2021-12-27 15:48:00+00:00  177.9600  178.0500  177.9600  178.0100  159700
+
+        [105 rows x 5 columns]
+
+        >>> import time
+        >>> time.sleep(60)
+
+        >>> alpaca_data = alpaca_data.update()
+        >>> alpaca_data.get()
+                                    Open      High       Low     Close      Volume
+        timestamp
+        2021-12-27 14:04:00+00:00  177.0500  177.0500  177.0500  177.0500    1967
+        2021-12-27 14:05:00+00:00  177.0500  177.0500  177.0300  177.0500    3218
+        2021-12-27 14:06:00+00:00  177.0400  177.0400  177.0400  177.0400     873
+        ...                             ...       ...       ...       ...     ...
+        2021-12-27 15:47:00+00:00  177.8810  177.9600  177.8400  177.9515  123284
+        2021-12-27 15:48:00+00:00  177.9600  178.0500  177.9600  178.0100  159700
+        2021-12-27 15:49:00+00:00  178.0100  178.0700  177.9700  178.0650  185037
+
+        [106 rows x 5 columns]
+        ```
+    """
+
+    @classmethod
+    def fetch(cls: tp.Type[AlpacaDataT],
+              symbols: tp.Sequence[str],
+              client: tp.Optional["AlpacaClientT"] = None,
+              **kwargs) -> AlpacaDataT:
+        """Override `vectorbtpro.data.base.Data.fetch` to instantiate an Alpaca client."""
+        from vectorbtpro.utils.opt_packages import assert_can_import
+        assert_can_import('alpaca_trade_api')
+        from alpaca_trade_api.rest import REST
+
+        from vectorbtpro._settings import settings
+        alpaca_cfg = settings['data']['custom']['alpaca']
+
+        client_kwargs = dict()
+        for k in get_func_kwargs(REST.__init__):
+            if k in kwargs:
+                client_kwargs[k] = kwargs.pop(k)
+        client_kwargs = merge_dicts(alpaca_cfg, client_kwargs)
+        if client is None:
+            client = REST(**client_kwargs)
+        return super(AlpacaData, cls).fetch(symbols, client=client, **kwargs)
+
+    @classmethod
+    def fetch_symbol(cls,
+                     symbol: str,
+                     client: tp.Optional["AlpacaClientT"] = None,
+                     timeframe: str = '1d',
+                     start: tp.DatetimeLike = 0,
+                     end: tp.DatetimeLike = 'now UTC',
+                     adjustment: tp.Optional[str] = 'all',
+                     limit: int = 500,
+                     exchange: tp.Optional[str] = 'CBSE',
+                     **kwargs) -> tp.Frame:
+        """Fetch a symbol.
+
+        Args:
+            symbol (str): Symbol.
+            client (alpaca_trade_api.rest.REST): Client of type `alpaca_trade_api.rest.REST`.
+            timeframe (str): Timeframe of data.
+
+                Must be integer multiple of 'm' (minute), 'h' (hour) or 'd' (day). i.e. '15m'.
+                See https://alpaca.markets/data.
+
+                !!! note
+                    Data from the latest 15 minutes is not available with a free data plan.
+
+            start (any): Start datetime.
+
+                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
+            end (any): End datetime.
+
+                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
+            adjustment (str): Specifies the corporate action adjustment for the stocks.
+
+                Allowed are `raw`, `split`, `dividend`, and `all`.
+            limit (int): The maximum number of returned items.
+            exchange (str): For crypto symbols. Which exchange you wish to retrieve data from.
+
+                Allowed are `FTX`, `ERSX`, and `CBSE`.
+
+        For defaults, see `custom.alpaca` in `vectorbtpro._settings.data`.
+        """
+        from vectorbtpro.utils.opt_packages import assert_can_import
+        assert_can_import('alpaca_trade_api')
+        from alpaca_trade_api.rest import TimeFrameUnit, TimeFrame
+
+        _timeframe_units = {'d': TimeFrameUnit.Day, 'h': TimeFrameUnit.Hour, 'm': TimeFrameUnit.Minute}
+
+        if len(timeframe) < 2:
+            raise ValueError("invalid timeframe")
+
+        amount_str = timeframe[:-1]
+        unit_str = timeframe[-1]
+
+        if not amount_str.isnumeric() or unit_str not in _timeframe_units:
+            raise ValueError("invalid timeframe")
+
+        amount = int(amount_str)
+        unit = _timeframe_units[unit_str]
+
+        _timeframe = TimeFrame(amount, unit)
+
+        start_ts = to_tzaware_datetime(start, tz=get_utc_tz()).isoformat()
+        end_ts = to_tzaware_datetime(end, tz=get_utc_tz()).isoformat()
+
+        def _is_crypto_symbol(symbol):
+            return len(symbol) == 6 and "USD" in symbol
+
+        if _is_crypto_symbol(symbol):
+            df = client.get_crypto_bars(
+                symbol=symbol,
+                timeframe=_timeframe,
+                start=start_ts,
+                end=end_ts,
+                limit=limit,
+                exchanges=exchange
+            ).df
+        else:
+            df = client.get_bars(
+                symbol=symbol,
+                timeframe=_timeframe,
+                start=start_ts,
+                end=end_ts,
+                adjustment=adjustment,
+                limit=limit
+            ).df
+
+        # filter for OHLCV
+        # remove extra columns
+        df.drop(['trade_count', 'vwap'], axis=1, errors='ignore', inplace=True)
+
+        # capitalize
+        df.rename(columns={
+            'open': 'Open',
+            'high': 'High',
+            'low': 'Low',
+            'close': 'Close',
+            'volume': 'Volume',
+            'exchange': 'Exchange'
+        }, inplace=True)
+
         df['Open'] = df['Open'].astype(float)
         df['High'] = df['High'].astype(float)
         df['Low'] = df['Low'].astype(float)

@@ -69,7 +69,7 @@ opt_package_config = ReadonlyConfig(
             link="https://github.com/plotly/Kaleido"
         ),
         telegram=dict(
-            name="python-telegram-bot",
+            name="Python Telegram Bot",
             link="https://github.com/python-telegram-bot/python-telegram-bot"
         ),
         quantstats=dict(
@@ -79,6 +79,10 @@ opt_package_config = ReadonlyConfig(
         dill=dict(
             name="dill",
             link="https://github.com/uqfoundation/dill"
+        ),
+        alpaca_trade_api=dict(
+            name="Alpaca Trade API",
+            link="https://github.com/alpacahq/alpaca-trade-api-python"
         )
     )
 )
