@@ -1534,6 +1534,9 @@ entry_trades_field_config = ReadonlyConfig(
         settings={
             'id': dict(
                 title='Entry Trade Id'
+            ),
+            'idx': dict(
+                name='entry_idx'  # remap field of Records
             )
         }
     )
