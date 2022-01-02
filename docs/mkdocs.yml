@@ -26,6 +26,7 @@ theme:
     - navigation.instant
     - search.suggest
     - search.share
+    - content.code.annotate
   palette:
     scheme: slate
     accent: amber
