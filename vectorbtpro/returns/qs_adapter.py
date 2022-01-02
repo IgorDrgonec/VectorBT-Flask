@@ -218,7 +218,7 @@ class QSAdapter(Configured):
     @property
     def defaults_mapping(self) -> tp.Dict:
         """Common argument names in quantstats mapped to `ReturnsAccessor.defaults`."""
-        return dict(rf='risk_free')
+        return dict(rf='risk_free', rolling_period='window')
 
     @property
     def defaults(self) -> tp.Kwargs:
