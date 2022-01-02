@@ -54,7 +54,7 @@ To access the cache or any metric of interest, we can ask the setup:
 >>> my_setup.get_status()
 {
     'hash': 4792160544297109364,
-    'short_str': '<bound func __main__.<lambda>>',
+    'string': '<bound func __main__.<lambda>>',
     'use_cache': True,
     'whitelist': False,
     'caching_enabled': True,
@@ -76,7 +76,7 @@ To access the cache or any metric of interest, we can ask the setup:
 >>> my_setup.get_status()
 {
     'hash': 4792160544297109364,
-    'short_str': '<bound func __main__.<lambda>>',
+    'string': '<bound func __main__.<lambda>>',
     'use_cache': True,
     'whitelist': False,
     'caching_enabled': True,
@@ -98,7 +98,7 @@ To access the cache or any metric of interest, we can ask the setup:
 >>> my_setup.get_status()
 {
     'hash': 4792160544297109364,
-    'short_str': '<bound func __main__.<lambda>>',
+    'string': '<bound func __main__.<lambda>>',
     'use_cache': True,
     'whitelist': False,
     'caching_enabled': True,
@@ -1146,11 +1146,16 @@ class CABaseSetup(CAMetrics, Hashable):
         raise NotImplementedError
 
     @property
-    def short_str(self) -> str:
-        """Convert this setup into a short readable string."""
+    def readable_str(self) -> str:
+        """Convert this setup into a readable string."""
         raise NotImplementedError
 
-    def get_status(self, readable: bool = True) -> dict:
+    @property
+    def short_str(self) -> str:
+        """Convert this setup into a short string."""
+        raise NotImplementedError
+
+    def get_status(self, readable: bool = True, short_str: bool = False) -> dict:
         """Get status of the setup as a dict with metrics."""
         string = str(self)
         total_size = self.total_size
@@ -1164,7 +1169,10 @@ class CABaseSetup(CAMetrics, Hashable):
         last_update_time = self.last_update_time
 
         if readable:
-            string = self.short_str
+            if short_str:
+                string = self.short_str
+            else:
+                string = self.readable_str
             total_size = humanize.naturalsize(total_size)
             if total_elapsed is not None:
                 minimum_unit = 'seconds' if total_elapsed.total_seconds() >= 1 else 'milliseconds'
@@ -1213,12 +1221,15 @@ class CASetupDelegatorMixin(CAMetrics):
         """Child setups."""
         raise NotImplementedError
 
-    def get_setup_hierarchy(self, readable: bool = True) -> tp.List[dict]:
+    def get_setup_hierarchy(self, readable: bool = True, short_str: bool = False) -> tp.List[dict]:
         """Get the setup hierarchy by recursively traversing the child setups."""
         results = []
         for setup in self.child_setups:
             if readable:
-                setup_obj = setup.short_str
+                if short_str:
+                    setup_obj = setup.short_str
+                else:
+                    setup_obj = setup.readable_str
             else:
                 setup_obj = setup
             if isinstance(setup, CASetupDelegatorMixin):
@@ -1353,14 +1364,40 @@ class CASetupDelegatorMixin(CAMetrics):
             return None
         return list(sorted(last_hit_times))[-1]
 
-    def get_status_overview(self, readable: bool = True) -> tp.Optional[tp.Frame]:
+    def get_status_overview(self,
+                            readable: bool = True,
+                            short_str: bool = True,
+                            index_by_hash: bool = False,
+                            filter_func: tp.Optional[tp.Callable] = None,
+                            include: tp.Optional[tp.MaybeSequence[str]] = None,
+                            exclude: tp.Optional[tp.MaybeSequence[str]] = None) -> tp.Optional[tp.Frame]:
         """Get a DataFrame out of status dicts of child setups."""
         if len(self.child_setups) == 0:
             return None
-        status_overview = pd.DataFrame([setup.get_status(readable=readable) for setup in self.child_setups])
-        status_overview.set_index('hash', inplace=True)
-        status_overview.index.name = 'hash'
-        return status_overview
+        df = pd.DataFrame([
+            setup.get_status(readable=readable, short_str=short_str)
+            for setup in self.child_setups
+            if filter_func is None or filter_func(setup)
+        ])
+        if index_by_hash:
+            df.set_index('hash', inplace=True)
+            df.index.name = 'hash'
+        else:
+            df.set_index('string', inplace=True)
+            df.index.name = 'object'
+        if include is not None:
+            if isinstance(include, str):
+                include = [include]
+            columns = include
+        else:
+            columns = df.columns
+        if exclude is not None:
+            if isinstance(exclude, str):
+                exclude = [exclude]
+            columns = [c for c in columns if c not in exclude]
+        if len(columns) == 0:
+            return None
+        return df[columns]
 
 
 class CABaseDelegatorSetup(CABaseSetup, CASetupDelegatorMixin):
@@ -1573,8 +1610,12 @@ class CAClassSetup(CABaseDelegatorSetup):
         return set(self.subclass_setups) | self.instance_setups
 
     @property
-    def short_str(self) -> str:
+    def readable_str(self) -> str:
         return f"<class {self.cls.__module__}.{self.cls.__name__}>"
+    
+    @property
+    def short_str(self) -> str:
+        return self.cls.__name__
 
     @property
     def hash_key(self) -> tuple:
@@ -1685,10 +1726,16 @@ class CAInstanceSetup(CABaseDelegatorSetup):
         return self.run_setups
 
     @property
-    def short_str(self) -> str:
+    def readable_str(self) -> str:
         if self.contains_garbage:
             return "<destroyed object>"
         return f"<instance of {type(self.instance_obj).__module__}.{type(self.instance_obj).__name__}>"
+
+    @property
+    def short_str(self) -> str:
+        if self.contains_garbage:
+            return "_GARBAGE"
+        return type(self.instance_obj).__name__
 
     @property
     def hash_key(self) -> tuple:
@@ -1770,10 +1817,14 @@ class CAUnboundSetup(CABaseDelegatorSetup):
         return self.run_setups
 
     @property
-    def short_str(self) -> str:
+    def readable_str(self) -> str:
         if is_cacheable_property(self.cacheable):
             return f"<unbound property {self.cacheable.func.__module__}.{self.cacheable.func.__name__}>"
         return f"<unbound method {self.cacheable.func.__module__}.{self.cacheable.func.__name__}>"
+
+    @property
+    def short_str(self) -> str:
+        return f"{self.cacheable.func.__name__}.{self.cacheable.func.__name__}"
 
     @property
     def hash_key(self) -> tuple:
@@ -2124,7 +2175,7 @@ class CARunSetup(CABaseSetup):
         self.cache.clear()
 
     @property
-    def short_str(self) -> str:
+    def readable_str(self) -> str:
         if self.contains_garbage:
             return "<destroyed object>"
         if is_cacheable_property(self.cacheable):
@@ -2134,6 +2185,14 @@ class CARunSetup(CABaseSetup):
             return f"<instance method {type(self.instance_obj).__module__}." \
                    f"{type(self.instance_obj).__name__}.{self.cacheable.func.__name__}>"
         return f"<func {self.cacheable.__module__}.{self.cacheable.__name__}>"
+
+    @property
+    def short_str(self) -> str:
+        if self.contains_garbage:
+            return "_GARBAGE"
+        if is_cacheable_property(self.cacheable) or is_cacheable_method(self.cacheable):
+            return f"{type(self.instance_obj).__name__}.{self.cacheable.func.__name__}"
+        return self.cacheable.__name__
 
     @property
     def hash_key(self) -> tuple:
