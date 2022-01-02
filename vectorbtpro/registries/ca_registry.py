@@ -317,9 +317,7 @@ registered in any part of vectorbt that matches some condition using `CacheableR
 For example, let's look which setups have been registered so far:
 
 ```pycon
->>> from vectorbtpro.registries.ca_registry import ca_registry
-
->>> ca_registry.match_setups(kind=None)
+>>> vbt.ca_registry.match_setups(kind=None)
 {
     CAClassSetup(registry=<vectorbtpro.registries.ca_registry.CacheableRegistry object at 0x7fe14c27df60>, use_cache=None, whitelist=None, cls=<class '__main__.B'>),
     CAClassSetup(registry=<vectorbtpro.registries.ca_registry.CacheableRegistry object at 0x7fe14c27df60>, use_cache=None, whitelist=None, cls=<class '__main__.C'>),
@@ -340,7 +338,7 @@ For example, let's look which setups have been registered so far:
 Let's get the runnable setup of any property and method called `f2`:
 
 ```pycon
->>> ca_registry.match_setups('f2', kind='runnable')
+>>> vbt.ca_registry.match_setups('f2', kind='runnable')
 {
     CARunSetup(registry=<vectorbtpro.registries.ca_registry.CacheableRegistry object at 0x7fe14c27df60>, use_cache=True, whitelist=False, cacheable=<function C.f2 at 0x7fe13959ee18>, instance=<weakref at 0x7fe14e9d85e8; to 'C' at 0x7fe14e9448d0>, max_size=None, ignore_args=None, cache={}),
     CARunSetup(registry=<vectorbtpro.registries.ca_registry.CacheableRegistry object at 0x7fe14c27df60>, use_cache=True, whitelist=False, cacheable=<function C.f2 at 0x7fe13959ee18>, instance=<weakref at 0x7fe14e9d8728; to 'C' at 0x7fe1495111d0>, max_size=None, ignore_args=None, cache={})
@@ -1397,7 +1395,7 @@ class CASetupDelegatorMixin(CAMetrics):
             columns = [c for c in columns if c not in exclude]
         if len(columns) == 0:
             return None
-        return df[columns]
+        return df[columns].sort_index()
 
 
 class CABaseDelegatorSetup(CABaseSetup, CASetupDelegatorMixin):
@@ -1612,7 +1610,7 @@ class CAClassSetup(CABaseDelegatorSetup):
     @property
     def readable_str(self) -> str:
         return f"<class {self.cls.__module__}.{self.cls.__name__}>"
-    
+
     @property
     def short_str(self) -> str:
         return self.cls.__name__
@@ -1735,7 +1733,7 @@ class CAInstanceSetup(CABaseDelegatorSetup):
     def short_str(self) -> str:
         if self.contains_garbage:
             return "_GARBAGE"
-        return type(self.instance_obj).__name__
+        return type(self.instance_obj).__name__.lower()
 
     @property
     def hash_key(self) -> tuple:
@@ -1824,7 +1822,9 @@ class CAUnboundSetup(CABaseDelegatorSetup):
 
     @property
     def short_str(self) -> str:
-        return f"{self.cacheable.func.__name__}.{self.cacheable.func.__name__}"
+        if is_cacheable_property(self.cacheable):
+            return f"{self.cacheable.func.__name__}.{self.cacheable.func.__name__}"
+        return f"{self.cacheable.func.__name__}.{self.cacheable.func.__name__}()"
 
     @property
     def hash_key(self) -> tuple:
@@ -2190,9 +2190,11 @@ class CARunSetup(CABaseSetup):
     def short_str(self) -> str:
         if self.contains_garbage:
             return "_GARBAGE"
-        if is_cacheable_property(self.cacheable) or is_cacheable_method(self.cacheable):
-            return f"{type(self.instance_obj).__name__}.{self.cacheable.func.__name__}"
-        return self.cacheable.__name__
+        if is_cacheable_property(self.cacheable):
+            return f"{type(self.instance_obj).__name__.lower()}.{self.cacheable.func.__name__}"
+        if is_cacheable_method(self.cacheable):
+            return f"{type(self.instance_obj).__name__.lower()}.{self.cacheable.func.__name__}()"
+        return f"{self.cacheable.__name__}()"
 
     @property
     def hash_key(self) -> tuple:
