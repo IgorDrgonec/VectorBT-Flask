@@ -4408,6 +4408,11 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
                 When chunking, make sure to provide the chunk taking specification and the merging function.
                 See `vectorbtpro.portfolio.chunking.merge_sim_outs`.
+
+                !!! note
+                    When using Numba below 0.54, `in_outputs` cannot be a mapping, but must be a named tuple
+                    defined globally so Numba can introspect its attributes for pickling.
+
             seed (int): See `Portfolio.from_orders`.
             group_by (any): See `Portfolio.from_orders`.
             broadcast_named_args (dict): See `Portfolio.from_signals`.
@@ -4830,7 +4835,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             seed = portfolio_cfg['seed']
         if seed is not None:
             set_seed(seed)
-        if in_outputs is not None:
+        if in_outputs is not None and not checks.is_namedtuple(in_outputs):
             in_outputs = to_mapping(in_outputs)
             in_outputs = namedtuple("InOutputs", in_outputs)(**in_outputs)
         if group_by is None:

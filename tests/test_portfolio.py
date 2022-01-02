@@ -3,6 +3,7 @@ import uuid
 from collections import namedtuple
 from copy import deepcopy
 from datetime import datetime, timedelta
+from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -3967,6 +3968,12 @@ def log_flex_order_func_nb(c, size):
     return -1, nb.order_nothing_nb()
 
 
+class InOutputs(NamedTuple):
+    custom_1d_arr: vbt.RepEval
+    custom_2d_arr: vbt.RepEval
+    custom_rec_arr: vbt.RepEval
+
+
 class TestFromOrderFunc:
     @pytest.mark.parametrize("test_row_wise", [False, True])
     @pytest.mark.parametrize("test_flexible", [False, True])
@@ -6030,16 +6037,18 @@ class TestFromOrderFunc:
                 )
             )
         )
+        in_outputs = dict(
+            custom_1d_arr=vbt.RepEval("np.full(target_shape[1], 0., dtype=np.float_)"),
+            custom_2d_arr=vbt.RepEval("np.empty((target_shape[0], len(group_lens)), dtype=np.int_)"),
+            custom_rec_arr=vbt.RepEval("np.empty(target_shape[0] * target_shape[1], dtype=custom_dtype)")
+        )
+        in_outputs = InOutputs(**in_outputs)
         pf = vbt.Portfolio.from_order_func(
             price_wide,
             order_func, vbt.Rep('size'),
             post_sim_func_nb=post_sim_func_nb,
             broadcast_named_args=dict(size=[0, 1, np.inf]),
-            in_outputs=dict(
-                custom_1d_arr=vbt.RepEval("np.full(target_shape[1], 0., dtype=np.float_)"),
-                custom_2d_arr=vbt.RepEval("np.empty((target_shape[0], len(group_lens)), dtype=np.int_)"),
-                custom_rec_arr=vbt.RepEval("np.empty(target_shape[0] * target_shape[1], dtype=custom_dtype)")
-            ),
+            in_outputs=in_outputs,
             template_mapping=dict(custom_dtype=custom_dtype),
             group_by=group_by,
             cash_sharing=False,
