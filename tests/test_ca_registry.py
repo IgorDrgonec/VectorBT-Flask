@@ -1005,30 +1005,35 @@ class TestCacheableRegistry:
             'last_hit_time': query_delegator.last_hit_time
         }
 
-        status_overview = query_delegator.get_status_overview(readable=False)
+        columns = [
+            'hash',
+            'use_cache',
+            'whitelist',
+            'caching_enabled',
+            'hits',
+            'misses',
+            'total_size',
+            'total_elapsed',
+            'total_saved',
+            'first_run_time',
+            'last_run_time',
+            'first_hit_time',
+            'last_hit_time',
+            'creation_time',
+            'last_update_time'
+        ]
+        status_overview = query_delegator.get_status_overview(readable=False, short_str=False)
         pd.testing.assert_index_equal(
             status_overview.columns,
-            pd.Index([
-                'string',
-                'use_cache',
-                'whitelist',
-                'caching_enabled',
-                'hits',
-                'misses',
-                'total_size',
-                'total_elapsed',
-                'total_saved',
-                'first_run_time',
-                'last_run_time',
-                'first_hit_time',
-                'last_hit_time',
-                'creation_time',
-                'last_update_time'
-            ])
+            pd.Index(columns)
         )
         np.testing.assert_array_equal(
-            status_overview['string'].values,
+            status_overview.index.values,
             np.array([str(class_setup1)])
+        )
+        np.testing.assert_array_equal(
+            status_overview['hash'].values,
+            np.array([hash(class_setup1)])
         )
         np.testing.assert_array_equal(
             status_overview['use_cache'].values,
@@ -1085,6 +1090,39 @@ class TestCacheableRegistry:
         np.testing.assert_array_equal(
             status_overview['last_update_time'].values,
             pd.to_datetime([class_setup1.last_update_time]).values
+        )
+
+        status_overview = query_delegator.get_status_overview()
+        pd.testing.assert_index_equal(
+            status_overview.columns,
+            pd.Index(columns)
+        )
+        status_overview = query_delegator.get_status_overview(include=columns)
+        pd.testing.assert_index_equal(
+            status_overview.columns,
+            pd.Index(columns)
+        )
+        status_overview = query_delegator.get_status_overview(include=columns[0])
+        pd.testing.assert_index_equal(
+            status_overview.columns,
+            pd.Index([columns[0]])
+        )
+        status_overview = query_delegator.get_status_overview(include=[columns[0]])
+        pd.testing.assert_index_equal(
+            status_overview.columns,
+            pd.Index([columns[0]])
+        )
+        status_overview = query_delegator.get_status_overview(exclude=columns)
+        assert status_overview is None
+        status_overview = query_delegator.get_status_overview(exclude=columns[0])
+        pd.testing.assert_index_equal(
+            status_overview.columns,
+            pd.Index(columns[1:])
+        )
+        status_overview = query_delegator.get_status_overview(exclude=[columns[0]])
+        pd.testing.assert_index_equal(
+            status_overview.columns,
+            pd.Index(columns[1:])
         )
 
     def test_disable_machinery(self):
