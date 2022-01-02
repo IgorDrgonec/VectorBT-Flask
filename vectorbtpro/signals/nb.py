@@ -91,7 +91,7 @@ def generate_nb(target_shape: tp.Shape, place_func_nb: tp.PlaceFunc, *args) -> t
     ),
     merge_func=base_ch.column_stack
 )
-@register_jitted(tags={'can_parallel'})
+@register_jitted
 def generate_enex_nb(target_shape: tp.Shape,
                      entry_wait: int,
                      exit_wait: int,
@@ -149,7 +149,7 @@ def generate_enex_nb(target_shape: tp.Shape,
             return last_i
         return -1
 
-    for col in prange(target_shape[1]):
+    for col in range(target_shape[1]):
         from_i = 0
         entries_turn = True
         first_signal = True

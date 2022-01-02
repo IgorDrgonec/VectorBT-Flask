@@ -322,22 +322,6 @@ class TestAccessors:
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate_both(
                 (5, 3), entry_place_func_nb=entry_place_func2_nb, exit_place_func_nb=exit_place_func2_nb,
-                max_one_entry=False, max_one_exit=False, jitted=dict(parallel=True))[0],
-            pd.DataFrame.vbt.signals.generate_both(
-                (5, 3), entry_place_func_nb=entry_place_func2_nb, exit_place_func_nb=exit_place_func2_nb,
-                max_one_entry=False, max_one_exit=False, jitted=dict(parallel=False))[0]
-        )
-        pd.testing.assert_frame_equal(
-            pd.DataFrame.vbt.signals.generate_both(
-                (5, 3), entry_place_func_nb=entry_place_func2_nb, exit_place_func_nb=exit_place_func2_nb,
-                max_one_entry=False, max_one_exit=False, jitted=dict(parallel=True))[1],
-            pd.DataFrame.vbt.signals.generate_both(
-                (5, 3), entry_place_func_nb=entry_place_func2_nb, exit_place_func_nb=exit_place_func2_nb,
-                max_one_entry=False, max_one_exit=False, jitted=dict(parallel=False))[1]
-        )
-        pd.testing.assert_frame_equal(
-            pd.DataFrame.vbt.signals.generate_both(
-                (5, 3), entry_place_func_nb=entry_place_func2_nb, exit_place_func_nb=exit_place_func2_nb,
                 max_one_entry=False, max_one_exit=False, chunked=True)[0],
             pd.DataFrame.vbt.signals.generate_both(
                 (5, 3), entry_place_func_nb=entry_place_func2_nb, exit_place_func_nb=exit_place_func2_nb,
