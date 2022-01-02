@@ -90,7 +90,7 @@ def attach_shortcut_properties(config: Config) -> tp.ClassWrapper:
                 raise ValueError(f"Property names cannot have prefix 'get_' ('{target_name}')")
             method_name = settings.get('method_name', 'get_' + target_name)
             use_in_outputs = settings.get('use_in_outputs', True)
-            field_aliases = [target_name, *settings.get('field_aliases', [])]
+            field_aliases = settings.get('field_aliases', None)
             obj_type = settings.get('obj_type', 'array')
             group_by_aware = settings.get('group_by_aware', True)
             wrap_kwargs = settings.get('wrap_kwargs', None)
@@ -105,7 +105,7 @@ def attach_shortcut_properties(config: Config) -> tp.ClassWrapper:
                 else:
                     decorator = cacheable_property
             decorator_kwargs = merge_dicts(
-                dict(obj_type=obj_type, group_by_aware=group_by_aware),
+                dict(obj_type=obj_type, group_by_aware=group_by_aware, field_aliases=field_aliases),
                 settings.get('decorator_kwargs', None)
             )
             docstring = settings.get('docstring', None)
@@ -119,61 +119,19 @@ def attach_shortcut_properties(config: Config) -> tp.ClassWrapper:
                          _method_name: str = method_name,
                          _target_name: str = target_name,
                          _use_in_outputs: bool = use_in_outputs,
-                         _field_aliases: tp.List[str] = field_aliases,
-                         _obj_type: str = obj_type,
-                         _group_by_aware: bool = group_by_aware,
                          _wrap_kwargs: tp.Kwargs = wrap_kwargs,
                          _wrap_func: tp.Callable = wrap_func,
                          _method_kwargs: tp.Kwargs = method_kwargs) -> tp.Any:
 
-                def _find_obj(_is_grouped: bool) -> tp.Optional[str]:
-                    fields = set(self.in_outputs._fields)
-                    for field in _field_aliases:
-                        if field in fields:
-                            return field
-                        if _is_grouped:
-                            if _group_by_aware:
-                                if field + '_pg' in fields:
-                                    return field + '_pg'
-                                if field + '_pcg' in fields:
-                                    return field + '_pcg'
-                                if self.cash_sharing:
-                                    if field + '_pcgs' in fields:
-                                        return field + '_pcgs'
-                            else:
-                                if field + '_pc' in fields:
-                                    return field + '_pc'
-                                if not self.cash_sharing:
-                                    if field + '_pcgs' in fields:
-                                        return field + '_pcgs'
-                        else:
-                            if field + '_pc' in fields:
-                                return field + '_pc'
-                            if field + '_pcg' in fields:
-                                return field + '_pcg'
-                            if field + '_pcgs' in fields:
-                                return field + '_pcgs'
-                    return None
-
-                if _use_in_outputs:
-                    if self.use_in_outputs and self.in_outputs is not None:
-                        is_grouped = self.wrapper.grouper.is_grouped()
-                        found_field = _find_obj(is_grouped)
-                        if found_field is not None:
-                            obj = getattr(self.in_outputs, found_field)
-                            if _wrap_func is not None:
-                                return _wrap_func(self, obj)
-                            if _obj_type == 'array':
-                                if _group_by_aware:
-                                    return self.wrapper.wrap(obj, **_wrap_kwargs)
-                                return self.wrapper.wrap(obj, group_by=False, **_wrap_kwargs)
-                            elif _obj_type == 'red_array':
-                                _wrap_kwargs = merge_dicts(dict(name_or_index=_target_name), _wrap_kwargs)
-                                if _group_by_aware:
-                                    return self.wrapper.wrap_reduced(obj, **_wrap_kwargs)
-                                return self.wrapper.wrap_reduced(obj, group_by=False, **_wrap_kwargs)
-                            else:
-                                raise NotImplementedError
+                if _use_in_outputs and self.use_in_outputs and self.in_outputs is not None:
+                    try:
+                        return self.get_in_output(
+                            _target_name,
+                            wrap_kwargs=_wrap_kwargs,
+                            wrap_func=_wrap_func
+                        )
+                    except AttributeError:
+                        pass
 
                 return getattr(self, _method_name)(**_method_kwargs)
 

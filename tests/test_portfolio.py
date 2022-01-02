@@ -6631,6 +6631,8 @@ class TestPortfolio:
             arr_2d_pg=np.arange(15).reshape((5, 3)),
             arr_1d_pc=np.arange(3),
             arr_2d_pc=np.arange(15).reshape((5, 3)),
+            arr_1d=np.arange(3),
+            arr_2d=np.arange(15).reshape((5, 3)),
             arr_records=np.concatenate((
                 np.full(5, 0, dtype=np.dtype([('col', np.int_)])),
                 np.full(5, 1, dtype=np.dtype([('col', np.int_)])),
@@ -6639,6 +6641,56 @@ class TestPortfolio:
         )
         in_outputs = namedtuple('InOutputs', in_outputs)(**in_outputs)
         pf2 = pf.replace(in_outputs=in_outputs)
+
+        with pytest.raises(AttributeError):
+            pf2.get_in_output('my_arr')
+
+        pd.testing.assert_series_equal(
+            pf2.get_in_output('arr_1d_pcgs'),
+            pf2.wrapper.wrap_reduced(pf2.in_outputs.arr_1d_pcgs, name_or_index='arr')
+        )
+        pd.testing.assert_frame_equal(
+            pf2.get_in_output('arr_2d_pcgs'),
+            pf2.wrapper.wrap(pf2.in_outputs.arr_2d_pcgs)
+        )
+        pd.testing.assert_series_equal(
+            pf2.get_in_output('arr_1d_pcg'),
+            pf2.wrapper.wrap_reduced(pf2.in_outputs.arr_1d_pcg, name_or_index='arr')
+        )
+        pd.testing.assert_frame_equal(
+            pf2.get_in_output('arr_2d_pcg'),
+            pf2.wrapper.wrap(pf2.in_outputs.arr_2d_pcg)
+        )
+        pd.testing.assert_series_equal(
+            pf2.get_in_output('arr_1d_pg'),
+            pf2.wrapper.wrap_reduced(pf2.in_outputs.arr_1d_pg, name_or_index='arr')
+        )
+        pd.testing.assert_frame_equal(
+            pf2.get_in_output('arr_2d_pg'),
+            pf2.wrapper.wrap(pf2.in_outputs.arr_2d_pg)
+        )
+        pd.testing.assert_series_equal(
+            pf2.get_in_output('arr_1d_pc'),
+            pf2.wrapper.wrap_reduced(pf2.in_outputs.arr_1d_pc, name_or_index='arr')
+        )
+        pd.testing.assert_frame_equal(
+            pf2.get_in_output('arr_2d_pc'),
+            pf2.wrapper.wrap(pf2.in_outputs.arr_2d_pc)
+        )
+        pd.testing.assert_series_equal(
+            pf2.get_in_output('arr_1d'),
+            pf2.wrapper.wrap_reduced(pf2.in_outputs.arr_1d_pcg, name_or_index='arr')
+        )
+        pd.testing.assert_frame_equal(
+            pf2.get_in_output('arr_2d'),
+            pf2.wrapper.wrap(pf2.in_outputs.arr_2d_pcg)
+        )
+        assert_records_close(
+            pf2.get_in_output('arr_records'),
+            pf2.in_outputs.arr_records
+        )
+        with pytest.raises(NotImplementedError):
+            pf2.get_in_output('arr_records', force_wrapping=True)
 
         assert pf2['a'].in_outputs.arr_1d_pcgs == in_outputs.arr_1d_pcgs[0]
         np.testing.assert_array_equal(pf2['a'].in_outputs.arr_2d_pcgs, in_outputs.arr_2d_pcgs[:, 0])
@@ -6659,6 +6711,8 @@ class TestPortfolio:
             arr_2d_pg=np.arange(10).reshape((5, 2)),
             arr_1d_pc=np.arange(3),
             arr_2d_pc=np.arange(15).reshape((5, 3)),
+            arr_1d=np.arange(2),
+            arr_2d=np.arange(10).reshape((5, 2)),
             arr_records=np.concatenate((
                 np.full(5, 0, dtype=np.dtype([('col', np.int_)])),
                 np.full(5, 1, dtype=np.dtype([('col', np.int_)])),
@@ -6667,6 +6721,53 @@ class TestPortfolio:
         )
         in_outputs = namedtuple('InOutputs', in_outputs)(**in_outputs)
         pf_grouped2 = pf_grouped.replace(in_outputs=in_outputs)
+
+        pd.testing.assert_series_equal(
+            pf_grouped2.get_in_output('arr_1d_pcgs'),
+            pf_grouped2.wrapper.wrap_reduced(pf_grouped2.in_outputs.arr_1d_pcgs, name_or_index='arr', group_by=False)
+        )
+        pd.testing.assert_frame_equal(
+            pf_grouped2.get_in_output('arr_2d_pcgs'),
+            pf_grouped2.wrapper.wrap(pf_grouped2.in_outputs.arr_2d_pcgs, group_by=False)
+        )
+        pd.testing.assert_series_equal(
+            pf_grouped2.get_in_output('arr_1d_pcg'),
+            pf_grouped2.wrapper.wrap_reduced(pf_grouped2.in_outputs.arr_1d_pcg, name_or_index='arr')
+        )
+        pd.testing.assert_frame_equal(
+            pf_grouped2.get_in_output('arr_2d_pcg'),
+            pf_grouped2.wrapper.wrap(pf_grouped2.in_outputs.arr_2d_pcg)
+        )
+        pd.testing.assert_series_equal(
+            pf_grouped2.get_in_output('arr_1d_pg'),
+            pf_grouped2.wrapper.wrap_reduced(pf_grouped2.in_outputs.arr_1d_pg, name_or_index='arr')
+        )
+        pd.testing.assert_frame_equal(
+            pf_grouped2.get_in_output('arr_2d_pg'),
+            pf_grouped2.wrapper.wrap(pf_grouped2.in_outputs.arr_2d_pg)
+        )
+        pd.testing.assert_series_equal(
+            pf_grouped2.get_in_output('arr_1d_pc'),
+            pf_grouped2.wrapper.wrap_reduced(pf_grouped2.in_outputs.arr_1d_pc, name_or_index='arr', group_by=False)
+        )
+        pd.testing.assert_frame_equal(
+            pf_grouped2.get_in_output('arr_2d_pc'),
+            pf_grouped2.wrapper.wrap(pf_grouped2.in_outputs.arr_2d_pc, group_by=False)
+        )
+        pd.testing.assert_series_equal(
+            pf_grouped2.get_in_output('arr_1d'),
+            pf_grouped2.wrapper.wrap_reduced(pf_grouped2.in_outputs.arr_1d_pcg, name_or_index='arr')
+        )
+        pd.testing.assert_frame_equal(
+            pf_grouped2.get_in_output('arr_2d'),
+            pf_grouped2.wrapper.wrap(pf_grouped2.in_outputs.arr_2d_pcg)
+        )
+        assert_records_close(
+            pf_grouped2.get_in_output('arr_records'),
+            pf_grouped2.in_outputs.arr_records
+        )
+        with pytest.raises(NotImplementedError):
+            pf_grouped2.get_in_output('arr_records', force_wrapping=True)
 
         np.testing.assert_array_equal(pf_grouped2['first'].in_outputs.arr_1d_pcgs, in_outputs.arr_1d_pcgs[:2])
         np.testing.assert_array_equal(pf_grouped2['first'].in_outputs.arr_2d_pcgs, in_outputs.arr_2d_pcgs[:, :2])
@@ -6687,6 +6788,8 @@ class TestPortfolio:
             arr_2d_pg=np.arange(10).reshape((5, 2)),
             arr_1d_pc=np.arange(3),
             arr_2d_pc=np.arange(15).reshape((5, 3)),
+            arr_1d=np.arange(2),
+            arr_2d=np.arange(10).reshape((5, 2)),
             arr_records=np.concatenate((
                 np.full(5, 0, dtype=np.dtype([('col', np.int_)])),
                 np.full(5, 1, dtype=np.dtype([('col', np.int_)])),
@@ -6695,6 +6798,53 @@ class TestPortfolio:
         )
         in_outputs = namedtuple('InOutputs', in_outputs)(**in_outputs)
         pf_shared2 = pf_shared.replace(in_outputs=in_outputs)
+
+        pd.testing.assert_series_equal(
+            pf_shared2.get_in_output('arr_1d_pcgs'),
+            pf_shared2.wrapper.wrap_reduced(pf_shared2.in_outputs.arr_1d_pcgs, name_or_index='arr')
+        )
+        pd.testing.assert_frame_equal(
+            pf_shared2.get_in_output('arr_2d_pcgs'),
+            pf_shared2.wrapper.wrap(pf_shared2.in_outputs.arr_2d_pcgs)
+        )
+        pd.testing.assert_series_equal(
+            pf_shared2.get_in_output('arr_1d_pcg'),
+            pf_shared2.wrapper.wrap_reduced(pf_shared2.in_outputs.arr_1d_pcg, name_or_index='arr')
+        )
+        pd.testing.assert_frame_equal(
+            pf_shared2.get_in_output('arr_2d_pcg'),
+            pf_shared2.wrapper.wrap(pf_shared2.in_outputs.arr_2d_pcg)
+        )
+        pd.testing.assert_series_equal(
+            pf_shared2.get_in_output('arr_1d_pg'),
+            pf_shared2.wrapper.wrap_reduced(pf_shared2.in_outputs.arr_1d_pg, name_or_index='arr')
+        )
+        pd.testing.assert_frame_equal(
+            pf_shared2.get_in_output('arr_2d_pg'),
+            pf_shared2.wrapper.wrap(pf_shared2.in_outputs.arr_2d_pg)
+        )
+        pd.testing.assert_series_equal(
+            pf_shared2.get_in_output('arr_1d_pc'),
+            pf_shared2.wrapper.wrap_reduced(pf_shared2.in_outputs.arr_1d_pc, name_or_index='arr', group_by=False)
+        )
+        pd.testing.assert_frame_equal(
+            pf_shared2.get_in_output('arr_2d_pc'),
+            pf_shared2.wrapper.wrap(pf_shared2.in_outputs.arr_2d_pc, group_by=False)
+        )
+        pd.testing.assert_series_equal(
+            pf_shared2.get_in_output('arr_1d'),
+            pf_shared2.wrapper.wrap_reduced(pf_shared2.in_outputs.arr_1d_pcg, name_or_index='arr')
+        )
+        pd.testing.assert_frame_equal(
+            pf_shared2.get_in_output('arr_2d'),
+            pf_shared2.wrapper.wrap(pf_shared2.in_outputs.arr_2d_pcg)
+        )
+        assert_records_close(
+            pf_shared2.get_in_output('arr_records'),
+            pf_shared2.in_outputs.arr_records
+        )
+        with pytest.raises(NotImplementedError):
+            pf_shared2.get_in_output('arr_records', force_wrapping=True)
 
         assert pf_shared2['first'].in_outputs.arr_1d_pcgs == in_outputs.arr_1d_pcgs[0]
         np.testing.assert_array_equal(pf_shared2['first'].in_outputs.arr_2d_pcgs, in_outputs.arr_2d_pcgs[:, 0])

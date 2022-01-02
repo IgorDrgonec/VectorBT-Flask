@@ -1654,7 +1654,7 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, broadcast, broadcast_to, to_pd_array
+from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, broadcast, broadcast_to, to_pd_array, shape_to_2d
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.drawdowns import Drawdowns
@@ -1753,37 +1753,37 @@ shortcut_config = ReadonlyConfig(
         'orders': dict(
             obj_type='records',
             field_aliases=('order_records',),
-            wrap_func=lambda self, obj: Orders(fix_wrapper_for_records(self), obj, self.close),
+            wrap_func=lambda pf, obj, **kwargs: Orders(fix_wrapper_for_records(pf), obj, pf.close),
         ),
         'logs': dict(
             obj_type='records',
             field_aliases=('log_records',),
-            wrap_func=lambda self, obj: Logs(fix_wrapper_for_records(self), obj)
+            wrap_func=lambda pf, obj, **kwargs: Logs(fix_wrapper_for_records(pf), obj)
         ),
         'entry_trades': dict(
             obj_type='records',
             field_aliases=('entry_trade_records',),
-            wrap_func=lambda self, obj: EntryTrades.from_records(self.orders.wrapper, obj, self.close)
+            wrap_func=lambda pf, obj, **kwargs: EntryTrades.from_records(pf.orders.wrapper, obj, pf.close)
         ),
         'exit_trades': dict(
             obj_type='records',
             field_aliases=('exit_trade_records',),
-            wrap_func=lambda self, obj: ExitTrades.from_records(self.orders.wrapper, obj, self.close)
+            wrap_func=lambda pf, obj, **kwargs: ExitTrades.from_records(pf.orders.wrapper, obj, pf.close)
         ),
         'positions': dict(
             obj_type='records',
             field_aliases=('position_records',),
-            wrap_func=lambda self, obj: Positions.from_records(self.orders.wrapper, obj, self.close)
+            wrap_func=lambda pf, obj, **kwargs: Positions.from_records(pf.orders.wrapper, obj, pf.close)
         ),
         'trades': dict(
             obj_type='records',
             field_aliases=('trade_records',),
-            wrap_func=lambda self, obj: Trades.from_records(self.orders.wrapper, obj, self.close)
+            wrap_func=lambda pf, obj, **kwargs: Trades.from_records(pf.orders.wrapper, obj, pf.close)
         ),
         'drawdowns': dict(
             obj_type='records',
             field_aliases=('drawdown_records',),
-            wrap_func=lambda self, obj: Drawdowns.from_records(self.orders.wrapper.regroup(False), obj, self.close)
+            wrap_func=lambda pf, obj, **kwargs: Drawdowns.from_records(pf.orders.wrapper.regroup(False), obj, pf.close)
         ),
         'init_position': dict(
             obj_type='red_array',
@@ -2093,6 +2093,205 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         self._fillna_close = fillna_close
         self._trades_type = trades_type
 
+    # ############# In-outputs ############# #
+
+    def get_in_output(self,
+                      field: str,
+                      force_wrapping: bool = False,
+                      group_by: tp.GroupByLike = None,
+                      wrapper: tp.Optional[ArrayWrapper] = None,
+                      wrap_kwargs: tp.KwargsLike = None,
+                      wrap_func: tp.Optional[tp.Callable] = None,
+                      **kwargs) -> tp.AnyArray:
+        """Get wrapped in-output.
+
+        See `Portfolio.in_outputs_indexing_func` for parsing rules.
+
+        `**kwargs` are passed together with `self`, the object, `group_by`, and `wrap_kwargs` to `wrap_func`."""
+        if wrapper is None:
+            wrapper = self.wrapper
+        if wrap_kwargs is None:
+            wrap_kwargs = {}
+        is_grouped = wrapper.grouper.is_grouped(group_by=group_by)
+
+        def _find_field(field_aliases: tp.Iterable[str], group_by_aware: bool = True) -> tp.Optional[str]:
+            fields = set(self.in_outputs._fields)
+            for field in field_aliases:
+                if field in fields:
+                    return field
+                if is_grouped:
+                    if group_by_aware:
+                        if field + '_pg' in fields:
+                            return field + '_pg'
+                        if field + '_pcg' in fields:
+                            return field + '_pcg'
+                        if self.cash_sharing:
+                            if field + '_pcgs' in fields:
+                                return field + '_pcgs'
+                    else:
+                        if field + '_pc' in fields:
+                            return field + '_pc'
+                        if not self.cash_sharing:
+                            if field + '_pcgs' in fields:
+                                return field + '_pcgs'
+                else:
+                    if field + '_pc' in fields:
+                        return field + '_pc'
+                    if field + '_pcg' in fields:
+                        return field + '_pcg'
+                    if field + '_pcgs' in fields:
+                        return field + '_pcgs'
+            return None
+
+        def _wrap_1d_grouped(obj: tp.Array, name_or_index: str) -> tp.Series:
+            _wrap_kwargs = merge_dicts(dict(name_or_index=name_or_index), wrap_kwargs)
+            return wrapper.wrap_reduced(obj, group_by=group_by, **_wrap_kwargs)
+
+        def _wrap_1d(obj: tp.Array, name_or_index: str) -> tp.Series:
+            _wrap_kwargs = merge_dicts(dict(name_or_index=name_or_index), wrap_kwargs)
+            return wrapper.wrap_reduced(obj, group_by=False, **_wrap_kwargs)
+
+        def _wrap_2d_grouped(obj: tp.Array) -> tp.Frame:
+            return wrapper.wrap(obj, group_by=group_by, **wrap_kwargs)
+
+        def _wrap_2d(obj: tp.Array) -> tp.Frame:
+            return wrapper.wrap(obj, group_by=False, **wrap_kwargs)
+
+        if field in self.cls_dir:
+            method_or_prop = getattr(type(self), field)
+            options = getattr(method_or_prop, 'options', {})
+            obj_type = options.get('obj_type', None)
+            group_by_aware = options.get('group_by_aware', None)
+            field_aliases = options.get('field_aliases', None)
+            if field_aliases is None:
+                field_aliases = []
+            field_aliases = [field, *field_aliases]
+            if obj_type is None:
+                raise TypeError(f"Cannot parse in-output '{field}': option 'obj_type' is missing")
+            if group_by_aware is None:
+                raise TypeError(f"Cannot parse in-output '{field}': option 'group_by_aware' is missing")
+            if obj_type == 'array':
+                field_aliases = [*[alias + '_2d' for alias in field_aliases if '_2d' not in alias], *field_aliases]
+            elif obj_type == 'red_array':
+                field_aliases = [*[alias + '_1d' for alias in field_aliases if '_1d' not in alias], *field_aliases]
+
+            found_field = _find_field(field_aliases, group_by_aware=group_by_aware)
+            if found_field is None:
+                raise AttributeError(f"Field '{field}' not found in in_outputs")
+            obj = getattr(self.in_outputs, found_field)
+            if wrap_func is not None:
+                return wrap_func(
+                    self,
+                    obj,
+                    field=field,
+                    force_wrapping=force_wrapping,
+                    group_by=group_by,
+                    wrapper=wrapper,
+                    wrap_kwargs=wrap_kwargs,
+                    **kwargs
+                )
+            if obj_type == 'array':
+                if group_by_aware:
+                    return _wrap_2d_grouped(obj)
+                return _wrap_2d(obj)
+            elif obj_type == 'red_array':
+                if group_by_aware:
+                    return _wrap_1d_grouped(obj, field)
+                return _wrap_1d(obj, field)
+            if force_wrapping:
+                raise NotImplementedError(f"Cannot wrap field '{found_field}'")
+            return obj
+
+        found_field = _find_field([field])
+        if found_field is None:
+            raise AttributeError(f"Field '{field}' not found in in_outputs")
+        obj = getattr(self.in_outputs, found_field)
+        if wrap_func is not None:
+            return wrap_func(
+                self,
+                obj,
+                field=field,
+                force_wrapping=force_wrapping,
+                group_by=group_by,
+                wrapper=wrapper,
+                wrap_kwargs=wrap_kwargs,
+                **kwargs
+            )
+        if found_field.endswith('_pcgs'):
+            if found_field.endswith('_2d_pcgs'):
+                if is_grouped and self.cash_sharing:
+                    return _wrap_2d_grouped(obj)
+                return _wrap_2d(obj)
+            if found_field.endswith('_1d_pcgs'):
+                if is_grouped and self.cash_sharing:
+                    return _wrap_1d_grouped(obj, field.replace('_1d_pcgs', ''))
+                return _wrap_1d(obj, field.replace('_1d_pcgs', ''))
+            if obj.ndim == 2:
+                if is_grouped and self.cash_sharing:
+                    return _wrap_2d_grouped(obj)
+                return _wrap_2d(obj)
+            if obj.ndim == 1:
+                if is_grouped and self.cash_sharing:
+                    return _wrap_1d_grouped(obj, field.replace('_pcgs', ''))
+                return _wrap_1d(obj, field.replace('_pcgs', ''))
+        if found_field.endswith('_pcg'):
+            if found_field.endswith('_2d_pcg'):
+                if is_grouped:
+                    return _wrap_2d_grouped(obj)
+                return _wrap_2d(obj)
+            if found_field.endswith('_1d_pcg'):
+                if is_grouped:
+                    return _wrap_1d_grouped(obj, field.replace('_1d_pcg', ''))
+                return _wrap_1d(obj, field.replace('_1d_pcg', ''))
+            if obj.ndim == 2:
+                if is_grouped:
+                    return _wrap_2d_grouped(obj)
+                return _wrap_2d(obj)
+            if obj.ndim == 1:
+                if is_grouped:
+                    return _wrap_1d_grouped(obj, field.replace('_pcg', ''))
+                return _wrap_1d(obj, field.replace('_pcg', ''))
+        if found_field.endswith('_pg'):
+            if found_field.endswith('_2d_pg'):
+                return _wrap_2d_grouped(obj)
+            if found_field.endswith('_1d_pg'):
+                return _wrap_1d_grouped(obj, field.replace('_1d_pg', ''))
+            if obj.ndim == 2:
+                return _wrap_2d_grouped(obj)
+            if obj.ndim == 1:
+                return _wrap_1d_grouped(obj, field.replace('_pg', ''))
+        if found_field.endswith('_pc'):
+            if found_field.endswith('_2d_pc'):
+                return _wrap_2d(obj)
+            if found_field.endswith('_1d_pc'):
+                return _wrap_1d(obj, field.replace('_1d_pc', ''))
+            if obj.ndim == 2:
+                return _wrap_2d(obj)
+            if obj.ndim == 1:
+                return _wrap_1d(obj, field.replace('_pc', ''))
+        if not found_field.endswith('_records') and checks.is_np_array(obj):
+            if is_grouped:
+                if found_field.endswith('_2d'):
+                    return _wrap_2d_grouped(obj)
+                if found_field.endswith('_1d'):
+                    return _wrap_1d_grouped(obj, field.replace('_1d', ''))
+                if obj.shape == self.wrapper.get_shape():
+                    return _wrap_2d_grouped(obj)
+                if obj.shape == (self.wrapper.get_shape_2d()[1],):
+                    return _wrap_1d_grouped(obj, field)
+            else:
+                if found_field.endswith('_2d'):
+                    return _wrap_2d(obj)
+                if found_field.endswith('_1d'):
+                    return _wrap_1d(obj, field.replace('_1d', ''))
+                if obj.shape == self.wrapper.shape:
+                    return _wrap_2d(obj)
+                if obj.shape == (self.wrapper.shape_2d[1],):
+                    return _wrap_1d(obj, field)
+        if force_wrapping:
+            raise NotImplementedError(f"Cannot wrap field '{found_field}'")
+        return obj
+
     def in_outputs_indexing_func(self,
                                  new_wrapper: ArrayWrapper,
                                  group_idxs: tp.MaybeArray,
@@ -2102,13 +2301,19 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         If the name of a field can be found as an attribute of `Portfolio`, reads this attribute's
         annotations to figure out the type and layout of the indexed object.
 
-        Otherwise, attempts to derive the correct operation from the suffix of the field's name:
+        !!! note
+            Aliases are not supported.
+
+        If not found, attempts to derive the correct operation from the suffix of the field's name:
 
         * '_pcgs': per group if grouped with cash sharing, otherwise per column
         * '_pcg': per group if grouped, otherwise per column
         * '_pg': per group
         * '_pc': per column
-        * '_records': records per column"""
+        * '_records': records per column
+
+        Finally, looks for the field object having the same shape as that of `Portfolio.wrapper`,
+        both grouped and ungrouped. Cash sharing plays no role in this case."""
         if self.in_outputs is None:
             return None
 
@@ -2117,40 +2322,36 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         cls = type(self)
         cls_dir = dir(cls)
         is_grouped = self.wrapper.grouper.is_grouped()
-        shape = self.wrapper.shape_2d
-        shape_grouped = self.wrapper.get_shape_2d()
 
-        def _index_1d_by_group(obj):
+        def _index_1d_by_group(obj: tp.ArrayLike) -> tp.ArrayLike:
             return to_1d_array(obj)[group_idxs]
 
-        def _index_1d_by_col(obj):
+        def _index_1d_by_col(obj: tp.ArrayLike) -> tp.ArrayLike:
             return to_1d_array(obj)[col_idxs]
 
-        def _index_2d_by_group(obj):
+        def _index_2d_by_group(obj: tp.ArrayLike) -> tp.ArrayLike:
             return to_2d_array(obj)[:, group_idxs]
 
-        def _index_2d_by_col(obj):
+        def _index_2d_by_col(obj: tp.ArrayLike) -> tp.ArrayLike:
             return to_2d_array(obj)[:, col_idxs]
 
-        def _index_records(obj):
+        def _index_records(obj: tp.RecordArray) -> tp.RecordArray:
             func = jit_registry.resolve_option(records_nb.col_map_nb, None)
             col_map = func(obj['col'], len(self.wrapper.columns))
             func = jit_registry.resolve_option(records_nb.record_col_map_select_nb, None)
             return func(obj, col_map, to_1d_array(col_idxs))
 
-        for field_name, obj in in_outputs.items():
+        for field, obj in in_outputs.items():
             new_obj = None
-            if field_name in cls_dir:
-                method_or_prop = getattr(cls, field_name)
+            if field in cls_dir:
+                method_or_prop = getattr(cls, field)
                 options = getattr(method_or_prop, 'options', {})
                 obj_type = options.get('obj_type', None)
                 group_by_aware = options.get('group_by_aware', None)
                 if obj_type is None:
-                    raise TypeError(f"Cannot index in-output '{field_name}': "
-                                    f"option 'obj_type' is missing")
+                    raise TypeError(f"Cannot parse in-output '{field}': option 'obj_type' is missing")
                 if group_by_aware is None:
-                    raise TypeError(f"Cannot index in-output '{field_name}': "
-                                    f"option 'group_by_aware' is missing")
+                    raise TypeError(f"Cannot parse in-output '{field}': option 'group_by_aware' is missing")
 
                 if obj_type == 'array':
                     if group_by_aware and is_grouped:
@@ -2165,11 +2366,21 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 elif obj_type == 'records':
                     new_obj = _index_records(obj)
                 else:
-                    raise TypeError(f"Cannot index in-output '{field_name}': "
+                    raise TypeError(f"Cannot index in-output '{field}': "
                                     f"option 'obj_type={obj_type}' not supported")
             else:
-                if field_name.endswith('_pcgs'):
-                    if obj.ndim == 2:
+                if field.endswith('_pcgs'):
+                    if field.endswith('_2d_pcgs'):
+                        if is_grouped and self.cash_sharing:
+                            new_obj = _index_2d_by_group(obj)
+                        else:
+                            new_obj = _index_2d_by_col(obj)
+                    elif field.endswith('_1d_pcgs'):
+                        if is_grouped and self.cash_sharing:
+                            new_obj = _index_1d_by_group(obj)
+                        else:
+                            new_obj = _index_1d_by_col(obj)
+                    elif obj.ndim == 2:
                         if is_grouped and self.cash_sharing:
                             new_obj = _index_2d_by_group(obj)
                         else:
@@ -2179,8 +2390,18 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                             new_obj = _index_1d_by_group(obj)
                         else:
                             new_obj = _index_1d_by_col(obj)
-                elif field_name.endswith('_pcg'):
-                    if obj.ndim == 2:
+                elif field.endswith('_pcg'):
+                    if field.endswith('_2d_pcg'):
+                        if is_grouped:
+                            new_obj = _index_2d_by_group(obj)
+                        else:
+                            new_obj = _index_2d_by_col(obj)
+                    elif field.endswith('_1d_pcg'):
+                        if is_grouped:
+                            new_obj = _index_1d_by_group(obj)
+                        else:
+                            new_obj = _index_1d_by_col(obj)
+                    elif obj.ndim == 2:
                         if is_grouped:
                             new_obj = _index_2d_by_group(obj)
                         else:
@@ -2190,25 +2411,54 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                             new_obj = _index_1d_by_group(obj)
                         else:
                             new_obj = _index_1d_by_col(obj)
-                elif field_name.endswith('_pg'):
-                    if obj.ndim == 2:
+                elif field.endswith('_pg'):
+                    if field.endswith('_2d_pg'):
+                        new_obj = _index_2d_by_group(obj)
+                    elif field.endswith('_1d_pg'):
+                        new_obj = _index_1d_by_group(obj)
+                    elif obj.ndim == 2:
                         new_obj = _index_2d_by_group(obj)
                     elif obj.ndim == 1:
                         new_obj = _index_1d_by_group(obj)
-                elif field_name.endswith('_pc'):
-                    if obj.ndim == 2:
+                elif field.endswith('_pc'):
+                    if field.endswith('_2d_pc'):
+                        new_obj = _index_2d_by_col(obj)
+                    elif field.endswith('_1d_pc'):
+                        new_obj = _index_1d_by_col(obj)
+                    elif obj.ndim == 2:
                         new_obj = _index_2d_by_col(obj)
                     elif obj.ndim == 1:
                         new_obj = _index_1d_by_col(obj)
-                elif field_name.endswith('_records'):
+                elif field.endswith('_records'):
                     new_obj = _index_records(obj)
+                elif checks.is_np_array(obj):
+                    if is_grouped:
+                        if field.endswith('_2d'):
+                            new_obj = _index_2d_by_group(obj)
+                        elif field.endswith('_1d'):
+                            new_obj = _index_1d_by_group(obj)
+                        if obj.shape == self.wrapper.get_shape():
+                            new_obj = _index_2d_by_group(obj)
+                        elif obj.shape == (self.wrapper.get_shape_2d()[1],):
+                            new_obj = _index_1d_by_group(obj)
+                    else:
+                        if field.endswith('_2d'):
+                            new_obj = _index_2d_by_col(obj)
+                        elif field.endswith('_1d'):
+                            new_obj = _index_1d_by_col(obj)
+                        if obj.shape == self.wrapper.shape:
+                            new_obj = _index_2d_by_col(obj)
+                        elif obj.shape == (self.wrapper.shape_2d[1],):
+                            new_obj = _index_1d_by_col(obj)
 
                 if obj is not None and new_obj is None:
-                    warnings.warn(f"Cannot figure out how to index in-output '{field_name}'. "
+                    warnings.warn(f"Cannot figure out how to index in-output '{field}'. "
                                   f"Please provide a suffix.", stacklevel=2)
 
-            new_in_outputs[field_name] = new_obj
+            new_in_outputs[field] = new_obj
         return type(self.in_outputs)(**new_in_outputs)
+
+    # ############# Indexing ############# #
 
     def indexing_func(self: PortfolioT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> PortfolioT:
         """Perform indexing on `Portfolio`."""
