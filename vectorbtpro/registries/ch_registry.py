@@ -6,7 +6,7 @@ import attr
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.chunking import chunked, resolve_chunked
+from vectorbtpro.utils.chunking import chunked, resolve_chunked, resolve_chunked_option
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.hashing import Hashable
 from vectorbtpro.utils.template import RepEval
@@ -85,7 +85,7 @@ class ChunkableRegistry:
                 matched_setups.add(setup)
         return matched_setups
 
-    def get_setup(self, setup_id_or_func: tp.Union[tp.Hashable, tp.Callable]) -> ChunkedSetup:
+    def get_setup(self, setup_id_or_func: tp.Union[tp.Hashable, tp.Callable]) -> tp.Optional[ChunkedSetup]:
         """Get setup by its id or function.
 
         `setup_id_or_func` can be an identifier or a function.
@@ -101,7 +101,7 @@ class ChunkableRegistry:
         else:
             setup_id = setup_id_or_func
         if setup_id not in self.setups:
-            raise KeyError(f"Setup id '{str(setup_id)}' not registered")
+            return None
         return self.setups[setup_id]
 
     def decorate(self,
@@ -116,6 +116,8 @@ class ChunkableRegistry:
 
         Specify `target_func` to apply the found setup on another function."""
         setup = self.get_setup(setup_id_or_func)
+        if setup is None:
+            raise KeyError(f"Setup for {setup_id_or_func} not registered")
 
         if target_func is not None:
             func = target_func
@@ -132,6 +134,12 @@ class ChunkableRegistry:
                        **kwargs) -> tp.Callable:
         """Same as `ChunkableRegistry.decorate` but using `vectorbtpro.utils.chunking.resolve_chunked`."""
         setup = self.get_setup(setup_id_or_func)
+        if setup is None:
+            if callable(setup_id_or_func):
+                option = resolve_chunked_option(option=option)
+                if option is None:
+                    return setup_id_or_func
+            raise KeyError(f"Setup for {setup_id_or_func} not registered")
 
         if target_func is not None:
             func = target_func
