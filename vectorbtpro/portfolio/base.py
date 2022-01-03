@@ -2218,14 +2218,14 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 **kwargs
             )
         if found_field.endswith('_pcgs'):
-            if found_field.endswith('_2d_pcgs'):
+            if '_2d' in field:
                 if is_grouped and self.cash_sharing:
                     return _wrap_2d_grouped(obj)
                 return _wrap_2d(obj)
-            if found_field.endswith('_1d_pcgs'):
+            if '_1d' in field:
                 if is_grouped and self.cash_sharing:
-                    return _wrap_1d_grouped(obj, field.replace('_1d_pcgs', ''))
-                return _wrap_1d(obj, field.replace('_1d_pcgs', ''))
+                    return _wrap_1d_grouped(obj, field.replace('_pcgs', '').replace('_1d', ''))
+                return _wrap_1d(obj, field.replace('_pcgs', '').replace('_1d', ''))
             if obj.ndim == 2:
                 if is_grouped and self.cash_sharing:
                     return _wrap_2d_grouped(obj)
@@ -2235,14 +2235,14 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                     return _wrap_1d_grouped(obj, field.replace('_pcgs', ''))
                 return _wrap_1d(obj, field.replace('_pcgs', ''))
         if found_field.endswith('_pcg'):
-            if found_field.endswith('_2d_pcg'):
+            if '_2d' in field:
                 if is_grouped:
                     return _wrap_2d_grouped(obj)
                 return _wrap_2d(obj)
-            if found_field.endswith('_1d_pcg'):
+            if '_1d' in field:
                 if is_grouped:
-                    return _wrap_1d_grouped(obj, field.replace('_1d_pcg', ''))
-                return _wrap_1d(obj, field.replace('_1d_pcg', ''))
+                    return _wrap_1d_grouped(obj, field.replace('_pcg', '').replace('_1d', ''))
+                return _wrap_1d(obj, field.replace('_pcg', '').replace('_1d', ''))
             if obj.ndim == 2:
                 if is_grouped:
                     return _wrap_2d_grouped(obj)
@@ -2252,37 +2252,37 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                     return _wrap_1d_grouped(obj, field.replace('_pcg', ''))
                 return _wrap_1d(obj, field.replace('_pcg', ''))
         if found_field.endswith('_pg'):
-            if found_field.endswith('_2d_pg'):
+            if '_2d' in field:
                 return _wrap_2d_grouped(obj)
-            if found_field.endswith('_1d_pg'):
-                return _wrap_1d_grouped(obj, field.replace('_1d_pg', ''))
+            if '_1d' in field:
+                return _wrap_1d_grouped(obj, field.replace('_pg', '').replace('_1d', ''))
             if obj.ndim == 2:
                 return _wrap_2d_grouped(obj)
             if obj.ndim == 1:
                 return _wrap_1d_grouped(obj, field.replace('_pg', ''))
         if found_field.endswith('_pc'):
-            if found_field.endswith('_2d_pc'):
+            if '_2d' in field:
                 return _wrap_2d(obj)
-            if found_field.endswith('_1d_pc'):
-                return _wrap_1d(obj, field.replace('_1d_pc', ''))
+            if '_1d' in field:
+                return _wrap_1d(obj, field.replace('_pc', '').replace('_1d', ''))
             if obj.ndim == 2:
                 return _wrap_2d(obj)
             if obj.ndim == 1:
                 return _wrap_1d(obj, field.replace('_pc', ''))
         if not found_field.endswith('_records') and checks.is_np_array(obj):
             if is_grouped:
-                if found_field.endswith('_2d'):
+                if '_2d' in field:
                     return _wrap_2d_grouped(obj)
-                if found_field.endswith('_1d'):
+                if '_1d' in field:
                     return _wrap_1d_grouped(obj, field.replace('_1d', ''))
                 if obj.shape == self.wrapper.get_shape():
                     return _wrap_2d_grouped(obj)
                 if obj.shape == (self.wrapper.get_shape_2d()[1],):
                     return _wrap_1d_grouped(obj, field)
             else:
-                if found_field.endswith('_2d'):
+                if '_2d' in field:
                     return _wrap_2d(obj)
-                if found_field.endswith('_1d'):
+                if '_1d' in field:
                     return _wrap_1d(obj, field.replace('_1d', ''))
                 if obj.shape == self.wrapper.shape:
                     return _wrap_2d(obj)
@@ -2304,13 +2304,20 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         !!! note
             Aliases are not supported.
 
-        If not found, attempts to derive the correct operation from the suffix of the field's name:
+        If not found, you can provide a grouping suffix to specify whether the array is
+        grouped per column or group:
 
         * '_pcgs': per group if grouped with cash sharing, otherwise per column
         * '_pcg': per group if grouped, otherwise per column
         * '_pg': per group
         * '_pc': per column
         * '_records': records per column
+
+        Additionally, you can provide a shape suffix to specify whether the object is
+        a regular or reduced time series:
+
+        * '_2d': element per timestamp and column/group (time series)
+        * '_1d': element per column/group (reduced time series)
 
         Finally, looks for the field object having the same shape as that of `Portfolio.wrapper`,
         both grouped and ungrouped. Cash sharing plays no role in this case."""
@@ -2369,13 +2376,13 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                     raise TypeError(f"Cannot index in-output '{field}': "
                                     f"option 'obj_type={obj_type}' not supported")
             else:
-                if field.endswith('_pcgs'):
-                    if field.endswith('_2d_pcgs'):
+                if '_pcgs' in field:
+                    if '_2d' in field:
                         if is_grouped and self.cash_sharing:
                             new_obj = _index_2d_by_group(obj)
                         else:
                             new_obj = _index_2d_by_col(obj)
-                    elif field.endswith('_1d_pcgs'):
+                    elif '_1d' in field:
                         if is_grouped and self.cash_sharing:
                             new_obj = _index_1d_by_group(obj)
                         else:
@@ -2391,12 +2398,12 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                         else:
                             new_obj = _index_1d_by_col(obj)
                 elif field.endswith('_pcg'):
-                    if field.endswith('_2d_pcg'):
+                    if '_2d' in field:
                         if is_grouped:
                             new_obj = _index_2d_by_group(obj)
                         else:
                             new_obj = _index_2d_by_col(obj)
-                    elif field.endswith('_1d_pcg'):
+                    elif '_1d' in field:
                         if is_grouped:
                             new_obj = _index_1d_by_group(obj)
                         else:
@@ -2412,18 +2419,18 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                         else:
                             new_obj = _index_1d_by_col(obj)
                 elif field.endswith('_pg'):
-                    if field.endswith('_2d_pg'):
+                    if '_2d' in field:
                         new_obj = _index_2d_by_group(obj)
-                    elif field.endswith('_1d_pg'):
+                    elif '_1d' in field:
                         new_obj = _index_1d_by_group(obj)
                     elif obj.ndim == 2:
                         new_obj = _index_2d_by_group(obj)
                     elif obj.ndim == 1:
                         new_obj = _index_1d_by_group(obj)
                 elif field.endswith('_pc'):
-                    if field.endswith('_2d_pc'):
+                    if '_2d' in field:
                         new_obj = _index_2d_by_col(obj)
-                    elif field.endswith('_1d_pc'):
+                    elif '_1d' in field:
                         new_obj = _index_1d_by_col(obj)
                     elif obj.ndim == 2:
                         new_obj = _index_2d_by_col(obj)
@@ -2433,18 +2440,18 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                     new_obj = _index_records(obj)
                 elif checks.is_np_array(obj):
                     if is_grouped:
-                        if field.endswith('_2d'):
+                        if '_2d' in field:
                             new_obj = _index_2d_by_group(obj)
-                        elif field.endswith('_1d'):
+                        elif '_1d' in field:
                             new_obj = _index_1d_by_group(obj)
                         if obj.shape == self.wrapper.get_shape():
                             new_obj = _index_2d_by_group(obj)
                         elif obj.shape == (self.wrapper.get_shape_2d()[1],):
                             new_obj = _index_1d_by_group(obj)
                     else:
-                        if field.endswith('_2d'):
+                        if '_2d' in field:
                             new_obj = _index_2d_by_col(obj)
-                        elif field.endswith('_1d'):
+                        elif '_1d' in field:
                             new_obj = _index_1d_by_col(obj)
                         if obj.shape == self.wrapper.shape:
                             new_obj = _index_2d_by_col(obj)
