@@ -223,6 +223,11 @@ class TestCacheableRegistry:
             return a + b + c
 
         setup = f.get_ca_setup()
+
+        assert setup.readable_name == "f()"
+        assert setup.readable_str == "f():{}".format(setup.position_among_similar)
+        assert setup.short_str == "<func tests.test_ca_registry.f>"
+
         with pytest.raises(Exception):
             CARunSetup(f)
         assert setup.unbound_setup is None
@@ -332,6 +337,11 @@ class TestCacheableRegistry:
             return a + b + c
 
         setup = f.get_ca_setup()
+
+        assert setup.readable_name == "f()"
+        assert setup.readable_str == "f():{}".format(setup.position_among_similar)
+        assert setup.short_str == "<func tests.test_ca_registry.f>"
+
         np.testing.assert_array_equal(
             setup.run(10, 20, c=np.array([1, 2, 3])),
             np.array([31, 32, 33])
@@ -349,6 +359,11 @@ class TestCacheableRegistry:
         a = A()
 
         setup = A.f.get_ca_setup(a)
+
+        assert setup.readable_name == "a.f"
+        assert setup.readable_str == "a:{}.f".format(setup.instance_setup.position_among_similar)
+        assert setup.short_str == "<instance property tests.test_ca_registry.A.f>"
+
         unbound_setup = A.f.get_ca_setup()
         instance_setup = a.get_ca_setup()
         assert setup.unbound_setup is unbound_setup
@@ -370,6 +385,11 @@ class TestCacheableRegistry:
         b = B()
 
         setup = B.f.get_ca_setup(b)
+
+        assert setup.readable_name == "b.f()"
+        assert setup.readable_str == "b:{}.f()".format(setup.instance_setup.position_among_similar)
+        assert setup.short_str == "<instance method tests.test_ca_registry.B.f>"
+
         unbound_setup = B.f.get_ca_setup()
         instance_setup = b.get_ca_setup()
         assert setup.unbound_setup is unbound_setup
@@ -474,7 +494,17 @@ class TestCacheableRegistry:
         }
 
         unbound_setup1 = A.f.get_ca_setup()
+
+        assert unbound_setup1.readable_name == "f()"
+        assert unbound_setup1.readable_str == "f():{}".format(unbound_setup1.position_among_similar)
+        assert unbound_setup1.short_str == "<unbound method tests.test_ca_registry.f>"
+
         unbound_setup2 = B.f2.get_ca_setup()
+
+        assert unbound_setup2.readable_name == "f2()"
+        assert unbound_setup2.readable_str == "f2():{}".format(unbound_setup2.position_among_similar)
+        assert unbound_setup2.short_str == "<unbound method tests.test_ca_registry.f2>"
+
         run_setup1 = A.f.get_ca_setup(a)
         run_setup2 = B.f.get_ca_setup(b)
         run_setup3 = B.f2.get_ca_setup(b)
@@ -576,7 +606,17 @@ class TestCacheableRegistry:
         }
 
         instance_setup1 = a.get_ca_setup()
+
+        assert instance_setup1.readable_name == "a"
+        assert instance_setup1.readable_str == "a:{}".format(instance_setup1.position_among_similar)
+        assert instance_setup1.short_str == "<instance of tests.test_ca_registry.A>"
+
         instance_setup2 = b.get_ca_setup()
+
+        assert instance_setup2.readable_name == "b"
+        assert instance_setup2.readable_str == "b:{}".format(instance_setup2.position_among_similar)
+        assert instance_setup2.short_str == "<instance of tests.test_ca_registry.B>"
+
         run_setup1 = A.f.get_ca_setup(a)
         run_setup2 = B.f.get_ca_setup(b)
         run_setup3 = B.f2.get_ca_setup(b)
@@ -673,8 +713,23 @@ class TestCacheableRegistry:
         assert A.get_ca_setup() is not C.get_ca_setup()
 
         class_setup1 = A.get_ca_setup()
+
+        assert class_setup1.readable_name == "A"
+        assert class_setup1.readable_str == "A:{}".format(class_setup1.position_among_similar)
+        assert class_setup1.short_str == "<class tests.test_ca_registry.A>"
+
         class_setup2 = B.get_ca_setup()
+
+        assert class_setup2.readable_name == "B"
+        assert class_setup2.readable_str == "B:{}".format(class_setup2.position_among_similar)
+        assert class_setup2.short_str == "<class tests.test_ca_registry.B>"
+
         class_setup3 = C.get_ca_setup()
+
+        assert class_setup3.readable_name == "C"
+        assert class_setup3.readable_str == "C:{}".format(class_setup3.position_among_similar)
+        assert class_setup3.short_str == "<class tests.test_ca_registry.C>"
+
         assert class_setup1.superclass_setups == []
         assert class_setup2.superclass_setups == [
             class_setup1

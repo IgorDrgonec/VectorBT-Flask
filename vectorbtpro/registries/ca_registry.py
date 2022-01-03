@@ -406,6 +406,7 @@ import sys
 import warnings
 from datetime import datetime, timezone, timedelta
 from weakref import ref, ReferenceType
+from collections import ValuesView
 
 import attr
 import humanize
@@ -1144,8 +1145,7 @@ class CABaseSetup(CAMetrics, Hashable):
         raise NotImplementedError
 
     @property
-    def readable_str(self) -> str:
-        """Convert this setup into a readable string."""
+    def same_type_setups(self) -> ValuesView:
         raise NotImplementedError
 
     @property
@@ -1153,9 +1153,35 @@ class CABaseSetup(CAMetrics, Hashable):
         """Convert this setup into a short string."""
         raise NotImplementedError
 
+    @property
+    def readable_name(self) -> str:
+        """Get a readable name of the object the setup is bound to."""
+        raise NotImplementedError
+
+    @property
+    def position_among_similar(self) -> tp.Optional[int]:
+        """Get position among all similar setups.
+
+        Ordered by creation time."""
+        i = 0
+        for setup in self.same_type_setups:
+            if self is setup:
+                return i
+            if setup.readable_name == self.readable_name:
+                i += 1
+        return None
+
+    @property
+    def readable_str(self) -> str:
+        """Convert this setup into a readable string."""
+        return f"{self.readable_name}:{self.position_among_similar}"
+
     def get_status(self, readable: bool = True, short_str: bool = False) -> dict:
         """Get status of the setup as a dict with metrics."""
-        string = str(self)
+        if short_str:
+            string = self.short_str
+        else:
+            string = str(self)
         total_size = self.total_size
         total_elapsed = self.total_elapsed
         total_saved = self.total_saved
@@ -1167,10 +1193,7 @@ class CABaseSetup(CAMetrics, Hashable):
         last_update_time = self.last_update_time
 
         if readable:
-            if short_str:
-                string = self.short_str
-            else:
-                string = self.readable_str
+            string = self.readable_str
             total_size = humanize.naturalsize(total_size)
             if total_elapsed is not None:
                 minimum_unit = 'seconds' if total_elapsed.total_seconds() >= 1 else 'milliseconds'
@@ -1224,10 +1247,9 @@ class CASetupDelegatorMixin(CAMetrics):
         results = []
         for setup in self.child_setups:
             if readable:
-                if short_str:
-                    setup_obj = setup.short_str
-                else:
-                    setup_obj = setup.readable_str
+                setup_obj = setup.readable_str
+            elif short_str:
+                setup_obj = setup.short_str
             else:
                 setup_obj = setup
             if isinstance(setup, CASetupDelegatorMixin):
@@ -1364,7 +1386,7 @@ class CASetupDelegatorMixin(CAMetrics):
 
     def get_status_overview(self,
                             readable: bool = True,
-                            short_str: bool = True,
+                            short_str: bool = False,
                             index_by_hash: bool = False,
                             filter_func: tp.Optional[tp.Callable] = None,
                             include: tp.Optional[tp.MaybeSequence[str]] = None,
@@ -1608,11 +1630,15 @@ class CAClassSetup(CABaseDelegatorSetup):
         return set(self.subclass_setups) | self.instance_setups
 
     @property
-    def readable_str(self) -> str:
-        return f"<class {self.cls.__module__}.{self.cls.__name__}>"
+    def same_type_setups(self) -> ValuesView:
+        return self.registry.class_setups.values()
 
     @property
     def short_str(self) -> str:
+        return f"<class {self.cls.__module__}.{self.cls.__name__}>"
+
+    @property
+    def readable_name(self) -> str:
         return self.cls.__name__
 
     @property
@@ -1724,13 +1750,17 @@ class CAInstanceSetup(CABaseDelegatorSetup):
         return self.run_setups
 
     @property
-    def readable_str(self) -> str:
+    def same_type_setups(self) -> ValuesView:
+        return self.registry.instance_setups.values()
+
+    @property
+    def short_str(self) -> str:
         if self.contains_garbage:
             return "<destroyed object>"
         return f"<instance of {type(self.instance_obj).__module__}.{type(self.instance_obj).__name__}>"
 
     @property
-    def short_str(self) -> str:
+    def readable_name(self) -> str:
         if self.contains_garbage:
             return "_GARBAGE"
         return type(self.instance_obj).__name__.lower()
@@ -1815,16 +1845,20 @@ class CAUnboundSetup(CABaseDelegatorSetup):
         return self.run_setups
 
     @property
-    def readable_str(self) -> str:
+    def same_type_setups(self) -> ValuesView:
+        return self.registry.unbound_setups.values()
+
+    @property
+    def short_str(self) -> str:
         if is_cacheable_property(self.cacheable):
             return f"<unbound property {self.cacheable.func.__module__}.{self.cacheable.func.__name__}>"
         return f"<unbound method {self.cacheable.func.__module__}.{self.cacheable.func.__name__}>"
 
     @property
-    def short_str(self) -> str:
+    def readable_name(self) -> str:
         if is_cacheable_property(self.cacheable):
-            return f"{self.cacheable.func.__name__}.{self.cacheable.func.__name__}"
-        return f"{self.cacheable.func.__name__}.{self.cacheable.func.__name__}()"
+            return f"{self.cacheable.func.__name__}"
+        return f"{self.cacheable.func.__name__}()"
 
     @property
     def hash_key(self) -> tuple:
@@ -2175,7 +2209,11 @@ class CARunSetup(CABaseSetup):
         self.cache.clear()
 
     @property
-    def readable_str(self) -> str:
+    def same_type_setups(self) -> ValuesView:
+        return self.registry.run_setups.values()
+
+    @property
+    def short_str(self) -> str:
         if self.contains_garbage:
             return "<destroyed object>"
         if is_cacheable_property(self.cacheable):
@@ -2187,14 +2225,30 @@ class CARunSetup(CABaseSetup):
         return f"<func {self.cacheable.__module__}.{self.cacheable.__name__}>"
 
     @property
-    def short_str(self) -> str:
+    def readable_name(self) -> str:
         if self.contains_garbage:
             return "_GARBAGE"
         if is_cacheable_property(self.cacheable):
-            return f"{type(self.instance_obj).__name__.lower()}.{self.cacheable.func.__name__}"
+            return f"{type(self.instance_obj).__name__.lower()}." \
+                   f"{self.cacheable.func.__name__}"
         if is_cacheable_method(self.cacheable):
-            return f"{type(self.instance_obj).__name__.lower()}.{self.cacheable.func.__name__}()"
+            return f"{type(self.instance_obj).__name__.lower()}." \
+                   f"{self.cacheable.func.__name__}()"
         return f"{self.cacheable.__name__}()"
+
+    @property
+    def readable_str(self) -> str:
+        if self.contains_garbage:
+            return f"_GARBAGE:{self.position_among_similar}"
+        if is_cacheable_property(self.cacheable):
+            return f"{type(self.instance_obj).__name__.lower()}:" \
+                   f"{self.instance_setup.position_among_similar}." \
+                   f"{self.cacheable.func.__name__}"
+        if is_cacheable_method(self.cacheable):
+            return f"{type(self.instance_obj).__name__.lower()}:" \
+                   f"{self.instance_setup.position_among_similar}." \
+                   f"{self.cacheable.func.__name__}()"
+        return f"{self.cacheable.__name__}():{self.position_among_similar}"
 
     @property
     def hash_key(self) -> tuple:
