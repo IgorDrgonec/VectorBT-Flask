@@ -1,4 +1,4 @@
 ---
-title: Supercharged toolkit for quants
+title: Ultimate engine for quants
 template: home.html
 ---

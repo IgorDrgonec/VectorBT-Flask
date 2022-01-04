@@ -21,7 +21,7 @@
     </a>
 </p>
 
-vectorbt PRO is the most powerful toolkit for backtesting, algorithmic trading, and research. It is a high-performance superset of the **[vectorbt](https://github.com/polakowo/vectorbt)** library, one of the world's most innovative open-source backtesting frameworks. vectorbt PRO extends the standard vectorbt library with new impressive features and useful enhancements.
+vectorbt PRO is the most powerful engine for backtesting, algorithmic trading, and research. It is a high-performance superset of the **[vectorbt](https://github.com/polakowo/vectorbt)** library, one of the world's most innovative open-source backtesting frameworks. vectorbt PRO extends the standard vectorbt library with new impressive features and useful enhancements.
 
 ## [Home](https://vectorbt.pro) · [Features](#zap-features) · [Terms](#terms) · [Support](#support)
 
