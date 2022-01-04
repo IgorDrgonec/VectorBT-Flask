@@ -3,8 +3,10 @@
 """Utilities for pickling."""
 
 import humanize
+from pathlib import Path
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.utils.path_ import check_mkdir
 
 PickleableT = tp.TypeVar("PickleableT", bound="Pickleable")
 
@@ -35,16 +37,33 @@ class Pickleable:
 
         return pickle.loads(dumps, **kwargs)
 
-    def save(self, fname: tp.PathLike, **kwargs) -> None:
-        """Save dumps to a file."""
+    def save(self, path: tp.PathLike, mkdir_kwargs: tp.KwargsLike = None, **kwargs) -> None:
+        """Save dumps to a file.
+
+        If `path` has no suffix, adds the suffix '.pickle'."""
+        path = Path(path)
+        if mkdir_kwargs is None:
+            mkdir_kwargs = {}
+        if path.suffix == '':
+            path = path.with_suffix('.pickle')
+        check_mkdir(path.parent, **mkdir_kwargs)
         dumps = self.dumps(**kwargs)
-        with open(fname, "wb") as f:
+        with open(path, "wb") as f:
             f.write(dumps)
 
     @classmethod
-    def load(cls: tp.Type[PickleableT], fname: tp.PathLike, **kwargs) -> PickleableT:
-        """Load dumps from a file and create new instance."""
-        with open(fname, "rb") as f:
+    def load(cls: tp.Type[PickleableT], path: tp.PathLike, **kwargs) -> PickleableT:
+        """Load dumps from a file and create new instance.
+
+        If `path` has no suffix and doesn't exist, checks whether there is the same path
+        but with the suffix '.pickle' or '.pkl'."""
+        path = Path(path)
+        if path.suffix == '' and not path.exists():
+            if path.with_suffix('.pickle').exists():
+                path = path.with_suffix('.pickle')
+            elif path.with_suffix('.pkl').exists():
+                path = path.with_suffix('.pkl')
+        with open(path, "rb") as f:
             dumps = f.read()
         return cls.loads(dumps, **kwargs)
 

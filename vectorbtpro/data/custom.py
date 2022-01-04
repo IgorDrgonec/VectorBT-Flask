@@ -14,13 +14,16 @@ import time
 import traceback
 import warnings
 from functools import wraps
+from pathlib import Path
+from glob import glob
 
 import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.data import nb
-from vectorbtpro.data.base import Data
+from vectorbtpro.data.base import Data, symbol_dict
 from vectorbtpro.registries.jit_registry import jit_registry
+from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.datetime_ import get_utc_tz, get_local_tz, to_tzaware_datetime, datetime_to_ms
 from vectorbtpro.utils.parsing import get_func_kwargs
@@ -40,79 +43,179 @@ try:
 except ImportError:
     AlpacaClientT = tp.Any
 
-CSVDataT = tp.TypeVar("CSVDatat", bound="CSVData")
+LocalDataT = tp.TypeVar("LocalDataT", bound="LocalData")
 
 
-class CSVData(Data):
+def unfold_path(path: tp.PathLike) -> tp.List[Path]:
+    """`unfold_path_func` that returns a list of files matching a path."""
+    path = Path(path)
+    if path.exists():
+        if path.is_dir():
+            return [p for p in path.iterdir() if p.is_file()]
+        return [path]
+    return list([Path(p) for p in glob(str(path))])
+
+
+def path_to_symbol(path: tp.PathLike) -> str:
+    """`path_to_symbol_func` that returns the stem of a path."""
+    return Path(path).stem
+
+
+class LocalData(Data):
+    """`Data` for local data distributed over multiple files.
+
+    Use either `symbols` or `path` to specify the path to one or multiple files.
+    Allowed are paths in string or `pathlib.Path` format. Also allowed are string
+    expressions accepted by `glob.glob`."""
+
+    @classmethod
+    def fetch(cls: tp.Type[LocalDataT],
+              symbols: tp.Union[tp.Symbol, tp.Symbols] = None, *,
+              path: tp.Any = None,
+              parse_paths: bool = True,
+              sort_paths: bool = True,
+              unfold_path_func: tp.Callable = unfold_path,
+              path_to_symbol_func: tp.Callable = path_to_symbol,
+              **kwargs) -> LocalDataT:
+        """Override `vectorbtpro.data.base.Data.fetch`.
+
+        Set `parse_paths` to False to not parse paths and behave like a regular
+        `vectorbtpro.data.base.Data` instance.
+
+        Set `sort_paths` to False to disable sorting of found paths.
+
+        Use `unfold_path_func` to unfold a path into multiple paths. Won't get applied
+        if `path` is already an instance of `vectorbtpro.data.base.symbol_dict`.
+
+        Use `path_to_symbol_func` to get the symbol from a path. Gets applied only when
+        either `symbols` or `path` is None."""
+        if parse_paths:
+            sync = False
+            if path is None:
+                path = symbols
+                sync = True
+            elif symbols is None:
+                sync = True
+            if path is None:
+                raise ValueError("At least symbols or path must be set")
+
+            single_symbol = False
+            if isinstance(symbols, (str, Path)):
+                # Single symbol
+                symbols = [symbols]
+                single_symbol = True
+
+            single_path = False
+            if isinstance(path, (str, Path)):
+                # Single path
+                path = [path]
+                single_path = True
+                if sync:
+                    single_symbol = True
+
+            if isinstance(path, symbol_dict):
+                # Dict of path per symbol
+                if sync:
+                    symbols = list(path.keys())
+                elif len(symbols) != len(path):
+                    raise ValueError("The number of symbols must match the number of paths")
+            elif checks.is_iterable(path) or checks.is_sequence(path):
+                # Multiple paths
+                paths = [p for sub_path in path for p in unfold_path_func(sub_path)]
+                if len(paths) == 0:
+                    raise FileNotFoundError(f"No paths could be matched with {path}")
+                if sort_paths:
+                    paths = sorted(paths)
+                if sync:
+                    symbols = []
+                    path = symbol_dict()
+                    for p in paths:
+                        s = path_to_symbol_func(p)
+                        symbols.append(s)
+                        path[s] = p
+                elif len(symbols) != len(paths):
+                    raise ValueError("The number of symbols must match the number of paths")
+                else:
+                    path = symbol_dict({s: paths[i] for i, s in enumerate(symbols)})
+                if len(paths) == 1 and single_path:
+                    path = paths[0]
+            else:
+                raise TypeError(f"Path '{path}' is not supported")
+            if len(symbols) == 1 and single_symbol:
+                symbols = symbols[0]
+
+        return super(LocalData, cls).fetch(symbols, path=path, **kwargs)
+
+
+CSVDataT = tp.TypeVar("CSVDataT", bound="CSVData")
+
+
+class CSVData(LocalData):
     """`Data` for data that can be fetched and updated using `pd.read_csv`.
 
     Usage:
-        * Generate 5 seconds of random data, save it to the disk, and load using `CSVData`:
+        * Generate three random time series, save them to the disk, and load using `CSVData`:
 
         ```pycon
         >>> import vectorbtpro as vbt
 
-        >>> rand_data = vbt.RandomData.fetch(start='5 seconds ago', freq='1s')
-        ```
+        >>> rand_data1 = vbt.RandomData.fetch(start='2020-01-01', end='2020-01-05')
+        >>> rand_data2 = vbt.RandomData.fetch(start='2020-01-02', end='2020-01-05')
+        >>> rand_data3 = vbt.RandomData.fetch(start='2020-01-03', end='2020-01-05')
 
-        [=100% "100%"]{: .candystripe}
+        >>> rand_data1.get().to_csv('rand_data1.csv')
+        >>> rand_data2.get().to_csv('rand_data2.csv')
+        >>> rand_data3.get().to_csv('rand_data3.csv')
 
-        ```pycon
-        >>> rand_data.get().to_csv('rand_data.csv')
-
-        >>> csv_data = vbt.CSVData.fetch('rand_data.csv')
+        >>> csv_data = vbt.CSVData.fetch('rand_data*.csv')
+        >>> # same as vbt.CSVData.fetch(['rand_data1.csv', ...])
         ```
 
         [=100% "100%"]{: .candystripe}
 
         ```pycon
         >>> csv_data.get()
-        2021-10-30 11:19:32.168721+00:00    101.223837
-        2021-10-30 11:19:33.168721+00:00    101.580351
-        2021-10-30 11:19:34.168721+00:00    101.409540
-        2021-10-30 11:19:35.168721+00:00    101.198202
-        2021-10-30 11:19:36.168721+00:00    102.308458
-        2021-10-30 11:19:37.168721+00:00    102.692657
-        Freq: S, dtype: float64
+        symbol                     rand_data1.csv  rand_data2.csv  rand_data3.csv
+        2019-12-31 23:00:00+00:00       99.632114             NaN             NaN
+        2020-01-01 23:00:00+00:00       99.268772      101.372515             NaN
+        2020-01-02 23:00:00+00:00       99.771735      101.609975       99.640045
+        2020-01-03 23:00:00+00:00       98.452476      101.073658       99.466840
+        2020-01-04 23:00:00+00:00       98.055655      101.846403       99.719464
         ```
 
-        * Wait 2 seconds, generate new data, save it to the disk, and update using `CSVData`:
+        * Update one time series and update `CSVData`:
 
         ```pycon
-        >>> import time
-        >>> time.sleep(2)
-
-        >>> rand_data = rand_data.update()
-        >>> rand_data.get().to_csv('rand_data.csv')  # saves all data
+        >>> rand_data3 = rand_data3.update(end='2020-01-07')
+        >>> rand_data3.get().to_csv('rand_data3.csv')
 
         >>> csv_data = csv_data.update()  # loads only subset of data
         >>> csv_data.get()
-        2021-10-30 11:19:32.168721+00:00    101.223837
-        2021-10-30 11:19:33.168721+00:00    101.580351
-        2021-10-30 11:19:34.168721+00:00    101.409540
-        2021-10-30 11:19:35.168721+00:00    101.198202
-        2021-10-30 11:19:36.168721+00:00    102.308458
-        2021-10-30 11:19:37.168721+00:00    100.941811  << updated last
-        2021-10-30 11:19:38.168721+00:00    100.935500  << added new
-        2021-10-30 11:19:39.168721+00:00    100.618909  << added new
-        Freq: S, dtype: float64
+        symbol                     rand_data1.csv  rand_data2.csv  rand_data3.csv
+        2019-12-31 23:00:00+00:00       99.632114             NaN             NaN
+        2020-01-01 23:00:00+00:00       99.268772      101.372515             NaN
+        2020-01-02 23:00:00+00:00       99.771735      101.609975       99.640045
+        2020-01-03 23:00:00+00:00       98.452476      101.073658       99.466840
+        2020-01-04 23:00:00+00:00       98.055655      101.846403      100.212156
+        2020-01-05 23:00:00+00:00             NaN             NaN      100.829512
+        2020-01-06 23:00:00+00:00             NaN             NaN      100.617397
         ```
     """
 
     @classmethod
     def fetch_symbol(cls,
                      symbol: tp.Symbol,
-                     path: tp.Optional[tp.Any] = None,
+                     path: tp.Any = None,
                      header: tp.MaybeSequence[int] = 0,
                      index_col: int = 0,
                      parse_dates: bool = True,
                      start_row: int = 0,
                      end_row: tp.Optional[int] = None,
                      squeeze: bool = True,
-                     **kwargs) -> tp.Tuple[tp.SeriesFrame, tp.Kwargs]:
-        """Fetch a symbol.
+                     **kwargs) -> tp.Tuple[tp.SeriesFrame, dict]:
+        """Override `vectorbtpro.data.base.Data.fetch_symbol` to load a CSV file.
 
-        If `path` is None, uses `symbol` as path.
+        If `path` is None, uses `symbol` as the path to the CSV file.
 
         `skiprows` and `nrows` will be automatically calculated based on `start_row` and `end_row`.
 
@@ -133,6 +236,7 @@ class CSVData(Data):
             nrows = end_row - start_row + 1
         else:
             nrows = None
+
         obj = pd.read_csv(
             path,
             header=header,
@@ -148,79 +252,166 @@ class CSVData(Data):
         returned_kwargs = dict(last_row=start_row - header_rows + len(obj.index) - 1)
         return obj, returned_kwargs
 
-    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.Tuple[tp.SeriesFrame, tp.Kwargs]:
+    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.Tuple[tp.SeriesFrame, dict]:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
         fetch_kwargs['start_row'] = self.returned_kwargs[symbol]['last_row']
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         return self.fetch_symbol(symbol, **kwargs)
 
 
-class HDFData(Data):
+class HDFPathNotFoundError(Exception):
+    """Gets raised if the path to an HDF file could not be found."""
+    pass
+
+
+class HDFKeyNotFoundError(Exception):
+    """Gets raised if the key to an HDF object could not be found."""
+    pass
+
+
+def split_hdf_path(path: tp.PathLike,
+                   key: tp.Optional[str] = None,
+                   _full_path: tp.Optional[Path] = None) -> tp.Tuple[Path, tp.Optional[str]]:
+    """Split the path to an HDF object into the path to the file and the key."""
+    path = Path(path)
+    if _full_path is None:
+        _full_path = path
+    if path.exists():
+        if path.is_dir():
+            raise HDFPathNotFoundError(f"No HDF files could be matched with {_full_path}")
+        return path, key
+    new_path = path.parent
+    if key is None:
+        new_key = path.name
+    else:
+        new_key = str(Path(path.name) / key)
+    return split_hdf_path(new_path, new_key, _full_path=_full_path)
+
+
+def hdf_unfold_path(path: tp.PathLike) -> tp.List[Path]:
+    """`unfold_path_func` that returns a list of HDF paths (path to file + key) matching a path."""
+    path = Path(path)
+    if path.exists():
+        if path.is_dir():
+            sub_paths = [p for p in path.iterdir() if p.is_file()]
+            return [p for sub_path in sub_paths for p in hdf_unfold_path(sub_path)]
+        with pd.HDFStore(str(path)) as store:
+            keys = [k[1:] for k in store.keys()]
+        return [path / k for k in keys]
+    try:
+        file_path, key = split_hdf_path(path)
+        with pd.HDFStore(str(file_path)) as store:
+            keys = [k[1:] for k in store.keys()]
+        if key is None:
+            return [file_path / k for k in keys]
+        if key in keys:
+            return [file_path / key]
+        matching_keys = []
+        for k in keys:
+            if k.startswith(key):
+                matching_keys.append(k)
+        if len(matching_keys) == 0:
+            raise HDFKeyNotFoundError(f"No HDF keys could be matched with {key}")
+        return [file_path / k for k in matching_keys]
+    except HDFPathNotFoundError:
+        pass
+    sub_paths = list([Path(p) for p in glob(str(path))])
+    return [p for sub_path in sub_paths for p in hdf_unfold_path(sub_path)]
+
+
+HDFDataT = tp.TypeVar("HDFDataT", bound="HDFData")
+
+
+class HDFData(LocalData):
     """`Data` for data that can be fetched and updated using `pd.read_hdf`.
 
     Usage:
-        * Generate 5 seconds of random data, save it to the disk, and load using `HDFData`:
+        * Generate four random time series, save them to two HDF files, and load using `HDFData`:
 
         ```pycon
         >>> import vectorbtpro as vbt
 
-        >>> rand_data = vbt.RandomData.fetch(start='5 seconds ago', freq='1s')
+        >>> rand_data1 = vbt.RandomData.fetch(start='2020-01-01', end='2020-01-05')
+        >>> rand_data2 = vbt.RandomData.fetch(start='2020-01-02', end='2020-01-05')
+        >>> rand_data3 = vbt.RandomData.fetch(start='2020-01-03', end='2020-01-05')
+        >>> rand_data4 = vbt.RandomData.fetch(start='2020-01-04', end='2020-01-05')
+
+        >>> rand_data1.get().to_hdf('rand_data1.h5', '/R1')
+        >>> rand_data2.get().to_hdf('rand_data2.h5', '/R2')
+        >>> rand_data3.get().to_hdf('rand_data2.h5', '/folder/R3')
+        >>> rand_data4.get().to_hdf('rand_data2.h5', '/folder/R4')
+
+        >>> hdf_data = vbt.HDFData.fetch('rand_data*.h5')
         ```
 
         [=100% "100%"]{: .candystripe}
 
         ```pycon
-        >>> rand_data.get().to_hdf('rand_data.h5', 's')
-
-        >>> h5_data = vbt.HDFData.fetch('s', path='rand_data.h5')
+        >>> hdf_data.get()
+        symbol                             R1          R2         R3          R4
+        2019-12-31 23:00:00+00:00  101.351668         NaN        NaN         NaN
+        2020-01-01 23:00:00+00:00  101.263132  100.999627        NaN         NaN
+        2020-01-02 23:00:00+00:00  101.290664  103.431017  99.483751         NaN
+        2020-01-03 23:00:00+00:00  103.178471  104.279458  99.207583   98.995509
+        2020-01-04 23:00:00+00:00  103.493175  104.549302  99.784088  100.276962
         ```
 
-        [=100% "100%"]{: .candystripe}
+        * Update one time series and update `HDFData`:
 
         ```pycon
-        >>> h5_data.get()
-        2021-10-30 17:53:14.243189+00:00    100.119015
-        2021-10-30 17:53:15.243189+00:00    100.798207
-        2021-10-30 17:53:16.243189+00:00    101.928613
-        2021-10-30 17:53:17.243189+00:00    102.828592
-        2021-10-30 17:53:18.243189+00:00    104.505259
-        2021-10-30 17:53:19.243189+00:00    106.384834
-        Freq: S, dtype: float64
+        >>> rand_data4 = rand_data4.update(end='2020-01-07')
+        >>> rand_data4.get().to_hdf('rand_data2.h5', '/folder/R4')
+
+        >>> hdf_data = hdf_data.update()  # loads only subset of data
+        >>> hdf_data.get()
+        symbol                             R1          R2         R3         R4
+        2019-12-31 23:00:00+00:00  101.351668         NaN        NaN        NaN
+        2020-01-01 23:00:00+00:00  101.263132  100.999627        NaN        NaN
+        2020-01-02 23:00:00+00:00  101.290664  103.431017  99.483751        NaN
+        2020-01-03 23:00:00+00:00  103.178471  104.279458  99.207583  98.995509
+        2020-01-04 23:00:00+00:00  103.493175  104.549302  99.784088  99.456149
+        2020-01-05 23:00:00+00:00         NaN         NaN        NaN  96.833051
+        2020-01-06 23:00:00+00:00         NaN         NaN        NaN  96.422318
         ```
 
-        * Wait 2 seconds, generate new data, save it to the disk, and update using `HDFData`:
+        * Specify keys:
 
         ```pycon
-        >>> import time
-        >>> time.sleep(2)
+        >>> vbt.HDFData.fetch('rand_data2.h5/R2').get()
+        2020-01-01 23:00:00+00:00    100.999627
+        2020-01-02 23:00:00+00:00    103.431017
+        2020-01-03 23:00:00+00:00    104.279458
+        2020-01-04 23:00:00+00:00    104.549302
+        Freq: D, dtype: float6
 
-        >>> rand_data = rand_data.update()
-        >>> rand_data.get().to_hdf('rand_data.h5', 's')  # saves all data
-
-        >>> h5_data = h5_data.update()  # loads only subset of data
-        >>> h5_data.get()
-        2021-10-30 17:53:14.243189+00:00    100.119015
-        2021-10-30 17:53:15.243189+00:00    100.798207
-        2021-10-30 17:53:16.243189+00:00    101.928613
-        2021-10-30 17:53:17.243189+00:00    102.828592
-        2021-10-30 17:53:18.243189+00:00    104.505259
-        2021-10-30 17:53:19.243189+00:00    104.143708
-        2021-10-30 17:53:20.243189+00:00    104.661706
-        2021-10-30 17:53:21.243189+00:00    105.294653
-        Freq: S, dtype: float64
+        >>> vbt.HDFData.fetch('rand_data2.h5/folder').get()
+        symbol                            R3         R4
+        2020-01-02 23:00:00+00:00  99.483751        NaN
+        2020-01-03 23:00:00+00:00  99.207583  98.995509
+        2020-01-04 23:00:00+00:00  99.784088  99.456149
+        2020-01-05 23:00:00+00:00        NaN  96.833051
+        2020-01-06 23:00:00+00:00        NaN  96.422318
         ```
     """
 
     @classmethod
+    def fetch(cls: tp.Type[HDFDataT],
+              symbols: tp.Union[tp.Symbol, tp.Symbols] = None, *,
+              unfold_path_func: tp.Callable = hdf_unfold_path,
+              **kwargs) -> HDFDataT:
+        """Override `vectorbtpro.data.base.LocalData.fetch` to parse paths and HDF keys."""
+        return super(HDFData, cls).fetch(symbols, unfold_path_func=unfold_path_func, **kwargs)
+
+    @classmethod
     def fetch_symbol(cls,
                      symbol: tp.Symbol,
-                     path: tp.Optional[tp.Any] = None,
+                     path: tp.Any = None,
                      start_row: int = 0,
                      end_row: tp.Optional[int] = None,
-                     **kwargs) -> tp.Tuple[tp.SeriesFrame, tp.Kwargs]:
-        """Fetch a symbol.
+                     **kwargs) -> tp.Tuple[tp.SeriesFrame, dict]:
+        """Override `vectorbtpro.data.base.Data.fetch_symbol` to load an HDF object.
 
-        If `path` is None, uses `symbol` as path to an HDF file with a single pandas object.
+        If `path` is None, uses `symbol` as the path to the HDF file.
 
         !!! note
             `end_row` must include the last row.
@@ -228,15 +419,15 @@ class HDFData(Data):
         See https://pandas.pydata.org/docs/reference/api/pandas.read_hdf.html for other arguments."""
         if path is None:
             path = symbol
-            key = None
-        else:
-            key = symbol
+        path = Path(path)
+        file_path, key = split_hdf_path(path)
         if end_row is not None:
             stop = end_row + 1
         else:
             stop = None
+
         obj = pd.read_hdf(
-            path,
+            file_path,
             key=key,
             start=start_row,
             stop=stop,
@@ -245,7 +436,7 @@ class HDFData(Data):
         returned_kwargs = dict(last_row=start_row + len(obj.index) - 1)
         return obj, returned_kwargs
 
-    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.Tuple[tp.SeriesFrame, tp.Kwargs]:
+    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.Tuple[tp.SeriesFrame, dict]:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
         fetch_kwargs['start_row'] = self.returned_kwargs[symbol]['last_row']
         kwargs = merge_dicts(fetch_kwargs, kwargs)
@@ -271,7 +462,7 @@ class SyntheticData(Data):
                      freq: tp.Union[None, str, pd.DateOffset] = None,
                      date_range_kwargs: tp.KwargsLike = None,
                      **kwargs) -> tp.SeriesFrame:
-        """Fetch a symbol.
+        """Override `vectorbtpro.data.base.Data.fetch_symbol` to generate a symbol.
 
         Generates datetime index and passes it to `SyntheticData.generate_symbol` to fill
         the Series/DataFrame with generated data."""
@@ -518,7 +709,7 @@ class YFData(Data):  # pragma: no cover
                      start: tp.Optional[tp.DatetimeLike] = None,
                      end: tp.Optional[tp.DatetimeLike] = None,
                      **kwargs) -> tp.Frame:
-        """Fetch a symbol.
+        """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Yahoo Finance.
 
         Args:
             symbol (str): Symbol.
@@ -672,7 +863,7 @@ class BinanceData(Data):  # pragma: no cover
 
     @classmethod
     def fetch(cls: tp.Type[BinanceDataT],
-              symbols: tp.Sequence[str],
+              symbols: tp.Union[tp.Symbol, tp.Symbols] = None, *,
               client: tp.Optional["BinanceClientT"] = None,
               **kwargs) -> BinanceDataT:
         """Override `vectorbtpro.data.base.Data.fetch` to instantiate a Binance client."""
@@ -703,7 +894,7 @@ class BinanceData(Data):  # pragma: no cover
                      limit: int = 500,
                      show_progress: bool = True,
                      pbar_kwargs: tp.KwargsLike = None) -> tp.Frame:
-        """Fetch a symbol.
+        """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Binance.
 
         Args:
             symbol (str): Symbol.
@@ -893,7 +1084,7 @@ class CCXTData(Data):  # pragma: no cover
                      show_progress: bool = True,
                      params: tp.Optional[dict] = None,
                      pbar_kwargs: tp.KwargsLike = None) -> tp.Frame:
-        """Fetch a symbol.
+        """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from CCXT.
 
         Args:
             symbol (str): Symbol.
@@ -1054,7 +1245,7 @@ class CCXTData(Data):  # pragma: no cover
 AlpacaDataT = tp.TypeVar("AlpacaDataT", bound="AlpacaData")
 
 
-class AlpacaData(Data):
+class AlpacaData(Data):  # pragma: no cover
     """`Data` for data coming from `alpaca-trade-api`.
 
     Sign up for Alpaca API keys under https://app.alpaca.markets/signup.
@@ -1111,7 +1302,7 @@ class AlpacaData(Data):
 
     @classmethod
     def fetch(cls: tp.Type[AlpacaDataT],
-              symbols: tp.Sequence[str],
+              symbols: tp.Union[tp.Symbol, tp.Symbols] = None, *,
               client: tp.Optional["AlpacaClientT"] = None,
               **kwargs) -> AlpacaDataT:
         """Override `vectorbtpro.data.base.Data.fetch` to instantiate an Alpaca client."""
@@ -1142,7 +1333,7 @@ class AlpacaData(Data):
                      limit: int = 500,
                      exchange: tp.Optional[str] = 'CBSE',
                      **kwargs) -> tp.Frame:
-        """Fetch a symbol.
+        """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Alpaca.
 
         Args:
             symbol (str): Symbol.

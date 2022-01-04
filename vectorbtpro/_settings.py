@@ -1120,6 +1120,24 @@ ${config_doc}
 
 _settings['pbar'] = pbar
 
+path = dict(
+    mkdir=dict(
+        mkdir=False,
+        mode=0o777,
+        parents=True,
+        exist_ok=True
+    )
+)
+"""_"""
+
+__pdoc__['path'] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.path_`.
+
+```python
+${config_doc}
+```""")
+
+_settings['path'] = path
+
 
 # ############# Settings config ############# #
 

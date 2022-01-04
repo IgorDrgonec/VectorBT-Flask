@@ -984,6 +984,118 @@ class TestData:
             )
         )
 
+    def test_to_csv(self, tmp_path):
+        data = MyData.fetch(['S1', 'S2'], shape=(5, 3), columns=['feat0', 'feat1', 'feat2'])
+
+        def _load_and_check_symbol(s, path, **kwargs):
+            df = pd.read_csv(path, parse_dates=True, squeeze=True, index_col=0, **kwargs)
+            df.index.freq = df.index.inferred_freq
+            pd.testing.assert_frame_equal(
+                df,
+                data.data[s]
+            )
+
+        data.to_csv(tmp_path)
+        _load_and_check_symbol('S1', tmp_path / 'S1.csv')
+        _load_and_check_symbol('S2', tmp_path / 'S2.csv')
+
+        data.to_csv(
+            vbt.symbol_dict({
+                'S1': tmp_path / 'csv_data',
+                'S2': tmp_path / 'csv_data'
+            }),
+            ext=vbt.symbol_dict({
+                'S1': 'csv',
+                'S2': 'tsv'
+            }),
+            sep=vbt.symbol_dict({
+                'S1': ',',
+                'S2': '\t'
+            }),
+            mkdir_kwargs=dict(mkdir=True)
+        )
+        _load_and_check_symbol('S1', tmp_path / 'csv_data/S1.csv', sep=',')
+        _load_and_check_symbol('S2', tmp_path / 'csv_data/S2.tsv', sep='\t')
+
+        data.to_csv(
+            path_or_buf=vbt.symbol_dict({
+                'S1': tmp_path / 'my_S1.csv',
+                'S2': tmp_path / 'my_S2.csv'
+            })
+        )
+        _load_and_check_symbol('S1', tmp_path / 'my_S1.csv')
+        _load_and_check_symbol('S2', tmp_path / 'my_S2.csv')
+
+        data.to_csv(
+            vbt.symbol_dict({
+                'S1': tmp_path / 'csv_data',
+                'S2': tmp_path / 'csv_data'
+            }),
+            ext=vbt.symbol_dict({
+                'S1': 'csv',
+                'S2': 'tsv'
+            }),
+            sep=vbt.symbol_dict({
+                'S1': ',',
+                'S2': '\t'
+            })
+        )
+        _load_and_check_symbol('S1', tmp_path / 'csv_data/S1.csv', sep=',')
+        _load_and_check_symbol('S2', tmp_path / 'csv_data/S2.tsv', sep='\t')
+
+    def test_to_hdf(self, tmp_path):
+        data = MyData.fetch(['S1', 'S2'], shape=(5, 3), columns=['feat0', 'feat1', 'feat2'])
+
+        def _load_and_check_symbol(s, path, key=None, **kwargs):
+            if key is None:
+                key = s
+            df = pd.read_hdf(path, key, **kwargs)
+            df.index.freq = df.index.inferred_freq
+            pd.testing.assert_frame_equal(
+                df,
+                data.data[s]
+            )
+
+        data.to_hdf(tmp_path)
+        _load_and_check_symbol('S1', tmp_path / 'MyData.h5')
+        _load_and_check_symbol('S2', tmp_path / 'MyData.h5')
+
+        data.to_hdf(
+            vbt.symbol_dict({
+                'S1': tmp_path / 'hdf_data/S1.h5',
+                'S2': tmp_path / 'hdf_data/S2.h5'
+            }),
+            mkdir_kwargs=dict(mkdir=True)
+        )
+        _load_and_check_symbol('S1', tmp_path / 'hdf_data/S1.h5')
+        _load_and_check_symbol('S2', tmp_path / 'hdf_data/S2.h5')
+
+        data.to_hdf(
+            vbt.symbol_dict({
+                'S1': tmp_path / 'hdf_data/my_data.h5',
+                'S2': tmp_path / 'hdf_data/my_data.h5'
+            }),
+            key=vbt.symbol_dict({
+                'S1': 'df1',
+                'S2': 'df2'
+            })
+        )
+        _load_and_check_symbol('S1', tmp_path / 'hdf_data/my_data.h5', key='df1')
+        _load_and_check_symbol('S2', tmp_path / 'hdf_data/my_data.h5', key='df2')
+
+        data.to_hdf(
+            path_or_buf=vbt.symbol_dict({
+                'S1': tmp_path / 'hdf_data/my_data.h5',
+                'S2': tmp_path / 'hdf_data/my_data.h5'
+            }),
+            key=vbt.symbol_dict({
+                'S1': 'df1',
+                'S2': 'df2'
+            })
+        )
+        _load_and_check_symbol('S1', tmp_path / 'hdf_data/my_data.h5', key='df1')
+        _load_and_check_symbol('S2', tmp_path / 'hdf_data/my_data.h5', key='df2')
+
     def test_indexing(self):
         assert MyData.fetch([0, 1], shape=(5,), columns='feat0').iloc[:3].wrapper == \
                MyData.fetch([0, 1], shape=(3,), columns='feat0').wrapper
@@ -1071,6 +1183,24 @@ class TestCustom:
             csv_data.get(),
             sr
         )
+        csv_data = vbt.CSVData.fetch('TEMP', path=tmp_path / 'temp.csv')
+        assert csv_data.symbols[0] == 'TEMP'
+        pd.testing.assert_series_equal(
+            csv_data.get(),
+            sr
+        )
+        csv_data = vbt.CSVData.fetch('TEMP', path=[tmp_path / 'temp.csv'])
+        assert csv_data.symbols[0] == 'TEMP'
+        pd.testing.assert_series_equal(
+            csv_data.get(),
+            sr
+        )
+        csv_data = vbt.CSVData.fetch(['TEMP'], path=tmp_path / 'temp.csv')
+        assert csv_data.symbols[0] == 'TEMP'
+        pd.testing.assert_series_equal(
+            csv_data.get()['TEMP'],
+            sr.rename('TEMP')
+        )
         csv_data = vbt.CSVData.fetch(tmp_path / 'temp.csv', start_row=2, end_row=3)
         pd.testing.assert_series_equal(
             csv_data.get(),
@@ -1084,36 +1214,139 @@ class TestCustom:
             csv_data.get(),
             df.iloc[:2]
         )
-        assert csv_data.returned_kwargs[tmp_path / 'temp.csv'] == {'last_row': 1}
+        assert csv_data.returned_kwargs['temp'] == {'last_row': 1}
         csv_data = csv_data.update()
         pd.testing.assert_frame_equal(
             csv_data.get(),
             df.iloc[:2]
         )
-        assert csv_data.returned_kwargs[tmp_path / 'temp.csv'] == {'last_row': 1}
+        assert csv_data.returned_kwargs['temp'] == {'last_row': 1}
         csv_data = csv_data.update(end_row=2)
         csv_data.get()
         pd.testing.assert_frame_equal(
             csv_data.get(),
             df.iloc[:3]
         )
-        assert csv_data.returned_kwargs[tmp_path / 'temp.csv'] == {'last_row': 2}
+        assert csv_data.returned_kwargs['temp'] == {'last_row': 2}
         csv_data = csv_data.update(end_row=None)
         pd.testing.assert_frame_equal(
             csv_data.get(),
             df
         )
-        assert csv_data.returned_kwargs[tmp_path / 'temp.csv'] == {'last_row': 9}
+        assert csv_data.returned_kwargs['temp'] == {'last_row': 9}
+
+        data1 = MyData.fetch(shape=(5,))
+        data2 = MyData.fetch(shape=(6,))
+        data3 = MyData.fetch(shape=(7,))
+        result_data = vbt.Data.from_data({
+            'data1': data1.get(),
+            'data2': data2.get(),
+            'data3': data3.get()
+        })
+
+        data1.get().to_csv(tmp_path / 'data1.csv')
+        data2.get().to_csv(tmp_path / 'data2.csv')
+        data3.get().to_csv(tmp_path / 'data3.csv')
+        csv_data = vbt.CSVData.fetch(tmp_path / 'data*.csv')
+        pd.testing.assert_frame_equal(
+            csv_data.get(),
+            result_data.get()
+        )
+        (tmp_path / 'data').mkdir(exist_ok=True)
+        data1.get().to_csv(tmp_path / 'data/data1.csv')
+        data2.get().to_csv(tmp_path / 'data/data2.csv')
+        data3.get().to_csv(tmp_path / 'data/data3.csv')
+        csv_data = vbt.CSVData.fetch(tmp_path / 'data')
+        pd.testing.assert_frame_equal(
+            csv_data.get(),
+            result_data.get()
+        )
+        csv_data = vbt.CSVData.fetch([
+            tmp_path / 'data/data1.csv',
+            tmp_path / 'data/data2.csv',
+            tmp_path / 'data/data3.csv'
+        ])
+        pd.testing.assert_frame_equal(
+            csv_data.get(),
+            result_data.get()
+        )
+        csv_data = vbt.CSVData.fetch(path=[
+            tmp_path / 'data/data1.csv',
+            tmp_path / 'data/data2.csv',
+            tmp_path / 'data/data3.csv'
+        ])
+        pd.testing.assert_frame_equal(
+            csv_data.get(),
+            result_data.get()
+        )
+        csv_data = vbt.CSVData.fetch(symbols=[
+            'DATA1',
+            'DATA2',
+            'DATA3'
+        ], path=[
+            tmp_path / 'data/data1.csv',
+            tmp_path / 'data/data2.csv',
+            tmp_path / 'data/data3.csv'
+        ])
+        pd.testing.assert_frame_equal(
+            csv_data.get(),
+            result_data.get().rename(columns={
+                'data1': 'DATA1',
+                'data2': 'DATA2',
+                'data3': 'DATA3'
+            })
+        )
+        csv_data = vbt.CSVData.fetch(vbt.symbol_dict({
+            'DATA1': tmp_path / 'data/data1.csv',
+            'DATA2': tmp_path / 'data/data2.csv',
+            'DATA3': tmp_path / 'data/data3.csv'
+        }))
+        pd.testing.assert_frame_equal(
+            csv_data.get(),
+            result_data.get().rename(columns={
+                'data1': 'DATA1',
+                'data2': 'DATA2',
+                'data3': 'DATA3'
+            })
+        )
+        with pytest.raises(Exception):
+            vbt.CSVData.fetch('DATA')
+        with pytest.raises(Exception):
+            vbt.CSVData.fetch('DATA', path=tmp_path / 'data/data*.csv')
+        with pytest.raises(Exception):
+            vbt.CSVData.fetch(['DATA1', 'DATA2'], path=tmp_path / 'data/data1.csv')
+        with pytest.raises(Exception):
+            vbt.CSVData.fetch(None)
+        with pytest.raises(Exception):
+            vbt.CSVData.fetch(0)
 
     def test_hdf_data(self, tmp_path):
         sr = pd.Series(np.arange(10))
         sr.to_hdf(tmp_path / 'temp.h5', 's')
-        hdf_data = vbt.HDFData.fetch('s', path=tmp_path / 'temp.h5')
+        hdf_data = vbt.HDFData.fetch(tmp_path / 'temp.h5' / 's')
         pd.testing.assert_series_equal(
             hdf_data.get(),
             sr
         )
-        hdf_data = vbt.HDFData.fetch('s', path=tmp_path / 'temp.h5', start_row=2, end_row=3)
+        hdf_data = vbt.HDFData.fetch('S', path=tmp_path / 'temp.h5' / 's')
+        assert hdf_data.symbols[0] == 'S'
+        pd.testing.assert_series_equal(
+            hdf_data.get(),
+            sr
+        )
+        hdf_data = vbt.HDFData.fetch('S', path=[tmp_path / 'temp.h5' / 's'])
+        assert hdf_data.symbols[0] == 'S'
+        pd.testing.assert_series_equal(
+            hdf_data.get(),
+            sr
+        )
+        hdf_data = vbt.HDFData.fetch(['S'], path=tmp_path / 'temp.h5' / 's')
+        assert hdf_data.symbols[0] == 'S'
+        pd.testing.assert_series_equal(
+            hdf_data.get()['S'],
+            sr.rename('S')
+        )
+        hdf_data = vbt.HDFData.fetch(tmp_path / 'temp.h5' / 's', start_row=2, end_row=3)
         pd.testing.assert_series_equal(
             hdf_data.get(),
             sr.iloc[2:4]
@@ -1121,7 +1354,7 @@ class TestCustom:
         df = pd.DataFrame(np.arange(20).reshape((10, 2)))
         df.columns = pd.MultiIndex.from_tuples([('1', '2'), ('3', '4')], names=['a', 'b'])
         df.to_hdf(tmp_path / 'temp.h5', 'df')
-        hdf_data = vbt.HDFData.fetch('df', path=tmp_path / 'temp.h5', header=[0, 1], start_row=0, end_row=1)
+        hdf_data = vbt.HDFData.fetch(tmp_path / 'temp.h5' / 'df', header=[0, 1], start_row=0, end_row=1)
         pd.testing.assert_frame_equal(
             hdf_data.get(),
             df.iloc[:2]
@@ -1146,6 +1379,142 @@ class TestCustom:
             df
         )
         assert hdf_data.returned_kwargs['df'] == {'last_row': 9}
+
+        data1 = MyData.fetch(shape=(5,))
+        data2 = MyData.fetch(shape=(6,))
+        data3 = MyData.fetch(shape=(7,))
+        result_data = vbt.Data.from_data({
+            'data1': data1.get(),
+            'data2': data2.get(),
+            'data3': data3.get()
+        })
+
+        data1.get().to_hdf(tmp_path / 'data1.h5', 'data1')
+        data2.get().to_hdf(tmp_path / 'data2.h5', 'data2')
+        data3.get().to_hdf(tmp_path / 'data3.h5', 'data3')
+        hdf_data = vbt.HDFData.fetch(tmp_path / 'data*.h5')
+        pd.testing.assert_frame_equal(
+            hdf_data.get(),
+            result_data.get()
+        )
+        (tmp_path / 'data').mkdir(exist_ok=True)
+        data1.get().to_hdf(tmp_path / 'data/data1.h5', 'data1')
+        data2.get().to_hdf(tmp_path / 'data/data2.h5', 'data2')
+        data3.get().to_hdf(tmp_path / 'data/data3.h5', 'data3')
+        hdf_data = vbt.HDFData.fetch(tmp_path / 'data')
+        pd.testing.assert_frame_equal(
+            hdf_data.get(),
+            result_data.get()
+        )
+        hdf_data = vbt.HDFData.fetch([
+            tmp_path / 'data/data1.h5',
+            tmp_path / 'data/data2.h5',
+            tmp_path / 'data/data3.h5'
+        ])
+        pd.testing.assert_frame_equal(
+            hdf_data.get(),
+            result_data.get()
+        )
+        hdf_data = vbt.HDFData.fetch(path=[
+            tmp_path / 'data/data1.h5',
+            tmp_path / 'data/data2.h5',
+            tmp_path / 'data/data3.h5'
+        ])
+        pd.testing.assert_frame_equal(
+            hdf_data.get(),
+            result_data.get()
+        )
+        hdf_data = vbt.HDFData.fetch(symbols=[
+            'DATA1',
+            'DATA2',
+            'DATA3'
+        ], path=[
+            tmp_path / 'data/data1.h5',
+            tmp_path / 'data/data2.h5',
+            tmp_path / 'data/data3.h5'
+        ])
+        pd.testing.assert_frame_equal(
+            hdf_data.get(),
+            result_data.get().rename(columns={
+                'data1': 'DATA1',
+                'data2': 'DATA2',
+                'data3': 'DATA3'
+            })
+        )
+        hdf_data = vbt.HDFData.fetch(vbt.symbol_dict({
+            'DATA1': tmp_path / 'data/data1.h5',
+            'DATA2': tmp_path / 'data/data2.h5',
+            'DATA3': tmp_path / 'data/data3.h5'
+        }))
+        pd.testing.assert_frame_equal(
+            hdf_data.get(),
+            result_data.get().rename(columns={
+                'data1': 'DATA1',
+                'data2': 'DATA2',
+                'data3': 'DATA3'
+            })
+        )
+        with pytest.raises(Exception):
+            vbt.HDFData.fetch('DATA')
+        with pytest.raises(Exception):
+            vbt.HDFData.fetch('DATA', path=tmp_path / 'data/data*.h5')
+        with pytest.raises(Exception):
+            vbt.HDFData.fetch(['DATA1', 'DATA2'], path=tmp_path / 'data/data1.h5')
+        with pytest.raises(Exception):
+            vbt.HDFData.fetch(None)
+        with pytest.raises(Exception):
+            vbt.HDFData.fetch(0)
+
+        data1.get().to_hdf(tmp_path / 'data/data.h5', 'data1')
+        data2.get().to_hdf(tmp_path / 'data/data.h5', 'data2')
+        data3.get().to_hdf(tmp_path / 'data/data.h5', 'data3')
+        hdf_data = vbt.HDFData.fetch(tmp_path / 'data/data.h5')
+        pd.testing.assert_frame_equal(
+            hdf_data.get(),
+            result_data.get()
+        )
+        data1.get().to_hdf(tmp_path / 'data/data.h5', 'data1')
+        data2.get().to_hdf(tmp_path / 'data/data.h5', 'data2')
+        data3.get().to_hdf(tmp_path / 'data/data.h5', 'data3')
+        hdf_data = vbt.HDFData.fetch(tmp_path / 'data')
+        pd.testing.assert_frame_equal(
+            hdf_data.get(),
+            result_data.get()
+        )
+        data1.get().to_hdf(tmp_path / 'data/data.h5', '/folder/data1')
+        data2.get().to_hdf(tmp_path / 'data/data.h5', '/folder/data2')
+        data3.get().to_hdf(tmp_path / 'data/data.h5', '/folder/data3')
+        hdf_data = vbt.HDFData.fetch(tmp_path / 'data/data.h5/folder')
+        pd.testing.assert_frame_equal(
+            hdf_data.get(),
+            result_data.get()
+        )
+        hdf_data = vbt.HDFData.fetch(symbols=[
+            'DATA1',
+            'DATA2',
+            'DATA3'
+        ], path=[
+            tmp_path / 'data/data.h5/folder/data1',
+            tmp_path / 'data/data.h5/folder/data2',
+            tmp_path / 'data/data.h5/folder/data3'
+        ])
+        pd.testing.assert_frame_equal(
+            hdf_data.get(),
+            result_data.get().rename(columns={
+                'data1': 'DATA1',
+                'data2': 'DATA2',
+                'data3': 'DATA3'
+            })
+        )
+        (tmp_path / 'data/data.h5').unlink(missing_ok=True)
+        data1.get().to_hdf(tmp_path / 'data/data.h5', '/data1/folder')
+        data2.get().to_hdf(tmp_path / 'data/data.h5', '/data2/folder')
+        data3.get().to_hdf(tmp_path / 'data/data.h5', '/data3/folder')
+        with pytest.raises(Exception):
+            vbt.HDFData.fetch(tmp_path / 'data/data.h5/folder')
+
+        with pytest.raises(Exception):
+            vbt.HDFData.fetch(tmp_path / 'data/data.h5/folder/data4')
 
     def test_random_data(self):
         pd.testing.assert_series_equal(

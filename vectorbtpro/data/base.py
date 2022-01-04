@@ -258,6 +258,18 @@ symbol         RANDNX1     RANDNX2
 2021-01-09  100.912639  100.934014
 ```
 
+Instead of pickling, we can save the actual pandas objects to CSV or HDF5 files:
+
+```pycon
+>>> rand_data.to_hdf('rand_data.h5')
+
+>>> with pd.HDFStore('rand_data.h5') as store:
+...     print(store.keys())
+['/RANDNX1', '/RANDNX2']
+```
+
+This data can be later easily retrieved, for example, using pandas or `vectorbtpro.data.custom.HDFData`.
+
 ## Stats
 
 !!! hint
@@ -308,6 +320,7 @@ Name: group, dtype: object
 """
 
 import warnings
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -322,6 +335,7 @@ from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.datetime_ import is_tz_aware, to_timezone
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.pbar import get_pbar
+from vectorbtpro.utils.path_ import check_mkdir
 
 __pdoc__ = {}
 
@@ -569,9 +583,11 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
             new_data[symbol] = obj
         return new_data
 
-    @classmethod
-    def select_symbol_kwargs(cls, symbol: tp.Symbol, kwargs: dict) -> dict:
+    @staticmethod
+    def select_symbol_kwargs(symbol: tp.Symbol, kwargs: tp.DictLike) -> dict:
         """Select keyword arguments belonging to `symbol`."""
+        if kwargs is None:
+            kwargs = {}
         _kwargs = {}
         for k, v in kwargs.items():
             if isinstance(v, symbol_dict):
@@ -660,7 +676,7 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
 
     @classmethod
     def fetch(cls: tp.Type[DataT],
-              symbols: tp.Union[tp.Symbol, tp.Symbols] = None,
+              symbols: tp.Union[tp.Symbol, tp.Symbols] = None, *,
               tz_localize: tp.Optional[tp.TimezoneLike] = None,
               tz_convert: tp.Optional[tp.TimezoneLike] = None,
               missing_index: tp.Optional[str] = None,
@@ -749,7 +765,7 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
         """Update a symbol."""
         raise NotImplementedError
 
-    def update(self: DataT, show_progress: bool = False, pbar_kwargs: tp.KwargsLike = None, **kwargs) -> DataT:
+    def update(self: DataT, *, show_progress: bool = False, pbar_kwargs: tp.KwargsLike = None, **kwargs) -> DataT:
         """Fetch additional data using `Data.update_symbol` and append it to the existing data.
 
         Args:
@@ -860,6 +876,7 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
             new_data[symbol] = new_obj
 
         new_index = new_data[self.symbols[0]].index
+
         return self.replace(
             wrapper=self.wrapper.replace(index=new_index),
             data=new_data,
@@ -922,6 +939,83 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
                 return tuple([concat_data[c] for c in column])
             return concat_data[column]
         return tuple(concat_data.values())
+
+    # ############# Saving ############# #
+
+    def to_csv(self,
+               dir_path: tp.Union[tp.PathLike, symbol_dict] = '.',
+               ext: tp.Union[str, symbol_dict] = 'csv',
+               path_or_buf: tp.Optional[tp.Union[str, symbol_dict]] = None,
+               mkdir_kwargs: tp.Union[tp.KwargsLike, symbol_dict] = None,
+               **kwargs) -> None:
+        """Save data into CSV file(s).
+
+        Any argument can be provided per symbol using `symbol_dict`."""
+        for k, v in self.data.items():
+            if path_or_buf is None:
+                if isinstance(dir_path, symbol_dict):
+                    _dir_path = dir_path[k]
+                else:
+                    _dir_path = dir_path
+                _dir_path = Path(_dir_path)
+                if isinstance(mkdir_kwargs, symbol_dict):
+                    _mkdir_kwargs = mkdir_kwargs[k]
+                else:
+                    _mkdir_kwargs = self.select_symbol_kwargs(k, mkdir_kwargs)
+                check_mkdir(_dir_path, **_mkdir_kwargs)
+                if isinstance(ext, symbol_dict):
+                    _ext = ext[k]
+                else:
+                    _ext = ext
+                _path_or_buf = str(Path(_dir_path) / f'{k}.{_ext}')
+            elif isinstance(path_or_buf, symbol_dict):
+                _path_or_buf = path_or_buf[k]
+            else:
+                _path_or_buf = path_or_buf
+            _kwargs = self.select_symbol_kwargs(k, kwargs)
+            v.to_csv(path_or_buf=_path_or_buf, **_kwargs)
+
+    def to_hdf(self,
+               file_path: tp.Union[tp.PathLike, symbol_dict] = '.',
+               key: tp.Optional[tp.Union[str, symbol_dict]] = None,
+               path_or_buf: tp.Optional[tp.Union[str, symbol_dict]] = None,
+               mkdir_kwargs: tp.Union[tp.KwargsLike, symbol_dict] = None,
+               **kwargs) -> None:
+        """Save data into an HDF file.
+
+        Any argument can be provided per symbol using `symbol_dict`.
+
+        If `file_path` exists and it's a directory, will inside of it create a file named
+        after this class. This won't work with directories that do not exist, otherwise
+        they could be confused with file names."""
+        for k, v in self.data.items():
+            if path_or_buf is None:
+                if isinstance(file_path, symbol_dict):
+                    _file_path = file_path[k]
+                else:
+                    _file_path = file_path
+                _file_path = Path(_file_path)
+                if _file_path.exists() and _file_path.is_dir():
+                    _file_path /= type(self).__name__ + '.h5'
+                _dir_path = _file_path.parent
+                if isinstance(mkdir_kwargs, symbol_dict):
+                    _mkdir_kwargs = mkdir_kwargs[k]
+                else:
+                    _mkdir_kwargs = self.select_symbol_kwargs(k, mkdir_kwargs)
+                check_mkdir(_dir_path, **_mkdir_kwargs)
+                _path_or_buf = str(_file_path)
+            elif isinstance(path_or_buf, symbol_dict):
+                _path_or_buf = path_or_buf[k]
+            else:
+                _path_or_buf = path_or_buf
+            if key is None:
+                _key = str(k)
+            elif isinstance(key, symbol_dict):
+                _key = key[k]
+            else:
+                _key = key
+            _kwargs = self.select_symbol_kwargs(k, kwargs)
+            v.to_hdf(path_or_buf=_path_or_buf, key=_key, **_kwargs)
 
     # ############# Stats ############# #
 
