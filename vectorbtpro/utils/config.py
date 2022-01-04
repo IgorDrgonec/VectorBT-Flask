@@ -39,15 +39,15 @@ OutConfigLikeT = tp.Union[dict, "ConfigT"]
 
 
 def convert_to_dict(dct: InConfigLikeT, nested: bool = True) -> dict:
-    """Convert any dict (apart from `atomic_dict`) to `dict`.
+    """Convert any config to `dict`.
 
     Set `nested` to True to convert all child dicts in recursive manner."""
     if dct is None:
         dct = {}
-    if isinstance(dct, atomic_dict):
-        dct = atomic_dict(dct)
-    else:
+    if isinstance(dct, Config):
         dct = dict(dct)
+    else:
+        dct = type(dct)(dct)
     if not nested:
         return dct
     for k, v in dct.items():
@@ -262,11 +262,11 @@ class PickleableDict(Pickleable, dict):
                 config[k] = v.cls.loads(v.dumps, **kwargs)
         return cls(**config)
 
-    def load_update(self, fname: tp.PathLike, clear: bool = False, **kwargs) -> None:
+    def load_update(self, path: tp.PathLike, clear: bool = False, **kwargs) -> None:
         """Load dumps from a file and update this instance in-place."""
         if clear:
             self.clear()
-        self.update(self.load(fname, **kwargs))
+        self.update(self.load(path, **kwargs))
 
 
 ConfigT = tp.TypeVar("ConfigT", bound="Config")
@@ -719,13 +719,13 @@ class Config(PickleableDict, Prettified):
             as_attrs_=obj['as_attrs_']
         )
 
-    def load_update(self, fname: tp.PathLike, clear: bool = False,
+    def load_update(self, path: tp.PathLike, clear: bool = False,
                     nested: tp.Optional[bool] = None, **kwargs) -> None:
         """Load dumps from a file and update this instance in-place.
 
         !!! note
             Updates both the config properties and dictionary."""
-        loaded = self.load(fname, **kwargs)
+        loaded = self.load(path, **kwargs)
         if clear:
             self.clear(force=True)
             self.__dict__.clear()

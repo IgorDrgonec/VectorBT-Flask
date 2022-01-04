@@ -41,7 +41,7 @@ def prettify_inited(cls: type,
         if path is None:
             new_path = k
         else:
-            new_path = path + '.' + k
+            new_path = str(path) + '.' + str(k)
         if new_path in replace:
             new_v = replace[new_path]
         else:
@@ -96,7 +96,7 @@ def prettify(obj: tp.Any,
             if path is None:
                 new_path = k
             else:
-                new_path = path + '.' + k
+                new_path = str(path) + '.' + str(k)
             if new_path in replace:
                 new_v = replace[new_path]
             else:
