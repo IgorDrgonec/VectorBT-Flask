@@ -14,7 +14,7 @@ from pandas.core.resample import Resampler as PandasResampler
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import indexes
-from vectorbtpro.registries.jit_registry import jit_registry, register_jitted
+from vectorbtpro.registries.jit_registry import jit_reg, register_jitted
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.array_ import is_sorted
 from vectorbtpro.utils.config import Configured
@@ -319,7 +319,7 @@ class Grouper(Configured):
         if group_by is None or group_by is False:  # no grouping
             return np.full(len(self.index), 1)
         groups = self.get_groups(group_by=group_by)
-        func = jit_registry.resolve_option(get_group_lens_nb, jitted)
+        func = jit_reg.resolve_option(get_group_lens_nb, jitted)
         return func(groups)
 
     def get_group_count(self, **kwargs) -> int:

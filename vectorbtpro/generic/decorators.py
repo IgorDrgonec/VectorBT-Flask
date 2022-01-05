@@ -5,8 +5,8 @@
 import inspect
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.registries.ch_registry import ch_registry
-from vectorbtpro.registries.jit_registry import jit_registry
+from vectorbtpro.registries.ch_registry import ch_reg
+from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts, Config
 from vectorbtpro.utils.parsing import get_func_arg_names
@@ -57,11 +57,11 @@ def attach_nb_methods(config: Config) -> tp.ClassWrapper:
                 inspect.signature(_func).bind(*args, **kwargs)
 
                 if not _disable_jitted:
-                    _func = jit_registry.resolve_option(_func, jitted)
+                    _func = jit_reg.resolve_option(_func, jitted)
                 elif jitted is not None:
                     raise ValueError("This method doesn't support jitting")
                 if not _disable_chunked:
-                    _func = ch_registry.resolve_option(_func, chunked)
+                    _func = ch_reg.resolve_option(_func, chunked)
                 elif chunked is not None:
                     raise ValueError("This method doesn't support chunking")
                 a = _func(*args, **kwargs)

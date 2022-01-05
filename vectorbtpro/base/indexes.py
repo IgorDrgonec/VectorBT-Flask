@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.registries.jit_registry import jit_registry, register_jitted
+from vectorbtpro.registries.jit_registry import jit_reg, register_jitted
 from vectorbtpro.utils import checks
 
 
@@ -322,7 +322,7 @@ def align_index_to(index1: tp.Index, index2: tp.Index, jitted: tp.JittedOption =
     unique_indices = np.unique(stacked, axis=0, return_inverse=True)[1]
     unique1 = unique_indices[:len(index1)]
     unique2 = unique_indices[len(index1):]
-    func = jit_registry.resolve_option(align_arr_indices_nb, jitted)
+    func = jit_reg.resolve_option(align_arr_indices_nb, jitted)
     return pd.IndexSlice[func(unique1, unique2)]
 
 

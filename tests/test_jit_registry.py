@@ -3,7 +3,7 @@ from functools import wraps
 import pytest
 
 import vectorbtpro as vbt
-from vectorbtpro.registries.jit_registry import jit_registry
+from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import jitting
 
 
@@ -61,27 +61,27 @@ def jitted_f_my2():
 
 class TestJITRegistry:
     def test_register_jitted(self, jitted_f_my1, jitted_f_my2):
-        my1_jitable_setup = jit_registry.jitable_setups['f']['my1']
+        my1_jitable_setup = jit_reg.jitable_setups['f']['my1']
         assert my1_jitable_setup.task_id == 'f'
         assert my1_jitable_setup.jitter_id == 'my1'
         assert my1_jitable_setup.tags == {'tag_my1'}
         assert my1_jitable_setup.jitter_kwargs == dict(test='test_my1')
         assert my1_jitable_setup.py_func is jitted_f_my1.py_func
 
-        my2_jitable_setup = jit_registry.jitable_setups['f']['my2']
+        my2_jitable_setup = jit_reg.jitable_setups['f']['my2']
         assert my2_jitable_setup.task_id == 'f'
         assert my2_jitable_setup.jitter_id == 'my2'
         assert my2_jitable_setup.tags == {'tag_my2'}
         assert my2_jitable_setup.jitter_kwargs == dict(test='test_my2')
         assert my2_jitable_setup.py_func is jitted_f_my2.py_func
 
-        assert len(jit_registry.jitted_setups[hash(my1_jitable_setup)]) == 1
-        my1_jitted_setup = list(jit_registry.jitted_setups[hash(my1_jitable_setup)].values())[0]
+        assert len(jit_reg.jitted_setups[hash(my1_jitable_setup)]) == 1
+        my1_jitted_setup = list(jit_reg.jitted_setups[hash(my1_jitable_setup)].values())[0]
         assert my1_jitted_setup.jitter == MyJitter1(test='test_my1')
         assert my1_jitted_setup.jitted_func is jitted_f_my1
 
-        assert len(jit_registry.jitted_setups[hash(my2_jitable_setup)]) == 1
-        my2_jitted_setup = list(jit_registry.jitted_setups[hash(my2_jitable_setup)].values())[0]
+        assert len(jit_reg.jitted_setups[hash(my2_jitable_setup)]) == 1
+        my2_jitted_setup = list(jit_reg.jitted_setups[hash(my2_jitable_setup)].values())[0]
         assert my2_jitted_setup.jitter == MyJitter2(test='test_my2')
         assert my2_jitted_setup.jitted_func is jitted_f_my2
 
@@ -103,30 +103,30 @@ class TestJITRegistry:
         vbt.settings.jitting['jitters']['my1']['tasks'].clear()
 
     def test_match_jitable_setups(self):
-        assert jit_registry.match_jitable_setups('task_id == "f"') == {
-            jit_registry.jitable_setups['f']['my1'],
-            jit_registry.jitable_setups['f']['my2']
+        assert jit_reg.match_jitable_setups('task_id == "f"') == {
+            jit_reg.jitable_setups['f']['my1'],
+            jit_reg.jitable_setups['f']['my2']
         }
 
     def test_match_jitted_setups(self, jitted_f_my2):
-        my1_jitable_setup = jit_registry.jitable_setups['f']['my1']
-        assert jit_registry.match_jitted_setups(my1_jitable_setup) == \
-               {list(jit_registry.jitted_setups[hash(my1_jitable_setup)].values())[0]}
+        my1_jitable_setup = jit_reg.jitable_setups['f']['my1']
+        assert jit_reg.match_jitted_setups(my1_jitable_setup) == \
+               {list(jit_reg.jitted_setups[hash(my1_jitable_setup)].values())[0]}
 
-        my2_jitable_setup = jit_registry.jitable_setups['f']['my2']
-        assert jit_registry.match_jitted_setups(
+        my2_jitable_setup = jit_reg.jitable_setups['f']['my2']
+        assert jit_reg.match_jitted_setups(
             my2_jitable_setup, 'jitted_func == f_my2', mapping=dict(f_my2=jitted_f_my2)) == \
-               {list(jit_registry.jitted_setups[hash(my2_jitable_setup)].values())[0]}
-        assert jit_registry.match_jitted_setups(
+               {list(jit_reg.jitted_setups[hash(my2_jitable_setup)].values())[0]}
+        assert jit_reg.match_jitted_setups(
             my2_jitable_setup, 'jitted_func != f_my2', mapping=dict(f_my2=jitted_f_my2)) == set()
 
     def test_resolve(self, jitted_f_my1, jitted_f_my2):
         vbt.settings.jitting['disable_resolution'] = True
-        assert jit_registry.resolve(task_id_or_func='f') == 'f'
+        assert jit_reg.resolve(task_id_or_func='f') == 'f'
         vbt.settings.jitting['disable_resolution'] = False
 
-        assert jit_registry.resolve(task_id_or_func='f', jitter='my1') is jitted_f_my1
-        assert jit_registry.resolve(task_id_or_func='f', jitter='my2') is jitted_f_my2
+        assert jit_reg.resolve(task_id_or_func='f', jitter='my1') is jitted_f_my1
+        assert jit_reg.resolve(task_id_or_func='f', jitter='my2') is jitted_f_my2
 
         @vbt.register_jitted
         def f2_my1():
@@ -135,49 +135,49 @@ class TestJITRegistry:
         def f2_my2():
             pass
 
-        assert jit_registry.resolve(task_id_or_func=f2_my1) is f2_my1
-        assert jit_registry.resolve(task_id_or_func='tests.test_jit_registry.f2_my1') is f2_my1
-        assert jit_registry.resolve(task_id_or_func=f2_my1.py_func) is f2_my1
+        assert jit_reg.resolve(task_id_or_func=f2_my1) is f2_my1
+        assert jit_reg.resolve(task_id_or_func='tests.test_jit_registry.f2_my1') is f2_my1
+        assert jit_reg.resolve(task_id_or_func=f2_my1.py_func) is f2_my1
 
         with pytest.raises(Exception):
-            jit_registry.resolve(task_id_or_func=f2_my2)
-        assert jit_registry.resolve(task_id_or_func=f2_my2, return_missing_task=True) is f2_my2
+            jit_reg.resolve(task_id_or_func=f2_my2)
+        assert jit_reg.resolve(task_id_or_func=f2_my2, return_missing_task=True) is f2_my2
 
         with pytest.raises(Exception):
-            jit_registry.resolve(task_id_or_func='f')
-        assert jit_registry.resolve(task_id_or_func='f', jitter=vbt.RepEval('list(task_setups.keys())[0]')).py_func is \
-               list(jit_registry.jitable_setups['f'].values())[0].py_func
+            jit_reg.resolve(task_id_or_func='f')
+        assert jit_reg.resolve(task_id_or_func='f', jitter=vbt.RepEval('list(task_setups.keys())[0]')).py_func is \
+               list(jit_reg.jitable_setups['f'].values())[0].py_func
 
         @vbt.register_jitted(jitter='my1')
         def f3():
             pass
 
-        assert jit_registry.resolve(task_id_or_func=f3) is f3
+        assert jit_reg.resolve(task_id_or_func=f3) is f3
 
         def f4():
             pass
 
         with pytest.raises(Exception):
-            jit_registry.resolve(task_id_or_func=f4)
+            jit_reg.resolve(task_id_or_func=f4)
         with pytest.raises(Exception):
-            jit_registry.resolve(task_id_or_func=f4, allow_new=True)
-        assert jit_registry.resolve(task_id_or_func=f4, jitter='my1', allow_new=True).py_func is f4
-        assert jit_registry.resolve(task_id_or_func=f4, jitter='my1', allow_new=True).suffix == 'my1'
-        assert jit_registry.resolve(task_id_or_func=f4, jitter='my2', allow_new=True).suffix == 'my2'
+            jit_reg.resolve(task_id_or_func=f4, allow_new=True)
+        assert jit_reg.resolve(task_id_or_func=f4, jitter='my1', allow_new=True).py_func is f4
+        assert jit_reg.resolve(task_id_or_func=f4, jitter='my1', allow_new=True).suffix == 'my1'
+        assert jit_reg.resolve(task_id_or_func=f4, jitter='my2', allow_new=True).suffix == 'my2'
         with pytest.raises(Exception):
-            jit_registry.resolve(task_id_or_func='f4', jitter='my2', allow_new=True)
+            jit_reg.resolve(task_id_or_func='f4', jitter='my2', allow_new=True)
 
         vbt.settings.jitting['disable'] = True
-        assert jit_registry.resolve(task_id_or_func='f', jitter='my1') is jitted_f_my1.py_func
-        assert jit_registry.resolve(task_id_or_func='f', jitter='my2') is jitted_f_my2.py_func
+        assert jit_reg.resolve(task_id_or_func='f', jitter='my1') is jitted_f_my1.py_func
+        assert jit_reg.resolve(task_id_or_func='f', jitter='my2') is jitted_f_my2.py_func
         vbt.settings.jitting['disable'] = False
 
-        assert jit_registry.resolve(task_id_or_func='f', jitter='my1', disable=True) is jitted_f_my1.py_func
-        assert jit_registry.resolve(task_id_or_func=jitted_f_my1, disable=True, allow_new=True) is jitted_f_my1.py_func
-        assert jit_registry.resolve(
+        assert jit_reg.resolve(task_id_or_func='f', jitter='my1', disable=True) is jitted_f_my1.py_func
+        assert jit_reg.resolve(task_id_or_func=jitted_f_my1, disable=True, allow_new=True) is jitted_f_my1.py_func
+        assert jit_reg.resolve(
             task_id_or_func='f', jitter='my1',
             disable=vbt.RepEval("jitter_id == 'my1'")) is jitted_f_my1.py_func
-        assert jit_registry.resolve(
+        assert jit_reg.resolve(
             task_id_or_func='f', jitter='my2',
             disable=vbt.RepEval("jitter_id == 'my1'")).py_func is jitted_f_my2.py_func
 
@@ -188,7 +188,7 @@ class TestJITRegistry:
             }
         }
 
-        res_func = jit_registry.resolve(
+        res_func = jit_reg.resolve(
             task_id_or_func=f4, jitter=MyJitter1, allow_new=True, my_jitter_id=vbt.Rep('jitter_id'))
         assert res_func.config['hello'] == 'world'
         assert res_func.config['hello2'] == 'world3'
@@ -202,19 +202,19 @@ class TestJITRegistry:
         def f5():
             pass
 
-        jitable_setup = jit_registry.jitable_setups['f5']['my1']
-        assert len(jit_registry.jitted_setups[hash(jitable_setup)]) == 1
-        jit_registry.resolve(task_id_or_func='f5')
-        assert len(jit_registry.jitted_setups[hash(jitable_setup)]) == 1
-        jit_registry.resolve(task_id_or_func='f5', new_kwarg1='new_kwarg1', new_kwarg2='new_kwarg2')
-        assert len(jit_registry.jitted_setups[hash(jitable_setup)]) == 2
-        jit_registry.resolve(task_id_or_func='f5', new_kwarg2='new_kwarg2', new_kwarg1='new_kwarg1')
-        assert len(jit_registry.jitted_setups[hash(jitable_setup)]) == 2
+        jitable_setup = jit_reg.jitable_setups['f5']['my1']
+        assert len(jit_reg.jitted_setups[hash(jitable_setup)]) == 1
+        jit_reg.resolve(task_id_or_func='f5')
+        assert len(jit_reg.jitted_setups[hash(jitable_setup)]) == 1
+        jit_reg.resolve(task_id_or_func='f5', new_kwarg1='new_kwarg1', new_kwarg2='new_kwarg2')
+        assert len(jit_reg.jitted_setups[hash(jitable_setup)]) == 2
+        jit_reg.resolve(task_id_or_func='f5', new_kwarg2='new_kwarg2', new_kwarg1='new_kwarg1')
+        assert len(jit_reg.jitted_setups[hash(jitable_setup)]) == 2
 
         def f6():
             pass
 
-        jit_registry.resolve(
+        jit_reg.resolve(
             task_id_or_func=f6,
             jitter=MyJitter1,
             allow_new=True,
@@ -222,14 +222,14 @@ class TestJITRegistry:
             tags={'my_tag'},
             new_kwarg='new_kwarg'
         )
-        jitable_setup = jit_registry.jitable_setups['tests.test_jit_registry.f6']['my1']
+        jitable_setup = jit_reg.jitable_setups['tests.test_jit_registry.f6']['my1']
         assert jitable_setup.task_id == 'tests.test_jit_registry.f6'
         assert jitable_setup.jitter_id == 'my1'
         assert jitable_setup.tags == {'my_tag'}
         assert jitable_setup.jitter_kwargs == dict(new_kwarg='new_kwarg')
         assert jitable_setup.py_func is f6
 
-        assert len(jit_registry.jitted_setups[hash(jitable_setup)]) == 1
-        jitted_setup = list(jit_registry.jitted_setups[hash(jitable_setup)].values())[0]
+        assert len(jit_reg.jitted_setups[hash(jitable_setup)]) == 1
+        jitted_setup = list(jit_reg.jitted_setups[hash(jitable_setup)].values())[0]
         assert jitted_setup.jitter == MyJitter1(new_kwarg='new_kwarg')
         assert jitted_setup.jitted_func.suffix == 'my1'

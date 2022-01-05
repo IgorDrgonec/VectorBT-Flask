@@ -317,7 +317,7 @@ registered in any part of vectorbt that matches some condition using `CacheableR
 For example, let's look which setups have been registered so far:
 
 ```pycon
->>> vbt.ca_registry.match_setups(kind=None)
+>>> vbt.ca_reg.match_setups(kind=None)
 {
     CAClassSetup(registry=<vectorbtpro.registries.ca_registry.CacheableRegistry object at 0x7fe14c27df60>, use_cache=None, whitelist=None, cls=<class '__main__.B'>),
     CAClassSetup(registry=<vectorbtpro.registries.ca_registry.CacheableRegistry object at 0x7fe14c27df60>, use_cache=None, whitelist=None, cls=<class '__main__.C'>),
@@ -338,7 +338,7 @@ For example, let's look which setups have been registered so far:
 Let's get the runnable setup of any property and method called `f2`:
 
 ```pycon
->>> vbt.ca_registry.match_setups('f2', kind='runnable')
+>>> vbt.ca_reg.match_setups('f2', kind='runnable')
 {
     CARunSetup(registry=<vectorbtpro.registries.ca_registry.CacheableRegistry object at 0x7fe14c27df60>, use_cache=True, whitelist=False, cacheable=<function C.f2 at 0x7fe13959ee18>, instance=<weakref at 0x7fe14e9d85e8; to 'C' at 0x7fe14e9448d0>, max_size=None, ignore_args=None, cache={}),
     CARunSetup(registry=<vectorbtpro.registries.ca_registry.CacheableRegistry object at 0x7fe14c27df60>, use_cache=True, whitelist=False, cacheable=<function C.f2 at 0x7fe13959ee18>, instance=<weakref at 0x7fe14e9d8728; to 'C' at 0x7fe1495111d0>, max_size=None, ignore_args=None, cache={})
@@ -948,7 +948,7 @@ class CacheableRegistry:
         return matches
 
 
-ca_registry = CacheableRegistry()
+ca_reg = CacheableRegistry()
 """Default registry of type `CacheableRegistry`."""
 
 
@@ -1020,7 +1020,7 @@ class CAMetrics:
 class CABaseSetup(CAMetrics, Hashable):
     """Base class that exposes properties and methods for cache management."""
 
-    registry: CacheableRegistry = attr.ib(default=ca_registry)
+    registry: CacheableRegistry = attr.ib(default=ca_reg)
     """Registry of type `CacheableRegistry`."""
 
     use_cache: tp.Optional[bool] = attr.ib(default=None)
@@ -1561,7 +1561,7 @@ class CAClassSetup(CABaseDelegatorSetup):
     @classmethod
     def get(cls: tp.Type[CAClassSetupT],
             cls_: tp.Type[Cacheable],
-            registry: CacheableRegistry = ca_registry,
+            registry: CacheableRegistry = ca_reg,
             **kwargs) -> tp.Optional[CAClassSetupT]:
         """Get setup from `CacheableRegistry` or register a new one.
 
@@ -1688,7 +1688,7 @@ class CAInstanceSetup(CABaseDelegatorSetup):
     @classmethod
     def get(cls: tp.Type[CAInstanceSetupT],
             instance: Cacheable,
-            registry: CacheableRegistry = ca_registry,
+            registry: CacheableRegistry = ca_reg,
             **kwargs) -> tp.Optional[CAInstanceSetupT]:
         """Get setup from `CacheableRegistry` or register a new one.
 
@@ -1811,7 +1811,7 @@ class CAUnboundSetup(CABaseDelegatorSetup):
     @classmethod
     def get(cls: tp.Type[CAUnboundSetupT],
             cacheable: cacheableT,
-            registry: CacheableRegistry = ca_registry,
+            registry: CacheableRegistry = ca_reg,
             **kwargs) -> tp.Optional[CAUnboundSetupT]:
         """Get setup from `CacheableRegistry` or register a new one.
 
@@ -2040,7 +2040,7 @@ class CARunSetup(CABaseSetup):
     def get(cls: tp.Type[CARunSetupT],
             cacheable: cacheableT,
             instance: tp.Optional[Cacheable] = None,
-            registry: CacheableRegistry = ca_registry,
+            registry: CacheableRegistry = ca_reg,
             **kwargs) -> tp.Optional[CARunSetupT]:
         """Get setup from `CacheableRegistry` or register a new one.
 
@@ -2260,7 +2260,7 @@ class CAQueryDelegator(CASetupDelegatorMixin):
 
     `*args`, `collapse`, and `**kwargs` are passed to `CacheableRegistry.match_setups`."""
 
-    def __init__(self, *args, registry: CacheableRegistry = ca_registry, collapse: bool = True, **kwargs) -> None:
+    def __init__(self, *args, registry: CacheableRegistry = ca_reg, collapse: bool = True, **kwargs) -> None:
         self._args = args
         kwargs['collapse'] = collapse
         self._kwargs = kwargs

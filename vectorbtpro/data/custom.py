@@ -22,7 +22,7 @@ import pandas as pd
 from vectorbtpro import _typing as tp
 from vectorbtpro.data import nb
 from vectorbtpro.data.base import Data, symbol_dict
-from vectorbtpro.registries.jit_registry import jit_registry
+from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.datetime_ import get_utc_tz, get_local_tz, to_tzaware_datetime, datetime_to_ms
@@ -399,7 +399,7 @@ class HDFData(LocalData):
               symbols: tp.Union[tp.Symbol, tp.Symbols] = None, *,
               unfold_path_func: tp.Callable = hdf_unfold_path,
               **kwargs) -> HDFDataT:
-        """Override `vectorbtpro.data.base.LocalData.fetch` to parse paths and HDF keys."""
+        """Override `LocalData.fetch` to parse paths and HDF keys."""
         return super(HDFData, cls).fetch(symbols, unfold_path_func=unfold_path_func, **kwargs)
 
     @classmethod
@@ -540,7 +540,7 @@ class RandomData(SyntheticData):
         if seed is not None:
             set_seed(seed)
 
-        func = jit_registry.resolve_option(nb.generate_random_data_nb, jitted)
+        func = jit_reg.resolve_option(nb.generate_random_data_nb, jitted)
         out = func((len(index), num_paths), start_value, mean, std)
 
         if out.shape[1] == 1:
@@ -615,7 +615,7 @@ class GBMData(RandomData):
         if seed is not None:
             set_seed(seed)
 
-        func = jit_registry.resolve_option(nb.generate_gbm_data_nb, jitted)
+        func = jit_reg.resolve_option(nb.generate_gbm_data_nb, jitted)
         out = func((len(index), num_paths), start_value, mean, std, dt)
 
         if out.shape[1] == 1:

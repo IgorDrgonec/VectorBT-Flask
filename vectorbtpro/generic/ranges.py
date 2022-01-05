@@ -127,8 +127,8 @@ from vectorbtpro.generic.enums import RangeStatus, range_dt
 from vectorbtpro.records.base import Records
 from vectorbtpro.records.decorators import override_field_config, attach_fields, attach_shortcut_properties
 from vectorbtpro.records.mapped_array import MappedArray
-from vectorbtpro.registries.ch_registry import ch_registry
-from vectorbtpro.registries.jit_registry import jit_registry
+from vectorbtpro.registries.ch_registry import ch_reg
+from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig
 
@@ -300,8 +300,8 @@ class Ranges(Records):
                 gap_value = -1
             else:
                 gap_value = np.nan
-        func = jit_registry.resolve_option(nb.get_ranges_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.get_ranges_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         records_arr = func(ts_arr, gap_value)
         wrapper = ArrayWrapper.from_obj(ts_pd, **wrapper_kwargs)
         return cls(wrapper, records_arr, ts=ts_pd if attach_ts else None, **kwargs)
@@ -322,8 +322,8 @@ class Ranges(Records):
 
         See `vectorbtpro.generic.nb.ranges_to_mask_nb`."""
         col_map = self.col_mapper.get_col_map(group_by=group_by)
-        func = jit_registry.resolve_option(nb.ranges_to_mask_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.ranges_to_mask_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         mask = func(
             self.get_field_arr('start_idx'),
             self.get_field_arr('end_idx'),
@@ -338,8 +338,8 @@ class Ranges(Records):
                      chunked: tp.ChunkedOption = None,
                      **kwargs) -> MappedArray:
         """Get duration of each range (in raw format)."""
-        func = jit_registry.resolve_option(nb.range_duration_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.range_duration_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         duration = func(
             self.get_field_arr('start_idx'),
             self.get_field_arr('end_idx'),
@@ -391,8 +391,8 @@ class Ranges(Records):
         See `vectorbtpro.generic.nb.range_coverage_nb`."""
         col_map = self.col_mapper.get_col_map(group_by=group_by)
         index_lens = self.wrapper.grouper.get_group_lens(group_by=group_by) * self.wrapper.shape[0]
-        func = jit_registry.resolve_option(nb.range_coverage_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.range_coverage_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         coverage = func(
             self.get_field_arr('start_idx'),
             self.get_field_arr('end_idx'),

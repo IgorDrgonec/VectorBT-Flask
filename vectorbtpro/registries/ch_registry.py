@@ -150,13 +150,13 @@ class ChunkableRegistry:
         return resolve_chunked(func, option=option, **merge_dicts(setup.options, kwargs))
 
 
-ch_registry = ChunkableRegistry()
+ch_reg = ChunkableRegistry()
 """Default registry of type `ChunkableRegistry`."""
 
 
 def register_chunkable(func: tp.Optional[tp.Callable] = None,
                        setup_id: tp.Optional[tp.Hashable] = None,
-                       registry: ChunkableRegistry = ch_registry,
+                       registry: ChunkableRegistry = ch_reg,
                        tags: tp.SetLike = None,
                        return_wrapped: bool = False,
                        **options) -> tp.Callable:

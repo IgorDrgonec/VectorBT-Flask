@@ -180,8 +180,8 @@ from vectorbtpro.generic.enums import DrawdownStatus, drawdown_dt
 from vectorbtpro.generic.ranges import Ranges
 from vectorbtpro.records.decorators import override_field_config, attach_fields, attach_shortcut_properties
 from vectorbtpro.records.mapped_array import MappedArray
-from vectorbtpro.registries.ch_registry import ch_registry
-from vectorbtpro.registries.jit_registry import jit_registry
+from vectorbtpro.registries.ch_registry import ch_reg
+from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig
 from vectorbtpro.utils.template import RepEval
@@ -339,8 +339,8 @@ class Drawdowns(Ranges):
 
         `**kwargs` will be passed to `Drawdowns.__init__`."""
         ts_pd = to_pd_array(ts)
-        func = jit_registry.resolve_option(nb.get_drawdowns_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.get_drawdowns_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         records_arr = func(to_2d_array(ts_pd))
         wrapper = ArrayWrapper.from_obj(ts_pd, **resolve_dict(wrapper_kwargs))
         return cls(wrapper, records_arr, ts=ts_pd if attach_ts else None, **kwargs)
@@ -354,8 +354,8 @@ class Drawdowns(Ranges):
         """See `vectorbtpro.generic.nb.dd_drawdown_nb`.
 
         Takes into account both recovered and active drawdowns."""
-        func = jit_registry.resolve_option(nb.dd_drawdown_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.dd_drawdown_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         drawdown = func(
             self.get_field_arr('peak_val'),
             self.get_field_arr('valley_val')
@@ -407,8 +407,8 @@ class Drawdowns(Ranges):
         """See `vectorbtpro.generic.nb.dd_recovery_return_nb`.
 
         Takes into account both recovered and active drawdowns."""
-        func = jit_registry.resolve_option(nb.dd_recovery_return_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.dd_recovery_return_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         recovery_return = func(
             self.get_field_arr('valley_val'),
             self.get_field_arr('end_val')
@@ -460,8 +460,8 @@ class Drawdowns(Ranges):
         """See `vectorbtpro.generic.nb.dd_decline_duration_nb`.
 
         Takes into account both recovered and active drawdowns."""
-        func = jit_registry.resolve_option(nb.dd_decline_duration_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.dd_decline_duration_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         decline_duration = func(
             self.get_field_arr('start_idx'),
             self.get_field_arr('valley_idx')
@@ -477,8 +477,8 @@ class Drawdowns(Ranges):
         A value higher than 1 means the recovery was slower than the decline.
 
         Takes into account both recovered and active drawdowns."""
-        func = jit_registry.resolve_option(nb.dd_recovery_duration_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.dd_recovery_duration_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         recovery_duration = func(
             self.get_field_arr('valley_idx'),
             self.get_field_arr('end_idx')
@@ -492,8 +492,8 @@ class Drawdowns(Ranges):
         """See `vectorbtpro.generic.nb.dd_recovery_duration_ratio_nb`.
 
         Takes into account both recovered and active drawdowns."""
-        func = jit_registry.resolve_option(nb.dd_recovery_duration_ratio_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.dd_recovery_duration_ratio_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         recovery_duration_ratio = func(
             self.get_field_arr('start_idx'),
             self.get_field_arr('valley_idx'),

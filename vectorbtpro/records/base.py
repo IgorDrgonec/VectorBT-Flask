@@ -424,8 +424,8 @@ from vectorbtpro.generic.stats_builder import StatsBuilderMixin
 from vectorbtpro.records import nb
 from vectorbtpro.records.col_mapper import ColumnMapper
 from vectorbtpro.records.mapped_array import MappedArray
-from vectorbtpro.registries.ch_registry import ch_registry
-from vectorbtpro.registries.jit_registry import jit_registry
+from vectorbtpro.registries.ch_registry import ch_reg
+from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
@@ -585,10 +585,10 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         if len(self.values) == 0:
             return self.values
         if self.col_mapper.is_sorted():
-            func = jit_registry.resolve_option(nb.record_col_lens_select_nb, jitted)
+            func = jit_reg.resolve_option(nb.record_col_lens_select_nb, jitted)
             new_records_arr = func(self.values, self.col_mapper.col_lens, to_1d_array(col_idxs))  # faster
         else:
-            func = jit_registry.resolve_option(nb.record_col_map_select_nb, jitted)
+            func = jit_reg.resolve_option(nb.record_col_map_select_nb, jitted)
             new_records_arr = func(self.values, self.col_mapper.col_map, to_1d_array(col_idxs))  # more flexible
         return new_records_arr
 
@@ -720,9 +720,9 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
     def is_sorted(self, incl_id: bool = False, jitted: tp.JittedOption = None) -> bool:
         """Check whether records are sorted."""
         if incl_id:
-            func = jit_registry.resolve_option(nb.is_col_id_sorted_nb, jitted)
+            func = jit_reg.resolve_option(nb.is_col_id_sorted_nb, jitted)
             return func(self.col_arr, self.id_arr)
-        func = jit_registry.resolve_option(nb.is_col_sorted_nb, jitted)
+        func = jit_reg.resolve_option(nb.is_col_sorted_nb, jitted)
         return func(self.col_arr)
 
     def sort(self: RecordsT, incl_id: bool = False, group_by: tp.GroupByLike = None, **kwargs) -> RecordsT:
@@ -802,14 +802,14 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         `**kwargs` are passed to `Records.map_array`."""
         if isinstance(cls_or_self, type):
             checks.assert_not_none(col_mapper)
-            func = jit_registry.resolve_option(nb.map_records_meta_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.map_records_meta_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             mapped_arr = func(len(col_mapper.col_arr), map_func_nb, *args)
             mapped_arr = np.asarray(mapped_arr, dtype=dtype)
             return MappedArray(col_mapper.wrapper, mapped_arr, col_mapper.col_arr, col_mapper=col_mapper, **kwargs)
         else:
-            func = jit_registry.resolve_option(nb.map_records_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.map_records_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             mapped_arr = func(cls_or_self.values, map_func_nb, *args)
             mapped_arr = np.asarray(mapped_arr, dtype=dtype)
             return cls_or_self.map_array(mapped_arr, **kwargs)
@@ -839,15 +839,15 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         if isinstance(cls_or_self, type):
             checks.assert_not_none(col_mapper)
             col_map = col_mapper.get_col_map(group_by=group_by if apply_per_group else False)
-            func = jit_registry.resolve_option(nb.apply_meta_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.apply_meta_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             mapped_arr = func(len(col_mapper.col_arr), col_map, apply_func_nb, *args)
             mapped_arr = np.asarray(mapped_arr, dtype=dtype)
             return MappedArray(col_mapper.wrapper, mapped_arr, col_mapper.col_arr, col_mapper=col_mapper, **kwargs)
         else:
             col_map = cls_or_self.col_mapper.get_col_map(group_by=group_by if apply_per_group else False)
-            func = jit_registry.resolve_option(nb.apply_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.apply_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             mapped_arr = func(cls_or_self.values, col_map, apply_func_nb, *args)
             mapped_arr = np.asarray(mapped_arr, dtype=dtype)
             return cls_or_self.map_array(mapped_arr, group_by=group_by, **kwargs)

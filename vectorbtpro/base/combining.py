@@ -11,7 +11,7 @@ import numpy as np
 from numba.typed import List
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.registries.jit_registry import jit_registry
+from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils.execution import execute
 
@@ -99,11 +99,11 @@ def apply_and_concat(ntimes: int,
         if n_outputs is None:
             raise ValueError("Jitted iteration requires n_outputs")
         elif n_outputs == 0:
-            func = jit_registry.resolve(apply_and_concat_none_nb)
+            func = jit_reg.resolve(apply_and_concat_none_nb)
         elif n_outputs == 1:
-            func = jit_registry.resolve(apply_and_concat_one_nb)
+            func = jit_reg.resolve(apply_and_concat_one_nb)
         else:
-            func = jit_registry.resolve(apply_and_concat_multiple_nb)
+            func = jit_reg.resolve(apply_and_concat_multiple_nb)
         return func(ntimes, apply_func, *args)
 
     funcs_args = [(apply_func, (i, *args), kwargs) for i in range(ntimes)]
@@ -156,7 +156,7 @@ def combine_and_concat(obj: tp.Any,
 
     `select_and_combine_nb` is resolved using `vectorbtpro.registries.jit_registry.JITRegistry.resolve`."""
     if jitted_loop:
-        apply_func = jit_registry.resolve(select_and_combine_nb)
+        apply_func = jit_reg.resolve(select_and_combine_nb)
     else:
         apply_func = select_and_combine
     return apply_and_concat(
@@ -190,7 +190,7 @@ def combine_multiple(objs: tp.Sequence,
     !!! note
         Numba doesn't support variable keyword arguments."""
     if jitted_loop:
-        func = jit_registry.resolve(combine_multiple_nb)
+        func = jit_reg.resolve(combine_multiple_nb)
         return func(objs, combine_func, *args)
     result = objs[0]
     for i in range(1, len(objs)):

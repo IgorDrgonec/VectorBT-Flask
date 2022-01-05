@@ -6,7 +6,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_1d_array
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.records import nb
-from vectorbtpro.registries.jit_registry import jit_registry
+from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils.decorators import cached_property, cached_method
 
 
@@ -30,10 +30,10 @@ class ColumnMapper(Wrapping):
         Returns element indices and new column array.
         Automatically decides whether to use column lengths or column map."""
         if self.is_sorted():
-            func = jit_registry.resolve_option(nb.col_lens_select_nb, jitted)
+            func = jit_reg.resolve_option(nb.col_lens_select_nb, jitted)
             new_indices, new_col_arr = func(self.col_lens, to_1d_array(col_idxs))  # faster
         else:
-            func = jit_registry.resolve_option(nb.col_map_select_nb, jitted)
+            func = jit_reg.resolve_option(nb.col_map_select_nb, jitted)
             new_indices, new_col_arr = func(self.col_map, to_1d_array(col_idxs))  # more flexible
         return new_indices, new_col_arr
 
@@ -57,7 +57,7 @@ class ColumnMapper(Wrapping):
         """Column lengths.
 
         Faster than `ColumnMapper.col_map` but only compatible with sorted columns."""
-        func = jit_registry.resolve_option(nb.col_lens_nb, None)
+        func = jit_reg.resolve_option(nb.col_lens_nb, None)
         return func(self.col_arr, len(self.wrapper.columns))
 
     @cached_method(whitelist=True)
@@ -67,7 +67,7 @@ class ColumnMapper(Wrapping):
             return self.col_lens
         col_arr = self.get_col_arr(group_by=group_by)
         columns = self.wrapper.get_columns(group_by=group_by)
-        func = jit_registry.resolve_option(nb.col_lens_nb, jitted)
+        func = jit_reg.resolve_option(nb.col_lens_nb, jitted)
         return func(col_arr, len(columns))
 
     @cached_property(whitelist=True)
@@ -76,7 +76,7 @@ class ColumnMapper(Wrapping):
 
         More flexible than `ColumnMapper.col_lens`.
         More suited for mapped arrays."""
-        func = jit_registry.resolve_option(nb.col_map_nb, None)
+        func = jit_reg.resolve_option(nb.col_map_nb, None)
         return func(self.col_arr, len(self.wrapper.columns))
 
     @cached_method(whitelist=True)
@@ -86,11 +86,11 @@ class ColumnMapper(Wrapping):
             return self.col_map
         col_arr = self.get_col_arr(group_by=group_by)
         columns = self.wrapper.get_columns(group_by=group_by)
-        func = jit_registry.resolve_option(nb.col_map_nb, jitted)
+        func = jit_reg.resolve_option(nb.col_map_nb, jitted)
         return func(col_arr, len(columns))
 
     @cached_method(whitelist=True)
     def is_sorted(self, jitted: tp.JittedOption = None) -> bool:
         """Check whether column array is sorted."""
-        func = jit_registry.resolve_option(nb.is_col_sorted_nb, jitted)
+        func = jit_reg.resolve_option(nb.is_col_sorted_nb, jitted)
         return func(self.col_arr)

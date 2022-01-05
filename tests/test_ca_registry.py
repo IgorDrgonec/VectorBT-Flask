@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 import vectorbtpro as vbt
-from vectorbtpro.registries.ca_registry import ca_registry, CAQuery, CARunSetup, CARunResult
+from vectorbtpro.registries.ca_registry import ca_reg, CAQuery, CARunSetup, CARunResult
 from vectorbtpro.utils.caching import Cacheable
 
 
@@ -877,7 +877,7 @@ class TestCacheableRegistry:
             B.f2_test.get_ca_setup().query,
             f3_test.get_ca_setup().query
         ]
-        assert ca_registry.match_setups(queries, kind=None) == {
+        assert ca_reg.match_setups(queries, kind=None) == {
             A.get_ca_setup(),
             B.get_ca_setup(),
             a.get_ca_setup(),
@@ -889,62 +889,62 @@ class TestCacheableRegistry:
             B.f2_test.get_ca_setup(b),
             f3_test.get_ca_setup()
         }
-        assert ca_registry.match_setups(queries, kind=None, filter_func=lambda setup: setup.caching_enabled) == {
+        assert ca_reg.match_setups(queries, kind=None, filter_func=lambda setup: setup.caching_enabled) == {
             b.get_ca_setup(),
             B.f_test.get_ca_setup(b),
             B.f2_test.get_ca_setup(b)
         }
-        assert ca_registry.match_setups(queries, kind='runnable') == {
+        assert ca_reg.match_setups(queries, kind='runnable') == {
             A.f_test.get_ca_setup(a),
             B.f_test.get_ca_setup(b),
             B.f2_test.get_ca_setup(b),
             f3_test.get_ca_setup()
         }
-        assert ca_registry.match_setups(queries, kind='unbound') == {
+        assert ca_reg.match_setups(queries, kind='unbound') == {
             A.f_test.get_ca_setup(),
             B.f2_test.get_ca_setup()
         }
-        assert ca_registry.match_setups(queries, kind='instance') == {
+        assert ca_reg.match_setups(queries, kind='instance') == {
             a.get_ca_setup(),
             b.get_ca_setup()
         }
-        assert ca_registry.match_setups(queries, kind='class') == {
+        assert ca_reg.match_setups(queries, kind='class') == {
             A.get_ca_setup(),
             B.get_ca_setup()
         }
-        assert ca_registry.match_setups(queries, kind=('class', 'instance')) == {
+        assert ca_reg.match_setups(queries, kind=('class', 'instance')) == {
             A.get_ca_setup(),
             B.get_ca_setup(),
             a.get_ca_setup(),
             b.get_ca_setup()
         }
-        assert ca_registry.match_setups(queries, kind=('class', 'instance'), exclude=b.get_ca_setup()) == {
+        assert ca_reg.match_setups(queries, kind=('class', 'instance'), exclude=b.get_ca_setup()) == {
             A.get_ca_setup(),
             B.get_ca_setup(),
             a.get_ca_setup()
         }
-        assert ca_registry.match_setups(queries, collapse=True, kind=None) == {
+        assert ca_reg.match_setups(queries, collapse=True, kind=None) == {
             A.get_ca_setup(),
             A.f_test.get_ca_setup(),
             B.f2_test.get_ca_setup(),
             f3_test.get_ca_setup()
         }
-        assert ca_registry.match_setups(queries, collapse=True, kind='instance') == {
+        assert ca_reg.match_setups(queries, collapse=True, kind='instance') == {
             a.get_ca_setup(),
             b.get_ca_setup()
         }
-        assert ca_registry.match_setups(queries, collapse=True, kind=('instance', 'runnable')) == {
+        assert ca_reg.match_setups(queries, collapse=True, kind=('instance', 'runnable')) == {
             a.get_ca_setup(),
             b.get_ca_setup(),
             f3_test.get_ca_setup()
         }
-        assert ca_registry.match_setups(
+        assert ca_reg.match_setups(
             queries, collapse=True, kind=('instance', 'runnable'),
             exclude=a.get_ca_setup()) == {
                    b.get_ca_setup(),
                    f3_test.get_ca_setup()
                }
-        assert ca_registry.match_setups(
+        assert ca_reg.match_setups(
             queries, collapse=True, kind=('instance', 'runnable'),
             exclude=a.get_ca_setup(), exclude_children=False) == {
                    b.get_ca_setup(),
@@ -1227,7 +1227,7 @@ class TestCacheableRegistry:
 
         a = A()
 
-        assert ca_registry.match_setups(CAQuery(cls=A), kind=None) == {
+        assert ca_reg.match_setups(CAQuery(cls=A), kind=None) == {
             A.get_ca_setup(),
             a.get_ca_setup(),
             A.f.get_ca_setup(a)
@@ -1236,7 +1236,7 @@ class TestCacheableRegistry:
         del a
         gc.collect()
         assert a_ref() is None
-        assert ca_registry.match_setups(CAQuery(cls=A), kind=None) == {
+        assert ca_reg.match_setups(CAQuery(cls=A), kind=None) == {
             A.get_ca_setup()
         }
 
@@ -1247,7 +1247,7 @@ class TestCacheableRegistry:
 
         b = B()
 
-        assert ca_registry.match_setups(CAQuery(cls=B), kind=None) == {
+        assert ca_reg.match_setups(CAQuery(cls=B), kind=None) == {
             B.get_ca_setup(),
             B.f.get_ca_setup(b),
             b.get_ca_setup()
@@ -1256,6 +1256,6 @@ class TestCacheableRegistry:
         del b
         gc.collect()
         assert b_ref() is None
-        assert ca_registry.match_setups(CAQuery(cls=B), kind=None) == {
+        assert ca_reg.match_setups(CAQuery(cls=B), kind=None) == {
             B.get_ca_setup()
         }

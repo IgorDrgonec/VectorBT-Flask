@@ -200,8 +200,8 @@ from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.accessors import GenericAccessor, GenericSRAccessor, GenericDFAccessor
 from vectorbtpro.generic.ranges import Ranges
 from vectorbtpro.records.mapped_array import MappedArray
-from vectorbtpro.registries.ch_registry import ch_registry
-from vectorbtpro.registries.jit_registry import jit_registry
+from vectorbtpro.registries.ch_registry import ch_reg
+from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.signals import nb
 from vectorbtpro.utils import checks
 from vectorbtpro.utils import chunking as ch
@@ -310,8 +310,8 @@ class SignalsAccessor(GenericAccessor):
             template_mapping
         )
         args = deep_substitute(args, template_mapping, sub_id='args')
-        func = jit_registry.resolve_option(nb.generate_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.generate_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         result = func(shape_2d, place_func_nb, *args)
 
         if wrapper is None:
@@ -443,8 +443,8 @@ class SignalsAccessor(GenericAccessor):
         )
         entry_args = deep_substitute(entry_args, template_mapping, sub_id='entry_args')
         exit_args = deep_substitute(exit_args, template_mapping, sub_id='exit_args')
-        func = jit_registry.resolve_option(nb.generate_enex_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.generate_enex_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         result1, result2 = func(
             shape_2d,
             entry_wait,
@@ -513,8 +513,8 @@ class SignalsAccessor(GenericAccessor):
             template_mapping
         )
         args = deep_substitute(args, template_mapping, sub_id='args')
-        func = jit_registry.resolve_option(nb.generate_ex_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.generate_ex_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         exits = func(
             obj,
             wait,
@@ -554,8 +554,8 @@ class SignalsAccessor(GenericAccessor):
             broadcasted_args = reshaping.broadcast(dict(entries=args[0], exits=args[1]), **broadcast_kwargs)
             entries = broadcasted_args['entries']
             exits = broadcasted_args['exits']
-            func = jit_registry.resolve_option(nb.clean_enex_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.clean_enex_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             entries_out, exits_out = func(
                 reshaping.to_2d_array(entries),
                 reshaping.to_2d_array(exits),
@@ -648,7 +648,7 @@ class SignalsAccessor(GenericAccessor):
             )
             return cls.generate(
                 shape,
-                jit_registry.resolve_option(nb.rand_place_nb, jitted),
+                jit_reg.resolve_option(nb.rand_place_nb, jitted),
                 n,
                 jitted=jitted,
                 chunked=chunked,
@@ -667,7 +667,7 @@ class SignalsAccessor(GenericAccessor):
             )
             return cls.generate(
                 shape,
-                jit_registry.resolve_option(nb.rand_by_prob_place_nb, jitted),
+                jit_reg.resolve_option(nb.rand_by_prob_place_nb, jitted),
                 prob, pick_first, flex_2d,
                 jitted=jitted,
                 chunked=chunked,
@@ -762,8 +762,8 @@ class SignalsAccessor(GenericAccessor):
             set_seed_nb(seed)
         if n is not None:
             n = np.broadcast_to(n, (shape_2d[1],))
-            func = jit_registry.resolve_option(nb.generate_rand_enex_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.generate_rand_enex_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             entries, exits = func(shape_2d, n, entry_wait, exit_wait)
             if wrapper is None:
                 wrapper = ArrayWrapper.from_shape(shape_2d, ndim=cls.ndim)
@@ -791,13 +791,13 @@ class SignalsAccessor(GenericAccessor):
             )
             return cls.generate_both(
                 shape,
-                entry_place_func_nb=jit_registry.resolve_option(nb.rand_by_prob_place_nb, jitted),
+                entry_place_func_nb=jit_reg.resolve_option(nb.rand_by_prob_place_nb, jitted),
                 entry_args=(
                     entry_prob,
                     entry_pick_first,
                     flex_2d
                 ),
-                exit_place_func_nb=jit_registry.resolve_option(nb.rand_by_prob_place_nb, jitted),
+                exit_place_func_nb=jit_reg.resolve_option(nb.rand_by_prob_place_nb, jitted),
                 exit_args=(
                     exit_prob,
                     exit_pick_first,
@@ -878,7 +878,7 @@ class SignalsAccessor(GenericAccessor):
                 ))
             )
             return obj.vbt.signals.generate_exits(
-                jit_registry.resolve_option(nb.rand_by_prob_place_nb, jitted),
+                jit_reg.resolve_option(nb.rand_by_prob_place_nb, jitted),
                 prob, True, flex_2d,
                 wait=wait,
                 until_next=until_next,
@@ -896,7 +896,7 @@ class SignalsAccessor(GenericAccessor):
             ))
         )
         return self.generate_exits(
-            jit_registry.resolve_option(nb.rand_place_nb, jitted),
+            jit_reg.resolve_option(nb.rand_place_nb, jitted),
             n,
             wait=wait,
             until_next=until_next,
@@ -1031,9 +1031,9 @@ class SignalsAccessor(GenericAccessor):
             )
             return cls.generate_both(
                 entries.shape,
-                entry_place_func_nb=jit_registry.resolve_option(nb.first_place_nb, jitted),
+                entry_place_func_nb=jit_reg.resolve_option(nb.first_place_nb, jitted),
                 entry_args=(entries_arr,),
-                exit_place_func_nb=jit_registry.resolve_option(nb.stop_place_nb, jitted),
+                exit_place_func_nb=jit_reg.resolve_option(nb.stop_place_nb, jitted),
                 exit_args=(
                     broadcasted_args['ts'],
                     broadcasted_args['stop'],
@@ -1069,7 +1069,7 @@ class SignalsAccessor(GenericAccessor):
             if skip_until_exit and until_next:
                 warnings.warn("skip_until_exit=True has only effect when until_next=False", stacklevel=2)
             return entries.vbt.signals.generate_exits(
-                jit_registry.resolve_option(nb.stop_place_nb, jitted),
+                jit_reg.resolve_option(nb.stop_place_nb, jitted),
                 broadcasted_args['ts'],
                 broadcasted_args['stop'],
                 broadcasted_args['trailing'],
@@ -1382,9 +1382,9 @@ class SignalsAccessor(GenericAccessor):
             )
             new_entries, exits = cls.generate_both(
                 entries.shape,
-                entry_place_func_nb=jit_registry.resolve_option(nb.first_place_nb, jitted),
+                entry_place_func_nb=jit_reg.resolve_option(nb.first_place_nb, jitted),
                 entry_args=(entries_arr,),
-                exit_place_func_nb=jit_registry.resolve_option(nb.ohlc_stop_place_nb, jitted),
+                exit_place_func_nb=jit_reg.resolve_option(nb.ohlc_stop_place_nb, jitted),
                 exit_args=(
                     broadcasted_args['open'],
                     broadcasted_args['high'],
@@ -1439,7 +1439,7 @@ class SignalsAccessor(GenericAccessor):
                 )
             )
             exits = entries.vbt.signals.generate_exits(
-                jit_registry.resolve_option(nb.ohlc_stop_place_nb, jitted),
+                jit_reg.resolve_option(nb.ohlc_stop_place_nb, jitted),
                 broadcasted_args['open'],
                 broadcasted_args['high'],
                 broadcasted_args['low'],
@@ -1543,8 +1543,8 @@ class SignalsAccessor(GenericAccessor):
 
         if other is None:
             # One input array
-            func = jit_registry.resolve_option(nb.between_ranges_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.between_ranges_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             range_records = func(self.to_2d_array())
             wrapper = self.wrapper
             to_attach = self.obj
@@ -1553,8 +1553,8 @@ class SignalsAccessor(GenericAccessor):
             broadcasted_args = reshaping.broadcast(dict(obj=self.obj, other=other), **broadcast_kwargs)
             obj = broadcasted_args['obj']
             other = broadcasted_args['other']
-            func = jit_registry.resolve_option(nb.between_two_ranges_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.between_two_ranges_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             range_records = func(
                 reshaping.to_2d_array(obj),
                 reshaping.to_2d_array(other),
@@ -1590,8 +1590,8 @@ class SignalsAccessor(GenericAccessor):
             1         1       0                4              5    Open
             ```
         """
-        func = jit_registry.resolve_option(nb.partition_ranges_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.partition_ranges_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         range_records = func(self.to_2d_array())
         return Ranges(
             self.wrapper,
@@ -1618,8 +1618,8 @@ class SignalsAccessor(GenericAccessor):
             1         1       0                3              5  Closed
              ```
          """
-        func = jit_registry.resolve_option(nb.between_partition_ranges_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.between_partition_ranges_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         range_records = func(self.to_2d_array())
         return Ranges(
             self.wrapper,
@@ -1683,8 +1683,8 @@ class SignalsAccessor(GenericAccessor):
             template_mapping
         )
         args = deep_substitute(args, template_mapping, sub_id='args')
-        func = jit_registry.resolve_option(nb.rank_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.rank_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         rank = func(
             obj,
             reset_by,
@@ -1755,7 +1755,7 @@ class SignalsAccessor(GenericAccessor):
             arg_take_spec=dict(args=ch.ArgsTaker(ch.ArraySlicer(axis=0), None))
         )
         return self.rank(
-            jit_registry.resolve_option(nb.sig_pos_rank_nb, jitted),
+            jit_reg.resolve_option(nb.sig_pos_rank_nb, jitted),
             allow_gaps,
             prepare_func=prepare_func,
             jitted=jitted,
@@ -1806,7 +1806,7 @@ class SignalsAccessor(GenericAccessor):
             arg_take_spec=dict(args=ch.ArgsTaker(ch.ArraySlicer(axis=0)))
         )
         return self.rank(
-            jit_registry.resolve_option(nb.part_pos_rank_nb, jitted),
+            jit_reg.resolve_option(nb.part_pos_rank_nb, jitted),
             prepare_func=prepare_func,
             jitted=jitted,
             chunked=chunked,
@@ -1876,7 +1876,7 @@ class SignalsAccessor(GenericAccessor):
         """
         if self.is_frame() and self.wrapper.grouper.is_grouped(group_by=group_by):
             squeezed = self.squeeze_grouped(
-                jit_registry.resolve_option(generic_nb.any_reduce_nb, jitted),
+                jit_reg.resolve_option(generic_nb.any_reduce_nb, jitted),
                 group_by=group_by,
                 jitted=jitted,
                 chunked=chunked
@@ -1884,8 +1884,8 @@ class SignalsAccessor(GenericAccessor):
             arr = reshaping.to_2d_array(squeezed)
         else:
             arr = self.to_2d_array()
-        func = jit_registry.resolve_option(nb.nth_index_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.nth_index_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         nth_index = func(arr, n)
         wrap_kwargs = merge_dicts(dict(name_or_index='nth_index', to_index=True), wrap_kwargs)
         return self.wrapper.wrap_reduced(nth_index, group_by=group_by, **wrap_kwargs)
@@ -1922,12 +1922,12 @@ class SignalsAccessor(GenericAccessor):
         """
         if self.is_frame() and self.wrapper.grouper.is_grouped(group_by=group_by):
             group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
-            func = jit_registry.resolve_option(nb.norm_avg_index_grouped_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.norm_avg_index_grouped_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             norm_avg_index = func(self.to_2d_array(), group_lens)
         else:
-            func = jit_registry.resolve_option(nb.norm_avg_index_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.norm_avg_index_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             norm_avg_index = func(self.to_2d_array())
         wrap_kwargs = merge_dicts(dict(name_or_index='norm_avg_index'), wrap_kwargs)
         return self.wrapper.wrap_reduced(norm_avg_index, group_by=group_by, **wrap_kwargs)

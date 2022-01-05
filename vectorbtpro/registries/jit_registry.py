@@ -43,7 +43,7 @@ Let's implement a task that takes a sum over an array using both NumPy and Numba
 We can see that two new jitable setups were registered:
 
 ```pycon
->>> vbt.jit_registry.jitable_setups['sum']
+>>> vbt.jit_reg.jitable_setups['sum']
 {'np': JitableSetup(task_id='sum', jitter_id='np', py_func=<function sum_np at 0x7fea215b1e18>, jitter_kwargs={}, tags=None),
  'nb': JitableSetup(task_id='sum', jitter_id='nb', py_func=<function sum_nb at 0x7fea273d41e0>, jitter_kwargs={}, tags=None)}
 ```
@@ -54,11 +54,11 @@ Moreover, two jitted setups were registered for our decorated functions:
 >>> from vectorbtpro.registries.jit_registry import JitableSetup
 
 >>> hash_np = JitableSetup.get_hash('sum', 'np')
->>> vbt.jit_registry.jitted_setups[hash_np]
+>>> vbt.jit_reg.jitted_setups[hash_np]
 {3527539: JittedSetup(jitter=<vectorbtpro.utils.jitting.NumPyJitter object at 0x7fea21506080>, jitted_func=<function sum_np at 0x7fea215b1e18>)}
 
 >>> hash_nb = JitableSetup.get_hash('sum', 'nb')
->>> vbt.jit_registry.jitted_setups[hash_nb]
+>>> vbt.jit_reg.jitted_setups[hash_nb]
 {6326224984503844995: JittedSetup(jitter=<vectorbtpro.utils.jitting.NumbaJitter object at 0x7fea214d0ba8>, jitted_func=CPUDispatcher(<function sum_nb at 0x7fea273d41e0>))}
 ```
 
@@ -67,7 +67,7 @@ When we call `JITRegistry.resolve` without any additional keyword arguments,
 `JITRegistry` returns exactly these functions:
 
 ```pycon
->>> jitted_func = vbt.jit_registry.resolve('sum', jitter='nb')
+>>> jitted_func = vbt.jit_reg.resolve('sum', jitter='nb')
 >>> jitted_func
 CPUDispatcher(<function sum_nb at 0x7fea273d41e0>)
 
@@ -79,14 +79,14 @@ Once we pass any other option, the Python function will be redecorated, and anot
 instance will be registered:
 
 ```pycon
->>> jitted_func = vbt.jit_registry.resolve('sum', jitter='nb', nopython=False)
+>>> jitted_func = vbt.jit_reg.resolve('sum', jitter='nb', nopython=False)
 >>> jitted_func
 CPUDispatcher(<function sum_nb at 0x7fea273d41e0>)
 
 >>> jitted_func.targetoptions
 {'nopython': False, 'nogil': True, 'parallel': False, 'boundscheck': False}
 
->>> vbt.jit_registry.jitted_setups[hash_nb]
+>>> vbt.jit_reg.jitted_setups[hash_nb]
 {6326224984503844995: JittedSetup(jitter=<vectorbtpro.utils.jitting.NumbaJitter object at 0x7fea214d0ba8>, jitted_func=CPUDispatcher(<function sum_nb at 0x7fea273d41e0>)),
  -2979374923679407948: JittedSetup(jitter=<vectorbtpro.utils.jitting.NumbaJitter object at 0x7fea00bf94e0>, jitted_func=CPUDispatcher(<function sum_nb at 0x7fea273d41e0>))}
 ```
@@ -98,7 +98,7 @@ keyword arguments for jitting. For example, let's pick the NumPy jitter over any
 jitter if there are more than two of them for a given task:
 
 ```pycon
->>> vbt.jit_registry.resolve('sum', jitter=vbt.RepEval("'nb' if 'nb' in task_setups else None"))
+>>> vbt.jit_reg.resolve('sum', jitter=vbt.RepEval("'nb' if 'nb' in task_setups else None"))
 CPUDispatcher(<function sum_nb at 0x7fea273d41e0>)
 ```
 
@@ -107,7 +107,7 @@ CPUDispatcher(<function sum_nb at 0x7fea273d41e0>)
 In the case we want to disable jitting, we can simply pass `disable=True` to `JITRegistry.resolve`:
 
 ```pycon
->>> py_func = vbt.jit_registry.resolve('sum', jitter='nb', disable=True)
+>>> py_func = vbt.jit_reg.resolve('sum', jitter='nb', disable=True)
 >>> py_func
 <function __main__.sum_nb(a)>
 ```
@@ -117,7 +117,7 @@ We can also disable jitting globally:
 ```pycon
 >>> vbt.settings.jitting['disable'] = True
 
->>> vbt.jit_registry.resolve('sum', jitter='nb')
+>>> vbt.jit_reg.resolve('sum', jitter='nb')
 <function __main__.sum_nb(a)>
 ```
 
@@ -137,7 +137,7 @@ to disable jitting (see `vectorbtpro.utils.jitting.resolve_jitted_option`):
 
 ```pycon
 >>> def sum_arr(arr, jitted=None):
-...     func = vbt.jit_registry.resolve_option('sum', jitted)
+...     func = vbt.jit_reg.resolve_option('sum', jitted)
 ...     return func(arr)
 
 >>> arr = np.random.uniform(size=1000000)
@@ -187,7 +187,7 @@ such as `vectorbtpro.generic.nb.diff_nb`? For example, let's disable caching for
 Since all functions have already been registered, the above statement has no effect:
 
 ```pycon
->>> vbt.jit_registry.jitable_setups['vectorbtpro.generic.nb.diff_nb']['nb'].jitter_kwargs
+>>> vbt.jit_reg.jitable_setups['vectorbtpro.generic.nb.diff_nb']['nb'].jitter_kwargs
 {'cache': True}
 ```
 
@@ -205,7 +205,7 @@ Let's restart the runtime and instruct vectorbt to load the file with settings b
 >>> os.environ['VBT_SETTINGS_PATH'] = "my_settings"
 
 >>> import vectorbtpro as vbt
->>> vbt.jit_registry.jitable_setups['vectorbtpro.generic.nb.diff_nb']['nb'].jitter_kwargs
+>>> vbt.jit_reg.jitable_setups['vectorbtpro.generic.nb.diff_nb']['nb'].jitter_kwargs
 {'cache': False}
 ```
 
@@ -263,22 +263,22 @@ upon resolution using `JITRegistry.resolve_option`:
 ... )
 
 >>> # disabled
->>> vbt.jit_registry.resolve('vectorbtpro.generic.nb.diff_nb', jitter='nb').targetoptions
+>>> vbt.jit_reg.resolve('vectorbtpro.generic.nb.diff_nb', jitter='nb').targetoptions
 {'nopython': True, 'nogil': False, 'parallel': False, 'boundscheck': False}
 
 >>> # still enabled
->>> vbt.jit_registry.resolve('sum', jitter='nb').targetoptions
+>>> vbt.jit_reg.resolve('sum', jitter='nb').targetoptions
 {'nopython': True, 'nogil': True, 'parallel': False, 'boundscheck': False}
 
 >>> # On each Numba function
 >>> vbt.settings.jitting.jitters['nb']['resolve_kwargs'] = dict(nogil=False)
 
 >>> # disabled
->>> vbt.jit_registry.resolve('vectorbtpro.generic.nb.diff_nb', jitter='nb').targetoptions
+>>> vbt.jit_reg.resolve('vectorbtpro.generic.nb.diff_nb', jitter='nb').targetoptions
 {'nopython': True, 'nogil': False, 'parallel': False, 'boundscheck': False}
 
 >>> # disabled
->>> vbt.jit_registry.resolve('sum', jitter='nb').targetoptions
+>>> vbt.jit_reg.resolve('sum', jitter='nb').targetoptions
 {'nopython': True, 'nogil': False, 'parallel': False, 'boundscheck': False}
 ```
 
@@ -326,7 +326,7 @@ After we have defined our jitter class, we need to register it globally:
 Finally, we can execute any Numba function by specifying our new jitter:
 
 ```pycon
->>> func = vbt.jit_registry.resolve(
+>>> func = vbt.jit_reg.resolve(
 ...     task_id_or_func=vbt.generic.nb.diff_nb,
 ...     jitter='safe_nb',
 ...     allow_new=True
@@ -339,7 +339,7 @@ array([[nan, nan],
 Whereas executing the same func using the vanilla Numba jitter causes an error:
 
 ```pycon
->>> func = vbt.jit_registry.resolve(task_id_or_func=vbt.generic.nb.diff_nb)
+>>> func = vbt.jit_reg.resolve(task_id_or_func=vbt.generic.nb.diff_nb)
 >>> func(pd.DataFrame([[1, 2], [3, 4]]))
 Failed in nopython mode pipeline (step: nopython frontend)
 non-precise type pyobject
@@ -719,13 +719,13 @@ class JITRegistry:
         return self.resolve(task_id, **kwargs)
 
 
-jit_registry = JITRegistry()
+jit_reg = JITRegistry()
 """Default registry of type `JITRegistry`."""
 
 
 def register_jitted(py_func: tp.Optional[tp.Callable] = None,
                     task_id_or_func: tp.Optional[tp.Union[tp.Hashable, tp.Callable]] = None,
-                    registry: JITRegistry = jit_registry,
+                    registry: JITRegistry = jit_reg,
                     tags: tp.Optional[set] = None,
                     **options) -> tp.Callable:
     """Decorate and register a jitable function using `JITRegistry.decorate_and_register`.

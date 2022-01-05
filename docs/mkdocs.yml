@@ -208,6 +208,7 @@ nav:
       - math_: api/utils/math_.md
       - module_: api/utils/module_.md
       - opt_packages: api/utils/opt_packages.md
+      - path_: api/utils/path_.md
       - params: api/utils/params.md
       - parsing: api/utils/parsing.md
       - pbar: api/utils/pbar.md

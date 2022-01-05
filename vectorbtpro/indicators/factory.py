@@ -1185,7 +1185,7 @@ from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.accessors import BaseAccessor
 from vectorbtpro.generic.plots_builder import PlotsBuilderMixin
 from vectorbtpro.generic.stats_builder import StatsBuilderMixin
-from vectorbtpro.registries.jit_registry import jit_registry
+from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config
 from vectorbtpro.utils.decorators import classproperty, cacheable_property
@@ -2606,11 +2606,11 @@ class IndicatorFactory:
                     ('equal', np.equal, dict()),
                     ('crossed_above',
                      lambda x, y, wait=0:
-                     jit_registry.resolve(generic_nb.crossed_above_nb)(x, y, wait),
+                     jit_reg.resolve(generic_nb.crossed_above_nb)(x, y, wait),
                      dict(to_2d=True)),
                     ('crossed_below',
                      lambda x, y, wait=0:
-                     jit_registry.resolve(generic_nb.crossed_above_nb)(y, x, wait),
+                     jit_reg.resolve(generic_nb.crossed_above_nb)(y, x, wait),
                      dict(to_2d=True))
                 ]
                 for func_name, np_func, def_kwargs in func_info:

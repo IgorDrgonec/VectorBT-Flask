@@ -498,8 +498,8 @@ from vectorbtpro.portfolio.enums import TradeDirection, TradeStatus, trade_dt
 from vectorbtpro.portfolio.orders import Orders
 from vectorbtpro.records.decorators import attach_fields, override_field_config, attach_shortcut_properties
 from vectorbtpro.records.mapped_array import MappedArray
-from vectorbtpro.registries.ch_registry import ch_registry
-from vectorbtpro.registries.jit_registry import jit_registry
+from vectorbtpro.registries.ch_registry import ch_reg
+from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils.array_ import min_rel_rescale, max_rel_rescale
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig
@@ -1569,8 +1569,8 @@ class EntryTrades(Trades):
         """Build `EntryTrades` from `vectorbtpro.portfolio.orders.Orders`."""
         if close is None:
             close = orders.close
-        func = jit_registry.resolve_option(nb.get_entry_trades_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.get_entry_trades_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         trade_records_arr = func(
             orders.values,
             to_2d_array(close),
@@ -1619,8 +1619,8 @@ class ExitTrades(Trades):
         """Build `ExitTrades` from `vectorbtpro.portfolio.orders.Orders`."""
         if close is None:
             close = orders.close
-        func = jit_registry.resolve_option(nb.get_exit_trades_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.get_exit_trades_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         trade_records_arr = func(
             orders.values,
             to_2d_array(close),
@@ -1676,7 +1676,7 @@ class Positions(Trades):
         """Build `Positions` from `Trades`."""
         if close is None:
             close = trades.close
-        func = jit_registry.resolve_option(nb.get_positions_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.get_positions_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         position_records_arr = func(trades.values, trades.col_mapper.col_map)
         return cls(trades.wrapper, position_records_arr, close=close if attach_close else None, **kwargs)

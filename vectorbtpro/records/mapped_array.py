@@ -419,8 +419,8 @@ from vectorbtpro.generic.plots_builder import PlotsBuilderMixin
 from vectorbtpro.generic.stats_builder import StatsBuilderMixin
 from vectorbtpro.records import nb
 from vectorbtpro.records.col_mapper import ColumnMapper
-from vectorbtpro.registries.ch_registry import ch_registry
-from vectorbtpro.registries.jit_registry import jit_registry
+from vectorbtpro.registries.ch_registry import ch_reg
+from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.array_ import index_repeating_rows_nb
@@ -509,7 +509,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             idx_arr = np.asarray(idx_arr)
             checks.assert_shape_equal(mapped_arr, idx_arr, axis=0)
         if id_arr is None:
-            func = jit_registry.resolve_option(nb.generate_ids_nb, jitted)
+            func = jit_reg.resolve_option(nb.generate_ids_nb, jitted)
             id_arr = func(col_arr, wrapper.shape_2d[1])
         else:
             id_arr = np.asarray(id_arr)
@@ -629,9 +629,9 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
     def is_sorted(self, incl_id: bool = False, jitted: tp.JittedOption = None) -> bool:
         """Check whether mapped array is sorted."""
         if incl_id:
-            func = jit_registry.resolve_option(nb.is_col_id_sorted_nb, jitted)
+            func = jit_reg.resolve_option(nb.is_col_id_sorted_nb, jitted)
             return func(self.col_arr, self.id_arr)
-        func = jit_registry.resolve_option(nb.is_col_sorted_nb, jitted)
+        func = jit_reg.resolve_option(nb.is_col_sorted_nb, jitted)
         return func(self.col_arr)
 
     def sort(self: MappedArrayT,
@@ -686,8 +686,8 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
                    chunked: tp.ChunkedOption = None) -> tp.Array1d:
         """Return mask of top N elements in each column/group."""
         col_map = self.col_mapper.get_col_map(group_by=group_by)
-        func = jit_registry.resolve_option(nb.top_n_mapped_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.top_n_mapped_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         return func(self.values, col_map, n)
 
     def bottom_n_mask(self,
@@ -697,8 +697,8 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
                       chunked: tp.ChunkedOption = None) -> tp.Array1d:
         """Return mask of bottom N elements in each column/group."""
         col_map = self.col_mapper.get_col_map(group_by=group_by)
-        func = jit_registry.resolve_option(nb.bottom_n_mapped_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.bottom_n_mapped_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         return func(self.values, col_map, n)
 
     def top_n(self: MappedArrayT,
@@ -781,15 +781,15 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         if isinstance(cls_or_self, type):
             checks.assert_not_none(col_mapper)
             col_map = col_mapper.get_col_map(group_by=group_by if apply_per_group else False)
-            func = jit_registry.resolve_option(nb.apply_meta_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.apply_meta_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             mapped_arr = func(len(col_mapper.col_arr), col_map, apply_func_nb, *args)
             mapped_arr = np.asarray(mapped_arr, dtype=dtype)
             return MappedArray(col_mapper.wrapper, mapped_arr, col_mapper.col_arr, col_mapper=col_mapper, **kwargs)
         else:
             col_map = cls_or_self.col_mapper.get_col_map(group_by=group_by if apply_per_group else False)
-            func = jit_registry.resolve_option(nb.apply_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.apply_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             mapped_arr = func(cls_or_self.values, col_map, apply_func_nb, *args)
             mapped_arr = np.asarray(mapped_arr, dtype=dtype)
             return cls_or_self.replace(mapped_arr=mapped_arr, **kwargs).regroup(group_by)
@@ -833,7 +833,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             stacked_segment_arr = np.column_stack(segment_arr)
             segment_arr = index_repeating_rows_nb(stacked_segment_arr)
 
-        func = ch_registry.resolve_option(nb.reduce_mapped_segments_nb, chunked)
+        func = ch_reg.resolve_option(nb.reduce_mapped_segments_nb, chunked)
         new_mapped_arr, new_col_arr, new_idx_arr, new_id_arr = \
             func(self.values, idx_arr, self.id_arr, col_map, segment_arr, reduce_func_nb, *args)
         new_mapped_arr = np.asarray(new_mapped_arr, dtype=dtype)
@@ -892,8 +892,8 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             col_map = col_mapper.get_col_map(group_by=group_by)
             if not returns_array:
                 if not returns_idx:
-                    func = jit_registry.resolve_option(nb.reduce_mapped_meta_nb, jitted)
-                    func = ch_registry.resolve_option(func, chunked)
+                    func = jit_reg.resolve_option(nb.reduce_mapped_meta_nb, jitted)
+                    func = ch_reg.resolve_option(func, chunked)
                     out = func(
                         col_map,
                         fill_value,
@@ -902,8 +902,8 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
                     )
                 else:
                     checks.assert_not_none(idx_arr)
-                    func = jit_registry.resolve_option(nb.reduce_mapped_to_idx_meta_nb, jitted)
-                    func = ch_registry.resolve_option(func, chunked)
+                    func = jit_reg.resolve_option(nb.reduce_mapped_to_idx_meta_nb, jitted)
+                    func = ch_reg.resolve_option(func, chunked)
                     out = func(
                         col_map,
                         idx_arr,
@@ -913,8 +913,8 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
                     )
             else:
                 if not returns_idx:
-                    func = jit_registry.resolve_option(nb.reduce_mapped_to_array_meta_nb, jitted)
-                    func = ch_registry.resolve_option(func, chunked)
+                    func = jit_reg.resolve_option(nb.reduce_mapped_to_array_meta_nb, jitted)
+                    func = ch_reg.resolve_option(func, chunked)
                     out = func(
                         col_map,
                         fill_value,
@@ -923,8 +923,8 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
                     )
                 else:
                     checks.assert_not_none(idx_arr)
-                    func = jit_registry.resolve_option(nb.reduce_mapped_to_idx_array_meta_nb, jitted)
-                    func = ch_registry.resolve_option(func, chunked)
+                    func = jit_reg.resolve_option(nb.reduce_mapped_to_idx_array_meta_nb, jitted)
+                    func = ch_reg.resolve_option(func, chunked)
                     out = func(
                         col_map,
                         idx_arr,
@@ -942,8 +942,8 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             col_map = cls_or_self.col_mapper.get_col_map(group_by=group_by)
             if not returns_array:
                 if not returns_idx:
-                    func = jit_registry.resolve_option(nb.reduce_mapped_nb, jitted)
-                    func = ch_registry.resolve_option(func, chunked)
+                    func = jit_reg.resolve_option(nb.reduce_mapped_nb, jitted)
+                    func = ch_reg.resolve_option(func, chunked)
                     out = func(
                         cls_or_self.values,
                         col_map,
@@ -953,8 +953,8 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
                     )
                 else:
                     checks.assert_not_none(idx_arr)
-                    func = jit_registry.resolve_option(nb.reduce_mapped_to_idx_nb, jitted)
-                    func = ch_registry.resolve_option(func, chunked)
+                    func = jit_reg.resolve_option(nb.reduce_mapped_to_idx_nb, jitted)
+                    func = ch_reg.resolve_option(func, chunked)
                     out = func(
                         cls_or_self.values,
                         col_map,
@@ -965,8 +965,8 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
                     )
             else:
                 if not returns_idx:
-                    func = jit_registry.resolve_option(nb.reduce_mapped_to_array_nb, jitted)
-                    func = ch_registry.resolve_option(func, chunked)
+                    func = jit_reg.resolve_option(nb.reduce_mapped_to_array_nb, jitted)
+                    func = ch_reg.resolve_option(func, chunked)
                     out = func(
                         cls_or_self.values,
                         col_map,
@@ -976,8 +976,8 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
                     )
                 else:
                     checks.assert_not_none(idx_arr)
-                    func = jit_registry.resolve_option(nb.reduce_mapped_to_idx_array_nb, jitted)
-                    func = ch_registry.resolve_option(func, chunked)
+                    func = jit_reg.resolve_option(nb.reduce_mapped_to_idx_array_nb, jitted)
+                    func = ch_reg.resolve_option(func, chunked)
                     out = func(
                         cls_or_self.values,
                         col_map,
@@ -1011,7 +1011,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             arg_take_spec=dict(args=ch.ArgsTaker(None, ))
         )
         return self.reduce(
-            jit_registry.resolve_option(generic_nb.nth_reduce_nb, jitted),
+            jit_reg.resolve_option(generic_nb.nth_reduce_nb, jitted),
             n,
             returns_array=False,
             returns_idx=False,
@@ -1037,7 +1037,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             arg_take_spec=dict(args=ch.ArgsTaker(None, ))
         )
         return self.reduce(
-            jit_registry.resolve_option(generic_nb.nth_index_reduce_nb, jitted),
+            jit_reg.resolve_option(generic_nb.nth_index_reduce_nb, jitted),
             n,
             returns_array=False,
             returns_idx=True,
@@ -1058,7 +1058,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         """Return min by column/group."""
         wrap_kwargs = merge_dicts(dict(name_or_index='min'), wrap_kwargs)
         return self.reduce(
-            jit_registry.resolve_option(generic_nb.min_reduce_nb, jitted),
+            jit_reg.resolve_option(generic_nb.min_reduce_nb, jitted),
             returns_array=False,
             returns_idx=False,
             group_by=group_by,
@@ -1078,7 +1078,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         """Return max by column/group."""
         wrap_kwargs = merge_dicts(dict(name_or_index='max'), wrap_kwargs)
         return self.reduce(
-            jit_registry.resolve_option(generic_nb.max_reduce_nb, jitted),
+            jit_reg.resolve_option(generic_nb.max_reduce_nb, jitted),
             returns_array=False,
             returns_idx=False,
             group_by=group_by,
@@ -1098,7 +1098,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         """Return mean by column/group."""
         wrap_kwargs = merge_dicts(dict(name_or_index='mean'), wrap_kwargs)
         return self.reduce(
-            jit_registry.resolve_option(generic_nb.mean_reduce_nb, jitted),
+            jit_reg.resolve_option(generic_nb.mean_reduce_nb, jitted),
             returns_array=False,
             returns_idx=False,
             group_by=group_by,
@@ -1118,7 +1118,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         """Return median by column/group."""
         wrap_kwargs = merge_dicts(dict(name_or_index='median'), wrap_kwargs)
         return self.reduce(
-            jit_registry.resolve_option(generic_nb.median_reduce_nb, jitted),
+            jit_reg.resolve_option(generic_nb.median_reduce_nb, jitted),
             returns_array=False,
             returns_idx=False,
             group_by=group_by,
@@ -1143,7 +1143,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             arg_take_spec=dict(args=ch.ArgsTaker(None, ))
         )
         return self.reduce(
-            jit_registry.resolve_option(generic_nb.std_reduce_nb, jitted),
+            jit_reg.resolve_option(generic_nb.std_reduce_nb, jitted),
             ddof,
             returns_array=False,
             returns_idx=False,
@@ -1165,7 +1165,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         """Return sum by column/group."""
         wrap_kwargs = merge_dicts(dict(name_or_index='sum'), wrap_kwargs)
         return self.reduce(
-            jit_registry.resolve_option(generic_nb.sum_reduce_nb, jitted),
+            jit_reg.resolve_option(generic_nb.sum_reduce_nb, jitted),
             fill_value=fill_value,
             returns_array=False,
             returns_idx=False,
@@ -1186,7 +1186,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         """Return index of min by column/group."""
         wrap_kwargs = merge_dicts(dict(name_or_index='idxmin'), wrap_kwargs)
         return self.reduce(
-            jit_registry.resolve_option(generic_nb.argmin_reduce_nb, jitted),
+            jit_reg.resolve_option(generic_nb.argmin_reduce_nb, jitted),
             returns_array=False,
             returns_idx=True,
             group_by=group_by,
@@ -1206,7 +1206,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         """Return index of max by column/group."""
         wrap_kwargs = merge_dicts(dict(name_or_index='idxmax'), wrap_kwargs)
         return self.reduce(
-            jit_registry.resolve_option(generic_nb.argmax_reduce_nb, jitted),
+            jit_reg.resolve_option(generic_nb.argmax_reduce_nb, jitted),
             returns_array=False,
             returns_idx=True,
             group_by=group_by,
@@ -1242,7 +1242,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             arg_take_spec=dict(args=ch.ArgsTaker(None, None))
         )
         out = self.reduce(
-            jit_registry.resolve_option(generic_nb.describe_reduce_nb, jitted),
+            jit_reg.resolve_option(generic_nb.describe_reduce_nb, jitted),
             percentiles, ddof,
             returns_array=True,
             returns_idx=False,
@@ -1304,15 +1304,15 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             if idx_arr is None:
                 idx_arr = self.idx_arr
             checks.assert_not_none(idx_arr)
-            func = jit_registry.resolve_option(nb.mapped_value_counts_per_row_nb, jitted)
+            func = jit_reg.resolve_option(nb.mapped_value_counts_per_row_nb, jitted)
             value_counts = func(mapped_codes, len(mapped_uniques), idx_arr, self.wrapper.shape[0])
         elif axis == 1:
             col_map = self.col_mapper.get_col_map(group_by=group_by)
-            func = jit_registry.resolve_option(nb.mapped_value_counts_per_col_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.mapped_value_counts_per_col_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             value_counts = func(mapped_codes, len(mapped_uniques), col_map)
         else:
-            func = jit_registry.resolve_option(nb.mapped_value_counts_nb, jitted)
+            func = jit_reg.resolve_option(nb.mapped_value_counts_nb, jitted)
             value_counts = func(mapped_codes, len(mapped_uniques))
         if incl_all_keys and mapping is not None:
             missing_keys = []
@@ -1387,7 +1387,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             idx_arr = self.idx_arr
         col_arr = self.col_mapper.get_col_arr(group_by=group_by)
         target_shape = self.wrapper.get_shape_2d(group_by=group_by)
-        func = jit_registry.resolve_option(nb.mapped_has_conflicts_nb, jitted)
+        func = jit_reg.resolve_option(nb.mapped_has_conflicts_nb, jitted)
         return func(col_arr, idx_arr, target_shape)
 
     def coverage_map(self,
@@ -1402,7 +1402,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             idx_arr = self.idx_arr
         col_arr = self.col_mapper.get_col_arr(group_by=group_by)
         target_shape = self.wrapper.get_shape_2d(group_by=group_by)
-        func = jit_registry.resolve_option(nb.mapped_coverage_map_nb, jitted)
+        func = jit_reg.resolve_option(nb.mapped_coverage_map_nb, jitted)
         out = func(col_arr, idx_arr, target_shape)
         return self.wrapper.wrap(out, group_by=group_by, **resolve_dict(wrap_kwargs))
 
@@ -1442,7 +1442,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
                     **resolve_dict(wrap_kwargs)
                 )
             col_map = self.col_mapper.get_col_map(group_by=group_by)
-            func = jit_registry.resolve_option(nb.ignore_unstack_mapped_nb, jitted)
+            func = jit_reg.resolve_option(nb.ignore_unstack_mapped_nb, jitted)
             out = func(self.values, col_map, fill_value)
             return self.wrapper.wrap(
                 out, index=np.arange(out.shape[0]),
@@ -1455,12 +1455,12 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         col_arr = self.col_mapper.get_col_arr(group_by=group_by)
         target_shape = self.wrapper.get_shape_2d(group_by=group_by)
         if has_conflicts and repeat_index:
-            func = jit_registry.resolve_option(nb.mapped_coverage_map_nb, jitted)
+            func = jit_reg.resolve_option(nb.mapped_coverage_map_nb, jitted)
             coverage_map = func(col_arr, idx_arr, target_shape)
             repeat_cnt_arr = np.max(coverage_map, axis=1)
-            func = jit_registry.resolve_option(nb.unstack_index_nb, jitted)
+            func = jit_reg.resolve_option(nb.unstack_index_nb, jitted)
             unstacked_index = self.wrapper.index[func(repeat_cnt_arr)]
-            func = jit_registry.resolve_option(nb.repeat_unstack_mapped_nb, jitted)
+            func = jit_reg.resolve_option(nb.repeat_unstack_mapped_nb, jitted)
             out = func(
                 self.values,
                 col_arr,
@@ -1475,7 +1475,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             if has_conflicts and not silence_warnings:
                 warnings.warn("Multiple values are pointing to the same position. "
                               "Only the latest value is used.", stacklevel=2)
-            func = jit_registry.resolve_option(nb.unstack_mapped_nb, jitted)
+            func = jit_reg.resolve_option(nb.unstack_mapped_nb, jitted)
             out = func(self.values, col_arr, idx_arr, target_shape, fill_value)
             return self.wrapper.wrap(out, group_by=group_by, **resolve_dict(wrap_kwargs))
 

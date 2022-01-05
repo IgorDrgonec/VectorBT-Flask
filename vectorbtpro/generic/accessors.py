@@ -230,8 +230,8 @@ from vectorbtpro.generic.ranges import Ranges
 from vectorbtpro.generic.splitters import SplitterT, RangeSplitter, RollingSplitter, ExpandingSplitter
 from vectorbtpro.generic.stats_builder import StatsBuilderMixin
 from vectorbtpro.records.mapped_array import MappedArray
-from vectorbtpro.registries.ch_registry import ch_registry
-from vectorbtpro.registries.jit_registry import jit_registry
+from vectorbtpro.registries.ch_registry import ch_reg
+from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config, ReadonlyConfig, HybridConfig
@@ -407,8 +407,8 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                     chunked: tp.ChunkedOption = None,
                     wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:  # pragma: no cover
         """See `vectorbtpro.generic.nb.rolling_std_nb`."""
-        func = jit_registry.resolve_option(nb.rolling_std_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.rolling_std_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         out = func(self.to_2d_array(), window, minp=minp, ddof=ddof)
         return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
@@ -419,8 +419,8 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                       chunked: tp.ChunkedOption = None,
                       wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:  # pragma: no cover
         """See `vectorbtpro.generic.nb.expanding_std_nb`."""
-        func = jit_registry.resolve_option(nb.expanding_std_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.expanding_std_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         out = func(self.to_2d_array(), minp=minp, ddof=ddof)
         return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
@@ -432,8 +432,8 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                  chunked: tp.ChunkedOption = None,
                  wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:  # pragma: no cover
         """See `vectorbtpro.generic.nb.ewm_mean_nb`."""
-        func = jit_registry.resolve_option(nb.ewm_mean_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.ewm_mean_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         out = func(self.to_2d_array(), span, minp=minp, adjust=adjust)
         return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
@@ -446,8 +446,8 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                 chunked: tp.ChunkedOption = None,
                 wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:  # pragma: no cover
         """See `vectorbtpro.generic.nb.ewm_std_nb`."""
-        func = jit_registry.resolve_option(nb.ewm_std_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.ewm_std_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         out = func(self.to_2d_array(), span, minp=minp, adjust=adjust, ddof=ddof)
         return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
@@ -543,12 +543,12 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                 template_mapping
             )
             args = deep_substitute(args, template_mapping, sub_id='args')
-            func = jit_registry.resolve_option(nb.map_meta_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.map_meta_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             out = func(wrapper.shape_2d, apply_func_nb, *args)
         else:
-            func = jit_registry.resolve_option(nb.map_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.map_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             out = func(cls_or_self.to_2d_array(), apply_func_nb, *args)
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -652,17 +652,17 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             )
             args = deep_substitute(args, template_mapping, sub_id='args')
             if axis == 0:
-                func = jit_registry.resolve_option(nb.row_apply_meta_nb, jitted)
+                func = jit_reg.resolve_option(nb.row_apply_meta_nb, jitted)
             else:
-                func = jit_registry.resolve_option(nb.apply_meta_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+                func = jit_reg.resolve_option(nb.apply_meta_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             out = func(wrapper.shape_2d, apply_func_nb, *args)
         else:
             if axis == 0:
-                func = jit_registry.resolve_option(nb.row_apply_nb, jitted)
+                func = jit_reg.resolve_option(nb.row_apply_nb, jitted)
             else:
-                func = jit_registry.resolve_option(nb.apply_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+                func = jit_reg.resolve_option(nb.apply_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             out = func(cls_or_self.to_2d_array(), apply_func_nb, *args)
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -774,8 +774,8 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                 template_mapping
             )
             args = deep_substitute(args, template_mapping, sub_id='args')
-            func = jit_registry.resolve_option(nb.rolling_apply_meta_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.rolling_apply_meta_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             out = func(wrapper.shape_2d, window, minp, apply_func_nb, *args)
         else:
             if minp is None and window is None:
@@ -784,8 +784,8 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                 window = cls_or_self.wrapper.shape[0]
             if minp is None:
                 minp = window
-            func = jit_registry.resolve_option(nb.rolling_apply_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.rolling_apply_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             out = func(cls_or_self.to_2d_array(), window, minp, apply_func_nb, *args)
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -904,15 +904,15 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                 template_mapping
             )
             args = deep_substitute(args, template_mapping, sub_id='args')
-            func = jit_registry.resolve_option(nb.groupby_apply_meta_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.groupby_apply_meta_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             out = func(wrapper.shape_2d[1], group_map, apply_func_nb, *args)
         else:
             pd_group_by = cls_or_self.obj.groupby(by, axis=0, **kwargs)
             grouper = Grouper.from_pd_group_by(pd_group_by)
             group_map = grouper.index.values, grouper.get_group_lens()
-            func = jit_registry.resolve_option(nb.groupby_apply_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.groupby_apply_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             out = func(cls_or_self.to_2d_array(), group_map, apply_func_nb, *args)
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -1019,15 +1019,15 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                 template_mapping
             )
             args = deep_substitute(args, template_mapping, sub_id='args')
-            func = jit_registry.resolve_option(nb.groupby_apply_meta_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.groupby_apply_meta_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             out = func(wrapper.shape_2d[1], group_map, apply_func_nb, *args)
         else:
             pd_group_by = cls_or_self.obj.resample(rule, axis=0, **kwargs)
             grouper = Grouper.from_pd_group_by(pd_group_by)
             group_map = grouper.index.values, grouper.get_group_lens()
-            func = jit_registry.resolve_option(nb.groupby_apply_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.groupby_apply_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             out = func(cls_or_self.to_2d_array(), group_map, apply_func_nb, *args)
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -1145,12 +1145,12 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             )
             apply_args = deep_substitute(apply_args, template_mapping, sub_id='apply_args')
             reduce_args = deep_substitute(reduce_args, template_mapping, sub_id='reduce_args')
-            func = jit_registry.resolve_option(nb.apply_and_reduce_meta_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.apply_and_reduce_meta_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             out = func(wrapper.shape_2d[1], apply_func_nb, apply_args, reduce_func_nb, reduce_args)
         else:
-            func = jit_registry.resolve_option(nb.apply_and_reduce_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.apply_and_reduce_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             out = func(cls_or_self.to_2d_array(), apply_func_nb, apply_args, reduce_func_nb, reduce_args)
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -1344,17 +1344,17 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             if wrapper.grouper.is_grouped(group_by=group_by):
                 group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
                 if returns_array:
-                    func = jit_registry.resolve_option(nb.reduce_grouped_to_array_meta_nb, jitted)
+                    func = jit_reg.resolve_option(nb.reduce_grouped_to_array_meta_nb, jitted)
                 else:
-                    func = jit_registry.resolve_option(nb.reduce_grouped_meta_nb, jitted)
-                func = ch_registry.resolve_option(func, chunked)
+                    func = jit_reg.resolve_option(nb.reduce_grouped_meta_nb, jitted)
+                func = ch_reg.resolve_option(func, chunked)
                 out = func(group_lens, reduce_func_nb, *args)
             else:
                 if returns_array:
-                    func = jit_registry.resolve_option(nb.reduce_to_array_meta_nb, jitted)
+                    func = jit_reg.resolve_option(nb.reduce_to_array_meta_nb, jitted)
                 else:
-                    func = jit_registry.resolve_option(nb.reduce_meta_nb, jitted)
-                func = ch_registry.resolve_option(func, chunked)
+                    func = jit_reg.resolve_option(nb.reduce_meta_nb, jitted)
+                func = ch_reg.resolve_option(func, chunked)
                 out = func(wrapper.shape_2d[1], reduce_func_nb, *args)
         else:
             if wrapper is None:
@@ -1365,10 +1365,10 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                     checks.assert_in(order.upper(), ['C', 'F'])
                     in_c_order = order.upper() == 'C'
                     if returns_array:
-                        func = jit_registry.resolve_option(nb.reduce_flat_grouped_to_array_nb, jitted)
+                        func = jit_reg.resolve_option(nb.reduce_flat_grouped_to_array_nb, jitted)
                     else:
-                        func = jit_registry.resolve_option(nb.reduce_flat_grouped_nb, jitted)
-                    func = ch_registry.resolve_option(func, chunked)
+                        func = jit_reg.resolve_option(nb.reduce_flat_grouped_nb, jitted)
+                    func = ch_reg.resolve_option(func, chunked)
                     out = func(cls_or_self.to_2d_array(), group_lens, in_c_order, reduce_func_nb, *args)
                     if returns_idx:
                         if in_c_order:
@@ -1377,17 +1377,17 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                             out %= wrapper.shape[0]  # flattened in F order
                 else:
                     if returns_array:
-                        func = jit_registry.resolve_option(nb.reduce_grouped_to_array_nb, jitted)
+                        func = jit_reg.resolve_option(nb.reduce_grouped_to_array_nb, jitted)
                     else:
-                        func = jit_registry.resolve_option(nb.reduce_grouped_nb, jitted)
-                    func = ch_registry.resolve_option(func, chunked)
+                        func = jit_reg.resolve_option(nb.reduce_grouped_nb, jitted)
+                    func = ch_reg.resolve_option(func, chunked)
                     out = func(cls_or_self.to_2d_array(), group_lens, reduce_func_nb, *args)
             else:
                 if returns_array:
-                    func = jit_registry.resolve_option(nb.reduce_to_array_nb, jitted)
+                    func = jit_reg.resolve_option(nb.reduce_to_array_nb, jitted)
                 else:
-                    func = jit_registry.resolve_option(nb.reduce_nb, jitted)
-                func = ch_registry.resolve_option(func, chunked)
+                    func = jit_reg.resolve_option(nb.reduce_nb, jitted)
+                func = ch_reg.resolve_option(func, chunked)
                 out = func(cls_or_self.to_2d_array(), reduce_func_nb, *args)
 
         wrap_kwargs = merge_dicts(dict(
@@ -1499,8 +1499,8 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             if not wrapper.grouper.is_grouped(group_by=group_by):
                 raise ValueError("Grouping required")
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
-            func = jit_registry.resolve_option(nb.squeeze_grouped_meta_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.squeeze_grouped_meta_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             out = func(wrapper.shape_2d[0], group_lens, squeeze_func_nb, *args)
         else:
             if wrapper is None:
@@ -1508,8 +1508,8 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             if not wrapper.grouper.is_grouped(group_by=group_by):
                 raise ValueError("Grouping required")
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
-            func = jit_registry.resolve_option(nb.squeeze_grouped_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.squeeze_grouped_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             out = func(cls_or_self.to_2d_array(), group_lens, squeeze_func_nb, *args)
 
         return wrapper.wrap(out, group_by=group_by, **resolve_dict(wrap_kwargs))
@@ -1564,9 +1564,9 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
         group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
         if np.all(group_lens == group_lens.item(0)):
-            func = jit_registry.resolve_option(nb.flatten_uniform_grouped_nb, jitted)
+            func = jit_reg.resolve_option(nb.flatten_uniform_grouped_nb, jitted)
         else:
-            func = jit_registry.resolve_option(nb.flatten_grouped_nb, jitted)
+            func = jit_reg.resolve_option(nb.flatten_grouped_nb, jitted)
         if order.upper() == 'C':
             out = func(self.to_2d_array(), group_lens, True)
             new_index = indexes.repeat_index(self.wrapper.index, np.max(group_lens))
@@ -1586,7 +1586,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         wrap_kwargs = merge_dicts(dict(name_or_index='min'), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
-                jit_registry.resolve_option(nb.min_reduce_nb, jitted),
+                jit_reg.resolve_option(nb.min_reduce_nb, jitted),
                 flatten=True,
                 jitted=jitted,
                 chunked=chunked,
@@ -1601,13 +1601,13 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         if use_jitted is None:
             use_jitted = generic_cfg['use_jitted']
         if use_jitted:
-            func = jit_registry.resolve_option(nb.nanmin_nb, jitted)
+            func = jit_reg.resolve_option(nb.nanmin_nb, jitted)
         elif arr.dtype != int and arr.dtype != float:
             # bottleneck can't consume other than that
             func = partial(np.nanmin, axis=0)
         else:
             func = partial(nanmin, axis=0)
-        func = ch_registry.resolve_option(nb.nanmin_nb, chunked, target_func=func)
+        func = ch_reg.resolve_option(nb.nanmin_nb, chunked, target_func=func)
         return self.wrapper.wrap_reduced(func(arr), group_by=False, **wrap_kwargs)
 
     def max(self,
@@ -1620,7 +1620,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         wrap_kwargs = merge_dicts(dict(name_or_index='max'), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
-                jit_registry.resolve_option(nb.max_reduce_nb, jitted),
+                jit_reg.resolve_option(nb.max_reduce_nb, jitted),
                 flatten=True,
                 jitted=jitted,
                 chunked=chunked,
@@ -1635,13 +1635,13 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         if use_jitted is None:
             use_jitted = generic_cfg['use_jitted']
         if use_jitted:
-            func = jit_registry.resolve_option(nb.nanmax_nb, jitted)
+            func = jit_reg.resolve_option(nb.nanmax_nb, jitted)
         elif arr.dtype != int and arr.dtype != float:
             # bottleneck can't consume other than that
             func = partial(np.nanmax, axis=0)
         else:
             func = partial(nanmax, axis=0)
-        func = ch_registry.resolve_option(nb.nanmax_nb, chunked, target_func=func)
+        func = ch_reg.resolve_option(nb.nanmax_nb, chunked, target_func=func)
         return self.wrapper.wrap_reduced(func(arr), group_by=False, **wrap_kwargs)
 
     def mean(self,
@@ -1654,7 +1654,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         wrap_kwargs = merge_dicts(dict(name_or_index='mean'), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
-                jit_registry.resolve_option(nb.mean_reduce_nb, jitted),
+                jit_reg.resolve_option(nb.mean_reduce_nb, jitted),
                 flatten=True,
                 jitted=jitted,
                 chunked=chunked,
@@ -1669,13 +1669,13 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         if use_jitted is None:
             use_jitted = generic_cfg['use_jitted']
         if use_jitted:
-            func = jit_registry.resolve_option(nb.nanmean_nb, jitted)
+            func = jit_reg.resolve_option(nb.nanmean_nb, jitted)
         elif arr.dtype != int and arr.dtype != float:
             # bottleneck can't consume other than that
             func = partial(np.nanmean, axis=0)
         else:
             func = partial(nanmean, axis=0)
-        func = ch_registry.resolve_option(nb.nanmean_nb, chunked, target_func=func)
+        func = ch_reg.resolve_option(nb.nanmean_nb, chunked, target_func=func)
         return self.wrapper.wrap_reduced(func(arr), group_by=False, **wrap_kwargs)
 
     def median(self,
@@ -1688,7 +1688,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         wrap_kwargs = merge_dicts(dict(name_or_index='median'), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
-                jit_registry.resolve_option(nb.median_reduce_nb, jitted),
+                jit_reg.resolve_option(nb.median_reduce_nb, jitted),
                 flatten=True,
                 jitted=jitted,
                 chunked=chunked,
@@ -1703,13 +1703,13 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         if use_jitted is None:
             use_jitted = generic_cfg['use_jitted']
         if use_jitted:
-            func = jit_registry.resolve_option(nb.nanmedian_nb, jitted)
+            func = jit_reg.resolve_option(nb.nanmedian_nb, jitted)
         elif arr.dtype != int and arr.dtype != float:
             # bottleneck can't consume other than that
             func = partial(np.nanmedian, axis=0)
         else:
             func = partial(nanmedian, axis=0)
-        func = ch_registry.resolve_option(nb.nanmedian_nb, chunked, target_func=func)
+        func = ch_reg.resolve_option(nb.nanmedian_nb, chunked, target_func=func)
         return self.wrapper.wrap_reduced(func(arr), group_by=False, **wrap_kwargs)
 
     def std(self,
@@ -1723,7 +1723,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         wrap_kwargs = merge_dicts(dict(name_or_index='std'), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
-                jit_registry.resolve_option(nb.std_reduce_nb, jitted),
+                jit_reg.resolve_option(nb.std_reduce_nb, jitted),
                 ddof,
                 flatten=True,
                 jitted=jitted,
@@ -1739,13 +1739,13 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         if use_jitted is None:
             use_jitted = generic_cfg['use_jitted']
         if use_jitted:
-            func = jit_registry.resolve_option(nb.nanstd_nb, jitted)
+            func = jit_reg.resolve_option(nb.nanstd_nb, jitted)
         elif arr.dtype != int and arr.dtype != float:
             # bottleneck can't consume other than that
             func = partial(np.nanstd, axis=0)
         else:
             func = partial(nanstd, axis=0)
-        func = ch_registry.resolve_option(nb.nanstd_nb, chunked, target_func=func)
+        func = ch_reg.resolve_option(nb.nanstd_nb, chunked, target_func=func)
         return self.wrapper.wrap_reduced(func(arr, ddof=ddof), group_by=False, **wrap_kwargs)
 
     def sum(self,
@@ -1758,7 +1758,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         wrap_kwargs = merge_dicts(dict(name_or_index='sum'), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
-                jit_registry.resolve_option(nb.sum_reduce_nb, jitted),
+                jit_reg.resolve_option(nb.sum_reduce_nb, jitted),
                 flatten=True,
                 jitted=jitted,
                 chunked=chunked,
@@ -1773,13 +1773,13 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         if use_jitted is None:
             use_jitted = generic_cfg['use_jitted']
         if use_jitted:
-            func = jit_registry.resolve_option(nb.nansum_nb, jitted)
+            func = jit_reg.resolve_option(nb.nansum_nb, jitted)
         elif arr.dtype != int and arr.dtype != float:
             # bottleneck can't consume other than that
             func = partial(np.nansum, axis=0)
         else:
             func = partial(nansum, axis=0)
-        func = ch_registry.resolve_option(nb.nansum_nb, chunked, target_func=func)
+        func = ch_reg.resolve_option(nb.nansum_nb, chunked, target_func=func)
         return self.wrapper.wrap_reduced(func(arr), group_by=False, **wrap_kwargs)
 
     def count(self,
@@ -1792,7 +1792,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         wrap_kwargs = merge_dicts(dict(name_or_index='count', dtype=np.int_), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
-                jit_registry.resolve_option(nb.count_reduce_nb, jitted),
+                jit_reg.resolve_option(nb.count_reduce_nb, jitted),
                 flatten=True,
                 jitted=jitted,
                 chunked=chunked,
@@ -1807,10 +1807,10 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         if use_jitted is None:
             use_jitted = generic_cfg['use_jitted']
         if use_jitted:
-            func = jit_registry.resolve_option(nb.nancnt_nb, jitted)
+            func = jit_reg.resolve_option(nb.nancnt_nb, jitted)
         else:
             func = lambda a: np.sum(~np.isnan(a), axis=0)
-        func = ch_registry.resolve_option(nb.nancnt_nb, chunked, target_func=func)
+        func = ch_reg.resolve_option(nb.nancnt_nb, chunked, target_func=func)
         return self.wrapper.wrap_reduced(func(arr), group_by=False, **wrap_kwargs)
 
     def idxmin(self,
@@ -1823,7 +1823,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         wrap_kwargs = merge_dicts(dict(name_or_index='idxmin'), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
-                jit_registry.resolve_option(nb.argmin_reduce_nb, jitted),
+                jit_reg.resolve_option(nb.argmin_reduce_nb, jitted),
                 returns_idx=True,
                 flatten=True,
                 order=order,
@@ -1843,7 +1843,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             chunked,
             arg_take_spec=dict(index=None)
         )
-        func = ch_registry.resolve_option(nb.nanmin_nb, chunked, target_func=func)
+        func = ch_reg.resolve_option(nb.nanmin_nb, chunked, target_func=func)
         out = func(self.to_2d_array(), self.wrapper.index)
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
@@ -1857,7 +1857,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         wrap_kwargs = merge_dicts(dict(name_or_index='idxmax'), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
-                jit_registry.resolve_option(nb.argmax_reduce_nb, jitted),
+                jit_reg.resolve_option(nb.argmax_reduce_nb, jitted),
                 returns_idx=True,
                 flatten=True,
                 order=order,
@@ -1877,7 +1877,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             chunked,
             arg_take_spec=dict(index=None)
         )
-        func = ch_registry.resolve_option(nb.nanmax_nb, chunked, target_func=func)
+        func = ch_reg.resolve_option(nb.nanmax_nb, chunked, target_func=func)
         out = func(self.to_2d_array(), self.wrapper.index)
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
@@ -1923,7 +1923,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         )
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
-                jit_registry.resolve_option(nb.describe_reduce_nb, jitted),
+                jit_reg.resolve_option(nb.describe_reduce_nb, jitted),
                 percentiles, ddof,
                 returns_array=True,
                 flatten=True,
@@ -1933,7 +1933,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                 wrap_kwargs=wrap_kwargs)
         else:
             return self.reduce(
-                jit_registry.resolve_option(nb.describe_reduce_nb, jitted),
+                jit_reg.resolve_option(nb.describe_reduce_nb, jitted),
                 percentiles, ddof,
                 returns_array=True,
                 jitted=jitted,
@@ -2110,16 +2110,16 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             mapping = to_mapping(mapping)
         codes, uniques = pd.factorize(self.obj.values.flatten(), sort=False, na_sentinel=None)
         if axis == 0:
-            func = jit_registry.resolve_option(nb.value_counts_per_row_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.value_counts_per_row_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             value_counts = func(codes.reshape(self.wrapper.shape_2d), len(uniques))
         elif axis == 1:
             group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
-            func = jit_registry.resolve_option(nb.value_counts_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.value_counts_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             value_counts = func(codes.reshape(self.wrapper.shape_2d), len(uniques), group_lens)
         else:
-            func = jit_registry.resolve_option(nb.value_counts_1d_nb, jitted)
+            func = jit_reg.resolve_option(nb.value_counts_1d_nb, jitted)
             value_counts = func(codes, len(uniques))
         if incl_all_keys and mapping is not None:
             missing_keys = []
@@ -2238,8 +2238,8 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
         This makes comparing/plotting different series together easier.
         Will forward and backward fill NaN values."""
-        func = jit_registry.resolve_option(nb.fbfill_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.fbfill_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         result = func(self.to_2d_array())
         result = result / result[0] * base
         return self.wrapper.wrap(result, group_by=False, **resolve_dict(wrap_kwargs))
@@ -2522,8 +2522,8 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
                  chunked: tp.ChunkedOption = None,
                  wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Drawdown series."""
-        func = jit_registry.resolve_option(nb.drawdown_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.drawdown_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         out = func(self.to_2d_array())
         return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
@@ -2618,8 +2618,8 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
             ```
         """
         self_obj, other_obj = reshaping.broadcast(self.obj, other, **resolve_dict(broadcast_kwargs))
-        func = jit_registry.resolve_option(nb.crossed_above_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.crossed_above_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         out = func(reshaping.to_2d_array(self_obj), reshaping.to_2d_array(other_obj), wait=wait)
         return ArrayWrapper.from_obj(self_obj).wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
@@ -2634,8 +2634,8 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
 
         See `vectorbtpro.generic.nb.crossed_above_nb` but in reversed order."""
         self_obj, other_obj = reshaping.broadcast(self.obj, other, **resolve_dict(broadcast_kwargs))
-        func = jit_registry.resolve_option(nb.crossed_above_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.crossed_above_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         out = func(reshaping.to_2d_array(other_obj), reshaping.to_2d_array(self_obj), wait=wait)
         return ArrayWrapper.from_obj(self_obj).wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 

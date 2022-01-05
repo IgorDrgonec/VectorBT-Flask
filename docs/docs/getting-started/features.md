@@ -656,4 +656,8 @@ False
 
 1. Restart the runtime
 
+### And more...
+
+- [ ] Expect many more killer features to be added on a weekly basis! :heart:{ .heart }
+
 

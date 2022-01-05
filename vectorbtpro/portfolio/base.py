@@ -1669,8 +1669,8 @@ from vectorbtpro.portfolio.logs import Logs
 from vectorbtpro.portfolio.orders import Orders
 from vectorbtpro.portfolio.trades import Trades, EntryTrades, ExitTrades, Positions
 from vectorbtpro.records import nb as records_nb
-from vectorbtpro.registries.ch_registry import ch_registry
-from vectorbtpro.registries.jit_registry import jit_registry
+from vectorbtpro.registries.ch_registry import ch_reg
+from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.returns.accessors import ReturnsAccessor
 from vectorbtpro.signals.generators import RANDNX, RPROBNX
 from vectorbtpro.utils import checks
@@ -2343,9 +2343,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             return to_2d_array(obj)[:, col_idxs]
 
         def _index_records(obj: tp.RecordArray) -> tp.RecordArray:
-            func = jit_registry.resolve_option(records_nb.col_map_nb, None)
+            func = jit_reg.resolve_option(records_nb.col_map_nb, None)
             col_map = func(obj['col'], len(self.wrapper.columns))
-            func = jit_registry.resolve_option(records_nb.record_col_map_select_nb, None)
+            func = jit_reg.resolve_option(records_nb.record_col_map_select_nb, None)
             return func(obj, col_map, to_1d_array(col_idxs))
 
         for field, obj in in_outputs.items():
@@ -3101,8 +3101,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         checks.assert_subdtype(broadcasted_args['close'], np.number)
 
         # Perform the simulation
-        func = jit_registry.resolve_option(nb.simulate_from_orders_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.simulate_from_orders_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         sim_out = func(
             target_shape=target_shape_2d,
             group_lens=cs_group_lens,  # group only if cash sharing is enabled to speed up
@@ -4245,8 +4245,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             broadcasted_args.pop(k)
 
         # Perform the simulation
-        func = jit_registry.resolve_option(nb.simulate_from_signal_func_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.simulate_from_signal_func_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         sim_out = func(
             target_shape=target_shape_2d,
             group_lens=cs_group_lens,  # group only if cash sharing is enabled to speed up
@@ -5243,8 +5243,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         # Perform the simulation
         if row_wise:
             if flexible:
-                func = jit_registry.resolve_option(nb.flex_simulate_row_wise_nb, jitted)
-                func = ch_registry.resolve_option(func, chunked)
+                func = jit_reg.resolve_option(nb.flex_simulate_row_wise_nb, jitted)
+                func = ch_reg.resolve_option(func, chunked)
                 sim_out = func(
                     target_shape=target_shape_2d,
                     group_lens=group_lens,
@@ -5286,8 +5286,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                     in_outputs=in_outputs
                 )
             else:
-                func = jit_registry.resolve_option(nb.simulate_row_wise_nb, jitted)
-                func = ch_registry.resolve_option(func, chunked)
+                func = jit_reg.resolve_option(nb.simulate_row_wise_nb, jitted)
+                func = ch_reg.resolve_option(func, chunked)
                 sim_out = func(
                     target_shape=target_shape_2d,
                     group_lens=group_lens,
@@ -5331,8 +5331,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 )
         else:
             if flexible:
-                func = jit_registry.resolve_option(nb.flex_simulate_nb, jitted)
-                func = ch_registry.resolve_option(func, chunked)
+                func = jit_reg.resolve_option(nb.flex_simulate_nb, jitted)
+                func = ch_reg.resolve_option(func, chunked)
                 sim_out = func(
                     target_shape=target_shape_2d,
                     group_lens=group_lens,
@@ -5374,8 +5374,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                     in_outputs=in_outputs
                 )
             else:
-                func = jit_registry.resolve_option(nb.simulate_nb, jitted)
-                func = ch_registry.resolve_option(func, chunked)
+                func = jit_reg.resolve_option(nb.simulate_nb, jitted)
+                func = ch_reg.resolve_option(func, chunked)
                 sim_out = func(
                     target_shape=target_shape_2d,
                     group_lens=group_lens,
@@ -5800,8 +5800,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             checks.assert_not_none(close)
             checks.assert_not_none(wrapper)
 
-        func = jit_registry.resolve_option(generic_nb.fbfill_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(generic_nb.fbfill_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         filled_close = func(to_2d_array(close))
         return wrapper.wrap(filled_close, group_by=False, **resolve_dict(wrap_kwargs))
 
@@ -5993,8 +5993,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 wrapper = orders.wrapper
 
         direction = map_enum_fields(direction, Direction)
-        func = jit_registry.resolve_option(nb.asset_flow_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.asset_flow_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         asset_flow = func(
             wrapper.shape_2d,
             orders.values,
@@ -6035,17 +6035,17 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             checks.assert_not_none(wrapper)
 
         direction = map_enum_fields(direction, Direction)
-        func = jit_registry.resolve_option(nb.assets_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.assets_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         assets = func(
             to_2d_array(asset_flow),
             init_position=to_1d_array(init_position)
         )
         if direction == Direction.LongOnly:
-            func = jit_registry.resolve_option(nb.longonly_assets_nb, jitted)
+            func = jit_reg.resolve_option(nb.longonly_assets_nb, jitted)
             assets = func(assets)
         elif direction == Direction.ShortOnly:
-            func = jit_registry.resolve_option(nb.shortonly_assets_nb, jitted)
+            func = jit_reg.resolve_option(nb.shortonly_assets_nb, jitted)
             assets = func(assets)
         return wrapper.wrap(assets, group_by=False, **resolve_dict(wrap_kwargs))
 
@@ -6080,7 +6080,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             position_mask = wrapper.wrap(position_mask, group_by=False) \
                 .vbt(wrapper=wrapper) \
                 .squeeze_grouped(
-                jit_registry.resolve_option(generic_nb.any_reduce_nb, jitted),
+                jit_reg.resolve_option(generic_nb.any_reduce_nb, jitted),
                 group_by=group_by,
                 jitted=jitted,
                 chunked=chunked
@@ -6117,7 +6117,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         position_coverage = position_mask \
             .vbt(wrapper=wrapper) \
             .reduce(
-            jit_registry.resolve_option(generic_nb.mean_reduce_nb, jitted),
+            jit_reg.resolve_option(generic_nb.mean_reduce_nb, jitted),
             group_by=group_by,
             jitted=jitted,
             chunked=chunked
@@ -6161,18 +6161,18 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                         jitted=jitted,
                         chunked=chunked
                     )
-            func = jit_registry.resolve_option(nb.align_init_cash_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.align_init_cash_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             init_cash = func(init_cash_raw, to_2d_array(cash_flow))
         else:
             init_cash_raw = to_1d_array(init_cash_raw)
             if wrapper.grouper.is_grouped(group_by=group_by):
                 group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
-                func = jit_registry.resolve_option(nb.init_cash_grouped_nb, jitted)
+                func = jit_reg.resolve_option(nb.init_cash_grouped_nb, jitted)
                 init_cash = func(init_cash_raw, group_lens, cash_sharing)
             else:
                 group_lens = wrapper.grouper.get_group_lens()
-                func = jit_registry.resolve_option(nb.init_cash_nb, jitted)
+                func = jit_reg.resolve_option(nb.init_cash_nb, jitted)
                 init_cash = func(init_cash_raw, group_lens, cash_sharing, split_shared=split_shared)
         wrap_kwargs = merge_dicts(dict(name_or_index='init_cash'), wrap_kwargs)
         return wrapper.wrap_reduced(init_cash, group_by=group_by, **wrap_kwargs)
@@ -6211,8 +6211,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             if keep_flex and cash_sharing:
                 return cash_deposits_raw
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
-            func = jit_registry.resolve_option(nb.cash_deposits_grouped_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.cash_deposits_grouped_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             cash_deposits = func(
                 wrapper.shape_2d,
                 cash_deposits_raw,
@@ -6224,8 +6224,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             if keep_flex and not cash_sharing:
                 return cash_deposits_raw
             group_lens = wrapper.grouper.get_group_lens()
-            func = jit_registry.resolve_option(nb.cash_deposits_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.cash_deposits_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             cash_deposits = func(
                 wrapper.shape_2d,
                 cash_deposits_raw,
@@ -6265,8 +6265,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         if wrapper.grouper.is_grouped(group_by=group_by):
             cash_earnings = np.broadcast_to(cash_earnings_raw, wrapper.shape_2d)
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
-            func = jit_registry.resolve_option(nb.sum_grouped_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.sum_grouped_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             cash_earnings = func(cash_earnings, group_lens)
         else:
             if keep_flex:
@@ -6308,8 +6308,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             if wrapper is None:
                 wrapper = orders.wrapper
 
-        func = jit_registry.resolve_option(nb.cash_flow_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.cash_flow_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         cash_flow = func(
             wrapper.shape_2d,
             orders.values,
@@ -6320,8 +6320,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         )
         if wrapper.grouper.is_grouped(group_by=group_by):
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
-            func = jit_registry.resolve_option(nb.sum_grouped_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.sum_grouped_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             cash_flow = func(cash_flow, group_lens)
         return wrapper.wrap(cash_flow, group_by=group_by, **resolve_dict(wrap_kwargs))
 
@@ -6380,8 +6380,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                         keep_flex=True
                     )
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
-            func = jit_registry.resolve_option(nb.cash_grouped_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.cash_grouped_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             cash = func(
                 wrapper.shape_2d,
                 to_2d_array(cash_flow),
@@ -6407,8 +6407,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                         chunked=chunked,
                         keep_flex=True
                     )
-            func = jit_registry.resolve_option(nb.cash_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.cash_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             cash = func(
                 to_2d_array(cash_flow),
                 to_1d_array(init_cash),
@@ -6444,7 +6444,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 init_position = 0.
             checks.assert_not_none(wrapper)
 
-        func = jit_registry.resolve_option(nb.init_position_value_nb, jitted)
+        func = jit_reg.resolve_option(nb.init_position_value_nb, jitted)
         init_position_value = func(to_2d_array(close), init_position=to_1d_array(init_position))
         wrap_kwargs = merge_dicts(dict(name_or_index='init_position_value'), wrap_kwargs)
         return wrapper.wrap_reduced(init_position_value, group_by=False, **wrap_kwargs)
@@ -6482,14 +6482,14 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
         if wrapper.grouper.is_grouped(group_by=group_by):
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
-            func = jit_registry.resolve_option(nb.init_value_grouped_nb, jitted)
+            func = jit_reg.resolve_option(nb.init_value_grouped_nb, jitted)
             init_value = func(
                 group_lens,
                 to_1d_array(init_position_value),
                 to_1d_array(init_cash)
             )
         else:
-            func = jit_registry.resolve_option(nb.init_value_nb, jitted)
+            func = jit_reg.resolve_option(nb.init_value_nb, jitted)
             init_value = func(
                 to_1d_array(init_position_value),
                 to_1d_array(init_cash)
@@ -6536,11 +6536,11 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         cash_deposits_sum = cash_deposits_raw.sum(axis=0)
         if wrapper.grouper.is_grouped(group_by=group_by):
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
-            func = jit_registry.resolve_option(nb.init_cash_grouped_nb, jitted)
+            func = jit_reg.resolve_option(nb.init_cash_grouped_nb, jitted)
             input_value = func(cash_deposits_sum, group_lens, cash_sharing)
         else:
             group_lens = wrapper.grouper.get_group_lens()
-            func = jit_registry.resolve_option(nb.init_cash_nb, jitted)
+            func = jit_reg.resolve_option(nb.init_cash_nb, jitted)
             input_value = func(cash_deposits_sum, group_lens, cash_sharing, split_shared=split_shared)
         input_value += to_1d_array(init_value)
         wrap_kwargs = merge_dicts(dict(name_or_index='input_value'), wrap_kwargs)
@@ -6580,12 +6580,12 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         close = to_2d_array(close).copy()
         assets = to_2d_array(assets)
         close[assets == 0] = 0.  # for price being NaN
-        func = jit_registry.resolve_option(nb.asset_value_nb, jitted)
+        func = jit_reg.resolve_option(nb.asset_value_nb, jitted)
         asset_value = func(close, assets)
         if wrapper.grouper.is_grouped(group_by=group_by):
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
-            func = jit_registry.resolve_option(nb.sum_grouped_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.sum_grouped_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             asset_value = func(asset_value, group_lens)
         return wrapper.wrap(asset_value, group_by=group_by, **resolve_dict(wrap_kwargs))
 
@@ -6626,8 +6626,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             checks.assert_not_none(free_cash)
             checks.assert_not_none(wrapper)
 
-        func = jit_registry.resolve_option(nb.gross_exposure_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.gross_exposure_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         gross_exposure = func(to_2d_array(asset_value), to_2d_array(free_cash))
         return wrapper.wrap(gross_exposure, group_by=group_by, **resolve_dict(wrap_kwargs))
 
@@ -6704,7 +6704,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             checks.assert_not_none(asset_value)
             checks.assert_not_none(wrapper)
 
-        func = jit_registry.resolve_option(nb.value_nb, jitted)
+        func = jit_reg.resolve_option(nb.value_nb, jitted)
         value = func(to_2d_array(cash), to_2d_array(asset_value))
         return wrapper.wrap(value, group_by=group_by, **resolve_dict(wrap_kwargs))
 
@@ -6749,8 +6749,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             if wrapper is None:
                 wrapper = orders.wrapper
 
-        func = jit_registry.resolve_option(nb.total_profit_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.total_profit_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         total_profit = func(
             wrapper.shape_2d,
             to_2d_array(close),
@@ -6762,7 +6762,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         )
         if wrapper.grouper.is_grouped(group_by=group_by):
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
-            func = jit_registry.resolve_option(nb.total_profit_grouped_nb, jitted)
+            func = jit_reg.resolve_option(nb.total_profit_grouped_nb, jitted)
             total_profit = func(total_profit, group_lens)
         wrap_kwargs = merge_dicts(dict(name_or_index='total_profit'), wrap_kwargs)
         return wrapper.wrap_reduced(total_profit, group_by=group_by, **wrap_kwargs)
@@ -6883,8 +6883,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             checks.assert_not_none(value)
             checks.assert_not_none(wrapper)
 
-        func = jit_registry.resolve_option(nb.returns_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.returns_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         returns = func(
             to_2d_array(value),
             to_1d_array(init_value),
@@ -6934,8 +6934,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             checks.assert_not_none(cash_flow)
             checks.assert_not_none(wrapper)
 
-        func = jit_registry.resolve_option(nb.asset_returns_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.asset_returns_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         asset_returns = func(
             to_1d_array(init_position_value),
             to_2d_array(asset_value),
@@ -6995,8 +6995,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                         keep_flex=True
                     )
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
-            func = jit_registry.resolve_option(nb.market_value_grouped_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.market_value_grouped_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             market_value = func(
                 to_2d_array(close),
                 group_lens,
@@ -7021,8 +7021,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                         chunked=chunked,
                         keep_flex=True
                     )
-            func = jit_registry.resolve_option(nb.market_value_nb, jitted)
-            func = ch_registry.resolve_option(func, chunked)
+            func = jit_reg.resolve_option(nb.market_value_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
             market_value = func(
                 to_2d_array(close),
                 to_1d_array(init_value),
@@ -7075,8 +7075,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             checks.assert_not_none(market_value)
             checks.assert_not_none(wrapper)
 
-        func = jit_registry.resolve_option(nb.returns_nb, jitted)
-        func = ch_registry.resolve_option(func, chunked)
+        func = jit_reg.resolve_option(nb.returns_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         market_returns = func(
             to_2d_array(market_value),
             to_1d_array(init_value),

@@ -3,7 +3,6 @@
 """Modules for working with portfolio."""
 
 from vectorbtpro.portfolio.base import Portfolio
-from vectorbtpro.portfolio.enums import *
 from vectorbtpro.portfolio.logs import Logs
 from vectorbtpro.portfolio.orders import Orders
 from vectorbtpro.portfolio.trades import Trades, EntryTrades, ExitTrades, Positions
