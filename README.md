@@ -46,6 +46,6 @@ Thank you for using vectorbt PRO legally :heart:
 
 ## Support
 
-## [Documentation](https://vectorbt.pro) · [New issue](https://github.com/polakowo/vectorbt.pro/issues) · <sub>[![Discord](https://img.shields.io/discord/918629562441695344?logo=discord&logoColor=white)](https://discord.gg/63jZZzCwzp)</sub> · [Send email](mailto:olegpolakow@gmail.com)
+## [Documentation](https://vectorbt.pro) · [New issue](https://github.com/polakowo/vectorbt.pro/issues) · <sub>[![Discord](https://img.shields.io/discord/918629562441695344?logo=discord&logoColor=white)](https://discord.gg/63jZZzCwzp)</sub> · [Contact Us](mailto:olegpolakow@gmail.com)
 
 © 2021 vectorbt PRO
