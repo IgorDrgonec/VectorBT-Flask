@@ -34,7 +34,7 @@ def get_extra_requires(path, add_all=True):
 setup(
     name='vectorbtpro',
     version=version['__version__'],
-    description='Next-gen framework for backtesting, algorithmic trading, and research',
+    description='Ultimate engine for quants',
     author='Oleg Polakow',
     author_email='olegpolakow@gmail.com',
     long_description=long_description,
