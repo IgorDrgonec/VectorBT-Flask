@@ -3636,7 +3636,7 @@ Other keyword arguments are passed to `{0}.run`.
         )
 
     @classmethod
-    def get_pandas_ta_indicators(cls, silence_warnings: bool = True) -> tp.Set[str]:
+    def get_pandas_ta_indicators(cls, silence_warnings: bool = True, **kwargs) -> tp.Set[str]:
         """Get all pandas-ta indicators.
 
         !!! note
@@ -3648,7 +3648,7 @@ Other keyword arguments are passed to `{0}.run`.
         indicators = set()
         for func_name in [_k for k, v in pandas_ta.Category.items() for _k in v]:
             try:
-                cls.parse_pandas_ta_config(getattr(pandas_ta, func_name))
+                cls.parse_pandas_ta_config(getattr(pandas_ta, func_name), **kwargs)
                 indicators.add(func_name.upper())
             except Exception as e:
                 if not silence_warnings:
