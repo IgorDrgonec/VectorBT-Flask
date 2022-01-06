@@ -6191,6 +6191,11 @@ order_size_new = pd.DataFrame({
     'b': [0., 0.1, -1., -0.1, 1.],
     'c': [1., 0.1, -1., -0.1, 1.]
 }, index=price.index)
+bm_price_na = pd.DataFrame({
+    'a': [5., 4., 3., 2., np.nan],
+    'b': [5., 4., np.nan, 2., 1.],
+    'c': [np.nan, 4., 3., 2., 1.]
+}, index=price.index)
 init_position = [1., -1., 0.]
 directions = ['longonly', 'shortonly', 'both']
 group_by = pd.Index(['first', 'first', 'second'], name='group')
@@ -6214,7 +6219,8 @@ pf = vbt.Portfolio.from_orders(
         'c': [0., 0., 0., 0., 0.]
     }, index=price.index),
     freq='1D',
-    attach_call_seq=True
+    attach_call_seq=True,
+    bm_close=bm_price_na
 )  # independent
 
 pf_grouped = vbt.Portfolio.from_orders(
@@ -6237,7 +6243,8 @@ pf_grouped = vbt.Portfolio.from_orders(
         'c': [0., 0., 0., 0., 0.]
     }, index=price.index),
     freq='1D',
-    attach_call_seq=True
+    attach_call_seq=True,
+    bm_close=bm_price_na
 )  # grouped
 
 pf_shared = vbt.Portfolio.from_orders(
@@ -6259,7 +6266,8 @@ pf_shared = vbt.Portfolio.from_orders(
         'second': [0., 0., 0., 0., 0.]
     }, index=price.index),
     freq='1D',
-    attach_call_seq=True
+    attach_call_seq=True,
+    bm_close=bm_price_na
 )  # shared
 
 
@@ -9257,6 +9265,46 @@ class TestPortfolio:
             pf.get_market_returns(chunked=False),
         )
 
+    def test_bm_value(self):
+        pd.testing.assert_frame_equal(
+            pf.bm_value,
+            pd.DataFrame(
+                np.array([
+                    [102.0, 99.0, 100.0],
+                    [81.60000000000001, 79.2, 100.0],
+                    [161.2, 179.2, 75.0],
+                    [107.46666666666665, 89.6, 50.0],
+                    [107.46666666666665, 44.8, 25.0]
+                ]),
+                index=price_na.index,
+                columns=price_na.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            pf.replace(bm_close=None).bm_value,
+            pf.market_value,
+        )
+
+    def test_bm_returns(self):
+        pd.testing.assert_frame_equal(
+            pf.bm_returns,
+            pd.DataFrame(
+                np.array([
+                    [0.0, 0.0, 0.0],
+                    [-0.19999999999999993, -0.19999999999999998, 0.0],
+                    [-0.2500000000000002, 0.0, -0.25],
+                    [-0.33333333333333337, -0.5, -0.3333333333333333],
+                    [0.0, -0.5, -0.5]
+                ]),
+                index=price_na.index,
+                columns=price_na.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            pf.replace(bm_close=None).bm_returns,
+            pf.market_returns,
+        )
+
     def test_total_market_return(self):
         pd.testing.assert_series_equal(
             pf.total_market_return,
@@ -9383,7 +9431,7 @@ class TestPortfolio:
         pd.testing.assert_series_equal(
             pf_shared.get_information_ratio(group_by=False),
             pd.Series(
-                np.array([-1.001179677973908, -0.8792042984132398, -0.8847806423522397]),
+                np.array([1.0384749617059628, 0.9525372423693426, 1.0199058062359245]),
                 index=price_na.columns
             ).rename('information_ratio')
         )
@@ -9423,6 +9471,22 @@ class TestPortfolio:
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
                     pd.Timedelta('5 days 00:00:00'), 100.0, 166.24150666666665, -0.09944158449010732,
+                    -71.66666666666667, 1.2135130969045893, 0.42916000000000004, 0.6276712912251518,
+                    pd.Timedelta('2 days 00:00:00'), 2.3333333333333335, 1.6666666666666667,
+                    0.6666666666666666, -1.4678727272727272, 66.66666666666667, -62.06261760946578,
+                    -65.81967240213856, 91.58494359313319, -374.9933222036729, pd.Timedelta('3 days 00:00:00'),
+                    pd.Timedelta('4 days 00:00:00'), np.inf, 0.2866227272727273, -0.25595098630477686,
+                    889.6944375349927, 6.270976459353577, 49.897006624719126
+                ]),
+                index=stats_index,
+                name='agg_func_mean')
+        )
+        pd.testing.assert_series_equal(
+            pf.replace(bm_close=None).stats(),
+            pd.Series(
+                np.array([
+                    pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
+                    pd.Timedelta('5 days 00:00:00'), 100.0, 166.24150666666665, -0.09944158449010732,
                     283.3333333333333, 1.2135130969045893, 0.42916000000000004, 0.6276712912251518,
                     pd.Timedelta('2 days 00:00:00'), 2.3333333333333335, 1.6666666666666667,
                     0.6666666666666666, -1.4678727272727272, 66.66666666666667, -62.06261760946578,
@@ -9439,7 +9503,7 @@ class TestPortfolio:
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
                     pd.Timedelta('5 days 00:00:00'), 100.0, 202.62781999999999, 0.3108019801980197,
-                    150.0, 2.467578242711193, 0.48618000000000006, 0.10277254148026709,
+                    -60.00000000000001, 2.467578242711193, 0.48618000000000006, 0.10277254148026709,
                     pd.Timedelta('2 days 00:00:00'), 3, 2, 1, -0.20049999999999982, 100.0,
                     41.25431425976392, 37.25295186194369, 39.25363306085381, np.nan,
                     pd.Timedelta('3 days 12:00:00'), pd.NaT, np.inf, 0.4141600000000001, 6.258914490528395,
@@ -9454,7 +9518,7 @@ class TestPortfolio:
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
                     pd.Timedelta('50 days 00:00:00'), 100.0, 202.62781999999999, 0.3108019801980197,
-                    150.0, 2.467578242711193, 0.48618000000000006, 0.10277254148026709,
+                    -60.00000000000001, 2.467578242711193, 0.48618000000000006, 0.10277254148026709,
                     pd.Timedelta('20 days 00:00:00'), 3, 2, 1, -0.20049999999999982, 100.0,
                     41.25431425976392, 37.25295186194369, 39.25363306085381, np.nan,
                     pd.Timedelta('35 days 00:00:00'), pd.NaT, np.inf, 0.4141600000000001, 1.4651010643478568,
@@ -9469,7 +9533,7 @@ class TestPortfolio:
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
                     pd.Timedelta('5 days 00:00:00'), 100.0, 202.62781999999999, 0.3108019801980197,
-                    150.0, 2.467578242711193, 0.48618000000000006, 0.10277254148026709,
+                    -60.00000000000001, 2.467578242711193, 0.48618000000000006, 0.10277254148026709,
                     pd.Timedelta('2 days 00:00:00'), 3, 2, 1, -0.20049999999999982, 100.0, 41.25431425976392,
                     37.25295186194369, 39.25363306085381, np.nan, pd.Timedelta('3 days 12:00:00'),
                     pd.NaT, np.inf, 0.4141600000000001, 6.258914490528395, 665.2843559613844,
@@ -9494,7 +9558,7 @@ class TestPortfolio:
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
                     pd.Timedelta('5 days 00:00:00'), 100.0, 202.62781999999999, 0.3108019801980197,
-                    150.0, 2.467578242711193, 0.48618000000000006, 0.10277254148026709,
+                    -60.00000000000001, 2.467578242711193, 0.48618000000000006, 0.10277254148026709,
                     pd.Timedelta('2 days 00:00:00'), 3, 2, 1, -0.20049999999999982, 100.0,
                     41.25431425976392, 37.25295186194369, 39.25363306085381, np.nan,
                     pd.Timedelta('3 days 12:00:00'), pd.NaT, np.inf, 0.4141600000000001, -37.32398741973627,
@@ -9509,7 +9573,7 @@ class TestPortfolio:
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
                     pd.Timedelta('5 days 00:00:00'), 100.0, 202.62781999999999, 0.3108019801980197,
-                    150.0, 2.467578242711193, 0.48618000000000006, 0.10277254148026709,
+                    -60.00000000000001, 2.467578242711193, 0.48618000000000006, 0.10277254148026709,
                     pd.Timedelta('2 days 00:00:00'), 3, 2, 1, -0.20049999999999982, 100.0,
                     41.25431425976392, 37.25295186194369, 39.25363306085381, np.nan,
                     pd.Timedelta('3 days 12:00:00'), pd.NaT, np.inf, 0.4141600000000001, 5.746061520593739,
@@ -9524,7 +9588,7 @@ class TestPortfolio:
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
                     pd.Timedelta('5 days 00:00:00'), 100.0, 202.62781999999999, 0.3108019801980197,
-                    150.0, 2.467578242711193, 0.48618000000000006, 0.10277254148026709,
+                    -60.00000000000001, 2.467578242711193, 0.48618000000000006, 0.10277254148026709,
                     pd.Timedelta('2 days 00:00:00'), 3, 2, 1, -0.20049999999999982, 66.66666666666666,
                     41.25431425976392, -3.9702970297029667, 39.25363306085381, -3.9702970297029667,
                     pd.Timedelta('3 days 12:00:00'), pd.Timedelta('1 days 00:00:00'), 4.131271820448882,
@@ -9539,7 +9603,7 @@ class TestPortfolio:
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
                     pd.Timedelta('5 days 00:00:00'), 200.0, 397.0163, -0.9934413965087281,
-                    269.7483544166643, 0.4975124378109453, 0.8417000000000001, 0.9273023412387791,
+                    -68.75458196678184, 0.4975124378109453, 0.8417000000000001, 0.9273023412387791,
                     pd.Timedelta('2 days 00:00:00'), 5, 3, 2, -4.403618181818182, 66.66666666666666,
                     41.25431425976392, -374.9933222036729, 39.25363306085381, -374.9933222036729,
                     pd.Timedelta('3 days 12:00:00'), pd.Timedelta('4 days 00:00:00'), 2.0281986101032405,
@@ -9689,8 +9753,29 @@ class TestPortfolio:
         pd.testing.assert_index_equal(stats_df.columns, stats_index)
 
     def test_returns_stats(self):
+        stats_index = pd.Index([
+            'Start', 'End', 'Period', 'Total Return [%]', 'Benchmark Return [%]',
+            'Annualized Return [%]', 'Annualized Volatility [%]',
+            'Max Drawdown [%]', 'Max Drawdown Duration', 'Sharpe Ratio',
+            'Calmar Ratio', 'Omega Ratio', 'Sortino Ratio', 'Skew', 'Kurtosis',
+            'Tail Ratio', 'Common Sense Ratio', 'Value at Risk', 'Alpha', 'Beta'
+        ], dtype='object')
         pd.testing.assert_series_equal(
             pf.returns_stats(column='a'),
+            pd.Series(
+                np.array([
+                    pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
+                    pd.Timedelta('5 days 00:00:00'), 0.7162671975297075, -60.00000000000001, 68.3729640692142,
+                    8.374843895239454, 0.10277254148026353, pd.Timedelta('2 days 00:00:00'),
+                    6.258914490528395, 665.2843559613844, 4.506828421607624, 43.179437771402675,
+                    2.1657940859079745, 4.749360549470598, 7.283755486189502, 12.263875007651269,
+                    -0.001013547284289139, -0.07963807950336177, -0.010617659789479695
+                ]),
+                index=stats_index,
+                name='a')
+        )
+        pd.testing.assert_series_equal(
+            pf.replace(bm_close=None).returns_stats(column='a'),
             pd.Series(
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
@@ -9700,13 +9785,7 @@ class TestPortfolio:
                     2.1657940859079745, 4.749360549470598, 7.283755486189502, 12.263875007651269,
                     -0.001013547284289139, -0.4768429263982791, 0.014813148996296632
                 ]),
-                index=pd.Index([
-                    'Start', 'End', 'Period', 'Total Return [%]', 'Benchmark Return [%]',
-                    'Annualized Return [%]', 'Annualized Volatility [%]',
-                    'Max Drawdown [%]', 'Max Drawdown Duration', 'Sharpe Ratio',
-                    'Calmar Ratio', 'Omega Ratio', 'Sortino Ratio', 'Skew', 'Kurtosis',
-                    'Tail Ratio', 'Common Sense Ratio', 'Value at Risk', 'Alpha', 'Beta'
-                ], dtype='object'),
+                index=stats_index,
                 name='a')
         )
 

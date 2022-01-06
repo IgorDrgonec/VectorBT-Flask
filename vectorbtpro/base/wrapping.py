@@ -862,7 +862,11 @@ class Wrapping(Configured, PandasIndexer, AttrResolver):
         if not wrapper.grouper.is_grouped():
             if wrapper.ndim == 1:
                 return obj
+            if wrapper.shape_2d[1] == 1:
+                return obj.iloc[:, 0]
             raise TypeError("Only one column is allowed. Use indexing or column argument.")
         if wrapper.grouped_ndim == 1:
             return obj
+        if wrapper.shape_2d[1] == 1:
+            return obj.iloc[:, 0]
         raise TypeError("Only one group is allowed. Use indexing or column argument.")

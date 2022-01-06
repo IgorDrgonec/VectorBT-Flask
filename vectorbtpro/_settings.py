@@ -783,6 +783,7 @@ _settings['signals'] = signals
 
 returns = dict(
     year_freq='365 days',
+    bm_returns=None,
     defaults=Config(  # flex
         dict(
             start_value=0.,
@@ -803,10 +804,10 @@ returns = dict(
                     self.year_freq is not None,
                     warning_message=Sub("Metric '$metric_name' requires year frequency to be set")
                 ),
-                has_benchmark_rets=dict(
+                has_bm_returns=dict(
                     filter_func=lambda self, metric_settings:
-                    metric_settings.get('benchmark_rets', self.benchmark_rets) is not None,
-                    warning_message=Sub("Metric '$metric_name' requires benchmark_rets to be set")
+                    metric_settings.get('bm_returns', self.bm_returns) is not None,
+                    warning_message=Sub("Metric '$metric_name' requires bm_returns to be set")
                 )
             ),
             settings=dict(
@@ -1020,6 +1021,7 @@ portfolio = dict(
     keep_inout_raw=True,
     call_seq='default',
     attach_call_seq=False,
+    bm_close=None,
 
     # Portfolio
     freq=None,

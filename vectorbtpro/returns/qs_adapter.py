@@ -15,16 +15,16 @@ We can access the adapter from `ReturnsAccessor`:
 
 >>> np.random.seed(42)
 >>> rets = pd.Series(np.random.uniform(-0.1, 0.1, size=(100,)))
->>> benchmark_rets = pd.Series(np.random.uniform(-0.1, 0.1, size=(100,)))
+>>> bm_returns = pd.Series(np.random.uniform(-0.1, 0.1, size=(100,)))
 
->>> rets.vbt.returns.qs.r_squared(benchmark=benchmark_rets)
+>>> rets.vbt.returns.qs.r_squared(benchmark=bm_returns)
 0.0011582111228735541
 ```
 
 Which is the same as:
 
 ```pycon
->>> qs.stats.r_squared(rets, benchmark_rets)
+>>> qs.stats.r_squared(rets, bm_returns)
 ```
 
 So why not just using `qs.stats`?
@@ -36,7 +36,7 @@ for the use in quantstats.
 ```pycon
 >>> # Defaults that vectorbt understands
 >>> ret_acc = rets.vbt.returns(
-...     benchmark_rets=benchmark_rets,
+...     bm_returns=bm_returns,
 ...     freq='d',
 ...     year_freq='365d',
 ...     defaults=dict(risk_free=0.001)
@@ -50,7 +50,7 @@ for the use in quantstats.
 
 >>> # Defaults that only quantstats understands
 >>> qs_defaults = dict(
-...     benchmark=benchmark_rets,
+...     benchmark=bm_returns,
 ...     periods=365,
 ...     rf=0.001
 ... )
@@ -143,8 +143,8 @@ def attach_qs_methods(cls: tp.Type[tp.T], replace_signature: bool = True) -> tp.
                             if arg_name in defaults:
                                 pass_kwargs[arg_name] = defaults[arg_name]
                             elif arg_name == 'benchmark':
-                                if self.returns_accessor.benchmark_rets is not None:
-                                    pass_kwargs['benchmark'] = self.returns_accessor.benchmark_rets
+                                if self.returns_accessor.bm_returns is not None:
+                                    pass_kwargs['benchmark'] = self.returns_accessor.bm_returns
                             elif arg_name == 'periods':
                                 pass_kwargs['periods'] = int(self.returns_accessor.ann_factor)
                             elif arg_name == 'periods_per_year':

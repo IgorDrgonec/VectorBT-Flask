@@ -29,7 +29,7 @@ def attach_returns_acc_methods(config: Config) -> tp.ClassWrapper:
             def new_method(self,
                            *,
                            group_by: tp.GroupByLike = None,
-                           benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+                           bm_returns: tp.Optional[tp.ArrayLike] = None,
                            freq: tp.Optional[tp.FrequencyLike] = None,
                            year_freq: tp.Optional[tp.FrequencyLike] = None,
                            use_asset_returns: bool = False,
@@ -38,7 +38,7 @@ def attach_returns_acc_methods(config: Config) -> tp.ClassWrapper:
                            **kwargs) -> tp.Any:
                 returns_acc = self.get_returns_acc(
                     group_by=group_by,
-                    benchmark_rets=benchmark_rets,
+                    bm_returns=bm_returns,
                     freq=freq,
                     year_freq=year_freq,
                     use_asset_returns=use_asset_returns,

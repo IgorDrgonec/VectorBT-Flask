@@ -29,14 +29,14 @@ ts = pd.DataFrame({
 ]))
 rets = ts.pct_change()
 
-benchmark_ts = pd.DataFrame({
+bm_ts = pd.DataFrame({
     'a': [101, 102, 103, 102, 101],
     'b': [101, 102, 103, 104, 105],
     'c': [105, 104, 103, 102, 101],
 }, index=ts.index)
-benchmark_rets = benchmark_ts.pct_change()
+bm_returns = bm_ts.pct_change()
 
-ret_acc = rets.vbt.returns(benchmark_rets=benchmark_rets)
+ret_acc = rets.vbt.returns(bm_returns=bm_returns)
 
 
 # ############# Global ############# #
@@ -68,9 +68,9 @@ class TestAccessors:
     def test_indexing(self):
         assert ret_acc['a'].total() == ret_acc['a'].total()
 
-    def test_benchmark_rets(self):
-        pd.testing.assert_frame_equal(benchmark_rets, ret_acc.benchmark_rets)
-        pd.testing.assert_series_equal(benchmark_rets['a'], ret_acc['a'].benchmark_rets)
+    def test_bm_returns(self):
+        pd.testing.assert_frame_equal(bm_returns, ret_acc.bm_returns)
+        pd.testing.assert_series_equal(bm_returns['a'], ret_acc['a'].bm_returns)
 
     def test_freq(self):
         assert ret_acc.wrapper.freq == day_dt
@@ -1068,7 +1068,7 @@ class TestAccessors:
             )
         )
         pd.testing.assert_series_equal(
-            ret_acc.stats(column='a', settings=dict(benchmark_rets=None)),
+            ret_acc.stats(column='a', settings=dict(bm_returns=None)),
             pd.Series([
                 pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
                 pd.Timedelta('5 days 00:00:00'), 3.960396039603964, 1603.564361105591,
@@ -1103,8 +1103,8 @@ class TestAccessors:
             ret_acc().stats(column='a'),
         )
         pd.testing.assert_series_equal(
-            ret_acc.stats(column='a', settings=dict(benchmark_rets=None)),
-            ret_acc(benchmark_rets=None).stats(column='a'),
+            ret_acc.stats(column='a', settings=dict(bm_returns=None)),
+            ret_acc(bm_returns=None).stats(column='a'),
         )
         pd.testing.assert_series_equal(
             ret_acc['c'].stats(),

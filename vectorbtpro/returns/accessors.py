@@ -62,6 +62,15 @@ defaults for arguments used throughout the accessor, such as
 * `required_return`: Minimum acceptance return of the investor.
 * `cutoff`: Decimal representing the percentage cutoff for the bottom percentile of returns.
 
+Defaults as well as `bm_returns` and `year_freq` can be set globally using settings:
+
+```pycon
+>>> benchmark = pd.Series([1.05, 1.1, 1.15, 1.1, 1.05])
+>>> bm_returns = benchmark.vbt.to_returns()
+
+>>> vbt.settings.returns['bm_returns'] = bm_returns
+```
+
 ## Stats
 
 !!! hint
@@ -69,37 +78,6 @@ defaults for arguments used throughout the accessor, such as
 
 ```pycon
 >>> ret_acc.stats()
-UserWarning: Metric 'benchmark_return' requires benchmark_rets to be set
-UserWarning: Metric 'alpha' requires benchmark_rets to be set
-UserWarning: Metric 'beta' requires benchmark_rets to be set
-
-Start                                      0
-End                                        4
-Duration                     5 days 00:00:00
-Total Return [%]                           0
-Annualized Return [%]                      0
-Annualized Volatility [%]            184.643
-Sharpe Ratio                        0.691185
-Calmar Ratio                               0
-Max Drawdown [%]                     15.3846
-Omega Ratio                          1.08727
-Sortino Ratio                        1.17805
-Skew                              0.00151002
-Kurtosis                            -5.94737
-Tail Ratio                           1.08985
-Common Sense Ratio                   1.08985
-Value at Risk                     -0.0823718
-dtype: object
-```
-
-The missing `benchmark_rets` can be either passed to the contrustor of the accessor
-or as a setting to `ReturnsAccessor.stats`:
-
-```pycon
->>> benchmark = pd.Series([1.05, 1.1, 1.15, 1.1, 1.05])
->>> benchmark_rets = benchmark.vbt.to_returns()
-
->>> ret_acc.stats(settings=dict(benchmark_rets=benchmark_rets))
 Start                                      0
 End                                        4
 Duration                     5 days 00:00:00
@@ -130,7 +108,13 @@ dtype: object
 !!! hint
     See `vectorbtpro.generic.plots_builder.PlotsBuilderMixin.plots` and `ReturnsAccessor.subplots`.
 
-This class inherits subplots from `vectorbtpro.generic.accessors.GenericAccessor`.
+`ReturnsAccessor` class has a single subplot based on `ReturnsAccessor.plot_cumulative`:
+
+```pycon
+>>> ret_acc.plots()
+```
+
+![](/assets/images/returns_plots.svg)
 """
 
 import warnings
@@ -166,29 +150,29 @@ class ReturnsAccessor(GenericAccessor):
 
     Args:
         obj (pd.Series or pd.DataFrame): Pandas object representing returns.
-        benchmark_rets (array_like): Pandas object representing benchmark returns.
+        bm_returns (array_like): Pandas object representing benchmark returns.
         year_freq (any): Year frequency for annualization purposes.
         defaults (dict): Defaults that override `defaults` in `vectorbtpro._settings.returns`.
         **kwargs: Keyword arguments that are passed down to `vectorbtpro.generic.accessors.GenericAccessor`."""
 
     def __init__(self,
                  obj: tp.SeriesFrame,
-                 benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+                 bm_returns: tp.Optional[tp.ArrayLike] = None,
                  year_freq: tp.Optional[tp.FrequencyLike] = None,
                  defaults: tp.KwargsLike = None,
                  **kwargs) -> None:
         GenericAccessor.__init__(
             self,
             obj,
-            benchmark_rets=benchmark_rets,
+            bm_returns=bm_returns,
             year_freq=year_freq,
             defaults=defaults,
             **kwargs
         )
 
-        if benchmark_rets is not None:
-            benchmark_rets = broadcast_to(benchmark_rets, obj)
-        self._benchmark_rets = benchmark_rets
+        if bm_returns is not None:
+            bm_returns = broadcast_to(bm_returns, obj)
+        self._bm_returns = bm_returns
         self._year_freq = year_freq
         self._defaults = defaults
 
@@ -206,24 +190,24 @@ class ReturnsAccessor(GenericAccessor):
         """Perform indexing on `ReturnsAccessor`."""
         new_wrapper, idx_idxs, _, col_idxs = self.wrapper.indexing_func_meta(pd_indexing_func, **kwargs)
         new_obj = new_wrapper.wrap(self.to_2d_array()[idx_idxs, :][:, col_idxs], group_by=False)
-        if self.benchmark_rets is not None:
-            new_benchmark_rets = new_wrapper.wrap(
-                to_2d_array(self.benchmark_rets)[idx_idxs, :][:, col_idxs],
+        if self.bm_returns is not None:
+            new_bm_returns = new_wrapper.wrap(
+                to_2d_array(self.bm_returns)[idx_idxs, :][:, col_idxs],
                 group_by=False
             )
         else:
-            new_benchmark_rets = None
+            new_bm_returns = None
         if checks.is_series(new_obj):
             return self.replace(
                 cls_=self.sr_accessor_cls,
                 obj=new_obj,
-                benchmark_rets=new_benchmark_rets,
+                bm_returns=new_bm_returns,
                 wrapper=new_wrapper
             )
         return self.replace(
             cls_=self.df_accessor_cls,
             obj=new_obj,
-            benchmark_rets=new_benchmark_rets,
+            bm_returns=new_bm_returns,
             wrapper=new_wrapper
         )
 
@@ -253,9 +237,15 @@ class ReturnsAccessor(GenericAccessor):
         return cls(returns, **kwargs)
 
     @property
-    def benchmark_rets(self) -> tp.Optional[tp.SeriesFrame]:
+    def bm_returns(self) -> tp.Optional[tp.SeriesFrame]:
         """Benchmark returns."""
-        return self._benchmark_rets
+        from vectorbtpro._settings import settings
+        returns_cfg = settings['returns']
+
+        bm_returns = self._bm_returns
+        if bm_returns is None:
+            bm_returns = returns_cfg['bm_returns']
+        return bm_returns
 
     @property
     def year_freq(self) -> tp.Optional[pd.Timedelta]:
@@ -696,7 +686,7 @@ class ReturnsAccessor(GenericAccessor):
         )
 
     def information_ratio(self,
-                          benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+                          bm_returns: tp.Optional[tp.ArrayLike] = None,
                           ddof: tp.Optional[int] = None,
                           jitted: tp.JittedOption = None,
                           chunked: tp.ChunkedOption = None,
@@ -704,18 +694,18 @@ class ReturnsAccessor(GenericAccessor):
         """See `vectorbtpro.returns.nb.information_ratio_nb`."""
         if ddof is None:
             ddof = self.defaults['ddof']
-        if benchmark_rets is None:
-            benchmark_rets = self.benchmark_rets
-        checks.assert_not_none(benchmark_rets)
-        benchmark_rets = broadcast_to(benchmark_rets, self.obj)
+        if bm_returns is None:
+            bm_returns = self.bm_returns
+        checks.assert_not_none(bm_returns)
+        bm_returns = broadcast_to(bm_returns, self.obj)
         func = jit_reg.resolve_option(nb.information_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        out = func(self.to_2d_array() - to_2d_array(benchmark_rets), ddof)
+        out = func(self.to_2d_array() - to_2d_array(bm_returns), ddof)
         wrap_kwargs = merge_dicts(dict(name_or_index='information_ratio'), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def rolling_information_ratio(self,
-                                  benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+                                  bm_returns: tp.Optional[tp.ArrayLike] = None,
                                   window: tp.Optional[int] = None,
                                   minp: tp.Optional[int] = None,
                                   ddof: tp.Optional[int] = None,
@@ -729,15 +719,15 @@ class ReturnsAccessor(GenericAccessor):
             minp = self.defaults['minp']
         if ddof is None:
             ddof = self.defaults['ddof']
-        if benchmark_rets is None:
-            benchmark_rets = self.benchmark_rets
-        checks.assert_not_none(benchmark_rets)
-        benchmark_rets = broadcast_to(benchmark_rets, self.obj)
+        if bm_returns is None:
+            bm_returns = self.bm_returns
+        checks.assert_not_none(bm_returns)
+        bm_returns = broadcast_to(bm_returns, self.obj)
         chunked = ch.specialize_chunked_option(
             chunked,
             arg_take_spec=dict(args=ch.ArgsTaker(None, ))
         )
-        return (self - benchmark_rets).vbt.rolling_apply(
+        return (self - bm_returns).vbt.rolling_apply(
             window,
             jit_reg.resolve_option(nb.information_ratio_1d_nb, jitted),
             ddof,
@@ -748,7 +738,7 @@ class ReturnsAccessor(GenericAccessor):
         )
 
     def beta(self,
-             benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+             bm_returns: tp.Optional[tp.ArrayLike] = None,
              ddof: tp.Optional[int] = None,
              jitted: tp.JittedOption = None,
              chunked: tp.ChunkedOption = None,
@@ -756,18 +746,18 @@ class ReturnsAccessor(GenericAccessor):
         """See `vectorbtpro.returns.nb.beta_nb`."""
         if ddof is None:
             ddof = self.defaults['ddof']
-        if benchmark_rets is None:
-            benchmark_rets = self.benchmark_rets
-        checks.assert_not_none(benchmark_rets)
-        benchmark_rets = broadcast_to(benchmark_rets, self.obj)
+        if bm_returns is None:
+            bm_returns = self.bm_returns
+        checks.assert_not_none(bm_returns)
+        bm_returns = broadcast_to(bm_returns, self.obj)
         func = jit_reg.resolve_option(nb.beta_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        out = func(self.to_2d_array(), to_2d_array(benchmark_rets), ddof)
+        out = func(self.to_2d_array(), to_2d_array(bm_returns), ddof)
         wrap_kwargs = merge_dicts(dict(name_or_index='beta'), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def rolling_beta(self,
-                     benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+                     bm_returns: tp.Optional[tp.ArrayLike] = None,
                      ddof: tp.Optional[int] = None,
                      window: tp.Optional[int] = None,
                      minp: tp.Optional[int] = None,
@@ -781,10 +771,10 @@ class ReturnsAccessor(GenericAccessor):
             minp = self.defaults['minp']
         if ddof is None:
             ddof = self.defaults['ddof']
-        if benchmark_rets is None:
-            benchmark_rets = self.benchmark_rets
-        checks.assert_not_none(benchmark_rets)
-        benchmark_rets = broadcast_to(benchmark_rets, self.obj)
+        if bm_returns is None:
+            bm_returns = self.bm_returns
+        checks.assert_not_none(bm_returns)
+        bm_returns = broadcast_to(bm_returns, self.obj)
         chunked = ch.specialize_chunked_option(
             chunked,
             arg_take_spec=dict(args=ch.ArgsTaker(ch.ArraySlicer(axis=1), ch.ArraySlicer(axis=1), None))
@@ -792,7 +782,7 @@ class ReturnsAccessor(GenericAccessor):
         return type(self).rolling_apply(
             window,
             jit_reg.resolve_option(nb.beta_rollmeta_nb, jitted),
-            to_2d_array(self.obj), to_2d_array(benchmark_rets), ddof,
+            to_2d_array(self.obj), to_2d_array(bm_returns), ddof,
             minp=minp,
             wrapper=self.wrapper,
             jitted=jitted,
@@ -801,7 +791,7 @@ class ReturnsAccessor(GenericAccessor):
         )
 
     def alpha(self,
-              benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+              bm_returns: tp.Optional[tp.ArrayLike] = None,
               risk_free: tp.Optional[float] = None,
               jitted: tp.JittedOption = None,
               chunked: tp.ChunkedOption = None,
@@ -809,18 +799,18 @@ class ReturnsAccessor(GenericAccessor):
         """See `vectorbtpro.returns.nb.alpha_nb`."""
         if risk_free is None:
             risk_free = self.defaults['risk_free']
-        if benchmark_rets is None:
-            benchmark_rets = self.benchmark_rets
-        checks.assert_not_none(benchmark_rets)
-        benchmark_rets = broadcast_to(benchmark_rets, self.obj)
+        if bm_returns is None:
+            bm_returns = self.bm_returns
+        checks.assert_not_none(bm_returns)
+        bm_returns = broadcast_to(bm_returns, self.obj)
         func = jit_reg.resolve_option(nb.alpha_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        out = func(self.to_2d_array() - risk_free, to_2d_array(benchmark_rets) - risk_free, self.ann_factor)
+        out = func(self.to_2d_array() - risk_free, to_2d_array(bm_returns) - risk_free, self.ann_factor)
         wrap_kwargs = merge_dicts(dict(name_or_index='alpha'), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def rolling_alpha(self,
-                      benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+                      bm_returns: tp.Optional[tp.ArrayLike] = None,
                       window: tp.Optional[int] = None,
                       minp: tp.Optional[int] = None,
                       risk_free: tp.Optional[float] = None,
@@ -834,10 +824,10 @@ class ReturnsAccessor(GenericAccessor):
             minp = self.defaults['minp']
         if risk_free is None:
             risk_free = self.defaults['risk_free']
-        if benchmark_rets is None:
-            benchmark_rets = self.benchmark_rets
-        checks.assert_not_none(benchmark_rets)
-        benchmark_rets = broadcast_to(benchmark_rets, self.obj)
+        if bm_returns is None:
+            bm_returns = self.bm_returns
+        checks.assert_not_none(bm_returns)
+        bm_returns = broadcast_to(bm_returns, self.obj)
         chunked = ch.specialize_chunked_option(
             chunked,
             arg_take_spec=dict(args=ch.ArgsTaker(ch.ArraySlicer(axis=1), ch.ArraySlicer(axis=1), None))
@@ -845,7 +835,7 @@ class ReturnsAccessor(GenericAccessor):
         return type(self).rolling_apply(
             window,
             jit_reg.resolve_option(nb.alpha_rollmeta_nb, jitted),
-            to_2d_array(self.obj) - risk_free, to_2d_array(benchmark_rets) - risk_free, self.ann_factor,
+            to_2d_array(self.obj) - risk_free, to_2d_array(bm_returns) - risk_free, self.ann_factor,
             minp=minp,
             wrapper=self.wrapper,
             jitted=jitted,
@@ -1010,20 +1000,20 @@ class ReturnsAccessor(GenericAccessor):
         )
 
     def capture(self,
-                benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+                bm_returns: tp.Optional[tp.ArrayLike] = None,
                 jitted: tp.JittedOption = None,
                 chunked: tp.ChunkedOption = None,
                 wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbtpro.returns.nb.capture_nb`."""
-        if benchmark_rets is None:
-            benchmark_rets = self.benchmark_rets
-        checks.assert_not_none(benchmark_rets)
-        benchmark_rets = broadcast_to(benchmark_rets, self.obj)
+        if bm_returns is None:
+            bm_returns = self.bm_returns
+        checks.assert_not_none(bm_returns)
+        bm_returns = broadcast_to(bm_returns, self.obj)
         func = jit_reg.resolve_option(nb.capture_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         out = func(
             self.to_2d_array(),
-            to_2d_array(benchmark_rets),
+            to_2d_array(bm_returns),
             self.ann_factor,
             period=self.wrapper.dt_period
         )
@@ -1031,7 +1021,7 @@ class ReturnsAccessor(GenericAccessor):
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def rolling_capture(self,
-                        benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+                        bm_returns: tp.Optional[tp.ArrayLike] = None,
                         window: tp.Optional[int] = None,
                         minp: tp.Optional[int] = None,
                         jitted: tp.JittedOption = None,
@@ -1042,10 +1032,10 @@ class ReturnsAccessor(GenericAccessor):
             window = self.defaults['window']
         if minp is None:
             minp = self.defaults['minp']
-        if benchmark_rets is None:
-            benchmark_rets = self.benchmark_rets
-        checks.assert_not_none(benchmark_rets)
-        benchmark_rets = broadcast_to(benchmark_rets, self.obj)
+        if bm_returns is None:
+            bm_returns = self.bm_returns
+        checks.assert_not_none(bm_returns)
+        bm_returns = broadcast_to(bm_returns, self.obj)
         chunked = ch.specialize_chunked_option(
             chunked,
             arg_take_spec=dict(args=ch.ArgsTaker(ch.ArraySlicer(axis=1), ch.ArraySlicer(axis=1), None, None))
@@ -1053,7 +1043,7 @@ class ReturnsAccessor(GenericAccessor):
         return type(self).rolling_apply(
             window,
             jit_reg.resolve_option(nb.capture_rollmeta_nb, jitted),
-            to_2d_array(self.obj), to_2d_array(benchmark_rets), self.ann_factor, None,
+            to_2d_array(self.obj), to_2d_array(bm_returns), self.ann_factor, None,
             minp=minp,
             wrapper=self.wrapper,
             jitted=jitted,
@@ -1062,20 +1052,20 @@ class ReturnsAccessor(GenericAccessor):
         )
 
     def up_capture(self,
-                   benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+                   bm_returns: tp.Optional[tp.ArrayLike] = None,
                    jitted: tp.JittedOption = None,
                    chunked: tp.ChunkedOption = None,
                    wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbtpro.returns.nb.up_capture_nb`."""
-        if benchmark_rets is None:
-            benchmark_rets = self.benchmark_rets
-        checks.assert_not_none(benchmark_rets)
-        benchmark_rets = broadcast_to(benchmark_rets, self.obj)
+        if bm_returns is None:
+            bm_returns = self.bm_returns
+        checks.assert_not_none(bm_returns)
+        bm_returns = broadcast_to(bm_returns, self.obj)
         func = jit_reg.resolve_option(nb.up_capture_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         out = func(
             self.to_2d_array(),
-            to_2d_array(benchmark_rets),
+            to_2d_array(bm_returns),
             self.ann_factor,
             period=self.wrapper.dt_period
         )
@@ -1083,7 +1073,7 @@ class ReturnsAccessor(GenericAccessor):
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def rolling_up_capture(self,
-                           benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+                           bm_returns: tp.Optional[tp.ArrayLike] = None,
                            window: tp.Optional[int] = None,
                            minp: tp.Optional[int] = None,
                            jitted: tp.JittedOption = None,
@@ -1094,10 +1084,10 @@ class ReturnsAccessor(GenericAccessor):
             window = self.defaults['window']
         if minp is None:
             minp = self.defaults['minp']
-        if benchmark_rets is None:
-            benchmark_rets = self.benchmark_rets
-        checks.assert_not_none(benchmark_rets)
-        benchmark_rets = broadcast_to(benchmark_rets, self.obj)
+        if bm_returns is None:
+            bm_returns = self.bm_returns
+        checks.assert_not_none(bm_returns)
+        bm_returns = broadcast_to(bm_returns, self.obj)
         chunked = ch.specialize_chunked_option(
             chunked,
             arg_take_spec=dict(args=ch.ArgsTaker(ch.ArraySlicer(axis=1), ch.ArraySlicer(axis=1), None, None))
@@ -1105,7 +1095,7 @@ class ReturnsAccessor(GenericAccessor):
         return type(self).rolling_apply(
             window,
             jit_reg.resolve_option(nb.up_capture_rollmeta_nb, jitted),
-            to_2d_array(self.obj), to_2d_array(benchmark_rets), self.ann_factor, None,
+            to_2d_array(self.obj), to_2d_array(bm_returns), self.ann_factor, None,
             minp=minp,
             wrapper=self.wrapper,
             jitted=jitted,
@@ -1114,20 +1104,20 @@ class ReturnsAccessor(GenericAccessor):
         )
 
     def down_capture(self,
-                     benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+                     bm_returns: tp.Optional[tp.ArrayLike] = None,
                      jitted: tp.JittedOption = None,
                      chunked: tp.ChunkedOption = None,
                      wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbtpro.returns.nb.down_capture_nb`."""
-        if benchmark_rets is None:
-            benchmark_rets = self.benchmark_rets
-        checks.assert_not_none(benchmark_rets)
-        benchmark_rets = broadcast_to(benchmark_rets, self.obj)
+        if bm_returns is None:
+            bm_returns = self.bm_returns
+        checks.assert_not_none(bm_returns)
+        bm_returns = broadcast_to(bm_returns, self.obj)
         func = jit_reg.resolve_option(nb.down_capture_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         out = func(
             self.to_2d_array(),
-            to_2d_array(benchmark_rets),
+            to_2d_array(bm_returns),
             self.ann_factor,
             period=self.wrapper.dt_period
         )
@@ -1135,7 +1125,7 @@ class ReturnsAccessor(GenericAccessor):
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def rolling_down_capture(self,
-                             benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+                             bm_returns: tp.Optional[tp.ArrayLike] = None,
                              window: tp.Optional[int] = None,
                              minp: tp.Optional[int] = None,
                              jitted: tp.JittedOption = None,
@@ -1146,10 +1136,10 @@ class ReturnsAccessor(GenericAccessor):
             window = self.defaults['window']
         if minp is None:
             minp = self.defaults['minp']
-        if benchmark_rets is None:
-            benchmark_rets = self.benchmark_rets
-        checks.assert_not_none(benchmark_rets)
-        benchmark_rets = broadcast_to(benchmark_rets, self.obj)
+        if bm_returns is None:
+            bm_returns = self.bm_returns
+        checks.assert_not_none(bm_returns)
+        bm_returns = broadcast_to(bm_returns, self.obj)
         chunked = ch.specialize_chunked_option(
             chunked,
             arg_take_spec=dict(args=ch.ArgsTaker(ch.ArraySlicer(axis=1), ch.ArraySlicer(axis=1), None, None))
@@ -1157,7 +1147,7 @@ class ReturnsAccessor(GenericAccessor):
         return type(self).rolling_apply(
             window,
             jit_reg.resolve_option(nb.down_capture_rollmeta_nb, jitted),
-            to_2d_array(self.obj), to_2d_array(benchmark_rets), self.ann_factor, None,
+            to_2d_array(self.obj), to_2d_array(bm_returns), self.ann_factor, None,
             minp=minp,
             wrapper=self.wrapper,
             jitted=jitted,
@@ -1327,11 +1317,11 @@ class ReturnsAccessor(GenericAccessor):
                 post_calc_func=lambda self, out, settings: out * 100,
                 tags='returns'
             ),
-            benchmark_return=dict(
+            bm_return=dict(
                 title='Benchmark Return [%]',
-                calc_func='benchmark_rets.vbt.returns.total',
+                calc_func='bm_returns.vbt.returns.total',
                 post_calc_func=lambda self, out, settings: out * 100,
-                check_has_benchmark_rets=True,
+                check_has_bm_returns=True,
                 tags='returns'
             ),
             ann_return=dict(
@@ -1422,13 +1412,13 @@ class ReturnsAccessor(GenericAccessor):
                 calc_func='alpha',
                 check_has_freq=True,
                 check_has_year_freq=True,
-                check_has_benchmark_rets=True,
+                check_has_bm_returns=True,
                 tags='returns'
             ),
             beta=dict(
                 title='Beta',
                 calc_func='beta',
-                check_has_benchmark_rets=True,
+                check_has_bm_returns=True,
                 tags='returns'
             )
         )
@@ -1440,60 +1430,13 @@ class ReturnsAccessor(GenericAccessor):
 
     # ############# Plotting ############# #
 
-    @property
-    def plots_defaults(self) -> tp.Kwargs:
-        """Defaults for `ReturnsAccessor.plots`.
-
-        Merges `vectorbtpro.generic.accessors.GenericAccessor.plots_defaults`,
-        defaults from `ReturnsAccessor.defaults` (acting as `settings`), and
-        `plots` from `vectorbtpro._settings.returns`"""
-        from vectorbtpro._settings import settings
-        returns_plots_cfg = settings['returns']['plots']
-
-        return merge_dicts(
-            GenericAccessor.plots_defaults.__get__(self),
-            dict(settings=self.defaults),
-            dict(settings=dict(year_freq=self.year_freq)),
-            returns_plots_cfg
-        )
-
-    @property
-    def subplots(self) -> Config:
-        return self._subplots
-
-
-ReturnsAccessor.override_metrics_doc(__pdoc__)
-ReturnsAccessor.override_subplots_doc(__pdoc__)
-
-
-@register_sr_vbt_accessor('returns')
-class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
-    """Accessor on top of return series. For Series only.
-
-    Accessible via `pd.Series.vbt.returns`."""
-
-    def __init__(self,
-                 obj: tp.Series,
-                 benchmark_rets: tp.Optional[tp.ArrayLike] = None,
-                 year_freq: tp.Optional[tp.FrequencyLike] = None,
-                 defaults: tp.KwargsLike = None,
-                 **kwargs) -> None:
-        GenericSRAccessor.__init__(self, obj, **kwargs)
-        ReturnsAccessor.__init__(
-            self,
-            obj,
-            benchmark_rets=benchmark_rets,
-            year_freq=year_freq,
-            defaults=defaults,
-            **kwargs
-        )
-
     def plot_cumulative(self,
-                        benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+                        column: tp.Optional[tp.Label] = None,
+                        bm_returns: tp.Optional[tp.ArrayLike] = None,
                         start_value: float = 1,
                         fill_to_benchmark: bool = False,
                         main_kwargs: tp.KwargsLike = None,
-                        benchmark_kwargs: tp.KwargsLike = None,
+                        bm_kwargs: tp.KwargsLike = None,
                         hline_shape_kwargs: tp.KwargsLike = None,
                         add_trace_kwargs: tp.KwargsLike = None,
                         xref: str = 'x',
@@ -1503,12 +1446,13 @@ class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
         """Plot cumulative returns.
 
         Args:
-            benchmark_rets (array_like): Benchmark return to compare returns against.
+            column (str): Name of the column to plot.
+            bm_returns (array_like): Benchmark return to compare returns against.
                 Will broadcast per element.
             start_value (float): The starting returns.
             fill_to_benchmark (bool): Whether to fill between main and benchmark, or between main and `start_value`.
             main_kwargs (dict): Keyword arguments passed to `vectorbtpro.generic.accessors.GenericSRAccessor.plot` for main.
-            benchmark_kwargs (dict): Keyword arguments passed to `vectorbtpro.generic.accessors.GenericSRAccessor.plot` for benchmark.
+            bm_kwargs (dict): Keyword arguments passed to `vectorbtpro.generic.accessors.GenericSRAccessor.plot` for benchmark.
             hline_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for `start_value` line.
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             xref (str): X coordinate axis.
@@ -1523,8 +1467,8 @@ class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
 
             >>> np.random.seed(0)
             >>> rets = pd.Series(np.random.uniform(-0.05, 0.05, size=100))
-            >>> benchmark_rets = pd.Series(np.random.uniform(-0.05, 0.05, size=100))
-            >>> rets.vbt.returns.plot_cumulative(benchmark_rets=benchmark_rets)
+            >>> bm_returns = pd.Series(np.random.uniform(-0.05, 0.05, size=100))
+            >>> rets.vbt.returns.plot_cumulative(bm_returns=bm_returns)
             ```
 
             ![](/assets/images/plot_cumulative.svg)
@@ -1537,27 +1481,28 @@ class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
             fig = make_figure()
         fig.update_layout(**layout_kwargs)
         x_domain = get_domain(xref, fig)
-        if benchmark_rets is None:
-            benchmark_rets = self.benchmark_rets
-        fill_to_benchmark = fill_to_benchmark and benchmark_rets is not None
+        if bm_returns is None:
+            bm_returns = self.bm_returns
+        fill_to_benchmark = fill_to_benchmark and bm_returns is not None
 
-        if benchmark_rets is not None:
+        if bm_returns is not None:
             # Plot benchmark
-            benchmark_rets = broadcast_to(benchmark_rets, self.obj)
-            if benchmark_kwargs is None:
-                benchmark_kwargs = {}
-            benchmark_kwargs = merge_dicts(dict(
+            bm_returns = broadcast_to(bm_returns, self.obj)
+            bm_returns = self.select_one_from_obj(bm_returns, self.wrapper.regroup(False), column=column)
+            if bm_kwargs is None:
+                bm_kwargs = {}
+            bm_kwargs = merge_dicts(dict(
                 trace_kwargs=dict(
                     line=dict(
                         color=plotting_cfg['color_schema']['gray']
                     ),
                     name='Benchmark'
                 )
-            ), benchmark_kwargs)
-            benchmark_cumrets = benchmark_rets.vbt.returns.cumulative(start_value=start_value)
-            benchmark_cumrets.vbt.plot(**benchmark_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+            ), bm_kwargs)
+            bm_cumrets = bm_returns.vbt.returns.cumulative(start_value=start_value)
+            bm_cumrets.vbt.plot(**bm_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
         else:
-            benchmark_cumrets = None
+            bm_cumrets = None
 
         # Plot main
         if main_kwargs is None:
@@ -1571,8 +1516,9 @@ class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
             other_trace_kwargs='hidden'
         ), main_kwargs)
         cumrets = self.cumulative(start_value=start_value)
+        cumrets = self.select_one_from_obj(cumrets, self.wrapper.regroup(False), column=column)
         if fill_to_benchmark:
-            cumrets.vbt.plot_against(benchmark_cumrets, **main_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+            cumrets.vbt.plot_against(bm_cumrets, **main_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
         else:
             cumrets.vbt.plot_against(start_value, **main_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
 
@@ -1595,6 +1541,69 @@ class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
 
         return fig
 
+    @property
+    def plots_defaults(self) -> tp.Kwargs:
+        """Defaults for `ReturnsAccessor.plots`.
+
+        Merges `vectorbtpro.generic.accessors.GenericAccessor.plots_defaults`,
+        defaults from `ReturnsAccessor.defaults` (acting as `settings`), and
+        `plots` from `vectorbtpro._settings.returns`"""
+        from vectorbtpro._settings import settings
+        returns_plots_cfg = settings['returns']['plots']
+
+        return merge_dicts(
+            GenericAccessor.plots_defaults.__get__(self),
+            dict(settings=self.defaults),
+            dict(settings=dict(year_freq=self.year_freq)),
+            returns_plots_cfg
+        )
+
+    _subplots: tp.ClassVar[Config] = Config(
+        dict(
+            plot_cumulative=dict(
+                title="Cumulative Returns",
+                yaxis_kwargs=dict(title="Cumulative returns"),
+                plot_func='plot_cumulative',
+                pass_hline_shape_kwargs=True,
+                pass_add_trace_kwargs=True,
+                pass_xref=True,
+                pass_yref=True,
+                tags='returns'
+            )
+        )
+    )
+
+    @property
+    def subplots(self) -> Config:
+        return self._subplots
+
+
+ReturnsAccessor.override_metrics_doc(__pdoc__)
+ReturnsAccessor.override_subplots_doc(__pdoc__)
+
+
+@register_sr_vbt_accessor('returns')
+class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
+    """Accessor on top of return series. For Series only.
+
+    Accessible via `pd.Series.vbt.returns`."""
+
+    def __init__(self,
+                 obj: tp.Series,
+                 bm_returns: tp.Optional[tp.ArrayLike] = None,
+                 year_freq: tp.Optional[tp.FrequencyLike] = None,
+                 defaults: tp.KwargsLike = None,
+                 **kwargs) -> None:
+        GenericSRAccessor.__init__(self, obj, **kwargs)
+        ReturnsAccessor.__init__(
+            self,
+            obj,
+            bm_returns=bm_returns,
+            year_freq=year_freq,
+            defaults=defaults,
+            **kwargs
+        )
+
 
 @register_df_vbt_accessor('returns')
 class ReturnsDFAccessor(ReturnsAccessor, GenericDFAccessor):
@@ -1604,7 +1613,7 @@ class ReturnsDFAccessor(ReturnsAccessor, GenericDFAccessor):
 
     def __init__(self,
                  obj: tp.Frame,
-                 benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+                 bm_returns: tp.Optional[tp.ArrayLike] = None,
                  year_freq: tp.Optional[tp.FrequencyLike] = None,
                  defaults: tp.KwargsLike = None,
                  **kwargs) -> None:
@@ -1612,7 +1621,7 @@ class ReturnsDFAccessor(ReturnsAccessor, GenericDFAccessor):
         ReturnsAccessor.__init__(
             self,
             obj,
-            benchmark_rets=benchmark_rets,
+            bm_returns=bm_returns,
             year_freq=year_freq,
             defaults=defaults,
             **kwargs

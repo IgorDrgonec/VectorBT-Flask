@@ -430,10 +430,10 @@ def information_ratio_nb(adj_rets: tp.Array2d, ddof: int = 0) -> tp.Array1d:
 
 
 @register_jitted(cache=True)
-def beta_1d_nb(rets: tp.Array1d, benchmark_rets: tp.Array1d, ddof: int = 0) -> float:
+def beta_1d_nb(rets: tp.Array1d, bm_returns: tp.Array1d, ddof: int = 0) -> float:
     """Beta."""
-    cov = generic_nb.nancov_1d_nb(rets, benchmark_rets, ddof=ddof)
-    var = generic_nb.nanvar_1d_nb(benchmark_rets, ddof=ddof)
+    cov = generic_nb.nancov_1d_nb(rets, bm_returns, ddof=ddof)
+    var = generic_nb.nanvar_1d_nb(bm_returns, ddof=ddof)
     if var == 0:
         return np.inf
     return cov / var
@@ -443,59 +443,59 @@ def beta_1d_nb(rets: tp.Array1d, benchmark_rets: tp.Array1d, ddof: int = 0) -> f
     size=ch.ArraySizer(arg_query='rets', axis=1),
     arg_take_spec=dict(
         rets=ch.ArraySlicer(axis=1),
-        benchmark_rets=ch.ArraySlicer(axis=1),
+        bm_returns=ch.ArraySlicer(axis=1),
         ddof=None
     ),
     merge_func=base_ch.concat
 )
 @register_jitted(cache=True, tags={'can_parallel'})
-def beta_nb(rets: tp.Array2d, benchmark_rets: tp.Array2d, ddof: int = 0) -> tp.Array1d:
+def beta_nb(rets: tp.Array2d, bm_returns: tp.Array2d, ddof: int = 0) -> tp.Array1d:
     """2-dim version of `beta_1d_nb`."""
     out = np.empty(rets.shape[1], dtype=np.float_)
     for col in prange(rets.shape[1]):
-        out[col] = beta_1d_nb(rets[:, col], benchmark_rets[:, col], ddof=ddof)
+        out[col] = beta_1d_nb(rets[:, col], bm_returns[:, col], ddof=ddof)
     return out
 
 
 @register_jitted
 def beta_rollmeta_nb(from_i: int, to_i: int, col: int, rets: tp.Array2d,
-                     benchmark_rets: tp.Array1d, ddof: int = 0) -> float:
+                     bm_returns: tp.Array1d, ddof: int = 0) -> float:
     """Rolling apply meta function based on `beta_1d_nb`."""
-    return beta_1d_nb(rets[from_i:to_i, col], benchmark_rets[from_i:to_i, col], ddof)
+    return beta_1d_nb(rets[from_i:to_i, col], bm_returns[from_i:to_i, col], ddof)
 
 
 @register_jitted(cache=True)
 def alpha_1d_nb(adj_rets: tp.Array1d,
-                adj_benchmark_rets: tp.Array1d,
+                adj_bm_returns: tp.Array1d,
                 ann_factor: float) -> float:
     """Annualized alpha."""
-    beta = beta_1d_nb(adj_rets, adj_benchmark_rets)
-    return (np.nanmean(adj_rets) - beta * np.nanmean(adj_benchmark_rets) + 1) ** ann_factor - 1
+    beta = beta_1d_nb(adj_rets, adj_bm_returns)
+    return (np.nanmean(adj_rets) - beta * np.nanmean(adj_bm_returns) + 1) ** ann_factor - 1
 
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query='adj_rets', axis=1),
     arg_take_spec=dict(
         adj_rets=ch.ArraySlicer(axis=1),
-        adj_benchmark_rets=ch.ArraySlicer(axis=1),
+        adj_bm_returns=ch.ArraySlicer(axis=1),
         ann_factor=None
     ),
     merge_func=base_ch.concat
 )
 @register_jitted(cache=True, tags={'can_parallel'})
-def alpha_nb(adj_rets: tp.Array2d, adj_benchmark_rets: tp.Array2d, ann_factor: float) -> tp.Array1d:
+def alpha_nb(adj_rets: tp.Array2d, adj_bm_returns: tp.Array2d, ann_factor: float) -> tp.Array1d:
     """2-dim version of `alpha_1d_nb`."""
     out = np.empty(adj_rets.shape[1], dtype=np.float_)
     for col in prange(adj_rets.shape[1]):
-        out[col] = alpha_1d_nb(adj_rets[:, col], adj_benchmark_rets[:, col], ann_factor)
+        out[col] = alpha_1d_nb(adj_rets[:, col], adj_bm_returns[:, col], ann_factor)
     return out
 
 
 @register_jitted
 def alpha_rollmeta_nb(from_i: int, to_i: int, col: int, adj_rets: tp.Array2d,
-                      adj_benchmark_rets: tp.Array1d, ann_factor: float) -> float:
+                      adj_bm_returns: tp.Array1d, ann_factor: float) -> float:
     """Rolling apply meta function based on `alpha_1d_nb`."""
-    return alpha_1d_nb(adj_rets[from_i:to_i, col], adj_benchmark_rets[from_i:to_i, col], ann_factor)
+    return alpha_1d_nb(adj_rets[from_i:to_i, col], adj_bm_returns[from_i:to_i, col], ann_factor)
 
 
 @register_jitted(cache=True)
@@ -594,11 +594,11 @@ def cond_value_at_risk_nb(rets: tp.Array2d, cutoff: float = 0.05) -> tp.Array1d:
 
 
 @register_jitted(cache=True)
-def capture_1d_nb(rets: tp.Array1d, benchmark_rets: tp.Array1d,
+def capture_1d_nb(rets: tp.Array1d, bm_returns: tp.Array1d,
                   ann_factor: float, period: tp.Optional[float] = None) -> float:
     """Capture ratio."""
     annualized_return1 = annualized_return_1d_nb(rets, ann_factor, period=period)
-    annualized_return2 = annualized_return_1d_nb(benchmark_rets, ann_factor, period=period)
+    annualized_return2 = annualized_return_1d_nb(bm_returns, ann_factor, period=period)
     if annualized_return2 == 0:
         return np.inf
     return annualized_return1 / annualized_return2
@@ -608,32 +608,32 @@ def capture_1d_nb(rets: tp.Array1d, benchmark_rets: tp.Array1d,
     size=ch.ArraySizer(arg_query='rets', axis=1),
     arg_take_spec=dict(
         rets=ch.ArraySlicer(axis=1),
-        benchmark_rets=ch.ArraySlicer(axis=1),
+        bm_returns=ch.ArraySlicer(axis=1),
         ann_factor=None,
         period=None
     ),
     merge_func=base_ch.concat
 )
 @register_jitted(cache=True, tags={'can_parallel'})
-def capture_nb(rets: tp.Array2d, benchmark_rets: tp.Array2d,
+def capture_nb(rets: tp.Array2d, bm_returns: tp.Array2d,
                ann_factor: float, period: tp.Optional[float] = None) -> tp.Array1d:
     """2-dim version of `capture_1d_nb`."""
     out = np.empty(rets.shape[1], dtype=np.float_)
     for col in prange(rets.shape[1]):
-        out[col] = capture_1d_nb(rets[:, col], benchmark_rets[:, col], ann_factor, period=period)
+        out[col] = capture_1d_nb(rets[:, col], bm_returns[:, col], ann_factor, period=period)
     return out
 
 
 @register_jitted
 def capture_rollmeta_nb(from_i: int, to_i: int, col: int, rets: tp.Array2d,
-                        benchmark_rets: tp.Array1d, ann_factor: float,
+                        bm_returns: tp.Array1d, ann_factor: float,
                         period: tp.Optional[float] = None) -> float:
     """Rolling apply meta function based on `capture_1d_nb`."""
-    return capture_1d_nb(rets[from_i:to_i, col], benchmark_rets[from_i:to_i, col], ann_factor, period=period)
+    return capture_1d_nb(rets[from_i:to_i, col], bm_returns[from_i:to_i, col], ann_factor, period=period)
 
 
 @register_jitted(cache=True)
-def up_capture_1d_nb(rets: tp.Array1d, benchmark_rets: tp.Array1d,
+def up_capture_1d_nb(rets: tp.Array1d, bm_returns: tp.Array1d,
                      ann_factor: float, period: tp.Optional[float] = None) -> float:
     """Capture ratio for periods when the benchmark return is positive."""
     if period is None:
@@ -654,42 +654,42 @@ def up_capture_1d_nb(rets: tp.Array1d, benchmark_rets: tp.Array1d,
         return ann_ret ** (ann_factor / period) - 1
 
     annualized_return = _annualized_pos_return(rets)
-    annualized_benchmark_return = _annualized_pos_return(benchmark_rets)
-    if annualized_benchmark_return == 0:
+    annualized_bm_return = _annualized_pos_return(bm_returns)
+    if annualized_bm_return == 0:
         return np.inf
-    return annualized_return / annualized_benchmark_return
+    return annualized_return / annualized_bm_return
 
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query='rets', axis=1),
     arg_take_spec=dict(
         rets=ch.ArraySlicer(axis=1),
-        benchmark_rets=ch.ArraySlicer(axis=1),
+        bm_returns=ch.ArraySlicer(axis=1),
         ann_factor=None,
         period=None
     ),
     merge_func=base_ch.concat
 )
 @register_jitted(cache=True, tags={'can_parallel'})
-def up_capture_nb(rets: tp.Array2d, benchmark_rets: tp.Array2d,
+def up_capture_nb(rets: tp.Array2d, bm_returns: tp.Array2d,
                   ann_factor: float, period: tp.Optional[float] = None) -> tp.Array1d:
     """2-dim version of `up_capture_1d_nb`."""
     out = np.empty(rets.shape[1], dtype=np.float_)
     for col in prange(rets.shape[1]):
-        out[col] = up_capture_1d_nb(rets[:, col], benchmark_rets[:, col], ann_factor, period=period)
+        out[col] = up_capture_1d_nb(rets[:, col], bm_returns[:, col], ann_factor, period=period)
     return out
 
 
 @register_jitted
 def up_capture_rollmeta_nb(from_i: int, to_i: int, col: int, rets: tp.Array2d,
-                           benchmark_rets: tp.Array1d, ann_factor: float,
+                           bm_returns: tp.Array1d, ann_factor: float,
                            period: tp.Optional[float] = None) -> float:
     """Rolling apply meta function based on `up_capture_1d_nb`."""
-    return up_capture_1d_nb(rets[from_i:to_i, col], benchmark_rets[from_i:to_i, col], ann_factor, period=period)
+    return up_capture_1d_nb(rets[from_i:to_i, col], bm_returns[from_i:to_i, col], ann_factor, period=period)
 
 
 @register_jitted(cache=True)
-def down_capture_1d_nb(rets: tp.Array1d, benchmark_rets: tp.Array1d,
+def down_capture_1d_nb(rets: tp.Array1d, bm_returns: tp.Array1d,
                        ann_factor: float, period: tp.Optional[float] = None) -> float:
     """Capture ratio for periods when the benchmark return is negative."""
     if period is None:
@@ -710,35 +710,35 @@ def down_capture_1d_nb(rets: tp.Array1d, benchmark_rets: tp.Array1d,
         return ann_ret ** (ann_factor / period) - 1
 
     annualized_return = _annualized_neg_return(rets)
-    annualized_benchmark_return = _annualized_neg_return(benchmark_rets)
-    if annualized_benchmark_return == 0:
+    annualized_bm_return = _annualized_neg_return(bm_returns)
+    if annualized_bm_return == 0:
         return np.inf
-    return annualized_return / annualized_benchmark_return
+    return annualized_return / annualized_bm_return
 
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query='rets', axis=1),
     arg_take_spec=dict(
         rets=ch.ArraySlicer(axis=1),
-        benchmark_rets=ch.ArraySlicer(axis=1),
+        bm_returns=ch.ArraySlicer(axis=1),
         ann_factor=None,
         period=None
     ),
     merge_func=base_ch.concat
 )
 @register_jitted(cache=True, tags={'can_parallel'})
-def down_capture_nb(rets: tp.Array2d, benchmark_rets: tp.Array2d,
+def down_capture_nb(rets: tp.Array2d, bm_returns: tp.Array2d,
                     ann_factor: float, period: tp.Optional[float] = None) -> tp.Array1d:
     """2-dim version of `down_capture_1d_nb`."""
     out = np.empty(rets.shape[1], dtype=np.float_)
     for col in prange(rets.shape[1]):
-        out[col] = down_capture_1d_nb(rets[:, col], benchmark_rets[:, col], ann_factor, period=period)
+        out[col] = down_capture_1d_nb(rets[:, col], bm_returns[:, col], ann_factor, period=period)
     return out
 
 
 @register_jitted
 def down_capture_rollmeta_nb(from_i: int, to_i: int, col: int, rets: tp.Array2d,
-                             benchmark_rets: tp.Array1d, ann_factor: float,
+                             bm_returns: tp.Array1d, ann_factor: float,
                              period: tp.Optional[float] = None) -> float:
     """Rolling apply meta function based on `down_capture_1d_nb`."""
-    return down_capture_1d_nb(rets[from_i:to_i, col], benchmark_rets[from_i:to_i, col], ann_factor, period=period)
+    return down_capture_1d_nb(rets[from_i:to_i, col], bm_returns[from_i:to_i, col], ann_factor, period=period)

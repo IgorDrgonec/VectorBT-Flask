@@ -1520,16 +1520,39 @@ dtype: float64
 !!! hint
     See `vectorbtpro.generic.plots_builder.PlotsBuilderMixin.plots`.
 
-    The features implemented in this method are very similar to `Portfolio.stats`.
-    See also the examples under `Portfolio.stats`.
+    The features implemented in this method are very similar to stats - see [Stats](#stats).
 
-Plot portfolio of a random strategy:
+Plot a single column of a portfolio:
 
 ```pycon
 >>> pf.plot(column=10)
 ```
 
-![](/assets/images/portfolio_plot.svg)
+![](/assets/images/portfolio_col_plot.svg)
+
+To plot a single column of a grouped portfolio:
+
+```pycon
+>>> pf_grouped = vbt.Portfolio.from_random_signals(
+...     close, n=[10, 20, 30, 40], seed=42, freq='d',
+...     group_by=['group1', 'group1', 'group2', 'group2'])
+
+>>> pf_grouped.plot(column=10, group_by=False)
+```
+
+To plot a single group of a grouped portfolio:
+
+```pycon
+>>> pf_grouped.plot(column='group1')
+UserWarning: Subplot 'orders' does not support grouped data
+UserWarning: Subplot 'trade_pnl' does not support grouped data
+```
+
+![](/assets/images/portfolio_group_plot.svg)
+
+!!! note
+    Some subplots do not support plotting grouped data.
+    Pass `group_by=False` and select a regular column to plot.
 
 You can choose any of the subplots in `Portfolio.subplots`, in any order, and
 control their appearance using keyword arguments:
@@ -1551,6 +1574,8 @@ control their appearance using keyword arguments:
 ```
 
 ![](/assets/images/portfolio_plot_drawdowns.svg)
+
+### Custom subplots
 
 To create a new subplot, a preferred way is to pass a plotting function:
 
@@ -1654,7 +1679,7 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, broadcast, broadcast_to, to_pd_array, shape_to_2d
+from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, broadcast, broadcast_to, to_pd_array
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.drawdowns import Drawdowns
@@ -1747,6 +1772,10 @@ __pdoc__['returns_acc_config'] = f"""Config of returns accessor methods to be at
 shortcut_config = ReadonlyConfig(
     {
         'filled_close': dict(
+            group_by_aware=False,
+            decorator=cached_property
+        ),
+        'filled_bm_close': dict(
             group_by_aware=False,
             decorator=cached_property
         ),
@@ -1895,7 +1924,8 @@ shortcut_config = ReadonlyConfig(
         'asset_returns': dict(),
         'market_value': dict(),
         'market_returns': dict(),
-        'benchmark_rets': dict(),
+        'bm_value': dict(),
+        'bm_returns': dict(),
         'total_market_return': dict(
             obj_type='red_array'
         ),
@@ -2039,6 +2069,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                  call_seq: tp.Optional[tp.Array2d] = None,
                  in_outputs: tp.Optional[tp.NamedTuple] = None,
                  use_in_outputs: tp.Optional[bool] = None,
+                 bm_close: tp.Optional[tp.ArrayLike] = None,
                  fillna_close: tp.Optional[bool] = None,
                  trades_type: tp.Optional[tp.Union[int, str]] = None,
                  **kwargs) -> None:
@@ -2072,6 +2103,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             call_seq=call_seq,
             in_outputs=in_outputs,
             use_in_outputs=use_in_outputs,
+            bm_close=bm_close,
             fillna_close=fillna_close,
             trades_type=trades_type,
             **kwargs
@@ -2090,6 +2122,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         self._call_seq = call_seq
         self._in_outputs = in_outputs
         self._use_in_outputs = use_in_outputs
+        self._bm_close = bm_close
         self._fillna_close = fillna_close
         self._trades_type = trades_type
 
@@ -2102,7 +2135,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                       wrapper: tp.Optional[ArrayWrapper] = None,
                       wrap_kwargs: tp.KwargsLike = None,
                       wrap_func: tp.Optional[tp.Callable] = None,
-                      **kwargs) -> tp.AnyArray:
+                      **kwargs) -> tp.Optional[tp.AnyArray]:
         """Get wrapped in-output.
 
         See `Portfolio.in_outputs_indexing_func` for parsing rules.
@@ -2179,6 +2212,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             if found_field is None:
                 raise AttributeError(f"Field '{field}' not found in in_outputs")
             obj = getattr(self.in_outputs, found_field)
+            if obj is None:
+                return None
             if wrap_func is not None:
                 return wrap_func(
                     self,
@@ -2206,6 +2241,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         if found_field is None:
             raise AttributeError(f"Field '{field}' not found in in_outputs")
         obj = getattr(self.in_outputs, found_field)
+        if obj is None:
+            return None
         if wrap_func is not None:
             return wrap_func(
                 self,
@@ -2349,6 +2386,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             return func(obj, col_map, to_1d_array(col_idxs))
 
         for field, obj in in_outputs.items():
+            if obj is None:
+                continue
             new_obj = None
             if field in cls_dir:
                 method_or_prop = getattr(cls, field)
@@ -2471,7 +2510,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         """Perform indexing on `Portfolio`."""
         new_wrapper, _, group_idxs, col_idxs = \
             self.wrapper.indexing_func_meta(pd_indexing_func, column_only_select=True, **kwargs)
-        new_close = to_2d_array(self.close)[:, col_idxs]
+        new_close = to_2d_array(self._close)[:, col_idxs]
         new_order_records = self.orders.get_by_col_idxs(col_idxs)
         new_log_records = self.logs.get_by_col_idxs(col_idxs)
         if isinstance(self._init_cash, int):
@@ -2500,6 +2539,11 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             new_call_seq = call_seq[:, col_idxs]
         else:
             new_call_seq = None
+        if self._bm_close is not None:
+            bm_close = to_2d_array(self._bm_close)
+            new_bm_close = bm_close[:, col_idxs]
+        else:
+            new_bm_close = None
         new_in_outputs = self.in_outputs_indexing_func(new_wrapper, group_idxs, col_idxs)
 
         return self.replace(
@@ -2512,7 +2556,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             cash_deposits=new_cash_deposits,
             cash_earnings=new_cash_earnings,
             call_seq=new_call_seq,
-            in_outputs=new_in_outputs
+            in_outputs=new_in_outputs,
+            bm_close=new_bm_close
         )
 
     # ############# Class methods ############# #
@@ -2559,6 +2604,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                     chunked: tp.ChunkedOption = None,
                     wrapper_kwargs: tp.KwargsLike = None,
                     freq: tp.Optional[tp.FrequencyLike] = None,
+                    bm_close: tp.Optional[tp.ArrayLike] = None,
                     **kwargs) -> PortfolioT:
         """Simulate portfolio from orders - size, price, fees, and other information.
 
@@ -2729,6 +2775,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             chunked (any): See `vectorbtpro.utils.chunking.resolve_chunked_option`.
             wrapper_kwargs (dict): Keyword arguments passed to `vectorbtpro.base.wrapping.ArrayWrapper`.
             freq (any): Index frequency in case it cannot be parsed from `close`.
+            bm_close (array_like): Latest benchmark price at each time step.
+                Will broadcast.
+
+                If not provided, will use `close`.
             **kwargs: Keyword arguments passed to the `Portfolio` constructor.
 
         All broadcastable arguments will broadcast using `vectorbtpro.base.reshaping.broadcast`
@@ -3004,6 +3054,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             wrapper_kwargs = {}
         if not wrapper_kwargs.get('group_select', True) and cash_sharing:
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
+        if bm_close is None:
+            bm_close = portfolio_cfg['bm_close']
 
         # Prepare the simulation
         # Only close is broadcast, others can remain unchanged thanks to flexible indexing
@@ -3030,15 +3082,27 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             open=open,
             high=high,
             low=low,
-            close=close
+            close=close,
+            bm_close=bm_close
         )
-        broadcast_kwargs = merge_dicts(dict(keep_flex=dict(close=False, _default=True)), broadcast_kwargs)
+        broadcast_kwargs = merge_dicts(dict(
+            keep_flex=dict(
+                close=False,
+                bm_close=False,
+                _default=True
+            )
+        ), broadcast_kwargs)
         broadcasted_args = broadcast(broadcastable_args, **broadcast_kwargs)
         cash_earnings = broadcasted_args.pop('cash_earnings')
         cash_dividends = broadcasted_args.pop('cash_dividends')
         close = broadcasted_args['close']
         if not checks.is_pandas(close):
             close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
+        bm_close = broadcasted_args['bm_close']
+        if bm_close is not None:
+            if not checks.is_pandas(bm_close):
+                bm_close = pd.Series(bm_close) if bm_close.ndim == 1 else pd.DataFrame(bm_close)
+            broadcasted_args['bm_close'] = to_2d_array(bm_close)
         flex_2d = close.ndim == 2
         broadcasted_args['close'] = to_2d_array(close)
         target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
@@ -3099,6 +3163,11 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         checks.assert_subdtype(broadcasted_args['high'], np.number)
         checks.assert_subdtype(broadcasted_args['low'], np.number)
         checks.assert_subdtype(broadcasted_args['close'], np.number)
+        if bm_close is not None:
+            checks.assert_subdtype(broadcasted_args['bm_close'], np.number)
+
+        # Remove arguments
+        broadcasted_args.pop('bm_close', None)
 
         # Perform the simulation
         func = jit_reg.resolve_option(nb.simulate_from_orders_nb, jitted)
@@ -3134,6 +3203,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             cash_earnings=sim_out.cash_earnings,
             call_seq=call_seq if attach_call_seq else None,
             in_outputs=sim_out.in_outputs,
+            bm_close=bm_close,
             **kwargs
         )
 
@@ -3205,6 +3275,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                      chunked: tp.ChunkedOption = None,
                      wrapper_kwargs: tp.KwargsLike = None,
                      freq: tp.Optional[tp.FrequencyLike] = None,
+                     bm_close: tp.Optional[tp.ArrayLike] = None,
                      **kwargs) -> PortfolioT:
         """Simulate portfolio from entry and exit signals.
 
@@ -3402,6 +3473,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             chunked (any): See `Portfolio.from_orders`.
             wrapper_kwargs (dict): See `Portfolio.from_orders`.
             freq (any): See `Portfolio.from_orders`.
+            bm_close (array_like): See `Portfolio.from_orders`.
             **kwargs: Keyword arguments passed to the `Portfolio` constructor.
 
         All broadcastable arguments will broadcast using `vectorbtpro.base.reshaping.broadcast`
@@ -4013,6 +4085,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             wrapper_kwargs = {}
         if not wrapper_kwargs.get('group_select', True) and cash_sharing:
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
+        if bm_close is None:
+            bm_close = portfolio_cfg['bm_close']
 
         # Prepare the simulation
         broadcastable_args = dict(
@@ -4050,7 +4124,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             stop_exit_price=stop_exit_price,
             upon_stop_exit=upon_stop_exit,
             upon_stop_update=upon_stop_update,
-            signal_priority=signal_priority
+            signal_priority=signal_priority,
+            bm_close=bm_close
         )
         if not signal_func_mode:
             if ls_mode:
@@ -4064,13 +4139,24 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 broadcastable_args['direction'] = direction
         broadcastable_args = {**broadcastable_args, **broadcast_named_args}
         # Only close is broadcast, others can remain unchanged thanks to flexible indexing
-        broadcast_kwargs = merge_dicts(dict(keep_flex=dict(close=False, _default=True)), broadcast_kwargs)
+        broadcast_kwargs = merge_dicts(dict(
+            keep_flex=dict(
+                close=False,
+                bm_close=False,
+                _default=True
+            )
+        ), broadcast_kwargs)
         broadcasted_args = broadcast(broadcastable_args, **broadcast_kwargs)
         cash_earnings = broadcasted_args.pop('cash_earnings')
         cash_dividends = broadcasted_args.pop('cash_dividends')
         close = broadcasted_args['close']
         if not checks.is_pandas(close):
             close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
+        bm_close = broadcasted_args['bm_close']
+        if bm_close is not None:
+            if not checks.is_pandas(bm_close):
+                bm_close = pd.Series(bm_close) if bm_close.ndim == 1 else pd.DataFrame(bm_close)
+            broadcasted_args['bm_close'] = to_2d_array(bm_close)
         flex_2d = close.ndim == 2
         broadcasted_args['close'] = to_2d_array(close)
         target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
@@ -4174,6 +4260,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             checks.assert_subdtype(broadcasted_args['short_exits'], np.bool_)
         if 'direction' in broadcasted_args:
             checks.assert_subdtype(broadcasted_args['direction'], np.int_)
+        if bm_close is not None:
+            checks.assert_subdtype(broadcasted_args['bm_close'], np.number)
 
         # Prepare arguments
         template_mapping = merge_dicts(
@@ -4243,6 +4331,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 )
         for k in broadcast_named_args:
             broadcasted_args.pop(k)
+        broadcasted_args.pop('bm_close', None)
 
         # Perform the simulation
         func = jit_reg.resolve_option(nb.simulate_from_signal_func_nb, jitted)
@@ -4285,6 +4374,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             cash_earnings=sim_out.cash_earnings,
             call_seq=call_seq if attach_call_seq else None,
             in_outputs=sim_out.in_outputs,
+            bm_close=bm_close,
             **kwargs
         )
 
@@ -4539,6 +4629,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                         chunked: tp.ChunkedOption = None,
                         wrapper_kwargs: tp.KwargsLike = None,
                         freq: tp.Optional[tp.FrequencyLike] = None,
+                        bm_close: tp.Optional[tp.ArrayLike] = None,
                         **kwargs) -> PortfolioT:
         """Build portfolio from a custom order function.
 
@@ -4693,6 +4784,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             chunked (any): See `vectorbtpro.utils.chunking.resolve_chunked_option`.
             wrapper_kwargs (dict): See `Portfolio.from_orders`.
             freq (any): See `Portfolio.from_orders`.
+            bm_close (array_like): See `Portfolio.from_orders`.
             **kwargs: Keyword arguments passed to the `Portfolio` constructor.
 
         For defaults, see `vectorbtpro._settings.portfolio`.
@@ -5112,6 +5204,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             wrapper_kwargs = {}
         if not wrapper_kwargs.get('group_select', True) and cash_sharing:
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
+        if bm_close is None:
+            bm_close = portfolio_cfg['bm_close']
 
         # Prepare the simulation
         broadcastable_args = dict(
@@ -5119,16 +5213,28 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             open=open,
             high=high,
             low=low,
-            close=close
+            close=close,
+            bm_close=bm_close
         )
         broadcastable_args = {**broadcastable_args, **broadcast_named_args}
         # Only close is broadcast, others can remain unchanged thanks to flexible indexing
-        broadcast_kwargs = merge_dicts(dict(keep_flex=dict(close=False, _default=True)), broadcast_kwargs)
+        broadcast_kwargs = merge_dicts(dict(
+            keep_flex=dict(
+                close=False,
+                bm_close=False,
+                _default=True
+            )
+        ), broadcast_kwargs)
         broadcasted_args = broadcast(broadcastable_args, **broadcast_kwargs)
         cash_earnings = broadcasted_args.pop('cash_earnings')
         close = broadcasted_args['close']
         if not checks.is_pandas(close):
             close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
+        bm_close = broadcasted_args['bm_close']
+        if bm_close is not None:
+            if not checks.is_pandas(bm_close):
+                bm_close = pd.Series(bm_close) if bm_close.ndim == 1 else pd.DataFrame(bm_close)
+            broadcasted_args['bm_close'] = to_2d_array(bm_close)
         flex_2d = close.ndim == 2
         broadcasted_args['close'] = to_2d_array(close)
         target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
@@ -5179,6 +5285,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         checks.assert_subdtype(broadcasted_args['high'], np.number)
         checks.assert_subdtype(broadcasted_args['low'], np.number)
         checks.assert_subdtype(broadcasted_args['close'], np.number)
+        if bm_close is not None:
+            checks.assert_subdtype(broadcasted_args['bm_close'], np.number)
 
         # Prepare arguments
         template_mapping = merge_dicts(
@@ -5276,6 +5384,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                     high=broadcasted_args['high'],
                     low=broadcasted_args['low'],
                     close=broadcasted_args['close'],
+                    bm_close=broadcasted_args['bm_close'],
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
@@ -5320,6 +5429,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                     high=broadcasted_args['high'],
                     low=broadcasted_args['low'],
                     close=broadcasted_args['close'],
+                    bm_close=broadcasted_args['bm_close'],
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
@@ -5364,6 +5474,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                     high=broadcasted_args['high'],
                     low=broadcasted_args['low'],
                     close=broadcasted_args['close'],
+                    bm_close=broadcasted_args['bm_close'],
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
@@ -5408,6 +5519,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                     high=broadcasted_args['high'],
                     low=broadcasted_args['low'],
                     close=broadcasted_args['close'],
+                    bm_close=broadcasted_args['bm_close'],
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
@@ -5431,6 +5543,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             cash_earnings=sim_out.cash_earnings,
             call_seq=call_seq if not flexible and attach_call_seq else None,
             in_outputs=sim_out.in_outputs,
+            bm_close=bm_close,
             **kwargs
         )
 
@@ -5804,6 +5917,42 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         func = ch_reg.resolve_option(func, chunked)
         filled_close = func(to_2d_array(close))
         return wrapper.wrap(filled_close, group_by=False, **resolve_dict(wrap_kwargs))
+
+    @custom_property(obj_type='array', group_by_aware=False)
+    def bm_close(self) -> tp.Optional[tp.SeriesFrame]:
+        """Benchmark price per unit series."""
+        if self.use_in_outputs and self.in_outputs is not None and hasattr(self.in_outputs, 'bm_close'):
+            bm_close = self.in_outputs.bm_close
+        else:
+            bm_close = self._bm_close
+
+        if bm_close is None:
+            return None
+        return self.wrapper.wrap(bm_close, group_by=False)
+
+    @class_or_instancemethod
+    def get_filled_bm_close(cls_or_self,
+                            bm_close: tp.Optional[tp.SeriesFrame] = None,
+                            jitted: tp.JittedOption = None,
+                            chunked: tp.ChunkedOption = None,
+                            wrapper: tp.Optional[ArrayWrapper] = None,
+                            wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """Get forward and backward filled benchmark closing price.
+
+        See `vectorbtpro.generic.nb.fbfill_nb`."""
+        if not isinstance(cls_or_self, type):
+            if bm_close is None:
+                bm_close = cls_or_self.bm_close
+            if wrapper is None:
+                wrapper = cls_or_self.wrapper
+        else:
+            checks.assert_not_none(bm_close)
+            checks.assert_not_none(wrapper)
+
+        func = jit_reg.resolve_option(generic_nb.fbfill_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        filled_bm_close = func(to_2d_array(bm_close))
+        return wrapper.wrap(filled_bm_close, group_by=False, **resolve_dict(wrap_kwargs))
 
     # ############# Records ############# #
 
@@ -7085,7 +7234,73 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         )
         return wrapper.wrap(market_returns, group_by=group_by, **resolve_dict(wrap_kwargs))
 
-    get_benchmark_rets = get_market_returns
+    @class_or_instancemethod
+    def get_bm_value(cls_or_self,
+                     group_by: tp.GroupByLike = None,
+                     bm_close: tp.Optional[tp.SeriesFrame] = None,
+                     init_value: tp.Optional[tp.MaybeSeries] = None,
+                     cash_deposits: tp.Optional[tp.ArrayLike] = None,
+                     flex_2d: bool = False,
+                     jitted: tp.JittedOption = None,
+                     chunked: tp.ChunkedOption = None,
+                     wrapper: tp.Optional[ArrayWrapper] = None,
+                     wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """Get benchmark value series per column/group.
+
+        Based on `Portfolio.bm_close` and `Portfolio.get_market_value`."""
+        if not isinstance(cls_or_self, type):
+            if bm_close is None:
+                if cls_or_self.bm_close is not None:
+                    if cls_or_self.fillna_close:
+                        bm_close = cls_or_self.filled_bm_close
+                    else:
+                        bm_close = cls_or_self.bm_close
+        return cls_or_self.get_market_value(
+            group_by=group_by,
+            close=bm_close,
+            init_value=init_value,
+            cash_deposits=cash_deposits,
+            flex_2d=flex_2d,
+            jitted=jitted,
+            chunked=chunked,
+            wrapper=wrapper,
+            wrap_kwargs=wrap_kwargs
+        )
+
+    @class_or_instancemethod
+    def get_bm_returns(cls_or_self,
+                       group_by: tp.GroupByLike = None,
+                       init_value: tp.Optional[tp.MaybeSeries] = None,
+                       cash_deposits: tp.Optional[tp.ArrayLike] = None,
+                       bm_value: tp.Optional[tp.SeriesFrame] = None,
+                       flex_2d: bool = False,
+                       jitted: tp.JittedOption = None,
+                       chunked: tp.ChunkedOption = None,
+                       wrapper: tp.Optional[ArrayWrapper] = None,
+                       wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """Get benchmark return series per column/group.
+
+        Based on `Portfolio.bm_close` and `Portfolio.get_market_returns`."""
+        if not isinstance(cls_or_self, type):
+            if bm_value is None:
+                if cls_or_self.bm_close is not None:
+                    bm_value = cls_or_self.resolve_shortcut_attr(
+                        'bm_value',
+                        group_by=group_by,
+                        jitted=jitted,
+                        chunked=chunked
+                    )
+        return cls_or_self.get_market_returns(
+            group_by=group_by,
+            init_value=init_value,
+            cash_deposits=cash_deposits,
+            market_value=bm_value,
+            flex_2d=flex_2d,
+            jitted=jitted,
+            chunked=chunked,
+            wrapper=wrapper,
+            wrap_kwargs=wrap_kwargs
+        )
 
     @class_or_instancemethod
     def get_total_market_return(cls_or_self,
@@ -7129,7 +7344,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
     def get_returns_acc(cls_or_self,
                         group_by: tp.GroupByLike = None,
                         returns: tp.Optional[tp.SeriesFrame] = None,
-                        benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+                        bm_returns: tp.Optional[tp.ArrayLike] = None,
                         freq: tp.Optional[tp.FrequencyLike] = None,
                         year_freq: tp.Optional[tp.FrequencyLike] = None,
                         use_asset_returns: bool = False,
@@ -7157,9 +7372,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                         jitted=jitted,
                         chunked=chunked
                     )
-            if benchmark_rets is None:
-                benchmark_rets = cls_or_self.resolve_shortcut_attr(
-                    'market_returns',
+            if bm_returns is None:
+                bm_returns = cls_or_self.resolve_shortcut_attr(
+                    'bm_returns',
                     group_by=group_by,
                     jitted=jitted,
                     chunked=chunked
@@ -7168,10 +7383,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 freq = cls_or_self.wrapper.freq
         else:
             checks.assert_not_none(returns)
-            checks.assert_not_none(benchmark_rets)
+            checks.assert_not_none(bm_returns)
 
         return returns.vbt.returns(
-            benchmark_rets=benchmark_rets,
+            bm_returns=bm_returns,
             freq=freq,
             year_freq=year_freq,
             defaults=defaults,
@@ -7187,7 +7402,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
     def get_qs(cls_or_self,
                group_by: tp.GroupByLike = None,
                returns: tp.Optional[tp.SeriesFrame] = None,
-               benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+               bm_returns: tp.Optional[tp.ArrayLike] = None,
                freq: tp.Optional[tp.FrequencyLike] = None,
                year_freq: tp.Optional[tp.FrequencyLike] = None,
                use_asset_returns: bool = False,
@@ -7203,7 +7418,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         returns_acc = cls_or_self.get_returns_acc(
             group_by=group_by,
             returns=returns,
-            benchmark_rets=benchmark_rets,
+            bm_returns=bm_returns,
             freq=freq,
             year_freq=year_freq,
             use_asset_returns=use_asset_returns,
@@ -7377,9 +7592,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 post_calc_func=lambda self, out, settings: out * 100,
                 tags='portfolio'
             ),
-            benchmark_return=dict(
+            bm_return=dict(
                 title='Benchmark Return [%]',
-                calc_func='benchmark_rets.vbt.returns.total',
+                calc_func='bm_returns.vbt.returns.total',
                 post_calc_func=lambda self, out, settings: out * 100,
                 tags='portfolio'
             ),
@@ -7518,7 +7733,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
     def returns_stats(self,
                       group_by: tp.GroupByLike = None,
-                      benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+                      bm_returns: tp.Optional[tp.ArrayLike] = None,
                       freq: tp.Optional[tp.FrequencyLike] = None,
                       year_freq: tp.Optional[tp.FrequencyLike] = None,
                       use_asset_returns: bool = False,
@@ -7530,10 +7745,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         See `Portfolio.returns_acc` and `vectorbtpro.returns.accessors.ReturnsAccessor.metrics`.
 
         `kwargs` will be passed to `vectorbtpro.returns.accessors.ReturnsAccessor.stats` method.
-        If `benchmark_rets` is not set, uses `Portfolio.get_market_returns`."""
+        If `bm_returns` is not set, uses `Portfolio.get_market_returns`."""
         returns_acc = self.get_returns_acc(
             group_by=group_by,
-            benchmark_rets=benchmark_rets,
+            bm_returns=bm_returns,
             freq=freq,
             year_freq=year_freq,
             use_asset_returns=use_asset_returns,
@@ -7902,29 +8117,29 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
     def plot_cum_returns(self,
                          column: tp.Optional[tp.Label] = None,
                          group_by: tp.GroupByLike = None,
-                         benchmark_rets: tp.Optional[tp.ArrayLike] = None,
+                         bm_returns: tp.Optional[tp.ArrayLike] = None,
                          use_asset_returns: bool = False,
                          jitted: tp.JittedOption = None,
                          chunked: tp.ChunkedOption = None,
                          **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of cumulative returns.
 
-        If `benchmark_rets` is None, will use `Portfolio.get_market_returns`.
+        If `bm_returns` is None, will use `Portfolio.get_market_returns`.
 
         `**kwargs` are passed to `vectorbtpro.returns.accessors.ReturnsSRAccessor.plot_cumulative`."""
         from vectorbtpro._settings import settings
         plotting_cfg = settings['plotting']
 
-        if benchmark_rets is None:
-            benchmark_rets = self.resolve_shortcut_attr(
-                'market_returns',
+        if bm_returns is None:
+            bm_returns = self.resolve_shortcut_attr(
+                'bm_returns',
                 group_by=group_by,
                 jitted=jitted,
                 chunked=chunked
             )
         else:
-            benchmark_rets = broadcast_to(benchmark_rets, self.obj)
-        benchmark_rets = self.select_one_from_obj(benchmark_rets, self.wrapper.regroup(group_by), column=column)
+            bm_returns = broadcast_to(bm_returns, self.obj)
+        bm_returns = self.select_one_from_obj(bm_returns, self.wrapper.regroup(group_by), column=column)
         if use_asset_returns:
             returns = self.resolve_shortcut_attr(
                 'asset_returns',
@@ -7941,7 +8156,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             )
         returns = self.select_one_from_obj(returns, self.wrapper.regroup(group_by), column=column)
         kwargs = merge_dicts(dict(
-            benchmark_rets=benchmark_rets,
+            bm_returns=bm_returns,
             main_kwargs=dict(
                 trace_kwargs=dict(
                     line=dict(
