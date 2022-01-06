@@ -175,12 +175,12 @@ class CSVData(LocalData):
 
         ```pycon
         >>> csv_data.get()
-        symbol                     rand_data1.csv  rand_data2.csv  rand_data3.csv
-        2019-12-31 23:00:00+00:00       99.632114             NaN             NaN
-        2020-01-01 23:00:00+00:00       99.268772      101.372515             NaN
-        2020-01-02 23:00:00+00:00       99.771735      101.609975       99.640045
-        2020-01-03 23:00:00+00:00       98.452476      101.073658       99.466840
-        2020-01-04 23:00:00+00:00       98.055655      101.846403       99.719464
+        symbol                     rand_data1  rand_data2  rand_data3
+        2019-12-31 23:00:00+00:00   97.922824         NaN         NaN
+        2020-01-01 23:00:00+00:00   97.905890   99.296237         NaN
+        2020-01-02 23:00:00+00:00   97.656002   99.130784   99.347756
+        2020-01-03 23:00:00+00:00   97.117341   98.655973   98.845936
+        2020-01-04 23:00:00+00:00   96.346229   98.841839   98.165722
         ```
 
         * Update one time series and update `CSVData`:
@@ -189,16 +189,16 @@ class CSVData(LocalData):
         >>> rand_data3 = rand_data3.update(end='2020-01-07')
         >>> rand_data3.get().to_csv('rand_data3.csv')
 
-        >>> csv_data = csv_data.update()  # loads only subset of data
+        >>> csv_data = csv_data.update()
         >>> csv_data.get()
-        symbol                     rand_data1.csv  rand_data2.csv  rand_data3.csv
-        2019-12-31 23:00:00+00:00       99.632114             NaN             NaN
-        2020-01-01 23:00:00+00:00       99.268772      101.372515             NaN
-        2020-01-02 23:00:00+00:00       99.771735      101.609975       99.640045
-        2020-01-03 23:00:00+00:00       98.452476      101.073658       99.466840
-        2020-01-04 23:00:00+00:00       98.055655      101.846403      100.212156
-        2020-01-05 23:00:00+00:00             NaN             NaN      100.829512
-        2020-01-06 23:00:00+00:00             NaN             NaN      100.617397
+        symbol                     rand_data1  rand_data2  rand_data3
+        2019-12-31 23:00:00+00:00   97.922824         NaN         NaN
+        2020-01-01 23:00:00+00:00   97.905890   99.296237         NaN
+        2020-01-02 23:00:00+00:00   97.656002   99.130784   99.347756
+        2020-01-03 23:00:00+00:00   97.117341   98.655973   98.845936
+        2020-01-04 23:00:00+00:00   96.346229   98.841839   99.104168  << updated data
+        2020-01-05 23:00:00+00:00         NaN         NaN  100.049764  << new data
+        2020-01-06 23:00:00+00:00         NaN         NaN   96.298642  << new data
         ```
     """
 
@@ -362,16 +362,16 @@ class HDFData(LocalData):
         >>> rand_data4 = rand_data4.update(end='2020-01-07')
         >>> rand_data4.get().to_hdf('rand_data2.h5', '/folder/R4')
 
-        >>> hdf_data = hdf_data.update()  # loads only subset of data
+        >>> hdf_data = hdf_data.update()
         >>> hdf_data.get()
         symbol                             R1          R2         R3         R4
         2019-12-31 23:00:00+00:00  101.351668         NaN        NaN        NaN
         2020-01-01 23:00:00+00:00  101.263132  100.999627        NaN        NaN
         2020-01-02 23:00:00+00:00  101.290664  103.431017  99.483751        NaN
         2020-01-03 23:00:00+00:00  103.178471  104.279458  99.207583  98.995509
-        2020-01-04 23:00:00+00:00  103.493175  104.549302  99.784088  99.456149
-        2020-01-05 23:00:00+00:00         NaN         NaN        NaN  96.833051
-        2020-01-06 23:00:00+00:00         NaN         NaN        NaN  96.422318
+        2020-01-04 23:00:00+00:00  103.493175  104.549302  99.784088  99.456149  << updated data
+        2020-01-05 23:00:00+00:00         NaN         NaN        NaN  96.833051  << new data
+        2020-01-06 23:00:00+00:00         NaN         NaN        NaN  96.422318  << new data
         ```
 
         * Specify keys:
@@ -693,12 +693,12 @@ class YFData(Data):  # pragma: no cover
         2021-04-12 13:31:00+00:00  152276          0             0
         2021-04-12 13:32:00+00:00  168363          0             0
         2021-04-12 13:33:00+00:00  129607          0             0
-        2021-04-12 13:34:00+00:00       0          0             0
-        2021-04-12 13:35:00+00:00  110500          0             0
-        2021-04-12 13:36:00+00:00  148384          0             0
-        2021-04-12 13:37:00+00:00  243851          0             0
-        2021-04-12 13:38:00+00:00  203569          0             0
-        2021-04-12 13:39:00+00:00   93308          0             0
+        2021-04-12 13:34:00+00:00       0          0             0  << updated data
+        2021-04-12 13:35:00+00:00  110500          0             0  << new data
+        2021-04-12 13:36:00+00:00  148384          0             0  << new data
+        2021-04-12 13:37:00+00:00  243851          0             0  << new data
+        2021-04-12 13:38:00+00:00  203569          0             0  << new data
+        2021-04-12 13:39:00+00:00   93308          0             0  << new data
         ```
     """
 
@@ -748,7 +748,7 @@ class BinanceData(Data):  # pragma: no cover
     """`Data` for data coming from `python-binance`.
 
     Usage:
-        * Fetch the 1-minute data of the last 2 hours, wait 1 minute:
+        * Fetch the 1-minute data of the last 2 hours:
 
         ```pycon
         >>> import vectorbtpro as vbt
@@ -809,7 +809,7 @@ class BinanceData(Data):  # pragma: no cover
         [120 rows x 10 columns]
         ```
 
-        * Update data:
+        * Wait 1 minute and update:
 
         ```pycon
         >>> import time
@@ -854,8 +854,8 @@ class BinanceData(Data):  # pragma: no cover
         2021-05-02 14:50:00+00:00        6.156418e+05
         ...                                       ...
         2021-05-02 16:46:00+00:00        8.421173e+05
-        2021-05-02 16:47:00+00:00        4.404362e+05
-        2021-05-02 16:48:00+00:00        1.335474e+05
+        2021-05-02 16:47:00+00:00        4.404362e+05  << updated data
+        2021-05-02 16:48:00+00:00        1.335474e+05  << new data
 
         [121 rows x 10 columns]
         ```
@@ -1017,7 +1017,7 @@ class CCXTData(Data):  # pragma: no cover
     """`Data` for data coming from `ccxt`.
 
     Usage:
-        * Fetch the 1-minute data of the last 2 hours, wait 1 minute:
+        * Fetch the 1-minute data of the last 2 hours:
 
         ```pycon
         >>> import vectorbtpro as vbt
@@ -1048,7 +1048,7 @@ class CCXTData(Data):  # pragma: no cover
         [120 rows x 5 columns]
         ```
 
-        * Update data:
+        * Wait 1 minute and update:
 
         ```pycon
         >>> import time
@@ -1063,8 +1063,8 @@ class CCXTData(Data):  # pragma: no cover
         2021-05-02 14:53:00+00:00  56977.61  56987.09  56882.98  56885.42  27.752200
         ...                             ...       ...       ...       ...        ...
         2021-05-02 16:49:00+00:00  56596.00  56664.14  56596.00  56640.35  12.777475
-        2021-05-02 16:50:00+00:00  56640.35  56689.99  56640.35  56678.33  14.610231
-        2021-05-02 16:51:00+00:00  56678.33  56688.99  56636.89  56653.42  11.647158
+        2021-05-02 16:50:00+00:00  56640.35  56689.99  56640.35  56678.33  14.610231  << updated data
+        2021-05-02 16:51:00+00:00  56678.33  56688.99  56636.89  56653.42  11.647158  << new data
 
         [121 rows x 5 columns]
         ```
@@ -1254,7 +1254,7 @@ class AlpacaData(Data):  # pragma: no cover
     Adapted to vectorbtpro by @polakowo.
 
     Usage:
-        * Fetch the 1-minute data of the last 2 hours, wait 1 minute, and update:
+        * Fetch the 1-minute data of the last 2 hours:
 
         ```pycon
         >>> import vectorbtpro as vbt
@@ -1280,7 +1280,11 @@ class AlpacaData(Data):  # pragma: no cover
         2021-12-27 15:48:00+00:00  177.9600  178.0500  177.9600  178.0100  159700
 
         [105 rows x 5 columns]
+        ```
 
+        * Wait 1 minute and update:
+
+        ```pycon
         >>> import time
         >>> time.sleep(60)
 
@@ -1293,8 +1297,8 @@ class AlpacaData(Data):  # pragma: no cover
         2021-12-27 14:06:00+00:00  177.0400  177.0400  177.0400  177.0400     873
         ...                             ...       ...       ...       ...     ...
         2021-12-27 15:47:00+00:00  177.8810  177.9600  177.8400  177.9515  123284
-        2021-12-27 15:48:00+00:00  177.9600  178.0500  177.9600  178.0100  159700
-        2021-12-27 15:49:00+00:00  178.0100  178.0700  177.9700  178.0650  185037
+        2021-12-27 15:48:00+00:00  177.9600  178.0500  177.9600  178.0100  159700  << updated data
+        2021-12-27 15:49:00+00:00  178.0100  178.0700  177.9700  178.0650  185037  << new data
 
         [106 rows x 5 columns]
         ```
