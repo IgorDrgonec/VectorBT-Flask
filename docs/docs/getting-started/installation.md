@@ -111,5 +111,6 @@ pip install -e vectorbtpro
 
 ## Troubleshooting
 
-* [TA-Lib support](https://github.com/mrjbq7/ta-lib#dependencies)
-* [Jupyter Notebook and JupyterLab support](https://plotly.com/python/getting-started/#jupyter-notebook-support)
+* [TA-Lib](https://github.com/mrjbq7/ta-lib#dependencies)
+* [Jupyter Notebook and JupyterLab](https://plotly.com/python/getting-started/#jupyter-notebook-support)
+* [Apple M1](https://github.com/polakowo/vectorbt/issues/320)

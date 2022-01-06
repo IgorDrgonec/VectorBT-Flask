@@ -374,7 +374,7 @@ dtype: float64
 
 ### Refactored data
 
-- [x] In case of connectivity issues, data won't be lost but returned so it can be updated later. Also, symbol fetching methods can also return a state, which will be preserved for the use in data updates. There is also a new progress bar for symbols.
+- [x] In case of connectivity issues, data won't be lost but returned so it can be updated later. Also, symbol fetching methods can return a state, which will be preserved for the use in data updates. There is also a new progress bar for symbols.
 
 ### Local data
 
@@ -589,6 +589,8 @@ Name: b, dtype: float64
 3. The same holds for reduced NumPy arrays
 4. Portfolio instance also knows how to properly select a column/group in a custom NumPy array
 
+## Analysis
+
 ### Shortcut properties
 
 - [x] [In-output arrays](#in-outputs) can be used to override regular portfolio attributes. Portfolio will automatically pick the pre-computed array and perform all future calculations using this array, without wasting time on its reconstruction.
@@ -633,6 +635,24 @@ dtype: float64
 2. Pre-computed returns are automatically taken from `in_outputs.returns`
 3. Actual returns can still be reconstructed
 
+### Benchmark
+
+- [x] Benchmark can be easily set for the entire portfolio.
+
+```pycon title="Compare Microsoft to S&P 500"
+>>> data = vbt.YFData.fetch(['SPY', 'MSFT'], start='2010-01-01')
+
+>>> pf = vbt.Portfolio.from_holding(
+...     close=data.data['MSFT']['Close'],
+...     bm_close=data.data['SPY']['Close']
+... )
+>>> pf.plot_cum_returns()
+```
+
+[=100% "Data 2/2"]{: .candystripe}
+
+![](/assets/images/features_benchmark.svg)
+
 ## Extra
 
 ### New settings
@@ -656,8 +676,9 @@ False
 
 1. Restart the runtime
 
-### And more...
+### And many more...
 
-- [ ] Expect many more killer features to be added on a weekly basis! :heart:{ .heart }
+- [x] This is just the tip of the iceberg: vectorbt PRO deploys an optimized project structure, time and memory profiling tools, rich templating macros, an upgraded formatting engine, dynamic type checking, new efficient data structures, and more.
+- [ ] Expect more killer features to be added on a weekly basis! :heart:{ .heart }
 
 
