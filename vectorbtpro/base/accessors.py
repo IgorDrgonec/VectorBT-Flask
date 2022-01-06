@@ -836,12 +836,12 @@ class BaseAccessor(Wrapping):
             ...         df=pd.DataFrame([[1, 2, 3]], columns=['a', 'b', 'c'])
             ...     )
             ... )
-            ```
             combine_idx        0        1        2
                          a  b  c  a  b  c  a  b  c
             x            3  4  5  4  5  6  5  6  7
             y            4  5  6  5  6  7  6  7  8
             z            5  6  7  6  7  8  7  8  9
+            ```
 
             * To change the execution engine or specify other engine-related arguments, use `execute_kwargs`:
 
