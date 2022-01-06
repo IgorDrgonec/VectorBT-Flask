@@ -4,7 +4,7 @@ title: Features
 
 # Features :zap:
 
-On top of the [features](https://github.com/polakowo/vectorbt#zap-features) offered by the vanilla version of vectorbt, vectorbt PRO implements the following enhancements:
+On top of the [features](https://vectorbt.dev/getting-started/features/) offered by the vanilla version of vectorbt, vectorbt PRO implements the following enhancements:
 
 ## Performance
 
