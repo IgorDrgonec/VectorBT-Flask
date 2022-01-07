@@ -46,6 +46,7 @@ markdown_extensions:
   - attr_list
   - tables
   - footnotes
+  - md_in_html
   - toc:
       permalink: true
   - pymdownx.inlinehilite
@@ -89,6 +90,7 @@ nav:
     - getting-started/index.md
     - Features: getting-started/features.md
     - Installation: getting-started/installation.md
+    - Quickstart Guide: getting-started/quickstart-guide.md
   - API:
     - api/index.md
     - _settings: api/_settings.md

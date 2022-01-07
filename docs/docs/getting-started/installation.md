@@ -13,18 +13,19 @@ title: Installation
 ## Requirements
 
 After you've been added to the list of collaborators and accepted the
-repository invitation, the next step is to create a [personal access token] for
+repository invitation, the next step is to create a [Personal Access Token] for
 your GitHub account in order to access the PRO repository programmatically 
 (from the command line or GitHub Actions workflows):
 
-1.  Go to https://github.com/settings/tokens
-2.  Click on [Generate a new token]
-3.  Enter a name and select the [`repo`][scopes] scope
-4.  Generate the token and store it in a safe place
+1. Go to https://github.com/settings/tokens
+2. Click on [Generate a new token]
+3. Enter a name (such as "vectorbtpro") and select the [`repo`][scopes] scope
+4. Generate the token and save it in a safe place. You can also [add it to your system].
 
-  [personal access token]: https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token
-  [Generate a new token]: https://github.com/settings/tokens/new
-  [scopes]: https://docs.github.com/en/developers/apps/scopes-for-oauth-apps#available-scopes
+    [Personal Access Token]: https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token
+    [Generate a new token]: https://github.com/settings/tokens/new
+    [scopes]: https://docs.github.com/en/developers/apps/scopes-for-oauth-apps#available-scopes
+    [add it to your system]: https://stackoverflow.com/a/68781050
 
 ## With pip
 
@@ -40,26 +41,25 @@ Install the base PRO version:
 
 ```sh
 # if you're using Git/HTTPS authentication
-pip install -U "vectorbtpro[base] @ git+https://${GH_TOKEN}@github.com/polakowo/vectorbt.pro.git"
+pip install -U "vectorbtpro[base] @ git+https://github.com/polakowo/vectorbt.pro.git"
 
 # if you are connecting to GitHub with SSH
-pip install -U "vectorbtpro[base] @ git+ssh://${GH_TOKEN}@github.com/polakowo/vectorbt.pro.git"
+pip install -U "vectorbtpro[base] @ git+ssh://github.com/polakowo/vectorbt.pro.git"
 ```
 
-The `GH_TOKEN` environment variable must be set to the value of the personal access 
-token you generated in the previous step. Note that the personal access token must 
-be kept secret at all times, as it allows the owner to access your private repositories.
+!!! info
+    Whenever you are prompted for a password, paste the token that you generated in the previous steps.
 
 Full version (with all optional dependencies):
 
 ```sh
-pip install -U "vectorbtpro[full] @ git+https://${GH_TOKEN}@github.com/polakowo/vectorbt.pro.git"
+pip install -U "vectorbtpro[full] @ git+https://github.com/polakowo/vectorbt.pro.git"
 ```
 
 Lightweight version (with only required dependencies):
 
 ```sh
-pip install -U git+https://${GH_TOKEN}@github.com/polakowo/vectorbt.pro.git
+pip install -U git+https://github.com/polakowo/vectorbt.pro.git
 ```
 
 For more details, see [extra-requirements.txt](https://github.com/polakowo/vectorbt.pro/blob/main/extra-requirements.txt).
@@ -89,7 +89,7 @@ dependency to your Python package can be done by listing it in setup.py or in yo
 setup(
     # ...
     install_requires=[
-        "vectorbtpro @ git+https://${GH_TOKEN}@github.com/polakowo/vectorbt.pro.git"
+        "vectorbtpro @ git+https://github.com/polakowo/vectorbt.pro.git"
     ]
     # ...
 )

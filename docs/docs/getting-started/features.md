@@ -595,7 +595,7 @@ Name: b, dtype: float64
 
 - [x] [In-output arrays](#in-outputs) can be used to override regular portfolio attributes. Portfolio will automatically pick the pre-computed array and perform all future calculations using this array, without wasting time on its reconstruction.
 
-```pycon title="Diminish positive returns"
+```pycon title="Modify returns from within simulation"
 >>> @njit
 ... def post_segment_func_nb(c):
 ...     for col in range(c.from_col, c.to_col):
@@ -618,7 +618,7 @@ Name: b, dtype: float64
 >>> pf.returns  # (1)!
 0    0.000
 1    0.000
-2    0.125  << diminished
+2    0.125  << modified
 3   -0.200
 4   -0.250
 dtype: float64

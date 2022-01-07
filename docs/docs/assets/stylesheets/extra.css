@@ -67,6 +67,30 @@
     animation: heart 1000ms infinite;
 }
 
+.feature-row:after {
+    content: "";
+    display: table;
+    clear: both;
+}
+
+.feature-column {
+    width: 50%;
+    float: left;
+    padding: 0 20px 20px 20px;
+}
+
+
+@media screen and (max-width:29.9375em) {
+    .feature-column {
+        width: 100%;
+    }
+}
+
+.feature-column .icon {
+    font-size: 1.5rem;
+    display: block;
+}
+
 /* Progress Bars */
 .progress {
     display: block;
