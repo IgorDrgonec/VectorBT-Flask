@@ -20,12 +20,11 @@ your GitHub account in order to access the PRO repository programmatically
 1. Go to https://github.com/settings/tokens
 2. Click on [Generate a new token]
 3. Enter a name (such as "vectorbtpro") and select the [`repo`][scopes] scope
-4. Generate the token and save it in a safe place. You can also [add it to your system].
+4. Generate the token and save it in a safe place
 
     [Personal Access Token]: https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token
     [Generate a new token]: https://github.com/settings/tokens/new
     [scopes]: https://docs.github.com/en/developers/apps/scopes-for-oauth-apps#available-scopes
-    [add it to your system]: https://stackoverflow.com/a/68781050
 
 ## With pip
 
@@ -37,7 +36,7 @@ Uninstall the vanilla version if installed:
 pip uninstall vectorbt
 ```
 
-Install the base PRO version:
+Install the base PRO version (this requires [TA-Lib](https://github.com/mrjbq7/ta-lib#dependencies) installed):
 
 ```sh
 # if you're using Git/HTTPS authentication
@@ -49,6 +48,14 @@ pip install -U "vectorbtpro[base] @ git+ssh://github.com/polakowo/vectorbt.pro.g
 
 !!! info
     Whenever you are prompted for a password, paste the token that you generated in the previous steps.
+
+    To avoid re-entering the token over and over again, you can 
+    [add it to your system](https://stackoverflow.com/a/68781050) 
+    or set an environment variable `GH_TOKEN` and then install the package as follows:
+
+    ```sh
+    pip install -U "vectorbtpro[base] @ git+https://${GH_TOKEN}@github.com/polakowo/vectorbt.pro.git"
+    ```
 
 Full version (with all optional dependencies):
 
