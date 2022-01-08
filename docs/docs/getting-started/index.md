@@ -23,8 +23,8 @@ The PRO version extends the standard vectorbt library with new impressive featur
     <span class="icon">
       <span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m13.13 22.19-1.63-3.83c1.57-.58 3.04-1.36 4.4-2.27l-2.77 6.1M5.64 12.5l-3.83-1.63 6.1-2.77C7 9.46 6.22 10.93 5.64 12.5M21.61 2.39S16.66.269 11 5.93c-2.19 2.19-3.5 4.6-4.35 6.71-.28.75-.09 1.57.46 2.13l2.13 2.12c.55.56 1.37.74 2.12.46A19.1 19.1 0 0 0 18.07 13c5.66-5.66 3.54-10.61 3.54-10.61m-7.07 7.07c-.78-.78-.78-2.05 0-2.83s2.05-.78 2.83 0c.77.78.78 2.05 0 2.83-.78.78-2.05.78-2.83 0m-5.66 7.07-1.41-1.41 1.41 1.41M6.24 22l3.64-3.64c-.34-.09-.67-.24-.97-.45L4.83 22h1.41M2 22h1.41l4.77-4.76-1.42-1.41L2 20.59V22m0-2.83 4.09-4.08c-.21-.3-.36-.62-.45-.97L2 17.76v1.41z"></path></svg></span>
     </span>
-    <b>Active development</b>
-    <p>vectorbt PRO enjoys priority in development and maintenance. All major enhancements and updates will be immediately available to all eligible sponsors.</p>
+    <b>Rapid development</b>
+    <p>vectorbt PRO enjoys priority in development and maintenance. All major enhancements will be exclusively and immediately available to all eligible sponsors.</p>
   </div>
 </div>
 <div class="feature-row">
@@ -61,7 +61,8 @@ The PRO version extends the standard vectorbt library with new impressive featur
 </div>
 
 !!! info
-    In order to access the PRO repository, you need to become an eligible sponsor of @polakowo on GitHub.
+    vectorbt PRO is a successor of the open-source version of vectorbt. Due to a vast and growing
+    difference between both packages, most of the PRO features will remain exclusive and won't be merged back!
 
 ## What is vectorbt PRO?
 
@@ -72,10 +73,10 @@ immediately available to all eligible sponsors, as they are made collaborators o
 Sponsorships start as low as [__$25 a month__](#how-to-become-a-sponsor).[^1]
 
 [^1]:
-  Note that $25 a month is the minimum amount to become eligible for the
-  PRO version. While GitHub Sponsors also allows to sponsor lower amounts or
-  one-time amounts, those can't be granted access to the PRO version due to
-  technical reasons.
+    Note that $25 a month is the minimum amount to become eligible for the
+    PRO version. While GitHub Sponsors also allows to sponsor lower amounts or
+    one-time amounts, those can't be granted access to the PRO version due to
+    technical reasons.
 
 ## What sponsorships achieve
 
@@ -95,24 +96,24 @@ organization and the GitHub account of the individual that should be added as a
 collaborator.[^2]
 
 [^2]:
-  It's currently not possible to grant access to each member of an
-  organization, as GitHub only allows for adding users. Thus, after
-  sponsoring, please send an email to olegpolakow@gmail.com, stating which
-  account should become a collaborator of the PRO repository.
-  To ensure that access is not tied to a particular individual GitHub account,
-  create a bot account (i.e. a GitHub account that is not tied to a specific
-  individual), and use this account for the sponsoring. After being added to
-  the list of collaborators, the bot account can create a private fork of the
-  private GitHub repository, and grant access to all members of the
-  organizations.
+    It's currently not possible to grant access to each member of an
+    organization, as GitHub only allows for adding users. Thus, after
+    sponsoring, please send an email to olegpolakow@gmail.com, stating which
+    account should become a collaborator of the PRO repository.
+    To ensure that access is not tied to a particular individual GitHub account,
+    create a bot account (i.e. a GitHub account that is not tied to a specific
+    individual), and use this account for the sponsoring. After being added to
+    the list of collaborators, the bot account can create a private fork of the
+    private GitHub repository, and grant access to all members of the
+    organizations.
 
 You can cancel your sponsorship anytime.[^3]
 
 [^3]:
-  If you cancel your sponsorship, GitHub schedules a cancellation request
-  which will become effective at the end of the billing cycle. This means
-  that even though you cancel your sponsorship, you will keep your access to
-  the PRO repository as long as your cancellation isn't effective. All charges are
-  processed by GitHub through Stripe. As we don't receive any information
-  regarding your payment, and GitHub doesn't offer refunds, sponsorships are
-  non-refundable.
+    If you cancel your sponsorship, GitHub schedules a cancellation request
+    which will become effective at the end of the billing cycle. This means
+    that even though you cancel your sponsorship, you will keep your access to
+    the PRO repository as long as your cancellation isn't effective. All charges are
+    processed by GitHub through Stripe. As we don't receive any information
+    regarding your payment, and GitHub doesn't offer refunds, sponsorships are
+    non-refundable.
