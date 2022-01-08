@@ -271,51 +271,6 @@ Date
 * Many inputs (such as `fees`) can be passed as a single value, value per column/row, or as a matrix
 * Implements flexible indexing wherever possible to save memory
 
-### Flexible indexing
-
-Instead of expensive broadcasting, most methods keep the original shape and do indexing in a smart way.
-A nice feature of this is that it has almost no memory footprint and can broadcast in
-any direction indefinitely.
-
-For example, let's broadcast three inputs and select the last element using both approaches:
-
-```pycon
->>> # Classic way
->>> a = np.array([1, 2, 3])
->>> b = np.array([[4], [5], [6]])
->>> c = np.array(10)
->>> a_, b_, c_ = broadcast(a, b, c)
-
->>> a_
-array([[1, 2, 3],
-       [1, 2, 3],
-       [1, 2, 3]])
->>> a_[2, 2]
-3
-
->>> b_
-array([[4, 4, 4],
-       [5, 5, 5],
-       [6, 6, 6]])
->>> b_[2, 2]
-6
-
->>> c_
-array([[10, 10, 10],
-       [10, 10, 10],
-       [10, 10, 10]])
->>> c_[2, 2]
-10
-
->>> # Flexible indexing being done during simulation
->>> flex_select_auto_nb(a, 2, 2)
-3
->>> flex_select_auto_nb(b, 2, 2)
-6
->>> flex_select_auto_nb(c, 2, 2)
-10
-```
-
 ## Defaults
 
 If you look at the arguments of each class method, you will notice that most of them default to None.

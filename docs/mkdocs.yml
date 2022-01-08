@@ -90,7 +90,9 @@ nav:
     - getting-started/index.md
     - Features: getting-started/features.md
     - Installation: getting-started/installation.md
-    - Quickstart: getting-started/quickstart.md
+  - Documentation:
+    - documentation/fundamentals.md
+    - To be continued...: documentation/to-be-continued.md
   - API:
     - api/index.md
     - _settings: api/_settings.md
