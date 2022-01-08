@@ -46,14 +46,20 @@ except ImportError:
 LocalDataT = tp.TypeVar("LocalDataT", bound="LocalData")
 
 
-def unfold_path(path: tp.PathLike) -> tp.List[Path]:
+def unfold_path(path: tp.PathLike, sort_paths: bool = True) -> tp.List[Path]:
     """`unfold_path_func` that returns a list of files matching a path."""
     path = Path(path)
     if path.exists():
         if path.is_dir():
-            return [p for p in path.iterdir() if p.is_file()]
+            sub_paths = [p for p in path.iterdir() if p.is_file()]
+            if sort_paths:
+                sub_paths = sorted(sub_paths)
+            return sub_paths
         return [path]
-    return list([Path(p) for p in glob(str(path))])
+    sub_paths = list([Path(p) for p in glob(str(path))])
+    if sort_paths:
+        sub_paths = sorted(sub_paths)
+    return sub_paths
 
 
 def path_to_symbol(path: tp.PathLike) -> str:
@@ -75,14 +81,13 @@ class LocalData(Data):
               parse_paths: bool = True,
               sort_paths: bool = True,
               unfold_path_func: tp.Callable = unfold_path,
+              unfold_path_kwargs: tp.KwargsLike = None,
               path_to_symbol_func: tp.Callable = path_to_symbol,
               **kwargs) -> LocalDataT:
         """Override `vectorbtpro.data.base.Data.fetch`.
 
         Set `parse_paths` to False to not parse paths and behave like a regular
         `vectorbtpro.data.base.Data` instance.
-
-        Set `sort_paths` to False to disable sorting of found paths.
 
         Use `unfold_path_func` to unfold a path into multiple paths. Won't get applied
         if `path` is already an instance of `vectorbtpro.data.base.symbol_dict`.
@@ -98,6 +103,8 @@ class LocalData(Data):
                 sync = True
             if path is None:
                 raise ValueError("At least symbols or path must be set")
+            if unfold_path_kwargs is None:
+                unfold_path_kwargs = {}
 
             single_symbol = False
             if isinstance(symbols, (str, Path)):
@@ -121,11 +128,9 @@ class LocalData(Data):
                     raise ValueError("The number of symbols must match the number of paths")
             elif checks.is_iterable(path) or checks.is_sequence(path):
                 # Multiple paths
-                paths = [p for sub_path in path for p in unfold_path_func(sub_path)]
+                paths = [p for sub_path in path for p in unfold_path_func(sub_path, **unfold_path_kwargs)]
                 if len(paths) == 0:
                     raise FileNotFoundError(f"No paths could be matched with {path}")
-                if sort_paths:
-                    paths = sorted(paths)
                 if sync:
                     symbols = []
                     path = symbol_dict()
@@ -288,20 +293,27 @@ def split_hdf_path(path: tp.PathLike,
     return split_hdf_path(new_path, new_key, _full_path=_full_path)
 
 
-def hdf_unfold_path(path: tp.PathLike) -> tp.List[Path]:
+def hdf_unfold_path(path: tp.PathLike, sort_paths: bool = True) -> tp.List[Path]:
     """`unfold_path_func` that returns a list of HDF paths (path to file + key) matching a path."""
     path = Path(path)
     if path.exists():
         if path.is_dir():
             sub_paths = [p for p in path.iterdir() if p.is_file()]
-            return [p for sub_path in sub_paths for p in hdf_unfold_path(sub_path)]
+            key_paths = [p for sub_path in sub_paths for p in hdf_unfold_path(sub_path)]
+            if sort_paths:
+                key_paths = sorted(key_paths)
+            return key_paths
         with pd.HDFStore(str(path)) as store:
             keys = [k[1:] for k in store.keys()]
+        if sort_paths:
+            keys = sorted(keys)
         return [path / k for k in keys]
     try:
         file_path, key = split_hdf_path(path)
         with pd.HDFStore(str(file_path)) as store:
             keys = [k[1:] for k in store.keys()]
+        if sort_paths:
+            keys = sorted(keys)
         if key is None:
             return [file_path / k for k in keys]
         if key in keys:
@@ -316,7 +328,10 @@ def hdf_unfold_path(path: tp.PathLike) -> tp.List[Path]:
     except HDFPathNotFoundError:
         pass
     sub_paths = list([Path(p) for p in glob(str(path))])
-    return [p for sub_path in sub_paths for p in hdf_unfold_path(sub_path)]
+    key_paths = [p for sub_path in sub_paths for p in hdf_unfold_path(sub_path)]
+    if sort_paths:
+        key_paths = sorted(key_paths)
+    return key_paths
 
 
 HDFDataT = tp.TypeVar("HDFDataT", bound="HDFData")
