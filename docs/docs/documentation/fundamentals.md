@@ -471,20 +471,20 @@ and vectorbt will automatically figure out where the respective element belongs 
 In contrast to NumPy and Pandas, vectorbt knows how to broadcast labels: in case where columns 
 or individual column levels in both objects are different, they are stacked upon each other. 
 Consider checking whenever the fast moving average is higher than the slow moving average, 
-using the following window combinations: (2, 3), (2, 4), and (3, 4).
+using the following window combinations: (2, 3) and (3, 4).
 
 ```pycon
->>> fast_ma = vbt.MA.run(multi_close, window=[2, 2], short_name='fast')
+>>> fast_ma = vbt.MA.run(multi_close, window=[2, 3], short_name='fast')
 >>> slow_ma = vbt.MA.run(multi_close, window=[3, 4], short_name='slow')
 
 >>> fast_ma.ma
-fast_window    2    2    2    2
+fast_window    2    2    3    3
               p1   p2   p1   p2
 2020-01-01   NaN  NaN  NaN  NaN
-2020-01-02   2.5  4.5  2.5  4.5
-2020-01-03   3.5  3.5  3.5  3.5
-2020-01-04   4.5  2.5  4.5  2.5
-2020-01-05   5.5  1.5  5.5  1.5
+2020-01-02   2.5  4.5  NaN  NaN
+2020-01-03   3.5  3.5  3.0  4.0
+2020-01-04   4.5  2.5  4.0  3.0
+2020-01-05   5.5  1.5  5.0  2.0
 
 >>> slow_ma.ma
 slow_window    3    3    4    4
@@ -506,7 +506,7 @@ array([[False, False, False, False],
        [ True, False,  True, False]])
 
 >>> fast_ma.ma.vbt > slow_ma.ma  # (3)!
-fast_window      2      2      2      2
+fast_window      2      2      3      3
 slow_window      3      3      4      4
                 p1     p2     p1     p2
 2020-01-01   False  False  False  False
@@ -533,13 +533,13 @@ check whenever the fast moving average is higher than the price:
 ValueError: Can only compare identically-labeled DataFrame objects
 
 >>> fast_ma.ma.values > multi_close.values  # (2)!
-ValueError: operands could not be broadcast together with shapes (5,6) (5,2)
+ValueError: operands could not be broadcast together with shapes (5,4) (5,2) 
 
 >>> fast_ma.ma.vbt > multi_close  # (3)!
-fast_window      2      2      2      2
+fast_window      2      2      3      3
                 p1     p2     p1     p2
 2020-01-01   False  False  False  False
-2020-01-02   False   True  False   True
+2020-01-02   False   True  False  False
 2020-01-03   False   True  False   True
 2020-01-04   False   True  False   True
 2020-01-05   False   True  False   True
