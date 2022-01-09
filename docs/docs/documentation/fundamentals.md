@@ -317,9 +317,9 @@ we can simply pass DataFrames instead of Series:
 2020-01-05  300.0   20.0
 ```
 
-Here, each column in each feature DataFrame represents a separate backtesting instance and 
-generates a separate equity curve. Thus, adding one more backtest is as simple as adding 
-one more column to the features :sparkles:
+Here, each column (also often referred as "line" in vectorbt) in each feature DataFrame represents 
+a separate backtesting instance and generates a separate equity curve. Thus, adding one more backtest 
+is as simple as adding one more column to the features :sparkles:
 
 Keeping features separated has another big advantage: we can combine them easily.
 And not only this: we combine all backtesting instances at once using vectorization.

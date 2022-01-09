@@ -6886,6 +6886,33 @@ class TestPortfolio:
             pf.get_filled_close(chunked=False)
         )
 
+    def test_bm_close(self):
+        pd.testing.assert_frame_equal(pf.bm_close, bm_price_na)
+        pd.testing.assert_frame_equal(pf_grouped.bm_close, bm_price_na)
+        pd.testing.assert_frame_equal(pf_shared.bm_close, bm_price_na)
+        assert pf.replace(bm_close=None).bm_close is None
+        assert not pf.replace(bm_close=False).bm_close
+
+    def test_get_filled_bm_close(self):
+        pd.testing.assert_frame_equal(
+            pf.filled_bm_close,
+            bm_price_na.ffill().bfill()
+        )
+        pd.testing.assert_frame_equal(
+            pf.filled_bm_close,
+            vbt.Portfolio.get_filled_bm_close(bm_close=pf.bm_close, wrapper=pf.wrapper)
+        )
+        pd.testing.assert_frame_equal(
+            pf.get_filled_bm_close(jitted=dict(parallel=True)),
+            pf.get_filled_bm_close(jitted=dict(parallel=False))
+        )
+        pd.testing.assert_frame_equal(
+            pf.get_filled_bm_close(chunked=True),
+            pf.get_filled_bm_close(chunked=False)
+        )
+        assert pf.replace(bm_close=None).filled_bm_close is None
+        assert not pf.replace(bm_close=False).filled_bm_close
+
     def test_orders(self):
         result = np.array([
             (0, 0, 1, 0.1, 2.02, 0.10202, 0),
@@ -9283,6 +9310,7 @@ class TestPortfolio:
             pf.replace(bm_close=None).bm_value,
             pf.market_value,
         )
+        assert pf.replace(bm_close=False).bm_value is None
 
     def test_bm_returns(self):
         pd.testing.assert_frame_equal(
@@ -9303,6 +9331,7 @@ class TestPortfolio:
             pf.replace(bm_close=None).bm_returns,
             pf.market_returns,
         )
+        assert pf.replace(bm_close=False).bm_returns is None
 
     def test_total_market_return(self):
         pd.testing.assert_series_equal(
@@ -9494,6 +9523,32 @@ class TestPortfolio:
                     889.6944375349927, 6.270976459353577, 49.897006624719126
                 ]),
                 index=stats_index,
+                name='agg_func_mean')
+        )
+        pd.testing.assert_series_equal(
+            pf.replace(bm_close=False).stats(),
+            pd.Series(
+                np.array([
+                    pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
+                    pd.Timedelta('5 days 00:00:00'), 100.0, 166.24150666666665, -0.09944158449010732,
+                    1.2135130969045893, 0.42916000000000004, 0.6276712912251518,
+                    pd.Timedelta('2 days 00:00:00'), 2.3333333333333335, 1.6666666666666667,
+                    0.6666666666666666, -1.4678727272727272, 66.66666666666667, -62.06261760946578,
+                    -65.81967240213856, 91.58494359313319, -374.9933222036729, pd.Timedelta('3 days 00:00:00'),
+                    pd.Timedelta('4 days 00:00:00'), np.inf, 0.2866227272727273, -0.25595098630477686,
+                    889.6944375349927, 6.270976459353577, 49.897006624719126
+                ]),
+                index=pd.Index([
+                    'Start', 'End', 'Period', 'Start Value', 'End Value',
+                    'Total Return [%]', 'Max Gross Exposure [%]', 'Total Fees Paid',
+                    'Max Drawdown [%]', 'Max Drawdown Duration', 'Total Trades',
+                    'Total Closed Trades', 'Total Open Trades', 'Open Trade PnL',
+                    'Win Rate [%]', 'Best Trade [%]', 'Worst Trade [%]',
+                    'Avg Winning Trade [%]', 'Avg Losing Trade [%]',
+                    'Avg Winning Trade Duration', 'Avg Losing Trade Duration',
+                    'Profit Factor', 'Expectancy', 'Sharpe Ratio', 'Calmar Ratio',
+                    'Omega Ratio', 'Sortino Ratio'
+                ], dtype='object'),
                 name='agg_func_mean')
         )
         pd.testing.assert_series_equal(
@@ -9787,8 +9842,31 @@ class TestPortfolio:
                 index=stats_index,
                 name='a')
         )
+        pd.testing.assert_series_equal(
+            pf.replace(bm_close=False).returns_stats(column='a'),
+            pd.Series(
+                np.array([
+                    pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
+                    pd.Timedelta('5 days 00:00:00'), 0.7162671975297075, 68.3729640692142,
+                    8.374843895239454, 0.10277254148026353, pd.Timedelta('2 days 00:00:00'),
+                    6.258914490528395, 665.2843559613844, 4.506828421607624, 43.179437771402675,
+                    2.1657940859079745, 4.749360549470598, 7.283755486189502, 12.263875007651269,
+                    -0.001013547284289139
+                ]),
+                index=pd.Index([
+                    'Start', 'End', 'Period', 'Total Return [%]',
+                    'Annualized Return [%]', 'Annualized Volatility [%]',
+                    'Max Drawdown [%]', 'Max Drawdown Duration', 'Sharpe Ratio',
+                    'Calmar Ratio', 'Omega Ratio', 'Sortino Ratio', 'Skew', 'Kurtosis',
+                    'Tail Ratio', 'Common Sense Ratio', 'Value at Risk'
+                ], dtype='object'),
+                name='a')
+        )
 
     def test_plots(self):
+        pf.plot(column='a', subplots='all')
+        pf.replace(bm_close=None).plot(column='a', subplots='all')
+        pf.replace(bm_close=False).plot(column='a', subplots='all')
         pf.plot(column='a', subplots='all')
         pf_grouped.plot(column='first', subplots='all')
         pf_grouped.plot(column='a', subplots='all', group_by=False)

@@ -722,7 +722,7 @@ class SimulationContext(tp.NamedTuple):
     high: tp.Array
     low: tp.Array
     close: tp.Array
-    bm_close: tp.Array
+    bm_close: tp.Optional[tp.Array]
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
@@ -921,7 +921,9 @@ Must broadcast to shape `SimulationContext.target_shape`.
 """
 __pdoc__['SimulationContext.bm_close'] = """Benchmark closing price at each time step.
 
-Has the same shape as `SimulationContext.close`."""
+Can be None to indicate that the user should use `SimulationContext.close`.
+
+If an array, has the same shape as `SimulationContext.close`."""
 __pdoc__['SimulationContext.ffill_val_price'] = """Whether to track valuation price only if it's known.
 
 Otherwise, unknown `SimulationContext.close` will lead to NaN in valuation price at the next timestamp."""
@@ -1182,7 +1184,7 @@ class GroupContext(tp.NamedTuple):
     high: tp.Array
     low: tp.Array
     close: tp.Array
-    bm_close: tp.Array
+    bm_close: tp.Optional[tp.Array]
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
@@ -1267,7 +1269,7 @@ class RowContext(tp.NamedTuple):
     high: tp.Array
     low: tp.Array
     close: tp.Array
-    bm_close: tp.Array
+    bm_close: tp.Optional[tp.Array]
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
@@ -1322,7 +1324,7 @@ class SegmentContext(tp.NamedTuple):
     high: tp.Array
     low: tp.Array
     close: tp.Array
-    bm_close: tp.Array
+    bm_close: tp.Optional[tp.Array]
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
@@ -1396,7 +1398,7 @@ class OrderContext(tp.NamedTuple):
     high: tp.Array
     low: tp.Array
     close: tp.Array
-    bm_close: tp.Array
+    bm_close: tp.Optional[tp.Array]
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
@@ -1482,7 +1484,7 @@ class PostOrderContext(tp.NamedTuple):
     high: tp.Array
     low: tp.Array
     close: tp.Array
-    bm_close: tp.Array
+    bm_close: tp.Optional[tp.Array]
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
@@ -1586,7 +1588,7 @@ class FlexOrderContext(tp.NamedTuple):
     high: tp.Array
     low: tp.Array
     close: tp.Array
-    bm_close: tp.Array
+    bm_close: tp.Optional[tp.Array]
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool

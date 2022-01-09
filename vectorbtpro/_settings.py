@@ -1033,8 +1033,13 @@ portfolio = dict(
             filters=dict(
                 has_year_freq=dict(
                     filter_func=lambda self, metric_settings:
-                    metric_settings['year_freq'] is not None,
+                    metric_settings.get('year_freq', None) is not None,
                     warning_message=Sub("Metric '$metric_name' requires year frequency to be set")
+                ),
+                has_bm_returns=dict(
+                    filter_func=lambda self, metric_settings:
+                    metric_settings.get('bm_returns', self.bm_returns) is not None,
+                    warning_message=Sub("Metric '$metric_name' requires bm_returns to be set")
                 )
             ),
             settings=dict(

@@ -837,10 +837,14 @@ class Wrapping(Configured, PandasIndexer, AttrResolver):
         raise TypeError("Only one group is allowed. Use indexing or column argument.")
 
     @staticmethod
-    def select_one_from_obj(obj: tp.SeriesFrame, wrapper: ArrayWrapper, column: tp.Any = None) -> tp.MaybeSeries:
+    def select_one_from_obj(obj: tp.Optional[tp.SeriesFrame],
+                            wrapper: ArrayWrapper,
+                            column: tp.Any = None) -> tp.MaybeSeries:
         """Select one column/group from a pandas object.
 
         `column` can be a label-based position as well as an integer position (if label fails)."""
+        if obj is None:
+            return None
         if column is not None:
             if wrapper.ndim == 1:
                 raise TypeError("This object already contains one column of data")

@@ -2159,8 +2159,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             if found_field is None:
                 raise AttributeError(f"Field '{field}' not found in in_outputs")
             obj = getattr(self.in_outputs, found_field)
-            if obj is None:
-                return None
+            if obj is None or isinstance(obj, bool):
+                return obj
             if wrap_func is not None:
                 return wrap_func(
                     self,
@@ -2188,8 +2188,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         if found_field is None:
             raise AttributeError(f"Field '{field}' not found in in_outputs")
         obj = getattr(self.in_outputs, found_field)
-        if obj is None:
-            return None
+        if obj is None or isinstance(obj, bool):
+            return obj
         if wrap_func is not None:
             return wrap_func(
                 self,
@@ -2333,120 +2333,121 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             return func(obj, col_map, to_1d_array(col_idxs))
 
         for field, obj in in_outputs.items():
-            if obj is None:
-                continue
-            new_obj = None
-            if field in cls_dir:
-                method_or_prop = getattr(cls, field)
-                options = getattr(method_or_prop, 'options', {})
-                obj_type = options.get('obj_type', None)
-                group_by_aware = options.get('group_by_aware', None)
-                if obj_type is None:
-                    raise TypeError(f"Cannot parse in-output '{field}': option 'obj_type' is missing")
-                if group_by_aware is None:
-                    raise TypeError(f"Cannot parse in-output '{field}': option 'group_by_aware' is missing")
-
-                if obj_type == 'array':
-                    if group_by_aware and is_grouped:
-                        new_obj = _index_2d_by_group(obj)
-                    else:
-                        new_obj = _index_2d_by_col(obj)
-                elif obj_type == 'red_array':
-                    if group_by_aware and is_grouped:
-                        new_obj = _index_1d_by_group(obj)
-                    else:
-                        new_obj = _index_1d_by_col(obj)
-                elif obj_type == 'records':
-                    new_obj = _index_records(obj)
-                else:
-                    raise TypeError(f"Cannot index in-output '{field}': "
-                                    f"option 'obj_type={obj_type}' not supported")
+            if obj is None or isinstance(obj, bool):
+                new_obj = obj
             else:
-                if '_pcgs' in field:
-                    if '_2d' in field:
-                        if is_grouped and self.cash_sharing:
-                            new_obj = _index_2d_by_group(obj)
-                        else:
-                            new_obj = _index_2d_by_col(obj)
-                    elif '_1d' in field:
-                        if is_grouped and self.cash_sharing:
-                            new_obj = _index_1d_by_group(obj)
-                        else:
-                            new_obj = _index_1d_by_col(obj)
-                    elif obj.ndim == 2:
-                        if is_grouped and self.cash_sharing:
-                            new_obj = _index_2d_by_group(obj)
-                        else:
-                            new_obj = _index_2d_by_col(obj)
-                    elif obj.ndim == 1:
-                        if is_grouped and self.cash_sharing:
-                            new_obj = _index_1d_by_group(obj)
-                        else:
-                            new_obj = _index_1d_by_col(obj)
-                elif field.endswith('_pcg'):
-                    if '_2d' in field:
-                        if is_grouped:
-                            new_obj = _index_2d_by_group(obj)
-                        else:
-                            new_obj = _index_2d_by_col(obj)
-                    elif '_1d' in field:
-                        if is_grouped:
-                            new_obj = _index_1d_by_group(obj)
-                        else:
-                            new_obj = _index_1d_by_col(obj)
-                    elif obj.ndim == 2:
-                        if is_grouped:
-                            new_obj = _index_2d_by_group(obj)
-                        else:
-                            new_obj = _index_2d_by_col(obj)
-                    elif obj.ndim == 1:
-                        if is_grouped:
-                            new_obj = _index_1d_by_group(obj)
-                        else:
-                            new_obj = _index_1d_by_col(obj)
-                elif field.endswith('_pg'):
-                    if '_2d' in field:
-                        new_obj = _index_2d_by_group(obj)
-                    elif '_1d' in field:
-                        new_obj = _index_1d_by_group(obj)
-                    elif obj.ndim == 2:
-                        new_obj = _index_2d_by_group(obj)
-                    elif obj.ndim == 1:
-                        new_obj = _index_1d_by_group(obj)
-                elif field.endswith('_pc'):
-                    if '_2d' in field:
-                        new_obj = _index_2d_by_col(obj)
-                    elif '_1d' in field:
-                        new_obj = _index_1d_by_col(obj)
-                    elif obj.ndim == 2:
-                        new_obj = _index_2d_by_col(obj)
-                    elif obj.ndim == 1:
-                        new_obj = _index_1d_by_col(obj)
-                elif field.endswith('_records'):
-                    new_obj = _index_records(obj)
-                elif checks.is_np_array(obj):
-                    if is_grouped:
-                        if '_2d' in field:
-                            new_obj = _index_2d_by_group(obj)
-                        elif '_1d' in field:
-                            new_obj = _index_1d_by_group(obj)
-                        if obj.shape == self.wrapper.get_shape():
-                            new_obj = _index_2d_by_group(obj)
-                        elif obj.shape == (self.wrapper.get_shape_2d()[1],):
-                            new_obj = _index_1d_by_group(obj)
-                    else:
-                        if '_2d' in field:
-                            new_obj = _index_2d_by_col(obj)
-                        elif '_1d' in field:
-                            new_obj = _index_1d_by_col(obj)
-                        if obj.shape == self.wrapper.shape:
-                            new_obj = _index_2d_by_col(obj)
-                        elif obj.shape == (self.wrapper.shape_2d[1],):
-                            new_obj = _index_1d_by_col(obj)
+                new_obj = None
+                if field in cls_dir:
+                    method_or_prop = getattr(cls, field)
+                    options = getattr(method_or_prop, 'options', {})
+                    obj_type = options.get('obj_type', None)
+                    group_by_aware = options.get('group_by_aware', None)
+                    if obj_type is None:
+                        raise TypeError(f"Cannot parse in-output '{field}': option 'obj_type' is missing")
+                    if group_by_aware is None:
+                        raise TypeError(f"Cannot parse in-output '{field}': option 'group_by_aware' is missing")
 
-                if obj is not None and new_obj is None:
-                    warnings.warn(f"Cannot figure out how to index in-output '{field}'. "
-                                  f"Please provide a suffix.", stacklevel=2)
+                    if obj_type == 'array':
+                        if group_by_aware and is_grouped:
+                            new_obj = _index_2d_by_group(obj)
+                        else:
+                            new_obj = _index_2d_by_col(obj)
+                    elif obj_type == 'red_array':
+                        if group_by_aware and is_grouped:
+                            new_obj = _index_1d_by_group(obj)
+                        else:
+                            new_obj = _index_1d_by_col(obj)
+                    elif obj_type == 'records':
+                        new_obj = _index_records(obj)
+                    else:
+                        raise TypeError(f"Cannot index in-output '{field}': "
+                                        f"option 'obj_type={obj_type}' not supported")
+                else:
+                    if '_pcgs' in field:
+                        if '_2d' in field:
+                            if is_grouped and self.cash_sharing:
+                                new_obj = _index_2d_by_group(obj)
+                            else:
+                                new_obj = _index_2d_by_col(obj)
+                        elif '_1d' in field:
+                            if is_grouped and self.cash_sharing:
+                                new_obj = _index_1d_by_group(obj)
+                            else:
+                                new_obj = _index_1d_by_col(obj)
+                        elif obj.ndim == 2:
+                            if is_grouped and self.cash_sharing:
+                                new_obj = _index_2d_by_group(obj)
+                            else:
+                                new_obj = _index_2d_by_col(obj)
+                        elif obj.ndim == 1:
+                            if is_grouped and self.cash_sharing:
+                                new_obj = _index_1d_by_group(obj)
+                            else:
+                                new_obj = _index_1d_by_col(obj)
+                    elif field.endswith('_pcg'):
+                        if '_2d' in field:
+                            if is_grouped:
+                                new_obj = _index_2d_by_group(obj)
+                            else:
+                                new_obj = _index_2d_by_col(obj)
+                        elif '_1d' in field:
+                            if is_grouped:
+                                new_obj = _index_1d_by_group(obj)
+                            else:
+                                new_obj = _index_1d_by_col(obj)
+                        elif obj.ndim == 2:
+                            if is_grouped:
+                                new_obj = _index_2d_by_group(obj)
+                            else:
+                                new_obj = _index_2d_by_col(obj)
+                        elif obj.ndim == 1:
+                            if is_grouped:
+                                new_obj = _index_1d_by_group(obj)
+                            else:
+                                new_obj = _index_1d_by_col(obj)
+                    elif field.endswith('_pg'):
+                        if '_2d' in field:
+                            new_obj = _index_2d_by_group(obj)
+                        elif '_1d' in field:
+                            new_obj = _index_1d_by_group(obj)
+                        elif obj.ndim == 2:
+                            new_obj = _index_2d_by_group(obj)
+                        elif obj.ndim == 1:
+                            new_obj = _index_1d_by_group(obj)
+                    elif field.endswith('_pc'):
+                        if '_2d' in field:
+                            new_obj = _index_2d_by_col(obj)
+                        elif '_1d' in field:
+                            new_obj = _index_1d_by_col(obj)
+                        elif obj.ndim == 2:
+                            new_obj = _index_2d_by_col(obj)
+                        elif obj.ndim == 1:
+                            new_obj = _index_1d_by_col(obj)
+                    elif field.endswith('_records'):
+                        new_obj = _index_records(obj)
+                    elif checks.is_np_array(obj):
+                        if is_grouped:
+                            if '_2d' in field:
+                                new_obj = _index_2d_by_group(obj)
+                            elif '_1d' in field:
+                                new_obj = _index_1d_by_group(obj)
+                            if obj.shape == self.wrapper.get_shape():
+                                new_obj = _index_2d_by_group(obj)
+                            elif obj.shape == (self.wrapper.get_shape_2d()[1],):
+                                new_obj = _index_1d_by_group(obj)
+                        else:
+                            if '_2d' in field:
+                                new_obj = _index_2d_by_col(obj)
+                            elif '_1d' in field:
+                                new_obj = _index_1d_by_col(obj)
+                            if obj.shape == self.wrapper.shape:
+                                new_obj = _index_2d_by_col(obj)
+                            elif obj.shape == (self.wrapper.shape_2d[1],):
+                                new_obj = _index_1d_by_col(obj)
+
+                    if new_obj is None:
+                        warnings.warn(f"Cannot figure out how to index in-output '{field}'. "
+                                      f"Please provide a suffix.", stacklevel=2)
 
             new_in_outputs[field] = new_obj
         return type(self.in_outputs)(**new_in_outputs)
@@ -2486,11 +2487,11 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             new_call_seq = call_seq[:, col_idxs]
         else:
             new_call_seq = None
-        if self._bm_close is not None:
+        if self._bm_close is not None and not isinstance(self._bm_close, bool):
             bm_close = to_2d_array(self._bm_close)
             new_bm_close = bm_close[:, col_idxs]
         else:
-            new_bm_close = None
+            new_bm_close = self._bm_close
         new_in_outputs = self.in_outputs_indexing_func(new_wrapper, group_idxs, col_idxs)
 
         return self.replace(
@@ -2725,7 +2726,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             bm_close (array_like): Latest benchmark price at each time step.
                 Will broadcast.
 
-                If not provided, will use `close`.
+                If not provided, will use `close`. If False, will not use any benchmark.
             **kwargs: Keyword arguments passed to the `Portfolio` constructor.
 
         All broadcastable arguments will broadcast using `vectorbtpro.base.reshaping.broadcast`
@@ -3030,8 +3031,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             high=high,
             low=low,
             close=close,
-            bm_close=bm_close
         )
+        if bm_close is not None and not isinstance(bm_close, bool):
+            broadcastable_args['bm_close'] = bm_close
         broadcast_kwargs = merge_dicts(dict(
             keep_flex=dict(
                 close=False,
@@ -3045,11 +3047,13 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         close = broadcasted_args['close']
         if not checks.is_pandas(close):
             close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
-        bm_close = broadcasted_args['bm_close']
-        if bm_close is not None:
+        if bm_close is not None and not isinstance(bm_close, bool):
+            bm_close = broadcasted_args['bm_close']
             if not checks.is_pandas(bm_close):
                 bm_close = pd.Series(bm_close) if bm_close.ndim == 1 else pd.DataFrame(bm_close)
             broadcasted_args['bm_close'] = to_2d_array(bm_close)
+        else:
+            broadcasted_args['bm_close'] = None
         flex_2d = close.ndim == 2
         broadcasted_args['close'] = to_2d_array(close)
         target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
@@ -3110,7 +3114,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         checks.assert_subdtype(broadcasted_args['high'], np.number)
         checks.assert_subdtype(broadcasted_args['low'], np.number)
         checks.assert_subdtype(broadcasted_args['close'], np.number)
-        if bm_close is not None:
+        if bm_close is not None and not isinstance(bm_close, bool):
             checks.assert_subdtype(broadcasted_args['bm_close'], np.number)
 
         # Remove arguments
@@ -4071,9 +4075,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             stop_exit_price=stop_exit_price,
             upon_stop_exit=upon_stop_exit,
             upon_stop_update=upon_stop_update,
-            signal_priority=signal_priority,
-            bm_close=bm_close
+            signal_priority=signal_priority
         )
+        if bm_close is not None and not isinstance(bm_close, bool):
+            broadcastable_args['bm_close'] = bm_close
         if not signal_func_mode:
             if ls_mode:
                 broadcastable_args['entries'] = entries
@@ -4099,11 +4104,13 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         close = broadcasted_args['close']
         if not checks.is_pandas(close):
             close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
-        bm_close = broadcasted_args['bm_close']
-        if bm_close is not None:
+        if bm_close is not None and not isinstance(bm_close, bool):
+            bm_close = broadcasted_args['bm_close']
             if not checks.is_pandas(bm_close):
                 bm_close = pd.Series(bm_close) if bm_close.ndim == 1 else pd.DataFrame(bm_close)
             broadcasted_args['bm_close'] = to_2d_array(bm_close)
+        else:
+            broadcasted_args['bm_close'] = None
         flex_2d = close.ndim == 2
         broadcasted_args['close'] = to_2d_array(close)
         target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
@@ -4207,7 +4214,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             checks.assert_subdtype(broadcasted_args['short_exits'], np.bool_)
         if 'direction' in broadcasted_args:
             checks.assert_subdtype(broadcasted_args['direction'], np.int_)
-        if bm_close is not None:
+        if bm_close is not None and not isinstance(bm_close, bool):
             checks.assert_subdtype(broadcasted_args['bm_close'], np.number)
 
         # Prepare arguments
@@ -5160,9 +5167,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             open=open,
             high=high,
             low=low,
-            close=close,
-            bm_close=bm_close
+            close=close
         )
+        if bm_close is not None and not isinstance(bm_close, bool):
+            broadcastable_args['bm_close'] = bm_close
         broadcastable_args = {**broadcastable_args, **broadcast_named_args}
         # Only close is broadcast, others can remain unchanged thanks to flexible indexing
         broadcast_kwargs = merge_dicts(dict(
@@ -5177,11 +5185,13 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         close = broadcasted_args['close']
         if not checks.is_pandas(close):
             close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
-        bm_close = broadcasted_args['bm_close']
-        if bm_close is not None:
+        if bm_close is not None and not isinstance(bm_close, bool):
+            bm_close = broadcasted_args['bm_close']
             if not checks.is_pandas(bm_close):
                 bm_close = pd.Series(bm_close) if bm_close.ndim == 1 else pd.DataFrame(bm_close)
             broadcasted_args['bm_close'] = to_2d_array(bm_close)
+        else:
+            broadcasted_args['bm_close'] = None
         flex_2d = close.ndim == 2
         broadcasted_args['close'] = to_2d_array(close)
         target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
@@ -5232,7 +5242,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         checks.assert_subdtype(broadcasted_args['high'], np.number)
         checks.assert_subdtype(broadcasted_args['low'], np.number)
         checks.assert_subdtype(broadcasted_args['close'], np.number)
-        if bm_close is not None:
+        if bm_close is not None and not isinstance(bm_close, bool):
             checks.assert_subdtype(broadcasted_args['bm_close'], np.number)
 
         # Prepare arguments
@@ -5866,15 +5876,15 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         return wrapper.wrap(filled_close, group_by=False, **resolve_dict(wrap_kwargs))
 
     @custom_property(obj_type='array', group_by_aware=False)
-    def bm_close(self) -> tp.Optional[tp.SeriesFrame]:
+    def bm_close(self) -> tp.Union[None, bool, tp.SeriesFrame]:
         """Benchmark price per unit series."""
         if self.use_in_outputs and self.in_outputs is not None and hasattr(self.in_outputs, 'bm_close'):
             bm_close = self.in_outputs.bm_close
         else:
             bm_close = self._bm_close
 
-        if bm_close is None:
-            return None
+        if bm_close is None or isinstance(bm_close, bool):
+            return bm_close
         return self.wrapper.wrap(bm_close, group_by=False)
 
     @class_or_instancemethod
@@ -5883,13 +5893,15 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                             jitted: tp.JittedOption = None,
                             chunked: tp.ChunkedOption = None,
                             wrapper: tp.Optional[ArrayWrapper] = None,
-                            wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+                            wrap_kwargs: tp.KwargsLike = None) -> tp.Union[None, bool, tp.SeriesFrame]:
         """Get forward and backward filled benchmark closing price.
 
         See `vectorbtpro.generic.nb.fbfill_nb`."""
         if not isinstance(cls_or_self, type):
             if bm_close is None:
                 bm_close = cls_or_self.bm_close
+                if bm_close is None or isinstance(bm_close, bool):
+                    return bm_close
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
@@ -7184,24 +7196,27 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
     @class_or_instancemethod
     def get_bm_value(cls_or_self,
                      group_by: tp.GroupByLike = None,
-                     bm_close: tp.Optional[tp.SeriesFrame] = None,
+                     bm_close: tp.Optional[tp.ArrayLike] = None,
                      init_value: tp.Optional[tp.MaybeSeries] = None,
                      cash_deposits: tp.Optional[tp.ArrayLike] = None,
                      flex_2d: bool = False,
                      jitted: tp.JittedOption = None,
                      chunked: tp.ChunkedOption = None,
                      wrapper: tp.Optional[ArrayWrapper] = None,
-                     wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+                     wrap_kwargs: tp.KwargsLike = None) -> tp.Optional[tp.SeriesFrame]:
         """Get benchmark value series per column/group.
 
         Based on `Portfolio.bm_close` and `Portfolio.get_market_value`."""
         if not isinstance(cls_or_self, type):
             if bm_close is None:
-                if cls_or_self.bm_close is not None:
+                bm_close = cls_or_self.bm_close
+                if isinstance(bm_close, bool):
+                    if not bm_close:
+                        return None
+                    bm_close = None
+                if bm_close is not None:
                     if cls_or_self.fillna_close:
                         bm_close = cls_or_self.filled_bm_close
-                    else:
-                        bm_close = cls_or_self.bm_close
         return cls_or_self.get_market_value(
             group_by=group_by,
             close=bm_close,
@@ -7224,19 +7239,19 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                        jitted: tp.JittedOption = None,
                        chunked: tp.ChunkedOption = None,
                        wrapper: tp.Optional[ArrayWrapper] = None,
-                       wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+                       wrap_kwargs: tp.KwargsLike = None) -> tp.Optional[tp.SeriesFrame]:
         """Get benchmark return series per column/group.
 
         Based on `Portfolio.bm_close` and `Portfolio.get_market_returns`."""
         if not isinstance(cls_or_self, type):
+            bm_value = cls_or_self.resolve_shortcut_attr(
+                'bm_value',
+                group_by=group_by,
+                jitted=jitted,
+                chunked=chunked
+            )
             if bm_value is None:
-                if cls_or_self.bm_close is not None:
-                    bm_value = cls_or_self.resolve_shortcut_attr(
-                        'bm_value',
-                        group_by=group_by,
-                        jitted=jitted,
-                        chunked=chunked
-                    )
+                return None
         return cls_or_self.get_market_returns(
             group_by=group_by,
             init_value=init_value,
@@ -7319,18 +7334,19 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                         jitted=jitted,
                         chunked=chunked
                     )
-            if bm_returns is None:
+            if bm_returns is None or (isinstance(bm_returns, bool) and bm_returns):
                 bm_returns = cls_or_self.resolve_shortcut_attr(
                     'bm_returns',
                     group_by=group_by,
                     jitted=jitted,
                     chunked=chunked
                 )
+            elif isinstance(bm_returns, bool) and not bm_returns:
+                bm_returns = None
             if freq is None:
                 freq = cls_or_self.wrapper.freq
         else:
             checks.assert_not_none(returns)
-            checks.assert_not_none(bm_returns)
 
         return returns.vbt.returns(
             bm_returns=bm_returns,
@@ -7543,6 +7559,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
                 title='Benchmark Return [%]',
                 calc_func='bm_returns.vbt.returns.total',
                 post_calc_func=lambda self, out, settings: out * 100,
+                check_has_bm_returns=True,
                 tags='portfolio'
             ),
             max_gross_exposure=dict(
@@ -8077,13 +8094,15 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         from vectorbtpro._settings import settings
         plotting_cfg = settings['plotting']
 
-        if bm_returns is None:
+        if bm_returns is None or (isinstance(bm_returns, bool) and bm_returns):
             bm_returns = self.resolve_shortcut_attr(
                 'bm_returns',
                 group_by=group_by,
                 jitted=jitted,
                 chunked=chunked
             )
+        elif isinstance(bm_returns, bool) and not bm_returns:
+            bm_returns = None
         else:
             bm_returns = broadcast_to(bm_returns, self.obj)
         bm_returns = self.select_one_from_obj(bm_returns, self.wrapper.regroup(group_by), column=column)
