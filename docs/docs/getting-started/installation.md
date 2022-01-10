@@ -5,10 +5,10 @@ title: Installation
 # Installation
 
 !!! info
-    vectorbt PRO is a totally different beast compared to the open-source version of vectorbt. 
+    vectorbt PRO is a totally different beast compared to vanilla vectorbt. 
     In fact, the PRO version redesigns the underlying core to enable groundbreaking features. 
     
-    To avoid using an outdated code, make sure to only use **vectorbtpro**!
+    To avoid using an outdated code, make sure to only import **vectorbtpro**!
 
 ## Requirements
 

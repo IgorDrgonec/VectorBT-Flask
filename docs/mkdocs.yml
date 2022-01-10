@@ -1,6 +1,6 @@
 # Project information
 site_name: vectorbt PRO
-site_description: Find your trading edge, using the most powerful engine for backtesting, algorithmic trading, and research
+site_description: Find your trading edge, using the ultimate engine for backtesting, algorithmic trading, and research
 site_author: Oleg Polakow
 site_url: https://vectorbt.pro/
 
@@ -90,6 +90,7 @@ nav:
     - getting-started/index.md
     - Features: getting-started/features.md
     - Installation: getting-started/installation.md
+    - Release notes: getting-started/release-notes.md
   - Documentation:
     - documentation/fundamentals.md
     - To be continued...: documentation/to-be-continued.md

@@ -379,17 +379,17 @@ hierarchy of a MACD indicator:
 ...     signal_ewm=True
 ... )
 >>> macd.signal
-macd_fast_window            2          2  << fast window for MACD line
-macd_slow_window            3          4  << slow window for MACD line
-macd_signal_window          2          2  << window for signal line
-macd_macd_ewm           False      False  << EWM flag for MACD line
-macd_signal_ewm          True       True  << EWM flag for signal line
-                      p1   p2    p1   p2  << price
-2020-01-01           NaN  NaN   NaN  NaN
-2020-01-02           NaN  NaN   NaN  NaN
-2020-01-03           NaN  NaN   NaN  NaN
-2020-01-04           0.5 -0.5   NaN  NaN
-2020-01-05           0.5 -0.5   1.0 -1.0
+macd_fast_window          2      2      2      2  << fast window for MACD line
+macd_slow_window          3      3      4      4  << slow window for MACD line
+macd_signal_window        2      2      2      2  << window for signal line
+macd_macd_ewm         False  False  False  False  << EWM flag for MACD line
+macd_signal_ewm        True   True   True   True  << EWM flag for signal line
+                         p1     p2     p1     p2  << price
+2020-01-01              NaN    NaN    NaN    NaN
+2020-01-02              NaN    NaN    NaN    NaN
+2020-01-03              NaN    NaN    NaN    NaN
+2020-01-04              0.5   -0.5    NaN    NaN
+2020-01-05              0.5   -0.5    1.0   -1.0
 ```
 
 The columns above capture two different backtesting configurations that can now be easily analyzed and 

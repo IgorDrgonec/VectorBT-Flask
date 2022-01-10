@@ -10,7 +10,7 @@ On top of the [features](https://vectorbt.dev/getting-started/features/) offered
 
 ### Parallelization with Numba
 
-- [x] Most Numba-compiled functions have been rewritten to process columns in parallel using [Explicit Parallel Loops](https://numba.pydata.org/numba-doc/0.37.0/user/parallel.html#explicit-parallel-loops), which can be enabled by a single command.
+- [x] Most Numba-compiled functions were rewritten to process columns in parallel, which can be enabled by a single command.
 
 ```pycon title="Benchmark the rolling mean without and with parallelization"
 >>> import vectorbtpro as vbt
@@ -165,7 +165,7 @@ Wall time: 4.32 s
 
 ### Caching
 
-- [x] Caching has been reimplemented from the ground up and now it's being managed by a central registry. This allows for tracking useful statistics of all cacheable parts of vectorbt, such as to display the total cached size in MB. Full control and transparency.
+- [x] Caching was reimplemented from the ground up and now it's being managed by a central registry. This allows for tracking useful statistics of all cacheable parts of vectorbt, such as to display the total cached size in MB. Full control and transparency.
 
 ```pycon title="Display caching statistics of a portfolio"
 >>> price = vbt.YFData.fetch('BTC-USD').get('Close')
@@ -193,7 +193,7 @@ portfolio:0.trades                  0       1    70.5 kB
 
 ### Hyperfast rolling metrics
 
-- [x] Rolling metrics based on returns have been optimized for best performance (up to 100x speedup).
+- [x] Rolling metrics based on returns were optimized for best performance (up to 100x speedup).
 
 ```pycon title="Benchmark the rolling Sortino ratio"
 >>> returns = pd.DataFrame(np.random.normal(0, 0.001, size=(1000, 100)))
@@ -214,7 +214,7 @@ portfolio:0.trades                  0       1    70.5 kB
 
 ### Smart broadcasting
 
-- [x] Broadcasting mechanism has been completely refactored and now supports parameters. Build a product of multiple hyperparameter combinations with a single line of code. :magic_wand:
+- [x] Broadcasting mechanism was completely refactored and now supports parameters. Build a product of multiple hyperparameter combinations with a single line of code. :magic_wand:
 
 ```pycon title="Backtest the Golden Cross with different stop configurations"
 >>> price = vbt.YFData.fetch('BTC-USD').get('Close')
@@ -372,10 +372,6 @@ dtype: float64
 
 ## Data
 
-### Refactored data
-
-- [x] In case of connectivity issues, data won't be lost but returned so it can be updated later. Also, symbol fetching methods can return a state, which will be preserved for the use in data updates. There is also a new progress bar for symbols.
-
 ### Local data
 
 - [x] Added data classes that specialize in loading data from local files, such as CSV and HDF5. Also, any data can be effortlessly saved locally.
@@ -417,10 +413,6 @@ symbol                             R1         R2          R3
 ```
 
 ## Modeling
-
-### Extra validation
-
-- [x] Introduced new runtime checks, such as typing and OHLC violation checks.
 
 ### Initial position
 
@@ -653,32 +645,9 @@ dtype: float64
 
 ![](/assets/images/features_benchmark.svg)
 
-## Extra
+## And many more...
 
-### New settings
-
-- [x] Settings have become more intuitive and human-readable. You can also use environment variables to instruct vectorbt to load settings from a file before any function is registered internally. This has some interesting use cases, such as overriding Numba options for specific functions and even replacing entire implementations in the deepest layers of the vectorbt PRO's core.
-
-```pycon title="Disable caching for all Numba functions"
->>> vbt.settings.jitting['jitters']['nb']['override_options']['cache'] = False
-
->>> vbt.settings.save('my_settings')
-
->>> # (1)!
-
->>> import os
->>> os.environ['VBT_SETTINGS_PATH'] = "my_settings"
-
->>> import vectorbtpro as vbt
->>> vbt.settings.jitting['jitters']['nb']['override_options']['cache']
-False
-```
-
-1. Restart the runtime
-
-### And many more...
-
-- [x] This is just the tip of the iceberg: vectorbt PRO deploys an optimized project structure, time and memory profiling tools, rich templating macros, an upgraded formatting engine, dynamic type checking, new efficient data structures, and more.
+- [x] This is just the tip of the iceberg: vectorbt PRO deploys a new project structure, modular settings, time and memory profiling tools, rich templating macros, an upgraded formatting engine, dynamic type checking, new efficient data structures, and more.
 - [ ] Expect more killer features to be added on a weekly basis! :heart:{ .heart }
 
 
