@@ -181,13 +181,3 @@ def register_sr_vbt_accessor(name: str, parent: tp.Type[DirNamesMixin] = Vbt_SRA
 def register_df_vbt_accessor(name: str, parent: tp.Type[DirNamesMixin] = Vbt_DFAccessor) -> tp.Callable:
     """Decorator to register a `pd.DataFrame` accessor on top of a parent accessor."""
     return register_accessor(name, parent)
-
-
-pd_acc = Vbt_Accessor
-"""Shortcut for `Vbt_Accessor`."""
-
-sr_acc = Vbt_SRAccessor
-"""Shortcut for `Vbt_SRAccessor`."""
-
-df_acc = Vbt_DFAccessor
-"""Shortcut for `Vbt_DFAccessor`."""

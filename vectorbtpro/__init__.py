@@ -25,7 +25,11 @@ from vectorbtpro.px import *
 # Most important modules and objects
 from vectorbtpro import _typing as tp
 from vectorbtpro._settings import settings
-from vectorbtpro.accessors import pd_acc, sr_acc, df_acc
+from vectorbtpro.accessors import (
+    Vbt_Accessor as pd_acc,
+    Vbt_SRAccessor as sr_acc,
+    Vbt_DFAccessor as df_acc
+)
 from vectorbtpro.generic import nb
 
 # Import all submodules
