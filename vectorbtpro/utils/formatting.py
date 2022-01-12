@@ -161,7 +161,7 @@ def prettify(obj: tp.Any,
     if hasattr(obj, 'shape') and isinstance(obj.shape, tuple) and len(obj.shape) > 0:
         module = type(obj).__module__
         qualname = type(obj).__qualname__
-        return "<%s.%s object at %s of shape %s>" % (module, qualname, str(hex(id(object))), obj.shape)
+        return "<%s.%s object at %s of shape %s>" % (module, qualname, str(hex(id(obj))), obj.shape)
     if isinstance(obj, float):
         if np.isnan(obj):
             return "np.nan"
