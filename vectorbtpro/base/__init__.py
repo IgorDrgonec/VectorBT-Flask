@@ -4,6 +4,7 @@
 
 from vectorbtpro.base.chunking import GroupLensMapper, FlexArraySelector, FlexArraySlicer
 from vectorbtpro.base.grouping import Grouper
+from vectorbtpro.base.indexing import PandasIndexer
 from vectorbtpro.base.reshaping import BCO, Default, Ref, broadcast, broadcast_to
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 
@@ -18,7 +19,8 @@ __all__ = [
     'Default',
     'Ref',
     'broadcast',
-    'broadcast_to'
+    'broadcast_to',
+    'PandasIndexer'
 ]
 
 __pdoc__ = {k: False for k in __all__}

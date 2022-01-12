@@ -1,17 +1,11 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Classes and functions for indexing.
-
-The main purpose of indexing classes is to provide pandas-like indexing to user-defined classes
-holding objects that have rows and/or columns. This is done by forwarding indexing commands
-to each structured object and constructing the new user-defined class using them. This way,
-one can manipulate complex classes with dozens of pandas objects using a single command."""
+"""Classes and functions for indexing."""
 
 import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base import indexes, reshaping
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import checks
 
@@ -197,13 +191,15 @@ class ParamLoc(LocBase):
         is_multiple = isinstance(key, (slice, list, np.ndarray))
 
         def pd_indexing_func(obj: tp.SeriesFrame) -> tp.MaybeSeriesFrame:
+            from vectorbtpro.base.indexes import drop_levels
+
             new_obj = obj.iloc[:, indices]
             if not is_multiple:
                 # If we selected only one param, then remove its columns levels to keep it clean
                 if self.level_name is not None:
                     if checks.is_frame(new_obj):
                         if isinstance(new_obj.columns, pd.MultiIndex):
-                            new_obj.columns = indexes.drop_levels(new_obj.columns, self.level_name)
+                            new_obj.columns = drop_levels(new_obj.columns, self.level_name)
             return new_obj
 
         return self.indexing_func(pd_indexing_func, **self.indexing_kwargs)
@@ -212,10 +208,12 @@ class ParamLoc(LocBase):
 def indexing_on_mapper(mapper: tp.Series, ref_obj: tp.SeriesFrame,
                        pd_indexing_func: tp.Callable) -> tp.Optional[tp.Series]:
     """Broadcast `mapper` Series to `ref_obj` and perform pandas indexing using `pd_indexing_func`."""
+    from vectorbtpro.base.reshaping import broadcast_to
+
     checks.assert_instance_of(mapper, pd.Series)
     checks.assert_instance_of(ref_obj, (pd.Series, pd.DataFrame))
 
-    df_range_mapper = reshaping.broadcast_to(np.arange(len(mapper.index)), ref_obj)
+    df_range_mapper = broadcast_to(np.arange(len(mapper.index)), ref_obj)
     loced_range_mapper = pd_indexing_func(df_range_mapper)
     new_mapper = mapper.iloc[loced_range_mapper.values[0]]
     if checks.is_frame(loced_range_mapper):

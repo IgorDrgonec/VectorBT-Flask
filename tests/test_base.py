@@ -169,6 +169,48 @@ class TestColumnGrouper:
         with pytest.raises(Exception):
             grouping.get_group_lens_nb(np.array([0, 1, 0, 1]))
 
+    def test_get_group_map_nb(self):
+        np.testing.assert_array_equal(
+            grouping.get_group_map_nb(np.array([0, 1, 0, 1, 0, 1, 0, 1]), 2)[0],
+            np.array([0, 2, 4, 6, 1, 3, 5, 7])
+        )
+        np.testing.assert_array_equal(
+            grouping.get_group_map_nb(np.array([0, 1, 0, 1, 0, 1, 0, 1]), 2)[1],
+            np.array([4, 4])
+        )
+        np.testing.assert_array_equal(
+            grouping.get_group_map_nb(np.array([1, 0]), 2)[0],
+            np.array([1, 0])
+        )
+        np.testing.assert_array_equal(
+            grouping.get_group_map_nb(np.array([1, 0]), 2)[1],
+            np.array([1, 1])
+        )
+        np.testing.assert_array_equal(
+            grouping.get_group_map_nb(np.array([0, 0]), 1)[0],
+            np.array([0, 1])
+        )
+        np.testing.assert_array_equal(
+            grouping.get_group_map_nb(np.array([0, 0]), 1)[1],
+            np.array([2])
+        )
+        np.testing.assert_array_equal(
+            grouping.get_group_map_nb(np.array([0]), 1)[0],
+            np.array([0])
+        )
+        np.testing.assert_array_equal(
+            grouping.get_group_map_nb(np.array([0]), 1)[1],
+            np.array([1])
+        )
+        np.testing.assert_array_equal(
+            grouping.get_group_map_nb(np.array([]), 0)[0],
+            np.array([])
+        )
+        np.testing.assert_array_equal(
+            grouping.get_group_map_nb(np.array([]), 0)[1],
+            np.array([])
+        )
+
     def test_is_grouped(self):
         assert grouping.Grouper(grouped_columns, group_by=0).is_grouped()
         assert grouping.Grouper(grouped_columns, group_by=0).is_grouped(group_by=True)
@@ -318,6 +360,16 @@ class TestColumnGrouper:
         np.testing.assert_array_equal(
             grouping.Grouper(grouped_columns).get_group_end_idxs(group_by=0),
             np.array([4, 8])
+        )
+
+    def test_yield_col_idxs(self):
+        np.testing.assert_array_equal(
+            np.concatenate(tuple(grouping.Grouper(grouped_columns).yield_col_idxs())),
+            np.array([0, 1, 2, 3, 4, 5, 6, 7])
+        )
+        np.testing.assert_array_equal(
+            np.concatenate(tuple(grouping.Grouper(grouped_columns).yield_col_idxs(group_by=0))),
+            np.array([0, 1, 2, 3, 4, 5, 6, 7])
         )
 
     def test_eq(self):

@@ -70,8 +70,8 @@ def get_groups_and_index(index: tp.Index, group_by: tp.GroupByLike) -> tp.Tuple[
 
 
 @register_jitted(cache=True)
-def get_group_lens_nb(groups: tp.Array1d) -> tp.Array1d:
-    """Return count per group."""
+def get_group_lens_nb(groups: tp.Array1d) -> tp.ColLens:
+    """Return the count per group."""
     result = np.empty(groups.shape[0], dtype=np.int_)
     j = 0
     last_group = -1
@@ -94,6 +94,29 @@ def get_group_lens_nb(groups: tp.Array1d) -> tp.Array1d:
             j += 1
             group_len = 0
     return result[:j]
+
+
+@register_jitted(cache=True)
+def get_group_map_nb(groups: tp.Array1d, n_groups: int) -> tp.ColMap:
+    """Build the map between groups and column indices.
+
+    Returns an array with column indices segmented by group and an array with group lengths.
+
+    Works well for unsorted group arrays."""
+    group_lens_out = np.full(n_groups, 0, dtype=np.int_)
+    for g in range(groups.shape[0]):
+        group = groups[g]
+        group_lens_out[group] += 1
+
+    group_start_idxs = np.cumsum(group_lens_out) - group_lens_out
+    col_idxs_out = np.empty((groups.shape[0],), dtype=np.int_)
+    group_i = np.full(n_groups, 0, dtype=np.int_)
+    for g in range(groups.shape[0]):
+        group = groups[g]
+        col_idxs_out[group_start_idxs[group] + group_i[group]] = g
+        group_i[group] += 1
+
+    return col_idxs_out, group_lens_out
 
 
 @register_jitted(cache=True)
@@ -310,7 +333,10 @@ class Grouper(Configured):
         return is_sorted(groups)
 
     @cached_method(whitelist=True)
-    def get_group_lens(self, group_by: tp.GroupByLike = None, jitted: tp.JittedOption = None, **kwargs) -> tp.Array1d:
+    def get_group_lens(self,
+                       group_by: tp.GroupByLike = None,
+                       jitted: tp.JittedOption = None,
+                       **kwargs) -> tp.ColLens:
         """See get_group_lens_nb."""
         if not self.is_sorted(group_by=group_by):
             raise ValueError("group_by must lead to groups that are coherent and sorted "
@@ -335,3 +361,27 @@ class Grouper(Configured):
         """Get end index of each group as an array."""
         group_lens = self.get_group_lens(**kwargs)
         return np.cumsum(group_lens)
+
+    @cached_method(whitelist=True)
+    def get_group_map(self,
+                      group_by: tp.GroupByLike = None,
+                      jitted: tp.JittedOption = None,
+                      **kwargs) -> tp.ColMap:
+        """See get_group_map_nb."""
+        group_by = self.resolve_group_by(group_by=group_by, **kwargs)
+        if group_by is None or group_by is False:  # no grouping
+            return np.arange(len(self.index)), np.full(len(self.index), 1)
+        groups, new_index = self.get_groups_and_index(group_by=group_by)
+        func = jit_reg.resolve_option(get_group_map_nb, jitted)
+        return func(groups, len(new_index))
+
+    def yield_col_idxs(self, **kwargs) -> tp.Generator[tp.Array1d, None, None]:
+        """Yield column indices of each group."""
+        col_idxs, group_lens = self.get_group_map(**kwargs)
+        group_start = 0
+        group_end = 0
+        for g in range(len(group_lens)):
+            group_len = group_lens[g]
+            group_end += group_len
+            yield col_idxs[group_start:group_end]
+            group_start += group_len
