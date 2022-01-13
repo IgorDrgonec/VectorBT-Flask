@@ -189,17 +189,10 @@ class ArrayWrapper(Configured, PandasIndexer):
             as a Series of columns rather than a DataFrame. For example, the operation
             `.iloc[:, :2]` should become `.iloc[:2]`. Operations are not allowed if the
             object is already a Series and thus has only one column/group."""
-        from vectorbtpro._settings import settings
-        wrapping_cfg = settings['wrapping']
-
         if column_only_select is None:
             column_only_select = self.column_only_select
-        if column_only_select is None:
-            column_only_select = wrapping_cfg['column_only_select']
         if group_select is None:
             group_select = self.group_select
-        if group_select is None:
-            group_select = wrapping_cfg['group_select']
         _self = self.regroup(group_by)
         group_select = group_select and _self.grouper.is_grouped()
         if index is None:
@@ -499,12 +492,24 @@ class ArrayWrapper(Configured, PandasIndexer):
     @property
     def column_only_select(self) -> tp.Optional[bool]:
         """Whether to perform indexing on columns only."""
-        return self._column_only_select
+        from vectorbtpro._settings import settings
+        wrapping_cfg = settings['wrapping']
+
+        column_only_select = self._column_only_select
+        if column_only_select is None:
+            column_only_select = wrapping_cfg['column_only_select']
+        return column_only_select
 
     @property
     def group_select(self) -> tp.Optional[bool]:
         """Whether to perform indexing on groups."""
-        return self._group_select
+        from vectorbtpro._settings import settings
+        wrapping_cfg = settings['wrapping']
+
+        group_select = self._group_select
+        if group_select is None:
+            group_select = wrapping_cfg['group_select']
+        return group_select
 
     @property
     def grouper(self) -> Grouper:
@@ -740,12 +745,34 @@ class Wrapping(Configured, PandasIndexer, AttrResolver):
 
     def indexing_func(self: WrappingT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> WrappingT:
         """Perform indexing on `Wrapping`."""
-        return self.replace(wrapper=self.wrapper.indexing_func(pd_indexing_func, **kwargs))
+        new_wrapper = self.wrapper.indexing_func(
+            pd_indexing_func,
+            column_only_select=self.column_only_select,
+            group_select=self.group_select,
+            **kwargs
+        )
+        return self.replace(wrapper=new_wrapper)
 
     @property
     def wrapper(self) -> ArrayWrapper:
         """Array wrapper."""
         return self._wrapper
+
+    @property
+    def column_only_select(self) -> tp.Optional[bool]:
+        """Overrides `Wrapping.wrapper.column_only_select`."""
+        column_only_select = getattr(self, '_column_only_select', None)
+        if column_only_select is None:
+            return self.wrapper.column_only_select
+        return column_only_select
+
+    @property
+    def group_select(self) -> tp.Optional[bool]:
+        """Overrides `Wrapping.wrapper.group_select`."""
+        group_select = getattr(self, '_group_select', None)
+        if group_select is None:
+            return self.wrapper.group_select
+        return group_select
 
     def regroup(self: WrappingT, group_by: tp.GroupByLike, **kwargs) -> WrappingT:
         """Regroup this object.
@@ -808,13 +835,16 @@ class Wrapping(Configured, PandasIndexer, AttrResolver):
                     raise TypeError("Could not select one column: multiple columns returned")
             return out
 
+        if column is None:
+            if _self.wrapper.get_ndim() == 2 and _self.wrapper.get_shape_2d()[1] == 1:
+                column = 0
         if column is not None:
-            if _self.wrapper.grouper.is_grouped():
+            if _self.wrapper.grouper.is_grouped() and _self.group_select:
                 if _self.wrapper.grouped_ndim == 1:
                     raise TypeError("This object already contains one group of data")
                 if column not in _self.wrapper.get_columns():
                     if isinstance(column, int):
-                        if _self.wrapper.column_only_select:
+                        if _self.column_only_select:
                             return _check_out_dim(_self.iloc[column])
                         return _check_out_dim(_self.iloc[:, column])
                     raise KeyError(f"Group '{column}' not found")
@@ -823,12 +853,12 @@ class Wrapping(Configured, PandasIndexer, AttrResolver):
                     raise TypeError("This object already contains one column of data")
                 if column not in _self.wrapper.columns:
                     if isinstance(column, int):
-                        if _self.wrapper.column_only_select:
+                        if _self.column_only_select:
                             return _check_out_dim(_self.iloc[column])
                         return _check_out_dim(_self.iloc[:, column])
                     raise KeyError(f"Column '{column}' not found")
             return _check_out_dim(_self[column])
-        if not _self.wrapper.grouper.is_grouped():
+        if not _self.wrapper.grouper.is_grouped() and _self.group_select:
             if _self.wrapper.ndim == 1:
                 return _self
             raise TypeError("Only one column is allowed. Use indexing or column argument.")
@@ -845,6 +875,9 @@ class Wrapping(Configured, PandasIndexer, AttrResolver):
         `column` can be a label-based position as well as an integer position (if label fails)."""
         if obj is None:
             return None
+        if column is None:
+            if wrapper.get_ndim() == 2 and wrapper.get_shape_2d()[1] == 1:
+                column = 0
         if column is not None:
             if wrapper.ndim == 1:
                 raise TypeError("This object already contains one column of data")
@@ -866,11 +899,7 @@ class Wrapping(Configured, PandasIndexer, AttrResolver):
         if not wrapper.grouper.is_grouped():
             if wrapper.ndim == 1:
                 return obj
-            if wrapper.shape_2d[1] == 1:
-                return obj.iloc[:, 0]
             raise TypeError("Only one column is allowed. Use indexing or column argument.")
         if wrapper.grouped_ndim == 1:
             return obj
-        if wrapper.shape_2d[1] == 1:
-            return obj.iloc[:, 0]
         raise TypeError("Only one group is allowed. Use indexing or column argument.")

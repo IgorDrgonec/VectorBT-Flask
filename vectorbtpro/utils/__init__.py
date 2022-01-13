@@ -2,6 +2,7 @@
 
 """Modules with utilities that are used throughout vectorbtpro."""
 
+from vectorbtpro.utils.attr_ import deep_getattr
 from vectorbtpro.utils.caching import Cacheable
 from vectorbtpro.utils.chunking import (
     ChunkMeta,
@@ -40,8 +41,8 @@ from vectorbtpro.utils.decorators import (
     cacheable_method,
     cached_method
 )
-from vectorbtpro.utils.formatting import prettify
 from vectorbtpro.utils.execution import SequenceEngine, DaskEngine, RayEngine
+from vectorbtpro.utils.formatting import prettify
 from vectorbtpro.utils.image_ import save_animation
 from vectorbtpro.utils.jitting import jitted
 from vectorbtpro.utils.parsing import Regex
@@ -101,7 +102,8 @@ __all__ = [
     'Timer',
     'MemTracer',
     'prettify',
-    'jitted'
+    'jitted',
+    'deep_getattr'
 ]
 
 __blacklist__ = []

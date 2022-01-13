@@ -9507,7 +9507,8 @@ class TestPortfolio:
                     889.6944375349927, 6.270976459353577, 49.897006624719126
                 ]),
                 index=stats_index,
-                name='agg_func_mean')
+                name='agg_func_mean',
+                dtype=object)
         )
         pd.testing.assert_series_equal(
             pf.replace(bm_close=None).stats(),
@@ -9523,7 +9524,8 @@ class TestPortfolio:
                     889.6944375349927, 6.270976459353577, 49.897006624719126
                 ]),
                 index=stats_index,
-                name='agg_func_mean')
+                name='agg_func_mean',
+                dtype=object)
         )
         pd.testing.assert_series_equal(
             pf.replace(bm_close=False).stats(),
@@ -9549,7 +9551,8 @@ class TestPortfolio:
                     'Profit Factor', 'Expectancy', 'Sharpe Ratio', 'Calmar Ratio',
                     'Omega Ratio', 'Sortino Ratio'
                 ], dtype='object'),
-                name='agg_func_mean')
+                name='agg_func_mean',
+                dtype=object)
         )
         pd.testing.assert_series_equal(
             pf.stats(column='a'),
@@ -9564,7 +9567,8 @@ class TestPortfolio:
                     665.2843559613844, 4.506828421607624, 43.179437771402675
                 ]),
                 index=stats_index,
-                name='a')
+                name='a',
+                dtype=object)
         )
         pd.testing.assert_series_equal(
             pf.stats(column='a', settings=dict(freq='10 days', year_freq='200 days')),
@@ -9579,7 +9583,8 @@ class TestPortfolio:
                     104.44254493914563, 4.506828421607624, 10.1075418640978
                 ]),
                 index=stats_index,
-                name='a')
+                name='a',
+                dtype=object)
         )
         pd.testing.assert_series_equal(
             pf.stats(column='a', settings=dict(trade_type='positions')),
@@ -9604,7 +9609,8 @@ class TestPortfolio:
                     'Avg Losing Trade Duration', 'Profit Factor', 'Expectancy',
                     'Sharpe Ratio', 'Calmar Ratio', 'Omega Ratio', 'Sortino Ratio'
                 ], dtype='object'),
-                name='a')
+                name='a',
+                dtype=object)
         )
         pd.testing.assert_series_equal(
             pf.stats(column='a', settings=dict(required_return=0.1, risk_free=0.01)),
@@ -9619,7 +9625,8 @@ class TestPortfolio:
                     665.2843559613844, 0.0, -19.089875288486446
                 ]),
                 index=stats_index,
-                name='a')
+                name='a',
+                dtype=object)
         )
         pd.testing.assert_series_equal(
             pf.stats(column='a', settings=dict(use_asset_returns=True)),
@@ -9634,7 +9641,8 @@ class TestPortfolio:
                     418742834.6664331, 3.602470352954977, 37.244793636996356
                 ]),
                 index=stats_index,
-                name='a')
+                name='a',
+                dtype=object)
         )
         pd.testing.assert_series_equal(
             pf.stats(column='a', settings=dict(incl_open=True)),
@@ -9649,7 +9657,8 @@ class TestPortfolio:
                     0.20927333333333345, 6.258914490528395, 665.2843559613844, 4.506828421607624, 43.179437771402675
                 ]),
                 index=stats_index,
-                name='a')
+                name='a',
+                dtype=object)
         )
         pd.testing.assert_series_equal(
             pf_grouped.stats(column='first'),
@@ -9665,7 +9674,8 @@ class TestPortfolio:
                     -10.006463484493487
                 ]),
                 index=stats_index,
-                name='first')
+                name='first',
+                dtype=object)
         )
         pd.testing.assert_series_equal(
             pf.stats(column='a', tags='trades and open and not closed', settings=dict(incl_open=True)),
@@ -9676,7 +9686,8 @@ class TestPortfolio:
                 index=pd.Index([
                     'Total Open Trades', 'Open Trade PnL'
                 ], dtype='object'),
-                name='a')
+                name='a',
+                dtype=object)
         )
         max_winning_streak = (
             'max_winning_streak',
@@ -9688,7 +9699,7 @@ class TestPortfolio:
         )
         pd.testing.assert_series_equal(
             pf.stats(column='a', metrics=max_winning_streak),
-            pd.Series([2.0], index=['Max Winning Streak'], name='a')
+            pd.Series([2.0], index=['Max Winning Streak'], name='a', dtype=object)
         )
         max_winning_streak = (
             'max_winning_streak',
@@ -9699,7 +9710,7 @@ class TestPortfolio:
         )
         pd.testing.assert_series_equal(
             pf.stats(column='a', metrics=max_winning_streak),
-            pd.Series([2.0], index=['Max Winning Streak'], name='a')
+            pd.Series([2.0], index=['Max Winning Streak'], name='a', dtype=object)
         )
         max_winning_streak = (
             'max_winning_streak',
@@ -9712,28 +9723,28 @@ class TestPortfolio:
         )
         pd.testing.assert_series_equal(
             pf.stats(column='a', metrics=max_winning_streak),
-            pd.Series([2.0], index=['Max Winning Streak'], name='a')
+            pd.Series([2.0], index=['Max Winning Streak'], name='a', dtype=object)
         )
         vbt.settings.portfolio.stats['settings']['my_arg'] = 100
         my_arg_metric = ('my_arg_metric', dict(title='My Arg', calc_func=lambda my_arg: my_arg))
         pd.testing.assert_series_equal(
             pf.stats(my_arg_metric, column='a'),
-            pd.Series([100], index=['My Arg'], name='a')
+            pd.Series([100], index=['My Arg'], name='a', dtype=object)
         )
         vbt.settings.portfolio.stats.reset()
         pd.testing.assert_series_equal(
             pf.stats(my_arg_metric, column='a', settings=dict(my_arg=200)),
-            pd.Series([200], index=['My Arg'], name='a')
+            pd.Series([200], index=['My Arg'], name='a', dtype=object)
         )
         my_arg_metric = ('my_arg_metric', dict(title='My Arg', my_arg=300, calc_func=lambda my_arg: my_arg))
         pd.testing.assert_series_equal(
             pf.stats(my_arg_metric, column='a', settings=dict(my_arg=200)),
-            pd.Series([300], index=['My Arg'], name='a')
+            pd.Series([300], index=['My Arg'], name='a', dtype=object)
         )
         pd.testing.assert_series_equal(
             pf.stats(my_arg_metric, column='a', settings=dict(my_arg=200),
                      metric_settings=dict(my_arg_metric=dict(my_arg=400))),
-            pd.Series([400], index=['My Arg'], name='a')
+            pd.Series([400], index=['My Arg'], name='a', dtype=object)
         )
         trade_min_pnl_cnt = (
             'trade_min_pnl_cnt',
@@ -9748,7 +9759,7 @@ class TestPortfolio:
             pf.stats(
                 metrics=trade_min_pnl_cnt, column='a',
                 metric_settings=dict(trade_min_pnl_cnt=dict(min_pnl=0))),
-            pd.Series([2], index=['Trades with PnL over $0'], name='a')
+            pd.Series([2], index=['Trades with PnL over $0'], name='a', dtype=object)
         )
         pd.testing.assert_series_equal(
             pf.stats(
@@ -9767,7 +9778,7 @@ class TestPortfolio:
                 'Trades with PnL over $0',
                 'Trades with PnL over $10',
                 'Trades with PnL over $20'
-            ], name='a')
+            ], name='a', dtype=object)
         )
         pd.testing.assert_frame_equal(
             pf.stats(metrics='total_trades', agg_func=None, settings=dict(trades_type='entry_trades')),

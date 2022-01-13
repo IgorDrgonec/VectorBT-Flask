@@ -10,6 +10,15 @@ from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils.decorators import cached_property, cached_method
 
 
+ColumnMapperT = tp.TypeVar("ColumnMapperT", bound="ColumnMapper")
+IndexingMetaT = tp.Tuple[
+    ArrayWrapper,
+    tp.Array1d,
+    tp.MaybeArray,
+    tp.Array1d
+]
+
+
 class ColumnMapper(Wrapping):
     """Used by `vectorbtpro.records.base.Records` and `vectorbtpro.records.mapped_array.MappedArray`
     classes to make use of column and group metadata."""
@@ -24,7 +33,10 @@ class ColumnMapper(Wrapping):
 
         self._col_arr = col_arr
 
-    def _col_idxs_meta(self, col_idxs: tp.Array1d, jitted: tp.JittedOption = None) -> tp.Tuple[tp.Array1d, tp.Array1d]:
+        # Cannot select rows
+        self._column_only_select = True
+
+    def col_idxs_meta(self, col_idxs: tp.Array1d, jitted: tp.JittedOption = None) -> tp.Tuple[tp.Array1d, tp.Array1d]:
         """Get metadata of column indices.
 
         Returns element indices and new column array.
@@ -36,6 +48,25 @@ class ColumnMapper(Wrapping):
             func = jit_reg.resolve_option(nb.col_map_select_nb, jitted)
             new_indices, new_col_arr = func(self.col_map, to_1d_array(col_idxs))  # more flexible
         return new_indices, new_col_arr
+
+    def indexing_func_meta(self, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> IndexingMetaT:
+        """Perform indexing on `ColumnMapper` and return metadata."""
+        new_wrapper, _, group_idxs, col_idxs = self.wrapper.indexing_func_meta(
+            pd_indexing_func,
+            column_only_select=self.column_only_select,
+            group_select=self.group_select,
+            **kwargs
+        )
+        _, new_col_arr = self.col_idxs_meta(col_idxs)
+        return new_wrapper, new_col_arr, group_idxs, col_idxs
+
+    def indexing_func(self: ColumnMapperT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> ColumnMapperT:
+        """Perform indexing on `ColumnMapper`."""
+        new_wrapper, new_col_arr, _, _ = self.indexing_func_meta(pd_indexing_func, **kwargs)
+        return self.replace(
+            wrapper=new_wrapper,
+            col_arr=new_col_arr
+        )
 
     @property
     def col_arr(self) -> tp.Array1d:

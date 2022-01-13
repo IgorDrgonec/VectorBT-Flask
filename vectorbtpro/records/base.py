@@ -562,6 +562,9 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         self._records_arr = records_arr
         self._col_mapper = col_mapper
 
+        # Cannot select rows
+        self._column_only_select = True
+
         # Copy writeable attrs
         self._field_config = type(self)._field_config.copy()
 
@@ -594,8 +597,12 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
 
     def indexing_func_meta(self, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> IndexingMetaT:
         """Perform indexing on `Records` and return metadata."""
-        new_wrapper, _, group_idxs, col_idxs = \
-            self.wrapper.indexing_func_meta(pd_indexing_func, column_only_select=True, **kwargs)
+        new_wrapper, _, group_idxs, col_idxs = self.wrapper.indexing_func_meta(
+            pd_indexing_func,
+            column_only_select=self.column_only_select,
+            group_select=self.group_select,
+            **kwargs
+        )
         new_records_arr = self.get_by_col_idxs(col_idxs)
         return new_wrapper, new_records_arr, group_idxs, col_idxs
 

@@ -2073,6 +2073,9 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         self._fillna_close = fillna_close
         self._trades_type = trades_type
 
+        # Cannot select rows
+        self._column_only_select = True
+
     # ############# In-outputs ############# #
 
     def get_in_output(self,
@@ -2456,8 +2459,12 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
 
     def indexing_func(self: PortfolioT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> PortfolioT:
         """Perform indexing on `Portfolio`."""
-        new_wrapper, _, group_idxs, col_idxs = \
-            self.wrapper.indexing_func_meta(pd_indexing_func, column_only_select=True, **kwargs)
+        new_wrapper, _, group_idxs, col_idxs = self.wrapper.indexing_func_meta(
+            pd_indexing_func,
+            column_only_select=self.column_only_select,
+            group_select=self.group_select,
+            **kwargs
+        )
         new_close = to_2d_array(self._close)[:, col_idxs]
         new_order_records = self.orders.get_by_col_idxs(col_idxs)
         new_log_records = self.logs.get_by_col_idxs(col_idxs)

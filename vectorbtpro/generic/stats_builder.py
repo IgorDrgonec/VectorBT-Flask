@@ -589,7 +589,9 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
                     # Select column or aggregate
                     if checks.is_series(v):
-                        if _column is not None:
+                        if _column is None and v.shape[0] == 1:
+                            v = v.iloc[0]
+                        elif _column is not None:
                             v = custom_reself.select_one_from_obj(
                                 v, custom_reself.wrapper.regroup(_group_by), column=_column)
                         elif _agg_func is not None and agg_func is not None:
@@ -612,14 +614,14 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
         # Return the stats
         if reself.wrapper.get_ndim(group_by=group_by) == 1:
-            return pd.Series(stats_dct, name=reself.wrapper.get_name(group_by=group_by))
+            return pd.Series(stats_dct, name=reself.wrapper.get_name(group_by=group_by), dtype=object)
         if column is not None:
-            return pd.Series(stats_dct, name=column)
+            return pd.Series(stats_dct, name=column, dtype=object)
         if agg_func is not None:
             if used_agg_func and not silence_warnings:
                 warnings.warn(f"Object has multiple columns. Aggregating using {agg_func}. "
                               f"Pass column to select a single column/group.", stacklevel=2)
-            return pd.Series(stats_dct, name='agg_func_' + agg_func.__name__)
+            return pd.Series(stats_dct, name='agg_func_' + agg_func.__name__, dtype=object)
         new_index = reself.wrapper.grouper.get_index(group_by=group_by)
         stats_df = pd.DataFrame(stats_dct, index=new_index)
         return stats_df

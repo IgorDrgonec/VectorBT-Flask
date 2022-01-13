@@ -545,6 +545,9 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         self._mapping = mapping
         self._col_mapper = col_mapper
 
+        # Cannot select rows
+        self._column_only_select = True
+
     def replace(self: MappedArrayT, **kwargs) -> MappedArrayT:
         """See `vectorbtpro.utils.config.Configured.replace`.
 
@@ -560,9 +563,13 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
 
     def indexing_func_meta(self, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> IndexingMetaT:
         """Perform indexing on `MappedArray` and return metadata."""
-        new_wrapper, _, group_idxs, col_idxs = \
-            self.wrapper.indexing_func_meta(pd_indexing_func, column_only_select=True, **kwargs)
-        new_indices, new_col_arr = self.col_mapper._col_idxs_meta(col_idxs)
+        new_wrapper, _, group_idxs, col_idxs = self.wrapper.indexing_func_meta(
+            pd_indexing_func,
+            column_only_select=self.column_only_select,
+            group_select=self.group_select,
+            **kwargs
+        )
+        new_indices, new_col_arr = self.col_mapper.col_idxs_meta(col_idxs)
         new_mapped_arr = self.values[new_indices]
         new_id_arr = self.id_arr[new_indices]
         if self.idx_arr is not None:

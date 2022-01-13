@@ -75,7 +75,7 @@ def teardown_module():
 class TestColumnMapper:
     def test_col_arr(self):
         np.testing.assert_array_equal(
-            records['a'].col_mapper.col_arr,
+            records.col_mapper['a'].col_arr,
             np.array([0, 0, 0])
         )
         np.testing.assert_array_equal(
@@ -89,7 +89,7 @@ class TestColumnMapper:
             records.col_mapper.col_arr
         )
         np.testing.assert_array_equal(
-            records_grouped['g1'].col_mapper.get_col_arr(),
+            records_grouped.col_mapper['g1'].get_col_arr(),
             np.array([0, 0, 0, 0, 0, 0])
         )
         np.testing.assert_array_equal(
@@ -99,7 +99,7 @@ class TestColumnMapper:
 
     def test_col_lens(self):
         np.testing.assert_array_equal(
-            records['a'].col_mapper.col_lens,
+            records.col_mapper['a'].col_lens,
             np.array([3])
         )
         np.testing.assert_array_equal(
@@ -113,7 +113,7 @@ class TestColumnMapper:
             np.array([3, 3, 3, 0])
         )
         np.testing.assert_array_equal(
-            records_grouped['g1'].col_mapper.get_col_lens(),
+            records_grouped.col_mapper['g1'].get_col_lens(),
             np.array([6])
         )
         np.testing.assert_array_equal(
@@ -123,11 +123,11 @@ class TestColumnMapper:
 
     def test_col_map(self):
         np.testing.assert_array_equal(
-            records['a'].col_mapper.col_map[0],
+            records.col_mapper['a'].col_map[0],
             np.array([0, 1, 2])
         )
         np.testing.assert_array_equal(
-            records['a'].col_mapper.col_map[1],
+            records.col_mapper['a'].col_map[1],
             np.array([3])
         )
         np.testing.assert_array_equal(
@@ -149,11 +149,11 @@ class TestColumnMapper:
             records.col_mapper.col_map[1]
         )
         np.testing.assert_array_equal(
-            records_grouped['g1'].col_mapper.get_col_map()[0],
+            records_grouped.col_mapper['g1'].get_col_map()[0],
             np.array([0, 1, 2, 3, 4, 5])
         )
         np.testing.assert_array_equal(
-            records_grouped['g1'].col_mapper.get_col_map()[1],
+            records_grouped.col_mapper['g1'].get_col_map()[1],
             np.array([6])
         )
         np.testing.assert_array_equal(
