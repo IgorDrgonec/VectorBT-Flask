@@ -223,6 +223,7 @@ from vectorbtpro.base.accessors import BaseAccessor, BaseDFAccessor, BaseSRAcces
 from vectorbtpro.base.grouping import Grouper
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.generic import nb
+from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic.decorators import attach_nb_methods, attach_transform_methods
 from vectorbtpro.generic.drawdowns import Drawdowns
 from vectorbtpro.generic.plots_builder import PlotsBuilderMixin
@@ -262,11 +263,6 @@ except ImportError:
     nanargmin = np.nanargmin
 
 __pdoc__ = {}
-
-
-class MetaGenericAccessor(type(StatsBuilderMixin), type(PlotsBuilderMixin)):
-    pass
-
 
 GenericAccessorT = tp.TypeVar("GenericAccessorT", bound="GenericAccessor")
 SplitOutputT = tp.Union[tp.MaybeTuple[tp.Tuple[tp.Frame, tp.Index]], tp.BaseFigure]
@@ -361,7 +357,7 @@ __pdoc__['transform_config'] = f"""Config of transform methods to be attached to
 
 @attach_nb_methods(nb_config)
 @attach_transform_methods(transform_config)
-class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaGenericAccessor):
+class GenericAccessor(BaseAccessor, Analyzable):
     """Accessor on top of data of any type. For both, Series and DataFrames.
 
     Accessible via `pd.Series.vbt` and `pd.DataFrame.vbt`."""
@@ -2691,7 +2687,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         generic_stats_cfg = settings['generic']['stats']
 
         return merge_dicts(
-            StatsBuilderMixin.stats_defaults.__get__(self),
+            Analyzable.stats_defaults.__get__(self),
             generic_stats_cfg
         )
 
@@ -2940,7 +2936,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin, PlotsBuilderMixin, metacl
         generic_plots_cfg = settings['generic']['plots']
 
         return merge_dicts(
-            PlotsBuilderMixin.plots_defaults.__get__(self),
+            Analyzable.plots_defaults.__get__(self),
             generic_plots_cfg
         )
 

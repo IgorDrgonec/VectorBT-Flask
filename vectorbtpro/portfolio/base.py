@@ -1629,9 +1629,8 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, broadcast, broadcast_to, to_pd_array
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.generic import nb as generic_nb
+from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic.drawdowns import Drawdowns
-from vectorbtpro.generic.plots_builder import PlotsBuilderMixin
-from vectorbtpro.generic.stats_builder import StatsBuilderMixin
 from vectorbtpro.portfolio import chunking as portfolio_ch
 from vectorbtpro.portfolio import nb
 from vectorbtpro.portfolio.call_seq import require_call_seq, build_call_seq
@@ -1948,13 +1947,9 @@ __pdoc__['shortcut_config'] = f"""Config of shortcut properties to be attached t
 PortfolioT = tp.TypeVar("PortfolioT", bound="Portfolio")
 
 
-class MetaPortfolio(type(StatsBuilderMixin), type(PlotsBuilderMixin)):
-    pass
-
-
 @attach_shortcut_properties(shortcut_config)
 @attach_returns_acc_methods(returns_acc_config)
-class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPortfolio):
+class Portfolio(Analyzable):
     """Class for modeling portfolio and measuring its performance.
 
     Args:
@@ -2036,7 +2031,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             if wrapper.grouper.allow_enable or wrapper.grouper.allow_modify:
                 wrapper = wrapper.replace(allow_enable=False, allow_modify=False)
 
-        Wrapping.__init__(
+        Analyzable.__init__(
             self,
             wrapper,
             close=close,
@@ -2055,8 +2050,6 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
             trades_type=trades_type,
             **kwargs
         )
-        StatsBuilderMixin.__init__(self)
-        PlotsBuilderMixin.__init__(self)
 
         self._close = close
         self._order_records = order_records
@@ -7515,7 +7508,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         portfolio_stats_cfg = settings['portfolio']['stats']
 
         return merge_dicts(
-            StatsBuilderMixin.stats_defaults.__get__(self),
+            Analyzable.stats_defaults.__get__(self),
             dict(
                 settings=dict(
                     year_freq=returns_cfg['year_freq'],
@@ -8346,7 +8339,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         portfolio_plots_cfg = settings['portfolio']['plots']
 
         return merge_dicts(
-            PlotsBuilderMixin.plots_defaults.__get__(self),
+            Analyzable.plots_defaults.__get__(self),
             dict(
                 settings=dict(
                     year_freq=returns_cfg['year_freq'],
@@ -8466,7 +8459,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaPo
         )
     )
 
-    plot = PlotsBuilderMixin.plots
+    plot = Analyzable.plots
 
     @property
     def subplots(self) -> Config:

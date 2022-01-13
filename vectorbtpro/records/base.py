@@ -419,8 +419,7 @@ import pandas as pd
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_1d_array
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
-from vectorbtpro.generic.plots_builder import PlotsBuilderMixin
-from vectorbtpro.generic.stats_builder import StatsBuilderMixin
+from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.records import nb
 from vectorbtpro.records.col_mapper import ColumnMapper
 from vectorbtpro.records.mapped_array import MappedArray
@@ -460,11 +459,11 @@ class RecordsWithFields(metaclass=MetaFields):
         return self._field_config
 
 
-class MetaRecords(type(StatsBuilderMixin), type(PlotsBuilderMixin), type(RecordsWithFields)):
+class MetaRecords(type(Analyzable), type(RecordsWithFields)):
     pass
 
 
-class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields, metaclass=MetaRecords):
+class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
     """Wraps the actual records array (such as trades) and exposes methods for mapping
     it to some array of values (such as PnL of each trade).
 
@@ -549,15 +548,13 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         if col_mapper is None:
             col_mapper = ColumnMapper(wrapper, records_arr[self.get_field_name('col')])
 
-        Wrapping.__init__(
+        Analyzable.__init__(
             self,
             wrapper,
             records_arr=records_arr,
             col_mapper=col_mapper,
             **kwargs
         )
-        StatsBuilderMixin.__init__(self)
-        PlotsBuilderMixin.__init__(self)
 
         self._records_arr = records_arr
         self._col_mapper = col_mapper
@@ -892,7 +889,7 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         records_stats_cfg = settings['records']['stats']
 
         return merge_dicts(
-            StatsBuilderMixin.stats_defaults.__get__(self),
+            Analyzable.stats_defaults.__get__(self),
             records_stats_cfg
         )
 
@@ -941,7 +938,7 @@ class Records(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, RecordsWithFields,
         records_plots_cfg = settings['records']['plots']
 
         return merge_dicts(
-            PlotsBuilderMixin.plots_defaults.__get__(self),
+            Analyzable.plots_defaults.__get__(self),
             records_plots_cfg
         )
 

@@ -415,8 +415,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_1d_array, to_dict
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.generic import nb as generic_nb
-from vectorbtpro.generic.plots_builder import PlotsBuilderMixin
-from vectorbtpro.generic.stats_builder import StatsBuilderMixin
+from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.records import nb
 from vectorbtpro.records.col_mapper import ColumnMapper
 from vectorbtpro.registries.ch_registry import ch_reg
@@ -454,13 +453,9 @@ def combine_mapped_with_other(self: MappedArrayT,
     return self.replace(mapped_arr=np_func(self.values, other))
 
 
-class MetaMappedArray(type(StatsBuilderMixin), type(PlotsBuilderMixin)):
-    pass
-
-
 @attach_binary_magic_methods(combine_mapped_with_other)
 @attach_unary_magic_methods(lambda self, np_func: self.replace(mapped_arr=np_func(self.values)))
-class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaMappedArray):
+class MappedArray(Analyzable):
     """Exposes methods for reducing, converting, and plotting arrays mapped by
     `vectorbtpro.records.base.Records` class.
 
@@ -524,7 +519,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         if col_mapper is None:
             col_mapper = ColumnMapper(wrapper, col_arr)
 
-        Wrapping.__init__(
+        Analyzable.__init__(
             self,
             wrapper,
             mapped_arr=mapped_arr,
@@ -535,8 +530,6 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
             col_mapper=col_mapper,
             **kwargs
         )
-        StatsBuilderMixin.__init__(self)
-        PlotsBuilderMixin.__init__(self)
 
         self._mapped_arr = mapped_arr
         self._id_arr = id_arr
@@ -1498,7 +1491,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         mapped_array_stats_cfg = settings['mapped_array']['stats']
 
         return merge_dicts(
-            StatsBuilderMixin.stats_defaults.__get__(self),
+            Analyzable.stats_defaults.__get__(self),
             mapped_array_stats_cfg
         )
 
@@ -1606,7 +1599,7 @@ class MappedArray(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Meta
         mapped_array_plots_cfg = settings['mapped_array']['plots']
 
         return merge_dicts(
-            PlotsBuilderMixin.plots_defaults.__get__(self),
+            Analyzable.plots_defaults.__get__(self),
             mapped_array_plots_cfg
         )
 

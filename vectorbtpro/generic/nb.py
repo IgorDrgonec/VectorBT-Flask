@@ -3,7 +3,7 @@
 """Numba-compiled functions for generic data.
 
 Provides an arsenal of Numba-compiled functions that are used by accessors
-and in many other parts of the backtesting pipeline, such as technical indicators.
+and in many other parts of a backtesting pipeline, such as technical indicators.
 These only accept NumPy arrays and other Numba-compatible types.
 
 !!! note

@@ -4,7 +4,7 @@
 
 Combine functions combine two or more NumPy arrays using a custom function. The emphasis here is
 done upon stacking the results into one NumPy array - since vectorbt is all about brute-forcing
-large spaces of hyperparameters, concatenating the results of each hyperparameter combination into
+large spaces of hyper-parameters, concatenating the results of each hyper-parameter combination into
 a single DataFrame is important. All functions are available in both Python and Numba-compiled form."""
 
 import numpy as np

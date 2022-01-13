@@ -30,6 +30,8 @@ from vectorbtpro.utils.config import (
     atomic_dict,
     merge_dicts,
     Config,
+    ReadonlyConfig,
+    HybridConfig,
     Configured,
     AtomicConfig
 )
@@ -55,6 +57,8 @@ __all__ = [
     'atomic_dict',
     'merge_dicts',
     'Config',
+    'ReadonlyConfig',
+    'HybridConfig',
     'Configured',
     'AtomicConfig',
     'Sub',

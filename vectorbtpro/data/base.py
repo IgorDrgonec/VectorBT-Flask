@@ -327,15 +327,14 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_pd_array
-from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
-from vectorbtpro.generic.plots_builder import PlotsBuilderMixin
-from vectorbtpro.generic.stats_builder import StatsBuilderMixin
+from vectorbtpro.base.wrapping import ArrayWrapper
+from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.datetime_ import is_tz_aware, to_timezone
 from vectorbtpro.utils.parsing import get_func_arg_names
-from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.path_ import check_mkdir
+from vectorbtpro.utils.pbar import get_pbar
 
 __pdoc__ = {}
 
@@ -345,14 +344,10 @@ class symbol_dict(dict):
     pass
 
 
-class MetaData(type(StatsBuilderMixin), type(PlotsBuilderMixin)):
-    pass
-
-
 DataT = tp.TypeVar("DataT", bound="Data")
 
 
-class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
+class Data(Analyzable):
     """Class that downloads, updates, and manages data coming from a data source."""
 
     def __init__(self,
@@ -372,7 +367,7 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
         for symbol, obj in data.items():
             checks.assert_meta_equal(obj, data[list(data.keys())[0]])
 
-        Wrapping.__init__(
+        Analyzable.__init__(
             self,
             wrapper,
             data=data,
@@ -386,8 +381,6 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
             returned_kwargs=returned_kwargs,
             **kwargs
         )
-        StatsBuilderMixin.__init__(self)
-        PlotsBuilderMixin.__init__(self)
 
         self._data = data
         self._single_symbol = single_symbol
@@ -1029,7 +1022,7 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
         data_stats_cfg = settings['data']['stats']
 
         return merge_dicts(
-            StatsBuilderMixin.stats_defaults.__get__(self),
+            Analyzable.stats_defaults.__get__(self),
             data_stats_cfg
         )
 
@@ -1125,7 +1118,7 @@ class Data(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaData):
         data_plots_cfg = settings['data']['plots']
 
         return merge_dicts(
-            PlotsBuilderMixin.plots_defaults.__get__(self),
+            Analyzable.plots_defaults.__get__(self),
             data_plots_cfg
         )
 

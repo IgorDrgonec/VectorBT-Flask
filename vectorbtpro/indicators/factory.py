@@ -1180,17 +1180,16 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base import indexes, reshaping, combining
 from vectorbtpro.base.indexing import build_param_indexer
 from vectorbtpro.base.reshaping import Default, resolve_ref
-from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
+from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.accessors import BaseAccessor
-from vectorbtpro.generic.plots_builder import PlotsBuilderMixin
-from vectorbtpro.generic.stats_builder import StatsBuilderMixin
+from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config
 from vectorbtpro.utils.decorators import classproperty, cacheable_property
-from vectorbtpro.utils.formatting import prettify
 from vectorbtpro.utils.enum_ import map_enum_fields
+from vectorbtpro.utils.formatting import prettify
 from vectorbtpro.utils.mapping import to_mapping, apply_mapping
 from vectorbtpro.utils.params import to_typed_list, broadcast_params, create_param_product, params_to_list
 from vectorbtpro.utils.random_ import set_seed
@@ -2097,11 +2096,7 @@ RunOutputT = tp.Union[IndicatorBaseT, tp.Tuple[tp.Any, ...], RawOutputT, CacheOu
 RunCombsOutputT = tp.Tuple[IndicatorBaseT, ...]
 
 
-class MetaIndicatorBase(type(StatsBuilderMixin), type(PlotsBuilderMixin)):
-    pass
-
-
-class IndicatorBase(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaIndicatorBase):
+class IndicatorBase(Analyzable):
     """Indicator base class.
 
     Properties should be set before instantiation."""
@@ -2173,7 +2168,7 @@ class IndicatorBase(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Me
         checks.assert_instance_of(short_name, str)
         checks.assert_len_equal(level_names, param_list)
 
-        Wrapping.__init__(
+        Analyzable.__init__(
             self,
             wrapper,
             input_list=input_list,
@@ -2186,8 +2181,6 @@ class IndicatorBase(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=Me
             level_names=level_names,
             **kwargs
         )
-        StatsBuilderMixin.__init__(self)
-        PlotsBuilderMixin.__init__(self)
 
         setattr(self, '_short_name', short_name)
         setattr(self, '_level_names', level_names)

@@ -4,6 +4,7 @@
 
 In contrast to the `vectorbtpro.base` sub-package, focuses on the data itself."""
 
+from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic.drawdowns import Drawdowns
 from vectorbtpro.generic.enums import *
 from vectorbtpro.generic.ranges import Ranges
@@ -14,7 +15,8 @@ __all__ = [
     'Drawdowns',
     'RangeSplitter',
     'RollingSplitter',
-    'ExpandingSplitter'
+    'ExpandingSplitter',
+    'Analyzable'
 ]
 
 __blacklist__ = []

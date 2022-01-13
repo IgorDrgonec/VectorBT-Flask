@@ -1,125 +1,6 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Custom pandas accessors for base operations.
-
-Methods can be accessed as follows:
-
-* `BaseSRAccessor` -> `pd.Series.vbt.*`
-* `BaseDFAccessor` -> `pd.DataFrame.vbt.*`
-
-For example:
-
-```pycon
->>> import numpy as np
->>> import pandas as pd
->>> import vectorbtpro as vbt
-
->>> # vectorbtpro.base.accessors.BaseAccessor.make_symmetric
->>> pd.Series([1, 2, 3]).vbt.make_symmetric()
-     0    1    2
-0  1.0  2.0  3.0
-1  2.0  NaN  NaN
-2  3.0  NaN  NaN
-```
-
-It contains base methods for working with pandas objects. Most of these methods are adaptations
-of combine/reshape/index functions that can work with pandas objects. For example,
-`vectorbtpro.base.reshaping.broadcast` can take an arbitrary number of pandas objects, thus
-you can find its variations as accessor methods.
-
-```pycon
->>> sr = pd.Series([1])
->>> df = pd.DataFrame([1, 2, 3])
-
->>> vbt.base.reshaping.broadcast_to(sr, df)
-   0
-0  1
-1  1
-2  1
-
->>> sr.vbt.broadcast_to(df)
-   0
-0  1
-1  1
-2  1
-```
-
-Many methods such as `BaseAccessor.broadcast` are both class and instance methods:
-
-```pycon
->>> from vectorbtpro.base.accessors import BaseAccessor
-
->>> # Same as sr.vbt.broadcast(df)
->>> new_sr, new_df = BaseAccessor.broadcast(sr, df)
->>> new_sr
-   0
-0  1
-1  1
-2  1
->>> new_df
-   0
-0  1
-1  2
-2  3
-```
-
-Instead of explicitly importing `BaseAccessor` or any other accessor, we can use
-`vectorbtpro.accessors.pd_acc` instead:
-
-```pycon
->>> vbt.pd_acc.broadcast(sr, df)
->>> new_sr
-   0
-0  1
-1  1
-2  1
->>> new_df
-   0
-0  1
-1  2
-2  3
-```
-
-Additionally, `BaseAccessor` implements arithmetic (such as `+`), comparison (such as `>`) and
-logical operators (such as `&`) by forwarding the operation to `BaseAccessor.combine`:
-
-```pycon
->>> sr.vbt + df
-   0
-0  2
-1  3
-2  4
-```
-
-Many interesting use cases can be implemented this way. For example, let's compare an array
-with 3 different thresholds (index is treated as multiple values by `BaseAccessor.combine`):
-
-```pycon
->>> df.vbt > pd.Index(np.arange(3), name='threshold')
-threshold     0                  1                  2
-             a2    b2    c2     a2    b2    c2     a2     b2    c2
-x2         True  True  True  False  True  True  False  False  True
-y2         True  True  True   True  True  True   True   True  True
-z2         True  True  True   True  True  True   True   True  True
-```
-
-The same using broadcasting mechanism:
-
-```pycon
->>> df.vbt > vbt.BCO(np.arange(3), name='threshold', product=True)
-threshold     0                  1                  2
-             a2    b2    c2     a2    b2    c2     a2     b2    c2
-x2         True  True  True  False  True  True  False  False  True
-y2         True  True  True   True  True  True   True   True  True
-z2         True  True  True   True  True  True   True   True  True
-```
-
-!!! note
-    You should ensure that your `*.vbt` operand is on the left if the other operand is an array.
-
-    Accessors do not utilize caching.
-
-    Grouping is only supported by the methods that accept the `group_by` argument."""
+"""Custom pandas accessors for base operations with pandas objects."""
 
 import numpy as np
 import pandas as pd
@@ -149,7 +30,123 @@ class BaseAccessor(Wrapping):
     we will convert any Series to a DataFrame and perform matrix computation on it. Afterwards,
     by using `BaseAccessor.wrapper`, we will convert the 2-dim output back to a Series.
 
-    `**kwargs` will be passed to `vectorbtpro.base.wrapping.ArrayWrapper`."""
+    `**kwargs` will be passed to `vectorbtpro.base.wrapping.ArrayWrapper`.
+
+    !!! note
+        When using magic methods, ensure that `.vbt` is called on the operand on the left
+        if the other operand is an array.
+
+        Accessors do not utilize caching.
+
+        Grouping is only supported by the methods that accept the `group_by` argument.
+
+    Usage:
+        * Build a symmetric matrix:
+
+        ```pycon
+        >>> import numpy as np
+        >>> import pandas as pd
+        >>> import vectorbtpro as vbt
+
+        >>> # vectorbtpro.base.accessors.BaseAccessor.make_symmetric
+        >>> pd.Series([1, 2, 3]).vbt.make_symmetric()
+             0    1    2
+        0  1.0  2.0  3.0
+        1  2.0  NaN  NaN
+        2  3.0  NaN  NaN
+        ```
+
+        * Broadcast pandas objects:
+
+        ```pycon
+        >>> sr = pd.Series([1])
+        >>> df = pd.DataFrame([1, 2, 3])
+
+        >>> vbt.base.reshaping.broadcast_to(sr, df)
+           0
+        0  1
+        1  1
+        2  1
+
+        >>> sr.vbt.broadcast_to(df)
+           0
+        0  1
+        1  1
+        2  1
+        ```
+
+        * Many methods such as `BaseAccessor.broadcast` are both class and instance methods:
+
+        ```pycon
+        >>> from vectorbtpro.base.accessors import BaseAccessor
+
+        >>> # Same as sr.vbt.broadcast(df)
+        >>> new_sr, new_df = BaseAccessor.broadcast(sr, df)
+        >>> new_sr
+           0
+        0  1
+        1  1
+        2  1
+        >>> new_df
+           0
+        0  1
+        1  2
+        2  3
+        ```
+
+        * Instead of explicitly importing `BaseAccessor` or any other accessor, we can use
+        `vectorbtpro.accessors.pd_acc` instead:
+
+        ```pycon
+        >>> vbt.pd_acc.broadcast(sr, df)
+        >>> new_sr
+           0
+        0  1
+        1  1
+        2  1
+        >>> new_df
+           0
+        0  1
+        1  2
+        2  3
+        ```
+
+        * `BaseAccessor` implements arithmetic (such as `+`), comparison (such as `>`) and
+        logical operators (such as `&`) by forwarding the operation to `BaseAccessor.combine`:
+
+        ```pycon
+        >>> sr.vbt + df
+           0
+        0  2
+        1  3
+        2  4
+        ```
+
+        Many interesting use cases can be implemented this way.
+
+        * For example, let's compare an array with 3 different thresholds
+        (index is treated as multiple values by `BaseAccessor.combine`):
+
+        ```pycon
+        >>> df.vbt > pd.Index(np.arange(3), name='threshold')
+        threshold     0                  1                  2
+                     a2    b2    c2     a2    b2    c2     a2     b2    c2
+        x2         True  True  True  False  True  True  False  False  True
+        y2         True  True  True   True  True  True   True   True  True
+        z2         True  True  True   True  True  True   True   True  True
+        ```
+
+        * The same using the broadcasting mechanism:
+
+        ```pycon
+        >>> df.vbt > vbt.BCO(np.arange(3), name='threshold', product=True)
+        threshold     0                  1                  2
+                     a2    b2    c2     a2    b2    c2     a2     b2    c2
+        x2         True  True  True  False  True  True  False  False  True
+        y2         True  True  True   True  True  True   True   True  True
+        z2         True  True  True   True  True  True   True   True  True
+        ```
+    """
 
     def __init__(self, obj: tp.SeriesFrame, wrapper: tp.Optional[ArrayWrapper] = None, **kwargs) -> None:
         checks.assert_instance_of(obj, (pd.Series, pd.DataFrame))
