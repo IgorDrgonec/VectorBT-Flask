@@ -31,7 +31,7 @@ def ma_nb(a: tp.Array2d, window: int, ewm: bool, adjust: bool = False) -> tp.Arr
 def mstd_nb(a: tp.Array2d, window: int, ewm: int, adjust: bool = False, ddof: int = 0) -> tp.Array2d:
     """Compute simple or exponential moving STD (`ewm=True`)."""
     if ewm:
-        return generic_nb.ewm_std_nb(a, window, minp=window, adjust=adjust, ddof=ddof)
+        return generic_nb.ewm_std_nb(a, window, minp=window, adjust=adjust)
     return generic_nb.rolling_std_nb(a, window, minp=window, ddof=ddof)
 
 

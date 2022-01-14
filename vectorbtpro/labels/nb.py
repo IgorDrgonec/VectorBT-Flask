@@ -47,7 +47,7 @@ def future_std_apply_nb(close: tp.Array2d,
                         ddof: int = 0) -> tp.Array2d:
     """Get the standard deviation of the next period."""
     if ewm:
-        out = generic_nb.ewm_std_nb(close[::-1], window, minp=window, adjust=adjust, ddof=ddof)[::-1]
+        out = generic_nb.ewm_std_nb(close[::-1], window, minp=window, adjust=adjust)[::-1]
     else:
         out = generic_nb.rolling_std_nb(close[::-1], window, minp=window, ddof=ddof)[::-1]
     if wait > 0:

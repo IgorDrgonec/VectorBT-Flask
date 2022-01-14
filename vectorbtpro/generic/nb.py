@@ -164,7 +164,7 @@ def set_by_mask_mult_nb(arr: tp.Array2d, mask: tp.Array2d, values: tp.Array2d) -
 def fillna_1d_nb(arr: tp.Array1d, value: tp.Scalar) -> tp.Array1d:
     """Replace NaNs with value.
 
-    Numba equivalent to `pd.Series(a).fillna(value)`."""
+    Numba equivalent to `pd.Series(arr).fillna(value)`."""
     return set_by_mask_1d_nb(arr, np.isnan(arr), value)
 
 
@@ -230,7 +230,7 @@ def fbfill_nb(arr: tp.Array2d) -> tp.Array2d:
 def bshift_1d_nb(arr: tp.Array1d, n: int = 1, fill_value: tp.Scalar = np.nan) -> tp.Array1d:
     """Shift backward by `n` positions.
 
-    Numba equivalent to `pd.Series(a).shift(n)`.
+    Numba equivalent to `pd.Series(arr).shift(n)`.
 
     !!! warning
         This operation looks ahead."""
@@ -298,7 +298,7 @@ def bshift_nb(arr: tp.Array2d, n: int = 1, fill_value: tp.Scalar = np.nan) -> tp
 def fshift_1d_nb(arr: tp.Array1d, n: int = 1, fill_value: tp.Scalar = np.nan) -> tp.Array1d:
     """Shift forward by `n` positions.
 
-    Numba equivalent to `pd.Series(a).shift(n)`."""
+    Numba equivalent to `pd.Series(arr).shift(n)`."""
     nb_enabled = not isinstance(arr, np.ndarray)
     if nb_enabled:
         a_dtype = as_dtype(arr.dtype)
@@ -363,7 +363,7 @@ def fshift_nb(arr: tp.Array2d, n: int = 1, fill_value: tp.Scalar = np.nan) -> tp
 def diff_1d_nb(arr: tp.Array1d, n: int = 1) -> tp.Array1d:
     """Return the 1-th discrete difference.
 
-    Numba equivalent to `pd.Series(a).diff()`."""
+    Numba equivalent to `pd.Series(arr).diff()`."""
     out = np.empty_like(arr, dtype=np.float_)
     out[:n] = np.nan
     out[n:] = arr[n:] - arr[:-n]
@@ -391,7 +391,7 @@ def diff_nb(arr: tp.Array2d, n: int = 1) -> tp.Array2d:
 def pct_change_1d_nb(arr: tp.Array1d, n: int = 1) -> tp.Array1d:
     """Return the percentage change.
 
-    Numba equivalent to `pd.Series(a).pct_change()`."""
+    Numba equivalent to `pd.Series(arr).pct_change()`."""
     out = np.empty_like(arr, dtype=np.float_)
     out[:n] = np.nan
     out[n:] = arr[n:] / arr[:-n] - 1
@@ -419,7 +419,7 @@ def pct_change_nb(arr: tp.Array2d, n: int = 1) -> tp.Array2d:
 def bfill_1d_nb(arr: tp.Array1d) -> tp.Array1d:
     """Fill NaNs by propagating first valid observation backward.
 
-    Numba equivalent to `pd.Series(a).fillna(method='bfill')`.
+    Numba equivalent to `pd.Series(arr).fillna(method='bfill')`.
 
     !!! warning
         This operation looks ahead."""
@@ -453,7 +453,7 @@ def bfill_nb(arr: tp.Array2d) -> tp.Array2d:
 def ffill_1d_nb(arr: tp.Array1d) -> tp.Array1d:
     """Fill NaNs by propagating last valid observation forward.
 
-    Numba equivalent to `pd.Series(a).fillna(method='ffill')`."""
+    Numba equivalent to `pd.Series(arr).fillna(method='ffill')`."""
     out = np.empty_like(arr, dtype=arr.dtype)
     lastval = arr[0]
     for i in range(arr.shape[0]):
@@ -859,6 +859,51 @@ def nanstd_nb(arr: tp.Array2d, ddof: int = 0) -> tp.Array1d:
     return out
 
 
+@register_jitted(cache=True)
+def corr_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d) -> float:
+    """Numba-equivalent of `np.corrcoef` that ignores NaN values.
+
+    Numerically stable."""
+    arr1_sum = 0.
+    arr2_sum = 0.
+    k = 0
+    for i in range(arr1.shape[0]):
+        if not np.isnan(arr1[i]) and not np.isnan(arr2[i]):
+            arr1_sum += arr1[i]
+            arr2_sum += arr2[i]
+            k += 1
+    if k == 0:
+        return np.nan
+    arr1_mean = arr1_sum / k
+    arr2_mean = arr2_sum / k
+    num = 0
+    denom1 = 0
+    denom2 = 0
+    for i in range(arr1.shape[0]):
+        if not np.isnan(arr1[i]) and not np.isnan(arr2[i]):
+            num += (arr1[i] - arr1_mean) * (arr2[i] - arr2_mean)
+            denom1 += (arr1[i] - arr1_mean) ** 2
+            denom2 += (arr2[i] - arr2_mean) ** 2
+    return num / np.sqrt(denom1 * denom2)
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='arr1', axis=1),
+    arg_take_spec=dict(
+        arr1=ch.ArraySlicer(axis=1),
+        arr2=ch.ArraySlicer(axis=1)
+    ),
+    merge_func=base_ch.concat
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def corr_nb(arr1: tp.Array2d, arr2: tp.Array2d) -> tp.Array1d:
+    """2-dim version of `corr_1d_nb`."""
+    out = np.empty(arr1.shape[1], dtype=np.float_)
+    for col in prange(arr1.shape[1]):
+        out[col] = corr_1d_nb(arr1[:, col], arr2[:, col])
+    return out
+
+
 # ############# Rolling functions ############# #
 
 
@@ -866,7 +911,7 @@ def nanstd_nb(arr: tp.Array2d, ddof: int = 0) -> tp.Array1d:
 def rolling_min_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None) -> tp.Array1d:
     """Return rolling min.
 
-    Numba equivalent to `pd.Series(a).rolling(window, min_periods=minp).min()`."""
+    Numba equivalent to `pd.Series(arr).rolling(window, min_periods=minp).min()`."""
     if minp is None:
         minp = window
     if minp > window:
@@ -910,7 +955,7 @@ def rolling_min_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None) 
 def rolling_max_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None) -> tp.Array1d:
     """Return rolling max.
 
-    Numba equivalent to `pd.Series(a).rolling(window, min_periods=minp).max()`."""
+    Numba equivalent to `pd.Series(arr).rolling(window, min_periods=minp).max()`."""
     if minp is None:
         minp = window
     if minp > window:
@@ -954,15 +999,15 @@ def rolling_max_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None) 
 def rolling_mean_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None) -> tp.Array1d:
     """Return rolling mean.
 
-    Numba equivalent to `pd.Series(a).rolling(window, min_periods=minp).mean()`."""
+    Numba equivalent to `pd.Series(arr).rolling(window, min_periods=minp).mean()`."""
     if minp is None:
         minp = window
     if minp > window:
         raise ValueError("minp must be <= window")
     out = np.empty_like(arr, dtype=np.float_)
-    cumsum_arr = np.zeros_like(arr)
+    cumsum_arr = np.empty_like(arr)
     cumsum = 0
-    nancnt_arr = np.zeros_like(arr)
+    nancnt_arr = np.empty_like(arr)
     nancnt = 0
     for i in range(arr.shape[0]):
         if np.isnan(arr[i]):
@@ -1006,17 +1051,17 @@ def rolling_mean_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None)
 def rolling_std_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None, ddof: int = 0) -> tp.Array1d:
     """Return rolling standard deviation.
 
-    Numba equivalent to `pd.Series(a).rolling(window, min_periods=minp).std(ddof=ddof)`."""
+    Numba equivalent to `pd.Series(arr).rolling(window, min_periods=minp).std(ddof=ddof)`."""
     if minp is None:
         minp = window
     if minp > window:
         raise ValueError("minp must be <= window")
     out = np.empty_like(arr, dtype=np.float_)
-    cumsum_arr = np.zeros_like(arr)
+    cumsum_arr = np.empty_like(arr)
     cumsum = 0
-    cumsum_sq_arr = np.zeros_like(arr)
+    cumsum_sq_arr = np.empty_like(arr)
     cumsum_sq = 0
-    nancnt_arr = np.zeros_like(arr)
+    nancnt_arr = np.empty_like(arr)
     nancnt = 0
     for i in range(arr.shape[0]):
         if np.isnan(arr[i]):
@@ -1067,7 +1112,7 @@ def rolling_std_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None, 
 def ewm_mean_1d_nb(arr: tp.Array1d, span: int, minp: int = 0, adjust: bool = False) -> tp.Array1d:
     """Return exponential weighted average.
 
-    Numba equivalent to `pd.Series(a).ewm(span=span, min_periods=minp, adjust=adjust).mean()`.
+    Numba equivalent to `pd.Series(arr).ewm(span=span, min_periods=minp, adjust=adjust).mean()`.
 
     Adaptation of `pd._libs.window.aggregations.window_aggregations.ewma` with default arguments."""
     if minp is None:
@@ -1128,10 +1173,10 @@ def ewm_mean_nb(arr: tp.Array2d, span: int, minp: int = 0, adjust: bool = False)
 
 
 @register_jitted(cache=True)
-def ewm_std_1d_nb(arr: tp.Array1d, span: int, minp: int = 0, adjust: bool = False, ddof: int = 0) -> tp.Array1d:
+def ewm_std_1d_nb(arr: tp.Array1d, span: int, minp: int = 0, adjust: bool = False) -> tp.Array1d:
     """Return exponential weighted standard deviation.
 
-    Numba equivalent to `pd.Series(a).ewm(span=span, min_periods=minp).std(ddof=ddof)`.
+    Numba equivalent to `pd.Series(arr).ewm(span=span, min_periods=minp).std()`.
 
     Adaptation of `pd._libs.window.aggregations.window_aggregations.ewmcov` with default arguments."""
     if minp is None:
@@ -1220,11 +1265,92 @@ def ewm_std_1d_nb(arr: tp.Array1d, span: int, minp: int = 0, adjust: bool = Fals
     merge_func=base_ch.column_stack
 )
 @register_jitted(cache=True, tags={'can_parallel'})
-def ewm_std_nb(arr: tp.Array2d, span: int, minp: int = 0, adjust: bool = False, ddof: int = 0) -> tp.Array2d:
+def ewm_std_nb(arr: tp.Array2d, span: int, minp: int = 0, adjust: bool = False) -> tp.Array2d:
     """2-dim version of `ewm_std_1d_nb`."""
     out = np.empty_like(arr, dtype=np.float_)
     for col in prange(arr.shape[1]):
-        out[:, col] = ewm_std_1d_nb(arr[:, col], span, minp=minp, adjust=adjust, ddof=ddof)
+        out[:, col] = ewm_std_1d_nb(arr[:, col], span, minp=minp, adjust=adjust)
+    return out
+
+
+@register_jitted(cache=True)
+def rolling_corr_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d,
+                       window: int, minp: tp.Optional[int] = None) -> tp.Array1d:
+    """Return rolling Pearson correlation coefficient.
+
+    Numba equivalent to `pd.Series(arr1).rolling(window, min_periods=minp).corr(arr2)`."""
+    if minp is None:
+        minp = window
+    if minp > window:
+        raise ValueError("minp must be <= window")
+    out = np.empty_like(arr1, dtype=np.float_)
+    cumsum1_arr = np.empty_like(arr1)
+    cumsum2_arr = np.empty_like(arr2)
+    cumsum1 = 0
+    cumsum2 = 0
+    cumsum_sq1_arr = np.empty_like(arr1)
+    cumsum_sq2_arr = np.empty_like(arr2)
+    cumsum_sq1 = 0
+    cumsum_sq2 = 0
+    cumsum_prod_arr = np.empty_like(arr1)
+    cumsum_prod = 0
+    nancnt_arr = np.empty_like(arr1)
+    nancnt = 0
+    for i in range(arr1.shape[0]):
+        if np.isnan(arr1[i]) or np.isnan(arr2[i]):
+            nancnt = nancnt + 1
+        else:
+            cumsum1 = cumsum1 + arr1[i]
+            cumsum2 = cumsum2 + arr2[i]
+            cumsum_sq1 = cumsum_sq1 + arr1[i] ** 2
+            cumsum_sq2 = cumsum_sq2 + arr2[i] ** 2
+            cumsum_prod = cumsum_prod + arr1[i] * arr2[i]
+        nancnt_arr[i] = nancnt
+        cumsum1_arr[i] = cumsum1
+        cumsum2_arr[i] = cumsum2
+        cumsum_sq1_arr[i] = cumsum_sq1
+        cumsum_sq2_arr[i] = cumsum_sq2
+        cumsum_prod_arr[i] = cumsum_prod
+        if i < window:
+            window_len = i + 1 - nancnt
+            window_cumsum1 = cumsum1
+            window_cumsum2 = cumsum2
+            window_cumsum_sq1 = cumsum_sq1
+            window_cumsum_sq2 = cumsum_sq2
+            window_cumsum_prod = cumsum_prod
+        else:
+            window_len = window - (nancnt - nancnt_arr[i - window])
+            window_cumsum1 = cumsum1 - cumsum1_arr[i - window]
+            window_cumsum2 = cumsum2 - cumsum2_arr[i - window]
+            window_cumsum_sq1 = cumsum_sq1 - cumsum_sq1_arr[i - window]
+            window_cumsum_sq2 = cumsum_sq2 - cumsum_sq2_arr[i - window]
+            window_cumsum_prod = cumsum_prod - cumsum_prod_arr[i - window]
+        if window_len < minp:
+            out[i] = np.nan
+        else:
+            nom = window_len * window_cumsum_prod - window_cumsum1 * window_cumsum2
+            denom1 = np.sqrt(window_len * window_cumsum_sq1 - window_cumsum1 ** 2)
+            denom2 = np.sqrt(window_len * window_cumsum_sq2 - window_cumsum2 ** 2)
+            out[i] = nom / (denom1 * denom2)
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='arr1', axis=1),
+    arg_take_spec=dict(
+        arr1=ch.ArraySlicer(axis=1),
+        arr2=ch.ArraySlicer(axis=1),
+        window=None,
+        minp=None
+    ),
+    merge_func=base_ch.column_stack
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def rolling_corr_nb(arr1: tp.Array2d, arr2: tp.Array2d, window: int, minp: int = 0) -> tp.Array2d:
+    """2-dim version of `rolling_corr_1d_nb`."""
+    out = np.empty_like(arr1, dtype=np.float_)
+    for col in prange(arr1.shape[1]):
+        out[:, col] = rolling_corr_1d_nb(arr1[:, col], arr2[:, col], window, minp=minp)
     return out
 
 
@@ -1235,7 +1361,7 @@ def ewm_std_nb(arr: tp.Array2d, span: int, minp: int = 0, adjust: bool = False, 
 def expanding_min_1d_nb(arr: tp.Array1d, minp: int = 1) -> tp.Array1d:
     """Return expanding min.
 
-    Numba equivalent to `pd.Series(a).expanding(min_periods=minp).min()`."""
+    Numba equivalent to `pd.Series(arr).expanding(min_periods=minp).min()`."""
     out = np.empty_like(arr, dtype=np.float_)
     minv = arr[0]
     cnt = 0
@@ -1272,7 +1398,7 @@ def expanding_min_nb(arr: tp.Array2d, minp: int = 1) -> tp.Array2d:
 def expanding_max_1d_nb(arr: tp.Array1d, minp: int = 1) -> tp.Array1d:
     """Return expanding max.
 
-    Numba equivalent to `pd.Series(a).expanding(min_periods=minp).max()`."""
+    Numba equivalent to `pd.Series(arr).expanding(min_periods=minp).max()`."""
     out = np.empty_like(arr, dtype=np.float_)
     maxv = arr[0]
     cnt = 0
@@ -1302,57 +1428,6 @@ def expanding_max_nb(arr: tp.Array2d, minp: int = 1) -> tp.Array2d:
     out = np.empty_like(arr, dtype=np.float_)
     for col in prange(arr.shape[1]):
         out[:, col] = expanding_max_1d_nb(arr[:, col], minp=minp)
-    return out
-
-
-@register_jitted(cache=True)
-def expanding_mean_1d_nb(arr: tp.Array1d, minp: int = 1) -> tp.Array1d:
-    """Return expanding mean.
-
-    Numba equivalent to `pd.Series(a).expanding(min_periods=minp).mean()`."""
-    return rolling_mean_1d_nb(arr, arr.shape[0], minp=minp)
-
-
-@register_chunkable(
-    size=ch.ArraySizer(arg_query='arr', axis=1),
-    arg_take_spec=dict(
-        arr=ch.ArraySlicer(axis=1),
-        minp=None
-    ),
-    merge_func=base_ch.column_stack
-)
-@register_jitted(cache=True, tags={'can_parallel'})
-def expanding_mean_nb(arr: tp.Array2d, minp: int = 1) -> tp.Array2d:
-    """2-dim version of `expanding_mean_1d_nb`."""
-    out = np.empty_like(arr, dtype=np.float_)
-    for col in prange(arr.shape[1]):
-        out[:, col] = expanding_mean_1d_nb(arr[:, col], minp=minp)
-    return out
-
-
-@register_jitted(cache=True)
-def expanding_std_1d_nb(arr: tp.Array1d, minp: int = 1, ddof: int = 0) -> tp.Array1d:
-    """Return expanding standard deviation.
-
-    Numba equivalent to `pd.Series(a).expanding(min_periods=minp).std(ddof=ddof)`."""
-    return rolling_std_1d_nb(arr, arr.shape[0], minp=minp, ddof=ddof)
-
-
-@register_chunkable(
-    size=ch.ArraySizer(arg_query='arr', axis=1),
-    arg_take_spec=dict(
-        arr=ch.ArraySlicer(axis=1),
-        minp=None,
-        ddof=None
-    ),
-    merge_func=base_ch.column_stack
-)
-@register_jitted(cache=True, tags={'can_parallel'})
-def expanding_std_nb(arr: tp.Array2d, minp: int = 1, ddof: int = 0) -> tp.Array2d:
-    """2-dim version of `expanding_std_1d_nb`."""
-    out = np.empty_like(arr, dtype=np.float_)
-    for col in prange(arr.shape[1]):
-        out[:, col] = expanding_std_1d_nb(arr[:, col], minp=minp, ddof=ddof)
     return out
 
 
@@ -2238,7 +2313,7 @@ def argmax_reduce_nb(arr: tp.Array1d) -> int:
 def describe_reduce_nb(arr: tp.Array1d, perc: tp.Array1d, ddof: int) -> tp.Array1d:
     """Return descriptive statistics (ignores NaNs).
 
-    Numba equivalent to `pd.Series(a).describe(perc)`."""
+    Numba equivalent to `pd.Series(arr).describe(perc)`."""
     arr = arr[~np.isnan(arr)]
     out = np.empty(5 + len(perc), dtype=np.float_)
     out[0] = len(arr)

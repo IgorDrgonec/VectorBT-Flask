@@ -1626,6 +1626,7 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.base.indexing import select_from_1d_array, select_from_2d_array
 from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, broadcast, broadcast_to, to_pd_array
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.generic import nb as generic_nb
@@ -2311,16 +2312,16 @@ class Portfolio(Analyzable):
         is_grouped = self.wrapper.grouper.is_grouped()
 
         def _index_1d_by_group(obj: tp.ArrayLike) -> tp.ArrayLike:
-            return to_1d_array(obj)[group_idxs]
+            return select_from_1d_array(obj, idxs=group_idxs)
 
         def _index_1d_by_col(obj: tp.ArrayLike) -> tp.ArrayLike:
-            return to_1d_array(obj)[col_idxs]
+            return select_from_1d_array(obj, idxs=col_idxs)
 
         def _index_2d_by_group(obj: tp.ArrayLike) -> tp.ArrayLike:
-            return to_2d_array(obj)[:, group_idxs]
+            return select_from_2d_array(obj, col_idxs=group_idxs)
 
         def _index_2d_by_col(obj: tp.ArrayLike) -> tp.ArrayLike:
-            return to_2d_array(obj)[:, col_idxs]
+            return select_from_2d_array(obj, col_idxs=col_idxs)
 
         def _index_records(obj: tp.RecordArray) -> tp.RecordArray:
             func = jit_reg.resolve_option(records_nb.col_map_nb, None)

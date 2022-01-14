@@ -293,10 +293,8 @@ nb_config = ReadonlyConfig(
         'cumprod': dict(func=nb.nancumprod_nb),
         'rolling_min': dict(func=nb.rolling_min_nb),
         'rolling_max': dict(func=nb.rolling_max_nb),
-        'rolling_mean': dict(func=nb.rolling_mean_nb),
         'expanding_min': dict(func=nb.expanding_min_nb),
         'expanding_max': dict(func=nb.expanding_max_nb),
-        'expanding_mean': dict(func=nb.expanding_mean_nb),
         'product': dict(func=nb.nanprod_nb, is_reducing=True)
     }
 )
@@ -386,6 +384,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
         """Accessor class for `pd.DataFrame`."""
         return GenericDFAccessor
 
+    # ############# Mapping ############# #
+
     @property
     def mapping(self) -> tp.Optional[tp.Mapping]:
         """Mapping."""
@@ -395,30 +395,44 @@ class GenericAccessor(BaseAccessor, Analyzable):
         """See `vectorbtpro.utils.mapping.apply_mapping`."""
         return apply_mapping(self.obj, self.mapping, **kwargs)
 
+    # ############# Rolling ############# #
+
+    def rolling_mean(self,
+                     window: tp.Optional[int],
+                     minp: tp.Optional[int] = None,
+                     jitted: tp.JittedOption = None,
+                     chunked: tp.ChunkedOption = None,
+                     wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """See `vectorbtpro.generic.nb.rolling_mean_nb`."""
+        if window is None:
+            window = self.wrapper.shape[0]
+        func = jit_reg.resolve_option(nb.rolling_mean_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        out = func(self.to_2d_array(), window, minp=minp)
+        return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
+
+    def expanding_mean(self, minp: tp.Optional[int] = 1, **kwargs) -> tp.SeriesFrame:
+        """Expanding version of `GenericAccessor.rolling_mean`."""
+        return self.rolling_mean(None, minp=minp, **kwargs)
+
     def rolling_std(self,
-                    window: int,
+                    window: tp.Optional[int],
                     minp: tp.Optional[int] = None,
                     ddof: int = 1,
                     jitted: tp.JittedOption = None,
                     chunked: tp.ChunkedOption = None,
-                    wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:  # pragma: no cover
+                    wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """See `vectorbtpro.generic.nb.rolling_std_nb`."""
+        if window is None:
+            window = self.wrapper.shape[0]
         func = jit_reg.resolve_option(nb.rolling_std_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         out = func(self.to_2d_array(), window, minp=minp, ddof=ddof)
         return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
-    def expanding_std(self,
-                      minp: tp.Optional[int] = 1,
-                      ddof: int = 1,
-                      jitted: tp.JittedOption = None,
-                      chunked: tp.ChunkedOption = None,
-                      wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:  # pragma: no cover
-        """See `vectorbtpro.generic.nb.expanding_std_nb`."""
-        func = jit_reg.resolve_option(nb.expanding_std_nb, jitted)
-        func = ch_reg.resolve_option(func, chunked)
-        out = func(self.to_2d_array(), minp=minp, ddof=ddof)
-        return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
+    def expanding_std(self, minp: tp.Optional[int] = 1, **kwargs) -> tp.SeriesFrame:
+        """Expanding version of `GenericAccessor.rolling_std`."""
+        return self.rolling_std(None, minp=minp, **kwargs)
 
     def ewm_mean(self,
                  span: int,
@@ -426,7 +440,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                  adjust: bool = True,
                  jitted: tp.JittedOption = None,
                  chunked: tp.ChunkedOption = None,
-                 wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:  # pragma: no cover
+                 wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """See `vectorbtpro.generic.nb.ewm_mean_nb`."""
         func = jit_reg.resolve_option(nb.ewm_mean_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -437,15 +451,42 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 span: int,
                 minp: tp.Optional[int] = 0,
                 adjust: bool = True,
-                ddof: int = 1,
                 jitted: tp.JittedOption = None,
                 chunked: tp.ChunkedOption = None,
-                wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:  # pragma: no cover
+                wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """See `vectorbtpro.generic.nb.ewm_std_nb`."""
         func = jit_reg.resolve_option(nb.ewm_std_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        out = func(self.to_2d_array(), span, minp=minp, adjust=adjust, ddof=ddof)
+        out = func(self.to_2d_array(), span, minp=minp, adjust=adjust)
         return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
+
+    def rolling_corr(self,
+                     other: tp.SeriesFrame,
+                     window: tp.Optional[int],
+                     minp: tp.Optional[int] = None,
+                     broadcast_kwargs: tp.KwargsLike = None,
+                     jitted: tp.JittedOption = None,
+                     chunked: tp.ChunkedOption = None,
+                     wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """See `vectorbtpro.generic.nb.rolling_corr_nb`."""
+        self_obj, other_obj = reshaping.broadcast(self.obj, other, **resolve_dict(broadcast_kwargs))
+        if window is None:
+            window = self_obj.shape[0]
+        func = jit_reg.resolve_option(nb.rolling_corr_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        out = func(
+            reshaping.to_2d_array(self_obj),
+            reshaping.to_2d_array(other_obj),
+            window,
+            minp=minp
+        )
+        return ArrayWrapper.from_obj(self_obj).wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
+
+    def expanding_corr(self, other: tp.SeriesFrame, minp: tp.Optional[int] = 1, **kwargs) -> tp.SeriesFrame:
+        """Expanding version of `GenericAccessor.rolling_corr`."""
+        return self.rolling_corr(other, None, minp=minp, **kwargs)
+
+    # ############# Taking UDFs ############# #
 
     @class_or_instancemethod
     def map(cls_or_self,
@@ -1571,6 +1612,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
             new_index = indexes.tile_index(self.wrapper.index, np.max(group_lens))
         wrap_kwargs = merge_dicts(dict(index=new_index), wrap_kwargs)
         return self.wrapper.wrap(out, group_by=group_by, **wrap_kwargs)
+
+    # ############# Describing ############# #
 
     def min(self,
             use_jitted: tp.Optional[bool] = None,
