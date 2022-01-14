@@ -2,6 +2,7 @@
 
 """Utilities for working with class/instance attributes."""
 
+import re
 import inspect
 from collections.abc import Iterable
 
@@ -67,6 +68,25 @@ def deep_getattr(obj: tp.Any,
             return deep_getattr(
                 obj,
                 attr_chain.split('.'),
+                getattr_func=getattr_func,
+                call_last_attr=call_last_attr
+            )
+        outer = re.compile(r"(\w+)\((.*)\)")
+        match = outer.match(attr_chain)
+        if isinstance(attr_chain, str) and match:
+            args = ()
+            kwargs = dict()
+            for arg in match.group(2).split(','):
+                arg = arg.strip()
+                if len(arg) == 0:
+                    continue
+                if '=' in arg:
+                    kwargs[arg.split('=')[0]] = eval(arg.split('=')[1])
+                else:
+                    args += (eval(arg),)
+            return deep_getattr(
+                obj,
+                (match.group(1), args, kwargs),
                 getattr_func=getattr_func,
                 call_last_attr=call_last_attr
             )

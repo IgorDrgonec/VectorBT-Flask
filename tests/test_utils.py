@@ -1066,7 +1066,9 @@ class TestAttr:
         assert attr_.deep_getattr(C(), 'c') == 0
         assert attr_.deep_getattr(C(), ['c']) == 0
         assert attr_.deep_getattr(C(), ['b', ('b', (1,))]) == 1
+        assert attr_.deep_getattr(C(), 'b.b(1)') == 1
         assert attr_.deep_getattr(C(), ['b', ('a',), ('a', (1,), {'y': 1})]) == 2
+        assert attr_.deep_getattr(C(), 'b.a().a(1, y=1)') == 2
         assert attr_.deep_getattr(C(), 'b.b_prop') == 1
         assert callable(attr_.deep_getattr(C(), 'b.a.a', call_last_attr=False))
 
