@@ -1702,6 +1702,27 @@ class TestAccessors:
             test_func(bool_ts).rename(test_name)
         )
 
+    def test_corr(self):
+        df2 = df[['b', 'c', 'a']].rename(columns={'b': 'a', 'c': 'b', 'a': 'c'})
+        assert df['a'].vbt.corr(df2['a']) == df['a'].corr(df2['a'])
+        pd.testing.assert_series_equal(
+            df.vbt.corr(df2),
+            df.corrwith(df2).rename('corr')
+        )
+        pd.testing.assert_series_equal(
+            df.vbt.corr(df2, chunked=True),
+            df.vbt.corr(df2, chunked=False)
+        )
+        flatten1 = pd.Series(df[['a', 'b']].values.flatten())
+        flatten2 = pd.Series(df2[['a', 'b']].values.flatten())
+        pd.testing.assert_series_equal(
+            df.vbt.corr(df2, group_by=group_by),
+            pd.Series([
+                flatten1.vbt.corr(flatten2),
+                df['c'].vbt.corr(df2['c'])
+            ], index=['g1', 'g2']).rename('corr')
+        )
+
     @pytest.mark.parametrize(
         "test_name,test_func",
         [

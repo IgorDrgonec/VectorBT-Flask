@@ -1852,6 +1852,34 @@ class GenericAccessor(BaseAccessor, Analyzable):
         func = ch_reg.resolve_option(nb.nancnt_nb, chunked, target_func=func)
         return self.wrapper.wrap_reduced(func(arr), group_by=False, **wrap_kwargs)
 
+    def corr(self,
+             other: tp.SeriesFrame,
+             broadcast_kwargs: tp.KwargsLike = None,
+             jitted: tp.JittedOption = None,
+             chunked: tp.ChunkedOption = None,
+             group_by: tp.GroupByLike = None,
+             wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+        """Return correlation coefficient of non-NaN elements."""
+        self_obj, other_obj = reshaping.broadcast(self.obj, other, **resolve_dict(broadcast_kwargs))
+        self_arr = reshaping.to_2d_array(self_obj)
+        other_arr = reshaping.to_2d_array(other_obj)
+        wrap_kwargs = merge_dicts(dict(name_or_index='corr'), wrap_kwargs)
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            return type(self).reduce(
+                jit_reg.resolve_option(nb.corr_reduce_grouped_meta_nb, jitted),
+                self_arr, other_arr,
+                flatten=True,
+                jitted=jitted,
+                chunked=chunked,
+                wrapper=ArrayWrapper.from_obj(self_obj),
+                group_by=self.wrapper.grouper.resolve_group_by(group_by=group_by),
+                wrap_kwargs=wrap_kwargs
+            )
+
+        func = jit_reg.resolve_option(nb.nancorr_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        return self.wrapper.wrap_reduced(func(self_arr, other_arr), group_by=False, **wrap_kwargs)
+
     def idxmin(self,
                order: str = 'C',
                jitted: tp.JittedOption = None,

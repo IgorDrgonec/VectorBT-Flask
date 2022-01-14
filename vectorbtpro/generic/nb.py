@@ -860,7 +860,7 @@ def nanstd_nb(arr: tp.Array2d, ddof: int = 0) -> tp.Array1d:
 
 
 @register_jitted(cache=True)
-def corr_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d) -> float:
+def nancorr_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d) -> float:
     """Numba-equivalent of `np.corrcoef` that ignores NaN values.
 
     Numerically stable."""
@@ -896,11 +896,11 @@ def corr_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d) -> float:
     merge_func=base_ch.concat
 )
 @register_jitted(cache=True, tags={'can_parallel'})
-def corr_nb(arr1: tp.Array2d, arr2: tp.Array2d) -> tp.Array1d:
-    """2-dim version of `corr_1d_nb`."""
+def nancorr_nb(arr1: tp.Array2d, arr2: tp.Array2d) -> tp.Array1d:
+    """2-dim version of `nancorr_1d_nb`."""
     out = np.empty(arr1.shape[1], dtype=np.float_)
     for col in prange(arr1.shape[1]):
-        out[col] = corr_1d_nb(arr1[:, col], arr2[:, col])
+        out[col] = nancorr_1d_nb(arr1[:, col], arr2[:, col])
     return out
 
 
@@ -1276,7 +1276,7 @@ def ewm_std_nb(arr: tp.Array2d, span: int, minp: int = 0, adjust: bool = False) 
 @register_jitted(cache=True)
 def rolling_corr_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d,
                        window: int, minp: tp.Optional[int] = None) -> tp.Array1d:
-    """Return rolling Pearson correlation coefficient.
+    """Return rolling correlation coefficient.
 
     Numba equivalent to `pd.Series(arr1).rolling(window, min_periods=minp).corr(arr2)`."""
     if minp is None:
@@ -2326,6 +2326,13 @@ def describe_reduce_nb(arr: tp.Array1d, perc: tp.Array1d, ddof: int) -> tp.Array
     else:
         out[1:] = np.nan
     return out
+
+
+@register_jitted(cache=True)
+def corr_reduce_grouped_meta_nb(from_col: int, to_col: int, group: int,
+                                arr1: tp.Array2d, arr2: tp.Array2d) -> float:
+    """Return correlation coefficient (ignores NaNs)."""
+    return nancorr_1d_nb(arr1[:, from_col:to_col].flatten(), arr2[:, from_col:to_col].flatten())
 
 
 # ############# Value counts ############# #
