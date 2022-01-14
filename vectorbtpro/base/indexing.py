@@ -307,30 +307,6 @@ def build_param_indexer(param_names: tp.Sequence[str], class_name: str = 'ParamI
     return ParamIndexer
 
 
-def select_from_1d_array(a: tp.Array, idxs: tp.Optional[tp.ArrayLike] = None) -> tp.ArrayLike:
-    """Select rows from a 1-dim array."""
-    from vectorbtpro.base.reshaping import to_1d_array
-
-    a = to_1d_array(a)
-    if idxs is not None:
-        a = a[idxs]
-    return a
-
-
-def select_from_2d_array(a: tp.Array,
-                         row_idxs: tp.Optional[tp.ArrayLike] = None,
-                         col_idxs: tp.Optional[tp.ArrayLike] = None) -> tp.ArrayLike:
-    """Select rows and column from a 2-dim array."""
-    from vectorbtpro.base.reshaping import to_2d_array
-
-    a = to_2d_array(a)
-    if row_idxs is not None:
-        a = a[row_idxs, :]
-    if col_idxs is not None:
-        a = a[:, col_idxs]
-    return a
-
-
 @register_jitted(cache=True)
 def flex_choose_i_and_col_nb(a: tp.Array, flex_2d: bool = True) -> tp.Tuple[int, int]:
     """Choose selection index and column based on the array's shape.
