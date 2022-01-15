@@ -13,7 +13,7 @@ import pandas as pd
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.wrapping import Wrapping
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.attr_ import get_dict_attr, AttrResolver
+from vectorbtpro.utils.attr_ import get_dict_attr, AttrResolverMixin
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.tagging import match_tags
@@ -147,10 +147,10 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                     If argument to be passed was not found, `pass_{arg}` is removed.
                 * `resolve_path_{arg}`: Whether to resolve an argument that is meant to be an attribute of
                     this object and is the first part of the path of `calc_func`. Passes only optional arguments.
-                    Defaults to True. See `vectorbtpro.utils.attr_.AttrResolver.resolve_attr`.
+                    Defaults to True. See `vectorbtpro.utils.attr_.AttrResolverMixin.resolve_attr`.
                 * `resolve_{arg}`: Whether to resolve an argument that is meant to be an attribute of
                     this object and is present in the function's signature. Defaults to False.
-                    See `vectorbtpro.utils.attr_.AttrResolver.resolve_attr`.
+                    See `vectorbtpro.utils.attr_.AttrResolverMixin.resolve_attr`.
                 * `use_shortcuts_{arg}`: Whether to use shortcut properties whenever possible when resolving
                     an argument. Defaults to True.
                 * `template_mapping`: Mapping to replace templates in metric settings. Used across all settings.
@@ -159,7 +159,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                 If `resolve_calc_func` is True, the calculation function may "request" any of the
                 following arguments by accepting them or if `pass_{arg}` was found in the settings dict:
 
-                * Each of `vectorbtpro.utils.attr_.AttrResolver.self_aliases`: original object
+                * Each of `vectorbtpro.utils.attr_.AttrResolverMixin.self_aliases`: original object
                     (ungrouped, with no column selected)
                 * `group_by`: won't be passed if it was used in resolving the first attribute of `calc_func`
                     specified as a path, use `pass_group_by=True` to pass anyway
@@ -170,7 +170,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                 * `to_timedelta`: replaced by True if None and frequency is set
                 * Any argument from `settings`
                 * Any attribute of this object if it meant to be resolved
-                    (see `vectorbtpro.utils.attr_.AttrResolver.resolve_attr`)
+                    (see `vectorbtpro.utils.attr_.AttrResolverMixin.resolve_attr`)
 
                 Pass `metrics='all'` to calculate all supported metrics.
             tags (str or iterable): Tags to select.
@@ -493,7 +493,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                                         passed_kwargs_out=passed_kwargs_out,
                                         use_shortcuts=_use_shortcuts
                                     )
-                                if isinstance(obj, AttrResolver):
+                                if isinstance(obj, AttrResolverMixin):
                                     cls_dir = obj.cls_dir
                                 else:
                                     cls_dir = dir(type(obj))

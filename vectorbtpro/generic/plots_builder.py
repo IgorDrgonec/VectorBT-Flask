@@ -10,7 +10,7 @@ from collections import Counter
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.wrapping import Wrapping
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.attr_ import get_dict_attr, AttrResolver
+from vectorbtpro.utils.attr_ import get_dict_attr, AttrResolverMixin
 from vectorbtpro.utils.config import Config, merge_dicts
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.tagging import match_tags
@@ -114,7 +114,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                 If `resolve_plot_func` is True, the plotting function may "request" any of the
                 following arguments by accepting them or if `pass_{arg}` was found in the settings dict:
 
-                * Each of `vectorbtpro.utils.attr_.AttrResolver.self_aliases`: original object
+                * Each of `vectorbtpro.utils.attr_.AttrResolverMixin.self_aliases`: original object
                     (ungrouped, with no column selected)
                 * `group_by`: won't be passed if it was used in resolving the first attribute of `plot_func`
                     specified as a path, use `pass_group_by=True` to pass anyway
@@ -132,7 +132,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                 * `silence_warnings`
                 * Any argument from `settings`
                 * Any attribute of this object if it meant to be resolved
-                    (see `vectorbtpro.utils.attr_.AttrResolver.resolve_attr`)
+                    (see `vectorbtpro.utils.attr_.AttrResolverMixin.resolve_attr`)
 
                 !!! note
                     Layout-related resolution arguments such as `add_trace_kwargs` are unavailable
@@ -569,7 +569,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                                                 use_shortcuts=_use_shortcuts
                                             )
                                         else:
-                                            if isinstance(obj, AttrResolver):
+                                            if isinstance(obj, AttrResolverMixin):
                                                 cls_dir = obj.cls_dir
                                             else:
                                                 cls_dir = dir(type(obj))

@@ -13,7 +13,7 @@ from vectorbtpro.base.grouping import Grouper
 from vectorbtpro.base.indexing import IndexingError, PandasIndexer
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.array_ import get_ranges_arr
-from vectorbtpro.utils.attr_ import AttrResolver, AttrResolverT
+from vectorbtpro.utils.attr_ import AttrResolverMixin, AttrResolverMixinT
 from vectorbtpro.utils.config import Configured
 from vectorbtpro.utils.datetime_ import freq_to_timedelta, DatetimeIndexes
 from vectorbtpro.utils.parsing import get_func_arg_names
@@ -650,7 +650,7 @@ class ArrayWrapper(Configured, PandasIndexer):
 WrappingT = tp.TypeVar("WrappingT", bound="Wrapping")
 
 
-class Wrapping(Configured, PandasIndexer, AttrResolver):
+class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
     """Class that uses `ArrayWrapper` globally."""
 
     def __init__(self, wrapper: ArrayWrapper, **kwargs) -> None:
@@ -659,7 +659,7 @@ class Wrapping(Configured, PandasIndexer, AttrResolver):
 
         Configured.__init__(self, wrapper=wrapper, **kwargs)
         PandasIndexer.__init__(self)
-        AttrResolver.__init__(self)
+        AttrResolverMixin.__init__(self)
 
     def indexing_func(self: WrappingT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> WrappingT:
         """Perform indexing on `Wrapping`."""
@@ -703,11 +703,11 @@ class Wrapping(Configured, PandasIndexer, AttrResolver):
             return self.replace(wrapper=self.wrapper.regroup(group_by, **kwargs))
         return self  # important for keeping cache
 
-    def resolve_self(self: AttrResolverT,
+    def resolve_self(self: AttrResolverMixinT,
                      cond_kwargs: tp.KwargsLike = None,
                      custom_arg_names: tp.ClassVar[tp.Optional[tp.Set[str]]] = None,
                      impacts_caching: bool = True,
-                     silence_warnings: tp.Optional[bool] = None) -> AttrResolverT:
+                     silence_warnings: tp.Optional[bool] = None) -> AttrResolverMixinT:
         """Resolve self.
 
         Creates a copy of this instance if a different `freq` can be found in `cond_kwargs`."""

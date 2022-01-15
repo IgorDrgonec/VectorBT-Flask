@@ -123,10 +123,10 @@ def deep_getattr(obj: tp.Any,
     return result
 
 
-AttrResolverT = tp.TypeVar("AttrResolverT", bound="AttrResolver")
+AttrResolverMixinT = tp.TypeVar("AttrResolverMixinT", bound="AttrResolverMixin")
 
 
-class AttrResolver:
+class AttrResolverMixin:
     """Class that implements resolution of self and its attributes.
 
     Resolution is `getattr` that works for self, properties, and methods. It also utilizes built-in caching."""
@@ -136,11 +136,11 @@ class AttrResolver:
         """Names to associate with this object."""
         return {'self'}
 
-    def resolve_self(self: AttrResolverT,
+    def resolve_self(self: AttrResolverMixinT,
                      cond_kwargs: tp.KwargsLike = None,
                      custom_arg_names: tp.ClassVar[tp.Optional[tp.Set[str]]] = None,
                      impacts_caching: bool = True,
-                     silence_warnings: bool = False) -> AttrResolverT:
+                     silence_warnings: bool = False) -> AttrResolverMixinT:
         """Resolve self.
 
         !!! note
@@ -190,7 +190,7 @@ class AttrResolver:
         * If there is a `get_{arg}` method, uses `get_{arg}` as `attr`.
         * If `attr` is a property, returns its value.
         * If `attr` is a method, passes `*args`, `**kwargs`, and `**cond_kwargs` with keys found in the signature.
-        * If `use_shortcuts` is True, resolves the potential shortcuts using `AttrResolver.resolve_shortcut_attr`.
+        * If `use_shortcuts` is True, resolves the potential shortcuts using `AttrResolverMixin.resolve_shortcut_attr`.
 
         Won't cache if `use_caching` is False or any passed argument is in `custom_arg_names`.
 
