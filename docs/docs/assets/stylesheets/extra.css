@@ -25,6 +25,7 @@
     background-color: rgba(64, 81, 181, 0.3);
 }
 
+/* API */
 .dobjtype {
     display: inline-block;
     margin-left: 0.5rem;
@@ -55,6 +56,7 @@
     }
 }
 
+/* Animated heart */
 @keyframes heart {
     0%, 40%, 80%, 100% {
         transform: scale(1);
@@ -67,6 +69,7 @@
     animation: heart 1000ms infinite;
 }
 
+/* Getting started */
 .feature-row:after {
     content: "";
     display: table;
@@ -89,6 +92,14 @@
 .feature-column .icon {
     font-size: 1.5rem;
     display: block;
+}
+
+/* Version */
+.md-version {
+    font-family: 'Roboto Mono', monospace;
+    color: var(--md-default-fg-color--light);
+    display: inline-block;
+    margin-left: .2rem;
 }
 
 /* Progress Bars */

@@ -136,6 +136,7 @@ nav:
     - generic:
       - api/generic/index.md
       - accessors: api/generic/accessors.md
+      - analyzable: api/generic/analyzable.md
       - decorators: api/generic/decorators.md
       - drawdowns: api/generic/drawdowns.md
       - enums: api/generic/enums.md

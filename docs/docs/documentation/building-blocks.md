@@ -22,6 +22,8 @@ flowchart TD;
     AttrResolverMixin;
 ```
 
+(If the diagram doesn't show up, reload the page)
+
 vectorbt deploys a modular project structure that is composed of a range of subpackages.
 Each subpackage is applicable to a certain area of analysis. 
 

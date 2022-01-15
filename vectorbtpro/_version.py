@@ -1,3 +1,3 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-__version__ = "1.0.6"
+__version__ = "1.0.7"
