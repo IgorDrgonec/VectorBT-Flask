@@ -11,7 +11,7 @@ It is a high-performance superset of the [vectorbt](https://github.com/polakowo/
 library, one of the world's most innovative open-source backtesting engines. 
 The PRO version extends the standard vectorbt library with new impressive features and useful enhancements.
 
-We bring many [SOTA](https://en.wikipedia.org/wiki/State_of_the_art) tools and libraries
+We bring many [SOTA](https://en.wikipedia.org/wiki/State_of_the_art){target=_blank} tools and libraries
 under one umbrella and automate them. Our vision is to make quantitative analysis and 
 algorithmic trading accessible to everyone. Join us!
 

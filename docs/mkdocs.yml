@@ -38,6 +38,13 @@ theme:
   logo: assets/logo/logo.svg
   favicon: /assets/logo/favicon.png
 
+# Plugins
+plugins:
+  - search
+  - tags
+  - minify:
+      minify_html: true
+
 # Customization
 markdown_extensions:
   - meta
@@ -51,7 +58,11 @@ markdown_extensions:
       permalink: true
   - pymdownx.inlinehilite
   - pymdownx.snippets
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.progressbar
   - pymdownx.magiclink:
       repo_url_shorthand: true
@@ -77,6 +88,13 @@ extra:
       link: https://github.com/polakowo
     - icon: fontawesome/brands/discord
       link: https://discord.gg/63jZZzCwzp
+  consent:
+    title: Cookie consent
+    description: >-
+      We use cookies to recognize your repeated visits and preferences, as well
+      as to measure the effectiveness of our documentation and whether users
+      find what they're searching for. With your consent, you're helping us to
+      make our documentation better.
 extra_javascript:
   - assets/javascripts/extra.js
 extra_css:
@@ -93,6 +111,7 @@ nav:
     - Release notes: getting-started/release-notes.md
   - Documentation:
     - documentation/fundamentals.md
+    - Building blocks: documentation/building-blocks.md
     - To be continued...: documentation/to-be-continued.md
   - API:
     - api/index.md

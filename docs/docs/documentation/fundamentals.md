@@ -409,8 +409,8 @@ looks for a possibility to "stretch" it such that it can match the length of oth
 This approach is heavily inspired by (and internally based upon) [NumPy's broadcasting](https://numpy.org/doc/stable/user/basics.broadcasting.html).
 
 Why should we care about broadcasting? Because it allows us to pass array-like
-objects of any shapes to almost every function in vectorbt, be it constants or full-blown DataFrames,
-and vectorbt will automatically figure out where the respective element belongs to.
+objects of any shape to almost every function in vectorbt, be it constants or full-blown DataFrames,
+and vectorbt will automatically figure out where the respective elements belong to.
 
 ```pycon
 >>> part_arrays = dict(
@@ -522,7 +522,35 @@ slow_window      3      3      4      4
 
 !!! hint
     Appending `.vbt` to a Pandas object on the left will broadcast both operands with 
-    vectorbt and execute with NumPy/Numba - ultimate combo :firecracker:
+    vectorbt and execute the operation with NumPy/Numba - ultimate combo :firecracker:
+
+In contrast to Pandas, vectorbt broadcasts rows and columns by their absolute positions, not labels.
+This broadcasting style is very similar to that of NumPy:
+
+```pycon
+>>> df1 = pd.DataFrame({'a': [0], 'b': [1]})
+>>> df2 = pd.DataFrame({'b': [0], 'a': [1]})
+>>> df1 + df2  # (1)!
+   a  b
+0  1  1
+
+>>> df1.values + df2.values
+array([[0, 2]])
+
+>>> df1.vbt + df2  # (2)!
+   a  b
+   b  a
+0  0  2
+```
+
+1. Pandas connects column `a` in `df1` and `df2`
+2. vectorbt connects the first column in `df1` with the first column in `df2`, regardless of their labels
+
+!!! important
+    If you pass multiple arrays of data to vectorbt, ensure that their columns connect well positionally!
+
+    In case your columns are not properly ordered, you will notice this by the result having
+    multiple column levels with identical labels but different ordering.
 
 Another feature of vectorbt is that it can broadcast objects with incompatible shapes but overlapping
 multi-index levels - those having the same name or values. Continuing with the previous example, 
