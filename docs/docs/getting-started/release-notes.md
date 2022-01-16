@@ -6,6 +6,20 @@ title: Release notes
 
 All notable changes in reverse chronological order.
 
+## Version 1.0.7 (16 January, 2021)
+
+- Changed `np.int_` to `np.integer` when passed to `np.issubdtype`
+- Refactored auto-aligned initial cash to be based on free cash flows and cash deposits
+- Upgraded the string parser of [deep_getattr](/api/utils/attr_/#vectorbtpro.utils.attr_.deep_getattr) 
+to accept strings of chained method calls (more intuitive)
+- Implemented superfast Pearson correlation coefficient and its rolling version
+- Created the class [Analyzable](/api/generic/analyzable/#vectorbtpro.generic.analyzable.Analyzable),
+which combines [Wrapping](/api/base/wrapping/#vectorbtpro.base.wrapping.Wrapping) and builder mixins
+- Metrics and subplots that require a single column won't raise an error if the object
+is two-dimensional and has only one column
+- [Grouper](/api/base/grouping/#vectorbtpro.base.grouping.Grouper) can return a group map,
+which isn't tied to a strict group ordering and is easier to use outside of Numba
+
 ## Version 1.0.6 (9 January, 2021)
 
 - Benchmark can be disabled by passing `bm_close=False` to 
