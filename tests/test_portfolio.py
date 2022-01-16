@@ -7866,19 +7866,19 @@ class TestPortfolio:
             pf.init_cash,
             vbt.Portfolio.get_init_cash(
                 init_cash_raw=pf._init_cash, cash_sharing=pf.cash_sharing,
-                cash_flow=pf.cash_flow, wrapper=pf.wrapper)
+                free_cash_flow=pf.free_cash_flow, wrapper=pf.wrapper)
         )
         pd.testing.assert_series_equal(
             pf_grouped.init_cash,
             vbt.Portfolio.get_init_cash(
                 init_cash_raw=pf_grouped._init_cash, cash_sharing=pf_grouped.cash_sharing,
-                cash_flow=pf_grouped.cash_flow, wrapper=pf_grouped.wrapper)
+                free_cash_flow=pf_grouped.free_cash_flow, wrapper=pf_grouped.wrapper)
         )
         pd.testing.assert_series_equal(
             pf_shared.init_cash,
             vbt.Portfolio.get_init_cash(
                 init_cash_raw=pf_shared._init_cash, cash_sharing=pf_shared.cash_sharing,
-                cash_flow=pf_shared.cash_flow, wrapper=pf_shared.wrapper)
+                free_cash_flow=pf_shared.free_cash_flow, wrapper=pf_shared.wrapper)
         )
         pf2 = vbt.Portfolio.from_orders(
             price_na, 1000., init_cash=InitCashMode.AutoAlign, group_by=group_by, cash_sharing=True)
@@ -7886,7 +7886,7 @@ class TestPortfolio:
             pf2.init_cash,
             type(pf2).get_init_cash(
                 init_cash_raw=pf2._init_cash, cash_sharing=pf2.cash_sharing,
-                cash_flow=pf2.cash_flow, wrapper=pf2.wrapper)
+                free_cash_flow=pf2.free_cash_flow, wrapper=pf2.wrapper)
         )
         pd.testing.assert_series_equal(
             vbt.Portfolio.from_orders(

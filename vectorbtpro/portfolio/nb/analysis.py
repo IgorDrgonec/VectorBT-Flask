@@ -285,24 +285,32 @@ def cash_flow_grouped_nb(cash_flow: tp.Array2d, group_lens: tp.Array1d) -> tp.Ar
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='cash_flow', axis=1),
+    size=ch.ArraySizer(arg_query='free_cash_flow', axis=1),
     arg_take_spec=dict(
         init_cash_raw=None,
-        cash_flow=ch.ArraySlicer(axis=1)
+        free_cash_flow=ch.ArraySlicer(axis=1),
+        cash_deposits=base_ch.FlexArraySlicer(axis=1),
+        flex_2d=None
     ),
     merge_func=base_ch.concat
 )
 @register_jitted(cache=True, tags={'can_parallel'})
-def align_init_cash_nb(init_cash_raw: int, cash_flow: tp.Array2d) -> tp.Array1d:
-    """Align initial cash."""
-    out = np.empty(cash_flow.shape[1], dtype=np.float_)
-    for col in range(cash_flow.shape[1]):
-        cash = 0.
+def align_init_cash_nb(init_cash_raw: int,
+                       free_cash_flow: tp.Array2d,
+                       cash_deposits: tp.FlexArray = np.asarray(0.),
+                       flex_2d: bool = False) -> tp.Array1d:
+    """Align initial cash to the maximum negative free cash flow.
+
+    Adds 1 for easier computing returns."""
+    out = np.empty(free_cash_flow.shape[1], dtype=np.float_)
+    for col in range(free_cash_flow.shape[1]):
+        free_cash = 0.
         min_req_cash = np.inf
-        for i in range(cash_flow.shape[0]):
-            cash += cash_flow[i, col]
-            if cash < min_req_cash:
-                min_req_cash = cash
+        for i in range(free_cash_flow.shape[0]):
+            free_cash = add_nb(free_cash, free_cash_flow[i, col])
+            free_cash = add_nb(free_cash, flex_select_auto_nb(cash_deposits, i, col, flex_2d))
+            if free_cash < min_req_cash:
+                min_req_cash = free_cash
         if min_req_cash < 0:
             out[col] = np.abs(min_req_cash)
         else:

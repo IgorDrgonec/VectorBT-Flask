@@ -1333,7 +1333,7 @@ def rolling_corr_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d,
             denom2 = np.sqrt(window_len * window_cumsum_sq2 - window_cumsum2 ** 2)
             denom = denom1 * denom2
             if denom == 0:
-                out[i] = np.inf
+                out[i] = np.nan
             else:
                 out[i] = nom / denom
     return out

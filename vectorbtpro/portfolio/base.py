@@ -3086,8 +3086,8 @@ class Portfolio(Analyzable):
             broadcasted_args['price_area_vio_mode'], PriceAreaVioMode)
 
         # Check data types
-        checks.assert_subdtype(cs_group_lens, np.int_)
-        checks.assert_subdtype(call_seq, np.int_)
+        checks.assert_subdtype(cs_group_lens, np.integer)
+        checks.assert_subdtype(call_seq, np.integer)
         checks.assert_subdtype(init_cash, np.number)
         checks.assert_subdtype(init_position, np.number)
         checks.assert_subdtype(cash_deposits, np.number)
@@ -3095,8 +3095,8 @@ class Portfolio(Analyzable):
         checks.assert_subdtype(cash_dividends, np.number)
         checks.assert_subdtype(broadcasted_args['size'], np.number)
         checks.assert_subdtype(broadcasted_args['price'], np.number)
-        checks.assert_subdtype(broadcasted_args['size_type'], np.int_)
-        checks.assert_subdtype(broadcasted_args['direction'], np.int_)
+        checks.assert_subdtype(broadcasted_args['size_type'], np.integer)
+        checks.assert_subdtype(broadcasted_args['direction'], np.integer)
         checks.assert_subdtype(broadcasted_args['fees'], np.number)
         checks.assert_subdtype(broadcasted_args['fixed_fees'], np.number)
         checks.assert_subdtype(broadcasted_args['slippage'], np.number)
@@ -3104,7 +3104,7 @@ class Portfolio(Analyzable):
         checks.assert_subdtype(broadcasted_args['max_size'], np.number)
         checks.assert_subdtype(broadcasted_args['size_granularity'], np.number)
         checks.assert_subdtype(broadcasted_args['reject_prob'], np.number)
-        checks.assert_subdtype(broadcasted_args['price_area_vio_mode'], np.int_)
+        checks.assert_subdtype(broadcasted_args['price_area_vio_mode'], np.integer)
         checks.assert_subdtype(broadcasted_args['lock_cash'], np.bool_)
         checks.assert_subdtype(broadcasted_args['allow_partial'], np.bool_)
         checks.assert_subdtype(broadcasted_args['raise_reject'], np.bool_)
@@ -4164,8 +4164,8 @@ class Portfolio(Analyzable):
                 broadcasted_args['direction'], Direction)
 
         # Check data types
-        checks.assert_subdtype(cs_group_lens, np.int_)
-        checks.assert_subdtype(call_seq, np.int_)
+        checks.assert_subdtype(cs_group_lens, np.integer)
+        checks.assert_subdtype(call_seq, np.integer)
         checks.assert_subdtype(init_cash, np.number)
         checks.assert_subdtype(init_position, np.number)
         checks.assert_subdtype(cash_deposits, np.number)
@@ -4173,7 +4173,7 @@ class Portfolio(Analyzable):
         checks.assert_subdtype(cash_dividends, np.number)
         checks.assert_subdtype(broadcasted_args['size'], np.number)
         checks.assert_subdtype(broadcasted_args['price'], np.number)
-        checks.assert_subdtype(broadcasted_args['size_type'], np.int_)
+        checks.assert_subdtype(broadcasted_args['size_type'], np.integer)
         checks.assert_subdtype(broadcasted_args['fees'], np.number)
         checks.assert_subdtype(broadcasted_args['fixed_fees'], np.number)
         checks.assert_subdtype(broadcasted_args['slippage'], np.number)
@@ -4181,16 +4181,16 @@ class Portfolio(Analyzable):
         checks.assert_subdtype(broadcasted_args['max_size'], np.number)
         checks.assert_subdtype(broadcasted_args['size_granularity'], np.number)
         checks.assert_subdtype(broadcasted_args['reject_prob'], np.number)
-        checks.assert_subdtype(broadcasted_args['price_area_vio_mode'], np.int_)
+        checks.assert_subdtype(broadcasted_args['price_area_vio_mode'], np.integer)
         checks.assert_subdtype(broadcasted_args['lock_cash'], np.bool_)
         checks.assert_subdtype(broadcasted_args['allow_partial'], np.bool_)
         checks.assert_subdtype(broadcasted_args['raise_reject'], np.bool_)
         checks.assert_subdtype(broadcasted_args['log'], np.bool_)
-        checks.assert_subdtype(broadcasted_args['accumulate'], (np.int_, np.bool_))
-        checks.assert_subdtype(broadcasted_args['upon_long_conflict'], np.int_)
-        checks.assert_subdtype(broadcasted_args['upon_short_conflict'], np.int_)
-        checks.assert_subdtype(broadcasted_args['upon_dir_conflict'], np.int_)
-        checks.assert_subdtype(broadcasted_args['upon_opposite_entry'], np.int_)
+        checks.assert_subdtype(broadcasted_args['accumulate'], (np.integer, np.bool_))
+        checks.assert_subdtype(broadcasted_args['upon_long_conflict'], np.integer)
+        checks.assert_subdtype(broadcasted_args['upon_short_conflict'], np.integer)
+        checks.assert_subdtype(broadcasted_args['upon_dir_conflict'], np.integer)
+        checks.assert_subdtype(broadcasted_args['upon_opposite_entry'], np.integer)
         checks.assert_subdtype(broadcasted_args['val_price'], np.number)
         checks.assert_subdtype(broadcasted_args['open'], np.number)
         checks.assert_subdtype(broadcasted_args['high'], np.number)
@@ -4199,11 +4199,11 @@ class Portfolio(Analyzable):
         checks.assert_subdtype(broadcasted_args['sl_stop'], np.number)
         checks.assert_subdtype(broadcasted_args['sl_trail'], np.bool_)
         checks.assert_subdtype(broadcasted_args['tp_stop'], np.number)
-        checks.assert_subdtype(broadcasted_args['stop_entry_price'], np.int_)
-        checks.assert_subdtype(broadcasted_args['stop_exit_price'], np.int_)
-        checks.assert_subdtype(broadcasted_args['upon_stop_exit'], np.int_)
-        checks.assert_subdtype(broadcasted_args['upon_stop_update'], np.int_)
-        checks.assert_subdtype(broadcasted_args['signal_priority'], np.int_)
+        checks.assert_subdtype(broadcasted_args['stop_entry_price'], np.integer)
+        checks.assert_subdtype(broadcasted_args['stop_exit_price'], np.integer)
+        checks.assert_subdtype(broadcasted_args['upon_stop_exit'], np.integer)
+        checks.assert_subdtype(broadcasted_args['upon_stop_update'], np.integer)
+        checks.assert_subdtype(broadcasted_args['signal_priority'], np.integer)
         if 'entries' in broadcasted_args:
             checks.assert_subdtype(broadcasted_args['entries'], np.bool_)
         if 'exits' in broadcasted_args:
@@ -4213,7 +4213,7 @@ class Portfolio(Analyzable):
         if 'short_exits' in broadcasted_args:
             checks.assert_subdtype(broadcasted_args['short_exits'], np.bool_)
         if 'direction' in broadcasted_args:
-            checks.assert_subdtype(broadcasted_args['direction'], np.int_)
+            checks.assert_subdtype(broadcasted_args['direction'], np.integer)
         if bm_close is not None and not isinstance(bm_close, bool):
             checks.assert_subdtype(broadcasted_args['bm_close'], np.number)
 
@@ -5230,9 +5230,9 @@ class Portfolio(Analyzable):
                 call_seq = build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
 
         # Check data types
-        checks.assert_subdtype(cs_group_lens, np.int_)
+        checks.assert_subdtype(cs_group_lens, np.integer)
         if call_seq is not None:
-            checks.assert_subdtype(call_seq, np.int_)
+            checks.assert_subdtype(call_seq, np.integer)
         checks.assert_subdtype(init_cash, np.number)
         checks.assert_subdtype(init_position, np.number)
         checks.assert_subdtype(cash_deposits, np.number)
@@ -5705,17 +5705,17 @@ class Portfolio(Analyzable):
 
         def _postprocess_size_type(size_type):
             size_type = map_enum_fields(size_type, SizeType)
-            checks.assert_subdtype(size_type, np.int_)
+            checks.assert_subdtype(size_type, np.integer)
             return size_type
 
         def _postprocess_direction(direction):
             direction = map_enum_fields(direction, Direction)
-            checks.assert_subdtype(direction, np.int_)
+            checks.assert_subdtype(direction, np.integer)
             return direction
 
         def _postprocess_price_area_vio_mode(price_area_vio_mode):
             price_area_vio_mode = map_enum_fields(price_area_vio_mode, PriceAreaVioMode)
-            checks.assert_subdtype(price_area_vio_mode, np.int_)
+            checks.assert_subdtype(price_area_vio_mode, np.integer)
             return price_area_vio_mode
 
         # Prepare arguments and pass to from_order_func
@@ -6236,56 +6236,6 @@ class Portfolio(Analyzable):
     # ############# Cash ############# #
 
     @class_or_instancemethod
-    def get_init_cash(cls_or_self,
-                      group_by: tp.GroupByLike = None,
-                      init_cash_raw: tp.Optional[tp.ArrayLike] = None,
-                      cash_sharing: tp.Optional[bool] = None,
-                      cash_flow: tp.Optional[tp.SeriesFrame] = None,
-                      split_shared: bool = False,
-                      jitted: tp.JittedOption = None,
-                      chunked: tp.ChunkedOption = None,
-                      wrapper: tp.Optional[ArrayWrapper] = None,
-                      wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Get initial amount of cash per column/group."""
-        if not isinstance(cls_or_self, type):
-            if init_cash_raw is None:
-                init_cash_raw = cls_or_self._init_cash
-            if cash_sharing is None:
-                cash_sharing = cls_or_self.cash_sharing
-            if wrapper is None:
-                wrapper = cls_or_self.wrapper
-        else:
-            checks.assert_not_none(init_cash_raw)
-            checks.assert_not_none(cash_sharing)
-            checks.assert_not_none(cash_flow)
-            checks.assert_not_none(wrapper)
-
-        if isinstance(init_cash_raw, int):
-            if not isinstance(cls_or_self, type):
-                if cash_flow is None:
-                    cash_flow = cls_or_self.resolve_shortcut_attr(
-                        'cash_flow',
-                        group_by=group_by,
-                        jitted=jitted,
-                        chunked=chunked
-                    )
-            func = jit_reg.resolve_option(nb.align_init_cash_nb, jitted)
-            func = ch_reg.resolve_option(func, chunked)
-            init_cash = func(init_cash_raw, to_2d_array(cash_flow))
-        else:
-            init_cash_raw = to_1d_array(init_cash_raw)
-            if wrapper.grouper.is_grouped(group_by=group_by):
-                group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
-                func = jit_reg.resolve_option(nb.init_cash_grouped_nb, jitted)
-                init_cash = func(init_cash_raw, group_lens, cash_sharing)
-            else:
-                group_lens = wrapper.grouper.get_group_lens()
-                func = jit_reg.resolve_option(nb.init_cash_nb, jitted)
-                init_cash = func(init_cash_raw, group_lens, cash_sharing, split_shared=split_shared)
-        wrap_kwargs = merge_dicts(dict(name_or_index='init_cash'), wrap_kwargs)
-        return wrapper.wrap_reduced(init_cash, group_by=group_by, **wrap_kwargs)
-
-    @class_or_instancemethod
     def get_cash_deposits(cls_or_self,
                           group_by: tp.GroupByLike = None,
                           cash_deposits_raw: tp.Optional[tp.ArrayLike] = None,
@@ -6432,6 +6382,75 @@ class Portfolio(Analyzable):
             func = ch_reg.resolve_option(func, chunked)
             cash_flow = func(cash_flow, group_lens)
         return wrapper.wrap(cash_flow, group_by=group_by, **resolve_dict(wrap_kwargs))
+
+    @class_or_instancemethod
+    def get_init_cash(cls_or_self,
+                      group_by: tp.GroupByLike = None,
+                      init_cash_raw: tp.Optional[tp.ArrayLike] = None,
+                      cash_deposits: tp.Optional[tp.ArrayLike] = None,
+                      cash_sharing: tp.Optional[bool] = None,
+                      free_cash_flow: tp.Optional[tp.SeriesFrame] = None,
+                      split_shared: bool = False,
+                      flex_2d: bool = False,
+                      jitted: tp.JittedOption = None,
+                      chunked: tp.ChunkedOption = None,
+                      wrapper: tp.Optional[ArrayWrapper] = None,
+                      wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+        """Get initial amount of cash per column/group."""
+        if not isinstance(cls_or_self, type):
+            if init_cash_raw is None:
+                init_cash_raw = cls_or_self._init_cash
+            if cash_sharing is None:
+                cash_sharing = cls_or_self.cash_sharing
+            if wrapper is None:
+                wrapper = cls_or_self.wrapper
+        else:
+            checks.assert_not_none(init_cash_raw)
+            checks.assert_not_none(cash_sharing)
+            checks.assert_not_none(wrapper)
+
+        if isinstance(init_cash_raw, int) and init_cash_raw in InitCashMode:
+            if not isinstance(cls_or_self, type):
+                if free_cash_flow is None:
+                    free_cash_flow = cls_or_self.resolve_shortcut_attr(
+                        'cash_flow',
+                        group_by=group_by,
+                        free=True,
+                        jitted=jitted,
+                        chunked=chunked
+                    )
+                if cash_deposits is None:
+                    cash_deposits = cls_or_self.resolve_shortcut_attr(
+                        'cash_deposits',
+                        group_by=group_by,
+                        jitted=jitted,
+                        chunked=chunked,
+                        keep_flex=True
+                    )
+            else:
+                checks.assert_not_none(free_cash_flow)
+                if cash_deposits is None:
+                    cash_deposits = 0.
+            func = jit_reg.resolve_option(nb.align_init_cash_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
+            init_cash = func(
+                init_cash_raw,
+                to_2d_array(free_cash_flow),
+                cash_deposits=to_2d_array(cash_deposits),
+                flex_2d=flex_2d
+            )
+        else:
+            init_cash_raw = to_1d_array(init_cash_raw)
+            if wrapper.grouper.is_grouped(group_by=group_by):
+                group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
+                func = jit_reg.resolve_option(nb.init_cash_grouped_nb, jitted)
+                init_cash = func(init_cash_raw, group_lens, cash_sharing)
+            else:
+                group_lens = wrapper.grouper.get_group_lens()
+                func = jit_reg.resolve_option(nb.init_cash_nb, jitted)
+                init_cash = func(init_cash_raw, group_lens, cash_sharing, split_shared=split_shared)
+        wrap_kwargs = merge_dicts(dict(name_or_index='init_cash'), wrap_kwargs)
+        return wrapper.wrap_reduced(init_cash, group_by=group_by, **wrap_kwargs)
 
     @class_or_instancemethod
     def get_cash(cls_or_self,
