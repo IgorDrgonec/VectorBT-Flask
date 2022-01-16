@@ -57,14 +57,14 @@ to passing to the method.
 
 ## Version 1.0.2 (31 December, 2021)
 
-- Added Alpaca data source (#31). In contrast to vanilla vectorbt, additionally 
+- Added Alpaca data source (#31). In contrast to the community version, additionally 
 allows passing a pre-configured REST object to the 
 [AlpacaData.fetch](/api/data/custom/#vectorbtpro.data.custom.AlpacaData.fetch) method.
 - Changed the default index field of 
 [EntryTrades](/api/portfolio/trades/#vectorbtpro.portfolio.trades.EntryTrades) from `exit_idx` to `entry_idx`
 - Dropped JSON and implemented a custom formatting engine that represents objects in Python format.
 This perfectly aligns with the switch to dataclasses vectorbt PRO has made. Here's a comparison of 
-a wrapper being printed out by vanilla vectorbt and JSON, and vectorbt PRO with the new engine:
+a wrapper being printed out by the community version and JSON, and vectorbt PRO with the new engine:
 
 ```plaintext
 ArrayWrapper(**Config({
@@ -111,7 +111,7 @@ resides in a private repository of @polakowo.
 ## Version 1.0.0 (13 December, 2021)
 
 !!! info
-    This section briefly describes major changes made to vanilla vectorbt. For more details, see commits.
+    This section briefly describes major changes made to the community version. For more details, see commits.
 
 ### Execution
 

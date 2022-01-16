@@ -5,7 +5,7 @@ title: Installation
 # Installation
 
 !!! info
-    vectorbt PRO is a totally different beast compared to vanilla vectorbt. 
+    vectorbt PRO is a totally different beast compared to the community version. 
     In fact, the PRO version redesigns the underlying core to enable groundbreaking features. 
     
     To avoid using an outdated code, make sure to only import **vectorbtpro**!
@@ -30,7 +30,7 @@ your GitHub account in order to access the PRO repository programmatically
 
 The PRO version can be installed with `pip`.
 
-Uninstall the vanilla version if installed:
+Uninstall the community version if installed:
 
 ```sh
 pip uninstall vectorbt
