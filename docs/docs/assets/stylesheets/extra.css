@@ -96,7 +96,6 @@
 
 /* Version */
 .md-version {
-    font-family: 'Roboto Mono', monospace;
     color: var(--md-default-fg-color--light);
     display: inline-block;
     margin-left: .2rem;
