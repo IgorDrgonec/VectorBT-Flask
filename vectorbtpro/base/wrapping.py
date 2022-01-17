@@ -678,7 +678,7 @@ class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
 
     @property
     def column_only_select(self) -> tp.Optional[bool]:
-        """Overrides `vectorbtpro.base.grouper.Grouper.column_only_select`."""
+        """Overrides `vectorbtpro.base.grouping.Grouper.column_only_select`."""
         column_only_select = getattr(self, '_column_only_select', None)
         if column_only_select is None:
             return self.wrapper.column_only_select
@@ -686,7 +686,7 @@ class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
 
     @property
     def group_select(self) -> tp.Optional[bool]:
-        """Overrides `vectorbtpro.base.grouper.Grouper.group_select`."""
+        """Overrides `vectorbtpro.base.grouping.Grouper.group_select`."""
         group_select = getattr(self, '_group_select', None)
         if group_select is None:
             return self.wrapper.group_select
