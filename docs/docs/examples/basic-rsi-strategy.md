@@ -25,6 +25,8 @@ the pair BTC/USDT from Binance:
 
 ```pycon
 >>> import vectorbtpro as vbt
+>>> import numpy as np
+>>> import pandas as pd
 
 >>> data = vbt.BinanceData.fetch('BTCUSDT')
 >>> data
