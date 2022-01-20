@@ -816,3 +816,5 @@ and analyze them in more detail. Instead of using overused and outdated charts a
 from books and YouTube videos, we can build our own tools that go hand in hand with the market. 
 We can backtest thousands of strategy configurations to learn how the market reacts to each one 
 of them - in a matter of milliseconds. All it takes is creativity :bulb:
+
+[Notebook](https://github.com/polakowo/vectorbt.pro/blob/main/notebooks/BasicRSI.ipynb){ .md-button target="blank_" }
