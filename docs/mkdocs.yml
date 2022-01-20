@@ -84,6 +84,8 @@ extra:
     provider: google
     property: G-0C5VNYCFHL
   social:
+    - icon: fontawesome/brands/linkedin
+      link: https://www.linkedin.com/in/polakowo
     - icon: fontawesome/brands/github
       link: https://github.com/polakowo
     - icon: fontawesome/brands/discord
