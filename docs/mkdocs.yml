@@ -109,8 +109,11 @@ nav:
     - Features: getting-started/features.md
     - Installation: getting-started/installation.md
     - Release notes: getting-started/release-notes.md
+  - Examples:
+    - Basic RSI strategy: examples/basic-rsi-strategy.md
+    - To be continued...: examples/to-be-continued.md
   - Documentation:
-    - documentation/fundamentals.md
+    - Fundamentals: documentation/fundamentals.md
     - Building blocks: documentation/building-blocks.md
     - To be continued...: documentation/to-be-continued.md
   - API:

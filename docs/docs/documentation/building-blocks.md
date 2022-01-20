@@ -320,7 +320,7 @@ as if we performed them on the config itself, such as saving to disk
 Attribute resolution is handy when it comes to accessing attributes based on strings or some other logic,
 which is realized by the mixin [AttrResolverMixin](/api/base/grouping/#vectorbtpro.utils.attr_.AttrResolverMixin).
 You can imagine it implementing an arbitrary logic for a custom `getattr` operation.
-It's widely used in [MetaStatsBuilderMixin](/api/generic/stats_builder/#vectorbtpro.generic.stats_builder.MetaStatsBuilderMixin) 
+It's widely used in [StatsBuilderMixin](/api/generic/stats_builder/#vectorbtpro.generic.stats_builder.StatsBuilderMixin) 
 and [PlotsBuilderMixin](/api/generic/plots_builder/#vectorbtpro.generic.plots_builder.PlotsBuilderMixin)
 to execute metrics and subplots respectively as a chain of commands. In other classes,
 such as [Portfolio](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio), 
@@ -872,8 +872,8 @@ Builder [mixins](https://en.wikipedia.org/wiki/Mixin) are classes that, once sub
 a class, allow to build a specific functionality from this class' attributes. There are two
 prominent members: [StatsBuilderMixin](/api/generic/stats_builder/#vectorbtpro.generic.stats_builder.StatsBuilderMixin) 
 and [PlotsBuilderMixin](/api/generic/plots_builder/#vectorbtpro.generic.plots_builder.PlotsBuilderMixin).
-The former exposes the method [MetaStatsBuilderMixin.stats](/api/generic/stats_builder/#vectorbtpro.generic.stats_builder.MetaStatsBuilderMixin.stats)
-to compute various metrics, while the latter exposes the method [MetaStatsBuilderMixin.plots](/api/generic/stats_builder/#vectorbtpro.generic.stats_builder.MetaStatsBuilderMixin.plots)
+The former exposes the method [StatsBuilderMixin.stats](/api/generic/stats_builder/#vectorbtpro.generic.stats_builder.StatsBuilderMixin.stats)
+to compute various metrics, while the latter exposes the method [PlotsBuilderMixin.plots](/api/generic/plots_builder/#vectorbtpro.generic.plots_builder.PlotsBuilderMixin.plots)
 to display various subplots. Both are subclassed by almost every class that can analyze data.
 
 ### Analyzing

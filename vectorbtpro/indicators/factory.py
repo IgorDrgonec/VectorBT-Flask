@@ -3522,6 +3522,7 @@ Other keyword arguments are passed to `{0}.run`.
                 dict(
                     class_name=class_name,
                     class_docstring=class_docstring,
+                    module_name=__name__ + '.talib',
                     input_names=input_names,
                     param_names=param_names,
                     output_names=output_names,
@@ -3782,6 +3783,7 @@ Other keyword arguments are passed to `{0}.run`.
         defaults = config.pop('defaults')
         PTAIndicator = cls(
             **merge_dicts(
+                dict(module_name=__name__ + '.pandas_ta'),
                 config,
                 init_kwargs
             )
@@ -3967,6 +3969,7 @@ Other keyword arguments are passed to `{0}.run`.
         defaults = config.pop('defaults')
         TAIndicator = cls(
             **merge_dicts(
+                dict(module_name=__name__ + '.ta'),
                 config,
                 init_kwargs
             )
