@@ -904,6 +904,76 @@ def nancorr_nb(arr1: tp.Array2d, arr2: tp.Array2d) -> tp.Array1d:
     return out
 
 
+@register_jitted(cache=True)
+def rank_1d_nb(arr: tp.Array1d, argsorted: tp.Optional[tp.Array1d] = None, pct: bool = False) -> tp.Array1d:
+    """Compute numerical data ranks.
+
+    Numba equivalent to `pd.Series(arr).rank(pct=pct)`."""
+    if argsorted is None:
+        argsorted = np.argsort(arr)
+    out = np.empty_like(arr, dtype=np.float_)
+    rank_sum = 0
+    rank_cnt = 0
+    nan_cnt = 0
+    for i in range(arr.shape[0]):
+        if np.isnan(arr[i]):
+            nan_cnt += 1
+    if nan_cnt == arr.shape[0]:
+        out[:] = np.nan
+        return out
+    valid_cnt = out.shape[0] - nan_cnt
+    for i in range(argsorted.shape[0]):
+        rank = i + 1
+        if np.isnan(arr[argsorted[i]]):
+            out[argsorted[i]] = np.nan
+        elif i < out.shape[0] - 1 and arr[argsorted[i]] == arr[argsorted[i + 1]]:
+            rank_sum += rank
+            rank_cnt += 1
+            if pct:
+                v = rank / valid_cnt
+            else:
+                v = rank
+            out[argsorted[i]] = v
+        elif rank_sum > 0:
+            rank_sum += rank
+            rank_cnt += 1
+            if pct:
+                v = rank_sum / rank_cnt / valid_cnt
+            else:
+                v = rank_sum / rank_cnt
+            out[argsorted[i - rank_cnt + 1:i + 1]] = v
+            rank_sum = 0
+            rank_cnt = 0
+        else:
+            if pct:
+                v = rank / valid_cnt
+            else:
+                v = rank
+            out[argsorted[i]] = v
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='arr', axis=1),
+    arg_take_spec=dict(
+        arr=ch.ArraySlicer(axis=1),
+        argsorted=ch.ArraySlicer(axis=1),
+        pct=None
+    ),
+    merge_func=base_ch.column_stack
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def rank_nb(arr: tp.Array2d, argsorted: tp.Optional[tp.Array2d] = None, pct: bool = False) -> tp.Array2d:
+    """2-dim version of `rank_1d_nb`."""
+    out = np.empty_like(arr, dtype=np.float_)
+    for col in prange(arr.shape[1]):
+        if argsorted is None:
+            out[:, col] = rank_1d_nb(arr[:, col], argsorted=None, pct=pct)
+        else:
+            out[:, col] = rank_1d_nb(arr[:, col], argsorted=argsorted[:, col], pct=pct)
+    return out
+
+
 # ############# Rolling functions ############# #
 
 
@@ -1355,6 +1425,51 @@ def rolling_corr_nb(arr1: tp.Array2d, arr2: tp.Array2d, window: int, minp: int =
     out = np.empty_like(arr1, dtype=np.float_)
     for col in prange(arr1.shape[1]):
         out[:, col] = rolling_corr_1d_nb(arr1[:, col], arr2[:, col], window, minp=minp)
+    return out
+
+
+@register_jitted(cache=True)
+def rolling_rank_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int], pct: bool = False) -> tp.Array1d:
+    """Rolling version of `rank_1d_nb`."""
+    if minp is None:
+        minp = window
+    out = np.empty_like(arr, dtype=np.float_)
+    nancnt_arr = np.empty(arr.shape[0], dtype=np.int_)
+    nancnt = 0
+    for i in range(arr.shape[0]):
+        if np.isnan(arr[i]):
+            nancnt = nancnt + 1
+        nancnt_arr[i] = nancnt
+        if i < window:
+            valid_cnt = i + 1 - nancnt
+        else:
+            valid_cnt = window - (nancnt - nancnt_arr[i - window])
+        if valid_cnt < minp:
+            out[i] = np.nan
+        else:
+            from_i = max(0, i + 1 - window)
+            to_i = i + 1
+            window_a = arr[from_i:to_i]
+            out[i] = rank_1d_nb(window_a, pct=pct)[-1]
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='arr', axis=1),
+    arg_take_spec=dict(
+        arr=ch.ArraySlicer(axis=1),
+        window=None,
+        minp=None,
+        pct=None
+    ),
+    merge_func=base_ch.column_stack
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def rolling_rank_nb(arr: tp.Array2d, window: int, minp: int = 0, pct: bool = False) -> tp.Array2d:
+    """2-dim version of `rolling_rank_1d_nb`."""
+    out = np.empty_like(arr, dtype=np.float_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = rolling_rank_1d_nb(arr[:, col], window, minp=minp, pct=pct)
     return out
 
 

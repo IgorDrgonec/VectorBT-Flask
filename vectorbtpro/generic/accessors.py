@@ -486,6 +486,25 @@ class GenericAccessor(BaseAccessor, Analyzable):
         """Expanding version of `GenericAccessor.rolling_corr`."""
         return self.rolling_corr(other, None, minp=minp, **kwargs)
 
+    def rolling_rank(self,
+                     window: tp.Optional[int],
+                     minp: tp.Optional[int] = None,
+                     pct: bool = False,
+                     jitted: tp.JittedOption = None,
+                     chunked: tp.ChunkedOption = None,
+                     wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """See `vectorbtpro.generic.nb.rolling_rank_nb`."""
+        if window is None:
+            window = self.wrapper.shape[0]
+        func = jit_reg.resolve_option(nb.rolling_rank_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        out = func(self.to_2d_array(), window, minp=minp, pct=pct)
+        return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
+
+    def expanding_rank(self, minp: tp.Optional[int] = 1, **kwargs) -> tp.SeriesFrame:
+        """Expanding version of `GenericAccessor.rolling_rank`."""
+        return self.rolling_rank(None, minp=minp, **kwargs)
+
     # ############# Taking UDFs ############# #
 
     @class_or_instancemethod
@@ -1879,6 +1898,22 @@ class GenericAccessor(BaseAccessor, Analyzable):
         func = jit_reg.resolve_option(nb.nancorr_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         return self.wrapper.wrap_reduced(func(self_arr, other_arr), group_by=False, **wrap_kwargs)
+
+    def rank(self,
+             pct: bool = False,
+             jitted: tp.JittedOption = None,
+             chunked: tp.ChunkedOption = None,
+             group_by: tp.GroupByLike = None,
+             wrap_kwargs: tp.KwargsLike = None):
+        """Compute numerical data rank.
+
+        By default, equal values are assigned a rank that is the average of the ranks of those values."""
+        func = jit_reg.resolve_option(nb.rank_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        arr = self.to_2d_array()
+        argsorted = np.argsort(arr, axis=0)
+        rank = func(arr, argsorted=argsorted, pct=pct)
+        return self.wrapper.wrap(rank, group_by=False, **resolve_dict(wrap_kwargs))
 
     def idxmin(self,
                order: str = 'C',

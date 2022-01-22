@@ -282,10 +282,7 @@ class TestAccessors:
             df.vbt.rolling_min(test_window, chunked=False)
         )
 
-    @pytest.mark.parametrize(
-        "test_minp",
-        [1, 3]
-    )
+    @pytest.mark.parametrize("test_minp", [1, 3])
     def test_expanding_min(self, test_minp):
         pd.testing.assert_series_equal(
             df['a'].vbt.expanding_min(minp=test_minp),
@@ -334,10 +331,7 @@ class TestAccessors:
             df.vbt.rolling_max(test_window, chunked=False)
         )
 
-    @pytest.mark.parametrize(
-        "test_minp",
-        [1, 3]
-    )
+    @pytest.mark.parametrize("test_minp", [1, 3])
     def test_expanding_max(self, test_minp):
         pd.testing.assert_series_equal(
             df['a'].vbt.expanding_max(minp=test_minp),
@@ -386,10 +380,7 @@ class TestAccessors:
             df.vbt.rolling_mean(test_window, chunked=False)
         )
 
-    @pytest.mark.parametrize(
-        "test_minp",
-        [1, 3]
-    )
+    @pytest.mark.parametrize("test_minp", [1, 3])
     def test_expanding_mean(self, test_minp):
         pd.testing.assert_series_equal(
             df['a'].vbt.expanding_mean(minp=test_minp),
@@ -544,10 +535,7 @@ class TestAccessors:
             df.vbt.rolling_corr(df2, test_window, chunked=False)
         )
 
-    @pytest.mark.parametrize(
-        "test_minp",
-        [1, 3]
-    )
+    @pytest.mark.parametrize("test_minp", [1, 3])
     def test_expanding_corr(self, test_minp):
         df2 = df[['b', 'c', 'a']].rename(columns={'b': 'a', 'c': 'b', 'a': 'c'})
         pd.testing.assert_series_equal(
@@ -569,6 +557,57 @@ class TestAccessors:
         pd.testing.assert_frame_equal(
             df.vbt.expanding_corr(df2, chunked=True),
             df.vbt.expanding_corr(df2, chunked=False)
+        )
+
+    @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
+    @pytest.mark.parametrize("test_minp", [1, None])
+    @pytest.mark.parametrize("test_pct", [False, True])
+    def test_rolling_rank(self, test_window, test_minp, test_pct):
+        if test_minp is None:
+            test_minp = test_window
+        pd.testing.assert_series_equal(
+            df['a'].vbt.rolling_rank(test_window, minp=test_minp, pct=test_pct),
+            df['a'].rolling(test_window, min_periods=test_minp).apply(lambda sr: sr.rank(pct=test_pct).iloc[-1])
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_rank(test_window, minp=test_minp, pct=test_pct),
+            df.rolling(test_window, min_periods=test_minp).apply(lambda sr: sr.rank(pct=test_pct).iloc[-1])
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_rank(test_window, pct=test_pct),
+            df.rolling(test_window).apply(lambda sr: sr.rank(pct=test_pct).iloc[-1])
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_rank(test_window, pct=test_pct, jitted=dict(parallel=True)),
+            df.vbt.rolling_rank(test_window, pct=test_pct, jitted=dict(parallel=False))
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_rank(test_window, pct=test_pct, chunked=True),
+            df.vbt.rolling_rank(test_window, pct=test_pct, chunked=False)
+        )
+
+    @pytest.mark.parametrize("test_minp", [1, 3])
+    @pytest.mark.parametrize("test_pct", [False, True])
+    def test_expanding_rank(self, test_minp, test_pct):
+        pd.testing.assert_series_equal(
+            df['a'].vbt.expanding_rank(minp=test_minp, pct=test_pct),
+            df['a'].expanding(min_periods=test_minp).apply(lambda sr: sr.rank(pct=test_pct).iloc[-1])
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_rank(minp=test_minp, pct=test_pct),
+            df.expanding(min_periods=test_minp).apply(lambda sr: sr.rank(pct=test_pct).iloc[-1])
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_rank(pct=test_pct),
+            df.expanding().apply(lambda sr: sr.rank(pct=test_pct).iloc[-1])
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_rank(pct=test_pct, jitted=dict(parallel=True)),
+            df.vbt.expanding_rank(pct=test_pct, jitted=dict(parallel=False))
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_rank(pct=test_pct, chunked=True),
+            df.vbt.expanding_rank(pct=test_pct, chunked=False)
         )
 
     def test_map(self):
@@ -818,10 +857,7 @@ class TestAccessors:
             ], index=df.index, columns=df.columns)
         )
 
-    @pytest.mark.parametrize(
-        "test_minp",
-        [1, 3]
-    )
+    @pytest.mark.parametrize("test_minp", [1, 3])
     def test_expanding_apply(self, test_minp):
         @njit
         def mean_nb(x):
@@ -1710,6 +1746,10 @@ class TestAccessors:
             df.corrwith(df2).rename('corr')
         )
         pd.testing.assert_series_equal(
+            df.vbt.corr(df2, jitted=dict(parallel=True)),
+            df.vbt.corr(df2, jitted=dict(parallel=False))
+        )
+        pd.testing.assert_series_equal(
             df.vbt.corr(df2, chunked=True),
             df.vbt.corr(df2, chunked=False)
         )
@@ -1721,6 +1761,32 @@ class TestAccessors:
                 flatten1.vbt.corr(flatten2),
                 df['c'].vbt.corr(df2['c'])
             ], index=['g1', 'g2']).rename('corr')
+        )
+
+    @pytest.mark.parametrize(
+        "test_pct",
+        [False, True],
+    )
+    def test_rank(self, test_pct):
+        pd.testing.assert_series_equal(
+            df['a'].vbt.rank(pct=test_pct),
+            df['a'].rank(pct=test_pct)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rank(pct=test_pct),
+            df.rank(pct=test_pct)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rank(),
+            df.rank()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rank(jitted=dict(parallel=True)),
+            df.vbt.rank(jitted=dict(parallel=False))
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rank(chunked=True),
+            df.vbt.rank(chunked=False)
         )
 
     @pytest.mark.parametrize(
