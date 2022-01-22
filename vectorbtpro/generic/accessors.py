@@ -460,6 +460,34 @@ class GenericAccessor(BaseAccessor, Analyzable):
         out = func(self.to_2d_array(), span, minp=minp, adjust=adjust)
         return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
+    def rolling_cov(self,
+                    other: tp.SeriesFrame,
+                    window: tp.Optional[int],
+                    minp: tp.Optional[int] = None,
+                    ddof: int = 1,
+                    broadcast_kwargs: tp.KwargsLike = None,
+                    jitted: tp.JittedOption = None,
+                    chunked: tp.ChunkedOption = None,
+                    wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """See `vectorbtpro.generic.nb.rolling_cov_nb`."""
+        self_obj, other_obj = reshaping.broadcast(self.obj, other, **resolve_dict(broadcast_kwargs))
+        if window is None:
+            window = self_obj.shape[0]
+        func = jit_reg.resolve_option(nb.rolling_cov_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        out = func(
+            reshaping.to_2d_array(self_obj),
+            reshaping.to_2d_array(other_obj),
+            window,
+            minp=minp,
+            ddof=ddof
+        )
+        return ArrayWrapper.from_obj(self_obj).wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
+
+    def expanding_cov(self, other: tp.SeriesFrame, minp: tp.Optional[int] = 1, **kwargs) -> tp.SeriesFrame:
+        """Expanding version of `GenericAccessor.rolling_cov`."""
+        return self.rolling_cov(other, None, minp=minp, **kwargs)
+
     def rolling_corr(self,
                      other: tp.SeriesFrame,
                      window: tp.Optional[int],
@@ -1870,6 +1898,35 @@ class GenericAccessor(BaseAccessor, Analyzable):
             func = lambda a: np.sum(~np.isnan(a), axis=0)
         func = ch_reg.resolve_option(nb.nancnt_nb, chunked, target_func=func)
         return self.wrapper.wrap_reduced(func(arr), group_by=False, **wrap_kwargs)
+
+    def cov(self,
+            other: tp.SeriesFrame,
+            ddof: int = 1,
+            broadcast_kwargs: tp.KwargsLike = None,
+            jitted: tp.JittedOption = None,
+            chunked: tp.ChunkedOption = None,
+            group_by: tp.GroupByLike = None,
+            wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+        """Return covariance of non-NaN elements."""
+        self_obj, other_obj = reshaping.broadcast(self.obj, other, **resolve_dict(broadcast_kwargs))
+        self_arr = reshaping.to_2d_array(self_obj)
+        other_arr = reshaping.to_2d_array(other_obj)
+        wrap_kwargs = merge_dicts(dict(name_or_index='cov'), wrap_kwargs)
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            return type(self).reduce(
+                jit_reg.resolve_option(nb.cov_reduce_grouped_meta_nb, jitted),
+                self_arr, other_arr, ddof,
+                flatten=True,
+                jitted=jitted,
+                chunked=chunked,
+                wrapper=ArrayWrapper.from_obj(self_obj),
+                group_by=self.wrapper.grouper.resolve_group_by(group_by=group_by),
+                wrap_kwargs=wrap_kwargs
+            )
+
+        func = jit_reg.resolve_option(nb.nancov_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        return self.wrapper.wrap_reduced(func(self_arr, other_arr, ddof=ddof), group_by=False, **wrap_kwargs)
 
     def corr(self,
              other: tp.SeriesFrame,

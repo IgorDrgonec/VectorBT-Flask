@@ -510,6 +510,59 @@ class TestAccessors:
 
     @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
     @pytest.mark.parametrize("test_minp", [1, None])
+    @pytest.mark.parametrize("test_ddof", [0, 1])
+    def test_rolling_cov(self, test_window, test_minp, test_ddof):
+        if test_minp is None:
+            test_minp = test_window
+        df2 = df[['b', 'c', 'a']].rename(columns={'b': 'a', 'c': 'b', 'a': 'c'})
+        pd.testing.assert_series_equal(
+            df['a'].vbt.rolling_cov(df2['a'], test_window, minp=test_minp, ddof=test_ddof),
+            df['a'].rolling(test_window, min_periods=test_minp).cov(df2['a'], ddof=test_ddof)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_cov(df2, test_window, minp=test_minp, ddof=test_ddof),
+            df.rolling(test_window, min_periods=test_minp).cov(df2, ddof=test_ddof)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_cov(df2, test_window, ddof=test_ddof),
+            df.rolling(test_window).cov(df2, ddof=test_ddof)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_cov(df2, test_window, ddof=test_ddof, jitted=dict(parallel=True)),
+            df.vbt.rolling_cov(df2, test_window, ddof=test_ddof, jitted=dict(parallel=False))
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_cov(df2, test_window, ddof=test_ddof, chunked=True),
+            df.vbt.rolling_cov(df2, test_window, ddof=test_ddof, chunked=False)
+        )
+
+    @pytest.mark.parametrize("test_minp", [1, 3])
+    @pytest.mark.parametrize("test_ddof", [0, 1])
+    def test_expanding_cov(self, test_minp, test_ddof):
+        df2 = df[['b', 'c', 'a']].rename(columns={'b': 'a', 'c': 'b', 'a': 'c'})
+        pd.testing.assert_series_equal(
+            df['a'].vbt.expanding_cov(df2['a'], minp=test_minp, ddof=test_ddof),
+            df['a'].expanding(min_periods=test_minp).cov(df2['a'], ddof=test_ddof)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_cov(df2, minp=test_minp, ddof=test_ddof),
+            df.expanding(min_periods=test_minp).cov(df2, ddof=test_ddof)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_cov(df2, ddof=test_ddof),
+            df.expanding().cov(df2, ddof=test_ddof)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_cov(df2, ddof=test_ddof, jitted=dict(parallel=True)),
+            df.vbt.expanding_cov(df2, ddof=test_ddof, jitted=dict(parallel=False))
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_cov(df2, ddof=test_ddof, chunked=True),
+            df.vbt.expanding_cov(df2, ddof=test_ddof, chunked=False)
+        )
+
+    @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
+    @pytest.mark.parametrize("test_minp", [1, None])
     def test_rolling_corr(self, test_window, test_minp):
         if test_minp is None:
             test_minp = test_window
@@ -1763,10 +1816,37 @@ class TestAccessors:
             ], index=['g1', 'g2']).rename('corr')
         )
 
-    @pytest.mark.parametrize(
-        "test_pct",
-        [False, True],
-    )
+    @pytest.mark.parametrize("test_ddof", [0, 1])
+    def test_cov(self, test_ddof):
+        df2 = df[['b', 'c', 'a']].rename(columns={'b': 'a', 'c': 'b', 'a': 'c'})
+        assert df['a'].vbt.cov(df2['a'], ddof=test_ddof) == df['a'].cov(df2['a'], ddof=test_ddof)
+        pd.testing.assert_series_equal(
+            df.vbt.cov(df2, ddof=test_ddof),
+            pd.Series([
+                df['a'].cov(df2['a'], ddof=test_ddof),
+                df['b'].cov(df2['b'], ddof=test_ddof),
+                df['c'].cov(df2['c'], ddof=test_ddof)
+            ], index=pd.Index(['a', 'b', 'c'], dtype='object'), name='cov')
+        )
+        pd.testing.assert_series_equal(
+            df.vbt.cov(df2, ddof=test_ddof, jitted=dict(parallel=True)),
+            df.vbt.cov(df2, ddof=test_ddof, jitted=dict(parallel=False))
+        )
+        pd.testing.assert_series_equal(
+            df.vbt.cov(df2, ddof=test_ddof, chunked=True),
+            df.vbt.cov(df2, ddof=test_ddof, chunked=False)
+        )
+        flatten1 = pd.Series(df[['a', 'b']].values.flatten())
+        flatten2 = pd.Series(df2[['a', 'b']].values.flatten())
+        pd.testing.assert_series_equal(
+            df.vbt.cov(df2, ddof=test_ddof, group_by=group_by),
+            pd.Series([
+                flatten1.vbt.cov(flatten2, ddof=test_ddof),
+                df['c'].vbt.cov(df2['c'], ddof=test_ddof)
+            ], index=['g1', 'g2']).rename('cov')
+        )
+
+    @pytest.mark.parametrize("test_pct", [False, True])
     def test_rank(self, test_pct):
         pd.testing.assert_series_equal(
             df['a'].vbt.rank(pct=test_pct),

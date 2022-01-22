@@ -489,7 +489,7 @@ def ffill_nb(arr: tp.Array2d) -> tp.Array2d:
 )
 @register_jitted(cache=True, is_generated_jit=True, tags={'can_parallel'})
 def nanprod_nb(arr: tp.Array2d) -> tp.Array1d:
-    """Numba-equivalent of `np.nanprod` along axis 0."""
+    """Numba equivalent of `np.nanprod` along axis 0."""
     nb_enabled = not isinstance(arr, np.ndarray)
     if nb_enabled:
         a_dtype = as_dtype(arr.dtype)
@@ -518,7 +518,7 @@ def nanprod_nb(arr: tp.Array2d) -> tp.Array1d:
 )
 @register_jitted(cache=True, is_generated_jit=True, tags={'can_parallel'})
 def nancumsum_nb(arr: tp.Array2d) -> tp.Array2d:
-    """Numba-equivalent of `np.nancumsum` along axis 0."""
+    """Numba equivalent of `np.nancumsum` along axis 0."""
     nb_enabled = not isinstance(arr, np.ndarray)
     if nb_enabled:
         a_dtype = as_dtype(arr.dtype)
@@ -547,7 +547,7 @@ def nancumsum_nb(arr: tp.Array2d) -> tp.Array2d:
 )
 @register_jitted(cache=True, is_generated_jit=True, tags={'can_parallel'})
 def nancumprod_nb(arr: tp.Array2d) -> tp.Array2d:
-    """Numba-equivalent of `np.nancumprod` along axis 0."""
+    """Numba equivalent of `np.nancumprod` along axis 0."""
     nb_enabled = not isinstance(arr, np.ndarray)
     if nb_enabled:
         a_dtype = as_dtype(arr.dtype)
@@ -602,7 +602,7 @@ def nancnt_nb(arr: tp.Array2d) -> tp.Array1d:
 )
 @register_jitted(cache=True, is_generated_jit=True, tags={'can_parallel'})
 def nansum_nb(arr: tp.Array2d) -> tp.Array1d:
-    """Numba-equivalent of `np.nansum` along axis 0."""
+    """Numba equivalent of `np.nansum` along axis 0."""
     nb_enabled = not isinstance(arr, np.ndarray)
     if nb_enabled:
         a_dtype = as_dtype(arr.dtype)
@@ -631,7 +631,7 @@ def nansum_nb(arr: tp.Array2d) -> tp.Array1d:
 )
 @register_jitted(cache=True, tags={'can_parallel'})
 def nanmin_nb(arr: tp.Array2d) -> tp.Array1d:
-    """Numba-equivalent of `np.nanmin` along axis 0."""
+    """Numba equivalent of `np.nanmin` along axis 0."""
     out = np.empty(arr.shape[1], dtype=arr.dtype)
     for col in prange(arr.shape[1]):
         out[col] = np.nanmin(arr[:, col])
@@ -647,7 +647,7 @@ def nanmin_nb(arr: tp.Array2d) -> tp.Array1d:
 )
 @register_jitted(cache=True, tags={'can_parallel'})
 def nanmax_nb(arr: tp.Array2d) -> tp.Array1d:
-    """Numba-equivalent of `np.nanmax` along axis 0."""
+    """Numba equivalent of `np.nanmax` along axis 0."""
     out = np.empty(arr.shape[1], dtype=arr.dtype)
     for col in prange(arr.shape[1]):
         out[col] = np.nanmax(arr[:, col])
@@ -663,7 +663,7 @@ def nanmax_nb(arr: tp.Array2d) -> tp.Array1d:
 )
 @register_jitted(cache=True, tags={'can_parallel'})
 def nanmean_nb(arr: tp.Array2d) -> tp.Array1d:
-    """Numba-equivalent of `np.nanmean` along axis 0."""
+    """Numba equivalent of `np.nanmean` along axis 0."""
     out = np.empty(arr.shape[1], dtype=np.float_)
     for col in prange(arr.shape[1]):
         out[col] = np.nanmean(arr[:, col])
@@ -679,7 +679,7 @@ def nanmean_nb(arr: tp.Array2d) -> tp.Array1d:
 )
 @register_jitted(cache=True, tags={'can_parallel'})
 def nanmedian_nb(arr: tp.Array2d) -> tp.Array1d:
-    """Numba-equivalent of `np.nanmedian` along axis 0."""
+    """Numba equivalent of `np.nanmedian` along axis 0."""
     out = np.empty(arr.shape[1], dtype=np.float_)
     for col in prange(arr.shape[1]):
         out[col] = np.nanmedian(arr[:, col])
@@ -688,7 +688,7 @@ def nanmedian_nb(arr: tp.Array2d) -> tp.Array1d:
 
 @register_jitted(cache=True)
 def nanpercentile_noarr_1d_nb(arr: tp.Array1d, q: float) -> float:
-    """Numba-equivalent of `np.nanpercentile` that does not allocate any arrays.
+    """Numba equivalent of `np.nanpercentile` that does not allocate any arrays.
 
     !!! note
         Has worst case time complexity of O(N^2), which makes it much slower than `np.nanpercentile`,
@@ -800,27 +800,8 @@ def nanpartition_mean_noarr_1d_nb(arr: tp.Array1d, q: float) -> float:
 
 
 @register_jitted(cache=True)
-def nancov_1d_nb(arr: tp.Array1d, arr2: tp.Array1d, ddof: int = 0) -> float:
-    """Numba-equivalent of `np.cov` that ignores NaN values and does not allocate any arrays."""
-    cnt = arr.shape[0]
-    for i in range(arr.shape[0]):
-        if np.isnan(arr[i]) or np.isnan(arr2[i]):
-            cnt -= 1
-    rcount = max(cnt - ddof, 0)
-    if rcount == 0:
-        return np.nan
-    out = 0.
-    a_mean = np.nanmean(arr)
-    b_mean = np.nanmean(arr2)
-    for i in range(len(arr)):
-        if not np.isnan(arr[i]) and not np.isnan(arr2[i]):
-            out += (arr[i] - a_mean) * (arr2[i] - b_mean)
-    return out / rcount
-
-
-@register_jitted(cache=True)
 def nanvar_1d_nb(arr: tp.Array1d, ddof: int = 0) -> float:
-    """Numba-equivalent of `np.nanvar` that does not allocate any arrays."""
+    """Numba equivalent of `np.nanvar` that does not allocate any arrays."""
     cnt = arr.shape[0]
     for i in range(arr.shape[0]):
         if np.isnan(arr[i]):
@@ -838,7 +819,7 @@ def nanvar_1d_nb(arr: tp.Array1d, ddof: int = 0) -> float:
 
 @register_jitted(cache=True)
 def nanstd_1d_nb(arr: tp.Array1d, ddof: int = 0) -> float:
-    """Numba-equivalent of `np.nanstd`."""
+    """Numba equivalent of `np.nanstd`."""
     return np.sqrt(nanvar_1d_nb(arr, ddof=ddof))
 
 
@@ -860,8 +841,48 @@ def nanstd_nb(arr: tp.Array2d, ddof: int = 0) -> tp.Array1d:
 
 
 @register_jitted(cache=True)
+def nancov_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d, ddof: int = 0) -> float:
+    """Numba equivalent of `np.cov` that ignores NaN values."""
+    arr1_sum = 0.
+    arr2_sum = 0.
+    k = 0
+    for i in range(arr1.shape[0]):
+        if not np.isnan(arr1[i]) and not np.isnan(arr2[i]):
+            arr1_sum += arr1[i]
+            arr2_sum += arr2[i]
+            k += 1
+    if k == 0:
+        return np.nan
+    arr1_mean = arr1_sum / k
+    arr2_mean = arr2_sum / k
+    num = 0
+    for i in range(arr1.shape[0]):
+        if not np.isnan(arr1[i]) and not np.isnan(arr2[i]):
+            num += (arr1[i] - arr1_mean) * (arr2[i] - arr2_mean)
+    return num / (k - ddof)
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='arr1', axis=1),
+    arg_take_spec=dict(
+        arr1=ch.ArraySlicer(axis=1),
+        arr2=ch.ArraySlicer(axis=1),
+        ddof=None
+    ),
+    merge_func=base_ch.concat
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def nancov_nb(arr1: tp.Array2d, arr2: tp.Array2d, ddof: int = 0) -> tp.Array1d:
+    """2-dim version of `nancov_1d_nb`."""
+    out = np.empty(arr1.shape[1], dtype=np.float_)
+    for col in prange(arr1.shape[1]):
+        out[col] = nancov_1d_nb(arr1[:, col], arr2[:, col], ddof=ddof)
+    return out
+
+
+@register_jitted(cache=True)
 def nancorr_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d) -> float:
-    """Numba-equivalent of `np.corrcoef` that ignores NaN values.
+    """Numba equivalent of `np.corrcoef` that ignores NaN values.
 
     Numerically stable."""
     arr1_sum = 0.
@@ -1340,6 +1361,77 @@ def ewm_std_nb(arr: tp.Array2d, span: int, minp: int = 0, adjust: bool = False) 
     out = np.empty_like(arr, dtype=np.float_)
     for col in prange(arr.shape[1]):
         out[:, col] = ewm_std_1d_nb(arr[:, col], span, minp=minp, adjust=adjust)
+    return out
+
+
+@register_jitted(cache=True)
+def rolling_cov_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d,
+                      window: int, minp: tp.Optional[int] = None, ddof: int = 0) -> tp.Array1d:
+    """Return rolling covariance.
+
+    Numba equivalent to `pd.Series(arr1).rolling(window, min_periods=minp).cov(arr2)`."""
+    if minp is None:
+        minp = window
+    if minp > window:
+        raise ValueError("minp must be <= window")
+    out = np.empty_like(arr1, dtype=np.float_)
+    cumsum1_arr = np.empty_like(arr1)
+    cumsum2_arr = np.empty_like(arr2)
+    cumsum1 = 0
+    cumsum2 = 0
+    cumsum_prod_arr = np.empty_like(arr1)
+    cumsum_prod = 0
+    nancnt_arr = np.empty_like(arr1)
+    nancnt = 0
+    for i in range(arr1.shape[0]):
+        if np.isnan(arr1[i]) or np.isnan(arr2[i]):
+            nancnt = nancnt + 1
+        else:
+            cumsum1 = cumsum1 + arr1[i]
+            cumsum2 = cumsum2 + arr2[i]
+            cumsum_prod = cumsum_prod + arr1[i] * arr2[i]
+        nancnt_arr[i] = nancnt
+        cumsum1_arr[i] = cumsum1
+        cumsum2_arr[i] = cumsum2
+        cumsum_prod_arr[i] = cumsum_prod
+        if i < window:
+            window_len = i + 1 - nancnt
+            window_cumsum1 = cumsum1
+            window_cumsum2 = cumsum2
+            window_cumsum_prod = cumsum_prod
+        else:
+            window_len = window - (nancnt - nancnt_arr[i - window])
+            window_cumsum1 = cumsum1 - cumsum1_arr[i - window]
+            window_cumsum2 = cumsum2 - cumsum2_arr[i - window]
+            window_cumsum_prod = cumsum_prod - cumsum_prod_arr[i - window]
+        if window_len < minp:
+            out[i] = np.nan
+        else:
+            window_prod_mean = window_cumsum_prod / (window_len - ddof)
+            window_mean1 = window_cumsum1 / window_len
+            window_mean2 = window_cumsum2 / window_len
+            window_mean_prod = window_mean1 * window_mean2 * window_len / (window_len - ddof)
+            out[i] = window_prod_mean - window_mean_prod
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='arr1', axis=1),
+    arg_take_spec=dict(
+        arr1=ch.ArraySlicer(axis=1),
+        arr2=ch.ArraySlicer(axis=1),
+        window=None,
+        minp=None,
+        ddof=None
+    ),
+    merge_func=base_ch.column_stack
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def rolling_cov_nb(arr1: tp.Array2d, arr2: tp.Array2d, window: int, minp: int = 0, ddof: int = 0) -> tp.Array2d:
+    """2-dim version of `rolling_cov_1d_nb`."""
+    out = np.empty_like(arr1, dtype=np.float_)
+    for col in prange(arr1.shape[1]):
+        out[:, col] = rolling_cov_1d_nb(arr1[:, col], arr2[:, col], window, minp=minp, ddof=ddof)
     return out
 
 
@@ -2445,6 +2537,13 @@ def describe_reduce_nb(arr: tp.Array1d, perc: tp.Array1d, ddof: int) -> tp.Array
     else:
         out[1:] = np.nan
     return out
+
+
+@register_jitted(cache=True)
+def cov_reduce_grouped_meta_nb(from_col: int, to_col: int, group: int,
+                               arr1: tp.Array2d, arr2: tp.Array2d, ddof: int) -> float:
+    """Return correlation coefficient (ignores NaNs)."""
+    return nancov_1d_nb(arr1[:, from_col:to_col].flatten(), arr2[:, from_col:to_col].flatten(), ddof=ddof)
 
 
 @register_jitted(cache=True)
