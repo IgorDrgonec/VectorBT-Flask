@@ -999,6 +999,110 @@ def rank_nb(arr: tp.Array2d, argsorted: tp.Optional[tp.Array2d] = None, pct: boo
 
 
 @register_jitted(cache=True)
+def rolling_sum_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None) -> tp.Array1d:
+    """Return rolling sum.
+
+    Numba equivalent to `pd.Series(arr).rolling(window, min_periods=minp).sum()`."""
+    if minp is None:
+        minp = window
+    if minp > window:
+        raise ValueError("minp must be <= window")
+    out = np.empty_like(arr, dtype=np.float_)
+    cumsum = 0
+    nancnt = 0
+    for i in range(arr.shape[0]):
+        if np.isnan(arr[i]):
+            nancnt = nancnt + 1
+        else:
+            cumsum = cumsum + arr[i]
+        if i < window:
+            window_len = i + 1 - nancnt
+            window_cumsum = cumsum
+        else:
+            if np.isnan(arr[i - window]):
+                nancnt = nancnt - 1
+            else:
+                cumsum = cumsum - arr[i - window]
+            window_len = window - nancnt
+            window_cumsum = cumsum
+        if window_len < minp:
+            out[i] = np.nan
+        else:
+            out[i] = window_cumsum
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='arr', axis=1),
+    arg_take_spec=dict(
+        arr=ch.ArraySlicer(axis=1),
+        window=None,
+        minp=None
+    ),
+    merge_func=base_ch.column_stack
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def rolling_sum_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None) -> tp.Array2d:
+    """2-dim version of `rolling_sum_1d_nb`."""
+    out = np.empty_like(arr, dtype=np.float_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = rolling_sum_1d_nb(arr[:, col], window, minp=minp)
+    return out
+
+
+@register_jitted(cache=True)
+def rolling_prod_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None) -> tp.Array1d:
+    """Return rolling product.
+
+    Numba equivalent to `pd.Series(arr).rolling(window, min_periods=minp).product()`."""
+    if minp is None:
+        minp = window
+    if minp > window:
+        raise ValueError("minp must be <= window")
+    out = np.empty_like(arr, dtype=np.float_)
+    cumprod = 1
+    nancnt = 0
+    for i in range(arr.shape[0]):
+        if np.isnan(arr[i]):
+            nancnt = nancnt + 1
+        else:
+            cumprod = cumprod * arr[i]
+        if i < window:
+            window_len = i + 1 - nancnt
+            window_cumprod = cumprod
+        else:
+            if np.isnan(arr[i - window]):
+                nancnt = nancnt - 1
+            else:
+                cumprod = cumprod / arr[i - window]
+            window_len = window - nancnt
+            window_cumprod = cumprod
+        if window_len < minp:
+            out[i] = np.nan
+        else:
+            out[i] = window_cumprod
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='arr', axis=1),
+    arg_take_spec=dict(
+        arr=ch.ArraySlicer(axis=1),
+        window=None,
+        minp=None
+    ),
+    merge_func=base_ch.column_stack
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def rolling_prod_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None) -> tp.Array2d:
+    """2-dim version of `rolling_prod_1d_nb`."""
+    out = np.empty_like(arr, dtype=np.float_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = rolling_prod_1d_nb(arr[:, col], window, minp=minp)
+    return out
+
+
+@register_jitted(cache=True)
 def rolling_min_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None) -> tp.Array1d:
     """Return rolling min.
 
@@ -1096,23 +1200,23 @@ def rolling_mean_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = No
     if minp > window:
         raise ValueError("minp must be <= window")
     out = np.empty_like(arr, dtype=np.float_)
-    cumsum_arr = np.empty_like(arr)
     cumsum = 0
-    nancnt_arr = np.empty_like(arr)
     nancnt = 0
     for i in range(arr.shape[0]):
         if np.isnan(arr[i]):
             nancnt = nancnt + 1
         else:
             cumsum = cumsum + arr[i]
-        nancnt_arr[i] = nancnt
-        cumsum_arr[i] = cumsum
         if i < window:
             window_len = i + 1 - nancnt
             window_cumsum = cumsum
         else:
-            window_len = window - (nancnt - nancnt_arr[i - window])
-            window_cumsum = cumsum - cumsum_arr[i - window]
+            if np.isnan(arr[i - window]):
+                nancnt = nancnt - 1
+            else:
+                cumsum = cumsum - arr[i - window]
+            window_len = window - nancnt
+            window_cumsum = cumsum
         if window_len < minp:
             out[i] = np.nan
         else:
@@ -1148,11 +1252,8 @@ def rolling_std_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = Non
     if minp > window:
         raise ValueError("minp must be <= window")
     out = np.empty_like(arr, dtype=np.float_)
-    cumsum_arr = np.empty_like(arr)
     cumsum = 0
-    cumsum_sq_arr = np.empty_like(arr)
     cumsum_sq = 0
-    nancnt_arr = np.empty_like(arr)
     nancnt = 0
     for i in range(arr.shape[0]):
         if np.isnan(arr[i]):
@@ -1160,17 +1261,19 @@ def rolling_std_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = Non
         else:
             cumsum = cumsum + arr[i]
             cumsum_sq = cumsum_sq + arr[i] ** 2
-        nancnt_arr[i] = nancnt
-        cumsum_arr[i] = cumsum
-        cumsum_sq_arr[i] = cumsum_sq
         if i < window:
             window_len = i + 1 - nancnt
             window_cumsum = cumsum
             window_cumsum_sq = cumsum_sq
         else:
-            window_len = window - (nancnt - nancnt_arr[i - window])
-            window_cumsum = cumsum - cumsum_arr[i - window]
-            window_cumsum_sq = cumsum_sq - cumsum_sq_arr[i - window]
+            if np.isnan(arr[i - window]):
+                nancnt = nancnt - 1
+            else:
+                cumsum = cumsum - arr[i - window]
+                cumsum_sq = cumsum_sq - arr[i - window] ** 2
+            window_len = window - nancnt
+            window_cumsum = cumsum
+            window_cumsum_sq = cumsum_sq
         if window_len < minp or window_len == ddof:
             out[i] = np.nan
         else:
@@ -1375,13 +1478,9 @@ def rolling_cov_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d,
     if minp > window:
         raise ValueError("minp must be <= window")
     out = np.empty_like(arr1, dtype=np.float_)
-    cumsum1_arr = np.empty_like(arr1)
-    cumsum2_arr = np.empty_like(arr2)
     cumsum1 = 0
     cumsum2 = 0
-    cumsum_prod_arr = np.empty_like(arr1)
     cumsum_prod = 0
-    nancnt_arr = np.empty_like(arr1)
     nancnt = 0
     for i in range(arr1.shape[0]):
         if np.isnan(arr1[i]) or np.isnan(arr2[i]):
@@ -1390,21 +1489,23 @@ def rolling_cov_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d,
             cumsum1 = cumsum1 + arr1[i]
             cumsum2 = cumsum2 + arr2[i]
             cumsum_prod = cumsum_prod + arr1[i] * arr2[i]
-        nancnt_arr[i] = nancnt
-        cumsum1_arr[i] = cumsum1
-        cumsum2_arr[i] = cumsum2
-        cumsum_prod_arr[i] = cumsum_prod
         if i < window:
             window_len = i + 1 - nancnt
             window_cumsum1 = cumsum1
             window_cumsum2 = cumsum2
             window_cumsum_prod = cumsum_prod
         else:
-            window_len = window - (nancnt - nancnt_arr[i - window])
-            window_cumsum1 = cumsum1 - cumsum1_arr[i - window]
-            window_cumsum2 = cumsum2 - cumsum2_arr[i - window]
-            window_cumsum_prod = cumsum_prod - cumsum_prod_arr[i - window]
-        if window_len < minp:
+            if np.isnan(arr1[i - window]) or np.isnan(arr2[i - window]):
+                nancnt = nancnt - 1
+            else:
+                cumsum1 = cumsum1 - arr1[i - window]
+                cumsum2 = cumsum2 - arr2[i - window]
+                cumsum_prod = cumsum_prod - arr1[i - window] * arr2[i - window]
+            window_len = window - nancnt
+            window_cumsum1 = cumsum1
+            window_cumsum2 = cumsum2
+            window_cumsum_prod = cumsum_prod
+        if window_len < minp or window_len == ddof:
             out[i] = np.nan
         else:
             window_prod_mean = window_cumsum_prod / (window_len - ddof)
@@ -1446,17 +1547,11 @@ def rolling_corr_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d,
     if minp > window:
         raise ValueError("minp must be <= window")
     out = np.empty_like(arr1, dtype=np.float_)
-    cumsum1_arr = np.empty_like(arr1)
-    cumsum2_arr = np.empty_like(arr2)
     cumsum1 = 0
     cumsum2 = 0
-    cumsum_sq1_arr = np.empty_like(arr1)
-    cumsum_sq2_arr = np.empty_like(arr2)
     cumsum_sq1 = 0
     cumsum_sq2 = 0
-    cumsum_prod_arr = np.empty_like(arr1)
     cumsum_prod = 0
-    nancnt_arr = np.empty_like(arr1)
     nancnt = 0
     for i in range(arr1.shape[0]):
         if np.isnan(arr1[i]) or np.isnan(arr2[i]):
@@ -1467,12 +1562,6 @@ def rolling_corr_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d,
             cumsum_sq1 = cumsum_sq1 + arr1[i] ** 2
             cumsum_sq2 = cumsum_sq2 + arr2[i] ** 2
             cumsum_prod = cumsum_prod + arr1[i] * arr2[i]
-        nancnt_arr[i] = nancnt
-        cumsum1_arr[i] = cumsum1
-        cumsum2_arr[i] = cumsum2
-        cumsum_sq1_arr[i] = cumsum_sq1
-        cumsum_sq2_arr[i] = cumsum_sq2
-        cumsum_prod_arr[i] = cumsum_prod
         if i < window:
             window_len = i + 1 - nancnt
             window_cumsum1 = cumsum1
@@ -1481,12 +1570,20 @@ def rolling_corr_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d,
             window_cumsum_sq2 = cumsum_sq2
             window_cumsum_prod = cumsum_prod
         else:
-            window_len = window - (nancnt - nancnt_arr[i - window])
-            window_cumsum1 = cumsum1 - cumsum1_arr[i - window]
-            window_cumsum2 = cumsum2 - cumsum2_arr[i - window]
-            window_cumsum_sq1 = cumsum_sq1 - cumsum_sq1_arr[i - window]
-            window_cumsum_sq2 = cumsum_sq2 - cumsum_sq2_arr[i - window]
-            window_cumsum_prod = cumsum_prod - cumsum_prod_arr[i - window]
+            if np.isnan(arr1[i - window]) or np.isnan(arr2[i - window]):
+                nancnt = nancnt - 1
+            else:
+                cumsum1 = cumsum1 - arr1[i - window]
+                cumsum2 = cumsum2 - arr2[i - window]
+                cumsum_sq1 = cumsum_sq1 - arr1[i - window] ** 2
+                cumsum_sq2 = cumsum_sq2 - arr2[i - window] ** 2
+                cumsum_prod = cumsum_prod - arr1[i - window] * arr2[i - window]
+            window_len = window - nancnt
+            window_cumsum1 = cumsum1
+            window_cumsum2 = cumsum2
+            window_cumsum_sq1 = cumsum_sq1
+            window_cumsum_sq2 = cumsum_sq2
+            window_cumsum_prod = cumsum_prod
         if window_len < minp:
             out[i] = np.nan
         else:
@@ -1526,16 +1623,16 @@ def rolling_rank_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int], pct
     if minp is None:
         minp = window
     out = np.empty_like(arr, dtype=np.float_)
-    nancnt_arr = np.empty(arr.shape[0], dtype=np.int_)
     nancnt = 0
     for i in range(arr.shape[0]):
         if np.isnan(arr[i]):
             nancnt = nancnt + 1
-        nancnt_arr[i] = nancnt
         if i < window:
             valid_cnt = i + 1 - nancnt
         else:
-            valid_cnt = window - (nancnt - nancnt_arr[i - window])
+            if np.isnan(arr[i - window]):
+                nancnt = nancnt - 1
+            valid_cnt = window - nancnt
         if valid_cnt < minp:
             out[i] = np.nan
         else:

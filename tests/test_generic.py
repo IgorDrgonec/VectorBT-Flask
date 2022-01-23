@@ -258,6 +258,58 @@ class TestAccessors:
 
     @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
     @pytest.mark.parametrize("test_minp", [1, None])
+    def test_rolling_sum(self, test_window, test_minp):
+        if test_minp is None:
+            test_minp = test_window
+        pd.testing.assert_series_equal(
+            df['a'].vbt.rolling_sum(test_window, minp=test_minp),
+            df['a'].rolling(test_window, min_periods=test_minp).sum()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_sum(test_window, minp=test_minp),
+            df.rolling(test_window, min_periods=test_minp).sum()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_sum(test_window),
+            df.rolling(test_window).sum()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_sum(test_window, jitted=dict(parallel=True)),
+            df.vbt.rolling_sum(test_window, jitted=dict(parallel=False))
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_sum(test_window, chunked=True),
+            df.vbt.rolling_sum(test_window, chunked=False)
+        )
+
+    @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
+    @pytest.mark.parametrize("test_minp", [1, None])
+    def test_rolling_prod(self, test_window, test_minp):
+        if test_minp is None:
+            test_minp = test_window
+        pd.testing.assert_series_equal(
+            df['a'].vbt.rolling_prod(test_window, minp=test_minp),
+            df['a'].rolling(test_window, min_periods=test_minp).apply(np.prod)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_prod(test_window, minp=test_minp),
+            df.rolling(test_window, min_periods=test_minp).apply(np.prod)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_prod(test_window),
+            df.rolling(test_window).apply(np.prod)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_prod(test_window, jitted=dict(parallel=True)),
+            df.vbt.rolling_prod(test_window, jitted=dict(parallel=False))
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_prod(test_window, chunked=True),
+            df.vbt.rolling_prod(test_window, chunked=False)
+        )
+
+    @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
+    @pytest.mark.parametrize("test_minp", [1, None])
     def test_rolling_min(self, test_window, test_minp):
         if test_minp is None:
             test_minp = test_window

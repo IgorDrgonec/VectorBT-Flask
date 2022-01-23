@@ -397,6 +397,34 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
     # ############# Rolling ############# #
 
+    def rolling_sum(self,
+                    window: tp.Optional[int],
+                    minp: tp.Optional[int] = None,
+                    jitted: tp.JittedOption = None,
+                    chunked: tp.ChunkedOption = None,
+                    wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """See `vectorbtpro.generic.nb.rolling_sum_nb`."""
+        if window is None:
+            window = self.wrapper.shape[0]
+        func = jit_reg.resolve_option(nb.rolling_sum_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        out = func(self.to_2d_array(), window, minp=minp)
+        return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
+
+    def rolling_prod(self,
+                     window: tp.Optional[int],
+                     minp: tp.Optional[int] = None,
+                     jitted: tp.JittedOption = None,
+                     chunked: tp.ChunkedOption = None,
+                     wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """See `vectorbtpro.generic.nb.rolling_prod_nb`."""
+        if window is None:
+            window = self.wrapper.shape[0]
+        func = jit_reg.resolve_option(nb.rolling_prod_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        out = func(self.to_2d_array(), window, minp=minp)
+        return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
+
     def rolling_mean(self,
                      window: tp.Optional[int],
                      minp: tp.Optional[int] = None,
