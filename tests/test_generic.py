@@ -274,12 +274,12 @@ class TestAccessors:
             df.rolling(test_window).sum()
         )
         pd.testing.assert_frame_equal(
-            df.vbt.rolling_sum(test_window, jitted=dict(parallel=True)),
-            df.vbt.rolling_sum(test_window, jitted=dict(parallel=False))
+            df.vbt.rolling_sum(test_window, minp=test_minp, jitted=dict(parallel=True)),
+            df.vbt.rolling_sum(test_window, minp=test_minp, jitted=dict(parallel=False))
         )
         pd.testing.assert_frame_equal(
-            df.vbt.rolling_sum(test_window, chunked=True),
-            df.vbt.rolling_sum(test_window, chunked=False)
+            df.vbt.rolling_sum(test_window, minp=test_minp, chunked=True),
+            df.vbt.rolling_sum(test_window, minp=test_minp, chunked=False)
         )
 
     @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
@@ -300,12 +300,12 @@ class TestAccessors:
             df.rolling(test_window).apply(np.prod)
         )
         pd.testing.assert_frame_equal(
-            df.vbt.rolling_prod(test_window, jitted=dict(parallel=True)),
-            df.vbt.rolling_prod(test_window, jitted=dict(parallel=False))
+            df.vbt.rolling_prod(test_window, minp=test_minp, jitted=dict(parallel=True)),
+            df.vbt.rolling_prod(test_window, minp=test_minp, jitted=dict(parallel=False))
         )
         pd.testing.assert_frame_equal(
-            df.vbt.rolling_prod(test_window, chunked=True),
-            df.vbt.rolling_prod(test_window, chunked=False)
+            df.vbt.rolling_prod(test_window, minp=test_minp, chunked=True),
+            df.vbt.rolling_prod(test_window, minp=test_minp, chunked=False)
         )
 
     @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
@@ -326,12 +326,12 @@ class TestAccessors:
             df.rolling(test_window).min()
         )
         pd.testing.assert_frame_equal(
-            df.vbt.rolling_min(test_window, jitted=dict(parallel=True)),
-            df.vbt.rolling_min(test_window, jitted=dict(parallel=False))
+            df.vbt.rolling_min(test_window, minp=test_minp, jitted=dict(parallel=True)),
+            df.vbt.rolling_min(test_window, minp=test_minp, jitted=dict(parallel=False))
         )
         pd.testing.assert_frame_equal(
-            df.vbt.rolling_min(test_window, chunked=True),
-            df.vbt.rolling_min(test_window, chunked=False)
+            df.vbt.rolling_min(test_window, minp=test_minp, chunked=True),
+            df.vbt.rolling_min(test_window, minp=test_minp, chunked=False)
         )
 
     @pytest.mark.parametrize("test_minp", [1, 3])
@@ -349,12 +349,12 @@ class TestAccessors:
             df.expanding().min()
         )
         pd.testing.assert_frame_equal(
-            df.vbt.expanding_min(jitted=dict(parallel=True)),
-            df.vbt.expanding_min(jitted=dict(parallel=False))
+            df.vbt.expanding_min(minp=test_minp, jitted=dict(parallel=True)),
+            df.vbt.expanding_min(minp=test_minp, jitted=dict(parallel=False))
         )
         pd.testing.assert_frame_equal(
-            df.vbt.expanding_min(chunked=True),
-            df.vbt.expanding_min(chunked=False)
+            df.vbt.expanding_min(minp=test_minp, chunked=True),
+            df.vbt.expanding_min(minp=test_minp, chunked=False)
         )
 
     @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
@@ -375,12 +375,12 @@ class TestAccessors:
             df.rolling(test_window).max()
         )
         pd.testing.assert_frame_equal(
-            df.vbt.rolling_max(test_window, jitted=dict(parallel=True)),
-            df.vbt.rolling_max(test_window, jitted=dict(parallel=False))
+            df.vbt.rolling_max(test_window, minp=test_minp, jitted=dict(parallel=True)),
+            df.vbt.rolling_max(test_window, minp=test_minp, jitted=dict(parallel=False))
         )
         pd.testing.assert_frame_equal(
-            df.vbt.rolling_max(test_window, chunked=True),
-            df.vbt.rolling_max(test_window, chunked=False)
+            df.vbt.rolling_max(test_window, minp=test_minp, chunked=True),
+            df.vbt.rolling_max(test_window, minp=test_minp, chunked=False)
         )
 
     @pytest.mark.parametrize("test_minp", [1, 3])
@@ -398,12 +398,12 @@ class TestAccessors:
             df.expanding().max()
         )
         pd.testing.assert_frame_equal(
-            df.vbt.expanding_max(jitted=dict(parallel=True)),
-            df.vbt.expanding_max(jitted=dict(parallel=False))
+            df.vbt.expanding_max(minp=test_minp, jitted=dict(parallel=True)),
+            df.vbt.expanding_max(minp=test_minp, jitted=dict(parallel=False))
         )
         pd.testing.assert_frame_equal(
-            df.vbt.expanding_max(chunked=True),
-            df.vbt.expanding_max(chunked=False)
+            df.vbt.expanding_max(minp=test_minp, chunked=True),
+            df.vbt.expanding_max(minp=test_minp, chunked=False)
         )
 
     @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
@@ -424,12 +424,12 @@ class TestAccessors:
             df.rolling(test_window).apply(np.argmin).fillna(-1).astype(np.int_)
         )
         pd.testing.assert_frame_equal(
-            df.vbt.rolling_idxmin(test_window, jitted=dict(parallel=True)),
-            df.vbt.rolling_idxmin(test_window, jitted=dict(parallel=False))
+            df.vbt.rolling_idxmin(test_window, minp=test_minp, jitted=dict(parallel=True)),
+            df.vbt.rolling_idxmin(test_window, minp=test_minp, jitted=dict(parallel=False))
         )
         pd.testing.assert_frame_equal(
-            df.vbt.rolling_idxmin(test_window, chunked=True),
-            df.vbt.rolling_idxmin(test_window, chunked=False)
+            df.vbt.rolling_idxmin(test_window, minp=test_minp, chunked=True),
+            df.vbt.rolling_idxmin(test_window, minp=test_minp, chunked=False)
         )
 
     @pytest.mark.parametrize("test_minp", [1, 3])
@@ -447,12 +447,12 @@ class TestAccessors:
             df.expanding().apply(np.argmin).fillna(-1).astype(np.int_)
         )
         pd.testing.assert_frame_equal(
-            df.vbt.expanding_idxmin(jitted=dict(parallel=True)),
-            df.vbt.expanding_idxmin(jitted=dict(parallel=False))
+            df.vbt.expanding_idxmin(minp=test_minp, jitted=dict(parallel=True)),
+            df.vbt.expanding_idxmin(minp=test_minp, jitted=dict(parallel=False))
         )
         pd.testing.assert_frame_equal(
-            df.vbt.expanding_idxmin(chunked=True),
-            df.vbt.expanding_idxmin(chunked=False)
+            df.vbt.expanding_idxmin(minp=test_minp, chunked=True),
+            df.vbt.expanding_idxmin(minp=test_minp, chunked=False)
         )
 
     @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
@@ -473,12 +473,12 @@ class TestAccessors:
             df.rolling(test_window).apply(np.argmax).fillna(-1).astype(np.int_)
         )
         pd.testing.assert_frame_equal(
-            df.vbt.rolling_idxmax(test_window, jitted=dict(parallel=True)),
-            df.vbt.rolling_idxmax(test_window, jitted=dict(parallel=False))
+            df.vbt.rolling_idxmax(test_window, minp=test_minp, jitted=dict(parallel=True)),
+            df.vbt.rolling_idxmax(test_window, minp=test_minp, jitted=dict(parallel=False))
         )
         pd.testing.assert_frame_equal(
-            df.vbt.rolling_idxmax(test_window, chunked=True),
-            df.vbt.rolling_idxmax(test_window, chunked=False)
+            df.vbt.rolling_idxmax(test_window, minp=test_minp, chunked=True),
+            df.vbt.rolling_idxmax(test_window, minp=test_minp, chunked=False)
         )
 
     @pytest.mark.parametrize("test_minp", [1, 3])
@@ -496,12 +496,12 @@ class TestAccessors:
             df.expanding().apply(np.argmax).fillna(-1).astype(np.int_)
         )
         pd.testing.assert_frame_equal(
-            df.vbt.expanding_idxmax(jitted=dict(parallel=True)),
-            df.vbt.expanding_idxmax(jitted=dict(parallel=False))
+            df.vbt.expanding_idxmax(minp=test_minp, jitted=dict(parallel=True)),
+            df.vbt.expanding_idxmax(minp=test_minp, jitted=dict(parallel=False))
         )
         pd.testing.assert_frame_equal(
-            df.vbt.expanding_idxmax(chunked=True),
-            df.vbt.expanding_idxmax(chunked=False)
+            df.vbt.expanding_idxmax(minp=test_minp, chunked=True),
+            df.vbt.expanding_idxmax(minp=test_minp, chunked=False)
         )
 
     @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
@@ -522,12 +522,12 @@ class TestAccessors:
             df.rolling(test_window).mean()
         )
         pd.testing.assert_frame_equal(
-            df.vbt.rolling_mean(test_window, jitted=dict(parallel=True)),
-            df.vbt.rolling_mean(test_window, jitted=dict(parallel=False))
+            df.vbt.rolling_mean(test_window, minp=test_minp, jitted=dict(parallel=True)),
+            df.vbt.rolling_mean(test_window, minp=test_minp, jitted=dict(parallel=False))
         )
         pd.testing.assert_frame_equal(
-            df.vbt.rolling_mean(test_window, chunked=True),
-            df.vbt.rolling_mean(test_window, chunked=False)
+            df.vbt.rolling_mean(test_window, minp=test_minp, chunked=True),
+            df.vbt.rolling_mean(test_window, minp=test_minp, chunked=False)
         )
 
     @pytest.mark.parametrize("test_minp", [1, 3])
@@ -545,12 +545,12 @@ class TestAccessors:
             df.expanding().mean()
         )
         pd.testing.assert_frame_equal(
-            df.vbt.expanding_mean(jitted=dict(parallel=True)),
-            df.vbt.expanding_mean(jitted=dict(parallel=False))
+            df.vbt.expanding_mean(minp=test_minp, jitted=dict(parallel=True)),
+            df.vbt.expanding_mean(minp=test_minp, jitted=dict(parallel=False))
         )
         pd.testing.assert_frame_equal(
-            df.vbt.expanding_mean(chunked=True),
-            df.vbt.expanding_mean(chunked=False)
+            df.vbt.expanding_mean(minp=test_minp, chunked=True),
+            df.vbt.expanding_mean(minp=test_minp, chunked=False)
         )
 
     @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
@@ -572,12 +572,12 @@ class TestAccessors:
             df.rolling(test_window).std()
         )
         pd.testing.assert_frame_equal(
-            df.vbt.rolling_std(test_window, jitted=dict(parallel=True)),
-            df.vbt.rolling_std(test_window, jitted=dict(parallel=False))
+            df.vbt.rolling_std(test_window, minp=test_minp, ddof=test_ddof, jitted=dict(parallel=True)),
+            df.vbt.rolling_std(test_window, minp=test_minp, ddof=test_ddof, jitted=dict(parallel=False))
         )
         pd.testing.assert_frame_equal(
-            df.vbt.rolling_std(test_window, chunked=True),
-            df.vbt.rolling_std(test_window, chunked=False)
+            df.vbt.rolling_std(test_window, minp=test_minp, ddof=test_ddof, chunked=True),
+            df.vbt.rolling_std(test_window, minp=test_minp, ddof=test_ddof, chunked=False)
         )
 
     @pytest.mark.parametrize("test_minp", [1, 3])
@@ -596,12 +596,44 @@ class TestAccessors:
             df.expanding().std()
         )
         pd.testing.assert_frame_equal(
-            df.vbt.expanding_std(jitted=dict(parallel=True)),
-            df.vbt.expanding_std(jitted=dict(parallel=False))
+            df.vbt.expanding_std(minp=test_minp, ddof=test_ddof, jitted=dict(parallel=True)),
+            df.vbt.expanding_std(minp=test_minp, ddof=test_ddof, jitted=dict(parallel=False))
         )
         pd.testing.assert_frame_equal(
-            df.vbt.expanding_std(chunked=True),
-            df.vbt.expanding_std(chunked=False)
+            df.vbt.expanding_std(minp=test_minp, ddof=test_ddof, chunked=True),
+            df.vbt.expanding_std(minp=test_minp, ddof=test_ddof, chunked=False)
+        )
+
+    @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
+    @pytest.mark.parametrize("test_minp", [1, None])
+    def test_wm_mean(self, test_window, test_minp):
+        if test_minp is None:
+            test_minp = test_window
+
+        def wma(sr):
+            sr = sr[sr.notna()]
+            weights = np.arange(len(sr)) + 1
+            return np.sum(sr * weights) / np.sum(weights)
+
+        pd.testing.assert_series_equal(
+            df['a'].vbt.wm_mean(test_window, minp=test_minp),
+            df['a'].rolling(window=test_window, min_periods=test_minp).apply(wma)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.wm_mean(test_window, minp=test_minp),
+            df.rolling(window=test_window, min_periods=test_minp).apply(wma)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.wm_mean(test_window),
+            df.rolling(window=test_window).apply(wma)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.wm_mean(test_window, minp=test_minp, jitted=dict(parallel=True)),
+            df.vbt.wm_mean(test_window, minp=test_minp, jitted=dict(parallel=False))
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.wm_mean(test_window, minp=test_minp, chunked=True),
+            df.vbt.wm_mean(test_window, minp=test_minp, chunked=False)
         )
 
     @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
@@ -623,12 +655,12 @@ class TestAccessors:
             df.ewm(span=test_window).mean()
         )
         pd.testing.assert_frame_equal(
-            df.vbt.ewm_mean(test_window, jitted=dict(parallel=True)),
-            df.vbt.ewm_mean(test_window, jitted=dict(parallel=False))
+            df.vbt.ewm_mean(test_window, minp=test_minp, adjust=test_adjust, jitted=dict(parallel=True)),
+            df.vbt.ewm_mean(test_window, minp=test_minp, adjust=test_adjust, jitted=dict(parallel=False))
         )
         pd.testing.assert_frame_equal(
-            df.vbt.ewm_mean(test_window, chunked=True),
-            df.vbt.ewm_mean(test_window, chunked=False)
+            df.vbt.ewm_mean(test_window, minp=test_minp, adjust=test_adjust, chunked=True),
+            df.vbt.ewm_mean(test_window, minp=test_minp, adjust=test_adjust, chunked=False)
         )
 
     @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
@@ -650,12 +682,12 @@ class TestAccessors:
             df.ewm(span=test_window).std()
         )
         pd.testing.assert_frame_equal(
-            df.vbt.ewm_std(test_window, jitted=dict(parallel=True)),
-            df.vbt.ewm_std(test_window, jitted=dict(parallel=False))
+            df.vbt.ewm_std(test_window, minp=test_minp, adjust=test_adjust, jitted=dict(parallel=True)),
+            df.vbt.ewm_std(test_window, minp=test_minp, adjust=test_adjust, jitted=dict(parallel=False))
         )
         pd.testing.assert_frame_equal(
-            df.vbt.ewm_std(test_window, chunked=True),
-            df.vbt.ewm_std(test_window, chunked=False)
+            df.vbt.ewm_std(test_window, minp=test_minp, adjust=test_adjust, chunked=True),
+            df.vbt.ewm_std(test_window, minp=test_minp, adjust=test_adjust, chunked=False)
         )
 
     @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
@@ -678,12 +710,12 @@ class TestAccessors:
             df.rolling(test_window).cov(df2, ddof=test_ddof)
         )
         pd.testing.assert_frame_equal(
-            df.vbt.rolling_cov(df2, test_window, ddof=test_ddof, jitted=dict(parallel=True)),
-            df.vbt.rolling_cov(df2, test_window, ddof=test_ddof, jitted=dict(parallel=False))
+            df.vbt.rolling_cov(df2, test_window, minp=test_minp, ddof=test_ddof, jitted=dict(parallel=True)),
+            df.vbt.rolling_cov(df2, test_window, minp=test_minp, ddof=test_ddof, jitted=dict(parallel=False))
         )
         pd.testing.assert_frame_equal(
-            df.vbt.rolling_cov(df2, test_window, ddof=test_ddof, chunked=True),
-            df.vbt.rolling_cov(df2, test_window, ddof=test_ddof, chunked=False)
+            df.vbt.rolling_cov(df2, test_window, minp=test_minp, ddof=test_ddof, chunked=True),
+            df.vbt.rolling_cov(df2, test_window, minp=test_minp, ddof=test_ddof, chunked=False)
         )
 
     @pytest.mark.parametrize("test_minp", [1, 3])
@@ -703,12 +735,12 @@ class TestAccessors:
             df.expanding().cov(df2, ddof=test_ddof)
         )
         pd.testing.assert_frame_equal(
-            df.vbt.expanding_cov(df2, ddof=test_ddof, jitted=dict(parallel=True)),
-            df.vbt.expanding_cov(df2, ddof=test_ddof, jitted=dict(parallel=False))
+            df.vbt.expanding_cov(df2, minp=test_minp, ddof=test_ddof, jitted=dict(parallel=True)),
+            df.vbt.expanding_cov(df2, minp=test_minp, ddof=test_ddof, jitted=dict(parallel=False))
         )
         pd.testing.assert_frame_equal(
-            df.vbt.expanding_cov(df2, ddof=test_ddof, chunked=True),
-            df.vbt.expanding_cov(df2, ddof=test_ddof, chunked=False)
+            df.vbt.expanding_cov(df2, minp=test_minp, ddof=test_ddof, chunked=True),
+            df.vbt.expanding_cov(df2, minp=test_minp, ddof=test_ddof, chunked=False)
         )
 
     @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
@@ -730,12 +762,12 @@ class TestAccessors:
             df.rolling(test_window).corr(df2)
         )
         pd.testing.assert_frame_equal(
-            df.vbt.rolling_corr(df2, test_window, jitted=dict(parallel=True)),
-            df.vbt.rolling_corr(df2, test_window, jitted=dict(parallel=False))
+            df.vbt.rolling_corr(df2, test_window, minp=test_minp, jitted=dict(parallel=True)),
+            df.vbt.rolling_corr(df2, test_window, minp=test_minp, jitted=dict(parallel=False))
         )
         pd.testing.assert_frame_equal(
-            df.vbt.rolling_corr(df2, test_window, chunked=True),
-            df.vbt.rolling_corr(df2, test_window, chunked=False)
+            df.vbt.rolling_corr(df2, test_window, minp=test_minp, chunked=True),
+            df.vbt.rolling_corr(df2, test_window, minp=test_minp, chunked=False)
         )
 
     @pytest.mark.parametrize("test_minp", [1, 3])
@@ -754,12 +786,12 @@ class TestAccessors:
             df.expanding().corr(df2)
         )
         pd.testing.assert_frame_equal(
-            df.vbt.expanding_corr(df2, jitted=dict(parallel=True)),
-            df.vbt.expanding_corr(df2, jitted=dict(parallel=False))
+            df.vbt.expanding_corr(df2, minp=test_minp, jitted=dict(parallel=True)),
+            df.vbt.expanding_corr(df2, minp=test_minp, jitted=dict(parallel=False))
         )
         pd.testing.assert_frame_equal(
-            df.vbt.expanding_corr(df2, chunked=True),
-            df.vbt.expanding_corr(df2, chunked=False)
+            df.vbt.expanding_corr(df2, minp=test_minp, chunked=True),
+            df.vbt.expanding_corr(df2, minp=test_minp, chunked=False)
         )
 
     @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
@@ -781,12 +813,12 @@ class TestAccessors:
             df.rolling(test_window).apply(lambda sr: sr.rank(pct=test_pct).iloc[-1])
         )
         pd.testing.assert_frame_equal(
-            df.vbt.rolling_rank(test_window, pct=test_pct, jitted=dict(parallel=True)),
-            df.vbt.rolling_rank(test_window, pct=test_pct, jitted=dict(parallel=False))
+            df.vbt.rolling_rank(test_window, minp=test_minp, pct=test_pct, jitted=dict(parallel=True)),
+            df.vbt.rolling_rank(test_window, minp=test_minp, pct=test_pct, jitted=dict(parallel=False))
         )
         pd.testing.assert_frame_equal(
-            df.vbt.rolling_rank(test_window, pct=test_pct, chunked=True),
-            df.vbt.rolling_rank(test_window, pct=test_pct, chunked=False)
+            df.vbt.rolling_rank(test_window, minp=test_minp, pct=test_pct, chunked=True),
+            df.vbt.rolling_rank(test_window, minp=test_minp, pct=test_pct, chunked=False)
         )
 
     @pytest.mark.parametrize("test_minp", [1, 3])
@@ -805,12 +837,12 @@ class TestAccessors:
             df.expanding().apply(lambda sr: sr.rank(pct=test_pct).iloc[-1])
         )
         pd.testing.assert_frame_equal(
-            df.vbt.expanding_rank(pct=test_pct, jitted=dict(parallel=True)),
-            df.vbt.expanding_rank(pct=test_pct, jitted=dict(parallel=False))
+            df.vbt.expanding_rank(minp=test_minp, pct=test_pct, jitted=dict(parallel=True)),
+            df.vbt.expanding_rank(minp=test_minp, pct=test_pct, jitted=dict(parallel=False))
         )
         pd.testing.assert_frame_equal(
-            df.vbt.expanding_rank(pct=test_pct, chunked=True),
-            df.vbt.expanding_rank(pct=test_pct, chunked=False)
+            df.vbt.expanding_rank(minp=test_minp, pct=test_pct, chunked=True),
+            df.vbt.expanding_rank(minp=test_minp, pct=test_pct, chunked=False)
         )
 
     def test_map(self):

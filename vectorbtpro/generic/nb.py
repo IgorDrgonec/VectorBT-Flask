@@ -1377,8 +1377,6 @@ def rolling_std_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = Non
             cumsum_sq = cumsum_sq + arr[i] ** 2
         if i < window:
             window_len = i + 1 - nancnt
-            window_cumsum = cumsum
-            window_cumsum_sq = cumsum_sq
         else:
             if np.isnan(arr[i - window]):
                 nancnt = nancnt - 1
@@ -1386,14 +1384,11 @@ def rolling_std_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = Non
                 cumsum = cumsum - arr[i - window]
                 cumsum_sq = cumsum_sq - arr[i - window] ** 2
             window_len = window - nancnt
-            window_cumsum = cumsum
-            window_cumsum_sq = cumsum_sq
         if window_len < minp or window_len == ddof:
             out[i] = np.nan
         else:
-            mean = window_cumsum / window_len
-            out[i] = np.sqrt(np.abs(window_cumsum_sq - 2 * window_cumsum *
-                                    mean + window_len * mean ** 2) / (window_len - ddof))
+            mean = cumsum / window_len
+            out[i] = np.sqrt(np.abs(cumsum_sq - 2 * cumsum * mean + window_len * mean ** 2) / (window_len - ddof))
     return out
 
 
@@ -1417,8 +1412,61 @@ def rolling_std_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None, 
 
 
 @register_jitted(cache=True)
+def wm_mean_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None) -> tp.Array1d:
+    """Compute weighted moving average."""
+    if minp is None:
+        minp = window
+    if minp > window:
+        raise ValueError("minp must be <= window")
+    out = np.empty_like(arr, dtype=np.float_)
+    cumsum = 0
+    wcumsum = 0
+    nancnt = 0
+    for i in range(arr.shape[0]):
+        if i >= window and not np.isnan(arr[i - window]):
+            wcumsum = wcumsum - cumsum
+        if np.isnan(arr[i]):
+            nancnt = nancnt + 1
+        else:
+            cumsum = cumsum + arr[i]
+        if i < window:
+            window_len = i + 1 - nancnt
+        else:
+            if np.isnan(arr[i - window]):
+                nancnt = nancnt - 1
+            else:
+                cumsum = cumsum - arr[i - window]
+            window_len = window - nancnt
+        if not np.isnan(arr[i]):
+            wcumsum = wcumsum + arr[i] * window_len
+        if window_len < minp:
+            out[i] = np.nan
+        else:
+            out[i] = wcumsum * 2 / (window_len + 1) / window_len
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='arr', axis=1),
+    arg_take_spec=dict(
+        arr=ch.ArraySlicer(axis=1),
+        window=None,
+        minp=None
+    ),
+    merge_func=base_ch.column_stack
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def wm_mean_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None) -> tp.Array2d:
+    """2-dim version of `wm_mean_1d_nb`."""
+    out = np.empty_like(arr, dtype=np.float_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = wm_mean_1d_nb(arr[:, col], window, minp=minp)
+    return out
+
+
+@register_jitted(cache=True)
 def ewm_mean_1d_nb(arr: tp.Array1d, span: int, minp: int = 0, adjust: bool = False) -> tp.Array1d:
-    """Compute exponential weighted average.
+    """Compute exponential weighted moving average.
 
     Numba equivalent to `pd.Series(arr).ewm(span=span, min_periods=minp, adjust=adjust).mean()`.
 
@@ -1482,7 +1530,7 @@ def ewm_mean_nb(arr: tp.Array2d, span: int, minp: int = 0, adjust: bool = False)
 
 @register_jitted(cache=True)
 def ewm_std_1d_nb(arr: tp.Array1d, span: int, minp: int = 0, adjust: bool = False) -> tp.Array1d:
-    """Compute exponential weighted standard deviation.
+    """Compute exponential weighted moving standard deviation.
 
     Numba equivalent to `pd.Series(arr).ewm(span=span, min_periods=minp).std()`.
 
@@ -1605,9 +1653,6 @@ def rolling_cov_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d,
             cumsum_prod = cumsum_prod + arr1[i] * arr2[i]
         if i < window:
             window_len = i + 1 - nancnt
-            window_cumsum1 = cumsum1
-            window_cumsum2 = cumsum2
-            window_cumsum_prod = cumsum_prod
         else:
             if np.isnan(arr1[i - window]) or np.isnan(arr2[i - window]):
                 nancnt = nancnt - 1
@@ -1616,15 +1661,12 @@ def rolling_cov_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d,
                 cumsum2 = cumsum2 - arr2[i - window]
                 cumsum_prod = cumsum_prod - arr1[i - window] * arr2[i - window]
             window_len = window - nancnt
-            window_cumsum1 = cumsum1
-            window_cumsum2 = cumsum2
-            window_cumsum_prod = cumsum_prod
         if window_len < minp or window_len == ddof:
             out[i] = np.nan
         else:
-            window_prod_mean = window_cumsum_prod / (window_len - ddof)
-            window_mean1 = window_cumsum1 / window_len
-            window_mean2 = window_cumsum2 / window_len
+            window_prod_mean = cumsum_prod / (window_len - ddof)
+            window_mean1 = cumsum1 / window_len
+            window_mean2 = cumsum2 / window_len
             window_mean_prod = window_mean1 * window_mean2 * window_len / (window_len - ddof)
             out[i] = window_prod_mean - window_mean_prod
     return out
@@ -1678,11 +1720,6 @@ def rolling_corr_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d,
             cumsum_prod = cumsum_prod + arr1[i] * arr2[i]
         if i < window:
             window_len = i + 1 - nancnt
-            window_cumsum1 = cumsum1
-            window_cumsum2 = cumsum2
-            window_cumsum_sq1 = cumsum_sq1
-            window_cumsum_sq2 = cumsum_sq2
-            window_cumsum_prod = cumsum_prod
         else:
             if np.isnan(arr1[i - window]) or np.isnan(arr2[i - window]):
                 nancnt = nancnt - 1
@@ -1693,17 +1730,12 @@ def rolling_corr_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d,
                 cumsum_sq2 = cumsum_sq2 - arr2[i - window] ** 2
                 cumsum_prod = cumsum_prod - arr1[i - window] * arr2[i - window]
             window_len = window - nancnt
-            window_cumsum1 = cumsum1
-            window_cumsum2 = cumsum2
-            window_cumsum_sq1 = cumsum_sq1
-            window_cumsum_sq2 = cumsum_sq2
-            window_cumsum_prod = cumsum_prod
         if window_len < minp:
             out[i] = np.nan
         else:
-            nom = window_len * window_cumsum_prod - window_cumsum1 * window_cumsum2
-            denom1 = np.sqrt(window_len * window_cumsum_sq1 - window_cumsum1 ** 2)
-            denom2 = np.sqrt(window_len * window_cumsum_sq2 - window_cumsum2 ** 2)
+            nom = window_len * cumsum_prod - cumsum1 * cumsum2
+            denom1 = np.sqrt(window_len * cumsum_sq1 - cumsum1 ** 2)
+            denom2 = np.sqrt(window_len * cumsum_sq2 - cumsum2 ** 2)
             denom = denom1 * denom2
             if denom == 0:
                 out[i] = np.nan
