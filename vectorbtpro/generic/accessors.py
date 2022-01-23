@@ -291,6 +291,8 @@ nb_config = ReadonlyConfig(
         'ffill': dict(func=nb.ffill_nb),
         'cumsum': dict(func=nb.nancumsum_nb),
         'cumprod': dict(func=nb.nancumprod_nb),
+        'rolling_sum': dict(func=nb.rolling_sum_nb),
+        'rolling_prod': dict(func=nb.rolling_prod_nb),
         'rolling_min': dict(func=nb.rolling_min_nb),
         'rolling_max': dict(func=nb.rolling_max_nb),
         'expanding_min': dict(func=nb.expanding_min_nb),
@@ -397,33 +399,47 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
     # ############# Rolling ############# #
 
-    def rolling_sum(self,
-                    window: tp.Optional[int],
-                    minp: tp.Optional[int] = None,
-                    jitted: tp.JittedOption = None,
-                    chunked: tp.ChunkedOption = None,
-                    wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
-        """See `vectorbtpro.generic.nb.rolling_sum_nb`."""
+    def rolling_idxmin(self,
+                       window: tp.Optional[int],
+                       minp: tp.Optional[int] = None,
+                       local: bool = False,
+                       jitted: tp.JittedOption = None,
+                       chunked: tp.ChunkedOption = None,
+                       wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """See `vectorbtpro.generic.nb.rolling_argmin_nb`."""
         if window is None:
             window = self.wrapper.shape[0]
-        func = jit_reg.resolve_option(nb.rolling_sum_nb, jitted)
+        func = jit_reg.resolve_option(nb.rolling_argmin_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        out = func(self.to_2d_array(), window, minp=minp)
+        out = func(self.to_2d_array(), window, minp=minp, local=local)
+        if not local:
+            wrap_kwargs = merge_dicts(dict(to_index=True), wrap_kwargs)
         return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
-    def rolling_prod(self,
-                     window: tp.Optional[int],
-                     minp: tp.Optional[int] = None,
-                     jitted: tp.JittedOption = None,
-                     chunked: tp.ChunkedOption = None,
-                     wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
-        """See `vectorbtpro.generic.nb.rolling_prod_nb`."""
+    def expanding_idxmin(self, minp: tp.Optional[int] = 1, **kwargs) -> tp.SeriesFrame:
+        """Expanding version of `GenericAccessor.rolling_idxmin`."""
+        return self.rolling_idxmin(None, minp=minp, **kwargs)
+
+    def rolling_idxmax(self,
+                       window: tp.Optional[int],
+                       minp: tp.Optional[int] = None,
+                       local: bool = False,
+                       jitted: tp.JittedOption = None,
+                       chunked: tp.ChunkedOption = None,
+                       wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """See `vectorbtpro.generic.nb.rolling_argmax_nb`."""
         if window is None:
             window = self.wrapper.shape[0]
-        func = jit_reg.resolve_option(nb.rolling_prod_nb, jitted)
+        func = jit_reg.resolve_option(nb.rolling_argmax_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        out = func(self.to_2d_array(), window, minp=minp)
+        out = func(self.to_2d_array(), window, minp=minp, local=local)
+        if not local:
+            wrap_kwargs = merge_dicts(dict(to_index=True), wrap_kwargs)
         return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
+
+    def expanding_idxmax(self, minp: tp.Optional[int] = 1, **kwargs) -> tp.SeriesFrame:
+        """Expanding version of `GenericAccessor.rolling_idxmax`."""
+        return self.rolling_idxmax(None, minp=minp, **kwargs)
 
     def rolling_mean(self,
                      window: tp.Optional[int],

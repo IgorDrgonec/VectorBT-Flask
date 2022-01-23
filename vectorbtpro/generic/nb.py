@@ -361,7 +361,7 @@ def fshift_nb(arr: tp.Array2d, n: int = 1, fill_value: tp.Scalar = np.nan) -> tp
 
 @register_jitted(cache=True)
 def diff_1d_nb(arr: tp.Array1d, n: int = 1) -> tp.Array1d:
-    """Return the 1-th discrete difference.
+    """Compute the 1-th discrete difference.
 
     Numba equivalent to `pd.Series(arr).diff()`."""
     out = np.empty_like(arr, dtype=np.float_)
@@ -389,7 +389,7 @@ def diff_nb(arr: tp.Array2d, n: int = 1) -> tp.Array2d:
 
 @register_jitted(cache=True)
 def pct_change_1d_nb(arr: tp.Array1d, n: int = 1) -> tp.Array1d:
-    """Return the percentage change.
+    """Compute the percentage change.
 
     Numba equivalent to `pd.Series(arr).pct_change()`."""
     out = np.empty_like(arr, dtype=np.float_)
@@ -1000,7 +1000,7 @@ def rank_nb(arr: tp.Array2d, argsorted: tp.Optional[tp.Array2d] = None, pct: boo
 
 @register_jitted(cache=True)
 def rolling_sum_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None) -> tp.Array1d:
-    """Return rolling sum.
+    """Compute rolling sum.
 
     Numba equivalent to `pd.Series(arr).rolling(window, min_periods=minp).sum()`."""
     if minp is None:
@@ -1052,9 +1052,9 @@ def rolling_sum_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None) 
 
 @register_jitted(cache=True)
 def rolling_prod_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None) -> tp.Array1d:
-    """Return rolling product.
+    """Compute rolling product.
 
-    Numba equivalent to `pd.Series(arr).rolling(window, min_periods=minp).product()`."""
+    Numba equivalent to `pd.Series(arr).rolling(window, min_periods=minp).apply(np.prod)`."""
     if minp is None:
         minp = window
     if minp > window:
@@ -1104,7 +1104,7 @@ def rolling_prod_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None)
 
 @register_jitted(cache=True)
 def rolling_min_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None) -> tp.Array1d:
-    """Return rolling min.
+    """Compute rolling min.
 
     Numba equivalent to `pd.Series(arr).rolling(window, min_periods=minp).min()`."""
     if minp is None:
@@ -1113,9 +1113,11 @@ def rolling_min_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = Non
         raise ValueError("minp must be <= window")
     out = np.empty_like(arr, dtype=np.float_)
     for i in range(arr.shape[0]):
-        minv = arr[i]
+        from_i = max(i - window + 1, 0)
+        to_i = i + 1
+        minv = arr[from_i]
         cnt = 0
-        for j in range(max(i - window + 1, 0), i + 1):
+        for j in range(from_i, to_i):
             if np.isnan(arr[j]):
                 continue
             if np.isnan(minv) or arr[j] < minv:
@@ -1148,7 +1150,7 @@ def rolling_min_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None) 
 
 @register_jitted(cache=True)
 def rolling_max_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None) -> tp.Array1d:
-    """Return rolling max.
+    """Compute rolling max.
 
     Numba equivalent to `pd.Series(arr).rolling(window, min_periods=minp).max()`."""
     if minp is None:
@@ -1157,9 +1159,11 @@ def rolling_max_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = Non
         raise ValueError("minp must be <= window")
     out = np.empty_like(arr, dtype=np.float_)
     for i in range(arr.shape[0]):
-        maxv = arr[i]
+        from_i = max(i - window + 1, 0)
+        to_i = i + 1
+        maxv = arr[from_i]
         cnt = 0
-        for j in range(max(i - window + 1, 0), i + 1):
+        for j in range(from_i, to_i):
             if np.isnan(arr[j]):
                 continue
             if np.isnan(maxv) or arr[j] > maxv:
@@ -1191,8 +1195,118 @@ def rolling_max_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None) 
 
 
 @register_jitted(cache=True)
+def rolling_argmin_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None,
+                         local: bool = False) -> tp.Array1d:
+    """Compute rolling min index."""
+    if minp is None:
+        minp = window
+    if minp > window:
+        raise ValueError("minp must be <= window")
+    out = np.empty_like(arr, dtype=np.int_)
+    for i in range(arr.shape[0]):
+        from_i = max(i - window + 1, 0)
+        to_i = i + 1
+        minv = arr[from_i]
+        if local:
+            mini = 0
+        else:
+            mini = from_i
+        cnt = 0
+        for k, j in enumerate(range(from_i, to_i)):
+            if np.isnan(arr[j]):
+                continue
+            if np.isnan(minv) or arr[j] < minv:
+                minv = arr[j]
+                if local:
+                    mini = k
+                else:
+                    mini = j
+            cnt += 1
+        if cnt < minp:
+            out[i] = -1
+        else:
+            out[i] = mini
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='arr', axis=1),
+    arg_take_spec=dict(
+        arr=ch.ArraySlicer(axis=1),
+        window=None,
+        minp=None,
+        local=None
+    ),
+    merge_func=base_ch.column_stack
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def rolling_argmin_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None,
+                      local: bool = False) -> tp.Array2d:
+    """2-dim version of `rolling_argmin_1d_nb`."""
+    out = np.empty_like(arr, dtype=np.int_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = rolling_argmin_1d_nb(arr[:, col], window, minp=minp, local=local)
+    return out
+
+
+@register_jitted(cache=True)
+def rolling_argmax_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None,
+                         local: bool = False) -> tp.Array1d:
+    """Compute rolling max index."""
+    if minp is None:
+        minp = window
+    if minp > window:
+        raise ValueError("minp must be <= window")
+    out = np.empty_like(arr, dtype=np.int_)
+    for i in range(arr.shape[0]):
+        from_i = max(i - window + 1, 0)
+        to_i = i + 1
+        maxv = arr[from_i]
+        if local:
+            maxi = 0
+        else:
+            maxi = from_i
+        cnt = 0
+        for k, j in enumerate(range(from_i, to_i)):
+            if np.isnan(arr[j]):
+                continue
+            if np.isnan(maxv) or arr[j] > maxv:
+                maxv = arr[j]
+                if local:
+                    maxi = k
+                else:
+                    maxi = j
+            cnt += 1
+        if cnt < minp:
+            out[i] = -1
+        else:
+            out[i] = maxi
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='arr', axis=1),
+    arg_take_spec=dict(
+        arr=ch.ArraySlicer(axis=1),
+        window=None,
+        minp=None,
+        local=None
+    ),
+    merge_func=base_ch.column_stack
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def rolling_argmax_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None,
+                      local: bool = False) -> tp.Array2d:
+    """2-dim version of `rolling_argmax_1d_nb`."""
+    out = np.empty_like(arr, dtype=np.int_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = rolling_argmax_1d_nb(arr[:, col], window, minp=minp, local=local)
+    return out
+
+
+@register_jitted(cache=True)
 def rolling_mean_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None) -> tp.Array1d:
-    """Return rolling mean.
+    """Compute rolling mean.
 
     Numba equivalent to `pd.Series(arr).rolling(window, min_periods=minp).mean()`."""
     if minp is None:
@@ -1244,7 +1358,7 @@ def rolling_mean_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None)
 
 @register_jitted(cache=True)
 def rolling_std_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None, ddof: int = 0) -> tp.Array1d:
-    """Return rolling standard deviation.
+    """Compute rolling standard deviation.
 
     Numba equivalent to `pd.Series(arr).rolling(window, min_periods=minp).std(ddof=ddof)`."""
     if minp is None:
@@ -1304,7 +1418,7 @@ def rolling_std_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None, 
 
 @register_jitted(cache=True)
 def ewm_mean_1d_nb(arr: tp.Array1d, span: int, minp: int = 0, adjust: bool = False) -> tp.Array1d:
-    """Return exponential weighted average.
+    """Compute exponential weighted average.
 
     Numba equivalent to `pd.Series(arr).ewm(span=span, min_periods=minp, adjust=adjust).mean()`.
 
@@ -1368,7 +1482,7 @@ def ewm_mean_nb(arr: tp.Array2d, span: int, minp: int = 0, adjust: bool = False)
 
 @register_jitted(cache=True)
 def ewm_std_1d_nb(arr: tp.Array1d, span: int, minp: int = 0, adjust: bool = False) -> tp.Array1d:
-    """Return exponential weighted standard deviation.
+    """Compute exponential weighted standard deviation.
 
     Numba equivalent to `pd.Series(arr).ewm(span=span, min_periods=minp).std()`.
 
@@ -1470,7 +1584,7 @@ def ewm_std_nb(arr: tp.Array2d, span: int, minp: int = 0, adjust: bool = False) 
 @register_jitted(cache=True)
 def rolling_cov_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d,
                       window: int, minp: tp.Optional[int] = None, ddof: int = 0) -> tp.Array1d:
-    """Return rolling covariance.
+    """Compute rolling covariance.
 
     Numba equivalent to `pd.Series(arr1).rolling(window, min_periods=minp).cov(arr2)`."""
     if minp is None:
@@ -1539,7 +1653,7 @@ def rolling_cov_nb(arr1: tp.Array2d, arr2: tp.Array2d, window: int, minp: int = 
 @register_jitted(cache=True)
 def rolling_corr_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d,
                        window: int, minp: tp.Optional[int] = None) -> tp.Array1d:
-    """Return rolling correlation coefficient.
+    """Compute rolling correlation coefficient.
 
     Numba equivalent to `pd.Series(arr1).rolling(window, min_periods=minp).corr(arr2)`."""
     if minp is None:
@@ -1667,7 +1781,7 @@ def rolling_rank_nb(arr: tp.Array2d, window: int, minp: int = 0, pct: bool = Fal
 
 @register_jitted(cache=True)
 def expanding_min_1d_nb(arr: tp.Array1d, minp: int = 1) -> tp.Array1d:
-    """Return expanding min.
+    """Compute expanding min.
 
     Numba equivalent to `pd.Series(arr).expanding(min_periods=minp).min()`."""
     out = np.empty_like(arr, dtype=np.float_)
@@ -1704,7 +1818,7 @@ def expanding_min_nb(arr: tp.Array2d, minp: int = 1) -> tp.Array2d:
 
 @register_jitted(cache=True)
 def expanding_max_1d_nb(arr: tp.Array1d, minp: int = 1) -> tp.Array1d:
-    """Return expanding max.
+    """Compute expanding max.
 
     Numba equivalent to `pd.Series(arr).expanding(min_periods=minp).max()`."""
     out = np.empty_like(arr, dtype=np.float_)
@@ -2525,7 +2639,7 @@ def flatten_uniform_grouped_nb(arr: tp.Array2d, group_lens: tp.Array1d, in_c_ord
 
 @register_jitted(cache=True)
 def nth_reduce_nb(arr: tp.Array1d, n: int) -> float:
-    """Return n-th element."""
+    """Compute n-th element."""
     if (n < 0 and abs(n) > arr.shape[0]) or n >= arr.shape[0]:
         raise ValueError("index is out of bounds")
     return arr[n]
@@ -2533,7 +2647,7 @@ def nth_reduce_nb(arr: tp.Array1d, n: int) -> float:
 
 @register_jitted(cache=True)
 def nth_index_reduce_nb(arr: tp.Array1d, n: int) -> int:
-    """Return index of n-th element."""
+    """Compute index of n-th element."""
     if (n < 0 and abs(n) > arr.shape[0]) or n >= arr.shape[0]:
         raise ValueError("index is out of bounds")
     if n >= 0:
@@ -2543,61 +2657,61 @@ def nth_index_reduce_nb(arr: tp.Array1d, n: int) -> int:
 
 @register_jitted(cache=True)
 def any_reduce_nb(arr: tp.Array1d) -> bool:
-    """Return whether any of the elements are True."""
+    """Compute whether any of the elements are True."""
     return np.any(arr)
 
 
 @register_jitted(cache=True)
 def all_reduce_nb(arr: tp.Array1d) -> bool:
-    """Return whether all of the elements are True."""
+    """Compute whether all of the elements are True."""
     return np.all(arr)
 
 
 @register_jitted(cache=True)
 def min_reduce_nb(arr: tp.Array1d) -> float:
-    """Return min (ignores NaNs)."""
+    """Compute min (ignores NaNs)."""
     return np.nanmin(arr)
 
 
 @register_jitted(cache=True)
 def max_reduce_nb(arr: tp.Array1d) -> float:
-    """Return max (ignores NaNs)."""
+    """Compute max (ignores NaNs)."""
     return np.nanmax(arr)
 
 
 @register_jitted(cache=True)
 def mean_reduce_nb(arr: tp.Array1d) -> float:
-    """Return mean (ignores NaNs)."""
+    """Compute mean (ignores NaNs)."""
     return np.nanmean(arr)
 
 
 @register_jitted(cache=True)
 def median_reduce_nb(arr: tp.Array1d) -> float:
-    """Return median (ignores NaNs)."""
+    """Compute median (ignores NaNs)."""
     return np.nanmedian(arr)
 
 
 @register_jitted(cache=True)
 def std_reduce_nb(arr: tp.Array1d, ddof) -> float:
-    """Return std (ignores NaNs)."""
+    """Compute std (ignores NaNs)."""
     return nanstd_1d_nb(arr, ddof=ddof)
 
 
 @register_jitted(cache=True)
 def sum_reduce_nb(arr: tp.Array1d) -> float:
-    """Return sum (ignores NaNs)."""
+    """Compute sum (ignores NaNs)."""
     return np.nansum(arr)
 
 
 @register_jitted(cache=True)
 def count_reduce_nb(arr: tp.Array1d) -> int:
-    """Return count (ignores NaNs)."""
+    """Compute count (ignores NaNs)."""
     return np.sum(~np.isnan(arr))
 
 
 @register_jitted(cache=True)
 def argmin_reduce_nb(arr: tp.Array1d) -> int:
-    """Return position of min."""
+    """Compute position of min."""
     arr = np.copy(arr)
     mask = np.isnan(arr)
     if np.all(mask):
@@ -2608,7 +2722,7 @@ def argmin_reduce_nb(arr: tp.Array1d) -> int:
 
 @register_jitted(cache=True)
 def argmax_reduce_nb(arr: tp.Array1d) -> int:
-    """Return position of max."""
+    """Compute position of max."""
     arr = np.copy(arr)
     mask = np.isnan(arr)
     if np.all(mask):
@@ -2619,7 +2733,7 @@ def argmax_reduce_nb(arr: tp.Array1d) -> int:
 
 @register_jitted(cache=True)
 def describe_reduce_nb(arr: tp.Array1d, perc: tp.Array1d, ddof: int) -> tp.Array1d:
-    """Return descriptive statistics (ignores NaNs).
+    """Compute descriptive statistics (ignores NaNs).
 
     Numba equivalent to `pd.Series(arr).describe(perc)`."""
     arr = arr[~np.isnan(arr)]
@@ -2639,14 +2753,14 @@ def describe_reduce_nb(arr: tp.Array1d, perc: tp.Array1d, ddof: int) -> tp.Array
 @register_jitted(cache=True)
 def cov_reduce_grouped_meta_nb(from_col: int, to_col: int, group: int,
                                arr1: tp.Array2d, arr2: tp.Array2d, ddof: int) -> float:
-    """Return correlation coefficient (ignores NaNs)."""
+    """Compute correlation coefficient (ignores NaNs)."""
     return nancov_1d_nb(arr1[:, from_col:to_col].flatten(), arr2[:, from_col:to_col].flatten(), ddof=ddof)
 
 
 @register_jitted(cache=True)
 def corr_reduce_grouped_meta_nb(from_col: int, to_col: int, group: int,
                                 arr1: tp.Array2d, arr2: tp.Array2d) -> float:
-    """Return correlation coefficient (ignores NaNs)."""
+    """Compute correlation coefficient (ignores NaNs)."""
     return nancorr_1d_nb(arr1[:, from_col:to_col].flatten(), arr2[:, from_col:to_col].flatten())
 
 
@@ -2664,7 +2778,7 @@ def corr_reduce_grouped_meta_nb(from_col: int, to_col: int, group: int,
 )
 @register_jitted(cache=True, tags={'can_parallel'})
 def value_counts_nb(codes: tp.Array2d, n_uniques: int, group_lens: tp.Array1d) -> tp.Array2d:
-    """Return value counts per column/group."""
+    """Compute value counts per column/group."""
     out = np.full((n_uniques, group_lens.shape[0]), 0, dtype=np.int_)
 
     group_end_idxs = np.cumsum(group_lens)
@@ -2680,7 +2794,7 @@ def value_counts_nb(codes: tp.Array2d, n_uniques: int, group_lens: tp.Array1d) -
 
 @register_jitted(cache=True)
 def value_counts_1d_nb(codes: tp.Array1d, n_uniques: int) -> tp.Array1d:
-    """Return value counts."""
+    """Compute value counts."""
     out = np.full(n_uniques, 0, dtype=np.int_)
 
     for i in range(codes.shape[0]):
@@ -2698,7 +2812,7 @@ def value_counts_1d_nb(codes: tp.Array1d, n_uniques: int) -> tp.Array1d:
 )
 @register_jitted(cache=True, tags={'can_parallel'})
 def value_counts_per_row_nb(codes: tp.Array2d, n_uniques: int) -> tp.Array2d:
-    """Return value counts per row."""
+    """Compute value counts per row."""
     out = np.empty((n_uniques, codes.shape[0]), dtype=np.int_)
 
     for i in prange(codes.shape[0]):
@@ -2933,7 +3047,7 @@ def ranges_to_mask_nb(start_idx_arr: tp.Array1d,
 
 @register_jitted(cache=True)
 def drawdown_1d_nb(arr: tp.Array1d) -> tp.Array1d:
-    """Return drawdown."""
+    """Compute drawdown."""
     out = np.empty_like(arr, dtype=np.float_)
     max_val = np.nan
     for i in range(arr.shape[0]):
@@ -3081,7 +3195,7 @@ def get_drawdowns_nb(arr: tp.Array2d) -> tp.RecordArray:
 )
 @register_jitted(cache=True, tags={'can_parallel'})
 def dd_drawdown_nb(peak_val_arr: tp.Array1d, valley_val_arr: tp.Array1d) -> tp.Array1d:
-    """Return the drawdown of each drawdown record."""
+    """Compute the drawdown of each drawdown record."""
     out = np.empty(valley_val_arr.shape[0], dtype=np.float_)
     for r in prange(valley_val_arr.shape[0]):
         out[r] = (valley_val_arr[r] - peak_val_arr[r]) / peak_val_arr[r]
@@ -3098,7 +3212,7 @@ def dd_drawdown_nb(peak_val_arr: tp.Array1d, valley_val_arr: tp.Array1d) -> tp.A
 )
 @register_jitted(cache=True, tags={'can_parallel'})
 def dd_decline_duration_nb(start_idx_arr: tp.Array1d, valley_idx_arr: tp.Array1d) -> tp.Array1d:
-    """Return the duration of the peak-to-valley phase of each drawdown record."""
+    """Compute the duration of the peak-to-valley phase of each drawdown record."""
     out = np.empty(valley_idx_arr.shape[0], dtype=np.float_)
     for r in prange(valley_idx_arr.shape[0]):
         out[r] = valley_idx_arr[r] - start_idx_arr[r] + 1
@@ -3115,7 +3229,7 @@ def dd_decline_duration_nb(start_idx_arr: tp.Array1d, valley_idx_arr: tp.Array1d
 )
 @register_jitted(cache=True, tags={'can_parallel'})
 def dd_recovery_duration_nb(valley_idx_arr: tp.Array1d, end_idx_arr: tp.Array1d) -> tp.Array1d:
-    """Return the duration of the valley-to-recovery phase of each drawdown record."""
+    """Compute the duration of the valley-to-recovery phase of each drawdown record."""
     out = np.empty(end_idx_arr.shape[0], dtype=np.float_)
     for r in prange(end_idx_arr.shape[0]):
         out[r] = end_idx_arr[r] - valley_idx_arr[r]
@@ -3135,7 +3249,7 @@ def dd_recovery_duration_nb(valley_idx_arr: tp.Array1d, end_idx_arr: tp.Array1d)
 def dd_recovery_duration_ratio_nb(start_idx_arr: tp.Array1d,
                                   valley_idx_arr: tp.Array1d,
                                   end_idx_arr: tp.Array1d) -> tp.Array1d:
-    """Return the ratio of the recovery duration to the decline duration of each drawdown record."""
+    """Compute the ratio of the recovery duration to the decline duration of each drawdown record."""
     out = np.empty(start_idx_arr.shape[0], dtype=np.float_)
     for r in prange(start_idx_arr.shape[0]):
         out[r] = (end_idx_arr[r] - valley_idx_arr[r]) / (valley_idx_arr[r] - start_idx_arr[r] + 1)
@@ -3152,7 +3266,7 @@ def dd_recovery_duration_ratio_nb(start_idx_arr: tp.Array1d,
 )
 @register_jitted(cache=True, tags={'can_parallel'})
 def dd_recovery_return_nb(valley_val_arr: tp.Array1d, end_val_arr: tp.Array1d) -> tp.Array1d:
-    """Return the recovery return of each drawdown record."""
+    """Compute the recovery return of each drawdown record."""
     out = np.empty(end_val_arr.shape[0], dtype=np.float_)
     for r in prange(end_val_arr.shape[0]):
         out[r] = (end_val_arr[r] - valley_val_arr[r]) / valley_val_arr[r]
