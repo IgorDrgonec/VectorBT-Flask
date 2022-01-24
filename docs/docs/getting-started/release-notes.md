@@ -17,7 +17,7 @@ to accept strings of chained method calls (more intuitive)
 which combines [Wrapping](/api/base/wrapping/#vectorbtpro.base.wrapping.Wrapping) and builder mixins
 - Metrics and subplots that require a single column won't raise an error if the object
 is two-dimensional and has only one column
-- [Grouper](/api/base/grouping/#vectorbtpro.base.grouping.Grouper) can return a group map,
+- [Grouper](/api/base/grouping/#vectorbtpro.base.grouping.base.Grouper) can return a group map,
 which isn't tied to a strict group ordering and is easier to use outside of Numba
 
 ## Version 1.0.6 (9 January, 2021)

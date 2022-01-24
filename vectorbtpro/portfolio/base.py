@@ -2717,7 +2717,7 @@ class Portfolio(Analyzable):
 
                 Set to a lower number if you run out of memory, and to 0 to not fill.
             seed (int): Seed to be set for both `call_seq` and at the beginning of the simulation.
-            group_by (any): Group columns. See `vectorbtpro.base.grouping.Grouper`.
+            group_by (any): Group columns. See `vectorbtpro.base.grouping.base.Grouper`.
             broadcast_kwargs (dict): Keyword arguments passed to `vectorbtpro.base.reshaping.broadcast`.
             jitted (any): See `vectorbtpro.utils.jitting.resolve_jitted_option`.
             chunked (any): See `vectorbtpro.utils.chunking.resolve_chunked_option`.

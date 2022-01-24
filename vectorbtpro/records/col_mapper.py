@@ -5,6 +5,7 @@
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_1d_array
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
+from vectorbtpro.base.grouping import nb as grouping_nb
 from vectorbtpro.records import nb
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils.decorators import cached_property, cached_method
@@ -36,16 +37,15 @@ class ColumnMapper(Wrapping):
         # Cannot select rows
         self._column_only_select = True
 
-    def col_idxs_meta(self, col_idxs: tp.Array1d, jitted: tp.JittedOption = None) -> tp.Tuple[tp.Array1d, tp.Array1d]:
-        """Get metadata of column indices.
+    def select_cols(self, col_idxs: tp.Array1d, jitted: tp.JittedOption = None) -> tp.Tuple[tp.Array1d, tp.Array1d]:
+        """Select columns.
 
-        Returns element indices and new column array.
-        Automatically decides whether to use column lengths or column map."""
+        Returns indices and new column array. Automatically decides whether to use column lengths or column map."""
         if self.is_sorted():
-            func = jit_reg.resolve_option(nb.col_lens_select_nb, jitted)
+            func = jit_reg.resolve_option(grouping_nb.group_lens_select_nb, jitted)
             new_indices, new_col_arr = func(self.col_lens, to_1d_array(col_idxs))  # faster
         else:
-            func = jit_reg.resolve_option(nb.col_map_select_nb, jitted)
+            func = jit_reg.resolve_option(grouping_nb.group_map_select_nb, jitted)
             new_indices, new_col_arr = func(self.col_map, to_1d_array(col_idxs))  # more flexible
         return new_indices, new_col_arr
 
@@ -57,7 +57,7 @@ class ColumnMapper(Wrapping):
             group_select=self.group_select,
             **kwargs
         )
-        _, new_col_arr = self.col_idxs_meta(col_idxs)
+        _, new_col_arr = self.select_cols(col_idxs)
         return new_wrapper, new_col_arr, group_idxs, col_idxs
 
     def indexing_func(self: ColumnMapperT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> ColumnMapperT:
@@ -84,7 +84,7 @@ class ColumnMapper(Wrapping):
         return col_arr
 
     @cached_property(whitelist=True)
-    def col_lens(self) -> tp.ColLens:
+    def col_lens(self) -> tp.GroupLens:
         """Column lengths.
 
         Faster than `ColumnMapper.col_map` but only compatible with sorted columns."""
@@ -92,7 +92,7 @@ class ColumnMapper(Wrapping):
         return func(self.col_arr, len(self.wrapper.columns))
 
     @cached_method(whitelist=True)
-    def get_col_lens(self, group_by: tp.GroupByLike = None, jitted: tp.JittedOption = None) -> tp.ColLens:
+    def get_col_lens(self, group_by: tp.GroupByLike = None, jitted: tp.JittedOption = None) -> tp.GroupLens:
         """Get group-aware column lengths."""
         if not self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.col_lens
@@ -102,7 +102,7 @@ class ColumnMapper(Wrapping):
         return func(col_arr, len(columns))
 
     @cached_property(whitelist=True)
-    def col_map(self) -> tp.ColMap:
+    def col_map(self) -> tp.GroupMap:
         """Column map.
 
         More flexible than `ColumnMapper.col_lens`.
@@ -111,7 +111,7 @@ class ColumnMapper(Wrapping):
         return func(self.col_arr, len(self.wrapper.columns))
 
     @cached_method(whitelist=True)
-    def get_col_map(self, group_by: tp.GroupByLike = None, jitted: tp.JittedOption = None) -> tp.ColMap:
+    def get_col_map(self, group_by: tp.GroupByLike = None, jitted: tp.JittedOption = None) -> tp.GroupMap:
         """Get group-aware column map."""
         if not self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.col_map

@@ -9,15 +9,7 @@ from vectorbtpro.generic.drawdowns import Drawdowns
 from vectorbtpro.generic.enums import *
 from vectorbtpro.generic.ranges import Ranges
 from vectorbtpro.generic.splitters import RangeSplitter, RollingSplitter, ExpandingSplitter
-
-__all__ = [
-    'Ranges',
-    'Drawdowns',
-    'RangeSplitter',
-    'RollingSplitter',
-    'ExpandingSplitter',
-    'Analyzable'
-]
+from vectorbtpro.utils.module_ import create__all__
 
 __blacklist__ = []
 
@@ -28,12 +20,5 @@ except ImportError:
 else:
     from vectorbtpro.generic.plotting import Gauge, Bar, Scatter, Histogram, Box, Heatmap, Volume
 
-    __all__.append('Gauge')
-    __all__.append('Bar')
-    __all__.append('Scatter')
-    __all__.append('Histogram')
-    __all__.append('Box')
-    __all__.append('Heatmap')
-    __all__.append('Volume')
-
+__all__ = create__all__(__name__)
 __pdoc__ = {k: False for k in __all__}

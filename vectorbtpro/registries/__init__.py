@@ -5,15 +5,7 @@
 from vectorbtpro.registries.ca_registry import ca_reg, CAQuery, CAQueryDelegator
 from vectorbtpro.registries.ch_registry import ch_reg, register_chunkable
 from vectorbtpro.registries.jit_registry import jit_reg, register_jitted
+from vectorbtpro.utils.module_ import create__all__
 
-__all__ = [
-    'ca_reg',
-    'ch_reg',
-    'jit_reg',
-    'CAQuery',
-    'CAQueryDelegator',
-    'register_chunkable',
-    'register_jitted',
-]
-
+__all__ = create__all__(__name__)
 __pdoc__ = {k: False for k in __all__}

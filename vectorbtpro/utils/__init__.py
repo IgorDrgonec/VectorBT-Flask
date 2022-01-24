@@ -52,63 +52,7 @@ from vectorbtpro.utils.profiling import Timer, MemTracer
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.schedule_ import AsyncJob, AsyncScheduler, CancelledError, ScheduleManager
 from vectorbtpro.utils.template import Sub, Rep, RepEval, RepFunc, deep_substitute
-
-__all__ = [
-    'atomic_dict',
-    'merge_dicts',
-    'Config',
-    'ReadonlyConfig',
-    'HybridConfig',
-    'Configured',
-    'AtomicConfig',
-    'Sub',
-    'Rep',
-    'RepEval',
-    'RepFunc',
-    'deep_substitute',
-    'Regex',
-    'cacheable_property',
-    'cached_property',
-    'cacheable',
-    'cached',
-    'cacheable_method',
-    'cached_method',
-    'Cacheable',
-    'set_seed',
-    'save_animation',
-    'AsyncJob',
-    'AsyncScheduler',
-    'CancelledError',
-    'ScheduleManager',
-    'SequenceEngine',
-    'DaskEngine',
-    'RayEngine',
-    'ChunkMeta',
-    'ArgChunkMeta',
-    'LenChunkMeta',
-    'ArgSizer',
-    'LenSizer',
-    'ShapeSizer',
-    'ArraySizer',
-    'ChunkMapper',
-    'ChunkSelector',
-    'ChunkSlicer',
-    'CountAdapter',
-    'ShapeSelector',
-    'ShapeSlicer',
-    'ArraySelector',
-    'ArraySlicer',
-    'SequenceTaker',
-    'MappingTaker',
-    'ArgsTaker',
-    'KwargsTaker',
-    'chunked',
-    'Timer',
-    'MemTracer',
-    'prettify',
-    'jitted',
-    'deep_getattr'
-]
+from vectorbtpro.utils.module_ import create__all__
 
 __blacklist__ = []
 
@@ -119,9 +63,5 @@ except ImportError:
 else:
     from vectorbtpro.utils.figure import Figure, FigureWidget, make_figure, make_subplots
 
-    __all__.append('Figure')
-    __all__.append('FigureWidget')
-    __all__.append('make_figure')
-    __all__.append('make_subplots')
-
+__all__ = create__all__(__name__)
 __pdoc__ = {k: False for k in __all__}

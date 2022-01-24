@@ -15,20 +15,7 @@ from vectorbtpro.data.custom import (
     AlpacaData
 )
 from vectorbtpro.data.updater import DataUpdater
+from vectorbtpro.utils.module_ import create__all__
 
-__all__ = [
-    'symbol_dict',
-    'Data',
-    'DataUpdater',
-    'CSVData',
-    'HDFData',
-    'SyntheticData',
-    'RandomData',
-    'GBMData',
-    'YFData',
-    'BinanceData',
-    'CCXTData',
-    'AlpacaData'
-]
-
+__all__ = create__all__(__name__)
 __pdoc__ = {k: False for k in __all__}

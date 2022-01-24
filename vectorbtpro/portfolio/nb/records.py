@@ -65,7 +65,7 @@ def fill_trade_record_nb(new_records: tp.Record,
 
 @register_jitted(cache=True)
 def fill_entry_trades_in_position_nb(order_records: tp.RecordArray,
-                                     col_map: tp.ColMap,
+                                     col_map: tp.GroupMap,
                                      col: int,
                                      first_c: int,
                                      last_c: int,
@@ -141,11 +141,11 @@ def fill_entry_trades_in_position_nb(order_records: tp.RecordArray,
 
 
 @register_chunkable(
-    size=records_ch.ColLensSizer(arg_query='col_map'),
+    size=base_ch.GroupLensSizer(arg_query='col_map'),
     arg_take_spec=dict(
         order_records=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
         close=ch.ArraySlicer(axis=1),
-        col_map=records_ch.ColMapSlicer(),
+        col_map=base_ch.GroupMapSlicer(),
         init_position=base_ch.FlexArraySlicer(axis=1, flex_2d=True)
     ),
     merge_func=records_ch.merge_records,
@@ -154,7 +154,7 @@ def fill_entry_trades_in_position_nb(order_records: tp.RecordArray,
 @register_jitted(cache=True, tags={'can_parallel'})
 def get_entry_trades_nb(order_records: tp.RecordArray,
                         close: tp.Array2d,
-                        col_map: tp.ColMap,
+                        col_map: tp.GroupMap,
                         init_position: tp.FlexArray = np.asarray(0.)) -> tp.RecordArray:
     """Fill entry trade records by aggregating order records.
 
@@ -418,11 +418,11 @@ def get_entry_trades_nb(order_records: tp.RecordArray,
 
 
 @register_chunkable(
-    size=records_ch.ColLensSizer(arg_query='col_map'),
+    size=base_ch.GroupLensSizer(arg_query='col_map'),
     arg_take_spec=dict(
         order_records=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
         close=ch.ArraySlicer(axis=1),
-        col_map=records_ch.ColMapSlicer(),
+        col_map=base_ch.GroupMapSlicer(),
         init_position=base_ch.FlexArraySlicer(axis=1, flex_2d=True)
     ),
     merge_func=records_ch.merge_records,
@@ -431,7 +431,7 @@ def get_entry_trades_nb(order_records: tp.RecordArray,
 @register_jitted(cache=True, tags={'can_parallel'})
 def get_exit_trades_nb(order_records: tp.RecordArray,
                        close: tp.Array2d,
-                       col_map: tp.ColMap,
+                       col_map: tp.GroupMap,
                        init_position: tp.FlexArray = np.asarray(0.)) -> tp.RecordArray:
     """Fill exit trade records by aggregating order records.
 
@@ -723,15 +723,15 @@ def copy_trade_record_nb(new_records: tp.RecordArray, r: int, trade_record: tp.R
 
 
 @register_chunkable(
-    size=records_ch.ColLensSizer(arg_query='col_map'),
+    size=base_ch.GroupLensSizer(arg_query='col_map'),
     arg_take_spec=dict(
         trade_records=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
-        col_map=records_ch.ColMapSlicer()
+        col_map=base_ch.GroupMapSlicer()
     ),
     merge_func=base_ch.concat
 )
 @register_jitted(cache=True, tags={'can_parallel'})
-def get_positions_nb(trade_records: tp.RecordArray, col_map: tp.ColMap) -> tp.RecordArray:
+def get_positions_nb(trade_records: tp.RecordArray, col_map: tp.GroupMap) -> tp.RecordArray:
     """Fill position records by aggregating trade records.
 
     Trades can be entry trades, exit trades, and even positions themselves - all will produce the same results.

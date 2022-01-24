@@ -2,7 +2,8 @@
 
 """Modules for messaging."""
 
-__all__ = []
+from vectorbtpro.utils.module_ import create__all__
+
 __blacklist__ = []
 
 try:
@@ -12,6 +13,6 @@ except ImportError:
 else:
     from vectorbtpro.messaging.telegram import TelegramBot
 
-    __all__.append('TelegramBot')
 
+__all__ = create__all__(__name__)
 __pdoc__ = {k: False for k in __all__}

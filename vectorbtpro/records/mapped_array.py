@@ -562,7 +562,7 @@ class MappedArray(Analyzable):
             group_select=self.group_select,
             **kwargs
         )
-        new_indices, new_col_arr = self.col_mapper.col_idxs_meta(col_idxs)
+        new_indices, new_col_arr = self.col_mapper.select_cols(col_idxs)
         new_mapped_arr = self.values[new_indices]
         new_id_arr = self.id_arr[new_indices]
         if self.idx_arr is not None:

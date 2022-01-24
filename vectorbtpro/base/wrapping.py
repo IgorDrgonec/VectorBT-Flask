@@ -9,10 +9,9 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import indexes, reshaping
-from vectorbtpro.base.grouping import Grouper
+from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.base.indexing import IndexingError, PandasIndexer
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.array_ import get_ranges_arr
 from vectorbtpro.utils.attr_ import AttrResolverMixin, AttrResolverMixinT
 from vectorbtpro.utils.config import Configured
 from vectorbtpro.utils.datetime_ import freq_to_timedelta, DatetimeIndexes
@@ -24,11 +23,11 @@ IndexingMetaT = tp.Tuple[ArrayWrapperT, tp.MaybeArray, tp.MaybeArray, tp.Array1d
 
 class ArrayWrapper(Configured, PandasIndexer):
     """Class that stores index, columns, and shape metadata for wrapping NumPy arrays.
-    Tightly integrated with `vectorbtpro.base.grouping.Grouper` for grouping columns.
+    Tightly integrated with `vectorbtpro.base.grouping.base.Grouper` for grouping columns.
 
     If the underlying object is a Series, pass `[sr.name]` as `columns`.
 
-    `**kwargs` are passed to `vectorbtpro.base.grouping.Grouper`.
+    `**kwargs` are passed to `vectorbtpro.base.grouping.base.Grouper`.
 
     !!! note
         This class is meant to be immutable. To change any attribute, use `ArrayWrapper.replace`.
@@ -210,31 +209,21 @@ class ArrayWrapper(Configured, PandasIndexer):
                 # Selection based on groups
                 # Get indices of columns corresponding to selected groups
                 group_idxs = col_idxs
-                group_idxs_arr = reshaping.to_1d_array(group_idxs)
-                group_start_idxs = _self.grouper.get_group_start_idxs()[group_idxs_arr]
-                group_end_idxs = _self.grouper.get_group_end_idxs()[group_idxs_arr]
-                ungrouped_col_idxs = get_ranges_arr(group_start_idxs, group_end_idxs)
-                ungrouped_columns = _self.columns[ungrouped_col_idxs]
+                new_group_idxs, new_groups = _self.grouper.select_groups(group_idxs)
+                ungrouped_columns = _self.columns[new_group_idxs]
                 if new_ndim == 1 and len(ungrouped_columns) == 1:
                     ungrouped_ndim = 1
-                    ungrouped_col_idxs = ungrouped_col_idxs[0]
+                    new_group_idxs = new_group_idxs[0]
                 else:
                     ungrouped_ndim = 2
-
-                # Get indices of selected groups corresponding to the new columns
-                # We could do _self.group_by[ungrouped_col_idxs] but indexing operation may have changed the labels
-                group_lens = _self.grouper.get_group_lens()[group_idxs_arr]
-                ungrouped_group_idxs = np.full(len(ungrouped_columns), 0)
-                ungrouped_group_idxs[group_lens[:-1]] = 1
-                ungrouped_group_idxs = np.cumsum(ungrouped_group_idxs)
 
                 return _self.replace(
                     index=new_index,
                     columns=ungrouped_columns,
                     ndim=ungrouped_ndim,
                     grouped_ndim=new_ndim,
-                    group_by=new_columns[ungrouped_group_idxs]
-                ), idx_idxs, group_idxs, ungrouped_col_idxs
+                    group_by=new_columns[new_groups]
+                ), idx_idxs, group_idxs, new_group_idxs
 
             # Selection based on columns
             col_idxs_arr = reshaping.to_1d_array(col_idxs)

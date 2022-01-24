@@ -406,7 +406,7 @@ Since vectorbt usually associates with processing multi-column data, where each 
 represents a separate backtesting instance, the ability to group those columns into some sort
 of groups is a must-have feature.
 
-Class [Grouper](/api/base/grouping/#vectorbtpro.base.grouping.Grouper) implements functionality
+Class [Grouper](/api/base/grouping/#vectorbtpro.base.grouping.base.Grouper) implements functionality
 to validate and build groups of any Pandas Index, especially columns. It's capable of translating 
 various metadata such as [GroupBy objects](https://pandas.pydata.org/docs/reference/groupby.html) 
 and column levels into special NumPy arrays that can be used by Numba-compiled functions
@@ -571,8 +571,8 @@ columns, let's adapt our function to sum all elements over each group of columns
 >>> def sum_per_group(df, group_by):
 ...     wrapper = vbt.ArrayWrapper.from_obj(df, group_by=group_by)
 ...     results = []
-...     for col_idxs in wrapper.grouper.yield_col_idxs():
-...         group_result = np.sum(df.values[:, col_idxs])
+...     for group_idxs in wrapper.grouper.yield_group_idxs():
+...         group_result = np.sum(df.values[:, group_idxs])
 ...         results.append(group_result)
 ...     return wrapper.wrap_reduced(results)
 

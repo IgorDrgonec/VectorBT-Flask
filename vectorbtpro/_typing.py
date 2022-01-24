@@ -120,7 +120,9 @@ PandasIndexingFunc = Callable[[SeriesFrame], MaybeSeriesFrame]
 # Grouping
 GroupByLike = Union[None, bool, MaybeLevelSequence, IndexLike]
 PandasGroupByLike = Union[Label, Labels, Callable, Mapping[Label, Any]]
-GroupMap = Tuple[Array1d, Array1d]
+GroupIdxs = Array1d
+GroupLens = Array1d
+GroupMap = Tuple[GroupIdxs, GroupLens]
 
 # Wrapping
 NameIndex = Union[None, Any, Index]
@@ -150,29 +152,26 @@ MapMetaFunc = Callable[[int, int, Scalar, VarArg()], Scalar]
 ApplyFunc = Callable[[Array1d, VarArg()], MaybeArray]
 ApplyMetaFunc = Callable[[int, VarArg()], MaybeArray]
 RollApplyMetaFunc = Callable[[int, int, int, VarArg()], Scalar]
-GroupByApplyMetaFunc = Callable[[Array1d, int, int, VarArg()], Scalar]
+GroupByApplyMetaFunc = Callable[[GroupIdxs, int, int, VarArg()], Scalar]
 ReduceFunc = Callable[[Array1d, VarArg()], Scalar]
 ReduceMetaFunc = Callable[[int, VarArg()], Scalar]
 ReduceToArrayFunc = Callable[[Array1d, VarArg()], Array1d]
 ReduceToArrayMetaFunc = Callable[[int, VarArg()], Array1d]
 ReduceGroupedFunc = Callable[[Array2d, VarArg()], Scalar]
-ReduceGroupedMetaFunc = Callable[[int, int, int, VarArg()], Scalar]
+ReduceGroupedMetaFunc = Callable[[GroupIdxs, int, VarArg()], Scalar]
 ReduceGroupedToArrayFunc = Callable[[Array2d, VarArg()], Array1d]
-ReduceGroupedToArrayMetaFunc = Callable[[int, int, int, VarArg()], Array1d]
-GroupSqueezeMetaFunc = Callable[[int, int, int, int, VarArg()], Scalar]
+ReduceGroupedToArrayMetaFunc = Callable[[GroupIdxs, int, VarArg()], Array1d]
+GroupSqueezeMetaFunc = Callable[[int, GroupIdxs, int, VarArg()], Scalar]
 
 # Signals
 PlaceFunc = Callable[[Array1d, int, int, int, VarArg()], None]
 RankFunc = Callable[[int, int, int, int, int, VarArg()], int]
 
 # Records
-ColIdxs = Array1d
-ColLens = Array1d
-ColMap = Tuple[ColIdxs, ColLens]
 RecordsMapFunc = Callable[[np.void, VarArg()], Scalar]
 RecordsMapMetaFunc = Callable[[int, VarArg()], Scalar]
-MappedReduceMetaFunc = Callable[[Array1d, int, VarArg()], Scalar]
-MappedReduceToArrayMetaFunc = Callable[[Array1d, int, VarArg()], Array1d]
+MappedReduceMetaFunc = Callable[[GroupIdxs, int, VarArg()], Scalar]
+MappedReduceToArrayMetaFunc = Callable[[GroupIdxs, int, VarArg()], Array1d]
 
 # Indicators
 Param = Any

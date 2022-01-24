@@ -6,10 +6,6 @@ Provides an arsenal of Numba-compiled functions for records and mapped arrays.
 These only accept NumPy arrays and other Numba-compatible types.
 
 !!! note
-    vectorbt treats matrices as first-class citizens and expects input arrays to be
-    2-dim, unless function has suffix `_1d` or is meant to be input to another function.
-    Data is processed along index (axis 0).
-
     All functions passed as argument must be Numba-compiled.
 
     Records must retain the order they were created in."""
@@ -45,7 +41,7 @@ def generate_ids_nb(col_arr: tp.Array1d, n_cols: int) -> tp.Array1d:
 
 
 @register_jitted(cache=True)
-def col_lens_nb(col_arr: tp.Array1d, n_cols: int) -> tp.ColLens:
+def col_lens_nb(col_arr: tp.Array1d, n_cols: int) -> tp.GroupLens:
     """Get column lengths from sorted column array.
 
     !!! note
@@ -63,31 +59,7 @@ def col_lens_nb(col_arr: tp.Array1d, n_cols: int) -> tp.ColLens:
 
 
 @register_jitted(cache=True)
-def col_lens_select_nb(col_lens: tp.ColLens, new_cols: tp.Array1d) -> tp.Tuple[tp.Array1d, tp.Array1d]:
-    """Perform indexing on a sorted array using column lengths.
-
-    Returns indices of elements corresponding to columns in `new_cols` and a new column array."""
-    col_end_idxs = np.cumsum(col_lens)
-    col_start_idxs = col_end_idxs - col_lens
-    n_values = np.sum(col_lens[new_cols])
-    indices_out = np.empty(n_values, dtype=np.int_)
-    col_arr_out = np.empty(n_values, dtype=np.int_)
-    j = 0
-
-    for c in range(new_cols.shape[0]):
-        from_r = col_start_idxs[new_cols[c]]
-        to_r = col_end_idxs[new_cols[c]]
-        if from_r == to_r:
-            continue
-        rang = np.arange(from_r, to_r)
-        indices_out[j:j + rang.shape[0]] = rang
-        col_arr_out[j:j + rang.shape[0]] = c
-        j += rang.shape[0]
-    return indices_out, col_arr_out
-
-
-@register_jitted(cache=True)
-def record_col_lens_select_nb(records: tp.RecordArray, col_lens: tp.ColLens, new_cols: tp.Array1d) -> tp.RecordArray:
+def record_col_lens_select_nb(records: tp.RecordArray, col_lens: tp.GroupLens, new_cols: tp.Array1d) -> tp.RecordArray:
     """Perform indexing on sorted records using column lengths.
 
     Returns new records."""
@@ -110,7 +82,7 @@ def record_col_lens_select_nb(records: tp.RecordArray, col_lens: tp.ColLens, new
 
 
 @register_jitted(cache=True)
-def col_map_nb(col_arr: tp.Array1d, n_cols: int) -> tp.ColMap:
+def col_map_nb(col_arr: tp.Array1d, n_cols: int) -> tp.GroupMap:
     """Build a map between columns and value indices.
 
     Returns an array with indices segmented by column and an array with column lengths.
@@ -133,30 +105,7 @@ def col_map_nb(col_arr: tp.Array1d, n_cols: int) -> tp.ColMap:
 
 
 @register_jitted(cache=True)
-def col_map_select_nb(col_map: tp.ColMap, new_cols: tp.Array1d) -> tp.Tuple[tp.Array1d, tp.Array1d]:
-    """Same as `col_lens_select_nb` but using column map `col_map`."""
-    col_idxs, col_lens = col_map
-    col_start_idxs = np.cumsum(col_lens) - col_lens
-    total_count = np.sum(col_lens[new_cols])
-    idxs_out = np.empty(total_count, dtype=np.int_)
-    col_arr_out = np.empty(total_count, dtype=np.int_)
-    j = 0
-
-    for new_col_i in range(len(new_cols)):
-        new_col = new_cols[new_col_i]
-        col_len = col_lens[new_col]
-        if col_len == 0:
-            continue
-        col_start_idx = col_start_idxs[new_col]
-        idxs = col_idxs[col_start_idx:col_start_idx + col_len]
-        idxs_out[j:j + col_len] = idxs
-        col_arr_out[j:j + col_len] = new_col_i
-        j += col_len
-    return idxs_out, col_arr_out
-
-
-@register_jitted(cache=True)
-def record_col_map_select_nb(records: tp.RecordArray, col_map: tp.ColMap, new_cols: tp.Array1d) -> tp.RecordArray:
+def record_col_map_select_nb(records: tp.RecordArray, col_map: tp.GroupMap, new_cols: tp.Array1d) -> tp.RecordArray:
     """Same as `record_col_lens_select_nb` but using column map `col_map`."""
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
@@ -204,16 +153,16 @@ def is_col_id_sorted_nb(col_arr: tp.Array1d, id_arr: tp.Array1d) -> bool:
 
 
 @register_chunkable(
-    size=records_ch.ColLensSizer(arg_query='col_map'),
+    size=base_ch.GroupLensSizer(arg_query='col_map'),
     arg_take_spec=dict(
         mapped_arr=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
-        col_map=records_ch.ColMapSlicer(),
+        col_map=base_ch.GroupMapSlicer(),
         n=None
     ),
     merge_func=base_ch.concat
 )
 @register_jitted(cache=True, tags={'can_parallel'})
-def top_n_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, n: int) -> tp.Array1d:
+def top_n_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.GroupMap, n: int) -> tp.Array1d:
     """Returns mask of top N mapped elements."""
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
@@ -230,16 +179,16 @@ def top_n_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, n: int) -> tp.Ar
 
 
 @register_chunkable(
-    size=records_ch.ColLensSizer(arg_query='col_map'),
+    size=base_ch.GroupLensSizer(arg_query='col_map'),
     arg_take_spec=dict(
         mapped_arr=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
-        col_map=records_ch.ColMapSlicer(),
+        col_map=base_ch.GroupMapSlicer(),
         n=None
     ),
     merge_func=base_ch.concat
 )
 @register_jitted(cache=True, tags={'can_parallel'})
-def bottom_n_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, n: int) -> tp.Array1d:
+def bottom_n_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.GroupMap, n: int) -> tp.Array1d:
     """Returns mask of bottom N mapped elements."""
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
@@ -300,17 +249,17 @@ def map_records_meta_nb(n_values: int, map_func_nb: tp.MappedReduceMetaFunc, *ar
 
 
 @register_chunkable(
-    size=records_ch.ColLensSizer(arg_query='col_map'),
+    size=base_ch.GroupLensSizer(arg_query='col_map'),
     arg_take_spec=dict(
         arr=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
-        col_map=records_ch.ColMapSlicer(),
+        col_map=base_ch.GroupMapSlicer(),
         apply_func_nb=None,
         args=ch.ArgsTaker()
     ),
     merge_func=base_ch.concat
 )
 @register_jitted(tags={'can_parallel'})
-def apply_nb(arr: tp.Array1d, col_map: tp.ColMap, apply_func_nb: tp.ApplyFunc, *args) -> tp.Array1d:
+def apply_nb(arr: tp.Array1d, col_map: tp.GroupMap, apply_func_nb: tp.ApplyFunc, *args) -> tp.Array1d:
     """Apply function on mapped array or records per column.
 
     Returns the same shape as `mapped_or_records`.
@@ -331,17 +280,17 @@ def apply_nb(arr: tp.Array1d, col_map: tp.ColMap, apply_func_nb: tp.ApplyFunc, *
 
 
 @register_chunkable(
-    size=records_ch.ColLensSizer(arg_query='col_map'),
+    size=base_ch.GroupLensSizer(arg_query='col_map'),
     arg_take_spec=dict(
         n_values=ch.CountAdapter(mapper=records_ch.col_idxs_mapper),
-        col_map=records_ch.ColMapSlicer(),
+        col_map=base_ch.GroupMapSlicer(),
         apply_func_nb=None,
         args=ch.ArgsTaker()
     ),
     merge_func=base_ch.concat
 )
 @register_jitted(tags={'can_parallel'})
-def apply_meta_nb(n_values: int, col_map: tp.ColMap, apply_func_nb: tp.ApplyMetaFunc, *args) -> tp.Array1d:
+def apply_meta_nb(n_values: int, col_map: tp.GroupMap, apply_func_nb: tp.ApplyMetaFunc, *args) -> tp.Array1d:
     """Meta version of `apply_nb`.
 
     `apply_func_nb` must accept the indices, the column index, and `*args`. Must return an array."""
@@ -362,12 +311,12 @@ def apply_meta_nb(n_values: int, col_map: tp.ColMap, apply_func_nb: tp.ApplyMeta
 # ############# Reducing ############# #
 
 @register_chunkable(
-    size=records_ch.ColLensSizer(arg_query='col_map'),
+    size=base_ch.GroupLensSizer(arg_query='col_map'),
     arg_take_spec=dict(
         mapped_arr=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
         idx_arr=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
         id_arr=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
-        col_map=records_ch.ColMapSlicer(),
+        col_map=base_ch.GroupMapSlicer(),
         segment_arr=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
         reduce_func_nb=None,
         args=ch.ArgsTaker()
@@ -378,7 +327,7 @@ def apply_meta_nb(n_values: int, col_map: tp.ColMap, apply_func_nb: tp.ApplyMeta
 def reduce_mapped_segments_nb(mapped_arr: tp.Array1d,
                               idx_arr: tp.Array1d,
                               id_arr: tp.Array1d,
-                              col_map: tp.ColMap,
+                              col_map: tp.GroupMap,
                               segment_arr: tp.Array1d,
                               reduce_func_nb: tp.ReduceFunc, *args) \
         -> tp.Tuple[tp.Array1d, tp.Array1d, tp.Array1d, tp.Array1d]:
@@ -443,10 +392,10 @@ def reduce_mapped_segments_nb(mapped_arr: tp.Array1d,
 
 
 @register_chunkable(
-    size=records_ch.ColLensSizer(arg_query='col_map'),
+    size=base_ch.GroupLensSizer(arg_query='col_map'),
     arg_take_spec=dict(
         mapped_arr=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
-        col_map=records_ch.ColMapSlicer(),
+        col_map=base_ch.GroupMapSlicer(),
         fill_value=None,
         reduce_func_nb=None,
         args=ch.ArgsTaker()
@@ -454,7 +403,7 @@ def reduce_mapped_segments_nb(mapped_arr: tp.Array1d,
     merge_func=base_ch.concat
 )
 @register_jitted(tags={'can_parallel'})
-def reduce_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, fill_value: float,
+def reduce_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.GroupMap, fill_value: float,
                      reduce_func_nb: tp.ReduceFunc, *args) -> tp.Array1d:
     """Reduce mapped array by column to a single value.
 
@@ -478,9 +427,9 @@ def reduce_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, fill_value: flo
 
 
 @register_chunkable(
-    size=records_ch.ColLensSizer(arg_query='col_map'),
+    size=base_ch.GroupLensSizer(arg_query='col_map'),
     arg_take_spec=dict(
-        col_map=records_ch.ColMapSlicer(),
+        col_map=base_ch.GroupMapSlicer(),
         fill_value=None,
         reduce_func_nb=None,
         args=ch.ArgsTaker()
@@ -488,7 +437,7 @@ def reduce_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, fill_value: flo
     merge_func=base_ch.concat
 )
 @register_jitted(tags={'can_parallel'})
-def reduce_mapped_meta_nb(col_map: tp.ColMap, fill_value: float,
+def reduce_mapped_meta_nb(col_map: tp.GroupMap, fill_value: float,
                           reduce_func_nb: tp.MappedReduceMetaFunc, *args) -> tp.Array1d:
     """Meta version of `reduce_mapped_nb`.
 
@@ -509,10 +458,10 @@ def reduce_mapped_meta_nb(col_map: tp.ColMap, fill_value: float,
 
 
 @register_chunkable(
-    size=records_ch.ColLensSizer(arg_query='col_map'),
+    size=base_ch.GroupLensSizer(arg_query='col_map'),
     arg_take_spec=dict(
         mapped_arr=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
-        col_map=records_ch.ColMapSlicer(),
+        col_map=base_ch.GroupMapSlicer(),
         idx_arr=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
         fill_value=None,
         reduce_func_nb=None,
@@ -521,7 +470,7 @@ def reduce_mapped_meta_nb(col_map: tp.ColMap, fill_value: float,
     merge_func=base_ch.concat
 )
 @register_jitted(tags={'can_parallel'})
-def reduce_mapped_to_idx_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, idx_arr: tp.Array1d,
+def reduce_mapped_to_idx_nb(mapped_arr: tp.Array1d, col_map: tp.GroupMap, idx_arr: tp.Array1d,
                             fill_value: float, reduce_func_nb: tp.ReduceFunc, *args) -> tp.Array1d:
     """Reduce mapped array by column to an index.
 
@@ -545,9 +494,9 @@ def reduce_mapped_to_idx_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, idx_arr:
 
 
 @register_chunkable(
-    size=records_ch.ColLensSizer(arg_query='col_map'),
+    size=base_ch.GroupLensSizer(arg_query='col_map'),
     arg_take_spec=dict(
-        col_map=records_ch.ColMapSlicer(),
+        col_map=base_ch.GroupMapSlicer(),
         idx_arr=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
         fill_value=None,
         reduce_func_nb=None,
@@ -556,7 +505,7 @@ def reduce_mapped_to_idx_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, idx_arr:
     merge_func=base_ch.concat
 )
 @register_jitted(tags={'can_parallel'})
-def reduce_mapped_to_idx_meta_nb(col_map: tp.ColMap, idx_arr: tp.Array1d, fill_value: float,
+def reduce_mapped_to_idx_meta_nb(col_map: tp.GroupMap, idx_arr: tp.Array1d, fill_value: float,
                                  reduce_func_nb: tp.MappedReduceMetaFunc, *args) -> tp.Array1d:
     """Meta version of `reduce_mapped_to_idx_nb`.
 
@@ -577,10 +526,10 @@ def reduce_mapped_to_idx_meta_nb(col_map: tp.ColMap, idx_arr: tp.Array1d, fill_v
 
 
 @register_chunkable(
-    size=records_ch.ColLensSizer(arg_query='col_map'),
+    size=base_ch.GroupLensSizer(arg_query='col_map'),
     arg_take_spec=dict(
         mapped_arr=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
-        col_map=records_ch.ColMapSlicer(),
+        col_map=base_ch.GroupMapSlicer(),
         fill_value=None,
         reduce_func_nb=None,
         args=ch.ArgsTaker()
@@ -588,7 +537,7 @@ def reduce_mapped_to_idx_meta_nb(col_map: tp.ColMap, idx_arr: tp.Array1d, fill_v
     merge_func=base_ch.column_stack
 )
 @register_jitted(tags={'can_parallel'})
-def reduce_mapped_to_array_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, fill_value: float,
+def reduce_mapped_to_array_nb(mapped_arr: tp.Array1d, col_map: tp.GroupMap, fill_value: float,
                               reduce_func_nb: tp.ReduceToArrayFunc, *args) -> tp.Array2d:
     """Reduce mapped array by column to an array.
 
@@ -620,9 +569,9 @@ def reduce_mapped_to_array_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, fill_v
 
 
 @register_chunkable(
-    size=records_ch.ColLensSizer(arg_query='col_map'),
+    size=base_ch.GroupLensSizer(arg_query='col_map'),
     arg_take_spec=dict(
-        col_map=records_ch.ColMapSlicer(),
+        col_map=base_ch.GroupMapSlicer(),
         fill_value=None,
         reduce_func_nb=None,
         args=ch.ArgsTaker()
@@ -630,7 +579,7 @@ def reduce_mapped_to_array_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, fill_v
     merge_func=base_ch.column_stack
 )
 @register_jitted(tags={'can_parallel'})
-def reduce_mapped_to_array_meta_nb(col_map: tp.ColMap, fill_value: float,
+def reduce_mapped_to_array_meta_nb(col_map: tp.GroupMap, fill_value: float,
                                    reduce_func_nb: tp.MappedReduceToArrayMetaFunc, *args) -> tp.Array2d:
     """Meta version of `reduce_mapped_to_array_nb`.
 
@@ -662,10 +611,10 @@ def reduce_mapped_to_array_meta_nb(col_map: tp.ColMap, fill_value: float,
 
 
 @register_chunkable(
-    size=records_ch.ColLensSizer(arg_query='col_map'),
+    size=base_ch.GroupLensSizer(arg_query='col_map'),
     arg_take_spec=dict(
         mapped_arr=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
-        col_map=records_ch.ColMapSlicer(),
+        col_map=base_ch.GroupMapSlicer(),
         idx_arr=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
         fill_value=None,
         reduce_func_nb=None,
@@ -674,7 +623,7 @@ def reduce_mapped_to_array_meta_nb(col_map: tp.ColMap, fill_value: float,
     merge_func=base_ch.column_stack
 )
 @register_jitted(tags={'can_parallel'})
-def reduce_mapped_to_idx_array_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, idx_arr: tp.Array1d,
+def reduce_mapped_to_idx_array_nb(mapped_arr: tp.Array1d, col_map: tp.GroupMap, idx_arr: tp.Array1d,
                                   fill_value: float, reduce_func_nb: tp.ReduceToArrayFunc, *args) -> tp.Array2d:
     """Reduce mapped array by column to an index array.
 
@@ -709,9 +658,9 @@ def reduce_mapped_to_idx_array_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, id
 
 
 @register_chunkable(
-    size=records_ch.ColLensSizer(arg_query='col_map'),
+    size=base_ch.GroupLensSizer(arg_query='col_map'),
     arg_take_spec=dict(
-        col_map=records_ch.ColMapSlicer(),
+        col_map=base_ch.GroupMapSlicer(),
         idx_arr=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
         fill_value=None,
         reduce_func_nb=None,
@@ -720,7 +669,7 @@ def reduce_mapped_to_idx_array_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, id
     merge_func=base_ch.column_stack
 )
 @register_jitted(tags={'can_parallel'})
-def reduce_mapped_to_idx_array_meta_nb(col_map: tp.ColMap, idx_arr: tp.Array1d, fill_value: float,
+def reduce_mapped_to_idx_array_meta_nb(col_map: tp.GroupMap, idx_arr: tp.Array1d, fill_value: float,
                                        reduce_func_nb: tp.MappedReduceToArrayMetaFunc, *args) -> tp.Array2d:
     """Meta version of `reduce_mapped_to_idx_array_nb`.
 
@@ -755,16 +704,16 @@ def reduce_mapped_to_idx_array_meta_nb(col_map: tp.ColMap, idx_arr: tp.Array1d, 
 
 
 @register_chunkable(
-    size=records_ch.ColLensSizer(arg_query='col_map'),
+    size=base_ch.GroupLensSizer(arg_query='col_map'),
     arg_take_spec=dict(
         codes=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
         n_uniques=None,
-        col_map=records_ch.ColMapSlicer()
+        col_map=base_ch.GroupMapSlicer()
     ),
     merge_func=base_ch.column_stack
 )
 @register_jitted(cache=True, tags={'can_parallel'})
-def mapped_value_counts_per_col_nb(codes: tp.Array1d, n_uniques: int, col_map: tp.ColMap) -> tp.Array2d:
+def mapped_value_counts_per_col_nb(codes: tp.Array1d, n_uniques: int, col_map: tp.GroupMap) -> tp.Array2d:
     """Get value counts per column/group of an already factorized mapped array."""
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
@@ -859,7 +808,7 @@ def unstack_mapped_nb(mapped_arr: tp.Array1d, col_arr: tp.Array1d, idx_arr: tp.A
 
 
 @register_jitted(cache=True, is_generated_jit=True)
-def ignore_unstack_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, fill_value: float) -> tp.Array2d:
+def ignore_unstack_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.GroupMap, fill_value: float) -> tp.Array2d:
     """Unstack mapped array by ignoring index data."""
     nb_enabled = not isinstance(mapped_arr, np.ndarray)
     if nb_enabled:

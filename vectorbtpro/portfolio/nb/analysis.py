@@ -43,11 +43,11 @@ def get_short_size_nb(position_before: float, position_now: float) -> float:
 
 
 @register_chunkable(
-    size=records_ch.ColLensSizer(arg_query='col_map'),
+    size=base_ch.GroupLensSizer(arg_query='col_map'),
     arg_take_spec=dict(
         target_shape=ch.ShapeSlicer(axis=1),
         order_records=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
-        col_map=records_ch.ColMapSlicer(),
+        col_map=base_ch.GroupMapSlicer(),
         init_position=base_ch.FlexArraySlicer(axis=1, flex_2d=True),
         direction=None
     ),
@@ -56,7 +56,7 @@ def get_short_size_nb(position_before: float, position_now: float) -> float:
 @register_jitted(cache=True, tags={'can_parallel'})
 def asset_flow_nb(target_shape: tp.Shape,
                   order_records: tp.RecordArray,
-                  col_map: tp.ColMap,
+                  col_map: tp.GroupMap,
                   direction: int = Direction.Both,
                   init_position: tp.FlexArray = np.asarray(0.)) -> tp.Array2d:
     """Get asset flow series per column.
@@ -189,11 +189,11 @@ def get_free_cash_diff_nb(position_before: float,
 
 
 @register_chunkable(
-    size=records_ch.ColLensSizer(arg_query='col_map'),
+    size=base_ch.GroupLensSizer(arg_query='col_map'),
     arg_take_spec=dict(
         target_shape=ch.ShapeSlicer(axis=1),
         order_records=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
-        col_map=records_ch.ColMapSlicer(),
+        col_map=base_ch.GroupMapSlicer(),
         free=None,
         cash_earnings=base_ch.FlexArraySlicer(axis=1),
         flex_2d=None
@@ -203,7 +203,7 @@ def get_free_cash_diff_nb(position_before: float,
 @register_jitted(cache=True, tags={'can_parallel'})
 def cash_flow_nb(target_shape: tp.Shape,
                  order_records: tp.RecordArray,
-                 col_map: tp.ColMap,
+                 col_map: tp.GroupMap,
                  free: bool = False,
                  cash_earnings: tp.FlexArray = np.asarray(0.),
                  flex_2d: bool = False) -> tp.Array2d:
@@ -584,12 +584,12 @@ def value_nb(cash: tp.Array2d, asset_value: tp.Array2d) -> tp.Array2d:
 
 
 @register_chunkable(
-    size=records_ch.ColLensSizer(arg_query='col_map'),
+    size=base_ch.GroupLensSizer(arg_query='col_map'),
     arg_take_spec=dict(
         target_shape=ch.ShapeSlicer(axis=1),
         close=ch.ArraySlicer(axis=1),
         order_records=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
-        col_map=records_ch.ColMapSlicer(),
+        col_map=base_ch.GroupMapSlicer(),
         init_position=base_ch.FlexArraySlicer(axis=1, flex_2d=True),
         cash_earnings=base_ch.FlexArraySlicer(axis=1),
         flex_2d=None
@@ -600,7 +600,7 @@ def value_nb(cash: tp.Array2d, asset_value: tp.Array2d) -> tp.Array2d:
 def total_profit_nb(target_shape: tp.Shape,
                     close: tp.Array2d,
                     order_records: tp.RecordArray,
-                    col_map: tp.ColMap,
+                    col_map: tp.GroupMap,
                     init_position: tp.FlexArray = np.asarray(0.),
                     cash_earnings: tp.FlexArray = np.asarray(0.),
                     flex_2d: bool = False) -> tp.Array1d:

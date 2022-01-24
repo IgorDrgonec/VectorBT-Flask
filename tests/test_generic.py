@@ -1212,7 +1212,7 @@ class TestAccessors:
                 ),
                 template_mapping=dict(
                     to_2d_array=vbt.base.reshaping.to_2d_array,
-                    group_by_evenly_nb=vbt.base.grouping.group_by_evenly_nb
+                    group_by_evenly_nb=vbt.base.grouping.nb.group_by_evenly_nb
                 )
             ),
             pd.DataFrame([
@@ -1289,7 +1289,7 @@ class TestAccessors:
                 ),
                 template_mapping=dict(
                     to_2d_array=vbt.base.reshaping.to_2d_array,
-                    group_by_evenly_nb=vbt.base.grouping.group_by_evenly_nb
+                    group_by_evenly_nb=vbt.base.grouping.nb.group_by_evenly_nb
                 )
             ),
             pd.DataFrame([
@@ -1397,8 +1397,8 @@ class TestAccessors:
             return np.nansum(a[:, col])
 
         @njit
-        def sum_grouped_meta_nb(from_col, to_col, group, a):
-            return np.nansum(a[:, from_col:to_col])
+        def sum_grouped_meta_nb(group_idxs, group, a):
+            return np.nansum(a[:, group_idxs])
 
         assert df['a'].vbt.reduce(sum_nb) == df['a'].sum()
         pd.testing.assert_series_equal(
@@ -1455,7 +1455,11 @@ class TestAccessors:
                 sum_grouped_meta_nb, df.vbt.to_2d_array(),
                 wrapper=df.vbt.wrapper, group_by=group_by, jitted=dict(parallel=False)),
         )
-        chunked = dict(arg_take_spec=dict(args=vbt.ArgsTaker(vbt.ArraySlicer(axis=1, mapper=vbt.GroupLensMapper(0)), )))
+        chunked = dict(
+            arg_take_spec=dict(
+                args=vbt.ArgsTaker(vbt.ArraySlicer(axis=1, mapper=vbt.GroupLensMapper(arg_query=0)), )
+            )
+        )
         pd.testing.assert_series_equal(
             pd.DataFrame.vbt.reduce(
                 sum_grouped_meta_nb, df.vbt.to_2d_array(),
@@ -1484,8 +1488,8 @@ class TestAccessors:
         )
 
         @njit
-        def sum_grouped_meta2_nb(from_col, to_col, group, a, b):
-            return np.nansum(a[:, from_col:to_col]) + np.nansum(b[:, from_col:to_col])
+        def sum_grouped_meta2_nb(group_idxs, group, a, b):
+            return np.nansum(a[:, group_idxs]) + np.nansum(b[:, group_idxs])
 
         pd.testing.assert_series_equal(
             pd.DataFrame.vbt.reduce(
@@ -1516,10 +1520,10 @@ class TestAccessors:
             return np.argmax(a)
 
         @njit
-        def argmax_grouped_meta_nb(from_col, to_col, group, a):
-            a = a[:, from_col:to_col].flatten()
+        def argmax_grouped_meta_nb(group_idxs, group, a):
+            a = a[:, group_idxs].flatten()
             a[np.isnan(a)] = -np.inf
-            return np.argmax(a) // (to_col - from_col)
+            return np.argmax(a) // len(group_idxs)
 
         assert df['a'].vbt.reduce(argmax_nb, returns_idx=True) == df['a'].idxmax()
         pd.testing.assert_series_equal(
@@ -1577,7 +1581,11 @@ class TestAccessors:
                 argmax_grouped_meta_nb, df.vbt.to_2d_array(), returns_idx=True,
                 wrapper=df.vbt.wrapper, group_by=group_by, flatten=True, jitted=dict(parallel=False)),
         )
-        chunked = dict(arg_take_spec=dict(args=vbt.ArgsTaker(vbt.ArraySlicer(axis=1, mapper=vbt.GroupLensMapper(0)), )))
+        chunked = dict(
+            arg_take_spec=dict(
+                args=vbt.ArgsTaker(vbt.ArraySlicer(axis=1, mapper=vbt.GroupLensMapper(arg_query=0)), )
+            )
+        )
         pd.testing.assert_series_equal(
             pd.DataFrame.vbt.reduce(
                 argmax_grouped_meta_nb, df.vbt.to_2d_array(), returns_idx=True,
@@ -1603,10 +1611,10 @@ class TestAccessors:
             return out
 
         @njit
-        def min_and_max_grouped_meta_nb(from_col, to_col, group, a):
+        def min_and_max_grouped_meta_nb(group_idxs, group, a):
             out = np.empty(2)
-            out[0] = np.nanmin(a[:, from_col:to_col])
-            out[1] = np.nanmax(a[:, from_col:to_col])
+            out[0] = np.nanmin(a[:, group_idxs])
+            out[1] = np.nanmax(a[:, group_idxs])
             return out
 
         pd.testing.assert_series_equal(
@@ -1679,7 +1687,11 @@ class TestAccessors:
                 min_and_max_grouped_meta_nb, df.vbt.to_2d_array(), returns_array=True,
                 wrapper=df.vbt.wrapper, group_by=group_by, jitted=dict(parallel=False))
         )
-        chunked = dict(arg_take_spec=dict(args=vbt.ArgsTaker(vbt.ArraySlicer(axis=1, mapper=vbt.GroupLensMapper(0)), )))
+        chunked = dict(
+            arg_take_spec=dict(
+                args=vbt.ArgsTaker(vbt.ArraySlicer(axis=1, mapper=vbt.GroupLensMapper(arg_query=0)), )
+            )
+        )
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.reduce(
                 min_and_max_grouped_meta_nb, df.vbt.to_2d_array(), returns_array=True,
@@ -1715,16 +1727,16 @@ class TestAccessors:
             return out
 
         @njit
-        def argmin_and_argmax_grouped_meta_nb(from_col, to_col, group, a):
+        def argmin_and_argmax_grouped_meta_nb(group_idxs, group, a):
             # nanargmin and nanargmax
             out = np.empty(2)
-            _a = a[:, from_col:to_col].flatten()
+            _a = a[:, group_idxs].flatten()
             _a[np.isnan(_a)] = np.inf
             out[0] = np.argmin(_a)
-            _a = a[:, from_col:to_col].flatten()
+            _a = a[:, group_idxs].flatten()
             _a[np.isnan(_a)] = -np.inf
             out[1] = np.argmax(_a)
-            return out // (to_col - from_col)
+            return out // len(group_idxs)
 
         pd.testing.assert_series_equal(
             df['a'].vbt.reduce(
@@ -1798,7 +1810,11 @@ class TestAccessors:
                 argmin_and_argmax_grouped_meta_nb, df.vbt.to_2d_array(), returns_idx=True, returns_array=True,
                 wrapper=df.vbt.wrapper, group_by=group_by, jitted=dict(parallel=False))
         )
-        chunked = dict(arg_take_spec=dict(args=vbt.ArgsTaker(vbt.ArraySlicer(axis=1, mapper=vbt.GroupLensMapper(0)), )))
+        chunked = dict(
+            arg_take_spec=dict(
+                args=vbt.ArgsTaker(vbt.ArraySlicer(axis=1, mapper=vbt.GroupLensMapper(arg_query=0)), )
+            )
+        )
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.reduce(
                 argmin_and_argmax_grouped_meta_nb, df.vbt.to_2d_array(), returns_idx=True, returns_array=True,
@@ -1814,8 +1830,8 @@ class TestAccessors:
             return np.nanmean(a)
 
         @njit
-        def mean_grouped_meta_nb(i, from_col, to_col, group, a):
-            return np.nanmean(a[i, from_col:to_col])
+        def mean_grouped_meta_nb(i, group_idxs, group, a):
+            return np.nanmean(a[i, group_idxs])
 
         pd.testing.assert_frame_equal(
             df.vbt.squeeze_grouped(mean_nb, group_by=group_by),
@@ -1848,7 +1864,11 @@ class TestAccessors:
                 mean_grouped_meta_nb, df.vbt.to_2d_array(), group_by=group_by,
                 wrapper=df.vbt.wrapper, jitted=dict(parallel=False))
         )
-        chunked = dict(arg_take_spec=dict(args=vbt.ArgsTaker(vbt.ArraySlicer(axis=1, mapper=vbt.GroupLensMapper(1)), )))
+        chunked = dict(
+            arg_take_spec=dict(
+                args=vbt.ArgsTaker(vbt.ArraySlicer(axis=1, mapper=vbt.GroupLensMapper(arg_query=1)), )
+            )
+        )
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.squeeze_grouped(
                 mean_grouped_meta_nb, df.vbt.to_2d_array(), group_by=group_by,
@@ -1859,8 +1879,8 @@ class TestAccessors:
         )
 
         @njit
-        def sum_grouped_meta_nb(i, from_col, to_col, group, a, b):
-            return np.nansum(a[i, from_col:to_col]) + np.nansum(b[i, from_col:to_col])
+        def sum_grouped_meta_nb(i, group_idxs, group, a, b):
+            return np.nansum(a[i, group_idxs]) + np.nansum(b[i, group_idxs])
 
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.squeeze_grouped(

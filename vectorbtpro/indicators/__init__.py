@@ -17,6 +17,7 @@ from vectorbtpro.indicators.custom import (
     OBV
 )
 from vectorbtpro.indicators.factory import IndicatorFactory, IndicatorBase
+from vectorbtpro.utils.module_ import create__all__
 
 
 def talib(*args, **kwargs) -> tp.Type[IndicatorBase]:
@@ -34,24 +35,12 @@ def ta(*args, **kwargs) -> tp.Type[IndicatorBase]:
     return IndicatorFactory.from_ta(*args, **kwargs)
 
 
-__all__ = [
-    'IndicatorFactory',
-    'talib',
-    'pandas_ta',
-    'ta',
-    'MA',
-    'MSTD',
-    'BBANDS',
-    'RSI',
-    'STOCH',
-    'MACD',
-    'ATR',
-    'OBV'
-]
 __whitelist__ = [
     'talib',
     'pandas_ta',
     'ta'
 ]
-
+__all__ = create__all__(__name__)
 __pdoc__ = {k: k in __whitelist__ for k in __all__}
+
+

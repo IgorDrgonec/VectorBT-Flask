@@ -2376,57 +2376,63 @@ def reduce_to_array_meta_nb(n_cols: int, reduce_func_nb: tp.ReduceToArrayMetaFun
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='group_lens', axis=0),
+    size=base_ch.GroupLensSizer(arg_query='group_map'),
     arg_take_spec=dict(
-        arr=ch.ArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
-        group_lens=ch.ArraySlicer(axis=0),
+        arr=ch.ArraySlicer(axis=1, mapper=base_ch.group_idxs_mapper),
+        group_map=base_ch.GroupMapSlicer(),
         reduce_func_nb=None,
         args=ch.ArgsTaker()
     ),
     merge_func=base_ch.concat
 )
 @register_jitted(tags={'can_parallel'})
-def reduce_grouped_nb(arr: tp.Array2d, group_lens: tp.Array1d,
+def reduce_grouped_nb(arr: tp.Array2d, group_map: tp.GroupMap,
                       reduce_func_nb: tp.ReduceGroupedFunc, *args) -> tp.Array1d:
     """Reduce each group of columns into a single value using `reduce_func_nb`.
 
     `reduce_func_nb` must accept the 2-dim array and `*args`. Must return a single value."""
-    group_0_out = reduce_func_nb(arr[:, 0:group_lens[0]], *args)
+    group_idxs, group_lens = group_map
+    group_start_idxs = np.cumsum(group_lens) - group_lens
+    group_0_idxs = group_idxs[group_start_idxs[0]:group_start_idxs[0] + group_lens[0]]
+    group_0_out = reduce_func_nb(arr[:, group_0_idxs], *args)
     out = np.empty(len(group_lens), dtype=np.asarray(group_0_out).dtype)
     out[0] = group_0_out
-    group_end_idxs = np.cumsum(group_lens)
-    group_start_idxs = group_end_idxs - group_lens
+
     for group in prange(1, len(group_lens)):
-        from_col = group_start_idxs[group]
-        to_col = group_end_idxs[group]
-        out[group] = reduce_func_nb(arr[:, from_col:to_col], *args)
+        group_len = group_lens[group]
+        start_idx = group_start_idxs[group]
+        col_idxs = group_idxs[start_idx:start_idx + group_len]
+        out[group] = reduce_func_nb(arr[:, col_idxs], *args)
     return out
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='group_lens', axis=0),
+    size=base_ch.GroupLensSizer(arg_query='group_map'),
     arg_take_spec=dict(
-        group_lens=ch.ArraySlicer(axis=0),
+        group_map=base_ch.GroupMapSlicer(),
         reduce_func_nb=None,
         args=ch.ArgsTaker()
     ),
     merge_func=base_ch.concat
 )
 @register_jitted(tags={'can_parallel'})
-def reduce_grouped_meta_nb(group_lens: tp.Array1d, reduce_func_nb: tp.ReduceGroupedMetaFunc, *args) -> tp.Array1d:
+def reduce_grouped_meta_nb(group_map: tp.GroupMap, reduce_func_nb: tp.ReduceGroupedMetaFunc, *args) -> tp.Array1d:
     """Meta version of `reduce_grouped_nb`.
 
-    `reduce_func_nb` must accept the from-column index, the to-column index, the group index, and `*args`.
+    `reduce_func_nb` must accept the column indices of the group, the group index, and `*args`.
     Must return a single value."""
-    group_0_out = reduce_func_nb(0, group_lens[0], 0, *args)
+    group_idxs, group_lens = group_map
+    group_start_idxs = np.cumsum(group_lens) - group_lens
+    group_0_idxs = group_idxs[group_start_idxs[0]:group_start_idxs[0] + group_lens[0]]
+    group_0_out = reduce_func_nb(group_0_idxs, 0, *args)
     out = np.empty(len(group_lens), dtype=np.asarray(group_0_out).dtype)
     out[0] = group_0_out
-    group_end_idxs = np.cumsum(group_lens)
-    group_start_idxs = group_end_idxs - group_lens
+
     for group in prange(1, len(group_lens)):
-        from_col = group_start_idxs[group]
-        to_col = group_end_idxs[group]
-        out[group] = reduce_func_nb(from_col, to_col, group, *args)
+        group_len = group_lens[group]
+        start_idx = group_start_idxs[group]
+        col_idxs = group_idxs[start_idx:start_idx + group_len]
+        out[group] = reduce_func_nb(col_idxs, group, *args)
     return out
 
 
@@ -2447,10 +2453,10 @@ def flatten_forder_nb(arr: tp.Array2d) -> tp.Array1d:
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='group_lens', axis=0),
+    size=base_ch.GroupLensSizer(arg_query='group_map'),
     arg_take_spec=dict(
-        arr=ch.ArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
-        group_lens=ch.ArraySlicer(axis=0),
+        arr=ch.ArraySlicer(axis=1, mapper=base_ch.group_idxs_mapper),
+        group_map=base_ch.GroupMapSlicer(),
         in_c_order=None,
         reduce_func_nb=None,
         args=ch.ArgsTaker()
@@ -2458,83 +2464,92 @@ def flatten_forder_nb(arr: tp.Array2d) -> tp.Array1d:
     merge_func=base_ch.concat
 )
 @register_jitted(tags={'can_parallel'})
-def reduce_flat_grouped_nb(arr: tp.Array2d, group_lens: tp.Array1d, in_c_order: bool,
+def reduce_flat_grouped_nb(arr: tp.Array2d, group_map: tp.GroupMap, in_c_order: bool,
                            reduce_func_nb: tp.ReduceToArrayFunc, *args) -> tp.Array1d:
     """Same as `reduce_grouped_nb` but passes flattened array."""
+    group_idxs, group_lens = group_map
+    group_start_idxs = np.cumsum(group_lens) - group_lens
+    group_0_idxs = group_idxs[group_start_idxs[0]:group_start_idxs[0] + group_lens[0]]
     if in_c_order:
-        group_0_out = reduce_func_nb(arr[:, 0:group_lens[0]].flatten(), *args)
+        group_0_out = reduce_func_nb(arr[:, group_0_idxs].flatten(), *args)
     else:
-        group_0_out = reduce_func_nb(flatten_forder_nb(arr[:, 0:group_lens[0]]), *args)
+        group_0_out = reduce_func_nb(flatten_forder_nb(arr[:, group_0_idxs]), *args)
     out = np.empty(len(group_lens), dtype=np.asarray(group_0_out).dtype)
     out[0] = group_0_out
-    group_end_idxs = np.cumsum(group_lens)
-    group_start_idxs = group_end_idxs - group_lens
+
     for group in prange(1, len(group_lens)):
-        from_col = group_start_idxs[group]
-        to_col = group_end_idxs[group]
+        group_len = group_lens[group]
+        start_idx = group_start_idxs[group]
+        col_idxs = group_idxs[start_idx:start_idx + group_len]
         if in_c_order:
-            out[group] = reduce_func_nb(arr[:, from_col:to_col].flatten(), *args)
+            out[group] = reduce_func_nb(arr[:, col_idxs].flatten(), *args)
         else:
-            out[group] = reduce_func_nb(flatten_forder_nb(arr[:, from_col:to_col]), *args)
+            out[group] = reduce_func_nb(flatten_forder_nb(arr[:, col_idxs]), *args)
     return out
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='group_lens', axis=0),
+    size=base_ch.GroupLensSizer(arg_query='group_map'),
     arg_take_spec=dict(
-        arr=ch.ArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
-        group_lens=ch.ArraySlicer(axis=0),
+        arr=ch.ArraySlicer(axis=1, mapper=base_ch.group_idxs_mapper),
+        group_map=base_ch.GroupMapSlicer(),
         reduce_func_nb=None,
         args=ch.ArgsTaker()
     ),
     merge_func=base_ch.column_stack
 )
 @register_jitted(tags={'can_parallel'})
-def reduce_grouped_to_array_nb(arr: tp.Array2d, group_lens: tp.Array1d,
+def reduce_grouped_to_array_nb(arr: tp.Array2d, group_map: tp.GroupMap,
                                reduce_func_nb: tp.ReduceGroupedToArrayFunc, *args) -> tp.Array2d:
     """Same as `reduce_grouped_nb` but `reduce_func_nb` must return an array."""
-    group_0_out = reduce_func_nb(arr[:, 0:group_lens[0]], *args)
+    group_idxs, group_lens = group_map
+    group_start_idxs = np.cumsum(group_lens) - group_lens
+    group_0_idxs = group_idxs[group_start_idxs[0]:group_start_idxs[0] + group_lens[0]]
+    group_0_out = reduce_func_nb(arr[:, group_0_idxs], *args)
     out = np.empty((group_0_out.shape[0], len(group_lens)), dtype=group_0_out.dtype)
     out[:, 0] = group_0_out
-    group_end_idxs = np.cumsum(group_lens)
-    group_start_idxs = group_end_idxs - group_lens
+
     for group in prange(1, len(group_lens)):
-        from_col = group_start_idxs[group]
-        to_col = group_end_idxs[group]
-        out[:, group] = reduce_func_nb(arr[:, from_col:to_col], *args)
+        group_len = group_lens[group]
+        start_idx = group_start_idxs[group]
+        col_idxs = group_idxs[start_idx:start_idx + group_len]
+        out[:, group] = reduce_func_nb(arr[:, col_idxs], *args)
     return out
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='group_lens', axis=0),
+    size=base_ch.GroupLensSizer(arg_query='group_map'),
     arg_take_spec=dict(
-        group_lens=ch.ArraySlicer(axis=0),
+        group_map=base_ch.GroupMapSlicer(),
         reduce_func_nb=None,
         args=ch.ArgsTaker()
     ),
     merge_func=base_ch.column_stack
 )
 @register_jitted(tags={'can_parallel'})
-def reduce_grouped_to_array_meta_nb(group_lens: tp.Array1d,
+def reduce_grouped_to_array_meta_nb(group_map: tp.GroupMap,
                                     reduce_func_nb: tp.ReduceGroupedToArrayMetaFunc, *args) -> tp.Array2d:
     """Same as `reduce_grouped_meta_nb` but `reduce_func_nb` must return an array."""
-    group_0_out = reduce_func_nb(0, group_lens[0], 0, *args)
+    group_idxs, group_lens = group_map
+    group_start_idxs = np.cumsum(group_lens) - group_lens
+    group_0_idxs = group_idxs[group_start_idxs[0]:group_start_idxs[0] + group_lens[0]]
+    group_0_out = reduce_func_nb(group_0_idxs, 0, *args)
     out = np.empty((group_0_out.shape[0], len(group_lens)), dtype=group_0_out.dtype)
     out[:, 0] = group_0_out
-    group_end_idxs = np.cumsum(group_lens)
-    group_start_idxs = group_end_idxs - group_lens
+
     for group in prange(1, len(group_lens)):
-        from_col = group_start_idxs[group]
-        to_col = group_end_idxs[group]
-        out[:, group] = reduce_func_nb(from_col, to_col, group, *args)
+        group_len = group_lens[group]
+        start_idx = group_start_idxs[group]
+        col_idxs = group_idxs[start_idx:start_idx + group_len]
+        out[:, group] = reduce_func_nb(col_idxs, group, *args)
     return out
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='group_lens', axis=0),
+    size=base_ch.GroupLensSizer(arg_query='group_map'),
     arg_take_spec=dict(
-        arr=ch.ArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
-        group_lens=ch.ArraySlicer(axis=0),
+        arr=ch.ArraySlicer(axis=1, mapper=base_ch.group_idxs_mapper),
+        group_map=base_ch.GroupMapSlicer(),
         in_c_order=None,
         reduce_func_nb=None,
         args=ch.ArgsTaker()
@@ -2542,127 +2557,140 @@ def reduce_grouped_to_array_meta_nb(group_lens: tp.Array1d,
     merge_func=base_ch.column_stack
 )
 @register_jitted(tags={'can_parallel'})
-def reduce_flat_grouped_to_array_nb(arr: tp.Array2d, group_lens: tp.Array1d, in_c_order: bool,
+def reduce_flat_grouped_to_array_nb(arr: tp.Array2d, group_map: tp.GroupMap, in_c_order: bool,
                                     reduce_func_nb: tp.ReduceToArrayFunc, *args) -> tp.Array2d:
     """Same as `reduce_grouped_to_array_nb` but passes flattened array."""
+    group_idxs, group_lens = group_map
+    group_start_idxs = np.cumsum(group_lens) - group_lens
+    group_0_idxs = group_idxs[group_start_idxs[0]:group_start_idxs[0] + group_lens[0]]
     if in_c_order:
-        group_0_out = reduce_func_nb(arr[:, 0:group_lens[0]].flatten(), *args)
+        group_0_out = reduce_func_nb(arr[:, group_0_idxs].flatten(), *args)
     else:
-        group_0_out = reduce_func_nb(flatten_forder_nb(arr[:, 0:group_lens[0]]), *args)
+        group_0_out = reduce_func_nb(flatten_forder_nb(arr[:, group_0_idxs]), *args)
     out = np.empty((group_0_out.shape[0], len(group_lens)), dtype=group_0_out.dtype)
     out[:, 0] = group_0_out
-    group_end_idxs = np.cumsum(group_lens)
-    group_start_idxs = group_end_idxs - group_lens
+
     for group in prange(1, len(group_lens)):
-        from_col = group_start_idxs[group]
-        to_col = group_end_idxs[group]
+        group_len = group_lens[group]
+        start_idx = group_start_idxs[group]
+        col_idxs = group_idxs[start_idx:start_idx + group_len]
         if in_c_order:
-            out[:, group] = reduce_func_nb(arr[:, from_col:to_col].flatten(), *args)
+            out[:, group] = reduce_func_nb(arr[:, col_idxs].flatten(), *args)
         else:
-            out[:, group] = reduce_func_nb(flatten_forder_nb(arr[:, from_col:to_col]), *args)
+            out[:, group] = reduce_func_nb(flatten_forder_nb(arr[:, col_idxs]), *args)
     return out
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='group_lens', axis=0),
+    size=base_ch.GroupLensSizer(arg_query='group_map'),
     arg_take_spec=dict(
-        arr=ch.ArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
-        group_lens=ch.ArraySlicer(axis=0),
+        arr=ch.ArraySlicer(axis=1, mapper=base_ch.group_idxs_mapper),
+        group_map=base_ch.GroupMapSlicer(),
         squeeze_func_nb=None,
         args=ch.ArgsTaker()
     ),
     merge_func=base_ch.column_stack
 )
 @register_jitted(tags={'can_parallel'})
-def squeeze_grouped_nb(arr: tp.Array2d, group_lens: tp.Array1d,
+def squeeze_grouped_nb(arr: tp.Array2d, group_map: tp.GroupMap,
                        squeeze_func_nb: tp.ReduceFunc, *args) -> tp.Array2d:
     """Squeeze each group of columns into a single column using `squeeze_func_nb`.
 
     `squeeze_func_nb` must accept index the array and `*args`. Must return a single value."""
-    group_i_0_out = squeeze_func_nb(arr[0, 0:group_lens[0]], *args)
+    group_idxs, group_lens = group_map
+    group_start_idxs = np.cumsum(group_lens) - group_lens
+    group_0_idxs = group_idxs[group_start_idxs[0]:group_start_idxs[0] + group_lens[0]]
+    group_i_0_out = squeeze_func_nb(arr[0, group_0_idxs], *args)
     out = np.empty((arr.shape[0], len(group_lens)), dtype=np.asarray(group_i_0_out).dtype)
     out[0, 0] = group_i_0_out
-    group_end_idxs = np.cumsum(group_lens)
-    group_start_idxs = group_end_idxs - group_lens
+
     for group in prange(len(group_lens)):
-        from_col = group_start_idxs[group]
-        to_col = group_end_idxs[group]
+        group_len = group_lens[group]
+        start_idx = group_start_idxs[group]
+        col_idxs = group_idxs[start_idx:start_idx + group_len]
         for i in range(arr.shape[0]):
             if group == 0 and i == 0:
                 continue
-            out[i, group] = squeeze_func_nb(arr[i, from_col:to_col], *args)
+            out[i, group] = squeeze_func_nb(arr[i, col_idxs], *args)
     return out
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='group_lens', axis=0),
+    size=base_ch.GroupLensSizer(arg_query='group_map'),
     arg_take_spec=dict(
         n_rows=None,
-        group_lens=ch.ArraySlicer(axis=0),
+        group_map=base_ch.GroupMapSlicer(),
         squeeze_func_nb=None,
         args=ch.ArgsTaker()
     ),
     merge_func=base_ch.column_stack
 )
 @register_jitted(tags={'can_parallel'})
-def squeeze_grouped_meta_nb(n_rows: int, group_lens: tp.Array1d,
+def squeeze_grouped_meta_nb(n_rows: int, group_map: tp.GroupMap,
                             squeeze_func_nb: tp.GroupSqueezeMetaFunc, *args) -> tp.Array2d:
     """Meta version of `squeeze_grouped_nb`.
 
-    `squeeze_func_nb` must accept the row index, the from-column index, the to-column index,
+    `squeeze_func_nb` must accept the row index, the column indices of the group,
     the group index, and `*args`. Must return a single value."""
-    group_i_0_out = squeeze_func_nb(0, 0, group_lens[0], 0, *args)
+    group_idxs, group_lens = group_map
+    group_start_idxs = np.cumsum(group_lens) - group_lens
+    group_0_idxs = group_idxs[group_start_idxs[0]:group_start_idxs[0] + group_lens[0]]
+    group_i_0_out = squeeze_func_nb(0, group_0_idxs, 0, *args)
     out = np.empty((n_rows, len(group_lens)), dtype=np.asarray(group_i_0_out).dtype)
     out[0, 0] = group_i_0_out
-    group_end_idxs = np.cumsum(group_lens)
-    group_start_idxs = group_end_idxs - group_lens
+
     for group in prange(len(group_lens)):
-        from_col = group_start_idxs[group]
-        to_col = group_end_idxs[group]
+        group_len = group_lens[group]
+        start_idx = group_start_idxs[group]
+        col_idxs = group_idxs[start_idx:start_idx + group_len]
         for i in range(n_rows):
             if group == 0 and i == 0:
                 continue
-            out[i, group] = squeeze_func_nb(i, from_col, to_col, group, *args)
+            out[i, group] = squeeze_func_nb(i, col_idxs, group, *args)
     return out
 
 
 # ############# Flattening ############# #
 
 @register_jitted(cache=True)
-def flatten_grouped_nb(arr: tp.Array2d, group_lens: tp.Array1d, in_c_order: bool) -> tp.Array2d:
+def flatten_grouped_nb(arr: tp.Array2d, group_map: tp.GroupMap, in_c_order: bool) -> tp.Array2d:
     """Flatten each group of columns."""
+    group_idxs, group_lens = group_map
+    group_start_idxs = np.cumsum(group_lens) - group_lens
     out = np.full((arr.shape[0] * np.max(group_lens), len(group_lens)), np.nan, dtype=np.float_)
-    group_end_idxs = np.cumsum(group_lens)
-    group_start_idxs = group_end_idxs - group_lens
     max_len = np.max(group_lens)
 
     for group in range(len(group_lens)):
-        from_col = group_start_idxs[group]
         group_len = group_lens[group]
+        start_idx = group_start_idxs[group]
+        col_idxs = group_idxs[start_idx:start_idx + group_len]
         for k in range(group_len):
+            col = col_idxs[k]
             if in_c_order:
-                out[k::max_len, group] = arr[:, from_col + k]
+                out[k::max_len, group] = arr[:, col]
             else:
-                out[k * arr.shape[0]:(k + 1) * arr.shape[0], group] = arr[:, from_col + k]
+                out[k * arr.shape[0]:(k + 1) * arr.shape[0], group] = arr[:, col]
     return out
 
 
 @register_jitted(cache=True)
-def flatten_uniform_grouped_nb(arr: tp.Array2d, group_lens: tp.Array1d, in_c_order: bool) -> tp.Array2d:
+def flatten_uniform_grouped_nb(arr: tp.Array2d, group_map: tp.GroupMap, in_c_order: bool) -> tp.Array2d:
     """Flatten each group of columns of the same length."""
+    group_idxs, group_lens = group_map
+    group_start_idxs = np.cumsum(group_lens) - group_lens
     out = np.empty((arr.shape[0] * np.max(group_lens), len(group_lens)), dtype=arr.dtype)
-    group_end_idxs = np.cumsum(group_lens)
-    group_start_idxs = group_end_idxs - group_lens
     max_len = np.max(group_lens)
 
     for group in range(len(group_lens)):
-        from_col = group_start_idxs[group]
         group_len = group_lens[group]
+        start_idx = group_start_idxs[group]
+        col_idxs = group_idxs[start_idx:start_idx + group_len]
         for k in range(group_len):
+            col = col_idxs[k]
             if in_c_order:
-                out[k::max_len, group] = arr[:, from_col + k]
+                out[k::max_len, group] = arr[:, col]
             else:
-                out[k * arr.shape[0]:(k + 1) * arr.shape[0], group] = arr[:, from_col + k]
+                out[k * arr.shape[0]:(k + 1) * arr.shape[0], group] = arr[:, col]
     return out
 
 
@@ -2783,17 +2811,17 @@ def describe_reduce_nb(arr: tp.Array1d, perc: tp.Array1d, ddof: int) -> tp.Array
 
 
 @register_jitted(cache=True)
-def cov_reduce_grouped_meta_nb(from_col: int, to_col: int, group: int,
-                               arr1: tp.Array2d, arr2: tp.Array2d, ddof: int) -> float:
+def cov_reduce_grouped_meta_nb(group_idxs: tp.GroupIdxs, group: int, arr1: tp.Array2d,
+                               arr2: tp.Array2d, ddof: int) -> float:
     """Compute correlation coefficient (ignores NaNs)."""
-    return nancov_1d_nb(arr1[:, from_col:to_col].flatten(), arr2[:, from_col:to_col].flatten(), ddof=ddof)
+    return nancov_1d_nb(arr1[:, group_idxs].flatten(), arr2[:, group_idxs].flatten(), ddof=ddof)
 
 
 @register_jitted(cache=True)
-def corr_reduce_grouped_meta_nb(from_col: int, to_col: int, group: int,
-                                arr1: tp.Array2d, arr2: tp.Array2d) -> float:
+def corr_reduce_grouped_meta_nb(group_idxs: tp.GroupIdxs, group: int, arr1: tp.Array2d,
+                                arr2: tp.Array2d) -> float:
     """Compute correlation coefficient (ignores NaNs)."""
-    return nancorr_1d_nb(arr1[:, from_col:to_col].flatten(), arr2[:, from_col:to_col].flatten())
+    return nancorr_1d_nb(arr1[:, group_idxs].flatten(), arr2[:, group_idxs].flatten())
 
 
 # ############# Value counts ############# #
@@ -2802,23 +2830,25 @@ def corr_reduce_grouped_meta_nb(from_col: int, to_col: int, group: int,
 @register_chunkable(
     size=ch.ArraySizer(arg_query='codes', axis=1),
     arg_take_spec=dict(
-        codes=ch.ArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
+        codes=ch.ArraySlicer(axis=1, mapper=base_ch.group_idxs_mapper),
         n_uniques=None,
-        group_lens=ch.ArraySlicer(axis=0)
+        group_map=base_ch.GroupMapSlicer()
     ),
     merge_func=base_ch.column_stack
 )
 @register_jitted(cache=True, tags={'can_parallel'})
-def value_counts_nb(codes: tp.Array2d, n_uniques: int, group_lens: tp.Array1d) -> tp.Array2d:
+def value_counts_nb(codes: tp.Array2d, n_uniques: int, group_map: tp.GroupMap) -> tp.Array2d:
     """Compute value counts per column/group."""
+    group_idxs, group_lens = group_map
+    group_start_idxs = np.cumsum(group_lens) - group_lens
     out = np.full((n_uniques, group_lens.shape[0]), 0, dtype=np.int_)
 
-    group_end_idxs = np.cumsum(group_lens)
-    group_start_idxs = group_end_idxs - group_lens
     for group in prange(len(group_lens)):
-        from_col = group_start_idxs[group]
-        to_col = group_end_idxs[group]
-        for col in range(from_col, to_col):
+        group_len = group_lens[group]
+        start_idx = group_start_idxs[group]
+        col_idxs = group_idxs[start_idx:start_idx + group_len]
+        for k in range(group_len):
+            col = col_idxs[k]
             for i in range(codes.shape[0]):
                 out[codes[i, col], group] += 1
     return out
@@ -2983,12 +3013,12 @@ def range_duration_nb(start_idx_arr: tp.Array1d,
 
 
 @register_chunkable(
-    size=records_ch.ColLensSizer(arg_query='col_map'),
+    size=base_ch.GroupLensSizer(arg_query='col_map'),
     arg_take_spec=dict(
         start_idx_arr=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
         end_idx_arr=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
         status_arr=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
-        col_map=records_ch.ColMapSlicer(),
+        col_map=base_ch.GroupMapSlicer(),
         index_lens=ch.ArraySlicer(axis=0),
         overlapping=None,
         normalize=None
@@ -2999,7 +3029,7 @@ def range_duration_nb(start_idx_arr: tp.Array1d,
 def range_coverage_nb(start_idx_arr: tp.Array1d,
                       end_idx_arr: tp.Array1d,
                       status_arr: tp.Array2d,
-                      col_map: tp.ColMap,
+                      col_map: tp.GroupMap,
                       index_lens: tp.Array1d,
                       overlapping: bool = False,
                       normalize: bool = False) -> tp.Array1d:
@@ -3039,12 +3069,12 @@ def range_coverage_nb(start_idx_arr: tp.Array1d,
 
 
 @register_chunkable(
-    size=records_ch.ColLensSizer(arg_query='col_map'),
+    size=base_ch.GroupLensSizer(arg_query='col_map'),
     arg_take_spec=dict(
         start_idx_arr=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
         end_idx_arr=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
         status_arr=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
-        col_map=records_ch.ColMapSlicer(),
+        col_map=base_ch.GroupMapSlicer(),
         index_len=None
     ),
     merge_func=base_ch.column_stack
@@ -3053,7 +3083,7 @@ def range_coverage_nb(start_idx_arr: tp.Array1d,
 def ranges_to_mask_nb(start_idx_arr: tp.Array1d,
                       end_idx_arr: tp.Array1d,
                       status_arr: tp.Array2d,
-                      col_map: tp.ColMap,
+                      col_map: tp.GroupMap,
                       index_len: int) -> tp.Array2d:
     """Convert ranges to 2-dim mask."""
     col_idxs, col_lens = col_map

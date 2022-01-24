@@ -220,7 +220,7 @@ from sklearn.utils.validation import check_is_fitted
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import indexes, reshaping
 from vectorbtpro.base.accessors import BaseAccessor, BaseDFAccessor, BaseSRAccessor
-from vectorbtpro.base.grouping import Grouper
+from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.generic import nb
 from vectorbtpro.generic.analyzable import Analyzable
@@ -991,7 +991,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             run the calculation function on each group:
 
             ```pycon
-            >>> from vectorbtpro.base.grouping import group_by_evenly_nb
+            >>> from vectorbtpro.base.grouping.nb import group_by_evenly_nb
 
             >>> vbt.pd_acc.groupby_apply(
             ...     vbt.RepEval('group_by_evenly_nb(wrapper.shape[0], 2)'),
@@ -1038,7 +1038,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             by = deep_substitute(by, template_mapping, sub_id='by')
             pd_group_by = wrapper.dummy().groupby(by, axis=0, **kwargs)
             grouper = Grouper.from_pd_group_by(pd_group_by)
-            group_map = grouper.index.values, grouper.get_group_lens()
+            group_map = grouper.get_group_map()
             template_mapping = merge_dicts(
                 dict(by=by, grouper=grouper),
                 template_mapping
@@ -1050,7 +1050,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         else:
             pd_group_by = cls_or_self.obj.groupby(by, axis=0, **kwargs)
             grouper = Grouper.from_pd_group_by(pd_group_by)
-            group_map = grouper.index.values, grouper.get_group_lens()
+            group_map = grouper.get_group_map()
             func = jit_reg.resolve_option(nb.groupby_apply_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             out = func(cls_or_self.to_2d_array(), group_map, apply_func_nb, *args)
@@ -1153,7 +1153,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             rule = deep_substitute(rule, template_mapping, sub_id='rule')
             pd_group_by = wrapper.dummy().resample(rule, axis=0, **kwargs)
             grouper = Grouper.from_pd_group_by(pd_group_by)
-            group_map = grouper.index.values, grouper.get_group_lens()
+            group_map = grouper.get_group_map()
             template_mapping = merge_dicts(
                 dict(rule=rule, grouper=grouper),
                 template_mapping
@@ -1165,7 +1165,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         else:
             pd_group_by = cls_or_self.obj.resample(rule, axis=0, **kwargs)
             grouper = Grouper.from_pd_group_by(pd_group_by)
-            group_map = grouper.index.values, grouper.get_group_lens()
+            group_map = grouper.get_group_map()
             func = jit_reg.resolve_option(nb.groupby_apply_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             out = func(cls_or_self.to_2d_array(), group_map, apply_func_nb, *args)
@@ -1482,13 +1482,13 @@ class GenericAccessor(BaseAccessor, Analyzable):
             )
             args = deep_substitute(args, template_mapping, sub_id='args')
             if wrapper.grouper.is_grouped(group_by=group_by):
-                group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
+                group_map = wrapper.grouper.get_group_map(group_by=group_by)
                 if returns_array:
                     func = jit_reg.resolve_option(nb.reduce_grouped_to_array_meta_nb, jitted)
                 else:
                     func = jit_reg.resolve_option(nb.reduce_grouped_meta_nb, jitted)
                 func = ch_reg.resolve_option(func, chunked)
-                out = func(group_lens, reduce_func_nb, *args)
+                out = func(group_map, reduce_func_nb, *args)
             else:
                 if returns_array:
                     func = jit_reg.resolve_option(nb.reduce_to_array_meta_nb, jitted)
@@ -1500,7 +1500,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
             if wrapper.grouper.is_grouped(group_by=group_by):
-                group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
+                group_map = wrapper.grouper.get_group_map(group_by=group_by)
                 if flatten:
                     checks.assert_in(order.upper(), ['C', 'F'])
                     in_c_order = order.upper() == 'C'
@@ -1509,10 +1509,10 @@ class GenericAccessor(BaseAccessor, Analyzable):
                     else:
                         func = jit_reg.resolve_option(nb.reduce_flat_grouped_nb, jitted)
                     func = ch_reg.resolve_option(func, chunked)
-                    out = func(cls_or_self.to_2d_array(), group_lens, in_c_order, reduce_func_nb, *args)
+                    out = func(cls_or_self.to_2d_array(), group_map, in_c_order, reduce_func_nb, *args)
                     if returns_idx:
                         if in_c_order:
-                            out //= group_lens  # flattened in C order
+                            out //= group_map[1]  # flattened in C order
                         else:
                             out %= wrapper.shape[0]  # flattened in F order
                 else:
@@ -1521,7 +1521,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                     else:
                         func = jit_reg.resolve_option(nb.reduce_grouped_nb, jitted)
                     func = ch_reg.resolve_option(func, chunked)
-                    out = func(cls_or_self.to_2d_array(), group_lens, reduce_func_nb, *args)
+                    out = func(cls_or_self.to_2d_array(), group_map, reduce_func_nb, *args)
             else:
                 if returns_array:
                     func = jit_reg.resolve_option(nb.reduce_to_array_nb, jitted)
@@ -1638,19 +1638,19 @@ class GenericAccessor(BaseAccessor, Analyzable):
             args = deep_substitute(args, template_mapping, sub_id='args')
             if not wrapper.grouper.is_grouped(group_by=group_by):
                 raise ValueError("Grouping required")
-            group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
+            group_map = wrapper.grouper.get_group_map(group_by=group_by)
             func = jit_reg.resolve_option(nb.squeeze_grouped_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
-            out = func(wrapper.shape_2d[0], group_lens, squeeze_func_nb, *args)
+            out = func(wrapper.shape_2d[0], group_map, squeeze_func_nb, *args)
         else:
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
             if not wrapper.grouper.is_grouped(group_by=group_by):
                 raise ValueError("Grouping required")
-            group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
+            group_map = wrapper.grouper.get_group_map(group_by=group_by)
             func = jit_reg.resolve_option(nb.squeeze_grouped_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
-            out = func(cls_or_self.to_2d_array(), group_lens, squeeze_func_nb, *args)
+            out = func(cls_or_self.to_2d_array(), group_map, squeeze_func_nb, *args)
 
         return wrapper.wrap(out, group_by=group_by, **resolve_dict(wrap_kwargs))
 
@@ -1702,17 +1702,17 @@ class GenericAccessor(BaseAccessor, Analyzable):
             raise ValueError("Grouping required")
         checks.assert_in(order.upper(), ['C', 'F'])
 
-        group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
-        if np.all(group_lens == group_lens.item(0)):
+        group_map = self.wrapper.grouper.get_group_map(group_by=group_by)
+        if np.all(group_map[1] == group_map[1].item(0)):
             func = jit_reg.resolve_option(nb.flatten_uniform_grouped_nb, jitted)
         else:
             func = jit_reg.resolve_option(nb.flatten_grouped_nb, jitted)
         if order.upper() == 'C':
-            out = func(self.to_2d_array(), group_lens, True)
-            new_index = indexes.repeat_index(self.wrapper.index, np.max(group_lens))
+            out = func(self.to_2d_array(), group_map, True)
+            new_index = indexes.repeat_index(self.wrapper.index, np.max(group_map[1]))
         else:
-            out = func(self.to_2d_array(), group_lens, False)
-            new_index = indexes.tile_index(self.wrapper.index, np.max(group_lens))
+            out = func(self.to_2d_array(), group_map, False)
+            new_index = indexes.tile_index(self.wrapper.index, np.max(group_map[1]))
         wrap_kwargs = merge_dicts(dict(index=new_index), wrap_kwargs)
         return self.wrapper.wrap(out, group_by=group_by, **wrap_kwargs)
 
@@ -2238,7 +2238,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             dropna (bool): Whether to exclude counts of NaN.
             group_by (any): Group or ungroup columns.
 
-                See `vectorbtpro.base.grouping.Grouper`.
+                See `vectorbtpro.base.grouping.base.Grouper`.
             mapping (mapping_like): Mapping of values to labels.
             incl_all_keys (bool): Whether to include all mapping keys, no only those that are present in the array.
             jitted (any): Whether to JIT-compile `vectorbtpro.generic.nb.value_counts_nb` or options.
@@ -2329,10 +2329,10 @@ class GenericAccessor(BaseAccessor, Analyzable):
             func = ch_reg.resolve_option(func, chunked)
             value_counts = func(codes.reshape(self.wrapper.shape_2d), len(uniques))
         elif axis == 1:
-            group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
+            group_map = self.wrapper.grouper.get_group_map(group_by=group_by)
             func = jit_reg.resolve_option(nb.value_counts_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
-            value_counts = func(codes.reshape(self.wrapper.shape_2d), len(uniques), group_lens)
+            value_counts = func(codes.reshape(self.wrapper.shape_2d), len(uniques), group_map)
         else:
             func = jit_reg.resolve_option(nb.value_counts_1d_nb, jitted)
             value_counts = func(codes, len(uniques))

@@ -2,97 +2,18 @@
 
 """Extensions for chunking records and mapped arrays."""
 
-import uuid
-
-import attr
 import numpy as np
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.chunking import get_group_lens_slice
-from vectorbtpro.utils.chunking import (
-    ArgGetter,
-    ChunkMeta,
-    ArgSizer,
-    ChunkSlicer,
-    ChunkMapper
-)
+from vectorbtpro.base.chunking import GroupLensMapper, GroupIdxsMapper
+from vectorbtpro.utils.chunking import ChunkMeta, ChunkMapper
+from vectorbtpro.utils.parsing import Regex
 
+col_lens_mapper = GroupLensMapper(arg_query=Regex(r'(col_lens|col_map)'))
+"""Default instance of `vectorbtpro.base.chunking.GroupLensMapper` for per-column lengths."""
 
-class ColLensSizer(ArgSizer):
-    """Class for getting the size from column lengths.
-
-    Argument can be either a column map tuple or a column lengths array."""
-
-    def get_size(self, ann_args: tp.AnnArgs) -> int:
-        arg = self.get_arg(ann_args)
-        if isinstance(arg, tuple):
-            return len(arg[1])
-        return len(arg)
-
-
-class ColLensSlicer(ChunkSlicer):
-    """Class for slicing multiple elements from column lengths based on the chunk range."""
-
-    def take(self, obj: tp.Union[tp.ColLens, tp.ColMap], chunk_meta: ChunkMeta, **kwargs) -> tp.ColMap:
-        if isinstance(obj, tuple):
-            return obj[1][chunk_meta.start:chunk_meta.end]
-        return obj[chunk_meta.start:chunk_meta.end]
-
-
-@attr.s(frozen=True)
-class ColLensMapper(ChunkMapper, ArgGetter):
-    """Class for mapping chunk metadata to per-column record lengths.
-
-    Argument can be either a column map tuple or a column lengths array."""
-
-    def map(self, chunk_meta: ChunkMeta, ann_args: tp.Optional[tp.AnnArgs] = None, **kwargs) -> ChunkMeta:
-        col_lens = self.get_arg(ann_args)
-        if isinstance(col_lens, tuple):
-            col_lens = col_lens[1]
-        col_lens_slice = get_group_lens_slice(col_lens, chunk_meta)
-        return ChunkMeta(
-            uuid=str(uuid.uuid4()),
-            idx=chunk_meta.idx,
-            start=col_lens_slice.start,
-            end=col_lens_slice.stop,
-            indices=None
-        )
-
-
-col_lens_mapper = ColLensMapper(arg_query=r'(col_lens|col_map)')
-"""Default instance of `ColLensMapper`."""
-
-
-class ColMapSlicer(ChunkSlicer):
-    """Class for slicing multiple elements from a column map based on the chunk range."""
-
-    def take(self, obj: tp.ColMap, chunk_meta: ChunkMeta, **kwargs) -> tp.ColMap:
-        col_idxs, col_lens = obj
-        col_lens = col_lens[chunk_meta.start:chunk_meta.end]
-        return np.arange(np.sum(col_lens)), col_lens
-
-
-@attr.s(frozen=True)
-class ColIdxsMapper(ChunkMapper, ArgGetter):
-    """Class for mapping chunk metadata to per-column record indices.
-
-    Argument must be a column map tuple."""
-
-    def map(self, chunk_meta: ChunkMeta, ann_args: tp.Optional[tp.AnnArgs] = None, **kwargs) -> ChunkMeta:
-        col_map = self.get_arg(ann_args)
-        col_idxs, col_lens = col_map
-        col_lens_slice = get_group_lens_slice(col_lens, chunk_meta)
-        return ChunkMeta(
-            uuid=str(uuid.uuid4()),
-            idx=chunk_meta.idx,
-            start=None,
-            end=None,
-            indices=col_idxs[col_lens_slice]
-        )
-
-
-col_idxs_mapper = ColIdxsMapper(arg_query='col_map')
-"""Default instance of `ColIdxsMapper`."""
+col_idxs_mapper = GroupIdxsMapper(arg_query='col_map')
+"""Default instance of `vectorbtpro.base.chunking.GroupIdxsMapper` for per-column indices."""
 
 
 def fix_field_in_records(record_arrays: tp.List[tp.RecordArray],

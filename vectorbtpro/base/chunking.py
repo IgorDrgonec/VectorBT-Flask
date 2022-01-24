@@ -11,12 +11,14 @@ from numba.typed import List
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.chunking import (
     ArgGetter,
+    ArgSizer,
     ChunkMeta,
     ChunkMapper,
+    ChunkSlicer,
     ArraySelector,
     ArraySlicer
 )
-from vectorbtpro.utils.parsing import match_ann_arg
+from vectorbtpro.utils.parsing import match_ann_arg, Regex
 
 
 def column_stack(results: list) -> tp.MaybeTuple[list]:
@@ -40,6 +42,27 @@ def concat(results: list) -> tp.MaybeTuple[list]:
     return np.concatenate(results)
 
 
+class GroupLensSizer(ArgSizer):
+    """Class for getting the size from group lengths.
+
+    Argument can be either a group map tuple or a group lengths array."""
+
+    def get_size(self, ann_args: tp.AnnArgs) -> int:
+        arg = self.get_arg(ann_args)
+        if isinstance(arg, tuple):
+            return len(arg[1])
+        return len(arg)
+
+
+class GroupLensSlicer(ChunkSlicer):
+    """Class for slicing multiple elements from group lengths based on the chunk range."""
+
+    def take(self, obj: tp.Union[tp.GroupLens, tp.GroupMap], chunk_meta: ChunkMeta, **kwargs) -> tp.GroupMap:
+        if isinstance(obj, tuple):
+            return obj[1][chunk_meta.start:chunk_meta.end]
+        return obj[chunk_meta.start:chunk_meta.end]
+
+
 def get_group_lens_slice(group_lens: tp.Array1d, chunk_meta: ChunkMeta) -> slice:
     """Get slice of each chunk in group lengths."""
     group_lens_cumsum = np.cumsum(group_lens[:chunk_meta.end])
@@ -50,12 +73,14 @@ def get_group_lens_slice(group_lens: tp.Array1d, chunk_meta: ChunkMeta) -> slice
 
 @attr.s(frozen=True)
 class GroupLensMapper(ChunkMapper, ArgGetter):
-    """Class for mapping chunk metadata using group lengths."""
+    """Class for mapping chunk metadata to per-group column lengths.
 
-    arg_query: tp.AnnArgQuery = attr.ib(default='group_lens')
+    Argument can be either a group map tuple or a group lengths array."""
 
     def map(self, chunk_meta: ChunkMeta, ann_args: tp.Optional[tp.AnnArgs] = None, **kwargs) -> ChunkMeta:
         group_lens = self.get_arg(ann_args)
+        if isinstance(group_lens, tuple):
+            group_lens = group_lens[1]
         group_lens_slice = get_group_lens_slice(group_lens, chunk_meta)
         return ChunkMeta(
             uuid=str(uuid.uuid4()),
@@ -66,8 +91,40 @@ class GroupLensMapper(ChunkMapper, ArgGetter):
         )
 
 
-group_lens_mapper = GroupLensMapper()
+group_lens_mapper = GroupLensMapper(arg_query=Regex(r'(group_lens|group_map)'))
 """Default instance of `GroupLensMapper`."""
+
+
+class GroupMapSlicer(ChunkSlicer):
+    """Class for slicing multiple elements from a group map based on the chunk range."""
+
+    def take(self, obj: tp.GroupMap, chunk_meta: ChunkMeta, **kwargs) -> tp.GroupMap:
+        group_idxs, group_lens = obj
+        group_lens = group_lens[chunk_meta.start:chunk_meta.end]
+        return np.arange(np.sum(group_lens)), group_lens
+
+
+@attr.s(frozen=True)
+class GroupIdxsMapper(ChunkMapper, ArgGetter):
+    """Class for mapping chunk metadata to per-group column indices.
+
+    Argument must be a group map tuple."""
+
+    def map(self, chunk_meta: ChunkMeta, ann_args: tp.Optional[tp.AnnArgs] = None, **kwargs) -> ChunkMeta:
+        group_map = self.get_arg(ann_args)
+        group_idxs, group_lens = group_map
+        group_lens_slice = get_group_lens_slice(group_lens, chunk_meta)
+        return ChunkMeta(
+            uuid=str(uuid.uuid4()),
+            idx=chunk_meta.idx,
+            start=None,
+            end=None,
+            indices=group_idxs[group_lens_slice]
+        )
+
+
+group_idxs_mapper = GroupIdxsMapper(arg_query='group_map')
+"""Default instance of `GroupIdxsMapper`."""
 
 
 @attr.s(frozen=True)

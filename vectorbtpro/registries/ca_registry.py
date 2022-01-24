@@ -406,7 +406,7 @@ import sys
 import warnings
 from datetime import datetime, timezone, timedelta
 from weakref import ref, ReferenceType
-from collections import ValuesView
+from collections.abc import ValuesView
 
 import attr
 import humanize

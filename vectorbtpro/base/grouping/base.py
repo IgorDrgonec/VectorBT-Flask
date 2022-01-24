@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2022 Oleg Polakow. All rights reserved.
 
 """Class that exposes methods for grouping.
 
@@ -14,11 +14,12 @@ from pandas.core.resample import Resampler as PandasResampler
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import indexes
-from vectorbtpro.registries.jit_registry import jit_reg, register_jitted
+from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.array_ import is_sorted
 from vectorbtpro.utils.config import Configured
 from vectorbtpro.utils.decorators import cached_method
+from vectorbtpro.base.grouping import nb
 
 GroupByT = tp.Union[None, bool, tp.Index]
 
@@ -67,65 +68,6 @@ def get_groups_and_index(index: tp.Index, group_by: tp.GroupByLike) -> tp.Tuple[
     elif isinstance(group_by, (pd.Index, pd.Series)):
         new_index.name = group_by.name
     return codes, new_index
-
-
-@register_jitted(cache=True)
-def get_group_lens_nb(groups: tp.Array1d) -> tp.ColLens:
-    """Return the count per group."""
-    result = np.empty(groups.shape[0], dtype=np.int_)
-    j = 0
-    last_group = -1
-    group_len = 0
-    for i in range(groups.shape[0]):
-        cur_group = groups[i]
-        if cur_group < last_group:
-            raise ValueError("Groups must be coherent and sorted (such as [0, 0, 1, 2, 2, ...])")
-        if cur_group != last_group:
-            if last_group != -1:
-                # Process previous group
-                result[j] = group_len
-                j += 1
-                group_len = 0
-            last_group = cur_group
-        group_len += 1
-        if i == groups.shape[0] - 1:
-            # Process last group
-            result[j] = group_len
-            j += 1
-            group_len = 0
-    return result[:j]
-
-
-@register_jitted(cache=True)
-def get_group_map_nb(groups: tp.Array1d, n_groups: int) -> tp.ColMap:
-    """Build the map between groups and column indices.
-
-    Returns an array with column indices segmented by group and an array with group lengths.
-
-    Works well for unsorted group arrays."""
-    group_lens_out = np.full(n_groups, 0, dtype=np.int_)
-    for g in range(groups.shape[0]):
-        group = groups[g]
-        group_lens_out[group] += 1
-
-    group_start_idxs = np.cumsum(group_lens_out) - group_lens_out
-    col_idxs_out = np.empty((groups.shape[0],), dtype=np.int_)
-    group_i = np.full(n_groups, 0, dtype=np.int_)
-    for g in range(groups.shape[0]):
-        group = groups[g]
-        col_idxs_out[group_start_idxs[group] + group_i[group]] = g
-        group_i[group] += 1
-
-    return col_idxs_out, group_lens_out
-
-
-@register_jitted(cache=True)
-def group_by_evenly_nb(n: int, n_splits: int) -> tp.Array1d:
-    """Get `group_by` from evenly splitting a space of values."""
-    out = np.empty(n, dtype=np.int_)
-    for i in range(n):
-        out[i] = i * n_splits // n + n_splits // (2 * n)
-    return out
 
 
 GrouperT = tp.TypeVar("GrouperT", bound="Grouper")
@@ -325,6 +267,10 @@ class Grouper(Configured):
         """Return grouped index."""
         return self.get_groups_and_index(**kwargs)[1]
 
+    def get_group_count(self, **kwargs) -> int:
+        """Get number of groups."""
+        return len(self.get_index(**kwargs))
+
     @cached_method(whitelist=True)
     def is_sorted(self, group_by: tp.GroupByLike = None, **kwargs) -> bool:
         """Return whether groups are coherent and sorted."""
@@ -336,21 +282,16 @@ class Grouper(Configured):
     def get_group_lens(self,
                        group_by: tp.GroupByLike = None,
                        jitted: tp.JittedOption = None,
-                       **kwargs) -> tp.ColLens:
+                       **kwargs) -> tp.GroupLens:
         """See get_group_lens_nb."""
-        if not self.is_sorted(group_by=group_by):
-            raise ValueError("group_by must lead to groups that are coherent and sorted "
-                             "(such as [0, 0, 1, 2, 2, ...])")
         group_by = self.resolve_group_by(group_by=group_by, **kwargs)
         if group_by is None or group_by is False:  # no grouping
             return np.full(len(self.index), 1)
+        if not self.is_sorted(group_by=group_by):
+            raise ValueError("group_by must lead to groups that are coherent and sorted")
         groups = self.get_groups(group_by=group_by)
-        func = jit_reg.resolve_option(get_group_lens_nb, jitted)
+        func = jit_reg.resolve_option(nb.get_group_lens_nb, jitted)
         return func(groups)
-
-    def get_group_count(self, **kwargs) -> int:
-        """Get number of groups."""
-        return len(self.get_group_lens(**kwargs))
 
     def get_group_start_idxs(self, **kwargs) -> tp.Array1d:
         """Get first index of each group as an array."""
@@ -366,22 +307,37 @@ class Grouper(Configured):
     def get_group_map(self,
                       group_by: tp.GroupByLike = None,
                       jitted: tp.JittedOption = None,
-                      **kwargs) -> tp.ColMap:
+                      **kwargs) -> tp.GroupMap:
         """See get_group_map_nb."""
         group_by = self.resolve_group_by(group_by=group_by, **kwargs)
         if group_by is None or group_by is False:  # no grouping
             return np.arange(len(self.index)), np.full(len(self.index), 1)
         groups, new_index = self.get_groups_and_index(group_by=group_by)
-        func = jit_reg.resolve_option(get_group_map_nb, jitted)
+        func = jit_reg.resolve_option(nb.get_group_map_nb, jitted)
         return func(groups, len(new_index))
 
-    def yield_col_idxs(self, **kwargs) -> tp.Generator[tp.Array1d, None, None]:
-        """Yield column indices of each group."""
-        col_idxs, group_lens = self.get_group_map(**kwargs)
+    def yield_group_idxs(self, **kwargs) -> tp.Generator[tp.GroupIdxs, None, None]:
+        """Yield indices of each group."""
+        group_idxs, group_lens = self.get_group_map(**kwargs)
         group_start = 0
         group_end = 0
         for g in range(len(group_lens)):
             group_len = group_lens[g]
             group_end += group_len
-            yield col_idxs[group_start:group_end]
+            yield group_idxs[group_start:group_end]
             group_start += group_len
+
+    def select_groups(self, group_idxs: tp.Array1d,
+                      jitted: tp.JittedOption = None) -> tp.Tuple[tp.Array1d, tp.Array1d]:
+        """Select groups.
+
+        Returns indices and new group array. Automatically decides whether to use group lengths or group map."""
+        from vectorbtpro.base.reshaping import to_1d_array
+
+        if self.is_sorted():
+            func = jit_reg.resolve_option(nb.group_lens_select_nb, jitted)
+            new_group_idxs, new_groups = func(self.get_group_lens(), to_1d_array(group_idxs))  # faster
+        else:
+            func = jit_reg.resolve_option(nb.group_map_select_nb, jitted)
+            new_group_idxs, new_groups = func(self.get_group_map(), to_1d_array(group_idxs))  # more flexible
+        return new_group_idxs, new_groups

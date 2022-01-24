@@ -7,7 +7,7 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import combining, reshaping, indexes
-from vectorbtpro.base.grouping import Grouper
+from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts, resolve_dict
@@ -94,8 +94,7 @@ class BaseAccessor(Wrapping):
         2  3
         ```
 
-        * Instead of explicitly importing `BaseAccessor` or any other accessor, we can use
-        `vectorbtpro.accessors.pd_acc` instead:
+        * Instead of explicitly importing `BaseAccessor` or any other accessor, we can use `pd_acc` instead:
 
         ```pycon
         >>> vbt.pd_acc.broadcast(sr, df)

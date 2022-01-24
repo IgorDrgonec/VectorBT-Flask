@@ -185,7 +185,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                     all columns first and only then selects the column 'a'. The first method is preferred
                     when you have a lot of data or caching is disabled. The second method is preferred when
                     most attributes have already been cached.
-            group_by (any): Group or ungroup columns. See `vectorbtpro.base.grouping.Grouper`.
+            group_by (any): Group or ungroup columns. See `vectorbtpro.base.grouping.base.Grouper`.
             agg_func (callable): Aggregation function to aggregate statistics across all columns.
                 Defaults to mean.
 

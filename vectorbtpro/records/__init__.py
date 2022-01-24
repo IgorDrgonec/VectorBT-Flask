@@ -7,23 +7,8 @@ such as drawdowns, orders, trades, and positions, without converting them back t
 occupying the user's memory."""
 
 from vectorbtpro.records.base import Records
-from vectorbtpro.records.chunking import (
-    ColLensSizer,
-    ColLensSlicer,
-    ColLensMapper,
-    ColMapSlicer,
-    ColIdxsMapper
-)
 from vectorbtpro.records.mapped_array import MappedArray
+from vectorbtpro.utils.module_ import create__all__
 
-__all__ = [
-    'MappedArray',
-    'Records',
-    'ColLensSizer',
-    'ColLensSlicer',
-    'ColLensMapper',
-    'ColMapSlicer',
-    'ColIdxsMapper'
-]
-
+__all__ = create__all__(__name__)
 __pdoc__ = {k: False for k in __all__}
