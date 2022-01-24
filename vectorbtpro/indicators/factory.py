@@ -1165,7 +1165,9 @@ Similarly to stats, we can attach subplots to any new indicator class:
 
 import inspect
 import itertools
+import functools
 import warnings
+import importlib
 from collections import Counter
 from collections import OrderedDict
 from datetime import datetime, timedelta
@@ -1187,13 +1189,15 @@ from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config
-from vectorbtpro.utils.decorators import classproperty, cacheable_property
+from vectorbtpro.utils.decorators import classproperty, cacheable_property, class_or_instancemethod
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.formatting import prettify
 from vectorbtpro.utils.mapping import to_mapping, apply_mapping
 from vectorbtpro.utils.params import to_typed_list, broadcast_params, create_param_product, params_to_list
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.template import has_templates, deep_substitute
+from vectorbtpro.utils.parsing import get_expr_var_names, get_func_arg_names
+from vectorbtpro.indicators.expr import expr_func_config, expr_res_func_config
 
 try:
     from ta.utils import IndicatorMixin as IndicatorMixinT
@@ -1390,6 +1394,7 @@ def run_pipeline(
         pass_packed: bool = False,
         pass_input_shape: tp.Optional[bool] = None,
         pass_flex_2d: bool = False,
+        pass_wrapper: bool = False,
         level_names: tp.Optional[tp.Sequence[str]] = None,
         hide_levels: tp.Optional[tp.Sequence[tp.Union[str, int]]] = None,
         build_col_kwargs: tp.KwargsLike = None,
@@ -1486,6 +1491,7 @@ def run_pipeline(
 
             Defaults to True if `require_input_shape` is True, otherwise to False.
         pass_flex_2d (bool): Whether to pass `flex_2d` to `custom_func` as keyword argument.
+        pass_wrapper (bool): Whether to pass the input wrapper to `custom_func` as keyword argument.
         level_names (list of str): A list of column level names corresponding to each parameter.
 
             Must have the same length as `param_list`.
@@ -1838,6 +1844,8 @@ def run_pipeline(
             if input_shape is None:
                 raise ValueError("Cannot determine flex_2d without inputs")
             func_kwargs['flex_2d'] = len(input_shape) == 2
+        if pass_wrapper:
+            func_kwargs['wrapper'] = ArrayWrapper(input_index, input_columns, len(orig_input_shape))
         func_kwargs = merge_dicts(func_kwargs, kwargs)
 
         # Set seed
@@ -3419,6 +3427,229 @@ Other keyword arguments are passed to `{0}.run`.
 
         return self.from_custom_func(custom_func, pass_packed=True, **kwargs)
 
+    # ############# Expressions ############# #
+
+    @class_or_instancemethod
+    def from_expr(cls_or_self, expr: str, factory_kwargs: tp.KwargsLike = None, **kwargs) -> tp.Type[IndicatorBase]:
+        """Build an indicator class from an indicator expression.
+
+        Args:
+            expr (str): Expression.
+
+                Expression must be a string with a valid Python code.
+            factory_kwargs: Keyword arguments passed to `IndicatorFactory`.
+
+                Only applied when calling the class method.
+            **kwargs: Keyword arguments passed to `IndicatorFactory.from_apply_func`.
+
+        Returns:
+            Indicator
+
+        Searches each variable name parsed from `expr` in
+
+        * `vectorbtpro.indicators.expr.expr_res_func_config` (calls right away),
+        * `vectorbtpro.indicators.expr.expr_func_config`,
+        * inputs, in-outputs, and params,
+        * keyword arguments,
+        * attributes of `np`,
+        * attributes of `vectorbtpro.generic.nb` (with and without `_nb` suffix),
+        * attributes of `vbt`, and
+        * packages and modules.
+
+        `vectorbtpro.indicators.expr.expr_func_config` and `vectorbtpro.indicators.expr.expr_res_func_config`
+        can be overridden with `func_mapping` and `res_func_mapping` respectively.
+
+        !!! note
+            Each variable name is case-sensitive.
+
+        When using the class method, all names are parsed from the expression itself
+        based on the name prefix of a variable:
+
+        * `in_*`: input
+        * `inout_*`: in-output
+        * `p_*`: parameter
+
+        !!! note
+            The parsed names come in the same order they appear in the expression.
+
+        The number of outputs is derived based on the number of commas outside of any bracket pair.
+        If there is only one output, the output name is `out`. If more - `out1`, `out2`, etc.
+
+        Any information can be overridden using `factory_kwargs`.
+
+        Usage:
+            ```pycon
+            >>> WMA = vbt.IndicatorFactory(
+            ...     class_name='WMA',
+            ...     input_names=['close'],
+            ...     param_names=['window'],
+            ...     output_names=['wma']
+            ... ).from_expr("wm_mean_nb(close, window)")
+
+            >>> wma = WMA.run(price, window=[2, 3])
+            >>> wma.wma
+            wma_window                   2                   3
+                               a         b         a         b
+            2020-01-01       NaN       NaN       NaN       NaN
+            2020-01-02  1.666667  4.333333       NaN       NaN
+            2020-01-03  2.666667  3.333333  2.333333  3.666667
+            2020-01-04  3.666667  2.333333  3.333333  2.666667
+            2020-01-05  4.666667  1.333333  4.333333  1.666667
+            ```
+
+            The same can be achieved by calling the class method and providing suffixes
+            to the variable names to indicate their type:
+
+            ```pycon
+            >>> expr = "wm_mean_nb((in_high + in_low) / 2, p_window)"
+            >>> WMA = vbt.IndicatorFactory.from_expr(expr)
+            >>> wma = WMA.run(price + 1, price, window=[2, 3])
+            >>> wma.out
+            custom_window                   2                   3
+                                  a         b         a         b
+            2020-01-01          NaN       NaN       NaN       NaN
+            2020-01-02     2.166667  4.833333       NaN       NaN
+            2020-01-03     3.166667  3.833333  2.833333  4.166667
+            2020-01-04     4.166667  2.833333  3.833333  3.166667
+            2020-01-05     5.166667  1.833333  4.833333  2.166667
+            ```"""
+        expr = expr.strip()
+        if expr.startswith('(') and expr.endswith(')'):
+            expr = expr[1:-1]
+        if expr.endswith(','):
+            expr = expr[:-1]
+
+        if isinstance(cls_or_self, type):
+            input_names = []
+            in_output_names = []
+            param_names = []
+            var_names = get_expr_var_names(expr)
+            _var_names = []
+            for var_name in var_names:
+                _var_names.append((var_name, expr.index(var_name)))
+            _var_names = sorted(_var_names, key=lambda x: x[1])
+            for var_name, _ in _var_names:
+                if var_name.startswith('in_'):
+                    new_var_name = var_name[3:]
+                    if new_var_name not in input_names:
+                        input_names.append(new_var_name)
+                        expr = expr.replace(var_name, new_var_name)
+                if var_name.startswith('inout_'):
+                    new_var_name = var_name[6:]
+                    if new_var_name not in in_output_names:
+                        in_output_names.append(new_var_name)
+                        expr = expr.replace(var_name, new_var_name)
+                if var_name.startswith('p_'):
+                    new_var_name = var_name[2:]
+                    if new_var_name not in param_names:
+                        param_names.append(new_var_name)
+                        expr = expr.replace(var_name, new_var_name)
+
+            n_open_brackets = 0
+            n_outputs = 1
+            for i, s in enumerate(expr):
+                if s == ',' and n_open_brackets == 0:
+                    n_outputs += 1
+                elif s in '([{':
+                    n_open_brackets += 1
+                elif s in ')]}':
+                    n_open_brackets -= 1
+            if n_open_brackets != 0:
+                raise ValueError("Couldn't parse the number of outputs: mismatching brackets")
+            if n_outputs == 1:
+                output_names = ['out']
+            else:
+                output_names = ['out%d' % (i + 1) for i in range(n_outputs)]
+
+            factory = cls_or_self(
+                **merge_dicts(
+                    dict(
+                        input_names=input_names,
+                        in_output_names=in_output_names,
+                        param_names=param_names,
+                        output_names=output_names
+                    ),
+                    factory_kwargs
+                )
+            )
+        else:
+            factory = cls_or_self
+
+        Indicator = factory.Indicator
+
+        input_names = factory.input_names
+        in_output_names = factory.in_output_names
+        param_names = factory.param_names
+
+        def apply_func(input_tuple: tp.Tuple[tp.AnyArray],
+                       in_output_tuple: tp.Tuple[tp.SeriesFrame, ...],
+                       param_tuple: tp.Tuple[tp.Param, ...],
+                       res_func_mapping: tp.KwargsLike = None,
+                       func_mapping: tp.KwargsLike = None,
+                       **_kwargs) -> tp.Union[tp.Array2d, tp.List[tp.Array2d]]:
+            import vectorbtpro as vbt
+
+            input_mapping = dict(
+                np=np,
+                pd=pd,
+                vbt=vbt
+            )
+            for i, input in enumerate(input_tuple):
+                input_mapping[input_names[i]] = input
+            for i, in_output in enumerate(in_output_tuple):
+                input_mapping[in_output_names[i]] = in_output
+            for i, param in enumerate(param_tuple):
+                input_mapping[param_names[i]] = param
+            def_func_mapping = {}
+            for k, v in expr_func_config.items():
+                def_func_mapping[k] = v
+            func_mapping = merge_dicts(def_func_mapping, func_mapping)
+            def_res_func_mapping = {}
+            for k, v in expr_res_func_config.items():
+                def_res_func_mapping[k] = v
+            res_func_mapping = merge_dicts(def_res_func_mapping, res_func_mapping)
+            merged_mapping = merge_dicts(input_mapping, _kwargs)
+            mapping = {}
+            subbed_mapping = {}
+
+            for var_name in get_expr_var_names(expr):
+                if var_name in res_func_mapping:
+                    var = res_func_mapping[var_name]
+                elif var_name in func_mapping:
+                    var = func_mapping[var_name]
+                elif var_name in merged_mapping:
+                    var = merged_mapping[var_name]
+                elif hasattr(np, var_name):
+                    var = getattr(np, var_name)
+                elif hasattr(generic_nb, var_name):
+                    var = getattr(generic_nb, var_name)
+                elif hasattr(generic_nb, var_name + '_nb'):
+                    var = getattr(generic_nb, var_name + '_nb')
+                elif hasattr(vbt, var_name):
+                    var = getattr(vbt, var_name)
+                else:
+                    try:
+                        var = importlib.import_module(var_name)
+                    except ModuleNotFoundError:
+                        raise NameError(f"name '{var_name}' is not defined")
+                if callable(var) and 'mapping' in get_func_arg_names(var):
+                    var = functools.partial(var, mapping=merged_mapping)
+                if var_name in res_func_mapping:
+                    var = var()
+                mapping[var_name] = var
+
+            return eval(expr, {}, mapping)
+
+        return factory.from_apply_func(
+            apply_func,
+            pass_packed=True,
+            pass_wrapper=True,
+            keep_pd=False,
+            **kwargs
+        )
+
+    # ############# Third party ############# #
+
     @classmethod
     def get_talib_indicators(cls) -> tp.Set[str]:
         """Get all TA-Lib indicators."""
@@ -3498,18 +3729,18 @@ Other keyword arguments are passed to `{0}.run`.
         output_names = info['output_names']
         output_flags = info['output_flags']
 
-        def apply_func(input_list: tp.List[tp.AnyArray],
+        def apply_func(input_tuple: tp.Tuple[tp.AnyArray],
                        in_output_tuple: tp.Tuple[tp.AnyArray, ...],
                        param_tuple: tp.Tuple[tp.Param, ...],
-                       **kwargs) -> tp.Union[tp.Array2d, tp.List[tp.Array2d]]:
+                       **_kwargs) -> tp.Union[tp.Array2d, tp.List[tp.Array2d]]:
             # TA-Lib functions can only process 1-dim arrays
-            n_input_cols = input_list[0].shape[1]
+            n_input_cols = input_tuple[0].shape[1]
             outputs = []
             for col in range(n_input_cols):
                 output = talib_func(
-                    *map(lambda x: x[:, col], input_list),
+                    *map(lambda x: x[:, col], input_tuple),
                     *param_tuple,
-                    **kwargs
+                    **_kwargs
                 )
                 outputs.append(output)
             if isinstance(outputs[0], tuple):  # multiple outputs
@@ -3742,24 +3973,24 @@ Other keyword arguments are passed to `{0}.run`.
             parse_kwargs = {}
         config = cls.parse_pandas_ta_config(pandas_ta_func, **parse_kwargs)
 
-        def apply_func(input_list: tp.List[tp.SeriesFrame],
+        def apply_func(input_tuple: tp.Tuple[tp.AnyArray],
                        in_output_tuple: tp.Tuple[tp.SeriesFrame, ...],
                        param_tuple: tp.Tuple[tp.Param, ...],
-                       **kwargs) -> tp.Union[tp.Array2d, tp.List[tp.Array2d]]:
-            is_series = isinstance(input_list[0], pd.Series)
-            n_input_cols = 1 if is_series else len(input_list[0].columns)
+                       **_kwargs) -> tp.Union[tp.Array2d, tp.List[tp.Array2d]]:
+            is_series = isinstance(input_tuple[0], pd.Series)
+            n_input_cols = 1 if is_series else len(input_tuple[0].columns)
             outputs = []
             for col in range(n_input_cols):
                 output = pandas_ta_func(
                     **{
-                        name: input_list[i] if is_series else input_list[i].iloc[:, col]
+                        name: input_tuple[i] if is_series else input_tuple[i].iloc[:, col]
                         for i, name in enumerate(config['input_names'])
                     },
                     **{
                         name: param_tuple[i]
                         for i, name in enumerate(config['param_names'])
                     },
-                    **kwargs
+                    **_kwargs
                 )
                 if isinstance(output, tuple):
                     _outputs = []
@@ -3934,24 +4165,24 @@ Other keyword arguments are passed to `{0}.run`.
         ind_cls = cls.find_ta_indicator(cls_name)
         config = cls.parse_ta_config(ind_cls)
 
-        def apply_func(input_list: tp.List[tp.SeriesFrame],
+        def apply_func(input_tuple: tp.Tuple[tp.AnyArray],
                        in_output_tuple: tp.Tuple[tp.SeriesFrame, ...],
                        param_tuple: tp.Tuple[tp.Param, ...],
-                       **kwargs) -> tp.Union[tp.Array2d, tp.List[tp.Array2d]]:
-            is_series = isinstance(input_list[0], pd.Series)
-            n_input_cols = 1 if is_series else len(input_list[0].columns)
+                       **_kwargs) -> tp.Union[tp.Array2d, tp.List[tp.Array2d]]:
+            is_series = isinstance(input_tuple[0], pd.Series)
+            n_input_cols = 1 if is_series else len(input_tuple[0].columns)
             outputs = []
             for col in range(n_input_cols):
                 ind = ind_cls(
                     **{
-                        name: input_list[i] if is_series else input_list[i].iloc[:, col]
+                        name: input_tuple[i] if is_series else input_tuple[i].iloc[:, col]
                         for i, name in enumerate(config['input_names'])
                     },
                     **{
                         name: param_tuple[i]
                         for i, name in enumerate(config['param_names'])
                     },
-                    **kwargs
+                    **_kwargs
                 )
                 output = []
                 for output_name in config['output_names']:

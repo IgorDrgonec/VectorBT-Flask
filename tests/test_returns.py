@@ -88,8 +88,8 @@ class TestAccessors:
             assert pd.Series([1, 2, 3]).vbt.returns(freq=None).ann_factor
 
     def test_from_value(self):
-        pd.testing.assert_series_equal(pd.Series.vbt.returns.from_value(ts['a']).obj, ts['a'].pct_change())
-        pd.testing.assert_frame_equal(pd.DataFrame.vbt.returns.from_value(ts).obj, ts.pct_change())
+        pd.testing.assert_series_equal(pd.Series.vbt.returns.from_value(ts['a']).obj, ts['a'].pct_change().fillna(0.))
+        pd.testing.assert_frame_equal(pd.DataFrame.vbt.returns.from_value(ts).obj, ts.pct_change().fillna(0.))
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.returns.from_value(ts, jitted=dict(parallel=True)).obj,
             pd.DataFrame.vbt.returns.from_value(ts, jitted=dict(parallel=False)).obj

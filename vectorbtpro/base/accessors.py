@@ -13,7 +13,7 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts, resolve_dict
 from vectorbtpro.utils.decorators import class_or_instanceproperty, class_or_instancemethod
 from vectorbtpro.utils.magic_decorators import attach_binary_magic_methods, attach_unary_magic_methods
-from vectorbtpro.utils.parsing import get_func_arg_names, get_ex_var_names, get_context_vars
+from vectorbtpro.utils.parsing import get_func_arg_names, get_expr_var_names, get_context_vars
 from vectorbtpro.utils.template import deep_substitute
 
 BaseAccessorT = tp.TypeVar("BaseAccessorT", bound="BaseAccessor")
@@ -968,7 +968,7 @@ class BaseAccessor(Wrapping):
         if wrap_kwargs is None:
             wrap_kwargs = {}
 
-        var_names = get_ex_var_names(expression)
+        var_names = get_expr_var_names(expression)
         objs = get_context_vars(var_names, frames_back=1, local_dict=local_dict, global_dict=global_dict)
         objs = reshaping.broadcast(*objs, **broadcast_kwargs)
         vars_by_name = {}

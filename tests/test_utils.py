@@ -2171,8 +2171,8 @@ class TestParsing:
 
         assert parsing.get_func_arg_names(f) == ['a', 'b']
 
-    def test_get_ex_var_names(self):
-        assert parsing.get_ex_var_names('d = (a + b) / c') == ['d', 'c', 'a', 'b']
+    def test_get_expr_var_names(self):
+        assert parsing.get_expr_var_names('d = (a + b) / c') == ['d', 'c', 'a', 'b']
 
     def test_annotate_args(self):
         def f(a, *args, b=2, **kwargs):

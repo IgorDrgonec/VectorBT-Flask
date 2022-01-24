@@ -29,6 +29,7 @@ from numba import prange
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import chunking as base_ch
+from vectorbtpro.base.indexing import flex_select_auto_nb
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.registries.jit_registry import register_jitted
@@ -50,11 +51,14 @@ def get_return_nb(input_value: float, output_value: float) -> float:
 
 
 @register_jitted(cache=True)
-def returns_1d_nb(arr: tp.Array1d, init_value: float) -> tp.Array1d:
+def returns_1d_nb(arr: tp.Array1d, init_value: float = np.nan) -> tp.Array1d:
     """Calculate returns."""
     out = np.empty(arr.shape, dtype=np.float_)
-    input_value = init_value
-    for i in range(out.shape[0]):
+    if np.isnan(init_value) and arr.shape[0] > 0:
+        input_value = arr[0]
+    else:
+        input_value = init_value
+    for i in range(arr.shape[0]):
         output_value = arr[i]
         out[i] = get_return_nb(input_value, output_value)
         input_value = output_value
@@ -65,16 +69,17 @@ def returns_1d_nb(arr: tp.Array1d, init_value: float) -> tp.Array1d:
     size=ch.ArraySizer(arg_query='arr', axis=1),
     arg_take_spec=dict(
         arr=ch.ArraySlicer(axis=1),
-        init_value=ch.ArraySlicer(axis=0)
+        init_value=base_ch.FlexArraySlicer(axis=1, flex_2d=True)
     ),
     merge_func=base_ch.column_stack
 )
 @register_jitted(cache=True, tags={'can_parallel'})
-def returns_nb(arr: tp.Array2d, init_value: tp.Array1d) -> tp.Array2d:
+def returns_nb(arr: tp.Array2d, init_value: tp.FlexArray = np.asarray(np.nan)) -> tp.Array2d:
     """2-dim version of `returns_1d_nb`."""
     out = np.empty(arr.shape, dtype=np.float_)
     for col in prange(out.shape[1]):
-        out[:, col] = returns_1d_nb(arr[:, col], init_value[col])
+        _init_value = flex_select_auto_nb(init_value, 0, col, True)
+        out[:, col] = returns_1d_nb(arr[:, col], init_value=_init_value)
     return out
 
 

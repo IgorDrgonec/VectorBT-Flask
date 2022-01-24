@@ -3,7 +3,7 @@
 """Utilities for working with tags."""
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils.parsing import get_ex_var_names
+from vectorbtpro.utils.parsing import get_expr_var_names
 from vectorbtpro.utils.template import RepEval
 
 
@@ -42,7 +42,7 @@ def match_tags(tags: tp.MaybeIterable[str], in_tags: tp.MaybeIterable[str]) -> b
 
     for t in tags:
         if not t.isidentifier():
-            var_names = get_ex_var_names(t)
+            var_names = get_expr_var_names(t)
             eval_mapping = {var_name: var_name in in_tags for var_name in var_names}
             eval_result = RepEval(t).substitute(eval_mapping)
             if not isinstance(eval_result, bool):

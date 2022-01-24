@@ -178,7 +178,7 @@ def hash_args(func: tp.Callable, args: tp.Args, kwargs: tp.Kwargs,
         raise UnhashableArgsError
 
 
-def get_ex_var_names(expression: str) -> tp.List[str]:
+def get_expr_var_names(expression: str) -> tp.List[str]:
     """Get variable names listed in the expression."""
     return [node.id for node in ast.walk(ast.parse(expression)) if type(node) is ast.Name]
 

@@ -2259,6 +2259,60 @@ class TestFactory:
             'xs'
         ]
 
+    def test_from_expr(self):
+        I = vbt.IndicatorFactory.from_expr("rolling_mean(in_ts, p_window)", window=2)
+        assert I.input_names == ('ts',)
+        assert I.param_names == ('window',)
+        pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
+        I = vbt.IndicatorFactory.from_expr("rolling_mean_nb(in_ts, p_window)", window=2)
+        assert I.input_names == ('ts',)
+        assert I.param_names == ('window',)
+        pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
+        I = vbt.IndicatorFactory.from_expr("(rolling_mean(in_ts, p_window))", window=2)
+        assert I.input_names == ('ts',)
+        assert I.param_names == ('window',)
+        pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
+        I = vbt.IndicatorFactory.from_expr("(rolling_mean(in_ts, p_window),)", window=2)
+        assert I.input_names == ('ts',)
+        assert I.param_names == ('window',)
+        pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
+        I = vbt.IndicatorFactory.from_expr("rolling_mean(in_ts, p_window),", window=2)
+        assert I.input_names == ('ts',)
+        assert I.param_names == ('window',)
+        pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
+        I = vbt.IndicatorFactory.from_expr("rolling_mean(in_ts1, p_window1),"
+                                           "rolling_mean(in_ts2, p_window2)", window1=2, window2=3)
+        assert I.input_names == ('ts1', 'ts2')
+        assert I.param_names == ('window1', 'window2')
+        pd.testing.assert_frame_equal(I.run(ts, ts * 2).out1, ts.vbt.rolling_mean(2))
+        pd.testing.assert_frame_equal(I.run(ts, ts * 2).out2, (ts * 2).vbt.rolling_mean(3))
+        I = vbt.IndicatorFactory.from_expr("ts_mean(in_ts, p_window)", window=2)
+        assert I.input_names == ('ts',)
+        assert I.param_names == ('window',)
+        pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
+        I = vbt.IndicatorFactory.from_expr("returns", factory_kwargs=dict(input_names=['close']))
+        assert I.input_names == ('close',)
+        assert I.param_names == ()
+        pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.to_returns())
+        I = vbt.IndicatorFactory.from_expr("random_func(in_ts)", random_func=lambda x: x)
+        assert I.input_names == ('ts',)
+        assert I.param_names == ()
+        pd.testing.assert_frame_equal(I.run(ts).out, ts)
+        I = vbt.IndicatorFactory.from_expr("vbt.nb.rolling_mean_nb(in_ts, p_window)", window=2)
+        assert I.input_names == ('ts',)
+        assert I.param_names == ('window',)
+        pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
+        I = vbt.IndicatorFactory.from_expr("vectorbtpro.generic.nb.rolling_mean_nb(in_ts, p_window)", window=2)
+        assert I.input_names == ('ts',)
+        assert I.param_names == ('window',)
+        pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
+        I = vbt.IndicatorFactory.from_expr(
+            "random_func()", random_func=lambda mapping: mapping['close'],
+            factory_kwargs=dict(input_names=['close']))
+        assert I.input_names == ('close',)
+        assert I.param_names == ()
+        pd.testing.assert_frame_equal(I.run(ts).out, ts)
+
     def test_get_talib_indicators(self):
         if talib_available:
             assert len(vbt.IndicatorFactory.get_talib_indicators()) > 0
