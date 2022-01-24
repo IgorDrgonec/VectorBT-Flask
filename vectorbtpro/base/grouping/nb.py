@@ -1,9 +1,6 @@
 # Copyright (c) 2022 Oleg Polakow. All rights reserved.
 
-"""Numba-compiled functions for grouping.
-
-!!! note
-    All functions passed as argument must be Numba-compiled."""
+"""Numba-compiled functions for grouping."""
 
 import numpy as np
 import pandas as pd

@@ -91,9 +91,15 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.accessors import register_df_vbt_accessor
-from vectorbtpro.generic import nb
+from vectorbtpro.base.reshaping import to_2d_array
+from vectorbtpro.base.wrapping import ArrayWrapper
+from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.accessors import GenericAccessor, GenericDFAccessor
-from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
+from vectorbtpro.ohlcv import nb
+from vectorbtpro.registries.ch_registry import ch_reg
+from vectorbtpro.registries.jit_registry import jit_reg
+from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
+from vectorbtpro.utils.decorators import class_or_instancemethod
 
 __pdoc__ = {}
 
@@ -167,6 +173,32 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
         """Volume series."""
         return self.get_column('volume')
 
+    @class_or_instancemethod
+    def vwap(cls_or_self,
+             high: tp.ArrayLike = None,
+             low: tp.ArrayLike = None,
+             volume: tp.ArrayLike = None,
+             jitted: tp.JittedOption = None,
+             chunked: tp.ChunkedOption = None,
+             wrapper: tp.Optional[ArrayWrapper] = None,
+             wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """See `vectorbtpro.ohlcv.nb.vwap_nb`."""
+        if not isinstance(cls_or_self, type):
+            if high is None:
+                high = cls_or_self.high
+            if low is None:
+                low = cls_or_self.low
+            if volume is None:
+                volume = cls_or_self.volume
+        func = jit_reg.resolve_option(nb.vwap_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        out = func(to_2d_array(high), to_2d_array(low), to_2d_array(volume))
+        if wrapper is None:
+            wrapper = ArrayWrapper.from_obj(volume)
+            if wrapper.ndim == 1 and not isinstance(cls_or_self, type):
+                wrapper = wrapper.replace(columns=['vwap'])
+        return wrapper.wrap(out, **resolve_dict(wrap_kwargs))
+
     # ############# Stats ############# #
 
     @property
@@ -206,7 +238,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             ),
             first_price=dict(
                 title='First Price',
-                calc_func=lambda ohlc: nb.bfill_1d_nb(ohlc.values.flatten())[0],
+                calc_func=lambda ohlc: generic_nb.bfill_1d_nb(ohlc.values.flatten())[0],
                 resolve_ohlc=True,
                 tags=['ohlcv', 'ohlc']
             ),
@@ -224,13 +256,13 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             ),
             last_price=dict(
                 title='Last Price',
-                calc_func=lambda ohlc: nb.ffill_1d_nb(ohlc.values.flatten())[-1],
+                calc_func=lambda ohlc: generic_nb.ffill_1d_nb(ohlc.values.flatten())[-1],
                 resolve_ohlc=True,
                 tags=['ohlcv', 'ohlc']
             ),
             first_volume=dict(
                 title='First Volume',
-                calc_func=lambda volume: nb.bfill_1d_nb(volume.values)[0],
+                calc_func=lambda volume: generic_nb.bfill_1d_nb(volume.values)[0],
                 resolve_volume=True,
                 tags=['ohlcv', 'volume']
             ),
@@ -248,7 +280,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             ),
             last_volume=dict(
                 title='Last Volume',
-                calc_func=lambda volume: nb.ffill_1d_nb(volume.values)[-1],
+                calc_func=lambda volume: generic_nb.ffill_1d_nb(volume.values)[-1],
                 resolve_volume=True,
                 tags=['ohlcv', 'volume']
             ),
