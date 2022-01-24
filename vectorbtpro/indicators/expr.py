@@ -147,30 +147,35 @@ def vwap(mapping: tp.KwargsLike = None) -> tp.Array2d:
     return vwap_nb(mapping['high'], mapping['low'], mapping['volume'])
 
 
+def cap(mapping: tp.KwargsLike = None) -> tp.Array2d:
+    """Market capitalization."""
+    return mapping['close'] * mapping['volume']
+
+
 # ############# Configs ############# #
 
 __pdoc__ = {}
 
 expr_func_config = HybridConfig(
     dict(
-        delay=delay,
-        delta=delta,
-        rescale=rescale,
-        cs_rank=cs_rank,
-        cs_demean=cs_demean,
-        ts_min=ts_min,
-        ts_max=ts_max,
-        ts_argmin=ts_argmin,
-        ts_argmax=ts_argmax,
-        ts_rank=ts_rank,
-        ts_sum=ts_sum,
-        ts_product=ts_product,
-        ts_mean=ts_mean,
-        ts_weighted_mean=ts_weighted_mean,
-        ts_std=ts_std,
-        ts_corr=ts_corr,
-        ts_cov=ts_cov,
-        adv=adv
+        delay=dict(func=delay),
+        delta=dict(func=delta),
+        rescale=dict(func=rescale),
+        cs_rank=dict(func=cs_rank),
+        cs_demean=dict(func=cs_demean),
+        ts_min=dict(func=ts_min),
+        ts_max=dict(func=ts_max),
+        ts_argmin=dict(func=ts_argmin),
+        ts_argmax=dict(func=ts_argmax),
+        ts_rank=dict(func=ts_rank),
+        ts_sum=dict(func=ts_sum),
+        ts_product=dict(func=ts_product),
+        ts_mean=dict(func=ts_mean),
+        ts_weighted_mean=dict(func=ts_weighted_mean),
+        ts_std=dict(func=ts_std),
+        ts_corr=dict(func=ts_corr),
+        ts_cov=dict(func=ts_cov),
+        adv=dict(func=adv, magnet_input_names=['volume'])
     )
 )
 """_"""
@@ -186,8 +191,9 @@ Can be modified.
 
 expr_res_func_config = HybridConfig(
     dict(
-        returns=returns,
-        vwap=vwap
+        returns=dict(func=returns, magnet_input_names=['close']),
+        vwap=dict(func=vwap, magnet_input_names=['high', 'low', 'volume']),
+        cap=dict(func=cap, magnet_input_names=['close', 'volume'])
     )
 )
 """_"""

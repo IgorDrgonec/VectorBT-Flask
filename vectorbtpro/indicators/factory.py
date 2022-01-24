@@ -3430,7 +3430,8 @@ Other keyword arguments are passed to `{0}.run`.
     # ############# Expressions ############# #
 
     @class_or_instancemethod
-    def from_expr(cls_or_self, expr: str, factory_kwargs: tp.KwargsLike = None, **kwargs) -> tp.Type[IndicatorBase]:
+    def from_expr(cls_or_self, expr: str, factory_kwargs: tp.KwargsLike = None,
+                  magnet_input_names: tp.Iterable[str] = None, **kwargs) -> tp.Type[IndicatorBase]:
         """Build an indicator class from an indicator expression.
 
         Args:
@@ -3462,15 +3463,20 @@ Other keyword arguments are passed to `{0}.run`.
         !!! note
             Each variable name is case-sensitive.
 
-        When using the class method, all names are parsed from the expression itself
-        based on the name prefix of a variable:
+        When using the class method, all names are parsed from the expression itself.
+        If any of `open`, `high`, `low`, `close`, and `volume` appear in the expression or
+        in `magnet_input_names` in either `vectorbtpro.indicators.expr.expr_func_config` or
+        `vectorbtpro.indicators.expr.expr_res_func_config`, they are automatically added to `input_names`.
+        Set `magnet_input_names` to an empty list to disable this logic.
+
+        Other variables are parsed based on the name prefix of a variable:
 
         * `in_*`: input
         * `inout_*`: in-output
         * `p_*`: parameter
 
         !!! note
-            The parsed names come in the same order they appear in the expression.
+            The parsed names come in the same order they appear in the expression, not in the parsing order.
 
         The number of outputs is derived based on the number of commas outside of any bracket pair.
         If there is only one output, the output name is `out`. If more - `out1`, `out2`, etc.
@@ -3512,7 +3518,24 @@ Other keyword arguments are passed to `{0}.run`.
             2020-01-03     3.166667  3.833333  2.833333  4.166667
             2020-01-04     4.166667  2.833333  3.833333  3.166667
             2020-01-05     5.166667  1.833333  4.833333  2.166667
-            ```"""
+            ```
+
+            Common input names from OHLCV are recognized automatically:
+
+            ```pycon
+            >>> expr = "wm_mean_nb((high + low) / 2, p_window)"
+            >>> WMA = vbt.IndicatorFactory.from_expr(expr)
+            >>> wma = WMA.run(price + 1, price, window=[2, 3])
+            >>> wma.out
+            custom_window                   2                   3
+                                  a         b         a         b
+            2020-01-01          NaN       NaN       NaN       NaN
+            2020-01-02     2.166667  4.833333       NaN       NaN
+            2020-01-03     3.166667  3.833333  2.833333  4.166667
+            2020-01-04     4.166667  2.833333  3.833333  3.166667
+            2020-01-05     5.166667  1.833333  4.833333  2.166667
+            ```
+        """
         expr = expr.strip()
         if expr.startswith('(') and expr.endswith(')'):
             expr = expr[1:-1]
@@ -3524,6 +3547,17 @@ Other keyword arguments are passed to `{0}.run`.
             in_output_names = []
             param_names = []
             var_names = get_expr_var_names(expr)
+            if magnet_input_names is None:
+                magnet_input_names = ['open', 'high', 'low', 'close', 'volume']
+            for input_name in magnet_input_names:
+                if input_name in var_names or \
+                        'in_' + input_name in var_names:
+                    input_names.append(input_name)
+                else:
+                    for var_name in var_names:
+                        if input_name in expr_func_config.get(var_name, {}).get('magnet_input_names', []) or \
+                                input_name in expr_res_func_config.get(var_name, {}).get('magnet_input_names', []):
+                            input_names.append(input_name)
             _var_names = []
             for var_name in var_names:
                 _var_names.append((var_name, expr.index(var_name)))
@@ -3602,11 +3636,11 @@ Other keyword arguments are passed to `{0}.run`.
                 input_mapping[param_names[i]] = param
             def_func_mapping = {}
             for k, v in expr_func_config.items():
-                def_func_mapping[k] = v
+                def_func_mapping[k] = v['func']
             func_mapping = merge_dicts(def_func_mapping, func_mapping)
             def_res_func_mapping = {}
             for k, v in expr_res_func_config.items():
-                def_res_func_mapping[k] = v
+                def_res_func_mapping[k] = v['func']
             res_func_mapping = merge_dicts(def_res_func_mapping, res_func_mapping)
             merged_mapping = merge_dicts(input_mapping, _kwargs)
             mapping = {}

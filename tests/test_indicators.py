@@ -2290,7 +2290,7 @@ class TestFactory:
         assert I.input_names == ('ts',)
         assert I.param_names == ('window',)
         pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
-        I = vbt.IndicatorFactory.from_expr("returns", factory_kwargs=dict(input_names=['close']))
+        I = vbt.IndicatorFactory.from_expr("returns")
         assert I.input_names == ('close',)
         assert I.param_names == ()
         pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.to_returns())
@@ -2312,6 +2312,13 @@ class TestFactory:
         assert I.input_names == ('close',)
         assert I.param_names == ()
         pd.testing.assert_frame_equal(I.run(ts).out, ts)
+        I = vbt.IndicatorFactory.from_expr("(close + low + high + open + volume) / 5")
+        assert I.input_names == ('open', 'high', 'low', 'close', 'volume')
+        assert I.param_names == ()
+        pd.testing.assert_frame_equal(
+            I.run(ts, ts * 2, ts * 3, ts * 4, ts * 5).out,
+            (ts + ts * 2 + ts * 3 + ts * 4 + ts * 5) / 5
+        )
 
     def test_get_talib_indicators(self):
         if talib_available:
