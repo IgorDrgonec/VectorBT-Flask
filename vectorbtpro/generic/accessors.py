@@ -2397,6 +2397,18 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
     # ############# Transformation ############# #
 
+    def demean(self,
+               jitted: tp.JittedOption = None,
+               chunked: tp.ChunkedOption = None,
+               group_by: tp.GroupByLike = None,
+               wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """See `vectorbtpro.generic.nb.demean_nb`."""
+        func = jit_reg.resolve_option(nb.demean_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        group_map = self.wrapper.grouper.get_group_map(group_by=group_by)
+        out = func(self.to_2d_array(), group_map)
+        return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
+
     def transform(self, transformer: TransformerT, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
         """Transform using a transformer.
 
@@ -2736,7 +2748,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                  jitted: tp.JittedOption = None,
                  chunked: tp.ChunkedOption = None,
                  wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
-        """Drawdown series."""
+        """Get drawdown series."""
         func = jit_reg.resolve_option(nb.drawdown_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         out = func(self.to_2d_array())

@@ -3378,3 +3378,41 @@ def crossed_above_nb(arr1: tp.Array2d, arr2: tp.Array2d, wait: int = 0) -> tp.Ar
     for col in prange(arr1.shape[1]):
         out[:, col] = crossed_above_1d_nb(arr1[:, col], arr2[:, col], wait=wait)
     return out
+
+
+# ############# Transformation ############# #
+
+@register_chunkable(
+    size=base_ch.GroupLensSizer(arg_query='group_map'),
+    arg_take_spec=dict(
+        arr=ch.ArraySlicer(axis=1, mapper=base_ch.group_idxs_mapper),
+        group_map=base_ch.GroupMapSlicer()
+    ),
+    merge_func=base_ch.column_stack
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def demean_nb(arr: tp.Array2d, group_map: tp.GroupMap) -> tp.Array2d:
+    """Demean each value within its group."""
+    group_idxs, group_lens = group_map
+    group_start_idxs = np.cumsum(group_lens) - group_lens
+    out = np.empty_like(arr, dtype=np.float_)
+
+    for group in prange(len(group_lens)):
+        group_len = group_lens[group]
+        start_idx = group_start_idxs[group]
+        col_idxs = group_idxs[start_idx:start_idx + group_len]
+        for i in range(arr.shape[0]):
+            group_sum = 0
+            group_cnt = 0
+            for k in range(group_len):
+                col = col_idxs[k]
+                if not np.isnan(arr[i, col]):
+                    group_sum += arr[i, col]
+                    group_cnt += 1
+            for k in range(group_len):
+                col = col_idxs[k]
+                if np.isnan(arr[i, col]) or group_cnt == 0:
+                    out[i, col] = np.nan
+                else:
+                    out[i, col] = arr[i, col] - group_sum / group_cnt
+    return out

@@ -2294,6 +2294,24 @@ class TestAccessors:
             )
         )
 
+    def test_demean(self):
+        pd.testing.assert_frame_equal(
+            df.vbt.demean(group_by=group_by),
+            pd.DataFrame({
+                'a': df['a'].values - df[['a', 'b']].mean(axis=1).values,
+                'b': df['b'].values - df[['a', 'b']].mean(axis=1).values,
+                'c': df['c'].values - df['c'].values
+            }, index=df.index)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.demean(jitted=dict(parallel=True)),
+            df.vbt.demean(jitted=dict(parallel=False))
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.demean(chunked=True),
+            df.vbt.demean(chunked=False)
+        )
+
     def test_drawdown(self):
         pd.testing.assert_series_equal(
             df['a'].vbt.drawdown(),
