@@ -11,7 +11,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.caching import Cacheable
 from vectorbtpro.utils.decorators import class_or_instancemethod
-from vectorbtpro.utils.formatting import Prettified, prettify, prettify_inited
+from vectorbtpro.utils.formatting import Prettified, prettify_dict, prettify_inited
 from vectorbtpro.utils.pickling import Pickleable
 
 
@@ -757,9 +757,18 @@ class Config(PickleableDict, Prettified):
             }
         else:
             dct = dict(self)
-        return prettify_inited(
-            type(self),
-            dct,
+        if all([isinstance(k, str) for k in dct]):
+            return prettify_inited(
+                type(self),
+                dct,
+                replace=replace,
+                path=path,
+                htchar=htchar,
+                lfchar=lfchar,
+                indent=indent
+            )
+        return prettify_dict(
+            self,
             replace=replace,
             path=path,
             htchar=htchar,
