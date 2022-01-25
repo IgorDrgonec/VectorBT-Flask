@@ -851,7 +851,7 @@ def nancov_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d, ddof: int = 0) -> float:
             arr1_sum += arr1[i]
             arr2_sum += arr2[i]
             k += 1
-    if k == 0:
+    if k - ddof <= 0:
         return np.nan
     arr1_mean = arr1_sum / k
     arr2_mean = arr2_sum / k
@@ -2600,7 +2600,7 @@ def squeeze_grouped_nb(arr: tp.Array2d, group_map: tp.GroupMap,
     group_idxs, group_lens = group_map
     group_start_idxs = np.cumsum(group_lens) - group_lens
     group_0_idxs = group_idxs[group_start_idxs[0]:group_start_idxs[0] + group_lens[0]]
-    group_i_0_out = squeeze_func_nb(arr[0, group_0_idxs], *args)
+    group_i_0_out = squeeze_func_nb(arr[0][group_0_idxs], *args)
     out = np.empty((arr.shape[0], len(group_lens)), dtype=np.asarray(group_i_0_out).dtype)
     out[0, 0] = group_i_0_out
 
@@ -2611,7 +2611,7 @@ def squeeze_grouped_nb(arr: tp.Array2d, group_map: tp.GroupMap,
         for i in range(arr.shape[0]):
             if group == 0 and i == 0:
                 continue
-            out[i, group] = squeeze_func_nb(arr[i, col_idxs], *args)
+            out[i, group] = squeeze_func_nb(arr[i][col_idxs], *args)
     return out
 
 

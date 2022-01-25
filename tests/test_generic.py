@@ -1831,7 +1831,7 @@ class TestAccessors:
 
         @njit
         def mean_grouped_meta_nb(i, group_idxs, group, a):
-            return np.nanmean(a[i, group_idxs])
+            return np.nanmean(a[i][group_idxs])
 
         pd.testing.assert_frame_equal(
             df.vbt.squeeze_grouped(mean_nb, group_by=group_by),
@@ -1880,7 +1880,7 @@ class TestAccessors:
 
         @njit
         def sum_grouped_meta_nb(i, group_idxs, group, a, b):
-            return np.nansum(a[i, group_idxs]) + np.nansum(b[i, group_idxs])
+            return np.nansum(a[i][group_idxs]) + np.nansum(b[i][group_idxs])
 
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.squeeze_grouped(

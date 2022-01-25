@@ -1413,7 +1413,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             c    1.8
             Name: reduce, dtype: float64
 
-            >>> grouped_mean_meta_nb = njit(lambda from_col, to_col, group, a: np.nanmean(a[:, from_col:to_col]))
+            >>> grouped_mean_meta_nb = njit(lambda group_idxs, group, a: np.nanmean(a[:, group_idxs]))
 
             >>> group_by = pd.Series(['first', 'first', 'second'], name='group')
             >>> vbt.pd_acc.reduce(
@@ -1573,8 +1573,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
             * Using meta function:
 
             ```pycon
-            >>> mean_ratio_meta_nb = njit(lambda i, from_col, to_col, group, a, b: \\
-            ...     np.mean(a[i, from_col:to_col]) / np.mean(b[i, from_col:to_col]))
+            >>> mean_ratio_meta_nb = njit(lambda i, group_idxs, group, a, b: \\
+            ...     np.mean(a[i][group_idxs]) / np.mean(b[i][group_idxs]))
 
             >>> vbt.pd_acc.squeeze_grouped(
             ...     mean_ratio_meta_nb,

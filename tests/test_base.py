@@ -203,11 +203,11 @@ class TestColumnGrouper:
             np.array([1])
         )
         np.testing.assert_array_equal(
-            grouping.nb.get_group_map_nb(np.array([]), 0)[0],
+            grouping.nb.get_group_map_nb(np.array([], dtype=np.int_), 0)[0],
             np.array([])
         )
         np.testing.assert_array_equal(
-            grouping.nb.get_group_map_nb(np.array([]), 0)[1],
+            grouping.nb.get_group_map_nb(np.array([], dtype=np.int_), 0)[1],
             np.array([])
         )
 
