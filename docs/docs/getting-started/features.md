@@ -425,7 +425,7 @@ NumPy and vectorbt functions thanks to a built-in matching mechanism.
 
 >>> VWAP = vbt.IF.from_expr("cumsum(close * volume) / cumsum(volume)")  # (1)!
 >>> vwap = VWAP.run(data.get('Close'), data.get('Volume'))
->>> vwap.out.vbt.plot().show_svg()
+>>> vwap.out.rename('VWAP').vbt.plot().show_svg()
 ```
 
 1. `cumsum` has been matched with `np.cumsum`
@@ -450,7 +450,7 @@ Date
 2022-01-24 00:00:00+00:00     0.50     0.00
 2022-01-25 00:00:00+00:00     0.50     0.00
 
-[2688 rows x 2 columns
+[2688 rows x 2 columns]
 ```
 
 ## Modeling
