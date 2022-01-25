@@ -12,7 +12,7 @@ All notable changes in reverse chronological order.
     - Ranking and rolling ranking (SP)
     - Covariance and rolling covariance (SP)
     - Rolling sum and product (SP)
-    - Rolling weighted moving average (SP)
+    - Rolling weighted average (SP)
     - Rolling argmin and argmax
     - Demeaning within a group
 - Implemented volume-weighted average price (VWAP)
