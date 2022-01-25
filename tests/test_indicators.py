@@ -2272,6 +2272,10 @@ class TestFactory:
         assert I.input_names == ('ts',)
         assert I.param_names == ('window',)
         pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
+        I = vbt.IndicatorFactory.from_expr("(rolling_mean(in_ts, p_window) - 1) * (3 - 1)", window=2)
+        assert I.input_names == ('ts',)
+        assert I.param_names == ('window',)
+        pd.testing.assert_frame_equal(I.run(ts).out, (ts.vbt.rolling_mean(2) - 1) * (3 - 1))
         I = vbt.IndicatorFactory.from_expr("(rolling_mean(in_ts, p_window),)", window=2)
         assert I.input_names == ('ts',)
         assert I.param_names == ('window',)
@@ -2319,6 +2323,25 @@ class TestFactory:
             I.run(ts, ts * 2, ts * 3, ts * 4, ts * 5).out,
             (ts + ts * 2 + ts * 3 + ts * 4 + ts * 5) / 5
         )
+
+    def test_from_wqa101(self):
+        columns = pd.MultiIndex.from_tuples([
+            ('A', 0, 0, 0),
+            ('B', 0, 0, 0)
+        ], names=['symbol', 'sector', 'subindustry', 'industry'])
+        np.random.seed(42)
+        data_dct = {
+            'open': pd.DataFrame(np.random.uniform(size=(100, 2)), columns=columns),
+            'high': pd.DataFrame(np.random.uniform(size=(100, 2)), columns=columns),
+            'low': pd.DataFrame(np.random.uniform(size=(100, 2)), columns=columns),
+            'close': pd.DataFrame(np.random.uniform(size=(100, 2)), columns=columns),
+            'volume': pd.DataFrame(np.random.uniform(size=(100, 2)), columns=columns)
+        }
+        for i in range(1, 102):
+            WQA = vbt.IndicatorFactory.from_wqa101(i)
+            wqa = WQA.run(*[data_dct[input_name] for input_name in WQA.input_names])
+            assert wqa.out.shape == data_dct['open'].shape
+
 
     def test_get_talib_indicators(self):
         if talib_available:

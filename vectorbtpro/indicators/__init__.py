@@ -35,10 +35,16 @@ def ta(*args, **kwargs) -> tp.Type[IndicatorBase]:
     return IndicatorFactory.from_ta(*args, **kwargs)
 
 
+def wqa101(*args, **kwargs) -> tp.Type[IndicatorBase]:
+    """Shortcut for `vectorbtpro.indicators.factory.IndicatorFactory.from_wqa101`."""
+    return IndicatorFactory.from_wqa101(*args, **kwargs)
+
+
 __whitelist__ = [
     'talib',
     'pandas_ta',
-    'ta'
+    'ta',
+    'wqa101'
 ]
 __all__ = create__all__(__name__)
 __pdoc__ = {k: k in __whitelist__ for k in __all__}

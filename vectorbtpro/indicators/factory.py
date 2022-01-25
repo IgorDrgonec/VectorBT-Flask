@@ -173,7 +173,7 @@ To get details on what arguments are accepted by any of the class methods, use `
 >>> help(MyInd.run)
 Help on method run:
 
-run(price, window, short_name='custom', hide_params=None, hide_default=True, **kwargs) method of builtins.type instance
+run(price, window, short_name='custom', hide_params=None, hide_default=True, **kwargs) method of vectorbtpro.generic.analyzable.MetaAnalyzable instance
     Run `Indicator` indicator.
 
     * Inputs: `price`
@@ -1197,7 +1197,7 @@ from vectorbtpro.utils.params import to_typed_list, broadcast_params, create_par
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.template import has_templates, deep_substitute
 from vectorbtpro.utils.parsing import get_expr_var_names, get_func_arg_names
-from vectorbtpro.indicators.expr import expr_func_config, expr_res_func_config
+from vectorbtpro.indicators.expr import expr_func_config, expr_res_func_config, wqa101_expr_config
 
 try:
     from ta.utils import IndicatorMixin as IndicatorMixinT
@@ -3430,17 +3430,23 @@ Other keyword arguments are passed to `{0}.run`.
     # ############# Expressions ############# #
 
     @class_or_instancemethod
-    def from_expr(cls_or_self, expr: str, factory_kwargs: tp.KwargsLike = None,
-                  magnet_input_names: tp.Iterable[str] = None, **kwargs) -> tp.Type[IndicatorBase]:
+    def from_expr(cls_or_self,
+                  expr: str,
+                  factory_kwargs: tp.KwargsLike = None,
+                  magnet_input_names: tp.Iterable[str] = None,
+                  **kwargs) -> tp.Type[IndicatorBase]:
         """Build an indicator class from an indicator expression.
 
         Args:
             expr (str): Expression.
 
                 Expression must be a string with a valid Python code.
-            factory_kwargs: Keyword arguments passed to `IndicatorFactory`.
+            factory_kwargs (dict): Keyword arguments passed to `IndicatorFactory`.
 
                 Only applied when calling the class method.
+            magnet_input_names (iterable of str): Names recognized as input names.
+
+                Defaults to `open`, `high`, `low`, `close`, and `volume`.
             **kwargs: Keyword arguments passed to `IndicatorFactory.from_apply_func`.
 
         Returns:
@@ -3520,7 +3526,7 @@ Other keyword arguments are passed to `{0}.run`.
             2020-01-05     5.166667  1.833333  4.833333  2.166667
             ```
 
-            Common input names from OHLCV are recognized automatically:
+            Common (lower-case) input names from OHLCV are recognized automatically:
 
             ```pycon
             >>> expr = "wm_mean_nb((high + low) / 2, p_window)"
@@ -3537,10 +3543,23 @@ Other keyword arguments are passed to `{0}.run`.
             ```
         """
         expr = expr.strip()
-        if expr.startswith('(') and expr.endswith(')'):
-            expr = expr[1:-1]
         if expr.endswith(','):
             expr = expr[:-1]
+        if expr.startswith('(') and expr.endswith(')'):
+            n_open_brackets = 0
+            remove_brackets = True
+            for i, s in enumerate(expr):
+                if s == '(':
+                    n_open_brackets += 1
+                elif s == ')':
+                    n_open_brackets -= 1
+                    if n_open_brackets == 0 and i < len(expr) - 1:
+                        remove_brackets = False
+                        break
+            if remove_brackets:
+                expr = expr[1:-1]
+        if expr.endswith(','):
+            expr = expr[:-1]  # again
 
         if isinstance(cls_or_self, type):
             input_names = []
@@ -3550,14 +3569,14 @@ Other keyword arguments are passed to `{0}.run`.
             if magnet_input_names is None:
                 magnet_input_names = ['open', 'high', 'low', 'close', 'volume']
             for input_name in magnet_input_names:
-                if input_name in var_names or \
-                        'in_' + input_name in var_names:
+                if input_name in var_names or 'in_' + input_name in var_names:
                     input_names.append(input_name)
-                else:
-                    for var_name in var_names:
-                        if input_name in expr_func_config.get(var_name, {}).get('magnet_input_names', []) or \
-                                input_name in expr_res_func_config.get(var_name, {}).get('magnet_input_names', []):
-                            input_names.append(input_name)
+                    continue
+                for var_name in var_names:
+                    if input_name in expr_func_config.get(var_name, {}).get('magnet_input_names', []) or \
+                            input_name in expr_res_func_config.get(var_name, {}).get('magnet_input_names', []):
+                        input_names.append(input_name)
+                        break
             _var_names = []
             for var_name in var_names:
                 _var_names.append((var_name, expr.index(var_name)))
@@ -3666,8 +3685,11 @@ Other keyword arguments are passed to `{0}.run`.
                         var = importlib.import_module(var_name)
                     except ModuleNotFoundError:
                         raise NameError(f"name '{var_name}' is not defined")
-                if callable(var) and 'mapping' in get_func_arg_names(var):
-                    var = functools.partial(var, mapping=merged_mapping)
+                try:
+                    if callable(var) and 'mapping' in get_func_arg_names(var):
+                        var = functools.partial(var, mapping=merged_mapping)
+                except:
+                    pass
                 if var_name in res_func_mapping:
                     var = var()
                 mapping[var_name] = var
@@ -3678,7 +3700,67 @@ Other keyword arguments are passed to `{0}.run`.
             apply_func,
             pass_packed=True,
             pass_wrapper=True,
-            keep_pd=False,
+            **kwargs
+        )
+
+    @classmethod
+    def from_wqa101(cls, alpha_idx: int, **kwargs) -> tp.Type[IndicatorBase]:
+        """From one of the WorldQuant's 101 alpha expressions.
+
+        See `vectorbtpro.indicators.expr.wqa101_expr_config`.
+
+        !!! note
+            Some expressions that utilize cross-sectional operations require columns to be
+            a multi-index with a level `sector`, `subindustry`, or `industry`.
+
+        Usage:
+            ```pycon
+            >>> data = vbt.YFData.fetch(['BTC-USD', 'ETH-USD'])
+
+            >>> WQA1 = vbt.IndicatorFactory.from_wqa101(1)
+            >>> wqa1 = WQA1.run(data.get('Close'))
+            >>> wqa1.out
+            symbol                     BTC-USD  ETH-USD
+            Date
+            2014-09-17 00:00:00+00:00     0.25     0.25
+            2014-09-18 00:00:00+00:00     0.25     0.25
+            2014-09-19 00:00:00+00:00     0.25     0.25
+            2014-09-20 00:00:00+00:00     0.25     0.25
+            2014-09-21 00:00:00+00:00     0.25     0.25
+            ...                            ...      ...
+            2022-01-21 00:00:00+00:00     0.00     0.50
+            2022-01-22 00:00:00+00:00     0.00     0.50
+            2022-01-23 00:00:00+00:00     0.25     0.25
+            2022-01-24 00:00:00+00:00     0.50     0.00
+            2022-01-25 00:00:00+00:00     0.50     0.00
+
+            [2688 rows x 2 columns]
+            ```
+
+            To get help on running the indicator, use the `help` command:
+
+            ```pycon
+            >>> help(WQA1.run)
+            Help on method run:
+
+            run(close, short_name='wqa1', hide_params=None, hide_default=True, **kwargs) method of vectorbtpro.generic.analyzable.MetaAnalyzable instance
+                Run `WQA1` indicator.
+
+                * Inputs: `close`
+                * Outputs: `out`
+
+                Pass a list of parameter names as `hide_params` to hide their column levels.
+                Set `hide_default` to False to show the column levels of the parameters with a default value.
+
+                Other keyword arguments are passed to `vectorbtpro.indicators.factory.run_pipeline`.
+            ```
+        """
+        return cls.from_expr(
+            wqa101_expr_config[alpha_idx],
+            factory_kwargs=dict(
+                class_name="WQA%d" % alpha_idx,
+                module_name=__name__ + '.wqa'
+            ),
             **kwargs
         )
 
@@ -3730,7 +3812,7 @@ Other keyword arguments are passed to `{0}.run`.
             >>> help(SMA.run)
             Help on method run:
 
-            run(close, timeperiod=30, short_name='sma', hide_params=None, hide_default=True, **kwargs) method of builtins.type instance
+            run(close, timeperiod=30, short_name='sma', hide_params=None, hide_default=True, **kwargs) method of vectorbtpro.generic.analyzable.MetaAnalyzable instance
                 Run `SMA` indicator.
 
                 * Inputs: `close`
@@ -3951,7 +4033,7 @@ Other keyword arguments are passed to `{0}.run`.
             >>> help(SMA.run)
             Help on method run:
 
-            run(close, length=None, offset=None, short_name='sma', hide_params=None, hide_default=True, **kwargs) method of builtins.type instance
+            run(close, length=None, offset=None, short_name='sma', hide_params=None, hide_default=True, **kwargs) method of vectorbtpro.generic.analyzable.MetaAnalyzable instance
                 Run `SMA` indicator.
 
                 * Inputs: `close`
@@ -4168,7 +4250,7 @@ Other keyword arguments are passed to `{0}.run`.
             >>> help(SMAIndicator.run)
             Help on method run:
 
-            run(close, window, fillna=False, short_name='smaindicator', hide_params=None, hide_default=True, **kwargs) method of builtins.type instance
+            run(close, window, fillna=False, short_name='smaindicator', hide_params=None, hide_default=True, **kwargs) method of vectorbtpro.generic.analyzable.MetaAnalyzable instance
                 Run `SMAIndicator` indicator.
 
                 * Inputs: `close`
