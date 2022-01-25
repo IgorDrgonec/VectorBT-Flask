@@ -2,9 +2,6 @@
 
 """Numba-compiled functions for label generation.
 
-Provides an arsenal of Numba-compiled functions that are used by indicator
-classes. These only accept NumPy arrays and other Numba-compatible types.
-
 !!! note
     Set `wait` to 1 to exclude the current value from calculation of future values.
 
@@ -16,18 +13,32 @@ import numpy as np
 from numba import prange
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.base.indexing import flex_select_auto_nb
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.labels.enums import TrendMode
+from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.registries.jit_registry import register_jitted
+from vectorbtpro.utils import chunking as ch
 
 
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='close', axis=1),
+    arg_take_spec=dict(
+        close=ch.ArraySlicer(axis=1),
+        window=None,
+        ewm=None,
+        wait=None,
+        adjust=None
+    ),
+    merge_func=base_ch.column_stack
+)
 @register_jitted(cache=True)
-def future_mean_apply_nb(close: tp.Array2d,
-                         window: int,
-                         ewm: bool,
-                         wait: int = 1,
-                         adjust: bool = False) -> tp.Array2d:
+def future_mean_nb(close: tp.Array2d,
+                   window: int,
+                   ewm: bool,
+                   wait: int = 1,
+                   adjust: bool = False) -> tp.Array2d:
     """Get the mean of the next period."""
     if ewm:
         out = generic_nb.ewm_mean_nb(close[::-1], window, minp=window, adjust=adjust)[::-1]
@@ -38,13 +49,25 @@ def future_mean_apply_nb(close: tp.Array2d,
     return out
 
 
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='close', axis=1),
+    arg_take_spec=dict(
+        close=ch.ArraySlicer(axis=1),
+        window=None,
+        ewm=None,
+        wait=None,
+        adjust=None,
+        ddof=None
+    ),
+    merge_func=base_ch.column_stack
+)
 @register_jitted(cache=True)
-def future_std_apply_nb(close: tp.Array2d,
-                        window: int,
-                        ewm: bool,
-                        wait: int = 1,
-                        adjust: bool = False,
-                        ddof: int = 0) -> tp.Array2d:
+def future_std_nb(close: tp.Array2d,
+                  window: int,
+                  ewm: bool,
+                  wait: int = 1,
+                  adjust: bool = False,
+                  ddof: int = 0) -> tp.Array2d:
     """Get the standard deviation of the next period."""
     if ewm:
         out = generic_nb.ewm_std_nb(close[::-1], window, minp=window, adjust=adjust)[::-1]
@@ -55,8 +78,17 @@ def future_std_apply_nb(close: tp.Array2d,
     return out
 
 
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='close', axis=1),
+    arg_take_spec=dict(
+        close=ch.ArraySlicer(axis=1),
+        window=None,
+        wait=None
+    ),
+    merge_func=base_ch.column_stack
+)
 @register_jitted(cache=True)
-def future_min_apply_nb(close: tp.Array2d, window: int, wait: int = 1) -> tp.Array2d:
+def future_min_nb(close: tp.Array2d, window: int, wait: int = 1) -> tp.Array2d:
     """Get the minimum of the next period."""
     out = generic_nb.rolling_min_nb(close[::-1], window, minp=window)[::-1]
     if wait > 0:
@@ -64,8 +96,17 @@ def future_min_apply_nb(close: tp.Array2d, window: int, wait: int = 1) -> tp.Arr
     return out
 
 
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='close', axis=1),
+    arg_take_spec=dict(
+        close=ch.ArraySlicer(axis=1),
+        window=None,
+        wait=None
+    ),
+    merge_func=base_ch.column_stack
+)
 @register_jitted(cache=True)
-def future_max_apply_nb(close: tp.Array2d, window: int, wait: int = 1) -> tp.Array2d:
+def future_max_nb(close: tp.Array2d, window: int, wait: int = 1) -> tp.Array2d:
     """Get the maximum of the next period."""
     out = generic_nb.rolling_max_nb(close[::-1], window, minp=window)[::-1]
     if wait > 0:
@@ -73,24 +114,43 @@ def future_max_apply_nb(close: tp.Array2d, window: int, wait: int = 1) -> tp.Arr
     return out
 
 
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='close', axis=1),
+    arg_take_spec=dict(
+        close=ch.ArraySlicer(axis=1),
+        n=None
+    ),
+    merge_func=base_ch.column_stack
+)
 @register_jitted(cache=True)
-def fixed_labels_apply_nb(close: tp.Array2d, n: int) -> tp.Array2d:
+def fixed_labels_nb(close: tp.Array2d, n: int) -> tp.Array2d:
     """Get percentage change from the current value to a future value."""
     return (generic_nb.bshift_nb(close, n) - close) / close
 
 
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='close', axis=1),
+    arg_take_spec=dict(
+        close=ch.ArraySlicer(axis=1),
+        window=None,
+        ewm=None,
+        wait=None,
+        adjust=None
+    ),
+    merge_func=base_ch.column_stack
+)
 @register_jitted(cache=True)
-def mean_labels_apply_nb(close: tp.Array2d,
-                         window: int,
-                         ewm: bool,
-                         wait: int = 1,
-                         adjust: bool = False) -> tp.Array2d:
+def mean_labels_nb(close: tp.Array2d,
+                   window: int,
+                   ewm: bool,
+                   wait: int = 1,
+                   adjust: bool = False) -> tp.Array2d:
     """Get the percentage change from the current value to the average of the next period."""
-    return (future_mean_apply_nb(close, window, ewm, wait, adjust) - close) / close
+    return (future_mean_nb(close, window, ewm, wait, adjust) - close) / close
 
 
 @register_jitted(cache=True)
-def get_symmetric_pos_th_nb(neg_th: tp.MaybeArray[float]) -> tp.MaybeArray[float]:
+def get_symmetric_pos_th_nb(neg_th: tp.FlexArray) -> tp.FlexArray:
     """Compute the positive return that is symmetric to a negative one.
 
     For example, 50% down requires 100% to go up to the initial level."""
@@ -98,16 +158,26 @@ def get_symmetric_pos_th_nb(neg_th: tp.MaybeArray[float]) -> tp.MaybeArray[float
 
 
 @register_jitted(cache=True)
-def get_symmetric_neg_th_nb(pos_th: tp.MaybeArray[float]) -> tp.MaybeArray[float]:
+def get_symmetric_neg_th_nb(pos_th: tp.FlexArray) -> tp.FlexArray:
     """Compute the negative return that is symmetric to a positive one."""
     return pos_th / (1 + pos_th)
 
 
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='close', axis=1),
+    arg_take_spec=dict(
+        close=ch.ArraySlicer(axis=1),
+        pos_th=base_ch.FlexArraySlicer(axis=1),
+        neg_th=base_ch.FlexArraySlicer(axis=1),
+        flex_2d=None
+    ),
+    merge_func=base_ch.column_stack
+)
 @register_jitted(cache=True, tags={'can_parallel'})
-def local_extrema_apply_nb(close: tp.Array2d,
-                           pos_th: tp.MaybeArray[float],
-                           neg_th: tp.MaybeArray[float],
-                           flex_2d: bool = True) -> tp.Array2d:
+def local_extrema_nb(close: tp.Array2d,
+                     pos_th: tp.FlexArray,
+                     neg_th: tp.FlexArray,
+                     flex_2d: bool = True) -> tp.Array2d:
     """Get array of local extrema denoted by 1 (peak) or -1 (trough), otherwise 0.
 
     Two adjacent peak and trough points should exceed the given threshold parameters.
@@ -165,6 +235,14 @@ def local_extrema_apply_nb(close: tp.Array2d,
     return out
 
 
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='close', axis=1),
+    arg_take_spec=dict(
+        close=ch.ArraySlicer(axis=1),
+        local_extrema=ch.ArraySlicer(axis=1)
+    ),
+    merge_func=base_ch.column_stack
+)
 @register_jitted(cache=True, tags={'can_parallel'})
 def bn_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d) -> tp.Array2d:
     """Return 0 for H-L and 1 for L-H."""
@@ -187,6 +265,14 @@ def bn_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d) -> tp.Array
     return out
 
 
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='close', axis=1),
+    arg_take_spec=dict(
+        close=ch.ArraySlicer(axis=1),
+        local_extrema=ch.ArraySlicer(axis=1)
+    ),
+    merge_func=base_ch.column_stack
+)
 @register_jitted(cache=True, tags={'can_parallel'})
 def bn_cont_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d) -> tp.Array2d:
     """Normalize each range between two extrema between 0 (will go up) and 1 (will go down)."""
@@ -208,11 +294,22 @@ def bn_cont_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d) -> tp.
     return out
 
 
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='close', axis=1),
+    arg_take_spec=dict(
+        close=ch.ArraySlicer(axis=1),
+        local_extrema=ch.ArraySlicer(axis=1),
+        pos_th=base_ch.FlexArraySlicer(axis=1),
+        neg_th=base_ch.FlexArraySlicer(axis=1),
+        flex_2d=None
+    ),
+    merge_func=base_ch.column_stack
+)
 @register_jitted(cache=True, tags={'can_parallel'})
 def bn_cont_sat_trend_labels_nb(close: tp.Array2d,
                                 local_extrema: tp.Array2d,
-                                pos_th: tp.MaybeArray[float],
-                                neg_th: tp.MaybeArray[float],
+                                pos_th: tp.FlexArray,
+                                neg_th: tp.FlexArray,
                                 flex_2d: bool = True) -> tp.Array2d:
     """Similar to `bn_cont_trend_labels_nb` but sets each close value to 0 or 1
     if the percentage change to the next extremum exceeds the threshold set for this range.
@@ -258,6 +355,15 @@ def bn_cont_sat_trend_labels_nb(close: tp.Array2d,
     return out
 
 
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='close', axis=1),
+    arg_take_spec=dict(
+        close=ch.ArraySlicer(axis=1),
+        local_extrema=ch.ArraySlicer(axis=1),
+        normalize=None
+    ),
+    merge_func=base_ch.column_stack
+)
 @register_jitted(cache=True, tags={'can_parallel'})
 def pct_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d, normalize: bool) -> tp.Array2d:
     """Compute the percentage change of the current value to the next extremum."""
@@ -281,14 +387,25 @@ def pct_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d, normalize:
     return out
 
 
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='close', axis=1),
+    arg_take_spec=dict(
+        close=ch.ArraySlicer(axis=1),
+        pos_th=base_ch.FlexArraySlicer(axis=1),
+        neg_th=base_ch.FlexArraySlicer(axis=1),
+        mode=None,
+        flex_2d=None
+    ),
+    merge_func=base_ch.column_stack
+)
 @register_jitted(cache=True)
-def trend_labels_apply_nb(close: tp.Array2d,
-                          pos_th: tp.MaybeArray[float],
-                          neg_th: tp.MaybeArray[float],
-                          mode: int,
-                          flex_2d: bool = True) -> tp.Array2d:
+def trend_labels_nb(close: tp.Array2d,
+                    pos_th: tp.FlexArray,
+                    neg_th: tp.FlexArray,
+                    mode: int,
+                    flex_2d: bool = True) -> tp.Array2d:
     """Apply a trend labeling function based on `TrendMode`."""
-    local_extrema = local_extrema_apply_nb(close, pos_th, neg_th, flex_2d)
+    local_extrema = local_extrema_nb(close, pos_th, neg_th, flex_2d)
     if mode == TrendMode.Binary:
         return bn_trend_labels_nb(close, local_extrema)
     if mode == TrendMode.BinaryCont:
@@ -302,11 +419,23 @@ def trend_labels_apply_nb(close: tp.Array2d,
     raise ValueError("Trend mode is not recognized")
 
 
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='close', axis=1),
+    arg_take_spec=dict(
+        close=ch.ArraySlicer(axis=1),
+        window=None,
+        pos_th=base_ch.FlexArraySlicer(axis=1),
+        neg_th=base_ch.FlexArraySlicer(axis=1),
+        wait=None,
+        flex_2d=None
+    ),
+    merge_func=base_ch.column_stack
+)
 @register_jitted(cache=True, tags={'can_parallel'})
 def breakout_labels_nb(close: tp.Array2d,
                        window: int,
-                       pos_th: tp.MaybeArray[float],
-                       neg_th: tp.MaybeArray[float],
+                       pos_th: tp.FlexArray,
+                       neg_th: tp.FlexArray,
                        wait: int = 1,
                        flex_2d: bool = True) -> tp.Array2d:
     """For each value, return 1 if any value in the next period is greater than the

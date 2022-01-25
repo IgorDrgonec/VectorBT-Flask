@@ -19,14 +19,14 @@ FMEAN = IndicatorFactory(
     param_names=['window', 'ewm'],
     output_names=['fmean']
 ).from_apply_func(
-    nb.future_mean_apply_nb,
+    nb.future_mean_nb,
     kwargs_to_args=['wait', 'adjust'],
     ewm=False,
     wait=1,
     adjust=False
 )
 
-FMEAN.__doc__ = """Look-ahead indicator based on `vectorbtpro.labels.nb.future_mean_apply_nb`."""
+FMEAN.__doc__ = """Look-ahead indicator based on `vectorbtpro.labels.nb.future_mean_nb`."""
 
 FSTD = IndicatorFactory(
     class_name='FSTD',
@@ -35,7 +35,7 @@ FSTD = IndicatorFactory(
     param_names=['window', 'ewm'],
     output_names=['fstd']
 ).from_apply_func(
-    nb.future_std_apply_nb,
+    nb.future_std_nb,
     kwargs_to_args=['wait', 'adjust', 'ddof'],
     ewm=False,
     wait=1,
@@ -43,7 +43,7 @@ FSTD = IndicatorFactory(
     ddof=0
 )
 
-FSTD.__doc__ = """Look-ahead indicator based on `vectorbtpro.labels.nb.future_std_apply_nb`."""
+FSTD.__doc__ = """Look-ahead indicator based on `vectorbtpro.labels.nb.future_std_nb`."""
 
 FMIN = IndicatorFactory(
     class_name='FMIN',
@@ -52,12 +52,12 @@ FMIN = IndicatorFactory(
     param_names=['window'],
     output_names=['fmin']
 ).from_apply_func(
-    nb.future_min_apply_nb,
+    nb.future_min_nb,
     kwargs_to_args=['wait'],
     wait=1
 )
 
-FMIN.__doc__ = """Look-ahead indicator based on `vectorbtpro.labels.nb.future_min_apply_nb`."""
+FMIN.__doc__ = """Look-ahead indicator based on `vectorbtpro.labels.nb.future_min_nb`."""
 
 FMAX = IndicatorFactory(
     class_name='FMAX',
@@ -66,12 +66,12 @@ FMAX = IndicatorFactory(
     param_names=['window'],
     output_names=['fmax']
 ).from_apply_func(
-    nb.future_max_apply_nb,
+    nb.future_max_nb,
     kwargs_to_args=['wait'],
     wait=1
 )
 
-FMAX.__doc__ = """Look-ahead indicator based on `vectorbtpro.labels.nb.future_max_apply_nb`."""
+FMAX.__doc__ = """Look-ahead indicator based on `vectorbtpro.labels.nb.future_max_nb`."""
 
 
 # ############# Label generators ############# #
@@ -93,12 +93,12 @@ FIXLB = IndicatorFactory(
     param_names=['n'],
     output_names=['labels']
 ).from_apply_func(
-    nb.fixed_labels_apply_nb
+    nb.fixed_labels_nb
 )
 
 
 class _FIXLB(FIXLB):
-    """Label generator based on `vectorbtpro.labels.nb.fixed_labels_apply_nb`."""
+    """Label generator based on `vectorbtpro.labels.nb.fixed_labels_nb`."""
 
     plot = _plot
 
@@ -113,7 +113,7 @@ MEANLB = IndicatorFactory(
     param_names=['window', 'ewm'],
     output_names=['labels']
 ).from_apply_func(
-    nb.mean_labels_apply_nb,
+    nb.mean_labels_nb,
     kwargs_to_args=['wait', 'adjust'],
     ewm=False,
     wait=1,
@@ -122,7 +122,7 @@ MEANLB = IndicatorFactory(
 
 
 class _MEANLB(MEANLB):
-    """Label generator based on `vectorbtpro.labels.nb.mean_labels_apply_nb`."""
+    """Label generator based on `vectorbtpro.labels.nb.mean_labels_nb`."""
 
     plot = _plot
 
@@ -137,7 +137,7 @@ LEXLB = IndicatorFactory(
     param_names=['pos_th', 'neg_th'],
     output_names=['labels']
 ).from_apply_func(
-    nb.local_extrema_apply_nb,
+    nb.local_extrema_nb,
     param_settings=dict(
         pos_th=flex_elem_param_config,
         neg_th=flex_elem_param_config
@@ -147,7 +147,7 @@ LEXLB = IndicatorFactory(
 
 
 class _LEXLB(LEXLB):
-    """Label generator based on `vectorbtpro.labels.nb.local_extrema_apply_nb`."""
+    """Label generator based on `vectorbtpro.labels.nb.local_extrema_nb`."""
 
     plot = _plot
 
@@ -162,7 +162,7 @@ TRENDLB = IndicatorFactory(
     param_names=['pos_th', 'neg_th', 'mode'],
     output_names=['labels']
 ).from_apply_func(
-    nb.trend_labels_apply_nb,
+    nb.trend_labels_nb,
     param_settings=dict(
         pos_th=flex_elem_param_config,
         neg_th=flex_elem_param_config,
@@ -174,7 +174,7 @@ TRENDLB = IndicatorFactory(
 
 
 class _TRENDLB(TRENDLB):
-    """Label generator based on `vectorbtpro.labels.nb.trend_labels_apply_nb`."""
+    """Label generator based on `vectorbtpro.labels.nb.trend_labels_nb`."""
 
     plot = _plot
 
