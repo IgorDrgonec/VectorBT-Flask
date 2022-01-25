@@ -3705,7 +3705,7 @@ Other keyword arguments are passed to `{0}.run`.
 
     @classmethod
     def from_wqa101(cls, alpha_idx: int, **kwargs) -> tp.Type[IndicatorBase]:
-        """From one of the WorldQuant's 101 alpha expressions.
+        """Build an indicator class from one of the WorldQuant's 101 alpha expressions.
 
         See `vectorbtpro.indicators.expr.wqa101_expr_config`.
 

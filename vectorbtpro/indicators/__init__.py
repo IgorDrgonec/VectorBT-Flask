@@ -40,6 +40,9 @@ def wqa101(*args, **kwargs) -> tp.Type[IndicatorBase]:
     return IndicatorFactory.from_wqa101(*args, **kwargs)
 
 
+IF = IndicatorFactory
+
+
 __whitelist__ = [
     'talib',
     'pandas_ta',
