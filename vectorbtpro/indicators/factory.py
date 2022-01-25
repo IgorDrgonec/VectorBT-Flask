@@ -3509,7 +3509,7 @@ Other keyword arguments are passed to `{0}.run`.
             2020-01-05  4.666667  1.333333  4.333333  1.666667
             ```
 
-            The same can be achieved by calling the class method and providing suffixes
+            The same can be achieved by calling the class method and providing prefixes
             to the variable names to indicate their type:
 
             ```pycon

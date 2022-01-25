@@ -21,7 +21,7 @@ All notable changes in reverse chronological order.
 an indicator can be automatically constructed out of an expression string, such as 
 `"rolling_mean((low + high) / 2, 10)"`! [IndicatorFactory](/api/indicators/factory/#vectorbtpro.indicators.factory.IndicatorFactory)
 can recognize common inputs such as `low` and the number of outputs. For parameters and more cryptic inputs,
-the user can provide a suffix: `"rolling_mean(abs(in_ts), p_window)"`. Moreover, apart from preset functions
+the user can provide a prefix: `"rolling_mean(abs(in_ts), p_window)"`. Moreover, apart from preset functions
 such as `rolling_mean`, whenever it recognizes an unknown function, searches for its implementation 
 in various parts of vectorbt and NumPy. Supports NumExpr to accelerate simpler expressions.
 - Translated each one of [WorldQuant's 101 Formulaic Alphas](https://arxiv.org/pdf/1601.00991.pdf) 
