@@ -2264,6 +2264,23 @@ class TestFactory:
         assert I.input_names == ('ts',)
         assert I.param_names == ('window',)
         pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
+        I = vbt.IndicatorFactory.from_expr("rolling_mean(in_ts, window)")
+        assert I.input_names == ('ts',)
+        assert I.param_names == ()
+        pd.testing.assert_frame_equal(I.run(ts, window=2).out, ts.vbt.rolling_mean(2))
+        I = vbt.IndicatorFactory.from_expr(
+            "rolling_mean(in_ts, window)",
+            func_mapping=dict(rolling_mean=dict(func=vbt.nb.rolling_min_nb)))
+        assert I.input_names == ('ts',)
+        assert I.param_names == ()
+        pd.testing.assert_frame_equal(I.run(ts, window=2).out, ts.vbt.rolling_min(2))
+        I = vbt.IndicatorFactory.from_expr(
+            "hello",
+            magnet_input_names=['ts'],
+            res_func_mapping=dict(hello=dict(func=lambda mapping: mapping['ts'], magnet_input_names=['ts'])))
+        assert I.input_names == ('ts',)
+        assert I.param_names == ()
+        pd.testing.assert_frame_equal(I.run(ts).out, ts)
         I = vbt.IndicatorFactory.from_expr("rolling_mean_nb(in_ts, p_window)", window=2)
         assert I.input_names == ('ts',)
         assert I.param_names == ('window',)
@@ -2323,6 +2340,10 @@ class TestFactory:
             I.run(ts, ts * 2, ts * 3, ts * 4, ts * 5).out,
             (ts + ts * 2 + ts * 3 + ts * 4 + ts * 5) / 5
         )
+        I = vbt.IndicatorFactory.from_expr("in_ts1 + in_ts2", use_pd_eval=True)
+        assert I.input_names == ('ts1', 'ts2')
+        assert I.param_names == ()
+        pd.testing.assert_frame_equal(I.run(ts, ts * 2).out, ts + ts * 2)
 
     def test_from_wqa101(self):
         columns = pd.MultiIndex.from_tuples([

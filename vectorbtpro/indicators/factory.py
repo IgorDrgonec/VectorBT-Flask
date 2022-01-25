@@ -3434,6 +3434,10 @@ Other keyword arguments are passed to `{0}.run`.
                   expr: str,
                   factory_kwargs: tp.KwargsLike = None,
                   magnet_input_names: tp.Iterable[str] = None,
+                  func_mapping: tp.KwargsLike = None,
+                  res_func_mapping: tp.KwargsLike = None,
+                  use_pd_eval: bool = False,
+                  pd_eval_kwargs: tp.KwargsLike = None,
                   **kwargs) -> tp.Type[IndicatorBase]:
         """Build an indicator class from an indicator expression.
 
@@ -3447,6 +3451,14 @@ Other keyword arguments are passed to `{0}.run`.
             magnet_input_names (iterable of str): Names recognized as input names.
 
                 Defaults to `open`, `high`, `low`, `close`, and `volume`.
+            func_mapping (mapping): Mapping merged over `vectorbtpro.indicators.expr.expr_func_config`.
+            res_func_mapping (mapping): Mapping merged over `vectorbtpro.indicators.expr.expr_res_func_config`.
+            use_pd_eval (bool): Whether to use `pd.eval` instead of the Python's `eval` function.
+
+                !!! hint
+                    By default, operates on NumPy objects using NumExpr.
+                    If you want to operate on Pandas objects, set `keep_pd` to True.
+            pd_eval_kwargs (dict): Keyword arguments passed to `pd.eval`.
             **kwargs: Keyword arguments passed to `IndicatorFactory.from_apply_func`.
 
         Returns:
@@ -3561,6 +3573,9 @@ Other keyword arguments are passed to `{0}.run`.
         if expr.endswith(','):
             expr = expr[:-1]  # again
 
+        func_mapping = merge_dicts(expr_func_config, func_mapping)
+        res_func_mapping = merge_dicts(expr_res_func_config, res_func_mapping)
+
         if isinstance(cls_or_self, type):
             input_names = []
             in_output_names = []
@@ -3573,8 +3588,8 @@ Other keyword arguments are passed to `{0}.run`.
                     input_names.append(input_name)
                     continue
                 for var_name in var_names:
-                    if input_name in expr_func_config.get(var_name, {}).get('magnet_input_names', []) or \
-                            input_name in expr_res_func_config.get(var_name, {}).get('magnet_input_names', []):
+                    if input_name in func_mapping.get(var_name, {}).get('magnet_input_names', []) or \
+                            input_name in res_func_mapping.get(var_name, {}).get('magnet_input_names', []):
                         input_names.append(input_name)
                         break
             _var_names = []
@@ -3637,8 +3652,6 @@ Other keyword arguments are passed to `{0}.run`.
         def apply_func(input_tuple: tp.Tuple[tp.AnyArray],
                        in_output_tuple: tp.Tuple[tp.SeriesFrame, ...],
                        param_tuple: tp.Tuple[tp.Param, ...],
-                       res_func_mapping: tp.KwargsLike = None,
-                       func_mapping: tp.KwargsLike = None,
                        **_kwargs) -> tp.Union[tp.Array2d, tp.List[tp.Array2d]]:
             import vectorbtpro as vbt
 
@@ -3653,23 +3666,15 @@ Other keyword arguments are passed to `{0}.run`.
                 input_mapping[in_output_names[i]] = in_output
             for i, param in enumerate(param_tuple):
                 input_mapping[param_names[i]] = param
-            def_func_mapping = {}
-            for k, v in expr_func_config.items():
-                def_func_mapping[k] = v['func']
-            func_mapping = merge_dicts(def_func_mapping, func_mapping)
-            def_res_func_mapping = {}
-            for k, v in expr_res_func_config.items():
-                def_res_func_mapping[k] = v['func']
-            res_func_mapping = merge_dicts(def_res_func_mapping, res_func_mapping)
             merged_mapping = merge_dicts(input_mapping, _kwargs)
             mapping = {}
             subbed_mapping = {}
 
             for var_name in get_expr_var_names(expr):
                 if var_name in res_func_mapping:
-                    var = res_func_mapping[var_name]
+                    var = res_func_mapping[var_name]['func']
                 elif var_name in func_mapping:
-                    var = func_mapping[var_name]
+                    var = func_mapping[var_name]['func']
                 elif var_name in merged_mapping:
                     var = merged_mapping[var_name]
                 elif hasattr(np, var_name):
@@ -3694,6 +3699,8 @@ Other keyword arguments are passed to `{0}.run`.
                     var = var()
                 mapping[var_name] = var
 
+            if use_pd_eval:
+                return pd.eval(expr, local_dict=mapping, **resolve_dict(pd_eval_kwargs))
             return eval(expr, {}, mapping)
 
         return factory.from_apply_func(
