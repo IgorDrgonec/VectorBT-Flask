@@ -41,7 +41,7 @@ def wqa101(*args, **kwargs) -> tp.Type[IndicatorBase]:
 
 
 IF = IndicatorFactory
-
+"""Shortcut for `vectorbtpro.indicators.factory.IndicatorFactory`."""
 
 __whitelist__ = [
     'talib',
@@ -51,5 +51,3 @@ __whitelist__ = [
 ]
 __all__ = create__all__(__name__)
 __pdoc__ = {k: k in __whitelist__ for k in __all__}
-
-

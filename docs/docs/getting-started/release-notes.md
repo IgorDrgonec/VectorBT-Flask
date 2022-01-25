@@ -6,6 +6,34 @@ title: Release notes
 
 All notable changes in reverse chronological order.
 
+## Version 1.0.8 (25 January, 2021)
+
+- Implemented the following Numba-compiled functions:
+    - Ranking and rolling ranking (SP)
+    - Covariance and rolling covariance (SP)
+    - Rolling sum and product (SP)
+    - Rolling weighted moving average (SP)
+    - Rolling argmin and argmax
+    - Demeaning within a group
+- Implemented volume-weighted average price (VWAP)
+- Built a powerful engine for parsing indicator expressions. Using 
+[IndicatorFactory.from_expr](/api/indicators/factory/#vectorbtpro.indicators.factory.IndicatorFactory.from_expr),
+an indicator can be automatically constructed out of an expression string, such as 
+`"rolling_mean((low + high) / 2, 10)"`! [IndicatorFactory](/api/indicators/factory/#vectorbtpro.indicators.factory.IndicatorFactory)
+can recognize common inputs such as `low` and the number of outputs. For parameters and more cryptic inputs,
+the user can provide a suffix: `"rolling_mean(abs(in_ts), p_window)"`. Moreover, apart from preset functions
+such as `rolling_mean`, whenever it recognizes an unknown function, searches for its implementation 
+in various parts of vectorbt and NumPy. Supports NumExpr to accelerate simpler expressions.
+- Translated each one of [WorldQuant's 101 Formulaic Alphas](https://arxiv.org/pdf/1601.00991.pdf) 
+into an indicator expression and implemented a convenience method 
+[IndicatorFactory.from_wqa101](/api/indicators/factory/#vectorbtpro.indicators.factory.IndicatorFactory.from_wqa101)
+(also as a shortcut `vbt.wqa101`) for executing them
+- Unified column grouping for matrices and records across the entire codebase.
+Most logic now resides in the sub-package [grouping](/api/base/grouping/). Also, most functions 
+(apart from the portfolio-related ones) do not require strict group ordering anymore.
+- Added chunking specification for labeling functions
+- Fixed [Config.prettify](/api/utils/config/#vectorbtpro.utils.config.Config.prettify) for non-string keys
+
 ## Version 1.0.7 (16 January, 2021)
 
 - Changed `np.int_` to `np.integer` when passed to `np.issubdtype`
@@ -312,3 +340,5 @@ initialization, and all options for changing data in-place were removed
 Additionally, upon import, vectorbt looks for an environment variable that contains the path 
 to a settings file and updates/replaces the current settings in-place.
 - Created and set up a private repository :sparkler:
+
+*[SP]: Single-pass algorithm for best performance

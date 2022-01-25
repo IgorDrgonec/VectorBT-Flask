@@ -412,6 +412,47 @@ symbol                             R1         R2          R3
 2020-01-04 23:00:00+00:00  100.119515  96.278695  101.840087
 ```
 
+## Indicators
+
+### Expressions
+
+- [x] No more code! Simple indicators can now be easily built using regular strings.
+The indicator factory automatically recognizes all inputs, parameters, and even 
+NumPy and vectorbt functions thanks to a built-in matching mechanism.
+
+```pycon
+>>> data = vbt.YFData.fetch('BTC-USD')
+
+>>> VWAP = vbt.IF.from_expr("cumsum(close * volume) / cumsum(volume)")  # (1)!
+>>> vwap = VWAP.run(data.get('Close'), data.get('Volume'))
+>>> vwap.out.vbt.plot().show_svg()
+```
+
+1. `cumsum` has been matched with `np.cumsum`
+
+![](/assets/images/features_vwap.svg)
+
+### WorldQuant Alphas
+
+- [x] vectorbt PRO supports all [101 Formulaic Alphas](https://arxiv.org/pdf/1601.00991.pdf) :eyes:
+
+```pycon
+>>> close = vbt.YFData.fetch(['BTC-USD', 'ETH-USD']).get('Close')
+
+>>> vbt.wqa101(1).run(close).out
+symbol                     BTC-USD  ETH-USD
+Date                                       
+2014-09-17 00:00:00+00:00     0.25     0.25
+2014-09-18 00:00:00+00:00     0.25     0.25
+2014-09-19 00:00:00+00:00     0.25     0.25
+...                            ...      ...
+2022-01-23 00:00:00+00:00     0.25     0.25
+2022-01-24 00:00:00+00:00     0.50     0.00
+2022-01-25 00:00:00+00:00     0.50     0.00
+
+[2688 rows x 2 columns
+```
+
 ## Modeling
 
 ### Initial position

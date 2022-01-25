@@ -56,6 +56,7 @@ markdown_extensions:
   - md_in_html
   - toc:
       permalink: true
+  - abbr
   - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.superfences:
@@ -127,7 +128,10 @@ nav:
       - accessors: api/base/accessors.md
       - chunking: api/base/chunking.md
       - combining: api/base/combining.md
-      - grouping: api/base/grouping.md
+      - grouping:
+        - api/base/grouping/index.md
+        - base: api/base/grouping/base.md
+        - nb: api/base/grouping/nb.md
       - indexes: api/base/indexes.md
       - indexing: api/base/indexing.md
       - reshaping: api/base/reshaping.md
@@ -155,6 +159,7 @@ nav:
       - api/indicators/index.md
       - configs: api/indicators/configs.md
       - custom: api/indicators/custom.md
+      - expr: api/indicators/expr.md
       - factory: api/indicators/factory.md
       - nb: api/indicators/nb.md
     - labels:
@@ -168,6 +173,7 @@ nav:
     - ohlcv:
       - api/ohlcv/index.md
       - accessors: api/ohlcv/accessors.md
+      - nb: api/ohlcv/nb.md
     - portfolio:
       - api/portfolio/index.md
       - base: api/portfolio/base.md
