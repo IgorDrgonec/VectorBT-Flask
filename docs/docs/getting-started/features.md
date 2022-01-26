@@ -416,8 +416,8 @@ symbol                             R1         R2          R3
 
 ### Expressions
 
-- [x] No more code! Simple indicators can now be easily built using regular strings.
-The indicator factory automatically recognizes all inputs, parameters, and even 
+- [x] No more code! Indicators can now be easily built from expressions.
+The indicator factory can automatically parse all inputs, parameters, and even 
 NumPy and vectorbt functions thanks to a built-in matching mechanism.
 
 ```pycon
@@ -425,7 +425,7 @@ NumPy and vectorbt functions thanks to a built-in matching mechanism.
 
 >>> VWAP = vbt.IF.from_expr("cumsum(close * volume) / cumsum(volume)")  # (1)!
 >>> vwap = VWAP.run(data.get('Close'), data.get('Volume'))
->>> vwap.out.rename('VWAP').vbt.plot().show_svg()
+>>> vwap.out.rename('VWAP').vbt.plot()
 ```
 
 1. `cumsum` has been matched with `np.cumsum`

@@ -1163,6 +1163,7 @@ Similarly to stats, we can attach subplots to any new indicator class:
 ![](/assets/images/IndicatorFactory_plots.svg)
 """
 
+import re
 import inspect
 import itertools
 import functools
@@ -2395,6 +2396,8 @@ class IndicatorFactory:
         all_output_names = in_output_names + output_names
         if len(all_output_names) == 0:
             raise ValueError("Must have at least one in-place or regular output")
+        if len(set.intersection(set(input_names), set(in_output_names), set(output_names))) > 0:
+            raise ValueError("Inputs, in-outputs, and parameters must all have unique names")
 
         if output_flags is None:
             output_flags = {}
@@ -3433,6 +3436,7 @@ Other keyword arguments are passed to `{0}.run`.
     def from_expr(cls_or_self,
                   expr: str,
                   factory_kwargs: tp.KwargsLike = None,
+                  parse_special_vars: bool = True,
                   magnet_input_names: tp.Iterable[str] = None,
                   func_mapping: tp.KwargsLike = None,
                   res_func_mapping: tp.KwargsLike = None,
@@ -3448,6 +3452,7 @@ Other keyword arguments are passed to `{0}.run`.
             factory_kwargs (dict): Keyword arguments passed to `IndicatorFactory`.
 
                 Only applied when calling the class method.
+            parse_special_vars (bool): Whether to parse variables starting with `@`.
             magnet_input_names (iterable of str): Names recognized as input names.
 
                 Defaults to `open`, `high`, `low`, `close`, and `volume`.
@@ -3487,11 +3492,11 @@ Other keyword arguments are passed to `{0}.run`.
         `vectorbtpro.indicators.expr.expr_res_func_config`, they are automatically added to `input_names`.
         Set `magnet_input_names` to an empty list to disable this logic.
 
-        Other variables are parsed based on the name prefix of a variable:
+        If `parse_special_vars` is True, variables that start with `@` have a special meaning:
 
-        * `in_*`: input
-        * `inout_*`: in-output
-        * `p_*`: parameter
+        * `@in_*`: input
+        * `@inout_*`: in-output
+        * `@p_*`: parameter
 
         !!! note
             The parsed names come in the same order they appear in the expression, not in the parsing order.
@@ -3525,7 +3530,7 @@ Other keyword arguments are passed to `{0}.run`.
             to the variable names to indicate their type:
 
             ```pycon
-            >>> expr = "wm_mean_nb((in_high + in_low) / 2, p_window)"
+            >>> expr = "wm_mean_nb((@in_high + @in_low) / 2, @p_window)"
             >>> WMA = vbt.IndicatorFactory.from_expr(expr)
             >>> wma = WMA.run(price + 1, price, window=[2, 3])
             >>> wma.out
@@ -3541,7 +3546,7 @@ Other keyword arguments are passed to `{0}.run`.
             Common (lower-case) input names from OHLCV are recognized automatically:
 
             ```pycon
-            >>> expr = "wm_mean_nb((high + low) / 2, p_window)"
+            >>> expr = "wm_mean_nb((high + low) / 2, @p_window)"
             >>> WMA = vbt.IndicatorFactory.from_expr(expr)
             >>> wma = WMA.run(price + 1, price, window=[2, 3])
             >>> wma.out
@@ -3577,41 +3582,46 @@ Other keyword arguments are passed to `{0}.run`.
         res_func_mapping = merge_dicts(expr_res_func_config, res_func_mapping)
 
         if isinstance(cls_or_self, type):
+            if magnet_input_names is None:
+                magnet_input_names = ['open', 'high', 'low', 'close', 'volume']
+            found_magnet_input_names = []
             input_names = []
             in_output_names = []
             param_names = []
+
+            if parse_special_vars:
+                for var_name in re.findall(r"@\w+", expr):
+                    var_name = var_name.replace('@', '')
+                    if var_name.startswith('in_'):
+                        var_name = var_name[3:]
+                        if var_name in magnet_input_names:
+                            found_magnet_input_names.append(var_name)
+                        else:
+                            input_names.append(var_name)
+                    elif var_name.startswith('inout_'):
+                        var_name = var_name[6:]
+                        in_output_names.append(var_name)
+                    elif var_name.startswith('p_'):
+                        var_name = var_name[2:]
+                        param_names.append(var_name)
+
+                expr = expr.replace("@in_", "__in_")
+                expr = expr.replace("@inout_", "__inout_")
+                expr = expr.replace("@p_", "__p_")
+
             var_names = get_expr_var_names(expr)
-            if magnet_input_names is None:
-                magnet_input_names = ['open', 'high', 'low', 'close', 'volume']
             for input_name in magnet_input_names:
-                if input_name in var_names or 'in_' + input_name in var_names:
-                    input_names.append(input_name)
+                if input_name in var_names:
+                    found_magnet_input_names.append(input_name)
                     continue
                 for var_name in var_names:
                     if input_name in func_mapping.get(var_name, {}).get('magnet_input_names', []) or \
                             input_name in res_func_mapping.get(var_name, {}).get('magnet_input_names', []):
-                        input_names.append(input_name)
+                        found_magnet_input_names.append(input_name)
                         break
-            _var_names = []
-            for var_name in var_names:
-                _var_names.append((var_name, expr.index(var_name)))
-            _var_names = sorted(_var_names, key=lambda x: x[1])
-            for var_name, _ in _var_names:
-                if var_name.startswith('in_'):
-                    new_var_name = var_name[3:]
-                    if new_var_name not in input_names:
-                        input_names.append(new_var_name)
-                        expr = expr.replace(var_name, new_var_name)
-                if var_name.startswith('inout_'):
-                    new_var_name = var_name[6:]
-                    if new_var_name not in in_output_names:
-                        in_output_names.append(new_var_name)
-                        expr = expr.replace(var_name, new_var_name)
-                if var_name.startswith('p_'):
-                    new_var_name = var_name[2:]
-                    if new_var_name not in param_names:
-                        param_names.append(new_var_name)
-                        expr = expr.replace(var_name, new_var_name)
+            for input_name in magnet_input_names:
+                if input_name in found_magnet_input_names:
+                    input_names.append(input_name)
 
             n_open_brackets = 0
             n_outputs = 1
@@ -3671,7 +3681,13 @@ Other keyword arguments are passed to `{0}.run`.
             subbed_mapping = {}
 
             for var_name in get_expr_var_names(expr):
-                if var_name in res_func_mapping:
+                if var_name.startswith('__in_'):
+                    var = merged_mapping[var_name[5:]]
+                elif var_name.startswith('__inout_'):
+                    var = merged_mapping[var_name[8:]]
+                elif var_name.startswith('__p_'):
+                    var = merged_mapping[var_name[4:]]
+                elif var_name in res_func_mapping:
                     var = res_func_mapping[var_name]['func']
                 elif var_name in func_mapping:
                     var = func_mapping[var_name]['func']
