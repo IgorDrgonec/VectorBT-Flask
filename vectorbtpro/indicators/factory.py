@@ -221,7 +221,7 @@ def run_pipeline(
         in_output_settings: tp.Optional[tp.MappingSequence[tp.KwargsLike]] = None,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
-        template_mapping: tp.Optional[tp.Mapping] = None,
+        template_context: tp.Optional[tp.Mapping] = None,
         params: tp.Optional[tp.MappingSequence[tp.Params]] = None,
         param_product: bool = False,
         param_settings: tp.Optional[tp.MappingSequence[tp.KwargsLike]] = None,
@@ -282,7 +282,7 @@ def run_pipeline(
             and this method will substitute them by their corresponding broadcasted objects.
         broadcast_kwargs (dict): Keyword arguments passed to `vectorbtpro.base.reshaping.broadcast`
             to broadcast inputs.
-        template_mapping (dict): Mapping used to substitute templates in `args` and `kwargs`.
+        template_context (dict): Mapping used to substitute templates in `args` and `kwargs`.
         params (mapping or sequence of any): A mapping or sequence of parameters.
 
             Use mapping to also supply names. If sequence, will convert to a mapping using `param_{i}` key.
@@ -383,8 +383,8 @@ def run_pipeline(
         broadcast_named_args = {}
     if broadcast_kwargs is None:
         broadcast_kwargs = {}
-    if template_mapping is None:
-        template_mapping = {}
+    if template_context is None:
+        template_context = {}
     if params is None:
         params = {}
     if not checks.is_mapping(params):
@@ -606,7 +606,7 @@ def run_pipeline(
         def _call_custom_func(_input_list_ready, _in_output_list_ready, _param_list_ready, *_func_args, **_func_kwargs):
             # Substitute templates
             if has_templates(_func_args) or has_templates(_func_kwargs):
-                _template_mapping = merge_dicts(
+                _template_context = merge_dicts(
                     broadcast_named_args,
                     dict(
                         input_shape=input_shape_ready,
@@ -616,10 +616,10 @@ def run_pipeline(
                         pre_sub_args=_func_args,
                         pre_sub_kwargs=_func_kwargs
                     ),
-                    template_mapping
+                    template_context
                 )
-                _func_args = deep_substitute(_func_args, _template_mapping, sub_id='custom_func_args')
-                _func_kwargs = deep_substitute(_func_kwargs, _template_mapping, sub_id='custom_func_kwargs')
+                _func_args = deep_substitute(_func_args, _template_context, sub_id='custom_func_args')
+                _func_kwargs = deep_substitute(_func_kwargs, _template_context, sub_id='custom_func_kwargs')
 
             # Run the function
             if pass_packed:
@@ -2306,7 +2306,13 @@ Other keyword arguments are passed to `{0}.run`.
 
                 Defaults to `open`, `high`, `low`, `close`, and `volume`.
             func_mapping (mapping): Mapping merged over `vectorbtpro.indicators.expr.expr_func_config`.
+
+                Each key must be a function name and each value must be a dict with
+                `func` and optionally `magnet_input_names`.
             res_func_mapping (mapping): Mapping merged over `vectorbtpro.indicators.expr.expr_res_func_config`.
+
+                Each key must be a function name and each value must be a dict with
+                `func` and optionally `magnet_input_names`.
             use_pd_eval (bool): Whether to use `pd.eval`.
 
                 Otherwise, uses `vectorbtpro.utils.eval_.multiline_eval`.
@@ -2521,34 +2527,34 @@ Other keyword arguments are passed to `{0}.run`.
                        **_kwargs) -> tp.Union[tp.Array2d, tp.List[tp.Array2d]]:
             import vectorbtpro as vbt
 
-            input_mapping = dict(
+            input_context = dict(
                 np=np,
                 pd=pd,
                 vbt=vbt
             )
             for i, input in enumerate(input_tuple):
-                input_mapping[input_names[i]] = input
+                input_context[input_names[i]] = input
             for i, in_output in enumerate(in_output_tuple):
-                input_mapping[in_output_names[i]] = in_output
+                input_context[in_output_names[i]] = in_output
             for i, param in enumerate(param_tuple):
-                input_mapping[param_names[i]] = param
-            merged_mapping = merge_dicts(input_mapping, _kwargs)
-            mapping = {}
-            subbed_mapping = {}
+                input_context[param_names[i]] = param
+            merged_context = merge_dicts(input_context, _kwargs)
+            context = {}
+            subbed_context = {}
 
             for var_name in get_expr_var_names(expr):
                 if var_name.startswith('__in_'):
-                    var = merged_mapping[var_name[5:]]
+                    var = merged_context[var_name[5:]]
                 elif var_name.startswith('__inout_'):
-                    var = merged_mapping[var_name[8:]]
+                    var = merged_context[var_name[8:]]
                 elif var_name.startswith('__p_'):
-                    var = merged_mapping[var_name[4:]]
+                    var = merged_context[var_name[4:]]
                 elif var_name in res_func_mapping:
                     var = res_func_mapping[var_name]['func']
                 elif var_name in func_mapping:
                     var = func_mapping[var_name]['func']
-                elif var_name in merged_mapping:
-                    var = merged_mapping[var_name]
+                elif var_name in merged_context:
+                    var = merged_context[var_name]
                 elif hasattr(np, var_name):
                     var = getattr(np, var_name)
                 elif hasattr(generic_nb, var_name):
@@ -2563,17 +2569,17 @@ Other keyword arguments are passed to `{0}.run`.
                     except ModuleNotFoundError:
                         continue
                 try:
-                    if callable(var) and 'mapping' in get_func_arg_names(var):
-                        var = functools.partial(var, mapping=merged_mapping)
+                    if callable(var) and 'context' in get_func_arg_names(var):
+                        var = functools.partial(var, context=merged_context)
                 except:
                     pass
                 if var_name in res_func_mapping:
                     var = var()
-                mapping[var_name] = var
+                context[var_name] = var
 
             if use_pd_eval:
-                return pd.eval(expr, local_dict=mapping, **resolve_dict(pd_eval_kwargs))
-            return multiline_eval(expr, context=mapping)
+                return pd.eval(expr, local_dict=context, **resolve_dict(pd_eval_kwargs))
+            return multiline_eval(expr, context=context)
 
         return factory.from_apply_func(
             apply_func,
@@ -2655,7 +2661,7 @@ Other keyword arguments are passed to `{0}.run`.
         return set(talib.get_functions())
 
     @classmethod
-    def from_talib(cls, func_name: str, init_kwargs: tp.KwargsLike = None, **kwargs) -> tp.Type[IndicatorBase]:
+    def from_talib(cls, func_name: str, factory_kwargs: tp.KwargsLike = None, **kwargs) -> tp.Type[IndicatorBase]:
         """Build an indicator class around a TA-Lib function.
 
         Requires [TA-Lib](https://github.com/mrjbq7/ta-lib) installed.
@@ -2664,7 +2670,7 @@ Other keyword arguments are passed to `{0}.run`.
 
         Args:
             func_name (str): Function name.
-            init_kwargs (dict): Keyword arguments passed to `IndicatorFactory`.
+            factory_kwargs (dict): Keyword arguments passed to `IndicatorFactory`.
             **kwargs: Keyword arguments passed to `IndicatorFactory.from_custom_func`.
 
         Returns:
@@ -2754,7 +2760,7 @@ Other keyword arguments are passed to `{0}.run`.
                     output_names=output_names,
                     output_flags=output_flags
                 ),
-                init_kwargs
+                factory_kwargs
             )
         ).from_apply_func(
             apply_func,
@@ -2877,7 +2883,7 @@ Other keyword arguments are passed to `{0}.run`.
 
     @classmethod
     def from_pandas_ta(cls, func_name: str, parse_kwargs: tp.KwargsLike = None,
-                       init_kwargs: tp.KwargsLike = None, **kwargs) -> tp.Type[IndicatorBase]:
+                       factory_kwargs: tp.KwargsLike = None, **kwargs) -> tp.Type[IndicatorBase]:
         """Build an indicator class around a pandas-ta function.
 
         Requires [pandas-ta](https://github.com/twopirllc/pandas-ta) installed.
@@ -2885,7 +2891,7 @@ Other keyword arguments are passed to `{0}.run`.
         Args:
             func_name (str): Function name.
             parse_kwargs (dict): Keyword arguments passed to `IndicatorFactory.parse_pandas_ta_config`.
-            init_kwargs (dict): Keyword arguments passed to `IndicatorFactory`.
+            factory_kwargs (dict): Keyword arguments passed to `IndicatorFactory`.
             **kwargs: Keyword arguments passed to `IndicatorFactory.from_custom_func`.
 
         Returns:
@@ -3011,7 +3017,7 @@ Other keyword arguments are passed to `{0}.run`.
             **merge_dicts(
                 dict(module_name=__name__ + '.pandas_ta'),
                 config,
-                init_kwargs
+                factory_kwargs
             )
         ).from_apply_func(
             apply_func,
@@ -3095,14 +3101,14 @@ Other keyword arguments are passed to `{0}.run`.
         )
 
     @classmethod
-    def from_ta(cls, cls_name: str, init_kwargs: tp.KwargsLike = None, **kwargs) -> tp.Type[IndicatorBase]:
+    def from_ta(cls, cls_name: str, factory_kwargs: tp.KwargsLike = None, **kwargs) -> tp.Type[IndicatorBase]:
         """Build an indicator class around a ta class.
 
         Requires [ta](https://github.com/bukosabino/ta) installed.
 
         Args:
             cls_name (str): Class name.
-            init_kwargs (dict): Keyword arguments passed to `IndicatorFactory`.
+            factory_kwargs (dict): Keyword arguments passed to `IndicatorFactory`.
             **kwargs: Keyword arguments passed to `IndicatorFactory.from_custom_func`.
 
         Returns:
@@ -3197,7 +3203,7 @@ Other keyword arguments are passed to `{0}.run`.
             **merge_dicts(
                 dict(module_name=__name__ + '.ta'),
                 config,
-                init_kwargs
+                factory_kwargs
             )
         ).from_apply_func(
             apply_func,

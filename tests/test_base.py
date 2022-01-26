@@ -3691,7 +3691,7 @@ class TestAccessors:
             sr2.vbt.apply_and_concat(
                 3, apply_func2, vbt.Rep('y'), vbt.RepEval('np.arange(ntimes)'),
                 broadcast_named_args=dict(y=df4),
-                template_mapping=dict(np=np)
+                template_context=dict(np=np)
             ),
             pd.DataFrame([
                 [2, 3, 4, 3, 4, 5, 4, 5, 6],

@@ -77,7 +77,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
               column: tp.Optional[tp.Label] = None,
               group_by: tp.GroupByLike = None,
               silence_warnings: tp.Optional[bool] = None,
-              template_mapping: tp.Optional[tp.Mapping] = None,
+              template_context: tp.Optional[tp.Mapping] = None,
               settings: tp.KwargsLike = None,
               filters: tp.KwargsLike = None,
               subplot_settings: tp.KwargsLike = None,
@@ -104,7 +104,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                 * `xaxis_kwargs`: Layout keyword arguments for the x-axis. Defaults to `dict(title='Index')`.
                 * `yaxis_kwargs`: Layout keyword arguments for the y-axis. Defaults to empty dict.
                 * `tags`, `check_{filter}`, `inv_check_{filter}`, `resolve_plot_func`, `pass_{arg}`,
-                    `resolve_path_{arg}`, `resolve_{arg}` and `template_mapping`:
+                    `resolve_path_{arg}`, `resolve_{arg}` and `template_context`:
                     The same as in `vectorbtpro.generic.stats_builder.StatsBuilderMixin` for `calc_func`.
                 * `select_col_{arg}`: Whether to select the column from an argument that is meant to be
                     an attribute of this object. If False, make sure that the plotting function
@@ -143,7 +143,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
             column (str): See `column` in `vectorbtpro.generic.stats_builder.StatsBuilderMixin`.
             group_by (any): See `group_by` in `vectorbtpro.generic.stats_builder.StatsBuilderMixin`.
             silence_warnings (bool): See `silence_warnings` in `vectorbtpro.generic.stats_builder.StatsBuilderMixin`.
-            template_mapping (mapping): See `template_mapping` in `vectorbtpro.generic.stats_builder.StatsBuilderMixin`.
+            template_context (mapping): See `template_context` in `vectorbtpro.generic.stats_builder.StatsBuilderMixin`.
 
                 Applied on `settings`, `make_subplots_kwargs`, and `layout_kwargs`, and then on each subplot settings.
             filters (dict): See `filters` in `vectorbtpro.generic.stats_builder.StatsBuilderMixin`.
@@ -183,7 +183,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
             hide_id_labels = self.plots_defaults['hide_id_labels']
         if group_id_labels is None:
             group_id_labels = self.plots_defaults['group_id_labels']
-        template_mapping = merge_dicts(self.plots_defaults['template_mapping'], template_mapping)
+        template_context = merge_dicts(self.plots_defaults['template_context'], template_context)
         filters = merge_dicts(self.plots_defaults['filters'], filters)
         settings = merge_dicts(self.plots_defaults['settings'], settings)
         subplot_settings = merge_dicts(self.plots_defaults['subplot_settings'], subplot_settings)
@@ -191,21 +191,21 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
         layout_kwargs = merge_dicts(self.plots_defaults['layout_kwargs'], layout_kwargs)
 
         # Replace templates globally (not used at subplot level)
-        if len(template_mapping) > 0:
+        if len(template_context) > 0:
             sub_settings = deep_substitute(
                 settings,
-                mapping=template_mapping,
+                context=template_context,
                 sub_id='sub_settings',
                 strict=False
             )
             sub_make_subplots_kwargs = deep_substitute(
                 make_subplots_kwargs,
-                mapping=template_mapping,
+                context=template_context,
                 sub_id='sub_make_subplots_kwargs'
             )
             sub_layout_kwargs = deep_substitute(
                 layout_kwargs,
-                mapping=template_mapping,
+                context=template_context,
                 sub_id='sub_layout_kwargs'
             )
         else:
@@ -267,7 +267,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
         opt_arg_names_dct = {}
         custom_arg_names_dct = {}
         resolved_self_dct = {}
-        mapping_dct = {}
+        context_dct = {}
         for subplot_name, _subplot_settings in list(subplots_dct.items()):
             opt_settings = merge_dicts(
                 {name: reself for name in reself.self_aliases},
@@ -287,16 +287,16 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                 _subplot_settings,
                 passed_subplot_settings
             )
-            subplot_template_mapping = merged_settings.pop('template_mapping', {})
-            template_mapping_merged = merge_dicts(template_mapping, subplot_template_mapping)
-            template_mapping_merged = deep_substitute(
-                template_mapping_merged,
-                mapping=merged_settings,
-                sub_id='template_mapping_merged'
+            subplot_template_context = merged_settings.pop('template_context', {})
+            template_context_merged = merge_dicts(template_context, subplot_template_context)
+            template_context_merged = deep_substitute(
+                template_context_merged,
+                context=merged_settings,
+                sub_id='template_context_merged'
             )
-            mapping = merge_dicts(template_mapping_merged, merged_settings)
+            context = merge_dicts(template_context_merged, merged_settings)
             # safe because we will use deep_substitute again once layout params are known
-            merged_settings = deep_substitute(merged_settings, mapping=mapping, sub_id='merged_settings')
+            merged_settings = deep_substitute(merged_settings, context=context, sub_id='merged_settings')
 
             # Filter by tag
             if tags is not None:
@@ -318,12 +318,12 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
             custom_arg_names_dct[subplot_name] = custom_arg_names
             opt_arg_names_dct[subplot_name] = opt_arg_names
             resolved_self_dct[subplot_name] = custom_reself
-            mapping_dct[subplot_name] = mapping
+            context_dct[subplot_name] = context
 
         # Filter subplots
         for subplot_name, _subplot_settings in list(subplots_dct.items()):
             custom_reself = resolved_self_dct[subplot_name]
-            mapping = mapping_dct[subplot_name]
+            context = context_dct[subplot_name]
             _silence_warnings = _subplot_settings.get('silence_warnings')
 
             subplot_filters = set()
@@ -340,7 +340,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
 
             for filter_name in subplot_filters:
                 filter_settings = filters[filter_name]
-                _filter_settings = deep_substitute(filter_settings, mapping=mapping, sub_id='filter_settings')
+                _filter_settings = deep_substitute(filter_settings, context=context, sub_id='filter_settings')
                 filter_func = _filter_settings['filter_func']
                 warning_message = _filter_settings.get('warning_message', None)
                 inv_warning_message = _filter_settings.get('inv_warning_message', None)
@@ -360,7 +360,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                         custom_arg_names_dct.pop(subplot_name, None)
                         opt_arg_names_dct.pop(subplot_name, None)
                         resolved_self_dct.pop(subplot_name, None)
-                        mapping_dct.pop(subplot_name, None)
+                        context_dct.pop(subplot_name, None)
                         break
 
         # Any subplots left?
@@ -478,7 +478,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                 opt_arg_names = opt_arg_names_dct[subplot_name]
                 custom_arg_names = custom_arg_names_dct[subplot_name]
                 custom_reself = resolved_self_dct[subplot_name]
-                mapping = mapping_dct[subplot_name]
+                context = context_dct[subplot_name]
 
                 # Compute figure artifacts
                 row, col = row_col_tuples[i]
@@ -504,8 +504,8 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                     if k in final_kwargs:
                         custom_arg_names.add(k)
                 final_kwargs = merge_dicts(subplot_layout_kwargs, final_kwargs)
-                mapping = merge_dicts(subplot_layout_kwargs, mapping)
-                final_kwargs = deep_substitute(final_kwargs, mapping=mapping, sub_id='final_kwargs')
+                context = merge_dicts(subplot_layout_kwargs, context)
+                final_kwargs = deep_substitute(final_kwargs, context=context, sub_id='final_kwargs')
 
                 # Clean up keys
                 for k, v in list(final_kwargs.items()):

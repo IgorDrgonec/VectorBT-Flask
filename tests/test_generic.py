@@ -900,7 +900,7 @@ class TestAccessors:
                     x=pd.Series([1, 2, 3, 4, 5], index=df.index),
                     y=pd.DataFrame([[1, 2, 3]], columns=df.columns)
                 ),
-                template_mapping=dict(to_2d_array=vbt.base.reshaping.to_2d_array)
+                template_context=dict(to_2d_array=vbt.base.reshaping.to_2d_array)
             ),
             pd.DataFrame([
                 [1, 2, 3],
@@ -1001,7 +1001,7 @@ class TestAccessors:
                     x=pd.Series([1, 2, 3, 4, 5], index=df.index),
                     y=pd.DataFrame([[1, 2, 3]], columns=df.columns)
                 ),
-                template_mapping=dict(to_2d_array=vbt.base.reshaping.to_2d_array)
+                template_context=dict(to_2d_array=vbt.base.reshaping.to_2d_array)
             ),
             pd.DataFrame([
                 [1, 1, 1],
@@ -1081,7 +1081,7 @@ class TestAccessors:
                     x=pd.Series([1, 2, 3, 4, 5], index=df.index),
                     y=pd.DataFrame([[1, 2, 3]], columns=df.columns)
                 ),
-                template_mapping=dict(to_2d_array=vbt.base.reshaping.to_2d_array)
+                template_context=dict(to_2d_array=vbt.base.reshaping.to_2d_array)
             ),
             pd.DataFrame([
                 [np.nan, np.nan, np.nan],
@@ -1210,7 +1210,7 @@ class TestAccessors:
                     x=pd.Series([1, 2, 3, 4, 5], index=df.index),
                     y=pd.DataFrame([[1, 2, 3]], columns=df.columns)
                 ),
-                template_mapping=dict(
+                template_context=dict(
                     to_2d_array=vbt.base.reshaping.to_2d_array,
                     group_by_evenly_nb=vbt.base.grouping.nb.group_by_evenly_nb
                 )
@@ -1287,7 +1287,7 @@ class TestAccessors:
                     x=pd.Series([1, 2, 3, 4, 5], index=df.index),
                     y=pd.DataFrame([[1, 2, 3]], columns=df.columns)
                 ),
-                template_mapping=dict(
+                template_context=dict(
                     to_2d_array=vbt.base.reshaping.to_2d_array,
                     group_by_evenly_nb=vbt.base.grouping.nb.group_by_evenly_nb
                 )
@@ -1382,7 +1382,7 @@ class TestAccessors:
                     a=pd.Series([1, 2, 3, 4, 5], index=df.index),
                     b=pd.DataFrame([[1, 2, 3]], columns=df.columns)
                 ),
-                template_mapping=dict(to_2d_array=vbt.base.reshaping.to_2d_array)
+                template_context=dict(to_2d_array=vbt.base.reshaping.to_2d_array)
             ),
             pd.Series([12, 15, 18], index=df.columns, name='apply_and_reduce')
         )
@@ -1482,7 +1482,7 @@ class TestAccessors:
                     a=pd.Series([1, 2, 3, 4, 5], index=df.index),
                     b=pd.DataFrame([[1, 2, 3]], columns=df.columns)
                 ),
-                template_mapping=dict(to_2d_array=vbt.base.reshaping.to_2d_array)
+                template_context=dict(to_2d_array=vbt.base.reshaping.to_2d_array)
             ),
             pd.Series([20, 25, 30], index=df.columns, name='reduce')
         )
@@ -1500,7 +1500,7 @@ class TestAccessors:
                     a=pd.Series([1, 2, 3, 4, 5], index=df.index),
                     b=pd.DataFrame([[1, 2, 3]], columns=df.columns)
                 ),
-                template_mapping=dict(to_2d_array=vbt.base.reshaping.to_2d_array),
+                template_context=dict(to_2d_array=vbt.base.reshaping.to_2d_array),
                 group_by=group_by
             ),
             pd.Series([45, 30], index=['g1', 'g2'], name='reduce')
@@ -1891,7 +1891,7 @@ class TestAccessors:
                     a=pd.Series([1, 2, 3, 4, 5], index=df.index),
                     b=pd.DataFrame([[1, 2, 3]], columns=df.columns)
                 ),
-                template_mapping=dict(to_2d_array=vbt.base.reshaping.to_2d_array),
+                template_context=dict(to_2d_array=vbt.base.reshaping.to_2d_array),
                 group_by=group_by
             ),
             pd.DataFrame([

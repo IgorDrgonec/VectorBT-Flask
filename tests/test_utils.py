@@ -2727,7 +2727,7 @@ class TestChunking:
         ann_args = parsing.annotate_args(
             f, (template.RepEval('ann_args["args"]["value"][1] + 1'), 3, 1), dict(b=template.Rep('lst')))
         assert list(chunking.yield_arg_chunks(
-            f, ann_args, chunk_meta, arg_take_spec=arg_take_spec, template_mapping={'lst': [1, 2, 3]})) == result
+            f, ann_args, chunk_meta, arg_take_spec=arg_take_spec, template_context={'lst': [1, 2, 3]})) == result
 
     def test_chunked(self):
         @chunking.chunked(

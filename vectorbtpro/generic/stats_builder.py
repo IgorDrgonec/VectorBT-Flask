@@ -101,7 +101,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
               group_by: tp.GroupByLike = None,
               agg_func: tp.Optional[tp.Callable] = np.mean,
               silence_warnings: tp.Optional[bool] = None,
-              template_mapping: tp.Optional[tp.Mapping] = None,
+              template_context: tp.Optional[tp.Mapping] = None,
               settings: tp.KwargsLike = None,
               filters: tp.KwargsLike = None,
               metric_settings: tp.KwargsLike = None) -> tp.Optional[tp.SeriesFrame]:
@@ -153,7 +153,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                     See `vectorbtpro.utils.attr_.AttrResolverMixin.resolve_attr`.
                 * `use_shortcuts_{arg}`: Whether to use shortcut properties whenever possible when resolving
                     an argument. Defaults to True.
-                * `template_mapping`: Mapping to replace templates in metric settings. Used across all settings.
+                * `template_context`: Mapping to replace templates in metric settings. Used across all settings.
                 * Any other keyword argument that overrides the settings or is passed directly to `calc_func`.
 
                 If `resolve_calc_func` is True, the calculation function may "request" any of the
@@ -198,9 +198,9 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                 * it only takes effect if global `agg_func` is not None
                 * will raise a warning if it's None but the result of calculation has multiple values
             silence_warnings (bool): Whether to silence all warnings.
-            template_mapping (mapping): Global mapping to replace templates.
+            template_context (mapping): Global context to replace templates.
 
-                Gets merged over `template_mapping` from `StatsBuilderMixin.stats_defaults`.
+                Gets merged over `template_context` from `StatsBuilderMixin.stats_defaults`.
 
                 Applied on `settings` and then on each metric settings.
             filters (dict): Filters to apply.
@@ -212,7 +212,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                 * `filter_func`: Filter function that must accept resolved self and
                     merged settings for a metric, and return either True or False.
                 * `warning_message`: Warning message to be shown when skipping a metric.
-                    Can be a template that will be substituted using merged metric settings as mapping.
+                    Can be a template that will be substituted using merged metric settings as context.
                     Defaults to None.
                 * `inv_warning_message`: Same as `warning_message` but for inverse checks.
 
@@ -247,16 +247,16 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
         # Resolve defaults
         if silence_warnings is None:
             silence_warnings = self.stats_defaults.get('silence_warnings', False)
-        template_mapping = merge_dicts(self.stats_defaults.get('template_mapping', {}), template_mapping)
+        template_context = merge_dicts(self.stats_defaults.get('template_context', {}), template_context)
         filters = merge_dicts(self.stats_defaults.get('filters', {}), filters)
         settings = merge_dicts(self.stats_defaults.get('settings', {}), settings)
         metric_settings = merge_dicts(self.stats_defaults.get('metric_settings', {}), metric_settings)
 
         # Replace templates globally (not used at metric level)
-        if len(template_mapping) > 0:
+        if len(template_context) > 0:
             sub_settings = deep_substitute(
                 settings,
-                mapping=template_mapping,
+                context=template_context,
                 sub_id='sub_settings',
                 strict=False
             )
@@ -317,7 +317,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
         opt_arg_names_dct = {}
         custom_arg_names_dct = {}
         resolved_self_dct = {}
-        mapping_dct = {}
+        context_dct = {}
         for metric_name, _metric_settings in list(metrics_dct.items()):
             opt_settings = merge_dicts(
                 {name: reself for name in reself.self_aliases},
@@ -338,15 +338,15 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                 _metric_settings,
                 passed_metric_settings
             )
-            metric_template_mapping = merged_settings.pop('template_mapping', {})
-            template_mapping_merged = merge_dicts(template_mapping, metric_template_mapping)
-            template_mapping_merged = deep_substitute(
-                template_mapping_merged,
-                mapping=merged_settings,
-                sub_id='template_mapping_merged'
+            metric_template_context = merged_settings.pop('template_context', {})
+            template_context_merged = merge_dicts(template_context, metric_template_context)
+            template_context_merged = deep_substitute(
+                template_context_merged,
+                context=merged_settings,
+                sub_id='template_context_merged'
             )
-            mapping = merge_dicts(template_mapping_merged, merged_settings)
-            merged_settings = deep_substitute(merged_settings, mapping=mapping, sub_id='merged_settings')
+            context = merge_dicts(template_context_merged, merged_settings)
+            merged_settings = deep_substitute(merged_settings, context=context, sub_id='merged_settings')
 
             # Filter by tag
             if tags is not None:
@@ -368,12 +368,12 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
             custom_arg_names_dct[metric_name] = custom_arg_names
             opt_arg_names_dct[metric_name] = opt_arg_names
             resolved_self_dct[metric_name] = custom_reself
-            mapping_dct[metric_name] = mapping
+            context_dct[metric_name] = context
 
         # Filter metrics
         for metric_name, _metric_settings in list(metrics_dct.items()):
             custom_reself = resolved_self_dct[metric_name]
-            mapping = mapping_dct[metric_name]
+            context = context_dct[metric_name]
             _silence_warnings = _metric_settings.get('silence_warnings')
 
             metric_filters = set()
@@ -390,7 +390,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
             for filter_name in metric_filters:
                 filter_settings = filters[filter_name]
-                _filter_settings = deep_substitute(filter_settings, mapping=mapping, sub_id='filter_settings')
+                _filter_settings = deep_substitute(filter_settings, context=context, sub_id='filter_settings')
                 filter_func = _filter_settings['filter_func']
                 warning_message = _filter_settings.get('warning_message', None)
                 inv_warning_message = _filter_settings.get('inv_warning_message', None)
@@ -410,7 +410,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                         custom_arg_names_dct.pop(metric_name, None)
                         opt_arg_names_dct.pop(metric_name, None)
                         resolved_self_dct.pop(metric_name, None)
-                        mapping_dct.pop(metric_name, None)
+                        context_dct.pop(metric_name, None)
                         break
 
         # Any metrics left?

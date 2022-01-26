@@ -71,14 +71,14 @@ class ChunkableRegistry:
         self.setups[setup_id] = setup
 
     def match_setups(self, expression: tp.Optional[str] = None,
-                     mapping: tp.KwargsLike = None) -> tp.Set[ChunkedSetup]:
-        """Match setups against an expression with each setup being a mapping."""
+                     context: tp.KwargsLike = None) -> tp.Set[ChunkedSetup]:
+        """Match setups against an expression with each setup being a context."""
         matched_setups = set()
         for setup in self.setups.values():
             if expression is None:
                 result = True
             else:
-                result = RepEval(expression).substitute(mapping=merge_dicts(attr.asdict(setup), mapping))
+                result = RepEval(expression).substitute(context=merge_dicts(attr.asdict(setup), context))
                 checks.assert_instance_of(result, bool)
 
             if result:

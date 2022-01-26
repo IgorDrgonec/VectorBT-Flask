@@ -496,7 +496,7 @@ class BaseAccessor(Wrapping):
               to_2d: bool = False,
               broadcast_named_args: tp.KwargsLike = None,
               broadcast_kwargs: tp.KwargsLike = None,
-              template_mapping: tp.Optional[tp.Mapping] = None,
+              template_context: tp.Optional[tp.Mapping] = None,
               wrap_kwargs: tp.KwargsLike = None,
               **kwargs) -> tp.SeriesFrame:
         """Apply a function `apply_func`.
@@ -540,8 +540,8 @@ class BaseAccessor(Wrapping):
             broadcast_named_args = {}
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
-        if template_mapping is None:
-            template_mapping = {}
+        if template_context is None:
+            template_context = {}
 
         broadcast_named_args = {'obj': self.obj, **broadcast_named_args}
         if len(broadcast_named_args) > 1:
@@ -559,9 +559,9 @@ class BaseAccessor(Wrapping):
                 k: np.asarray(v)
                 for k, v in broadcast_named_args.items()
             }
-        template_mapping = merge_dicts(broadcast_named_args, template_mapping)
-        args = deep_substitute(args, template_mapping, sub_id='args')
-        kwargs = deep_substitute(kwargs, template_mapping, sub_id='kwargs')
+        template_context = merge_dicts(broadcast_named_args, template_context)
+        args = deep_substitute(args, template_context, sub_id='args')
+        kwargs = deep_substitute(kwargs, template_context, sub_id='kwargs')
         out = apply_func(
             broadcast_named_args['obj'],
             *args,
@@ -610,7 +610,7 @@ class BaseAccessor(Wrapping):
                          keys: tp.Optional[tp.IndexLike] = None,
                          broadcast_named_args: tp.KwargsLike = None,
                          broadcast_kwargs: tp.KwargsLike = None,
-                         template_mapping: tp.Optional[tp.Mapping] = None,
+                         template_context: tp.Optional[tp.Mapping] = None,
                          wrap_kwargs: tp.KwargsLike = None,
                          **kwargs) -> tp.MaybeTuple[tp.Frame]:
         """Apply `apply_func` `ntimes` times and concatenate the results along columns.
@@ -683,8 +683,8 @@ class BaseAccessor(Wrapping):
             broadcast_named_args = {}
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
-        if template_mapping is None:
-            template_mapping = {}
+        if template_context is None:
+            template_context = {}
 
         broadcast_named_args = {'obj': self.obj, **broadcast_named_args}
         if len(broadcast_named_args) > 1:
@@ -702,13 +702,13 @@ class BaseAccessor(Wrapping):
                 k: np.asarray(v)
                 for k, v in broadcast_named_args.items()
             }
-        template_mapping = merge_dicts(
+        template_context = merge_dicts(
             broadcast_named_args,
             dict(ntimes=ntimes),
-            template_mapping
+            template_context
         )
-        args = deep_substitute(args, template_mapping, sub_id='args')
-        kwargs = deep_substitute(kwargs, template_mapping, sub_id='kwargs')
+        args = deep_substitute(args, template_context, sub_id='args')
+        kwargs = deep_substitute(kwargs, template_context, sub_id='kwargs')
         out = combining.apply_and_concat(
             ntimes,
             apply_func,
@@ -740,7 +740,7 @@ class BaseAccessor(Wrapping):
                 keys: tp.Optional[tp.IndexLike] = None,
                 broadcast_named_args: tp.KwargsLike = None,
                 broadcast_kwargs: tp.KwargsLike = None,
-                template_mapping: tp.Optional[tp.Mapping] = None,
+                template_context: tp.Optional[tp.Mapping] = None,
                 wrap_kwargs: tp.KwargsLike = None,
                 **kwargs) -> tp.SeriesFrame:
         """Combine with `other` using `combine_func`.
@@ -767,7 +767,7 @@ class BaseAccessor(Wrapping):
             keys (index_like): Outermost column level.
             broadcast_named_args (dict): Dictionary with arguments to broadcast against each other.
             broadcast_kwargs (dict): Keyword arguments passed to `vectorbtpro.base.reshaping.broadcast`.
-            template_mapping (dict): Mapping used to substitute templates in `args` and `kwargs`.
+            template_context (dict): Mapping used to substitute templates in `args` and `kwargs`.
             wrap_kwargs (dict): Keyword arguments passed to `vectorbtpro.base.wrapping.ArrayWrapper.wrap`.
             **kwargs: Keyword arguments passed to `combine_func`.
 
@@ -861,8 +861,8 @@ class BaseAccessor(Wrapping):
             broadcast_named_args = {}
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
-        if template_mapping is None:
-            template_mapping = {}
+        if template_context is None:
+            template_context = {}
 
         if isinstance(cls_or_self, type):
             objs = obj
@@ -889,9 +889,9 @@ class BaseAccessor(Wrapping):
             broadcast_named_args = {k: reshaping.to_2d(v, raw=not keep_pd) for k, v in broadcast_named_args.items()}
         elif not keep_pd:
             broadcast_named_args = {k: np.asarray(v) for k, v in broadcast_named_args.items()}
-        template_mapping = merge_dicts(broadcast_named_args, template_mapping)
-        args = deep_substitute(args, template_mapping, sub_id='args')
-        kwargs = deep_substitute(kwargs, template_mapping, sub_id='kwargs')
+        template_context = merge_dicts(broadcast_named_args, template_context)
+        args = deep_substitute(args, template_context, sub_id='args')
+        kwargs = deep_substitute(kwargs, template_context, sub_id='kwargs')
         inputs = [broadcast_named_args['obj_' + str(i)] for i in range(len(objs))]
 
         if concat is None:

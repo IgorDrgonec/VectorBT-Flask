@@ -115,10 +115,10 @@ class TestJITRegistry:
 
         my2_jitable_setup = jit_reg.jitable_setups['f']['my2']
         assert jit_reg.match_jitted_setups(
-            my2_jitable_setup, 'jitted_func == f_my2', mapping=dict(f_my2=jitted_f_my2)) == \
+            my2_jitable_setup, 'jitted_func == f_my2', context=dict(f_my2=jitted_f_my2)) == \
                {list(jit_reg.jitted_setups[hash(my2_jitable_setup)].values())[0]}
         assert jit_reg.match_jitted_setups(
-            my2_jitable_setup, 'jitted_func != f_my2', mapping=dict(f_my2=jitted_f_my2)) == set()
+            my2_jitable_setup, 'jitted_func != f_my2', context=dict(f_my2=jitted_f_my2)) == set()
 
     def test_resolve(self, jitted_f_my1, jitted_f_my2):
         vbt.settings.jitting['disable_resolution'] = True

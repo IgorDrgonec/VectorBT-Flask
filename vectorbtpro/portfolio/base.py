@@ -1602,7 +1602,7 @@ You can additionally use templates to make some parameters to depend upon passed
 ...     column=10,
 ...     subplot_settings=dict(
 ...         rolling_drawdown=dict(
-...             template_mapping=dict(
+...             template_context=dict(
 ...                 window=10
 ...             )
 ...         )
@@ -1613,7 +1613,7 @@ You can additionally use templates to make some parameters to depend upon passed
 You can also replace templates across all subplots by using the global template mapping:
 
 ```pycon
->>> pf.plot(subplots, column=10, template_mapping=dict(window=10))
+>>> pf.plot(subplots, column=10, template_context=dict(window=10))
 ```
 
 ![](/assets/images/portfolio_plot_path.svg)
@@ -3221,7 +3221,7 @@ class Portfolio(Analyzable):
                      group_by: tp.GroupByLike = None,
                      broadcast_named_args: tp.KwargsLike = None,
                      broadcast_kwargs: tp.KwargsLike = None,
-                     template_mapping: tp.Optional[tp.Mapping] = None,
+                     template_context: tp.Optional[tp.Mapping] = None,
                      jitted: tp.JittedOption = None,
                      chunked: tp.ChunkedOption = None,
                      wrapper_kwargs: tp.KwargsLike = None,
@@ -3419,7 +3419,7 @@ class Portfolio(Analyzable):
                 You can then pass argument names wrapped with `vectorbtpro.utils.template.Rep`
                 and this method will substitute them by their corresponding broadcasted objects.
             broadcast_kwargs (dict): See `Portfolio.from_orders`.
-            template_mapping (mapping): Mapping to replace templates in arguments.
+            template_context (mapping): Mapping to replace templates in arguments.
             jitted (any): See `Portfolio.from_orders`.
             chunked (any): See `Portfolio.from_orders`.
             wrapper_kwargs (dict): See `Portfolio.from_orders`.
@@ -4031,7 +4031,7 @@ class Portfolio(Analyzable):
             broadcast_named_args = {}
         broadcast_kwargs = merge_dicts(portfolio_cfg['broadcast_kwargs'], broadcast_kwargs)
         require_kwargs = broadcast_kwargs.get('require_kwargs', {})
-        template_mapping = merge_dicts(portfolio_cfg['template_mapping'], template_mapping)
+        template_context = merge_dicts(portfolio_cfg['template_context'], template_context)
         if wrapper_kwargs is None:
             wrapper_kwargs = {}
         if not wrapper_kwargs.get('group_select', True) and cash_sharing:
@@ -4218,7 +4218,7 @@ class Portfolio(Analyzable):
             checks.assert_subdtype(broadcasted_args['bm_close'], np.number)
 
         # Prepare arguments
-        template_mapping = merge_dicts(
+        template_context = merge_dicts(
             broadcasted_args,
             dict(
                 target_shape=target_shape_2d,
@@ -4242,12 +4242,12 @@ class Portfolio(Analyzable):
                 flex_2d=flex_2d,
                 wrapper=wrapper
             ),
-            template_mapping
+            template_context
         )
-        adjust_sl_args = deep_substitute(adjust_sl_args, template_mapping, sub_id='adjust_sl_args')
-        adjust_tp_args = deep_substitute(adjust_tp_args, template_mapping, sub_id='adjust_tp_args')
+        adjust_sl_args = deep_substitute(adjust_sl_args, template_context, sub_id='adjust_sl_args')
+        adjust_tp_args = deep_substitute(adjust_tp_args, template_context, sub_id='adjust_tp_args')
         if signal_func_mode:
-            signal_args = deep_substitute(signal_args, template_mapping, sub_id='signal_args')
+            signal_args = deep_substitute(signal_args, template_context, sub_id='signal_args')
         else:
             if ls_mode:
                 signal_args = (
@@ -4577,7 +4577,7 @@ class Portfolio(Analyzable):
                         group_by: tp.GroupByLike = None,
                         broadcast_named_args: tp.KwargsLike = None,
                         broadcast_kwargs: tp.KwargsLike = None,
-                        template_mapping: tp.Optional[tp.Mapping] = None,
+                        template_context: tp.Optional[tp.Mapping] = None,
                         keep_inout_raw: tp.Optional[bool] = None,
                         jitted: tp.JittedOption = None,
                         chunked: tp.ChunkedOption = None,
@@ -4719,7 +4719,7 @@ class Portfolio(Analyzable):
             group_by (any): See `Portfolio.from_orders`.
             broadcast_named_args (dict): See `Portfolio.from_signals`.
             broadcast_kwargs (dict): See `Portfolio.from_orders`.
-            template_mapping (mapping): See `Portfolio.from_signals`.
+            template_context (mapping): See `Portfolio.from_signals`.
             keep_inout_raw (bool): Whether to keep arrays that can be edited in-place raw when broadcasting.
 
                 Disable this to be able to edit `segment_mask`, `cash_deposits`, and
@@ -4882,7 +4882,7 @@ class Portfolio(Analyzable):
             ...         fixed_fees=1.,
             ...         slippage=0.001
             ...     ),
-            ...     template_mapping=dict(np=np),  # required by size_template
+            ...     template_context=dict(np=np),  # required by size_template
             ...     cash_sharing=True, group_by=True,  # one group with cash sharing
             ... )
 
@@ -5149,11 +5149,11 @@ class Portfolio(Analyzable):
             broadcast_named_args = {}
         broadcast_kwargs = merge_dicts(portfolio_cfg['broadcast_kwargs'], broadcast_kwargs)
         require_kwargs = broadcast_kwargs.get('require_kwargs', {})
-        template_mapping = merge_dicts(portfolio_cfg['template_mapping'], template_mapping)
+        template_context = merge_dicts(portfolio_cfg['template_context'], template_context)
         if keep_inout_raw is None:
             keep_inout_raw = portfolio_cfg['keep_inout_raw']
-        if template_mapping is None:
-            template_mapping = {}
+        if template_context is None:
+            template_context = {}
         if wrapper_kwargs is None:
             wrapper_kwargs = {}
         if not wrapper_kwargs.get('group_select', True) and cash_sharing:
@@ -5246,7 +5246,7 @@ class Portfolio(Analyzable):
             checks.assert_subdtype(broadcasted_args['bm_close'], np.number)
 
         # Prepare arguments
-        template_mapping = merge_dicts(
+        template_context = merge_dicts(
             broadcasted_args,
             dict(
                 target_shape=target_shape_2d,
@@ -5289,19 +5289,19 @@ class Portfolio(Analyzable):
                 flex_2d=flex_2d,
                 wrapper=wrapper
             ),
-            template_mapping
+            template_context
         )
-        pre_sim_args = deep_substitute(pre_sim_args, template_mapping, sub_id='pre_sim_args')
-        post_sim_args = deep_substitute(post_sim_args, template_mapping, sub_id='post_sim_args')
-        pre_group_args = deep_substitute(pre_group_args, template_mapping, sub_id='pre_group_args')
-        post_group_args = deep_substitute(post_group_args, template_mapping, sub_id='post_group_args')
-        pre_row_args = deep_substitute(pre_row_args, template_mapping, sub_id='pre_row_args')
-        post_row_args = deep_substitute(post_row_args, template_mapping, sub_id='post_row_args')
-        pre_segment_args = deep_substitute(pre_segment_args, template_mapping, sub_id='pre_segment_args')
-        post_segment_args = deep_substitute(post_segment_args, template_mapping, sub_id='post_segment_args')
-        order_args = deep_substitute(order_args, template_mapping, sub_id='order_args')
-        post_order_args = deep_substitute(post_order_args, template_mapping, sub_id='post_order_args')
-        in_outputs = deep_substitute(in_outputs, template_mapping, sub_id='in_outputs')
+        pre_sim_args = deep_substitute(pre_sim_args, template_context, sub_id='pre_sim_args')
+        post_sim_args = deep_substitute(post_sim_args, template_context, sub_id='post_sim_args')
+        pre_group_args = deep_substitute(pre_group_args, template_context, sub_id='pre_group_args')
+        post_group_args = deep_substitute(post_group_args, template_context, sub_id='post_group_args')
+        pre_row_args = deep_substitute(pre_row_args, template_context, sub_id='pre_row_args')
+        post_row_args = deep_substitute(post_row_args, template_context, sub_id='post_row_args')
+        pre_segment_args = deep_substitute(pre_segment_args, template_context, sub_id='pre_segment_args')
+        post_segment_args = deep_substitute(post_segment_args, template_context, sub_id='post_segment_args')
+        order_args = deep_substitute(order_args, template_context, sub_id='order_args')
+        post_order_args = deep_substitute(post_order_args, template_context, sub_id='post_order_args')
+        in_outputs = deep_substitute(in_outputs, template_context, sub_id='in_outputs')
         for k in broadcast_named_args:
             broadcasted_args.pop(k)
 

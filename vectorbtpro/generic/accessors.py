@@ -596,7 +596,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             apply_func_nb: tp.Union[tp.MapFunc, tp.MapMetaFunc], *args,
             broadcast_named_args: tp.KwargsLike = None,
             broadcast_kwargs: tp.KwargsLike = None,
-            template_mapping: tp.Optional[tp.Mapping] = None,
+            template_context: tp.Optional[tp.Mapping] = None,
             jitted: tp.JittedOption = None,
             chunked: tp.ChunkedOption = None,
             wrapper: tp.Optional[ArrayWrapper] = None,
@@ -663,8 +663,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
             broadcast_named_args = {}
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
-        if template_mapping is None:
-            template_mapping = {}
+        if template_context is None:
+            template_context = {}
 
         if isinstance(cls_or_self, type):
             if len(broadcast_named_args) > 0:
@@ -677,12 +677,12 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         broadcast_named_args, return_wrapper=True, **broadcast_kwargs)
             else:
                 checks.assert_not_none(wrapper)
-            template_mapping = merge_dicts(
+            template_context = merge_dicts(
                 broadcast_named_args,
                 dict(wrapper=wrapper),
-                template_mapping
+                template_context
             )
-            args = deep_substitute(args, template_mapping, sub_id='args')
+            args = deep_substitute(args, template_context, sub_id='args')
             func = jit_reg.resolve_option(nb.map_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             out = func(wrapper.shape_2d, apply_func_nb, *args)
@@ -701,7 +701,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                          axis: int = 1,
                          broadcast_named_args: tp.KwargsLike = None,
                          broadcast_kwargs: tp.KwargsLike = None,
-                         template_mapping: tp.Optional[tp.Mapping] = None,
+                         template_context: tp.Optional[tp.Mapping] = None,
                          jitted: tp.JittedOption = None,
                          chunked: tp.ChunkedOption = None,
                          wrapper: tp.Optional[ArrayWrapper] = None,
@@ -771,8 +771,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
             broadcast_named_args = {}
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
-        if template_mapping is None:
-            template_mapping = {}
+        if template_context is None:
+            template_context = {}
 
         if isinstance(cls_or_self, type):
             if len(broadcast_named_args) > 0:
@@ -785,12 +785,12 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         broadcast_named_args, return_wrapper=True, **broadcast_kwargs)
             else:
                 checks.assert_not_none(wrapper)
-            template_mapping = merge_dicts(
+            template_context = merge_dicts(
                 broadcast_named_args,
                 dict(wrapper=wrapper, axis=axis),
-                template_mapping
+                template_context
             )
-            args = deep_substitute(args, template_mapping, sub_id='args')
+            args = deep_substitute(args, template_context, sub_id='args')
             if axis == 0:
                 func = jit_reg.resolve_option(nb.row_apply_meta_nb, jitted)
             else:
@@ -816,7 +816,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                       minp: tp.Optional[int] = None,
                       broadcast_named_args: tp.KwargsLike = None,
                       broadcast_kwargs: tp.KwargsLike = None,
-                      template_mapping: tp.Optional[tp.Mapping] = None,
+                      template_context: tp.Optional[tp.Mapping] = None,
                       jitted: tp.JittedOption = None,
                       chunked: tp.ChunkedOption = None,
                       wrapper: tp.Optional[ArrayWrapper] = None,
@@ -888,8 +888,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
             broadcast_named_args = {}
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
-        if template_mapping is None:
-            template_mapping = {}
+        if template_context is None:
+            template_context = {}
 
         if isinstance(cls_or_self, type):
             if len(broadcast_named_args) > 0:
@@ -908,12 +908,12 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 window = wrapper.shape[0]
             if minp is None:
                 minp = window
-            template_mapping = merge_dicts(
+            template_context = merge_dicts(
                 broadcast_named_args,
                 dict(wrapper=wrapper, window=window, minp=minp),
-                template_mapping
+                template_context
             )
-            args = deep_substitute(args, template_mapping, sub_id='args')
+            args = deep_substitute(args, template_context, sub_id='args')
             func = jit_reg.resolve_option(nb.rolling_apply_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             out = func(wrapper.shape_2d, window, minp, apply_func_nb, *args)
@@ -943,7 +943,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                       apply_func_nb: tp.Union[tp.ApplyFunc, tp.GroupByApplyMetaFunc], *args,
                       broadcast_named_args: tp.KwargsLike = None,
                       broadcast_kwargs: tp.KwargsLike = None,
-                      template_mapping: tp.Optional[tp.Mapping] = None,
+                      template_context: tp.Optional[tp.Mapping] = None,
                       jitted: tp.JittedOption = None,
                       chunked: tp.ChunkedOption = None,
                       wrapper: tp.Optional[ArrayWrapper] = None,
@@ -1002,7 +1002,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             ...         a=pd.Series([1, 2, 3, 4, 5], index=df.index),
             ...         b=pd.DataFrame([[1, 2, 3]], columns=['a', 'b', 'c'])
             ...     ),
-            ...     template_mapping=dict(group_by_evenly_nb=group_by_evenly_nb)
+            ...     template_context=dict(group_by_evenly_nb=group_by_evenly_nb)
             ... )
                  a     b         c
             0  2.0  1.00  0.666667
@@ -1016,8 +1016,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
             broadcast_named_args = {}
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
-        if template_mapping is None:
-            template_mapping = {}
+        if template_context is None:
+            template_context = {}
 
         if isinstance(cls_or_self, type):
             if len(broadcast_named_args) > 0:
@@ -1030,20 +1030,20 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         broadcast_named_args, return_wrapper=True, **broadcast_kwargs)
             else:
                 checks.assert_not_none(wrapper)
-            template_mapping = merge_dicts(
+            template_context = merge_dicts(
                 broadcast_named_args,
                 dict(wrapper=wrapper),
-                template_mapping
+                template_context
             )
-            by = deep_substitute(by, template_mapping, sub_id='by')
+            by = deep_substitute(by, template_context, sub_id='by')
             pd_group_by = wrapper.dummy().groupby(by, axis=0, **kwargs)
             grouper = Grouper.from_pd_group_by(pd_group_by)
             group_map = grouper.get_group_map()
-            template_mapping = merge_dicts(
+            template_context = merge_dicts(
                 dict(by=by, grouper=grouper),
-                template_mapping
+                template_context
             )
-            args = deep_substitute(args, template_mapping, sub_id='args')
+            args = deep_substitute(args, template_context, sub_id='args')
             func = jit_reg.resolve_option(nb.groupby_apply_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             out = func(wrapper.shape_2d[1], group_map, apply_func_nb, *args)
@@ -1066,7 +1066,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                        apply_func_nb: tp.Union[tp.ApplyFunc, tp.GroupByApplyMetaFunc], *args,
                        broadcast_named_args: tp.KwargsLike = None,
                        broadcast_kwargs: tp.KwargsLike = None,
-                       template_mapping: tp.Optional[tp.Mapping] = None,
+                       template_context: tp.Optional[tp.Mapping] = None,
                        jitted: tp.JittedOption = None,
                        chunked: tp.ChunkedOption = None,
                        wrapper: tp.Optional[ArrayWrapper] = None,
@@ -1131,8 +1131,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
             broadcast_named_args = {}
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
-        if template_mapping is None:
-            template_mapping = {}
+        if template_context is None:
+            template_context = {}
 
         if isinstance(cls_or_self, type):
             if len(broadcast_named_args) > 0:
@@ -1145,20 +1145,20 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         broadcast_named_args, return_wrapper=True, **broadcast_kwargs)
             else:
                 checks.assert_not_none(wrapper)
-            template_mapping = merge_dicts(
+            template_context = merge_dicts(
                 broadcast_named_args,
                 dict(wrapper=wrapper),
-                template_mapping
+                template_context
             )
-            rule = deep_substitute(rule, template_mapping, sub_id='rule')
+            rule = deep_substitute(rule, template_context, sub_id='rule')
             pd_group_by = wrapper.dummy().resample(rule, axis=0, **kwargs)
             grouper = Grouper.from_pd_group_by(pd_group_by)
             group_map = grouper.get_group_map()
-            template_mapping = merge_dicts(
+            template_context = merge_dicts(
                 dict(rule=rule, grouper=grouper),
-                template_mapping
+                template_context
             )
-            args = deep_substitute(args, template_mapping, sub_id='args')
+            args = deep_substitute(args, template_context, sub_id='args')
             func = jit_reg.resolve_option(nb.groupby_apply_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             out = func(wrapper.shape_2d[1], group_map, apply_func_nb, *args)
@@ -1191,7 +1191,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                          reduce_args: tp.Optional[tuple] = None,
                          broadcast_named_args: tp.KwargsLike = None,
                          broadcast_kwargs: tp.KwargsLike = None,
-                         template_mapping: tp.Optional[tp.Mapping] = None,
+                         template_context: tp.Optional[tp.Mapping] = None,
                          jitted: tp.JittedOption = None,
                          chunked: tp.ChunkedOption = None,
                          wrapper: tp.Optional[ArrayWrapper] = None,
@@ -1260,8 +1260,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
             broadcast_named_args = {}
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
-        if template_mapping is None:
-            template_mapping = {}
+        if template_context is None:
+            template_context = {}
 
         if apply_args is None:
             apply_args = ()
@@ -1278,13 +1278,13 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         broadcast_named_args, return_wrapper=True, **broadcast_kwargs)
             else:
                 checks.assert_not_none(wrapper)
-            template_mapping = merge_dicts(
+            template_context = merge_dicts(
                 broadcast_named_args,
                 dict(wrapper=wrapper),
-                template_mapping
+                template_context
             )
-            apply_args = deep_substitute(apply_args, template_mapping, sub_id='apply_args')
-            reduce_args = deep_substitute(reduce_args, template_mapping, sub_id='reduce_args')
+            apply_args = deep_substitute(apply_args, template_context, sub_id='apply_args')
+            reduce_args = deep_substitute(reduce_args, template_context, sub_id='reduce_args')
             func = jit_reg.resolve_option(nb.apply_and_reduce_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             out = func(wrapper.shape_2d[1], apply_func_nb, apply_args, reduce_func_nb, reduce_args)
@@ -1317,7 +1317,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                to_index: bool = True,
                broadcast_named_args: tp.KwargsLike = None,
                broadcast_kwargs: tp.KwargsLike = None,
-               template_mapping: tp.Optional[tp.Mapping] = None,
+               template_context: tp.Optional[tp.Mapping] = None,
                jitted: tp.JittedOption = None,
                chunked: tp.ChunkedOption = None,
                wrapper: tp.Optional[ArrayWrapper] = None,
@@ -1454,8 +1454,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
             broadcast_named_args = {}
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
-        if template_mapping is None:
-            template_mapping = {}
+        if template_context is None:
+            template_context = {}
 
         if isinstance(cls_or_self, type):
             if len(broadcast_named_args) > 0:
@@ -1468,7 +1468,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         broadcast_named_args, return_wrapper=True, **broadcast_kwargs)
             else:
                 checks.assert_not_none(wrapper)
-            template_mapping = merge_dicts(
+            template_context = merge_dicts(
                 broadcast_named_args,
                 dict(
                     wrapper=wrapper,
@@ -1478,9 +1478,9 @@ class GenericAccessor(BaseAccessor, Analyzable):
                     flatten=flatten,
                     order=order
                 ),
-                template_mapping
+                template_context
             )
-            args = deep_substitute(args, template_mapping, sub_id='args')
+            args = deep_substitute(args, template_context, sub_id='args')
             if wrapper.grouper.is_grouped(group_by=group_by):
                 group_map = wrapper.grouper.get_group_map(group_by=group_by)
                 if returns_array:
@@ -1543,7 +1543,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         squeeze_func_nb: tp.Union[tp.ReduceFunc, tp.GroupSqueezeMetaFunc], *args,
                         broadcast_named_args: tp.KwargsLike = None,
                         broadcast_kwargs: tp.KwargsLike = None,
-                        template_mapping: tp.Optional[tp.Mapping] = None,
+                        template_context: tp.Optional[tp.Mapping] = None,
                         jitted: tp.JittedOption = None,
                         chunked: tp.ChunkedOption = None,
                         wrapper: tp.Optional[ArrayWrapper] = None,
@@ -1616,8 +1616,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
             broadcast_named_args = {}
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
-        if template_mapping is None:
-            template_mapping = {}
+        if template_context is None:
+            template_context = {}
 
         if isinstance(cls_or_self, type):
             if len(broadcast_named_args) > 0:
@@ -1630,12 +1630,12 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         broadcast_named_args, return_wrapper=True, **broadcast_kwargs)
             else:
                 checks.assert_not_none(wrapper)
-            template_mapping = merge_dicts(
+            template_context = merge_dicts(
                 broadcast_named_args,
                 dict(wrapper=wrapper, group_by=group_by),
-                template_mapping
+                template_context
             )
-            args = deep_substitute(args, template_mapping, sub_id='args')
+            args = deep_substitute(args, template_context, sub_id='args')
             if not wrapper.grouper.is_grouped(group_by=group_by):
                 raise ValueError("Grouping required")
             group_map = wrapper.grouper.get_group_map(group_by=group_by)

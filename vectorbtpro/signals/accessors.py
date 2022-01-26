@@ -263,7 +263,7 @@ class SignalsAccessor(GenericAccessor):
                  place_func_nb: tp.PlaceFunc, *args,
                  broadcast_named_args: tp.KwargsLike = None,
                  broadcast_kwargs: tp.KwargsLike = None,
-                 template_mapping: tp.Optional[tp.Mapping] = None,
+                 template_context: tp.Optional[tp.Mapping] = None,
                  jitted: tp.JittedOption = None,
                  chunked: tp.ChunkedOption = None,
                  wrapper: tp.Optional[ArrayWrapper] = None,
@@ -298,18 +298,18 @@ class SignalsAccessor(GenericAccessor):
             broadcast_named_args = {}
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
-        if template_mapping is None:
-            template_mapping = {}
+        if template_context is None:
+            template_context = {}
 
         shape_2d = cls.resolve_shape(shape)
         if len(broadcast_named_args) > 0:
             broadcast_named_args = reshaping.broadcast(broadcast_named_args, to_shape=shape_2d, **broadcast_kwargs)
-        template_mapping = merge_dicts(
+        template_context = merge_dicts(
             broadcast_named_args,
             dict(shape=shape, shape_2d=shape_2d),
-            template_mapping
+            template_context
         )
-        args = deep_substitute(args, template_mapping, sub_id='args')
+        args = deep_substitute(args, template_context, sub_id='args')
         func = jit_reg.resolve_option(nb.generate_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         result = func(shape_2d, place_func_nb, *args)
@@ -333,7 +333,7 @@ class SignalsAccessor(GenericAccessor):
                       max_one_exit: bool = True,
                       broadcast_named_args: tp.KwargsLike = None,
                       broadcast_kwargs: tp.KwargsLike = None,
-                      template_mapping: tp.Optional[tp.Mapping] = None,
+                      template_context: tp.Optional[tp.Mapping] = None,
                       jitted: tp.JittedOption = None,
                       chunked: tp.ChunkedOption = None,
                       wrapper: tp.Optional[ArrayWrapper] = None,
@@ -426,23 +426,23 @@ class SignalsAccessor(GenericAccessor):
             broadcast_named_args = {}
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
-        if template_mapping is None:
-            template_mapping = {}
+        if template_context is None:
+            template_context = {}
 
         shape_2d = cls.resolve_shape(shape)
         if len(broadcast_named_args) > 0:
             broadcast_named_args = reshaping.broadcast(broadcast_named_args, to_shape=shape_2d, **broadcast_kwargs)
-        template_mapping = merge_dicts(
+        template_context = merge_dicts(
             broadcast_named_args,
             dict(
                 shape=shape, shape_2d=shape_2d,
                 entry_wait=entry_wait, exit_wait=exit_wait,
                 max_one_entry=max_one_entry, max_one_exit=max_one_exit
             ),
-            template_mapping
+            template_context
         )
-        entry_args = deep_substitute(entry_args, template_mapping, sub_id='entry_args')
-        exit_args = deep_substitute(exit_args, template_mapping, sub_id='exit_args')
+        entry_args = deep_substitute(entry_args, template_context, sub_id='entry_args')
+        exit_args = deep_substitute(exit_args, template_context, sub_id='exit_args')
         func = jit_reg.resolve_option(nb.generate_enex_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         result1, result2 = func(
@@ -467,7 +467,7 @@ class SignalsAccessor(GenericAccessor):
                        skip_until_exit: bool = False,
                        broadcast_named_args: tp.KwargsLike = None,
                        broadcast_kwargs: tp.KwargsLike = None,
-                       template_mapping: tp.Optional[tp.Mapping] = None,
+                       template_context: tp.Optional[tp.Mapping] = None,
                        jitted: tp.JittedOption = None,
                        chunked: tp.ChunkedOption = None,
                        wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
@@ -494,8 +494,8 @@ class SignalsAccessor(GenericAccessor):
             broadcast_named_args = {}
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
-        if template_mapping is None:
-            template_mapping = {}
+        if template_context is None:
+            template_context = {}
 
         obj = self.obj
         if len(broadcast_named_args) > 0:
@@ -507,12 +507,12 @@ class SignalsAccessor(GenericAccessor):
         else:
             wrapper = self.wrapper
             obj = reshaping.to_2d_array(obj)
-        template_mapping = merge_dicts(
+        template_context = merge_dicts(
             broadcast_named_args,
             dict(wait=wait, until_next=until_next, skip_until_exit=skip_until_exit),
-            template_mapping
+            template_context
         )
-        args = deep_substitute(args, template_mapping, sub_id='args')
+        args = deep_substitute(args, template_context, sub_id='args')
         func = jit_reg.resolve_option(nb.generate_ex_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         exits = func(
@@ -1638,7 +1638,7 @@ class SignalsAccessor(GenericAccessor):
              as_mapped: bool = False,
              broadcast_named_args: tp.KwargsLike = None,
              broadcast_kwargs: tp.KwargsLike = None,
-             template_mapping: tp.Optional[tp.Mapping] = None,
+             template_context: tp.Optional[tp.Mapping] = None,
              jitted: tp.JittedOption = None,
              chunked: tp.ChunkedOption = None,
              wrap_kwargs: tp.KwargsLike = None,
@@ -1655,8 +1655,8 @@ class SignalsAccessor(GenericAccessor):
             broadcast_named_args = {}
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
-        if template_mapping is None:
-            template_mapping = {}
+        if template_context is None:
+            template_context = {}
         if wrap_kwargs is None:
             wrap_kwargs = {}
 
@@ -1677,12 +1677,12 @@ class SignalsAccessor(GenericAccessor):
             temp_arrs = prepare_func(obj, reset_by)
         else:
             temp_arrs = ()
-        template_mapping = merge_dicts(
+        template_context = merge_dicts(
             broadcast_named_args,
             dict(after_false=after_false, temp_arrs=temp_arrs),
-            template_mapping
+            template_context
         )
-        args = deep_substitute(args, template_mapping, sub_id='args')
+        args = deep_substitute(args, template_context, sub_id='args')
         func = jit_reg.resolve_option(nb.rank_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         rank = func(

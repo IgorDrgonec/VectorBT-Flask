@@ -345,7 +345,7 @@ class TestFactory:
         )
         pd.testing.assert_frame_equal(
             F.from_apply_func(apply_func, var_args=True).run(
-                ts, [0, 1], vbt.RepEval('10'), b=vbt.Rep('b'), template_mapping=dict(b=100)).out,
+                ts, [0, 1], vbt.RepEval('10'), b=vbt.Rep('b'), template_context=dict(b=100)).out,
             target
         )
 
@@ -2277,7 +2277,7 @@ class TestFactory:
         I = vbt.IndicatorFactory.from_expr(
             "hello",
             magnet_input_names=['ts'],
-            res_func_mapping=dict(hello=dict(func=lambda mapping: mapping['ts'], magnet_input_names=['ts'])))
+            res_func_mapping=dict(hello=dict(func=lambda context: context['ts'], magnet_input_names=['ts'])))
         assert I.input_names == ('ts',)
         assert I.param_names == ()
         pd.testing.assert_frame_equal(I.run(ts).out, ts)
@@ -2328,7 +2328,7 @@ class TestFactory:
         assert I.param_names == ('window',)
         pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
         I = vbt.IndicatorFactory.from_expr(
-            "random_func()", random_func=lambda mapping: mapping['close'],
+            "random_func()", random_func=lambda context: context['close'],
             factory_kwargs=dict(input_names=['close']))
         assert I.input_names == ('close',)
         assert I.param_names == ()

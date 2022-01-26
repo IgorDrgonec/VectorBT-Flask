@@ -158,7 +158,7 @@ jitting = dict(
             )
         )
     ),
-    template_mapping=Config(  # flex
+    template_context=Config(  # flex
         dict()
     )
 )
@@ -264,7 +264,7 @@ chunking = dict(
     chunk_len=None,
     skip_one_chunk=True,
     silence_warnings=False,
-    template_mapping=Config(  # flex
+    template_context=Config(  # flex
         dict()
     ),
     options=Config(  # flex
@@ -293,7 +293,7 @@ _settings['chunking'] = chunking
 
 template = dict(
     strict=True,
-    mapping=Config(  # flex
+    context=Config(  # flex
         dict()
     )
 )
@@ -561,7 +561,7 @@ stats_builder = dict(
     metrics='all',
     tags='all',
     silence_warnings=False,
-    template_mapping=Config(  # flex
+    template_context=Config(  # flex
         dict()
     ),
     filters=Config(  # flex
@@ -603,7 +603,7 @@ plots_builder = dict(
     subplots='all',
     tags='all',
     silence_warnings=False,
-    template_mapping=Config(  # flex
+    template_context=Config(  # flex
         dict()
     ),
     filters=Config(  # flex
@@ -914,7 +914,7 @@ trades = dict(
             settings=dict(
                 incl_open=False
             ),
-            template_mapping=dict(
+            template_context=dict(
                 incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")
             )
         )
@@ -1015,7 +1015,7 @@ portfolio = dict(
             )
         )
     ),
-    template_mapping=Config(  # flex
+    template_context=Config(  # flex
         dict()
     ),
     keep_inout_raw=True,
@@ -1046,7 +1046,7 @@ portfolio = dict(
                 use_asset_returns=False,
                 incl_open=False
             ),
-            template_mapping=dict(
+            template_context=dict(
                 incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")
             )
         )
@@ -1184,7 +1184,7 @@ class SettingsConfig(Config):
         for k, v in __pdoc__.items():
             if k in self:
                 config_doc = self[k].prettify(**prettify_kwargs.get(k, {}))
-                __pdoc__[k] = deep_substitute(v, mapping=dict(config_doc=config_doc), sub_id='__pdoc__')
+                __pdoc__[k] = deep_substitute(v, context=dict(config_doc=config_doc), sub_id='__pdoc__')
 
 
 settings = SettingsConfig(

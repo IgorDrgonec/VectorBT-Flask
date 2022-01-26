@@ -5273,7 +5273,7 @@ class TestFromOrderFunc:
             pre_segment_func_nb=pre_segment_func_nb, pre_segment_args=(pre_segment_lst, sub_arg),
             post_segment_func_nb=post_segment_func_nb, post_segment_args=(post_segment_lst, sub_arg),
             post_order_func_nb=post_order_func_nb, post_order_args=(post_order_lst, sub_arg),
-            row_wise=False, template_mapping=dict(np=np)
+            row_wise=False, template_context=dict(np=np)
         )
         assert call_i[0] == 56
         assert list(pre_sim_lst) == [1]
@@ -5312,7 +5312,7 @@ class TestFromOrderFunc:
             post_segment_func_nb=post_segment_func_nb, post_segment_args=(post_segment_lst, sub_arg),
             post_order_func_nb=post_order_func_nb, post_order_args=(post_order_lst, sub_arg),
             segment_mask=segment_mask, call_pre_segment=True, call_post_segment=True,
-            row_wise=False, template_mapping=dict(np=np)
+            row_wise=False, template_context=dict(np=np)
         )
         assert call_i[0] == 38
         assert list(pre_sim_lst) == [1]
@@ -5344,7 +5344,7 @@ class TestFromOrderFunc:
             post_segment_func_nb=post_segment_func_nb, post_segment_args=(post_segment_lst, sub_arg),
             post_order_func_nb=post_order_func_nb, post_order_args=(post_order_lst, sub_arg),
             segment_mask=segment_mask, call_pre_segment=False, call_post_segment=False,
-            row_wise=False, template_mapping=dict(np=np)
+            row_wise=False, template_context=dict(np=np)
         )
         assert call_i[0] == 26
         assert list(pre_sim_lst) == [1]
@@ -5444,7 +5444,7 @@ class TestFromOrderFunc:
             pre_segment_func_nb=pre_segment_func_nb, pre_segment_args=(pre_segment_lst, sub_arg),
             post_segment_func_nb=post_segment_func_nb, post_segment_args=(post_segment_lst, sub_arg),
             post_order_func_nb=post_order_func_nb, post_order_args=(post_order_lst, sub_arg),
-            row_wise=False, flexible=True, template_mapping=dict(np=np)
+            row_wise=False, flexible=True, template_context=dict(np=np)
         )
         assert call_i[0] == 66
         assert list(pre_sim_lst) == [1]
@@ -5486,7 +5486,7 @@ class TestFromOrderFunc:
             post_segment_func_nb=post_segment_func_nb, post_segment_args=(post_segment_lst, sub_arg),
             post_order_func_nb=post_order_func_nb, post_order_args=(post_order_lst, sub_arg),
             segment_mask=segment_mask, call_pre_segment=True, call_post_segment=True,
-            row_wise=False, flexible=True, template_mapping=dict(np=np)
+            row_wise=False, flexible=True, template_context=dict(np=np)
         )
         assert call_i[0] == 42
         assert list(pre_sim_lst) == [1]
@@ -5518,7 +5518,7 @@ class TestFromOrderFunc:
             post_segment_func_nb=post_segment_func_nb, post_segment_args=(post_segment_lst, sub_arg),
             post_order_func_nb=post_order_func_nb, post_order_args=(post_order_lst, sub_arg),
             segment_mask=segment_mask, call_pre_segment=False, call_post_segment=False,
-            row_wise=False, flexible=True, template_mapping=dict(np=np)
+            row_wise=False, flexible=True, template_context=dict(np=np)
         )
         assert call_i[0] == 30
         assert list(pre_sim_lst) == [1]
@@ -5599,7 +5599,7 @@ class TestFromOrderFunc:
             pre_segment_func_nb=pre_segment_func_nb, pre_segment_args=(pre_segment_lst,),
             post_segment_func_nb=post_segment_func_nb, post_segment_args=(post_segment_lst,),
             post_order_func_nb=post_order_func_nb, post_order_args=(post_order_lst,),
-            row_wise=True, template_mapping=dict(np=np)
+            row_wise=True, template_context=dict(np=np)
         )
         assert call_i[0] == 62
         assert list(pre_sim_lst) == [1]
@@ -5638,7 +5638,7 @@ class TestFromOrderFunc:
             post_segment_func_nb=post_segment_func_nb, post_segment_args=(post_segment_lst,),
             post_order_func_nb=post_order_func_nb, post_order_args=(post_order_lst,),
             segment_mask=segment_mask, call_pre_segment=True, call_post_segment=True,
-            row_wise=True, template_mapping=dict(np=np)
+            row_wise=True, template_context=dict(np=np)
         )
         assert call_i[0] == 44
         assert list(pre_sim_lst) == [1]
@@ -5670,7 +5670,7 @@ class TestFromOrderFunc:
             post_segment_func_nb=post_segment_func_nb, post_segment_args=(post_segment_lst,),
             post_order_func_nb=post_order_func_nb, post_order_args=(post_order_lst,),
             segment_mask=segment_mask, call_pre_segment=False, call_post_segment=False,
-            row_wise=True, template_mapping=dict(np=np)
+            row_wise=True, template_context=dict(np=np)
         )
         assert call_i[0] == 32
         assert list(pre_sim_lst) == [1]
@@ -5770,7 +5770,7 @@ class TestFromOrderFunc:
             pre_segment_func_nb=pre_segment_func_nb, pre_segment_args=(pre_segment_lst, sub_arg),
             post_segment_func_nb=post_segment_func_nb, post_segment_args=(post_segment_lst, sub_arg),
             post_order_func_nb=post_order_func_nb, post_order_args=(post_order_lst, sub_arg),
-            row_wise=True, flexible=True, template_mapping=dict(np=np)
+            row_wise=True, flexible=True, template_context=dict(np=np)
         )
         assert call_i[0] == 72
         assert list(pre_sim_lst) == [1]
@@ -5812,7 +5812,7 @@ class TestFromOrderFunc:
             post_segment_func_nb=post_segment_func_nb, post_segment_args=(post_segment_lst, sub_arg),
             post_order_func_nb=post_order_func_nb, post_order_args=(post_order_lst, sub_arg),
             segment_mask=segment_mask, call_pre_segment=True, call_post_segment=True,
-            row_wise=True, flexible=True, template_mapping=dict(np=np)
+            row_wise=True, flexible=True, template_context=dict(np=np)
         )
         assert call_i[0] == 48
         assert list(pre_sim_lst) == [1]
@@ -5844,7 +5844,7 @@ class TestFromOrderFunc:
             post_segment_func_nb=post_segment_func_nb, post_segment_args=(post_segment_lst, sub_arg),
             post_order_func_nb=post_order_func_nb, post_order_args=(post_order_lst, sub_arg),
             segment_mask=segment_mask, call_pre_segment=False, call_post_segment=False,
-            row_wise=True, flexible=True, template_mapping=dict(np=np)
+            row_wise=True, flexible=True, template_context=dict(np=np)
         )
         assert call_i[0] == 36
         assert list(pre_sim_lst) == [1]
@@ -6048,7 +6048,7 @@ class TestFromOrderFunc:
             post_sim_func_nb=post_sim_func_nb,
             broadcast_named_args=dict(size=[0, 1, np.inf]),
             in_outputs=in_outputs,
-            template_mapping=dict(custom_dtype=custom_dtype),
+            template_context=dict(custom_dtype=custom_dtype),
             group_by=group_by,
             cash_sharing=False,
             row_wise=test_row_wise,

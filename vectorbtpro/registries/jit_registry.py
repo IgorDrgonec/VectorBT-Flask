@@ -521,15 +521,15 @@ class JITRegistry:
         return jitted_func
 
     def match_jitable_setups(self, expression: tp.Optional[str] = None,
-                             mapping: tp.KwargsLike = None) -> tp.Set[JitableSetup]:
-        """Match jitable setups against an expression with each setup being a mapping."""
+                             context: tp.KwargsLike = None) -> tp.Set[JitableSetup]:
+        """Match jitable setups against an expression with each setup being a context."""
         matched_setups = set()
         for setups_by_jitter_id in self.jitable_setups.values():
             for setup in setups_by_jitter_id.values():
                 if expression is None:
                     result = True
                 else:
-                    result = RepEval(expression).substitute(mapping=merge_dicts(attr.asdict(setup), mapping))
+                    result = RepEval(expression).substitute(context=merge_dicts(attr.asdict(setup), context))
                     checks.assert_instance_of(result, bool)
 
                 if result:
@@ -537,14 +537,14 @@ class JITRegistry:
         return matched_setups
 
     def match_jitted_setups(self, jitable_setup: JitableSetup, expression: tp.Optional[str] = None,
-                            mapping: tp.KwargsLike = None) -> tp.Set[JittedSetup]:
-        """Match jitted setups of a jitable setup against an expression with each setup a mapping."""
+                            context: tp.KwargsLike = None) -> tp.Set[JittedSetup]:
+        """Match jitted setups of a jitable setup against an expression with each setup a context."""
         matched_setups = set()
         for setup in self.jitted_setups[hash(jitable_setup)].values():
             if expression is None:
                 result = True
             else:
-                result = RepEval(expression).substitute(mapping=merge_dicts(attr.asdict(setup), mapping))
+                result = RepEval(expression).substitute(context=merge_dicts(attr.asdict(setup), context))
                 checks.assert_instance_of(result, bool)
 
             if result:
@@ -559,7 +559,7 @@ class JITRegistry:
                 allow_new: tp.Optional[bool] = None,
                 register_new: tp.Optional[bool] = None,
                 return_missing_task: bool = False,
-                template_mapping: tp.Optional[tp.Mapping] = None,
+                template_context: tp.Optional[tp.Mapping] = None,
                 tags: tp.Optional[set] = None,
                 **jitter_kwargs) -> tp.Union[tp.Hashable, tp.Callable]:
         """Resolve jitted function for the given task id.
@@ -621,16 +621,16 @@ class JITRegistry:
                 raise KeyError(f"Task id '{task_id}' not registered")
         task_setups = self.jitable_setups.get(task_id, dict())
 
-        template_mapping = merge_dicts(
-            jitting_cfg['template_mapping'],
-            template_mapping,
+        template_context = merge_dicts(
+            jitting_cfg['template_context'],
+            template_context,
             dict(
                 task_id=task_id,
                 py_func=py_func,
                 task_setups=atomic_dict(task_setups)
             )
         )
-        jitter = deep_substitute(jitter, template_mapping, sub_id='jitter')
+        jitter = deep_substitute(jitter, template_context, sub_id='jitter')
 
         if jitter is None and py_func is not None:
             jitter = get_func_suffix(py_func)
@@ -660,15 +660,15 @@ class JITRegistry:
             raise ValueError(f"Unable to find Python function for task id '{task_id}' "
                              f"and jitter id '{jitter_id}'")
 
-        template_mapping = merge_dicts(
-            template_mapping,
+        template_context = merge_dicts(
+            template_context,
             dict(
                 jitter_id=jitter_id,
                 jitter=jitter,
                 jitable_setup=jitable_setup
             )
         )
-        disable = deep_substitute(disable, template_mapping, sub_id='disable')
+        disable = deep_substitute(disable, template_context, sub_id='disable')
         if disable is None:
             disable = jitting_cfg['disable']
         if disable:
@@ -686,7 +686,7 @@ class JITRegistry:
                 setup_cfg.get('resolve_kwargs', None),
                 jitter_kwargs
             )
-            jitter_kwargs = deep_substitute(jitter_kwargs, template_mapping, sub_id='jitter_kwargs')
+            jitter_kwargs = deep_substitute(jitter_kwargs, template_context, sub_id='jitter_kwargs')
             jitter = resolve_jitter(jitter=jitter, **jitter_kwargs)
 
         if jitable_setup is not None:

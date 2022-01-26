@@ -57,9 +57,9 @@ def cs_rank(x: tp.Array2d) -> tp.Array2d:
     return rank_nb(x.T, pct=True).T
 
 
-def cs_demean(x: tp.Array2d, g: tp.GroupByLike, mapping: tp.KwargsLike = None) -> tp.Array2d:
+def cs_demean(x: tp.Array2d, g: tp.GroupByLike, context: tp.KwargsLike = None) -> tp.Array2d:
     """Demean `x` against groups `g` cross-sectionally."""
-    group_map = Grouper(mapping['wrapper'].columns, g).get_group_map()
+    group_map = Grouper(context['wrapper'].columns, g).get_group_map()
     return demean_nb(x, group_map)
 
 
@@ -126,27 +126,27 @@ def ts_cov(x: tp.Array2d, y: tp.Array2d, d: float) -> tp.Array2d:
     return rolling_cov_nb(x, y, math.floor(d))
 
 
-def adv(d: float, mapping: tp.KwargsLike = None) -> tp.Array2d:
+def adv(d: float, context: tp.KwargsLike = None) -> tp.Array2d:
     """Average daily dollar volume for the past `d` days."""
-    return ts_mean(mapping['volume'], math.floor(d))
+    return ts_mean(context['volume'], math.floor(d))
 
 
 # ############# Substitutions ############# #
 
 
-def returns(mapping: tp.KwargsLike = None) -> tp.Array2d:
+def returns(context: tp.KwargsLike = None) -> tp.Array2d:
     """Daily close-to-close returns."""
-    return returns_nb(mapping['close'])
+    return returns_nb(context['close'])
 
 
-def vwap(mapping: tp.KwargsLike = None) -> tp.Array2d:
+def vwap(context: tp.KwargsLike = None) -> tp.Array2d:
     """VWAP."""
-    return vwap_nb(mapping['high'], mapping['low'], mapping['volume'])
+    return vwap_nb(context['high'], context['low'], context['volume'])
 
 
-def cap(mapping: tp.KwargsLike = None) -> tp.Array2d:
+def cap(context: tp.KwargsLike = None) -> tp.Array2d:
     """Market capitalization."""
-    return mapping['close'] * mapping['volume']
+    return context['close'] * context['volume']
 
 
 # ############# Configs ############# #
