@@ -2543,6 +2543,8 @@ Other keyword arguments are passed to `{0}.run`.
             subbed_context = {}
 
             for var_name in get_expr_var_names(expr):
+                if var_name in context:
+                    continue
                 if var_name.startswith('__in_'):
                     var = merged_context[var_name[5:]]
                 elif var_name.startswith('__inout_'):

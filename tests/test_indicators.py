@@ -2281,6 +2281,15 @@ class TestFactory:
         assert I.input_names == ('ts',)
         assert I.param_names == ()
         pd.testing.assert_frame_equal(I.run(ts).out, ts)
+        np.random.seed(42)
+        I = vbt.IndicatorFactory.from_expr(
+            "ts * rand, ts * rand",
+            magnet_input_names=['ts'],
+            res_func_mapping=dict(rand=dict(func=lambda: np.random.uniform())))
+        assert I.input_names == ('ts',)
+        assert I.param_names == ()
+        ind = I.run(ts)
+        pd.testing.assert_frame_equal(ind.out1, ind.out2)
         I = vbt.IndicatorFactory.from_expr("rolling_mean_nb(@in_ts, @p_window)", window=2)
         assert I.input_names == ('ts',)
         assert I.param_names == ('window',)
