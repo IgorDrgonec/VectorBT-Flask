@@ -12,6 +12,7 @@ from vectorbtpro.base.chunking import (
     FlexArraySlicer
 )
 from vectorbtpro.base.grouping import *
+from vectorbtpro.base.indexes import stack_indexes, combine_indexes
 from vectorbtpro.base.indexing import PandasIndexer
 from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, BCO, Default, Ref, broadcast, broadcast_to
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping

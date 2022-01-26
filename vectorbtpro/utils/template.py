@@ -15,6 +15,7 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import set_dict_item, merge_dicts
 from vectorbtpro.utils.hashing import Hashable
 from vectorbtpro.utils.parsing import get_func_arg_names
+from vectorbtpro.utils.eval_ import multiline_eval
 
 
 @attr.s(frozen=True)
@@ -136,7 +137,8 @@ class Rep(CustomTemplate):
 
 
 class RepEval(CustomTemplate):
-    """Template expression to be evaluated with `mapping` used as locals."""
+    """Template expression to be evaluated using `vectorbtpro.utils.eval_.multiline_eval`
+    with `mapping` used as locals."""
 
     def substitute(self,
                    mapping: tp.Optional[tp.Mapping] = None,
@@ -149,7 +151,7 @@ class RepEval(CustomTemplate):
         strict = self.resolve_strict(strict=strict)
 
         try:
-            return eval(self.template, {}, mapping)
+            return multiline_eval(self.template, mapping)
         except NameError as e:
             if strict:
                 raise e

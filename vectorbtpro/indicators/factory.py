@@ -36,6 +36,7 @@ from vectorbtpro.utils.params import to_typed_list, broadcast_params, create_par
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.template import has_templates, deep_substitute
 from vectorbtpro.utils.parsing import get_expr_var_names, get_func_arg_names
+from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.indicators.expr import expr_func_config, expr_res_func_config, wqa101_expr_config
 
 try:
@@ -2306,7 +2307,9 @@ Other keyword arguments are passed to `{0}.run`.
                 Defaults to `open`, `high`, `low`, `close`, and `volume`.
             func_mapping (mapping): Mapping merged over `vectorbtpro.indicators.expr.expr_func_config`.
             res_func_mapping (mapping): Mapping merged over `vectorbtpro.indicators.expr.expr_res_func_config`.
-            use_pd_eval (bool): Whether to use `pd.eval` instead of the Python's `eval` function.
+            use_pd_eval (bool): Whether to use `pd.eval`.
+
+                Otherwise, uses `vectorbtpro.utils.eval_.multiline_eval`.
 
                 !!! hint
                     By default, operates on NumPy objects using NumExpr.
@@ -2558,7 +2561,7 @@ Other keyword arguments are passed to `{0}.run`.
                     try:
                         var = importlib.import_module(var_name)
                     except ModuleNotFoundError:
-                        raise NameError(f"name '{var_name}' is not defined")
+                        continue
                 try:
                     if callable(var) and 'mapping' in get_func_arg_names(var):
                         var = functools.partial(var, mapping=merged_mapping)
@@ -2570,7 +2573,7 @@ Other keyword arguments are passed to `{0}.run`.
 
             if use_pd_eval:
                 return pd.eval(expr, local_dict=mapping, **resolve_dict(pd_eval_kwargs))
-            return eval(expr, {}, mapping)
+            return multiline_eval(expr, context=mapping)
 
         return factory.from_apply_func(
             apply_func,
