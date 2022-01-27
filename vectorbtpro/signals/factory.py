@@ -207,7 +207,7 @@ class SignalFactory(IndicatorFactory):
                 Parameter selector will be automatically compiled using Numba.
 
                 Set to True when iterating large number of times over small input.
-            **kwargs: Keyword arguments passed to `IndicatorFactory.from_custom_func`.
+            **kwargs: Keyword arguments passed to `IndicatorFactory.with_custom_func`.
 
         !!! note
             Choice functions must be Numba-compiled.
@@ -894,7 +894,7 @@ class SignalFactory(IndicatorFactory):
                     execute_kwargs=execute_kwargs
                 )
 
-        return self.from_custom_func(
+        return self.with_custom_func(
             custom_func,
             pass_packed=True,
             require_input_shape=require_input_shape,

@@ -18,7 +18,7 @@ FMEAN = IndicatorFactory(
     input_names=['close'],
     param_names=['window', 'ewm'],
     output_names=['fmean']
-).from_apply_func(
+).with_apply_func(
     nb.future_mean_nb,
     kwargs_to_args=['wait', 'adjust'],
     ewm=False,
@@ -34,7 +34,7 @@ FSTD = IndicatorFactory(
     input_names=['close'],
     param_names=['window', 'ewm'],
     output_names=['fstd']
-).from_apply_func(
+).with_apply_func(
     nb.future_std_nb,
     kwargs_to_args=['wait', 'adjust', 'ddof'],
     ewm=False,
@@ -51,7 +51,7 @@ FMIN = IndicatorFactory(
     input_names=['close'],
     param_names=['window'],
     output_names=['fmin']
-).from_apply_func(
+).with_apply_func(
     nb.future_min_nb,
     kwargs_to_args=['wait'],
     wait=1
@@ -65,7 +65,7 @@ FMAX = IndicatorFactory(
     input_names=['close'],
     param_names=['window'],
     output_names=['fmax']
-).from_apply_func(
+).with_apply_func(
     nb.future_max_nb,
     kwargs_to_args=['wait'],
     wait=1
@@ -92,7 +92,7 @@ FIXLB = IndicatorFactory(
     input_names=['close'],
     param_names=['n'],
     output_names=['labels']
-).from_apply_func(
+).with_apply_func(
     nb.fixed_labels_nb
 )
 
@@ -112,7 +112,7 @@ MEANLB = IndicatorFactory(
     input_names=['close'],
     param_names=['window', 'ewm'],
     output_names=['labels']
-).from_apply_func(
+).with_apply_func(
     nb.mean_labels_nb,
     kwargs_to_args=['wait', 'adjust'],
     ewm=False,
@@ -136,7 +136,7 @@ LEXLB = IndicatorFactory(
     input_names=['close'],
     param_names=['pos_th', 'neg_th'],
     output_names=['labels']
-).from_apply_func(
+).with_apply_func(
     nb.local_extrema_nb,
     param_settings=dict(
         pos_th=flex_elem_param_config,
@@ -161,7 +161,7 @@ TRENDLB = IndicatorFactory(
     input_names=['close'],
     param_names=['pos_th', 'neg_th', 'mode'],
     output_names=['labels']
-).from_apply_func(
+).with_apply_func(
     nb.trend_labels_nb,
     param_settings=dict(
         pos_th=flex_elem_param_config,
@@ -188,7 +188,7 @@ BOLB = IndicatorFactory(
     input_names=['close'],
     param_names=['window', 'pos_th', 'neg_th'],
     output_names=['labels']
-).from_apply_func(
+).with_apply_func(
     nb.breakout_labels_nb,
     param_settings=dict(
         pos_th=flex_elem_param_config,

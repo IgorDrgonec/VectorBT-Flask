@@ -249,7 +249,7 @@ def run_pipeline(
         num_ret_outputs (int): The number of output arrays returned by `custom_func`.
         custom_func (callable): A custom calculation function.
 
-            See `IndicatorFactory.from_custom_func`.
+            See `IndicatorFactory.with_custom_func`.
         *args: Arguments passed to the `custom_func`.
         require_input_shape (bool): Whether to input shape is required.
 
@@ -345,7 +345,7 @@ def run_pipeline(
 
             Some common arguments include `return_cache` to return cache and `use_cache` to use cache.
             Those are only applicable to `custom_func` that supports it (`custom_func` created using
-            `IndicatorFactory.from_apply_func` are supported by default).
+            `IndicatorFactory.with_apply_func` are supported by default).
 
     Returns:
         Array wrapper, list of inputs (`np.ndarray`), input mapper (`np.ndarray`), list of outputs
@@ -1040,7 +1040,7 @@ class IndicatorFactory(Configured):
         """A factory for creating new indicators.
 
         Initialize `IndicatorFactory` to create a skeleton and then use a class method
-        such as `IndicatorFactory.from_custom_func` to bind a calculation function to the skeleton.
+        such as `IndicatorFactory.with_custom_func` to bind a calculation function to the skeleton.
 
         Args:
             class_name (str): Name for the created indicator class.
@@ -1533,7 +1533,7 @@ class IndicatorFactory(Configured):
         """Built indicator class."""
         return self._Indicator
 
-    def from_custom_func(self,
+    def with_custom_func(self,
                          custom_func: tp.Callable,
                          require_input_shape: bool = False,
                          param_settings: tp.KwargsLike = None,
@@ -1545,8 +1545,8 @@ class IndicatorFactory(Configured):
                          **pipeline_kwargs) -> tp.Type[IndicatorBase]:
         """Build indicator class around a custom calculation function.
 
-        In contrast to `IndicatorFactory.from_apply_func`, this method offers full flexbility.
-        It's up to we to handle caching and concatenate columns for each parameter (for example,
+        In contrast to `IndicatorFactory.with_apply_func`, this method offers full flexibility.
+        It's up to the user to handle caching and concatenate columns for each parameter (for example,
         by using `vectorbtpro.base.combining.apply_and_concat`). Also, you must ensure that
         each output array has an appropriate number of columns, which is the number of columns in
         input arrays multiplied by the number of parameter combinations.
@@ -1596,7 +1596,7 @@ class IndicatorFactory(Configured):
             and exceed `output_names`.
 
         Usage:
-            The following example produces the same indicator as the `IndicatorFactory.from_apply_func` example.
+            The following example produces the same indicator as the `IndicatorFactory.with_apply_func` example.
 
             ```pycon
             >>> @njit
@@ -1612,7 +1612,7 @@ class IndicatorFactory(Configured):
             ...     input_names=['ts1', 'ts2'],
             ...     param_names=['p1', 'p2'],
             ...     output_names=['o1', 'o2']
-            ... ).from_custom_func(custom_func, var_args=True, arg2=200)
+            ... ).with_custom_func(custom_func, var_args=True, arg2=200)
 
             >>> myInd = MyInd.run(price, price * 2, [1, 2], [3, 4], 100)
             >>> myInd.o1
@@ -1635,7 +1635,7 @@ class IndicatorFactory(Configured):
             2020-01-05  230.0  206.0  240.0  208.0
             ```
 
-            The difference between `apply_func_nb` here and in `IndicatorFactory.from_apply_func` is that
+            The difference between `apply_func_nb` here and in `IndicatorFactory.with_apply_func` is that
             here it takes the index of the current parameter combination that can be used for parameter selection.
             You can also remove the entire `apply_func_nb` and define your logic in `custom_func`
             (which shouldn't necessarily be Numba-compiled):
@@ -1991,7 +1991,7 @@ Other keyword arguments are passed to `{0}.run`.
 
         return Indicator
 
-    def from_apply_func(self,
+    def with_apply_func(self,
                         apply_func: tp.Callable,
                         cache_func: tp.Optional[tp.Callable] = None,
                         pass_packed: bool = False,
@@ -2001,10 +2001,10 @@ Other keyword arguments are passed to `{0}.run`.
                         **kwargs) -> tp.Type[IndicatorBase]:
         """Build indicator class around a custom apply function.
 
-        In contrast to `IndicatorFactory.from_custom_func`, this method handles a lot of things for you,
+        In contrast to `IndicatorFactory.with_custom_func`, this method handles a lot of things for you,
         such as caching, parameter selection, and concatenation. Your part is writing a function `apply_func`
         that accepts a selection of parameters (single values as opposed to multiple values in
-        `IndicatorFactory.from_custom_func`) and does the calculation. It then automatically concatenates
+        `IndicatorFactory.with_custom_func`) and does the calculation. It then automatically concatenates
         the resulting arrays into a single array per output.
 
         While this approach is simpler, it's also less flexible, since we can only work with
@@ -2063,14 +2063,14 @@ Other keyword arguments are passed to `{0}.run`.
             remove_kwargs (bool): Whether to remove keyword arguments when selecting parameters.
 
                 If None, gets set to True if `jitted_loop` is True.
-            **kwargs: Keyword arguments passed to `IndicatorFactory.from_custom_func`, all the way down
+            **kwargs: Keyword arguments passed to `IndicatorFactory.with_custom_func`, all the way down
                 to `vectorbtpro.base.combining.apply_and_concat`.
 
         Returns:
             Indicator
 
         Usage:
-            The following example produces the same indicator as the `IndicatorFactory.from_custom_func` example.
+            The following example produces the same indicator as the `IndicatorFactory.with_custom_func` example.
 
             ```pycon
             >>> @njit
@@ -2081,7 +2081,7 @@ Other keyword arguments are passed to `{0}.run`.
             ...     input_names=['ts1', 'ts2'],
             ...     param_names=['p1', 'p2'],
             ...     output_names=['out1', 'out2']
-            ... ).from_apply_func(
+            ... ).with_apply_func(
             ...     apply_func_nb, var_args=True,
             ...     kwargs_to_args=['arg2'], arg2=200)
 
@@ -2119,7 +2119,7 @@ Other keyword arguments are passed to `{0}.run`.
             ...     input_names=['ts'],
             ...     param_names=['p'],
             ...     output_names=['out']
-            ... ).from_apply_func(apply_func)
+            ... ).with_apply_func(apply_func)
 
             >>> %timeit MyInd.run(price, [1, 2, 3])
             3.02 s ± 3.47 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
@@ -2277,7 +2277,7 @@ Other keyword arguments are passed to `{0}.run`.
                 jitted_loop=jitted_loop
             )
 
-        return self.from_custom_func(custom_func, pass_packed=True, **kwargs)
+        return self.with_custom_func(custom_func, pass_packed=True, **kwargs)
 
     # ############# Expressions ############# #
 
@@ -2321,7 +2321,7 @@ Other keyword arguments are passed to `{0}.run`.
                     By default, operates on NumPy objects using NumExpr.
                     If you want to operate on Pandas objects, set `keep_pd` to True.
             pd_eval_kwargs (dict): Keyword arguments passed to `pd.eval`.
-            **kwargs: Keyword arguments passed to `IndicatorFactory.from_apply_func`.
+            **kwargs: Keyword arguments passed to `IndicatorFactory.with_apply_func`.
 
         Returns:
             Indicator
@@ -2583,7 +2583,7 @@ Other keyword arguments are passed to `{0}.run`.
                 return pd.eval(expr, local_dict=context, **resolve_dict(pd_eval_kwargs))
             return multiline_eval(expr, context=context)
 
-        return factory.from_apply_func(
+        return factory.with_apply_func(
             apply_func,
             pass_packed=True,
             pass_wrapper=True,
@@ -2673,7 +2673,7 @@ Other keyword arguments are passed to `{0}.run`.
         Args:
             func_name (str): Function name.
             factory_kwargs (dict): Keyword arguments passed to `IndicatorFactory`.
-            **kwargs: Keyword arguments passed to `IndicatorFactory.from_custom_func`.
+            **kwargs: Keyword arguments passed to `IndicatorFactory.with_custom_func`.
 
         Returns:
             Indicator
@@ -2764,7 +2764,7 @@ Other keyword arguments are passed to `{0}.run`.
                 ),
                 factory_kwargs
             )
-        ).from_apply_func(
+        ).with_apply_func(
             apply_func,
             pass_packed=True,
             **info['parameters'],
@@ -2894,7 +2894,7 @@ Other keyword arguments are passed to `{0}.run`.
             func_name (str): Function name.
             parse_kwargs (dict): Keyword arguments passed to `IndicatorFactory.parse_pandas_ta_config`.
             factory_kwargs (dict): Keyword arguments passed to `IndicatorFactory`.
-            **kwargs: Keyword arguments passed to `IndicatorFactory.from_custom_func`.
+            **kwargs: Keyword arguments passed to `IndicatorFactory.with_custom_func`.
 
         Returns:
             Indicator
@@ -3021,7 +3021,7 @@ Other keyword arguments are passed to `{0}.run`.
                 config,
                 factory_kwargs
             )
-        ).from_apply_func(
+        ).with_apply_func(
             apply_func,
             pass_packed=True,
             keep_pd=True,
@@ -3111,7 +3111,7 @@ Other keyword arguments are passed to `{0}.run`.
         Args:
             cls_name (str): Class name.
             factory_kwargs (dict): Keyword arguments passed to `IndicatorFactory`.
-            **kwargs: Keyword arguments passed to `IndicatorFactory.from_custom_func`.
+            **kwargs: Keyword arguments passed to `IndicatorFactory.with_custom_func`.
 
         Returns:
             Indicator
@@ -3207,7 +3207,7 @@ Other keyword arguments are passed to `{0}.run`.
                 config,
                 factory_kwargs
             )
-        ).from_apply_func(
+        ).with_apply_func(
             apply_func,
             pass_packed=True,
             keep_pd=True,

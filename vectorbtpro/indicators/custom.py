@@ -82,7 +82,7 @@ MA = IndicatorFactory(
     input_names=['close'],
     param_names=['window', 'ewm'],
     output_names=['ma']
-).from_apply_func(
+).with_apply_func(
     nb.ma_apply_nb,
     cache_func=nb.ma_cache_nb,
     kwargs_to_args=['adjust'],
@@ -173,7 +173,7 @@ MSTD = IndicatorFactory(
     input_names=['close'],
     param_names=['window', 'ewm'],
     output_names=['mstd']
-).from_apply_func(
+).with_apply_func(
     nb.mstd_apply_nb,
     cache_func=nb.mstd_cache_nb,
     kwargs_to_args=['adjust', 'ddof'],
@@ -250,7 +250,7 @@ BBANDS = IndicatorFactory(
         bandwidth=lambda self: self.wrapper.wrap(
             (self.upper.values - self.lower.values) / self.middle.values)
     )
-).from_apply_func(
+).with_apply_func(
     nb.bb_apply_nb,
     cache_func=nb.bb_cache_nb,
     kwargs_to_args=['adjust', 'ddof'],
@@ -372,7 +372,7 @@ RSI = IndicatorFactory(
     input_names=['close'],
     param_names=['window', 'ewm'],
     output_names=['rsi']
-).from_apply_func(
+).with_apply_func(
     nb.rsi_apply_nb,
     cache_func=nb.rsi_cache_nb,
     kwargs_to_args=['adjust'],
@@ -471,7 +471,7 @@ STOCH = IndicatorFactory(
     input_names=['high', 'low', 'close'],
     param_names=['k_window', 'd_window', 'd_ewm'],
     output_names=['percent_k', 'percent_d']
-).from_apply_func(
+).with_apply_func(
     nb.stoch_apply_nb,
     cache_func=nb.stoch_cache_nb,
     kwargs_to_args=['adjust'],
@@ -589,7 +589,7 @@ MACD = IndicatorFactory(
     custom_output_props=dict(
         hist=lambda self: self.wrapper.wrap(self.macd.values - self.signal.values),
     )
-).from_apply_func(
+).with_apply_func(
     nb.macd_apply_nb,
     cache_func=nb.macd_cache_nb,
     kwargs_to_args=['adjust'],
@@ -704,7 +704,7 @@ ATR = IndicatorFactory(
     input_names=['high', 'low', 'close'],
     param_names=['window', 'ewm'],
     output_names=['tr', 'atr']
-).from_apply_func(
+).with_apply_func(
     nb.atr_apply_nb,
     cache_func=nb.atr_cache_nb,
     kwargs_to_args=['adjust'],
@@ -792,7 +792,7 @@ OBV = IndicatorFactory(
     input_names=['close', 'volume'],
     param_names=[],
     output_names=['obv'],
-).from_custom_func(nb.obv_custom_nb)
+).with_custom_func(nb.obv_custom_nb)
 
 
 class _OBV(OBV):

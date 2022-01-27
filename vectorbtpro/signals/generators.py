@@ -141,7 +141,7 @@ RANDNX = SignalFactory(
     short_name='randnx',
     mode='both',
     param_names=['n']
-).from_apply_func(  # apply_func since function is (almost) vectorized
+).with_apply_func(  # apply_func since function is (almost) vectorized
     rand_enex_apply_nb,
     require_input_shape=True,
     param_settings=dict(
