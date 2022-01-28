@@ -1522,6 +1522,108 @@ class TestFactory:
             target
         )
 
+        def apply_func(input_tuple, in_output_tuple, param_tuple):
+            return input_tuple[0] * param_tuple[0]
+
+        @njit
+        def apply_func_nb(input_tuple, in_output_tuple, param_tuple):
+            return input_tuple[0] * param_tuple[0]
+
+        target = pd.DataFrame(
+            ts.values * 2,
+            index=ts.index,
+            columns=pd.MultiIndex.from_tuples([
+                (2, 'a'),
+                (2, 'b'),
+                (2, 'c')
+            ], names=['custom_p', None])
+        )
+        pd.testing.assert_frame_equal(
+            F.with_apply_func(apply_func, pass_packed=True).run(ts, 2).out,
+            target
+        )
+        pd.testing.assert_frame_equal(
+            F.with_apply_func(apply_func_nb, pass_packed=True).run(ts, 2).out,
+            target
+        )
+        pd.testing.assert_frame_equal(
+            F.with_apply_func(apply_func, pass_packed=True).run(ts, 2, per_column=True).out,
+            target
+        )
+        pd.testing.assert_frame_equal(
+            F.with_apply_func(apply_func_nb, pass_packed=True).run(ts, 2, per_column=True).out,
+            target
+        )
+
+    def test_select_params(self):
+        F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p'], output_names=['out'])
+
+        def apply_func(i, ts, p):
+            return ts * p[i]
+
+        @njit
+        def apply_func_nb(i, ts, p):
+            return ts * p[i]
+
+        target = pd.DataFrame(
+            ts.values * 2,
+            index=ts.index,
+            columns=pd.MultiIndex.from_tuples([
+                (2, 'a'),
+                (2, 'b'),
+                (2, 'c')
+            ], names=['custom_p', None])
+        )
+        pd.testing.assert_frame_equal(
+            F.with_apply_func(apply_func, pass_packed=False, select_params=False).run(ts, 2).out,
+            target
+        )
+        pd.testing.assert_frame_equal(
+            F.with_apply_func(apply_func_nb, pass_packed=False, select_params=False).run(ts, 2).out,
+            target
+        )
+        pd.testing.assert_frame_equal(
+            F.with_apply_func(apply_func, pass_packed=False, select_params=False).run(ts, 2, per_column=True).out,
+            target
+        )
+        pd.testing.assert_frame_equal(
+            F.with_apply_func(apply_func_nb, pass_packed=False, select_params=False).run(ts, 2, per_column=True).out,
+            target
+        )
+
+        def apply_func(i, input_tuple, in_output_tuple, param_tuple):
+            return input_tuple[0] * param_tuple[0][i]
+
+        @njit
+        def apply_func_nb(i, input_tuple, in_output_tuple, param_tuple):
+            return input_tuple[0] * param_tuple[0][i]
+
+        target = pd.DataFrame(
+            ts.values * 2,
+            index=ts.index,
+            columns=pd.MultiIndex.from_tuples([
+                (2, 'a'),
+                (2, 'b'),
+                (2, 'c')
+            ], names=['custom_p', None])
+        )
+        pd.testing.assert_frame_equal(
+            F.with_apply_func(apply_func, pass_packed=True, select_params=False).run(ts, 2).out,
+            target
+        )
+        pd.testing.assert_frame_equal(
+            F.with_apply_func(apply_func_nb, pass_packed=True, select_params=False).run(ts, 2).out,
+            target
+        )
+        pd.testing.assert_frame_equal(
+            F.with_apply_func(apply_func, pass_packed=True, select_params=False).run(ts, 2, per_column=True).out,
+            target
+        )
+        pd.testing.assert_frame_equal(
+            F.with_apply_func(apply_func_nb, pass_packed=True, select_params=False).run(ts, 2, per_column=True).out,
+            target
+        )
+
     def test_other(self):
         F = vbt.IndicatorFactory(input_names=['ts'], output_names=['o1', 'o2'])
 

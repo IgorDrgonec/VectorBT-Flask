@@ -1994,11 +1994,12 @@ Other keyword arguments are passed to `{0}.run`.
     def with_apply_func(self,
                         apply_func: tp.Callable,
                         cache_func: tp.Optional[tp.Callable] = None,
+                        select_params: bool = True,
                         pass_packed: bool = False,
                         kwargs_to_args: tp.Optional[tp.Sequence[str]] = None,
                         jitted_loop: bool = False,
                         remove_kwargs: tp.Optional[bool] = None,
-                        **kwargs) -> tp.Type[IndicatorBase]:
+                        **kwargs) -> tp.Union[str, tp.Type[IndicatorBase]]:
         """Build indicator class around a custom apply function.
 
         In contrast to `IndicatorFactory.with_custom_func`, this method handles a lot of things for you,
@@ -2046,6 +2047,9 @@ Other keyword arguments are passed to `{0}.run`.
                 All returned objects will be passed unpacked as last arguments to `apply_func`.
 
                 Can be Numba-compiled.
+            select_params (bool): Whether to automatically select in-outputs and parameters.
+
+                If False, prepends the current iteration index to the arguments.
             pass_packed (bool): Whether to pass packed tuples for inputs, in-place outputs, and parameters.
             kwargs_to_args (list of str): Keyword arguments from `kwargs` dict to pass as
                 positional arguments to the apply function.
@@ -2158,27 +2162,30 @@ Other keyword arguments are passed to `{0}.run`.
         _0 += ", *args"
         if not remove_kwargs:
             _0 += ", **kwargs"
-        _1 = "*args_before"
+        if select_params:
+            _1 = "*args_before"
+        else:
+            _1 = "i, *args_before"
         if pass_packed:
             if len(input_names) > 0:
                 _1 += ', (' + ', '.join(input_names) + ',)'
             else:
                 _1 += ', ()'
             if len(in_output_names) > 0:
-                _1 += ', (' + ', '.join(map(lambda x: x + '[i]', in_output_names)) + ',)'
+                _1 += ', (' + ', '.join(map(lambda x: x + ('[i]' if select_params else ''), in_output_names)) + ',)'
             else:
                 _1 += ', ()'
             if len(param_names) > 0:
-                _1 += ', (' + ', '.join(map(lambda x: x + '[i]', param_names)) + ',)'
+                _1 += ', (' + ', '.join(map(lambda x: x + ('[i]' if select_params else ''), param_names)) + ',)'
             else:
                 _1 += ', ()'
         else:
             if len(input_names) > 0:
                 _1 += ', ' + ', '.join(input_names)
             if len(in_output_names) > 0:
-                _1 += ', ' + ', '.join(map(lambda x: x + '[i]', in_output_names))
+                _1 += ', ' + ', '.join(map(lambda x: x + ('[i]' if select_params else ''), in_output_names))
             if len(param_names) > 0:
-                _1 += ', ' + ', '.join(map(lambda x: x + '[i]', param_names))
+                _1 += ', ' + ', '.join(map(lambda x: x + ('[i]' if select_params else ''), param_names))
         _1 += ", *args"
         if not remove_kwargs:
             _1 += ", **kwargs"
