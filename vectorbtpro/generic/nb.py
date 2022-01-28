@@ -1684,7 +1684,8 @@ def rolling_cov_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d,
     merge_func=base_ch.column_stack
 )
 @register_jitted(cache=True, tags={'can_parallel'})
-def rolling_cov_nb(arr1: tp.Array2d, arr2: tp.Array2d, window: int, minp: int = 0, ddof: int = 0) -> tp.Array2d:
+def rolling_cov_nb(arr1: tp.Array2d, arr2: tp.Array2d, window: int,
+                   minp: tp.Optional[int] = None, ddof: int = 0) -> tp.Array2d:
     """2-dim version of `rolling_cov_1d_nb`."""
     out = np.empty_like(arr1, dtype=np.float_)
     for col in prange(arr1.shape[1]):
@@ -1755,7 +1756,8 @@ def rolling_corr_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d,
     merge_func=base_ch.column_stack
 )
 @register_jitted(cache=True, tags={'can_parallel'})
-def rolling_corr_nb(arr1: tp.Array2d, arr2: tp.Array2d, window: int, minp: int = 0) -> tp.Array2d:
+def rolling_corr_nb(arr1: tp.Array2d, arr2: tp.Array2d, window: int,
+                    minp: tp.Optional[int] = None) -> tp.Array2d:
     """2-dim version of `rolling_corr_1d_nb`."""
     out = np.empty_like(arr1, dtype=np.float_)
     for col in prange(arr1.shape[1]):
