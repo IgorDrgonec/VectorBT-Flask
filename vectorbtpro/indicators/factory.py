@@ -423,7 +423,7 @@ def run_pipeline(
             index_from=input_index,
             columns_from=input_columns,
             require_kwargs=dict(requirements='W'),
-            post_func=np.asarray,
+            post_func=None if keep_pd else np.asarray,
             to_pd=True
         ), broadcast_kwargs)
         broadcast_args, wrapper = reshaping.broadcast(
@@ -515,14 +515,19 @@ def run_pipeline(
         for input in input_list:
             input_2d = reshaping.to_2d(input)
             col_inputs = []
-            for i in range(input_2d.shape[1]):
-                if to_2d:
-                    col_input = input_2d[:, [i]]
+            for col in range(input_2d.shape[1]):
+                if isinstance(input_2d, pd.DataFrame):
+                    col_input = input_2d.iloc[:, col]
                 else:
-                    col_input = input_2d[:, i]
-                if keep_pd:
+                    col_input = input_2d[:, col]
+                if to_2d:
+                    if isinstance(col_input, pd.Series):
+                        col_input = col_input.to_frame()
+                    else:
+                        col_input = col_input[:, None]
+                if keep_pd and isinstance(col_input, np.ndarray):
                     # Keep as pandas object
-                    col_input = ArrayWrapper(input_index, input_columns[[i]], col_input.ndim).wrap(col_input)
+                    col_input = ArrayWrapper(input_index, input_columns[[col]], col_input.ndim).wrap(col_input)
                 col_inputs.append(col_input)
             input_list_ready.append(col_inputs)
     else:
@@ -531,7 +536,7 @@ def run_pipeline(
             new_input = input
             if to_2d:
                 new_input = reshaping.to_2d(input)
-            if keep_pd:
+            if keep_pd and isinstance(new_input, np.ndarray):
                 # Keep as pandas object
                 new_input = ArrayWrapper(input_index, input_columns, new_input.ndim).wrap(new_input)
             input_list_ready.append(new_input)
@@ -543,7 +548,8 @@ def run_pipeline(
             raise ValueError("input_shape is required when using in-place outputs")
         if in_output_list[i] is not None:
             # This in-place output has been already broadcast with inputs
-            in_output_wide = np.require(in_output_list[i], requirements='W')
+            if isinstance(in_output_list[i], np.ndarray):
+                in_output_wide = np.require(in_output_list[i], requirements='W')
             if not per_column:
                 # One per parameter combination
                 in_output_wide = reshaping.tile(in_output_wide, n_unique_param_values, axis=1)
@@ -557,10 +563,15 @@ def run_pipeline(
         in_outputs = []
         # Split each in-place output into chunks, each of input shape, and append to a list
         for i in range(n_unique_param_values):
-            in_output = in_output_wide[:, i * input_shape_2d[1]: (i + 1) * input_shape_2d[1]]
-            if len(input_shape_ready) == 1:
-                in_output = in_output[:, 0]
-            if keep_pd:
+            if isinstance(in_output_wide, pd.DataFrame):
+                in_output = in_output_wide.iloc[:, i * input_shape_2d[1]: (i + 1) * input_shape_2d[1]]
+                if len(input_shape_ready) == 1:
+                    in_output = in_output.iloc[:, 0]
+            else:
+                in_output = in_output_wide[:, i * input_shape_2d[1]: (i + 1) * input_shape_2d[1]]
+                if len(input_shape_ready) == 1:
+                    in_output = in_output[:, 0]
+            if keep_pd and isinstance(in_output, np.ndarray):
                 if per_column:
                     in_output = ArrayWrapper(input_index, input_columns[[i]], in_output.ndim).wrap(in_output)
                 else:
