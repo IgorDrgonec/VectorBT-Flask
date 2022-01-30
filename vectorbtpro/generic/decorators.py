@@ -84,7 +84,7 @@ def attach_nb_methods(config: Config) -> tp.ClassWrapper:
                 if not disable_chunked:
                     new_parameters += (chunked_arg,)
                 new_parameters += (wrap_kwargs_arg,)
-                new_method.__signature__ = source_sig
+                new_method.__signature__ = source_sig.replace(parameters=new_parameters)
 
             new_method.__doc__ = f"See `{func.__module__ + '.' + func.__name__}`."
             new_method.__qualname__ = f"{cls.__name__}.{target_name}"

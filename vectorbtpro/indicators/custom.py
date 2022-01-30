@@ -61,6 +61,7 @@ Date
 
 >>> ohlcv.vbt.ohlcv.plot()
 ```
+
 ![](/assets/images/custom_price.svg)"""
 
 import numpy as np

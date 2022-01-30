@@ -1,13 +1,41 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Factory for building indicators."""
+"""Factory for building indicators.
 
-import re
+Run for the examples below:
+
+```pycon
+>>> import vectorbtpro as vbt
+>>> import numpy as np
+>>> import pandas as pd
+>>> from numba import njit
+>>> from datetime import datetime
+
+>>> price = pd.DataFrame({
+...     'a': [1, 2, 3, 4, 5],
+...     'b': [5, 4, 3, 2, 1]
+... }, index=pd.Index([
+...     datetime(2020, 1, 1),
+...     datetime(2020, 1, 2),
+...     datetime(2020, 1, 3),
+...     datetime(2020, 1, 4),
+...     datetime(2020, 1, 5),
+... ])).astype(float)
+>>> price
+            a    b
+2020-01-01  1.0  5.0
+2020-01-02  2.0  4.0
+2020-01-03  3.0  3.0
+2020-01-04  4.0  2.0
+2020-01-05  5.0  1.0
+```"""
+
+import functools
+import importlib
 import inspect
 import itertools
-import functools
+import re
 import warnings
-import importlib
 from collections import Counter, OrderedDict
 from datetime import datetime, timedelta
 from types import ModuleType
@@ -25,20 +53,21 @@ from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.accessors import BaseAccessor
 from vectorbtpro.generic.analyzable import Analyzable
+from vectorbtpro.indicators.expr import expr_func_config, expr_res_func_config, wqa101_expr_config
+from vectorbtpro.registries.ca_registry import is_cacheable
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
+from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config, Configured
 from vectorbtpro.utils.decorators import classproperty, cacheable_property, class_or_instancemethod
 from vectorbtpro.utils.enum_ import map_enum_fields
+from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.formatting import prettify
 from vectorbtpro.utils.mapping import to_mapping, apply_mapping
 from vectorbtpro.utils.params import to_typed_list, broadcast_params, create_param_product, params_to_list
+from vectorbtpro.utils.parsing import get_expr_var_names, get_func_arg_names
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.template import has_templates, deep_substitute
-from vectorbtpro.utils.parsing import get_expr_var_names, get_func_arg_names
-from vectorbtpro.utils.eval_ import multiline_eval
-from vectorbtpro.indicators.expr import expr_func_config, expr_res_func_config, wqa101_expr_config
-from vectorbtpro.registries.ca_registry import is_cacheable
 
 try:
     from ta.utils import IndicatorMixin as IndicatorMixinT
@@ -2738,6 +2767,14 @@ Other keyword arguments are passed to `{0}.run`.
 
                 Other keyword arguments are passed to `vectorbtpro.indicators.factory.run_pipeline`.
             ```
+
+            To plot an indicator:
+
+            ```pycon
+            >>> sma.plot(column=(2, 'a'))
+            ```
+
+            ![](/assets/images/talib_plot.svg)
         """
         from vectorbtpro.utils.opt_packages import assert_can_import
         assert_can_import('talib')
@@ -2746,7 +2783,7 @@ Other keyword arguments are passed to `{0}.run`.
 
         func_name = func_name.upper()
         talib_func = getattr(talib, func_name)
-        info = abstract.Function(func_name)._Function__info
+        info = abstract.Function(func_name).info
         input_names = []
         for in_names in info['input_names'].values():
             if isinstance(in_names, (list, tuple)):
@@ -2768,7 +2805,7 @@ Other keyword arguments are passed to `{0}.run`.
             outputs = []
             for col in range(n_input_cols):
                 output = talib_func(
-                    *map(lambda x: x[:, col], input_tuple),
+                    *map(lambda x: np.require(x[:, col], dtype=np.double), input_tuple),
                     *param_tuple,
                     **_kwargs
                 )
@@ -2797,6 +2834,111 @@ Other keyword arguments are passed to `{0}.run`.
             **info['parameters'],
             **kwargs
         )
+
+        def plot(self,
+                 column: tp.Optional[tp.Label] = None,
+                 add_trace_kwargs: tp.KwargsLike = None,
+                 fig: tp.Optional[tp.BaseFigure] = None,
+                 **kwargs) -> tp.BaseFigure:  # pragma: no cover
+            from vectorbtpro._settings import settings
+            plotting_cfg = settings['plotting']
+
+            self_col = self.select_col(column=column)
+
+            output_trace_kwargs = {}
+            for output_name in output_names:
+                output_trace_kwargs[output_name] = kwargs.pop(output_name + '_trace_kwargs', {})
+            priority_outputs = []
+            other_outputs = []
+            for output_name in output_names:
+                flags = set(output_flags.get(output_name))
+                found_priority = False
+                if talib.abstract.TA_OUTPUT_FLAGS[2048] in flags:
+                    priority_outputs = priority_outputs + [output_name]
+                    found_priority = True
+                if talib.abstract.TA_OUTPUT_FLAGS[4096] in flags:
+                    priority_outputs = [output_name] + priority_outputs
+                    found_priority = True
+                if not found_priority:
+                    other_outputs.append(output_name)
+
+            for output_name in priority_outputs + other_outputs:
+                output = getattr(self_col, output_name).rename(output_name)
+                flags = set(output_flags.get(output_name))
+                trace_kwargs = {}
+                plot_func_name = 'lineplot'
+
+                if talib.abstract.TA_OUTPUT_FLAGS[2] in flags:
+                    # Dotted Line
+                    if 'line' not in trace_kwargs:
+                        trace_kwargs['line'] = dict()
+                    trace_kwargs['line']['dash'] = 'dashdot'
+                if talib.abstract.TA_OUTPUT_FLAGS[4] in flags:
+                    # Dashed Line
+                    if 'line' not in trace_kwargs:
+                        trace_kwargs['line'] = dict()
+                    trace_kwargs['line']['dash'] = 'dash'
+                if talib.abstract.TA_OUTPUT_FLAGS[8] in flags:
+                    # Dot
+                    if 'line' not in trace_kwargs:
+                        trace_kwargs['line'] = dict()
+                    trace_kwargs['line']['dash'] = 'dot'
+                if talib.abstract.TA_OUTPUT_FLAGS[16] in flags:
+                    # Histogram
+                    hist = np.asarray(output)
+                    hist_diff = generic_nb.diff_1d_nb(hist)
+                    marker_colors = np.full(hist.shape, adjust_opacity('silver', 0.75), dtype=object)
+                    marker_colors[(hist > 0) & (hist_diff > 0)] = adjust_opacity('green', 0.75)
+                    marker_colors[(hist > 0) & (hist_diff <= 0)] = adjust_opacity('lightgreen', 0.75)
+                    marker_colors[(hist < 0) & (hist_diff < 0)] = adjust_opacity('red', 0.75)
+                    marker_colors[(hist < 0) & (hist_diff >= 0)] = adjust_opacity('lightcoral', 0.75)
+                    if 'marker' not in trace_kwargs:
+                        trace_kwargs['marker'] = {}
+                    trace_kwargs['marker']['color'] = marker_colors
+                    if 'line' not in trace_kwargs['marker']:
+                        trace_kwargs['marker']['line'] = {}
+                    trace_kwargs['marker']['line']['width'] = 0
+                    kwargs['bargap'] = 0
+                    plot_func_name = 'barplot'
+                if talib.abstract.TA_OUTPUT_FLAGS[2048] in flags:
+                    # Values represent an upper limit
+                    if 'line' not in trace_kwargs:
+                        trace_kwargs['line'] = {}
+                    trace_kwargs['line']['color'] = adjust_opacity(plotting_cfg['color_schema']['gray'], 0.75)
+                    trace_kwargs['fill'] = 'tonexty'
+                    trace_kwargs['fillcolor'] = 'rgba(128, 128, 128, 0.2)'
+                if talib.abstract.TA_OUTPUT_FLAGS[4096] in flags:
+                    # Values represent a lower limit
+                    if 'line' not in trace_kwargs:
+                        trace_kwargs['line'] = {}
+                    trace_kwargs['line']['color'] = adjust_opacity(plotting_cfg['color_schema']['gray'], 0.75)
+
+                trace_kwargs = merge_dicts(
+                    trace_kwargs,
+                    output_trace_kwargs[output_name]
+                )
+                plot_func = getattr(output.vbt, plot_func_name)
+                fig = plot_func(fig=fig, trace_kwargs=trace_kwargs, **kwargs)
+
+            return fig
+
+        signature = inspect.signature(plot)
+        new_parameters = list(signature.parameters.values())[:-1]
+        for output_name in output_names:
+            new_parameters.append(inspect.Parameter(
+                output_name + '_trace_kwargs',
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                default=None,
+                annotation=tp.KwargsLike
+            ))
+        new_parameters.append(inspect.Parameter(
+            'layout_kwargs',
+            inspect.Parameter.VAR_KEYWORD
+        ))
+        plot.__signature__ = signature.replace(parameters=new_parameters)
+        plot.__doc__ = "Plot the outputs of the indicator based on their flags."
+        setattr(TALibIndicator, 'plot', plot)
+
         return TALibIndicator
 
     @classmethod
