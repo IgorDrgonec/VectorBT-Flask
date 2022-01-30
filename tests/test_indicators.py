@@ -1960,7 +1960,7 @@ class TestFactory:
             param_names=['p1', 'p2'],
             output_names=['o1', 'o2'],
             in_output_names=['in_o1', 'in_o2'],
-            custom_output_props={
+            lazy_outputs={
                 'co1': lambda self: self.ts1 + self.ts2,
                 'co2': lambda self: self.o1 + self.o2
             }

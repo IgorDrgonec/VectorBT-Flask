@@ -38,6 +38,7 @@ from vectorbtpro.utils.template import has_templates, deep_substitute
 from vectorbtpro.utils.parsing import get_expr_var_names, get_func_arg_names
 from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.indicators.expr import expr_func_config, expr_res_func_config, wqa101_expr_config
+from vectorbtpro.registries.ca_registry import is_cacheable
 
 try:
     from ta.utils import IndicatorMixin as IndicatorMixinT
@@ -439,6 +440,8 @@ def run_pipeline(
         input_list = [broadcast_args[input_name] for input_name in input_names]
         in_output_list = [broadcast_args[in_output_name] for in_output_name in in_output_names]
         broadcast_named_args = {arg_name: broadcast_args[arg_name] for arg_name in broadcast_named_args}
+    else:
+        wrapper = None
 
     # Reshape input shape
     # Keep original input_shape for per_column=True
@@ -607,7 +610,10 @@ def run_pipeline(
                 raise ValueError("Cannot determine flex_2d without inputs")
             func_kwargs['flex_2d'] = len(input_shape) == 2
         if pass_wrapper:
-            func_kwargs['wrapper'] = ArrayWrapper(input_index, input_columns, len(orig_input_shape))
+            if wrapper is not None:
+                func_kwargs['wrapper'] = wrapper
+            else:
+                func_kwargs['wrapper'] = ArrayWrapper(input_index, input_columns, len(orig_input_shape))
         func_kwargs = merge_dicts(func_kwargs, kwargs)
 
         # Set seed
@@ -1042,7 +1048,7 @@ class IndicatorFactory(Configured):
                  in_output_names: tp.Optional[tp.Sequence[str]] = None,
                  output_names: tp.Optional[tp.Sequence[str]] = None,
                  output_flags: tp.KwargsLike = None,
-                 custom_output_props: tp.KwargsLike = None,
+                 lazy_outputs: tp.KwargsLike = None,
                  attr_settings: tp.KwargsLike = None,
                  metrics: tp.Optional[tp.Kwargs] = None,
                  stats_defaults: tp.Union[None, tp.Callable, tp.Kwargs] = None,
@@ -1074,11 +1080,12 @@ class IndicatorFactory(Configured):
                 4) if data or default value are not provided, they are created empty to not occupy memory.
             output_names (list of str): List with output names.
             output_flags (dict): Dictionary of in-place and regular output flags.
-            custom_output_props (dict): Dictionary with user-defined functions that will be
-                bound to the indicator class and wrapped with `vectorbtpro.utils.decorators.cacheable_property`.
+            lazy_outputs (dict): Dictionary with user-defined functions that will be
+                bound to the indicator class and wrapped with `vectorbtpro.utils.decorators.cacheable_property`
+                if not already wrapped.
             attr_settings (dict): Dictionary with attribute settings.
 
-                Attributes can be `input_names`, `in_output_names`, `output_names` and `custom_output_props`.
+                Attributes can be `input_names`, `in_output_names`, `output_names`, and `lazy_outputs`.
 
                 Following keys are accepted:
 
@@ -1116,7 +1123,7 @@ class IndicatorFactory(Configured):
             in_output_names=in_output_names,
             output_names=output_names,
             output_flags=output_flags,
-            custom_output_props=custom_output_props,
+            lazy_outputs=lazy_outputs,
             attr_settings=attr_settings,
             metrics=metrics,
             stats_defaults=stats_defaults,
@@ -1166,13 +1173,13 @@ class IndicatorFactory(Configured):
         checks.assert_instance_of(output_flags, dict)
         if len(output_flags) > 0:
             checks.assert_dict_valid(output_flags, all_output_names)
-        if custom_output_props is None:
-            custom_output_props = {}
-        checks.assert_instance_of(custom_output_props, dict)
+        if lazy_outputs is None:
+            lazy_outputs = {}
+        checks.assert_instance_of(lazy_outputs, dict)
         if attr_settings is None:
             attr_settings = {}
         checks.assert_instance_of(attr_settings, dict)
-        all_attr_names = input_names + all_output_names + list(custom_output_props.keys())
+        all_attr_names = input_names + all_output_names + list(lazy_outputs.keys())
         if len(attr_settings) > 0:
             checks.assert_dict_valid(attr_settings, all_attr_names)
 
@@ -1268,11 +1275,12 @@ class IndicatorFactory(Configured):
         setattr(Indicator, '__init__', __init__)
 
         # Add user-defined outputs
-        for prop_name, prop in custom_output_props.items():
+        for prop_name, prop in lazy_outputs.items():
             if prop.__doc__ is None:
                 prop.__doc__ = f"""Custom property."""
             prop.__name__ = prop_name
-            prop = cacheable_property(prop)
+            if not is_cacheable(prop):
+                prop = cacheable_property(prop)
             setattr(Indicator, prop_name, prop)
 
         # Add comparison & combination methods for all inputs, outputs, and user-defined properties
@@ -1449,7 +1457,7 @@ class IndicatorFactory(Configured):
         self._in_output_names = in_output_names
         self._output_names = output_names
         self._output_flags = output_flags
-        self._custom_output_props = custom_output_props
+        self._lazy_outputs = lazy_outputs
         self._attr_settings = attr_settings
         self._metrics = metrics
         self._stats_defaults = stats_defaults
@@ -1510,9 +1518,9 @@ class IndicatorFactory(Configured):
         return self._output_flags
 
     @property
-    def custom_output_props(self):
+    def lazy_outputs(self):
         """Dictionary with user-defined functions that will become properties."""
-        return self._custom_output_props
+        return self._lazy_outputs
 
     @property
     def attr_settings(self):
@@ -2038,6 +2046,7 @@ Other keyword arguments are passed to `{0}.run`.
 
                 Arguments are passed to `apply_func` in the following order:
 
+                * `i` if `select_params` is set to False
                 * `input_shape` if `pass_input_shape` is set to True and `input_shape` not in `kwargs_to_args`
                 * `col` if `per_column` and `pass_col` are set to True and `col` not in `kwargs_to_args`
                 * broadcast time-series arrays corresponding to `input_names` (one-dimensional)

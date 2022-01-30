@@ -244,7 +244,7 @@ BBANDS = IndicatorFactory(
     input_names=['close'],
     param_names=['window', 'ewm', 'alpha'],
     output_names=['middle', 'upper', 'lower'],
-    custom_output_props=dict(
+    lazy_outputs=dict(
         percent_b=lambda self: self.wrapper.wrap(
             (self.close.values - self.lower.values) / (self.upper.values - self.lower.values)),
         bandwidth=lambda self: self.wrapper.wrap(
@@ -586,7 +586,7 @@ MACD = IndicatorFactory(
     input_names=['close'],
     param_names=['fast_window', 'slow_window', 'signal_window', 'macd_ewm', 'signal_ewm'],
     output_names=['macd', 'signal'],
-    custom_output_props=dict(
+    lazy_outputs=dict(
         hist=lambda self: self.wrapper.wrap(self.macd.values - self.signal.values),
     )
 ).with_apply_func(
