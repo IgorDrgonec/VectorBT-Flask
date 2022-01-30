@@ -809,7 +809,7 @@ class Drawdowns(Ranges):
         from vectorbtpro._settings import settings
         plotting_cfg = settings['plotting']
 
-        self_col = self.select_one(column=column, group_by=False)
+        self_col = self.select_col(column=column, group_by=False)
         if top_n is not None:
             # Drawdowns is negative, thus top_n becomes bottom_n
             self_col = self_col.apply_mask(self_col.drawdown.bottom_n_mask(top_n))

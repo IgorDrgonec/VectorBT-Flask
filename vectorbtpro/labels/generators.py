@@ -81,7 +81,7 @@ def _plot(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure
     """Plot `close` and overlay it with the heatmap of `labels`.
 
     `**kwargs` are passed to `vectorbtpro.generic.accessors.GenericSRAccessor.overlay_with_heatmap`."""
-    self_col = self.select_one(column=column, group_by=False)
+    self_col = self.select_col(column=column, group_by=False)
 
     return self_col.close.rename('close').vbt.overlay_with_heatmap(self_col.labels.rename('labels'), **kwargs)
 

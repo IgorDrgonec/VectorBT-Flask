@@ -532,7 +532,7 @@ class Ranges(Records):
         from vectorbtpro._settings import settings
         plotting_cfg = settings['plotting']
 
-        self_col = self.select_one(column=column, group_by=False)
+        self_col = self.select_col(column=column, group_by=False)
         if top_n is not None:
             self_col = self_col.apply_mask(self_col.duration.top_n_mask(top_n))
 

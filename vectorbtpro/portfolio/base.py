@@ -1528,7 +1528,7 @@ To create a new subplot, a preferred way is to pass a plotting function:
 
 ```pycon
 >>> def plot_order_size(pf, size, column=None, add_trace_kwargs=None, fig=None):
-...     size = pf.select_one_from_obj(size, pf.wrapper.regroup(False), column=column)
+...     size = pf.select_col_from_obj(size, column, wrapper=pf.wrapper.regroup(False))
 ...     size.rename('Order Size').vbt.barplot(add_trace_kwargs=add_trace_kwargs, fig=fig)
 
 >>> order_size = pf.orders.size.to_pd(fill_value=0.)
@@ -7789,7 +7789,7 @@ class Portfolio(Analyzable):
             jitted=jitted,
             chunked=chunked
         )
-        asset_flow = self.select_one_from_obj(asset_flow, self.wrapper.regroup(False), column=column)
+        asset_flow = self.select_col_from_obj(asset_flow, column, wrapper=self.wrapper.regroup(False))
         kwargs = merge_dicts(dict(
             trace_kwargs=dict(
                 line=dict(
@@ -7839,7 +7839,7 @@ class Portfolio(Analyzable):
             jitted=jitted,
             chunked=chunked
         )
-        cash_flow = self.select_one_from_obj(cash_flow, self.wrapper.regroup(group_by), column=column)
+        cash_flow = self.select_col_from_obj(cash_flow, column, wrapper=self.wrapper.regroup(group_by))
         kwargs = merge_dicts(dict(
             trace_kwargs=dict(
                 line=dict(
@@ -7887,7 +7887,7 @@ class Portfolio(Analyzable):
             jitted=jitted,
             chunked=chunked
         )
-        assets = self.select_one_from_obj(assets, self.wrapper.regroup(False), column=column)
+        assets = self.select_col_from_obj(assets, column, wrapper=self.wrapper.regroup(False))
         kwargs = merge_dicts(dict(
             trace_kwargs=dict(
                 line=dict(
@@ -7943,7 +7943,7 @@ class Portfolio(Analyzable):
             jitted=jitted,
             chunked=chunked
         )
-        init_cash = self.select_one_from_obj(init_cash, self.wrapper.regroup(group_by), column=column)
+        init_cash = self.select_col_from_obj(init_cash, column, wrapper=self.wrapper.regroup(group_by))
         cash = self.resolve_shortcut_attr(
             'cash',
             group_by=group_by,
@@ -7951,7 +7951,7 @@ class Portfolio(Analyzable):
             jitted=jitted,
             chunked=chunked
         )
-        cash = self.select_one_from_obj(cash, self.wrapper.regroup(group_by), column=column)
+        cash = self.select_col_from_obj(cash, column, wrapper=self.wrapper.regroup(group_by))
         kwargs = merge_dicts(dict(
             trace_kwargs=dict(
                 line=dict(
@@ -8008,7 +8008,7 @@ class Portfolio(Analyzable):
             jitted=jitted,
             chunked=chunked
         )
-        asset_value = self.select_one_from_obj(asset_value, self.wrapper.regroup(group_by), column=column)
+        asset_value = self.select_col_from_obj(asset_value, column, wrapper=self.wrapper.regroup(group_by))
         kwargs = merge_dicts(dict(
             trace_kwargs=dict(
                 line=dict(
@@ -8063,14 +8063,14 @@ class Portfolio(Analyzable):
             jitted=jitted,
             chunked=chunked
         )
-        init_cash = self.select_one_from_obj(init_cash, self.wrapper.regroup(group_by), column=column)
+        init_cash = self.select_col_from_obj(init_cash, column, wrapper=self.wrapper.regroup(group_by))
         value = self.resolve_shortcut_attr(
             'value',
             group_by=group_by,
             jitted=jitted,
             chunked=chunked
         )
-        value = self.select_one_from_obj(value, self.wrapper.regroup(group_by), column=column)
+        value = self.select_col_from_obj(value, column, wrapper=self.wrapper.regroup(group_by))
         kwargs = merge_dicts(dict(
             trace_kwargs=dict(
                 line=dict(
@@ -8124,7 +8124,7 @@ class Portfolio(Analyzable):
             bm_returns = None
         else:
             bm_returns = broadcast_to(bm_returns, self.obj)
-        bm_returns = self.select_one_from_obj(bm_returns, self.wrapper.regroup(group_by), column=column)
+        bm_returns = self.select_col_from_obj(bm_returns, column, wrapper=self.wrapper.regroup(group_by))
         if use_asset_returns:
             returns = self.resolve_shortcut_attr(
                 'asset_returns',
@@ -8139,7 +8139,7 @@ class Portfolio(Analyzable):
                 jitted=jitted,
                 chunked=chunked
             )
-        returns = self.select_one_from_obj(returns, self.wrapper.regroup(group_by), column=column)
+        returns = self.select_col_from_obj(returns, column, wrapper=self.wrapper.regroup(group_by))
         kwargs = merge_dicts(dict(
             bm_returns=bm_returns,
             main_kwargs=dict(
@@ -8205,7 +8205,7 @@ class Portfolio(Analyzable):
             jitted=jitted,
             chunked=chunked
         )
-        drawdown = self.select_one_from_obj(drawdown, self.wrapper.regroup(group_by), column=column)
+        drawdown = self.select_col_from_obj(drawdown, column, wrapper=self.wrapper.regroup(group_by))
         kwargs = merge_dicts(dict(
             trace_kwargs=dict(
                 line=dict(
@@ -8259,7 +8259,7 @@ class Portfolio(Analyzable):
             jitted=jitted,
             chunked=chunked
         )
-        gross_exposure = self.select_one_from_obj(gross_exposure, self.wrapper.regroup(group_by), column=column)
+        gross_exposure = self.select_col_from_obj(gross_exposure, column, wrapper=self.wrapper.regroup(group_by))
         kwargs = merge_dicts(dict(
             trace_kwargs=dict(
                 line=dict(
@@ -8314,7 +8314,7 @@ class Portfolio(Analyzable):
             jitted=jitted,
             chunked=chunked
         )
-        net_exposure = self.select_one_from_obj(net_exposure, self.wrapper.regroup(group_by), column=column)
+        net_exposure = self.select_col_from_obj(net_exposure, column, wrapper=self.wrapper.regroup(group_by))
         kwargs = merge_dicts(dict(
             trace_kwargs=dict(
                 line=dict(

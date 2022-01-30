@@ -16,6 +16,7 @@ from vectorbtpro.utils.attr_ import AttrResolverMixin, AttrResolverMixinT
 from vectorbtpro.utils.config import Configured
 from vectorbtpro.utils.datetime_ import freq_to_timedelta, DatetimeIndexes
 from vectorbtpro.utils.parsing import get_func_arg_names
+from vectorbtpro.utils.decorators import class_or_instancemethod
 
 ArrayWrapperT = tp.TypeVar("ArrayWrapperT", bound="ArrayWrapper")
 IndexingMetaT = tp.Tuple[ArrayWrapperT, tp.MaybeArray, tp.MaybeArray, tp.Array1d]
@@ -727,7 +728,10 @@ class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
                 return self_copy
         return self
 
-    def select_one(self: WrappingT, column: tp.Any = None, group_by: tp.GroupByLike = None, **kwargs) -> WrappingT:
+    def select_col(self: WrappingT,
+                   column: tp.Any = None,
+                   group_by: tp.GroupByLike = None,
+                   **kwargs) -> WrappingT:
         """Select one column/group.
 
         `column` can be a label-based position as well as an integer position (if label fails)."""
@@ -773,13 +777,16 @@ class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
             return _self
         raise TypeError("Only one group is allowed. Use indexing or column argument.")
 
-    @staticmethod
-    def select_one_from_obj(obj: tp.Optional[tp.SeriesFrame],
-                            wrapper: ArrayWrapper,
-                            column: tp.Any = None) -> tp.MaybeSeries:
+    @class_or_instancemethod
+    def select_col_from_obj(cls_or_self,
+                            obj: tp.Optional[tp.SeriesFrame],
+                            column: tp.Any = None,
+                            wrapper: tp.Optional[ArrayWrapper] = None) -> tp.MaybeSeries:
         """Select one column/group from a pandas object.
 
         `column` can be a label-based position as well as an integer position (if label fails)."""
+        if not isinstance(cls_or_self, type) and wrapper is None:
+            wrapper = cls_or_self.wrapper
         if obj is None:
             return None
         if column is None:

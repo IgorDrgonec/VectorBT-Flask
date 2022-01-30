@@ -153,6 +153,8 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                     See `vectorbtpro.utils.attr_.AttrResolverMixin.resolve_attr`.
                 * `use_shortcuts_{arg}`: Whether to use shortcut properties whenever possible when resolving
                     an argument. Defaults to True.
+                * `select_col_{arg}`: Whether to select the column from an argument that is meant to be
+                    an attribute of this object. Defaults to False.
                 * `template_context`: Mapping to replace templates in metric settings. Used across all settings.
                 * Any other keyword argument that overrides the settings or is passed directly to `calc_func`.
 
@@ -480,28 +482,46 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                             if kwargs is None:
                                 kwargs = {}
 
-                            if obj is custom_reself and _final_kwargs.pop('resolve_path_' + attr, True):
-                                if call_attr:
-                                    return custom_reself.resolve_attr(
-                                        attr,  # do not pass _attr, important for caching
-                                        args=args,
-                                        cond_kwargs={k: v for k, v in _final_kwargs.items() if k in _opt_arg_names},
-                                        kwargs=kwargs,
-                                        custom_arg_names=_custom_arg_names,
-                                        cache_dct=_arg_cache_dct,
-                                        use_caching=_use_caching,
-                                        passed_kwargs_out=passed_kwargs_out,
-                                        use_shortcuts=_use_shortcuts
-                                    )
-                                if isinstance(obj, AttrResolverMixin):
-                                    cls_dir = obj.cls_dir
-                                else:
-                                    cls_dir = dir(type(obj))
-                                if 'get_' + attr in cls_dir:
-                                    _attr = 'get_' + attr
-                                else:
-                                    _attr = attr
-                                return getattr(obj, _attr)
+                            if obj is custom_reself:
+                                resolve_path_arg = _final_kwargs.pop('resolve_path_' + attr, True)
+                                if resolve_path_arg:
+                                    if call_attr:
+                                        cond_kwargs = {
+                                            k: v
+                                            for k, v in _final_kwargs.items()
+                                            if k in _opt_arg_names
+                                        }
+                                        out = custom_reself.resolve_attr(
+                                            attr,  # do not pass _attr, important for caching
+                                            args=args,
+                                            cond_kwargs=cond_kwargs,
+                                            kwargs=kwargs,
+                                            custom_arg_names=_custom_arg_names,
+                                            cache_dct=_arg_cache_dct,
+                                            use_caching=_use_caching,
+                                            passed_kwargs_out=passed_kwargs_out,
+                                            use_shortcuts=_use_shortcuts
+                                        )
+                                    else:
+                                        if isinstance(obj, AttrResolverMixin):
+                                            cls_dir = obj.cls_dir
+                                        else:
+                                            cls_dir = dir(type(obj))
+                                        if 'get_' + attr in cls_dir:
+                                            _attr = 'get_' + attr
+                                        else:
+                                            _attr = attr
+                                        out = getattr(obj, _attr)
+                                    select_col_arg = _final_kwargs.pop('select_col_' + attr, False)
+                                    if select_col_arg and _column is not None:
+                                        out = custom_reself.select_col_from_obj(
+                                            out,
+                                            _column,
+                                            wrapper=custom_reself.wrapper.regroup(_group_by)
+                                        )
+                                        passed_kwargs_out['group_by'] = _group_by
+                                        passed_kwargs_out['column'] = _column
+                                    return out
 
                             out = getattr(obj, attr)
                             if callable(out) and call_attr:
@@ -517,6 +537,9 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                         if 'group_by' in passed_kwargs_out:
                             if 'pass_group_by' not in final_kwargs:
                                 final_kwargs.pop('group_by', None)
+                        if 'column' in passed_kwargs_out:
+                            if 'pass_column' not in final_kwargs:
+                                final_kwargs.pop('column', None)
 
                     # Resolve arguments
                     if callable(calc_func):
@@ -525,6 +548,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                             if k not in final_kwargs:
                                 resolve_arg = final_kwargs.pop('resolve_' + k, False)
                                 use_shortcuts_arg = final_kwargs.pop('use_shortcuts_' + k, True)
+                                select_col_arg = final_kwargs.pop('select_col_' + k, False)
                                 if resolve_arg:
                                     try:
                                         arg_out = custom_reself.resolve_attr(
@@ -537,6 +561,13 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                                         )
                                     except AttributeError:
                                         continue
+
+                                    if select_col_arg and _column is not None:
+                                        arg_out = custom_reself.select_col_from_obj(
+                                            arg_out,
+                                            _column,
+                                            wrapper=custom_reself.wrapper.regroup(_group_by)
+                                        )
                                     final_kwargs[k] = arg_out
                         for k in list(final_kwargs.keys()):
                             if k in opt_arg_names:
@@ -592,8 +623,8 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                         if _column is None and v.shape[0] == 1:
                             v = v.iloc[0]
                         elif _column is not None:
-                            v = custom_reself.select_one_from_obj(
-                                v, custom_reself.wrapper.regroup(_group_by), column=_column)
+                            v = custom_reself.select_col_from_obj(
+                                v, _column, wrapper=custom_reself.wrapper.regroup(_group_by))
                         elif _agg_func is not None and agg_func is not None:
                             v = _agg_func(v)
                             used_agg_func = True

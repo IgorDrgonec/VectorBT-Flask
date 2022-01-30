@@ -1102,7 +1102,7 @@ class Data(Analyzable):
 
             ![](/assets/images/data_plot.svg)
         """
-        self_col = self.select_one(column=column, group_by=False)
+        self_col = self.select_col(column=column, group_by=False)
         data = self_col.get()
         if base is not None:
             data = data.vbt.rebase(base)

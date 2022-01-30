@@ -17,6 +17,7 @@ from vectorbtpro.indicators.custom import (
     OBV
 )
 from vectorbtpro.indicators.factory import IndicatorFactory, IndicatorBase
+from vectorbtpro.indicators.configs import flex_col_param_config, flex_elem_param_config
 from vectorbtpro.utils.module_ import create__all__
 
 

@@ -1013,7 +1013,7 @@ class Trades(Ranges):
         from vectorbtpro._settings import settings
         plotting_cfg = settings['plotting']
 
-        self_col = self.select_one(column=column, group_by=False)
+        self_col = self.select_col(column=column, group_by=False)
 
         if closed_trace_kwargs is None:
             closed_trace_kwargs = {}
@@ -1223,7 +1223,7 @@ class Trades(Ranges):
         from vectorbtpro._settings import settings
         plotting_cfg = settings['plotting']
 
-        self_col = self.select_one(column=column, group_by=False)
+        self_col = self.select_col(column=column, group_by=False)
 
         if close_trace_kwargs is None:
             close_trace_kwargs = {}

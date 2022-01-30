@@ -1488,7 +1488,7 @@ class ReturnsAccessor(GenericAccessor):
         if bm_returns is not None:
             # Plot benchmark
             bm_returns = broadcast_to(bm_returns, self.obj)
-            bm_returns = self.select_one_from_obj(bm_returns, self.wrapper.regroup(False), column=column)
+            bm_returns = self.select_col_from_obj(bm_returns, column, wrapper=self.wrapper.regroup(False))
             if bm_kwargs is None:
                 bm_kwargs = {}
             bm_kwargs = merge_dicts(dict(
@@ -1516,7 +1516,7 @@ class ReturnsAccessor(GenericAccessor):
             other_trace_kwargs='hidden'
         ), main_kwargs)
         cumrets = self.cumulative(start_value=start_value)
-        cumrets = self.select_one_from_obj(cumrets, self.wrapper.regroup(False), column=column)
+        cumrets = self.select_col_from_obj(cumrets, column, wrapper=self.wrapper.regroup(False))
         if fill_to_benchmark:
             cumrets.vbt.plot_against(bm_cumrets, **main_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
         else:

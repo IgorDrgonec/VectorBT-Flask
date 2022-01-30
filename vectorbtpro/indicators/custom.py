@@ -129,7 +129,7 @@ class _MA(MA):
         from vectorbtpro._settings import settings
         plotting_cfg = settings['plotting']
 
-        self_col = self.select_one(column=column)
+        self_col = self.select_col(column=column)
 
         if fig is None:
             fig = make_figure()
@@ -212,7 +212,7 @@ class _MSTD(MSTD):
             ![](/assets/images/MSTD.svg)
         """
         from vectorbtpro.utils.figure import make_figure
-        self_col = self.select_one(column=column)
+        self_col = self.select_col(column=column)
 
         if fig is None:
             fig = make_figure()
@@ -306,7 +306,7 @@ class _BBANDS(BBANDS):
         from vectorbtpro._settings import settings
         plotting_cfg = settings['plotting']
 
-        self_col = self.select_one(column=column)
+        self_col = self.select_col(column=column)
 
         if fig is None:
             fig = make_figure()
@@ -421,7 +421,7 @@ class _RSI(RSI):
             ![](/assets/images/RSI.svg)
         """
         from vectorbtpro.utils.figure import make_figure
-        self_col = self.select_one(column=column)
+        self_col = self.select_col(column=column)
 
         if fig is None:
             fig = make_figure()
@@ -524,7 +524,7 @@ class _STOCH(STOCH):
             ![](/assets/images/STOCH.svg)
         """
         from vectorbtpro.utils.figure import make_figure
-        self_col = self.select_one(column=column)
+        self_col = self.select_col(column=column)
 
         if fig is None:
             fig = make_figure()
@@ -640,7 +640,7 @@ class _MACD(MACD):
         assert_can_import('plotly')
         import plotly.graph_objects as go
         from vectorbtpro.utils.figure import make_figure
-        self_col = self.select_one(column=column)
+        self_col = self.select_col(column=column)
 
         if fig is None:
             fig = make_figure()
@@ -752,7 +752,7 @@ class _ATR(ATR):
             ![](/assets/images/ATR.svg)
         """
         from vectorbtpro.utils.figure import make_figure
-        self_col = self.select_one(column=column)
+        self_col = self.select_col(column=column)
 
         if fig is None:
             fig = make_figure()
@@ -825,7 +825,7 @@ class _OBV(OBV):
             ![](/assets/images/OBV.svg)
         """
         from vectorbtpro.utils.figure import make_figure
-        self_col = self.select_one(column=column)
+        self_col = self.select_col(column=column)
 
         if fig is None:
             fig = make_figure()

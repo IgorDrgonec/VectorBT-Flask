@@ -106,9 +106,6 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                 * `tags`, `check_{filter}`, `inv_check_{filter}`, `resolve_plot_func`, `pass_{arg}`,
                     `resolve_path_{arg}`, `resolve_{arg}` and `template_context`:
                     The same as in `vectorbtpro.generic.stats_builder.StatsBuilderMixin` for `calc_func`.
-                * `select_col_{arg}`: Whether to select the column from an argument that is meant to be
-                    an attribute of this object. If False, make sure that the plotting function
-                    accepts the argument `column` and does this manually. Defaults to False.
                 * Any other keyword argument that overrides the settings or is passed directly to `plot_func`.
 
                 If `resolve_plot_func` is True, the plotting function may "request" any of the
@@ -579,11 +576,11 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                                                 _attr = attr
                                             out = getattr(obj, _attr)
                                         select_col_arg = _final_kwargs.pop('select_col_' + attr, False)
-                                        if select_col_arg:
-                                            out = custom_reself.select_one_from_obj(
+                                        if select_col_arg and _column is not None:
+                                            out = custom_reself.select_col_from_obj(
                                                 out,
-                                                custom_reself.wrapper.regroup(_group_by),
-                                                column=_column
+                                                _column,
+                                                wrapper=custom_reself.wrapper.regroup(_group_by)
                                             )
                                             passed_kwargs_out['group_by'] = _group_by
                                             passed_kwargs_out['column'] = _column
@@ -615,6 +612,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                             if k not in final_kwargs:
                                 resolve_arg = final_kwargs.pop('resolve_' + k, False)
                                 use_shortcuts_arg = final_kwargs.pop('use_shortcuts_' + k, True)
+                                select_col_arg = final_kwargs.pop('select_col_' + k, False)
                                 if resolve_arg:
                                     try:
                                         arg_out = custom_reself.resolve_attr(
@@ -627,6 +625,13 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                                         )
                                     except AttributeError:
                                         continue
+
+                                    if select_col_arg and _column is not None:
+                                        arg_out = custom_reself.select_col_from_obj(
+                                            arg_out,
+                                            _column,
+                                            wrapper=custom_reself.wrapper.regroup(_group_by)
+                                        )
                                     final_kwargs[k] = arg_out
                         for k in list(final_kwargs.keys()):
                             if k in opt_arg_names:

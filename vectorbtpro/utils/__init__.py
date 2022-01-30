@@ -47,6 +47,7 @@ from vectorbtpro.utils.execution import SequenceEngine, DaskEngine, RayEngine
 from vectorbtpro.utils.formatting import prettify
 from vectorbtpro.utils.image_ import save_animation
 from vectorbtpro.utils.jitting import jitted
+from vectorbtpro.utils.params import generate_param_combs
 from vectorbtpro.utils.parsing import Regex
 from vectorbtpro.utils.profiling import Timer, MemTracer
 from vectorbtpro.utils.random_ import set_seed
