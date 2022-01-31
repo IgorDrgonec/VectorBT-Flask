@@ -2445,6 +2445,10 @@ Other keyword arguments are passed to `{0}.run`.
                 return list(map(np.column_stack, outputs))
             return np.column_stack(outputs)
 
+        kwargs = merge_dicts(
+            {k: Default(v) for k, v in info['parameters'].items()},
+            kwargs
+        )
         TALibIndicator = cls(
             **merge_dicts(
                 dict(
@@ -2461,7 +2465,6 @@ Other keyword arguments are passed to `{0}.run`.
         ).with_apply_func(
             apply_func,
             pass_packed=True,
-            **info['parameters'],
             **kwargs
         )
 
@@ -2853,7 +2856,10 @@ Args:
                 return list(map(np.column_stack, outputs))
             return np.column_stack(outputs)
 
-        defaults = config.pop('defaults')
+        kwargs = merge_dicts(
+            {k: Default(v) for k, v in config.pop('defaults').items()},
+            kwargs
+        )
         PTAIndicator = cls(
             **merge_dicts(
                 dict(module_name=__name__ + '.pandas_ta'),
@@ -2865,7 +2871,6 @@ Args:
             pass_packed=True,
             keep_pd=True,
             to_2d=False,
-            **defaults,
             **kwargs
         )
         return PTAIndicator
@@ -3039,7 +3044,10 @@ Args:
                 return list(map(np.column_stack, outputs))
             return np.column_stack(outputs)
 
-        defaults = config.pop('defaults')
+        kwargs = merge_dicts(
+            {k: Default(v) for k, v in config.pop('defaults').items()},
+            kwargs
+        )
         TAIndicator = cls(
             **merge_dicts(
                 dict(module_name=__name__ + '.ta'),
@@ -3051,7 +3059,6 @@ Args:
             pass_packed=True,
             keep_pd=True,
             to_2d=False,
-            **defaults,
             **kwargs
         )
         return TAIndicator
@@ -3136,6 +3143,7 @@ Args:
         * `@inout_*`: in-output
         * `@p_*`: parameter
         * `@out_*` followed by a color (`:`): output
+        * `@talib_*`: TA-Lib indicator name, accepts the same arguments as a regular TA-Lib function
 
         !!! note
             The parsed names come in the same order they appear in the expression, not in the execution order,
@@ -3203,6 +3211,7 @@ Args:
         res_func_mapping = merge_dicts(expr_res_func_config, res_func_mapping)
 
         if isinstance(cls_or_self, type):
+            # Parse the class name
             match = re.match(r"^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*", expr)
             if match:
                 class_name = match.group(1)
@@ -3210,6 +3219,7 @@ Args:
             else:
                 class_name = None
 
+            # Clean the expression from redundant brackets and commas
             expr = expr.strip()
             if expr.endswith(','):
                 expr = expr[:-1]
@@ -3235,9 +3245,12 @@ Args:
             input_names = []
             in_output_names = []
             param_names = []
+            talib_names = []
             output_names = []
 
+            # Parse special variables
             if parse_special_vars:
+                # Parse input, in-output, parameter, and TA-Lib function names
                 for var_name in re.findall(r"@[a-z]+_[a-zA-Z_][a-zA-Z0-9_]*", expr):
                     var_name = var_name.replace('@', '')
                     if var_name.startswith('in_'):
@@ -3256,11 +3269,17 @@ Args:
                         var_name = var_name[2:]
                         if var_name not in param_names:
                             param_names.append(var_name)
+                    elif var_name.startswith('talib_'):
+                        var_name = var_name[6:]
+                        if var_name not in talib_names:
+                            talib_names.append(var_name)
 
                 expr = expr.replace("@in_", "__in_")
                 expr = expr.replace("@inout_", "__inout_")
                 expr = expr.replace("@p_", "__p_")
+                expr = expr.replace("@talib_", "__talib_")
 
+                # Parse output names
                 to_replace = []
                 for var_name in re.findall(r"@out_[a-zA-Z_][a-zA-Z0-9_]*\s*:\s*", expr):
                     to_replace.append(var_name)
@@ -3270,6 +3289,7 @@ Args:
                 for s in to_replace:
                     expr = expr.replace(s, '')
 
+            # Parse magnet input names
             var_names = get_expr_var_names(expr)
             for input_name in magnet_input_names:
                 if input_name not in found_magnet_input_names:
@@ -3285,6 +3305,7 @@ Args:
                 if input_name in found_magnet_input_names:
                     input_names.append(input_name)
 
+            # Parse the number of outputs
             n_open_brackets = 0
             n_outputs = 1
             for i, s in enumerate(expr):
@@ -3346,6 +3367,7 @@ Args:
             context = {}
             subbed_context = {}
 
+            # Resolve each variable in the expression
             for var_name in get_expr_var_names(expr):
                 if var_name in context:
                     continue
@@ -3355,6 +3377,16 @@ Args:
                     var = merged_context[var_name[8:]]
                 elif var_name.startswith('__p_'):
                     var = merged_context[var_name[4:]]
+                elif var_name.startswith('__talib_'):
+                    talib_ind = cls_or_self.from_talib(var_name[8:])
+
+                    def _talib_func(*args, _talib_ind: tp.Callable = talib_ind, **kwargs) -> tp.Any:
+                        raw = _talib_ind.run(*args, return_raw=True, **kwargs)[0]
+                        if len(raw) == 1:
+                            return raw[0]
+                        return raw
+
+                    var = _talib_func
                 elif var_name in res_func_mapping:
                     var = res_func_mapping[var_name]['func']
                 elif var_name in func_mapping:
@@ -3383,6 +3415,7 @@ Args:
                     var = var()
                 context[var_name] = var
 
+            # Evaluate the expression using resolved variables as a context
             if use_pd_eval:
                 return pd.eval(expr, local_dict=context, **resolve_dict(pd_eval_kwargs))
             return multiline_eval(expr, context=context)
