@@ -516,6 +516,30 @@ class GenericAccessor(BaseAccessor, Analyzable):
         out = func(self.to_2d_array(), span, minp=minp, adjust=adjust)
         return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
+    def wwm_mean(self,
+                 period: int,
+                 minp: tp.Optional[int] = 0,
+                 jitted: tp.JittedOption = None,
+                 chunked: tp.ChunkedOption = None,
+                 wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """See `vectorbtpro.generic.nb.wwm_mean_nb`."""
+        func = jit_reg.resolve_option(nb.wwm_mean_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        out = func(self.to_2d_array(), period, minp=minp)
+        return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
+
+    def wwm_std(self,
+                period: int,
+                minp: tp.Optional[int] = 0,
+                jitted: tp.JittedOption = None,
+                chunked: tp.ChunkedOption = None,
+                wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """See `vectorbtpro.generic.nb.wwm_std_nb`."""
+        func = jit_reg.resolve_option(nb.wwm_std_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        out = func(self.to_2d_array(), period, minp=minp)
+        return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
+
     def rolling_cov(self,
                     other: tp.SeriesFrame,
                     window: tp.Optional[int],

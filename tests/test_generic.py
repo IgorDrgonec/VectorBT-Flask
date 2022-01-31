@@ -692,6 +692,58 @@ class TestAccessors:
 
     @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
     @pytest.mark.parametrize("test_minp", [1, None])
+    def test_wwm_mean(self, test_window, test_minp):
+        if test_minp is None:
+            test_minp = test_window
+        pd.testing.assert_series_equal(
+            df['a'].vbt.wwm_mean(test_window, minp=test_minp),
+            df['a'].ewm(alpha=1 / test_window, min_periods=test_minp, adjust=False).mean()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.wwm_mean(test_window, minp=test_minp),
+            df.ewm(alpha=1 / test_window, min_periods=test_minp, adjust=False).mean()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.wwm_mean(test_window),
+            df.ewm(alpha=1 / test_window, adjust=False).mean()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.wwm_mean(test_window, minp=test_minp, jitted=dict(parallel=True)),
+            df.vbt.wwm_mean(test_window, minp=test_minp, jitted=dict(parallel=False))
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.wwm_mean(test_window, minp=test_minp, chunked=True),
+            df.vbt.wwm_mean(test_window, minp=test_minp, chunked=False)
+        )
+
+    @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
+    @pytest.mark.parametrize("test_minp", [1, None])
+    def test_wwm_std(self, test_window, test_minp):
+        if test_minp is None:
+            test_minp = test_window
+        pd.testing.assert_series_equal(
+            df['a'].vbt.wwm_std(test_window, minp=test_minp),
+            df['a'].ewm(alpha=1 / test_window, min_periods=test_minp, adjust=False).std()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.wwm_std(test_window, minp=test_minp),
+            df.ewm(alpha=1 / test_window, min_periods=test_minp, adjust=False).std()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.wwm_std(test_window),
+            df.ewm(alpha=1 / test_window, adjust=False).std()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.wwm_std(test_window, minp=test_minp, jitted=dict(parallel=True)),
+            df.vbt.wwm_std(test_window, minp=test_minp, jitted=dict(parallel=False))
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.wwm_std(test_window, minp=test_minp, chunked=True),
+            df.vbt.wwm_std(test_window, minp=test_minp, chunked=False)
+        )
+
+    @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
+    @pytest.mark.parametrize("test_minp", [1, None])
     @pytest.mark.parametrize("test_ddof", [0, 1])
     def test_rolling_cov(self, test_window, test_minp, test_ddof):
         if test_minp is None:

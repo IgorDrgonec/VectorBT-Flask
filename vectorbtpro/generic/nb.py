@@ -1529,6 +1529,54 @@ def ewm_mean_nb(arr: tp.Array2d, span: int, minp: int = 0, adjust: bool = False)
 
 
 @register_jitted(cache=True)
+def wwm_mean_1d_nb(arr: tp.Array1d, period: int, minp: int = 0) -> tp.Array1d:
+    """Compute Wilder's exponential weighted moving average."""
+    return ewm_mean_1d_nb(arr, 2 * period - 1, minp=minp, adjust=False)
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='arr', axis=1),
+    arg_take_spec=dict(
+        arr=ch.ArraySlicer(axis=1),
+        period=None,
+        minp=None
+    ),
+    merge_func=base_ch.column_stack
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def wwm_mean_nb(arr: tp.Array2d, period: int, minp: int = 0) -> tp.Array2d:
+    """2-dim version of `wwm_mean_1d_nb`."""
+    out = np.empty_like(arr, dtype=np.float_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = wwm_mean_1d_nb(arr[:, col], period, minp=minp)
+    return out
+
+
+@register_jitted(cache=True)
+def wwm_std_1d_nb(arr: tp.Array1d, period: int, minp: int = 0) -> tp.Array1d:
+    """Compute Wilder's exponential weighted moving standard deviation."""
+    return ewm_std_1d_nb(arr, 2 * period - 1, minp=minp, adjust=False)
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='arr', axis=1),
+    arg_take_spec=dict(
+        arr=ch.ArraySlicer(axis=1),
+        period=None,
+        minp=None
+    ),
+    merge_func=base_ch.column_stack
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def wwm_std_nb(arr: tp.Array2d, period: int, minp: int = 0) -> tp.Array2d:
+    """2-dim version of `wwm_std_1d_nb`."""
+    out = np.empty_like(arr, dtype=np.float_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = wwm_std_1d_nb(arr[:, col], period, minp=minp)
+    return out
+
+
+@register_jitted(cache=True)
 def ewm_std_1d_nb(arr: tp.Array1d, span: int, minp: int = 0, adjust: bool = False) -> tp.Array1d:
     """Compute exponential weighted moving standard deviation.
 
