@@ -575,8 +575,8 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                                             else:
                                                 _attr = attr
                                             out = getattr(obj, _attr)
-                                        select_col_arg = _final_kwargs.pop('select_col_' + attr, False)
-                                        if select_col_arg and _column is not None:
+                                        _select_col_arg = _final_kwargs.pop('select_col_' + attr, False)
+                                        if _select_col_arg and _column is not None:
                                             out = custom_reself.select_col_from_obj(
                                                 out,
                                                 _column,

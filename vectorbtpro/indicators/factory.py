@@ -2837,6 +2837,8 @@ Other keyword arguments are passed to `{0}.run`.
 
         def plot(self,
                  column: tp.Optional[tp.Label] = None,
+                 limits: tp.Optional[tp.Tuple[float, float]] = None,
+                 add_shape_kwargs: tp.KwargsLike = None,
                  add_trace_kwargs: tp.KwargsLike = None,
                  fig: tp.Optional[tp.BaseFigure] = None,
                  **kwargs) -> tp.BaseFigure:  # pragma: no cover
@@ -2918,7 +2920,32 @@ Other keyword arguments are passed to `{0}.run`.
                     output_trace_kwargs[output_name]
                 )
                 plot_func = getattr(output.vbt, plot_func_name)
-                fig = plot_func(fig=fig, trace_kwargs=trace_kwargs, **kwargs)
+                fig = plot_func(trace_kwargs=trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig, **kwargs)
+
+            if limits is not None:
+                xaxis = getattr(fig.data[-1], 'xaxis', None)
+                if xaxis is None:
+                    xaxis = 'x'
+                yaxis = getattr(fig.data[-1], 'yaxis', None)
+                if yaxis is None:
+                    yaxis = 'y'
+                add_shape_kwargs = merge_dicts(
+                    dict(
+                        type="rect",
+                        xref=xaxis,
+                        yref=yaxis,
+                        x0=self_col.wrapper.index[0],
+                        y0=limits[0],
+                        x1=self_col.wrapper.index[-1],
+                        y1=limits[1],
+                        fillcolor="purple",
+                        opacity=0.2,
+                        layer="below",
+                        line_width=0
+                    ),
+                    add_shape_kwargs
+                )
+                fig.add_shape(**add_shape_kwargs)
 
             return fig
 
@@ -2936,7 +2963,20 @@ Other keyword arguments are passed to `{0}.run`.
             inspect.Parameter.VAR_KEYWORD
         ))
         plot.__signature__ = signature.replace(parameters=new_parameters)
-        plot.__doc__ = "Plot the outputs of the indicator based on their flags."
+        output_trace_kwargs_docstring = '\n    '.join([
+            f'{output_name}_trace_kwargs (dict): Keyword arguments passed to the trace of `{output_name}`.'
+            for output_name in output_names
+        ])
+        plot.__doc__ = f"""Plot the outputs of the indicator based on their flags.
+        
+Args:
+    column (str): Name of the column to plot.
+    limits (tuple of float): Tuple of the lower and upper limit.
+    add_shape_kwargs (dict): Keyword arguments passed to `fig.add_shape` when adding the range between both limits.
+    add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
+    {output_trace_kwargs_docstring}
+    fig (Figure or FigureWidget): Figure to add the traces to.
+    **layout_kwargs: Keyword arguments passed to `fig.update_layout`."""
         setattr(TALibIndicator, 'plot', plot)
 
         return TALibIndicator

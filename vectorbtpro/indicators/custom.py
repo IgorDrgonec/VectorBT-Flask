@@ -115,9 +115,9 @@ class _MA(MA):
             plot_close (bool): Whether to plot `MA.close`.
             close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MA.close`.
             ma_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MA.ma`.
-            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
+            add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
             fig (Figure or FigureWidget): Figure to add traces to.
-            **layout_kwargs: Keyword arguments for layout.
+            **layout_kwargs: Keyword arguments passed to `fig.update_layout`.
 
         Usage:
             ```pycon
@@ -201,9 +201,9 @@ class _MSTD(MSTD):
         Args:
             column (str): Name of the column to plot.
             mstd_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MSTD.mstd`.
-            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
+            add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
             fig (Figure or FigureWidget): Figure to add traces to.
-            **layout_kwargs: Keyword arguments for layout.
+            **layout_kwargs: Keyword arguments passed to `fig.update_layout`.
 
         Usage:
             ```pycon
@@ -292,9 +292,9 @@ class _BBANDS(BBANDS):
             middle_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.middle`.
             upper_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.upper`.
             lower_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.lower`.
-            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
+            add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
             fig (Figure or FigureWidget): Figure to add traces to.
-            **layout_kwargs: Keyword arguments for layout.
+            **layout_kwargs: Keyword arguments passed to `fig.update_layout`.
 
         Usage:
             ```pycon
@@ -395,24 +395,22 @@ class _RSI(RSI):
 
     def plot(self,
              column: tp.Optional[tp.Label] = None,
-             levels: tp.Tuple[float, float] = (30, 70),
+             limits: tp.Tuple[float, float] = (30, 70),
+             add_shape_kwargs: tp.KwargsLike = None,
              rsi_trace_kwargs: tp.KwargsLike = None,
              add_trace_kwargs: tp.KwargsLike = None,
-             xref: str = 'x',
-             yref: str = 'y',
              fig: tp.Optional[tp.BaseFigure] = None,
              **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot `RSI.rsi`.
 
         Args:
             column (str): Name of the column to plot.
-            levels (tuple): Two extremes: bottom and top.
+            limits (tuple of float): Tuple of the lower and upper limit.
+            add_shape_kwargs (dict): Keyword arguments passed to `fig.add_shape` when adding the range between both limits.
             rsi_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `RSI.rsi`.
-            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
-            xref (str): X coordinate axis.
-            yref (str): Y coordinate axis.
+            add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
             fig (Figure or FigureWidget): Figure to add traces to.
-            **layout_kwargs: Keyword arguments for layout.
+            **layout_kwargs: Keyword arguments passed to `fig.update_layout`.
 
         Usage:
             ```pycon
@@ -426,10 +424,6 @@ class _RSI(RSI):
 
         if fig is None:
             fig = make_figure()
-        default_layout = dict()
-        default_layout['yaxis' + yref[1:]] = dict(range=[-5, 105])
-        fig.update_layout(**default_layout)
-        fig.update_layout(**layout_kwargs)
 
         if rsi_trace_kwargs is None:
             rsi_trace_kwargs = {}
@@ -441,20 +435,35 @@ class _RSI(RSI):
             trace_kwargs=rsi_trace_kwargs,
             add_trace_kwargs=add_trace_kwargs, fig=fig)
 
-        # Fill void between levels
-        fig.add_shape(
-            type="rect",
-            xref=xref,
-            yref=yref,
-            x0=self_col.rsi.index[0],
-            y0=levels[0],
-            x1=self_col.rsi.index[-1],
-            y1=levels[1],
-            fillcolor="purple",
-            opacity=0.2,
-            layer="below",
-            line_width=0,
+        xaxis = getattr(fig.data[-1], 'xaxis', None)
+        if xaxis is None:
+            xaxis = 'x'
+        yaxis = getattr(fig.data[-1], 'yaxis', None)
+        if yaxis is None:
+            yaxis = 'y'
+        default_layout = dict()
+        default_layout[yaxis.replace('y', 'yaxis')] = dict(range=[-5, 105])
+        fig.update_layout(**default_layout)
+        fig.update_layout(**layout_kwargs)
+
+        # Fill void between limits
+        add_shape_kwargs = merge_dicts(
+            dict(
+                type="rect",
+                xref=xaxis,
+                yref=yaxis,
+                x0=self_col.wrapper.index[0],
+                y0=limits[0],
+                x1=self_col.wrapper.index[-1],
+                y1=limits[1],
+                fillcolor="purple",
+                opacity=0.2,
+                layer="below",
+                line_width=0
+            ),
+            add_shape_kwargs
         )
+        fig.add_shape(**add_shape_kwargs)
 
         return fig
 
@@ -494,28 +503,24 @@ class _STOCH(STOCH):
 
     def plot(self,
              column: tp.Optional[tp.Label] = None,
-             levels: tp.Tuple[float, float] = (30, 70),
+             limits: tp.Tuple[float, float] = (20, 80),
+             add_shape_kwargs: tp.KwargsLike = None,
              percent_k_trace_kwargs: tp.KwargsLike = None,
              percent_d_trace_kwargs: tp.KwargsLike = None,
-             shape_kwargs: tp.KwargsLike = None,
              add_trace_kwargs: tp.KwargsLike = None,
-             xref: str = 'x',
-             yref: str = 'y',
              fig: tp.Optional[tp.BaseFigure] = None,
              **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot `STOCH.percent_k` and `STOCH.percent_d`.
 
         Args:
             column (str): Name of the column to plot.
-            levels (tuple): Two extremes: bottom and top.
+            limits (tuple of float): Tuple of the lower and upper limit.
+            add_shape_kwargs (dict): Keyword arguments passed to `fig.add_shape` when adding the range between both limits.
             percent_k_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `STOCH.percent_k`.
             percent_d_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `STOCH.percent_d`.
-            shape_kwargs (dict): Keyword arguments passed to `Figure or FigureWidget.add_shape` for zone between levels.
-            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
-            xref (str): X coordinate axis.
-            yref (str): Y coordinate axis.
+            add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
             fig (Figure or FigureWidget): Figure to add traces to.
-            **layout_kwargs: Keyword arguments for layout.
+            **layout_kwargs: Keyword arguments passed to `fig.update_layout`.
 
         Usage:
             ```pycon
@@ -529,17 +534,11 @@ class _STOCH(STOCH):
 
         if fig is None:
             fig = make_figure()
-        default_layout = dict()
-        default_layout['yaxis' + yref[1:]] = dict(range=[-5, 105])
-        fig.update_layout(**default_layout)
-        fig.update_layout(**layout_kwargs)
 
         if percent_k_trace_kwargs is None:
             percent_k_trace_kwargs = {}
         if percent_d_trace_kwargs is None:
             percent_d_trace_kwargs = {}
-        if shape_kwargs is None:
-            shape_kwargs = {}
         percent_k_trace_kwargs = merge_dicts(dict(
             name='%K'
         ), percent_k_trace_kwargs)
@@ -554,22 +553,35 @@ class _STOCH(STOCH):
             trace_kwargs=percent_d_trace_kwargs,
             add_trace_kwargs=add_trace_kwargs, fig=fig)
 
-        # Plot levels
-        # Fill void between levels
-        shape_kwargs = merge_dicts(dict(
-            type="rect",
-            xref=xref,
-            yref=yref,
-            x0=self_col.percent_k.index[0],
-            y0=levels[0],
-            x1=self_col.percent_k.index[-1],
-            y1=levels[1],
-            fillcolor="purple",
-            opacity=0.2,
-            layer="below",
-            line_width=0,
-        ), shape_kwargs)
-        fig.add_shape(**shape_kwargs)
+        xaxis = getattr(fig.data[-1], 'xaxis', None)
+        if xaxis is None:
+            xaxis = 'x'
+        yaxis = getattr(fig.data[-1], 'yaxis', None)
+        if yaxis is None:
+            yaxis = 'y'
+        default_layout = dict()
+        default_layout[yaxis.replace('y', 'yaxis')] = dict(range=[-5, 105])
+        fig.update_layout(**default_layout)
+        fig.update_layout(**layout_kwargs)
+
+        # Fill void between limits
+        add_shape_kwargs = merge_dicts(
+            dict(
+                type="rect",
+                xref=xaxis,
+                yref=yaxis,
+                x0=self_col.wrapper.index[0],
+                y0=limits[0],
+                x1=self_col.wrapper.index[-1],
+                y1=limits[1],
+                fillcolor="purple",
+                opacity=0.2,
+                layer="below",
+                line_width=0
+            ),
+            add_shape_kwargs
+        )
+        fig.add_shape(**add_shape_kwargs)
 
         return fig
 
@@ -626,9 +638,9 @@ class _MACD(MACD):
             macd_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MACD.macd`.
             signal_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MACD.signal`.
             hist_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Bar` for `MACD.hist`.
-            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
+            add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
             fig (Figure or FigureWidget): Figure to add traces to.
-            **layout_kwargs: Keyword arguments for layout.
+            **layout_kwargs: Keyword arguments passed to `fig.update_layout`.
 
         Usage:
             ```pycon
@@ -741,9 +753,9 @@ class _ATR(ATR):
             column (str): Name of the column to plot.
             tr_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `ATR.tr`.
             atr_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `ATR.atr`.
-            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
+            add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
             fig (Figure or FigureWidget): Figure to add traces to.
-            **layout_kwargs: Keyword arguments for layout.
+            **layout_kwargs: Keyword arguments passed to `fig.update_layout`.
 
         Usage:
             ```pycon
@@ -814,9 +826,9 @@ class _OBV(OBV):
         Args:
             column (str): Name of the column to plot.
             obv_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `OBV.obv`.
-            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
+            add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
             fig (Figure or FigureWidget): Figure to add traces to.
-            **layout_kwargs: Keyword arguments for layout.
+            **layout_kwargs: Keyword arguments passed to `fig.update_layout`.
 
         Usage:
             ```py

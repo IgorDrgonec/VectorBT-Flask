@@ -649,7 +649,7 @@ class Ranges(Records):
                             y0=y_domain[0],
                             x1=end_idx[closed_mask][i],
                             y1=y_domain[1],
-                            fillcolor='teal',
+                            fillcolor='royalblue',
                             opacity=0.2,
                             layer="below",
                             line_width=0,
