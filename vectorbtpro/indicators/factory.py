@@ -1067,7 +1067,7 @@ class IndicatorBase(Analyzable):
 
 class IndicatorFactory(Configured):
     def __init__(self,
-                 class_name: str = 'Indicator',
+                 class_name: tp.Optional[str] = None,
                  class_docstring: str = '',
                  module_name: tp.Optional[str] = __name__,
                  short_name: tp.Optional[str] = None,
@@ -1161,6 +1161,8 @@ class IndicatorFactory(Configured):
         )
 
         # Check parameters
+        if class_name is None:
+            class_name = 'Indicator'
         checks.assert_instance_of(class_name, str)
         checks.assert_instance_of(class_docstring, str)
         if module_name is not None:
@@ -2335,378 +2337,6 @@ Other keyword arguments are passed to `{0}.run`.
 
         return self.with_custom_func(custom_func, pass_packed=True, **kwargs)
 
-    # ############# Expressions ############# #
-
-    @class_or_instancemethod
-    def from_expr(cls_or_self,
-                  expr: str,
-                  factory_kwargs: tp.KwargsLike = None,
-                  parse_special_vars: bool = True,
-                  magnet_input_names: tp.Iterable[str] = None,
-                  func_mapping: tp.KwargsLike = None,
-                  res_func_mapping: tp.KwargsLike = None,
-                  use_pd_eval: bool = False,
-                  pd_eval_kwargs: tp.KwargsLike = None,
-                  **kwargs) -> tp.Type[IndicatorBase]:
-        """Build an indicator class from an indicator expression.
-
-        Args:
-            expr (str): Expression.
-
-                Expression must be a string with a valid Python code.
-            factory_kwargs (dict): Keyword arguments passed to `IndicatorFactory`.
-
-                Only applied when calling the class method.
-            parse_special_vars (bool): Whether to parse variables starting with `@`.
-            magnet_input_names (iterable of str): Names recognized as input names.
-
-                Defaults to `open`, `high`, `low`, `close`, and `volume`.
-            func_mapping (mapping): Mapping merged over `vectorbtpro.indicators.expr.expr_func_config`.
-
-                Each key must be a function name and each value must be a dict with
-                `func` and optionally `magnet_input_names`.
-            res_func_mapping (mapping): Mapping merged over `vectorbtpro.indicators.expr.expr_res_func_config`.
-
-                Each key must be a function name and each value must be a dict with
-                `func` and optionally `magnet_input_names`.
-            use_pd_eval (bool): Whether to use `pd.eval`.
-
-                Otherwise, uses `vectorbtpro.utils.eval_.multiline_eval`.
-
-                !!! hint
-                    By default, operates on NumPy objects using NumExpr.
-                    If you want to operate on Pandas objects, set `keep_pd` to True.
-            pd_eval_kwargs (dict): Keyword arguments passed to `pd.eval`.
-            **kwargs: Keyword arguments passed to `IndicatorFactory.with_apply_func`.
-
-        Returns:
-            Indicator
-
-        Searches each variable name parsed from `expr` in
-
-        * `vectorbtpro.indicators.expr.expr_res_func_config` (calls right away),
-        * `vectorbtpro.indicators.expr.expr_func_config`,
-        * inputs, in-outputs, and params,
-        * keyword arguments,
-        * attributes of `np`,
-        * attributes of `vectorbtpro.generic.nb` (with and without `_nb` suffix),
-        * attributes of `vbt`, and
-        * packages and modules.
-
-        `vectorbtpro.indicators.expr.expr_func_config` and `vectorbtpro.indicators.expr.expr_res_func_config`
-        can be overridden with `func_mapping` and `res_func_mapping` respectively.
-
-        !!! note
-            Each variable name is case-sensitive.
-
-        When using the class method, all names are parsed from the expression itself.
-        If any of `open`, `high`, `low`, `close`, and `volume` appear in the expression or
-        in `magnet_input_names` in either `vectorbtpro.indicators.expr.expr_func_config` or
-        `vectorbtpro.indicators.expr.expr_res_func_config`, they are automatically added to `input_names`.
-        Set `magnet_input_names` to an empty list to disable this logic.
-
-        If `parse_special_vars` is True, variables that start with `@` have a special meaning:
-
-        * `@in_*`: input
-        * `@inout_*`: in-output
-        * `@p_*`: parameter
-
-        !!! note
-            The parsed names come in the same order they appear in the expression, not in the parsing order.
-
-        The number of outputs is derived based on the number of commas outside of any bracket pair.
-        If there is only one output, the output name is `out`. If more - `out1`, `out2`, etc.
-
-        Any information can be overridden using `factory_kwargs`.
-
-        Usage:
-            ```pycon
-            >>> WMA = vbt.IF(
-            ...     class_name='WMA',
-            ...     input_names=['close'],
-            ...     param_names=['window'],
-            ...     output_names=['wma']
-            ... ).from_expr("wm_mean_nb(close, window)")
-
-            >>> wma = WMA.run(price, window=[2, 3])
-            >>> wma.wma
-            wma_window                   2                   3
-                               a         b         a         b
-            2020-01-01       NaN       NaN       NaN       NaN
-            2020-01-02  1.666667  4.333333       NaN       NaN
-            2020-01-03  2.666667  3.333333  2.333333  3.666667
-            2020-01-04  3.666667  2.333333  3.333333  2.666667
-            2020-01-05  4.666667  1.333333  4.333333  1.666667
-            ```
-
-            The same can be achieved by calling the class method and providing prefixes
-            to the variable names to indicate their type:
-
-            ```pycon
-            >>> expr = "wm_mean_nb((@in_high + @in_low) / 2, @p_window)"
-            >>> WMA = vbt.IF.from_expr(expr)
-            >>> wma = WMA.run(price + 1, price, window=[2, 3])
-            >>> wma.out
-            custom_window                   2                   3
-                                  a         b         a         b
-            2020-01-01          NaN       NaN       NaN       NaN
-            2020-01-02     2.166667  4.833333       NaN       NaN
-            2020-01-03     3.166667  3.833333  2.833333  4.166667
-            2020-01-04     4.166667  2.833333  3.833333  3.166667
-            2020-01-05     5.166667  1.833333  4.833333  2.166667
-            ```
-
-            Common (lower-case) input names from OHLCV are recognized automatically:
-
-            ```pycon
-            >>> expr = "wm_mean_nb((high + low) / 2, @p_window)"
-            >>> WMA = vbt.IF.from_expr(expr)
-            >>> wma = WMA.run(price + 1, price, window=[2, 3])
-            >>> wma.out
-            custom_window                   2                   3
-                                  a         b         a         b
-            2020-01-01          NaN       NaN       NaN       NaN
-            2020-01-02     2.166667  4.833333       NaN       NaN
-            2020-01-03     3.166667  3.833333  2.833333  4.166667
-            2020-01-04     4.166667  2.833333  3.833333  3.166667
-            2020-01-05     5.166667  1.833333  4.833333  2.166667
-            ```
-        """
-        expr = expr.strip()
-        if expr.endswith(','):
-            expr = expr[:-1]
-        if expr.startswith('(') and expr.endswith(')'):
-            n_open_brackets = 0
-            remove_brackets = True
-            for i, s in enumerate(expr):
-                if s == '(':
-                    n_open_brackets += 1
-                elif s == ')':
-                    n_open_brackets -= 1
-                    if n_open_brackets == 0 and i < len(expr) - 1:
-                        remove_brackets = False
-                        break
-            if remove_brackets:
-                expr = expr[1:-1]
-        if expr.endswith(','):
-            expr = expr[:-1]  # again
-
-        func_mapping = merge_dicts(expr_func_config, func_mapping)
-        res_func_mapping = merge_dicts(expr_res_func_config, res_func_mapping)
-
-        if isinstance(cls_or_self, type):
-            if magnet_input_names is None:
-                magnet_input_names = ['open', 'high', 'low', 'close', 'volume']
-            found_magnet_input_names = []
-            input_names = []
-            in_output_names = []
-            param_names = []
-
-            if parse_special_vars:
-                for var_name in re.findall(r"@\w+", expr):
-                    var_name = var_name.replace('@', '')
-                    if var_name.startswith('in_'):
-                        var_name = var_name[3:]
-                        if var_name in magnet_input_names:
-                            if var_name not in found_magnet_input_names:
-                                found_magnet_input_names.append(var_name)
-                        else:
-                            if var_name not in input_names:
-                                input_names.append(var_name)
-                    elif var_name.startswith('inout_'):
-                        var_name = var_name[6:]
-                        if var_name not in in_output_names:
-                            in_output_names.append(var_name)
-                    elif var_name.startswith('p_'):
-                        var_name = var_name[2:]
-                        if var_name not in param_names:
-                            param_names.append(var_name)
-
-                expr = expr.replace("@in_", "__in_")
-                expr = expr.replace("@inout_", "__inout_")
-                expr = expr.replace("@p_", "__p_")
-
-            var_names = get_expr_var_names(expr)
-            for input_name in magnet_input_names:
-                if input_name not in found_magnet_input_names:
-                    if input_name in var_names:
-                        found_magnet_input_names.append(input_name)
-                        continue
-                    for var_name in var_names:
-                        if input_name in func_mapping.get(var_name, {}).get('magnet_input_names', []) or \
-                                input_name in res_func_mapping.get(var_name, {}).get('magnet_input_names', []):
-                            found_magnet_input_names.append(input_name)
-                            break
-            for input_name in magnet_input_names:
-                if input_name in found_magnet_input_names:
-                    input_names.append(input_name)
-
-            n_open_brackets = 0
-            n_outputs = 1
-            for i, s in enumerate(expr):
-                if s == ',' and n_open_brackets == 0:
-                    n_outputs += 1
-                elif s in '([{':
-                    n_open_brackets += 1
-                elif s in ')]}':
-                    n_open_brackets -= 1
-            if n_open_brackets != 0:
-                raise ValueError("Couldn't parse the number of outputs: mismatching brackets")
-            if n_outputs == 1:
-                output_names = ['out']
-            else:
-                output_names = ['out%d' % (i + 1) for i in range(n_outputs)]
-
-            factory = cls_or_self(
-                **merge_dicts(
-                    dict(
-                        input_names=input_names,
-                        in_output_names=in_output_names,
-                        param_names=param_names,
-                        output_names=output_names
-                    ),
-                    factory_kwargs
-                )
-            )
-        else:
-            factory = cls_or_self
-
-        Indicator = factory.Indicator
-
-        input_names = factory.input_names
-        in_output_names = factory.in_output_names
-        param_names = factory.param_names
-
-        def apply_func(input_tuple: tp.Tuple[tp.AnyArray],
-                       in_output_tuple: tp.Tuple[tp.SeriesFrame, ...],
-                       param_tuple: tp.Tuple[tp.Param, ...],
-                       **_kwargs) -> tp.Union[tp.Array2d, tp.List[tp.Array2d]]:
-            import vectorbtpro as vbt
-
-            input_context = dict(
-                np=np,
-                pd=pd,
-                vbt=vbt
-            )
-            for i, input in enumerate(input_tuple):
-                input_context[input_names[i]] = input
-            for i, in_output in enumerate(in_output_tuple):
-                input_context[in_output_names[i]] = in_output
-            for i, param in enumerate(param_tuple):
-                input_context[param_names[i]] = param
-            merged_context = merge_dicts(input_context, _kwargs)
-            context = {}
-            subbed_context = {}
-
-            for var_name in get_expr_var_names(expr):
-                if var_name in context:
-                    continue
-                if var_name.startswith('__in_'):
-                    var = merged_context[var_name[5:]]
-                elif var_name.startswith('__inout_'):
-                    var = merged_context[var_name[8:]]
-                elif var_name.startswith('__p_'):
-                    var = merged_context[var_name[4:]]
-                elif var_name in res_func_mapping:
-                    var = res_func_mapping[var_name]['func']
-                elif var_name in func_mapping:
-                    var = func_mapping[var_name]['func']
-                elif var_name in merged_context:
-                    var = merged_context[var_name]
-                elif hasattr(np, var_name):
-                    var = getattr(np, var_name)
-                elif hasattr(generic_nb, var_name):
-                    var = getattr(generic_nb, var_name)
-                elif hasattr(generic_nb, var_name + '_nb'):
-                    var = getattr(generic_nb, var_name + '_nb')
-                elif hasattr(vbt, var_name):
-                    var = getattr(vbt, var_name)
-                else:
-                    try:
-                        var = importlib.import_module(var_name)
-                    except ModuleNotFoundError:
-                        continue
-                try:
-                    if callable(var) and 'context' in get_func_arg_names(var):
-                        var = functools.partial(var, context=merged_context)
-                except:
-                    pass
-                if var_name in res_func_mapping:
-                    var = var()
-                context[var_name] = var
-
-            if use_pd_eval:
-                return pd.eval(expr, local_dict=context, **resolve_dict(pd_eval_kwargs))
-            return multiline_eval(expr, context=context)
-
-        return factory.with_apply_func(
-            apply_func,
-            pass_packed=True,
-            pass_wrapper=True,
-            **kwargs
-        )
-
-    @classmethod
-    def from_wqa101(cls, alpha_idx: int, **kwargs) -> tp.Type[IndicatorBase]:
-        """Build an indicator class from one of the WorldQuant's 101 alpha expressions.
-
-        See `vectorbtpro.indicators.expr.wqa101_expr_config`.
-
-        !!! note
-            Some expressions that utilize cross-sectional operations require columns to be
-            a multi-index with a level `sector`, `subindustry`, or `industry`.
-
-        Usage:
-            ```pycon
-            >>> data = vbt.YFData.fetch(['BTC-USD', 'ETH-USD'])
-
-            >>> WQA1 = vbt.IF.from_wqa101(1)
-            >>> wqa1 = WQA1.run(data.get('Close'))
-            >>> wqa1.out
-            symbol                     BTC-USD  ETH-USD
-            Date
-            2014-09-17 00:00:00+00:00     0.25     0.25
-            2014-09-18 00:00:00+00:00     0.25     0.25
-            2014-09-19 00:00:00+00:00     0.25     0.25
-            2014-09-20 00:00:00+00:00     0.25     0.25
-            2014-09-21 00:00:00+00:00     0.25     0.25
-            ...                            ...      ...
-            2022-01-21 00:00:00+00:00     0.00     0.50
-            2022-01-22 00:00:00+00:00     0.00     0.50
-            2022-01-23 00:00:00+00:00     0.25     0.25
-            2022-01-24 00:00:00+00:00     0.50     0.00
-            2022-01-25 00:00:00+00:00     0.50     0.00
-
-            [2688 rows x 2 columns]
-            ```
-
-            To get help on running the indicator, use the `help` command:
-
-            ```pycon
-            >>> help(WQA1.run)
-            Help on method run:
-
-            run(close, short_name='wqa1', hide_params=None, hide_default=True, **kwargs) method of vectorbtpro.generic.analyzable.MetaAnalyzable instance
-                Run `WQA1` indicator.
-
-                * Inputs: `close`
-                * Outputs: `out`
-
-                Pass a list of parameter names as `hide_params` to hide their column levels.
-                Set `hide_default` to False to show the column levels of the parameters with a default value.
-
-                Other keyword arguments are passed to `vectorbtpro.indicators.factory.run_pipeline`.
-            ```
-        """
-        return cls.from_expr(
-            wqa101_expr_config[alpha_idx],
-            factory_kwargs=dict(
-                class_name="WQA%d" % alpha_idx,
-                module_name=__name__ + '.wqa'
-            ),
-            **kwargs
-        )
-
     # ############# Third party ############# #
 
     @classmethod
@@ -3425,3 +3055,402 @@ Args:
             **kwargs
         )
         return TAIndicator
+
+    # ############# Expressions ############# #
+
+    @class_or_instancemethod
+    def from_expr(cls_or_self,
+                  expr: str,
+                  factory_kwargs: tp.KwargsLike = None,
+                  parse_special_vars: bool = True,
+                  magnet_input_names: tp.Iterable[str] = None,
+                  func_mapping: tp.KwargsLike = None,
+                  res_func_mapping: tp.KwargsLike = None,
+                  use_pd_eval: bool = False,
+                  pd_eval_kwargs: tp.KwargsLike = None,
+                  **kwargs) -> tp.Type[IndicatorBase]:
+        """Build an indicator class from an indicator expression.
+
+        Args:
+            expr (str): Expression.
+
+                Expression must be a string with a valid Python code.
+                Supported are both single-line and multi-line expressions.
+            factory_kwargs (dict): Keyword arguments passed to `IndicatorFactory`.
+
+                Only applied when calling the class method.
+            parse_special_vars (bool): Whether to parse variables starting with `@`.
+            magnet_input_names (iterable of str): Names recognized as input names.
+
+                Defaults to `open`, `high`, `low`, `close`, and `volume`.
+            func_mapping (mapping): Mapping merged over `vectorbtpro.indicators.expr.expr_func_config`.
+
+                Each key must be a function name and each value must be a dict with
+                `func` and optionally `magnet_input_names`.
+            res_func_mapping (mapping): Mapping merged over `vectorbtpro.indicators.expr.expr_res_func_config`.
+
+                Each key must be a function name and each value must be a dict with
+                `func` and optionally `magnet_input_names`.
+            use_pd_eval (bool): Whether to use `pd.eval`.
+
+                Otherwise, uses `vectorbtpro.utils.eval_.multiline_eval`.
+
+                !!! hint
+                    By default, operates on NumPy objects using NumExpr.
+                    If you want to operate on Pandas objects, set `keep_pd` to True.
+            pd_eval_kwargs (dict): Keyword arguments passed to `pd.eval`.
+            **kwargs: Keyword arguments passed to `IndicatorFactory.with_apply_func`.
+
+        Returns:
+            Indicator
+
+        Searches each variable name parsed from `expr` in
+
+        * `vectorbtpro.indicators.expr.expr_res_func_config` (calls right away),
+        * `vectorbtpro.indicators.expr.expr_func_config`,
+        * inputs, in-outputs, and params,
+        * keyword arguments,
+        * attributes of `np`,
+        * attributes of `vectorbtpro.generic.nb` (with and without `_nb` suffix),
+        * attributes of `vbt`, and
+        * packages and modules.
+
+        `vectorbtpro.indicators.expr.expr_func_config` and `vectorbtpro.indicators.expr.expr_res_func_config`
+        can be overridden with `func_mapping` and `res_func_mapping` respectively.
+
+        !!! note
+            Each variable name is case-sensitive.
+
+        When using the class method, all names are parsed from the expression itself.
+        If any of `open`, `high`, `low`, `close`, and `volume` appear in the expression or
+        in `magnet_input_names` in either `vectorbtpro.indicators.expr.expr_func_config` or
+        `vectorbtpro.indicators.expr.expr_res_func_config`, they are automatically added to `input_names`.
+        Set `magnet_input_names` to an empty list to disable this logic.
+
+        If the expression begins with a valid variable name and a color (`:`), the variable name
+        will be used as the name of the generated class.
+
+        If `parse_special_vars` is True, variables that start with `@` have a special meaning:
+
+        * `@in_*`: input
+        * `@inout_*`: in-output
+        * `@p_*`: parameter
+        * `@out_*` followed by a color (`:`): output
+
+        !!! note
+            The parsed names come in the same order they appear in the expression, not in the execution order,
+            apart from the magnet input names, which are added in the same order they appear in the list.
+
+        The number of outputs is derived based on the number of commas outside of any bracket pair.
+        If there is only one output, the output name is `out`. If more - `out1`, `out2`, etc.
+
+        Any information can be overridden using `factory_kwargs`.
+
+        Usage:
+            ```pycon
+            >>> WMA = vbt.IF(
+            ...     class_name='WMA',
+            ...     input_names=['close'],
+            ...     param_names=['window'],
+            ...     output_names=['wma']
+            ... ).from_expr("wm_mean_nb(close, window)")
+
+            >>> wma = WMA.run(price, window=[2, 3])
+            >>> wma.wma
+            wma_window                   2                   3
+                               a         b         a         b
+            2020-01-01       NaN       NaN       NaN       NaN
+            2020-01-02  1.666667  4.333333       NaN       NaN
+            2020-01-03  2.666667  3.333333  2.333333  3.666667
+            2020-01-04  3.666667  2.333333  3.333333  2.666667
+            2020-01-05  4.666667  1.333333  4.333333  1.666667
+            ```
+
+            The same can be achieved by calling the class method and providing prefixes
+            to the variable names to indicate their type:
+
+            ```pycon
+            >>> expr = "WMA: @out_wma:wm_mean_nb((@in_high + @in_low) / 2, @p_window)"
+            >>> WMA = vbt.IF.from_expr(expr)
+            >>> wma = WMA.run(price + 1, price, window=[2, 3])
+            >>> wma.wma
+            wma_window                   2                   3
+                               a         b         a         b
+            2020-01-01       NaN       NaN       NaN       NaN
+            2020-01-02  2.166667  4.833333       NaN       NaN
+            2020-01-03  3.166667  3.833333  2.833333  4.166667
+            2020-01-04  4.166667  2.833333  3.833333  3.166667
+            2020-01-05  5.166667  1.833333  4.833333  2.166667
+            ```
+
+            Common (lower-case) input names from OHLCV are recognized automatically:
+
+            ```pycon
+            >>> expr = "WMA: @out_wma:wm_mean_nb((high + low) / 2, @p_window)"
+            >>> WMA = vbt.IF.from_expr(expr)
+            >>> wma = WMA.run(price + 1, price, window=[2, 3])
+            >>> wma.wma
+            wma_window                   2                   3
+                               a         b         a         b
+            2020-01-01       NaN       NaN       NaN       NaN
+            2020-01-02  2.166667  4.833333       NaN       NaN
+            2020-01-03  3.166667  3.833333  2.833333  4.166667
+            2020-01-04  4.166667  2.833333  3.833333  3.166667
+            2020-01-05  5.166667  1.833333  4.833333  2.166667
+            ```
+        """
+        func_mapping = merge_dicts(expr_func_config, func_mapping)
+        res_func_mapping = merge_dicts(expr_res_func_config, res_func_mapping)
+
+        if isinstance(cls_or_self, type):
+            match = re.match(r"^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*", expr)
+            if match:
+                class_name = match.group(1)
+                expr = expr[len(match.group(0)):]
+            else:
+                class_name = None
+
+            expr = expr.strip()
+            if expr.endswith(','):
+                expr = expr[:-1]
+            if expr.startswith('(') and expr.endswith(')'):
+                n_open_brackets = 0
+                remove_brackets = True
+                for i, s in enumerate(expr):
+                    if s == '(':
+                        n_open_brackets += 1
+                    elif s == ')':
+                        n_open_brackets -= 1
+                        if n_open_brackets == 0 and i < len(expr) - 1:
+                            remove_brackets = False
+                            break
+                if remove_brackets:
+                    expr = expr[1:-1]
+            if expr.endswith(','):
+                expr = expr[:-1]  # again
+
+            if magnet_input_names is None:
+                magnet_input_names = ['open', 'high', 'low', 'close', 'volume']
+            found_magnet_input_names = []
+            input_names = []
+            in_output_names = []
+            param_names = []
+            output_names = []
+
+            if parse_special_vars:
+                for var_name in re.findall(r"@[a-z]+_[a-zA-Z_][a-zA-Z0-9_]*", expr):
+                    var_name = var_name.replace('@', '')
+                    if var_name.startswith('in_'):
+                        var_name = var_name[3:]
+                        if var_name in magnet_input_names:
+                            if var_name not in found_magnet_input_names:
+                                found_magnet_input_names.append(var_name)
+                        else:
+                            if var_name not in input_names:
+                                input_names.append(var_name)
+                    elif var_name.startswith('inout_'):
+                        var_name = var_name[6:]
+                        if var_name not in in_output_names:
+                            in_output_names.append(var_name)
+                    elif var_name.startswith('p_'):
+                        var_name = var_name[2:]
+                        if var_name not in param_names:
+                            param_names.append(var_name)
+
+                expr = expr.replace("@in_", "__in_")
+                expr = expr.replace("@inout_", "__inout_")
+                expr = expr.replace("@p_", "__p_")
+
+                to_replace = []
+                for var_name in re.findall(r"@out_[a-zA-Z_][a-zA-Z0-9_]*\s*:\s*", expr):
+                    to_replace.append(var_name)
+                    var_name = var_name.split(':')[0].strip()[5:]
+                    if var_name not in output_names:
+                        output_names.append(var_name)
+                for s in to_replace:
+                    expr = expr.replace(s, '')
+
+            var_names = get_expr_var_names(expr)
+            for input_name in magnet_input_names:
+                if input_name not in found_magnet_input_names:
+                    if input_name in var_names:
+                        found_magnet_input_names.append(input_name)
+                        continue
+                    for var_name in var_names:
+                        if input_name in func_mapping.get(var_name, {}).get('magnet_input_names', []) or \
+                                input_name in res_func_mapping.get(var_name, {}).get('magnet_input_names', []):
+                            found_magnet_input_names.append(input_name)
+                            break
+            for input_name in magnet_input_names:
+                if input_name in found_magnet_input_names:
+                    input_names.append(input_name)
+
+            n_open_brackets = 0
+            n_outputs = 1
+            for i, s in enumerate(expr):
+                if s == ',' and n_open_brackets == 0:
+                    n_outputs += 1
+                elif s in '([{':
+                    n_open_brackets += 1
+                elif s in ')]}':
+                    n_open_brackets -= 1
+            if n_open_brackets != 0:
+                raise ValueError("Couldn't parse the number of outputs: mismatching brackets")
+            if len(output_names) > 0 and len(output_names) != n_outputs:
+                raise ValueError("The number of parsed outputs doesn't match the actual number of outputs")
+            elif len(output_names) == 0:
+                if n_outputs == 1:
+                    output_names = ['out']
+                else:
+                    output_names = ['out%d' % (i + 1) for i in range(n_outputs)]
+
+            factory = cls_or_self(
+                **merge_dicts(
+                    dict(
+                        class_name=class_name,
+                        input_names=input_names,
+                        in_output_names=in_output_names,
+                        param_names=param_names,
+                        output_names=output_names
+                    ),
+                    factory_kwargs
+                )
+            )
+        else:
+            factory = cls_or_self
+
+        Indicator = factory.Indicator
+
+        input_names = factory.input_names
+        in_output_names = factory.in_output_names
+        param_names = factory.param_names
+
+        def apply_func(input_tuple: tp.Tuple[tp.AnyArray],
+                       in_output_tuple: tp.Tuple[tp.SeriesFrame, ...],
+                       param_tuple: tp.Tuple[tp.Param, ...],
+                       **_kwargs) -> tp.Union[tp.Array2d, tp.List[tp.Array2d]]:
+            import vectorbtpro as vbt
+
+            input_context = dict(
+                np=np,
+                pd=pd,
+                vbt=vbt
+            )
+            for i, input in enumerate(input_tuple):
+                input_context[input_names[i]] = input
+            for i, in_output in enumerate(in_output_tuple):
+                input_context[in_output_names[i]] = in_output
+            for i, param in enumerate(param_tuple):
+                input_context[param_names[i]] = param
+            merged_context = merge_dicts(input_context, _kwargs)
+            context = {}
+            subbed_context = {}
+
+            for var_name in get_expr_var_names(expr):
+                if var_name in context:
+                    continue
+                if var_name.startswith('__in_'):
+                    var = merged_context[var_name[5:]]
+                elif var_name.startswith('__inout_'):
+                    var = merged_context[var_name[8:]]
+                elif var_name.startswith('__p_'):
+                    var = merged_context[var_name[4:]]
+                elif var_name in res_func_mapping:
+                    var = res_func_mapping[var_name]['func']
+                elif var_name in func_mapping:
+                    var = func_mapping[var_name]['func']
+                elif var_name in merged_context:
+                    var = merged_context[var_name]
+                elif hasattr(np, var_name):
+                    var = getattr(np, var_name)
+                elif hasattr(generic_nb, var_name):
+                    var = getattr(generic_nb, var_name)
+                elif hasattr(generic_nb, var_name + '_nb'):
+                    var = getattr(generic_nb, var_name + '_nb')
+                elif hasattr(vbt, var_name):
+                    var = getattr(vbt, var_name)
+                else:
+                    try:
+                        var = importlib.import_module(var_name)
+                    except ModuleNotFoundError:
+                        continue
+                try:
+                    if callable(var) and 'context' in get_func_arg_names(var):
+                        var = functools.partial(var, context=merged_context)
+                except:
+                    pass
+                if var_name in res_func_mapping:
+                    var = var()
+                context[var_name] = var
+
+            if use_pd_eval:
+                return pd.eval(expr, local_dict=context, **resolve_dict(pd_eval_kwargs))
+            return multiline_eval(expr, context=context)
+
+        return factory.with_apply_func(
+            apply_func,
+            pass_packed=True,
+            pass_wrapper=True,
+            **kwargs
+        )
+
+    @classmethod
+    def from_wqa101(cls, alpha_idx: int, **kwargs) -> tp.Type[IndicatorBase]:
+        """Build an indicator class from one of the WorldQuant's 101 alpha expressions.
+
+        See `vectorbtpro.indicators.expr.wqa101_expr_config`.
+
+        !!! note
+            Some expressions that utilize cross-sectional operations require columns to be
+            a multi-index with a level `sector`, `subindustry`, or `industry`.
+
+        Usage:
+            ```pycon
+            >>> data = vbt.YFData.fetch(['BTC-USD', 'ETH-USD'])
+
+            >>> WQA1 = vbt.IF.from_wqa101(1)
+            >>> wqa1 = WQA1.run(data.get('Close'))
+            >>> wqa1.out
+            symbol                     BTC-USD  ETH-USD
+            Date
+            2014-09-17 00:00:00+00:00     0.25     0.25
+            2014-09-18 00:00:00+00:00     0.25     0.25
+            2014-09-19 00:00:00+00:00     0.25     0.25
+            2014-09-20 00:00:00+00:00     0.25     0.25
+            2014-09-21 00:00:00+00:00     0.25     0.25
+            ...                            ...      ...
+            2022-01-21 00:00:00+00:00     0.00     0.50
+            2022-01-22 00:00:00+00:00     0.00     0.50
+            2022-01-23 00:00:00+00:00     0.25     0.25
+            2022-01-24 00:00:00+00:00     0.50     0.00
+            2022-01-25 00:00:00+00:00     0.50     0.00
+
+            [2688 rows x 2 columns]
+            ```
+
+            To get help on running the indicator, use the `help` command:
+
+            ```pycon
+            >>> help(WQA1.run)
+            Help on method run:
+
+            run(close, short_name='wqa1', hide_params=None, hide_default=True, **kwargs) method of vectorbtpro.generic.analyzable.MetaAnalyzable instance
+                Run `WQA1` indicator.
+
+                * Inputs: `close`
+                * Outputs: `out`
+
+                Pass a list of parameter names as `hide_params` to hide their column levels.
+                Set `hide_default` to False to show the column levels of the parameters with a default value.
+
+                Other keyword arguments are passed to `vectorbtpro.indicators.factory.run_pipeline`.
+            ```
+        """
+        return cls.from_expr(
+            wqa101_expr_config[alpha_idx],
+            factory_kwargs=dict(
+                class_name="WQA%d" % alpha_idx,
+                module_name=__name__ + '.wqa'
+            ),
+            **kwargs
+        )
