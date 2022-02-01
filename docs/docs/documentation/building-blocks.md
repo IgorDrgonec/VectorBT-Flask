@@ -1,5 +1,6 @@
 ---
 title: Building blocks
+icon: material/cube-outline
 ---
 
 # Building blocks
@@ -358,20 +359,20 @@ substitution id (`sub_id`), if provided. The actual substitution operation is pe
 ```pycon
 >>> def some_function(*args, **kwargs):
 ...     context = {}
-...     args = vbt.deep_substitute(args, mapping=context, strict=False)
-...     kwargs = vbt.deep_substitute(kwargs, mapping=context, strict=False)
+...     args = vbt.deep_substitute(args, context=context, strict=False)
+...     kwargs = vbt.deep_substitute(kwargs, context=context, strict=False)
 ...     print(args)
 ...     print(kwargs)
 ...     
 ...     context['result'] = 100  # (1)!
-...     args = vbt.deep_substitute(args, mapping=context)
-...     kwargs = vbt.deep_substitute(kwargs, mapping=context)
+...     args = vbt.deep_substitute(args, context=context)
+...     kwargs = vbt.deep_substitute(kwargs, context=context)
 ...     print(args)
 ...     print(kwargs)
 
 >>> some_function(vbt.Rep('result'), double_result=vbt.RepEval('result * 2'))
-(Rep(template='result', mapping=None, strict=None, sub_id=None),)
-{'double_result': RepEval(template='result * 2', mapping=None, strict=None, sub_id=None)}
+(Rep(template='result', context=None, strict=None, sub_id=None),)
+{'double_result': RepEval(template='result * 2', context=None, strict=None, sub_id=None)}
 (100,)
 {'double_result': 200}
 ```
@@ -790,7 +791,7 @@ with it everything what we can do with our custom `CorrStats` class. Why calling
 accessor? Because it is the superclass of all other accessors in vectorbt and provides them with 
 the core combining, reshaping, and indexing functions, such as 
 [BaseAccessor.to_2d_array](/api/base/accessors/#vectorbtpro.base.accessors.BaseAccessor.to_2d_array)
-to convert a Pandas object into a 2-dimensional NumPy array.
+to convert a Pandas object into a two-dimensional NumPy array.
 
 The "access" to the accessor is simple:
 
@@ -968,14 +969,14 @@ Name: a, dtype: object
 Corr. Coefficient    0.3
 Name: a, dtype: object
 
->>> corrstats.plots(template_mapping=dict(window=3))  # (3)!
+>>> corrstats.plots(template_context=dict(window=3))  # (3)!
 ```
 
 1. Compute metrics for all columns and display only `a`
 2. Compute and display metrics only for `a`
 3. Set the rolling window to 3 and display subplots for all columns
 
-![](/assets/images/building-blocks-analyzing.svg)
+![](/assets/images/building_blocks_analyzing.svg)
 
 There is nothing more satisfying than not having to write boilerplate code. 
 Thanks to [Analyzable](/api/generic/analyzable/#vectorbtpro.generic.analyzable.Analyzable), 

@@ -214,7 +214,7 @@ portfolio:0.trades                  0       1    70.5 kB
 
 ### Smart broadcasting
 
-- [x] Broadcasting mechanism was completely refactored and now supports parameters. Build a product of multiple hyperparameter combinations with a single line of code. :magic_wand:
+- [x] Broadcasting mechanism was completely refactored and now supports parameters. Build a product of multiple hyperparameter combinations with a single line of code :magic_wand:
 
 ```pycon title="Backtest the Golden Cross with different stop configurations"
 >>> price = vbt.YFData.fetch('BTC-USD').get('Close')
@@ -398,7 +398,7 @@ Freq: D, dtype: float64
 ```
 
 1. vectorbt PRO supports parsing of directories, path expressions, and HDF keys
-2. Automatically discover and import all keys in an HDF file
+2. Automatically discovers and imports all keys in an HDF file
 
 [=100% "Key 3/3"]{: .candystripe}
 
@@ -414,13 +414,25 @@ symbol                             R1         R2          R3
 
 ## Indicators
 
+### Plotting TA-Lib
+
+- [x] Every TA-Lib indicator knows how to be plotted - fully automatically based on output flags.
+
+```pycon
+>>> data = vbt.YFData.fetch('BTC-USD', start='2020-01-01', end='2021-01-01')
+
+>>> vbt.talib('MACD').run(data.get('Close')).plot()
+```
+
+![](/assets/images/features_talib.svg)
+
 ### Expressions
 
-- [x] No more code! Indicators can now be easily built from expressions.
+- [x] No more functions! Indicators can now be easily built from expressions.
 The indicator factory can automatically parse all inputs, parameters, and even 
 NumPy and vectorbt functions thanks to a built-in matching mechanism.
 
-```pycon
+```pycon title="Calculate and plot VWAP"
 >>> data = vbt.YFData.fetch('BTC-USD')
 
 >>> VWAP = vbt.IF.from_expr("cumsum(close * volume) / cumsum(volume)")  # (1)!
@@ -436,7 +448,7 @@ NumPy and vectorbt functions thanks to a built-in matching mechanism.
 
 - [x] vectorbt PRO supports all [101 Formulaic Alphas](https://arxiv.org/pdf/1601.00991.pdf) :eyes:
 
-```pycon
+```pycon title="Run the first alpha"
 >>> close = vbt.YFData.fetch(['BTC-USD', 'ETH-USD']).get('Close')
 
 >>> vbt.wqa101(1).run(close).out

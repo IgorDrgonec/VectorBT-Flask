@@ -1,5 +1,6 @@
 ---
 title: Fundamentals
+icon: material/alphabetical-variant
 ---
 
 # Fundamentals
@@ -40,8 +41,8 @@ grouping, and other operations on dates and time?
 Here comes [Pandas](https://pandas.pydata.org/docs/getting_started/overview.html) 
 to the rescue! Pandas provides rich time series functionality, data alignment, NA-friendly statistics, 
 groupby, merge and join methods, and lots of other conveniences. It has two primary data structures: 
-[Series](https://pandas.pydata.org/docs/reference/api/pandas.Series.html) (1-dimensional) and 
-[DataFrame](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html) (2-dimensional). 
+[Series](https://pandas.pydata.org/docs/reference/api/pandas.Series.html) (one-dimensional) and 
+[DataFrame](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html) (two-dimensional). 
 You can imagine them as NumPy arrays wrapped with valuable information, such as timestamps and column names.
 Our moving average can be implemented in a one-liner:
 
@@ -598,7 +599,7 @@ As you see, smart broadcasting is :gem: when it comes to merging information.
 See [broadcast](/api/base/reshaping/#vectorbtpro.base.reshaping.broadcast) to learn more about
 broadcasting principles and new exciting techniques to combine arrays.
 
-### Flexible indexing
+## Flexible indexing
 
 Broadcasting many big arrays consumes a lot of RAM and ultimately makes processing slower.
 That's why vectorbt introduces a concept of "flexible indexing", which only returns the shape

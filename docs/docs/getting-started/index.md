@@ -75,13 +75,13 @@ vectorbt PRO is a private fork of vectorbt, hosted as a private GitHub repositor
 Almost all new features are developed as part of this fork, which means that they are 
 immediately available to all eligible sponsors, as they are made collaborators of this repository.
 
-Sponsorships start as low as [__$25 a month__](#how-to-become-a-sponsor).[^1]
+During the beta phase, sponsorships start as low as [__$25 a month or $500 one time__](#how-to-become-a-sponsor).[^1]
 
 [^1]:
-    Note that $25 a month is the minimum amount to become eligible for the
-    PRO version. While GitHub Sponsors also allows to sponsor lower amounts or
-    one-time amounts, those can't be granted access to the PRO version due to
-    technical reasons.
+    After the beta phase, the price will stay the same for all existing sponsors.
+    Note that $25 a month or $500 one time is the minimum amount to become eligible 
+    for the PRO version. While GitHub Sponsors also allows sponsoring lower amounts, 
+    those can't be granted access to the PRO version due to technical reasons.
 
 ## What sponsorships achieve
 
@@ -103,7 +103,7 @@ collaborator.[^2]
 [^2]:
     It's currently not possible to grant access to each member of an
     organization, as GitHub only allows for adding users. Thus, after
-    sponsoring, please send an email to olegpolakow@gmail.com, stating which
+    sponsoring, please email me at olegpolakow@gmail.com, stating which
     account should become a collaborator of the PRO repository.
     To ensure that access is not tied to a particular individual GitHub account,
     create a bot account (i.e. a GitHub account that is not tied to a specific
