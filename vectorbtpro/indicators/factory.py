@@ -906,23 +906,19 @@ class IndicatorBase(Analyzable):
 
     Properties should be set before instantiation."""
 
-    _short_name: str
+    _short_name: tp.ClassVar[str]
+    _input_names: tp.ClassVar[tp.Tuple[str, ...]]
+    _param_names: tp.ClassVar[tp.Tuple[str, ...]]
+    _in_output_names: tp.ClassVar[tp.Tuple[str, ...]]
+    _output_names: tp.ClassVar[tp.Tuple[str, ...]]
+    _output_flags: tp.ClassVar[tp.Kwargs]
+
     _level_names: tp.Tuple[str, ...]
-    _input_names: tp.Tuple[str, ...]
-    _param_names: tp.Tuple[str, ...]
-    _in_output_names: tp.Tuple[str, ...]
-    _output_names: tp.Tuple[str, ...]
-    _output_flags: tp.Kwargs
 
-    @property
-    def short_name(self) -> str:
+    @classproperty
+    def short_name(cls_or_self) -> str:
         """Name of the indicator."""
-        return self._short_name
-
-    @property
-    def level_names(self) -> tp.Tuple[str, ...]:
-        """Column level names corresponding to each parameter."""
-        return self._level_names
+        return cls_or_self._short_name
 
     @classproperty
     def input_names(cls_or_self) -> tp.Tuple[str, ...]:
@@ -948,6 +944,11 @@ class IndicatorBase(Analyzable):
     def output_flags(cls_or_self) -> tp.Kwargs:
         """Dictionary of output flags."""
         return cls_or_self._output_flags
+
+    @classproperty
+    def level_names(cls_or_self) -> tp.Tuple[str, ...]:
+        """Column level names corresponding to each parameter."""
+        return cls_or_self._level_names
 
     def __init__(self,
                  wrapper: ArrayWrapper,
@@ -1225,6 +1226,7 @@ class IndicatorFactory(Configured):
             Indicator.__module__ = module_name
 
         # Create read-only properties
+        setattr(Indicator, "_short_name", short_name)
         setattr(Indicator, "_input_names", tuple(input_names))
         setattr(Indicator, "_param_names", tuple(param_names))
         setattr(Indicator, "_in_output_names", tuple(in_output_names))
@@ -1646,7 +1648,7 @@ class IndicatorFactory(Configured):
             and exceed `output_names`.
 
         Usage:
-            The following example produces the same indicator as the `IndicatorFactory.with_apply_func` example.
+            * The following example produces the same indicator as the `IndicatorFactory.with_apply_func` example.
 
             ```pycon
             >>> @njit
@@ -1687,7 +1689,8 @@ class IndicatorFactory(Configured):
 
             The difference between `apply_func_nb` here and in `IndicatorFactory.with_apply_func` is that
             here it takes the index of the current parameter combination that can be used for parameter selection.
-            You can also remove the entire `apply_func_nb` and define your logic in `custom_func`
+
+            * You can also remove the entire `apply_func_nb` and define your logic in `custom_func`
             (which shouldn't necessarily be Numba-compiled):
 
             ```pycon
@@ -2125,7 +2128,7 @@ Other keyword arguments are passed to `{0}.run`.
             Indicator
 
         Usage:
-            The following example produces the same indicator as the `IndicatorFactory.with_custom_func` example.
+            * The following example produces the same indicator as the `IndicatorFactory.with_custom_func` example.
 
             ```pycon
             >>> @njit
@@ -2161,7 +2164,7 @@ Other keyword arguments are passed to `{0}.run`.
             2020-01-05  230.0  206.0  240.0  208.0
             ```
 
-            To change the execution engine or specify other engine-related arguments, use `execute_kwargs`:
+            * To change the execution engine or specify other engine-related arguments, use `execute_kwargs`:
 
             ```pycon
             >>> import time
@@ -2379,7 +2382,7 @@ Other keyword arguments are passed to `{0}.run`.
             2020-01-05      4.5  1.5  4.0  2.0
             ```
 
-            To get help on running the indicator, use the `help` command:
+            * To get help on running the indicator, use the `help` command:
 
             ```pycon
             >>> help(SMA.run)
@@ -2398,7 +2401,7 @@ Other keyword arguments are passed to `{0}.run`.
                 Other keyword arguments are passed to `vectorbtpro.indicators.factory.run_pipeline`.
             ```
 
-            To plot an indicator:
+            * To plot an indicator:
 
             ```pycon
             >>> sma.plot(column=(2, 'a'))
@@ -2756,7 +2759,7 @@ Args:
             2020-01-05  4.5  1.5  4.0  2.0
             ```
 
-            To get help on running the indicator, use the `help` command:
+            * To get help on running the indicator, use the `help` command:
 
             ```pycon
             >>> help(SMA.run)
@@ -2775,7 +2778,7 @@ Args:
                 Other keyword arguments are passed to `vectorbtpro.indicators.factory.run_pipeline`.
             ```
 
-            To get the indicator docstring, use the `help` command or print the `__doc__` attribute:
+            * To get the indicator docstring, use the `help` command or print the `__doc__` attribute:
 
             ```pycon
             >>> print(SMA.__doc__)
@@ -2975,7 +2978,7 @@ Args:
             2020-01-05           4.5  1.5  4.0  2.0
             ```
 
-            To get help on running the indicator, use the `help` command:
+            * To get help on running the indicator, use the `help` command:
 
             ```pycon
             >>> help(SMAIndicator.run)
@@ -2994,7 +2997,7 @@ Args:
                 Other keyword arguments are passed to `vectorbtpro.indicators.factory.run_pipeline`.
             ```
 
-            To get the indicator docstring, use the `help` command or print the `__doc__` attribute:
+            * To get the indicator docstring, use the `help` command or print the `__doc__` attribute:
 
             ```pycon
             >>> print(SMAIndicator.__doc__)
@@ -3068,16 +3071,17 @@ Args:
     @class_or_instancemethod
     def from_expr(cls_or_self,
                   expr: str,
+                  parse_annotations: bool = True,
                   factory_kwargs: tp.KwargsLike = None,
-                  parse_special_vars: bool = True,
                   magnet_inputs: tp.Iterable[str] = None,
                   magnet_in_outputs: tp.Iterable[str] = None,
                   magnet_params: tp.Iterable[str] = None,
                   func_mapping: tp.KwargsLike = None,
                   res_func_mapping: tp.KwargsLike = None,
-                  use_pd_eval: bool = False,
+                  use_pd_eval: tp.Optional[bool] = None,
                   pd_eval_kwargs: tp.KwargsLike = None,
-                  **kwargs) -> tp.Type[IndicatorBase]:
+                  return_clean_expr: bool = False,
+                  **kwargs) -> tp.Union[str, tp.Type[IndicatorBase]]:
         """Build an indicator class from an indicator expression.
 
         Args:
@@ -3085,10 +3089,10 @@ Args:
 
                 Expression must be a string with a valid Python code.
                 Supported are both single-line and multi-line expressions.
+            parse_annotations (bool): Whether to parse annotations starting with `@`.
             factory_kwargs (dict): Keyword arguments passed to `IndicatorFactory`.
 
                 Only applied when calling the class method.
-            parse_special_vars (bool): Whether to parse variables starting with `@`.
             magnet_inputs (iterable of str): Names recognized as input names.
 
                 Defaults to `open`, `high`, `low`, `close`, and `volume`.
@@ -3108,12 +3112,15 @@ Args:
                 `func` and optionally `magnet_inputs`, `magnet_in_outputs`, and `magnet_params`.
             use_pd_eval (bool): Whether to use `pd.eval`.
 
+                Defaults to False.
+
                 Otherwise, uses `vectorbtpro.utils.eval_.multiline_eval`.
 
                 !!! hint
                     By default, operates on NumPy objects using NumExpr.
                     If you want to operate on Pandas objects, set `keep_pd` to True.
             pd_eval_kwargs (dict): Keyword arguments passed to `pd.eval`.
+            return_clean_expr (bool): Whether to return a cleaned expression.
             **kwargs: Keyword arguments passed to `IndicatorFactory.with_apply_func`.
 
         Returns:
@@ -3145,14 +3152,21 @@ Args:
         If the expression begins with a valid variable name and a color (`:`), the variable name
         will be used as the name of the generated class.
 
-        If `parse_special_vars` is True, variables that start with `@` have a special meaning:
+        If `parse_annotations` is True, variables that start with `@` have a special meaning:
 
-        * `@in_*`: input
-        * `@inout_*`: in-output
-        * `@p_*`: parameter
-        * `@out_*` followed by a color (`:`): output
+        * `@in_*`: input variable
+        * `@inout_*`: in-output variable
+        * `@p_*`: parameter variable
+        * `@out_*`: output variable
+        * `@out_*:`: indicates that the next part until a comma is an output
         * `@talib_*`: name of a TA-Lib indicator wrapped by `IndicatorFactory`
         * `@talib_1d_*`: name of an original TA-Lib function
+        * `@res_*`: name of the indicator to resolve automatically. Input names can overlap with
+            those of other indicators, while all other information gets a prefix with the indicator's short name.
+        * `@settings(*)`: settings to be merged with the current `IndicatorFactory.from_expr` settings.
+            Everything within the parentheses gets evaluated using the Pythons `eval` command
+            and must be a dictionary. Overrides defaults but gets overridden by any argument
+            passed to this method. Arguments `expr` and `parse_annotations` cannot be overridden.
 
         !!! note
             The parsed names come in the same order they appear in the expression, not in the execution order,
@@ -3183,7 +3197,7 @@ Args:
             2020-01-05  4.666667  1.333333  4.333333  1.666667
             ```
 
-            The same can be achieved by calling the class method and providing prefixes
+            * The same can be achieved by calling the class method and providing prefixes
             to the variable names to indicate their type:
 
             ```pycon
@@ -3200,26 +3214,117 @@ Args:
             2020-01-05  5.166667  1.833333  4.833333  2.166667
             ```
 
-            Common (lower-case) input names from OHLCV are recognized automatically:
+            * Magnet names are recognized automatically:
 
             ```pycon
             >>> expr = "WMA: @out_wma:wm_mean_nb((high + low) / 2, @p_window)"
-            >>> WMA = vbt.IF.from_expr(expr)
-            >>> wma = WMA.run(price + 1, price, window=[2, 3])
-            >>> wma.wma
-            wma_window                   2                   3
-                               a         b         a         b
-            2020-01-01       NaN       NaN       NaN       NaN
-            2020-01-02  2.166667  4.833333       NaN       NaN
-            2020-01-03  3.166667  3.833333  2.833333  4.166667
-            2020-01-04  4.166667  2.833333  3.833333  3.166667
-            2020-01-05  5.166667  1.833333  4.833333  2.166667
+            ```
+
+            * Most settings of this method can be overriden from within the expression:
+
+            ```pycon
+            >>> expr = \"\"\"
+            ... @settings({factory_kwargs={'class_name': 'WMA', 'param_names': ['window']}})
+            ... @out_wma:wm_mean_nb((high + low) / 2, window)
+            ... \"\"\"
             ```
         """
-        func_mapping = merge_dicts(expr_func_config, func_mapping)
-        res_func_mapping = merge_dicts(expr_res_func_config, res_func_mapping)
+
+        def _clean_expr(expr: str) -> str:
+            # Clean the expression from redundant brackets and commas
+            expr = inspect.cleandoc(expr).strip()
+            if expr.endswith(','):
+                expr = expr[:-1]
+            if expr.startswith('(') and expr.endswith(')'):
+                n_open_brackets = 0
+                remove_brackets = True
+                for i, s in enumerate(expr):
+                    if s == '(':
+                        n_open_brackets += 1
+                    elif s == ')':
+                        n_open_brackets -= 1
+                        if n_open_brackets == 0 and i < len(expr) - 1:
+                            remove_brackets = False
+                            break
+                if remove_brackets:
+                    expr = expr[1:-1]
+            if expr.endswith(','):
+                expr = expr[:-1]  # again
+            return expr
 
         if isinstance(cls_or_self, type):
+            settings = dict(
+                factory_kwargs=dict(
+                    class_name=None,
+                    input_names=[],
+                    in_output_names=[],
+                    param_names=[],
+                    output_names=[]
+                )
+            )
+
+            # Parse the class name
+            match = re.match(r"^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*", expr)
+            if match:
+                settings['factory_kwargs']['class_name'] = match.group(1)
+                expr = expr[len(match.group(0)):]
+
+            # Parse the settings dictionary
+            if '@settings' in expr:
+                remove_chars = set()
+                for m in re.finditer('@settings', expr):
+                    n_open_brackets = 0
+                    from_i = None
+                    to_i = None
+                    for i in range(m.start(), m.end()):
+                        remove_chars.add(i)
+                    for i in range(m.end(), len(expr)):
+                        remove_chars.add(i)
+                        s = expr[i]
+                        if s in '(':
+                            if n_open_brackets == 0:
+                                from_i = i + 1
+                            n_open_brackets += 1
+                        elif s in ')':
+                            n_open_brackets -= 1
+                            if n_open_brackets == 0:
+                                to_i = i
+                                break
+                    if n_open_brackets != 0:
+                        raise ValueError("Couldn't parse the settings: mismatching brackets")
+                    settings = merge_dicts(settings, eval(_clean_expr(expr[from_i:to_i])))
+                expr = ''.join([expr[i] for i in range(len(expr)) if i not in remove_chars])
+
+            expr = _clean_expr(expr)
+
+            # Merge info
+            parsed_factory_kwargs = settings.pop('factory_kwargs')
+            magnet_inputs = settings.pop('magnet_inputs', magnet_inputs)
+            magnet_in_outputs = settings.pop('magnet_in_outputs', magnet_in_outputs)
+            magnet_params = settings.pop('magnet_params', magnet_params)
+            func_mapping = merge_dicts(
+                expr_func_config,
+                settings.pop('func_mapping', None),
+                func_mapping
+            )
+            res_func_mapping = merge_dicts(
+                expr_res_func_config,
+                settings.pop('res_func_mapping', None),
+                res_func_mapping
+            )
+            use_pd_eval = settings.pop('use_pd_eval', use_pd_eval)
+            pd_eval_kwargs = merge_dicts(
+                settings.pop('pd_eval_kwargs', None),
+                pd_eval_kwargs
+            )
+            kwargs = merge_dicts(
+                settings,
+                kwargs
+            )
+
+            # Resolve defaults
+            if use_pd_eval is None:
+                use_pd_eval = False
             if magnet_inputs is None:
                 magnet_inputs = ['open', 'high', 'low', 'close', 'volume']
             if magnet_in_outputs is None:
@@ -3229,46 +3334,9 @@ Args:
             found_magnet_inputs = []
             found_magnet_in_outputs = []
             found_magnet_params = []
-            input_names = []
-            in_output_names = []
-            param_names = []
-            talib_names = []
-            output_names = []
 
-            # Parse the class name
-            match = re.match(r"^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*", expr)
-            if match:
-                class_name = match.group(1)
-                expr = expr[len(match.group(0)):]
-            else:
-                class_name = None
-
-            # Clean the expression from redundant brackets and commas
-            def _clean_expr(expr: str) -> str:
-                expr = expr.strip()
-                if expr.endswith(','):
-                    expr = expr[:-1]
-                if expr.startswith('(') and expr.endswith(')'):
-                    n_open_brackets = 0
-                    remove_brackets = True
-                    for i, s in enumerate(expr):
-                        if s == '(':
-                            n_open_brackets += 1
-                        elif s == ')':
-                            n_open_brackets -= 1
-                            if n_open_brackets == 0 and i < len(expr) - 1:
-                                remove_brackets = False
-                                break
-                    if remove_brackets:
-                        expr = expr[1:-1]
-                if expr.endswith(','):
-                    expr = expr[:-1]  # again
-                return expr
-
-            expr = _clean_expr(expr)
-
-            # Parse special variables
-            if parse_special_vars:
+            # Parse annotated variables
+            if parse_annotations:
                 # Parse input, in-output, parameter, and TA-Lib function names
                 for var_name in re.findall(r"@[a-z]+_[a-zA-Z_][a-zA-Z0-9_]*", expr):
                     var_name = var_name.replace('@', '')
@@ -3278,41 +3346,85 @@ Args:
                             if var_name not in found_magnet_inputs:
                                 found_magnet_inputs.append(var_name)
                         else:
-                            if var_name not in input_names:
-                                input_names.append(var_name)
+                            if var_name not in parsed_factory_kwargs['input_names']:
+                                parsed_factory_kwargs['input_names'].append(var_name)
                     elif var_name.startswith('inout_'):
                         var_name = var_name[6:]
                         if var_name in magnet_in_outputs:
                             if var_name not in found_magnet_in_outputs:
                                 found_magnet_in_outputs.append(var_name)
                         else:
-                            if var_name not in in_output_names:
-                                in_output_names.append(var_name)
+                            if var_name not in parsed_factory_kwargs['in_output_names']:
+                                parsed_factory_kwargs['in_output_names'].append(var_name)
                     elif var_name.startswith('p_'):
                         var_name = var_name[2:]
                         if var_name in magnet_params:
                             if var_name not in found_magnet_params:
                                 found_magnet_params.append(var_name)
                         else:
-                            if var_name not in param_names:
-                                param_names.append(var_name)
-                    elif var_name.startswith('talib_'):
-                        var_name = var_name[6:]
-                        if var_name not in talib_names:
-                            talib_names.append(var_name)
+                            if var_name not in parsed_factory_kwargs['param_names']:
+                                parsed_factory_kwargs['param_names'].append(var_name)
+                    elif var_name.startswith('res_'):
+                        ind_name = var_name[4:]
+                        if ind_name.startswith('talib_'):
+                            ind_name = ind_name[6:]
+                            I = IndicatorFactory.from_talib(ind_name)
+                        else:
+                            I = kwargs[ind_name]
+                        if not issubclass(I, IndicatorBase):
+                            raise TypeError(f"Indicator class '{ind_name}' must subclass IndicatorBase")
+
+                        def _ind_func(context: tp.Kwargs, _I: IndicatorBase = I) -> tp.Any:
+                            _args = ()
+                            _kwargs = {}
+                            signature = inspect.signature(_I.run)
+                            for p in signature.parameters.values():
+                                if p.name in _I.input_names:
+                                    if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD):
+                                        _args += (context[p.name],)
+                                    else:
+                                        _kwargs[p.name] = context[p.name]
+                                else:
+                                    ind_p_name = _I.short_name + '_' + p.name
+                                    if ind_p_name in context:
+                                        if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD):
+                                            _args += (context[ind_p_name],)
+                                        elif p.kind == p.VAR_POSITIONAL:
+                                            _args += context[ind_p_name]
+                                        elif p.kind == p.VAR_KEYWORD:
+                                            for k, v in context[ind_p_name].items():
+                                                _kwargs[k] = v
+                                        else:
+                                            _kwargs[p.name] = context[ind_p_name]
+                            return_raw = _kwargs.pop('return_raw', True)
+                            ind = _I.run(*_args, return_raw=return_raw, **_kwargs)
+                            if return_raw:
+                                raw_outputs = ind[0]
+                                if len(raw_outputs) == 1:
+                                    return raw_outputs[0]
+                                return raw_outputs
+                            return ind
+
+                        res_func_mapping['__' + var_name] = dict(
+                            func=_ind_func,
+                            magnet_inputs=I.input_names,
+                            magnet_in_outputs=[I.short_name + '_' + name for name in I.in_output_names],
+                            magnet_params=[I.short_name + '_' + name for name in I.param_names]
+                        )
 
                 expr = expr.replace("@in_", "__in_")
                 expr = expr.replace("@inout_", "__inout_")
                 expr = expr.replace("@p_", "__p_")
                 expr = expr.replace("@talib_", "__talib_")
+                expr = expr.replace("@res_", "__res_")
 
                 # Parse output names
                 to_replace = []
                 for var_name in re.findall(r"@out_[a-zA-Z_][a-zA-Z0-9_]*\s*:\s*", expr):
                     to_replace.append(var_name)
                     var_name = var_name.split(':')[0].strip()[5:]
-                    if var_name not in output_names:
-                        output_names.append(var_name)
+                    if var_name not in parsed_factory_kwargs['output_names']:
+                        parsed_factory_kwargs['output_names'].append(var_name)
                 for s in to_replace:
                     expr = expr.replace(s, '')
 
@@ -3320,12 +3432,12 @@ Args:
                     var_name = var_name.replace('@', '')
                     if var_name.startswith('out_'):
                         var_name = var_name[4:]
-                        if var_name not in output_names:
-                            output_names.append(var_name)
+                        if var_name not in parsed_factory_kwargs['output_names']:
+                            parsed_factory_kwargs['output_names'].append(var_name)
 
                 expr = expr.replace("@out_", "__out_")
 
-                if len(output_names) == 0:
+                if len(parsed_factory_kwargs['output_names']) == 0:
                     lines = expr.split('\n')
                     if len(lines) > 1:
                         last_line = _clean_expr(lines[-1])
@@ -3339,7 +3451,7 @@ Args:
                                 found_not_valid = True
                                 break
                         if not found_not_valid:
-                            output_names = valid_output_names
+                            parsed_factory_kwargs['output_names'] = valid_output_names
 
             # Parse magnet names
             var_names = get_expr_var_names(expr)
@@ -3357,15 +3469,30 @@ Args:
                             if magnet_name not in found_magnet_lst:
                                 found_magnet_lst.append(magnet_name)
                 for magnet_name in magnet_lst:
-                    if magnet_name in found_magnet_lst:
+                    if magnet_name in found_magnet_lst and magnet_name not in magnet_names:
                         magnet_names.append(magnet_name)
                 for magnet_name in found_magnet_lst:
-                    if magnet_name not in magnet_names:
+                    if magnet_name not in magnet_names and magnet_name not in magnet_names:
                         magnet_names.append(magnet_name)
 
-            _find_magnets('magnet_inputs', input_names, magnet_inputs, found_magnet_inputs)
-            _find_magnets('magnet_in_outputs', in_output_names, magnet_in_outputs, found_magnet_in_outputs)
-            _find_magnets('magnet_params', param_names, magnet_params, found_magnet_params)
+            _find_magnets(
+                'magnet_inputs',
+                parsed_factory_kwargs['input_names'],
+                magnet_inputs,
+                found_magnet_inputs
+            )
+            _find_magnets(
+                'magnet_in_outputs',
+                parsed_factory_kwargs['in_output_names'],
+                magnet_in_outputs,
+                found_magnet_in_outputs
+            )
+            _find_magnets(
+                'magnet_params',
+                parsed_factory_kwargs['param_names'],
+                magnet_params,
+                found_magnet_params
+            )
 
             # Parse the number of outputs
             n_open_brackets = 0
@@ -3379,28 +3506,30 @@ Args:
                     n_open_brackets -= 1
             if n_open_brackets != 0:
                 raise ValueError("Couldn't parse the number of outputs: mismatching brackets")
-            if len(output_names) > 0 and len(output_names) != n_outputs:
+            if len(parsed_factory_kwargs['output_names']) > 0 \
+                    and len(parsed_factory_kwargs['output_names']) != n_outputs:
                 raise ValueError("The number of parsed outputs doesn't match the actual number of outputs")
-            elif len(output_names) == 0:
+            elif len(parsed_factory_kwargs['output_names']) == 0:
                 if n_outputs == 1:
-                    output_names = ['out']
+                    parsed_factory_kwargs['output_names'] = ['out']
                 else:
-                    output_names = ['out%d' % (i + 1) for i in range(n_outputs)]
+                    parsed_factory_kwargs['output_names'] = ['out%d' % (i + 1) for i in range(n_outputs)]
 
             factory = cls_or_self(
                 **merge_dicts(
-                    dict(
-                        class_name=class_name,
-                        input_names=input_names,
-                        in_output_names=in_output_names,
-                        param_names=param_names,
-                        output_names=output_names
-                    ),
+                    parsed_factory_kwargs,
                     factory_kwargs
                 )
             )
         else:
+            func_mapping = merge_dicts(expr_func_config, func_mapping)
+            res_func_mapping = merge_dicts(expr_res_func_config, res_func_mapping)
+
             factory = cls_or_self
+
+        if return_clean_expr:
+            # For debugging purposes
+            return expr
 
         Indicator = factory.Indicator
 
@@ -3529,7 +3658,7 @@ Args:
             [2688 rows x 2 columns]
             ```
 
-            To get help on running the indicator, use the `help` command:
+            * To get help on running the indicator, use the `help` command:
 
             ```pycon
             >>> help(WQA1.run)
@@ -3551,7 +3680,7 @@ Args:
             wqa101_expr_config[alpha_idx],
             factory_kwargs=dict(
                 class_name="WQA%d" % alpha_idx,
-                module_name=__name__ + '.wqa'
+                module_name=__name__ + '.wqa101'
             ),
             **kwargs
         )

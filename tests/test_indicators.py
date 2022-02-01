@@ -2372,6 +2372,15 @@ class TestFactory:
         assert I.input_names == ('ts',)
         assert I.param_names == ('window',)
         pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
+        I = vbt.IndicatorFactory.from_expr("""
+        RollMean:
+        rolling_mean(@in_ts, @p_window)
+        """, window=2)
+        assert I.__name__ == "RollMean"
+        assert I.input_names == ('ts',)
+        assert I.param_names == ('window',)
+        pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
+
         I = vbt.IndicatorFactory.from_expr("rolling_mean(@in_ts, @p_window)", window=2)
         assert I.input_names == ('ts',)
         assert I.param_names == ('window',)
@@ -2480,14 +2489,118 @@ class TestFactory:
         assert I.param_names == ('window1', 'window2')
         pd.testing.assert_frame_equal(I.run(ts, ts * 2).o1, ts.vbt.rolling_mean(2))
         pd.testing.assert_frame_equal(I.run(ts, ts * 2).o2, (ts * 2).vbt.rolling_mean(3))
+        I = vbt.IndicatorFactory.from_expr("""
+        @out_o1 = rolling_mean(@in_ts1, @p_window1)
+        @out_o2 = rolling_mean(@in_ts2, @p_window2)
+        @out_o1, @out_o2
+        """, window1=2, window2=3)
+        assert I.input_names == ('ts1', 'ts2')
+        assert I.param_names == ('window1', 'window2')
+        pd.testing.assert_frame_equal(I.run(ts, ts * 2).o1, ts.vbt.rolling_mean(2))
+        pd.testing.assert_frame_equal(I.run(ts, ts * 2).o2, (ts * 2).vbt.rolling_mean(3))
+        I = vbt.IndicatorFactory.from_expr("""
+        o1 = rolling_mean(@in_ts1, @p_window1)
+        o2 = rolling_mean(@in_ts2, @p_window2)
+        o1, o2
+        """, window1=2, window2=3)
+        assert I.input_names == ('ts1', 'ts2')
+        assert I.param_names == ('window1', 'window2')
+        pd.testing.assert_frame_equal(I.run(ts, ts * 2).o1, ts.vbt.rolling_mean(2))
+        pd.testing.assert_frame_equal(I.run(ts, ts * 2).o2, (ts * 2).vbt.rolling_mean(3))
 
         I = vbt.IndicatorFactory.from_expr("@talib_sma(@in_ts, @p_window)", window=2)
         assert I.input_names == ('ts',)
         assert I.param_names == ('window',)
         pd.testing.assert_frame_equal(I.run(ts).out, vbt.IF.from_talib('SMA', timeperiod=2).run(ts).real)
+        I = vbt.IndicatorFactory.from_expr("@talib_1d_sma(@in_ts, @p_window)", window=2)
+        assert I.input_names == ('ts',)
+        assert I.param_names == ('window',)
+        pd.testing.assert_series_equal(
+            I.run(ts['a'], to_2d=False).out,
+            vbt.IF.from_talib('SMA', timeperiod=2).run(ts['a']).real)
+
+        I = vbt.IndicatorFactory.from_expr("""
+        @settings({
+            'factory_kwargs': {
+                'input_names': ['ts1', 'ts2'], 
+                'param_names': ['window1', 'window2'], 
+                'output_names': ['o3', 'o4']
+            },
+            'window1': 2,
+            'window2': 3
+        })
+        o1 = rolling_mean(ts1, window1)
+        o2 = rolling_mean(ts2, window2)
+        o1, o2
+        """)
+        assert I.input_names == ('ts1', 'ts2')
+        assert I.param_names == ('window1', 'window2')
+        pd.testing.assert_frame_equal(I.run(ts, ts * 2).o3, ts.vbt.rolling_mean(2))
+        pd.testing.assert_frame_equal(I.run(ts, ts * 2).o4, (ts * 2).vbt.rolling_mean(3))
+        I = vbt.IndicatorFactory.from_expr("""
+        @settings({
+            'factory_kwargs': {
+                'input_names': ['ts1', 'ts2'], 
+                'param_names': ['window1', 'window2'], 
+                'output_names': ['o3', 'o4']
+            },
+            'window1': 2,
+            'window2': 3
+        })
+        o1 = rolling_mean(ts1, window1)
+        o2 = rolling_mean(ts2, window2)
+        o1, o2
+        """, factory_kwargs=dict(output_names=['o1', 'o2']))
+        assert I.input_names == ('ts1', 'ts2')
+        assert I.param_names == ('window1', 'window2')
+        pd.testing.assert_frame_equal(I.run(ts, ts * 2).o1, ts.vbt.rolling_mean(2))
+        pd.testing.assert_frame_equal(I.run(ts, ts * 2).o2, (ts * 2).vbt.rolling_mean(3))
+        I = vbt.IndicatorFactory.from_expr("""
+        @settings({
+            'factory_kwargs': {
+                'input_names': ['ts1', 'ts2'], 
+                'param_names': ['window1', 'window2'], 
+                'output_names': ['o3', 'o4']
+            },
+            'window1': 2,
+            'window2': 3
+        })
+        @settings({
+            'factory_kwargs': {
+                'output_names': ['o1', 'o2']
+            },
+            'window2': 4
+        })
+        o1 = rolling_mean(ts1, window1)
+        o2 = rolling_mean(ts2, window2)
+        o1, o2
+        """)
+        assert I.input_names == ('ts1', 'ts2')
+        assert I.param_names == ('window1', 'window2')
+        pd.testing.assert_frame_equal(I.run(ts, ts * 2).o1, ts.vbt.rolling_mean(2))
+        pd.testing.assert_frame_equal(I.run(ts, ts * 2).o2, (ts * 2).vbt.rolling_mean(4))
+
+        I = vbt.IndicatorFactory.from_expr("@res_talib_sma", sma_timeperiod=2)
+        assert I.input_names == ('close',)
+        assert I.param_names == ('sma_timeperiod',)
+        pd.testing.assert_frame_equal(I.run(ts).out, vbt.IF.from_talib('SMA', timeperiod=2).run(ts).real)
+        I = vbt.IndicatorFactory.from_expr("@res_talib_sma * @res_talib_ema", sma_timeperiod=2, ema_timeperiod=3)
+        assert I.input_names == ('close',)
+        assert I.param_names == ('sma_timeperiod', 'ema_timeperiod')
+        pd.testing.assert_frame_equal(
+            I.run(ts).out,
+            vbt.IF.from_talib('SMA', timeperiod=2).run(ts).real *
+            vbt.IF.from_talib('EMA', timeperiod=3).run(ts).real)
+        I = vbt.IndicatorFactory.from_expr(
+            "@res_talib_sma.real.cumsum()",
+            sma_timeperiod=2,
+            sma_kwargs=dict(return_raw=False))
+        assert I.input_names == ('close',)
+        assert I.param_names == ('sma_timeperiod',)
+        pd.testing.assert_frame_equal(I.run(ts).out, vbt.IF.from_talib('SMA', timeperiod=2).run(ts).real.cumsum())
 
         with pytest.raises(Exception):
-            vbt.IndicatorFactory.from_expr("rolling_mean(@in_ts, @p_window)", parse_special_vars=False)
+            vbt.IndicatorFactory.from_expr("rolling_mean(@in_ts, @p_window)", parse_annotations=False)
 
     def test_from_wqa101(self):
         columns = pd.MultiIndex.from_tuples([
