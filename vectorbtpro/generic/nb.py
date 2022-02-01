@@ -1465,7 +1465,7 @@ def wm_mean_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None) -> t
 
 
 @register_jitted(cache=True)
-def ewm_mean_1d_nb(arr: tp.Array1d, span: int, minp: int = 0, adjust: bool = False) -> tp.Array1d:
+def ewm_mean_1d_nb(arr: tp.Array1d, span: int, minp: tp.Optional[int] = None, adjust: bool = False) -> tp.Array1d:
     """Compute exponential weighted moving average.
 
     Numba equivalent to `pd.Series(arr).ewm(span=span, min_periods=minp, adjust=adjust).mean()`.
@@ -1520,7 +1520,7 @@ def ewm_mean_1d_nb(arr: tp.Array1d, span: int, minp: int = 0, adjust: bool = Fal
     merge_func=base_ch.column_stack
 )
 @register_jitted(cache=True, tags={'can_parallel'})
-def ewm_mean_nb(arr: tp.Array2d, span: int, minp: int = 0, adjust: bool = False) -> tp.Array2d:
+def ewm_mean_nb(arr: tp.Array2d, span: int, minp: tp.Optional[int] = None, adjust: bool = False) -> tp.Array2d:
     """2-dim version of `ewm_mean_1d_nb`."""
     out = np.empty_like(arr, dtype=np.float_)
     for col in prange(arr.shape[1]):
@@ -1529,8 +1529,10 @@ def ewm_mean_nb(arr: tp.Array2d, span: int, minp: int = 0, adjust: bool = False)
 
 
 @register_jitted(cache=True)
-def wwm_mean_1d_nb(arr: tp.Array1d, period: int, minp: int = 0) -> tp.Array1d:
+def wwm_mean_1d_nb(arr: tp.Array1d, period: int, minp: tp.Optional[int] = None) -> tp.Array1d:
     """Compute Wilder's exponential weighted moving average."""
+    if minp is None:
+        minp = period
     return ewm_mean_1d_nb(arr, 2 * period - 1, minp=minp, adjust=False)
 
 
@@ -1544,7 +1546,7 @@ def wwm_mean_1d_nb(arr: tp.Array1d, period: int, minp: int = 0) -> tp.Array1d:
     merge_func=base_ch.column_stack
 )
 @register_jitted(cache=True, tags={'can_parallel'})
-def wwm_mean_nb(arr: tp.Array2d, period: int, minp: int = 0) -> tp.Array2d:
+def wwm_mean_nb(arr: tp.Array2d, period: int, minp: tp.Optional[int] = None) -> tp.Array2d:
     """2-dim version of `wwm_mean_1d_nb`."""
     out = np.empty_like(arr, dtype=np.float_)
     for col in prange(arr.shape[1]):
@@ -1553,8 +1555,10 @@ def wwm_mean_nb(arr: tp.Array2d, period: int, minp: int = 0) -> tp.Array2d:
 
 
 @register_jitted(cache=True)
-def wwm_std_1d_nb(arr: tp.Array1d, period: int, minp: int = 0) -> tp.Array1d:
+def wwm_std_1d_nb(arr: tp.Array1d, period: int, minp: tp.Optional[int] = None) -> tp.Array1d:
     """Compute Wilder's exponential weighted moving standard deviation."""
+    if minp is None:
+        minp = period
     return ewm_std_1d_nb(arr, 2 * period - 1, minp=minp, adjust=False)
 
 
@@ -1568,7 +1572,7 @@ def wwm_std_1d_nb(arr: tp.Array1d, period: int, minp: int = 0) -> tp.Array1d:
     merge_func=base_ch.column_stack
 )
 @register_jitted(cache=True, tags={'can_parallel'})
-def wwm_std_nb(arr: tp.Array2d, period: int, minp: int = 0) -> tp.Array2d:
+def wwm_std_nb(arr: tp.Array2d, period: int, minp: tp.Optional[int] = None) -> tp.Array2d:
     """2-dim version of `wwm_std_1d_nb`."""
     out = np.empty_like(arr, dtype=np.float_)
     for col in prange(arr.shape[1]):
@@ -1577,7 +1581,7 @@ def wwm_std_nb(arr: tp.Array2d, period: int, minp: int = 0) -> tp.Array2d:
 
 
 @register_jitted(cache=True)
-def ewm_std_1d_nb(arr: tp.Array1d, span: int, minp: int = 0, adjust: bool = False) -> tp.Array1d:
+def ewm_std_1d_nb(arr: tp.Array1d, span: int, minp: tp.Optional[int] = None, adjust: bool = False) -> tp.Array1d:
     """Compute exponential weighted moving standard deviation.
 
     Numba equivalent to `pd.Series(arr).ewm(span=span, min_periods=minp).std()`.
@@ -1669,7 +1673,7 @@ def ewm_std_1d_nb(arr: tp.Array1d, span: int, minp: int = 0, adjust: bool = Fals
     merge_func=base_ch.column_stack
 )
 @register_jitted(cache=True, tags={'can_parallel'})
-def ewm_std_nb(arr: tp.Array2d, span: int, minp: int = 0, adjust: bool = False) -> tp.Array2d:
+def ewm_std_nb(arr: tp.Array2d, span: int, minp: tp.Optional[int] = None, adjust: bool = False) -> tp.Array2d:
     """2-dim version of `ewm_std_1d_nb`."""
     out = np.empty_like(arr, dtype=np.float_)
     for col in prange(arr.shape[1]):
@@ -1850,7 +1854,7 @@ def rolling_rank_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int], pct
     merge_func=base_ch.column_stack
 )
 @register_jitted(cache=True, tags={'can_parallel'})
-def rolling_rank_nb(arr: tp.Array2d, window: int, minp: int = 0, pct: bool = False) -> tp.Array2d:
+def rolling_rank_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None, pct: bool = False) -> tp.Array2d:
     """2-dim version of `rolling_rank_1d_nb`."""
     out = np.empty_like(arr, dtype=np.float_)
     for col in prange(arr.shape[1]):

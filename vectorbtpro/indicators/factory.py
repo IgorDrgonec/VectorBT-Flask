@@ -3070,7 +3070,9 @@ Args:
                   expr: str,
                   factory_kwargs: tp.KwargsLike = None,
                   parse_special_vars: bool = True,
-                  magnet_input_names: tp.Iterable[str] = None,
+                  magnet_inputs: tp.Iterable[str] = None,
+                  magnet_in_outputs: tp.Iterable[str] = None,
+                  magnet_params: tp.Iterable[str] = None,
                   func_mapping: tp.KwargsLike = None,
                   res_func_mapping: tp.KwargsLike = None,
                   use_pd_eval: bool = False,
@@ -3087,17 +3089,23 @@ Args:
 
                 Only applied when calling the class method.
             parse_special_vars (bool): Whether to parse variables starting with `@`.
-            magnet_input_names (iterable of str): Names recognized as input names.
+            magnet_inputs (iterable of str): Names recognized as input names.
 
                 Defaults to `open`, `high`, `low`, `close`, and `volume`.
+            magnet_in_outputs (iterable of str): Names recognized as in-output names.
+
+                Defaults to an empty list.
+            magnet_params (iterable of str): Names recognized as params names.
+
+                Defaults to an empty list.
             func_mapping (mapping): Mapping merged over `vectorbtpro.indicators.expr.expr_func_config`.
 
                 Each key must be a function name and each value must be a dict with
-                `func` and optionally `magnet_input_names`.
+                `func` and optionally `magnet_inputs`, `magnet_in_outputs`, and `magnet_params`.
             res_func_mapping (mapping): Mapping merged over `vectorbtpro.indicators.expr.expr_res_func_config`.
 
                 Each key must be a function name and each value must be a dict with
-                `func` and optionally `magnet_input_names`.
+                `func` and optionally `magnet_inputs`, `magnet_in_outputs`, and `magnet_params`.
             use_pd_eval (bool): Whether to use `pd.eval`.
 
                 Otherwise, uses `vectorbtpro.utils.eval_.multiline_eval`.
@@ -3130,9 +3138,9 @@ Args:
 
         When using the class method, all names are parsed from the expression itself.
         If any of `open`, `high`, `low`, `close`, and `volume` appear in the expression or
-        in `magnet_input_names` in either `vectorbtpro.indicators.expr.expr_func_config` or
+        in `magnet_inputs` in either `vectorbtpro.indicators.expr.expr_func_config` or
         `vectorbtpro.indicators.expr.expr_res_func_config`, they are automatically added to `input_names`.
-        Set `magnet_input_names` to an empty list to disable this logic.
+        Set `magnet_inputs` to an empty list to disable this logic.
 
         If the expression begins with a valid variable name and a color (`:`), the variable name
         will be used as the name of the generated class.
@@ -3143,7 +3151,8 @@ Args:
         * `@inout_*`: in-output
         * `@p_*`: parameter
         * `@out_*` followed by a color (`:`): output
-        * `@talib_*`: TA-Lib indicator name, accepts the same arguments as a regular TA-Lib function
+        * `@talib_*`: name of a TA-Lib indicator wrapped by `IndicatorFactory`
+        * `@talib_1d_*`: name of an original TA-Lib function
 
         !!! note
             The parsed names come in the same order they appear in the expression, not in the execution order,
@@ -3211,6 +3220,21 @@ Args:
         res_func_mapping = merge_dicts(expr_res_func_config, res_func_mapping)
 
         if isinstance(cls_or_self, type):
+            if magnet_inputs is None:
+                magnet_inputs = ['open', 'high', 'low', 'close', 'volume']
+            if magnet_in_outputs is None:
+                magnet_in_outputs = []
+            if magnet_params is None:
+                magnet_params = []
+            found_magnet_inputs = []
+            found_magnet_in_outputs = []
+            found_magnet_params = []
+            input_names = []
+            in_output_names = []
+            param_names = []
+            talib_names = []
+            output_names = []
+
             # Parse the class name
             match = re.match(r"^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*", expr)
             if match:
@@ -3220,33 +3244,28 @@ Args:
                 class_name = None
 
             # Clean the expression from redundant brackets and commas
-            expr = expr.strip()
-            if expr.endswith(','):
-                expr = expr[:-1]
-            if expr.startswith('(') and expr.endswith(')'):
-                n_open_brackets = 0
-                remove_brackets = True
-                for i, s in enumerate(expr):
-                    if s == '(':
-                        n_open_brackets += 1
-                    elif s == ')':
-                        n_open_brackets -= 1
-                        if n_open_brackets == 0 and i < len(expr) - 1:
-                            remove_brackets = False
-                            break
-                if remove_brackets:
-                    expr = expr[1:-1]
-            if expr.endswith(','):
-                expr = expr[:-1]  # again
+            def _clean_expr(expr: str) -> str:
+                expr = expr.strip()
+                if expr.endswith(','):
+                    expr = expr[:-1]
+                if expr.startswith('(') and expr.endswith(')'):
+                    n_open_brackets = 0
+                    remove_brackets = True
+                    for i, s in enumerate(expr):
+                        if s == '(':
+                            n_open_brackets += 1
+                        elif s == ')':
+                            n_open_brackets -= 1
+                            if n_open_brackets == 0 and i < len(expr) - 1:
+                                remove_brackets = False
+                                break
+                    if remove_brackets:
+                        expr = expr[1:-1]
+                if expr.endswith(','):
+                    expr = expr[:-1]  # again
+                return expr
 
-            if magnet_input_names is None:
-                magnet_input_names = ['open', 'high', 'low', 'close', 'volume']
-            found_magnet_input_names = []
-            input_names = []
-            in_output_names = []
-            param_names = []
-            talib_names = []
-            output_names = []
+            expr = _clean_expr(expr)
 
             # Parse special variables
             if parse_special_vars:
@@ -3255,20 +3274,28 @@ Args:
                     var_name = var_name.replace('@', '')
                     if var_name.startswith('in_'):
                         var_name = var_name[3:]
-                        if var_name in magnet_input_names:
-                            if var_name not in found_magnet_input_names:
-                                found_magnet_input_names.append(var_name)
+                        if var_name in magnet_inputs:
+                            if var_name not in found_magnet_inputs:
+                                found_magnet_inputs.append(var_name)
                         else:
                             if var_name not in input_names:
                                 input_names.append(var_name)
                     elif var_name.startswith('inout_'):
                         var_name = var_name[6:]
-                        if var_name not in in_output_names:
-                            in_output_names.append(var_name)
+                        if var_name in magnet_in_outputs:
+                            if var_name not in found_magnet_in_outputs:
+                                found_magnet_in_outputs.append(var_name)
+                        else:
+                            if var_name not in in_output_names:
+                                in_output_names.append(var_name)
                     elif var_name.startswith('p_'):
                         var_name = var_name[2:]
-                        if var_name not in param_names:
-                            param_names.append(var_name)
+                        if var_name in magnet_params:
+                            if var_name not in found_magnet_params:
+                                found_magnet_params.append(var_name)
+                        else:
+                            if var_name not in param_names:
+                                param_names.append(var_name)
                     elif var_name.startswith('talib_'):
                         var_name = var_name[6:]
                         if var_name not in talib_names:
@@ -3289,21 +3316,56 @@ Args:
                 for s in to_replace:
                     expr = expr.replace(s, '')
 
-            # Parse magnet input names
+                for var_name in re.findall(r"@out_[a-zA-Z_][a-zA-Z0-9_]*", expr):
+                    var_name = var_name.replace('@', '')
+                    if var_name.startswith('out_'):
+                        var_name = var_name[4:]
+                        if var_name not in output_names:
+                            output_names.append(var_name)
+
+                expr = expr.replace("@out_", "__out_")
+
+                if len(output_names) == 0:
+                    lines = expr.split('\n')
+                    if len(lines) > 1:
+                        last_line = _clean_expr(lines[-1])
+                        valid_output_names = []
+                        found_not_valid = False
+                        for i, out in enumerate(last_line.split(',')):
+                            out = out.strip()
+                            if not out.startswith('__') and out.isidentifier():
+                                valid_output_names.append(out)
+                            else:
+                                found_not_valid = True
+                                break
+                        if not found_not_valid:
+                            output_names = valid_output_names
+
+            # Parse magnet names
             var_names = get_expr_var_names(expr)
-            for input_name in magnet_input_names:
-                if input_name not in found_magnet_input_names:
-                    if input_name in var_names:
-                        found_magnet_input_names.append(input_name)
-                        continue
-                    for var_name in var_names:
-                        if input_name in func_mapping.get(var_name, {}).get('magnet_input_names', []) or \
-                                input_name in res_func_mapping.get(var_name, {}).get('magnet_input_names', []):
-                            found_magnet_input_names.append(input_name)
-                            break
-            for input_name in magnet_input_names:
-                if input_name in found_magnet_input_names:
-                    input_names.append(input_name)
+            def _find_magnets(magnet_type, magnet_names, magnet_lst, found_magnet_lst):
+                for var_name in var_names:
+                    if var_name in magnet_lst:
+                        if var_name not in found_magnet_lst:
+                            found_magnet_lst.append(var_name)
+                    if var_name in func_mapping:
+                        for magnet_name in func_mapping[var_name].get(magnet_type, []):
+                            if magnet_name not in found_magnet_lst:
+                                found_magnet_lst.append(magnet_name)
+                    if var_name in res_func_mapping:
+                        for magnet_name in res_func_mapping[var_name].get(magnet_type, []):
+                            if magnet_name not in found_magnet_lst:
+                                found_magnet_lst.append(magnet_name)
+                for magnet_name in magnet_lst:
+                    if magnet_name in found_magnet_lst:
+                        magnet_names.append(magnet_name)
+                for magnet_name in found_magnet_lst:
+                    if magnet_name not in magnet_names:
+                        magnet_names.append(magnet_name)
+
+            _find_magnets('magnet_inputs', input_names, magnet_inputs, found_magnet_inputs)
+            _find_magnets('magnet_in_outputs', in_output_names, magnet_in_outputs, found_magnet_in_outputs)
+            _find_magnets('magnet_params', param_names, magnet_params, found_magnet_params)
 
             # Parse the number of outputs
             n_open_brackets = 0
@@ -3377,6 +3439,12 @@ Args:
                     var = merged_context[var_name[8:]]
                 elif var_name.startswith('__p_'):
                     var = merged_context[var_name[4:]]
+                elif var_name.startswith('__talib_1d_'):
+                    from vectorbtpro.utils.opt_packages import assert_can_import
+                    assert_can_import('talib')
+                    import talib
+
+                    var = getattr(talib, var_name[11:].upper())
                 elif var_name.startswith('__talib_'):
                     talib_ind = cls_or_self.from_talib(var_name[8:])
 
