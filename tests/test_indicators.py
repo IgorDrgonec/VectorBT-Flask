@@ -2388,15 +2388,15 @@ class TestFactory:
         pd.testing.assert_frame_equal(I.run(ts, window=2).out, ts.vbt.rolling_min(2))
         I = vbt.IndicatorFactory.from_expr(
             "hello",
-            magnet_input_names=['ts'],
-            res_func_mapping=dict(hello=dict(func=lambda context: context['ts'], magnet_input_names=['ts'])))
+            magnet_inputs=['ts'],
+            res_func_mapping=dict(hello=dict(func=lambda context: context['ts'], magnet_inputs=['ts'])))
         assert I.input_names == ('ts',)
         assert I.param_names == ()
         pd.testing.assert_frame_equal(I.run(ts).out, ts)
         np.random.seed(42)
         I = vbt.IndicatorFactory.from_expr(
             "ts * rand, ts * rand",
-            magnet_input_names=['ts'],
+            magnet_inputs=['ts'],
             res_func_mapping=dict(rand=dict(func=lambda: np.random.uniform())))
         assert I.input_names == ('ts',)
         assert I.param_names == ()

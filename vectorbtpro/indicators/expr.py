@@ -172,7 +172,7 @@ expr_func_config = HybridConfig(
         ts_std=dict(func=ts_std),
         ts_corr=dict(func=ts_corr),
         ts_cov=dict(func=ts_cov),
-        adv=dict(func=adv, magnet_input_names=['volume'])
+        adv=dict(func=adv, magnet_inputs=['volume'])
     )
 )
 """_"""
@@ -188,9 +188,9 @@ Can be modified.
 
 expr_res_func_config = HybridConfig(
     dict(
-        returns=dict(func=returns, magnet_input_names=['close']),
-        vwap=dict(func=vwap, magnet_input_names=['high', 'low', 'volume']),
-        cap=dict(func=cap, magnet_input_names=['close', 'volume'])
+        returns=dict(func=returns, magnet_inputs=['close']),
+        vwap=dict(func=vwap, magnet_inputs=['high', 'low', 'volume']),
+        cap=dict(func=cap, magnet_inputs=['close', 'volume'])
     )
 )
 """_"""
