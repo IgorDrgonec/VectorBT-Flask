@@ -877,9 +877,12 @@ class Data(Analyzable):
             returned_kwargs=new_returned_kwargs
         )
 
-    def concat(self, level_name: str = 'symbol') -> tp.DataDict:
+    def concat(self, symbols: tp.Optional[tp.Symbols] = None, level_name: str = 'symbol') -> tp.DataDict:
         """Return a dict of Series/DataFrames with symbols as columns, keyed by column name."""
-        first_data = self.data[self.symbols[0]]
+        if symbols is None:
+            symbols = self.symbols
+
+        first_data = self.data[symbols[0]]
         index = first_data.index
         if isinstance(first_data, pd.Series):
             columns = pd.Index([first_data.name])
@@ -888,21 +891,21 @@ class Data(Analyzable):
         if self.single_symbol:
             new_data = {c: pd.Series(
                 index=index,
-                name=self.symbols[0],
-                dtype=self.data[self.symbols[0]].dtype
-                if isinstance(self.data[self.symbols[0]], pd.Series)
-                else self.data[self.symbols[0]][c].dtype
+                name=symbols[0],
+                dtype=self.data[symbols[0]].dtype
+                if isinstance(self.data[symbols[0]], pd.Series)
+                else self.data[symbols[0]][c].dtype
             ) for c in columns}
         else:
             new_data = {c: pd.DataFrame(
                 index=index,
-                columns=pd.Index(self.symbols, name=level_name),
-                dtype=self.data[self.symbols[0]].dtype
-                if isinstance(self.data[self.symbols[0]], pd.Series)
-                else self.data[self.symbols[0]][c].dtype
+                columns=pd.Index(symbols, name=level_name),
+                dtype=self.data[symbols[0]].dtype
+                if isinstance(self.data[symbols[0]], pd.Series)
+                else self.data[symbols[0]][c].dtype
             ) for c in columns}
         for c in columns:
-            for s in self.symbols:
+            for s in symbols:
                 if isinstance(self.data[s], pd.Series):
                     col_data = self.data[s]
                 else:
@@ -914,17 +917,31 @@ class Data(Analyzable):
 
         return new_data
 
-    def get(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.MaybeTuple[tp.SeriesFrame]:
+    def get(self,
+            column: tp.Optional[tp.Union[tp.Label, tp.Labels]] = None,
+            symbol: tp.Optional[tp.Union[tp.Symbol, tp.Symbols]] = None,
+            **kwargs) -> tp.MaybeTuple[tp.SeriesFrame]:
         """Get column data.
 
         If one symbol, returns data for that symbol. If multiple symbols, performs concatenation
         first and returns a DataFrame if one column and a tuple of DataFrames if a list of columns passed."""
-        if self.single_symbol:
-            if column is None:
-                return self.data[self.symbols[0]]
-            return self.data[self.symbols[0]][column]
+        if symbol is None:
+            single_symbol = self.single_symbol
+            symbols = self.symbols
+        else:
+            if isinstance(symbol, list):
+                single_symbol = False
+                symbols = symbol
+            else:
+                single_symbol = True
+                symbols = [symbol]
 
-        concat_data = self.concat(**kwargs)
+        if single_symbol:
+            if column is None:
+                return self.data[symbols[0]]
+            return self.data[symbols[0]][column]
+
+        concat_data = self.concat(symbols=symbols, **kwargs)
         if len(concat_data) == 1:
             return tuple(concat_data.values())[0]
         if column is not None:

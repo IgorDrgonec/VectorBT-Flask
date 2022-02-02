@@ -8,3 +8,7 @@ build
 vectorbtpro.egg-info
 docs/docs/api
 docs/site
+*.pkl
+*.pickle
+*.csv
+*.h5

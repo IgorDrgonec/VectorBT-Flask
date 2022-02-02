@@ -916,7 +916,7 @@ class BinanceData(Data):  # pragma: no cover
             client (binance.client.Client): Client of type `binance.client.Client`.
             interval (str): Kline interval.
 
-                See `binance.enums`.
+                See [Binance Constants](https://python-binance.readthedocs.io/en/latest/constants.html).
             start (any): Start datetime.
 
                 See `vectorbtpro.utils.datetime_.to_tzaware_datetime`.
