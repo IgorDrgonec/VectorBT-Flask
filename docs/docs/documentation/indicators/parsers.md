@@ -513,7 +513,7 @@ the name of an indicator and creates an automatically resolved function out of i
 input, in-output, and parameter names into the entry's magnet lists, so we don't have to worry about 
 passing the right information to the indicator - vectorbt does it for us!
 
-Let's illustrate this awesomeness by defining a Supertrend indicator:
+Let's illustrate this awesomeness by defining basic SuperTrend bands:
 
 ```pycon
 >>> expr = """
@@ -607,7 +607,7 @@ Freq: D, Length: 153, dtype: float64
 Notice how the output annotation `@out` isn't bound to any variable anymore but is written similarly
 to the class name - with a trailing colon following the expression of the output.
 If there are multiple outputs, their output expressions must be separated by a comma.
-Here's a single-line expression for a Supertrend indicator with multiple outputs:
+Here's a single-line expression for basic SuperTrend bands with multiple outputs:
 
 ```pycon
 >>> ST = vbt.IF.from_expr(

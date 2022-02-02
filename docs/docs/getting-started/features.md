@@ -428,21 +428,31 @@ symbol                             R1         R2          R3
 
 ### Expressions
 
-- [x] No more functions! Indicators can now be easily built from expressions.
-The indicator factory can automatically parse all inputs, parameters, and even 
-NumPy and vectorbt functions thanks to a built-in matching mechanism.
+- [x] Indicators can be parsed from expressions. The indicator factory can derive all 
+the required information such as inputs, parameters, outputs, and even NumPy, vectorbt, and 
+TA-Lib functions and indicators thanks to annotations and a built-in matching mechanism.
+Designing indicators has never been easier!
 
-```pycon title="Calculate and plot VWAP"
->>> data = vbt.YFData.fetch('BTC-USD')
+```pycon title="Create a MACD indicator"
+>>> data = vbt.YFData.fetch('BTC-USD', start='2020-01-01', end='2021-01-01')
 
->>> VWAP = vbt.IF.from_expr("cumsum(close * volume) / cumsum(volume)")  # (1)!
->>> vwap = VWAP.run(data.get('Close'), data.get('Volume'))
->>> vwap.out.rename('VWAP').vbt.plot()
+>>> expr = """
+... MACD:
+... fast_ema = @talib_ema(close, @p_fast_w)
+... slow_ema = @talib_ema(close, @p_slow_w)
+... macd = fast_ema - slow_ema
+... signal = @talib_ema(macd, @p_signal_w)
+... macd, signal
+... """
+>>> MACD = vbt.IF.from_expr(expr, fast_w=12, slow_w=26, signal_w=9)  # (1)!
+>>> macd = MACD.run(data.get('Close'))
+>>> fig = macd.macd.rename('MACD').vbt.plot()
+>>> macd.signal.rename('Signal').vbt.plot(fig=fig)
 ```
 
-1. `cumsum` has been matched with `np.cumsum`
+1. No more manually passing `input_names`, `param_names`, and other information
 
-![](/assets/images/features_vwap.svg)
+![](/assets/images/features_macd.svg)
 
 ### WorldQuant Alphas
 

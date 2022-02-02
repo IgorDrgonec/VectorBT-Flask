@@ -6,7 +6,37 @@ title: Release notes
 
 All notable changes in reverse chronological order.
 
-## Version 1.0.8 (25 January, 2021)
+## Version 1.0.9 (2 February, 2022)
+
+- Upgraded the parser of indicator expressions:
+    - Can evaluate the expression using [pandas.eval](https://pandas.pydata.org/docs/reference/api/pandas.eval.html)
+    - Special variables and commands are annotated with the prefix `@`
+    - Supports single as well as multi-line expressions
+    - Context variables with the same name aren't needlessly re-computed anymore
+    - Can parse the class name at the beginning of the expression
+    - Supports one and two-dimensional TA-Lib indicators out-of-the-box
+    - Supports magnet names for inputs, in-outputs, and parameters
+    - Can parse settings from within the expression and pass them to [IndicatorFactory.from_expr](/api/indicators/factory/#vectorbtpro.indicators.factory.IndicatorFactory.from_expr)
+    - Can automatically resolve annotated indicators
+- Enabled plotting of any TA-Lib indicator programmatically by parsing its output flags
+- Implemented Numba-compiled functions for Wilder's EMA and STD (SP)
+- Renamed `from_custom_func` to `with_custom_func` and `from_apply_func` to `with_apply_func`
+since those are instance methods
+- Set `minp` (minimum periods) to `None` in generic rolling functions to make the values of 
+incomplete windows NaN
+- Made parameter selection optional in [IndicatorFactory.with_apply_func](/api/indicators/factory/#vectorbtpro.indicators.factory.IndicatorFactory.from_apply_func).
+Setting `select_params` to False will prepend the iteration index to the arguments of the apply function.
+- Refactored the `keep_pd=True` flag to avoid back-and-forth conversion between broadcasted Pandas objects 
+and NumPy arrays. Pandas objects are now directly forwarded to the custom function without any pre-processing.
+- Renamed `custom_output_props` to `lazy_outputs`
+- Renamed `select_one` and `select_one_from_obj` to `select_col` and `select_col_from_obj` respectively
+in [Wrapping](/api/base/wrapping/#vectorbtpro.base.wrapping.Wrapping)
+- Input arrays passed to TA-Lib indicators are converted to the data type `np.double`
+- Renamed `mapping` to `context` when it comes to templates
+- Updated plotting methods in [custom](/api/indicators/custom/)
+- Wrote [Indicators](/documentation/indicators) :notebook_with_decorative_cover:
+
+## Version 1.0.8 (25 January, 2022)
 
 - Implemented the following Numba-compiled functions:
     - Ranking and rolling ranking (SP)
@@ -33,6 +63,7 @@ Most logic now resides in the sub-package [grouping](/api/base/grouping/). Also,
 (apart from the portfolio-related ones) do not require strict group ordering anymore.
 - Added chunking specification for labeling functions
 - Fixed [Config.prettify](/api/utils/config/#vectorbtpro.utils.config.Config.prettify) for non-string keys
+- Wrote [Basic RSI strategy](/examples/basic-rsi-strategy) :notebook_with_decorative_cover:
 
 ## Version 1.0.7 (16 January, 2021)
 
@@ -47,27 +78,29 @@ which combines [Wrapping](/api/base/wrapping/#vectorbtpro.base.wrapping.Wrapping
 is two-dimensional and has only one column
 - [Grouper](/api/base/grouping/#vectorbtpro.base.grouping.base.Grouper) can return a group map,
 which isn't tied to a strict group ordering and is easier to use outside of Numba
+- Wrote [Building blocks](/documentation/building-blocks) :notebook_with_decorative_cover:
 
-## Version 1.0.6 (9 January, 2021)
+## Version 1.0.6 (9 January, 2022)
 
 - Benchmark can be disabled by passing `bm_close=False` to 
 [Portfolio](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio)
+- Wrote [Fundamentals](/documentation/fundamentals) :notebook_with_decorative_cover:
 
-## Version 1.0.5 (8 January, 2021)
+## Version 1.0.5 (8 January, 2022)
 
 - Fixed [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_signals) 
 for `direction='both'` and `size_type='value'`. Previously, the position couldn't be properly reversed.
 - Avoid sorting paths in [LocalData](/api/data/custom/#vectorbtpro.data.custom.LocalData) 
 if they are passed as a sequence
 
-## Version 1.0.4 (6 January, 2021)
+## Version 1.0.4 (6 January, 2022)
 
 - Set benchmark easily and also globally (#32) by passing `bm_close` to 
 [Portfolio](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio).
 Works similarly to [Portfolio.close](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.close).
 - Shortened registry names (such as from `ca_registry` to `ca_reg`)
 
-## Version 1.0.3 (5 January, 2021)
+## Version 1.0.3 (5 January, 2022)
 
 - Automatic discovery of symbols for local data (#27): No more need to specify a path to each
 CSV/HDF file or HDF key. Passing a path to a directory will traverse each file in this directory.
