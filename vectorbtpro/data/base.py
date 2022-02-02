@@ -882,38 +882,27 @@ class Data(Analyzable):
         if symbols is None:
             symbols = self.symbols
 
+        new_data = {}
         first_data = self.data[symbols[0]]
-        index = first_data.index
-        if isinstance(first_data, pd.Series):
-            columns = pd.Index([first_data.name])
-        else:
-            columns = first_data.columns
         if self.single_symbol:
-            new_data = {c: pd.Series(
-                index=index,
-                name=symbols[0],
-                dtype=self.data[symbols[0]].dtype
-                if isinstance(self.data[symbols[0]], pd.Series)
-                else self.data[symbols[0]][c].dtype
-            ) for c in columns}
+            if isinstance(first_data, pd.Series):
+                new_data[first_data.name] = first_data.rename(symbols[0])
+            else:
+                for c in first_data.columns:
+                    new_data[c] = first_data[c].rename(symbols[0])
         else:
-            new_data = {c: pd.DataFrame(
-                index=index,
-                columns=pd.Index(symbols, name=level_name),
-                dtype=self.data[symbols[0]].dtype
-                if isinstance(self.data[symbols[0]], pd.Series)
-                else self.data[symbols[0]][c].dtype
-            ) for c in columns}
-        for c in columns:
-            for s in symbols:
-                if isinstance(self.data[s], pd.Series):
-                    col_data = self.data[s]
-                else:
-                    col_data = self.data[s][c]
-                if self.single_symbol:
-                    new_data[c].loc[:] = col_data
-                else:
-                    new_data[c].loc[:, s] = col_data
+            if isinstance(first_data, pd.Series):
+                columns = pd.Index([first_data.name])
+            else:
+                columns = first_data.columns
+            for c in columns:
+                col_data = []
+                for s in symbols:
+                    if isinstance(self.data[s], pd.Series):
+                        col_data.append(self.data[s].rename(None))
+                    else:
+                        col_data.append(self.data[s][c].rename(None))
+                new_data[c] = pd.concat(col_data, keys=pd.Index(symbols, name=level_name), axis=1)
 
         return new_data
 

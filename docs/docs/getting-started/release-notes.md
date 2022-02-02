@@ -34,6 +34,8 @@ in [Wrapping](/api/base/wrapping/#vectorbtpro.base.wrapping.Wrapping)
 - Input arrays passed to TA-Lib indicators are converted to the data type `np.double`
 - Renamed `mapping` to `context` when it comes to templates
 - Updated plotting methods in [custom](/api/indicators/custom/)
+- [Data.get](/api/data/base/#vectorbtpro.data.base.Data.get) also accepts symbol(s)
+- Greatly optimized [Data.concat](/api/data/base/#vectorbtpro.data.base.Data.concat)
 - Wrote [Indicators](/documentation/indicators) :notebook_with_decorative_cover:
 
 ## Version 1.0.8 (25 January, 2022)
