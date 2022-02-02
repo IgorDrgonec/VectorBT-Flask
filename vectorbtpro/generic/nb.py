@@ -905,7 +905,10 @@ def nancorr_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d) -> float:
             num += (arr1[i] - arr1_mean) * (arr2[i] - arr2_mean)
             denom1 += (arr1[i] - arr1_mean) ** 2
             denom2 += (arr2[i] - arr2_mean) ** 2
-    return num / np.sqrt(denom1 * denom2)
+    denom = np.sqrt(denom1 * denom2)
+    if denom == 0:
+        return np.nan
+    return num / denom
 
 
 @register_chunkable(

@@ -945,10 +945,10 @@ class IndicatorBase(Analyzable):
         """Dictionary of output flags."""
         return cls_or_self._output_flags
 
-    @classproperty
-    def level_names(cls_or_self) -> tp.Tuple[str, ...]:
+    @property
+    def level_names(self) -> tp.Tuple[str, ...]:
         """Column level names corresponding to each parameter."""
-        return cls_or_self._level_names
+        return self._level_names
 
     def __init__(self,
                  wrapper: ArrayWrapper,
