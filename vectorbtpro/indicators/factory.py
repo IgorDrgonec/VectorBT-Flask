@@ -3495,25 +3495,23 @@ Args:
             )
 
             # Parse the number of outputs
-            n_open_brackets = 0
-            n_outputs = 1
-            for i, s in enumerate(expr):
-                if s == ',' and n_open_brackets == 0:
-                    n_outputs += 1
-                elif s in '([{':
-                    n_open_brackets += 1
-                elif s in ')]}':
-                    n_open_brackets -= 1
-            if n_open_brackets != 0:
-                raise ValueError("Couldn't parse the number of outputs: mismatching brackets")
-            if len(parsed_factory_kwargs['output_names']) > 0 \
-                    and len(parsed_factory_kwargs['output_names']) != n_outputs:
-                raise ValueError("The number of parsed outputs doesn't match the actual number of outputs")
-            elif len(parsed_factory_kwargs['output_names']) == 0:
-                if n_outputs == 1:
-                    parsed_factory_kwargs['output_names'] = ['out']
-                else:
-                    parsed_factory_kwargs['output_names'] = ['out%d' % (i + 1) for i in range(n_outputs)]
+            if len(parsed_factory_kwargs['output_names']) == 0:
+                n_open_brackets = 0
+                n_outputs = 1
+                for i, s in enumerate(expr):
+                    if s == ',' and n_open_brackets == 0:
+                        n_outputs += 1
+                    elif s in '([{':
+                        n_open_brackets += 1
+                    elif s in ')]}':
+                        n_open_brackets -= 1
+                if n_open_brackets != 0:
+                    raise ValueError("Couldn't parse the number of outputs: mismatching brackets")
+                elif len(parsed_factory_kwargs['output_names']) == 0:
+                    if n_outputs == 1:
+                        parsed_factory_kwargs['output_names'] = ['out']
+                    else:
+                        parsed_factory_kwargs['output_names'] = ['out%d' % (i + 1) for i in range(n_outputs)]
 
             factory = cls_or_self(
                 **merge_dicts(
