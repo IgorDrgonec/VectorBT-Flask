@@ -84,6 +84,24 @@ def annotate_args(func: tp.Callable, args: tp.Args, kwargs: tp.Kwargs, only_pass
     return ann_args
 
 
+def ann_args_to_args(ann_args: tp.AnnArgs) -> tp.Tuple[tp.Args, tp.Kwargs]:
+    """Convert annotated arguments back to positional and keyword arguments."""
+    args = ()
+    kwargs = {}
+    p = inspect.Parameter
+    for k, v in ann_args.items():
+        if v['kind'] in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD):
+            args += (v['value'],)
+        elif v['kind'] == p.VAR_POSITIONAL:
+            args += v['value']
+        elif v['kind'] == p.KEYWORD_ONLY:
+            kwargs[k] = v['value']
+        else:
+            for _k, _v in v['value'].items():
+                kwargs[_k] = _v
+    return args, kwargs
+
+
 def flatten_ann_args(ann_args: tp.AnnArgs) -> tp.FlatAnnArgs:
     """Flatten annotated arguments."""
     flat_ann_args = []

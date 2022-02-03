@@ -2685,12 +2685,30 @@ class TestFactory:
         assert I.input_names == ('ts',)
         assert I.param_names == ('window',)
         pd.testing.assert_frame_equal(I.run(ts).out, vbt.IF.from_talib('SMA', timeperiod=2).run(ts).real)
-        I = vbt.IndicatorFactory.from_expr("@talib_1d_sma(@in_ts, @p_window)", window=2)
+        I = vbt.IndicatorFactory.from_expr("@talib_sma(@in_ts, @p_window)", window=2)
         assert I.input_names == ('ts',)
         assert I.param_names == ('window',)
         pd.testing.assert_series_equal(
             I.run(ts['a'], to_2d=False).out,
             vbt.IF.from_talib('SMA', timeperiod=2).run(ts['a']).real)
+        I = vbt.IndicatorFactory.from_expr(
+            "@talib_macd(@in_ts, @p_fastperiod, @p_slowperiod, @p_signalperiod)[1]",
+            fastperiod=2, slowperiod=3, signalperiod=4)
+        assert I.input_names == ('ts',)
+        assert I.param_names == ('fastperiod', 'slowperiod', 'signalperiod')
+        pd.testing.assert_frame_equal(
+            I.run(ts).out,
+            vbt.IF.from_talib('MACD', fastperiod=2, slowperiod=3, signalperiod=4).run(ts).macdsignal
+        )
+        I = vbt.IndicatorFactory.from_expr(
+            "@talib_macd(@in_ts, @p_fastperiod, @p_slowperiod, @p_signalperiod)[1]",
+            fastperiod=2, slowperiod=3, signalperiod=4)
+        assert I.input_names == ('ts',)
+        assert I.param_names == ('fastperiod', 'slowperiod', 'signalperiod')
+        pd.testing.assert_series_equal(
+            I.run(ts['a'], to_2d=False).out,
+            vbt.IF.from_talib('MACD', fastperiod=2, slowperiod=3, signalperiod=4).run(ts['a']).macdsignal
+        )
 
         I = vbt.IndicatorFactory.from_expr("""
         @settings({

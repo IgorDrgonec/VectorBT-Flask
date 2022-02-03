@@ -3230,8 +3230,7 @@ Args:
         * `@p_*`: parameter variable
         * `@out_*`: output variable
         * `@out_*:`: indicates that the next part until a comma is an output
-        * `@talib_*`: name of a TA-Lib indicator wrapped by `IndicatorFactory`
-        * `@talib_1d_*`: name of an original TA-Lib function
+        * `@talib_*`: name of a TA-Lib function
         * `@res_*`: name of the indicator to resolve automatically. Input names can overlap with
             those of other indicators, while all other information gets a prefix with the indicator's short name.
         * `@settings(*)`: settings to be merged with the current `IndicatorFactory.from_expr` settings.
@@ -3526,6 +3525,7 @@ Args:
 
             # Parse magnet names
             var_names = get_expr_var_names(expr)
+
             def _find_magnets(magnet_type, magnet_names, magnet_lst, found_magnet_lst):
                 for var_name in var_names:
                     if var_name in magnet_lst:
@@ -3600,8 +3600,6 @@ Args:
             # For debugging purposes
             return expr
 
-        Indicator = factory.Indicator
-
         input_names = factory.input_names
         in_output_names = factory.in_output_names
         param_names = factory.param_names
@@ -3625,7 +3623,6 @@ Args:
                 input_context[param_names[i]] = param
             merged_context = merge_dicts(input_context, _kwargs)
             context = {}
-            subbed_context = {}
 
             # Resolve each variable in the expression
             for var_name in get_expr_var_names(expr):
@@ -3637,20 +3634,51 @@ Args:
                     var = merged_context[var_name[8:]]
                 elif var_name.startswith('__p_'):
                     var = merged_context[var_name[4:]]
-                elif var_name.startswith('__talib_1d_'):
+                elif var_name.startswith('__talib_'):
                     from vectorbtpro.utils.opt_packages import assert_can_import
                     assert_can_import('talib')
                     import talib
+                    from talib import abstract
 
-                    var = getattr(talib, var_name[11:].upper())
-                elif var_name.startswith('__talib_'):
-                    talib_ind = cls_or_self.from_talib(var_name[8:])
+                    talib_func_name = var_name[8:].upper()
+                    talib_func = getattr(talib, talib_func_name)
+                    talib_info = abstract.Function(talib_func_name).info
+                    talib_input_names = []
+                    for in_names in talib_info['input_names'].values():
+                        if isinstance(in_names, (list, tuple)):
+                            talib_input_names.extend(list(in_names))
+                        else:
+                            talib_input_names.append(in_names)
 
-                    def _talib_func(*args, _talib_ind: tp.Callable = talib_ind, **kwargs) -> tp.Any:
-                        raw = _talib_ind.run(*args, return_raw=True, **kwargs)[0]
-                        if len(raw) == 1:
-                            return raw[0]
-                        return raw
+                    def _talib_func(*args,
+                                    _talib_func: tp.Callable = talib_func,
+                                    _talib_input_names: tp.List[str] = talib_input_names,
+                                    **kwargs) -> tp.Any:
+                        inputs = {}
+                        other_args = []
+                        for k in range(len(args)):
+                            if k < len(talib_input_names) and len(inputs) < len(talib_input_names):
+                                inputs[talib_input_names[k]] = args[k]
+                            else:
+                                other_args.append(args[k])
+                        if len(inputs) < len(talib_input_names):
+                            for k, v in kwargs.items():
+                                if k in talib_input_names:
+                                    inputs[k] = v
+                                else:
+                                    other_args.append(v)
+
+                        bc_inputs = tuple(np.broadcast_arrays(*inputs.values()))
+                        if bc_inputs[0].ndim == 1:
+                            return _talib_func(*args, **kwargs)
+                        outputs = []
+                        for col in range(bc_inputs[0].shape[1]):
+                            col_inputs = [input[:, col] for input in bc_inputs]
+                            outputs.append(_talib_func(*col_inputs, *other_args))
+                        if isinstance(outputs[0], tuple):  # multiple outputs
+                            outputs = list(zip(*outputs))
+                            return list(map(np.column_stack, outputs))
+                        return np.column_stack(outputs)
 
                     var = _talib_func
                 elif var_name in res_func_mapping:

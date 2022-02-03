@@ -2241,6 +2241,19 @@ class TestParsing:
             }
         )
 
+    def test_ann_args_to_args(self):
+        def f(a, *args, b=2, **kwargs):
+            pass
+
+        assert parsing.ann_args_to_args(parsing.annotate_args(f, (1,), {})) == ((1,), {'b': 2})
+        assert parsing.ann_args_to_args(parsing.annotate_args(f, (1,), {}, only_passed=True)) == ((1,), {})
+        assert parsing.ann_args_to_args(parsing.annotate_args(f, (1, 2, 3), {})) == ((1, 2, 3), {'b': 2})
+
+        def f2(a, b=2, **kwargs):
+            pass
+
+        assert parsing.ann_args_to_args(parsing.annotate_args(f2, (1, 2), dict(c=3))) == ((1, 2), {'c': 3})
+
     def test_match_ann_arg(self):
         def f(a, *args, b=2, **kwargs):
             pass
