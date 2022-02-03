@@ -86,9 +86,10 @@ MA = IndicatorFactory(
 ).with_apply_func(
     nb.ma_apply_nb,
     cache_func=nb.ma_cache_nb,
+    cache_pass_per_column=True,
     kwargs_as_args=['adjust'],
     ewm=False,
-    adjust=False
+    adjust=False,
 )
 
 
@@ -177,6 +178,7 @@ MSTD = IndicatorFactory(
 ).with_apply_func(
     nb.mstd_apply_nb,
     cache_func=nb.mstd_cache_nb,
+    cache_pass_per_column=True,
     kwargs_as_args=['adjust', 'ddof'],
     ewm=False,
     adjust=False,
@@ -254,6 +256,7 @@ BBANDS = IndicatorFactory(
 ).with_apply_func(
     nb.bb_apply_nb,
     cache_func=nb.bb_cache_nb,
+    cache_pass_per_column=True,
     kwargs_as_args=['adjust', 'ddof'],
     window=20,
     ewm=False,
@@ -376,6 +379,7 @@ RSI = IndicatorFactory(
 ).with_apply_func(
     nb.rsi_apply_nb,
     cache_func=nb.rsi_cache_nb,
+    cache_pass_per_column=True,
     kwargs_as_args=['adjust'],
     window=14,
     ewm=False,
@@ -484,6 +488,7 @@ STOCH = IndicatorFactory(
 ).with_apply_func(
     nb.stoch_apply_nb,
     cache_func=nb.stoch_cache_nb,
+    cache_pass_per_column=True,
     kwargs_as_args=['adjust'],
     k_window=14,
     d_window=3,
@@ -605,6 +610,7 @@ MACD = IndicatorFactory(
 ).with_apply_func(
     nb.macd_apply_nb,
     cache_func=nb.macd_cache_nb,
+    cache_pass_per_column=True,
     kwargs_as_args=['adjust'],
     fast_window=12,
     slow_window=26,
@@ -720,6 +726,7 @@ ATR = IndicatorFactory(
 ).with_apply_func(
     nb.atr_apply_nb,
     cache_func=nb.atr_cache_nb,
+    cache_pass_per_column=True,
     kwargs_as_args=['adjust'],
     window=14,
     ewm=True,
