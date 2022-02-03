@@ -31,7 +31,6 @@ Run for the examples below:
 ```"""
 
 import functools
-import importlib
 import inspect
 import itertools
 import re
@@ -3199,14 +3198,13 @@ Args:
 
         Searches each variable name parsed from `expr` in
 
-        * `vectorbtpro.indicators.expr.expr_res_func_config` (calls right away),
-        * `vectorbtpro.indicators.expr.expr_func_config`,
-        * inputs, in-outputs, and params,
-        * keyword arguments,
-        * attributes of `np`,
-        * attributes of `vectorbtpro.generic.nb` (with and without `_nb` suffix),
-        * attributes of `vbt`, and
-        * packages and modules.
+        * `vectorbtpro.indicators.expr.expr_res_func_config` (calls right away)
+        * `vectorbtpro.indicators.expr.expr_func_config`
+        * inputs, in-outputs, and params
+        * keyword arguments
+        * attributes of `np`
+        * attributes of `vectorbtpro.generic.nb` (with and without `_nb` suffix)
+        * attributes of `vbt`
 
         `vectorbtpro.indicators.expr.expr_func_config` and `vectorbtpro.indicators.expr.expr_res_func_config`
         can be overridden with `func_mapping` and `res_func_mapping` respectively.
@@ -3594,6 +3592,8 @@ Args:
             func_mapping = merge_dicts(expr_func_config, func_mapping)
             res_func_mapping = merge_dicts(expr_res_func_config, res_func_mapping)
 
+            var_names = get_expr_var_names(expr)
+
             factory = cls_or_self
 
         if return_clean_expr:
@@ -3625,7 +3625,7 @@ Args:
             context = {}
 
             # Resolve each variable in the expression
-            for var_name in get_expr_var_names(expr):
+            for var_name in var_names:
                 if var_name in context:
                     continue
                 if var_name.startswith('__in_'):
@@ -3696,10 +3696,7 @@ Args:
                 elif hasattr(vbt, var_name):
                     var = getattr(vbt, var_name)
                 else:
-                    try:
-                        var = importlib.import_module(var_name)
-                    except ModuleNotFoundError:
-                        continue
+                    continue
                 try:
                     if callable(var) and 'context' in get_func_arg_names(var):
                         var = functools.partial(var, context=merged_context)
