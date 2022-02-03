@@ -258,7 +258,6 @@ def run_pipeline(
         run_unique: bool = False,
         silence_warnings: bool = False,
         per_column: bool = False,
-        pass_col: bool = False,
         keep_pd: bool = False,
         to_2d: bool = True,
         pass_packed: bool = False,
@@ -334,7 +333,7 @@ def run_pipeline(
             * `bc_to_input`: Whether to broadcast parameter to input size. You can also broadcast
                 parameter to an axis by passing an integer.
             * `broadcast_kwargs`: Keyword arguments passed to `vectorbtpro.base.reshaping.broadcast`.
-            * `per_column`: Whether each parameter value can be split per column such that it can
+            * `per_column`: Whether each parameter value can be split by columns such that it can
                 be better reflected in a multi-index. Does not affect broadcasting.
         run_unique (bool): Whether to run only on unique parameter combinations.
 
@@ -345,13 +344,15 @@ def run_pipeline(
                 Cache, raw output, and output objects outside of `num_ret_outputs` will be returned
                 for unique parameter combinations only.
         silence_warnings (bool): Whether to hide warnings such as coming from `run_unique`.
-        per_column (bool): Whether to split the DataFrame into Series, one per column, and run `custom_func`
-            on each Series.
+        per_column (bool): Whether the values of each parameter should be split by columns.
 
             Each list of parameter values will broadcast to the number of columns and
-            each parameter value will be applied per Series rather than per DataFrame.
+            each parameter value will be applied per column rather than per whole input.
             Input shape must be known beforehand.
-        pass_col (bool): Whether to pass column index as keyword argument if `per_column` is set to True.
+
+            Each from inputs, in-outputs, and parameters will be passed to `custom_func`
+            with the full shape. Expects the outputs be of the same shape as inputs.
+            Additionally, will pass `per_column`.
         keep_pd (bool): Whether to keep inputs as pandas objects, otherwise convert to NumPy arrays.
         to_2d (bool): Whether to reshape inputs to 2-dim arrays, otherwise keep as-is.
         pass_packed (bool): Whether to pass inputs and parameters to `custom_func` as lists.
@@ -473,16 +474,6 @@ def run_pipeline(
         wrapper = None
 
     # Reshape input shape
-    # Keep original input_shape for per_column=True
-    orig_input_shape = input_shape
-    orig_input_shape_2d = input_shape
-    if input_shape is not None:
-        orig_input_shape_2d = input_shape if len(input_shape) > 1 else (input_shape[0], 1)
-    if per_column:
-        # input_shape is now the size of one column
-        if input_shape is None:
-            raise ValueError("input_shape is required when per_column=True")
-        input_shape = (input_shape[0],)
     input_shape_ready = input_shape
     input_shape_2d = input_shape
     if input_shape is not None:
@@ -517,7 +508,7 @@ def run_pipeline(
         # Broadcast such that each array has the same length
         if per_column:
             # The number of parameters should match the number of columns before split
-            param_list = broadcast_params(param_list, to_n=orig_input_shape_2d[1])
+            param_list = broadcast_params(param_list, to_n=input_shape_2d[1])
         else:
             param_list = broadcast_params(param_list)
     n_param_values = len(param_list[0]) if len(param_list) > 0 else 1
@@ -541,37 +532,15 @@ def run_pipeline(
     n_unique_param_values = len(param_list_unique[0]) if len(param_list_unique) > 0 else 1
 
     # Prepare inputs
-    if per_column:
-        # Split each input into Series/1-dim arrays, one per column
-        input_list_ready = []
-        for input in input_list:
-            input_2d = reshaping.to_2d(input)
-            col_inputs = []
-            for col in range(input_2d.shape[1]):
-                if isinstance(input_2d, pd.DataFrame):
-                    col_input = input_2d.iloc[:, col]
-                else:
-                    col_input = input_2d[:, col]
-                if to_2d:
-                    if isinstance(col_input, pd.Series):
-                        col_input = col_input.to_frame()
-                    else:
-                        col_input = col_input[:, None]
-                if keep_pd and isinstance(col_input, np.ndarray):
-                    # Keep as pandas object
-                    col_input = ArrayWrapper(input_index, input_columns[[col]], col_input.ndim).wrap(col_input)
-                col_inputs.append(col_input)
-            input_list_ready.append(col_inputs)
-    else:
-        input_list_ready = []
-        for input in input_list:
-            new_input = input
-            if to_2d:
-                new_input = reshaping.to_2d(input)
-            if keep_pd and isinstance(new_input, np.ndarray):
-                # Keep as pandas object
-                new_input = ArrayWrapper(input_index, input_columns, new_input.ndim).wrap(new_input)
-            input_list_ready.append(new_input)
+    input_list_ready = []
+    for input in input_list:
+        new_input = input
+        if to_2d:
+            new_input = reshaping.to_2d(input)
+        if keep_pd and isinstance(new_input, np.ndarray):
+            # Keep as pandas object
+            new_input = ArrayWrapper(input_index, input_columns, new_input.ndim).wrap(new_input)
+        input_list_ready.append(new_input)
 
     # Prepare in-place outputs
     in_output_list_ready = []
@@ -589,26 +558,29 @@ def run_pipeline(
             # This in-place output hasn't been provided, so create empty
             _in_output_settings = resolve_dict(in_output_settings[i])
             dtype = _in_output_settings.get('dtype', None)
-            in_output_shape = (input_shape_2d[0], input_shape_2d[1] * n_unique_param_values)
+            if per_column:
+                in_output_shape = input_shape_ready
+            else:
+                in_output_shape = (input_shape_2d[0], input_shape_2d[1] * n_unique_param_values)
             in_output_wide = np.empty(in_output_shape, dtype=dtype)
         in_output_list[i] = in_output_wide
-        in_outputs = []
         # Split each in-place output into chunks, each of input shape, and append to a list
-        for i in range(n_unique_param_values):
-            if isinstance(in_output_wide, pd.DataFrame):
-                in_output = in_output_wide.iloc[:, i * input_shape_2d[1]: (i + 1) * input_shape_2d[1]]
-                if len(input_shape_ready) == 1:
-                    in_output = in_output.iloc[:, 0]
-            else:
-                in_output = in_output_wide[:, i * input_shape_2d[1]: (i + 1) * input_shape_2d[1]]
-                if len(input_shape_ready) == 1:
-                    in_output = in_output[:, 0]
-            if keep_pd and isinstance(in_output, np.ndarray):
-                if per_column:
-                    in_output = ArrayWrapper(input_index, input_columns[[i]], in_output.ndim).wrap(in_output)
+        in_outputs = []
+        if per_column:
+            in_outputs.append(in_output_wide)
+        else:
+            for p in range(n_unique_param_values):
+                if isinstance(in_output_wide, pd.DataFrame):
+                    in_output = in_output_wide.iloc[:, p * input_shape_2d[1]: (p + 1) * input_shape_2d[1]]
+                    if len(input_shape_ready) == 1:
+                        in_output = in_output.iloc[:, 0]
                 else:
+                    in_output = in_output_wide[:, p * input_shape_2d[1]: (p + 1) * input_shape_2d[1]]
+                    if len(input_shape_ready) == 1:
+                        in_output = in_output[:, 0]
+                if keep_pd and isinstance(in_output, np.ndarray):
                     in_output = ArrayWrapper(input_index, input_columns, in_output.ndim).wrap(in_output)
-            in_outputs.append(in_output)
+                in_outputs.append(in_output)
         in_output_list_ready.append(in_outputs)
     if checks.is_numba_func(custom_func):
         # Numba can't stand untyped lists
@@ -642,107 +614,46 @@ def run_pipeline(
             if wrapper is not None:
                 func_kwargs['wrapper'] = wrapper
             else:
-                func_kwargs['wrapper'] = ArrayWrapper(input_index, input_columns, len(orig_input_shape))
+                func_kwargs['wrapper'] = ArrayWrapper(input_index, input_columns, len(input_shape_ready))
+        if per_column:
+            func_kwargs['per_column'] = per_column
         func_kwargs = merge_dicts(func_kwargs, kwargs)
 
         # Set seed
         if seed is not None:
             set_seed(seed)
 
-        def _call_custom_func(_input_list_ready, _in_output_list_ready, _param_list_ready, *_func_args, **_func_kwargs):
-            # Substitute templates
-            if has_templates(_func_args) or has_templates(_func_kwargs):
-                _template_context = merge_dicts(
-                    broadcast_named_args,
-                    dict(
-                        input_shape=input_shape_ready,
-                        **dict(zip(input_names, _input_list_ready)),
-                        **dict(zip(in_output_names, _in_output_list_ready)),
-                        **dict(zip(param_names, _param_list_ready)),
-                        pre_sub_args=_func_args,
-                        pre_sub_kwargs=_func_kwargs
-                    ),
-                    template_context
-                )
-                _func_args = deep_substitute(_func_args, _template_context, sub_id='custom_func_args')
-                _func_kwargs = deep_substitute(_func_kwargs, _template_context, sub_id='custom_func_kwargs')
-
-            # Run the function
-            if pass_packed:
-                if checks.is_numba_func(custom_func):
-                    return custom_func(
-                        tuple(_input_list_ready),
-                        tuple(_in_output_list_ready),
-                        tuple(_param_list_ready),
-                        *_func_args,
-                        **_func_kwargs
-                    )
-                return custom_func(
-                    _input_list_ready,
-                    _in_output_list_ready,
-                    _param_list_ready,
-                    *_func_args,
-                    **_func_kwargs
-                )
-            return custom_func(
-                *_input_list_ready,
-                *_in_output_list_ready,
-                *_param_list_ready,
-                *_func_args,
-                **_func_kwargs
+        # Substitute templates
+        if has_templates(func_args) or has_templates(func_kwargs):
+            template_context = merge_dicts(
+                broadcast_named_args,
+                dict(
+                    input_shape=input_shape_ready,
+                    **dict(zip(input_names, input_list_ready)),
+                    **dict(zip(in_output_names, in_output_list_ready)),
+                    **dict(zip(param_names, param_list_ready)),
+                    pre_sub_args=func_args,
+                    pre_sub_kwargs=func_kwargs
+                ),
+                template_context
             )
+            func_args = deep_substitute(func_args, template_context, sub_id='custom_func_args')
+            func_kwargs = deep_substitute(func_kwargs, template_context, sub_id='custom_func_kwargs')
 
-        if per_column:
-            output = []
-            for col in range(orig_input_shape_2d[1]):
-                # Select the column of each input and in-place output, and the respective parameter combination
-                _input_list_ready = []
-                for _inputs in input_list_ready:
-                    # Each input array is now one column wide
-                    _input_list_ready.append(_inputs[col])
-
-                _in_output_list_ready = []
-                for _in_outputs in in_output_list_ready:
-                    # Each in-output array is now one column wide
-                    if isinstance(_in_outputs, List):
-                        __in_outputs = List()
-                    else:
-                        __in_outputs = []
-                    __in_outputs.append(_in_outputs[col])
-                    _in_output_list_ready.append(__in_outputs)
-
-                _param_list_ready = []
-                for _params in param_list_ready:
-                    # Each parameter list is now one element long
-                    if isinstance(_params, List):
-                        __params = List()
-                    else:
-                        __params = []
-                    __params.append(_params[col])
-                    _param_list_ready.append(__params)
-
-                _func_args = func_args
-                _func_kwargs = func_kwargs.copy()
-                if 'use_cache' in func_kwargs:
-                    use_cache = func_kwargs['use_cache']
-                    if isinstance(use_cache, list) and len(use_cache) == orig_input_shape_2d[1]:
-                        # Pass cache for this column
-                        _func_kwargs['use_cache'] = func_kwargs['use_cache'][col]
-                if pass_col:
-                    _func_kwargs['col'] = col
-                col_output = _call_custom_func(
-                    _input_list_ready,
-                    _in_output_list_ready,
-                    _param_list_ready,
-                    *_func_args,
-                    **_func_kwargs
-                )
-                output.append(col_output)
+        # Run the custom function
+        if pass_packed:
+            output = custom_func(
+                tuple(input_list_ready),
+                tuple(in_output_list_ready),
+                tuple(param_list_ready),
+                *func_args,
+                **func_kwargs
+            )
         else:
-            output = _call_custom_func(
-                input_list_ready,
-                in_output_list_ready,
-                param_list_ready,
+            output = custom_func(
+                *input_list_ready,
+                *in_output_list_ready,
+                *param_list_ready,
                 *func_args,
                 **func_kwargs
             )
@@ -754,43 +665,28 @@ def run_pipeline(
                               "combinations when run_unique=True", stacklevel=2)
             return output
 
-        def _split_output(output):
-            # Post-process results
-            if output is None:
-                _output_list = []
-                _other_list = []
-            else:
-                if isinstance(output, (tuple, list, List)):
-                    _output_list = list(output)
-                else:
-                    _output_list = [output]
-                # Other outputs should be returned without post-processing (for example cache_dict)
-                if len(_output_list) > num_ret_outputs:
-                    _other_list = _output_list[num_ret_outputs:]
-                    if use_run_unique and not silence_warnings:
-                        warnings.warn("Additional output objects are produced by unique parameter "
-                                      "combinations when run_unique=True", stacklevel=2)
-                else:
-                    _other_list = []
-                # Process only the num_ret_outputs outputs
-                _output_list = _output_list[:num_ret_outputs]
-            if len(_output_list) != num_ret_outputs:
-                raise ValueError("Number of returned outputs other than expected")
-            _output_list = list(map(lambda x: reshaping.to_2d_array(x), _output_list))
-            return _output_list, _other_list
-
-        if per_column:
+        # Post-process results
+        if output is None:
             output_list = []
             other_list = []
-            for _output in output:
-                __output_list, __other_list = _split_output(_output)
-                output_list.append(__output_list)
-                if len(__other_list) > 0:
-                    other_list.append(__other_list)
-            # Concatenate each output (must be one column wide)
-            output_list = [np.hstack(input_group) for input_group in zip(*output_list)]
         else:
-            output_list, other_list = _split_output(output)
+            if isinstance(output, (tuple, list, List)):
+                output_list = list(output)
+            else:
+                output_list = [output]
+            # Other outputs should be returned without post-processing (for example cache_dict)
+            if len(output_list) > num_ret_outputs:
+                other_list = output_list[num_ret_outputs:]
+                if use_run_unique and not silence_warnings:
+                    warnings.warn("Additional output objects are produced by unique parameter "
+                                  "combinations when run_unique=True", stacklevel=2)
+            else:
+                other_list = []
+            # Process only the num_ret_outputs outputs
+            output_list = output_list[:num_ret_outputs]
+        if len(output_list) != num_ret_outputs:
+            raise ValueError("Number of returned outputs other than expected")
+        output_list = list(map(lambda x: reshaping.to_2d_array(x), output_list))
 
         # In-place outputs are treated as outputs from here
         output_list = in_output_list + output_list
@@ -802,13 +698,13 @@ def run_pipeline(
             if output.shape != output_shape:
                 raise ValueError("All outputs must have the same shape")
         if per_column:
-            n_input_cols = 1
+            n_input_cols = output_shape[1]
         else:
             n_input_cols = output_shape[1] // n_unique_param_values
         if input_shape_2d is not None:
             if n_input_cols != input_shape_2d[1]:
                 if per_column:
-                    raise ValueError("All outputs must have one column when per_column=True")
+                    raise ValueError("All outputs must have the same number of columns as inputs when per_column=True")
                 else:
                     raise ValueError("All outputs must have the number of columns = #input columns x #parameters")
         raw = output_list, param_map, n_input_cols, other_list
@@ -826,8 +722,6 @@ def run_pipeline(
             input_shape = (output_list[0].shape[0],)
         else:
             input_shape = (output_list[0].shape[0], n_input_cols)
-    else:
-        input_shape = orig_input_shape
     if input_index is None:
         input_index = pd.RangeIndex(start=0, step=1, stop=input_shape[0])
     if input_columns is None:
@@ -2049,7 +1943,8 @@ Other keyword arguments are passed to `{0}.run`.
                         cache_func: tp.Optional[tp.Callable] = None,
                         select_params: bool = True,
                         pass_packed: bool = False,
-                        kwargs_to_args: tp.Optional[tp.Sequence[str]] = None,
+                        pass_per_column: bool = False,
+                        kwargs_as_args: tp.Optional[tp.Iterable[str]] = None,
                         jitted_loop: bool = False,
                         remove_kwargs: tp.Optional[bool] = None,
                         **kwargs) -> tp.Union[str, tp.Type[IndicatorBase]]:
@@ -2074,22 +1969,24 @@ Other keyword arguments are passed to `{0}.run`.
             * You cannot pass keyword arguments
             * Your outputs must be arrays of the same shape, data type and data order
 
+        !!! note
+            Reserved arguments `flex_2d` and `per_column` (in this order) get passed as positional
+            arguments if `remove_kwargs` is True, otherwise as keyword arguments.
+
         Args:
             apply_func (callable): A function that takes inputs, selection of parameters, and
                 other arguments, and does calculations to produce outputs.
 
                 Arguments are passed to `apply_func` in the following order:
 
-                * `i` if `select_params` is set to False
-                * `input_shape` if `pass_input_shape` is set to True and `input_shape` not in `kwargs_to_args`
-                * `col` if `per_column` and `pass_col` are set to True and `col` not in `kwargs_to_args`
-                * broadcast time-series arrays corresponding to `input_names` (one-dimensional)
-                * broadcast in-place output arrays corresponding to `in_output_names` (one-dimensional)
-                * single parameter selection corresponding to `param_names` (single values)
-                * variable arguments if `var_args` is set to True
-                * arguments listed in `kwargs_to_args`
-                * `flex_2d` if `pass_flex_2d` is set to True and `flex_2d` not in `kwargs_to_args`
-                * keyword arguments if `apply_func` is not Numba-compiled
+                * `i` (index of the parameter combination) if `select_params` is set to False
+                * `input_shape` if `pass_input_shape` is set to True and `input_shape` not in `kwargs_as_args`
+                * Input arrays corresponding to `input_names`
+                * In-output arrays corresponding to `in_output_names`
+                * Parameters corresponding to `param_names`
+                * Variable arguments if `var_args` is set to True
+                * Arguments listed in `kwargs_as_args` passed as positional
+                * Other keyword arguments if `apply_func` is not Numba-compiled
 
                 Can be Numba-compiled.
 
@@ -2105,7 +2002,10 @@ Other keyword arguments are passed to `{0}.run`.
 
                 If False, prepends the current iteration index to the arguments.
             pass_packed (bool): Whether to pass packed tuples for inputs, in-place outputs, and parameters.
-            kwargs_to_args (list of str): Keyword arguments from `kwargs` dict to pass as
+            pass_per_column (bool): Whether to pass `per_column` to the apply function.
+
+                If `per_column` is True, gets passed to the caching function automatically.
+            kwargs_as_args (iterable of str): Keyword arguments from `kwargs` dict to pass as
                 positional arguments to the apply function.
 
                 Should be used together with `jitted_loop` set to True since Numba doesn't support
@@ -2120,7 +2020,7 @@ Other keyword arguments are passed to `{0}.run`.
                 but note that Numba doesn't support variable keyword arguments.
             remove_kwargs (bool): Whether to remove keyword arguments when selecting parameters.
 
-                If None, gets set to True if `jitted_loop` is True.
+                If None, becomes True if `jitted_loop` is True.
             **kwargs: Keyword arguments passed to `IndicatorFactory.with_custom_func`, all the way down
                 to `vectorbtpro.base.combining.apply_and_concat`.
 
@@ -2141,7 +2041,7 @@ Other keyword arguments are passed to `{0}.run`.
             ...     output_names=['out1', 'out2']
             ... ).with_apply_func(
             ...     apply_func_nb, var_args=True,
-            ...     kwargs_to_args=['arg2'], arg2=200)
+            ...     kwargs_as_args=['arg2'], arg2=200)
 
             >>> myInd = MyInd.run(price, price * 2, [1, 2], [3, 4], 100)
             >>> myInd.out1
@@ -2198,8 +2098,8 @@ Other keyword arguments are passed to `{0}.run`.
 
         num_ret_outputs = len(output_names)
 
-        if kwargs_to_args is None:
-            kwargs_to_args = []
+        if kwargs_as_args is None:
+            kwargs_as_args = []
         if remove_kwargs is None:
             remove_kwargs = jitted_loop
 
@@ -2222,7 +2122,7 @@ Other keyword arguments are passed to `{0}.run`.
             _1 = "i, *args_before"
         if pass_packed:
             if len(input_names) > 0:
-                _1 += ', (' + ', '.join(input_names) + ',)'
+                _1 += ', (' + ', '.join(map(lambda x: x + ('[i]' if select_params else ''), input_names)) + ',)'
             else:
                 _1 += ', ()'
             if len(in_output_names) > 0:
@@ -2235,7 +2135,7 @@ Other keyword arguments are passed to `{0}.run`.
                 _1 += ', ()'
         else:
             if len(input_names) > 0:
-                _1 += ', ' + ', '.join(input_names)
+                _1 += ', ' + ', '.join(map(lambda x: x + ('[i]' if select_params else ''), input_names))
             if len(in_output_names) > 0:
                 _1 += ', ' + ', '.join(map(lambda x: x + ('[i]' if select_params else ''), in_output_names))
             if len(param_names) > 0:
@@ -2254,61 +2154,107 @@ Other keyword arguments are passed to `{0}.run`.
         if jitted_loop:
             select_params_func = njit(select_params_func)
 
-        def custom_func(input_list: tp.List[tp.AnyArray],
-                        in_output_list: tp.List[tp.List[tp.AnyArray]],
-                        param_list: tp.List[tp.List[tp.Param]],
+        def custom_func(input_tuple: tp.Tuple[tp.AnyArray, ...],
+                        in_output_tuple: tp.Tuple[tp.List[tp.AnyArray], ...],
+                        param_tuple: tp.Tuple[tp.List[tp.Param], ...],
                         *args,
                         input_shape: tp.Optional[tp.Shape] = None,
-                        col: tp.Optional[int] = None,
                         flex_2d: tp.Optional[bool] = None,
+                        per_column: bool = False,
                         return_cache: bool = False,
                         use_cache: tp.Optional[CacheOutputT] = None,
                         **_kwargs) -> tp.Union[None, CacheOutputT, tp.Array2d, tp.List[tp.Array2d]]:
             """Custom function that forwards inputs and parameters to `apply_func`."""
-
-            n_params = len(param_list[0]) if len(param_list) > 0 else 1
+            # Prepend positional arguments
             args_before = ()
-            if input_shape is not None and 'input_shape' not in kwargs_to_args:
-                args_before += (input_shape,)
-            if col is not None and 'col' not in kwargs_to_args:
-                args_before += (col,)
+            if input_shape is not None and 'input_shape' not in kwargs_as_args:
+                if per_column:
+                    args_before += (input_shape[0],)
+                else:
+                    args_before += (input_shape,)
 
-            # Pass some keyword arguments as positional (required by numba)
+            # Append positional arguments
             more_args = ()
-            for key in kwargs_to_args:
-                value = _kwargs.pop(key)  # important: remove from kwargs
+            for key in kwargs_as_args:
+                if key == 'flex_2d':
+                    value = flex_2d
+                elif key == 'per_column':
+                    value = per_column
+                else:
+                    value = _kwargs.pop(key)  # important: remove from kwargs
                 more_args += (value,)
-            if flex_2d is not None and 'flex_2d' not in kwargs_to_args:
-                more_args += (flex_2d,)
+            if flex_2d is not None:
+                if 'flex_2d' not in kwargs_as_args:
+                    if remove_kwargs:
+                        more_args += (flex_2d,)
+                    else:
+                        _kwargs['flex_2d'] = flex_2d
+            if pass_per_column:
+                if 'per_column' not in kwargs_as_args:
+                    if remove_kwargs:
+                        more_args += (per_column,)
+                    else:
+                        _kwargs['per_column'] = per_column
+
+            # Resolve the number of parameters
+            if per_column:
+                if len(input_tuple) > 0:
+                    if input_tuple[0].ndim == 1:
+                        n_params = 1
+                    else:
+                        n_params = input_tuple[0].shape[1]
+                else:
+                    if len(input_shape) == 1:
+                        n_params = 1
+                    else:
+                        n_params = input_shape[1]
+            else:
+                n_params = len(param_tuple[0]) if len(param_tuple) > 0 else 1
 
             # Caching
             cache = use_cache
             if cache is None and cache_func is not None:
-                if checks.is_numba_func(cache_func):
-                    _in_output_list = list(map(to_typed_list, in_output_list))
-                    _param_list = list(map(to_typed_list, param_list))
-                else:
-                    _in_output_list = in_output_list
-                    _param_list = param_list
+                _input_tuple = input_tuple
+                _in_output_tuple = ()
+                for in_outputs in in_output_tuple:
+                    if jitted_loop:
+                        _in_outputs = to_typed_list(_in_outputs)
+                    else:
+                        _in_outputs = in_outputs
+                    _in_output_tuple += (_in_outputs,)
+                _param_tuple = ()
+                for params in param_tuple:
+                    if jitted_loop:
+                        _params = to_typed_list(_params)
+                    else:
+                        _params = params
+                    _param_tuple += (_params,)
+                __more_args = more_args
+                __kwargs = dict(_kwargs)
+                if per_column and 'per_column' not in kwargs_as_args:
+                    if remove_kwargs:
+                        __more_args += (per_column,)
+                    else:
+                        __kwargs['per_column'] = True
                 if pass_packed:
                     cache = cache_func(
                         *args_before,
-                        input_list,
-                        _in_output_list,
-                        _param_list,
+                        _input_tuple,
+                        _in_output_tuple,
+                        _param_tuple,
                         *args,
-                        *more_args,
-                        **_kwargs
+                        *__more_args,
+                        **__kwargs
                     )
                 else:
                     cache = cache_func(
                         *args_before,
-                        *input_list,
-                        *_in_output_list,
-                        *_param_list,
+                        *_input_tuple,
+                        *_in_output_tuple,
+                        *_param_tuple,
                         *args,
-                        *more_args,
-                        **_kwargs
+                        *__more_args,
+                        **__kwargs
                     )
             if return_cache:
                 return cache
@@ -2317,19 +2263,55 @@ Other keyword arguments are passed to `{0}.run`.
             if not isinstance(cache, tuple):
                 cache = (cache,)
 
-            if jitted_loop:
-                _in_output_list = list(map(to_typed_list, in_output_list))
-                _param_list = list(map(to_typed_list, param_list))
-            else:
-                _in_output_list = in_output_list
-                _param_list = param_list
+            # Prepare inputs
+            _input_tuple = ()
+            for input in input_tuple:
+                if per_column:
+                    if isinstance(input, pd.DataFrame):
+                        _inputs = [input.iloc[:, i:i + 1] for i in range(input.shape[1])]
+                    elif isinstance(input, pd.Series):
+                        _inputs = [input]
+                    elif input.ndim == 2:
+                        _inputs = [input[:, i:i + 1] for i in range(input.shape[1])]
+                    else:
+                        _inputs = [input]
+                else:
+                    _inputs = [input] * n_params
+                if jitted_loop:
+                    _inputs = to_typed_list(_inputs)
+                _input_tuple += (_inputs,)
+            _in_output_tuple = ()
+            for in_outputs in in_output_tuple:
+                if per_column:
+                    in_output = in_outputs[0]
+                    if isinstance(in_output, pd.DataFrame):
+                        _in_outputs = [in_output.iloc[:, i:i + 1] for i in range(in_output.shape[1])]
+                    elif isinstance(in_output, pd.Series):
+                        _in_outputs = [in_output]
+                    elif in_output.ndim == 2:
+                        _in_outputs = [in_output[:, i:i + 1] for i in range(in_output.shape[1])]
+                    else:
+                        _in_outputs = [in_output]
+                else:
+                    _in_outputs = in_outputs
+                if jitted_loop:
+                    _in_outputs = to_typed_list(_in_outputs)
+                _in_output_tuple += (_in_outputs,)
+            _param_tuple = ()
+            for params in param_tuple:
+                _params = params
+                if jitted_loop:
+                    _params = to_typed_list(_params)
+                _param_tuple += (_params,)
+
+            # Apply function and concatenate outputs
             return combining.apply_and_concat(
                 n_params,
                 select_params_func,
                 args_before,
-                *input_list,
-                *_in_output_list,
-                *_param_list,
+                *_input_tuple,
+                *_in_output_tuple,
+                *_param_tuple,
                 *args,
                 *more_args,
                 *cache,
@@ -2429,7 +2411,7 @@ Other keyword arguments are passed to `{0}.run`.
         output_names = info['output_names']
         output_flags = info['output_flags']
 
-        def apply_func(input_tuple: tp.Tuple[tp.AnyArray],
+        def apply_func(input_tuple: tp.Tuple[tp.AnyArray, ...],
                        in_output_tuple: tp.Tuple[tp.AnyArray, ...],
                        param_tuple: tp.Tuple[tp.Param, ...],
                        **_kwargs) -> tp.Union[tp.Array2d, tp.List[tp.Array2d]]:
@@ -2821,7 +2803,7 @@ Args:
             parse_kwargs = {}
         config = cls.parse_pandas_ta_config(pandas_ta_func, **parse_kwargs)
 
-        def apply_func(input_tuple: tp.Tuple[tp.AnyArray],
+        def apply_func(input_tuple: tp.Tuple[tp.AnyArray, ...],
                        in_output_tuple: tp.Tuple[tp.SeriesFrame, ...],
                        param_tuple: tp.Tuple[tp.Param, ...],
                        **_kwargs) -> tp.Union[tp.Array2d, tp.List[tp.Array2d]]:
@@ -3015,7 +2997,7 @@ Args:
         ind_cls = cls.find_ta_indicator(cls_name)
         config = cls.parse_ta_config(ind_cls)
 
-        def apply_func(input_tuple: tp.Tuple[tp.AnyArray],
+        def apply_func(input_tuple: tp.Tuple[tp.AnyArray, ...],
                        in_output_tuple: tp.Tuple[tp.SeriesFrame, ...],
                        param_tuple: tp.Tuple[tp.Param, ...],
                        **_kwargs) -> tp.Union[tp.Array2d, tp.List[tp.Array2d]]:
@@ -3535,7 +3517,7 @@ Args:
         in_output_names = factory.in_output_names
         param_names = factory.param_names
 
-        def apply_func(input_tuple: tp.Tuple[tp.AnyArray],
+        def apply_func(input_tuple: tp.Tuple[tp.AnyArray, ...],
                        in_output_tuple: tp.Tuple[tp.SeriesFrame, ...],
                        param_tuple: tp.Tuple[tp.Param, ...],
                        **_kwargs) -> tp.Union[tp.Array2d, tp.List[tp.Array2d]]:

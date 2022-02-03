@@ -75,19 +75,23 @@ class TestFactory:
     def test_with_custom_func(self):
         F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p'], output_names=['out'])
 
-        def apply_func(i, ts, p, a, b=10):
+        def apply_func(i, ts, p, a, b=10, per_column=False):
+            if per_column:
+                return ts[:, i] * p[i] + a + b
             return ts * p[i] + a + b
 
         @njit
-        def apply_func_nb(i, ts, p, a, b):
+        def apply_func_nb(i, ts, p, a, b, per_column):
+            if per_column:
+                return ts[:, i] * p[i] + a + b
             return ts * p[i] + a + b  # numba doesn't support **kwargs
 
         def custom_func(ts, p, *args, **kwargs):
             return vbt.base.combining.apply_and_concat(len(p), apply_func, ts, p, *args, **kwargs)
 
         @njit
-        def custom_func_nb(ts, p, *args):
-            return vbt.base.combining.apply_and_concat_one_nb(len(p), apply_func_nb, ts, p, *args)
+        def custom_func_nb(ts, p, *args, per_column=False):
+            return vbt.base.combining.apply_and_concat_one_nb(len(p), apply_func_nb, ts, p, *args, per_column)
 
         target = pd.DataFrame(
             np.array([
@@ -1130,7 +1134,7 @@ class TestFactory:
             target
         )
 
-    def test_kwargs_to_args(self):
+    def test_kwargs_as_args(self):
         F = vbt.IndicatorFactory(input_names=['ts'], output_names=['out'])
 
         def apply_func(ts, kw):
@@ -1141,40 +1145,57 @@ class TestFactory:
             return ts * kw
 
         pd.testing.assert_frame_equal(
-            F.with_apply_func(apply_func, kwargs_to_args=['kw']).run(ts, kw=2).out,
+            F.with_apply_func(apply_func, kwargs_as_args=['kw']).run(ts, kw=2).out,
             ts * 2
         )
         pd.testing.assert_frame_equal(
-            F.with_apply_func(apply_func_nb, jitted_loop=True, kwargs_to_args=['kw']).run(ts, kw=2).out,
+            F.with_apply_func(apply_func_nb, jitted_loop=True, kwargs_as_args=['kw']).run(ts, kw=2).out,
             ts * 2
         )
 
     def test_cache(self):
         F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p'], output_names=['out'])
 
-        def cache_func(ts, ps):
+        def cache_func(ts, ps, per_column=False):
             np.random.seed(seed)
-            return np.random.uniform(0, 1)
+            cache = dict()
+            for i, p in enumerate(ps):
+                if per_column:
+                    cache[p] = ts[:, i: i + 1] * p + np.random.uniform(0, 1)
+                else:
+                    cache[p] = ts * p + np.random.uniform(0, 1)
+            return cache
 
         @njit
-        def cache_func_nb(ts, ps):
+        def cache_func_nb(ts, ps, per_column=False):
             np.random.seed(seed)
-            return np.random.uniform(0, 1)
+            cache = dict()
+            for i, p in enumerate(ps):
+                if per_column:
+                    cache[p] = np.ascontiguousarray(ts[:, i: i + 1] * p + np.random.uniform(0, 1))
+                else:
+                    cache[p] = np.ascontiguousarray(ts * p + np.random.uniform(0, 1))
+            return cache
 
         def apply_func(ts, p, c):
-            return ts * p + c
+            return c[p]
 
         @njit
         def apply_func_nb(ts, p, c):
-            return ts * p + c
+            return c[p]
 
         target = pd.DataFrame(
             np.array([
-                [0.37454012, 0.37454012, 0.37454012, 1.37454012, 5.37454012, 1.37454012],
-                [0.37454012, 0.37454012, 0.37454012, 2.37454012, 4.37454012, 2.37454012],
-                [0.37454012, 0.37454012, 0.37454012, 3.37454012, 3.37454012, 3.37454012],
-                [0.37454012, 0.37454012, 0.37454012, 4.37454012, 2.37454012, 2.37454012],
-                [0.37454012, 0.37454012, 0.37454012, 5.37454012, 1.37454012, 1.37454012]
+                [0.3745401188473625, 0.3745401188473625, 0.3745401188473625,
+                 1.9507143064099162, 5.950714306409916, 1.9507143064099162],
+                [0.3745401188473625, 0.3745401188473625, 0.3745401188473625,
+                 2.950714306409916, 4.950714306409916, 2.950714306409916],
+                [0.3745401188473625, 0.3745401188473625, 0.3745401188473625,
+                 3.950714306409916, 3.950714306409916, 3.950714306409916],
+                [0.3745401188473625, 0.3745401188473625, 0.3745401188473625,
+                 4.950714306409916, 2.950714306409916, 2.950714306409916],
+                [0.3745401188473625, 0.3745401188473625, 0.3745401188473625,
+                 5.950714306409916, 1.9507143064099162, 1.9507143064099162]
             ]),
             index=ts.index,
             columns=pd.MultiIndex.from_tuples([
@@ -1201,16 +1222,32 @@ class TestFactory:
             target
         )
         # return_cache
+        target1 = np.array([
+            [0.3745401188473625, 0.3745401188473625, 0.3745401188473625],
+            [0.3745401188473625, 0.3745401188473625, 0.3745401188473625],
+            [0.3745401188473625, 0.3745401188473625, 0.3745401188473625],
+            [0.3745401188473625, 0.3745401188473625, 0.3745401188473625],
+            [0.3745401188473625, 0.3745401188473625, 0.3745401188473625]
+        ])
+        target2 = np.array([
+            [1.9507143064099162, 5.950714306409916, 1.9507143064099162],
+            [2.950714306409916, 4.950714306409916, 2.950714306409916],
+            [3.950714306409916, 3.950714306409916, 3.950714306409916],
+            [4.950714306409916, 2.950714306409916, 2.950714306409916],
+            [5.950714306409916, 1.9507143064099162, 1.9507143064099162]
+        ])
         cache = F.with_apply_func(
             apply_func,
             cache_func=cache_func
         ).run(ts, [0, 1], return_cache=True)
-        assert cache == 0.3745401188473625
+        np.testing.assert_array_equal(cache[0], target1)
+        np.testing.assert_array_equal(cache[1], target2)
         cache = F.with_apply_func(
             apply_func_nb,
             cache_func=cache_func_nb
         ).run(ts, [0, 1], return_cache=True)
-        assert cache == 0.3745401188473625
+        np.testing.assert_array_equal(cache[0], target1)
+        np.testing.assert_array_equal(cache[1], target2)
         # use_cache
         pd.testing.assert_frame_equal(
             F.with_apply_func(
@@ -1226,34 +1263,13 @@ class TestFactory:
         )
 
         # per_column
-        def cache_func(col, ts, ps):
-            np.random.seed(seed + col)
-            return np.random.uniform(0, 1)
-
-        @njit
-        def cache_func_nb(col, ts, ps):
-            np.random.seed(seed + col)
-            return np.random.uniform(0, 1)
-
-        cache = F.with_apply_func(
-            apply_func,
-            cache_func=cache_func,
-            pass_col=True
-        ).run(ts, [0, 1, 2], return_cache=True, per_column=True)
-        assert cache == [0.3745401188473625, 0.11505456638977896, 0.8348421486656494]
-        cache = F.with_apply_func(
-            apply_func_nb,
-            cache_func=cache_func_nb,
-            pass_col=True
-        ).run(ts, [0, 1, 2], return_cache=True, per_column=True)
-        assert cache == [0.3745401188473625, 0.11505456638977896, 0.8348421486656494]
         target = pd.DataFrame(
             np.array([
-                [0.37454012, 5.115054566389779, 2.8348421486656497],
-                [0.37454012, 4.115054566389779, 4.8348421486656497],
-                [0.37454012, 3.115054566389779, 6.8348421486656497],
-                [0.37454012, 2.115054566389779, 4.8348421486656497],
-                [0.37454012, 1.115054566389779, 2.8348421486656497]
+                [0.3745401188473625, 5.950714306409916, 2.731993941811405],
+                [0.3745401188473625, 4.950714306409916, 4.731993941811405],
+                [0.3745401188473625, 3.950714306409916, 6.731993941811405],
+                [0.3745401188473625, 2.950714306409916, 4.731993941811405],
+                [0.3745401188473625, 1.9507143064099162, 2.731993941811405]
             ]),
             index=ts.index,
             columns=pd.MultiIndex.from_tuples([
@@ -1264,14 +1280,16 @@ class TestFactory:
         )
         pd.testing.assert_frame_equal(
             F.with_apply_func(
-                apply_func
-            ).run(ts, [0, 1, 2], use_cache=cache, per_column=True).out,
+                apply_func,
+                cache_func=cache_func
+            ).run(ts, [0, 1, 2], per_column=True).out,
             target
         )
         pd.testing.assert_frame_equal(
             F.with_apply_func(
-                apply_func_nb
-            ).run(ts, [0, 1, 2], use_cache=cache, per_column=True).out,
+                apply_func_nb,
+                cache_func=cache_func_nb
+            ).run(ts, [0, 1, 2], per_column=True).out,
             target
         )
 
@@ -1481,19 +1499,14 @@ class TestFactory:
                     pd.testing.assert_series_equal(_in_out, ts.iloc[:, col].vbt.wrapper.wrap(_in_out.values))
             return _ts
 
-        F.with_custom_func(custom_func, to_2d=test_to_2d, keep_pd=test_keep_pd, var_args=True) \
-            .run(ts['a'], per_column=True, pass_col=True)
-        F.with_apply_func(apply_func, to_2d=test_to_2d, keep_pd=test_keep_pd, var_args=True) \
-            .run(ts['a'], per_column=True, pass_col=True)
-
     def test_pass_packed(self):
         F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p'], output_names=['out'])
 
-        def custom_func(input_list, in_output_list, param_list):
+        def custom_func(input_list, in_output_list, param_list, per_column=False):
             return input_list[0] * param_list[0][0]
 
         @njit
-        def custom_func_nb(input_list, in_output_list, param_list):
+        def custom_func_nb(input_list, in_output_list, param_list, per_column=False):
             return input_list[0] * param_list[0][0]
 
         target = pd.DataFrame(
@@ -1559,11 +1572,11 @@ class TestFactory:
         F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p'], output_names=['out'])
 
         def apply_func(i, ts, p):
-            return ts * p[i]
+            return ts[i] * p[i]
 
         @njit
         def apply_func_nb(i, ts, p):
-            return ts * p[i]
+            return ts[i] * p[i]
 
         target = pd.DataFrame(
             ts.values * 2,
@@ -1592,11 +1605,11 @@ class TestFactory:
         )
 
         def apply_func(i, input_tuple, in_output_tuple, param_tuple):
-            return input_tuple[0] * param_tuple[0][i]
+            return input_tuple[0][i] * param_tuple[0][i]
 
         @njit
         def apply_func_nb(i, input_tuple, in_output_tuple, param_tuple):
-            return input_tuple[0] * param_tuple[0][i]
+            return input_tuple[0][i] * param_tuple[0][i]
 
         target = pd.DataFrame(
             ts.values * 2,
@@ -1627,23 +1640,21 @@ class TestFactory:
     def test_other(self):
         F = vbt.IndicatorFactory(input_names=['ts'], output_names=['o1', 'o2'])
 
-        def custom_func(ts):
+        def custom_func(ts, per_column=False):
             return ts, ts + 1, ts + 2
 
         @njit
-        def custom_func_nb(ts):
+        def custom_func_nb(ts, per_column=False):
             return ts, ts + 1, ts + 2
 
         obj, other = F.with_custom_func(custom_func).run(ts)
         np.testing.assert_array_equal(other, ts + 2)
         obj, other = F.with_custom_func(custom_func_nb).run(ts)
         np.testing.assert_array_equal(other, ts + 2)
-        obj, *others = F.with_custom_func(custom_func).run(ts, per_column=True)
-        for i, other in enumerate(others):
-            np.testing.assert_array_equal(other[0], ts.iloc[:, [i]] + 2)
-        obj, *others = F.with_custom_func(custom_func_nb).run(ts, per_column=True)
-        for i, other in enumerate(others):
-            np.testing.assert_array_equal(other[0], ts.iloc[:, [i]] + 2)
+        obj, other = F.with_custom_func(custom_func).run(ts, per_column=True)
+        np.testing.assert_array_equal(other, ts + 2)
+        obj, other = F.with_custom_func(custom_func_nb).run(ts, per_column=True)
+        np.testing.assert_array_equal(other, ts + 2)
 
     def test_run_unique(self):
         F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p1', 'p2'], output_names=['out'])

@@ -147,7 +147,7 @@ RANDNX = SignalFactory(
     param_settings=dict(
         n=flex_col_param_config
     ),
-    kwargs_to_args=['entry_wait', 'exit_wait'],
+    kwargs_as_args=['entry_wait', 'exit_wait'],
     entry_wait=1,
     exit_wait=1,
     seed=None

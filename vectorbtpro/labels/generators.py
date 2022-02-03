@@ -20,7 +20,7 @@ FMEAN = IndicatorFactory(
     output_names=['fmean']
 ).with_apply_func(
     nb.future_mean_nb,
-    kwargs_to_args=['wait', 'adjust'],
+    kwargs_as_args=['wait', 'adjust'],
     ewm=False,
     wait=1,
     adjust=False
@@ -36,7 +36,7 @@ FSTD = IndicatorFactory(
     output_names=['fstd']
 ).with_apply_func(
     nb.future_std_nb,
-    kwargs_to_args=['wait', 'adjust', 'ddof'],
+    kwargs_as_args=['wait', 'adjust', 'ddof'],
     ewm=False,
     wait=1,
     adjust=False,
@@ -53,7 +53,7 @@ FMIN = IndicatorFactory(
     output_names=['fmin']
 ).with_apply_func(
     nb.future_min_nb,
-    kwargs_to_args=['wait'],
+    kwargs_as_args=['wait'],
     wait=1
 )
 
@@ -67,7 +67,7 @@ FMAX = IndicatorFactory(
     output_names=['fmax']
 ).with_apply_func(
     nb.future_max_nb,
-    kwargs_to_args=['wait'],
+    kwargs_as_args=['wait'],
     wait=1
 )
 
@@ -114,7 +114,7 @@ MEANLB = IndicatorFactory(
     output_names=['labels']
 ).with_apply_func(
     nb.mean_labels_nb,
-    kwargs_to_args=['wait', 'adjust'],
+    kwargs_as_args=['wait', 'adjust'],
     ewm=False,
     wait=1,
     adjust=False
@@ -195,7 +195,7 @@ BOLB = IndicatorFactory(
         neg_th=flex_elem_param_config
     ),
     pass_flex_2d=True,
-    kwargs_to_args=['wait'],
+    kwargs_as_args=['wait'],
     pos_th=0.,
     neg_th=0.,
     wait=1
