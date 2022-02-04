@@ -3083,6 +3083,26 @@ class TestAccessors:
             df.vbt.crossed_above(df.iloc[:, ::-1], chunked=True),
             df.vbt.crossed_above(df.iloc[:, ::-1], chunked=False)
         )
+        sr5 = pd.Series([1, 2, 1, 2, 1])
+        sr6 = pd.Series([2, 1, 2, 1, 2])
+        pd.testing.assert_series_equal(
+            sr5.vbt.crossed_above(sr6),
+            pd.Series([False, True, False, True, False])
+        )
+        pd.testing.assert_series_equal(
+            sr5.vbt.crossed_above(sr6, wait=1),
+            pd.Series([False, False, False, False, False])
+        )
+        sr7 = pd.Series([1, 1, 2, 2, 1, 1, 2, 2, 1, 1])
+        sr8 = pd.Series([2, 2, 1, 1, 2, 2, 1, 1, 2, 2])
+        pd.testing.assert_series_equal(
+            sr7.vbt.crossed_above(sr8),
+            pd.Series([False, False, True, False, False, False, True, False, False, False])
+        )
+        pd.testing.assert_series_equal(
+            sr7.vbt.crossed_above(sr8, wait=1),
+            pd.Series([False, False, False, True, False, False, False, True, False, False])
+        )
 
     def test_crossed_below(self):
         sr1 = pd.Series([np.nan, 3, 2, 1, 2, 3, 4])
@@ -3112,6 +3132,26 @@ class TestAccessors:
         pd.testing.assert_frame_equal(
             df.vbt.crossed_below(df.iloc[:, ::-1], chunked=True),
             df.vbt.crossed_below(df.iloc[:, ::-1], chunked=False)
+        )
+        sr5 = pd.Series([1, 2, 1, 2, 1])
+        sr6 = pd.Series([2, 1, 2, 1, 2])
+        pd.testing.assert_series_equal(
+            sr5.vbt.crossed_below(sr6),
+            pd.Series([False, False, True, False, True])
+        )
+        pd.testing.assert_series_equal(
+            sr5.vbt.crossed_below(sr6, wait=1),
+            pd.Series([False, False, False, False, False])
+        )
+        sr7 = pd.Series([1, 1, 2, 2, 1, 1, 2, 2, 1, 1])
+        sr8 = pd.Series([2, 2, 1, 1, 2, 2, 1, 1, 2, 2])
+        pd.testing.assert_series_equal(
+            sr7.vbt.crossed_below(sr8),
+            pd.Series([False, False, False, False, True, False, False, False, True, False])
+        )
+        pd.testing.assert_series_equal(
+            sr7.vbt.crossed_below(sr8, wait=1),
+            pd.Series([False, False, False, False, False, True, False, False, False, True])
         )
 
     def test_stats(self):

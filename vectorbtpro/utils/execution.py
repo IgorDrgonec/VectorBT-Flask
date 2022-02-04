@@ -68,6 +68,8 @@ class SequenceEngine(ExecutionEngine):
 
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
         results = []
+        if n_calls is None and hasattr(funcs_args, '__len__'):
+            n_calls = len(funcs_args)
         with get_pbar(total=n_calls, show_progress=self.show_progress, **self.pbar_kwargs) as pbar:
             for func, args, kwargs in funcs_args:
                 results.append(func(*args, **kwargs))
