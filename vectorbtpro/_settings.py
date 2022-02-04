@@ -213,6 +213,10 @@ ${config_doc}
 _settings['math'] = math
 
 execution = dict(
+    show_progress=True,
+    pbar_kwargs=Config(  # flex
+        dict()
+    ),
     engines=Config(  # flex
         dict(
             sequence=dict(
@@ -220,13 +224,17 @@ execution = dict(
                 show_progress=False,
                 pbar_kwargs=Config(  # flex
                     dict()
-                )
+                ),
+                n_chunks=None,
+                chunk_len=None
             ),
             dask=dict(
                 cls=DaskEngine,
                 compute_kwargs=Config(  # flex
                     dict()
                 ),
+                n_chunks=None,
+                chunk_len=None
             ),
             ray=dict(
                 cls=RayEngine,
@@ -239,7 +247,9 @@ execution = dict(
                 ),
                 remote_kwargs=Config(  # flex
                     dict()
-                )
+                ),
+                n_chunks=None,
+                chunk_len=None
             ),
         )
     ),

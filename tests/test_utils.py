@@ -2392,6 +2392,66 @@ class TestExecution:
         if ray_available:
             assert execution.execute(funcs_args, engine='ray') == [10, 35, 60]
 
+    def test_execute_chunks(self):
+        def f(a, *args, b=None, **kwargs):
+            return a + sum(args) + b + sum(kwargs.values())
+
+        funcs_args = [
+            (f, (0, 1, 2), dict(b=3, c=4)),
+            (f, (5, 6, 7), dict(b=8, c=9)),
+            (f, (10, 11, 12), dict(b=13, c=14))
+        ]
+
+        assert execution.execute(funcs_args, chunk_meta=[
+            chunking.ChunkMeta(uuid='', idx=0, start=0, end=1, indices=None),
+            chunking.ChunkMeta(uuid='', idx=1, start=1, end=3, indices=None)
+        ]) == [10, 35, 60]
+        assert execution.execute(funcs_args, chunk_meta=[
+            chunking.ChunkMeta(uuid='', idx=1, start=1, end=3, indices=None),
+            chunking.ChunkMeta(uuid='', idx=0, start=0, end=1, indices=None)
+        ]) == [10, 35, 60]
+        assert execution.execute(funcs_args, chunk_meta=[
+            chunking.ChunkMeta(uuid='', idx=1, start=1, end=3, indices=None),
+            chunking.ChunkMeta(uuid='', idx=0, start=0, end=1, indices=None)
+        ], in_chunk_order=True) == [35, 60, 10]
+        assert execution.execute(funcs_args, chunk_meta=[
+            chunking.ChunkMeta(uuid='', idx=1, start=None, end=None, indices=[0]),
+            chunking.ChunkMeta(uuid='', idx=0, start=None, end=None, indices=[1, 2])
+        ]) == [10, 35, 60]
+        assert execution.execute(funcs_args, chunk_meta=[
+            chunking.ChunkMeta(uuid='', idx=1, start=None, end=None, indices=[2, 1]),
+            chunking.ChunkMeta(uuid='', idx=0, start=None, end=None, indices=[0])
+        ], in_chunk_order=True) == [60, 35, 10]
+
+        assert execution.execute(iter(funcs_args), chunk_meta=[
+            chunking.ChunkMeta(uuid='', idx=0, start=0, end=1, indices=None),
+            chunking.ChunkMeta(uuid='', idx=1, start=1, end=3, indices=None)
+        ]) == [10, 35, 60]
+        assert execution.execute(iter(funcs_args), chunk_meta=[
+            chunking.ChunkMeta(uuid='', idx=1, start=1, end=3, indices=None),
+            chunking.ChunkMeta(uuid='', idx=0, start=0, end=1, indices=None)
+        ]) == [10, 35, 60]
+        assert execution.execute(iter(funcs_args), chunk_meta=[
+            chunking.ChunkMeta(uuid='', idx=1, start=1, end=3, indices=None),
+            chunking.ChunkMeta(uuid='', idx=0, start=0, end=1, indices=None)
+        ], in_chunk_order=True) == [35, 60, 10]
+        assert execution.execute(iter(funcs_args), chunk_meta=[
+            chunking.ChunkMeta(uuid='', idx=1, start=None, end=None, indices=[0]),
+            chunking.ChunkMeta(uuid='', idx=0, start=None, end=None, indices=[1, 2])
+        ]) == [10, 35, 60]
+        assert execution.execute(iter(funcs_args), chunk_meta=[
+            chunking.ChunkMeta(uuid='', idx=1, start=None, end=None, indices=[2, 1]),
+            chunking.ChunkMeta(uuid='', idx=0, start=None, end=None, indices=[0])
+        ], in_chunk_order=True) == [60, 35, 10]
+
+        assert execution.execute(iter(funcs_args), n_chunks=1) == [10, 35, 60]
+        assert execution.execute(iter(funcs_args), n_chunks=2) == [10, 35, 60]
+        assert execution.execute(iter(funcs_args), n_chunks=3) == [10, 35, 60]
+        assert execution.execute(iter(funcs_args), chunk_len=1) == [10, 35, 60]
+        assert execution.execute(iter(funcs_args), chunk_len=2) == [10, 35, 60]
+        assert execution.execute(iter(funcs_args), chunk_len=3) == [10, 35, 60]
+        assert execution.execute(iter(funcs_args), chunk_len='auto') == [10, 35, 60]
+
 
 # ############# chunking.py ############# #
 

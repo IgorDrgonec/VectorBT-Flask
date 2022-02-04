@@ -2,11 +2,14 @@
 
 """Engines for executing functions."""
 
+import multiprocessing
+
 from numba.core.registry import CPUDispatcher
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.config import merge_dicts, Configured
 from vectorbtpro.utils.pbar import get_pbar
+from vectorbtpro.utils.parsing import get_func_arg_names
 
 try:
     from ray.remote_function import RemoteFunction as RemoteFunctionT
@@ -292,6 +295,12 @@ class RayEngine(ExecutionEngine):
 def execute(funcs_args: tp.FuncsArgs,
             engine: tp.EngineLike = SequenceEngine,
             n_calls: tp.Optional[int] = None,
+            n_chunks: tp.Optional[int] = None,
+            chunk_len: tp.Optional[tp.Union[str, int]] = None,
+            chunk_meta: tp.Optional[tp.Iterable[tp.ChunkMeta]] = None,
+            in_chunk_order: bool = False,
+            show_progress: tp.Optional[bool] = None,
+            pbar_kwargs: tp.KwargsLike = None,
             **kwargs) -> list:
     """Execute using an engine.
 
@@ -302,21 +311,146 @@ def execute(funcs_args: tp.FuncsArgs,
     * Instance of `ExecutionEngine` - will call `ExecutionEngine.execute` with `n_calls`
     * Callable - will pass `funcs_args`, `n_calls` (if not None), and `**kwargs`
 
+    Can execute per chunk if `chunk_meta` is provided. Otherwise, if any of `n_chunks` and `chunk_len`
+    are set, passes them to `vectorbtpro.utils.chunking.yield_chunk_meta` to generate `chunk_meta`.
+    Arguments `n_chunks` and `chunk_len` can be set globally in the engine-specific settings.
+    Set `chunk_len` to 'auto' to set the chunk length to the number of cores.
+
+    If indices in `chunk_meta` are perfectly sorted and `funcs_args` is an iterable, traverses
+    through `funcs_args` to avoid converting it into a list. Otherwise, traverses through `chunk_meta`.
+    If `in_chunk_order` is True, returns the outputs in the order they appear in `chunk_meta`.
+    Otherwise, always returns them in the same order as in `funcs_args`.
+
+    !!! info
+        Chunks are processed sequentially, while functions within each chunk can be processed distributively.
+
     Supported engines can be found in `engines` in `vectorbtpro._settings.execution`."""
     from vectorbtpro._settings import settings
-    engines_cfg = settings['execution']['engines']
+    execution_cfg = settings['execution']
+    engines_cfg = execution_cfg['engines']
 
+    engine_cfg = dict()
     if isinstance(engine, str):
         if engine.lower() in engines_cfg:
+            engine_cfg = engines_cfg[engine]
             engine = engines_cfg[engine]['cls']
         else:
             raise ValueError(f"Engine with name '{engine}' is unknown")
     if isinstance(engine, type) and issubclass(engine, ExecutionEngine):
+        for k, v in engines_cfg.items():
+            if v['cls'] is engine:
+                engine_cfg = v
+        func_arg_names = get_func_arg_names(engine.__init__)
+        if 'show_progress' in func_arg_names:
+            kwargs['show_progress'] = show_progress
+        if 'pbar_kwargs' in func_arg_names:
+            kwargs['pbar_kwargs'] = pbar_kwargs
         engine = engine(**kwargs)
-    if isinstance(engine, ExecutionEngine):
-        return engine.execute(funcs_args, n_calls=n_calls)
+    elif isinstance(engine, ExecutionEngine):
+        for k, v in engines_cfg.items():
+            if v['cls'] is type(engine):
+                engine_cfg = v
     if callable(engine):
-        if n_calls is not None:
-            kwargs['n_calls'] = n_calls
-        return engine(funcs_args, **kwargs)
-    raise TypeError(f"Engine of type {type(engine)} is not supported")
+        func_arg_names = get_func_arg_names(engine)
+        if 'show_progress' in func_arg_names:
+            kwargs['show_progress'] = show_progress
+        if 'pbar_kwargs' in func_arg_names:
+            kwargs['pbar_kwargs'] = pbar_kwargs
+
+    if n_chunks is None:
+        n_chunks = engine_cfg.get('n_chunks', None)
+    if chunk_len is None:
+        chunk_len = engine_cfg.get('chunk_len', None)
+    if show_progress is None:
+        show_progress = execution_cfg['show_progress']
+    pbar_kwargs = merge_dicts(execution_cfg['pbar_kwargs'], pbar_kwargs)
+
+    def _execute(_funcs_args: tp.FuncsArgs, _n_calls: tp.Optional[int]) -> list:
+        if isinstance(engine, ExecutionEngine):
+            return engine.execute(_funcs_args, n_calls=_n_calls)
+        if callable(engine):
+            if n_calls is not None:  # use global n_calls
+                return engine(_funcs_args, n_calls=_n_calls, **kwargs)
+            return engine(_funcs_args, **kwargs)
+        raise TypeError(f"Engine of type {type(engine)} is not supported")
+
+    if n_chunks is None and chunk_len is None and chunk_meta is None:
+        return _execute(funcs_args, n_calls)
+
+    if chunk_meta is None:
+        # Generate chunk metadata
+        from vectorbtpro.utils.chunking import yield_chunk_meta
+
+        if hasattr(funcs_args, '__len__'):
+            _n_calls = len(funcs_args)
+        elif n_calls is not None:
+            _n_calls = n_calls
+        else:
+            funcs_args = list(funcs_args)
+            _n_calls = len(funcs_args)
+        if isinstance(chunk_len, str) and chunk_len.lower() == 'auto':
+            chunk_len = multiprocessing.cpu_count()
+        chunk_meta = yield_chunk_meta(
+            n_chunks=n_chunks,
+            size=_n_calls,
+            chunk_len=chunk_len
+        )
+
+    # Get indices of each chunk and whether they are sorted
+    last_idx = -1
+    indices_sorted = True
+    all_chunk_indices = []
+    for _chunk_meta in chunk_meta:
+        if _chunk_meta.indices is not None:
+            chunk_indices = list(_chunk_meta.indices)
+        else:
+            if _chunk_meta.start is None or _chunk_meta.end is None:
+                raise ValueError("Each chunk must have a start and an end index")
+            chunk_indices = list(range(_chunk_meta.start, _chunk_meta.end))
+        if indices_sorted:
+            for idx in chunk_indices:
+                if idx != last_idx + 1:
+                    indices_sorted = False
+                    break
+                last_idx = idx
+        all_chunk_indices.append(chunk_indices)
+
+    if indices_sorted and not hasattr(funcs_args, '__len__'):
+        # Iterate through funcs_args
+        outputs = []
+        chunk_idx = 0
+        _funcs_args = []
+
+        with get_pbar(total=len(all_chunk_indices), show_progress=show_progress, **pbar_kwargs) as pbar:
+            for i, func_args in enumerate(funcs_args):
+                if i > all_chunk_indices[chunk_idx][-1]:
+                    chunk_indices = all_chunk_indices[chunk_idx]
+                    outputs.extend(_execute(_funcs_args, len(chunk_indices)))
+                    chunk_idx += 1
+                    _funcs_args = []
+                    pbar.update(1)
+                _funcs_args.append(func_args)
+            if len(_funcs_args) > 0:
+                chunk_indices = all_chunk_indices[chunk_idx]
+                outputs.extend(_execute(_funcs_args, len(chunk_indices)))
+                pbar.update(1)
+        return outputs
+    else:
+        # Iterate through chunks
+        funcs_args = list(funcs_args)
+        outputs = []
+
+        with get_pbar(total=len(all_chunk_indices), show_progress=show_progress, **pbar_kwargs) as pbar:
+            for chunk_indices in all_chunk_indices:
+                _funcs_args = []
+                for idx in chunk_indices:
+                    _funcs_args.append(funcs_args[idx])
+                chunk_output = _execute(_funcs_args, len(chunk_indices))
+                if in_chunk_order or indices_sorted:
+                    outputs.extend(chunk_output)
+                else:
+                    outputs.extend(zip(chunk_indices, chunk_output))
+                pbar.update(1)
+        if in_chunk_order or indices_sorted:
+            return outputs
+        return list(list(zip(*sorted(outputs, key=lambda x: x[0])))[1])
