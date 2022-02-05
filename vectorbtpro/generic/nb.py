@@ -3413,6 +3413,8 @@ def crossed_above_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d, wait: int = 0) -> tp
             else:
                 out[i] = False
         elif arr1[i] == arr2[i]:
+            if crossed_ago > -1:
+                was_below = False
             crossed_ago = -1
             out[i] = False
         else:

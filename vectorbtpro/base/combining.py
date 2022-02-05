@@ -14,6 +14,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils.execution import execute
+from vectorbtpro.base.reshaping import column_stack
 
 
 @register_jitted
@@ -118,8 +119,8 @@ def apply_and_concat(ntimes: int,
     if n_outputs == 0:
         return None
     if n_outputs == 1:
-        return np.column_stack(out)
-    return list(map(np.column_stack, zip(*out)))
+        return column_stack(out)
+    return list(map(column_stack, zip(*out)))
 
 
 @register_jitted

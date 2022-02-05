@@ -2626,10 +2626,6 @@ class TestFactory:
         assert I.input_names == ('ts',)
         assert I.param_names == ('window',)
         pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
-        I = vbt.IndicatorFactory.from_expr("vectorbtpro.generic.nb.rolling_mean_nb(@in_ts, @p_window)", window=2)
-        assert I.input_names == ('ts',)
-        assert I.param_names == ('window',)
-        pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
         I = vbt.IndicatorFactory.from_expr(
             "random_func()", random_func=lambda context: context['close'],
             factory_kwargs=dict(input_names=['close']))

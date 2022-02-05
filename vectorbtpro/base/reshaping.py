@@ -193,6 +193,14 @@ def tile(arg: tp.ArrayLike, n: int, axis: int = 1, raw: bool = False,
         raise ValueError("Only axis 0 and 1 are supported")
 
 
+def column_stack(arrs: tp.Sequence[tp.AnyArray]) -> tp.Array2d:
+    """Stack arrays along columns."""
+    first_arr = arrs[0]
+    if first_arr.ndim == 1 or (first_arr.ndim == 2 and first_arr.shape[1] == 1):
+        return np.concatenate(arrs).reshape((len(arrs), len(first_arr))).T
+    return np.column_stack(arrs)
+
+
 IndexFromLike = tp.Union[None, str, int, tp.Any]
 """Any object that can be coerced into a `index_from` argument."""
 

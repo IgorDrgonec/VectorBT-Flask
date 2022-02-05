@@ -47,7 +47,7 @@ from numba.typed import List
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import indexes, reshaping, combining
 from vectorbtpro.base.indexing import build_param_indexer
-from vectorbtpro.base.reshaping import Default, resolve_ref
+from vectorbtpro.base.reshaping import Default, resolve_ref, column_stack
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.accessors import BaseAccessor
@@ -1957,6 +1957,8 @@ Other keyword arguments are passed to `{0}.run`.
                         pass_per_column: bool = False,
                         cache_pass_per_column: tp.Optional[bool] = None,
                         kwargs_as_args: tp.Optional[tp.Iterable[str]] = None,
+                        jit_select_params: tp.Optional[bool] = None,
+                        jit_kwargs: tp.KwargsLike = None,
                         jitted_loop: bool = False,
                         remove_kwargs: tp.Optional[bool] = None,
                         **kwargs) -> tp.Union[str, tp.Type[IndicatorBase]]:
@@ -2046,6 +2048,10 @@ Other keyword arguments are passed to `{0}.run`.
                 variable keyword arguments.
 
                 Defaults to []. Order matters.
+            jit_select_params (bool): Whether to JIT-compile the parameter selection function.
+
+                Defaults to `jitted_loop`.
+            jit_kwargs (dict): Keyword arguments passed to `@njit` decorator of the parameter selection function.
             jitted_loop (bool): Whether to loop using a jitter.
 
                 Parameter selector will be automatically compiled using Numba.
@@ -2134,8 +2140,10 @@ Other keyword arguments are passed to `{0}.run`.
 
         if kwargs_as_args is None:
             kwargs_as_args = []
+        if jit_select_params is None:
+            jit_select_params = jitted_loop
         if remove_kwargs is None:
-            remove_kwargs = jitted_loop
+            remove_kwargs = jit_select_params
 
         # Build a function that selects a parameter tuple
         # Do it here to avoid compilation with Numba every time custom_func is run
@@ -2185,8 +2193,8 @@ Other keyword arguments are passed to `{0}.run`.
         select_params_func = scope['select_params_func']
         if module_name is not None:
             select_params_func.__module__ = module_name
-        if jitted_loop:
-            select_params_func = njit(select_params_func)
+        if jit_select_params:
+            select_params_func = njit(select_params_func, **resolve_dict(jit_kwargs))
 
         def custom_func(input_tuple: tp.Tuple[tp.AnyArray, ...],
                         in_output_tuple: tp.Tuple[tp.List[tp.AnyArray], ...],
@@ -2356,13 +2364,13 @@ Other keyword arguments are passed to `{0}.run`.
             _input_tuple = ()
             for input in input_tuple:
                 _inputs = _expand_input(input)
-                if jitted_loop:
+                if jit_select_params:
                     _inputs = to_typed_list(_inputs)
                 _input_tuple += (_inputs,)
             _in_output_tuple = ()
             for in_outputs in in_output_tuple:
                 _in_outputs = _expand_input(in_outputs, multiple=True)
-                if jitted_loop:
+                if jit_select_params:
                     _in_outputs = to_typed_list(_in_outputs)
                 _in_output_tuple += (_in_outputs,)
             _param_tuple = ()
@@ -2371,7 +2379,7 @@ Other keyword arguments are passed to `{0}.run`.
                     _params = [params[p] for p in range(len(params)) for i in range(n_cols)]
                 else:
                     _params = params
-                if jitted_loop:
+                if jit_select_params:
                     _params = to_typed_list(_params)
                 _param_tuple += (_params,)
             if apply_on_1d and not per_column:
@@ -2515,8 +2523,8 @@ Other keyword arguments are passed to `{0}.run`.
                 outputs.append(output)
             if isinstance(outputs[0], tuple):  # multiple outputs
                 outputs = list(zip(*outputs))
-                return list(map(np.column_stack, outputs))
-            return np.column_stack(outputs)
+                return list(map(column_stack, outputs))
+            return column_stack(outputs)
 
         kwargs = merge_dicts(
             {k: Default(v) for k, v in info['parameters'].items()},
@@ -2926,8 +2934,8 @@ Args:
                 outputs.append(output)
             if isinstance(outputs[0], tuple):  # multiple outputs
                 outputs = list(zip(*outputs))
-                return list(map(np.column_stack, outputs))
-            return np.column_stack(outputs)
+                return list(map(column_stack, outputs))
+            return column_stack(outputs)
 
         kwargs = merge_dicts(
             {k: Default(v) for k, v in config.pop('defaults').items()},
@@ -3114,8 +3122,8 @@ Args:
                 outputs.append(output)
             if isinstance(outputs[0], tuple):  # multiple outputs
                 outputs = list(zip(*outputs))
-                return list(map(np.column_stack, outputs))
-            return np.column_stack(outputs)
+                return list(map(column_stack, outputs))
+            return column_stack(outputs)
 
         kwargs = merge_dicts(
             {k: Default(v) for k, v in config.pop('defaults').items()},
@@ -3677,8 +3685,8 @@ Args:
                             outputs.append(_talib_func(*col_inputs, *other_args))
                         if isinstance(outputs[0], tuple):  # multiple outputs
                             outputs = list(zip(*outputs))
-                            return list(map(np.column_stack, outputs))
-                        return np.column_stack(outputs)
+                            return list(map(column_stack, outputs))
+                        return column_stack(outputs)
 
                     var = _talib_func
                 elif var_name in res_func_mapping:
