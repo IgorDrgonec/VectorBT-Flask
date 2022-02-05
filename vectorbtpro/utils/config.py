@@ -321,15 +321,6 @@ class Config(PickleableDict, Prettified):
         All arguments are applied only once during initialization.
     """
 
-    _copy_kwargs_: tp.Kwargs
-    _reset_dct_: dict
-    _reset_dct_copy_kwargs_: tp.Kwargs
-    _frozen_keys_: bool
-    _readonly_: bool
-    _nested_: bool
-    _convert_dicts_: tp.Union[bool, tp.Type["Config"]]
-    _as_attrs_: bool
-
     def __init__(self,
                  *args,
                  copy_kwargs_: tp.KwargsLike = None,
@@ -429,22 +420,21 @@ class Config(PickleableDict, Prettified):
 
         dict.__init__(self, dct)
 
-        self.__dict__['_copy_kwargs_'] = copy_kwargs_
-        self.__dict__['_reset_dct_'] = reset_dct_
-        self.__dict__['_reset_dct_copy_kwargs_'] = reset_dct_copy_kwargs_
-        self.__dict__['_frozen_keys_'] = frozen_keys_
-        self.__dict__['_readonly_'] = readonly_
-        self.__dict__['_nested_'] = nested_
-        self.__dict__['_convert_dicts_'] = convert_dicts_
-        self.__dict__['_as_attrs_'] = as_attrs_
+        self._copy_kwargs_ = copy_kwargs_
+        self._reset_dct_ = reset_dct_
+        self._reset_dct_copy_kwargs_ = reset_dct_copy_kwargs_
+        self._frozen_keys_ = frozen_keys_
+        self._readonly_ = readonly_
+        self._nested_ = nested_
+        self._convert_dicts_ = convert_dicts_
+        self._as_attrs_ = as_attrs_
 
         # Set keys as attributes for autocomplete
         if as_attrs_:
             self_dir = set(self.__dir__())
             for k, v in self.items():
                 if k in self_dir:
-                    raise ValueError(f"Cannot set key '{k}' as attribute of the config. Disable as_attrs_.")
-                self.__dict__[k] = v
+                    raise ValueError(f"Key '{k}' shadows an attribute of the config. Disable as_attrs_.")
 
     @property
     def copy_kwargs_(self) -> tp.Kwargs:
@@ -486,9 +476,35 @@ class Config(PickleableDict, Prettified):
         """Whether to enable accessing dict keys via dot notation."""
         return self._as_attrs_
 
-    def __setattr__(self, k: str, v: tp.Any) -> None:
-        if self.as_attrs_:
-            self.__setitem__(k, v)
+    def __getattr__(self, k) -> tp.Any:
+        try:
+            _as_attrs_ = object.__getattribute__(self, '_as_attrs_')
+        except AttributeError:
+            return object.__getattribute__(self, k)
+        if _as_attrs_:
+            try:
+                return self.__getitem__(k)
+            except KeyError:
+                raise AttributeError
+        return object.__getattribute__(self, k)
+
+    def __setattr__(self, k: str, v: tp.Any, force: bool = False) -> None:
+        try:
+            _as_attrs_ = object.__getattribute__(self, '_as_attrs_')
+        except AttributeError:
+            return object.__setattr__(self, k, v)
+        if _as_attrs_:
+            return self.__setitem__(k, v, force=force)
+        return object.__setattr__(self, k, v)
+
+    def __delattr__(self, k: str, force: bool = False) -> None:
+        try:
+            _as_attrs_ = object.__getattribute__(self, '_as_attrs_')
+        except AttributeError:
+            return object.__delattr__(self, k)
+        if _as_attrs_:
+            return self.__delitem__(k, force=force)
+        return object.__delattr__(self, k)
 
     def __setitem__(self, k: str, v: tp.Any, force: bool = False) -> None:
         if not force and self.readonly_:
@@ -497,12 +513,6 @@ class Config(PickleableDict, Prettified):
             if k not in self:
                 raise KeyError(f"Config keys are frozen: key '{k}' not found")
         dict.__setitem__(self, k, v)
-        if self.as_attrs_:
-            self.__dict__[k] = v
-
-    def __delattr__(self, k: str) -> None:
-        if self.as_attrs_:
-            self.__delitem__(k)
 
     def __delitem__(self, k: str, force: bool = False) -> None:
         if not force and self.readonly_:
@@ -510,14 +520,6 @@ class Config(PickleableDict, Prettified):
         if not force and self.frozen_keys_:
             raise KeyError(f"Config keys are frozen")
         dict.__delitem__(self, k)
-        if self.as_attrs_:
-            del self.__dict__[k]
-
-    def _clear_attrs(self, prior_keys: tp.Iterable[str]) -> None:
-        """Remove attributes of the removed keys given keys prior to the removal."""
-        if self.as_attrs_:
-            for k in set(prior_keys).difference(self.keys()):
-                del self.__dict__[k]
 
     def pop(self, k: str, v: tp.Any = _RaiseKeyError, force: bool = False) -> tp.Any:
         """Remove and return the pair by the key."""
@@ -525,12 +527,10 @@ class Config(PickleableDict, Prettified):
             raise TypeError("Config is read-only")
         if not force and self.frozen_keys_:
             raise KeyError(f"Config keys are frozen")
-        prior_keys = list(self.keys())
         if v is _RaiseKeyError:
             result = dict.pop(self, k)
         else:
             result = dict.pop(self, k, v)
-        self._clear_attrs(prior_keys)
         return result
 
     def popitem(self, force: bool = False) -> tp.Tuple[tp.Any, tp.Any]:
@@ -539,9 +539,7 @@ class Config(PickleableDict, Prettified):
             raise TypeError("Config is read-only")
         if not force and self.frozen_keys_:
             raise KeyError(f"Config keys are frozen")
-        prior_keys = list(self.keys())
         result = dict.popitem(self)
-        self._clear_attrs(prior_keys)
         return result
 
     def clear(self, force: bool = False) -> None:
@@ -550,9 +548,7 @@ class Config(PickleableDict, Prettified):
             raise TypeError("Config is read-only")
         if not force and self.frozen_keys_:
             raise KeyError(f"Config keys are frozen")
-        prior_keys = list(self.keys())
         dict.clear(self)
-        self._clear_attrs(prior_keys)
 
     def update(self, *args, nested: tp.Optional[bool] = None, force: bool = False, **kwargs) -> None:
         """Update the config.
