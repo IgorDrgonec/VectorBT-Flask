@@ -351,9 +351,9 @@ def flex_select_nb(a: tp.Array, i: int, col: int, flex_i: int, flex_col: int, fl
         return a.item()
     if a.ndim == 1:
         if flex_2d:
-            return a[int(flex_col)]
-        return a[flex_i]
-    return a[flex_i, int(flex_col)]
+            return a[int(flex_col) % a.shape[0]]
+        return a[flex_i % a.shape[0]]
+    return a[flex_i % a.shape[0], int(flex_col) % a.shape[1]]
 
 
 @register_jitted(cache=True)

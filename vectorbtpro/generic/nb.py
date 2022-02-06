@@ -1002,18 +1002,18 @@ def rank_nb(arr: tp.Array2d, argsorted: tp.Optional[tp.Array2d] = None, pct: boo
 
 
 @register_jitted(cache=True)
-def rolling_sum_acc_nb(in_ctx: RollSumAIS) -> RollSumAOS:
+def rolling_sum_acc_nb(in_state: RollSumAIS) -> RollSumAOS:
     """Accumulator of `rolling_sum_1d_nb`.
 
     Takes a state of type `vectorbtpro.generic.enums.RollSumAIS` and returns
     a state of type `vectorbtpro.generic.enums.RollSumAOS`."""
-    i = in_ctx.i
-    value = in_ctx.value
-    pre_window_value = in_ctx.pre_window_value
-    cumsum = in_ctx.cumsum
-    nancnt = in_ctx.nancnt
-    window = in_ctx.window
-    minp = in_ctx.minp
+    i = in_state.i
+    value = in_state.value
+    pre_window_value = in_state.pre_window_value
+    cumsum = in_state.cumsum
+    nancnt = in_state.nancnt
+    window = in_state.window
+    minp = in_state.minp
 
     if np.isnan(value):
         nancnt = nancnt + 1
@@ -1058,7 +1058,7 @@ def rolling_sum_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = Non
     nancnt = 0
 
     for i in range(arr.shape[0]):
-        in_ctx = RollSumAIS(
+        in_state = RollSumAIS(
             i=i,
             value=arr[i],
             pre_window_value=arr[i - window] if i - window >= 0 else np.nan,
@@ -1067,10 +1067,10 @@ def rolling_sum_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = Non
             window=window,
             minp=minp
         )
-        out_ctx = rolling_sum_acc_nb(in_ctx)
-        cumsum = out_ctx.cumsum
-        nancnt = out_ctx.nancnt
-        out[i] = out_ctx.value
+        out_state = rolling_sum_acc_nb(in_state)
+        cumsum = out_state.cumsum
+        nancnt = out_state.nancnt
+        out[i] = out_state.value
 
     return out
 
@@ -1094,18 +1094,18 @@ def rolling_sum_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None) 
 
 
 @register_jitted(cache=True)
-def rolling_prod_acc_nb(in_ctx: RollProdAIS) -> RollProdAOS:
+def rolling_prod_acc_nb(in_state: RollProdAIS) -> RollProdAOS:
     """Accumulator of `rolling_prod_1d_nb`.
 
     Takes a state of type `vectorbtpro.generic.enums.RollProdAIS` and returns
     a state of type `vectorbtpro.generic.enums.RollProdAOS`."""
-    i = in_ctx.i
-    value = in_ctx.value
-    pre_window_value = in_ctx.pre_window_value
-    cumprod = in_ctx.cumprod
-    nancnt = in_ctx.nancnt
-    window = in_ctx.window
-    minp = in_ctx.minp
+    i = in_state.i
+    value = in_state.value
+    pre_window_value = in_state.pre_window_value
+    cumprod = in_state.cumprod
+    nancnt = in_state.nancnt
+    window = in_state.window
+    minp = in_state.minp
 
     if np.isnan(value):
         nancnt = nancnt + 1
@@ -1150,7 +1150,7 @@ def rolling_prod_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = No
     nancnt = 0
 
     for i in range(arr.shape[0]):
-        in_ctx = RollProdAIS(
+        in_state = RollProdAIS(
             i=i,
             value=arr[i],
             pre_window_value=arr[i - window] if i - window >= 0 else np.nan,
@@ -1159,10 +1159,10 @@ def rolling_prod_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = No
             window=window,
             minp=minp
         )
-        out_ctx = rolling_prod_acc_nb(in_ctx)
-        cumprod = out_ctx.cumprod
-        nancnt = out_ctx.nancnt
-        out[i] = out_ctx.value
+        out_state = rolling_prod_acc_nb(in_state)
+        cumprod = out_state.cumprod
+        nancnt = out_state.nancnt
+        out[i] = out_state.value
 
     return out
 
@@ -1186,18 +1186,18 @@ def rolling_prod_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None)
 
 
 @register_jitted(cache=True)
-def rolling_mean_acc_nb(in_ctx: RollMeanAIS) -> RollMeanAOS:
+def rolling_mean_acc_nb(in_state: RollMeanAIS) -> RollMeanAOS:
     """Accumulator of `rolling_mean_1d_nb`.
 
     Takes a state of type `vectorbtpro.generic.enums.RollMeanAIS` and returns
     a state of type `vectorbtpro.generic.enums.RollMeanAOS`."""
-    i = in_ctx.i
-    value = in_ctx.value
-    pre_window_value = in_ctx.pre_window_value
-    cumsum = in_ctx.cumsum
-    nancnt = in_ctx.nancnt
-    window = in_ctx.window
-    minp = in_ctx.minp
+    i = in_state.i
+    value = in_state.value
+    pre_window_value = in_state.pre_window_value
+    cumsum = in_state.cumsum
+    nancnt = in_state.nancnt
+    window = in_state.window
+    minp = in_state.minp
 
     if np.isnan(value):
         nancnt = nancnt + 1
@@ -1242,7 +1242,7 @@ def rolling_mean_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = No
     nancnt = 0
 
     for i in range(arr.shape[0]):
-        in_ctx = RollMeanAIS(
+        in_state = RollMeanAIS(
             i=i,
             value=arr[i],
             pre_window_value=arr[i - window] if i - window >= 0 else np.nan,
@@ -1251,10 +1251,10 @@ def rolling_mean_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = No
             window=window,
             minp=minp
         )
-        out_ctx = rolling_mean_acc_nb(in_ctx)
-        cumsum = out_ctx.cumsum
-        nancnt = out_ctx.nancnt
-        out[i] = out_ctx.value
+        out_state = rolling_mean_acc_nb(in_state)
+        cumsum = out_state.cumsum
+        nancnt = out_state.nancnt
+        out[i] = out_state.value
 
     return out
 
@@ -1278,20 +1278,20 @@ def rolling_mean_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None)
 
 
 @register_jitted(cache=True)
-def rolling_std_acc_nb(in_ctx: RollStdAIS) -> RollStdAOS:
+def rolling_std_acc_nb(in_state: RollStdAIS) -> RollStdAOS:
     """Accumulator of `rolling_std_1d_nb`.
 
     Takes a state of type `vectorbtpro.generic.enums.RollStdAIS` and returns
     a state of type `vectorbtpro.generic.enums.RollStdAOS`."""
-    i = in_ctx.i
-    value = in_ctx.value
-    pre_window_value = in_ctx.pre_window_value
-    cumsum = in_ctx.cumsum
-    cumsum_sq = in_ctx.cumsum_sq
-    nancnt = in_ctx.nancnt
-    window = in_ctx.window
-    minp = in_ctx.minp
-    ddof = in_ctx.ddof
+    i = in_state.i
+    value = in_state.value
+    pre_window_value = in_state.pre_window_value
+    cumsum = in_state.cumsum
+    cumsum_sq = in_state.cumsum_sq
+    nancnt = in_state.nancnt
+    window = in_state.window
+    minp = in_state.minp
+    ddof = in_state.ddof
 
     if np.isnan(value):
         nancnt = nancnt + 1
@@ -1339,7 +1339,7 @@ def rolling_std_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = Non
     nancnt = 0
 
     for i in range(arr.shape[0]):
-        in_ctx = RollStdAIS(
+        in_state = RollStdAIS(
             i=i,
             value=arr[i],
             pre_window_value=arr[i - window] if i - window >= 0 else np.nan,
@@ -1350,11 +1350,11 @@ def rolling_std_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = Non
             minp=minp,
             ddof=ddof
         )
-        out_ctx = rolling_std_acc_nb(in_ctx)
-        cumsum = out_ctx.cumsum
-        cumsum_sq = out_ctx.cumsum_sq
-        nancnt = out_ctx.nancnt
-        out[i] = out_ctx.value
+        out_state = rolling_std_acc_nb(in_state)
+        cumsum = out_state.cumsum
+        cumsum_sq = out_state.cumsum_sq
+        nancnt = out_state.nancnt
+        out[i] = out_state.value
 
     return out
 
@@ -1379,19 +1379,19 @@ def rolling_std_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None, 
 
 
 @register_jitted(cache=True)
-def wm_mean_acc_nb(in_ctx: WMMeanAIS) -> WMMeanAOS:
+def wm_mean_acc_nb(in_state: WMMeanAIS) -> WMMeanAOS:
     """Accumulator of `wm_mean_1d_nb`.
 
     Takes a state of type `vectorbtpro.generic.enums.WMMeanAIS` and returns
     a state of type `vectorbtpro.generic.enums.WMMeanAOS`."""
-    i = in_ctx.i
-    value = in_ctx.value
-    pre_window_value = in_ctx.pre_window_value
-    cumsum = in_ctx.cumsum
-    wcumsum = in_ctx.wcumsum
-    nancnt = in_ctx.nancnt
-    window = in_ctx.window
-    minp = in_ctx.minp
+    i = in_state.i
+    value = in_state.value
+    pre_window_value = in_state.pre_window_value
+    cumsum = in_state.cumsum
+    wcumsum = in_state.wcumsum
+    nancnt = in_state.nancnt
+    window = in_state.window
+    minp = in_state.minp
 
     if i >= window and not np.isnan(pre_window_value):
         wcumsum = wcumsum - cumsum
@@ -1438,7 +1438,7 @@ def wm_mean_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None) -
     nancnt = 0
 
     for i in range(arr.shape[0]):
-        in_ctx = WMMeanAIS(
+        in_state = WMMeanAIS(
             i=i,
             value=arr[i],
             pre_window_value=arr[i - window] if i - window >= 0 else np.nan,
@@ -1448,11 +1448,11 @@ def wm_mean_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None) -
             window=window,
             minp=minp
         )
-        out_ctx = wm_mean_acc_nb(in_ctx)
-        cumsum = out_ctx.cumsum
-        wcumsum = out_ctx.wcumsum
-        nancnt = out_ctx.nancnt
-        out[i] = out_ctx.value
+        out_state = wm_mean_acc_nb(in_state)
+        cumsum = out_state.cumsum
+        wcumsum = out_state.wcumsum
+        nancnt = out_state.nancnt
+        out[i] = out_state.value
 
     return out
 
@@ -1501,19 +1501,19 @@ def alpha_from_wilder_nb(period: int) -> float:
 
 
 @register_jitted(cache=True)
-def ewm_mean_acc_nb(in_ctx: EWMMeanAIS) -> EWMMeanAOS:
+def ewm_mean_acc_nb(in_state: EWMMeanAIS) -> EWMMeanAOS:
     """Accumulator of `ewm_mean_1d_nb`.
 
     Takes a state of type `vectorbtpro.generic.enums.EWMMeanAIS` and returns
     a state of type `vectorbtpro.generic.enums.EWMMeanAOS`."""
-    i = in_ctx.i
-    value = in_ctx.value
-    old_wt = in_ctx.old_wt
-    weighted_avg = in_ctx.weighted_avg
-    nobs = in_ctx.nobs
-    alpha = in_ctx.alpha
-    minp = in_ctx.minp
-    adjust = in_ctx.adjust
+    i = in_state.i
+    value = in_state.value
+    old_wt = in_state.old_wt
+    weighted_avg = in_state.weighted_avg
+    nobs = in_state.nobs
+    alpha = in_state.alpha
+    minp = in_state.minp
+    adjust = in_state.adjust
 
     old_wt_factor = 1. - alpha
     new_wt = 1. if adjust else alpha
@@ -1569,7 +1569,7 @@ def ewm_mean_1d_nb(arr: tp.Array1d, span: int, minp: tp.Optional[int] = None, ad
     old_wt = 1.
 
     for i in range(len(arr)):
-        in_ctx = EWMMeanAIS(
+        in_state = EWMMeanAIS(
             i=i,
             value=arr[i],
             old_wt=old_wt,
@@ -1579,11 +1579,11 @@ def ewm_mean_1d_nb(arr: tp.Array1d, span: int, minp: tp.Optional[int] = None, ad
             minp=minp,
             adjust=adjust
         )
-        out_ctx = ewm_mean_acc_nb(in_ctx)
-        old_wt = out_ctx.old_wt
-        weighted_avg = out_ctx.weighted_avg
-        nobs = out_ctx.nobs
-        out[i] = out_ctx.value
+        out_state = ewm_mean_acc_nb(in_state)
+        old_wt = out_state.old_wt
+        weighted_avg = out_state.weighted_avg
+        nobs = out_state.nobs
+        out[i] = out_state.value
 
     return out
 
@@ -1608,23 +1608,23 @@ def ewm_mean_nb(arr: tp.Array2d, span: int, minp: tp.Optional[int] = None, adjus
 
 
 @register_jitted(cache=True)
-def ewm_std_acc_nb(in_ctx: EWMStdAIS) -> EWMStdAOS:
+def ewm_std_acc_nb(in_state: EWMStdAIS) -> EWMStdAOS:
     """Accumulator of `ewm_std_1d_nb`.
 
     Takes a state of type `vectorbtpro.generic.enums.EWMStdAIS` and returns
     a state of type `vectorbtpro.generic.enums.EWMStdAOS`."""
-    i = in_ctx.i
-    value = in_ctx.value
-    mean_x = in_ctx.mean_x
-    mean_y = in_ctx.mean_y
-    cov = in_ctx.cov
-    sum_wt = in_ctx.sum_wt
-    sum_wt2 = in_ctx.sum_wt2
-    old_wt = in_ctx.old_wt
-    nobs = in_ctx.nobs
-    alpha = in_ctx.alpha
-    minp = in_ctx.minp
-    adjust = in_ctx.adjust
+    i = in_state.i
+    value = in_state.value
+    mean_x = in_state.mean_x
+    mean_y = in_state.mean_y
+    cov = in_state.cov
+    sum_wt = in_state.sum_wt
+    sum_wt2 = in_state.sum_wt2
+    old_wt = in_state.old_wt
+    nobs = in_state.nobs
+    alpha = in_state.alpha
+    minp = in_state.minp
+    adjust = in_state.adjust
 
     old_wt_factor = 1. - alpha
     new_wt = 1. if adjust else alpha
@@ -1715,7 +1715,7 @@ def ewm_std_1d_nb(arr: tp.Array1d, span: int, minp: tp.Optional[int] = None, adj
     old_wt = 1.
 
     for i in range(len(arr)):
-        in_ctx = EWMStdAIS(
+        in_state = EWMStdAIS(
             i=i,
             value=arr[i],
             mean_x=mean_x,
@@ -1729,15 +1729,15 @@ def ewm_std_1d_nb(arr: tp.Array1d, span: int, minp: tp.Optional[int] = None, adj
             minp=minp,
             adjust=adjust
         )
-        out_ctx = ewm_std_acc_nb(in_ctx)
-        mean_x = out_ctx.mean_x
-        mean_y = out_ctx.mean_y
-        cov = out_ctx.cov
-        sum_wt = out_ctx.sum_wt
-        sum_wt2 = out_ctx.sum_wt2
-        old_wt = out_ctx.old_wt
-        nobs = out_ctx.nobs
-        out[i] = out_ctx.value
+        out_state = ewm_std_acc_nb(in_state)
+        mean_x = out_state.mean_x
+        mean_y = out_state.mean_y
+        cov = out_state.cov
+        sum_wt = out_state.sum_wt
+        sum_wt2 = out_state.sum_wt2
+        old_wt = out_state.old_wt
+        nobs = out_state.nobs
+        out[i] = out_state.value
 
     return np.sqrt(out)
 
@@ -1815,23 +1815,23 @@ def wwm_std_nb(arr: tp.Array2d, period: int, minp: tp.Optional[int] = None) -> t
 
 
 @register_jitted(cache=True)
-def rolling_cov_acc_nb(in_ctx: RollCovAIS) -> RollCovAOS:
+def rolling_cov_acc_nb(in_state: RollCovAIS) -> RollCovAOS:
     """Accumulator of `rolling_cov_1d_nb`.
 
     Takes a state of type `vectorbtpro.generic.enums.RollCovIOS` and returns
     a state of type `vectorbtpro.generic.enums.RollCovAOS`."""
-    i = in_ctx.i
-    value1 = in_ctx.value1
-    value2 = in_ctx.value2
-    pre_window_value1 = in_ctx.pre_window_value1
-    pre_window_value2 = in_ctx.pre_window_value2
-    cumsum1 = in_ctx.cumsum1
-    cumsum2 = in_ctx.cumsum2
-    cumsum_prod = in_ctx.cumsum_prod
-    nancnt = in_ctx.nancnt
-    window = in_ctx.window
-    minp = in_ctx.minp
-    ddof = in_ctx.ddof
+    i = in_state.i
+    value1 = in_state.value1
+    value2 = in_state.value2
+    pre_window_value1 = in_state.pre_window_value1
+    pre_window_value2 = in_state.pre_window_value2
+    cumsum1 = in_state.cumsum1
+    cumsum2 = in_state.cumsum2
+    cumsum_prod = in_state.cumsum_prod
+    nancnt = in_state.nancnt
+    window = in_state.window
+    minp = in_state.minp
+    ddof = in_state.ddof
 
     if np.isnan(value1) or np.isnan(value2):
         nancnt = nancnt + 1
@@ -1885,7 +1885,7 @@ def rolling_cov_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d,
     nancnt = 0
 
     for i in range(arr1.shape[0]):
-        in_ctx = RollCovAIS(
+        in_state = RollCovAIS(
             i=i,
             value1=arr1[i],
             value2=arr2[i],
@@ -1899,12 +1899,12 @@ def rolling_cov_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d,
             minp=minp,
             ddof=ddof
         )
-        out_ctx = rolling_cov_acc_nb(in_ctx)
-        cumsum1 = out_ctx.cumsum1
-        cumsum2 = out_ctx.cumsum2
-        cumsum_prod = out_ctx.cumsum_prod
-        nancnt = out_ctx.nancnt
-        out[i] = out_ctx.value
+        out_state = rolling_cov_acc_nb(in_state)
+        cumsum1 = out_state.cumsum1
+        cumsum2 = out_state.cumsum2
+        cumsum_prod = out_state.cumsum_prod
+        nancnt = out_state.nancnt
+        out[i] = out_state.value
 
     return out
 
@@ -1931,24 +1931,24 @@ def rolling_cov_nb(arr1: tp.Array2d, arr2: tp.Array2d, window: int,
 
 
 @register_jitted(cache=True)
-def rolling_corr_acc_nb(in_ctx: RollCorrAIS) -> RollCorrAOS:
+def rolling_corr_acc_nb(in_state: RollCorrAIS) -> RollCorrAOS:
     """Accumulator of `rolling_corr_1d_nb`.
 
     Takes a state of type `vectorbtpro.generic.enums.RollCorrAIS` and returns
     a state of type `vectorbtpro.generic.enums.RollCorrAOS`."""
-    i = in_ctx.i
-    value1 = in_ctx.value1
-    value2 = in_ctx.value2
-    pre_window_value1 = in_ctx.pre_window_value1
-    pre_window_value2 = in_ctx.pre_window_value2
-    cumsum1 = in_ctx.cumsum1
-    cumsum2 = in_ctx.cumsum2
-    cumsum_sq1 = in_ctx.cumsum_sq1
-    cumsum_sq2 = in_ctx.cumsum_sq2
-    cumsum_prod = in_ctx.cumsum_prod
-    nancnt = in_ctx.nancnt
-    window = in_ctx.window
-    minp = in_ctx.minp
+    i = in_state.i
+    value1 = in_state.value1
+    value2 = in_state.value2
+    pre_window_value1 = in_state.pre_window_value1
+    pre_window_value2 = in_state.pre_window_value2
+    cumsum1 = in_state.cumsum1
+    cumsum2 = in_state.cumsum2
+    cumsum_sq1 = in_state.cumsum_sq1
+    cumsum_sq2 = in_state.cumsum_sq2
+    cumsum_prod = in_state.cumsum_prod
+    nancnt = in_state.nancnt
+    window = in_state.window
+    minp = in_state.minp
 
     if np.isnan(value1) or np.isnan(value2):
         nancnt = nancnt + 1
@@ -2013,7 +2013,7 @@ def rolling_corr_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d,
     nancnt = 0
 
     for i in range(arr1.shape[0]):
-        in_ctx = RollCorrAIS(
+        in_state = RollCorrAIS(
             i=i,
             value1=arr1[i],
             value2=arr2[i],
@@ -2028,14 +2028,14 @@ def rolling_corr_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d,
             window=window,
             minp=minp
         )
-        out_ctx = rolling_corr_acc_nb(in_ctx)
-        cumsum1 = out_ctx.cumsum1
-        cumsum2 = out_ctx.cumsum2
-        cumsum_sq1 = out_ctx.cumsum_sq1
-        cumsum_sq2 = out_ctx.cumsum_sq2
-        cumsum_prod = out_ctx.cumsum_prod
-        nancnt = out_ctx.nancnt
-        out[i] = out_ctx.value
+        out_state = rolling_corr_acc_nb(in_state)
+        cumsum1 = out_state.cumsum1
+        cumsum2 = out_state.cumsum2
+        cumsum_sq1 = out_state.cumsum_sq1
+        cumsum_sq2 = out_state.cumsum_sq2
+        cumsum_prod = out_state.cumsum_prod
+        nancnt = out_state.nancnt
+        out[i] = out_state.value
 
     return out
 
