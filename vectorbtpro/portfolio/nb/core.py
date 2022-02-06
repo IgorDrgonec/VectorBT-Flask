@@ -9,7 +9,6 @@ from vectorbtpro.base.indexing import flex_select_auto_nb
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.portfolio.enums import *
 from vectorbtpro.registries.jit_registry import register_jitted
-from vectorbtpro.utils.array_ import insert_argsort_nb
 from vectorbtpro.utils.math_ import (
     is_close_nb,
     is_close_or_less_nb,

@@ -10,6 +10,7 @@ from vectorbtpro.portfolio.nb.core import *
 from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.returns import nb as returns_nb_
 from vectorbtpro.utils import chunking as ch
+from vectorbtpro.utils.array_ import insert_argsort_nb
 from vectorbtpro.utils.template import RepFunc
 
 

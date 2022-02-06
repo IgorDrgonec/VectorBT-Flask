@@ -675,7 +675,7 @@ def total_profit_grouped_nb(total_profit: tp.Array1d, group_lens: tp.Array1d) ->
     size=ch.ArraySizer(arg_query='value', axis=1),
     arg_take_spec=dict(
         value=ch.ArraySlicer(axis=1),
-        init_value=ch.ArraySlicer(axis=0),
+        init_value=base_ch.FlexArraySlicer(axis=0),
         cash_deposits=base_ch.FlexArraySlicer(axis=1),
         flex_2d=None
     ),
@@ -683,13 +683,13 @@ def total_profit_grouped_nb(total_profit: tp.Array1d, group_lens: tp.Array1d) ->
 )
 @register_jitted(cache=True, tags={'can_parallel'})
 def returns_nb(value: tp.Array2d,
-               init_value: tp.Array1d,
+               init_value: tp.FlexArray,
                cash_deposits: tp.FlexArray = np.asarray(0.),
                flex_2d: bool = False) -> tp.Array2d:
     """Get return series per column/group."""
     out = np.empty(value.shape, dtype=np.float_)
     for col in prange(value.shape[1]):
-        input_value = init_value[col]
+        input_value = flex_select_auto_nb(init_value, 0, col, True)
         for i in range(value.shape[0]):
             output_value = value[i, col]
             adj_output_value = output_value - flex_select_auto_nb(cash_deposits, i, col, flex_2d)
@@ -739,7 +739,7 @@ def asset_returns_nb(init_position_value: tp.Array1d, asset_value: tp.Array2d, c
     size=ch.ArraySizer(arg_query='close', axis=1),
     arg_take_spec=dict(
         close=ch.ArraySlicer(axis=1),
-        init_value=base_ch.ArraySlicer(axis=0),
+        init_value=base_ch.FlexArraySlicer(axis=0),
         cash_deposits=base_ch.FlexArraySlicer(axis=1),
         flex_2d=None
     ),
@@ -747,13 +747,13 @@ def asset_returns_nb(init_position_value: tp.Array1d, asset_value: tp.Array2d, c
 )
 @register_jitted(cache=True, tags={'can_parallel'})
 def market_value_nb(close: tp.Array2d,
-                    init_value: tp.Array1d,
+                    init_value: tp.FlexArray,
                     cash_deposits: tp.FlexArray = np.asarray(0.),
                     flex_2d: bool = False) -> tp.Array2d:
     """Get market value per column."""
     out = np.empty_like(close)
     for col in prange(close.shape[1]):
-        curr_value = init_value[col]
+        curr_value = flex_select_auto_nb(init_value, 0, col, True)
         for i in range(close.shape[0]):
             if i > 0:
                 curr_value *= close[i, col] / close[i - 1, col]
@@ -767,7 +767,7 @@ def market_value_nb(close: tp.Array2d,
     arg_take_spec=dict(
         close=ch.ArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
         group_lens=ch.ArraySlicer(axis=0),
-        init_value=ch.ArraySlicer(axis=0, mapper=base_ch.group_lens_mapper),
+        init_value=base_ch.FlexArraySlicer(axis=0, mapper=base_ch.group_lens_mapper),
         cash_deposits=base_ch.FlexArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
         flex_2d=None
     ),
@@ -776,7 +776,7 @@ def market_value_nb(close: tp.Array2d,
 @register_jitted(cache=True, tags={'can_parallel'})
 def market_value_grouped_nb(close: tp.Array2d,
                             group_lens: tp.Array1d,
-                            init_value: tp.Array1d,
+                            init_value: tp.FlexArray,
                             cash_deposits: tp.FlexArray = np.asarray(0.),
                             flex_2d: bool = False) -> tp.Array2d:
     """Get market value per group."""
@@ -793,7 +793,7 @@ def market_value_grouped_nb(close: tp.Array2d,
         for i in range(close.shape[0]):
             for col in range(from_col, to_col):
                 if i == 0:
-                    temp[col] = init_value[col]
+                    temp[col] = flex_select_auto_nb(init_value, 0, col, True)
                 else:
                     temp[col] *= close[i, col] / close[i - 1, col]
                 temp[col] += flex_select_auto_nb(cash_deposits, i, col, flex_2d)

@@ -310,202 +310,6 @@ class TestAccessors:
 
     @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
     @pytest.mark.parametrize("test_minp", [1, None])
-    def test_rolling_min(self, test_window, test_minp):
-        if test_minp is None:
-            test_minp = test_window
-        pd.testing.assert_series_equal(
-            df['a'].vbt.rolling_min(test_window, minp=test_minp),
-            df['a'].rolling(test_window, min_periods=test_minp).min()
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.rolling_min(test_window, minp=test_minp),
-            df.rolling(test_window, min_periods=test_minp).min()
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.rolling_min(test_window),
-            df.rolling(test_window).min()
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.rolling_min(test_window, minp=test_minp, jitted=dict(parallel=True)),
-            df.vbt.rolling_min(test_window, minp=test_minp, jitted=dict(parallel=False))
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.rolling_min(test_window, minp=test_minp, chunked=True),
-            df.vbt.rolling_min(test_window, minp=test_minp, chunked=False)
-        )
-
-    @pytest.mark.parametrize("test_minp", [1, 3])
-    def test_expanding_min(self, test_minp):
-        pd.testing.assert_series_equal(
-            df['a'].vbt.expanding_min(minp=test_minp),
-            df['a'].expanding(min_periods=test_minp).min()
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.expanding_min(minp=test_minp),
-            df.expanding(min_periods=test_minp).min()
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.expanding_min(),
-            df.expanding().min()
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.expanding_min(minp=test_minp, jitted=dict(parallel=True)),
-            df.vbt.expanding_min(minp=test_minp, jitted=dict(parallel=False))
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.expanding_min(minp=test_minp, chunked=True),
-            df.vbt.expanding_min(minp=test_minp, chunked=False)
-        )
-
-    @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
-    @pytest.mark.parametrize("test_minp", [1, None])
-    def test_rolling_max(self, test_window, test_minp):
-        if test_minp is None:
-            test_minp = test_window
-        pd.testing.assert_series_equal(
-            df['a'].vbt.rolling_max(test_window, minp=test_minp),
-            df['a'].rolling(test_window, min_periods=test_minp).max()
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.rolling_max(test_window, minp=test_minp),
-            df.rolling(test_window, min_periods=test_minp).max()
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.rolling_max(test_window),
-            df.rolling(test_window).max()
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.rolling_max(test_window, minp=test_minp, jitted=dict(parallel=True)),
-            df.vbt.rolling_max(test_window, minp=test_minp, jitted=dict(parallel=False))
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.rolling_max(test_window, minp=test_minp, chunked=True),
-            df.vbt.rolling_max(test_window, minp=test_minp, chunked=False)
-        )
-
-    @pytest.mark.parametrize("test_minp", [1, 3])
-    def test_expanding_max(self, test_minp):
-        pd.testing.assert_series_equal(
-            df['a'].vbt.expanding_max(minp=test_minp),
-            df['a'].expanding(min_periods=test_minp).max()
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.expanding_max(minp=test_minp),
-            df.expanding(min_periods=test_minp).max()
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.expanding_max(),
-            df.expanding().max()
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.expanding_max(minp=test_minp, jitted=dict(parallel=True)),
-            df.vbt.expanding_max(minp=test_minp, jitted=dict(parallel=False))
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.expanding_max(minp=test_minp, chunked=True),
-            df.vbt.expanding_max(minp=test_minp, chunked=False)
-        )
-
-    @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
-    @pytest.mark.parametrize("test_minp", [1, None])
-    def test_rolling_idxmin(self, test_window, test_minp):
-        if test_minp is None:
-            test_minp = test_window
-        pd.testing.assert_series_equal(
-            df['a'].vbt.rolling_idxmin(test_window, minp=test_minp, local=True),
-            df['a'].rolling(test_window, min_periods=test_minp).apply(np.argmin).fillna(-1).astype(np.int_)
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.rolling_idxmin(test_window, minp=test_minp, local=True),
-            df.rolling(test_window, min_periods=test_minp).apply(np.argmin).fillna(-1).astype(np.int_)
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.rolling_idxmin(test_window, local=True),
-            df.rolling(test_window).apply(np.argmin).fillna(-1).astype(np.int_)
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.rolling_idxmin(test_window, minp=test_minp, jitted=dict(parallel=True)),
-            df.vbt.rolling_idxmin(test_window, minp=test_minp, jitted=dict(parallel=False))
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.rolling_idxmin(test_window, minp=test_minp, chunked=True),
-            df.vbt.rolling_idxmin(test_window, minp=test_minp, chunked=False)
-        )
-
-    @pytest.mark.parametrize("test_minp", [1, 3])
-    def test_expanding_idxmin(self, test_minp):
-        pd.testing.assert_series_equal(
-            df['a'].vbt.expanding_idxmin(minp=test_minp, local=True),
-            df['a'].expanding(min_periods=test_minp).apply(np.argmin).fillna(-1).astype(np.int_)
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.expanding_idxmin(minp=test_minp, local=True),
-            df.expanding(min_periods=test_minp).apply(np.argmin).fillna(-1).astype(np.int_)
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.expanding_idxmin(local=True),
-            df.expanding().apply(np.argmin).fillna(-1).astype(np.int_)
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.expanding_idxmin(minp=test_minp, jitted=dict(parallel=True)),
-            df.vbt.expanding_idxmin(minp=test_minp, jitted=dict(parallel=False))
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.expanding_idxmin(minp=test_minp, chunked=True),
-            df.vbt.expanding_idxmin(minp=test_minp, chunked=False)
-        )
-
-    @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
-    @pytest.mark.parametrize("test_minp", [1, None])
-    def test_rolling_idxmax(self, test_window, test_minp):
-        if test_minp is None:
-            test_minp = test_window
-        pd.testing.assert_series_equal(
-            df['a'].vbt.rolling_idxmax(test_window, minp=test_minp, local=True),
-            df['a'].rolling(test_window, min_periods=test_minp).apply(np.argmax).fillna(-1).astype(np.int_)
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.rolling_idxmax(test_window, minp=test_minp, local=True),
-            df.rolling(test_window, min_periods=test_minp).apply(np.argmax).fillna(-1).astype(np.int_)
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.rolling_idxmax(test_window, local=True),
-            df.rolling(test_window).apply(np.argmax).fillna(-1).astype(np.int_)
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.rolling_idxmax(test_window, minp=test_minp, jitted=dict(parallel=True)),
-            df.vbt.rolling_idxmax(test_window, minp=test_minp, jitted=dict(parallel=False))
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.rolling_idxmax(test_window, minp=test_minp, chunked=True),
-            df.vbt.rolling_idxmax(test_window, minp=test_minp, chunked=False)
-        )
-
-    @pytest.mark.parametrize("test_minp", [1, 3])
-    def test_expanding_idxmax(self, test_minp):
-        pd.testing.assert_series_equal(
-            df['a'].vbt.expanding_idxmax(minp=test_minp, local=True),
-            df['a'].expanding(min_periods=test_minp).apply(np.argmax).fillna(-1).astype(np.int_)
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.expanding_idxmax(minp=test_minp, local=True),
-            df.expanding(min_periods=test_minp).apply(np.argmax).fillna(-1).astype(np.int_)
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.expanding_idxmax(local=True),
-            df.expanding().apply(np.argmax).fillna(-1).astype(np.int_)
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.expanding_idxmax(minp=test_minp, jitted=dict(parallel=True)),
-            df.vbt.expanding_idxmax(minp=test_minp, jitted=dict(parallel=False))
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.expanding_idxmax(minp=test_minp, chunked=True),
-            df.vbt.expanding_idxmax(minp=test_minp, chunked=False)
-        )
-
-    @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
-    @pytest.mark.parametrize("test_minp", [1, None])
     def test_rolling_mean(self, test_window, test_minp):
         if test_minp is None:
             test_minp = test_window
@@ -895,6 +699,202 @@ class TestAccessors:
         pd.testing.assert_frame_equal(
             df.vbt.expanding_rank(minp=test_minp, pct=test_pct, chunked=True),
             df.vbt.expanding_rank(minp=test_minp, pct=test_pct, chunked=False)
+        )
+
+    @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
+    @pytest.mark.parametrize("test_minp", [1, None])
+    def test_rolling_min(self, test_window, test_minp):
+        if test_minp is None:
+            test_minp = test_window
+        pd.testing.assert_series_equal(
+            df['a'].vbt.rolling_min(test_window, minp=test_minp),
+            df['a'].rolling(test_window, min_periods=test_minp).min()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_min(test_window, minp=test_minp),
+            df.rolling(test_window, min_periods=test_minp).min()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_min(test_window),
+            df.rolling(test_window).min()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_min(test_window, minp=test_minp, jitted=dict(parallel=True)),
+            df.vbt.rolling_min(test_window, minp=test_minp, jitted=dict(parallel=False))
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_min(test_window, minp=test_minp, chunked=True),
+            df.vbt.rolling_min(test_window, minp=test_minp, chunked=False)
+        )
+
+    @pytest.mark.parametrize("test_minp", [1, 3])
+    def test_expanding_min(self, test_minp):
+        pd.testing.assert_series_equal(
+            df['a'].vbt.expanding_min(minp=test_minp),
+            df['a'].expanding(min_periods=test_minp).min()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_min(minp=test_minp),
+            df.expanding(min_periods=test_minp).min()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_min(),
+            df.expanding().min()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_min(minp=test_minp, jitted=dict(parallel=True)),
+            df.vbt.expanding_min(minp=test_minp, jitted=dict(parallel=False))
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_min(minp=test_minp, chunked=True),
+            df.vbt.expanding_min(minp=test_minp, chunked=False)
+        )
+
+    @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
+    @pytest.mark.parametrize("test_minp", [1, None])
+    def test_rolling_max(self, test_window, test_minp):
+        if test_minp is None:
+            test_minp = test_window
+        pd.testing.assert_series_equal(
+            df['a'].vbt.rolling_max(test_window, minp=test_minp),
+            df['a'].rolling(test_window, min_periods=test_minp).max()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_max(test_window, minp=test_minp),
+            df.rolling(test_window, min_periods=test_minp).max()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_max(test_window),
+            df.rolling(test_window).max()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_max(test_window, minp=test_minp, jitted=dict(parallel=True)),
+            df.vbt.rolling_max(test_window, minp=test_minp, jitted=dict(parallel=False))
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_max(test_window, minp=test_minp, chunked=True),
+            df.vbt.rolling_max(test_window, minp=test_minp, chunked=False)
+        )
+
+    @pytest.mark.parametrize("test_minp", [1, 3])
+    def test_expanding_max(self, test_minp):
+        pd.testing.assert_series_equal(
+            df['a'].vbt.expanding_max(minp=test_minp),
+            df['a'].expanding(min_periods=test_minp).max()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_max(minp=test_minp),
+            df.expanding(min_periods=test_minp).max()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_max(),
+            df.expanding().max()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_max(minp=test_minp, jitted=dict(parallel=True)),
+            df.vbt.expanding_max(minp=test_minp, jitted=dict(parallel=False))
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_max(minp=test_minp, chunked=True),
+            df.vbt.expanding_max(minp=test_minp, chunked=False)
+        )
+
+    @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
+    @pytest.mark.parametrize("test_minp", [1, None])
+    def test_rolling_idxmin(self, test_window, test_minp):
+        if test_minp is None:
+            test_minp = test_window
+        pd.testing.assert_series_equal(
+            df['a'].vbt.rolling_idxmin(test_window, minp=test_minp, local=True),
+            df['a'].rolling(test_window, min_periods=test_minp).apply(np.argmin).fillna(-1).astype(np.int_)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_idxmin(test_window, minp=test_minp, local=True),
+            df.rolling(test_window, min_periods=test_minp).apply(np.argmin).fillna(-1).astype(np.int_)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_idxmin(test_window, local=True),
+            df.rolling(test_window).apply(np.argmin).fillna(-1).astype(np.int_)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_idxmin(test_window, minp=test_minp, jitted=dict(parallel=True)),
+            df.vbt.rolling_idxmin(test_window, minp=test_minp, jitted=dict(parallel=False))
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_idxmin(test_window, minp=test_minp, chunked=True),
+            df.vbt.rolling_idxmin(test_window, minp=test_minp, chunked=False)
+        )
+
+    @pytest.mark.parametrize("test_minp", [1, 3])
+    def test_expanding_idxmin(self, test_minp):
+        pd.testing.assert_series_equal(
+            df['a'].vbt.expanding_idxmin(minp=test_minp, local=True),
+            df['a'].expanding(min_periods=test_minp).apply(np.argmin).fillna(-1).astype(np.int_)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_idxmin(minp=test_minp, local=True),
+            df.expanding(min_periods=test_minp).apply(np.argmin).fillna(-1).astype(np.int_)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_idxmin(local=True),
+            df.expanding().apply(np.argmin).fillna(-1).astype(np.int_)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_idxmin(minp=test_minp, jitted=dict(parallel=True)),
+            df.vbt.expanding_idxmin(minp=test_minp, jitted=dict(parallel=False))
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_idxmin(minp=test_minp, chunked=True),
+            df.vbt.expanding_idxmin(minp=test_minp, chunked=False)
+        )
+
+    @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
+    @pytest.mark.parametrize("test_minp", [1, None])
+    def test_rolling_idxmax(self, test_window, test_minp):
+        if test_minp is None:
+            test_minp = test_window
+        pd.testing.assert_series_equal(
+            df['a'].vbt.rolling_idxmax(test_window, minp=test_minp, local=True),
+            df['a'].rolling(test_window, min_periods=test_minp).apply(np.argmax).fillna(-1).astype(np.int_)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_idxmax(test_window, minp=test_minp, local=True),
+            df.rolling(test_window, min_periods=test_minp).apply(np.argmax).fillna(-1).astype(np.int_)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_idxmax(test_window, local=True),
+            df.rolling(test_window).apply(np.argmax).fillna(-1).astype(np.int_)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_idxmax(test_window, minp=test_minp, jitted=dict(parallel=True)),
+            df.vbt.rolling_idxmax(test_window, minp=test_minp, jitted=dict(parallel=False))
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_idxmax(test_window, minp=test_minp, chunked=True),
+            df.vbt.rolling_idxmax(test_window, minp=test_minp, chunked=False)
+        )
+
+    @pytest.mark.parametrize("test_minp", [1, 3])
+    def test_expanding_idxmax(self, test_minp):
+        pd.testing.assert_series_equal(
+            df['a'].vbt.expanding_idxmax(minp=test_minp, local=True),
+            df['a'].expanding(min_periods=test_minp).apply(np.argmax).fillna(-1).astype(np.int_)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_idxmax(minp=test_minp, local=True),
+            df.expanding(min_periods=test_minp).apply(np.argmax).fillna(-1).astype(np.int_)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_idxmax(local=True),
+            df.expanding().apply(np.argmax).fillna(-1).astype(np.int_)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_idxmax(minp=test_minp, jitted=dict(parallel=True)),
+            df.vbt.expanding_idxmax(minp=test_minp, jitted=dict(parallel=False))
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_idxmax(minp=test_minp, chunked=True),
+            df.vbt.expanding_idxmax(minp=test_minp, chunked=False)
         )
 
     def test_map(self):

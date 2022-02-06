@@ -26,7 +26,7 @@ from numba.np.numpy_support import as_dtype
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import chunking as base_ch
-from vectorbtpro.generic.enums import RangeStatus, DrawdownStatus, range_dt, drawdown_dt
+from vectorbtpro.generic.enums import *
 from vectorbtpro.records import chunking as records_ch
 from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.registries.jit_registry import register_jitted
@@ -1002,8 +1002,51 @@ def rank_nb(arr: tp.Array2d, argsorted: tp.Optional[tp.Array2d] = None, pct: boo
 
 
 @register_jitted(cache=True)
+def rolling_sum_acc_nb(in_ctx: RollSumAIS) -> RollSumAOS:
+    """Accumulator of `rolling_sum_1d_nb`.
+
+    Takes a state of type `vectorbtpro.generic.enums.RollSumAIS` and returns
+    a state of type `vectorbtpro.generic.enums.RollSumAOS`."""
+    i = in_ctx.i
+    value = in_ctx.value
+    pre_window_value = in_ctx.pre_window_value
+    cumsum = in_ctx.cumsum
+    nancnt = in_ctx.nancnt
+    window = in_ctx.window
+    minp = in_ctx.minp
+
+    if np.isnan(value):
+        nancnt = nancnt + 1
+    else:
+        cumsum = cumsum + value
+    if i < window:
+        window_len = i + 1 - nancnt
+        window_cumsum = cumsum
+    else:
+        if np.isnan(pre_window_value):
+            nancnt = nancnt - 1
+        else:
+            cumsum = cumsum - pre_window_value
+        window_len = window - nancnt
+        window_cumsum = cumsum
+    if window_len < minp:
+        value = np.nan
+    else:
+        value = window_cumsum
+
+    return RollSumAOS(
+        cumsum=cumsum,
+        nancnt=nancnt,
+        window_len=window_len,
+        value=value
+    )
+
+
+@register_jitted(cache=True)
 def rolling_sum_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None) -> tp.Array1d:
     """Compute rolling sum.
+
+    Uses `rolling_sum_acc_nb` at each iteration.
 
     Numba equivalent to `pd.Series(arr).rolling(window, min_periods=minp).sum()`."""
     if minp is None:
@@ -1011,27 +1054,24 @@ def rolling_sum_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = Non
     if minp > window:
         raise ValueError("minp must be <= window")
     out = np.empty_like(arr, dtype=np.float_)
-    cumsum = 0
+    cumsum = 0.
     nancnt = 0
+
     for i in range(arr.shape[0]):
-        if np.isnan(arr[i]):
-            nancnt = nancnt + 1
-        else:
-            cumsum = cumsum + arr[i]
-        if i < window:
-            window_len = i + 1 - nancnt
-            window_cumsum = cumsum
-        else:
-            if np.isnan(arr[i - window]):
-                nancnt = nancnt - 1
-            else:
-                cumsum = cumsum - arr[i - window]
-            window_len = window - nancnt
-            window_cumsum = cumsum
-        if window_len < minp:
-            out[i] = np.nan
-        else:
-            out[i] = window_cumsum
+        in_ctx = RollSumAIS(
+            i=i,
+            value=arr[i],
+            pre_window_value=arr[i - window] if i - window >= 0 else np.nan,
+            cumsum=cumsum,
+            nancnt=nancnt,
+            window=window,
+            minp=minp
+        )
+        out_ctx = rolling_sum_acc_nb(in_ctx)
+        cumsum = out_ctx.cumsum
+        nancnt = out_ctx.nancnt
+        out[i] = out_ctx.value
+
     return out
 
 
@@ -1054,8 +1094,51 @@ def rolling_sum_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None) 
 
 
 @register_jitted(cache=True)
+def rolling_prod_acc_nb(in_ctx: RollProdAIS) -> RollProdAOS:
+    """Accumulator of `rolling_prod_1d_nb`.
+
+    Takes a state of type `vectorbtpro.generic.enums.RollProdAIS` and returns
+    a state of type `vectorbtpro.generic.enums.RollProdAOS`."""
+    i = in_ctx.i
+    value = in_ctx.value
+    pre_window_value = in_ctx.pre_window_value
+    cumprod = in_ctx.cumprod
+    nancnt = in_ctx.nancnt
+    window = in_ctx.window
+    minp = in_ctx.minp
+
+    if np.isnan(value):
+        nancnt = nancnt + 1
+    else:
+        cumprod = cumprod * value
+    if i < window:
+        window_len = i + 1 - nancnt
+        window_cumprod = cumprod
+    else:
+        if np.isnan(pre_window_value):
+            nancnt = nancnt - 1
+        else:
+            cumprod = cumprod / pre_window_value
+        window_len = window - nancnt
+        window_cumprod = cumprod
+    if window_len < minp:
+        value = np.nan
+    else:
+        value = window_cumprod
+
+    return RollProdAOS(
+        cumprod=cumprod,
+        nancnt=nancnt,
+        window_len=window_len,
+        value=value
+    )
+
+
+@register_jitted(cache=True)
 def rolling_prod_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None) -> tp.Array1d:
     """Compute rolling product.
+
+    Uses `rolling_prod_acc_nb` at each iteration.
 
     Numba equivalent to `pd.Series(arr).rolling(window, min_periods=minp).apply(np.prod)`."""
     if minp is None:
@@ -1063,27 +1146,24 @@ def rolling_prod_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = No
     if minp > window:
         raise ValueError("minp must be <= window")
     out = np.empty_like(arr, dtype=np.float_)
-    cumprod = 1
+    cumprod = 1.
     nancnt = 0
+
     for i in range(arr.shape[0]):
-        if np.isnan(arr[i]):
-            nancnt = nancnt + 1
-        else:
-            cumprod = cumprod * arr[i]
-        if i < window:
-            window_len = i + 1 - nancnt
-            window_cumprod = cumprod
-        else:
-            if np.isnan(arr[i - window]):
-                nancnt = nancnt - 1
-            else:
-                cumprod = cumprod / arr[i - window]
-            window_len = window - nancnt
-            window_cumprod = cumprod
-        if window_len < minp:
-            out[i] = np.nan
-        else:
-            out[i] = window_cumprod
+        in_ctx = RollProdAIS(
+            i=i,
+            value=arr[i],
+            pre_window_value=arr[i - window] if i - window >= 0 else np.nan,
+            cumprod=cumprod,
+            nancnt=nancnt,
+            window=window,
+            minp=minp
+        )
+        out_ctx = rolling_prod_acc_nb(in_ctx)
+        cumprod = out_ctx.cumprod
+        nancnt = out_ctx.nancnt
+        out[i] = out_ctx.value
+
     return out
 
 
@@ -1102,6 +1182,926 @@ def rolling_prod_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None)
     out = np.empty_like(arr, dtype=np.float_)
     for col in prange(arr.shape[1]):
         out[:, col] = rolling_prod_1d_nb(arr[:, col], window, minp=minp)
+    return out
+
+
+@register_jitted(cache=True)
+def rolling_mean_acc_nb(in_ctx: RollMeanAIS) -> RollMeanAOS:
+    """Accumulator of `rolling_mean_1d_nb`.
+
+    Takes a state of type `vectorbtpro.generic.enums.RollMeanAIS` and returns
+    a state of type `vectorbtpro.generic.enums.RollMeanAOS`."""
+    i = in_ctx.i
+    value = in_ctx.value
+    pre_window_value = in_ctx.pre_window_value
+    cumsum = in_ctx.cumsum
+    nancnt = in_ctx.nancnt
+    window = in_ctx.window
+    minp = in_ctx.minp
+
+    if np.isnan(value):
+        nancnt = nancnt + 1
+    else:
+        cumsum = cumsum + value
+    if i < window:
+        window_len = i + 1 - nancnt
+        window_cumsum = cumsum
+    else:
+        if np.isnan(pre_window_value):
+            nancnt = nancnt - 1
+        else:
+            cumsum = cumsum - pre_window_value
+        window_len = window - nancnt
+        window_cumsum = cumsum
+    if window_len < minp:
+        value = np.nan
+    else:
+        value = window_cumsum / window_len
+
+    return RollMeanAOS(
+        cumsum=cumsum,
+        nancnt=nancnt,
+        window_len=window_len,
+        value=value
+    )
+
+
+@register_jitted(cache=True)
+def rolling_mean_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None) -> tp.Array1d:
+    """Compute rolling mean.
+
+    Uses `rolling_mean_acc_nb` at each iteration.
+
+    Numba equivalent to `pd.Series(arr).rolling(window, min_periods=minp).mean()`."""
+    if minp is None:
+        minp = window
+    if minp > window:
+        raise ValueError("minp must be <= window")
+    out = np.empty_like(arr, dtype=np.float_)
+    cumsum = 0.
+    nancnt = 0
+
+    for i in range(arr.shape[0]):
+        in_ctx = RollMeanAIS(
+            i=i,
+            value=arr[i],
+            pre_window_value=arr[i - window] if i - window >= 0 else np.nan,
+            cumsum=cumsum,
+            nancnt=nancnt,
+            window=window,
+            minp=minp
+        )
+        out_ctx = rolling_mean_acc_nb(in_ctx)
+        cumsum = out_ctx.cumsum
+        nancnt = out_ctx.nancnt
+        out[i] = out_ctx.value
+
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='arr', axis=1),
+    arg_take_spec=dict(
+        arr=ch.ArraySlicer(axis=1),
+        window=None,
+        minp=None
+    ),
+    merge_func=base_ch.column_stack
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def rolling_mean_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None) -> tp.Array2d:
+    """2-dim version of `rolling_mean_1d_nb`."""
+    out = np.empty_like(arr, dtype=np.float_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = rolling_mean_1d_nb(arr[:, col], window, minp=minp)
+    return out
+
+
+@register_jitted(cache=True)
+def rolling_std_acc_nb(in_ctx: RollStdAIS) -> RollStdAOS:
+    """Accumulator of `rolling_std_1d_nb`.
+
+    Takes a state of type `vectorbtpro.generic.enums.RollStdAIS` and returns
+    a state of type `vectorbtpro.generic.enums.RollStdAOS`."""
+    i = in_ctx.i
+    value = in_ctx.value
+    pre_window_value = in_ctx.pre_window_value
+    cumsum = in_ctx.cumsum
+    cumsum_sq = in_ctx.cumsum_sq
+    nancnt = in_ctx.nancnt
+    window = in_ctx.window
+    minp = in_ctx.minp
+    ddof = in_ctx.ddof
+
+    if np.isnan(value):
+        nancnt = nancnt + 1
+    else:
+        cumsum = cumsum + value
+        cumsum_sq = cumsum_sq + value ** 2
+    if i < window:
+        window_len = i + 1 - nancnt
+    else:
+        if np.isnan(pre_window_value):
+            nancnt = nancnt - 1
+        else:
+            cumsum = cumsum - pre_window_value
+            cumsum_sq = cumsum_sq - pre_window_value ** 2
+        window_len = window - nancnt
+    if window_len < minp or window_len == ddof:
+        value = np.nan
+    else:
+        mean = cumsum / window_len
+        value = np.sqrt(np.abs(cumsum_sq - 2 * cumsum * mean + window_len * mean ** 2) / (window_len - ddof))
+
+    return RollStdAOS(
+        cumsum=cumsum,
+        cumsum_sq=cumsum_sq,
+        nancnt=nancnt,
+        window_len=window_len,
+        value=value
+    )
+
+
+@register_jitted(cache=True)
+def rolling_std_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None, ddof: int = 0) -> tp.Array1d:
+    """Compute rolling standard deviation.
+
+    Uses `rolling_std_acc_nb` at each iteration.
+
+    Numba equivalent to `pd.Series(arr).rolling(window, min_periods=minp).std(ddof=ddof)`."""
+    if minp is None:
+        minp = window
+    if minp > window:
+        raise ValueError("minp must be <= window")
+    out = np.empty_like(arr, dtype=np.float_)
+    cumsum = 0.
+    cumsum_sq = 0.
+    nancnt = 0
+
+    for i in range(arr.shape[0]):
+        in_ctx = RollStdAIS(
+            i=i,
+            value=arr[i],
+            pre_window_value=arr[i - window] if i - window >= 0 else np.nan,
+            cumsum=cumsum,
+            cumsum_sq=cumsum_sq,
+            nancnt=nancnt,
+            window=window,
+            minp=minp,
+            ddof=ddof
+        )
+        out_ctx = rolling_std_acc_nb(in_ctx)
+        cumsum = out_ctx.cumsum
+        cumsum_sq = out_ctx.cumsum_sq
+        nancnt = out_ctx.nancnt
+        out[i] = out_ctx.value
+
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='arr', axis=1),
+    arg_take_spec=dict(
+        arr=ch.ArraySlicer(axis=1),
+        window=None,
+        minp=None,
+        ddof=None
+    ),
+    merge_func=base_ch.column_stack
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def rolling_std_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None, ddof: int = 0) -> tp.Array2d:
+    """2-dim version of `rolling_std_1d_nb`."""
+    out = np.empty_like(arr, dtype=np.float_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = rolling_std_1d_nb(arr[:, col], window, minp=minp, ddof=ddof)
+    return out
+
+
+@register_jitted(cache=True)
+def wm_mean_acc_nb(in_ctx: WMMeanAIS) -> WMMeanAOS:
+    """Accumulator of `wm_mean_1d_nb`.
+
+    Takes a state of type `vectorbtpro.generic.enums.WMMeanAIS` and returns
+    a state of type `vectorbtpro.generic.enums.WMMeanAOS`."""
+    i = in_ctx.i
+    value = in_ctx.value
+    pre_window_value = in_ctx.pre_window_value
+    cumsum = in_ctx.cumsum
+    wcumsum = in_ctx.wcumsum
+    nancnt = in_ctx.nancnt
+    window = in_ctx.window
+    minp = in_ctx.minp
+
+    if i >= window and not np.isnan(pre_window_value):
+        wcumsum = wcumsum - cumsum
+    if np.isnan(value):
+        nancnt = nancnt + 1
+    else:
+        cumsum = cumsum + value
+    if i < window:
+        window_len = i + 1 - nancnt
+    else:
+        if np.isnan(pre_window_value):
+            nancnt = nancnt - 1
+        else:
+            cumsum = cumsum - pre_window_value
+        window_len = window - nancnt
+    if not np.isnan(value):
+        wcumsum = wcumsum + value * window_len
+    if window_len < minp:
+        value = np.nan
+    else:
+        value = wcumsum * 2 / (window_len + 1) / window_len
+
+    return WMMeanAOS(
+        cumsum=cumsum,
+        wcumsum=wcumsum,
+        nancnt=nancnt,
+        window_len=window_len,
+        value=value
+    )
+
+
+@register_jitted(cache=True)
+def wm_mean_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None) -> tp.Array1d:
+    """Compute weighted moving average.
+
+    Uses `wm_mean_acc_nb` at each iteration."""
+    if minp is None:
+        minp = window
+    if minp > window:
+        raise ValueError("minp must be <= window")
+    out = np.empty_like(arr, dtype=np.float_)
+    cumsum = 0.
+    wcumsum = 0.
+    nancnt = 0
+
+    for i in range(arr.shape[0]):
+        in_ctx = WMMeanAIS(
+            i=i,
+            value=arr[i],
+            pre_window_value=arr[i - window] if i - window >= 0 else np.nan,
+            cumsum=cumsum,
+            wcumsum=wcumsum,
+            nancnt=nancnt,
+            window=window,
+            minp=minp
+        )
+        out_ctx = wm_mean_acc_nb(in_ctx)
+        cumsum = out_ctx.cumsum
+        wcumsum = out_ctx.wcumsum
+        nancnt = out_ctx.nancnt
+        out[i] = out_ctx.value
+
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='arr', axis=1),
+    arg_take_spec=dict(
+        arr=ch.ArraySlicer(axis=1),
+        window=None,
+        minp=None
+    ),
+    merge_func=base_ch.column_stack
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def wm_mean_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None) -> tp.Array2d:
+    """2-dim version of `wm_mean_1d_nb`."""
+    out = np.empty_like(arr, dtype=np.float_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = wm_mean_1d_nb(arr[:, col], window, minp=minp)
+    return out
+
+
+@register_jitted(cache=True)
+def alpha_from_com_nb(com: float) -> float:
+    """Get the smoothing factor `alpha` from a center of mass."""
+    return 1. / (1. + com)
+
+
+@register_jitted(cache=True)
+def alpha_from_span_nb(span: float) -> float:
+    """Get the smoothing factor `alpha` from a span."""
+    com = (span - 1) / 2.0
+    return alpha_from_com_nb(com)
+
+
+@register_jitted(cache=True)
+def alpha_from_halflife_nb(halflife: float) -> float:
+    """Get the smoothing factor `alpha` from a half-life."""
+    return 1 - np.exp(-np.log(2) / halflife)
+
+
+@register_jitted(cache=True)
+def alpha_from_wilder_nb(period: int) -> float:
+    """Get the smoothing factor `alpha` from a Wilder's period."""
+    return 1 / period
+
+
+@register_jitted(cache=True)
+def ewm_mean_acc_nb(in_ctx: EWMMeanAIS) -> EWMMeanAOS:
+    """Accumulator of `ewm_mean_1d_nb`.
+
+    Takes a state of type `vectorbtpro.generic.enums.EWMMeanAIS` and returns
+    a state of type `vectorbtpro.generic.enums.EWMMeanAOS`."""
+    i = in_ctx.i
+    value = in_ctx.value
+    old_wt = in_ctx.old_wt
+    weighted_avg = in_ctx.weighted_avg
+    nobs = in_ctx.nobs
+    alpha = in_ctx.alpha
+    minp = in_ctx.minp
+    adjust = in_ctx.adjust
+
+    old_wt_factor = 1. - alpha
+    new_wt = 1. if adjust else alpha
+
+    if i > 0:
+        is_observation = not np.isnan(value)
+        nobs += is_observation
+        if not np.isnan(weighted_avg):
+            old_wt *= old_wt_factor
+            if is_observation:
+                # avoid numerical errors on constant series
+                if weighted_avg != value:
+                    weighted_avg = ((old_wt * weighted_avg) + (new_wt * value)) / (old_wt + new_wt)
+                if adjust:
+                    old_wt += new_wt
+                else:
+                    old_wt = 1.
+        elif is_observation:
+            weighted_avg = value
+    else:
+        is_observation = not np.isnan(weighted_avg)
+        nobs += int(is_observation)
+    value = weighted_avg if (nobs >= minp) else np.nan
+
+    return EWMMeanAOS(
+        old_wt=old_wt,
+        weighted_avg=weighted_avg,
+        nobs=nobs,
+        value=value
+    )
+
+
+@register_jitted(cache=True)
+def ewm_mean_1d_nb(arr: tp.Array1d, span: int, minp: tp.Optional[int] = None, adjust: bool = False) -> tp.Array1d:
+    """Compute exponential weighted moving average.
+
+    Uses `ewm_mean_acc_nb` at each iteration.
+
+    Numba equivalent to `pd.Series(arr).ewm(span=span, min_periods=minp, adjust=adjust).mean()`.
+
+    Adaptation of `pd._libs.window.aggregations.window_aggregations.ewma` with default arguments."""
+    if minp is None:
+        minp = span
+    if minp > span:
+        raise ValueError("minp must be <= span")
+    out = np.empty(len(arr), dtype=np.float_)
+    if len(arr) == 0:
+        return out
+    com = (span - 1) / 2.0
+    alpha = 1. / (1. + com)
+    weighted_avg = arr[0]
+    nobs = 0
+    old_wt = 1.
+
+    for i in range(len(arr)):
+        in_ctx = EWMMeanAIS(
+            i=i,
+            value=arr[i],
+            old_wt=old_wt,
+            weighted_avg=weighted_avg,
+            nobs=nobs,
+            alpha=alpha,
+            minp=minp,
+            adjust=adjust
+        )
+        out_ctx = ewm_mean_acc_nb(in_ctx)
+        old_wt = out_ctx.old_wt
+        weighted_avg = out_ctx.weighted_avg
+        nobs = out_ctx.nobs
+        out[i] = out_ctx.value
+
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='arr', axis=1),
+    arg_take_spec=dict(
+        arr=ch.ArraySlicer(axis=1),
+        span=None,
+        minp=None,
+        adjust=None
+    ),
+    merge_func=base_ch.column_stack
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def ewm_mean_nb(arr: tp.Array2d, span: int, minp: tp.Optional[int] = None, adjust: bool = False) -> tp.Array2d:
+    """2-dim version of `ewm_mean_1d_nb`."""
+    out = np.empty_like(arr, dtype=np.float_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = ewm_mean_1d_nb(arr[:, col], span, minp=minp, adjust=adjust)
+    return out
+
+
+@register_jitted(cache=True)
+def ewm_std_acc_nb(in_ctx: EWMStdAIS) -> EWMStdAOS:
+    """Accumulator of `ewm_std_1d_nb`.
+
+    Takes a state of type `vectorbtpro.generic.enums.EWMStdAIS` and returns
+    a state of type `vectorbtpro.generic.enums.EWMStdAOS`."""
+    i = in_ctx.i
+    value = in_ctx.value
+    mean_x = in_ctx.mean_x
+    mean_y = in_ctx.mean_y
+    cov = in_ctx.cov
+    sum_wt = in_ctx.sum_wt
+    sum_wt2 = in_ctx.sum_wt2
+    old_wt = in_ctx.old_wt
+    nobs = in_ctx.nobs
+    alpha = in_ctx.alpha
+    minp = in_ctx.minp
+    adjust = in_ctx.adjust
+
+    old_wt_factor = 1. - alpha
+    new_wt = 1. if adjust else alpha
+
+    cur_x = value
+    cur_y = value
+    is_observation = not np.isnan(cur_x) and not np.isnan(cur_y)
+    nobs += is_observation
+    if i > 0:
+        if not np.isnan(mean_x):
+            sum_wt *= old_wt_factor
+            sum_wt2 *= (old_wt_factor * old_wt_factor)
+            old_wt *= old_wt_factor
+            if is_observation:
+                old_mean_x = mean_x
+                old_mean_y = mean_y
+
+                # avoid numerical errors on constant series
+                if mean_x != cur_x:
+                    mean_x = ((old_wt * old_mean_x) + (new_wt * cur_x)) / (old_wt + new_wt)
+
+                # avoid numerical errors on constant series
+                if mean_y != cur_y:
+                    mean_y = ((old_wt * old_mean_y) + (new_wt * cur_y)) / (old_wt + new_wt)
+                cov = ((old_wt * (cov + ((old_mean_x - mean_x) * (old_mean_y - mean_y)))) +
+                       (new_wt * ((cur_x - mean_x) * (cur_y - mean_y)))) / (old_wt + new_wt)
+                sum_wt += new_wt
+                sum_wt2 += (new_wt * new_wt)
+                old_wt += new_wt
+                if not adjust:
+                    sum_wt /= old_wt
+                    sum_wt2 /= (old_wt * old_wt)
+                    old_wt = 1.
+        elif is_observation:
+            mean_x = cur_x
+            mean_y = cur_y
+    else:
+        if not is_observation:
+            mean_x = np.nan
+            mean_y = np.nan
+
+    if nobs >= minp:
+        numerator = sum_wt * sum_wt
+        denominator = numerator - sum_wt2
+        if denominator > 0.:
+            value = ((numerator / denominator) * cov)
+        else:
+            value = np.nan
+    else:
+        value = np.nan
+
+    return EWMStdAOS(
+        mean_x=mean_x,
+        mean_y=mean_y,
+        cov=cov,
+        sum_wt=sum_wt,
+        sum_wt2=sum_wt2,
+        old_wt=old_wt,
+        nobs=nobs,
+        value=value
+    )
+
+
+@register_jitted(cache=True)
+def ewm_std_1d_nb(arr: tp.Array1d, span: int, minp: tp.Optional[int] = None, adjust: bool = False) -> tp.Array1d:
+    """Compute exponential weighted moving standard deviation.
+
+    Uses `ewm_std_acc_nb` at each iteration.
+
+    Numba equivalent to `pd.Series(arr).ewm(span=span, min_periods=minp).std()`.
+
+    Adaptation of `pd._libs.window.aggregations.window_aggregations.ewmcov` with default arguments."""
+    if minp is None:
+        minp = span
+    if minp > span:
+        raise ValueError("minp must be <= span")
+    out = np.empty(len(arr), dtype=np.float_)
+    if len(arr) == 0:
+        return out
+    com = (span - 1) / 2.0
+    alpha = 1. / (1. + com)
+    mean_x = arr[0]
+    mean_y = arr[0]
+    nobs = 0
+    cov = 0.
+    sum_wt = 1.
+    sum_wt2 = 1.
+    old_wt = 1.
+
+    for i in range(len(arr)):
+        in_ctx = EWMStdAIS(
+            i=i,
+            value=arr[i],
+            mean_x=mean_x,
+            mean_y=mean_y,
+            cov=cov,
+            sum_wt=sum_wt,
+            sum_wt2=sum_wt2,
+            old_wt=old_wt,
+            nobs=nobs,
+            alpha=alpha,
+            minp=minp,
+            adjust=adjust
+        )
+        out_ctx = ewm_std_acc_nb(in_ctx)
+        mean_x = out_ctx.mean_x
+        mean_y = out_ctx.mean_y
+        cov = out_ctx.cov
+        sum_wt = out_ctx.sum_wt
+        sum_wt2 = out_ctx.sum_wt2
+        old_wt = out_ctx.old_wt
+        nobs = out_ctx.nobs
+        out[i] = out_ctx.value
+
+    return np.sqrt(out)
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='arr', axis=1),
+    arg_take_spec=dict(
+        arr=ch.ArraySlicer(axis=1),
+        span=None,
+        minp=None,
+        adjust=None,
+        ddof=None
+    ),
+    merge_func=base_ch.column_stack
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def ewm_std_nb(arr: tp.Array2d, span: int, minp: tp.Optional[int] = None, adjust: bool = False) -> tp.Array2d:
+    """2-dim version of `ewm_std_1d_nb`."""
+    out = np.empty_like(arr, dtype=np.float_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = ewm_std_1d_nb(arr[:, col], span, minp=minp, adjust=adjust)
+    return out
+
+
+@register_jitted(cache=True)
+def wwm_mean_1d_nb(arr: tp.Array1d, period: int, minp: tp.Optional[int] = None) -> tp.Array1d:
+    """Compute Wilder's exponential weighted moving average."""
+    if minp is None:
+        minp = period
+    return ewm_mean_1d_nb(arr, 2 * period - 1, minp=minp, adjust=False)
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='arr', axis=1),
+    arg_take_spec=dict(
+        arr=ch.ArraySlicer(axis=1),
+        period=None,
+        minp=None
+    ),
+    merge_func=base_ch.column_stack
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def wwm_mean_nb(arr: tp.Array2d, period: int, minp: tp.Optional[int] = None) -> tp.Array2d:
+    """2-dim version of `wwm_mean_1d_nb`."""
+    out = np.empty_like(arr, dtype=np.float_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = wwm_mean_1d_nb(arr[:, col], period, minp=minp)
+    return out
+
+
+@register_jitted(cache=True)
+def wwm_std_1d_nb(arr: tp.Array1d, period: int, minp: tp.Optional[int] = None) -> tp.Array1d:
+    """Compute Wilder's exponential weighted moving standard deviation."""
+    if minp is None:
+        minp = period
+    return ewm_std_1d_nb(arr, 2 * period - 1, minp=minp, adjust=False)
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='arr', axis=1),
+    arg_take_spec=dict(
+        arr=ch.ArraySlicer(axis=1),
+        period=None,
+        minp=None
+    ),
+    merge_func=base_ch.column_stack
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def wwm_std_nb(arr: tp.Array2d, period: int, minp: tp.Optional[int] = None) -> tp.Array2d:
+    """2-dim version of `wwm_std_1d_nb`."""
+    out = np.empty_like(arr, dtype=np.float_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = wwm_std_1d_nb(arr[:, col], period, minp=minp)
+    return out
+
+
+@register_jitted(cache=True)
+def rolling_cov_acc_nb(in_ctx: RollCovAIS) -> RollCovAOS:
+    """Accumulator of `rolling_cov_1d_nb`.
+
+    Takes a state of type `vectorbtpro.generic.enums.RollCovIOS` and returns
+    a state of type `vectorbtpro.generic.enums.RollCovAOS`."""
+    i = in_ctx.i
+    value1 = in_ctx.value1
+    value2 = in_ctx.value2
+    pre_window_value1 = in_ctx.pre_window_value1
+    pre_window_value2 = in_ctx.pre_window_value2
+    cumsum1 = in_ctx.cumsum1
+    cumsum2 = in_ctx.cumsum2
+    cumsum_prod = in_ctx.cumsum_prod
+    nancnt = in_ctx.nancnt
+    window = in_ctx.window
+    minp = in_ctx.minp
+    ddof = in_ctx.ddof
+
+    if np.isnan(value1) or np.isnan(value2):
+        nancnt = nancnt + 1
+    else:
+        cumsum1 = cumsum1 + value1
+        cumsum2 = cumsum2 + value2
+        cumsum_prod = cumsum_prod + value1 * value2
+    if i < window:
+        window_len = i + 1 - nancnt
+    else:
+        if np.isnan(pre_window_value1) or np.isnan(pre_window_value2):
+            nancnt = nancnt - 1
+        else:
+            cumsum1 = cumsum1 - pre_window_value1
+            cumsum2 = cumsum2 - pre_window_value2
+            cumsum_prod = cumsum_prod - pre_window_value1 * pre_window_value2
+        window_len = window - nancnt
+    if window_len < minp or window_len == ddof:
+        value = np.nan
+    else:
+        window_prod_mean = cumsum_prod / (window_len - ddof)
+        window_mean1 = cumsum1 / window_len
+        window_mean2 = cumsum2 / window_len
+        window_mean_prod = window_mean1 * window_mean2 * window_len / (window_len - ddof)
+        value = window_prod_mean - window_mean_prod
+
+    return RollCovAOS(
+        cumsum1=cumsum1,
+        cumsum2=cumsum2,
+        cumsum_prod=cumsum_prod,
+        nancnt=nancnt,
+        window_len=window_len,
+        value=value
+    )
+
+
+@register_jitted(cache=True)
+def rolling_cov_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d,
+                      window: int, minp: tp.Optional[int] = None, ddof: int = 0) -> tp.Array1d:
+    """Compute rolling covariance.
+
+    Numba equivalent to `pd.Series(arr1).rolling(window, min_periods=minp).cov(arr2)`."""
+    if minp is None:
+        minp = window
+    if minp > window:
+        raise ValueError("minp must be <= window")
+    out = np.empty_like(arr1, dtype=np.float_)
+    cumsum1 = 0.
+    cumsum2 = 0.
+    cumsum_prod = 0.
+    nancnt = 0
+
+    for i in range(arr1.shape[0]):
+        in_ctx = RollCovAIS(
+            i=i,
+            value1=arr1[i],
+            value2=arr2[i],
+            pre_window_value1=arr1[i - window] if i - window >= 0 else np.nan,
+            pre_window_value2=arr2[i - window] if i - window >= 0 else np.nan,
+            cumsum1=cumsum1,
+            cumsum2=cumsum2,
+            cumsum_prod=cumsum_prod,
+            nancnt=nancnt,
+            window=window,
+            minp=minp,
+            ddof=ddof
+        )
+        out_ctx = rolling_cov_acc_nb(in_ctx)
+        cumsum1 = out_ctx.cumsum1
+        cumsum2 = out_ctx.cumsum2
+        cumsum_prod = out_ctx.cumsum_prod
+        nancnt = out_ctx.nancnt
+        out[i] = out_ctx.value
+
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='arr1', axis=1),
+    arg_take_spec=dict(
+        arr1=ch.ArraySlicer(axis=1),
+        arr2=ch.ArraySlicer(axis=1),
+        window=None,
+        minp=None,
+        ddof=None
+    ),
+    merge_func=base_ch.column_stack
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def rolling_cov_nb(arr1: tp.Array2d, arr2: tp.Array2d, window: int,
+                   minp: tp.Optional[int] = None, ddof: int = 0) -> tp.Array2d:
+    """2-dim version of `rolling_cov_1d_nb`."""
+    out = np.empty_like(arr1, dtype=np.float_)
+    for col in prange(arr1.shape[1]):
+        out[:, col] = rolling_cov_1d_nb(arr1[:, col], arr2[:, col], window, minp=minp, ddof=ddof)
+    return out
+
+
+@register_jitted(cache=True)
+def rolling_corr_acc_nb(in_ctx: RollCorrAIS) -> RollCorrAOS:
+    """Accumulator of `rolling_corr_1d_nb`.
+
+    Takes a state of type `vectorbtpro.generic.enums.RollCorrAIS` and returns
+    a state of type `vectorbtpro.generic.enums.RollCorrAOS`."""
+    i = in_ctx.i
+    value1 = in_ctx.value1
+    value2 = in_ctx.value2
+    pre_window_value1 = in_ctx.pre_window_value1
+    pre_window_value2 = in_ctx.pre_window_value2
+    cumsum1 = in_ctx.cumsum1
+    cumsum2 = in_ctx.cumsum2
+    cumsum_sq1 = in_ctx.cumsum_sq1
+    cumsum_sq2 = in_ctx.cumsum_sq2
+    cumsum_prod = in_ctx.cumsum_prod
+    nancnt = in_ctx.nancnt
+    window = in_ctx.window
+    minp = in_ctx.minp
+
+    if np.isnan(value1) or np.isnan(value2):
+        nancnt = nancnt + 1
+    else:
+        cumsum1 = cumsum1 + value1
+        cumsum2 = cumsum2 + value2
+        cumsum_sq1 = cumsum_sq1 + value1 ** 2
+        cumsum_sq2 = cumsum_sq2 + value2 ** 2
+        cumsum_prod = cumsum_prod + value1 * value2
+    if i < window:
+        window_len = i + 1 - nancnt
+    else:
+        if np.isnan(pre_window_value1) or np.isnan(pre_window_value2):
+            nancnt = nancnt - 1
+        else:
+            cumsum1 = cumsum1 - pre_window_value1
+            cumsum2 = cumsum2 - pre_window_value2
+            cumsum_sq1 = cumsum_sq1 - pre_window_value1 ** 2
+            cumsum_sq2 = cumsum_sq2 - pre_window_value2 ** 2
+            cumsum_prod = cumsum_prod - pre_window_value1 * pre_window_value2
+        window_len = window - nancnt
+    if window_len < minp:
+        value = np.nan
+    else:
+        nom = window_len * cumsum_prod - cumsum1 * cumsum2
+        denom1 = np.sqrt(window_len * cumsum_sq1 - cumsum1 ** 2)
+        denom2 = np.sqrt(window_len * cumsum_sq2 - cumsum2 ** 2)
+        denom = denom1 * denom2
+        if denom == 0:
+            value = np.nan
+        else:
+            value = nom / denom
+
+    return RollCorrAOS(
+        cumsum1=cumsum1,
+        cumsum2=cumsum2,
+        cumsum_sq1=cumsum_sq1,
+        cumsum_sq2=cumsum_sq2,
+        cumsum_prod=cumsum_prod,
+        nancnt=nancnt,
+        window_len=window_len,
+        value=value
+    )
+
+
+@register_jitted(cache=True)
+def rolling_corr_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d,
+                       window: int, minp: tp.Optional[int] = None) -> tp.Array1d:
+    """Compute rolling correlation coefficient.
+
+    Numba equivalent to `pd.Series(arr1).rolling(window, min_periods=minp).corr(arr2)`."""
+    if minp is None:
+        minp = window
+    if minp > window:
+        raise ValueError("minp must be <= window")
+    out = np.empty_like(arr1, dtype=np.float_)
+    cumsum1 = 0.
+    cumsum2 = 0.
+    cumsum_sq1 = 0.
+    cumsum_sq2 = 0.
+    cumsum_prod = 0.
+    nancnt = 0
+
+    for i in range(arr1.shape[0]):
+        in_ctx = RollCorrAIS(
+            i=i,
+            value1=arr1[i],
+            value2=arr2[i],
+            pre_window_value1=arr1[i - window] if i - window >= 0 else np.nan,
+            pre_window_value2=arr2[i - window] if i - window >= 0 else np.nan,
+            cumsum1=cumsum1,
+            cumsum2=cumsum2,
+            cumsum_sq1=cumsum_sq1,
+            cumsum_sq2=cumsum_sq2,
+            cumsum_prod=cumsum_prod,
+            nancnt=nancnt,
+            window=window,
+            minp=minp
+        )
+        out_ctx = rolling_corr_acc_nb(in_ctx)
+        cumsum1 = out_ctx.cumsum1
+        cumsum2 = out_ctx.cumsum2
+        cumsum_sq1 = out_ctx.cumsum_sq1
+        cumsum_sq2 = out_ctx.cumsum_sq2
+        cumsum_prod = out_ctx.cumsum_prod
+        nancnt = out_ctx.nancnt
+        out[i] = out_ctx.value
+
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='arr1', axis=1),
+    arg_take_spec=dict(
+        arr1=ch.ArraySlicer(axis=1),
+        arr2=ch.ArraySlicer(axis=1),
+        window=None,
+        minp=None
+    ),
+    merge_func=base_ch.column_stack
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def rolling_corr_nb(arr1: tp.Array2d, arr2: tp.Array2d, window: int,
+                    minp: tp.Optional[int] = None) -> tp.Array2d:
+    """2-dim version of `rolling_corr_1d_nb`."""
+    out = np.empty_like(arr1, dtype=np.float_)
+    for col in prange(arr1.shape[1]):
+        out[:, col] = rolling_corr_1d_nb(arr1[:, col], arr2[:, col], window, minp=minp)
+    return out
+
+
+@register_jitted(cache=True)
+def rolling_rank_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int], pct: bool = False) -> tp.Array1d:
+    """Rolling version of `rank_1d_nb`."""
+    if minp is None:
+        minp = window
+    out = np.empty_like(arr, dtype=np.float_)
+    nancnt = 0
+    for i in range(arr.shape[0]):
+        if np.isnan(arr[i]):
+            nancnt = nancnt + 1
+        if i < window:
+            valid_cnt = i + 1 - nancnt
+        else:
+            if np.isnan(arr[i - window]):
+                nancnt = nancnt - 1
+            valid_cnt = window - nancnt
+        if valid_cnt < minp:
+            out[i] = np.nan
+        else:
+            from_i = max(0, i + 1 - window)
+            to_i = i + 1
+            window_a = arr[from_i:to_i]
+            out[i] = rank_1d_nb(window_a, pct=pct)[-1]
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query='arr', axis=1),
+    arg_take_spec=dict(
+        arr=ch.ArraySlicer(axis=1),
+        window=None,
+        minp=None,
+        pct=None
+    ),
+    merge_func=base_ch.column_stack
+)
+@register_jitted(cache=True, tags={'can_parallel'})
+def rolling_rank_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None, pct: bool = False) -> tp.Array2d:
+    """2-dim version of `rolling_rank_1d_nb`."""
+    out = np.empty_like(arr, dtype=np.float_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = rolling_rank_1d_nb(arr[:, col], window, minp=minp, pct=pct)
     return out
 
 
@@ -1304,564 +2304,6 @@ def rolling_argmax_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = Non
     out = np.empty_like(arr, dtype=np.int_)
     for col in prange(arr.shape[1]):
         out[:, col] = rolling_argmax_1d_nb(arr[:, col], window, minp=minp, local=local)
-    return out
-
-
-@register_jitted(cache=True)
-def rolling_mean_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None) -> tp.Array1d:
-    """Compute rolling mean.
-
-    Numba equivalent to `pd.Series(arr).rolling(window, min_periods=minp).mean()`."""
-    if minp is None:
-        minp = window
-    if minp > window:
-        raise ValueError("minp must be <= window")
-    out = np.empty_like(arr, dtype=np.float_)
-    cumsum = 0
-    nancnt = 0
-    for i in range(arr.shape[0]):
-        if np.isnan(arr[i]):
-            nancnt = nancnt + 1
-        else:
-            cumsum = cumsum + arr[i]
-        if i < window:
-            window_len = i + 1 - nancnt
-            window_cumsum = cumsum
-        else:
-            if np.isnan(arr[i - window]):
-                nancnt = nancnt - 1
-            else:
-                cumsum = cumsum - arr[i - window]
-            window_len = window - nancnt
-            window_cumsum = cumsum
-        if window_len < minp:
-            out[i] = np.nan
-        else:
-            out[i] = window_cumsum / window_len
-    return out
-
-
-@register_chunkable(
-    size=ch.ArraySizer(arg_query='arr', axis=1),
-    arg_take_spec=dict(
-        arr=ch.ArraySlicer(axis=1),
-        window=None,
-        minp=None
-    ),
-    merge_func=base_ch.column_stack
-)
-@register_jitted(cache=True, tags={'can_parallel'})
-def rolling_mean_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None) -> tp.Array2d:
-    """2-dim version of `rolling_mean_1d_nb`."""
-    out = np.empty_like(arr, dtype=np.float_)
-    for col in prange(arr.shape[1]):
-        out[:, col] = rolling_mean_1d_nb(arr[:, col], window, minp=minp)
-    return out
-
-
-@register_jitted(cache=True)
-def rolling_std_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None, ddof: int = 0) -> tp.Array1d:
-    """Compute rolling standard deviation.
-
-    Numba equivalent to `pd.Series(arr).rolling(window, min_periods=minp).std(ddof=ddof)`."""
-    if minp is None:
-        minp = window
-    if minp > window:
-        raise ValueError("minp must be <= window")
-    out = np.empty_like(arr, dtype=np.float_)
-    cumsum = 0
-    cumsum_sq = 0
-    nancnt = 0
-    for i in range(arr.shape[0]):
-        if np.isnan(arr[i]):
-            nancnt = nancnt + 1
-        else:
-            cumsum = cumsum + arr[i]
-            cumsum_sq = cumsum_sq + arr[i] ** 2
-        if i < window:
-            window_len = i + 1 - nancnt
-        else:
-            if np.isnan(arr[i - window]):
-                nancnt = nancnt - 1
-            else:
-                cumsum = cumsum - arr[i - window]
-                cumsum_sq = cumsum_sq - arr[i - window] ** 2
-            window_len = window - nancnt
-        if window_len < minp or window_len == ddof:
-            out[i] = np.nan
-        else:
-            mean = cumsum / window_len
-            out[i] = np.sqrt(np.abs(cumsum_sq - 2 * cumsum * mean + window_len * mean ** 2) / (window_len - ddof))
-    return out
-
-
-@register_chunkable(
-    size=ch.ArraySizer(arg_query='arr', axis=1),
-    arg_take_spec=dict(
-        arr=ch.ArraySlicer(axis=1),
-        window=None,
-        minp=None,
-        ddof=None
-    ),
-    merge_func=base_ch.column_stack
-)
-@register_jitted(cache=True, tags={'can_parallel'})
-def rolling_std_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None, ddof: int = 0) -> tp.Array2d:
-    """2-dim version of `rolling_std_1d_nb`."""
-    out = np.empty_like(arr, dtype=np.float_)
-    for col in prange(arr.shape[1]):
-        out[:, col] = rolling_std_1d_nb(arr[:, col], window, minp=minp, ddof=ddof)
-    return out
-
-
-@register_jitted(cache=True)
-def wm_mean_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None) -> tp.Array1d:
-    """Compute weighted moving average."""
-    if minp is None:
-        minp = window
-    if minp > window:
-        raise ValueError("minp must be <= window")
-    out = np.empty_like(arr, dtype=np.float_)
-    cumsum = 0
-    wcumsum = 0
-    nancnt = 0
-    for i in range(arr.shape[0]):
-        if i >= window and not np.isnan(arr[i - window]):
-            wcumsum = wcumsum - cumsum
-        if np.isnan(arr[i]):
-            nancnt = nancnt + 1
-        else:
-            cumsum = cumsum + arr[i]
-        if i < window:
-            window_len = i + 1 - nancnt
-        else:
-            if np.isnan(arr[i - window]):
-                nancnt = nancnt - 1
-            else:
-                cumsum = cumsum - arr[i - window]
-            window_len = window - nancnt
-        if not np.isnan(arr[i]):
-            wcumsum = wcumsum + arr[i] * window_len
-        if window_len < minp:
-            out[i] = np.nan
-        else:
-            out[i] = wcumsum * 2 / (window_len + 1) / window_len
-    return out
-
-
-@register_chunkable(
-    size=ch.ArraySizer(arg_query='arr', axis=1),
-    arg_take_spec=dict(
-        arr=ch.ArraySlicer(axis=1),
-        window=None,
-        minp=None
-    ),
-    merge_func=base_ch.column_stack
-)
-@register_jitted(cache=True, tags={'can_parallel'})
-def wm_mean_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None) -> tp.Array2d:
-    """2-dim version of `wm_mean_1d_nb`."""
-    out = np.empty_like(arr, dtype=np.float_)
-    for col in prange(arr.shape[1]):
-        out[:, col] = wm_mean_1d_nb(arr[:, col], window, minp=minp)
-    return out
-
-
-@register_jitted(cache=True)
-def ewm_mean_1d_nb(arr: tp.Array1d, span: int, minp: tp.Optional[int] = None, adjust: bool = False) -> tp.Array1d:
-    """Compute exponential weighted moving average.
-
-    Numba equivalent to `pd.Series(arr).ewm(span=span, min_periods=minp, adjust=adjust).mean()`.
-
-    Adaptation of `pd._libs.window.aggregations.window_aggregations.ewma` with default arguments."""
-    if minp is None:
-        minp = span
-    if minp > span:
-        raise ValueError("minp must be <= span")
-    N = len(arr)
-    out = np.empty(N, dtype=np.float_)
-    if N == 0:
-        return out
-    com = (span - 1) / 2.0
-    alpha = 1. / (1. + com)
-    old_wt_factor = 1. - alpha
-    new_wt = 1. if adjust else alpha
-    weighted_avg = arr[0]
-    is_observation = (weighted_avg == weighted_avg)
-    nobs = int(is_observation)
-    out[0] = weighted_avg if (nobs >= minp) else np.nan
-    old_wt = 1.
-
-    for i in range(1, N):
-        cur = arr[i]
-        is_observation = (cur == cur)
-        nobs += is_observation
-        if weighted_avg == weighted_avg:
-            old_wt *= old_wt_factor
-            if is_observation:
-                # avoid numerical errors on constant series
-                if weighted_avg != cur:
-                    weighted_avg = ((old_wt * weighted_avg) + (new_wt * cur)) / (old_wt + new_wt)
-                if adjust:
-                    old_wt += new_wt
-                else:
-                    old_wt = 1.
-        elif is_observation:
-            weighted_avg = cur
-        out[i] = weighted_avg if (nobs >= minp) else np.nan
-    return out
-
-
-@register_chunkable(
-    size=ch.ArraySizer(arg_query='arr', axis=1),
-    arg_take_spec=dict(
-        arr=ch.ArraySlicer(axis=1),
-        span=None,
-        minp=None,
-        adjust=None
-    ),
-    merge_func=base_ch.column_stack
-)
-@register_jitted(cache=True, tags={'can_parallel'})
-def ewm_mean_nb(arr: tp.Array2d, span: int, minp: tp.Optional[int] = None, adjust: bool = False) -> tp.Array2d:
-    """2-dim version of `ewm_mean_1d_nb`."""
-    out = np.empty_like(arr, dtype=np.float_)
-    for col in prange(arr.shape[1]):
-        out[:, col] = ewm_mean_1d_nb(arr[:, col], span, minp=minp, adjust=adjust)
-    return out
-
-
-@register_jitted(cache=True)
-def wwm_mean_1d_nb(arr: tp.Array1d, period: int, minp: tp.Optional[int] = None) -> tp.Array1d:
-    """Compute Wilder's exponential weighted moving average."""
-    if minp is None:
-        minp = period
-    return ewm_mean_1d_nb(arr, 2 * period - 1, minp=minp, adjust=False)
-
-
-@register_chunkable(
-    size=ch.ArraySizer(arg_query='arr', axis=1),
-    arg_take_spec=dict(
-        arr=ch.ArraySlicer(axis=1),
-        period=None,
-        minp=None
-    ),
-    merge_func=base_ch.column_stack
-)
-@register_jitted(cache=True, tags={'can_parallel'})
-def wwm_mean_nb(arr: tp.Array2d, period: int, minp: tp.Optional[int] = None) -> tp.Array2d:
-    """2-dim version of `wwm_mean_1d_nb`."""
-    out = np.empty_like(arr, dtype=np.float_)
-    for col in prange(arr.shape[1]):
-        out[:, col] = wwm_mean_1d_nb(arr[:, col], period, minp=minp)
-    return out
-
-
-@register_jitted(cache=True)
-def wwm_std_1d_nb(arr: tp.Array1d, period: int, minp: tp.Optional[int] = None) -> tp.Array1d:
-    """Compute Wilder's exponential weighted moving standard deviation."""
-    if minp is None:
-        minp = period
-    return ewm_std_1d_nb(arr, 2 * period - 1, minp=minp, adjust=False)
-
-
-@register_chunkable(
-    size=ch.ArraySizer(arg_query='arr', axis=1),
-    arg_take_spec=dict(
-        arr=ch.ArraySlicer(axis=1),
-        period=None,
-        minp=None
-    ),
-    merge_func=base_ch.column_stack
-)
-@register_jitted(cache=True, tags={'can_parallel'})
-def wwm_std_nb(arr: tp.Array2d, period: int, minp: tp.Optional[int] = None) -> tp.Array2d:
-    """2-dim version of `wwm_std_1d_nb`."""
-    out = np.empty_like(arr, dtype=np.float_)
-    for col in prange(arr.shape[1]):
-        out[:, col] = wwm_std_1d_nb(arr[:, col], period, minp=minp)
-    return out
-
-
-@register_jitted(cache=True)
-def ewm_std_1d_nb(arr: tp.Array1d, span: int, minp: tp.Optional[int] = None, adjust: bool = False) -> tp.Array1d:
-    """Compute exponential weighted moving standard deviation.
-
-    Numba equivalent to `pd.Series(arr).ewm(span=span, min_periods=minp).std()`.
-
-    Adaptation of `pd._libs.window.aggregations.window_aggregations.ewmcov` with default arguments."""
-    if minp is None:
-        minp = span
-    if minp > span:
-        raise ValueError("minp must be <= span")
-    N = len(arr)
-    out = np.empty(N, dtype=np.float_)
-    if N == 0:
-        return out
-    com = (span - 1) / 2.0
-    alpha = 1. / (1. + com)
-    old_wt_factor = 1. - alpha
-    new_wt = 1. if adjust else alpha
-    mean_x = arr[0]
-    mean_y = arr[0]
-    is_observation = ((mean_x == mean_x) and (mean_y == mean_y))
-    nobs = int(is_observation)
-    if not is_observation:
-        mean_x = np.nan
-        mean_y = np.nan
-    out[0] = np.nan
-    cov = 0.
-    sum_wt = 1.
-    sum_wt2 = 1.
-    old_wt = 1.
-
-    for i in range(1, N):
-        cur_x = arr[i]
-        cur_y = arr[i]
-        is_observation = ((cur_x == cur_x) and (cur_y == cur_y))
-        nobs += is_observation
-        if mean_x == mean_x:
-            sum_wt *= old_wt_factor
-            sum_wt2 *= (old_wt_factor * old_wt_factor)
-            old_wt *= old_wt_factor
-            if is_observation:
-                old_mean_x = mean_x
-                old_mean_y = mean_y
-
-                # avoid numerical errors on constant series
-                if mean_x != cur_x:
-                    mean_x = ((old_wt * old_mean_x) +
-                              (new_wt * cur_x)) / (old_wt + new_wt)
-
-                # avoid numerical errors on constant series
-                if mean_y != cur_y:
-                    mean_y = ((old_wt * old_mean_y) +
-                              (new_wt * cur_y)) / (old_wt + new_wt)
-                cov = ((old_wt * (cov + ((old_mean_x - mean_x) *
-                                         (old_mean_y - mean_y)))) +
-                       (new_wt * ((cur_x - mean_x) *
-                                  (cur_y - mean_y)))) / (old_wt + new_wt)
-                sum_wt += new_wt
-                sum_wt2 += (new_wt * new_wt)
-                old_wt += new_wt
-                if not adjust:
-                    sum_wt /= old_wt
-                    sum_wt2 /= (old_wt * old_wt)
-                    old_wt = 1.
-        elif is_observation:
-            mean_x = cur_x
-            mean_y = cur_y
-
-        if nobs >= minp:
-            numerator = sum_wt * sum_wt
-            denominator = numerator - sum_wt2
-            if denominator > 0.:
-                out[i] = ((numerator / denominator) * cov)
-            else:
-                out[i] = np.nan
-        else:
-            out[i] = np.nan
-    return np.sqrt(out)
-
-
-@register_chunkable(
-    size=ch.ArraySizer(arg_query='arr', axis=1),
-    arg_take_spec=dict(
-        arr=ch.ArraySlicer(axis=1),
-        span=None,
-        minp=None,
-        adjust=None,
-        ddof=None
-    ),
-    merge_func=base_ch.column_stack
-)
-@register_jitted(cache=True, tags={'can_parallel'})
-def ewm_std_nb(arr: tp.Array2d, span: int, minp: tp.Optional[int] = None, adjust: bool = False) -> tp.Array2d:
-    """2-dim version of `ewm_std_1d_nb`."""
-    out = np.empty_like(arr, dtype=np.float_)
-    for col in prange(arr.shape[1]):
-        out[:, col] = ewm_std_1d_nb(arr[:, col], span, minp=minp, adjust=adjust)
-    return out
-
-
-@register_jitted(cache=True)
-def rolling_cov_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d,
-                      window: int, minp: tp.Optional[int] = None, ddof: int = 0) -> tp.Array1d:
-    """Compute rolling covariance.
-
-    Numba equivalent to `pd.Series(arr1).rolling(window, min_periods=minp).cov(arr2)`."""
-    if minp is None:
-        minp = window
-    if minp > window:
-        raise ValueError("minp must be <= window")
-    out = np.empty_like(arr1, dtype=np.float_)
-    cumsum1 = 0
-    cumsum2 = 0
-    cumsum_prod = 0
-    nancnt = 0
-    for i in range(arr1.shape[0]):
-        if np.isnan(arr1[i]) or np.isnan(arr2[i]):
-            nancnt = nancnt + 1
-        else:
-            cumsum1 = cumsum1 + arr1[i]
-            cumsum2 = cumsum2 + arr2[i]
-            cumsum_prod = cumsum_prod + arr1[i] * arr2[i]
-        if i < window:
-            window_len = i + 1 - nancnt
-        else:
-            if np.isnan(arr1[i - window]) or np.isnan(arr2[i - window]):
-                nancnt = nancnt - 1
-            else:
-                cumsum1 = cumsum1 - arr1[i - window]
-                cumsum2 = cumsum2 - arr2[i - window]
-                cumsum_prod = cumsum_prod - arr1[i - window] * arr2[i - window]
-            window_len = window - nancnt
-        if window_len < minp or window_len == ddof:
-            out[i] = np.nan
-        else:
-            window_prod_mean = cumsum_prod / (window_len - ddof)
-            window_mean1 = cumsum1 / window_len
-            window_mean2 = cumsum2 / window_len
-            window_mean_prod = window_mean1 * window_mean2 * window_len / (window_len - ddof)
-            out[i] = window_prod_mean - window_mean_prod
-    return out
-
-
-@register_chunkable(
-    size=ch.ArraySizer(arg_query='arr1', axis=1),
-    arg_take_spec=dict(
-        arr1=ch.ArraySlicer(axis=1),
-        arr2=ch.ArraySlicer(axis=1),
-        window=None,
-        minp=None,
-        ddof=None
-    ),
-    merge_func=base_ch.column_stack
-)
-@register_jitted(cache=True, tags={'can_parallel'})
-def rolling_cov_nb(arr1: tp.Array2d, arr2: tp.Array2d, window: int,
-                   minp: tp.Optional[int] = None, ddof: int = 0) -> tp.Array2d:
-    """2-dim version of `rolling_cov_1d_nb`."""
-    out = np.empty_like(arr1, dtype=np.float_)
-    for col in prange(arr1.shape[1]):
-        out[:, col] = rolling_cov_1d_nb(arr1[:, col], arr2[:, col], window, minp=minp, ddof=ddof)
-    return out
-
-
-@register_jitted(cache=True)
-def rolling_corr_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d,
-                       window: int, minp: tp.Optional[int] = None) -> tp.Array1d:
-    """Compute rolling correlation coefficient.
-
-    Numba equivalent to `pd.Series(arr1).rolling(window, min_periods=minp).corr(arr2)`."""
-    if minp is None:
-        minp = window
-    if minp > window:
-        raise ValueError("minp must be <= window")
-    out = np.empty_like(arr1, dtype=np.float_)
-    cumsum1 = 0
-    cumsum2 = 0
-    cumsum_sq1 = 0
-    cumsum_sq2 = 0
-    cumsum_prod = 0
-    nancnt = 0
-    for i in range(arr1.shape[0]):
-        if np.isnan(arr1[i]) or np.isnan(arr2[i]):
-            nancnt = nancnt + 1
-        else:
-            cumsum1 = cumsum1 + arr1[i]
-            cumsum2 = cumsum2 + arr2[i]
-            cumsum_sq1 = cumsum_sq1 + arr1[i] ** 2
-            cumsum_sq2 = cumsum_sq2 + arr2[i] ** 2
-            cumsum_prod = cumsum_prod + arr1[i] * arr2[i]
-        if i < window:
-            window_len = i + 1 - nancnt
-        else:
-            if np.isnan(arr1[i - window]) or np.isnan(arr2[i - window]):
-                nancnt = nancnt - 1
-            else:
-                cumsum1 = cumsum1 - arr1[i - window]
-                cumsum2 = cumsum2 - arr2[i - window]
-                cumsum_sq1 = cumsum_sq1 - arr1[i - window] ** 2
-                cumsum_sq2 = cumsum_sq2 - arr2[i - window] ** 2
-                cumsum_prod = cumsum_prod - arr1[i - window] * arr2[i - window]
-            window_len = window - nancnt
-        if window_len < minp:
-            out[i] = np.nan
-        else:
-            nom = window_len * cumsum_prod - cumsum1 * cumsum2
-            denom1 = np.sqrt(window_len * cumsum_sq1 - cumsum1 ** 2)
-            denom2 = np.sqrt(window_len * cumsum_sq2 - cumsum2 ** 2)
-            denom = denom1 * denom2
-            if denom == 0:
-                out[i] = np.nan
-            else:
-                out[i] = nom / denom
-    return out
-
-
-@register_chunkable(
-    size=ch.ArraySizer(arg_query='arr1', axis=1),
-    arg_take_spec=dict(
-        arr1=ch.ArraySlicer(axis=1),
-        arr2=ch.ArraySlicer(axis=1),
-        window=None,
-        minp=None
-    ),
-    merge_func=base_ch.column_stack
-)
-@register_jitted(cache=True, tags={'can_parallel'})
-def rolling_corr_nb(arr1: tp.Array2d, arr2: tp.Array2d, window: int,
-                    minp: tp.Optional[int] = None) -> tp.Array2d:
-    """2-dim version of `rolling_corr_1d_nb`."""
-    out = np.empty_like(arr1, dtype=np.float_)
-    for col in prange(arr1.shape[1]):
-        out[:, col] = rolling_corr_1d_nb(arr1[:, col], arr2[:, col], window, minp=minp)
-    return out
-
-
-@register_jitted(cache=True)
-def rolling_rank_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int], pct: bool = False) -> tp.Array1d:
-    """Rolling version of `rank_1d_nb`."""
-    if minp is None:
-        minp = window
-    out = np.empty_like(arr, dtype=np.float_)
-    nancnt = 0
-    for i in range(arr.shape[0]):
-        if np.isnan(arr[i]):
-            nancnt = nancnt + 1
-        if i < window:
-            valid_cnt = i + 1 - nancnt
-        else:
-            if np.isnan(arr[i - window]):
-                nancnt = nancnt - 1
-            valid_cnt = window - nancnt
-        if valid_cnt < minp:
-            out[i] = np.nan
-        else:
-            from_i = max(0, i + 1 - window)
-            to_i = i + 1
-            window_a = arr[from_i:to_i]
-            out[i] = rank_1d_nb(window_a, pct=pct)[-1]
-    return out
-
-
-@register_chunkable(
-    size=ch.ArraySizer(arg_query='arr', axis=1),
-    arg_take_spec=dict(
-        arr=ch.ArraySlicer(axis=1),
-        window=None,
-        minp=None,
-        pct=None
-    ),
-    merge_func=base_ch.column_stack
-)
-@register_jitted(cache=True, tags={'can_parallel'})
-def rolling_rank_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None, pct: bool = False) -> tp.Array2d:
-    """2-dim version of `rolling_rank_1d_nb`."""
-    out = np.empty_like(arr, dtype=np.float_)
-    for col in prange(arr.shape[1]):
-        out[:, col] = rolling_rank_1d_nb(arr[:, col], window, minp=minp, pct=pct)
     return out
 
 
