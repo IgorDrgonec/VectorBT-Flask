@@ -2537,11 +2537,13 @@ class TestFactory:
     def test_from_expr(self):
         I = vbt.IndicatorFactory.from_expr("RollMean: rolling_mean(@in_ts, @p_window)", window=2)
         assert I.__name__ == "RollMean"
+        assert I.short_name == 'rollmean'
         assert I.input_names == ('ts',)
         assert I.param_names == ('window',)
         pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
         I = vbt.IndicatorFactory.from_expr("RollMean:rolling_mean(@in_ts, @p_window)", window=2)
         assert I.__name__ == "RollMean"
+        assert I.short_name == 'rollmean'
         assert I.input_names == ('ts',)
         assert I.param_names == ('window',)
         pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
@@ -2550,6 +2552,13 @@ class TestFactory:
         rolling_mean(@in_ts, @p_window)
         """, window=2)
         assert I.__name__ == "RollMean"
+        assert I.short_name == 'rollmean'
+        assert I.input_names == ('ts',)
+        assert I.param_names == ('window',)
+        pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
+        I = vbt.IndicatorFactory.from_expr("RollMean[rm]: rolling_mean(@in_ts, @p_window)", window=2)
+        assert I.__name__ == "RollMean"
+        assert I.short_name == 'rm'
         assert I.input_names == ('ts',)
         assert I.param_names == ('window',)
         pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))

@@ -3226,8 +3226,9 @@ Args:
         `vectorbtpro.indicators.expr.expr_res_func_config`, they are automatically added to `input_names`.
         Set `magnet_inputs` to an empty list to disable this logic.
 
-        If the expression begins with a valid variable name and a color (`:`), the variable name
-        will be used as the name of the generated class.
+        If the expression begins with a valid variable name and a colon (`:`), the variable name
+        will be used as the name of the generated class. Provide another variable in the square brackets
+        after this one and before the colon to specify the indicator's short name.
 
         If `parse_annotations` is True, variables that start with `@` have a special meaning:
 
@@ -3340,9 +3341,11 @@ Args:
             )
 
             # Parse the class name
-            match = re.match(r"^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*", expr)
+            match = re.match(r"^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*(?:\[([a-zA-Z_][a-zA-Z0-9_]*)\])?\s*:\s*", expr)
             if match:
                 settings['factory_kwargs']['class_name'] = match.group(1)
+                if match.group(2):
+                    settings['factory_kwargs']['short_name'] = match.group(2)
                 expr = expr[len(match.group(0)):]
 
             # Parse the settings dictionary
