@@ -49,6 +49,8 @@ __all__ = [
     'AdjustSLContext',
     'AdjustTPContext',
     'SignalContext',
+    'FSInOutputs',
+    'FOInOutputs',
     'order_dt',
     'trade_dt',
     'log_dt'
@@ -1856,6 +1858,24 @@ Has range `[0, target_shape[1])` and is always within `[from_col, to_col)`."""
 __pdoc__['AdjustSLContext.position_now'] = "Latest position."
 __pdoc__['AdjustSLContext.val_price_now'] = "Latest valuation price."
 __pdoc__['AdjustSLContext.flex_2d'] = "See `vectorbtpro.base.indexing.flex_select_auto_nb`."
+
+
+# ############# In-outputs ############# #
+
+class FSInOutputs(tp.NamedTuple):
+    returns_pcgs: tp.Optional[tp.Array2d]
+
+
+__pdoc__['FSInOutputs'] = "A named tuple representing the in-outputs for simulation based on signals."
+__pdoc__['FSInOutputs.returns_pcgs'] = """Returns."""
+
+
+class FOInOutputs(tp.NamedTuple):
+    returns_pcgs: tp.Optional[tp.Array2d]
+
+
+__pdoc__['FOInOutputs'] = "A named tuple representing the in-outputs for simulation based on orders."
+__pdoc__['FOInOutputs.returns_pcgs'] = """Returns."""
 
 # ############# Records ############# #
 

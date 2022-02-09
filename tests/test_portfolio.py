@@ -1870,6 +1870,34 @@ class TestFromOrders:
             ], dtype=order_dt)
         )
 
+    @pytest.mark.parametrize("test_group_by", [False, np.array([0, 0, 1])])
+    @pytest.mark.parametrize("test_cash_sharing", [False, True])
+    def test_fill_returns(self, test_group_by, test_cash_sharing):
+        pd.testing.assert_frame_equal(
+            from_orders_both(
+                close=price_wide, fill_returns=True,
+                group_by=test_group_by, cash_sharing=test_cash_sharing).returns,
+            from_orders_both(
+                close=price_wide, fill_returns=False,
+                group_by=test_group_by, cash_sharing=test_cash_sharing).returns
+        )
+        pd.testing.assert_frame_equal(
+            from_orders_longonly(
+                close=price_wide, fill_returns=True,
+                group_by=test_group_by, cash_sharing=test_cash_sharing).returns,
+            from_orders_longonly(
+                close=price_wide, fill_returns=False,
+                group_by=test_group_by, cash_sharing=test_cash_sharing).returns
+        )
+        pd.testing.assert_frame_equal(
+            from_orders_shortonly(
+                close=price_wide, fill_returns=True,
+                group_by=test_group_by, cash_sharing=test_cash_sharing).returns,
+            from_orders_shortonly(
+                close=price_wide, fill_returns=False,
+                group_by=test_group_by, cash_sharing=test_cash_sharing).returns
+        )
+
 
 # ############# from_signals ############# #
 
@@ -3826,6 +3854,34 @@ class TestFromSignals:
             np.array([
                 (0, 0, 0, 100., 1., 0., 0), (1, 0, 2, 100., 1., 0., 0), (2, 0, 3, 400., 1., 0., 0)
             ], dtype=order_dt)
+        )
+
+    @pytest.mark.parametrize("test_group_by", [False, np.array([0, 0, 1])])
+    @pytest.mark.parametrize("test_cash_sharing", [False, True])
+    def test_fill_returns(self, test_group_by, test_cash_sharing):
+        pd.testing.assert_frame_equal(
+            from_signals_both(
+                close=price_wide, fill_returns=True,
+                group_by=test_group_by, cash_sharing=test_cash_sharing).returns,
+            from_signals_both(
+                close=price_wide, fill_returns=False,
+                group_by=test_group_by, cash_sharing=test_cash_sharing).returns
+        )
+        pd.testing.assert_frame_equal(
+            from_signals_longonly(
+                close=price_wide, fill_returns=True,
+                group_by=test_group_by, cash_sharing=test_cash_sharing).returns,
+            from_signals_longonly(
+                close=price_wide, fill_returns=False,
+                group_by=test_group_by, cash_sharing=test_cash_sharing).returns
+        )
+        pd.testing.assert_frame_equal(
+            from_signals_shortonly(
+                close=price_wide, fill_returns=True,
+                group_by=test_group_by, cash_sharing=test_cash_sharing).returns,
+            from_signals_shortonly(
+                close=price_wide, fill_returns=False,
+                group_by=test_group_by, cash_sharing=test_cash_sharing).returns
         )
 
 

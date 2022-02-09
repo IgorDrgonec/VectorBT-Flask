@@ -1012,6 +1012,7 @@ portfolio = dict(
     call_post_segment=False,
     ffill_val_price=True,
     update_value=False,
+    fill_returns=False,
     fill_pos_record=True,
     track_value=True,
     row_wise=False,

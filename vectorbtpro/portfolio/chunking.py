@@ -45,6 +45,9 @@ def in_outputs_merge_func(results: tp.List[SimulationOutput],
     using `vectorbtpro.records.chunking.merge_records`. Other objects will throw an error."""
     in_outputs = dict()
     for k, v in results[0].in_outputs._asdict().items():
+        if v is None:
+            in_outputs[k] = None
+            continue
         if not isinstance(v, np.ndarray):
             raise TypeError(f"Cannot merge in-output object '{k}' of type {type(v)}")
         if v.ndim == 2:

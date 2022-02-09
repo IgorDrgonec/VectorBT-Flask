@@ -8,6 +8,7 @@ from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.portfolio import chunking as portfolio_ch
 from vectorbtpro.portfolio.nb.core import *
 from vectorbtpro.registries.ch_registry import register_chunkable
+from vectorbtpro.returns.nb import get_return_nb
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.array_ import insert_argsort_nb
 
@@ -47,6 +48,7 @@ from vectorbtpro.utils.array_ import insert_argsort_nb
         auto_call_seq=None,
         ffill_val_price=None,
         update_value=None,
+        fill_returns=None,
         max_orders=None,
         max_logs=None,
         flex_2d=None
@@ -86,6 +88,7 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
                             auto_call_seq: bool = False,
                             ffill_val_price: bool = True,
                             update_value: bool = False,
+                            fill_returns: bool = False,
                             max_orders: tp.Optional[int] = None,
                             max_logs: tp.Optional[int] = 0,
                             flex_2d: bool = True) -> SimulationOutput:
@@ -132,10 +135,14 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
     order_records, log_records = prepare_records_nb(target_shape, max_orders, max_logs)
     last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash)
     last_position = prepare_last_position_nb(target_shape, init_position)
+    last_value = prepare_last_value_nb(target_shape, group_lens, cash_sharing, init_cash, init_position)
 
+    last_cash_deposits = np.full_like(last_cash, 0.)
     last_val_price = np.full_like(last_position, np.nan)
     last_debt = np.full(target_shape[1], 0., dtype=np.float_)
     temp_order_value = np.empty(target_shape[1], dtype=np.float_)
+    prev_close_value = last_value.copy()
+    last_return = np.full_like(last_cash, np.nan)
     last_oidx = np.full(target_shape[1], -1, dtype=np.int_)
     last_lidx = np.full(target_shape[1], -1, dtype=np.int_)
     track_cash_earnings = np.any(cash_earnings) or np.any(cash_dividends)
@@ -143,6 +150,12 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
         cash_earnings_out = np.full(target_shape, 0., dtype=np.float_)
     else:
         cash_earnings_out = np.full((1, 1), 0., dtype=np.float_)
+
+    if fill_returns:
+        returns_pcgs = np.empty((target_shape[0], len(group_lens)), dtype=np.float_)
+    else:
+        returns_pcgs = None
+    in_outputs = FSInOutputs(returns_pcgs=returns_pcgs)
 
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
@@ -293,14 +306,13 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
                 if not np.isnan(val_price_now) or not ffill_val_price:
                     last_val_price[col] = val_price_now
 
-            # Update valuation price using current close
+            group_value = cash_now
             for col in range(from_col, to_col):
+                # Update valuation price using current close
                 _close = flex_select_auto_nb(close, i, col, flex_2d)
                 if not np.isnan(_close) or not ffill_val_price:
                     last_val_price[col] = _close
 
-            # Add earnings in cash
-            for col in range(from_col, to_col):
                 _cash_earnings = flex_select_auto_nb(cash_earnings, i, col, flex_2d)
                 _cash_dividends = flex_select_auto_nb(cash_dividends, i, col, flex_2d)
                 _cash_earnings += _cash_dividends * last_position[col]
@@ -309,6 +321,32 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
                 if track_cash_earnings:
                     cash_earnings_out[i, col] += _cash_earnings
 
+                # Update previous value, current value, and return
+                if fill_returns:
+                    if cash_sharing:
+                        if last_position[col] != 0:
+                            group_value += last_position[col] * last_val_price[col]
+                    else:
+                        if last_position[col] == 0:
+                            last_value[col] = cash_now
+                        else:
+                            last_value[col] = cash_now + last_position[col] * last_val_price[col]
+                        last_return[col] = get_return_nb(
+                            prev_close_value[col],
+                            last_value[col] - last_cash_deposits[col]
+                        )
+                        prev_close_value[col] = last_value[col]
+                        in_outputs.returns_pcgs[i, group] = last_return[col]
+
+            if fill_returns and cash_sharing:
+                last_value[group] = group_value
+                last_return[group] = get_return_nb(
+                    prev_close_value[group],
+                    last_value[group] - last_cash_deposits[group]
+                )
+                prev_close_value[group] = last_value[group]
+                in_outputs.returns_pcgs[i, group] = last_return[group]
+
     return prepare_simout_nb(
         order_records=order_records,
         last_oidx=last_oidx,
@@ -316,5 +354,5 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
         last_lidx=last_lidx,
         cash_earnings=cash_earnings_out,
         call_seq=call_seq,
-        in_outputs=None
+        in_outputs=in_outputs
     )

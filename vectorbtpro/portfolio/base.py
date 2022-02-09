@@ -2543,6 +2543,7 @@ class Portfolio(Analyzable):
                     attach_call_seq: tp.Optional[bool] = None,
                     ffill_val_price: tp.Optional[bool] = None,
                     update_value: tp.Optional[bool] = None,
+                    fill_returns: tp.Optional[bool] = None,
                     max_orders: tp.Optional[int] = None,
                     max_logs: tp.Optional[int] = None,
                     seed: tp.Optional[int] = None,
@@ -2707,6 +2708,9 @@ class Portfolio(Analyzable):
 
                 Otherwise, unknown `close` will lead to NaN in valuation price at the next timestamp.
             update_value (bool): Whether to update group value after each filled order.
+            fill_returns (bool): Whether to fill returns.
+
+                The array will be avaiable as `returns_pcgs` in in-outputs.
             max_orders (int): The max number of order records expected to be filled at each column.
                 Defaults to the number of rows in the broadcasted shape.
 
@@ -2988,6 +2992,8 @@ class Portfolio(Analyzable):
             ffill_val_price = portfolio_cfg['ffill_val_price']
         if update_value is None:
             update_value = portfolio_cfg['update_value']
+        if fill_returns is None:
+            fill_returns = portfolio_cfg['fill_returns']
         if seed is None:
             seed = portfolio_cfg['seed']
         if seed is not None:
@@ -3136,6 +3142,7 @@ class Portfolio(Analyzable):
             auto_call_seq=auto_call_seq,
             ffill_val_price=ffill_val_price,
             update_value=update_value,
+            fill_returns=fill_returns,
             max_orders=max_orders,
             max_logs=max_logs,
             flex_2d=flex_2d
@@ -3215,6 +3222,7 @@ class Portfolio(Analyzable):
                      attach_call_seq: tp.Optional[bool] = None,
                      ffill_val_price: tp.Optional[bool] = None,
                      update_value: tp.Optional[bool] = None,
+                     fill_returns: tp.Optional[bool] = None,
                      max_orders: tp.Optional[int] = None,
                      max_logs: tp.Optional[int] = None,
                      seed: tp.Optional[int] = None,
@@ -3410,6 +3418,7 @@ class Portfolio(Analyzable):
             attach_call_seq (bool): See `Portfolio.from_orders`.
             ffill_val_price (bool): See `Portfolio.from_orders`.
             update_value (bool): See `Portfolio.from_orders`.
+            fill_returns (bool): See `Portfolio.from_orders`.
             max_orders (int): See `Portfolio.from_orders`.
             max_logs (int): See `Portfolio.from_orders`.
             seed (int): See `Portfolio.from_orders`.
@@ -4019,6 +4028,8 @@ class Portfolio(Analyzable):
             ffill_val_price = portfolio_cfg['ffill_val_price']
         if update_value is None:
             update_value = portfolio_cfg['update_value']
+        if fill_returns is None:
+            fill_returns = portfolio_cfg['fill_returns']
         if seed is None:
             seed = portfolio_cfg['seed']
         if seed is not None:
@@ -4237,6 +4248,7 @@ class Portfolio(Analyzable):
                 auto_call_seq=auto_call_seq,
                 ffill_val_price=ffill_val_price,
                 update_value=update_value,
+                fill_returns=fill_returns,
                 max_orders=max_orders,
                 max_logs=max_logs,
                 flex_2d=flex_2d,
@@ -4310,6 +4322,7 @@ class Portfolio(Analyzable):
             auto_call_seq=auto_call_seq,
             ffill_val_price=ffill_val_price,
             update_value=update_value,
+            fill_returns=fill_returns,
             max_orders=max_orders,
             max_logs=max_logs,
             flex_2d=flex_2d

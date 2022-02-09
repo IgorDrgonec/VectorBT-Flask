@@ -125,11 +125,13 @@ def attach_shortcut_properties(config: Config) -> tp.ClassWrapper:
 
                 if _use_in_outputs and self.use_in_outputs and self.in_outputs is not None:
                     try:
-                        return self.get_in_output(
+                        out = self.get_in_output(
                             _target_name,
                             wrap_kwargs=_wrap_kwargs,
                             wrap_func=_wrap_func
                         )
+                        if out is not None:
+                            return out
                     except AttributeError:
                         pass
 
