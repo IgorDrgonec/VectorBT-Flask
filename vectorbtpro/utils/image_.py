@@ -74,7 +74,7 @@ def save_animation(fname: str,
         delta = len(index) // 2
 
     with imageio.get_writer(fname, fps=fps, **writer_kwargs) as writer:
-        pbar = get_pbar(range(0, len(index) - delta, step), show_progress=show_progress, **pbar_kwargs)
+        pbar = get_pbar(range(0, len(index) - delta + 1, step), show_progress=show_progress, **pbar_kwargs)
         for i in pbar:
             pbar.set_description("{} - {}".format(str(index[i]), str(index[i + delta - 1])))
             fig = plot_func(index[i:i + delta], *args, **kwargs)
