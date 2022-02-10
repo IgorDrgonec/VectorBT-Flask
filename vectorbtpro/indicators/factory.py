@@ -1949,7 +1949,7 @@ Other keyword arguments are passed to `{0}.run`.
     def with_apply_func(self,
                         apply_func: tp.Callable,
                         cache_func: tp.Optional[tp.Callable] = None,
-                        apply_on_1d: bool = False,
+                        takes_1d: bool = False,
                         select_params: bool = True,
                         pass_packed: bool = False,
                         cache_pass_packed: tp.Optional[bool] = None,
@@ -1998,18 +1998,18 @@ Other keyword arguments are passed to `{0}.run`.
                 * Input arrays corresponding to `input_names`. Passed as a tuple if `pass_packed`, otherwise unpacked.
                     If `select_params` is True, each argument is a list composed of multiple arrays -
                     one per parameter combination. When `per_column` is True, each of those arrays
-                    corresponds to a column. Otherwise, they all refer to the same array. If `apply_on_1d`,
+                    corresponds to a column. Otherwise, they all refer to the same array. If `takes_1d`,
                     each array gets additionally split into multiple column arrays. Still passed
                     as a single array to the caching function.
                 * In-output arrays corresponding to `in_output_names`. Passed as a tuple if `pass_packed`, otherwise unpacked.
                     If `select_params` is True, each argument is a list composed of multiple arrays -
                     one per parameter combination. When `per_column` is True, each of those arrays
-                    corresponds to a column. If `apply_on_1d`, each array gets additionally split into
+                    corresponds to a column. If `takes_1d`, each array gets additionally split into
                     multiple column arrays. Still passed as a single array to the caching function.
                 * Parameters corresponding to `param_names`. Passed as a tuple if `pass_packed`, otherwise unpacked.
                     If `select_params` is True, each argument is a list composed of multiple values -
                     one per parameter combination.  When `per_column` is True, each of those values
-                    corresponds to a column. If `apply_on_1d`, each value gets additionally repeated by
+                    corresponds to a column. If `takes_1d`, each value gets additionally repeated by
                     the number of columns in the input arrays.
                 * Variable arguments if `var_args` is set to True
                 * `flex_2d` if `pass_flex_2d` is set to True and `flex_2d` not in `kwargs_as_args`
@@ -2030,7 +2030,7 @@ Other keyword arguments are passed to `{0}.run`.
                 All returned objects will be passed unpacked as last arguments to `apply_func`.
 
                 Can be Numba-compiled (but doesn't have to).
-            apply_on_1d (bool): Whether to split 2-dim arrays into multiple 1-dim arrays along the column axis.
+            takes_1d (bool): Whether to split 2-dim arrays into multiple 1-dim arrays along the column axis.
 
                 Gets applied on inputs and in-outputs, while parameters get repeated by the number of columns.
             select_params (bool): Whether to automatically select in-outputs and parameters.
@@ -2230,7 +2230,7 @@ Other keyword arguments are passed to `{0}.run`.
                     value = flex_2d
                 elif key == 'per_column':
                     value = per_column
-                elif key == 'apply_on_1d':
+                elif key == 'takes_1d':
                     value = per_column
                 else:
                     value = _kwargs.pop(key)  # important: remove from kwargs
@@ -2331,7 +2331,7 @@ Other keyword arguments are passed to `{0}.run`.
                     if _input.ndim == 2:
                         _inputs = []
                         for i in range(_input.shape[1]):
-                            if apply_on_1d:
+                            if takes_1d:
                                 if isinstance(_input, pd.DataFrame):
                                     _inputs.append(_input.iloc[:, i])
                                 else:
@@ -2350,7 +2350,7 @@ Other keyword arguments are passed to `{0}.run`.
                             _input = input[p]
                         else:
                             _input = input
-                        if apply_on_1d:
+                        if takes_1d:
                             if isinstance(_input, pd.DataFrame):
                                 for i in range(_input.shape[1]):
                                     _inputs.append(_input.iloc[:, i])
@@ -2377,14 +2377,14 @@ Other keyword arguments are passed to `{0}.run`.
                 _in_output_tuple += (_in_outputs,)
             _param_tuple = ()
             for params in param_tuple:
-                if apply_on_1d and not per_column:
+                if takes_1d and not per_column:
                     _params = [params[p] for p in range(len(params)) for i in range(n_cols)]
                 else:
                     _params = params
                 if jit_select_params:
                     _params = to_typed_list(_params)
                 _param_tuple += (_params,)
-            if apply_on_1d and not per_column:
+            if takes_1d and not per_column:
                 _n_params = n_params * n_cols
             else:
                 _n_params = n_params

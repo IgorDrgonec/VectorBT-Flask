@@ -545,7 +545,7 @@ class TestFactory:
             target
         )
 
-    def test_apply_on_1d(self):
+    def test_takes_1d(self):
         F = vbt.IndicatorFactory(
             input_names=['ts1', 'ts2'],
             param_names=['p1', 'p2'],
@@ -565,100 +565,100 @@ class TestFactory:
             return ts1 * p1, ts2 * p2
 
         pd.testing.assert_frame_equal(
-            F.with_apply_func(apply_func, apply_on_1d=True).run(
+            F.with_apply_func(apply_func, takes_1d=True).run(
                 ts, 0, [1, 2], 3, in_out1=4., in_out2=5.).out1,
-            F.with_apply_func(apply_func, apply_on_1d=False).run(
+            F.with_apply_func(apply_func, takes_1d=False).run(
                 ts, 0, [1, 2], 3, in_out1=4., in_out2=5.).out1
         )
         pd.testing.assert_frame_equal(
-            F.with_apply_func(apply_func, apply_on_1d=True).run(
+            F.with_apply_func(apply_func, takes_1d=True).run(
                 ts, 0, [1, 2], 3, in_out1=4., in_out2=5.).out2,
-            F.with_apply_func(apply_func, apply_on_1d=False).run(
+            F.with_apply_func(apply_func, takes_1d=False).run(
                 ts, 0, [1, 2], 3, in_out1=4., in_out2=5.).out2
         )
         pd.testing.assert_frame_equal(
-            F.with_apply_func(apply_func, apply_on_1d=True).run(
+            F.with_apply_func(apply_func, takes_1d=True).run(
                 ts, 0, [1, 2], 3, in_out1=4., in_out2=5.).in_out1,
-            F.with_apply_func(apply_func, apply_on_1d=False).run(
+            F.with_apply_func(apply_func, takes_1d=False).run(
                 ts, 0, [1, 2], 3, in_out1=4., in_out2=5.).in_out1
         )
         pd.testing.assert_frame_equal(
-            F.with_apply_func(apply_func, apply_on_1d=True).run(
+            F.with_apply_func(apply_func, takes_1d=True).run(
                 ts, 0, [1, 2], 3, in_out1=4., in_out2=5.).in_out2,
-            F.with_apply_func(apply_func, apply_on_1d=False).run(
+            F.with_apply_func(apply_func, takes_1d=False).run(
                 ts, 0, [1, 2], 3, in_out1=4., in_out2=5.).in_out2
         )
         pd.testing.assert_frame_equal(
-            F.with_apply_func(apply_func_nb, apply_on_1d=True).run(
+            F.with_apply_func(apply_func_nb, takes_1d=True).run(
                 ts, 0, [1, 2], 3, in_out1=4., in_out2=5.).out1,
-            F.with_apply_func(apply_func_nb, apply_on_1d=False).run(
+            F.with_apply_func(apply_func_nb, takes_1d=False).run(
                 ts, 0, [1, 2], 3, in_out1=4., in_out2=5.).out1
         )
         pd.testing.assert_frame_equal(
-            F.with_apply_func(apply_func_nb, apply_on_1d=True).run(
+            F.with_apply_func(apply_func_nb, takes_1d=True).run(
                 ts, 0, [1, 2], 3, in_out1=4., in_out2=5.).out2,
-            F.with_apply_func(apply_func_nb, apply_on_1d=False).run(
+            F.with_apply_func(apply_func_nb, takes_1d=False).run(
                 ts, 0, [1, 2], 3, in_out1=4., in_out2=5.).out2
         )
         pd.testing.assert_frame_equal(
-            F.with_apply_func(apply_func_nb, apply_on_1d=True).run(
+            F.with_apply_func(apply_func_nb, takes_1d=True).run(
                 ts, 0, [1, 2], 3, in_out1=4., in_out2=5.).in_out1,
-            F.with_apply_func(apply_func_nb, apply_on_1d=False).run(
+            F.with_apply_func(apply_func_nb, takes_1d=False).run(
                 ts, 0, [1, 2], 3, in_out1=4., in_out2=5.).in_out1
         )
         pd.testing.assert_frame_equal(
-            F.with_apply_func(apply_func_nb, apply_on_1d=True).run(
+            F.with_apply_func(apply_func_nb, takes_1d=True).run(
                 ts, 0, [1, 2], 3, in_out1=4., in_out2=5.).in_out2,
-            F.with_apply_func(apply_func_nb, apply_on_1d=False).run(
+            F.with_apply_func(apply_func_nb, takes_1d=False).run(
                 ts, 0, [1, 2], 3, in_out1=4., in_out2=5.).in_out2
         )
 
         pd.testing.assert_frame_equal(
-            F.with_apply_func(apply_func, apply_on_1d=True).run(
+            F.with_apply_func(apply_func, takes_1d=True).run(
                 ts, 0, [1, 2, 3], 3, in_out1=4., in_out2=5., per_column=True).out1,
-            F.with_apply_func(apply_func, apply_on_1d=False).run(
+            F.with_apply_func(apply_func, takes_1d=False).run(
                 ts, 0, [1, 2, 3], 3, in_out1=4., in_out2=5., per_column=True).out1
         )
         pd.testing.assert_frame_equal(
-            F.with_apply_func(apply_func, apply_on_1d=True).run(
+            F.with_apply_func(apply_func, takes_1d=True).run(
                 ts, 0, [1, 2, 3], 3, in_out1=4., in_out2=5., per_column=True).out2,
-            F.with_apply_func(apply_func, apply_on_1d=False).run(
+            F.with_apply_func(apply_func, takes_1d=False).run(
                 ts, 0, [1, 2, 3], 3, in_out1=4., in_out2=5., per_column=True).out2
         )
         pd.testing.assert_frame_equal(
-            F.with_apply_func(apply_func, apply_on_1d=True).run(
+            F.with_apply_func(apply_func, takes_1d=True).run(
                 ts, 0, [1, 2, 3], 3, in_out1=4., in_out2=5., per_column=True).in_out1,
-            F.with_apply_func(apply_func, apply_on_1d=False).run(
+            F.with_apply_func(apply_func, takes_1d=False).run(
                 ts, 0, [1, 2, 3], 3, in_out1=4., in_out2=5., per_column=True).in_out1
         )
         pd.testing.assert_frame_equal(
-            F.with_apply_func(apply_func, apply_on_1d=True).run(
+            F.with_apply_func(apply_func, takes_1d=True).run(
                 ts, 0, [1, 2, 3], 3, in_out1=4., in_out2=5., per_column=True).in_out2,
-            F.with_apply_func(apply_func, apply_on_1d=False).run(
+            F.with_apply_func(apply_func, takes_1d=False).run(
                 ts, 0, [1, 2, 3], 3, in_out1=4., in_out2=5., per_column=True).in_out2
         )
         pd.testing.assert_frame_equal(
-            F.with_apply_func(apply_func_nb, apply_on_1d=True).run(
+            F.with_apply_func(apply_func_nb, takes_1d=True).run(
                 ts, 0, [1, 2, 3], 3, in_out1=4., in_out2=5., per_column=True).out1,
-            F.with_apply_func(apply_func_nb, apply_on_1d=False).run(
+            F.with_apply_func(apply_func_nb, takes_1d=False).run(
                 ts, 0, [1, 2, 3], 3, in_out1=4., in_out2=5., per_column=True).out1
         )
         pd.testing.assert_frame_equal(
-            F.with_apply_func(apply_func_nb, apply_on_1d=True).run(
+            F.with_apply_func(apply_func_nb, takes_1d=True).run(
                 ts, 0, [1, 2, 3], 3, in_out1=4., in_out2=5., per_column=True).out2,
-            F.with_apply_func(apply_func_nb, apply_on_1d=False).run(
+            F.with_apply_func(apply_func_nb, takes_1d=False).run(
                 ts, 0, [1, 2, 3], 3, in_out1=4., in_out2=5., per_column=True).out2
         )
         pd.testing.assert_frame_equal(
-            F.with_apply_func(apply_func_nb, apply_on_1d=True).run(
+            F.with_apply_func(apply_func_nb, takes_1d=True).run(
                 ts, 0, [1, 2, 3], 3, in_out1=4., in_out2=5., per_column=True).in_out1,
-            F.with_apply_func(apply_func_nb, apply_on_1d=False).run(
+            F.with_apply_func(apply_func_nb, takes_1d=False).run(
                 ts, 0, [1, 2, 3], 3, in_out1=4., in_out2=5., per_column=True).in_out1
         )
         pd.testing.assert_frame_equal(
-            F.with_apply_func(apply_func_nb, apply_on_1d=True).run(
+            F.with_apply_func(apply_func_nb, takes_1d=True).run(
                 ts, 0, [1, 2, 3], 3, in_out1=4., in_out2=5., per_column=True).in_out2,
-            F.with_apply_func(apply_func_nb, apply_on_1d=False).run(
+            F.with_apply_func(apply_func_nb, takes_1d=False).run(
                 ts, 0, [1, 2, 3], 3, in_out1=4., in_out2=5., per_column=True).in_out2
         )
 
@@ -668,52 +668,52 @@ class TestFactory:
             return ts1 * p1, ts2 * p2
 
         pd.testing.assert_frame_equal(
-            F.with_apply_func(apply_func, apply_on_1d=True, keep_pd=True).run(
+            F.with_apply_func(apply_func, takes_1d=True, keep_pd=True).run(
                 ts, 0, [1, 2], 3, in_out1=4., in_out2=5.).out1,
-            F.with_apply_func(apply_func, apply_on_1d=False, keep_pd=True).run(
+            F.with_apply_func(apply_func, takes_1d=False, keep_pd=True).run(
                 ts, 0, [1, 2], 3, in_out1=4., in_out2=5.).out1
         )
         pd.testing.assert_frame_equal(
-            F.with_apply_func(apply_func, apply_on_1d=True, keep_pd=True).run(
+            F.with_apply_func(apply_func, takes_1d=True, keep_pd=True).run(
                 ts, 0, [1, 2], 3, in_out1=4., in_out2=5.).out2,
-            F.with_apply_func(apply_func, apply_on_1d=False, keep_pd=True).run(
+            F.with_apply_func(apply_func, takes_1d=False, keep_pd=True).run(
                 ts, 0, [1, 2], 3, in_out1=4., in_out2=5.).out2
         )
         pd.testing.assert_frame_equal(
-            F.with_apply_func(apply_func, apply_on_1d=True, keep_pd=True).run(
+            F.with_apply_func(apply_func, takes_1d=True, keep_pd=True).run(
                 ts, 0, [1, 2], 3, in_out1=4., in_out2=5.).in_out1,
-            F.with_apply_func(apply_func, apply_on_1d=False, keep_pd=True).run(
+            F.with_apply_func(apply_func, takes_1d=False, keep_pd=True).run(
                 ts, 0, [1, 2], 3, in_out1=4., in_out2=5.).in_out1
         )
         pd.testing.assert_frame_equal(
-            F.with_apply_func(apply_func, apply_on_1d=True, keep_pd=True).run(
+            F.with_apply_func(apply_func, takes_1d=True, keep_pd=True).run(
                 ts, 0, [1, 2], 3, in_out1=4., in_out2=5.).in_out2,
-            F.with_apply_func(apply_func, apply_on_1d=False, keep_pd=True).run(
+            F.with_apply_func(apply_func, takes_1d=False, keep_pd=True).run(
                 ts, 0, [1, 2], 3, in_out1=4., in_out2=5.).in_out2
         )
 
         pd.testing.assert_frame_equal(
-            F.with_apply_func(apply_func, apply_on_1d=True, keep_pd=True).run(
+            F.with_apply_func(apply_func, takes_1d=True, keep_pd=True).run(
                 ts, 0, [1, 2, 3], 3, in_out1=4., in_out2=5., per_column=True).out1,
-            F.with_apply_func(apply_func, apply_on_1d=False, keep_pd=True).run(
+            F.with_apply_func(apply_func, takes_1d=False, keep_pd=True).run(
                 ts, 0, [1, 2, 3], 3, in_out1=4., in_out2=5., per_column=True).out1
         )
         pd.testing.assert_frame_equal(
-            F.with_apply_func(apply_func, apply_on_1d=True, keep_pd=True).run(
+            F.with_apply_func(apply_func, takes_1d=True, keep_pd=True).run(
                 ts, 0, [1, 2, 3], 3, in_out1=4., in_out2=5., per_column=True).out2,
-            F.with_apply_func(apply_func, apply_on_1d=False, keep_pd=True).run(
+            F.with_apply_func(apply_func, takes_1d=False, keep_pd=True).run(
                 ts, 0, [1, 2, 3], 3, in_out1=4., in_out2=5., per_column=True).out2
         )
         pd.testing.assert_frame_equal(
-            F.with_apply_func(apply_func, apply_on_1d=True, keep_pd=True).run(
+            F.with_apply_func(apply_func, takes_1d=True, keep_pd=True).run(
                 ts, 0, [1, 2, 3], 3, in_out1=4., in_out2=5., per_column=True).in_out1,
-            F.with_apply_func(apply_func, apply_on_1d=False, keep_pd=True).run(
+            F.with_apply_func(apply_func, takes_1d=False, keep_pd=True).run(
                 ts, 0, [1, 2, 3], 3, in_out1=4., in_out2=5., per_column=True).in_out1
         )
         pd.testing.assert_frame_equal(
-            F.with_apply_func(apply_func, apply_on_1d=True, keep_pd=True).run(
+            F.with_apply_func(apply_func, takes_1d=True, keep_pd=True).run(
                 ts, 0, [1, 2, 3], 3, in_out1=4., in_out2=5., per_column=True).in_out2,
-            F.with_apply_func(apply_func, apply_on_1d=False, keep_pd=True).run(
+            F.with_apply_func(apply_func, takes_1d=False, keep_pd=True).run(
                 ts, 0, [1, 2, 3], 3, in_out1=4., in_out2=5., per_column=True).in_out2
         )
 
