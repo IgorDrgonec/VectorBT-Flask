@@ -1818,7 +1818,7 @@ def wwm_std_nb(arr: tp.Array2d, period: int, minp: tp.Optional[int] = None) -> t
 def rolling_cov_acc_nb(in_state: RollCovAIS) -> RollCovAOS:
     """Accumulator of `rolling_cov_1d_nb`.
 
-    Takes a state of type `vectorbtpro.generic.enums.RollCovIOS` and returns
+    Takes a state of type `vectorbtpro.generic.enums.RollCovAIS` and returns
     a state of type `vectorbtpro.generic.enums.RollCovAOS`."""
     i = in_state.i
     value1 = in_state.value1

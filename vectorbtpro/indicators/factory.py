@@ -2196,6 +2196,8 @@ Other keyword arguments are passed to `{0}.run`.
         if jit_select_params:
             select_params_func = njit(select_params_func, **resolve_dict(jit_kwargs))
 
+        setattr(Indicator, 'select_params_func', select_params_func)
+
         def custom_func(input_tuple: tp.Tuple[tp.AnyArray, ...],
                         in_output_tuple: tp.Tuple[tp.List[tp.AnyArray], ...],
                         param_tuple: tp.Tuple[tp.List[tp.Param], ...],
