@@ -6,7 +6,46 @@ title: Release notes
 
 All notable changes in reverse chronological order.
 
-## Version 1.0.9 (2 February, 2022)
+## Version 1.0.10 (11 Feb, 2022)
+
+- Moved the `per_column` logic from [run_pipeline](/api/indicators/factory/#vectorbtpro.indicators.factory.run_pipeline) 
+to the indicator function (`custom_func`). Previously, the indicator function received only one column 
+and parameter combination at a time, which created issues for caching. Now, the pipeline passes all 
+columns and parameter combinations, so it's the responsibility of the indicator function to distribute 
+the combinations properly (no worries, `apply_func` will handle it automatically).
+- Apply functions (`apply_func`) can run on one-dimensional input data just as well as on two-dimensional 
+input data by passing `takes_1d=True` to [IndicatorFactory.with_apply_func](/api/indicators/factory/#vectorbtpro.indicators.factory.IndicatorFactory.from_apply_func).
+This mode splits each input array (both Pandas and NumPy) into columns and builds a product of columns
+and parameter combinations. Benchmarks show that this has no real implications on performance +
+functions that process one column at a time are much easier to write.
+- `@talib` and `@talib_1d` annotations were merged into a single `@talib` annotations that 
+can handle both one and two-dimensional input data
+- Removed automatic module search when parsing indicator expressions, which degraded performance. It's now
+recommended to use multi-line expressions and `import` statements.
+- Renamed `kwargs_to_args` to `kwargs_as_args` in [IndicatorFactory.with_apply_func](/api/indicators/factory/#vectorbtpro.indicators.factory.IndicatorFactory.from_apply_func)
+- Refactored the [execute](/api/utils/execution/#vectorbtpro.utils.execution.execute) function to enable
+chunking in indicators
+- Fixed the calculation of crossovers. Previously, it ignored a crossover if there was another crossover
+one tick behind.
+- Greatly optimized stacking of output arrays with one column after running an indicator
+- Refactored the `as_attrs_` behavior in [Config](/api/utils/config/#vectorbtpro.utils.config.Config).
+Keys won't be attached to the config instance anymore but managed dynamically (= less side effects
+when pickling and unpickling).
+- Implemented a wide range of inputs states, output states, and accumulators for the use in 
+streaming functions, such as in [rolling_mean_1d_nb](/api/generic/nb/#vectorbtpro.generic.nb.rolling_mean_1d_nb)
+- Made flexible indexing with [flex_select_auto_nb](/api/base/indexing/#vectorbtpro.base.indexing.flex_select_auto_nb) 
+rotational. For example, if there is a smaller array with 3 columns and a bigger one with 6 columns,
+there is no need to tile the smaller array 2 times to match the bigger one - we can simply rotate 
+over the smaller array.
+- Added support for short names in indicator expressions
+- Returns can be pre-computed in both [Portfolio.from_orders](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_orders) 
+and [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_signals)
+by passing the `fill_returns=True` flag
+- Fixed [save_animation](/api/utils/image_/#vectorbtpro.utils.image_.save_animation), which previously
+produced one less iteration
+- Wrote [Superfast SuperTrend](/examples/superfast-supertrend) :notebook_with_decorative_cover:
+
+## Version 1.0.9 (2 Feb, 2022)
 
 - Upgraded the parser of indicator expressions:
     - Can evaluate the expression using [pandas.eval](https://pandas.pydata.org/docs/reference/api/pandas.eval.html)
@@ -38,7 +77,7 @@ in [Wrapping](/api/base/wrapping/#vectorbtpro.base.wrapping.Wrapping)
 - Greatly optimized [Data.concat](/api/data/base/#vectorbtpro.data.base.Data.concat)
 - Wrote [Indicators](/documentation/indicators) :notebook_with_decorative_cover:
 
-## Version 1.0.8 (25 January, 2022)
+## Version 1.0.8 (25 Jan, 2022)
 
 - Implemented the following Numba-compiled functions:
     - Ranking and rolling ranking (SP)
@@ -67,7 +106,7 @@ Most logic now resides in the sub-package [grouping](/api/base/grouping/). Also,
 - Fixed [Config.prettify](/api/utils/config/#vectorbtpro.utils.config.Config.prettify) for non-string keys
 - Wrote [Basic RSI strategy](/examples/basic-rsi-strategy) :notebook_with_decorative_cover:
 
-## Version 1.0.7 (16 January, 2021)
+## Version 1.0.7 (16 Jan, 2021)
 
 - Changed `np.int_` to `np.integer` when passed to `np.issubdtype`
 - Refactored auto-aligned initial cash to be based on free cash flows and cash deposits
@@ -82,27 +121,27 @@ is two-dimensional and has only one column
 which isn't tied to a strict group ordering and is easier to use outside of Numba
 - Wrote [Building blocks](/documentation/building-blocks) :notebook_with_decorative_cover:
 
-## Version 1.0.6 (9 January, 2022)
+## Version 1.0.6 (9 Jan, 2022)
 
 - Benchmark can be disabled by passing `bm_close=False` to 
 [Portfolio](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio)
 - Wrote [Fundamentals](/documentation/fundamentals) :notebook_with_decorative_cover:
 
-## Version 1.0.5 (8 January, 2022)
+## Version 1.0.5 (8 Jan, 2022)
 
 - Fixed [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_signals) 
 for `direction='both'` and `size_type='value'`. Previously, the position couldn't be properly reversed.
 - Avoid sorting paths in [LocalData](/api/data/custom/#vectorbtpro.data.custom.LocalData) 
 if they are passed as a sequence
 
-## Version 1.0.4 (6 January, 2022)
+## Version 1.0.4 (6 Jan, 2022)
 
 - Set benchmark easily and also globally (#32) by passing `bm_close` to 
 [Portfolio](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio).
 Works similarly to [Portfolio.close](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.close).
 - Shortened registry names (such as from `ca_registry` to `ca_reg`)
 
-## Version 1.0.3 (5 January, 2022)
+## Version 1.0.3 (5 Jan, 2022)
 
 - Automatic discovery of symbols for local data (#27): No more need to specify a path to each
 CSV/HDF file or HDF key. Passing a path to a directory will traverse each file in this directory.
@@ -132,7 +171,7 @@ to work with Numba 0.53.1. This requires the user to define `in_outputs` as a na
 to passing to the method.
 - Added mapping of `window` to `rolling_period` in the QuantStats adapter
 
-## Version 1.0.2 (31 December, 2021)
+## Version 1.0.2 (31 Dec, 2021)
 
 - Added Alpaca data source (#31). In contrast to the community version, additionally 
 allows passing a pre-configured REST object to the 
@@ -178,14 +217,14 @@ ArrayWrapper(
 )
 ```
 
-## Version 1.0.1 (21 December, 2021)
+## Version 1.0.1 (21 Dec, 2021)
 
 - Adapted the codebase to the new documentation format
 - Upgraded the documentation website generator from pdoc3 to MkDocs (Material Insiders). 
 API is being automatically converted to Markdown files by a modified version of pdoc3 that 
 resides in a private repository of @polakowo.
 
-## Version 1.0.0 (13 December, 2021)
+## Version 1.0.0 (13 Dec, 2021)
 
 !!! info
     This section briefly describes major changes made to the community version. For more details, see commits.

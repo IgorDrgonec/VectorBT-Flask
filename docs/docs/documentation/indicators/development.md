@@ -238,11 +238,6 @@ boundsind_upper     5    5
 
 1. The number of output columns matches the number of input columns
 
-!!! info
-    When `per_column` is False, `custom_func` receives the entire input and all parameter combinations. 
-    When `per_column` is True, each time series is split into columns and the entire `custom_func` 
-    is executed per column and parameter combination.
-
 ### Defaults
 
 Any argument passed to [IndicatorFactory.with_custom_func](/api/indicators/factory/#vectorbtpro.indicators.factory.IndicatorFactory.with_custom_func) 
@@ -621,6 +616,42 @@ a    float16
 b    float16
 dtype: object
 ```
+
+### One dim
+
+Not always we can (easily) adopt our indicator function to work on two-dimensional data. For instance, 
+to make use of a TA-Lib indicator in `apply_func`, we can pass to it only one column at a time. To instruct 
+[IndicatorFactory.with_apply_func](/api/indicators/factory/#vectorbtpro.indicators.factory.IndicatorFactory.with_apply_func)
+to split any input and in-output (Pandas or NumPy) array by column, we can use the `takes_1d` argument:
+
+```pycon
+>>> import talib
+
+>>> def apply_func_1d(close, timeperiod):
+...     return talib.SMA(close.astype(np.double), timeperiod)
+
+>>> SMA = vbt.IF(
+...     input_names=['ts'],
+...     param_names=['timeperiod'],
+...     output_names=['sma']
+... ).with_apply_func(apply_func_1d, takes_1d=True)
+
+>>> sma = SMA.run(ts, [3, 4])
+>>> sma.sma
+custom_timeperiod                   3         4
+                          a         b    a    b
+2020-01-01              NaN       NaN  NaN  NaN
+2020-01-02              NaN       NaN  NaN  NaN
+2020-01-03         4.000000  3.000000  NaN  NaN
+2020-01-04         3.000000  4.000000  3.5  3.5
+2020-01-05         2.666667  4.333333  3.0  4.0
+2020-01-06         3.000000  4.000000  3.0  4.0
+2020-01-07         4.000000  3.000000  3.5  3.5
+```
+
+!!! note
+    Not to be confused with `per_column`, which also splits by column but applies one parameter
+    combination on one column instead of all columns.
 
 ### Defaults
 
@@ -1431,6 +1462,81 @@ instead of single values
 outputs, they all must appear as separate arguments.
 
 We have cut down the processing time in half!
+
+### Per column
+
+What happens when the user passes `per_column=True` to apply each parameter combination per column?
+Internally, [IndicatorFactory.with_apply_func](/api/indicators/factory/#vectorbtpro.indicators.factory.IndicatorFactory.with_apply_func) 
+splits any input, in-output, and parameter array per column, and passes one element of each to `apply_func` 
+at a time. But the same splitting procedure cannot be performed for `cache_func` since we would
+suddenly get 1) a list of input arrays instead of a single array (if the caching function was Numba-compiled,
+this would yield an error since Numba doesn't allow the same argument with two different types), and 
+2) each input array in that list would be different, so keeping a single caching dict with parameter
+combinations as keys would be not enough. 
+
+To account for this edge case, vectorbt passes input and in-output arrays in their regular shape 
+(not split), but it also passes an argument `per_column` set to True, such that `cache_func` knows
+that each parameter corresponds to only one column in the input data. In the caching function, we can 
+then use this flag to decide what to do next. Usually, we just disable caching and calculate everything 
+directly in the apply function.
+
+```pycon
+>>> def cache_func(ts, w1, w2, per_column=False):
+...     if per_column:
+...         return None
+...     cache_dict = dict()
+...     for w in w1 + w2:
+...         if w not in cache_dict:
+...             cache_dict[w] = roll_mean_expensive_nb(ts, w)
+...     return cache_dict
+
+>>> def apply_func(ts, w1, w2, cache_dict=None):  # (1)!
+...     if cache_dict is None:
+...         roll_mean1 = roll_mean_expensive_nb(ts, w1)
+...         roll_mean2 = roll_mean_expensive_nb(ts, w2)
+...     else:
+...         roll_mean1 = cache_dict[w1]
+...         roll_mean2 = cache_dict[w2]
+...     return (roll_mean2 - roll_mean1) / roll_mean1
+...     
+
+>>> RelMADist = vbt.IF(
+...     class_name="RelMADist",
+...     input_names=['ts'],
+...     param_names=['w1', 'w2'],
+...     output_names=['out'],
+... ).with_apply_func(apply_func, cache_func=cache_func)
+
+>>> RelMADist.run(ts, 2, 3).out
+relmadist_w1                   2
+relmadist_w2                   3
+                     a         b
+2020-01-01         NaN       NaN
+2020-01-02         NaN       NaN
+2020-01-03   -0.200000  0.333333
+2020-01-04   -0.066667  0.111111
+2020-01-05    0.333333 -0.200000
+2020-01-06    0.111111 -0.066667
+2020-01-07   -0.200000  0.333333
+
+>>> RelMADist.run(ts, [2, 2], [3, 4], per_column=True).out
+relmadist_w1                   2
+relmadist_w2         3         4
+                     a         b
+2020-01-01         NaN       NaN
+2020-01-02         NaN       NaN
+2020-01-03   -0.200000       NaN
+2020-01-04   -0.066667  0.333333
+2020-01-05    0.333333 -0.200000
+2020-01-06    0.111111 -0.200000
+2020-01-07   -0.200000  0.333333
+```
+
+1. Make cache optional
+
+The design above is even better than the previous one because now cache is optional
+and any other function can call `apply_func` without being forced to do caching by itself.
+And it works in Numba too!
 
 ### Reusing cache
 

@@ -114,6 +114,11 @@ nav:
     - Release notes: getting-started/release-notes.md
   - Examples:
     - Basic RSI strategy: examples/basic-rsi-strategy.md
+    - Superfast SuperTrend:
+      - examples/superfast-supertrend/index.md
+      - Streaming: examples/superfast-supertrend/streaming.md
+      - Multithreading: examples/superfast-supertrend/multithreading.md
+      - Pipelines: examples/superfast-supertrend/pipelines.md
     - To be continued...: examples/to-be-continued.md
   - Documentation:
     - Fundamentals: documentation/fundamentals.md

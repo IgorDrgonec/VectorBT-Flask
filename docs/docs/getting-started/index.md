@@ -6,8 +6,6 @@ title: Getting started
 
 ![](/assets/logo/header.svg)
 
-Get a competitive advantage in trading — be among the first to try the cutting-edge software!
-
 vectorbt PRO (Beta) is the ultimate engine for backtesting, algorithmic trading, and research. 
 It's a high-performance superset of the [vectorbt](https://github.com/polakowo/vectorbt) 
 library, one of the world's most innovative open-source backtesting engines. 

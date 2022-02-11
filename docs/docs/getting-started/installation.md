@@ -19,12 +19,31 @@ your GitHub account in order to access the PRO repository programmatically
 
 1. Go to https://github.com/settings/tokens
 2. Click on [Generate a new token]
-3. Enter a name (such as "vectorbtpro") and select the [`repo`][scopes] scope
-4. Generate the token and save it in a safe place
+3. Enter a name (such as "vectorbtpro")
+4. Set the expiration to a fixed number of days
+5. Select the [`repo`][scopes] scope
+6. Generate the token and save it in a safe place
 
     [Personal Access Token]: https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token
     [Generate a new token]: https://github.com/settings/tokens/new
     [scopes]: https://docs.github.com/en/developers/apps/scopes-for-oauth-apps#available-scopes
+
+### TA-Lib
+
+To use TA-Lib for Python, you need to have the [TA-Lib](https://github.com/mrjbq7/ta-lib#dependencies) 
+already installed.
+
+To install the TA-Lib in Google Colab, run the following:
+
+```plaintext
+!wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
+!tar -xzvf ta-lib-0.4.0-src.tar.gz
+%cd ta-lib
+!./configure --prefix=/usr
+!make
+!make install
+!pip install Ta-Lib
+```
 
 ## With pip
 
@@ -36,7 +55,7 @@ Uninstall the community version if installed:
 pip uninstall vectorbt
 ```
 
-Install the base PRO version (this requires [TA-Lib](https://github.com/mrjbq7/ta-lib#dependencies) installed):
+Install the base PRO version:
 
 ```sh
 # if you're using Git/HTTPS authentication
@@ -79,11 +98,16 @@ Set your token using `%env`:
 %env GH_TOKEN=abcdef...
 ```
 
-Install vectorbt PRO in the next cell:
+!!! warning
+    Make sure to delete this cell when sharing the notebook with others!
+
+Install vectorbt PRO:
 
 ```plaintext
 !pip install -U "vectorbtpro[full] @ git+https://${GH_TOKEN}@github.com/polakowo/vectorbt.pro.git"
 ```
+
+Restart the runtime, and you're all set!
 
 ### As Python dependency
 

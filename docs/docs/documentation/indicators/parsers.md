@@ -353,7 +353,8 @@ modules via `np`, `pd`, and `vbt` respectively:
 #### TA-Lib
 
 Another automation touches TA-Lib indicators: vectorbt will replace any variable annotated
-with `@talib` with an actual TA-Lib indicator function that can work on two-dimensional data!
+with `@talib` with an actual TA-Lib indicator function that can work on both one-dimensional and 
+two-dimensional data!
 
 ```pycon
 >>> expr = """
@@ -366,9 +367,6 @@ with `@talib` with an actual TA-Lib indicator function that can work on two-dime
 ... tr, atr
 ... """
 ```
-
-!!! hint
-    We can annotate with `@talib_1d` to call the actual (one-dimensional) indicator function from `talib`.
 
 #### Context
 
@@ -517,24 +515,24 @@ Let's illustrate this awesomeness by defining basic SuperTrend bands:
 
 ```pycon
 >>> expr = """
-... ST:
+... SuperTrend[st]:
 ... avg_price = (high + low) / 2
 ... up = avg_price + @p_mult * @res_talib_atr
 ... down = avg_price - @p_mult * @res_talib_atr
 ... up, down
-... """
->>> ST = vbt.IF.from_expr(expr, mult=3, atr_timeperiod=10)
+... """  # (1)!
+>>> SuperTrend = vbt.IF.from_expr(expr, mult=3, atr_timeperiod=10)
 
->>> ST.input_names  # (1)!
+>>> SuperTrend.input_names  # (2)!
 ('high', 'low', 'close')
 
->>> ST.param_names  # (2)!
+>>> SuperTrend.param_names  # (3)!
 ('mult', 'atr_timeperiod')
 
->>> ST.output_names
+>>> SuperTrend.output_names
 ('up', 'down')
 
->>> st = ST.run(ohlc['high'], ohlc['low'], ohlc['close'])
+>>> st = SuperTrend.run(ohlc['high'], ohlc['low'], ohlc['close'])
 >>> st.up
 2019-12-31 00:00:00+00:00           NaN
 2020-01-01 00:00:00+00:00           NaN
@@ -550,8 +548,9 @@ Let's illustrate this awesomeness by defining basic SuperTrend bands:
 Freq: D, Length: 153, dtype: float64
 ```
 
-1. The TA-Lib's ATR indicator depends on `high`, `low`, and `close`
-2. Our indicator depends upon the multiplier `mult`, while the ATR also depends upon `timeperiod`. 
+1. Short name of the indicator can be provided in the square brackets following the class name
+2. The TA-Lib's ATR indicator depends on `high`, `low`, and `close`
+3. Our indicator depends upon the multiplier `mult`, while the ATR also depends upon `timeperiod`. 
 
 So, what happens if there are two indicators with overlapping inputs, parameters, or other arguments? 
 Every argument apart from the inputs receives a prefix with the short name of the indicator
@@ -566,21 +565,21 @@ indicator instance instead:
 
 ```pycon
 >>> expr = """
-... ST:
+... SuperTrend[st]:
 ... avg_price = (high + low) / 2
 ... up = avg_price + @p_mult * @res_talib_atr.real.values
 ... down = avg_price - @p_mult * @res_talib_atr.real.values
 ... up, down
 ... """
->>> ST = vbt.IF.from_expr(
+>>> SuperTrend = vbt.IF.from_expr(
 ...     expr, 
 ...     mult=3, 
 ...     atr_timeperiod=10, 
 ...     atr_kwargs=dict(return_raw=False))  # (1)!
 ```
 
-1. If we print `help(vbt.talib('ATR').run)`, we can see that any additional keyword argument
-is passed as `**kwargs`, so we can specify `atr_kwargs` to target those variable arguments.
+1. If we printed `help(vbt.talib('ATR').run)`, we would see that any additional keyword argument
+is passed as `**kwargs`, so we can specify `atr_kwargs` to target those variable arguments
 
 #### One-liners
 
@@ -610,13 +609,13 @@ If there are multiple outputs, their output expressions must be separated by a c
 Here's a single-line expression for basic SuperTrend bands with multiple outputs:
 
 ```pycon
->>> ST = vbt.IF.from_expr(
-...     "ST: @out_up:@res_avg_price + @p_mult * @res_talib_atr, "
+>>> SuperTrend = vbt.IF.from_expr(
+...     "SuperTrend[st]: @out_up:@res_avg_price + @p_mult * @res_talib_atr, "
 ...     "@out_down:@res_avg_price - @p_mult * @res_talib_atr",  # (1)!
 ...     avg_price=AvgPrice,
 ...     atr_timeperiod=10, 
 ...     mult=3)
->>> st = ST.run(ohlc['high'], ohlc['low'], ohlc['close'])
+>>> st = SuperTrend.run(ohlc['high'], ohlc['low'], ohlc['close'])
 
 >>> fig = ohlc.vbt.ohlc.plot()
 >>> st.up.rename('Upper').vbt.plot(fig=fig)

@@ -1,12 +1,13 @@
 ---
 title: Basic RSI strategy
+description: Design, backtest, and optimize a basic RSI strategy
 ---
 
 # Basic RSI strategy
 
-One of the main powers of vectorbt is the ability to create and backtest numerous strategy configurations
-in the blink of an eye. In this introductory example, we will explore how profitable is the following 
-RSI strategy commonly used by beginners:
+One of the main powers of vectorbt (PRO) is the ability to create and backtest numerous strategy 
+configurations in the blink of an eye. In this introductory example, we will explore how profitable 
+is the following RSI strategy commonly used by beginners:
 
 > If the RSI is less than 30, it indicates a stock is reaching oversold conditions and may see 
 > a trend reversal, or bounceback, towards a higher share price. Once the reversal is confirmed, 
@@ -14,8 +15,7 @@ RSI strategy commonly used by beginners:
 > reaching an overbought condition and may see a trend reversal, or pullback, in price. 
 > After a confirmation of the reversal, a sell trade is placed.
 
-As a bonus, we will gradually expand the analysis towards multiple 
-[hyperparameter](https://en.wikipedia.org/wiki/Hyperparameter_(machine_learning)) combinations. 
+As a bonus, we will gradually expand the analysis towards multiple parameter combinations. 
 Sounds fun? Let's start. 
 
 ## Single backtest
@@ -366,7 +366,7 @@ So, how do we improve from here?
 
 ### Using for-loop
 
-Even such a basic strategy as ours has many potential hyperparameters:
+Even such a basic strategy as ours has many potential parameters:
 
 1. Lower threshold (`lower_th`)
 2. Upper threshold (`upper_th`)
@@ -416,10 +416,10 @@ dtype: object
     (which cleans the signals automatically anyway).
 
 Bingo! The 80/20 configuration has done the trick. But how do we actually know whether this 
-positive result indicates alpha and not because of a pure luck? Testing one hyperparameter 
+positive result indicates alpha and not because of a pure luck? Testing one parameter 
 combination from a huge space usually means making a wild guess.
 
-Let's generate multiple hyperparameter combinations for thresholds, simulate them, and 
+Let's generate multiple parameter combinations for thresholds, simulate them, and 
 concatenate their statistics for further analysis:
 
 ```pycon
@@ -468,7 +468,7 @@ we need to convert it to a DataFrame first, with metrics arranged as columns:
 [121 rows x 4 columns]
 ```
 
-But how do we know which row corresponds to which hyperparameter combination? 
+But how do we know which row corresponds to which parameter combination? 
 We will build a [MultiIndex](https://pandas.pydata.org/pandas-docs/stable/user_guide/advanced.html)
 with two levels, `lower_th` and `upper_th`, and make it the index of `comb_stats_df`:
 
@@ -505,22 +505,22 @@ and the color bar reflecting the expectancy:
 
 ![](/assets/images/examples_rsi_heatmap.svg)
 
-We can observe entire regions of hyperparameter combinations that yield positive results.
+We can observe entire regions of parameter combinations that yield positive results.
 
 ### Using columns
 
 As you might have read in [Fundamentals](/documentation/fundamentals), vectorbt loves processing
 multi-dimensional data. In particular, it's built around the idea that you can represent
-each asset, period, hyperparameter combination, and a backtest in general, as a column
+each asset, period, parameter combination, and a backtest in general, as a column
 in a two-dimensional array. 
 
 Instead of computing everything in a loop (which isn't too bad but usually executes magnitudes 
 slower than a vectorized solution) we can change our code to accept parameters as arrays. 
-A function that takes such array will automatically convert multiple hyperparameters into 
+A function that takes such array will automatically convert multiple parameters into 
 multiple columns. A big benefit of this approach is that we don't have to collect our results, 
 put them in a list, and convert into a DataFrame - it's all done by vectorbt!
 
-First, define the hyperparameters that we would like to test:
+First, define the parameters that we would like to test:
 
 ```pycon
 >>> windows = list(range(8, 21))
@@ -672,7 +672,7 @@ lower_th upper_th rsi_window rsi_ewm
 takes the mean out of all columns and returns a Series. We, on the other hand, 
 want to disable the aggregation function and stack all Series into one big DataFrame.
 
-Congrats! We just backtested 3146 hyperparameter combinations in a quarter of a second :zap:
+Congrats! We just backtested 3146 parameter combinations in a quarter of a second :zap:
 
 !!! important
     Even though we gained some unreal performance, we need to be careful to not occupy the entire RAM
@@ -711,7 +711,7 @@ Name: Expectancy, dtype: float64
 
 The longer is the RSI window, the higher is the mean expectancy.
 
-Display the top 5 hyperparameter combinations:
+Display the top 5 parameter combinations:
 
 ```pycon
 >>> stats_df.sort_values(by='Expectancy', ascending=False).head()
@@ -817,4 +817,4 @@ from books and YouTube videos, we can build our own tools that go hand in hand w
 We can backtest thousands of strategy configurations to learn how the market reacts to each one 
 of them - in a matter of milliseconds. All it takes is creativity :bulb:
 
-[Notebook](https://github.com/polakowo/vectorbt.pro/blob/main/notebooks/BasicRSI.ipynb){ .md-button target="blank_" }
+[:material-lock: Notebook](https://github.com/polakowo/vectorbt.pro/blob/main/notebooks/BasicRSI.ipynb){ .md-button target="blank_" }
