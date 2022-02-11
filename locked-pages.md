@@ -1,3 +1,3 @@
-* [Superfast SuperTrend - Streaming](https://vectorbt.pro/examples/superfast-supertrend/streaming-locked-8b33d3d1-9c06-4a9a-99a2-593901fa4e10)
-* [Superfast SuperTrend - Multithreading](https://vectorbt.pro/examples/superfast-supertrend/multithreading-locked-1e95ede9-b8fd-4a30-abba-090110c024e8)
-* [Superfast SuperTrend - Pipelines](https://vectorbt.pro/examples/superfast-supertrend/pipelines-locked-69dc3a55-07f7-4610-835c-c52911f31948)
+* [Superfast SuperTrend - Streaming](https://vectorbt.pro/examples/superfast-supertrend/streaming-locked-00e4e3f4-7c87-4418-baae-e39bf9c492fc)
+* [Superfast SuperTrend - Multithreading](https://vectorbt.pro/examples/superfast-supertrend/multithreading-locked-509ef1e8-915e-4296-adbd-4c413e896a7f)
+* [Superfast SuperTrend - Pipelines](https://vectorbt.pro/examples/superfast-supertrend/pipelines-locked-de543504-e8a2-4b5e-9520-a2ad7b486f0e)
