@@ -1,0 +1,3 @@
+* [Superfast SuperTrend - Streaming](https://vectorbt.pro/examples/superfast-supertrend/streaming-locked-8b33d3d1-9c06-4a9a-99a2-593901fa4e10)
+* [Superfast SuperTrend - Multithreading](https://vectorbt.pro/examples/superfast-supertrend/multithreading-locked-1e95ede9-b8fd-4a30-abba-090110c024e8)
+* [Superfast SuperTrend - Pipelines](https://vectorbt.pro/examples/superfast-supertrend/pipelines-locked-69dc3a55-07f7-4610-835c-c52911f31948)
