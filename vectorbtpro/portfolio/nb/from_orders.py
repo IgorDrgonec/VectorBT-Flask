@@ -154,7 +154,7 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
     if fill_returns:
         returns_pcgs = np.empty((target_shape[0], len(group_lens)), dtype=np.float_)
     else:
-        returns_pcgs = None
+        returns_pcgs = np.empty((0, 0), dtype=np.float_)
     in_outputs = FSInOutputs(returns_pcgs=returns_pcgs)
 
     group_end_idxs = np.cumsum(group_lens)

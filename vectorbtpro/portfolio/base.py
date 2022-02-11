@@ -2157,6 +2157,8 @@ class Portfolio(Analyzable):
             obj = getattr(self.in_outputs, found_field)
             if obj is None or isinstance(obj, bool):
                 return obj
+            if isinstance(obj, np.ndarray) and obj.shape == (0, 0):
+                return None
             if wrap_func is not None:
                 return wrap_func(
                     self,
@@ -2329,7 +2331,7 @@ class Portfolio(Analyzable):
             return func(obj, col_map, to_1d_array(col_idxs))
 
         for field, obj in in_outputs.items():
-            if obj is None or isinstance(obj, bool):
+            if obj is None or isinstance(obj, bool) or (isinstance(obj, np.ndarray) and obj.shape == (0, 0)):
                 new_obj = obj
             else:
                 new_obj = None

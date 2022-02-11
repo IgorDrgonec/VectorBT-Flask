@@ -1867,7 +1867,9 @@ class FSInOutputs(tp.NamedTuple):
 
 
 __pdoc__['FSInOutputs'] = "A named tuple representing the in-outputs for simulation based on signals."
-__pdoc__['FSInOutputs.returns_pcgs'] = """Returns."""
+__pdoc__['FSInOutputs.returns_pcgs'] = """Returns.
+
+Gets filled if `fill_returns` is True, otherwise has the shape `(0, 0)`."""
 
 
 class FOInOutputs(tp.NamedTuple):
@@ -1875,7 +1877,9 @@ class FOInOutputs(tp.NamedTuple):
 
 
 __pdoc__['FOInOutputs'] = "A named tuple representing the in-outputs for simulation based on orders."
-__pdoc__['FOInOutputs.returns_pcgs'] = """Returns."""
+__pdoc__['FOInOutputs.returns_pcgs'] = """Returns.
+
+Gets filled if `fill_returns` is True, otherwise has the shape `(0, 0)`."""
 
 # ############# Records ############# #
 
