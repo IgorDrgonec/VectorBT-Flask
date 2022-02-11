@@ -2277,6 +2277,8 @@ Other keyword arguments are passed to `{0}.run`.
                     _cache_pass_packed = pass_packed
                 if _cache_pass_flex_2d is None:
                     _cache_pass_flex_2d = pass_flex_2d
+                if _cache_pass_per_column is None and per_column:
+                    _cache_pass_per_column = True
                 if _cache_pass_per_column is None:
                     _cache_pass_per_column = pass_per_column
                 cache_more_args = tuple(more_args)
