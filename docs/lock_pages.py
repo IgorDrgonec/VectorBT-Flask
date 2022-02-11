@@ -87,5 +87,5 @@ if __name__ == "__main__":
             str(page_path),
             locked_uuid[page_path]
         ))
-    with open('../locked-content.md', 'w') as f:
+    with open('../locked-pages.md', 'w') as f:
         f.write('\n'.join(links))

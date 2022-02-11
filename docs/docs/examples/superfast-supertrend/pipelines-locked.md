@@ -1371,3 +1371,5 @@ But at least you will learn how to design efficient algorithms in Python that ca
 top-notch algo-trading systems written in Java.
 
 As always, happy coding :heart:
+
+[:material-lock: Notebook](https://github.com/polakowo/vectorbt.pro/blob/main/locked-notebooks.md){ .md-button target="blank_" }

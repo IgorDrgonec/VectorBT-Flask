@@ -93,3 +93,5 @@ in that chunk can be executed concurrently. The chunks themselves are executed s
 This way, we are always running at most `n` combinations and do not create more threads than needed. 
 
 As we can see, this strategy has paid out with a 2x speedup.
+
+[:material-lock: Notebook](https://github.com/polakowo/vectorbt.pro/blob/main/locked-notebooks.md){ .md-button target="blank_" }

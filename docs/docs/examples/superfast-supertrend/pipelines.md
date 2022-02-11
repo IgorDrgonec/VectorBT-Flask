@@ -9,4 +9,4 @@ Learn how to properly design a backtesting pipeline. We'll discuss and implement
 designs: from the most modular and flexible to the fastest one. As the :cherries: on the cake, 
 we'll perform 67,200 backtests on SuperTrend in just one second!
 
-[:material-lock: View](https://github.com/polakowo/vectorbt.pro/blob/main/locked-content.md){ .md-button target="blank_" }
+[:material-lock: View](https://github.com/polakowo/vectorbt.pro/blob/main/locked-pages.md){ .md-button target="blank_" }

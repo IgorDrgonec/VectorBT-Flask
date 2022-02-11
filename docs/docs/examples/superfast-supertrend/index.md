@@ -984,4 +984,4 @@ vectorbt package takes a solid place in that ecosystem by allowing us to take ad
 introduced acceleration, for example, to do parameter optimization on arbitrary trading strategies 
 and analyze the dynamics of entire markets in the blink of an eye.
 
-[:material-lock: Notebook](https://github.com/polakowo/vectorbt.pro/blob/main/notebooks/SuperTrend.ipynb){ .md-button target="blank_" }
+[:material-lock: Notebook](https://github.com/polakowo/vectorbt.pro/blob/main/locked-notebooks.md){ .md-button target="blank_" }

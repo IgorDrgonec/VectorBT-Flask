@@ -19,9 +19,13 @@ python lock_pages.py
 echo "Pushing static files to GitHub..."
 python mkdocs_cli.py gh-deploy --force
 
-echo "Pushing locked-content.md to GitHub..."
-git add ../locked-content.md
-git commit -m "Update locked-content.md"
+echo "Locking notebooks..."
+python lock_notebooks.py
+
+echo "Pushing locked content to GitHub..."
+git add ../locked-pages.md
+git add ../locked-notebooks.md
+git commit -m "Update locked content"
 git push
 
 echo "Cleaning up..."

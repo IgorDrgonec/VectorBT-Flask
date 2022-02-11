@@ -18,7 +18,7 @@ input data by passing `takes_1d=True` to [IndicatorFactory.with_apply_func](/api
 This mode splits each input array (both Pandas and NumPy) into columns and builds a product of columns
 and parameter combinations. Benchmarks show that this has no real implications on performance +
 functions that process one column at a time are much easier to write.
-- `@talib` and `@talib_1d` annotations were merged into a single `@talib` annotations that 
+- `@talib` and `@talib_1d` annotations were merged into a single `@talib` annotation that 
 can handle both one and two-dimensional input data
 - Removed automatic module search when parsing indicator expressions, which degraded performance. It's now
 recommended to use multi-line expressions and `import` statements.

@@ -317,4 +317,6 @@ with similar implementations in C or any other compiled language. Neat!
     flag to the `@njit` decorator. But make sure that you define the cachable function in 
     a Python file rather than in a cell of Jupyter Notebook.
 
-We just hit the optimization ceiling - let's move on with parameter optimization.
+We just hit the performance ceiling - let's move on with parameter optimization.
+
+[:material-lock: Notebook](https://github.com/polakowo/vectorbt.pro/blob/main/locked-notebooks.md){ .md-button target="blank_" }

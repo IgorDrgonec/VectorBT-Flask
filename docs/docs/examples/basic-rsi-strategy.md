@@ -817,4 +817,4 @@ from books and YouTube videos, we can build our own tools that go hand in hand w
 We can backtest thousands of strategy configurations to learn how the market reacts to each one 
 of them - in a matter of milliseconds. All it takes is creativity :bulb:
 
-[:material-lock: Notebook](https://github.com/polakowo/vectorbt.pro/blob/main/notebooks/BasicRSI.ipynb){ .md-button target="blank_" }
+[:material-lock: Notebook](https://github.com/polakowo/vectorbt.pro/blob/main/locked-notebooks.md){ .md-button target="blank_" }
