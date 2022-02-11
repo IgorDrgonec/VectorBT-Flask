@@ -3,31 +3,34 @@ set -e
 # Any subsequent(*) commands which fail will cause the shell script to exit immediately
 cd "$(dirname "${BASH_SOURCE[0]}")/../docs" || exit
 
-echo "Updating pdoc_to_md..."
+C='\033[1;32m'
+NC='\033[0m' # No Color
+
+echo "${C}Updating pdoc_to_md...${NC}"
 pip uninstall -y pdoc_to_md
 pip install -U git+https://github.com/polakowo/pdoc-to-md.git
 
-echo "Generating API..."
+echo "${C}Generating API...${NC}"
 python generate_api.py
 
-echo "Building static files..."
+echo "${C}Building static files...${NC}"
 mkdocs build --clean
 
-echo "Locking pages..."
+echo "${C}Locking pages...${NC}"
 python lock_pages.py
 
-echo "Pushing static files to GitHub..."
+echo "${C}Pushing static files to GitHub...${NC}"
 python mkdocs_cli.py gh-deploy --force
 
-echo "Locking notebooks..."
+echo "${C}Locking notebooks...${NC}"
 python lock_notebooks.py
 
-echo "Pushing locked content to GitHub..."
+echo "${C}Pushing locked content to GitHub...${NC}"
 git add ../locked-pages.md
 git add ../locked-notebooks.md
 git commit -m "Update locked content"
 git push
 
-echo "Cleaning up..."
+echo "${C}Cleaning up...${NC}"
 rm -rf docs/api/
 rm -rf site/
