@@ -1564,7 +1564,7 @@ def ewm_mean_1d_nb(arr: tp.Array1d, span: int, minp: tp.Optional[int] = None, ad
         return out
     com = (span - 1) / 2.0
     alpha = 1. / (1. + com)
-    weighted_avg = arr[0]
+    weighted_avg = float(arr[0])
     nobs = 0
     old_wt = 1.
 
@@ -1706,8 +1706,8 @@ def ewm_std_1d_nb(arr: tp.Array1d, span: int, minp: tp.Optional[int] = None, adj
         return out
     com = (span - 1) / 2.0
     alpha = 1. / (1. + com)
-    mean_x = arr[0]
-    mean_y = arr[0]
+    mean_x = float(arr[0])
+    mean_y = float(arr[0])
     nobs = 0
     cov = 0.
     sum_wt = 1.

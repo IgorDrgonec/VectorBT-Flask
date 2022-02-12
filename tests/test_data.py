@@ -1522,7 +1522,8 @@ class TestCustom:
                 'data3': 'DATA3'
             })
         )
-        (tmp_path / 'data/data.h5').unlink(missing_ok=True)
+        if (tmp_path / 'data/data.h5').exists():
+            (tmp_path / 'data/data.h5').unlink()
         data1.get().to_hdf(tmp_path / 'data/data.h5', '/data1/folder')
         data2.get().to_hdf(tmp_path / 'data/data.h5', '/data2/folder')
         data3.get().to_hdf(tmp_path / 'data/data.h5', '/data3/folder')

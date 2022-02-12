@@ -1,3 +1,5 @@
+import numpy as np
+
 import vectorbtpro as vbt
 
 
@@ -9,10 +11,27 @@ def teardown_module():
 
 # ############# settings.py ############# #
 
+def is_lambda(v):
+    test_lambda = lambda: 0
+    return isinstance(v, type(test_lambda)) and v.__name__ == test_lambda.__name__
+
+
+def dicts_equal(dct1, dct2):
+    for k, v in dct1.items():
+        if isinstance(v, dict):
+            dicts_equal(v, dct2[k])
+        elif is_lambda(v) and is_lambda(dct2[k]):
+            pass
+        elif isinstance(v, float) and np.isnan(v) and np.isnan(dct2[k]):
+            pass
+        else:
+            assert v is dct2[k] or v == dct2[k]
+
+
 class TestSettings:
     def test_save_and_load(self, tmp_path):
         vbt.settings.set_theme('seaborn')
         vbt.settings.save(tmp_path / "settings", dump_reset_dct=True)
         new_settings = vbt.settings.load(tmp_path / "settings")
-        assert vbt.settings == new_settings
-        assert vbt.settings.__dict__ == new_settings.__dict__
+        dicts_equal(vbt.settings, new_settings)
+        dicts_equal(vbt.settings.__dict__, new_settings.__dict__)

@@ -138,11 +138,12 @@ def is_default_index(arg: tp.Any, check_names: bool = True) -> bool:
 
 def is_namedtuple(x: tp.Any) -> bool:
     """Check whether object is an instance of namedtuple."""
-    t = type(x)
-    b = t.__bases__
+    if not isinstance(x, type):
+        x = type(x)
+    b = x.__bases__
     if len(b) != 1 or b[0] != tuple:
         return False
-    f = getattr(t, '_fields', None)
+    f = getattr(x, '_fields', None)
     if not isinstance(f, tuple):
         return False
     return all(type(n) == str for n in f)
