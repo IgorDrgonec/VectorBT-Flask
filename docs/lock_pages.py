@@ -5,6 +5,7 @@ import re
 import uuid
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from argparse import ArgumentParser
 
 locked_pages = {
     Path('examples/superfast-supertrend/streaming-locked'):
@@ -25,11 +26,25 @@ def namespace(element):
     return m.group(1) if m else ''
 
 
+parser = ArgumentParser()
+parser.add_argument("--renew", dest="renew", default=False)
+args = parser.parse_args()
+
 if __name__ == "__main__":
-    while True:
-        locked_uuid = {page_path: generate_uuid() for page_path in locked_pages}
-        if len(set(locked_uuid.values())) == len(locked_pages):
-            break
+    if args.renew:
+        while True:
+            locked_uuid = {page_path: generate_uuid() for page_path in locked_pages}
+            if len(set(locked_uuid.values())) == len(locked_pages):
+                break
+    else:
+        locked_uuid = {}
+        with open('../locked-pages.md', 'r') as f:
+            lines = f.read().split('\n')
+        for line in lines:
+            for page_path in locked_pages:
+                if str(page_path) in line:
+                    locked_uuid[page_path] = line[-37:-1]
+                    break
 
     tree = ET.parse('./site/sitemap.xml')
     root = tree.getroot()
@@ -80,12 +95,13 @@ if __name__ == "__main__":
         if not found_path:
             raise ValueError(f"Locked page '{p}' missing")
 
-    links = []
-    for page_path, page_title in locked_pages.items():
-        links.append('* [{}](https://vectorbt.pro/{}-{})'.format(
-            page_title,
-            str(page_path),
-            locked_uuid[page_path]
-        ))
-    with open('../locked-pages.md', 'w') as f:
-        f.write('\n'.join(links))
+    if args.renew:
+        links = []
+        for page_path, page_title in locked_pages.items():
+            links.append('* [{}](https://vectorbt.pro/{}-{})'.format(
+                page_title,
+                str(page_path),
+                locked_uuid[page_path]
+            ))
+        with open('../locked-pages.md', 'w') as f:
+            f.write('\n'.join(links))

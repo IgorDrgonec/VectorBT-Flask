@@ -17,10 +17,19 @@ echo "${C}Building static files...${NC}"
 mkdocs build --clean
 
 echo "${C}Locking pages...${NC}"
-python lock_pages.py
+python lock_pages.py --renew
 
 echo "${C}Pushing static files to GitHub...${NC}"
 python mkdocs_cli.py gh-deploy --force
+
+echo "${C}Locking notebooks...${NC}"
+python lock_notebooks.py --renew
+
+echo "${C}Pushing locked content to GitHub...${NC}"
+git add ../locked-pages.md
+git add ../locked-notebooks.md
+git commit -m "Update locked content"
+git push
 
 echo "${C}Cleaning up...${NC}"
 rm -rf docs/api/

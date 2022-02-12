@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from argparse import ArgumentParser
 
 import requests
 
@@ -10,8 +11,6 @@ locked_notebooks = {
     Path('../notebooks/BasicRSI.ipynb'): 'Basic RSI strategy',
     Path('../notebooks/SuperTrend.ipynb'): 'Superfast SuperTrend'
 }
-
-gist_urls = {}
 
 
 def get_gists():
@@ -52,29 +51,67 @@ def create_gist(file_name, content, description):
     return requests.post(url, data=payload, headers=headers)
 
 
+def update_gist(gist_id, file_name, content, description):
+    url = 'https://api.github.com/gists/' + gist_id
+    payload = json.dumps({
+        'files': {
+            file_name: {
+                'content': content
+            }
+        },
+        'description': description,
+        'public': False
+    })
+    headers = {
+        'Accept': 'application/vnd.github.v3+json',
+        'Authorization': f'token {GITHUB_TOKEN}'
+    }
+    return requests.patch(url, data=payload, headers=headers)
+
+
+parser = ArgumentParser()
+parser.add_argument("--renew", dest="renew", default=False)
+args = parser.parse_args()
+
+
 if __name__ == "__main__":
     gists = get_gists().json()
+    gist_urls = {}
 
     for notebook_path, notebook_title in locked_notebooks.items():
         with open(notebook_path, 'r') as f:
             content = f.read()
 
-        for gist in gists:
-            if notebook_path.name in gist['files']:
-                print(f"Deleting the gist for '{notebook_path.name}'...")
-                res = delete_gist(gist['id'])
-                print(res.status_code)
+        if args.renew:
+            for gist in gists:
+                if notebook_path.name in gist['files']:
+                    print(f"Deleting the gist for '{notebook_path.name}'...")
+                    res = delete_gist(gist['id'])
+                    print(res.status_code)
+                    break
 
-        print(f"Creating a new gist for '{notebook_path.name}'...")
-        res = create_gist(notebook_path.name, content, notebook_title)
-        gist_urls[notebook_path] = res.json()['url']
-        print(res.status_code, gist_urls[notebook_path])
+            print(f"Creating a new gist for '{notebook_path.name}'...")
+            res = create_gist(notebook_path.name, content, notebook_title)
+            gist_urls[notebook_path] = res.json()['url']
+            print(res.status_code, gist_urls[notebook_path])
+        else:
+            found_gist = False
+            for gist in gists:
+                if notebook_path.name in gist['files']:
+                    print(f"Updating the gist for '{notebook_path.name}'...")
+                    res = update_gist(gist['id'], notebook_path.name, content, notebook_title)
+                    print(res.status_code)
+                    found_gist = True
+                    break
+            if not found_gist:
+                print(f"Couldn't find the gist for '{notebook_path.name}'!")
 
-    links = []
-    for notebook_path, url in gist_urls.items():
-        links.append('* [{}](https://nbviewer.org/gist/polakowo/{})'.format(
-            locked_notebooks[notebook_path],
-            url.split('/')[-1]
-        ))
-    with open('../locked-notebooks.md', 'w') as f:
-        f.write('\n'.join(links))
+    if args.renew:
+        links = []
+        for notebook_path, url in gist_urls.items():
+            links.append('* [{}](https://nbviewer.org/gist/polakowo/{})'.format(
+                locked_notebooks[notebook_path],
+                url.split('/')[-1]
+            ))
+        with open('../locked-notebooks.md', 'w') as f:
+            f.write('\n'.join(links))

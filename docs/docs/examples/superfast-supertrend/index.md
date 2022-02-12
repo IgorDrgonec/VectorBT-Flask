@@ -1,6 +1,6 @@
 ---
 title: Superfast SuperTrend
-description: How to design and implement the fastest SuperTrend indicator
+description: How to design and implement the fastest SuperTrend indicator on Earth
 ---
 
 # Superfast SuperTrend
