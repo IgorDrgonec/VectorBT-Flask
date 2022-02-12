@@ -13,3 +13,4 @@ docs/site
 *.csv
 *.h5
 .github_gist_token
+/venvs/
