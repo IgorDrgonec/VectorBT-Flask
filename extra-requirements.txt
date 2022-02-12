@@ -10,7 +10,7 @@ tables:                     data
 ta:                         ta
 pandas_ta:                  ta
 TA-Lib:                     ta, base
-Bottleneck:                 compute
+# Bottleneck:                 compute
 numexpr:                    compute, base
 ray>=1.4.1:                 distribute
 dask:                       distribute, base
