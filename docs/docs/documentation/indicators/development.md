@@ -719,13 +719,13 @@ will become a parameter!
 ...     output_names=['out']
 ... ).with_apply_func(apply_func, keep_pd=True)
 
->>> ts = pd.DataFrame({
+>>> ts_wide = pd.DataFrame({
 ...     'a': [1, 2, 3, 4, 5],
 ...     'b': [5, 4, 3, 2, 1],
 ...     'c': [3, 2, 1, 2, 3],
 ...     'd': [1, 2, 3, 2, 1]
 ... }, index=generate_index(5))
->>> demeaner = Demeaner.run(ts, group_by=[(0, 0, 1, 1), True])
+>>> demeaner = Demeaner.run(ts_wide, group_by=[(0, 0, 1, 1), True])
 >>> demeaner.out
 custom_group_by                tuple_0                True
                       a    b    c    d    a    b    c    d
@@ -884,11 +884,11 @@ from a moving average crossover:
 ...     output_names=['fast_ma', 'slow_ma', 'entries', 'exits']
 ... ).with_apply_func(apply_func)
 
->>> ts = pd.DataFrame({
+>>> ts2 = pd.DataFrame({
 ...     'a': [1, 2, 3, 2, 1, 2, 3],
 ...     'b': [3, 2, 1, 2, 3, 2, 1]
 ... }, index=generate_index(7))
->>> cross_sig = CrossSig.run(ts, 2, 4)
+>>> cross_sig = CrossSig.run(ts2, 2, 4)
 ```
 
 1. Also return the fast and the slow moving average for analysis
@@ -957,7 +957,7 @@ Let's modify the indicator above by converting both signal arrays to in-outputs:
 ...         exits=dict(dtype=np.bool_)
 ...     )
 ... )
->>> cross_sig = CrossSig.run(ts, 2, 4)
+>>> cross_sig = CrossSig.run(ts2, 2, 4)
 ```
 
 1. Both arrays are modified in-place
@@ -1079,7 +1079,7 @@ mean along with its maximum in each column:
 ...     output_names=['ma'],
 ... ).with_custom_func(custom_func)
 
->>> ma_ind, ma_max = MAMax.run(ts, [2, 3])  # (2)!
+>>> ma_ind, ma_max = MAMax.run(ts2, [2, 3])  # (2)!
 >>> ma_ind
 mamax_window         2                   3
                 a    b         a         b
@@ -1123,7 +1123,7 @@ returns the maximum of the rolling mean:
 ...     )
 ... ).with_apply_func(vbt.nb.rolling_mean_nb)
 
->>> ma_ind = MAMax.run(ts, [2, 3])
+>>> ma_ind = MAMax.run(ts2, [2, 3])
 >>> ma_ind.ma_max
 mamax_window   
 2             a    2.500000
@@ -1251,7 +1251,7 @@ and setting `return_raw` to True:
 
 ```pycon
 >>> raw = vbt.MA.run(
-...     ts, 
+...     ts2, 
 ...     window=[2, 2, 3], 
 ...     ewm=[False, False, True],  # (1)!
 ...     return_raw=True)
@@ -1289,7 +1289,7 @@ to run the indicator on unique parameter combinations only by passing `run_uniqu
 
 ```pycon
 >>> raw = vbt.MA.run(
-...     ts, 
+...     ts2, 
 ...     window=[2, 2, 3], 
 ...     ewm=[False, False, True], 
 ...     return_raw=True, 
@@ -1350,11 +1350,11 @@ combinations cannot be found in `use_raw`, it will throw an error:
 
 ```pycon
 >>> raw = vbt.MA.run(
-...     ts, 
+...     ts2, 
 ...     window=[2, 3], 
 ...     ewm=[False, True],
 ...     return_raw=True)
->>> vbt.MA.run(ts, 2, False, use_raw=raw).ma
+>>> vbt.MA.run(ts2, 2, False, use_raw=raw).ma
 ma_window             2
 ma_ewm            False
                a      b
@@ -1366,7 +1366,7 @@ ma_ewm            False
 2020-01-06   1.5    2.5
 2020-01-07   2.5    1.5
 
->>> vbt.MA.run(ts, 2, True, use_raw=raw).ma
+>>> vbt.MA.run(ts2, 2, True, use_raw=raw).ma
 ValueError: (2, True) is not in list
 ```
 
@@ -1404,7 +1404,7 @@ enabled, the first rolling window will be re-calculated over and over again and 
 ...     output_names=['out'],
 ... ).with_apply_func(apply_func)
 
->>> RelMADist.run(ts, 2, 3).out
+>>> RelMADist.run(ts2, 2, 3).out
 relmadist_w1                   2
 relmadist_w2                   3
                      a         b
@@ -1416,7 +1416,7 @@ relmadist_w2                   3
 2020-01-06    0.111111 -0.066667
 2020-01-07   -0.200000  0.333333
 
->>> %timeit RelMADist.run(ts, 2, np.arange(2, 1000))
+>>> %timeit RelMADist.run(ts2, 2, np.arange(2, 1000))
 294 ms ± 52.9 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
 ```
 
@@ -1440,7 +1440,7 @@ To avoid this, let's pre-compute all unique rolling windows in `cache_func` and 
 ...     output_names=['out'],
 ... ).with_apply_func(apply_func, cache_func=cache_func)
 
->>> RelMADist.run(ts, 2, 3).out
+>>> RelMADist.run(ts2, 2, 3).out
 relmadist_w1                   2
 relmadist_w2                   3
                      a         b
@@ -1452,7 +1452,7 @@ relmadist_w2                   3
 2020-01-06    0.111111 -0.066667
 2020-01-07   -0.200000  0.333333
 
->>> %timeit RelMADist.run(ts, 2, np.arange(2, 1000))
+>>> %timeit RelMADist.run(ts2, 2, np.arange(2, 1000))
 119 ms ± 335 µs per loop (mean ± std. dev. of 7 runs, 10 loops each)
 ```
 
@@ -1507,7 +1507,7 @@ directly in the apply function.
 ...     output_names=['out'],
 ... ).with_apply_func(apply_func, cache_func=cache_func)
 
->>> RelMADist.run(ts, 2, 3).out
+>>> RelMADist.run(ts2, 2, 3).out
 relmadist_w1                   2
 relmadist_w2                   3
                      a         b
@@ -1519,7 +1519,7 @@ relmadist_w2                   3
 2020-01-06    0.111111 -0.066667
 2020-01-07   -0.200000  0.333333
 
->>> RelMADist.run(ts, [2, 2], [3, 4], per_column=True).out
+>>> RelMADist.run(ts2, [2, 2], [3, 4], per_column=True).out
 relmadist_w1                   2
 relmadist_w2         3         4
                      a         b
@@ -1547,13 +1547,13 @@ anymore, but on the values of each parameter, which gives us more granularity in
 
 ```pycon
 >>> cache = RelMADist.run(
-...     ts, 
+...     ts2, 
 ...     w1=2, 
 ...     w2=np.arange(2, 1000), 
 ...     return_cache=True)
 
 >>> %timeit RelMADist.run( \
-...     ts, \
+...     ts2, \
 ...     w1=np.arange(2, 1000), \
 ...     w2=np.arange(2, 1000), \
 ...     use_cache=cache)
@@ -1592,7 +1592,7 @@ run(close, timeperiod=Default(value=30), ...
 ...     output_names=['fast_ma', 'slow_ma', 'entries', 'exits'],
 ... ).with_apply_func(apply_func)
 
->>> MACrossover.run(ts, 2, 3).entries
+>>> MACrossover.run(ts2, 2, 3).entries
 crosssig_timeperiod1             2
 crosssig_timeperiod2             3
                           a      b
