@@ -44,7 +44,7 @@ setup(
     package_data={
         'vectorbtpro': ['templates/*.json']
     },
-    python_requires='>=3.6, <3.10',
+    python_requires='>=3.7, <3.10',
     license='LICENSE.md',
     data_files=[('', ['LICENSE.md'])],
     install_requires=[
@@ -72,7 +72,6 @@ setup(
         'Intended Audience :: Information Technology',
         'Intended Audience :: Science/Research',
         'License :: Other/Proprietary License',
-        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
