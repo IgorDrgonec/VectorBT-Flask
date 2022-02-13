@@ -30,11 +30,7 @@ class Regex:
 def get_func_kwargs(func: tp.Callable) -> dict:
     """Get keyword arguments with defaults of a function."""
     signature = inspect.signature(func)
-    return {
-        k: v.default
-        for k, v in signature.parameters.items()
-        if v.default is not inspect.Parameter.empty
-    }
+    return {k: v.default for k, v in signature.parameters.items() if v.default is not inspect.Parameter.empty}
 
 
 def get_func_arg_names(func: tp.Callable, arg_kind: tp.Optional[tp.MaybeTuple[int]] = None) -> tp.List[str]:
@@ -43,14 +39,8 @@ def get_func_arg_names(func: tp.Callable, arg_kind: tp.Optional[tp.MaybeTuple[in
     if arg_kind is not None and isinstance(arg_kind, int):
         arg_kind = (arg_kind,)
     if arg_kind is None:
-        return [
-            p.name for p in signature.parameters.values()
-            if p.kind != p.VAR_POSITIONAL and p.kind != p.VAR_KEYWORD
-        ]
-    return [
-        p.name for p in signature.parameters.values()
-        if p.kind in arg_kind
-    ]
+        return [p.name for p in signature.parameters.values() if p.kind != p.VAR_POSITIONAL and p.kind != p.VAR_KEYWORD]
+    return [p.name for p in signature.parameters.values() if p.kind in arg_kind]
 
 
 def annotate_args(func: tp.Callable, args: tp.Args, kwargs: tp.Kwargs, only_passed: bool = False) -> tp.AnnArgs:
@@ -90,14 +80,14 @@ def ann_args_to_args(ann_args: tp.AnnArgs) -> tp.Tuple[tp.Args, tp.Kwargs]:
     kwargs = {}
     p = inspect.Parameter
     for k, v in ann_args.items():
-        if v['kind'] in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD):
-            args += (v['value'],)
-        elif v['kind'] == p.VAR_POSITIONAL:
-            args += v['value']
-        elif v['kind'] == p.KEYWORD_ONLY:
-            kwargs[k] = v['value']
+        if v["kind"] in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD):
+            args += (v["value"],)
+        elif v["kind"] == p.VAR_POSITIONAL:
+            args += v["value"]
+        elif v["kind"] == p.KEYWORD_ONLY:
+            kwargs[k] = v["value"]
         else:
-            for _k, _v in v['value'].items():
+            for _k, _v in v["value"].items():
                 kwargs[_k] = _v
     return args, kwargs
 
@@ -106,26 +96,14 @@ def flatten_ann_args(ann_args: tp.AnnArgs) -> tp.FlatAnnArgs:
     """Flatten annotated arguments."""
     flat_ann_args = []
     for arg_name, ann_arg in ann_args.items():
-        if ann_arg['kind'] == inspect.Parameter.VAR_POSITIONAL:
-            for v in ann_arg['value']:
-                flat_ann_args.append(dict(
-                    name=arg_name,
-                    kind=ann_arg['kind'],
-                    value=v
-                ))
-        elif ann_arg['kind'] == inspect.Parameter.VAR_KEYWORD:
-            for var_arg_name, var_value in ann_arg['value'].items():
-                flat_ann_args.append(dict(
-                    name=var_arg_name,
-                    kind=ann_arg['kind'],
-                    value=var_value
-                ))
+        if ann_arg["kind"] == inspect.Parameter.VAR_POSITIONAL:
+            for v in ann_arg["value"]:
+                flat_ann_args.append(dict(name=arg_name, kind=ann_arg["kind"], value=v))
+        elif ann_arg["kind"] == inspect.Parameter.VAR_KEYWORD:
+            for var_arg_name, var_value in ann_arg["value"].items():
+                flat_ann_args.append(dict(name=var_arg_name, kind=ann_arg["kind"], value=var_value))
         else:
-            flat_ann_args.append(dict(
-                name=arg_name,
-                kind=ann_arg['kind'],
-                value=ann_arg['value']
-            ))
+            flat_ann_args.append(dict(name=arg_name, kind=ann_arg["kind"], value=ann_arg["value"]))
     return flat_ann_args
 
 
@@ -140,16 +118,16 @@ def match_ann_arg(ann_args: tp.AnnArgs, query: tp.AnnArgQuery) -> tp.Any:
     The position can stretch over any variable argument."""
     flat_ann_args = flatten_ann_args(ann_args)
     if isinstance(query, int):
-        return flat_ann_args[query]['value']
+        return flat_ann_args[query]["value"]
     if isinstance(query, str):
         for arg in flat_ann_args:
-            if query == arg['name']:
-                return arg['value']
+            if query == arg["name"]:
+                return arg["value"]
         raise KeyError(f"Query '{query}' could not be matched with any argument")
     if isinstance(query, Regex):
         for arg in flat_ann_args:
-            if query.matches(arg['name']):
-                return arg['value']
+            if query.matches(arg["name"]):
+                return arg["value"]
         raise KeyError(f"Query '{query}' could not be matched with any argument")
     raise TypeError(f"Query of type {type(query)} is not supported")
 
@@ -163,10 +141,10 @@ def ignore_flat_ann_args(flat_ann_args: tp.FlatAnnArgs, ignore_args: tp.Iterable
             if isinstance(ignore_arg, int) and ignore_arg == i:
                 arg_matched = True
                 break
-            if isinstance(ignore_arg, str) and ignore_arg == arg['name']:
+            if isinstance(ignore_arg, str) and ignore_arg == arg["name"]:
                 arg_matched = True
                 break
-            if isinstance(ignore_arg, Regex) and ignore_arg.matches(arg['name']):
+            if isinstance(ignore_arg, Regex) and ignore_arg.matches(arg["name"]):
                 arg_matched = True
                 break
         if not arg_matched:
@@ -176,11 +154,16 @@ def ignore_flat_ann_args(flat_ann_args: tp.FlatAnnArgs, ignore_args: tp.Iterable
 
 class UnhashableArgsError(Exception):
     """Unhashable arguments error."""
+
     pass
 
 
-def hash_args(func: tp.Callable, args: tp.Args, kwargs: tp.Kwargs,
-              ignore_args: tp.Optional[tp.Iterable[tp.AnnArgQuery]] = None) -> int:
+def hash_args(
+    func: tp.Callable,
+    args: tp.Args,
+    kwargs: tp.Kwargs,
+    ignore_args: tp.Optional[tp.Iterable[tp.AnnArgQuery]] = None,
+) -> int:
     """Get hash of arguments.
 
     Use `ignore_args` to provide a sequence of queries for arguments that should be ignored."""
@@ -191,7 +174,7 @@ def hash_args(func: tp.Callable, args: tp.Args, kwargs: tp.Kwargs,
     if len(ignore_args) > 0:
         flat_ann_args = ignore_flat_ann_args(flat_ann_args, ignore_args)
     try:
-        return hash(tuple(map(lambda x: (x['name'], x['value']), flat_ann_args)))
+        return hash(tuple(map(lambda x: (x["name"], x["value"]), flat_ann_args)))
     except TypeError:
         raise UnhashableArgsError
 
@@ -201,10 +184,12 @@ def get_expr_var_names(expression: str) -> tp.List[str]:
     return [node.id for node in ast.walk(ast.parse(expression)) if type(node) is ast.Name]
 
 
-def get_context_vars(var_names: tp.Iterable[str],
-                     frames_back: int = 0,
-                     local_dict: tp.Optional[tp.Mapping] = None,
-                     global_dict: tp.Optional[tp.Mapping] = None) -> tp.List[tp.Any]:
+def get_context_vars(
+    var_names: tp.Iterable[str],
+    frames_back: int = 0,
+    local_dict: tp.Optional[tp.Mapping] = None,
+    global_dict: tp.Optional[tp.Mapping] = None,
+) -> tp.List[tp.Any]:
     """Get variables from the local/global context."""
     call_frame = sys._getframe(frames_back + 1)
     clear_local_dict = False

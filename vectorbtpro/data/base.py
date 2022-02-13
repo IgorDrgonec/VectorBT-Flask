@@ -341,6 +341,7 @@ __pdoc__ = {}
 
 class symbol_dict(dict):
     """Dict that contains symbols as keys."""
+
     pass
 
 
@@ -350,18 +351,20 @@ DataT = tp.TypeVar("DataT", bound="Data")
 class Data(Analyzable):
     """Class that downloads, updates, and manages data coming from a data source."""
 
-    def __init__(self,
-                 wrapper: ArrayWrapper,
-                 data: tp.DataDict,
-                 single_symbol: bool,
-                 tz_localize: tp.Optional[tp.TimezoneLike],
-                 tz_convert: tp.Optional[tp.TimezoneLike],
-                 missing_index: str,
-                 missing_columns: str,
-                 fetch_kwargs: tp.Kwargs,
-                 last_index: tp.Dict[tp.Symbol, int],
-                 returned_kwargs: tp.Dict[tp.Symbol, tp.Any],
-                 **kwargs) -> None:
+    def __init__(
+        self,
+        wrapper: ArrayWrapper,
+        data: tp.DataDict,
+        single_symbol: bool,
+        tz_localize: tp.Optional[tp.TimezoneLike],
+        tz_convert: tp.Optional[tp.TimezoneLike],
+        missing_index: str,
+        missing_columns: str,
+        fetch_kwargs: tp.Kwargs,
+        last_index: tp.Dict[tp.Symbol, int],
+        returned_kwargs: tp.Dict[tp.Symbol, tp.Any],
+        **kwargs,
+    ) -> None:
 
         checks.assert_instance_of(data, dict)
         for symbol, obj in data.items():
@@ -379,7 +382,7 @@ class Data(Analyzable):
             fetch_kwargs=fetch_kwargs,
             last_index=last_index,
             returned_kwargs=returned_kwargs,
-            **kwargs
+            **kwargs,
         )
 
         self._data = data
@@ -396,10 +399,7 @@ class Data(Analyzable):
         """Perform indexing on `Data`."""
         new_wrapper = pd_indexing_func(self.wrapper)
         new_data = {symbol: pd_indexing_func(obj) for symbol, obj in self.data.items()}
-        return self.replace(
-            wrapper=new_wrapper,
-            data=new_data
-        )
+        return self.replace(wrapper=new_wrapper, data=new_data)
 
     @property
     def data(self) -> tp.DataDict:
@@ -452,10 +452,12 @@ class Data(Analyzable):
         return self._returned_kwargs
 
     @classmethod
-    def prepare_tzaware_index(cls,
-                              obj: tp.SeriesFrame,
-                              tz_localize: tp.Optional[tp.TimezoneLike] = None,
-                              tz_convert: tp.Optional[tp.TimezoneLike] = None) -> tp.SeriesFrame:
+    def prepare_tzaware_index(
+        cls,
+        obj: tp.SeriesFrame,
+        tz_localize: tp.Optional[tp.TimezoneLike] = None,
+        tz_convert: tp.Optional[tp.TimezoneLike] = None,
+    ) -> tp.SeriesFrame:
         """Prepare a timezone-aware index of a pandas object.
 
         If the index is tz-naive, convert to a timezone using `tz_localize`.
@@ -464,12 +466,13 @@ class Data(Analyzable):
 
         For defaults, see `vectorbtpro._settings.data`."""
         from vectorbtpro._settings import settings
-        data_cfg = settings['data']
+
+        data_cfg = settings["data"]
 
         if tz_localize is None:
-            tz_localize = data_cfg['tz_localize']
+            tz_localize = data_cfg["tz_localize"]
         if tz_convert is None:
-            tz_convert = data_cfg['tz_convert']
+            tz_convert = data_cfg["tz_convert"]
 
         if isinstance(obj.index, pd.DatetimeIndex):
             if tz_localize is not None:
@@ -494,10 +497,11 @@ class Data(Analyzable):
             return data
 
         from vectorbtpro._settings import settings
-        data_cfg = settings['data']
+
+        data_cfg = settings["data"]
 
         if missing is None:
-            missing = data_cfg['missing_index']
+            missing = data_cfg["missing_index"]
 
         index = None
         for symbol, obj in data.items():
@@ -505,15 +509,16 @@ class Data(Analyzable):
                 index = obj.index
             else:
                 if len(index.intersection(obj.index)) != len(index.union(obj.index)):
-                    if missing == 'nan':
-                        warnings.warn("Symbols have mismatching index. "
-                                      "Setting missing data points to NaN.", stacklevel=2)
+                    if missing == "nan":
+                        warnings.warn(
+                            "Symbols have mismatching index. " "Setting missing data points to NaN.",
+                            stacklevel=2,
+                        )
                         index = index.union(obj.index)
-                    elif missing == 'drop':
-                        warnings.warn("Symbols have mismatching index. "
-                                      "Dropping missing data points.", stacklevel=2)
+                    elif missing == "drop":
+                        warnings.warn("Symbols have mismatching index. " "Dropping missing data points.", stacklevel=2)
                         index = index.intersection(obj.index)
-                    elif missing == 'raise':
+                    elif missing == "raise":
                         raise ValueError("Symbols have mismatching index")
                     else:
                         raise ValueError(f"missing='{missing}' is not recognized")
@@ -531,10 +536,11 @@ class Data(Analyzable):
             return data
 
         from vectorbtpro._settings import settings
-        data_cfg = settings['data']
+
+        data_cfg = settings["data"]
 
         if missing is None:
-            missing = data_cfg['missing_columns']
+            missing = data_cfg["missing_columns"]
 
         columns = None
         multiple_columns = False
@@ -550,15 +556,19 @@ class Data(Analyzable):
                 columns = obj.columns
             else:
                 if len(columns.intersection(obj.columns)) != len(columns.union(obj.columns)):
-                    if missing == 'nan':
-                        warnings.warn("Symbols have mismatching columns. "
-                                      "Setting missing data points to NaN.", stacklevel=2)
+                    if missing == "nan":
+                        warnings.warn(
+                            "Symbols have mismatching columns. " "Setting missing data points to NaN.",
+                            stacklevel=2,
+                        )
                         columns = columns.union(obj.columns)
-                    elif missing == 'drop':
-                        warnings.warn("Symbols have mismatching columns. "
-                                      "Dropping missing data points.", stacklevel=2)
+                    elif missing == "drop":
+                        warnings.warn(
+                            "Symbols have mismatching columns. " "Dropping missing data points.",
+                            stacklevel=2,
+                        )
                         columns = columns.intersection(obj.columns)
-                    elif missing == 'raise':
+                    elif missing == "raise":
                         raise ValueError("Symbols have mismatching columns")
                     else:
                         raise ValueError(f"missing='{missing}' is not recognized")
@@ -591,18 +601,20 @@ class Data(Analyzable):
         return _kwargs
 
     @classmethod
-    def from_data(cls: tp.Type[DataT],
-                  data: tp.DataDict,
-                  single_symbol: bool = False,
-                  tz_localize: tp.Optional[tp.TimezoneLike] = None,
-                  tz_convert: tp.Optional[tp.TimezoneLike] = None,
-                  missing_index: tp.Optional[str] = None,
-                  missing_columns: tp.Optional[str] = None,
-                  wrapper_kwargs: tp.KwargsLike = None,
-                  fetch_kwargs: tp.KwargsLike = None,
-                  last_index: tp.Optional[tp.Dict[tp.Symbol, int]] = None,
-                  returned_kwargs: tp.Optional[tp.Dict[tp.Symbol, tp.Any]] = None,
-                  **kwargs) -> DataT:
+    def from_data(
+        cls: tp.Type[DataT],
+        data: tp.DataDict,
+        single_symbol: bool = False,
+        tz_localize: tp.Optional[tp.TimezoneLike] = None,
+        tz_convert: tp.Optional[tp.TimezoneLike] = None,
+        missing_index: tp.Optional[str] = None,
+        missing_columns: tp.Optional[str] = None,
+        wrapper_kwargs: tp.KwargsLike = None,
+        fetch_kwargs: tp.KwargsLike = None,
+        last_index: tp.Optional[tp.Dict[tp.Symbol, int]] = None,
+        returned_kwargs: tp.Optional[tp.Dict[tp.Symbol, tp.Any]] = None,
+        **kwargs,
+    ) -> DataT:
         """Create a new `Data` instance from data.
 
         Args:
@@ -656,28 +668,30 @@ class Data(Analyzable):
             fetch_kwargs=fetch_kwargs,
             last_index=last_index,
             returned_kwargs=returned_kwargs,
-            **kwargs
+            **kwargs,
         )
 
     @classmethod
-    def fetch_symbol(cls, symbol: tp.Symbol, **kwargs) -> \
-            tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
+    def fetch_symbol(cls, symbol: tp.Symbol, **kwargs) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
         """Fetch a symbol.
 
         May also return a dictionary that will be accessible as `Data.returned_kwargs`."""
         raise NotImplementedError
 
     @classmethod
-    def fetch(cls: tp.Type[DataT],
-              symbols: tp.Union[tp.Symbol, tp.Symbols] = None, *,
-              tz_localize: tp.Optional[tp.TimezoneLike] = None,
-              tz_convert: tp.Optional[tp.TimezoneLike] = None,
-              missing_index: tp.Optional[str] = None,
-              missing_columns: tp.Optional[str] = None,
-              wrapper_kwargs: tp.KwargsLike = None,
-              show_progress: tp.Optional[bool] = None,
-              pbar_kwargs: tp.KwargsLike = None,
-              **kwargs) -> DataT:
+    def fetch(
+        cls: tp.Type[DataT],
+        symbols: tp.Union[tp.Symbol, tp.Symbols] = None,
+        *,
+        tz_localize: tp.Optional[tp.TimezoneLike] = None,
+        tz_convert: tp.Optional[tp.TimezoneLike] = None,
+        missing_index: tp.Optional[str] = None,
+        missing_columns: tp.Optional[str] = None,
+        wrapper_kwargs: tp.KwargsLike = None,
+        show_progress: tp.Optional[bool] = None,
+        pbar_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> DataT:
         """Fetch data using `Data.fetch_symbol` and pass to `Data.from_data`.
 
         Args:
@@ -702,7 +716,8 @@ class Data(Analyzable):
                 If two symbols require different keyword arguments, pass `symbol_dict` for each argument.
         """
         from vectorbtpro._settings import settings
-        data_cfg = settings['data']
+
+        data_cfg = settings["data"]
 
         if checks.is_hashable(symbols):
             single_symbol = True
@@ -713,10 +728,10 @@ class Data(Analyzable):
             single_symbol = False
         show_symbol_progress = show_progress
         if show_symbol_progress is None:
-            show_symbol_progress = data_cfg['show_progress']
+            show_symbol_progress = data_cfg["show_progress"]
         if show_progress is None:
-            show_progress = data_cfg['show_progress'] and not single_symbol
-        pbar_kwargs = merge_dicts(data_cfg['pbar_kwargs'], pbar_kwargs)
+            show_progress = data_cfg["show_progress"] and not single_symbol
+        pbar_kwargs = merge_dicts(data_cfg["pbar_kwargs"], pbar_kwargs)
 
         data = {}
         returned_kwargs = {}
@@ -727,10 +742,10 @@ class Data(Analyzable):
 
                 _kwargs = cls.select_symbol_kwargs(symbol, kwargs)
                 func_arg_names = get_func_arg_names(cls.fetch_symbol)
-                if 'show_progress' in func_arg_names:
-                    _kwargs['show_progress'] = show_symbol_progress
-                if 'pbar_kwargs' in func_arg_names:
-                    _kwargs['pbar_kwargs'] = pbar_kwargs
+                if "show_progress" in func_arg_names:
+                    _kwargs["show_progress"] = show_symbol_progress
+                if "pbar_kwargs" in func_arg_names:
+                    _kwargs["pbar_kwargs"] = pbar_kwargs
                 out = cls.fetch_symbol(symbol, **_kwargs)
                 if isinstance(out, tuple):
                     data[symbol] = out[0]
@@ -751,7 +766,7 @@ class Data(Analyzable):
             missing_columns=missing_columns,
             wrapper_kwargs=wrapper_kwargs,
             fetch_kwargs=kwargs,
-            returned_kwargs=returned_kwargs
+            returned_kwargs=returned_kwargs,
         )
 
     def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
@@ -776,9 +791,10 @@ class Data(Analyzable):
         !!! note
             Returns a new `Data` instance instead of changing the data in place."""
         from vectorbtpro._settings import settings
-        data_cfg = settings['data']
 
-        pbar_kwargs = merge_dicts(data_cfg['pbar_kwargs'], pbar_kwargs)
+        data_cfg = settings["data"]
+
+        pbar_kwargs = merge_dicts(data_cfg["pbar_kwargs"], pbar_kwargs)
 
         new_data = {}
         new_last_index = {}
@@ -790,10 +806,10 @@ class Data(Analyzable):
 
                 _kwargs = self.select_symbol_kwargs(symbol, kwargs)
                 func_arg_names = get_func_arg_names(self.fetch_symbol)
-                if 'show_progress' in func_arg_names:
-                    _kwargs['show_progress'] = show_progress
-                if 'pbar_kwargs' in func_arg_names:
-                    _kwargs['pbar_kwargs'] = pbar_kwargs
+                if "show_progress" in func_arg_names:
+                    _kwargs["show_progress"] = show_progress
+                if "pbar_kwargs" in func_arg_names:
+                    _kwargs["pbar_kwargs"] = pbar_kwargs
                 out = self.update_symbol(symbol, **_kwargs)
                 if isinstance(out, tuple):
                     new_obj = out[0]
@@ -804,16 +820,8 @@ class Data(Analyzable):
 
                 if not isinstance(new_obj, (pd.Series, pd.DataFrame)):
                     new_obj = to_pd_array(new_obj)
-                    new_obj.index = pd.RangeIndex(
-                        start=obj.index[-1],
-                        stop=obj.index[-1] + new_obj.shape[0],
-                        step=1
-                    )
-                new_obj = self.prepare_tzaware_index(
-                    new_obj,
-                    tz_localize=self.tz_localize,
-                    tz_convert=self.tz_convert
-                )
+                    new_obj.index = pd.RangeIndex(start=obj.index[-1], stop=obj.index[-1] + new_obj.shape[0], step=1)
+                new_obj = self.prepare_tzaware_index(new_obj, tz_localize=self.tz_localize, tz_convert=self.tz_convert)
                 new_data[symbol] = new_obj
                 if len(new_obj.index) > 0:
                     new_last_index[symbol] = new_obj.index[-1]
@@ -847,7 +855,7 @@ class Data(Analyzable):
                 obj = obj[new_obj.name]
             obj = obj.loc[from_index:to_index]
             new_obj = pd.concat((obj, new_obj), axis=0)
-            new_obj = new_obj[~new_obj.index.duplicated(keep='last')]
+            new_obj = new_obj[~new_obj.index.duplicated(keep="last")]
             new_data[symbol] = new_obj
 
         new_data = self.align_index(new_data, missing=self.missing_index)
@@ -874,10 +882,10 @@ class Data(Analyzable):
             wrapper=self.wrapper.replace(index=new_index),
             data=new_data,
             last_index=new_last_index,
-            returned_kwargs=new_returned_kwargs
+            returned_kwargs=new_returned_kwargs,
         )
 
-    def concat(self, symbols: tp.Optional[tp.Symbols] = None, level_name: str = 'symbol') -> tp.DataDict:
+    def concat(self, symbols: tp.Optional[tp.Symbols] = None, level_name: str = "symbol") -> tp.DataDict:
         """Return a dict of Series/DataFrames with symbols as columns, keyed by column name."""
         if symbols is None:
             symbols = self.symbols
@@ -906,10 +914,12 @@ class Data(Analyzable):
 
         return new_data
 
-    def get(self,
-            column: tp.Optional[tp.Union[tp.Label, tp.Labels]] = None,
-            symbol: tp.Optional[tp.Union[tp.Symbol, tp.Symbols]] = None,
-            **kwargs) -> tp.MaybeTuple[tp.SeriesFrame]:
+    def get(
+        self,
+        column: tp.Optional[tp.Union[tp.Label, tp.Labels]] = None,
+        symbol: tp.Optional[tp.Union[tp.Symbol, tp.Symbols]] = None,
+        **kwargs,
+    ) -> tp.MaybeTuple[tp.SeriesFrame]:
         """Get column data.
 
         If one symbol, returns data for that symbol. If multiple symbols, performs concatenation
@@ -941,12 +951,14 @@ class Data(Analyzable):
 
     # ############# Saving ############# #
 
-    def to_csv(self,
-               dir_path: tp.Union[tp.PathLike, symbol_dict] = '.',
-               ext: tp.Union[str, symbol_dict] = 'csv',
-               path_or_buf: tp.Optional[tp.Union[str, symbol_dict]] = None,
-               mkdir_kwargs: tp.Union[tp.KwargsLike, symbol_dict] = None,
-               **kwargs) -> None:
+    def to_csv(
+        self,
+        dir_path: tp.Union[tp.PathLike, symbol_dict] = ".",
+        ext: tp.Union[str, symbol_dict] = "csv",
+        path_or_buf: tp.Optional[tp.Union[str, symbol_dict]] = None,
+        mkdir_kwargs: tp.Union[tp.KwargsLike, symbol_dict] = None,
+        **kwargs,
+    ) -> None:
         """Save data into CSV file(s).
 
         Any argument can be provided per symbol using `symbol_dict`."""
@@ -966,7 +978,7 @@ class Data(Analyzable):
                     _ext = ext[k]
                 else:
                     _ext = ext
-                _path_or_buf = str(Path(_dir_path) / f'{k}.{_ext}')
+                _path_or_buf = str(Path(_dir_path) / f"{k}.{_ext}")
             elif isinstance(path_or_buf, symbol_dict):
                 _path_or_buf = path_or_buf[k]
             else:
@@ -974,12 +986,14 @@ class Data(Analyzable):
             _kwargs = self.select_symbol_kwargs(k, kwargs)
             v.to_csv(path_or_buf=_path_or_buf, **_kwargs)
 
-    def to_hdf(self,
-               file_path: tp.Union[tp.PathLike, symbol_dict] = '.',
-               key: tp.Optional[tp.Union[str, symbol_dict]] = None,
-               path_or_buf: tp.Optional[tp.Union[str, symbol_dict]] = None,
-               mkdir_kwargs: tp.Union[tp.KwargsLike, symbol_dict] = None,
-               **kwargs) -> None:
+    def to_hdf(
+        self,
+        file_path: tp.Union[tp.PathLike, symbol_dict] = ".",
+        key: tp.Optional[tp.Union[str, symbol_dict]] = None,
+        path_or_buf: tp.Optional[tp.Union[str, symbol_dict]] = None,
+        mkdir_kwargs: tp.Union[tp.KwargsLike, symbol_dict] = None,
+        **kwargs,
+    ) -> None:
         """Save data into an HDF file.
 
         Any argument can be provided per symbol using `symbol_dict`.
@@ -995,7 +1009,7 @@ class Data(Analyzable):
                     _file_path = file_path
                 _file_path = Path(_file_path)
                 if _file_path.exists() and _file_path.is_dir():
-                    _file_path /= type(self).__name__ + '.h5'
+                    _file_path /= type(self).__name__ + ".h5"
                 _dir_path = _file_path.parent
                 if isinstance(mkdir_kwargs, symbol_dict):
                     _mkdir_kwargs = mkdir_kwargs[k]
@@ -1025,49 +1039,36 @@ class Data(Analyzable):
         Merges `vectorbtpro.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
         `stats` from `vectorbtpro._settings.data`."""
         from vectorbtpro._settings import settings
-        data_stats_cfg = settings['data']['stats']
 
-        return merge_dicts(
-            Analyzable.stats_defaults.__get__(self),
-            data_stats_cfg
-        )
+        data_stats_cfg = settings["data"]["stats"]
+
+        return merge_dicts(Analyzable.stats_defaults.__get__(self), data_stats_cfg)
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
-            start=dict(
-                title='Start',
-                calc_func=lambda self: self.wrapper.index[0],
-                agg_func=None,
-                tags='wrapper'
-            ),
-            end=dict(
-                title='End',
-                calc_func=lambda self: self.wrapper.index[-1],
-                agg_func=None,
-                tags='wrapper'
-            ),
+            start=dict(title="Start", calc_func=lambda self: self.wrapper.index[0], agg_func=None, tags="wrapper"),
+            end=dict(title="End", calc_func=lambda self: self.wrapper.index[-1], agg_func=None, tags="wrapper"),
             period=dict(
-                title='Period',
+                title="Period",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,
-                tags='wrapper'
+                tags="wrapper",
             ),
             total_symbols=dict(
-                title='Total Symbols',
+                title="Total Symbols",
                 calc_func=lambda self: len(self.symbols),
                 agg_func=None,
-                tags='data'
+                tags="data",
             ),
             null_counts=dict(
-                title='Null Counts',
-                calc_func=lambda self, group_by:
-                {
+                title="Null Counts",
+                calc_func=lambda self, group_by: {
                     symbol: obj.isnull().vbt(wrapper=self.wrapper).sum(group_by=group_by)
                     for symbol, obj in self.data.items()
                 },
-                tags='data'
-            )
+                tags="data",
+            ),
         )
     )
 
@@ -1077,10 +1078,12 @@ class Data(Analyzable):
 
     # ############# Plotting ############# #
 
-    def plot(self,
-             column: tp.Optional[tp.Label] = None,
-             base: tp.Optional[float] = None,
-             **kwargs) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:  # pragma: no cover
+    def plot(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        base: tp.Optional[float] = None,
+        **kwargs,
+    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:  # pragma: no cover
         """Plot orders.
 
         Args:
@@ -1121,22 +1124,13 @@ class Data(Analyzable):
         Merges `vectorbtpro.generic.plots_builder.PlotsBuilderMixin.plots_defaults` and
         `plots` from `vectorbtpro._settings.data`."""
         from vectorbtpro._settings import settings
-        data_plots_cfg = settings['data']['plots']
 
-        return merge_dicts(
-            Analyzable.plots_defaults.__get__(self),
-            data_plots_cfg
-        )
+        data_plots_cfg = settings["data"]["plots"]
+
+        return merge_dicts(Analyzable.plots_defaults.__get__(self), data_plots_cfg)
 
     _subplots: tp.ClassVar[Config] = Config(
-        dict(
-            plot=dict(
-                check_is_not_grouped=True,
-                plot_func='plot',
-                pass_add_trace_kwargs=True,
-                tags='data'
-            )
-        )
+        dict(plot=dict(check_is_not_grouped=True, plot_func="plot", pass_add_trace_kwargs=True, tags="data")),
     )
 
     @property

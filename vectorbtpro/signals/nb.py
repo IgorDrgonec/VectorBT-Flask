@@ -43,15 +43,11 @@ from vectorbtpro.utils.template import Rep
 
 
 @register_chunkable(
-    size=ch.ShapeSizer(arg_query='target_shape', axis=1),
-    arg_take_spec=dict(
-        target_shape=ch.ShapeSlicer(axis=1),
-        place_func_nb=None,
-        args=ch.ArgsTaker()
-    ),
-    merge_func=base_ch.column_stack
+    size=ch.ShapeSizer(arg_query="target_shape", axis=1),
+    arg_take_spec=dict(target_shape=ch.ShapeSlicer(axis=1), place_func_nb=None, args=ch.ArgsTaker()),
+    merge_func=base_ch.column_stack,
 )
-@register_jitted(tags={'can_parallel'})
+@register_jitted(tags={"can_parallel"})
 def generate_nb(target_shape: tp.Shape, place_func_nb: tp.PlaceFunc, *args) -> tp.Array2d:
     """Create a boolean matrix of `target_shape` and pick signals using `place_func_nb`.
 
@@ -77,7 +73,7 @@ def generate_nb(target_shape: tp.Shape, place_func_nb: tp.PlaceFunc, *args) -> t
 
 
 @register_chunkable(
-    size=ch.ShapeSizer(arg_query='target_shape', axis=1),
+    size=ch.ShapeSizer(arg_query="target_shape", axis=1),
     arg_take_spec=dict(
         target_shape=ch.ShapeSlicer(axis=1),
         entry_wait=None,
@@ -87,20 +83,22 @@ def generate_nb(target_shape: tp.Shape, place_func_nb: tp.PlaceFunc, *args) -> t
         entry_place_func_nb=None,
         entry_args=ch.ArgsTaker(),
         exit_place_func_nb=None,
-        exit_args=ch.ArgsTaker()
+        exit_args=ch.ArgsTaker(),
     ),
-    merge_func=base_ch.column_stack
+    merge_func=base_ch.column_stack,
 )
 @register_jitted
-def generate_enex_nb(target_shape: tp.Shape,
-                     entry_wait: int,
-                     exit_wait: int,
-                     max_one_entry: bool,
-                     max_one_exit: bool,
-                     entry_place_func_nb: tp.PlaceFunc,
-                     entry_args: tp.Args,
-                     exit_place_func_nb: tp.PlaceFunc,
-                     exit_args: tp.Args) -> tp.Tuple[tp.Array2d, tp.Array2d]:
+def generate_enex_nb(
+    target_shape: tp.Shape,
+    entry_wait: int,
+    exit_wait: int,
+    max_one_entry: bool,
+    max_one_exit: bool,
+    entry_place_func_nb: tp.PlaceFunc,
+    entry_args: tp.Args,
+    exit_place_func_nb: tp.PlaceFunc,
+    exit_args: tp.Args,
+) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Pick entry signals using `entry_place_func_nb` and exit signals using
     `exit_place_func_nb` one after another.
 
@@ -157,25 +155,11 @@ def generate_enex_nb(target_shape: tp.Shape,
             if entries_turn:
                 if not first_signal:
                     from_i += entry_wait
-                from_i = _place_signals(
-                    entries,
-                    from_i,
-                    col,
-                    max_one_entry,
-                    entry_place_func_nb,
-                    entry_args
-                )
+                from_i = _place_signals(entries, from_i, col, max_one_entry, entry_place_func_nb, entry_args)
                 entries_turn = False
             else:
                 from_i += exit_wait
-                from_i = _place_signals(
-                    exits,
-                    from_i,
-                    col,
-                    max_one_exit,
-                    exit_place_func_nb,
-                    exit_args
-                )
+                from_i = _place_signals(exits, from_i, col, max_one_exit, exit_place_func_nb, exit_args)
                 entries_turn = True
             first_signal = False
 
@@ -183,23 +167,26 @@ def generate_enex_nb(target_shape: tp.Shape,
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='entries', axis=1),
+    size=ch.ArraySizer(arg_query="entries", axis=1),
     arg_take_spec=dict(
         entries=ch.ArraySlicer(axis=1),
         wait=None,
         until_next=None,
         skip_until_exit=None,
         exit_place_func_nb=None,
-        args=ch.ArgsTaker()
+        args=ch.ArgsTaker(),
     ),
-    merge_func=base_ch.column_stack
+    merge_func=base_ch.column_stack,
 )
-@register_jitted(tags={'can_parallel'})
-def generate_ex_nb(entries: tp.Array2d,
-                   wait: int,
-                   until_next: bool,
-                   skip_until_exit: bool,
-                   exit_place_func_nb: tp.PlaceFunc, *args) -> tp.Array2d:
+@register_jitted(tags={"can_parallel"})
+def generate_ex_nb(
+    entries: tp.Array2d,
+    wait: int,
+    until_next: bool,
+    skip_until_exit: bool,
+    exit_place_func_nb: tp.PlaceFunc,
+    *args,
+) -> tp.Array2d:
     """Pick exit signals using `exit_place_func_nb` after each signal in `entries`.
 
     Args:
@@ -255,9 +242,7 @@ def generate_ex_nb(entries: tp.Array2d,
 
 
 @register_jitted(cache=True)
-def clean_enex_1d_nb(entries: tp.Array1d,
-                     exits: tp.Array1d,
-                     entry_first: bool) -> tp.Tuple[tp.Array1d, tp.Array1d]:
+def clean_enex_1d_nb(entries: tp.Array1d, exits: tp.Array1d, entry_first: bool) -> tp.Tuple[tp.Array1d, tp.Array1d]:
     """Clean entry and exit arrays by picking the first signal out of each.
 
     Entry signal must be picked first. If both signals are present, selects none."""
@@ -281,18 +266,12 @@ def clean_enex_1d_nb(entries: tp.Array1d,
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='entries', axis=1),
-    arg_take_spec=dict(
-        entries=ch.ArraySlicer(axis=1),
-        exits=ch.ArraySlicer(axis=1),
-        entry_first=None
-    ),
-    merge_func=base_ch.column_stack
+    size=ch.ArraySizer(arg_query="entries", axis=1),
+    arg_take_spec=dict(entries=ch.ArraySlicer(axis=1), exits=ch.ArraySlicer(axis=1), entry_first=None),
+    merge_func=base_ch.column_stack,
 )
-@register_jitted(cache=True, tags={'can_parallel'})
-def clean_enex_nb(entries: tp.Array2d,
-                  exits: tp.Array2d,
-                  entry_first: bool) -> tp.Tuple[tp.Array2d, tp.Array2d]:
+@register_jitted(cache=True, tags={"can_parallel"})
+def clean_enex_nb(entries: tp.Array2d, exits: tp.Array2d, entry_first: bool) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """2-dim version of `clean_enex_1d_nb`."""
     entries_out = np.empty(entries.shape, dtype=np.bool_)
     exits_out = np.empty(exits.shape, dtype=np.bool_)
@@ -320,13 +299,15 @@ def rand_place_nb(out: tp.Array1d, from_i: int, to_i: int, col: int, n: tp.FlexA
 
 
 @register_jitted(cache=True)
-def rand_by_prob_place_nb(out: tp.Array1d,
-                          from_i: int,
-                          to_i: int,
-                          col: int,
-                          prob: tp.FlexArray,
-                          pick_first: bool,
-                          flex_2d: bool) -> None:
+def rand_by_prob_place_nb(
+    out: tp.Array1d,
+    from_i: int,
+    to_i: int,
+    col: int,
+    prob: tp.FlexArray,
+    pick_first: bool,
+    flex_2d: bool,
+) -> None:
     """`place_func_nb` to randomly place signals with probability `prob`.
 
     `prob` uses flexible indexing."""
@@ -338,20 +319,22 @@ def rand_by_prob_place_nb(out: tp.Array1d,
 
 
 @register_chunkable(
-    size=ch.ShapeSizer(arg_query='target_shape', axis=1),
+    size=ch.ShapeSizer(arg_query="target_shape", axis=1),
     arg_take_spec=dict(
         target_shape=ch.ShapeSlicer(axis=1),
         n=base_ch.FlexArraySlicer(axis=1, flex_2d=True),
         entry_wait=None,
-        exit_wait=None
+        exit_wait=None,
     ),
-    merge_func=base_ch.column_stack
+    merge_func=base_ch.column_stack,
 )
-@register_jitted(tags={'can_parallel'})
-def generate_rand_enex_nb(target_shape: tp.Shape,
-                          n: tp.FlexArray,
-                          entry_wait: int,
-                          exit_wait: int) -> tp.Tuple[tp.Array2d, tp.Array2d]:
+@register_jitted(tags={"can_parallel"})
+def generate_rand_enex_nb(
+    target_shape: tp.Shape,
+    n: tp.FlexArray,
+    entry_wait: int,
+    exit_wait: int,
+) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Pick a number of entries and the same number of exits one after another.
 
     Respects `entry_wait` and `exit_wait` constraints through a number of tricks.
@@ -442,10 +425,12 @@ def generate_rand_enex_nb(target_shape: tp.Shape,
     return entries, exits
 
 
-def rand_enex_apply_nb(target_shape: tp.Shape,
-                       n: tp.FlexArray,
-                       entry_wait: int,
-                       exit_wait: int) -> tp.Tuple[tp.Array2d, tp.Array2d]:
+def rand_enex_apply_nb(
+    target_shape: tp.Shape,
+    n: tp.FlexArray,
+    entry_wait: int,
+    exit_wait: int,
+) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """`apply_func_nb` that calls `generate_rand_enex_nb`."""
     return generate_rand_enex_nb(target_shape, n, entry_wait, exit_wait)
 
@@ -463,16 +448,18 @@ def first_place_nb(out: tp.Array1d, from_i: int, to_i: int, col: int, mask: tp.A
 
 
 @register_jitted(cache=True)
-def stop_place_nb(out: tp.Array1d,
-                  from_i: int,
-                  to_i: int,
-                  col: int,
-                  ts: tp.FlexArray,
-                  stop: tp.FlexArray,
-                  trailing: tp.FlexArray,
-                  wait: int,
-                  pick_first: bool,
-                  flex_2d: bool) -> None:
+def stop_place_nb(
+    out: tp.Array1d,
+    from_i: int,
+    to_i: int,
+    col: int,
+    ts: tp.FlexArray,
+    stop: tp.FlexArray,
+    trailing: tp.FlexArray,
+    wait: int,
+    pick_first: bool,
+    flex_2d: bool,
+) -> None:
     """`place_func_nb` that returns the indices of the stop being hit.
 
     Args:
@@ -536,24 +523,26 @@ def stop_place_nb(out: tp.Array1d,
 
 
 @register_jitted(cache=True)
-def ohlc_stop_place_nb(out: tp.Array1d,
-                       from_i: int,
-                       to_i: int,
-                       col: int,
-                       open: tp.FlexArray,
-                       high: tp.FlexArray,
-                       low: tp.FlexArray,
-                       close: tp.FlexArray,
-                       stop_price_out: tp.Array2d,
-                       stop_type_out: tp.Array2d,
-                       sl_stop: tp.FlexArray,
-                       sl_trail: tp.FlexArray,
-                       tp_stop: tp.FlexArray,
-                       reverse: tp.FlexArray,
-                       is_open_safe: bool,
-                       wait: int,
-                       pick_first: bool,
-                       flex_2d: bool) -> None:
+def ohlc_stop_place_nb(
+    out: tp.Array1d,
+    from_i: int,
+    to_i: int,
+    col: int,
+    open: tp.FlexArray,
+    high: tp.FlexArray,
+    low: tp.FlexArray,
+    close: tp.FlexArray,
+    stop_price_out: tp.Array2d,
+    stop_type_out: tp.Array2d,
+    sl_stop: tp.FlexArray,
+    sl_trail: tp.FlexArray,
+    tp_stop: tp.FlexArray,
+    reverse: tp.FlexArray,
+    is_open_safe: bool,
+    wait: int,
+    pick_first: bool,
+    flex_2d: bool,
+) -> None:
     """`place_func_nb` that returns the indices of the stop price being hit within OHLC.
 
     Compared to `stop_place_nb`, takes into account the whole bar, can check for both
@@ -567,7 +556,7 @@ def ohlc_stop_place_nb(out: tp.Array1d,
         1) if stop has been hit before open, stop price becomes current open,
         2) trailing stop can only be based on previous close/high, and
         3) we pessimistically assume that SL comes before TP.
-    
+
     Args:
         out (array): Boolean array to write.
         col (int): Current column.
@@ -727,14 +716,12 @@ def ohlc_stop_place_nb(out: tp.Array1d,
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='mask', axis=1),
-    arg_take_spec=dict(
-        mask=ch.ArraySlicer(axis=1)
-    ),
+    size=ch.ArraySizer(arg_query="mask", axis=1),
+    arg_take_spec=dict(mask=ch.ArraySlicer(axis=1)),
     merge_func=records_ch.merge_records,
-    merge_kwargs=dict(chunk_meta=Rep('chunk_meta'))
+    merge_kwargs=dict(chunk_meta=Rep("chunk_meta")),
 )
-@register_jitted(cache=True, tags={'can_parallel'})
+@register_jitted(cache=True, tags={"can_parallel"})
 def between_ranges_nb(mask: tp.Array2d) -> tp.RecordArray:
     """Create a record of type `vectorbtpro.generic.enums.range_dt` for each range between two signals in `mask`."""
     new_records = np.empty(mask.shape, dtype=range_dt)
@@ -747,11 +734,11 @@ def between_ranges_nb(mask: tp.Array2d) -> tp.RecordArray:
                 if from_i > -1:
                     to_i = i
                     r = counts[col]
-                    new_records['id'][r, col] = r
-                    new_records['col'][r, col] = col
-                    new_records['start_idx'][r, col] = from_i
-                    new_records['end_idx'][r, col] = to_i
-                    new_records['status'][r, col] = RangeStatus.Closed
+                    new_records["id"][r, col] = r
+                    new_records["col"][r, col] = col
+                    new_records["start_idx"][r, col] = from_i
+                    new_records["end_idx"][r, col] = to_i
+                    new_records["status"][r, col] = RangeStatus.Closed
                     counts[col] += 1
                 from_i = i
 
@@ -759,16 +746,12 @@ def between_ranges_nb(mask: tp.Array2d) -> tp.RecordArray:
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='mask', axis=1),
-    arg_take_spec=dict(
-        mask=ch.ArraySlicer(axis=1),
-        other_mask=ch.ArraySlicer(axis=1),
-        from_other=None
-    ),
+    size=ch.ArraySizer(arg_query="mask", axis=1),
+    arg_take_spec=dict(mask=ch.ArraySlicer(axis=1), other_mask=ch.ArraySlicer(axis=1), from_other=None),
     merge_func=records_ch.merge_records,
-    merge_kwargs=dict(chunk_meta=Rep('chunk_meta'))
+    merge_kwargs=dict(chunk_meta=Rep("chunk_meta")),
 )
-@register_jitted(cache=True, tags={'can_parallel'})
+@register_jitted(cache=True, tags={"can_parallel"})
 def between_two_ranges_nb(mask: tp.Array2d, other_mask: tp.Array2d, from_other: bool = False) -> tp.RecordArray:
     """Create a record of type `vectorbtpro.generic.enums.range_dt` for each range between two
     signals in `mask` and `other_mask`.
@@ -790,11 +773,11 @@ def between_two_ranges_nb(mask: tp.Array2d, other_mask: tp.Array2d, from_other: 
                 if mask[i, col]:
                     from_i = i
                     r = counts[col]
-                    new_records['id'][r, col] = r
-                    new_records['col'][r, col] = col
-                    new_records['start_idx'][r, col] = from_i
-                    new_records['end_idx'][r, col] = to_i
-                    new_records['status'][r, col] = RangeStatus.Closed
+                    new_records["id"][r, col] = r
+                    new_records["col"][r, col] = col
+                    new_records["start_idx"][r, col] = from_i
+                    new_records["end_idx"][r, col] = to_i
+                    new_records["status"][r, col] = RangeStatus.Closed
                     counts[col] += 1
         else:
             from_i = -1
@@ -804,25 +787,23 @@ def between_two_ranges_nb(mask: tp.Array2d, other_mask: tp.Array2d, from_other: 
                 if other_mask[i, col]:
                     to_i = i
                     r = counts[col]
-                    new_records['id'][r, col] = r
-                    new_records['col'][r, col] = col
-                    new_records['start_idx'][r, col] = from_i
-                    new_records['end_idx'][r, col] = to_i
-                    new_records['status'][r, col] = RangeStatus.Closed
+                    new_records["id"][r, col] = r
+                    new_records["col"][r, col] = col
+                    new_records["start_idx"][r, col] = from_i
+                    new_records["end_idx"][r, col] = to_i
+                    new_records["status"][r, col] = RangeStatus.Closed
                     counts[col] += 1
 
     return generic_nb.repartition_nb(new_records, counts)
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='mask', axis=1),
-    arg_take_spec=dict(
-        mask=ch.ArraySlicer(axis=1)
-    ),
+    size=ch.ArraySizer(arg_query="mask", axis=1),
+    arg_take_spec=dict(mask=ch.ArraySlicer(axis=1)),
     merge_func=records_ch.merge_records,
-    merge_kwargs=dict(chunk_meta=Rep('chunk_meta'))
+    merge_kwargs=dict(chunk_meta=Rep("chunk_meta")),
 )
-@register_jitted(cache=True, tags={'can_parallel'})
+@register_jitted(cache=True, tags={"can_parallel"})
 def partition_ranges_nb(mask: tp.Array2d) -> tp.RecordArray:
     """Create a record of type `vectorbtpro.generic.enums.range_dt` for each partition of signals in `mask`."""
     new_records = np.empty(mask.shape, dtype=range_dt)
@@ -839,36 +820,34 @@ def partition_ranges_nb(mask: tp.Array2d) -> tp.RecordArray:
             elif is_partition:
                 to_i = i
                 r = counts[col]
-                new_records['id'][r, col] = r
-                new_records['col'][r, col] = col
-                new_records['start_idx'][r, col] = from_i
-                new_records['end_idx'][r, col] = to_i
-                new_records['status'][r, col] = RangeStatus.Closed
+                new_records["id"][r, col] = r
+                new_records["col"][r, col] = col
+                new_records["start_idx"][r, col] = from_i
+                new_records["end_idx"][r, col] = to_i
+                new_records["status"][r, col] = RangeStatus.Closed
                 counts[col] += 1
                 is_partition = False
             if i == mask.shape[0] - 1:
                 if is_partition:
                     to_i = mask.shape[0] - 1
                     r = counts[col]
-                    new_records['id'][r, col] = r
-                    new_records['col'][r, col] = col
-                    new_records['start_idx'][r, col] = from_i
-                    new_records['end_idx'][r, col] = to_i
-                    new_records['status'][r, col] = RangeStatus.Open
+                    new_records["id"][r, col] = r
+                    new_records["col"][r, col] = col
+                    new_records["start_idx"][r, col] = from_i
+                    new_records["end_idx"][r, col] = to_i
+                    new_records["status"][r, col] = RangeStatus.Open
                     counts[col] += 1
 
     return generic_nb.repartition_nb(new_records, counts)
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='mask', axis=1),
-    arg_take_spec=dict(
-        mask=ch.ArraySlicer(axis=1)
-    ),
+    size=ch.ArraySizer(arg_query="mask", axis=1),
+    arg_take_spec=dict(mask=ch.ArraySlicer(axis=1)),
     merge_func=records_ch.merge_records,
-    merge_kwargs=dict(chunk_meta=Rep('chunk_meta'))
+    merge_kwargs=dict(chunk_meta=Rep("chunk_meta")),
 )
-@register_jitted(cache=True, tags={'can_parallel'})
+@register_jitted(cache=True, tags={"can_parallel"})
 def between_partition_ranges_nb(mask: tp.Array2d) -> tp.RecordArray:
     """Create a record of type `vectorbtpro.generic.enums.range_dt` for each range between two partitions in `mask`."""
     new_records = np.empty(mask.shape, dtype=range_dt)
@@ -882,11 +861,11 @@ def between_partition_ranges_nb(mask: tp.Array2d) -> tp.RecordArray:
                 if not is_partition and from_i != -1:
                     to_i = i
                     r = counts[col]
-                    new_records['id'][r, col] = r
-                    new_records['col'][r, col] = col
-                    new_records['start_idx'][r, col] = from_i
-                    new_records['end_idx'][r, col] = to_i
-                    new_records['status'][r, col] = RangeStatus.Closed
+                    new_records["id"][r, col] = r
+                    new_records["col"][r, col] = col
+                    new_records["start_idx"][r, col] = from_i
+                    new_records["end_idx"][r, col] = to_i
+                    new_records["status"][r, col] = RangeStatus.Closed
                     counts[col] += 1
                 is_partition = True
                 from_i = i
@@ -898,22 +877,26 @@ def between_partition_ranges_nb(mask: tp.Array2d) -> tp.RecordArray:
 
 # ############# Ranking ############# #
 
+
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='mask', axis=1),
+    size=ch.ArraySizer(arg_query="mask", axis=1),
     arg_take_spec=dict(
         mask=ch.ArraySlicer(axis=1),
         reset_by_mask=None,
         after_false=None,
         rank_func_nb=None,
-        args=ch.ArgsTaker()
+        args=ch.ArgsTaker(),
     ),
-    merge_func=base_ch.column_stack
+    merge_func=base_ch.column_stack,
 )
-@register_jitted(tags={'can_parallel'})
-def rank_nb(mask: tp.Array2d,
-            reset_by_mask: tp.Optional[tp.Array2d],
-            after_false: bool,
-            rank_func_nb: tp.RankFunc, *args) -> tp.Array2d:
+@register_jitted(tags={"can_parallel"})
+def rank_nb(
+    mask: tp.Array2d,
+    reset_by_mask: tp.Optional[tp.Array2d],
+    after_false: bool,
+    rank_func_nb: tp.RankFunc,
+    *args,
+) -> tp.Array2d:
     """Rank each signal using `rank_func_nb`.
 
     Applies `rank_func_nb` on each True value. Must accept the row index, the column index,
@@ -949,8 +932,15 @@ def rank_nb(mask: tp.Array2d,
 
 
 @register_jitted(cache=True)
-def sig_pos_rank_nb(i: int, col: int, reset_i: int, prev_part_end_i: int, part_start_i: int,
-                    sig_pos_temp: tp.Array1d, allow_gaps: bool) -> int:
+def sig_pos_rank_nb(
+    i: int,
+    col: int,
+    reset_i: int,
+    prev_part_end_i: int,
+    part_start_i: int,
+    sig_pos_temp: tp.Array1d,
+    allow_gaps: bool,
+) -> int:
     """`rank_func_nb` that returns the rank of each signal by its position in the partition."""
     if reset_i > prev_part_end_i and max(reset_i, part_start_i) == i:
         sig_pos_temp[col] = -1
@@ -961,8 +951,14 @@ def sig_pos_rank_nb(i: int, col: int, reset_i: int, prev_part_end_i: int, part_s
 
 
 @register_jitted(cache=True)
-def part_pos_rank_nb(i: int, col: int, reset_i: int, prev_part_end_i: int, part_start_i: int,
-                     part_pos_temp: tp.Array1d) -> int:
+def part_pos_rank_nb(
+    i: int,
+    col: int,
+    reset_i: int,
+    prev_part_end_i: int,
+    part_start_i: int,
+    part_pos_temp: tp.Array1d,
+) -> int:
     """`rank_func_nb` that returns the rank of each partition by its position in the series."""
     if reset_i > prev_part_end_i and max(reset_i, part_start_i) == i:
         part_pos_temp[col] = 0
@@ -998,14 +994,11 @@ def nth_index_1d_nb(mask: tp.Array1d, n: int) -> int:
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='mask', axis=1),
-    arg_take_spec=dict(
-        mask=ch.ArraySlicer(axis=1),
-        n=None
-    ),
-    merge_func=base_ch.concat
+    size=ch.ArraySizer(arg_query="mask", axis=1),
+    arg_take_spec=dict(mask=ch.ArraySlicer(axis=1), n=None),
+    merge_func=base_ch.concat,
 )
-@register_jitted(cache=True, tags={'can_parallel'})
+@register_jitted(cache=True, tags={"can_parallel"})
 def nth_index_nb(mask: tp.Array2d, n: int) -> tp.Array1d:
     """2-dim version of `nth_index_1d_nb`."""
     out = np.empty(mask.shape[1], dtype=np.int_)
@@ -1022,13 +1015,11 @@ def norm_avg_index_1d_nb(mask: tp.Array1d) -> float:
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='mask', axis=1),
-    arg_take_spec=dict(
-        mask=ch.ArraySlicer(axis=1)
-    ),
-    merge_func=base_ch.concat
+    size=ch.ArraySizer(arg_query="mask", axis=1),
+    arg_take_spec=dict(mask=ch.ArraySlicer(axis=1)),
+    merge_func=base_ch.concat,
 )
-@register_jitted(cache=True, tags={'can_parallel'})
+@register_jitted(cache=True, tags={"can_parallel"})
 def norm_avg_index_nb(mask: tp.Array2d) -> tp.Array1d:
     """2-dim version of `norm_avg_index_1d_nb`."""
     out = np.empty(mask.shape[1], dtype=np.float_)
@@ -1038,14 +1029,14 @@ def norm_avg_index_nb(mask: tp.Array2d) -> tp.Array1d:
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='group_lens', axis=0),
+    size=ch.ArraySizer(arg_query="group_lens", axis=0),
     arg_take_spec=dict(
         mask=ch.ArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
-        group_lens=ch.ArraySlicer(axis=0)
+        group_lens=ch.ArraySlicer(axis=0),
     ),
-    merge_func=base_ch.concat
+    merge_func=base_ch.concat,
 )
-@register_jitted(cache=True, tags={'can_parallel'})
+@register_jitted(cache=True, tags={"can_parallel"})
 def norm_avg_index_grouped_nb(mask, group_lens):
     """Grouped version of `norm_avg_index_nb`."""
     out = np.empty(len(group_lens), dtype=np.float_)

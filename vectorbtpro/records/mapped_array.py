@@ -430,19 +430,15 @@ from vectorbtpro.utils.mapping import to_mapping, apply_mapping
 
 MappedArrayT = tp.TypeVar("MappedArrayT", bound="MappedArray")
 IndexingMetaT = tp.Tuple[
-    ArrayWrapper,
-    tp.Array1d,
-    tp.Array1d,
-    tp.Array1d,
-    tp.Optional[tp.Array1d],
-    tp.MaybeArray,
-    tp.Array1d
+    ArrayWrapper, tp.Array1d, tp.Array1d, tp.Array1d, tp.Optional[tp.Array1d], tp.MaybeArray, tp.Array1d
 ]
 
 
-def combine_mapped_with_other(self: MappedArrayT,
-                              other: tp.Union["MappedArray", tp.ArrayLike],
-                              np_func: tp.Callable[[tp.ArrayLike, tp.ArrayLike], tp.Array1d]) -> MappedArrayT:
+def combine_mapped_with_other(
+    self: MappedArrayT,
+    other: tp.Union["MappedArray", tp.ArrayLike],
+    np_func: tp.Callable[[tp.ArrayLike, tp.ArrayLike], tp.Array1d],
+) -> MappedArrayT:
     """Combine `MappedArray` with other compatible object.
 
     If other object is also `MappedArray`, their `id_arr` and `col_arr` must match."""
@@ -486,16 +482,18 @@ class MappedArray(Analyzable):
             Useful if any subclass wants to extend the config.
     """
 
-    def __init__(self,
-                 wrapper: ArrayWrapper,
-                 mapped_arr: tp.ArrayLike,
-                 col_arr: tp.ArrayLike,
-                 idx_arr: tp.Optional[tp.ArrayLike] = None,
-                 id_arr: tp.Optional[tp.ArrayLike] = None,
-                 mapping: tp.Optional[tp.MappingLike] = None,
-                 col_mapper: tp.Optional[ColumnMapper] = None,
-                 jitted: tp.JittedOption = None,
-                 **kwargs) -> None:
+    def __init__(
+        self,
+        wrapper: ArrayWrapper,
+        mapped_arr: tp.ArrayLike,
+        col_arr: tp.ArrayLike,
+        idx_arr: tp.Optional[tp.ArrayLike] = None,
+        id_arr: tp.Optional[tp.ArrayLike] = None,
+        mapping: tp.Optional[tp.MappingLike] = None,
+        col_mapper: tp.Optional[ColumnMapper] = None,
+        jitted: tp.JittedOption = None,
+        **kwargs
+    ) -> None:
 
         mapped_arr = np.asarray(mapped_arr)
         col_arr = np.asarray(col_arr)
@@ -511,9 +509,9 @@ class MappedArray(Analyzable):
             checks.assert_shape_equal(mapped_arr, id_arr, axis=0)
         if mapping is not None:
             if isinstance(mapping, str):
-                if mapping.lower() == 'index':
+                if mapping.lower() == "index":
                     mapping = wrapper.index
-                elif mapping.lower() == 'columns':
+                elif mapping.lower() == "columns":
                     mapping = wrapper.columns
             mapping = to_mapping(mapping)
         if col_mapper is None:
@@ -528,7 +526,7 @@ class MappedArray(Analyzable):
             idx_arr=idx_arr,
             mapping=mapping,
             col_mapper=col_mapper,
-            **kwargs
+            **kwargs,
         )
 
         self._mapped_arr = mapped_arr
@@ -545,13 +543,13 @@ class MappedArray(Analyzable):
         """See `vectorbtpro.utils.config.Configured.replace`.
 
         Also, makes sure that `MappedArray.col_mapper` is not passed to the new instance."""
-        if self.config.get('col_mapper', None) is not None:
-            if 'wrapper' in kwargs:
-                if self.wrapper is not kwargs.get('wrapper'):
-                    kwargs['col_mapper'] = None
-            if 'col_arr' in kwargs:
-                if self.col_arr is not kwargs.get('col_arr'):
-                    kwargs['col_mapper'] = None
+        if self.config.get("col_mapper", None) is not None:
+            if "wrapper" in kwargs:
+                if self.wrapper is not kwargs.get("wrapper"):
+                    kwargs["col_mapper"] = None
+            if "col_arr" in kwargs:
+                if self.col_arr is not kwargs.get("col_arr"):
+                    kwargs["col_mapper"] = None
         return Wrapping.replace(self, **kwargs)
 
     def indexing_func_meta(self, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> IndexingMetaT:
@@ -560,7 +558,7 @@ class MappedArray(Analyzable):
             pd_indexing_func,
             column_only_select=self.column_only_select,
             group_select=self.group_select,
-            **kwargs
+            **kwargs,
         )
         new_indices, new_col_arr = self.col_mapper.select_cols(col_idxs)
         new_mapped_arr = self.values[new_indices]
@@ -573,14 +571,16 @@ class MappedArray(Analyzable):
 
     def indexing_func(self: MappedArrayT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> MappedArrayT:
         """Perform indexing on `MappedArray`."""
-        new_wrapper, new_mapped_arr, new_col_arr, new_id_arr, new_idx_arr, _, _ = \
-            self.indexing_func_meta(pd_indexing_func, **kwargs)
+        new_wrapper, new_mapped_arr, new_col_arr, new_id_arr, new_idx_arr, _, _ = self.indexing_func_meta(
+            pd_indexing_func,
+            **kwargs,
+        )
         return self.replace(
             wrapper=new_wrapper,
             mapped_arr=new_mapped_arr,
             col_arr=new_col_arr,
             id_arr=new_id_arr,
-            idx_arr=new_idx_arr
+            idx_arr=new_idx_arr,
         )
 
     @property
@@ -634,11 +634,13 @@ class MappedArray(Analyzable):
         func = jit_reg.resolve_option(nb.is_col_sorted_nb, jitted)
         return func(self.col_arr)
 
-    def sort(self: MappedArrayT,
-             incl_id: bool = False,
-             idx_arr: tp.Optional[tp.Array1d] = None,
-             group_by: tp.GroupByLike = None,
-             **kwargs) -> MappedArrayT:
+    def sort(
+        self: MappedArrayT,
+        incl_id: bool = False,
+        idx_arr: tp.Optional[tp.Array1d] = None,
+        group_by: tp.GroupByLike = None,
+        **kwargs
+    ) -> MappedArrayT:
         """Sort mapped array by column array (primary) and id array (secondary, optional).
 
         `**kwargs` are passed to `MappedArray.replace`."""
@@ -655,16 +657,18 @@ class MappedArray(Analyzable):
             col_arr=self.col_arr[ind],
             id_arr=self.id_arr[ind],
             idx_arr=idx_arr[ind] if idx_arr is not None else None,
-            **kwargs
+            **kwargs,
         ).regroup(group_by)
 
     # ############# Filtering ############# #
 
-    def apply_mask(self: MappedArrayT,
-                   mask: tp.Array1d,
-                   idx_arr: tp.Optional[tp.Array1d] = None,
-                   group_by: tp.GroupByLike = None,
-                   **kwargs) -> MappedArrayT:
+    def apply_mask(
+        self: MappedArrayT,
+        mask: tp.Array1d,
+        idx_arr: tp.Optional[tp.Array1d] = None,
+        group_by: tp.GroupByLike = None,
+        **kwargs
+    ) -> MappedArrayT:
         """Return a new class instance, filtered by mask.
 
         `**kwargs` are passed to `MappedArray.replace`."""
@@ -676,58 +680,56 @@ class MappedArray(Analyzable):
             col_arr=np.take(self.col_arr, mask_indices),
             id_arr=np.take(self.id_arr, mask_indices),
             idx_arr=np.take(idx_arr, mask_indices) if idx_arr is not None else None,
-            **kwargs
+            **kwargs,
         ).regroup(group_by)
 
-    def top_n_mask(self,
-                   n: int,
-                   group_by: tp.GroupByLike = None,
-                   jitted: tp.JittedOption = None,
-                   chunked: tp.ChunkedOption = None) -> tp.Array1d:
+    def top_n_mask(
+        self,
+        n: int,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+    ) -> tp.Array1d:
         """Return mask of top N elements in each column/group."""
         col_map = self.col_mapper.get_col_map(group_by=group_by)
         func = jit_reg.resolve_option(nb.top_n_mapped_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         return func(self.values, col_map, n)
 
-    def bottom_n_mask(self,
-                      n: int,
-                      group_by: tp.GroupByLike = None,
-                      jitted: tp.JittedOption = None,
-                      chunked: tp.ChunkedOption = None) -> tp.Array1d:
+    def bottom_n_mask(
+        self,
+        n: int,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+    ) -> tp.Array1d:
         """Return mask of bottom N elements in each column/group."""
         col_map = self.col_mapper.get_col_map(group_by=group_by)
         func = jit_reg.resolve_option(nb.bottom_n_mapped_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         return func(self.values, col_map, n)
 
-    def top_n(self: MappedArrayT,
-              n: int,
-              group_by: tp.GroupByLike = None,
-              jitted: tp.JittedOption = None,
-              chunked: tp.ChunkedOption = None,
-              **kwargs) -> MappedArrayT:
+    def top_n(
+        self: MappedArrayT,
+        n: int,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        **kwargs
+    ) -> MappedArrayT:
         """Filter top N elements from each column/group."""
-        return self.apply_mask(self.top_n_mask(
-            n,
-            group_by=group_by,
-            jitted=jitted,
-            chunked=chunked
-        ), **kwargs)
+        return self.apply_mask(self.top_n_mask(n, group_by=group_by, jitted=jitted, chunked=chunked), **kwargs)
 
-    def bottom_n(self: MappedArrayT,
-                 n: int,
-                 group_by: tp.GroupByLike = None,
-                 jitted: tp.JittedOption = None,
-                 chunked: tp.ChunkedOption = None,
-                 **kwargs) -> MappedArrayT:
+    def bottom_n(
+        self: MappedArrayT,
+        n: int,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        **kwargs
+    ) -> MappedArrayT:
         """Filter bottom N elements from each column/group."""
-        return self.apply_mask(self.bottom_n_mask(
-            n,
-            group_by=group_by,
-            jitted=jitted,
-            chunked=chunked
-        ), **kwargs)
+        return self.apply_mask(self.bottom_n_mask(n, group_by=group_by, jitted=jitted, chunked=chunked), **kwargs)
 
     # ############# Mapping ############# #
 
@@ -736,9 +738,9 @@ class MappedArray(Analyzable):
         if mapping is None:
             mapping = self.mapping
         if isinstance(mapping, str):
-            if mapping.lower() == 'index':
+            if mapping.lower() == "index":
                 mapping = self.wrapper.index
-            elif mapping.lower() == 'columns':
+            elif mapping.lower() == "columns":
                 mapping = self.wrapper.columns
             mapping = to_mapping(mapping)
         return self.replace(mapped_arr=apply_mapping(self.values, mapping), **kwargs)
@@ -757,18 +759,18 @@ class MappedArray(Analyzable):
         return self.wrapper.index[self.values]
 
     @class_or_instancemethod
-    def apply(cls_or_self: tp.Union[tp.Type[MappedArrayT], MappedArrayT],
-              apply_func_nb: tp.Union[
-                  tp.ApplyFunc,
-                  tp.ApplyMetaFunc
-              ], *args,
-              group_by: tp.GroupByLike = None,
-              apply_per_group: bool = False,
-              dtype: tp.Optional[tp.DTypeLike] = None,
-              jitted: tp.JittedOption = None,
-              chunked: tp.ChunkedOption = None,
-              col_mapper: tp.Optional[ColumnMapper] = None,
-              **kwargs) -> MappedArrayT:
+    def apply(
+        cls_or_self: tp.Union[tp.Type[MappedArrayT], MappedArrayT],
+        apply_func_nb: tp.Union[tp.ApplyFunc, tp.ApplyMetaFunc],
+        *args,
+        group_by: tp.GroupByLike = None,
+        apply_per_group: bool = False,
+        dtype: tp.Optional[tp.DTypeLike] = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        col_mapper: tp.Optional[ColumnMapper] = None,
+        **kwargs
+    ) -> MappedArrayT:
         """Apply function on mapped array per column/group. Returns a new mapped array.
 
         Applies per group of columns if `apply_per_group` is True.
@@ -796,15 +798,18 @@ class MappedArray(Analyzable):
 
     # ############# Reducing ############# #
 
-    def reduce_segments(self: MappedArrayT,
-                        segment_arr: tp.Union[tp.MaybeTuple[tp.Array1d]],
-                        reduce_func_nb: tp.ReduceFunc, *args,
-                        idx_arr: tp.Optional[tp.Array1d] = None,
-                        group_by: tp.GroupByLike = None,
-                        apply_per_group: bool = False,
-                        dtype: tp.Optional[tp.DTypeLike] = None,
-                        chunked: tp.ChunkedOption = None,
-                        **kwargs) -> MappedArrayT:
+    def reduce_segments(
+        self: MappedArrayT,
+        segment_arr: tp.Union[tp.MaybeTuple[tp.Array1d]],
+        reduce_func_nb: tp.ReduceFunc,
+        *args,
+        idx_arr: tp.Optional[tp.Array1d] = None,
+        group_by: tp.GroupByLike = None,
+        apply_per_group: bool = False,
+        dtype: tp.Optional[tp.DTypeLike] = None,
+        chunked: tp.ChunkedOption = None,
+        **kwargs
+    ) -> MappedArrayT:
         """Reduce each segment of values in mapped array. Returns a new mapped array.
 
         `segment_arr` must be an array of integers increasing per column, each indicating a segment.
@@ -834,35 +839,42 @@ class MappedArray(Analyzable):
             segment_arr = index_repeating_rows_nb(stacked_segment_arr)
 
         func = ch_reg.resolve_option(nb.reduce_mapped_segments_nb, chunked)
-        new_mapped_arr, new_col_arr, new_idx_arr, new_id_arr = \
-            func(self.values, idx_arr, self.id_arr, col_map, segment_arr, reduce_func_nb, *args)
+        new_mapped_arr, new_col_arr, new_idx_arr, new_id_arr = func(
+            self.values,
+            idx_arr,
+            self.id_arr,
+            col_map,
+            segment_arr,
+            reduce_func_nb,
+            *args,
+        )
         new_mapped_arr = np.asarray(new_mapped_arr, dtype=dtype)
         return self.replace(
             mapped_arr=new_mapped_arr,
             col_arr=new_col_arr,
             idx_arr=new_idx_arr,
             id_arr=new_id_arr,
-            **kwargs
+            **kwargs,
         ).regroup(group_by)
 
     @class_or_instancemethod
-    def reduce(cls_or_self,
-               reduce_func_nb: tp.Union[
-                   tp.ReduceFunc,
-                   tp.MappedReduceMetaFunc,
-                   tp.ReduceToArrayFunc,
-                   tp.MappedReduceToArrayMetaFunc
-               ], *args,
-               idx_arr: tp.Optional[tp.Array1d] = None,
-               returns_array: bool = False,
-               returns_idx: bool = False,
-               to_index: bool = True,
-               fill_value: tp.Scalar = np.nan,
-               jitted: tp.JittedOption = None,
-               chunked: tp.ChunkedOption = None,
-               col_mapper: tp.Optional[ColumnMapper] = None,
-               group_by: tp.GroupByLike = None,
-               wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeriesFrame:
+    def reduce(
+        cls_or_self,
+        reduce_func_nb: tp.Union[
+            tp.ReduceFunc, tp.MappedReduceMetaFunc, tp.ReduceToArrayFunc, tp.MappedReduceToArrayMetaFunc
+        ],
+        *args,
+        idx_arr: tp.Optional[tp.Array1d] = None,
+        returns_array: bool = False,
+        returns_idx: bool = False,
+        to_index: bool = True,
+        fill_value: tp.Scalar = np.nan,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        col_mapper: tp.Optional[ColumnMapper] = None,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None
+    ) -> tp.MaybeSeriesFrame:
         """Reduce mapped array by column/group.
 
         Set `returns_array` to True if `reduce_func_nb` returns an array.
@@ -894,44 +906,22 @@ class MappedArray(Analyzable):
                 if not returns_idx:
                     func = jit_reg.resolve_option(nb.reduce_mapped_meta_nb, jitted)
                     func = ch_reg.resolve_option(func, chunked)
-                    out = func(
-                        col_map,
-                        fill_value,
-                        reduce_func_nb,
-                        *args
-                    )
+                    out = func(col_map, fill_value, reduce_func_nb, *args)
                 else:
                     checks.assert_not_none(idx_arr)
                     func = jit_reg.resolve_option(nb.reduce_mapped_to_idx_meta_nb, jitted)
                     func = ch_reg.resolve_option(func, chunked)
-                    out = func(
-                        col_map,
-                        idx_arr,
-                        fill_value,
-                        reduce_func_nb,
-                        *args
-                    )
+                    out = func(col_map, idx_arr, fill_value, reduce_func_nb, *args)
             else:
                 if not returns_idx:
                     func = jit_reg.resolve_option(nb.reduce_mapped_to_array_meta_nb, jitted)
                     func = ch_reg.resolve_option(func, chunked)
-                    out = func(
-                        col_map,
-                        fill_value,
-                        reduce_func_nb,
-                        *args
-                    )
+                    out = func(col_map, fill_value, reduce_func_nb, *args)
                 else:
                     checks.assert_not_none(idx_arr)
                     func = jit_reg.resolve_option(nb.reduce_mapped_to_idx_array_meta_nb, jitted)
                     func = ch_reg.resolve_option(func, chunked)
-                    out = func(
-                        col_map,
-                        idx_arr,
-                        fill_value,
-                        reduce_func_nb,
-                        *args
-                    )
+                    out = func(col_map, idx_arr, fill_value, reduce_func_nb, *args)
             wrapper = col_mapper.wrapper
         else:
             if idx_arr is None:
@@ -944,71 +934,54 @@ class MappedArray(Analyzable):
                 if not returns_idx:
                     func = jit_reg.resolve_option(nb.reduce_mapped_nb, jitted)
                     func = ch_reg.resolve_option(func, chunked)
-                    out = func(
-                        cls_or_self.values,
-                        col_map,
-                        fill_value,
-                        reduce_func_nb,
-                        *args
-                    )
+                    out = func(cls_or_self.values, col_map, fill_value, reduce_func_nb, *args)
                 else:
                     checks.assert_not_none(idx_arr)
                     func = jit_reg.resolve_option(nb.reduce_mapped_to_idx_nb, jitted)
                     func = ch_reg.resolve_option(func, chunked)
-                    out = func(
-                        cls_or_self.values,
-                        col_map,
-                        idx_arr,
-                        fill_value,
-                        reduce_func_nb,
-                        *args
-                    )
+                    out = func(cls_or_self.values, col_map, idx_arr, fill_value, reduce_func_nb, *args)
             else:
                 if not returns_idx:
                     func = jit_reg.resolve_option(nb.reduce_mapped_to_array_nb, jitted)
                     func = ch_reg.resolve_option(func, chunked)
-                    out = func(
-                        cls_or_self.values,
-                        col_map,
-                        fill_value,
-                        reduce_func_nb,
-                        *args
-                    )
+                    out = func(cls_or_self.values, col_map, fill_value, reduce_func_nb, *args)
                 else:
                     checks.assert_not_none(idx_arr)
                     func = jit_reg.resolve_option(nb.reduce_mapped_to_idx_array_nb, jitted)
                     func = ch_reg.resolve_option(func, chunked)
-                    out = func(
-                        cls_or_self.values,
-                        col_map,
-                        idx_arr,
-                        fill_value,
-                        reduce_func_nb,
-                        *args
-                    )
+                    out = func(cls_or_self.values, col_map, idx_arr, fill_value, reduce_func_nb, *args)
             wrapper = cls_or_self.wrapper
 
-        wrap_kwargs = merge_dicts(dict(
-            name_or_index='reduce' if not returns_array else None,
-            to_index=returns_idx and to_index,
-            fillna=-1 if returns_idx else None,
-            dtype=np.int_ if returns_idx else None
-        ), wrap_kwargs)
+        wrap_kwargs = merge_dicts(
+            dict(
+                name_or_index="reduce" if not returns_array else None,
+                to_index=returns_idx and to_index,
+                fillna=-1 if returns_idx else None,
+                dtype=np.int_ if returns_idx else None,
+            ),
+            wrap_kwargs,
+        )
         return wrapper.wrap_reduced(out, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def nth(self,
-            n: int,
-            group_by: tp.GroupByLike = None,
-            jitted: tp.JittedOption = None,
-            chunked: tp.ChunkedOption = None,
-            wrap_kwargs: tp.KwargsLike = None,
-            **kwargs) -> tp.MaybeSeries:
+    def nth(
+        self,
+        n: int,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs
+    ) -> tp.MaybeSeries:
         """Return n-th element of each column/group."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='nth'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="nth"), wrap_kwargs)
         chunked = ch.specialize_chunked_option(
             chunked,
-            arg_take_spec=dict(args=ch.ArgsTaker(None, ))
+            arg_take_spec=dict(
+                args=ch.ArgsTaker(
+                    None,
+                )
+            ),
         )
         return self.reduce(
             jit_reg.resolve_option(generic_nb.nth_reduce_nb, jitted),
@@ -1019,22 +992,28 @@ class MappedArray(Analyzable):
             jitted=jitted,
             chunked=chunked,
             wrap_kwargs=wrap_kwargs,
-            **kwargs
+            **kwargs,
         )
 
     @cached_method
-    def nth_index(self,
-                  n: int,
-                  group_by: tp.GroupByLike = None,
-                  jitted: tp.JittedOption = None,
-                  chunked: tp.ChunkedOption = None,
-                  wrap_kwargs: tp.KwargsLike = None,
-                  **kwargs) -> tp.MaybeSeries:
+    def nth_index(
+        self,
+        n: int,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs
+    ) -> tp.MaybeSeries:
         """Return index of n-th element of each column/group."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='nth_index'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="nth_index"), wrap_kwargs)
         chunked = ch.specialize_chunked_option(
             chunked,
-            arg_take_spec=dict(args=ch.ArgsTaker(None, ))
+            arg_take_spec=dict(
+                args=ch.ArgsTaker(
+                    None,
+                )
+            ),
         )
         return self.reduce(
             jit_reg.resolve_option(generic_nb.nth_index_reduce_nb, jitted),
@@ -1045,18 +1024,20 @@ class MappedArray(Analyzable):
             jitted=jitted,
             chunked=chunked,
             wrap_kwargs=wrap_kwargs,
-            **kwargs
+            **kwargs,
         )
 
     @cached_method
-    def min(self,
-            group_by: tp.GroupByLike = None,
-            jitted: tp.JittedOption = None,
-            chunked: tp.ChunkedOption = None,
-            wrap_kwargs: tp.KwargsLike = None,
-            **kwargs) -> tp.MaybeSeries:
+    def min(
+        self,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs
+    ) -> tp.MaybeSeries:
         """Return min by column/group."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='min'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="min"), wrap_kwargs)
         return self.reduce(
             jit_reg.resolve_option(generic_nb.min_reduce_nb, jitted),
             returns_array=False,
@@ -1065,18 +1046,20 @@ class MappedArray(Analyzable):
             jitted=jitted,
             chunked=chunked,
             wrap_kwargs=wrap_kwargs,
-            **kwargs
+            **kwargs,
         )
 
     @cached_method
-    def max(self,
-            group_by: tp.GroupByLike = None,
-            jitted: tp.JittedOption = None,
-            chunked: tp.ChunkedOption = None,
-            wrap_kwargs: tp.KwargsLike = None,
-            **kwargs) -> tp.MaybeSeries:
+    def max(
+        self,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs
+    ) -> tp.MaybeSeries:
         """Return max by column/group."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='max'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="max"), wrap_kwargs)
         return self.reduce(
             jit_reg.resolve_option(generic_nb.max_reduce_nb, jitted),
             returns_array=False,
@@ -1085,18 +1068,20 @@ class MappedArray(Analyzable):
             jitted=jitted,
             chunked=chunked,
             wrap_kwargs=wrap_kwargs,
-            **kwargs
+            **kwargs,
         )
 
     @cached_method
-    def mean(self,
-             group_by: tp.GroupByLike = None,
-             jitted: tp.JittedOption = None,
-             chunked: tp.ChunkedOption = None,
-             wrap_kwargs: tp.KwargsLike = None,
-             **kwargs) -> tp.MaybeSeries:
+    def mean(
+        self,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs
+    ) -> tp.MaybeSeries:
         """Return mean by column/group."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='mean'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="mean"), wrap_kwargs)
         return self.reduce(
             jit_reg.resolve_option(generic_nb.mean_reduce_nb, jitted),
             returns_array=False,
@@ -1105,18 +1090,20 @@ class MappedArray(Analyzable):
             jitted=jitted,
             chunked=chunked,
             wrap_kwargs=wrap_kwargs,
-            **kwargs
+            **kwargs,
         )
 
     @cached_method
-    def median(self,
-               group_by: tp.GroupByLike = None,
-               jitted: tp.JittedOption = None,
-               chunked: tp.ChunkedOption = None,
-               wrap_kwargs: tp.KwargsLike = None,
-               **kwargs) -> tp.MaybeSeries:
+    def median(
+        self,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs
+    ) -> tp.MaybeSeries:
         """Return median by column/group."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='median'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="median"), wrap_kwargs)
         return self.reduce(
             jit_reg.resolve_option(generic_nb.median_reduce_nb, jitted),
             returns_array=False,
@@ -1125,22 +1112,28 @@ class MappedArray(Analyzable):
             jitted=jitted,
             chunked=chunked,
             wrap_kwargs=wrap_kwargs,
-            **kwargs
+            **kwargs,
         )
 
     @cached_method
-    def std(self,
-            ddof: int = 1,
-            group_by: tp.GroupByLike = None,
-            jitted: tp.JittedOption = None,
-            chunked: tp.ChunkedOption = None,
-            wrap_kwargs: tp.KwargsLike = None,
-            **kwargs) -> tp.MaybeSeries:
+    def std(
+        self,
+        ddof: int = 1,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs
+    ) -> tp.MaybeSeries:
         """Return std by column/group."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='std'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="std"), wrap_kwargs)
         chunked = ch.specialize_chunked_option(
             chunked,
-            arg_take_spec=dict(args=ch.ArgsTaker(None, ))
+            arg_take_spec=dict(
+                args=ch.ArgsTaker(
+                    None,
+                )
+            ),
         )
         return self.reduce(
             jit_reg.resolve_option(generic_nb.std_reduce_nb, jitted),
@@ -1151,19 +1144,21 @@ class MappedArray(Analyzable):
             jitted=jitted,
             chunked=chunked,
             wrap_kwargs=wrap_kwargs,
-            **kwargs
+            **kwargs,
         )
 
     @cached_method
-    def sum(self,
-            fill_value: tp.Scalar = 0.,
-            group_by: tp.GroupByLike = None,
-            jitted: tp.JittedOption = None,
-            chunked: tp.ChunkedOption = None,
-            wrap_kwargs: tp.KwargsLike = None,
-            **kwargs) -> tp.MaybeSeries:
+    def sum(
+        self,
+        fill_value: tp.Scalar = 0.0,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs
+    ) -> tp.MaybeSeries:
         """Return sum by column/group."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='sum'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="sum"), wrap_kwargs)
         return self.reduce(
             jit_reg.resolve_option(generic_nb.sum_reduce_nb, jitted),
             fill_value=fill_value,
@@ -1173,18 +1168,20 @@ class MappedArray(Analyzable):
             jitted=jitted,
             chunked=chunked,
             wrap_kwargs=wrap_kwargs,
-            **kwargs
+            **kwargs,
         )
 
     @cached_method
-    def idxmin(self,
-               group_by: tp.GroupByLike = None,
-               jitted: tp.JittedOption = None,
-               chunked: tp.ChunkedOption = None,
-               wrap_kwargs: tp.KwargsLike = None,
-               **kwargs) -> tp.MaybeSeries:
+    def idxmin(
+        self,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs
+    ) -> tp.MaybeSeries:
         """Return index of min by column/group."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='idxmin'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="idxmin"), wrap_kwargs)
         return self.reduce(
             jit_reg.resolve_option(generic_nb.argmin_reduce_nb, jitted),
             returns_array=False,
@@ -1193,18 +1190,20 @@ class MappedArray(Analyzable):
             jitted=jitted,
             chunked=chunked,
             wrap_kwargs=wrap_kwargs,
-            **kwargs
+            **kwargs,
         )
 
     @cached_method
-    def idxmax(self,
-               group_by: tp.GroupByLike = None,
-               jitted: tp.JittedOption = None,
-               chunked: tp.ChunkedOption = None,
-               wrap_kwargs: tp.KwargsLike = None,
-               **kwargs) -> tp.MaybeSeries:
+    def idxmax(
+        self,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs
+    ) -> tp.MaybeSeries:
         """Return index of max by column/group."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='idxmax'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="idxmax"), wrap_kwargs)
         return self.reduce(
             jit_reg.resolve_option(generic_nb.argmax_reduce_nb, jitted),
             returns_array=False,
@@ -1213,18 +1212,20 @@ class MappedArray(Analyzable):
             jitted=jitted,
             chunked=chunked,
             wrap_kwargs=wrap_kwargs,
-            **kwargs
+            **kwargs,
         )
 
     @cached_method
-    def describe(self,
-                 percentiles: tp.Optional[tp.ArrayLike] = None,
-                 ddof: int = 1,
-                 group_by: tp.GroupByLike = None,
-                 jitted: tp.JittedOption = None,
-                 chunked: tp.ChunkedOption = None,
-                 wrap_kwargs: tp.KwargsLike = None,
-                 **kwargs) -> tp.SeriesFrame:
+    def describe(
+        self,
+        percentiles: tp.Optional[tp.ArrayLike] = None,
+        ddof: int = 1,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs
+    ) -> tp.SeriesFrame:
         """Return statistics by column/group."""
         if percentiles is not None:
             percentiles = to_1d_array(percentiles)
@@ -1235,56 +1236,58 @@ class MappedArray(Analyzable):
             percentiles.append(0.5)
         percentiles = np.unique(percentiles)
         perc_formatted = pd.io.formats.format.format_percentiles(percentiles)
-        index = pd.Index(['count', 'mean', 'std', 'min', *perc_formatted, 'max'])
+        index = pd.Index(["count", "mean", "std", "min", *perc_formatted, "max"])
         wrap_kwargs = merge_dicts(dict(name_or_index=index), wrap_kwargs)
-        chunked = ch.specialize_chunked_option(
-            chunked,
-            arg_take_spec=dict(args=ch.ArgsTaker(None, None))
-        )
+        chunked = ch.specialize_chunked_option(chunked, arg_take_spec=dict(args=ch.ArgsTaker(None, None)))
         out = self.reduce(
             jit_reg.resolve_option(generic_nb.describe_reduce_nb, jitted),
-            percentiles, ddof,
+            percentiles,
+            ddof,
             returns_array=True,
             returns_idx=False,
             group_by=group_by,
             jitted=jitted,
             chunked=chunked,
             wrap_kwargs=wrap_kwargs,
-            **kwargs
+            **kwargs,
         )
         if isinstance(out, pd.DataFrame):
-            out.loc['count'].fillna(0., inplace=True)
+            out.loc["count"].fillna(0.0, inplace=True)
         else:
-            if np.isnan(out.loc['count']):
-                out.loc['count'] = 0.
+            if np.isnan(out.loc["count"]):
+                out.loc["count"] = 0.0
         return out
 
     @cached_method
     def count(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Return number of values by column/group."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='count'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="count"), wrap_kwargs)
         return self.wrapper.wrap_reduced(
             self.col_mapper.get_col_map(group_by=group_by)[1],
-            group_by=group_by, **wrap_kwargs)
+            group_by=group_by,
+            **wrap_kwargs,
+        )
 
     # ############# Value counts ############# #
 
     @cached_method
-    def value_counts(self,
-                     axis: int = 1,
-                     idx_arr: tp.Optional[tp.Array1d] = None,
-                     normalize: bool = False,
-                     sort_uniques: bool = True,
-                     sort: bool = False,
-                     ascending: bool = False,
-                     dropna: bool = False,
-                     group_by: tp.GroupByLike = None,
-                     mapping: tp.Optional[tp.MappingLike] = None,
-                     incl_all_keys: bool = False,
-                     jitted: tp.JittedOption = None,
-                     chunked: tp.ChunkedOption = None,
-                     wrap_kwargs: tp.KwargsLike = None,
-                     **kwargs) -> tp.SeriesFrame:
+    def value_counts(
+        self,
+        axis: int = 1,
+        idx_arr: tp.Optional[tp.Array1d] = None,
+        normalize: bool = False,
+        sort_uniques: bool = True,
+        sort: bool = False,
+        ascending: bool = False,
+        dropna: bool = False,
+        group_by: tp.GroupByLike = None,
+        mapping: tp.Optional[tp.MappingLike] = None,
+        incl_all_keys: bool = False,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs
+    ) -> tp.SeriesFrame:
         """See `vectorbtpro.generic.accessors.GenericAccessor.value_counts`.
 
         !!! note
@@ -1294,9 +1297,9 @@ class MappedArray(Analyzable):
         if mapping is None:
             mapping = self.mapping
         if isinstance(mapping, str):
-            if mapping.lower() == 'index':
+            if mapping.lower() == "index":
                 mapping = self.wrapper.index
-            elif mapping.lower() == 'columns':
+            elif mapping.lower() == "columns":
                 mapping = self.wrapper.columns
             mapping = to_mapping(mapping)
         mapped_codes, mapped_uniques = pd.factorize(self.values, sort=False, na_sentinel=None)
@@ -1353,21 +1356,21 @@ class MappedArray(Analyzable):
                 value_counts,
                 index=mapped_uniques,
                 columns=self.wrapper.index,
-                **resolve_dict(wrap_kwargs)
+                **resolve_dict(wrap_kwargs),
             )
         elif axis == 1:
             value_counts_pd = self.wrapper.wrap(
                 value_counts,
                 index=mapped_uniques,
                 group_by=group_by,
-                **resolve_dict(wrap_kwargs)
+                **resolve_dict(wrap_kwargs),
             )
         else:
             wrapper = ArrayWrapper.from_obj(value_counts)
             value_counts_pd = wrapper.wrap(
                 value_counts,
                 index=mapped_uniques,
-                **merge_dicts(dict(columns=['value_counts']), wrap_kwargs)
+                **merge_dicts(dict(columns=["value_counts"]), wrap_kwargs),
             )
         if mapping is not None:
             value_counts_pd.index = apply_mapping(value_counts_pd.index, mapping, **kwargs)
@@ -1376,10 +1379,12 @@ class MappedArray(Analyzable):
     # ############# Conflicts ############# #
 
     @cached_method
-    def has_conflicts(self,
-                      idx_arr: tp.Optional[tp.Array1d] = None,
-                      group_by: tp.GroupByLike = None,
-                      jitted: tp.JittedOption = None) -> bool:
+    def has_conflicts(
+        self,
+        idx_arr: tp.Optional[tp.Array1d] = None,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+    ) -> bool:
         """See `vectorbtpro.records.nb.mapped_has_conflicts_nb`."""
         if idx_arr is None:
             if self.idx_arr is None:
@@ -1390,11 +1395,13 @@ class MappedArray(Analyzable):
         func = jit_reg.resolve_option(nb.mapped_has_conflicts_nb, jitted)
         return func(col_arr, idx_arr, target_shape)
 
-    def coverage_map(self,
-                     idx_arr: tp.Optional[tp.Array1d] = None,
-                     group_by: tp.GroupByLike = None,
-                     jitted: tp.JittedOption = None,
-                     wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def coverage_map(
+        self,
+        idx_arr: tp.Optional[tp.Array1d] = None,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
         """See `vectorbtpro.records.nb.mapped_coverage_map_nb`."""
         if idx_arr is None:
             if self.idx_arr is None:
@@ -1408,15 +1415,17 @@ class MappedArray(Analyzable):
 
     # ############# Unstacking ############# #
 
-    def to_pd(self,
-              idx_arr: tp.Optional[tp.Array1d] = None,
-              ignore_index: bool = False,
-              repeat_index: bool = False,
-              fill_value: float = np.nan,
-              group_by: tp.GroupByLike = None,
-              jitted: tp.JittedOption = None,
-              wrap_kwargs: tp.KwargsLike = None,
-              silence_warnings: bool = False) -> tp.SeriesFrame:
+    def to_pd(
+        self,
+        idx_arr: tp.Optional[tp.Array1d] = None,
+        ignore_index: bool = False,
+        repeat_index: bool = False,
+        fill_value: float = np.nan,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        silence_warnings: bool = False,
+    ) -> tp.SeriesFrame:
         """Unstack mapped array to a Series/DataFrame.
 
         * If `ignore_index`, will ignore the index and place values on top of each other in every column/group.
@@ -1439,14 +1448,12 @@ class MappedArray(Analyzable):
                     self.values,
                     index=np.arange(len(self.values)),
                     group_by=group_by,
-                    **resolve_dict(wrap_kwargs)
+                    **resolve_dict(wrap_kwargs),
                 )
             col_map = self.col_mapper.get_col_map(group_by=group_by)
             func = jit_reg.resolve_option(nb.ignore_unstack_mapped_nb, jitted)
             out = func(self.values, col_map, fill_value)
-            return self.wrapper.wrap(
-                out, index=np.arange(out.shape[0]),
-                group_by=group_by, **resolve_dict(wrap_kwargs))
+            return self.wrapper.wrap(out, index=np.arange(out.shape[0]), group_by=group_by, **resolve_dict(wrap_kwargs))
         if idx_arr is None:
             if self.idx_arr is None:
                 raise ValueError("Must pass idx_arr")
@@ -1461,20 +1468,15 @@ class MappedArray(Analyzable):
             func = jit_reg.resolve_option(nb.unstack_index_nb, jitted)
             unstacked_index = self.wrapper.index[func(repeat_cnt_arr)]
             func = jit_reg.resolve_option(nb.repeat_unstack_mapped_nb, jitted)
-            out = func(
-                self.values,
-                col_arr,
-                idx_arr,
-                repeat_cnt_arr,
-                target_shape[1],
-                fill_value
-            )
+            out = func(self.values, col_arr, idx_arr, repeat_cnt_arr, target_shape[1], fill_value)
             wrap_kwargs = merge_dicts(dict(index=unstacked_index), wrap_kwargs)
             return self.wrapper.wrap(out, group_by=group_by, **wrap_kwargs)
         else:
             if has_conflicts and not silence_warnings:
-                warnings.warn("Multiple values are pointing to the same position. "
-                              "Only the latest value is used.", stacklevel=2)
+                warnings.warn(
+                    "Multiple values are pointing to the same position. " "Only the latest value is used.",
+                    stacklevel=2,
+                )
             func = jit_reg.resolve_option(nb.unstack_mapped_nb, jitted)
             out = func(self.values, col_arr, idx_arr, target_shape, fill_value)
             return self.wrapper.wrap(out, group_by=group_by, **resolve_dict(wrap_kwargs))
@@ -1488,90 +1490,54 @@ class MappedArray(Analyzable):
         Merges `vectorbtpro.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
         `stats` from `vectorbtpro._settings.mapped_array`."""
         from vectorbtpro._settings import settings
-        mapped_array_stats_cfg = settings['mapped_array']['stats']
 
-        return merge_dicts(
-            Analyzable.stats_defaults.__get__(self),
-            mapped_array_stats_cfg
-        )
+        mapped_array_stats_cfg = settings["mapped_array"]["stats"]
+
+        return merge_dicts(Analyzable.stats_defaults.__get__(self), mapped_array_stats_cfg)
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
-            start=dict(
-                title='Start',
-                calc_func=lambda self: self.wrapper.index[0],
-                agg_func=None,
-                tags='wrapper'
-            ),
-            end=dict(
-                title='End',
-                calc_func=lambda self: self.wrapper.index[-1],
-                agg_func=None,
-                tags='wrapper'
-            ),
+            start=dict(title="Start", calc_func=lambda self: self.wrapper.index[0], agg_func=None, tags="wrapper"),
+            end=dict(title="End", calc_func=lambda self: self.wrapper.index[-1], agg_func=None, tags="wrapper"),
             period=dict(
-                title='Period',
+                title="Period",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,
-                tags='wrapper'
+                tags="wrapper",
             ),
-            count=dict(
-                title='Count',
-                calc_func='count',
-                tags='mapped_array'
-            ),
-            mean=dict(
-                title='Mean',
-                calc_func='mean',
-                inv_check_has_mapping=True,
-                tags=['mapped_array', 'describe']
-            ),
-            std=dict(
-                title='Std',
-                calc_func='std',
-                inv_check_has_mapping=True,
-                tags=['mapped_array', 'describe']
-            ),
-            min=dict(
-                title='Min',
-                calc_func='min',
-                inv_check_has_mapping=True,
-                tags=['mapped_array', 'describe']
-            ),
+            count=dict(title="Count", calc_func="count", tags="mapped_array"),
+            mean=dict(title="Mean", calc_func="mean", inv_check_has_mapping=True, tags=["mapped_array", "describe"]),
+            std=dict(title="Std", calc_func="std", inv_check_has_mapping=True, tags=["mapped_array", "describe"]),
+            min=dict(title="Min", calc_func="min", inv_check_has_mapping=True, tags=["mapped_array", "describe"]),
             median=dict(
-                title='Median',
-                calc_func='median',
+                title="Median",
+                calc_func="median",
                 inv_check_has_mapping=True,
-                tags=['mapped_array', 'describe']
+                tags=["mapped_array", "describe"],
             ),
-            max=dict(
-                title='Max',
-                calc_func='max',
-                inv_check_has_mapping=True,
-                tags=['mapped_array', 'describe']
-            ),
+            max=dict(title="Max", calc_func="max", inv_check_has_mapping=True, tags=["mapped_array", "describe"]),
             idx_min=dict(
-                title='Min Index',
-                calc_func='idxmin',
+                title="Min Index",
+                calc_func="idxmin",
                 inv_check_has_mapping=True,
                 agg_func=None,
-                tags=['mapped_array', 'index']
+                tags=["mapped_array", "index"],
             ),
             idx_max=dict(
-                title='Max Index',
-                calc_func='idxmax',
+                title="Max Index",
+                calc_func="idxmax",
                 inv_check_has_mapping=True,
                 agg_func=None,
-                tags=['mapped_array', 'index']
+                tags=["mapped_array", "index"],
             ),
             value_counts=dict(
-                title='Value Counts',
-                calc_func=lambda value_counts: to_dict(value_counts, orient='index_series'),
+                title="Value Counts",
+                calc_func=lambda value_counts: to_dict(value_counts, orient="index_series"),
                 resolve_value_counts=True,
                 check_has_mapping=True,
-                tags=['mapped_array', 'value_counts']
-            )
+                tags=["mapped_array", "value_counts"],
+            ),
         )
     )
 
@@ -1596,20 +1562,18 @@ class MappedArray(Analyzable):
         Merges `vectorbtpro.generic.plots_builder.PlotsBuilderMixin.plots_defaults` and
         `plots` from `vectorbtpro._settings.mapped_array`."""
         from vectorbtpro._settings import settings
-        mapped_array_plots_cfg = settings['mapped_array']['plots']
 
-        return merge_dicts(
-            Analyzable.plots_defaults.__get__(self),
-            mapped_array_plots_cfg
-        )
+        mapped_array_plots_cfg = settings["mapped_array"]["plots"]
+
+        return merge_dicts(Analyzable.plots_defaults.__get__(self), mapped_array_plots_cfg)
 
     _subplots: tp.ClassVar[Config] = Config(
         dict(
             to_pd_plot=dict(
                 check_is_not_grouped=True,
-                plot_func='to_pd.vbt.plot',
+                plot_func="to_pd.vbt.plot",
                 pass_trace_names=False,
-                tags='mapped_array'
+                tags="mapped_array",
             )
         )
     )

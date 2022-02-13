@@ -9,7 +9,7 @@ __blacklist__ = []
 try:
     import telegram
 except ImportError:
-    __blacklist__.append('telegram')
+    __blacklist__.append("telegram")
 else:
     from vectorbtpro.messaging.telegram import TelegramBot
 

@@ -12,9 +12,10 @@ from vectorbtpro.utils.caching import Cacheable
 
 # ############# Global ############# #
 
+
 def setup_module():
-    vbt.settings.pbar['disable'] = True
-    vbt.settings.caching['register_lazily'] = False
+    vbt.settings.pbar["disable"] = True
+    vbt.settings.caching["register_lazily"] = False
 
 
 def teardown_module():
@@ -22,6 +23,7 @@ def teardown_module():
 
 
 # ############# ca_registry.py ############# #
+
 
 class TestCacheableRegistry:
     def test_ca_query(self):
@@ -53,147 +55,93 @@ class TestCacheableRegistry:
         def match_query(query):
             matched = set()
             if query.matches_setup(A.f.get_ca_setup()):
-                matched.add('A.f')
+                matched.add("A.f")
             if query.matches_setup(A.f.get_ca_setup(a)):
-                matched.add('a.f')
+                matched.add("a.f")
             if query.matches_setup(A.f2.get_ca_setup()):
-                matched.add('A.f2')
+                matched.add("A.f2")
             if query.matches_setup(A.f2.get_ca_setup(a)):
-                matched.add('a.f2')
+                matched.add("a.f2")
             if query.matches_setup(B.f.get_ca_setup()):
-                matched.add('B.f')
+                matched.add("B.f")
             if query.matches_setup(B.f.get_ca_setup(b)):
-                matched.add('b.f')
+                matched.add("b.f")
             if query.matches_setup(B.f2.get_ca_setup()):
-                matched.add('B.f2')
+                matched.add("B.f2")
             if query.matches_setup(B.f2.get_ca_setup(b)):
-                matched.add('b.f2')
+                matched.add("b.f2")
             if query.matches_setup(B.f3.get_ca_setup()):
-                matched.add('B.f3')
+                matched.add("B.f3")
             if query.matches_setup(B.f3.get_ca_setup(b)):
-                matched.add('b.f3')
+                matched.add("b.f3")
             if query.matches_setup(f4.get_ca_setup()):
-                matched.add('f4')
+                matched.add("f4")
             if query.matches_setup(A.get_ca_setup()):
-                matched.add('A')
+                matched.add("A")
             if query.matches_setup(B.get_ca_setup()):
-                matched.add('B')
+                matched.add("B")
             if query.matches_setup(a.get_ca_setup()):
-                matched.add('a')
+                matched.add("a")
             if query.matches_setup(b.get_ca_setup()):
-                matched.add('b')
+                matched.add("b")
             return matched
 
-        assert match_query(CAQuery(cacheable=A.f)) == {
-            'A.f', 'B.f', 'a.f', 'b.f'
+        assert match_query(CAQuery(cacheable=A.f)) == {"A.f", "B.f", "a.f", "b.f"}
+        assert match_query(CAQuery(cacheable=A.f2)) == {"A.f2", "a.f2"}
+        assert match_query(CAQuery(cacheable=B.f2)) == {"B.f2", "b.f2"}
+        assert match_query(CAQuery(cacheable=B.f3)) == {"B.f3", "b.f3"}
+        assert match_query(CAQuery(cacheable=f4)) == {"f4"}
+        assert match_query(CAQuery(cacheable=A.f.func)) == {"A.f", "B.f", "a.f", "b.f"}
+        assert match_query(CAQuery(cacheable=A.f2.func)) == {"A.f2", "a.f2"}
+        assert match_query(CAQuery(cacheable=B.f2.func)) == {"B.f2", "b.f2"}
+        assert match_query(CAQuery(cacheable=B.f3.func)) == {"B.f3", "b.f3"}
+        assert match_query(CAQuery(cacheable=f4.func)) == {"f4"}
+        assert match_query(CAQuery(cacheable="f")) == {"A.f", "B.f", "a.f", "b.f"}
+        assert match_query(CAQuery(cacheable="f2")) == {"A.f2", "B.f2", "a.f2", "b.f2"}
+        assert match_query(CAQuery(cacheable="f3")) == {"B.f3", "b.f3"}
+        assert match_query(CAQuery(cacheable="f4")) == {"f4"}
+        assert match_query(CAQuery(cacheable=vbt.Regex("(f2|f3)"))) == {"A.f2", "B.f2", "B.f3", "a.f2", "b.f2", "b.f3"}
+        assert match_query(CAQuery(instance=a)) == {"a", "a.f", "a.f2"}
+        assert match_query(CAQuery(instance=b)) == {"b", "b.f", "b.f2", "b.f3"}
+        assert match_query(CAQuery(cls=A)) == {"A", "a", "a.f", "a.f2"}
+        assert match_query(CAQuery(cls=B)) == {"B", "b", "b.f", "b.f2", "b.f3"}
+        assert match_query(CAQuery(cls="A")) == {"A", "a", "a.f", "a.f2"}
+        assert match_query(CAQuery(cls="B")) == {"B", "b", "b.f", "b.f2", "b.f3"}
+        assert match_query(CAQuery(cls=("A", "B"))) == {"A", "B", "a", "a.f", "a.f2", "b", "b.f", "b.f2", "b.f3"}
+        assert match_query(CAQuery(cls=vbt.Regex("(A|B)"))) == {
+            "A",
+            "B",
+            "a",
+            "a.f",
+            "a.f2",
+            "b",
+            "b.f",
+            "b.f2",
+            "b.f3",
         }
-        assert match_query(CAQuery(cacheable=A.f2)) == {
-            'A.f2', 'a.f2'
+        assert match_query(CAQuery(base_cls=A)) == {"A", "B", "a", "a.f", "a.f2", "b", "b.f", "b.f2", "b.f3"}
+        assert match_query(CAQuery(base_cls=B)) == {"B", "b", "b.f", "b.f2", "b.f3"}
+        assert match_query(CAQuery(base_cls="A")) == {"A", "B", "a", "a.f", "a.f2", "b", "b.f", "b.f2", "b.f3"}
+        assert match_query(CAQuery(base_cls="B")) == {"B", "b", "b.f", "b.f2", "b.f3"}
+        assert match_query(CAQuery(base_cls=("A", "B"))) == {"A", "B", "a", "a.f", "a.f2", "b", "b.f", "b.f2", "b.f3"}
+        assert match_query(CAQuery(base_cls=vbt.Regex("(A|B)"))) == {
+            "A",
+            "B",
+            "a",
+            "a.f",
+            "a.f2",
+            "b",
+            "b.f",
+            "b.f2",
+            "b.f3",
         }
-        assert match_query(CAQuery(cacheable=B.f2)) == {
-            'B.f2', 'b.f2'
-        }
-        assert match_query(CAQuery(cacheable=B.f3)) == {
-            'B.f3', 'b.f3'
-        }
-        assert match_query(CAQuery(cacheable=f4)) == {
-            'f4'
-        }
-        assert match_query(CAQuery(cacheable=A.f.func)) == {
-            'A.f', 'B.f', 'a.f', 'b.f'
-        }
-        assert match_query(CAQuery(cacheable=A.f2.func)) == {
-            'A.f2', 'a.f2'
-        }
-        assert match_query(CAQuery(cacheable=B.f2.func)) == {
-            'B.f2', 'b.f2'
-        }
-        assert match_query(CAQuery(cacheable=B.f3.func)) == {
-            'B.f3', 'b.f3'
-        }
-        assert match_query(CAQuery(cacheable=f4.func)) == {
-            'f4'
-        }
-        assert match_query(CAQuery(cacheable='f')) == {
-            'A.f', 'B.f', 'a.f', 'b.f'
-        }
-        assert match_query(CAQuery(cacheable='f2')) == {
-            'A.f2', 'B.f2', 'a.f2', 'b.f2'
-        }
-        assert match_query(CAQuery(cacheable='f3')) == {
-            'B.f3', 'b.f3'
-        }
-        assert match_query(CAQuery(cacheable='f4')) == {
-            'f4'
-        }
-        assert match_query(CAQuery(cacheable=vbt.Regex('(f2|f3)'))) == {
-            'A.f2', 'B.f2', 'B.f3', 'a.f2', 'b.f2', 'b.f3'
-        }
-        assert match_query(CAQuery(instance=a)) == {
-            'a', 'a.f', 'a.f2'
-        }
-        assert match_query(CAQuery(instance=b)) == {
-            'b', 'b.f', 'b.f2', 'b.f3'
-        }
-        assert match_query(CAQuery(cls=A)) == {
-            'A', 'a', 'a.f', 'a.f2'
-        }
-        assert match_query(CAQuery(cls=B)) == {
-            'B', 'b', 'b.f', 'b.f2', 'b.f3'
-        }
-        assert match_query(CAQuery(cls='A')) == {
-            'A', 'a', 'a.f', 'a.f2'
-        }
-        assert match_query(CAQuery(cls='B')) == {
-            'B', 'b', 'b.f', 'b.f2', 'b.f3'
-        }
-        assert match_query(CAQuery(cls=('A', 'B'))) == {
-            'A', 'B', 'a', 'a.f', 'a.f2', 'b', 'b.f', 'b.f2', 'b.f3'
-        }
-        assert match_query(CAQuery(cls=vbt.Regex('(A|B)'))) == {
-            'A', 'B', 'a', 'a.f', 'a.f2', 'b', 'b.f', 'b.f2', 'b.f3'
-        }
-        assert match_query(CAQuery(base_cls=A)) == {
-            'A', 'B', 'a', 'a.f', 'a.f2', 'b', 'b.f', 'b.f2', 'b.f3'
-        }
-        assert match_query(CAQuery(base_cls=B)) == {
-            'B', 'b', 'b.f', 'b.f2', 'b.f3'
-        }
-        assert match_query(CAQuery(base_cls='A')) == {
-            'A', 'B', 'a', 'a.f', 'a.f2', 'b', 'b.f', 'b.f2', 'b.f3'
-        }
-        assert match_query(CAQuery(base_cls='B')) == {
-            'B', 'b', 'b.f', 'b.f2', 'b.f3'
-        }
-        assert match_query(CAQuery(base_cls=('A', 'B'))) == {
-            'A', 'B', 'a', 'a.f', 'a.f2', 'b', 'b.f', 'b.f2', 'b.f3'
-        }
-        assert match_query(CAQuery(base_cls=vbt.Regex('(A|B)'))) == {
-            'A', 'B', 'a', 'a.f', 'a.f2', 'b', 'b.f', 'b.f2', 'b.f3'
-        }
-        assert match_query(CAQuery(options=dict(x=10))) == {
-            'A.f', 'A.f2', 'B.f', 'a.f', 'a.f2', 'b.f'
-        }
-        assert match_query(CAQuery(options=dict(y=10))) == {
-            'A.f', 'B.f', 'B.f2', 'a.f', 'b.f', 'b.f2'
-        }
-        assert match_query(CAQuery(options=dict(x=20, y=10))) == {
-            'B.f2', 'b.f2'
-        }
+        assert match_query(CAQuery(options=dict(x=10))) == {"A.f", "A.f2", "B.f", "a.f", "a.f2", "b.f"}
+        assert match_query(CAQuery(options=dict(y=10))) == {"A.f", "B.f", "B.f2", "a.f", "b.f", "b.f2"}
+        assert match_query(CAQuery(options=dict(x=20, y=10))) == {"B.f2", "b.f2"}
 
-        assert CAQuery(options=dict(
-            cacheable=A.f,
-            instance=a,
-            cls=A,
-            base_cls='A',
-            options=dict(my_option1=True)
-        )) == CAQuery(options=dict(
-            cacheable=A.f,
-            instance=a,
-            cls=A,
-            base_cls='A',
-            options=dict(my_option1=True)
-        ))
+        assert CAQuery(
+            options=dict(cacheable=A.f, instance=a, cls=A, base_cls="A", options=dict(my_option1=True)),
+        ) == CAQuery(options=dict(cacheable=A.f, instance=a, cls=A, base_cls="A", options=dict(my_option1=True)))
 
         assert CAQuery.parse(None) == CAQuery()
         assert CAQuery.parse(A.get_ca_setup()) == CAQuery(base_cls=A)
@@ -203,13 +151,13 @@ class TestCacheableRegistry:
         assert CAQuery.parse(A.f) == CAQuery(cacheable=A.f)
         assert CAQuery.parse(B.f) == CAQuery(cacheable=B.f)
         assert CAQuery.parse(B.f.func) == CAQuery(cacheable=B.f.func)
-        assert CAQuery.parse('f') == CAQuery(cacheable='f')
-        assert CAQuery.parse('A.f') == CAQuery(cacheable='f', base_cls='A')
-        assert CAQuery.parse('A.f', use_base_cls=False) == CAQuery(cacheable='f', cls='A')
-        assert CAQuery.parse('A') == CAQuery(base_cls='A')
-        assert CAQuery.parse('A', use_base_cls=False) == CAQuery(cls='A')
-        assert CAQuery.parse(vbt.Regex('A')) == CAQuery(base_cls=vbt.Regex('A'))
-        assert CAQuery.parse(vbt.Regex('A'), use_base_cls=False) == CAQuery(cls=vbt.Regex('A'))
+        assert CAQuery.parse("f") == CAQuery(cacheable="f")
+        assert CAQuery.parse("A.f") == CAQuery(cacheable="f", base_cls="A")
+        assert CAQuery.parse("A.f", use_base_cls=False) == CAQuery(cacheable="f", cls="A")
+        assert CAQuery.parse("A") == CAQuery(base_cls="A")
+        assert CAQuery.parse("A", use_base_cls=False) == CAQuery(cls="A")
+        assert CAQuery.parse(vbt.Regex("A")) == CAQuery(base_cls=vbt.Regex("A"))
+        assert CAQuery.parse(vbt.Regex("A"), use_base_cls=False) == CAQuery(cls=vbt.Regex("A"))
         assert CAQuery.parse(A) == CAQuery(base_cls=A)
         assert CAQuery.parse(A, use_base_cls=False) == CAQuery(cls=A)
         assert CAQuery.parse((A, B)) == CAQuery(base_cls=(A, B))
@@ -243,7 +191,7 @@ class TestCacheableRegistry:
         assert setup.first_hit_time is None
         assert setup.last_hit_time is None
         assert len(setup.cache) == 1
-        assert setup.cache[CARunResult.get_hash(hash((('a', 10), ('b', 20), ('c', 30))))].result == 60
+        assert setup.cache[CARunResult.get_hash(hash((("a", 10), ("b", 20), ("c", 30))))].result == 60
 
         assert setup.run_func_and_cache(10, 20, c=30) == 60
         assert setup.misses == 1
@@ -253,7 +201,7 @@ class TestCacheableRegistry:
         assert setup.first_hit_time == list(setup.cache.values())[0].first_hit_time
         assert setup.last_hit_time == list(setup.cache.values())[0].last_hit_time
         assert len(setup.cache) == 1
-        assert setup.cache[CARunResult.get_hash(hash((('a', 10), ('b', 20), ('c', 30))))].result == 60
+        assert setup.cache[CARunResult.get_hash(hash((("a", 10), ("b", 20), ("c", 30))))].result == 60
 
         assert setup.run_func_and_cache(10, 20, c=30) == 60
         assert setup.misses == 1
@@ -263,7 +211,7 @@ class TestCacheableRegistry:
         assert setup.first_hit_time == list(setup.cache.values())[0].first_hit_time
         assert setup.last_hit_time == list(setup.cache.values())[0].last_hit_time
         assert len(setup.cache) == 1
-        assert setup.cache[CARunResult.get_hash(hash((('a', 10), ('b', 20), ('c', 30))))].result == 60
+        assert setup.cache[CARunResult.get_hash(hash((("a", 10), ("b", 20), ("c", 30))))].result == 60
 
         assert setup.run_func_and_cache(10, 20, c=40) == 70
         assert setup.misses == 2
@@ -273,7 +221,7 @@ class TestCacheableRegistry:
         assert setup.first_hit_time == list(setup.cache.values())[0].first_hit_time
         assert setup.last_hit_time == list(setup.cache.values())[0].last_hit_time
         assert len(setup.cache) == 2
-        assert setup.cache[CARunResult.get_hash(hash((('a', 10), ('b', 20), ('c', 40))))].result == 70
+        assert setup.cache[CARunResult.get_hash(hash((("a", 10), ("b", 20), ("c", 40))))].result == 70
 
         assert setup.run_func_and_cache(10, 20, c=50) == 80
         assert setup.misses == 2
@@ -283,8 +231,8 @@ class TestCacheableRegistry:
         assert setup.first_hit_time == list(setup.cache.values())[0].first_hit_time
         assert setup.last_hit_time == list(setup.cache.values())[0].last_hit_time
         assert len(setup.cache) == 2
-        assert setup.cache[CARunResult.get_hash(hash((('a', 10), ('b', 20), ('c', 40))))].result == 70
-        assert setup.cache[CARunResult.get_hash(hash((('a', 10), ('b', 20), ('c', 50))))].result == 80
+        assert setup.cache[CARunResult.get_hash(hash((("a", 10), ("b", 20), ("c", 40))))].result == 70
+        assert setup.cache[CARunResult.get_hash(hash((("a", 10), ("b", 20), ("c", 50))))].result == 80
 
         setup.clear_cache()
         assert setup.misses == 0
@@ -310,7 +258,7 @@ class TestCacheableRegistry:
         assert len(setup.cache) == 0
 
         setup.enable_caching()
-        vbt.settings['caching']['disable'] = True
+        vbt.settings["caching"]["disable"] = True
         assert setup.run(10, 20, c=30) == 60
         assert len(setup.cache) == 0
 
@@ -318,21 +266,18 @@ class TestCacheableRegistry:
         assert setup.run(10, 20, c=30) == 60
         assert len(setup.cache) == 1
 
-        vbt.settings['caching']['disable_whitelist'] = True
+        vbt.settings["caching"]["disable_whitelist"] = True
         assert setup.run(10, 20, c=30) == 60
         assert len(setup.cache) == 1
 
         setup.clear_cache()
-        vbt.settings['caching']['disable'] = False
-        vbt.settings['caching']['disable_whitelist'] = False
+        vbt.settings["caching"]["disable"] = False
+        vbt.settings["caching"]["disable_whitelist"] = False
 
-        np.testing.assert_array_equal(
-            setup.run(10, 20, c=np.array([1, 2, 3])),
-            np.array([31, 32, 33])
-        )
+        np.testing.assert_array_equal(setup.run(10, 20, c=np.array([1, 2, 3])), np.array([31, 32, 33]))
         assert len(setup.cache) == 0
 
-        @vbt.cached(ignore_args=['c'])
+        @vbt.cached(ignore_args=["c"])
         def f(a, b, c=3):
             return a + b + c
 
@@ -342,10 +287,7 @@ class TestCacheableRegistry:
         assert setup.readable_str == "f():{}".format(setup.position_among_similar)
         assert setup.short_str == "<func tests.test_ca_registry.f>"
 
-        np.testing.assert_array_equal(
-            setup.run(10, 20, c=np.array([1, 2, 3])),
-            np.array([31, 32, 33])
-        )
+        np.testing.assert_array_equal(setup.run(10, 20, c=np.array([1, 2, 3])), np.array([31, 32, 33]))
         assert len(setup.cache) == 1
 
         class A(Cacheable):
@@ -481,17 +423,9 @@ class TestCacheableRegistry:
         assert A.f.get_ca_setup(a).unbound_setup is B.f.get_ca_setup(b).unbound_setup
         assert A.f.get_ca_setup(a).unbound_setup is not B.f2.get_ca_setup(b).unbound_setup
 
-        assert A.f.get_ca_setup().run_setups == {
-            A.f.get_ca_setup(a),
-            B.f.get_ca_setup(b)
-        }
-        assert B.f.get_ca_setup().run_setups == {
-            A.f.get_ca_setup(a),
-            B.f.get_ca_setup(b)
-        }
-        assert B.f2.get_ca_setup().run_setups == {
-            B.f2.get_ca_setup(b)
-        }
+        assert A.f.get_ca_setup().run_setups == {A.f.get_ca_setup(a), B.f.get_ca_setup(b)}
+        assert B.f.get_ca_setup().run_setups == {A.f.get_ca_setup(a), B.f.get_ca_setup(b)}
+        assert B.f2.get_ca_setup().run_setups == {B.f2.get_ca_setup(b)}
 
         unbound_setup1 = A.f.get_ca_setup()
 
@@ -590,20 +524,10 @@ class TestCacheableRegistry:
 
         assert a.get_ca_setup().class_setup is A.get_ca_setup()
         assert b.get_ca_setup().class_setup is B.get_ca_setup()
-        assert a.get_ca_setup().unbound_setups == {
-            A.f.get_ca_setup()
-        }
-        assert b.get_ca_setup().unbound_setups == {
-            B.f.get_ca_setup(),
-            B.f2.get_ca_setup()
-        }
-        assert a.get_ca_setup().run_setups == {
-            A.f.get_ca_setup(a)
-        }
-        assert b.get_ca_setup().run_setups == {
-            B.f.get_ca_setup(b),
-            B.f2.get_ca_setup(b)
-        }
+        assert a.get_ca_setup().unbound_setups == {A.f.get_ca_setup()}
+        assert b.get_ca_setup().unbound_setups == {B.f.get_ca_setup(), B.f2.get_ca_setup()}
+        assert a.get_ca_setup().run_setups == {A.f.get_ca_setup(a)}
+        assert b.get_ca_setup().run_setups == {B.f.get_ca_setup(b), B.f2.get_ca_setup(b)}
 
         instance_setup1 = a.get_ca_setup()
 
@@ -731,44 +655,20 @@ class TestCacheableRegistry:
         assert class_setup3.short_str == "<class tests.test_ca_registry.C>"
 
         assert class_setup1.superclass_setups == []
-        assert class_setup2.superclass_setups == [
-            class_setup1
-        ]
+        assert class_setup2.superclass_setups == [class_setup1]
         assert class_setup3.superclass_setups == []
-        assert class_setup1.subclass_setups == [
-            class_setup2
-        ]
+        assert class_setup1.subclass_setups == [class_setup2]
         assert class_setup2.subclass_setups == []
         assert class_setup3.subclass_setups == []
-        assert class_setup1.unbound_setups == {
-            A.f.get_ca_setup()
-        }
-        assert class_setup2.unbound_setups == {
-            A.f.get_ca_setup(),
-            B.f2.get_ca_setup()
-        }
-        assert class_setup3.unbound_setups == {
-            C.f3.get_ca_setup()
-        }
-        assert class_setup1.instance_setups == {
-            a.get_ca_setup()
-        }
-        assert class_setup2.instance_setups == {
-            b.get_ca_setup()
-        }
-        assert class_setup3.instance_setups == {
-            c.get_ca_setup()
-        }
-        assert class_setup1.child_setups == {
-            a.get_ca_setup(),
-            B.get_ca_setup()
-        }
-        assert class_setup2.child_setups == {
-            b.get_ca_setup()
-        }
-        assert class_setup3.child_setups == {
-            c.get_ca_setup()
-        }
+        assert class_setup1.unbound_setups == {A.f.get_ca_setup()}
+        assert class_setup2.unbound_setups == {A.f.get_ca_setup(), B.f2.get_ca_setup()}
+        assert class_setup3.unbound_setups == {C.f3.get_ca_setup()}
+        assert class_setup1.instance_setups == {a.get_ca_setup()}
+        assert class_setup2.instance_setups == {b.get_ca_setup()}
+        assert class_setup3.instance_setups == {c.get_ca_setup()}
+        assert class_setup1.child_setups == {a.get_ca_setup(), B.get_ca_setup()}
+        assert class_setup2.child_setups == {b.get_ca_setup()}
+        assert class_setup3.child_setups == {c.get_ca_setup()}
 
         class_setup1 = A.get_ca_setup()
         class_setup2 = B.get_ca_setup()
@@ -875,7 +775,7 @@ class TestCacheableRegistry:
             B.get_ca_setup().query,
             A.f_test.get_ca_setup().query,
             B.f2_test.get_ca_setup().query,
-            f3_test.get_ca_setup().query
+            f3_test.get_ca_setup().query,
         ]
         assert ca_reg.match_setups(queries, kind=None) == {
             A.get_ca_setup(),
@@ -887,70 +787,56 @@ class TestCacheableRegistry:
             A.f_test.get_ca_setup(a),
             B.f_test.get_ca_setup(b),
             B.f2_test.get_ca_setup(b),
-            f3_test.get_ca_setup()
+            f3_test.get_ca_setup(),
         }
         assert ca_reg.match_setups(queries, kind=None, filter_func=lambda setup: setup.caching_enabled) == {
             b.get_ca_setup(),
             B.f_test.get_ca_setup(b),
-            B.f2_test.get_ca_setup(b)
+            B.f2_test.get_ca_setup(b),
         }
-        assert ca_reg.match_setups(queries, kind='runnable') == {
+        assert ca_reg.match_setups(queries, kind="runnable") == {
             A.f_test.get_ca_setup(a),
             B.f_test.get_ca_setup(b),
             B.f2_test.get_ca_setup(b),
-            f3_test.get_ca_setup()
+            f3_test.get_ca_setup(),
         }
-        assert ca_reg.match_setups(queries, kind='unbound') == {
-            A.f_test.get_ca_setup(),
-            B.f2_test.get_ca_setup()
-        }
-        assert ca_reg.match_setups(queries, kind='instance') == {
-            a.get_ca_setup(),
-            b.get_ca_setup()
-        }
-        assert ca_reg.match_setups(queries, kind='class') == {
-            A.get_ca_setup(),
-            B.get_ca_setup()
-        }
-        assert ca_reg.match_setups(queries, kind=('class', 'instance')) == {
+        assert ca_reg.match_setups(queries, kind="unbound") == {A.f_test.get_ca_setup(), B.f2_test.get_ca_setup()}
+        assert ca_reg.match_setups(queries, kind="instance") == {a.get_ca_setup(), b.get_ca_setup()}
+        assert ca_reg.match_setups(queries, kind="class") == {A.get_ca_setup(), B.get_ca_setup()}
+        assert ca_reg.match_setups(queries, kind=("class", "instance")) == {
             A.get_ca_setup(),
             B.get_ca_setup(),
             a.get_ca_setup(),
-            b.get_ca_setup()
+            b.get_ca_setup(),
         }
-        assert ca_reg.match_setups(queries, kind=('class', 'instance'), exclude=b.get_ca_setup()) == {
+        assert ca_reg.match_setups(queries, kind=("class", "instance"), exclude=b.get_ca_setup()) == {
             A.get_ca_setup(),
             B.get_ca_setup(),
-            a.get_ca_setup()
+            a.get_ca_setup(),
         }
         assert ca_reg.match_setups(queries, collapse=True, kind=None) == {
             A.get_ca_setup(),
             A.f_test.get_ca_setup(),
             B.f2_test.get_ca_setup(),
-            f3_test.get_ca_setup()
+            f3_test.get_ca_setup(),
         }
-        assert ca_reg.match_setups(queries, collapse=True, kind='instance') == {
-            a.get_ca_setup(),
-            b.get_ca_setup()
-        }
-        assert ca_reg.match_setups(queries, collapse=True, kind=('instance', 'runnable')) == {
+        assert ca_reg.match_setups(queries, collapse=True, kind="instance") == {a.get_ca_setup(), b.get_ca_setup()}
+        assert ca_reg.match_setups(queries, collapse=True, kind=("instance", "runnable")) == {
             a.get_ca_setup(),
             b.get_ca_setup(),
-            f3_test.get_ca_setup()
+            f3_test.get_ca_setup(),
+        }
+        assert ca_reg.match_setups(queries, collapse=True, kind=("instance", "runnable"), exclude=a.get_ca_setup()) == {
+            b.get_ca_setup(),
+            f3_test.get_ca_setup(),
         }
         assert ca_reg.match_setups(
-            queries, collapse=True, kind=('instance', 'runnable'),
-            exclude=a.get_ca_setup()) == {
-                   b.get_ca_setup(),
-                   f3_test.get_ca_setup()
-               }
-        assert ca_reg.match_setups(
-            queries, collapse=True, kind=('instance', 'runnable'),
-            exclude=a.get_ca_setup(), exclude_children=False) == {
-                   b.get_ca_setup(),
-                   A.f_test.get_ca_setup(a),
-                   f3_test.get_ca_setup()
-               }
+            queries,
+            collapse=True,
+            kind=("instance", "runnable"),
+            exclude=a.get_ca_setup(),
+            exclude_children=False,
+        ) == {b.get_ca_setup(), A.f_test.get_ca_setup(a), f3_test.get_ca_setup()}
 
     def test_ca_query_delegator(self):
         class A(Cacheable):
@@ -983,12 +869,10 @@ class TestCacheableRegistry:
             B.get_ca_setup().query,
             A.f_test.get_ca_setup().query,
             B.f2_test.get_ca_setup().query,
-            f3_test.get_ca_setup().query
+            f3_test.get_ca_setup().query,
         ]
-        query_delegator = vbt.CAQueryDelegator(queries, kind='class')
-        assert query_delegator.child_setups == {
-            class_setup1
-        }
+        query_delegator = vbt.CAQueryDelegator(queries, kind="class")
+        assert query_delegator.child_setups == {class_setup1}
 
         query_delegator.enable_caching()
         query_delegator.disable_whitelist()
@@ -1046,142 +930,100 @@ class TestCacheableRegistry:
 
         setup_hierarchy = query_delegator.get_setup_hierarchy()
         assert len(setup_hierarchy) == 1
-        assert len(setup_hierarchy[0]['children']) == 2
+        assert len(setup_hierarchy[0]["children"]) == 2
 
         assert query_delegator.metrics == {
-            'hits': query_delegator.hits,
-            'misses': query_delegator.misses,
-            'total_size': query_delegator.total_size,
-            'total_elapsed': A.f_test.get_ca_setup(a).total_elapsed + B.f2_test.get_ca_setup(b).total_elapsed,
-            'total_saved': A.f_test.get_ca_setup(a).total_saved + B.f2_test.get_ca_setup(b).total_saved,
-            'first_run_time': query_delegator.first_run_time,
-            'last_run_time': query_delegator.last_run_time,
-            'first_hit_time': query_delegator.first_hit_time,
-            'last_hit_time': query_delegator.last_hit_time
+            "hits": query_delegator.hits,
+            "misses": query_delegator.misses,
+            "total_size": query_delegator.total_size,
+            "total_elapsed": A.f_test.get_ca_setup(a).total_elapsed + B.f2_test.get_ca_setup(b).total_elapsed,
+            "total_saved": A.f_test.get_ca_setup(a).total_saved + B.f2_test.get_ca_setup(b).total_saved,
+            "first_run_time": query_delegator.first_run_time,
+            "last_run_time": query_delegator.last_run_time,
+            "first_hit_time": query_delegator.first_hit_time,
+            "last_hit_time": query_delegator.last_hit_time,
         }
 
         columns = [
-            'hash',
-            'use_cache',
-            'whitelist',
-            'caching_enabled',
-            'hits',
-            'misses',
-            'total_size',
-            'total_elapsed',
-            'total_saved',
-            'first_run_time',
-            'last_run_time',
-            'first_hit_time',
-            'last_hit_time',
-            'creation_time',
-            'last_update_time'
+            "hash",
+            "use_cache",
+            "whitelist",
+            "caching_enabled",
+            "hits",
+            "misses",
+            "total_size",
+            "total_elapsed",
+            "total_saved",
+            "first_run_time",
+            "last_run_time",
+            "first_hit_time",
+            "last_hit_time",
+            "creation_time",
+            "last_update_time",
         ]
         status_overview = query_delegator.get_status_overview(readable=False, short_str=False)
-        pd.testing.assert_index_equal(
-            status_overview.columns,
-            pd.Index(columns)
+        pd.testing.assert_index_equal(status_overview.columns, pd.Index(columns))
+        np.testing.assert_array_equal(status_overview.index.values, np.array([str(class_setup1)]))
+        np.testing.assert_array_equal(status_overview["hash"].values, np.array([hash(class_setup1)]))
+        np.testing.assert_array_equal(status_overview["use_cache"].values, np.array([class_setup1.use_cache]))
+        np.testing.assert_array_equal(status_overview["whitelist"].values, np.array([class_setup1.whitelist]))
+        np.testing.assert_array_equal(
+            status_overview["caching_enabled"].values,
+            np.array([class_setup1.caching_enabled]),
+        )
+        np.testing.assert_array_equal(status_overview["hits"].values, np.array([class_setup1.hits]))
+        np.testing.assert_array_equal(status_overview["misses"].values, np.array([class_setup1.misses]))
+        np.testing.assert_array_equal(status_overview["total_size"].values, np.array([class_setup1.total_size]))
+        np.testing.assert_array_equal(
+            status_overview["total_elapsed"].values,
+            pd.to_timedelta(np.array([class_setup1.total_elapsed])),
         )
         np.testing.assert_array_equal(
-            status_overview.index.values,
-            np.array([str(class_setup1)])
+            status_overview["total_saved"].values,
+            pd.to_timedelta(np.array([class_setup1.total_saved])),
         )
         np.testing.assert_array_equal(
-            status_overview['hash'].values,
-            np.array([hash(class_setup1)])
+            status_overview["first_run_time"].values,
+            pd.to_datetime([class_setup1.first_run_time]).values,
         )
         np.testing.assert_array_equal(
-            status_overview['use_cache'].values,
-            np.array([class_setup1.use_cache])
+            status_overview["last_run_time"].values,
+            pd.to_datetime([class_setup1.last_run_time]).values,
         )
         np.testing.assert_array_equal(
-            status_overview['whitelist'].values,
-            np.array([class_setup1.whitelist])
+            status_overview["first_hit_time"].values,
+            pd.to_datetime([class_setup1.first_hit_time]).values,
         )
         np.testing.assert_array_equal(
-            status_overview['caching_enabled'].values,
-            np.array([class_setup1.caching_enabled])
+            status_overview["last_hit_time"].values,
+            pd.to_datetime([class_setup1.last_hit_time]).values,
         )
         np.testing.assert_array_equal(
-            status_overview['hits'].values,
-            np.array([class_setup1.hits])
+            status_overview["creation_time"].values,
+            pd.to_datetime([class_setup1.creation_time]).values,
         )
         np.testing.assert_array_equal(
-            status_overview['misses'].values,
-            np.array([class_setup1.misses])
-        )
-        np.testing.assert_array_equal(
-            status_overview['total_size'].values,
-            np.array([class_setup1.total_size])
-        )
-        np.testing.assert_array_equal(
-            status_overview['total_elapsed'].values,
-            pd.to_timedelta(np.array([class_setup1.total_elapsed]))
-        )
-        np.testing.assert_array_equal(
-            status_overview['total_saved'].values,
-            pd.to_timedelta(np.array([class_setup1.total_saved]))
-        )
-        np.testing.assert_array_equal(
-            status_overview['first_run_time'].values,
-            pd.to_datetime([class_setup1.first_run_time]).values
-        )
-        np.testing.assert_array_equal(
-            status_overview['last_run_time'].values,
-            pd.to_datetime([class_setup1.last_run_time]).values
-        )
-        np.testing.assert_array_equal(
-            status_overview['first_hit_time'].values,
-            pd.to_datetime([class_setup1.first_hit_time]).values
-        )
-        np.testing.assert_array_equal(
-            status_overview['last_hit_time'].values,
-            pd.to_datetime([class_setup1.last_hit_time]).values
-        )
-        np.testing.assert_array_equal(
-            status_overview['creation_time'].values,
-            pd.to_datetime([class_setup1.creation_time]).values
-        )
-        np.testing.assert_array_equal(
-            status_overview['last_update_time'].values,
-            pd.to_datetime([class_setup1.last_update_time]).values
+            status_overview["last_update_time"].values,
+            pd.to_datetime([class_setup1.last_update_time]).values,
         )
 
         status_overview = query_delegator.get_status_overview()
-        pd.testing.assert_index_equal(
-            status_overview.columns,
-            pd.Index(columns)
-        )
+        pd.testing.assert_index_equal(status_overview.columns, pd.Index(columns))
         status_overview = query_delegator.get_status_overview(include=columns)
-        pd.testing.assert_index_equal(
-            status_overview.columns,
-            pd.Index(columns)
-        )
+        pd.testing.assert_index_equal(status_overview.columns, pd.Index(columns))
         status_overview = query_delegator.get_status_overview(include=columns[0])
-        pd.testing.assert_index_equal(
-            status_overview.columns,
-            pd.Index([columns[0]])
-        )
+        pd.testing.assert_index_equal(status_overview.columns, pd.Index([columns[0]]))
         status_overview = query_delegator.get_status_overview(include=[columns[0]])
-        pd.testing.assert_index_equal(
-            status_overview.columns,
-            pd.Index([columns[0]])
-        )
+        pd.testing.assert_index_equal(status_overview.columns, pd.Index([columns[0]]))
         status_overview = query_delegator.get_status_overview(exclude=columns)
         assert status_overview is None
         status_overview = query_delegator.get_status_overview(exclude=columns[0])
-        pd.testing.assert_index_equal(
-            status_overview.columns,
-            pd.Index(columns[1:])
-        )
+        pd.testing.assert_index_equal(status_overview.columns, pd.Index(columns[1:]))
         status_overview = query_delegator.get_status_overview(exclude=[columns[0]])
-        pd.testing.assert_index_equal(
-            status_overview.columns,
-            pd.Index(columns[1:])
-        )
+        pd.testing.assert_index_equal(status_overview.columns, pd.Index(columns[1:]))
 
     def test_disable_machinery(self):
-        vbt.settings['caching']['disable_machinery'] = True
+        vbt.settings["caching"]["disable_machinery"] = True
 
         class A(Cacheable):
             @vbt.cacheable_property
@@ -1217,7 +1059,7 @@ class TestCacheableRegistry:
         assert B.f2_test.get_ca_setup(b) is None
         assert f3_test.get_ca_setup() is None
 
-        vbt.settings['caching']['disable_machinery'] = False
+        vbt.settings["caching"]["disable_machinery"] = False
 
     def test_gc(self):
         class A(Cacheable):
@@ -1230,15 +1072,13 @@ class TestCacheableRegistry:
         assert ca_reg.match_setups(CAQuery(cls=A), kind=None) == {
             A.get_ca_setup(),
             a.get_ca_setup(),
-            A.f.get_ca_setup(a)
+            A.f.get_ca_setup(a),
         }
         a_ref = weakref.ref(a)
         del a
         gc.collect()
         assert a_ref() is None
-        assert ca_reg.match_setups(CAQuery(cls=A), kind=None) == {
-            A.get_ca_setup()
-        }
+        assert ca_reg.match_setups(CAQuery(cls=A), kind=None) == {A.get_ca_setup()}
 
         class B(Cacheable):
             @vbt.cacheable_method
@@ -1250,12 +1090,10 @@ class TestCacheableRegistry:
         assert ca_reg.match_setups(CAQuery(cls=B), kind=None) == {
             B.get_ca_setup(),
             B.f.get_ca_setup(b),
-            b.get_ca_setup()
+            b.get_ca_setup(),
         }
         b_ref = weakref.ref(b)
         del b
         gc.collect()
         assert b_ref() is None
-        assert ca_reg.match_setups(CAQuery(cls=B), kind=None) == {
-            B.get_ca_setup()
-        }
+        assert ca_reg.match_setups(CAQuery(cls=B), kind=None) == {B.get_ca_setup()}

@@ -23,9 +23,10 @@ class Jitter(Configured):
     def wrapping_disabled(self) -> bool:
         """Whether wrapping is disabled globally."""
         from vectorbtpro._settings import settings
-        jitting_cfg = settings['jitting']
 
-        return jitting_cfg['disable_wrapping']
+        jitting_cfg = settings["jitting"]
+
+        return jitting_cfg["disable_wrapping"]
 
     def decorate(self, py_func: tp.Callable, tags: tp.Optional[set] = None) -> tp.Callable:
         """Decorate a jitable function."""
@@ -49,15 +50,17 @@ class NumbaJitter(Jitter):
     !!! note
         If `fix_cannot_parallel` is True, `parallel=True` will be ignored if there is no `can_parallel` tag."""
 
-    def __init__(self,
-                 is_generated_jit: bool = False,
-                 fix_cannot_parallel: bool = True,
-                 nopython: bool = True,
-                 nogil: bool = True,
-                 parallel: bool = False,
-                 cache: bool = False,
-                 boundscheck: bool = False,
-                 **options) -> None:
+    def __init__(
+        self,
+        is_generated_jit: bool = False,
+        fix_cannot_parallel: bool = True,
+        nopython: bool = True,
+        nogil: bool = True,
+        parallel: bool = False,
+        cache: bool = False,
+        boundscheck: bool = False,
+        **options,
+    ) -> None:
         Jitter.__init__(
             self,
             is_generated_jit=is_generated_jit,
@@ -67,7 +70,7 @@ class NumbaJitter(Jitter):
             parallel=parallel,
             cache=cache,
             boundscheck=boundscheck,
-            **options
+            **options,
         )
 
         self._is_generated_jit = is_generated_jit
@@ -131,7 +134,7 @@ class NumbaJitter(Jitter):
             decorator = nb_jit
         options = dict(self.options)
         parallel = self.parallel
-        if self.fix_cannot_parallel and parallel and 'can_parallel' not in tags:
+        if self.fix_cannot_parallel and parallel and "can_parallel" not in tags:
             parallel = False
         cache = self.cache
         if parallel and cache:
@@ -142,26 +145,29 @@ class NumbaJitter(Jitter):
             parallel=parallel,
             cache=cache,
             boundscheck=self.boundscheck,
-            **options
+            **options,
         )(py_func)
 
 
 def get_func_suffix(py_func: tp.Callable) -> tp.Optional[str]:
     """Get the suffix of the function."""
     from vectorbtpro._settings import settings
-    jitting_cfg = settings['jitting']
 
-    splitted_name = py_func.__name__.split('_')
+    jitting_cfg = settings["jitting"]
+
+    splitted_name = py_func.__name__.split("_")
     if len(splitted_name) == 1:
         return None
     suffix = splitted_name[-1].lower()
-    if suffix not in jitting_cfg['jitters']:
+    if suffix not in jitting_cfg["jitters"]:
         return None
     return suffix
 
 
-def resolve_jitter_type(jitter: tp.Optional[tp.JitterLike] = None,
-                        py_func: tp.Optional[tp.Callable] = None) -> tp.Type[Jitter]:
+def resolve_jitter_type(
+    jitter: tp.Optional[tp.JitterLike] = None,
+    py_func: tp.Optional[tp.Callable] = None,
+) -> tp.Type[Jitter]:
     """Resolve `jitter`.
 
     * If `jitter` is None and `py_func` is not None, uses `get_func_suffix`
@@ -170,7 +176,8 @@ def resolve_jitter_type(jitter: tp.Optional[tp.JitterLike] = None,
     * If `jitter` is an instance of `Jitter`, returns its class
     * Otherwise, throws an error"""
     from vectorbtpro._settings import settings
-    jitting_cfg = settings['jitting']
+
+    jitting_cfg = settings["jitting"]
 
     if jitter is None:
         if py_func is None:
@@ -180,13 +187,13 @@ def resolve_jitter_type(jitter: tp.Optional[tp.JitterLike] = None,
             raise ValueError(f"Could not parse jitter from suffix of function {py_func}")
 
     if isinstance(jitter, str):
-        if jitter in jitting_cfg['jitters']:
-            jitter = jitting_cfg['jitters'][jitter]['cls']
+        if jitter in jitting_cfg["jitters"]:
+            jitter = jitting_cfg["jitters"][jitter]["cls"]
         else:
             found = False
-            for k, v in jitting_cfg['jitters'].items():
-                if jitter in v.get('aliases', set()):
-                    jitter = v['cls']
+            for k, v in jitting_cfg["jitters"].items():
+                if jitter in v.get("aliases", set()):
+                    jitter = v["cls"]
                     found = True
                     break
             if not found:
@@ -201,10 +208,11 @@ def resolve_jitter_type(jitter: tp.Optional[tp.JitterLike] = None,
 def get_id_of_jitter_type(jitter_type: tp.Type[Jitter]) -> tp.Optional[tp.Hashable]:
     """Get id of a jitter type using `jitters` in `vectorbtpro._settings.jitting`."""
     from vectorbtpro._settings import settings
-    jitting_cfg = settings['jitting']
 
-    for jitter_id, jitter_cfg in jitting_cfg['jitters'].items():
-        if jitter_type is jitter_cfg['cls']:
+    jitting_cfg = settings["jitting"]
+
+    for jitter_id, jitter_cfg in jitting_cfg["jitters"].items():
+        if jitter_type is jitter_cfg["cls"]:
             return jitter_id
     return None
 
@@ -221,10 +229,11 @@ def resolve_jitted_option(option: tp.JittedOption = None) -> tp.KwargsLike:
 
     For defaults, see `option` in `vectorbtpro._settings.jitting`."""
     from vectorbtpro._settings import settings
-    jitting_cfg = settings['jitting']
+
+    jitting_cfg = settings["jitting"]
 
     if option is None:
-        option = jitting_cfg['option']
+        option = jitting_cfg["option"]
 
     if isinstance(option, bool):
         if not option:
@@ -254,21 +263,24 @@ def resolve_jitted_kwargs(option: tp.JittedOption = None, **kwargs) -> tp.Kwargs
     !!! note
         Keys in `option` have more priority than in `kwargs`."""
     from vectorbtpro._settings import settings
-    jitting_cfg = settings['jitting']
+
+    jitting_cfg = settings["jitting"]
 
     jitted_kwargs = resolve_jitted_option(option=option)
     if jitted_kwargs is None:
         return None
-    if isinstance(jitting_cfg['option'], dict):
-        jitted_kwargs = merge_dicts(jitting_cfg['option'], kwargs, jitted_kwargs)
+    if isinstance(jitting_cfg["option"], dict):
+        jitted_kwargs = merge_dicts(jitting_cfg["option"], kwargs, jitted_kwargs)
     else:
         jitted_kwargs = merge_dicts(kwargs, jitted_kwargs)
     return jitted_kwargs
 
 
-def resolve_jitter(jitter: tp.Optional[tp.JitterLike] = None,
-                   py_func: tp.Optional[tp.Callable] = None,
-                   **jitter_kwargs) -> Jitter:
+def resolve_jitter(
+    jitter: tp.Optional[tp.JitterLike] = None,
+    py_func: tp.Optional[tp.Callable] = None,
+    **jitter_kwargs,
+) -> Jitter:
     """Resolve jitter.
 
     !!! note

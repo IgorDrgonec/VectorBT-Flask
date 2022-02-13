@@ -49,26 +49,20 @@ class CustomTemplate:
                     return False
         return True
 
-    def resolve_context(self, context: tp.Optional[tp.Mapping] = None,
-                        sub_id: tp.Optional[Hashable] = None) -> tp.Kwargs:
+    def resolve_context(
+        self,
+        context: tp.Optional[tp.Mapping] = None,
+        sub_id: tp.Optional[Hashable] = None,
+    ) -> tp.Kwargs:
         """Resolve `CustomTemplate.context`.
 
         Merges `context` in `vectorbtpro._settings.template`, `CustomTemplate.context`, and `context`.
         Automatically appends `sub_id`, `np` (NumPy), `pd` (Pandas), and `vbt` (vectorbt)."""
         from vectorbtpro._settings import settings
-        template_cfg = settings['template']
 
-        return merge_dicts(
-            template_cfg['context'],
-            dict(
-                sub_id=sub_id,
-                np=np,
-                pd=pd,
-                vbt=vbt
-            ),
-            self.context,
-            context
-        )
+        template_cfg = settings["template"]
+
+        return merge_dicts(template_cfg["context"], dict(sub_id=sub_id, np=np, pd=pd, vbt=vbt), self.context, context)
 
     def resolve_strict(self, strict: tp.Optional[bool] = None) -> bool:
         """Resolve `CustomTemplate.strict`.
@@ -78,15 +72,18 @@ class CustomTemplate:
             strict = self.strict
         if strict is None:
             from vectorbtpro._settings import settings
-            template_cfg = settings['template']
 
-            strict = template_cfg['strict']
+            template_cfg = settings["template"]
+
+            strict = template_cfg["strict"]
         return strict
 
-    def substitute(self,
-                   context: tp.Optional[tp.Mapping] = None,
-                   strict: tp.Optional[bool] = None,
-                   sub_id: tp.Optional[Hashable] = None) -> tp.Any:
+    def substitute(
+        self,
+        context: tp.Optional[tp.Mapping] = None,
+        strict: tp.Optional[bool] = None,
+        sub_id: tp.Optional[Hashable] = None,
+    ) -> tp.Any:
         """Abstract method to substitute the template `CustomTemplate.template` using
         the context from merging `CustomTemplate.context` and `context`."""
         raise NotImplementedError
@@ -97,10 +94,12 @@ class Sub(CustomTemplate):
 
     Always returns a string."""
 
-    def substitute(self,
-                   context: tp.Optional[tp.Mapping] = None,
-                   strict: tp.Optional[bool] = None,
-                   sub_id: tp.Optional[Hashable] = None) -> tp.Any:
+    def substitute(
+        self,
+        context: tp.Optional[tp.Mapping] = None,
+        strict: tp.Optional[bool] = None,
+        sub_id: tp.Optional[Hashable] = None,
+    ) -> tp.Any:
         """Substitute parts of `Sub.template` as a regular template."""
         if not self.meets_sub_id(sub_id):
             return self
@@ -118,10 +117,12 @@ class Sub(CustomTemplate):
 class Rep(CustomTemplate):
     """Template string to be replaced with the respective value from `context`."""
 
-    def substitute(self,
-                   context: tp.Optional[tp.Mapping] = None,
-                   strict: tp.Optional[bool] = None,
-                   sub_id: tp.Optional[Hashable] = None) -> tp.Any:
+    def substitute(
+        self,
+        context: tp.Optional[tp.Mapping] = None,
+        strict: tp.Optional[bool] = None,
+        sub_id: tp.Optional[Hashable] = None,
+    ) -> tp.Any:
         """Replace `Rep.template` as a key."""
         if not self.meets_sub_id(sub_id):
             return self
@@ -140,10 +141,12 @@ class RepEval(CustomTemplate):
     """Template expression to be evaluated using `vectorbtpro.utils.eval_.multiline_eval`
     with `context` used as locals."""
 
-    def substitute(self,
-                   context: tp.Optional[tp.Mapping] = None,
-                   strict: tp.Optional[bool] = None,
-                   sub_id: tp.Optional[Hashable] = None) -> tp.Any:
+    def substitute(
+        self,
+        context: tp.Optional[tp.Mapping] = None,
+        strict: tp.Optional[bool] = None,
+        sub_id: tp.Optional[Hashable] = None,
+    ) -> tp.Any:
         """Evaluate `RepEval.template` as an expression."""
         if not self.meets_sub_id(sub_id):
             return self
@@ -161,10 +164,12 @@ class RepEval(CustomTemplate):
 class RepFunc(CustomTemplate):
     """Template function to be called with argument names from `context`."""
 
-    def substitute(self,
-                   context: tp.Optional[tp.Mapping] = None,
-                   strict: tp.Optional[bool] = None,
-                   sub_id: int = 0) -> tp.Any:
+    def substitute(
+        self,
+        context: tp.Optional[tp.Mapping] = None,
+        strict: tp.Optional[bool] = None,
+        sub_id: int = 0,
+    ) -> tp.Any:
         """Call `RepFunc.template` as a function."""
         if not self.meets_sub_id(sub_id):
             return self
@@ -200,11 +205,13 @@ def has_templates(obj: tp.Any) -> tp.Any:
     return False
 
 
-def deep_substitute(obj: tp.Any,
-                    context: tp.Optional[tp.Mapping] = None,
-                    strict: tp.Optional[bool] = None,
-                    make_copy: bool = True,
-                    sub_id: tp.Optional[Hashable] = None) -> tp.Any:
+def deep_substitute(
+    obj: tp.Any,
+    context: tp.Optional[tp.Mapping] = None,
+    strict: tp.Optional[bool] = None,
+    make_copy: bool = True,
+    sub_id: tp.Optional[Hashable] = None,
+) -> tp.Any:
     """Traverses the object recursively and, if any template found, substitutes it using a context.
 
     Traverses tuples, lists, dicts and (frozen-)sets. Does not look for templates in keys.

@@ -37,24 +37,19 @@ class SequenceEngine(ExecutionEngine):
 
     For defaults, see `engines.sequence` in `vectorbtpro._settings.execution`."""
 
-    def __init__(self,
-                 show_progress: tp.Optional[bool] = None,
-                 pbar_kwargs: tp.KwargsLike = None) -> None:
+    def __init__(self, show_progress: tp.Optional[bool] = None, pbar_kwargs: tp.KwargsLike = None) -> None:
         from vectorbtpro._settings import settings
-        sequence_cfg = settings['execution']['engines']['sequence']
+
+        sequence_cfg = settings["execution"]["engines"]["sequence"]
 
         if show_progress is None:
-            show_progress = sequence_cfg['show_progress']
-        pbar_kwargs = merge_dicts(pbar_kwargs, sequence_cfg['pbar_kwargs'])
+            show_progress = sequence_cfg["show_progress"]
+        pbar_kwargs = merge_dicts(pbar_kwargs, sequence_cfg["pbar_kwargs"])
 
         self._show_progress = show_progress
         self._pbar_kwargs = pbar_kwargs
 
-        ExecutionEngine.__init__(
-            self,
-            show_progress=show_progress,
-            pbar_kwargs=pbar_kwargs
-        )
+        ExecutionEngine.__init__(self, show_progress=show_progress, pbar_kwargs=pbar_kwargs)
 
     @property
     def show_progress(self) -> bool:
@@ -68,7 +63,7 @@ class SequenceEngine(ExecutionEngine):
 
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
         results = []
-        if n_calls is None and hasattr(funcs_args, '__len__'):
+        if n_calls is None and hasattr(funcs_args, "__len__"):
             n_calls = len(funcs_args)
         with get_pbar(total=n_calls, show_progress=self.show_progress, **self.pbar_kwargs) as pbar:
             for func, args, kwargs in funcs_args:
@@ -88,16 +83,14 @@ class DaskEngine(ExecutionEngine):
 
     def __init__(self, **compute_kwargs) -> None:
         from vectorbtpro._settings import settings
-        dask_cfg = settings['execution']['engines']['dask']
 
-        compute_kwargs = merge_dicts(compute_kwargs, dask_cfg['compute_kwargs'])
+        dask_cfg = settings["execution"]["engines"]["dask"]
+
+        compute_kwargs = merge_dicts(compute_kwargs, dask_cfg["compute_kwargs"])
 
         self._compute_kwargs = compute_kwargs
 
-        ExecutionEngine.__init__(
-            self,
-            **compute_kwargs
-        )
+        ExecutionEngine.__init__(self, **compute_kwargs)
 
     @property
     def compute_kwargs(self) -> tp.Kwargs:
@@ -106,7 +99,8 @@ class DaskEngine(ExecutionEngine):
 
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
         from vectorbtpro.utils.opt_packages import assert_can_import
-        assert_can_import('dask')
+
+        assert_can_import("dask")
         import dask
 
         results_delayed = []
@@ -126,26 +120,29 @@ class RayEngine(ExecutionEngine):
         a considerable amount of time compared to this copying operation, otherwise there will be
         a little to no speedup."""
 
-    def __init__(self,
-                 restart: tp.Optional[bool] = None,
-                 reuse_refs: tp.Optional[bool] = None,
-                 del_refs: tp.Optional[bool] = None,
-                 shutdown: tp.Optional[bool] = None,
-                 init_kwargs: tp.KwargsLike = None,
-                 remote_kwargs: tp.KwargsLike = None) -> None:
+    def __init__(
+        self,
+        restart: tp.Optional[bool] = None,
+        reuse_refs: tp.Optional[bool] = None,
+        del_refs: tp.Optional[bool] = None,
+        shutdown: tp.Optional[bool] = None,
+        init_kwargs: tp.KwargsLike = None,
+        remote_kwargs: tp.KwargsLike = None,
+    ) -> None:
         from vectorbtpro._settings import settings
-        ray_cfg = settings['execution']['engines']['ray']
+
+        ray_cfg = settings["execution"]["engines"]["ray"]
 
         if restart is None:
-            restart = ray_cfg['restart']
+            restart = ray_cfg["restart"]
         if reuse_refs is None:
-            reuse_refs = ray_cfg['reuse_refs']
+            reuse_refs = ray_cfg["reuse_refs"]
         if del_refs is None:
-            del_refs = ray_cfg['del_refs']
+            del_refs = ray_cfg["del_refs"]
         if shutdown is None:
-            shutdown = ray_cfg['shutdown']
-        init_kwargs = merge_dicts(init_kwargs, ray_cfg['init_kwargs'])
-        remote_kwargs = merge_dicts(remote_kwargs, ray_cfg['remote_kwargs'])
+            shutdown = ray_cfg["shutdown"]
+        init_kwargs = merge_dicts(init_kwargs, ray_cfg["init_kwargs"])
+        remote_kwargs = merge_dicts(remote_kwargs, ray_cfg["remote_kwargs"])
 
         self._restart = restart
         self._reuse_refs = reuse_refs
@@ -161,7 +158,7 @@ class RayEngine(ExecutionEngine):
             del_refs=del_refs,
             shutdown=shutdown,
             init_kwargs=init_kwargs,
-            remote_kwargs=remote_kwargs
+            remote_kwargs=remote_kwargs,
         )
 
     @property
@@ -196,16 +193,18 @@ class RayEngine(ExecutionEngine):
         return self._remote_kwargs
 
     @staticmethod
-    def get_ray_refs(funcs_args: tp.FuncsArgs,
-                     reuse_refs: bool = True,
-                     remote_kwargs: tp.KwargsLike = None) -> \
-            tp.List[tp.Tuple[RemoteFunctionT, tp.Tuple[ObjectRefT, ...], tp.Dict[str, ObjectRefT]]]:
+    def get_ray_refs(
+        funcs_args: tp.FuncsArgs,
+        reuse_refs: bool = True,
+        remote_kwargs: tp.KwargsLike = None,
+    ) -> tp.List[tp.Tuple[RemoteFunctionT, tp.Tuple[ObjectRefT, ...], tp.Dict[str, ObjectRefT]]]:
         """Get result references by putting each argument and keyword argument into the object store
         and invoking the remote decorator on each function using Ray.
 
         If `reuse_refs` is True, will generate one reference per unique object id."""
         from vectorbtpro.utils.opt_packages import assert_can_import
-        assert_can_import('ray')
+
+        assert_can_import("ray")
         import ray
         from ray.remote_function import RemoteFunction
         from ray import ObjectRef
@@ -267,7 +266,8 @@ class RayEngine(ExecutionEngine):
 
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
         from vectorbtpro.utils.opt_packages import assert_can_import
-        assert_can_import('ray')
+
+        assert_can_import("ray")
         import ray
 
         if self.restart:
@@ -275,11 +275,7 @@ class RayEngine(ExecutionEngine):
                 ray.shutdown()
         if not ray.is_initialized():
             ray.init(**self.init_kwargs)
-        funcs_args_refs = self.get_ray_refs(
-            funcs_args,
-            reuse_refs=self.reuse_refs,
-            remote_kwargs=self.remote_kwargs
-        )
+        funcs_args_refs = self.get_ray_refs(funcs_args, reuse_refs=self.reuse_refs, remote_kwargs=self.remote_kwargs)
         result_refs = []
         for func_remote, arg_refs, kwarg_refs in funcs_args_refs:
             result_refs.append(func_remote.remote(*arg_refs, **kwarg_refs))
@@ -294,16 +290,18 @@ class RayEngine(ExecutionEngine):
         return results
 
 
-def execute(funcs_args: tp.FuncsArgs,
-            engine: tp.EngineLike = SequenceEngine,
-            n_calls: tp.Optional[int] = None,
-            n_chunks: tp.Optional[int] = None,
-            chunk_len: tp.Optional[tp.Union[str, int]] = None,
-            chunk_meta: tp.Optional[tp.Iterable[tp.ChunkMeta]] = None,
-            in_chunk_order: bool = False,
-            show_progress: tp.Optional[bool] = None,
-            pbar_kwargs: tp.KwargsLike = None,
-            **kwargs) -> list:
+def execute(
+    funcs_args: tp.FuncsArgs,
+    engine: tp.EngineLike = SequenceEngine,
+    n_calls: tp.Optional[int] = None,
+    n_chunks: tp.Optional[int] = None,
+    chunk_len: tp.Optional[tp.Union[str, int]] = None,
+    chunk_meta: tp.Optional[tp.Iterable[tp.ChunkMeta]] = None,
+    in_chunk_order: bool = False,
+    show_progress: tp.Optional[bool] = None,
+    pbar_kwargs: tp.KwargsLike = None,
+    **kwargs,
+) -> list:
     """Execute using an engine.
 
     Supported values for `engine`:
@@ -328,44 +326,45 @@ def execute(funcs_args: tp.FuncsArgs,
 
     Supported engines can be found in `engines` in `vectorbtpro._settings.execution`."""
     from vectorbtpro._settings import settings
-    execution_cfg = settings['execution']
-    engines_cfg = execution_cfg['engines']
+
+    execution_cfg = settings["execution"]
+    engines_cfg = execution_cfg["engines"]
 
     engine_cfg = dict()
     if isinstance(engine, str):
         if engine.lower() in engines_cfg:
             engine_cfg = engines_cfg[engine]
-            engine = engines_cfg[engine]['cls']
+            engine = engines_cfg[engine]["cls"]
         else:
             raise ValueError(f"Engine with name '{engine}' is unknown")
     if isinstance(engine, type) and issubclass(engine, ExecutionEngine):
         for k, v in engines_cfg.items():
-            if v['cls'] is engine:
+            if v["cls"] is engine:
                 engine_cfg = v
         func_arg_names = get_func_arg_names(engine.__init__)
-        if 'show_progress' in func_arg_names:
-            kwargs['show_progress'] = show_progress
-        if 'pbar_kwargs' in func_arg_names:
-            kwargs['pbar_kwargs'] = pbar_kwargs
+        if "show_progress" in func_arg_names:
+            kwargs["show_progress"] = show_progress
+        if "pbar_kwargs" in func_arg_names:
+            kwargs["pbar_kwargs"] = pbar_kwargs
         engine = engine(**kwargs)
     elif isinstance(engine, ExecutionEngine):
         for k, v in engines_cfg.items():
-            if v['cls'] is type(engine):
+            if v["cls"] is type(engine):
                 engine_cfg = v
     if callable(engine):
         func_arg_names = get_func_arg_names(engine)
-        if 'show_progress' in func_arg_names:
-            kwargs['show_progress'] = show_progress
-        if 'pbar_kwargs' in func_arg_names:
-            kwargs['pbar_kwargs'] = pbar_kwargs
+        if "show_progress" in func_arg_names:
+            kwargs["show_progress"] = show_progress
+        if "pbar_kwargs" in func_arg_names:
+            kwargs["pbar_kwargs"] = pbar_kwargs
 
     if n_chunks is None:
-        n_chunks = engine_cfg.get('n_chunks', None)
+        n_chunks = engine_cfg.get("n_chunks", None)
     if chunk_len is None:
-        chunk_len = engine_cfg.get('chunk_len', None)
+        chunk_len = engine_cfg.get("chunk_len", None)
     if show_progress is None:
-        show_progress = execution_cfg['show_progress']
-    pbar_kwargs = merge_dicts(execution_cfg['pbar_kwargs'], pbar_kwargs)
+        show_progress = execution_cfg["show_progress"]
+    pbar_kwargs = merge_dicts(execution_cfg["pbar_kwargs"], pbar_kwargs)
 
     def _execute(_funcs_args: tp.FuncsArgs, _n_calls: tp.Optional[int]) -> list:
         if isinstance(engine, ExecutionEngine):
@@ -383,20 +382,16 @@ def execute(funcs_args: tp.FuncsArgs,
         # Generate chunk metadata
         from vectorbtpro.utils.chunking import yield_chunk_meta
 
-        if hasattr(funcs_args, '__len__'):
+        if hasattr(funcs_args, "__len__"):
             _n_calls = len(funcs_args)
         elif n_calls is not None:
             _n_calls = n_calls
         else:
             funcs_args = list(funcs_args)
             _n_calls = len(funcs_args)
-        if isinstance(chunk_len, str) and chunk_len.lower() == 'auto':
+        if isinstance(chunk_len, str) and chunk_len.lower() == "auto":
             chunk_len = multiprocessing.cpu_count()
-        chunk_meta = yield_chunk_meta(
-            n_chunks=n_chunks,
-            size=_n_calls,
-            chunk_len=chunk_len
-        )
+        chunk_meta = yield_chunk_meta(n_chunks=n_chunks, size=_n_calls, chunk_len=chunk_len)
 
     # Get indices of each chunk and whether they are sorted
     last_idx = -1
@@ -417,7 +412,7 @@ def execute(funcs_args: tp.FuncsArgs,
                 last_idx = idx
         all_chunk_indices.append(chunk_indices)
 
-    if indices_sorted and not hasattr(funcs_args, '__len__'):
+    if indices_sorted and not hasattr(funcs_args, "__len__"):
         # Iterate through funcs_args
         outputs = []
         chunk_idx = 0

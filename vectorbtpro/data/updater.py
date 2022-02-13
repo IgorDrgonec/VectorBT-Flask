@@ -107,12 +107,7 @@ class DataUpdater(Configured):
             schedule_manager = ScheduleManager()
         self._schedule_manager = schedule_manager
 
-        Configured.__init__(
-            self,
-            data=data,
-            schedule_manager=schedule_manager,
-            **kwargs
-        )
+        Configured.__init__(self, data=data, schedule_manager=schedule_manager, **kwargs)
 
     @property
     def data(self) -> Data:
@@ -139,8 +134,15 @@ class DataUpdater(Configured):
         new_index = self.data.wrapper.index
         logger.info(f"Updated data has {len(new_index)} rows from {new_index[0]} to {new_index[-1]}")
 
-    def update_every(self, *args, to: int = None, tags: tp.Optional[tp.Iterable[tp.Hashable]] = None,
-                     in_background: bool = False, start_kwargs: dict = None, **kwargs) -> None:
+    def update_every(
+        self,
+        *args,
+        to: int = None,
+        tags: tp.Optional[tp.Iterable[tp.Hashable]] = None,
+        in_background: bool = False,
+        start_kwargs: dict = None,
+        **kwargs,
+    ) -> None:
         """Schedule `DataUpdater.update`.
 
         For `*args`, `to` and `tags`, see `vectorbtpro.utils.schedule_.ScheduleManager.every`.

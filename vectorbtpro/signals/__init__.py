@@ -15,7 +15,7 @@ from vectorbtpro.signals.generators import (
     STX,
     STCX,
     OHLCSTX,
-    OHLCSTCX
+    OHLCSTCX,
 )
 from vectorbtpro.utils.module_ import create__all__
 

@@ -48,10 +48,7 @@ class ArgGetter:
 class AxisSpecifier:
     """Class with an attribute for specifying an axis."""
 
-    axis: tp.Optional[int] = attr.ib(default=None, validator=[
-        _assert_value_not_none,
-        attr.validators.instance_of(int)
-    ])
+    axis: tp.Optional[int] = attr.ib(default=None, validator=[_assert_value_not_none, attr.validators.instance_of(int)])
     """Axis of the argument to take from."""
 
 
@@ -129,6 +126,7 @@ class ArraySizer(ShapeSizer):
 
 # ############# Chunk generation ############# #
 
+
 @attr.s(frozen=True)
 class ChunkMeta:
     """Class that represents a chunk metadata."""
@@ -153,10 +151,12 @@ class ChunkMeta:
     Has priority over `ChunkMeta.start` and `ChunkMeta.end`."""
 
 
-def yield_chunk_meta(n_chunks: tp.Optional[int] = None,
-                     size: tp.Optional[int] = None,
-                     min_size: tp.Optional[int] = None,
-                     chunk_len: tp.Optional[int] = None) -> tp.Generator[ChunkMeta, None, None]:
+def yield_chunk_meta(
+    n_chunks: tp.Optional[int] = None,
+    size: tp.Optional[int] = None,
+    min_size: tp.Optional[int] = None,
+    chunk_len: tp.Optional[int] = None,
+) -> tp.Generator[ChunkMeta, None, None]:
     """Yield meta of each successive chunk from a sequence with a number of elements.
 
     If both `n_chunks` and `chunk_len` are None (after resolving them from settings),
@@ -164,23 +164,18 @@ def yield_chunk_meta(n_chunks: tp.Optional[int] = None,
 
     For defaults, see `vectorbtpro._settings.chunking`."""
     from vectorbtpro._settings import settings
-    chunking_cfg = settings['chunking']
+
+    chunking_cfg = settings["chunking"]
 
     if n_chunks is None:
-        n_chunks = chunking_cfg['n_chunks']
+        n_chunks = chunking_cfg["n_chunks"]
     if min_size is None:
-        min_size = chunking_cfg['min_size']
+        min_size = chunking_cfg["min_size"]
     if chunk_len is None:
-        chunk_len = chunking_cfg['chunk_len']
+        chunk_len = chunking_cfg["chunk_len"]
 
     if size is not None and min_size is not None and size < min_size:
-        yield ChunkMeta(
-            uuid=str(uuid.uuid4()),
-            idx=0,
-            start=0,
-            end=size,
-            indices=None
-        )
+        yield ChunkMeta(uuid=str(uuid.uuid4()), idx=0, start=0, end=size, indices=None)
     else:
         if n_chunks is None and chunk_len is None:
             n_chunks = multiprocessing.cpu_count()
@@ -200,17 +195,11 @@ def yield_chunk_meta(n_chunks: tp.Optional[int] = None,
                         idx=i,
                         start=si,
                         end=si + (d + 1 if i < r else d),
-                        indices=None
+                        indices=None,
                     )
             else:
                 for i in range(n_chunks):
-                    yield ChunkMeta(
-                        uuid=str(uuid.uuid4()),
-                        idx=i,
-                        start=None,
-                        end=None,
-                        indices=None
-                    )
+                    yield ChunkMeta(uuid=str(uuid.uuid4()), idx=i, start=None, end=None, indices=None)
         if chunk_len is not None:
             checks.assert_not_none(size)
             if chunk_len == 0:
@@ -221,7 +210,7 @@ def yield_chunk_meta(n_chunks: tp.Optional[int] = None,
                     idx=chunk_i,
                     start=i,
                     end=min(i + chunk_len, size),
-                    indices=None
+                    indices=None,
                 )
 
 
@@ -249,22 +238,18 @@ class LenChunkMeta(ArgChunkMeta):
         end = 0
         for i, chunk_len in enumerate(arg):
             end += chunk_len
-            yield ChunkMeta(
-                uuid=str(uuid.uuid4()),
-                idx=i,
-                start=start,
-                end=end,
-                indices=None
-            )
+            yield ChunkMeta(uuid=str(uuid.uuid4()), idx=i, start=start, end=end, indices=None)
             start = end
 
 
-def get_chunk_meta_from_args(ann_args: tp.AnnArgs,
-                             n_chunks: tp.Optional[tp.SizeLike] = None,
-                             size: tp.Optional[tp.SizeLike] = None,
-                             min_size: tp.Optional[int] = None,
-                             chunk_len: tp.Optional[tp.SizeLike] = None,
-                             chunk_meta: tp.Optional[tp.ChunkMetaLike] = None) -> tp.Iterable[ChunkMeta]:
+def get_chunk_meta_from_args(
+    ann_args: tp.AnnArgs,
+    n_chunks: tp.Optional[tp.SizeLike] = None,
+    size: tp.Optional[tp.SizeLike] = None,
+    min_size: tp.Optional[int] = None,
+    chunk_len: tp.Optional[tp.SizeLike] = None,
+    chunk_meta: tp.Optional[tp.ChunkMetaLike] = None,
+) -> tp.Iterable[ChunkMeta]:
     """Get chunk metadata from annotated arguments.
 
     Args:
@@ -308,12 +293,7 @@ def get_chunk_meta_from_args(ann_args: tp.AnnArgs,
                 chunk_len = chunk_len(ann_args)
             elif not isinstance(chunk_len, int):
                 raise TypeError(f"Type {type(chunk_len)} for chunk_len is not supported")
-        return yield_chunk_meta(
-            n_chunks=n_chunks,
-            size=size,
-            min_size=min_size,
-            chunk_len=chunk_len
-        )
+        return yield_chunk_meta(n_chunks=n_chunks, size=size, min_size=min_size, chunk_len=chunk_len)
     if isinstance(chunk_meta, ChunkMetaGenerator):
         return chunk_meta.get_chunk_meta(ann_args)
     if callable(chunk_meta):
@@ -409,7 +389,7 @@ class ChunkSelector(ChunkTaker, DimRetainer):
 
     def take(self, obj: tp.Sequence, chunk_meta: ChunkMeta, **kwargs) -> tp.Any:
         if self.keep_dims:
-            return obj[chunk_meta.idx:chunk_meta.idx + 1]
+            return obj[chunk_meta.idx : chunk_meta.idx + 1]
         return obj[chunk_meta.idx]
 
 
@@ -419,7 +399,7 @@ class ChunkSlicer(ChunkTaker):
     def take(self, obj: tp.Sequence, chunk_meta: ChunkMeta, **kwargs) -> tp.Sequence:
         if chunk_meta.indices is not None:
             return obj[chunk_meta.indices]
-        return obj[chunk_meta.start:chunk_meta.end]
+        return obj[chunk_meta.start : chunk_meta.end]
 
 
 class CountAdapter(ChunkSlicer):
@@ -529,16 +509,17 @@ class SequenceTaker(ContainerTaker):
 
     Calls `take_from_arg` on each element."""
 
-    def take(self, obj: tp.Sequence, chunk_meta: ChunkMeta,
-             silence_warnings: bool = False, **kwargs) -> tp.Sequence:
+    def take(self, obj: tp.Sequence, chunk_meta: ChunkMeta, silence_warnings: bool = False, **kwargs) -> tp.Sequence:
         new_obj = []
         for i, v in enumerate(obj):
             if i < len(self.cont_take_spec):
                 take_spec = self.cont_take_spec[i]
             else:
                 if not silence_warnings:
-                    warnings.warn(f"Argument at index {i} not found in SequenceTaker.cont_take_spec. "
-                                  f"Setting to None.", stacklevel=2)
+                    warnings.warn(
+                        f"Argument at index {i} not found in SequenceTaker.cont_take_spec. " f"Setting to None.",
+                        stacklevel=2,
+                    )
                 take_spec = None
             new_obj.append(take_from_arg(v, take_spec, chunk_meta, **kwargs))
         if checks.is_namedtuple(obj):
@@ -551,16 +532,17 @@ class MappingTaker(ContainerTaker):
 
     Calls `take_from_arg` on each element."""
 
-    def take(self, obj: tp.Mapping, chunk_meta: ChunkMeta,
-             silence_warnings: bool = False, **kwargs) -> tp.Mapping:
+    def take(self, obj: tp.Mapping, chunk_meta: ChunkMeta, silence_warnings: bool = False, **kwargs) -> tp.Mapping:
         new_obj = {}
         for k, v in obj.items():
             if k in self.cont_take_spec:
                 take_spec = self.cont_take_spec[k]
             else:
                 if not silence_warnings:
-                    warnings.warn(f"Argument with key '{k}' not found in MappingTaker.cont_take_spec. "
-                                  f"Setting to None.", stacklevel=2)
+                    warnings.warn(
+                        f"Argument with key '{k}' not found in MappingTaker.cont_take_spec. " f"Setting to None.",
+                        stacklevel=2,
+                    )
                 take_spec = None
             new_obj[k] = take_from_arg(v, take_spec, chunk_meta, **kwargs)
         return type(obj)(new_obj)
@@ -593,10 +575,12 @@ def take_from_arg(arg: tp.Any, take_spec: tp.TakeSpec, chunk_meta: ChunkMeta, **
     raise TypeError(f"Specification of type {type(take_spec)} is not supported")
 
 
-def take_from_args(ann_args: tp.AnnArgs,
-                   arg_take_spec: tp.ArgTakeSpec,
-                   chunk_meta: ChunkMeta,
-                   silence_warnings: bool = False) -> tp.Tuple[tp.Args, tp.Kwargs]:
+def take_from_args(
+    ann_args: tp.AnnArgs,
+    arg_take_spec: tp.ArgTakeSpec,
+    chunk_meta: ChunkMeta,
+    silence_warnings: bool = False,
+) -> tp.Tuple[tp.Args, tp.Kwargs]:
     """Take from each in the annotated arguments given the specification using `take_from_arg`.
 
     Additionally, passes to `take_from_arg` as keyword arguments `ann_args` and `arg_take_spec`.
@@ -623,35 +607,36 @@ def take_from_args(ann_args: tp.AnnArgs,
                     found_take_spec = take_spec
                     break
         if not take_spec_found and not silence_warnings:
-            warnings.warn(f"Argument '{arg_name}' not found in arg_take_spec. "
-                          f"Setting to None.", stacklevel=2)
+            warnings.warn(f"Argument '{arg_name}' not found in arg_take_spec. " f"Setting to None.", stacklevel=2)
         result = take_from_arg(
-            ann_arg['value'],
+            ann_arg["value"],
             found_take_spec,
             chunk_meta,
             ann_args=ann_args,
             arg_take_spec=arg_take_spec,
-            silence_warnings=silence_warnings
+            silence_warnings=silence_warnings,
         )
-        if ann_arg['kind'] == inspect.Parameter.VAR_POSITIONAL:
+        if ann_arg["kind"] == inspect.Parameter.VAR_POSITIONAL:
             for new_arg in result:
                 new_args += (new_arg,)
-        elif ann_arg['kind'] == inspect.Parameter.VAR_KEYWORD:
+        elif ann_arg["kind"] == inspect.Parameter.VAR_KEYWORD:
             for new_kwarg_name, new_kwarg in result.items():
                 new_kwargs[new_kwarg_name] = new_kwarg
-        elif ann_arg['kind'] == inspect.Parameter.KEYWORD_ONLY:
+        elif ann_arg["kind"] == inspect.Parameter.KEYWORD_ONLY:
             new_kwargs[arg_name] = result
         else:
             new_args += (result,)
     return new_args, new_kwargs
 
 
-def yield_arg_chunks(func: tp.Callable,
-                     ann_args: tp.AnnArgs,
-                     chunk_meta: tp.Iterable[ChunkMeta],
-                     arg_take_spec: tp.Optional[tp.ArgTakeSpecLike] = None,
-                     template_context: tp.Optional[tp.Mapping] = None,
-                     **kwargs) -> tp.Generator[tp.FuncArgs, None, None]:
+def yield_arg_chunks(
+    func: tp.Callable,
+    ann_args: tp.AnnArgs,
+    chunk_meta: tp.Iterable[ChunkMeta],
+    arg_take_spec: tp.Optional[tp.ArgTakeSpecLike] = None,
+    template_context: tp.Optional[tp.Mapping] = None,
+    **kwargs,
+) -> tp.Generator[tp.FuncArgs, None, None]:
     """Split annotated arguments into chunks using `take_from_args` and yield each chunk.
 
     Args:
@@ -669,43 +654,46 @@ def yield_arg_chunks(func: tp.Callable,
     For defaults, see `vectorbtpro._settings.chunking`."""
 
     from vectorbtpro._settings import settings
-    chunking_cfg = settings['chunking']
 
-    template_context = merge_dicts(chunking_cfg['template_context'], template_context)
+    chunking_cfg = settings["chunking"]
+
+    template_context = merge_dicts(chunking_cfg["template_context"], template_context)
     if arg_take_spec is None:
         arg_take_spec = {}
 
     for _chunk_meta in chunk_meta:
         context = merge_dicts(dict(ann_args=ann_args, chunk_meta=_chunk_meta), template_context)
-        chunk_ann_args = deep_substitute(ann_args, context=context, sub_id='chunk_ann_args')
+        chunk_ann_args = deep_substitute(ann_args, context=context, sub_id="chunk_ann_args")
         if callable(arg_take_spec):
             chunk_args, chunk_kwargs = arg_take_spec(chunk_ann_args, _chunk_meta, **kwargs)
         else:
             chunk_arg_take_spec = arg_take_spec
             if not checks.is_mapping(chunk_arg_take_spec):
                 chunk_arg_take_spec = dict(zip(range(len(chunk_arg_take_spec)), chunk_arg_take_spec))
-            chunk_arg_take_spec = deep_substitute(chunk_arg_take_spec, context=context, sub_id='chunk_arg_take_spec')
+            chunk_arg_take_spec = deep_substitute(chunk_arg_take_spec, context=context, sub_id="chunk_arg_take_spec")
             chunk_args, chunk_kwargs = take_from_args(chunk_ann_args, chunk_arg_take_spec, _chunk_meta, **kwargs)
         yield func, chunk_args, chunk_kwargs
 
 
-def chunked(*args,
-            n_chunks: tp.Optional[tp.SizeLike] = None,
-            size: tp.Optional[tp.SizeLike] = None,
-            min_size: tp.Optional[int] = None,
-            chunk_len: tp.Optional[tp.SizeLike] = None,
-            chunk_meta: tp.Optional[tp.ChunkMetaLike] = None,
-            skip_one_chunk: tp.Optional[bool] = None,
-            arg_take_spec: tp.Optional[tp.ArgTakeSpecLike] = None,
-            template_context: tp.Optional[tp.Mapping] = None,
-            prepend_chunk_meta: tp.Optional[bool] = None,
-            merge_func: tp.Optional[tp.Callable] = None,
-            merge_kwargs: tp.KwargsLike = None,
-            engine: tp.Optional[tp.EngineLike] = None,
-            return_raw_chunks: bool = False,
-            silence_warnings: tp.Optional[bool] = None,
-            disable: tp.Optional[bool] = None,
-            **engine_kwargs) -> tp.Callable:
+def chunked(
+    *args,
+    n_chunks: tp.Optional[tp.SizeLike] = None,
+    size: tp.Optional[tp.SizeLike] = None,
+    min_size: tp.Optional[int] = None,
+    chunk_len: tp.Optional[tp.SizeLike] = None,
+    chunk_meta: tp.Optional[tp.ChunkMetaLike] = None,
+    skip_one_chunk: tp.Optional[bool] = None,
+    arg_take_spec: tp.Optional[tp.ArgTakeSpecLike] = None,
+    template_context: tp.Optional[tp.Mapping] = None,
+    prepend_chunk_meta: tp.Optional[bool] = None,
+    merge_func: tp.Optional[tp.Callable] = None,
+    merge_kwargs: tp.KwargsLike = None,
+    engine: tp.Optional[tp.EngineLike] = None,
+    return_raw_chunks: bool = False,
+    silence_warnings: tp.Optional[bool] = None,
+    disable: tp.Optional[bool] = None,
+    **engine_kwargs,
+) -> tp.Callable:
     """Decorator that chunks the function. Engine-agnostic.
     Returns a new function with the same signature as the passed one.
 
@@ -916,59 +904,62 @@ def chunked(*args,
         nonlocal prepend_chunk_meta
 
         from vectorbtpro._settings import settings
-        chunking_cfg = settings['chunking']
 
-        if chunking_cfg['disable_wrapping']:
+        chunking_cfg = settings["chunking"]
+
+        if chunking_cfg["disable_wrapping"]:
             return func
 
         if prepend_chunk_meta is None:
             prepend_chunk_meta = False
             func_arg_names = get_func_arg_names(func)
             if len(func_arg_names) > 0:
-                if func_arg_names[0] == 'chunk_meta':
+                if func_arg_names[0] == "chunk_meta":
                     prepend_chunk_meta = True
 
         @wraps(func)
         def wrapper(*args, **kwargs) -> tp.Any:
-            disable = kwargs.pop('_disable', wrapper.options['disable'])
+            disable = kwargs.pop("_disable", wrapper.options["disable"])
             if disable is None:
-                disable = chunking_cfg['disable']
+                disable = chunking_cfg["disable"]
             if disable:
                 return func(*args, **kwargs)
 
-            n_chunks = kwargs.pop('_n_chunks', wrapper.options['n_chunks'])
-            size = kwargs.pop('_size', wrapper.options['size'])
-            min_size = kwargs.pop('_min_size', wrapper.options['min_size'])
-            chunk_len = kwargs.pop('_chunk_len', wrapper.options['chunk_len'])
-            skip_one_chunk = kwargs.pop('_skip_one_chunk', wrapper.options['skip_one_chunk'])
+            n_chunks = kwargs.pop("_n_chunks", wrapper.options["n_chunks"])
+            size = kwargs.pop("_size", wrapper.options["size"])
+            min_size = kwargs.pop("_min_size", wrapper.options["min_size"])
+            chunk_len = kwargs.pop("_chunk_len", wrapper.options["chunk_len"])
+            skip_one_chunk = kwargs.pop("_skip_one_chunk", wrapper.options["skip_one_chunk"])
             if skip_one_chunk is None:
-                skip_one_chunk = chunking_cfg['skip_one_chunk']
-            chunk_meta = kwargs.pop('_chunk_meta', wrapper.options['chunk_meta'])
-            arg_take_spec = kwargs.pop('_arg_take_spec', wrapper.options['arg_take_spec'])
-            template_context = merge_dicts(wrapper.options['template_context'], kwargs.pop('_template_context', {}))
-            engine = kwargs.pop('_engine', wrapper.options['engine'])
+                skip_one_chunk = chunking_cfg["skip_one_chunk"]
+            chunk_meta = kwargs.pop("_chunk_meta", wrapper.options["chunk_meta"])
+            arg_take_spec = kwargs.pop("_arg_take_spec", wrapper.options["arg_take_spec"])
+            template_context = merge_dicts(wrapper.options["template_context"], kwargs.pop("_template_context", {}))
+            engine = kwargs.pop("_engine", wrapper.options["engine"])
             if engine is None:
-                engine = chunking_cfg['engine']
-            engine_kwargs = merge_dicts(wrapper.options['engine_kwargs'], kwargs.pop('_engine_kwargs', {}))
-            merge_func = kwargs.pop('_merge_func', wrapper.options['merge_func'])
-            merge_kwargs = merge_dicts(wrapper.options['merge_kwargs'], kwargs.pop('_merge_kwargs', {}))
-            return_raw_chunks = kwargs.pop('_return_raw_chunks', wrapper.options['return_raw_chunks'])
-            silence_warnings = kwargs.pop('_silence_warnings', wrapper.options['silence_warnings'])
+                engine = chunking_cfg["engine"]
+            engine_kwargs = merge_dicts(wrapper.options["engine_kwargs"], kwargs.pop("_engine_kwargs", {}))
+            merge_func = kwargs.pop("_merge_func", wrapper.options["merge_func"])
+            merge_kwargs = merge_dicts(wrapper.options["merge_kwargs"], kwargs.pop("_merge_kwargs", {}))
+            return_raw_chunks = kwargs.pop("_return_raw_chunks", wrapper.options["return_raw_chunks"])
+            silence_warnings = kwargs.pop("_silence_warnings", wrapper.options["silence_warnings"])
             if silence_warnings is None:
-                silence_warnings = chunking_cfg['silence_warnings']
+                silence_warnings = chunking_cfg["silence_warnings"]
 
             if prepend_chunk_meta:
-                args = (Rep('chunk_meta'), *args)
+                args = (Rep("chunk_meta"), *args)
 
             ann_args = annotate_args(func, args, kwargs)
-            chunk_meta = list(get_chunk_meta_from_args(
-                ann_args,
-                n_chunks=n_chunks,
-                size=size,
-                min_size=min_size,
-                chunk_len=chunk_len,
-                chunk_meta=chunk_meta
-            ))
+            chunk_meta = list(
+                get_chunk_meta_from_args(
+                    ann_args,
+                    n_chunks=n_chunks,
+                    size=size,
+                    min_size=min_size,
+                    chunk_len=chunk_len,
+                    chunk_meta=chunk_meta,
+                )
+            )
             if len(chunk_meta) < 2 and skip_one_chunk:
                 return func(*args, **kwargs)
             funcs_args = yield_arg_chunks(
@@ -977,7 +968,7 @@ def chunked(*args,
                 chunk_meta=chunk_meta,
                 arg_take_spec=arg_take_spec,
                 template_context=template_context,
-                silence_warnings=silence_warnings
+                silence_warnings=silence_warnings,
             )
             if return_raw_chunks:
                 return chunk_meta, funcs_args
@@ -987,13 +978,13 @@ def chunked(*args,
                     chunk_meta=chunk_meta,
                     arg_take_spec=arg_take_spec,
                 ),
-                template_context
+                template_context,
             )
-            engine_kwargs = deep_substitute(engine_kwargs, context, sub_id='engine_kwargs')
+            engine_kwargs = deep_substitute(engine_kwargs, context, sub_id="engine_kwargs")
             results = execute(funcs_args, engine=engine, n_calls=len(chunk_meta), **engine_kwargs)
             if merge_func is not None:
-                context['funcs_args'] = funcs_args
-                merge_kwargs = deep_substitute(merge_kwargs, context, sub_id='merge_kwargs')
+                context["funcs_args"] = funcs_args
+                merge_kwargs = deep_substitute(merge_kwargs, context, sub_id="merge_kwargs")
                 return merge_func(results, **merge_kwargs)
             return results
 
@@ -1013,10 +1004,10 @@ def chunked(*args,
                 merge_kwargs=merge_kwargs,
                 return_raw_chunks=return_raw_chunks,
                 silence_warnings=silence_warnings,
-                disable=disable
+                disable=disable,
             ),
             frozen_keys_=True,
-            as_attrs_=True
+            as_attrs_=True,
         )
 
         if prepend_chunk_meta:
@@ -1044,10 +1035,11 @@ def resolve_chunked_option(option: tp.ChunkedOption = None) -> tp.KwargsLike:
 
     For defaults, see `option` in `vectorbtpro._settings.chunking`."""
     from vectorbtpro._settings import settings
-    chunking_cfg = settings['chunking']
+
+    chunking_cfg = settings["chunking"]
 
     if option is None:
-        option = chunking_cfg['option']
+        option = chunking_cfg["option"]
 
     if isinstance(option, bool):
         if not option:
@@ -1072,12 +1064,13 @@ def specialize_chunked_option(option: tp.ChunkedOption = None, **kwargs):
 def resolve_chunked(func: tp.Callable, option: tp.ChunkedOption = None, **kwargs) -> tp.Callable:
     """Decorate with `chunked` based on an option."""
     from vectorbtpro._settings import settings
-    chunking_cfg = settings['chunking']
+
+    chunking_cfg = settings["chunking"]
 
     chunked_kwargs = resolve_chunked_option(option)
     if chunked_kwargs is not None:
-        if isinstance(chunking_cfg['option'], dict):
-            chunked_kwargs = merge_dicts(chunking_cfg['option'], kwargs, chunked_kwargs)
+        if isinstance(chunking_cfg["option"], dict):
+            chunked_kwargs = merge_dicts(chunking_cfg["option"], kwargs, chunked_kwargs)
         else:
             chunked_kwargs = merge_dicts(kwargs, chunked_kwargs)
         return chunked(func, **chunked_kwargs)

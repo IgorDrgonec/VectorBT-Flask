@@ -19,21 +19,22 @@ def get_pbar(*args, pbar_type: tp.Optional[str] = None, show_progress: bool = Tr
     For defaults, see `vectorbtpro._settings.pbar`."""
 
     from vectorbtpro._settings import settings
-    pbar_cfg = settings['pbar']
 
-    if pbar_cfg['disable']:
+    pbar_cfg = settings["pbar"]
+
+    if pbar_cfg["disable"]:
         show_progress = False
     if pbar_type is None:
-        pbar_type = pbar_cfg['type']
-    kwargs = merge_dicts(pbar_cfg['kwargs'], kwargs)
+        pbar_type = pbar_cfg["type"]
+    kwargs = merge_dicts(pbar_cfg["kwargs"], kwargs)
 
-    if pbar_type.lower() == 'tqdm_auto':
+    if pbar_type.lower() == "tqdm_auto":
         from tqdm.auto import tqdm as pbar
-    elif pbar_type.lower() == 'tqdm_notebook':
+    elif pbar_type.lower() == "tqdm_notebook":
         from tqdm.notebook import tqdm as pbar
-    elif pbar_type.lower() == 'tqdm_gui':
+    elif pbar_type.lower() == "tqdm_gui":
         from tqdm.gui import tqdm as pbar
-    elif pbar_type.lower() == 'tqdm':
+    elif pbar_type.lower() == "tqdm":
         from tqdm import tqdm as pbar
     else:
         raise ValueError(f"pbar_type cannot be '{pbar_type}'")

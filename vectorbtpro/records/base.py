@@ -486,27 +486,16 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
             Useful if any subclass wants to extend the config.
     """
 
-    _writeable_attrs: tp.ClassVar[tp.Optional[tp.Set[str]]] = {'_field_config'}
+    _writeable_attrs: tp.ClassVar[tp.Optional[tp.Set[str]]] = {"_field_config"}
 
     _field_config: tp.ClassVar[Config] = HybridConfig(
         dict(
             dtype=None,
             settings=dict(
-                id=dict(
-                    name='id',
-                    title='Id'
-                ),
-                col=dict(
-                    name='col',
-                    title='Column',
-                    mapping='columns'
-                ),
-                idx=dict(
-                    name='idx',
-                    title='Timestamp',
-                    mapping='index'
-                )
-            )
+                id=dict(name="id", title="Id"),
+                col=dict(name="col", title="Column", mapping="columns"),
+                idx=dict(name="idx", title="Timestamp", mapping="index"),
+            ),
         )
     )
 
@@ -526,35 +515,28 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
         """
         return self._field_config
 
-    def __init__(self,
-                 wrapper: ArrayWrapper,
-                 records_arr: tp.RecordArray,
-                 col_mapper: tp.Optional[ColumnMapper] = None,
-                 **kwargs) -> None:
+    def __init__(
+        self,
+        wrapper: ArrayWrapper,
+        records_arr: tp.RecordArray,
+        col_mapper: tp.Optional[ColumnMapper] = None,
+        **kwargs,
+    ) -> None:
 
         # Check fields
         records_arr = np.asarray(records_arr)
         checks.assert_not_none(records_arr.dtype.fields)
-        field_names = {
-            dct.get('name', field_name)
-            for field_name, dct in self.field_config.get('settings', {}).items()
-        }
-        dtype = self.field_config.get('dtype', None)
+        field_names = {dct.get("name", field_name) for field_name, dct in self.field_config.get("settings", {}).items()}
+        dtype = self.field_config.get("dtype", None)
         if dtype is not None:
             for field in dtype.names:
                 if field not in records_arr.dtype.names:
                     if field not in field_names:
                         raise TypeError(f"Field '{field}' from {dtype} cannot be found in records or config")
         if col_mapper is None:
-            col_mapper = ColumnMapper(wrapper, records_arr[self.get_field_name('col')])
+            col_mapper = ColumnMapper(wrapper, records_arr[self.get_field_name("col")])
 
-        Analyzable.__init__(
-            self,
-            wrapper,
-            records_arr=records_arr,
-            col_mapper=col_mapper,
-            **kwargs
-        )
+        Analyzable.__init__(self, wrapper, records_arr=records_arr, col_mapper=col_mapper, **kwargs)
 
         self._records_arr = records_arr
         self._col_mapper = col_mapper
@@ -569,13 +551,13 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
         """See `vectorbtpro.utils.config.Configured.replace`.
 
         Also, makes sure that `Records.col_mapper` is not passed to the new instance."""
-        if self.config.get('col_mapper', None) is not None:
-            if 'wrapper' in kwargs:
-                if self.wrapper is not kwargs.get('wrapper'):
-                    kwargs['col_mapper'] = None
-            if 'records_arr' in kwargs:
-                if self.records_arr is not kwargs.get('records_arr'):
-                    kwargs['col_mapper'] = None
+        if self.config.get("col_mapper", None) is not None:
+            if "wrapper" in kwargs:
+                if self.wrapper is not kwargs.get("wrapper"):
+                    kwargs["col_mapper"] = None
+            if "records_arr" in kwargs:
+                if self.records_arr is not kwargs.get("records_arr"):
+                    kwargs["col_mapper"] = None
         return Wrapping.replace(self, **kwargs)
 
     def get_by_col_idxs(self, col_idxs: tp.Array1d, jitted: tp.JittedOption = None) -> tp.RecordArray:
@@ -598,7 +580,7 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
             pd_indexing_func,
             column_only_select=self.column_only_select,
             group_select=self.group_select,
-            **kwargs
+            **kwargs,
         )
         new_records_arr = self.get_by_col_idxs(col_idxs)
         return new_wrapper, new_records_arr, group_idxs, col_idxs
@@ -606,10 +588,7 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
     def indexing_func(self: RecordsT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> RecordsT:
         """Perform indexing on `Records`."""
         new_wrapper, new_records_arr, _, _ = self.indexing_func_meta(pd_indexing_func, **kwargs)
-        return self.replace(
-            wrapper=new_wrapper,
-            records_arr=new_records_arr
-        )
+        return self.replace(wrapper=new_wrapper, records_arr=new_records_arr)
 
     @property
     def records_arr(self) -> tp.RecordArray:
@@ -644,23 +623,23 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
     def records_readable(self) -> tp.Frame:
         """Records in readable format."""
         df = self.records.copy()
-        field_settings = self.field_config.get('settings', {})
+        field_settings = self.field_config.get("settings", {})
         for col_name in df.columns:
             if col_name in field_settings:
                 dct = field_settings[col_name]
-                if dct.get('ignore', False):
+                if dct.get("ignore", False):
                     df = df.drop(columns=col_name)
                     continue
-                field_name = dct.get('name', col_name)
-                if 'title' in dct:
-                    title = dct['title']
+                field_name = dct.get("name", col_name)
+                if "title" in dct:
+                    title = dct["title"]
                     new_columns = dict()
                     new_columns[field_name] = title
                     df.rename(columns=new_columns, inplace=True)
                 else:
                     title = field_name
-                if 'mapping' in dct:
-                    if isinstance(dct['mapping'], str) and dct['mapping'] == 'index':
+                if "mapping" in dct:
+                    if isinstance(dct["mapping"], str) and dct["mapping"] == "index":
                         df[title] = self.get_map_field_to_index(col_name)
                     else:
                         df[title] = self.get_apply_mapping_arr(col_name)
@@ -670,19 +649,19 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
 
     def get_field_setting(self, field: str, setting: str, default: tp.Any = None) -> tp.Any:
         """Get any setting of the field. Uses `Records.field_config`."""
-        return self.field_config.get('settings', {}).get(field, {}).get(setting, default)
+        return self.field_config.get("settings", {}).get(field, {}).get(setting, default)
 
     def get_field_name(self, field: str) -> str:
         """Get the name of the field. Uses `Records.field_config`.."""
-        return self.get_field_setting(field, 'name', field)
+        return self.get_field_setting(field, "name", field)
 
     def get_field_title(self, field: str) -> str:
         """Get the title of the field. Uses `Records.field_config`."""
-        return self.get_field_setting(field, 'title', field)
+        return self.get_field_setting(field, "title", field)
 
     def get_field_mapping(self, field: str) -> tp.Optional[tp.MappingLike]:
         """Get the mapping of the field. Uses `Records.field_config`."""
-        return self.get_field_setting(field, 'mapping', None)
+        return self.get_field_setting(field, "mapping", None)
 
     def get_field_arr(self, field: str) -> tp.Array1d:
         """Get the array of the field. Uses `Records.field_config`."""
@@ -703,17 +682,17 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
     @property
     def id_arr(self) -> tp.Array1d:
         """Get id array."""
-        return self.values[self.get_field_name('id')]
+        return self.values[self.get_field_name("id")]
 
     @property
     def col_arr(self) -> tp.Array1d:
         """Get column array."""
-        return self.values[self.get_field_name('col')]
+        return self.values[self.get_field_name("col")]
 
     @property
     def idx_arr(self) -> tp.Optional[tp.Array1d]:
         """Get index array."""
-        idx_field_name = self.get_field_name('idx')
+        idx_field_name = self.get_field_name("idx")
         if idx_field_name is None:
             return None
         return self.values[idx_field_name]
@@ -747,22 +726,21 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
     def apply_mask(self: RecordsT, mask: tp.Array1d, group_by: tp.GroupByLike = None, **kwargs) -> RecordsT:
         """Return a new class instance, filtered by mask."""
         mask_indices = np.flatnonzero(mask)
-        return self.replace(
-            records_arr=np.take(self.values, mask_indices),
-            **kwargs
-        ).regroup(group_by)
+        return self.replace(records_arr=np.take(self.values, mask_indices), **kwargs).regroup(group_by)
 
     # ############# Mapping ############# #
 
-    def map_array(self,
-                  a: tp.ArrayLike,
-                  idx_arr: tp.Optional[tp.ArrayLike] = None,
-                  mapping: tp.Optional[tp.MappingLike] = None,
-                  group_by: tp.GroupByLike = None,
-                  **kwargs) -> MappedArray:
+    def map_array(
+        self,
+        a: tp.ArrayLike,
+        idx_arr: tp.Optional[tp.ArrayLike] = None,
+        mapping: tp.Optional[tp.MappingLike] = None,
+        group_by: tp.GroupByLike = None,
+        **kwargs,
+    ) -> MappedArray:
         """Convert array to mapped array.
 
-         The length of the array must match that of the records."""
+        The length of the array must match that of the records."""
         if not isinstance(a, np.ndarray):
             a = np.asarray(a)
         checks.assert_shape_equal(a, self.values)
@@ -776,7 +754,7 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
             idx_arr=idx_arr,
             mapping=mapping,
             col_mapper=self.col_mapper,
-            **kwargs
+            **kwargs,
         ).regroup(group_by)
 
     def map_field(self, field: str, **kwargs) -> MappedArray:
@@ -787,16 +765,16 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
         return self.map_array(mapped_arr, **kwargs)
 
     @class_or_instancemethod
-    def map(cls_or_self,
-            map_func_nb: tp.Union[
-                tp.RecordsMapFunc,
-                tp.RecordsMapMetaFunc
-            ], *args,
-            dtype: tp.Optional[tp.DTypeLike] = None,
-            jitted: tp.JittedOption = None,
-            chunked: tp.ChunkedOption = None,
-            col_mapper: tp.Optional[ColumnMapper] = None,
-            **kwargs) -> MappedArray:
+    def map(
+        cls_or_self,
+        map_func_nb: tp.Union[tp.RecordsMapFunc, tp.RecordsMapMetaFunc],
+        *args,
+        dtype: tp.Optional[tp.DTypeLike] = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        col_mapper: tp.Optional[ColumnMapper] = None,
+        **kwargs,
+    ) -> MappedArray:
         """Map each record to a scalar value. Returns mapped array.
 
         See `vectorbtpro.records.nb.map_records_nb`.
@@ -819,18 +797,18 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
             return cls_or_self.map_array(mapped_arr, **kwargs)
 
     @class_or_instancemethod
-    def apply(cls_or_self,
-              apply_func_nb: tp.Union[
-                  tp.ApplyFunc,
-                  tp.ApplyMetaFunc
-              ], *args,
-              group_by: tp.GroupByLike = None,
-              apply_per_group: bool = False,
-              dtype: tp.Optional[tp.DTypeLike] = None,
-              jitted: tp.JittedOption = None,
-              chunked: tp.ChunkedOption = None,
-              col_mapper: tp.Optional[ColumnMapper] = None,
-              **kwargs) -> MappedArray:
+    def apply(
+        cls_or_self,
+        apply_func_nb: tp.Union[tp.ApplyFunc, tp.ApplyMetaFunc],
+        *args,
+        group_by: tp.GroupByLike = None,
+        apply_per_group: bool = False,
+        dtype: tp.Optional[tp.DTypeLike] = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        col_mapper: tp.Optional[ColumnMapper] = None,
+        **kwargs,
+    ) -> MappedArray:
         """Apply function on records per column/group. Returns mapped array.
 
         Applies per group if `apply_per_group` is True.
@@ -861,21 +839,23 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
     @cached_method
     def count(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Get count by column."""
-        wrap_kwargs = merge_dicts(dict(name_or_index='count'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="count"), wrap_kwargs)
         return self.wrapper.wrap_reduced(
             self.col_mapper.get_col_map(group_by=group_by)[1],
-            group_by=group_by, **wrap_kwargs)
+            group_by=group_by,
+            **wrap_kwargs,
+        )
 
     # ############# Conflicts ############# #
 
     @cached_method
     def has_conflicts(self, **kwargs) -> bool:
         """See `vectorbtpro.records.mapped_array.MappedArray.has_conflicts`."""
-        return self.get_map_field('col').has_conflicts(**kwargs)
+        return self.get_map_field("col").has_conflicts(**kwargs)
 
     def coverage_map(self, **kwargs) -> tp.SeriesFrame:
         """See `vectorbtpro.records.mapped_array.MappedArray.coverage_map`."""
-        return self.get_map_field('col').coverage_map(**kwargs)
+        return self.get_map_field("col").coverage_map(**kwargs)
 
     # ############# Stats ############# #
 
@@ -886,39 +866,23 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
         Merges `vectorbtpro.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
         `stats` from `vectorbtpro._settings.records`."""
         from vectorbtpro._settings import settings
-        records_stats_cfg = settings['records']['stats']
 
-        return merge_dicts(
-            Analyzable.stats_defaults.__get__(self),
-            records_stats_cfg
-        )
+        records_stats_cfg = settings["records"]["stats"]
+
+        return merge_dicts(Analyzable.stats_defaults.__get__(self), records_stats_cfg)
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
-            start=dict(
-                title='Start',
-                calc_func=lambda self: self.wrapper.index[0],
-                agg_func=None,
-                tags='wrapper'
-            ),
-            end=dict(
-                title='End',
-                calc_func=lambda self: self.wrapper.index[-1],
-                agg_func=None,
-                tags='wrapper'
-            ),
+            start=dict(title="Start", calc_func=lambda self: self.wrapper.index[0], agg_func=None, tags="wrapper"),
+            end=dict(title="End", calc_func=lambda self: self.wrapper.index[-1], agg_func=None, tags="wrapper"),
             period=dict(
-                title='Period',
+                title="Period",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,
-                tags='wrapper'
+                tags="wrapper",
             ),
-            count=dict(
-                title='Count',
-                calc_func='count',
-                tags='records'
-            )
+            count=dict(title="Count", calc_func="count", tags="records"),
         )
     )
 
@@ -935,12 +899,10 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
         Merges `vectorbtpro.generic.plots_builder.PlotsBuilderMixin.plots_defaults` and
         `plots` from `vectorbtpro._settings.records`."""
         from vectorbtpro._settings import settings
-        records_plots_cfg = settings['records']['plots']
 
-        return merge_dicts(
-            Analyzable.plots_defaults.__get__(self),
-            records_plots_cfg
-        )
+        records_plots_cfg = settings["records"]["plots"]
+
+        return merge_dicts(Analyzable.plots_defaults.__get__(self), records_plots_cfg)
 
     @property
     def subplots(self) -> Config:
@@ -953,16 +915,14 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
         """Build field config documentation."""
         if source_cls is None:
             source_cls = Records
-        return string.Template(
-            inspect.cleandoc(get_dict_attr(source_cls, 'field_config').__doc__)
-        ).substitute(
-            {'field_config': cls.field_config.prettify(), 'cls_name': cls.__name__}
+        return string.Template(inspect.cleandoc(get_dict_attr(source_cls, "field_config").__doc__)).substitute(
+            {"field_config": cls.field_config.prettify(), "cls_name": cls.__name__},
         )
 
     @classmethod
     def override_field_config_doc(cls, __pdoc__: dict, source_cls: tp.Optional[type] = None) -> None:
         """Call this method on each subclass that overrides `field_config`."""
-        __pdoc__[cls.__name__ + '.field_config'] = cls.build_field_config_doc(source_cls=source_cls)
+        __pdoc__[cls.__name__ + ".field_config"] = cls.build_field_config_doc(source_cls=source_cls)
 
 
 Records.override_field_config_doc(__pdoc__)

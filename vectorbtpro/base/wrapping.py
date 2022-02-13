@@ -35,16 +35,18 @@ class ArrayWrapper(Configured, PandasIndexer):
 
         Use methods that begin with `get_` to get group-aware results."""
 
-    def __init__(self,
-                 index: tp.IndexLike,
-                 columns: tp.IndexLike,
-                 ndim: int,
-                 freq: tp.Optional[tp.FrequencyLike] = None,
-                 column_only_select: tp.Optional[bool] = None,
-                 group_select: tp.Optional[bool] = None,
-                 grouped_ndim: tp.Optional[int] = None,
-                 grouper: tp.Optional[Grouper] = None,
-                 **kwargs) -> None:
+    def __init__(
+        self,
+        index: tp.IndexLike,
+        columns: tp.IndexLike,
+        ndim: int,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+        column_only_select: tp.Optional[bool] = None,
+        group_select: tp.Optional[bool] = None,
+        grouped_ndim: tp.Optional[int] = None,
+        grouper: tp.Optional[Grouper] = None,
+        **kwargs,
+    ) -> None:
 
         checks.assert_not_none(index)
         checks.assert_not_none(columns)
@@ -75,7 +77,7 @@ class ArrayWrapper(Configured, PandasIndexer):
             group_select=group_select,
             grouped_ndim=grouped_ndim,
             grouper=grouper,
-            **kwargs
+            **kwargs,
         )
 
         self._index = index
@@ -87,13 +89,15 @@ class ArrayWrapper(Configured, PandasIndexer):
         self._grouper = grouper
         self._grouped_ndim = grouped_ndim
 
-    def indexing_func_meta(self: ArrayWrapperT,
-                           pd_indexing_func: tp.PandasIndexingFunc,
-                           index: tp.Optional[tp.IndexLike] = None,
-                           columns: tp.Optional[tp.IndexLike] = None,
-                           column_only_select: tp.Optional[bool] = None,
-                           group_select: tp.Optional[bool] = None,
-                           group_by: tp.GroupByLike = None) -> IndexingMetaT:
+    def indexing_func_meta(
+        self: ArrayWrapperT,
+        pd_indexing_func: tp.PandasIndexingFunc,
+        index: tp.Optional[tp.IndexLike] = None,
+        columns: tp.Optional[tp.IndexLike] = None,
+        column_only_select: tp.Optional[bool] = None,
+        group_select: tp.Optional[bool] = None,
+        group_by: tp.GroupByLike = None,
+    ) -> IndexingMetaT:
         """Perform indexing on `ArrayWrapper` and also return indexing metadata.
 
         Takes into account column grouping.
@@ -139,8 +143,10 @@ class ArrayWrapper(Configured, PandasIndexer):
             try:
                 col_mapper = pd_indexing_func(i_wrapper.wrap_reduced(np.arange(n_cols), columns=columns))
             except pd.core.indexing.IndexingError as e:
-                warnings.warn("Columns only: Make sure to treat this object "
-                              "as a Series of columns rather than a DataFrame", stacklevel=2)
+                warnings.warn(
+                    "Columns only: Make sure to treat this object " "as a Series of columns rather than a DataFrame",
+                    stacklevel=2,
+                )
                 raise e
             if checks.is_series(col_mapper):
                 new_columns = col_mapper.index
@@ -153,22 +159,22 @@ class ArrayWrapper(Configured, PandasIndexer):
             new_index = index
             idx_idxs = np.arange(len(index))
         else:
-            idx_mapper = pd_indexing_func(i_wrapper.wrap(
-                np.broadcast_to(np.arange(n_rows)[:, None], (n_rows, n_cols)),
-                index=index,
-                columns=columns
-            ))
+            idx_mapper = pd_indexing_func(
+                i_wrapper.wrap(
+                    np.broadcast_to(np.arange(n_rows)[:, None], (n_rows, n_cols)),
+                    index=index,
+                    columns=columns,
+                )
+            )
             if i_wrapper.ndim == 1:
                 if not checks.is_series(idx_mapper):
                     raise IndexingError("Selection of a scalar is not allowed")
                 idx_idxs = idx_mapper.values
                 col_idxs = 0
             else:
-                col_mapper = pd_indexing_func(i_wrapper.wrap(
-                    np.broadcast_to(np.arange(n_cols), (n_rows, n_cols)),
-                    index=index,
-                    columns=columns
-                ))
+                col_mapper = pd_indexing_func(
+                    i_wrapper.wrap(np.broadcast_to(np.arange(n_cols), (n_rows, n_cols)), index=index, columns=columns),
+                )
                 if checks.is_frame(idx_mapper):
                     idx_idxs = idx_mapper.values[:, 0]
                     col_idxs = col_mapper.values[0]
@@ -218,32 +224,41 @@ class ArrayWrapper(Configured, PandasIndexer):
                 else:
                     ungrouped_ndim = 2
 
-                return _self.replace(
-                    index=new_index,
-                    columns=ungrouped_columns,
-                    ndim=ungrouped_ndim,
-                    grouped_ndim=new_ndim,
-                    group_by=new_columns[new_groups]
-                ), idx_idxs, group_idxs, new_group_idxs
+                return (
+                    _self.replace(
+                        index=new_index,
+                        columns=ungrouped_columns,
+                        ndim=ungrouped_ndim,
+                        grouped_ndim=new_ndim,
+                        group_by=new_columns[new_groups],
+                    ),
+                    idx_idxs,
+                    group_idxs,
+                    new_group_idxs,
+                )
 
             # Selection based on columns
             col_idxs_arr = reshaping.to_1d_array(col_idxs)
-            return _self.replace(
-                index=new_index,
-                columns=new_columns,
-                ndim=new_ndim,
-                grouped_ndim=None,
-                group_by=_self.grouper.group_by[col_idxs_arr]
-            ), idx_idxs, col_idxs, col_idxs
+            return (
+                _self.replace(
+                    index=new_index,
+                    columns=new_columns,
+                    ndim=new_ndim,
+                    grouped_ndim=None,
+                    group_by=_self.grouper.group_by[col_idxs_arr],
+                ),
+                idx_idxs,
+                col_idxs,
+                col_idxs,
+            )
 
         # Grouping disabled
-        return _self.replace(
-            index=new_index,
-            columns=new_columns,
-            ndim=new_ndim,
-            grouped_ndim=None,
-            group_by=None
-        ), idx_idxs, col_idxs, col_idxs
+        return (
+            _self.replace(index=new_index, columns=new_columns, ndim=new_ndim, grouped_ndim=None, group_by=None),
+            idx_idxs,
+            col_idxs,
+            col_idxs,
+        )
 
     def indexing_func(self: ArrayWrapperT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> ArrayWrapperT:
         """Perform indexing on `ArrayWrapper`"""
@@ -258,18 +273,21 @@ class ArrayWrapper(Configured, PandasIndexer):
         index = indexes.get_index(pd_obj, 0)
         columns = indexes.get_index(pd_obj, 1)
         ndim = pd_obj.ndim
-        kwargs.pop('index', None)
-        kwargs.pop('columns', None)
-        kwargs.pop('ndim', None)
+        kwargs.pop("index", None)
+        kwargs.pop("columns", None)
+        kwargs.pop("ndim", None)
         return cls(index, columns, ndim, *args, **kwargs)
 
     @classmethod
-    def from_shape(cls: tp.Type[ArrayWrapperT],
-                   shape: tp.ShapeLike,
-                   index: tp.Optional[tp.IndexLike] = None,
-                   columns: tp.Optional[tp.IndexLike] = None,
-                   ndim: tp.Optional[int] = None,
-                   *args, **kwargs) -> ArrayWrapperT:
+    def from_shape(
+        cls: tp.Type[ArrayWrapperT],
+        shape: tp.ShapeLike,
+        index: tp.Optional[tp.IndexLike] = None,
+        columns: tp.Optional[tp.IndexLike] = None,
+        ndim: tp.Optional[int] = None,
+        *args,
+        **kwargs,
+    ) -> ArrayWrapperT:
         """Derive metadata from shape."""
         shape = reshaping.shape_to_tuple(shape)
         if index is None:
@@ -320,7 +338,7 @@ class ArrayWrapper(Configured, PandasIndexer):
     def shape(self) -> tp.Shape:
         """Shape."""
         if self.ndim == 1:
-            return len(self.index),
+            return (len(self.index),)
         return len(self.index), len(self.columns)
 
     def get_shape(self, group_by: tp.GroupByLike = None) -> tp.Shape:
@@ -342,11 +360,12 @@ class ArrayWrapper(Configured, PandasIndexer):
     def freq(self) -> tp.Optional[pd.Timedelta]:
         """Index frequency."""
         from vectorbtpro._settings import settings
-        wrapping_cfg = settings['wrapping']
+
+        wrapping_cfg = settings["wrapping"]
 
         freq = self._freq
         if freq is None:
-            freq = wrapping_cfg['freq']
+            freq = wrapping_cfg["freq"]
         if freq is not None:
             return freq_to_timedelta(freq)
         if isinstance(self.index, DatetimeIndexes):
@@ -365,33 +384,45 @@ class ArrayWrapper(Configured, PandasIndexer):
     def dt_period(self) -> float:
         """Get the period of the index, taking into account its datetime-like properties."""
         from vectorbtpro._settings import settings
-        wrapping_cfg = settings['wrapping']
+
+        wrapping_cfg = settings["wrapping"]
 
         if isinstance(self.index, pd.DatetimeIndex):
             if self.freq is not None:
                 return (self.index[-1] - self.index[0]) / self.freq + 1
-            if not wrapping_cfg['silence_warnings']:
-                warnings.warn("Couldn't parse the frequency of index. Pass it as `freq` or "
-                              "define it globally under `settings.wrapping`.", stacklevel=2)
+            if not wrapping_cfg["silence_warnings"]:
+                warnings.warn(
+                    "Couldn't parse the frequency of index. Pass it as `freq` or "
+                    "define it globally under `settings.wrapping`.",
+                    stacklevel=2,
+                )
         if isinstance(self.index[0], int) and isinstance(self.index[-1], int):
             return self.index[-1] - self.index[0] + 1
-        if not wrapping_cfg['silence_warnings']:
+        if not wrapping_cfg["silence_warnings"]:
             warnings.warn("Index is neither datetime-like nor integer", stacklevel=2)
         return self.period
 
-    def to_timedelta(self, a: tp.MaybeArray[float], to_pd: bool = False,
-                     silence_warnings: tp.Optional[bool] = None) -> tp.Union[pd.Timedelta, np.timedelta64, tp.Array]:
+    def to_timedelta(
+        self,
+        a: tp.MaybeArray[float],
+        to_pd: bool = False,
+        silence_warnings: tp.Optional[bool] = None,
+    ) -> tp.Union[pd.Timedelta, np.timedelta64, tp.Array]:
         """Convert array to duration using `ArrayWrapper.freq`."""
         from vectorbtpro._settings import settings
-        wrapping_cfg = settings['wrapping']
+
+        wrapping_cfg = settings["wrapping"]
 
         if silence_warnings is None:
-            silence_warnings = wrapping_cfg['silence_warnings']
+            silence_warnings = wrapping_cfg["silence_warnings"]
 
         if self.freq is None:
             if not silence_warnings:
-                warnings.warn("Couldn't parse the frequency of index. Pass it as `freq` or "
-                              "define it globally under `settings.wrapping`.", stacklevel=2)
+                warnings.warn(
+                    "Couldn't parse the frequency of index. Pass it as `freq` or "
+                    "define it globally under `settings.wrapping`.",
+                    stacklevel=2,
+                )
             return a
         if to_pd:
             return pd.to_timedelta(a * self.freq)
@@ -401,22 +432,24 @@ class ArrayWrapper(Configured, PandasIndexer):
     def column_only_select(self) -> tp.Optional[bool]:
         """Whether to perform indexing on columns only."""
         from vectorbtpro._settings import settings
-        wrapping_cfg = settings['wrapping']
+
+        wrapping_cfg = settings["wrapping"]
 
         column_only_select = self._column_only_select
         if column_only_select is None:
-            column_only_select = wrapping_cfg['column_only_select']
+            column_only_select = wrapping_cfg["column_only_select"]
         return column_only_select
 
     @property
     def group_select(self) -> tp.Optional[bool]:
         """Whether to perform indexing on groups."""
         from vectorbtpro._settings import settings
-        wrapping_cfg = settings['wrapping']
+
+        wrapping_cfg = settings["wrapping"]
 
         group_select = self._group_select
         if group_select is None:
-            group_select = wrapping_cfg['group_select']
+            group_select = wrapping_cfg["group_select"]
         return group_select
 
     @property
@@ -456,20 +489,22 @@ class ArrayWrapper(Configured, PandasIndexer):
                 columns=_self.grouper.get_index(),
                 ndim=_self.grouped_ndim,
                 grouped_ndim=None,
-                group_by=None
+                group_by=None,
             )
         return _self  # important for keeping cache
 
-    def wrap(self,
-             arr: tp.ArrayLike,
-             group_by: tp.GroupByLike = None,
-             index: tp.Optional[tp.IndexLike] = None,
-             columns: tp.Optional[tp.IndexLike] = None,
-             fillna: tp.Optional[tp.Scalar] = None,
-             dtype: tp.Optional[tp.PandasDTypeLike] = None,
-             to_timedelta: bool = False,
-             to_index: bool = False,
-             silence_warnings: tp.Optional[bool] = None) -> tp.SeriesFrame:
+    def wrap(
+        self,
+        arr: tp.ArrayLike,
+        group_by: tp.GroupByLike = None,
+        index: tp.Optional[tp.IndexLike] = None,
+        columns: tp.Optional[tp.IndexLike] = None,
+        fillna: tp.Optional[tp.Scalar] = None,
+        dtype: tp.Optional[tp.PandasDTypeLike] = None,
+        to_timedelta: bool = False,
+        to_index: bool = False,
+        silence_warnings: tp.Optional[bool] = None,
+    ) -> tp.SeriesFrame:
         """Wrap a NumPy array using the stored metadata.
 
         Runs the following pipeline:
@@ -480,10 +515,11 @@ class ArrayWrapper(Configured, PandasIndexer):
         4) Converts to index (optional)
         5) Converts to timedelta using `ArrayWrapper.to_timedelta` (optional)"""
         from vectorbtpro._settings import settings
-        wrapping_cfg = settings['wrapping']
+
+        wrapping_cfg = settings["wrapping"]
 
         if silence_warnings is None:
-            silence_warnings = wrapping_cfg['silence_warnings']
+            silence_warnings = wrapping_cfg["silence_warnings"]
 
         _self = self.resolve(group_by=group_by)
 
@@ -531,16 +567,18 @@ class ArrayWrapper(Configured, PandasIndexer):
             out = self.to_timedelta(out, silence_warnings=silence_warnings)
         return out
 
-    def wrap_reduced(self,
-                     arr: tp.ArrayLike,
-                     group_by: tp.GroupByLike = None,
-                     name_or_index: tp.NameIndex = None,
-                     columns: tp.Optional[tp.IndexLike] = None,
-                     fillna: tp.Optional[tp.Scalar] = None,
-                     dtype: tp.Optional[tp.PandasDTypeLike] = None,
-                     to_timedelta: bool = False,
-                     to_index: bool = False,
-                     silence_warnings: tp.Optional[bool] = None) -> tp.MaybeSeriesFrame:
+    def wrap_reduced(
+        self,
+        arr: tp.ArrayLike,
+        group_by: tp.GroupByLike = None,
+        name_or_index: tp.NameIndex = None,
+        columns: tp.Optional[tp.IndexLike] = None,
+        fillna: tp.Optional[tp.Scalar] = None,
+        dtype: tp.Optional[tp.PandasDTypeLike] = None,
+        to_timedelta: bool = False,
+        to_index: bool = False,
+        silence_warnings: tp.Optional[bool] = None,
+    ) -> tp.MaybeSeriesFrame:
         """Wrap result of reduction.
 
         `name_or_index` can be the name of the resulting series if reducing to a scalar per column,
@@ -549,10 +587,11 @@ class ArrayWrapper(Configured, PandasIndexer):
 
         See `ArrayWrapper.wrap` for the pipeline."""
         from vectorbtpro._settings import settings
-        wrapping_cfg = settings['wrapping']
+
+        wrapping_cfg = settings["wrapping"]
 
         if silence_warnings is None:
-            silence_warnings = wrapping_cfg['silence_warnings']
+            silence_warnings = wrapping_cfg["silence_warnings"]
 
         checks.assert_not_none(self.ndim)
         _self = self.resolve(group_by=group_by)
@@ -657,7 +696,7 @@ class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
             pd_indexing_func,
             column_only_select=self.column_only_select,
             group_select=self.group_select,
-            **kwargs
+            **kwargs,
         )
         return self.replace(wrapper=new_wrapper)
 
@@ -669,7 +708,7 @@ class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
     @property
     def column_only_select(self) -> tp.Optional[bool]:
         """Overrides `ArrayWrapper.column_only_select`."""
-        column_only_select = getattr(self, '_column_only_select', None)
+        column_only_select = getattr(self, "_column_only_select", None)
         if column_only_select is None:
             return self.wrapper.column_only_select
         return column_only_select
@@ -677,7 +716,7 @@ class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
     @property
     def group_select(self) -> tp.Optional[bool]:
         """Overrides `ArrayWrapper.group_select`."""
-        group_select = getattr(self, '_group_select', None)
+        group_select = getattr(self, "_group_select", None)
         if group_select is None:
             return self.wrapper.group_select
         return group_select
@@ -693,45 +732,48 @@ class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
             return self.replace(wrapper=self.wrapper.regroup(group_by, **kwargs))
         return self  # important for keeping cache
 
-    def resolve_self(self: AttrResolverMixinT,
-                     cond_kwargs: tp.KwargsLike = None,
-                     custom_arg_names: tp.ClassVar[tp.Optional[tp.Set[str]]] = None,
-                     impacts_caching: bool = True,
-                     silence_warnings: tp.Optional[bool] = None) -> AttrResolverMixinT:
+    def resolve_self(
+        self: AttrResolverMixinT,
+        cond_kwargs: tp.KwargsLike = None,
+        custom_arg_names: tp.ClassVar[tp.Optional[tp.Set[str]]] = None,
+        impacts_caching: bool = True,
+        silence_warnings: tp.Optional[bool] = None,
+    ) -> AttrResolverMixinT:
         """Resolve self.
 
         Creates a copy of this instance if a different `freq` can be found in `cond_kwargs`."""
         from vectorbtpro._settings import settings
-        wrapping_cfg = settings['wrapping']
+
+        wrapping_cfg = settings["wrapping"]
 
         if cond_kwargs is None:
             cond_kwargs = {}
         if custom_arg_names is None:
             custom_arg_names = set()
         if silence_warnings is None:
-            silence_warnings = wrapping_cfg['silence_warnings']
+            silence_warnings = wrapping_cfg["silence_warnings"]
 
-        if 'freq' in cond_kwargs:
-            wrapper_copy = self.wrapper.replace(freq=cond_kwargs['freq'])
+        if "freq" in cond_kwargs:
+            wrapper_copy = self.wrapper.replace(freq=cond_kwargs["freq"])
 
             if wrapper_copy.freq != self.wrapper.freq:
                 if not silence_warnings:
-                    warnings.warn(f"Changing the frequency will create a copy of this object. "
-                                  f"Consider setting it upon object creation to re-use existing cache.", stacklevel=2)
+                    warnings.warn(
+                        f"Changing the frequency will create a copy of this object. "
+                        f"Consider setting it upon object creation to re-use existing cache.",
+                        stacklevel=2,
+                    )
                 self_copy = self.replace(wrapper=wrapper_copy)
                 for alias in self.self_aliases:
                     if alias not in custom_arg_names:
                         cond_kwargs[alias] = self_copy
-                cond_kwargs['freq'] = self_copy.wrapper.freq
+                cond_kwargs["freq"] = self_copy.wrapper.freq
                 if impacts_caching:
-                    cond_kwargs['use_caching'] = False
+                    cond_kwargs["use_caching"] = False
                 return self_copy
         return self
 
-    def select_col(self: WrappingT,
-                   column: tp.Any = None,
-                   group_by: tp.GroupByLike = None,
-                   **kwargs) -> WrappingT:
+    def select_col(self: WrappingT, column: tp.Any = None, group_by: tp.GroupByLike = None, **kwargs) -> WrappingT:
         """Select one column/group.
 
         `column` can be a label-based position as well as an integer position (if label fails)."""
@@ -778,10 +820,12 @@ class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
         raise TypeError("Only one group is allowed. Use indexing or column argument.")
 
     @class_or_instancemethod
-    def select_col_from_obj(cls_or_self,
-                            obj: tp.Optional[tp.SeriesFrame],
-                            column: tp.Any = None,
-                            wrapper: tp.Optional[ArrayWrapper] = None) -> tp.MaybeSeries:
+    def select_col_from_obj(
+        cls_or_self,
+        obj: tp.Optional[tp.SeriesFrame],
+        column: tp.Any = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+    ) -> tp.MaybeSeries:
         """Select one column/group from a pandas object.
 
         `column` can be a label-based position as well as an integer position (if label fails)."""

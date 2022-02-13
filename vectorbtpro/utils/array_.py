@@ -64,16 +64,19 @@ def uniform_summing_to_one_nb(n: int) -> tp.Array1d:
 
     See # https://stackoverflow.com/a/2640067/8141780"""
     rand_floats = np.empty(n + 1, dtype=np.float_)
-    rand_floats[0] = 0.
-    rand_floats[1] = 1.
+    rand_floats[0] = 0.0
+    rand_floats[1] = 1.0
     rand_floats[2:] = np.random.uniform(0, 1, n - 1)
     rand_floats = np.sort(rand_floats)
     rand_floats = rand_floats[1:] - rand_floats[:-1]
     return rand_floats
 
 
-def renormalize(a: tp.MaybeArray[float], from_range: tp.Tuple[float, float],
-                to_range: tp.Tuple[float, float]) -> tp.MaybeArray[float]:
+def renormalize(
+    a: tp.MaybeArray[float],
+    from_range: tp.Tuple[float, float],
+    to_range: tp.Tuple[float, float],
+) -> tp.MaybeArray[float]:
     """Renormalize `a` from one range to another."""
     from_delta = from_range[1] - from_range[0]
     to_delta = to_range[1] - to_range[0]
@@ -81,8 +84,11 @@ def renormalize(a: tp.MaybeArray[float], from_range: tp.Tuple[float, float],
 
 
 @register_jitted(cache=True)
-def renormalize_nb(a: tp.MaybeArray[float], from_range: tp.Tuple[float, float],
-                   to_range: tp.Tuple[float, float]) -> tp.MaybeArray[float]:
+def renormalize_nb(
+    a: tp.MaybeArray[float],
+    from_range: tp.Tuple[float, float],
+    to_range: tp.Tuple[float, float],
+) -> tp.MaybeArray[float]:
     """Numba-compiled version of `renormalize`."""
     from_delta = from_range[1] - from_range[0]
     to_delta = to_range[1] - to_range[0]
@@ -128,7 +134,7 @@ def max_rel_rescale(a: tp.Array, to_range: tp.Tuple[float, float]) -> tp.Array:
 @register_jitted(cache=True)
 def rescale_float_to_int_nb(floats: tp.Array, int_range: tp.Tuple[float, float], total: float) -> tp.Array:
     """Rescale a float array into an int array."""
-    ints = np.floor(renormalize_nb(floats, [0., 1.], int_range))
+    ints = np.floor(renormalize_nb(floats, [0.0, 1.0], int_range))
     leftover = int(total - ints.sum())
     for i in range(leftover):
         ints[np.random.choice(len(ints))] += 1

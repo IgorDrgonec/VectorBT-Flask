@@ -36,8 +36,13 @@ def mstd_nb(a: tp.Array2d, window: int, ewm: int, adjust: bool = False, ddof: in
 
 
 @register_jitted(cache=True)
-def ma_cache_nb(close: tp.Array2d, windows: tp.List[int], ewms: tp.List[bool],
-                adjust: bool = False, per_column: bool = False) -> tp.Optional[tp.Dict[int, tp.Array2d]]:
+def ma_cache_nb(
+    close: tp.Array2d,
+    windows: tp.List[int],
+    ewms: tp.List[bool],
+    adjust: bool = False,
+    per_column: bool = False,
+) -> tp.Optional[tp.Dict[int, tp.Array2d]]:
     """Caching function for `vectorbtpro.indicators.custom.MA`."""
     if per_column:
         return None
@@ -50,8 +55,13 @@ def ma_cache_nb(close: tp.Array2d, windows: tp.List[int], ewms: tp.List[bool],
 
 
 @register_jitted(cache=True)
-def ma_apply_nb(close: tp.Array2d, window: int, ewm: bool, adjust: bool = False,
-                cache_dict: tp.Optional[tp.Dict[int, tp.Array2d]] = None) -> tp.Array2d:
+def ma_apply_nb(
+    close: tp.Array2d,
+    window: int,
+    ewm: bool,
+    adjust: bool = False,
+    cache_dict: tp.Optional[tp.Dict[int, tp.Array2d]] = None,
+) -> tp.Array2d:
     """Apply function for `vectorbtpro.indicators.custom.MA`."""
     if cache_dict is not None:
         h = hash((window, ewm))
@@ -60,8 +70,14 @@ def ma_apply_nb(close: tp.Array2d, window: int, ewm: bool, adjust: bool = False,
 
 
 @register_jitted(cache=True)
-def mstd_cache_nb(close: tp.Array2d, windows: tp.List[int], ewms: tp.List[bool], adjust: bool = False,
-                  ddof: int = 0, per_column: bool = False) -> tp.Optional[tp.Dict[int, tp.Array2d]]:
+def mstd_cache_nb(
+    close: tp.Array2d,
+    windows: tp.List[int],
+    ewms: tp.List[bool],
+    adjust: bool = False,
+    ddof: int = 0,
+    per_column: bool = False,
+) -> tp.Optional[tp.Dict[int, tp.Array2d]]:
     """Caching function for `vectorbtpro.indicators.custom.MSTD`."""
     if per_column:
         return None
@@ -74,8 +90,14 @@ def mstd_cache_nb(close: tp.Array2d, windows: tp.List[int], ewms: tp.List[bool],
 
 
 @register_jitted(cache=True)
-def mstd_apply_nb(close: tp.Array2d, window: int, ewm: bool, adjust: bool = False, ddof: int = 0,
-                  cache_dict: tp.Optional[tp.Dict[int, tp.Array2d]] = None) -> tp.Array2d:
+def mstd_apply_nb(
+    close: tp.Array2d,
+    window: int,
+    ewm: bool,
+    adjust: bool = False,
+    ddof: int = 0,
+    cache_dict: tp.Optional[tp.Dict[int, tp.Array2d]] = None,
+) -> tp.Array2d:
     """Apply function for `vectorbtpro.indicators.custom.MSTD`."""
     if cache_dict is not None:
         h = hash((window, ewm))
@@ -84,9 +106,15 @@ def mstd_apply_nb(close: tp.Array2d, window: int, ewm: bool, adjust: bool = Fals
 
 
 @register_jitted(cache=True)
-def bb_cache_nb(close: tp.Array2d, windows: tp.List[int], ewms: tp.List[bool], alphas: tp.List[float],
-                adjust: bool = False, ddof: int = 0, per_column: bool = False) -> \
-        tp.Tuple[tp.Optional[tp.Dict[int, tp.Array2d]], tp.Optional[tp.Dict[int, tp.Array2d]]]:
+def bb_cache_nb(
+    close: tp.Array2d,
+    windows: tp.List[int],
+    ewms: tp.List[bool],
+    alphas: tp.List[float],
+    adjust: bool = False,
+    ddof: int = 0,
+    per_column: bool = False,
+) -> tp.Tuple[tp.Optional[tp.Dict[int, tp.Array2d]], tp.Optional[tp.Dict[int, tp.Array2d]]]:
     """Caching function for `vectorbtpro.indicators.custom.BBANDS`."""
     if per_column:
         return None, None
@@ -96,11 +124,16 @@ def bb_cache_nb(close: tp.Array2d, windows: tp.List[int], ewms: tp.List[bool], a
 
 
 @register_jitted(cache=True)
-def bb_apply_nb(close: tp.Array2d, window: int, ewm: bool, alpha: float,
-                adjust: bool = False, ddof: int = 0,
-                ma_cache_dict: tp.Optional[tp.Dict[int, tp.Array2d]] = None,
-                mstd_cache_dict: tp.Optional[tp.Dict[int, tp.Array2d]] = None) -> \
-        tp.Tuple[tp.Array2d, tp.Array2d, tp.Array2d]:
+def bb_apply_nb(
+    close: tp.Array2d,
+    window: int,
+    ewm: bool,
+    alpha: float,
+    adjust: bool = False,
+    ddof: int = 0,
+    ma_cache_dict: tp.Optional[tp.Dict[int, tp.Array2d]] = None,
+    mstd_cache_dict: tp.Optional[tp.Dict[int, tp.Array2d]] = None,
+) -> tp.Tuple[tp.Array2d, tp.Array2d, tp.Array2d]:
     """Apply function for `vectorbtpro.indicators.custom.BBANDS`."""
     # Calculate lower, middle and upper bands
     if ma_cache_dict is not None and mstd_cache_dict is not None:
@@ -125,9 +158,13 @@ def rsi_up_down_nb(close: tp.Array2d) -> tp.Tuple[tp.Array2d, tp.Array2d]:
 
 
 @register_jitted(cache=True)
-def rsi_cache_nb(close: tp.Array2d, windows: tp.List[int], ewms: tp.List[bool],
-                 adjust: bool = False, per_column: bool = False) -> \
-        tp.Optional[tp.Dict[int, tp.Tuple[tp.Array2d, tp.Array2d]]]:
+def rsi_cache_nb(
+    close: tp.Array2d,
+    windows: tp.List[int],
+    ewms: tp.List[bool],
+    adjust: bool = False,
+    per_column: bool = False,
+) -> tp.Optional[tp.Dict[int, tp.Tuple[tp.Array2d, tp.Array2d]]]:
     """Caching function for `vectorbtpro.indicators.custom.RSI`."""
     up, down = rsi_up_down_nb(close)
     if per_column:
@@ -145,8 +182,13 @@ def rsi_cache_nb(close: tp.Array2d, windows: tp.List[int], ewms: tp.List[bool],
 
 
 @register_jitted(cache=True)
-def rsi_apply_nb(close: tp.Array2d, window: int, ewm: bool, adjust: bool = False,
-                 cache_dict: tp.Optional[tp.Dict[int, tp.Tuple[tp.Array2d, tp.Array2d]]] = None) -> tp.Array2d:
+def rsi_apply_nb(
+    close: tp.Array2d,
+    window: int,
+    ewm: bool,
+    adjust: bool = False,
+    cache_dict: tp.Optional[tp.Dict[int, tp.Tuple[tp.Array2d, tp.Array2d]]] = None,
+) -> tp.Array2d:
     """Apply function for `vectorbtpro.indicators.custom.RSI`."""
     if cache_dict is not None:
         h = hash((window, ewm))
@@ -160,10 +202,16 @@ def rsi_apply_nb(close: tp.Array2d, window: int, ewm: bool, adjust: bool = False
 
 
 @register_jitted(cache=True)
-def stoch_cache_nb(high: tp.Array2d, low: tp.Array2d, close: tp.Array2d,
-                   k_windows: tp.List[int], d_windows: tp.List[int], d_ewms: tp.List[bool],
-                   adjust: bool = False, per_column: bool = False) -> \
-        tp.Optional[tp.Dict[int, tp.Tuple[tp.Array2d, tp.Array2d]]]:
+def stoch_cache_nb(
+    high: tp.Array2d,
+    low: tp.Array2d,
+    close: tp.Array2d,
+    k_windows: tp.List[int],
+    d_windows: tp.List[int],
+    d_ewms: tp.List[bool],
+    adjust: bool = False,
+    per_column: bool = False,
+) -> tp.Optional[tp.Dict[int, tp.Tuple[tp.Array2d, tp.Array2d]]]:
     """Caching function for `vectorbtpro.indicators.custom.STOCH`."""
     if per_column:
         return None
@@ -178,10 +226,16 @@ def stoch_cache_nb(high: tp.Array2d, low: tp.Array2d, close: tp.Array2d,
 
 
 @register_jitted(cache=True)
-def stoch_apply_nb(high: tp.Array2d, low: tp.Array2d, close: tp.Array2d,
-                   k_window: int, d_window: int, d_ewm: bool, adjust: bool = False,
-                   cache_dict: tp.Optional[tp.Dict[int, tp.Tuple[tp.Array2d, tp.Array2d]]] = None) \
-        -> tp.Tuple[tp.Array2d, tp.Array2d]:
+def stoch_apply_nb(
+    high: tp.Array2d,
+    low: tp.Array2d,
+    close: tp.Array2d,
+    k_window: int,
+    d_window: int,
+    d_ewm: bool,
+    adjust: bool = False,
+    cache_dict: tp.Optional[tp.Dict[int, tp.Tuple[tp.Array2d, tp.Array2d]]] = None,
+) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Apply function for `vectorbtpro.indicators.custom.STOCH`."""
     if cache_dict is not None:
         h = hash(k_window)
@@ -195,9 +249,16 @@ def stoch_apply_nb(high: tp.Array2d, low: tp.Array2d, close: tp.Array2d,
 
 
 @register_jitted(cache=True)
-def macd_cache_nb(close: tp.Array2d, fast_windows: tp.List[int], slow_windows: tp.List[int],
-                  signal_windows: tp.List[int], macd_ewms: tp.List[bool], signal_ewms: tp.List[bool],
-                  adjust: bool = False, per_column: bool = False) -> tp.Optional[tp.Dict[int, tp.Array2d]]:
+def macd_cache_nb(
+    close: tp.Array2d,
+    fast_windows: tp.List[int],
+    slow_windows: tp.List[int],
+    signal_windows: tp.List[int],
+    macd_ewms: tp.List[bool],
+    signal_ewms: tp.List[bool],
+    adjust: bool = False,
+    per_column: bool = False,
+) -> tp.Optional[tp.Dict[int, tp.Array2d]]:
     """Caching function for `vectorbtpro.indicators.custom.MACD`."""
     if per_column:
         return None
@@ -209,9 +270,16 @@ def macd_cache_nb(close: tp.Array2d, fast_windows: tp.List[int], slow_windows: t
 
 
 @register_jitted(cache=True)
-def macd_apply_nb(close: tp.Array2d, fast_window: int, slow_window: int,
-                  signal_window: int, macd_ewm: bool, signal_ewm: bool, adjust: bool = False,
-                  cache_dict: tp.Optional[tp.Dict[int, tp.Array2d]] = None) -> tp.Tuple[tp.Array2d, tp.Array2d]:
+def macd_apply_nb(
+    close: tp.Array2d,
+    fast_window: int,
+    slow_window: int,
+    signal_window: int,
+    macd_ewm: bool,
+    signal_ewm: bool,
+    adjust: bool = False,
+    cache_dict: tp.Optional[tp.Dict[int, tp.Array2d]] = None,
+) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Apply function for `vectorbtpro.indicators.custom.MACD`."""
     if cache_dict is not None:
         fast_h = hash((fast_window, macd_ewm))
@@ -241,9 +309,15 @@ def true_range_nb(high: tp.Array2d, low: tp.Array2d, close: tp.Array2d) -> tp.Ar
 
 
 @register_jitted(cache=True)
-def atr_cache_nb(high: tp.Array2d, low: tp.Array2d, close: tp.Array2d, windows: tp.List[int],
-                 ewms: tp.List[bool], adjust: bool = False, per_column: bool = False) -> \
-        tp.Tuple[tp.Optional[tp.Array2d], tp.Optional[tp.Dict[int, tp.Array2d]]]:
+def atr_cache_nb(
+    high: tp.Array2d,
+    low: tp.Array2d,
+    close: tp.Array2d,
+    windows: tp.List[int],
+    ewms: tp.List[bool],
+    adjust: bool = False,
+    per_column: bool = False,
+) -> tp.Tuple[tp.Optional[tp.Array2d], tp.Optional[tp.Dict[int, tp.Array2d]]]:
     """Caching function for `vectorbtpro.indicators.custom.ATR`."""
     # Calculate TR here instead of re-calculating it for each param in atr_apply_nb
     tr = true_range_nb(high, low, close)
@@ -259,9 +333,16 @@ def atr_cache_nb(high: tp.Array2d, low: tp.Array2d, close: tp.Array2d, windows: 
 
 
 @register_jitted(cache=True)
-def atr_apply_nb(high: tp.Array2d, low: tp.Array2d, close: tp.Array2d, window: int, ewm: bool,
-                 adjust: bool = False, tr: tp.Optional[tp.Array2d] = None,
-                 cache_dict: tp.Optional[tp.Dict[int, tp.Array2d]] = None) -> tp.Tuple[tp.Array2d, tp.Array2d]:
+def atr_apply_nb(
+    high: tp.Array2d,
+    low: tp.Array2d,
+    close: tp.Array2d,
+    window: int,
+    ewm: bool,
+    adjust: bool = False,
+    tr: tp.Optional[tp.Array2d] = None,
+    cache_dict: tp.Optional[tp.Dict[int, tp.Array2d]] = None,
+) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Apply function for `vectorbtpro.indicators.custom.ATR`."""
     if cache_dict is not None:
         h = hash((window, ewm))

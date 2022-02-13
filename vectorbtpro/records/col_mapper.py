@@ -12,12 +12,7 @@ from vectorbtpro.utils.decorators import cached_property, cached_method
 
 
 ColumnMapperT = tp.TypeVar("ColumnMapperT", bound="ColumnMapper")
-IndexingMetaT = tp.Tuple[
-    ArrayWrapper,
-    tp.Array1d,
-    tp.MaybeArray,
-    tp.Array1d
-]
+IndexingMetaT = tp.Tuple[ArrayWrapper, tp.Array1d, tp.MaybeArray, tp.Array1d]
 
 
 class ColumnMapper(Wrapping):
@@ -25,12 +20,7 @@ class ColumnMapper(Wrapping):
     classes to make use of column and group metadata."""
 
     def __init__(self, wrapper: ArrayWrapper, col_arr: tp.Array1d, **kwargs) -> None:
-        Wrapping.__init__(
-            self,
-            wrapper,
-            col_arr=col_arr,
-            **kwargs
-        )
+        Wrapping.__init__(self, wrapper, col_arr=col_arr, **kwargs)
 
         self._col_arr = col_arr
 
@@ -55,7 +45,7 @@ class ColumnMapper(Wrapping):
             pd_indexing_func,
             column_only_select=self.column_only_select,
             group_select=self.group_select,
-            **kwargs
+            **kwargs,
         )
         _, new_col_arr = self.select_cols(col_idxs)
         return new_wrapper, new_col_arr, group_idxs, col_idxs
@@ -63,10 +53,7 @@ class ColumnMapper(Wrapping):
     def indexing_func(self: ColumnMapperT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> ColumnMapperT:
         """Perform indexing on `ColumnMapper`."""
         new_wrapper, new_col_arr, _, _ = self.indexing_func_meta(pd_indexing_func, **kwargs)
-        return self.replace(
-            wrapper=new_wrapper,
-            col_arr=new_col_arr
-        )
+        return self.replace(wrapper=new_wrapper, col_arr=new_col_arr)
 
     @property
     def col_arr(self) -> tp.Array1d:

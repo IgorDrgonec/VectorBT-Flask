@@ -9,7 +9,7 @@ from vectorbtpro.base.chunking import (
     GroupMapSlicer,
     GroupIdxsMapper,
     FlexArraySelector,
-    FlexArraySlicer
+    FlexArraySlicer,
 )
 from vectorbtpro.base.grouping import *
 from vectorbtpro.base.indexes import stack_indexes, combine_indexes

@@ -32,14 +32,16 @@ def group_by_to_index(index: tp.Index, group_by: tp.GroupByLike) -> GroupByT:
     if group_by is None or group_by is False:
         return group_by
     if group_by is True:
-        group_by = pd.Index(['group'] * len(index))  # one group
+        group_by = pd.Index(["group"] * len(index))  # one group
     elif isinstance(group_by, (int, str)):
         group_by = indexes.select_levels(index, group_by)
     elif checks.is_sequence(group_by):
-        if len(group_by) != len(index) \
-                and isinstance(group_by[0], (int, str)) \
-                and isinstance(index, pd.MultiIndex) \
-                and len(group_by) <= len(index.names):
+        if (
+            len(group_by) != len(index)
+            and isinstance(group_by[0], (int, str))
+            and isinstance(index, pd.MultiIndex)
+            and len(group_by) <= len(index.names)
+        ):
             try:
                 group_by = indexes.select_levels(index, group_by)
             except (IndexError, KeyError):
@@ -52,8 +54,7 @@ def group_by_to_index(index: tp.Index, group_by: tp.GroupByLike) -> GroupByT:
 
 
 def get_groups_and_index(index: tp.Index, group_by: tp.GroupByLike) -> tp.Tuple[tp.Array1d, tp.Index]:
-    """Return array of group indices pointing to the original index, and grouped index.
-    """
+    """Return array of group indices pointing to the original index, and grouped index."""
     if group_by is None or group_by is False:
         return np.arange(len(index)), index
 
@@ -96,13 +97,15 @@ class Grouper(Configured):
     !!! note
         This class is meant to be immutable. To change any attribute, use `Grouper.replace`."""
 
-    def __init__(self,
-                 index: tp.Index,
-                 group_by: tp.GroupByLike = None,
-                 allow_enable: bool = True,
-                 allow_disable: bool = True,
-                 allow_modify: bool = True,
-                 **kwargs) -> None:
+    def __init__(
+        self,
+        index: tp.Index,
+        group_by: tp.GroupByLike = None,
+        allow_enable: bool = True,
+        allow_disable: bool = True,
+        allow_modify: bool = True,
+        **kwargs,
+    ) -> None:
 
         if not isinstance(index, pd.Index):
             index = pd.Index(index)
@@ -124,13 +127,15 @@ class Grouper(Configured):
             allow_enable=allow_enable,
             allow_disable=allow_disable,
             allow_modify=allow_modify,
-            **kwargs
+            **kwargs,
         )
 
     @classmethod
-    def from_pd_group_by(cls: tp.Type[GrouperT],
-                         pd_group_by: tp.Union[PandasGroupBy, PandasResampler],
-                         **kwargs) -> GrouperT:
+    def from_pd_group_by(
+        cls: tp.Type[GrouperT],
+        pd_group_by: tp.Union[PandasGroupBy, PandasResampler],
+        **kwargs,
+    ) -> GrouperT:
         """Build a `Grouper` instance from a pandas `GroupBy` object.
 
         Indices are stored under `index` and group labels under `group_by`."""
@@ -142,11 +147,7 @@ class Grouper(Configured):
         group_start_idxs = np.cumsum(group_lens)[1:] - group_lens[1:]
         groups[group_start_idxs] = 1
         groups = np.cumsum(groups)
-        return cls(
-            index=pd.Index(np.concatenate(indices)),
-            group_by=pd_group_by.count().index[groups],
-            **kwargs
-        )
+        return cls(index=pd.Index(np.concatenate(indices)), group_by=pd_group_by.count().index[groups], **kwargs)
 
     @property
     def index(self) -> tp.Index:
@@ -224,8 +225,13 @@ class Grouper(Configured):
             return len(group_by) != len(self.group_by)
         return True
 
-    def check_group_by(self, group_by: tp.GroupByLike = None, allow_enable: tp.Optional[bool] = None,
-                       allow_disable: tp.Optional[bool] = None, allow_modify: tp.Optional[bool] = None) -> None:
+    def check_group_by(
+        self,
+        group_by: tp.GroupByLike = None,
+        allow_enable: tp.Optional[bool] = None,
+        allow_disable: tp.Optional[bool] = None,
+        allow_modify: tp.Optional[bool] = None,
+    ) -> None:
         """Check passed `group_by` object against restrictions."""
         if allow_enable is None:
             allow_enable = self.allow_enable
@@ -279,10 +285,7 @@ class Grouper(Configured):
         return is_sorted(groups)
 
     @cached_method(whitelist=True)
-    def get_group_lens(self,
-                       group_by: tp.GroupByLike = None,
-                       jitted: tp.JittedOption = None,
-                       **kwargs) -> tp.GroupLens:
+    def get_group_lens(self, group_by: tp.GroupByLike = None, jitted: tp.JittedOption = None, **kwargs) -> tp.GroupLens:
         """See get_group_lens_nb."""
         group_by = self.resolve_group_by(group_by=group_by, **kwargs)
         if group_by is None or group_by is False:  # no grouping
@@ -304,10 +307,7 @@ class Grouper(Configured):
         return np.cumsum(group_lens)
 
     @cached_method(whitelist=True)
-    def get_group_map(self,
-                      group_by: tp.GroupByLike = None,
-                      jitted: tp.JittedOption = None,
-                      **kwargs) -> tp.GroupMap:
+    def get_group_map(self, group_by: tp.GroupByLike = None, jitted: tp.JittedOption = None, **kwargs) -> tp.GroupMap:
         """See get_group_map_nb."""
         group_by = self.resolve_group_by(group_by=group_by, **kwargs)
         if group_by is None or group_by is False:  # no grouping
@@ -327,8 +327,7 @@ class Grouper(Configured):
             yield group_idxs[group_start:group_end]
             group_start += group_len
 
-    def select_groups(self, group_idxs: tp.Array1d,
-                      jitted: tp.JittedOption = None) -> tp.Tuple[tp.Array1d, tp.Array1d]:
+    def select_groups(self, group_idxs: tp.Array1d, jitted: tp.JittedOption = None) -> tp.Tuple[tp.Array1d, tp.Array1d]:
         """Select groups.
 
         Returns indices and new group array. Automatically decides whether to use group lengths or group map."""

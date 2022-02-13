@@ -34,7 +34,7 @@ from vectorbtpro.utils import (
     parsing,
     execution,
     chunking,
-    jitting
+    jitting,
 )
 
 dask_available = True
@@ -54,13 +54,14 @@ seed = 42
 
 # ############# Global ############# #
 
+
 def setup_module():
-    if os.environ.get('VBT_DISABLE_CACHING', '0') == '1':
-        vbt.settings.caching['disable_machinery'] = True
-    vbt.settings.pbar['disable'] = True
-    vbt.settings.numba['check_func_suffix'] = True
+    if os.environ.get("VBT_DISABLE_CACHING", "0") == "1":
+        vbt.settings.caching["disable_machinery"] = True
+    vbt.settings.pbar["disable"] = True
+    vbt.settings.numba["check_func_suffix"] = True
     if dask_available:
-        dask.config.set(scheduler='synchronous')
+        dask.config.set(scheduler="synchronous")
     if ray_available:
         ray.init(local_mode=True, num_cpus=1)
 
@@ -73,6 +74,7 @@ def teardown_module():
 
 # ############# config.py ############# #
 
+
 class TestConfig:
     def test_copy_dict(self):
         assert config.copy_dict(None) == {}
@@ -81,94 +83,94 @@ class TestConfig:
             return dict(const=0, lst=[1, 2, 3], dct=dict(const=1, lst=[4, 5, 6]))
 
         dct = _init_dict()
-        _dct = config.copy_dict(dct, 'shallow', nested=False)
-        _dct['const'] = 2
-        _dct['dct']['const'] = 3
-        _dct['lst'][0] = 0
-        _dct['dct']['lst'][0] = 0
+        _dct = config.copy_dict(dct, "shallow", nested=False)
+        _dct["const"] = 2
+        _dct["dct"]["const"] = 3
+        _dct["lst"][0] = 0
+        _dct["dct"]["lst"][0] = 0
         assert dct == dict(const=0, lst=[0, 2, 3], dct=dict(const=3, lst=[0, 5, 6]))
 
         dct = _init_dict()
-        _dct = config.copy_dict(dct, 'shallow', nested=True)
-        _dct['const'] = 2
-        _dct['dct']['const'] = 3
-        _dct['lst'][0] = 0
-        _dct['dct']['lst'][0] = 0
+        _dct = config.copy_dict(dct, "shallow", nested=True)
+        _dct["const"] = 2
+        _dct["dct"]["const"] = 3
+        _dct["lst"][0] = 0
+        _dct["dct"]["lst"][0] = 0
         assert dct == dict(const=0, lst=[0, 2, 3], dct=dict(const=1, lst=[0, 5, 6]))
 
         dct = _init_dict()
-        _dct = config.copy_dict(dct, 'hybrid', nested=False)
-        _dct['const'] = 2
-        _dct['dct']['const'] = 3
-        _dct['lst'][0] = 0
-        _dct['dct']['lst'][0] = 0
+        _dct = config.copy_dict(dct, "hybrid", nested=False)
+        _dct["const"] = 2
+        _dct["dct"]["const"] = 3
+        _dct["lst"][0] = 0
+        _dct["dct"]["lst"][0] = 0
         assert dct == dict(const=0, lst=[1, 2, 3], dct=dict(const=1, lst=[0, 5, 6]))
 
         dct = _init_dict()
-        _dct = config.copy_dict(dct, 'hybrid', nested=True)
-        _dct['const'] = 2
-        _dct['dct']['const'] = 3
-        _dct['lst'][0] = 0
-        _dct['dct']['lst'][0] = 0
+        _dct = config.copy_dict(dct, "hybrid", nested=True)
+        _dct["const"] = 2
+        _dct["dct"]["const"] = 3
+        _dct["lst"][0] = 0
+        _dct["dct"]["lst"][0] = 0
         assert dct == dict(const=0, lst=[1, 2, 3], dct=dict(const=1, lst=[4, 5, 6]))
 
         def init_config_(**kwargs):
             return config.Config(dict(lst=[1, 2, 3], dct=config.Config(dict(lst=[4, 5, 6]), **kwargs)), **kwargs)
 
         cfg = init_config_(readonly_=True)
-        _cfg = config.copy_dict(cfg, 'shallow', nested=False)
+        _cfg = config.copy_dict(cfg, "shallow", nested=False)
         assert isinstance(_cfg, config.Config)
         assert _cfg.readonly_
-        assert isinstance(_cfg['dct'], config.Config)
-        assert _cfg['dct'].readonly_
-        _cfg['lst'][0] = 0
-        _cfg['dct']['lst'][0] = 0
-        assert cfg['lst'] == [0, 2, 3]
-        assert cfg['dct']['lst'] == [0, 5, 6]
+        assert isinstance(_cfg["dct"], config.Config)
+        assert _cfg["dct"].readonly_
+        _cfg["lst"][0] = 0
+        _cfg["dct"]["lst"][0] = 0
+        assert cfg["lst"] == [0, 2, 3]
+        assert cfg["dct"]["lst"] == [0, 5, 6]
 
         cfg = init_config_(readonly_=True)
-        _cfg = config.copy_dict(cfg, 'shallow', nested=True)
+        _cfg = config.copy_dict(cfg, "shallow", nested=True)
         assert isinstance(_cfg, config.Config)
         assert _cfg.readonly_
-        assert isinstance(_cfg['dct'], config.Config)
-        assert _cfg['dct'].readonly_
-        _cfg['lst'][0] = 0
-        _cfg['dct']['lst'][0] = 0
-        assert cfg['lst'] == [0, 2, 3]
-        assert cfg['dct']['lst'] == [0, 5, 6]
+        assert isinstance(_cfg["dct"], config.Config)
+        assert _cfg["dct"].readonly_
+        _cfg["lst"][0] = 0
+        _cfg["dct"]["lst"][0] = 0
+        assert cfg["lst"] == [0, 2, 3]
+        assert cfg["dct"]["lst"] == [0, 5, 6]
 
         cfg = init_config_(readonly_=True)
-        _cfg = config.copy_dict(cfg, 'hybrid', nested=False)
+        _cfg = config.copy_dict(cfg, "hybrid", nested=False)
         assert isinstance(_cfg, config.Config)
         assert _cfg.readonly_
-        assert isinstance(_cfg['dct'], config.Config)
-        assert _cfg['dct'].readonly_
-        _cfg['lst'][0] = 0
-        _cfg['dct']['lst'][0] = 0
-        assert cfg['lst'] == [1, 2, 3]
-        assert cfg['dct']['lst'] == [0, 5, 6]
+        assert isinstance(_cfg["dct"], config.Config)
+        assert _cfg["dct"].readonly_
+        _cfg["lst"][0] = 0
+        _cfg["dct"]["lst"][0] = 0
+        assert cfg["lst"] == [1, 2, 3]
+        assert cfg["dct"]["lst"] == [0, 5, 6]
 
         cfg = init_config_(readonly_=True)
-        _cfg = config.copy_dict(cfg, 'hybrid', nested=True)
+        _cfg = config.copy_dict(cfg, "hybrid", nested=True)
         assert isinstance(_cfg, config.Config)
         assert _cfg.readonly_
-        assert isinstance(_cfg['dct'], config.Config)
-        assert _cfg['dct'].readonly_
-        _cfg['lst'][0] = 0
-        _cfg['dct']['lst'][0] = 0
-        assert cfg['lst'] == [1, 2, 3]
-        assert cfg['dct']['lst'] == [4, 5, 6]
+        assert isinstance(_cfg["dct"], config.Config)
+        assert _cfg["dct"].readonly_
+        _cfg["lst"][0] = 0
+        _cfg["dct"]["lst"][0] = 0
+        assert cfg["lst"] == [1, 2, 3]
+        assert cfg["dct"]["lst"] == [4, 5, 6]
 
         cfg = init_config_(readonly_=True)
-        _cfg = config.copy_dict(cfg, 'deep')
+        _cfg = config.copy_dict(cfg, "deep")
         assert isinstance(_cfg, config.Config)
         assert _cfg.readonly_
-        assert isinstance(_cfg['dct'], config.Config)
-        assert _cfg['dct'].readonly_
-        _cfg['lst'][0] = 0
-        _cfg['dct']['lst'][0] = 0
-        assert cfg['lst'] == [1, 2, 3]
-        assert cfg['dct']['lst'] == [4, 5, 6]
+        assert isinstance(_cfg["dct"], config.Config)
+        assert _cfg["dct"].readonly_
+        _cfg["lst"][0] = 0
+        _cfg["dct"]["lst"][0] = 0
+        assert cfg["lst"] == [1, 2, 3]
+        assert cfg["dct"]["lst"] == [4, 5, 6]
 
     def test_update_dict(self):
         dct = dict(a=1)
@@ -200,299 +202,257 @@ class TestConfig:
         config.update_dict(cfg, dict(b=dict(c=2)), nested=True, force=True)
         assert cfg == config.Config(dict(a=0, b=config.Config(dict(c=2))))
         assert cfg.readonly_
-        assert cfg['b'].readonly_
+        assert cfg["b"].readonly_
 
         cfg = init_config_(readonly_=True)
         config.update_dict(
-            cfg, config.Config(dict(b=config.Config(dict(c=2), readonly_=False)), readonly_=False),
-            nested=True, force=True)
+            cfg,
+            config.Config(dict(b=config.Config(dict(c=2), readonly_=False)), readonly_=False),
+            nested=True,
+            force=True,
+        )
         assert cfg == config.Config(dict(a=0, b=config.Config(dict(c=2))))
         assert cfg.readonly_
-        assert cfg['b'].readonly_
+        assert cfg["b"].readonly_
 
     def test_merge_dicts(self):
-        assert config.merge_dicts({'a': 1}, {'b': 2}) == {'a': 1, 'b': 2}
-        assert config.merge_dicts({'a': 1}, {'a': 2}) == {'a': 2}
-        assert config.merge_dicts({'a': {'b': 2}}, {'a': {'c': 3}}) == {'a': {'b': 2, 'c': 3}}
-        assert config.merge_dicts({'a': {'b': 2}}, {'a': {'b': 3}}) == {'a': {'b': 3}}
+        assert config.merge_dicts({"a": 1}, {"b": 2}) == {"a": 1, "b": 2}
+        assert config.merge_dicts({"a": 1}, {"a": 2}) == {"a": 2}
+        assert config.merge_dicts({"a": {"b": 2}}, {"a": {"c": 3}}) == {"a": {"b": 2, "c": 3}}
+        assert config.merge_dicts({"a": {"b": 2}}, {"a": {"b": 3}}) == {"a": {"b": 3}}
 
         def init_configs(**kwargs):
             lists = [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]]
-            return lists, \
-                   config.Config(dict(lst=lists[0], dct=dict(a=1, lst=lists[1])), **kwargs), \
-                   dict(lst=lists[2], dct=config.Config(dict(b=2, lst=lists[3]), **kwargs))
+            return (
+                lists,
+                config.Config(dict(lst=lists[0], dct=dict(a=1, lst=lists[1])), **kwargs),
+                dict(lst=lists[2], dct=config.Config(dict(b=2, lst=lists[3]), **kwargs)),
+            )
 
         lists, cfg1, cfg2 = init_configs(readonly_=True)
-        _cfg = config.merge_dicts(
-            cfg1, cfg2,
-            to_dict=True,
-            copy_mode='shallow',
-            nested=False
-        )
+        _cfg = config.merge_dicts(cfg1, cfg2, to_dict=True, copy_mode="shallow", nested=False)
         assert _cfg == dict(lst=lists[2], dct=config.Config(dict(b=2, lst=lists[3])))
         lists[2][0] = 0
         lists[3][0] = 0
-        assert _cfg['lst'] == [0, 8, 9]
-        assert _cfg['dct']['lst'] == [0, 11, 12]
+        assert _cfg["lst"] == [0, 8, 9]
+        assert _cfg["dct"]["lst"] == [0, 11, 12]
 
         lists, cfg1, cfg2 = init_configs(readonly_=True)
-        _cfg = config.merge_dicts(
-            cfg1, cfg2,
-            to_dict=True,
-            copy_mode='shallow',
-            nested=True
-        )
+        _cfg = config.merge_dicts(cfg1, cfg2, to_dict=True, copy_mode="shallow", nested=True)
         assert _cfg == dict(lst=lists[2], dct=dict(a=1, b=2, lst=lists[3]))
         lists[2][0] = 0
         lists[3][0] = 0
-        assert _cfg['lst'] == [0, 8, 9]
-        assert _cfg['dct']['lst'] == [0, 11, 12]
+        assert _cfg["lst"] == [0, 8, 9]
+        assert _cfg["dct"]["lst"] == [0, 11, 12]
 
         lists, cfg1, cfg2 = init_configs(readonly_=True)
-        cfg2['dct'] = config.atomic_dict(cfg2['dct'])
-        _cfg = config.merge_dicts(
-            cfg1, cfg2,
-            to_dict=True,
-            copy_mode='shallow',
-            nested=True
-        )
+        cfg2["dct"] = config.atomic_dict(cfg2["dct"])
+        _cfg = config.merge_dicts(cfg1, cfg2, to_dict=True, copy_mode="shallow", nested=True)
         assert _cfg == dict(lst=lists[2], dct=dict(b=2, lst=lists[3]))
         lists[2][0] = 0
         lists[3][0] = 0
-        assert _cfg['lst'] == [0, 8, 9]
-        assert _cfg['dct']['lst'] == [0, 11, 12]
+        assert _cfg["lst"] == [0, 8, 9]
+        assert _cfg["dct"]["lst"] == [0, 11, 12]
 
         lists, cfg1, cfg2 = init_configs(readonly_=True)
-        _cfg = config.merge_dicts(
-            cfg1, config.atomic_dict(cfg2),
-            to_dict=True,
-            copy_mode='shallow',
-            nested=True
-        )
+        _cfg = config.merge_dicts(cfg1, config.atomic_dict(cfg2), to_dict=True, copy_mode="shallow", nested=True)
         assert _cfg == config.atomic_dict(lst=lists[2], dct=dict(b=2, lst=lists[3]))
         lists[2][0] = 0
         lists[3][0] = 0
-        assert _cfg['lst'] == [0, 8, 9]
-        assert _cfg['dct']['lst'] == [0, 11, 12]
+        assert _cfg["lst"] == [0, 8, 9]
+        assert _cfg["dct"]["lst"] == [0, 11, 12]
 
         lists, cfg1, cfg2 = init_configs(readonly_=True)
-        _cfg = config.merge_dicts(
-            cfg1, cfg2,
-            to_dict=False,
-            copy_mode='shallow',
-            nested=False
-        )
+        _cfg = config.merge_dicts(cfg1, cfg2, to_dict=False, copy_mode="shallow", nested=False)
         assert _cfg == config.Config(dict(lst=lists[2], dct=config.Config(dict(b=2, lst=lists[3]))))
         assert _cfg.readonly_
         lists[2][0] = 0
         lists[3][0] = 0
-        assert _cfg['lst'] == [0, 8, 9]
-        assert _cfg['dct']['lst'] == [0, 11, 12]
+        assert _cfg["lst"] == [0, 8, 9]
+        assert _cfg["dct"]["lst"] == [0, 11, 12]
 
         lists, cfg1, cfg2 = init_configs(readonly_=True)
-        _cfg = config.merge_dicts(
-            cfg1, cfg2,
-            to_dict=False,
-            copy_mode='hybrid',
-            nested=False
-        )
+        _cfg = config.merge_dicts(cfg1, cfg2, to_dict=False, copy_mode="hybrid", nested=False)
         assert _cfg == config.Config(dict(lst=lists[2], dct=config.Config(dict(b=2, lst=lists[3]))))
         assert _cfg.readonly_
         lists[2][0] = 0
         lists[3][0] = 0
-        assert _cfg['lst'] == [7, 8, 9]
-        assert _cfg['dct']['lst'] == [0, 11, 12]
+        assert _cfg["lst"] == [7, 8, 9]
+        assert _cfg["dct"]["lst"] == [0, 11, 12]
 
         lists, cfg1, cfg2 = init_configs(readonly_=True)
-        _cfg = config.merge_dicts(
-            cfg1, cfg2,
-            to_dict=False,
-            copy_mode='hybrid',
-            nested=True
-        )
+        _cfg = config.merge_dicts(cfg1, cfg2, to_dict=False, copy_mode="hybrid", nested=True)
         assert _cfg == config.Config(dict(lst=lists[2], dct=dict(a=1, b=2, lst=lists[3])))
         assert _cfg.readonly_
         lists[2][0] = 0
         lists[3][0] = 0
-        assert _cfg['lst'] == [7, 8, 9]
-        assert _cfg['dct']['lst'] == [10, 11, 12]
+        assert _cfg["lst"] == [7, 8, 9]
+        assert _cfg["dct"]["lst"] == [10, 11, 12]
 
         lists, cfg1, cfg2 = init_configs(readonly_=True)
-        _cfg = config.merge_dicts(
-            cfg1, cfg2,
-            to_dict=False,
-            copy_mode='deep',
-            nested=False
-        )
+        _cfg = config.merge_dicts(cfg1, cfg2, to_dict=False, copy_mode="deep", nested=False)
         assert _cfg == config.Config(dict(lst=lists[2], dct=config.Config(dict(b=2, lst=lists[3]))))
         assert _cfg.readonly_
         lists[2][0] = 0
         lists[3][0] = 0
-        assert _cfg['lst'] == [7, 8, 9]
-        assert _cfg['dct']['lst'] == [10, 11, 12]
+        assert _cfg["lst"] == [7, 8, 9]
+        assert _cfg["dct"]["lst"] == [10, 11, 12]
 
     def test_config_copy(self):
         def init_config(**kwargs):
-            dct = dict(
-                const=0,
-                lst=[1, 2, 3],
-                dct=config.Config(dict(
-                    const=1,
-                    lst=[4, 5, 6]
-                ))
-            )
+            dct = dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6])))
             return dct, config.Config(dct, **kwargs)
 
-        dct, cfg = init_config(copy_kwargs_=dict(copy_mode='shallow'), nested_=False)
-        assert isinstance(cfg['dct'], config.Config)
-        assert isinstance(cfg.reset_dct_['dct'], config.Config)
-        dct['const'] = 2
-        dct['dct']['const'] = 3
-        dct['lst'][0] = 0
-        dct['dct']['lst'][0] = 0
+        dct, cfg = init_config(copy_kwargs_=dict(copy_mode="shallow"), nested_=False)
+        assert isinstance(cfg["dct"], config.Config)
+        assert isinstance(cfg.reset_dct_["dct"], config.Config)
+        dct["const"] = 2
+        dct["dct"]["const"] = 3
+        dct["lst"][0] = 0
+        dct["dct"]["lst"][0] = 0
         assert cfg == config.Config(dict(const=0, lst=[0, 2, 3], dct=config.Config(dict(const=3, lst=[0, 5, 6]))))
         assert cfg.reset_dct_ == dict(const=0, lst=[0, 2, 3], dct=config.Config(dict(const=3, lst=[0, 5, 6])))
 
-        dct, cfg = init_config(copy_kwargs_=dict(copy_mode='shallow'), nested_=True)
-        assert isinstance(cfg['dct'], config.Config)
-        assert isinstance(cfg.reset_dct_['dct'], config.Config)
-        dct['const'] = 2
-        dct['dct']['const'] = 3
-        dct['lst'][0] = 0
-        dct['dct']['lst'][0] = 0
+        dct, cfg = init_config(copy_kwargs_=dict(copy_mode="shallow"), nested_=True)
+        assert isinstance(cfg["dct"], config.Config)
+        assert isinstance(cfg.reset_dct_["dct"], config.Config)
+        dct["const"] = 2
+        dct["dct"]["const"] = 3
+        dct["lst"][0] = 0
+        dct["dct"]["lst"][0] = 0
         assert cfg == config.Config(dict(const=0, lst=[0, 2, 3], dct=config.Config(dict(const=1, lst=[0, 5, 6]))))
         assert cfg.reset_dct_ == dict(const=0, lst=[0, 2, 3], dct=config.Config(dict(const=1, lst=[0, 5, 6])))
 
-        dct, cfg = init_config(copy_kwargs_=dict(copy_mode='hybrid'), nested_=True)
-        assert isinstance(cfg['dct'], config.Config)
-        assert isinstance(cfg.reset_dct_['dct'], config.Config)
-        dct['const'] = 2
-        dct['dct']['const'] = 3
-        dct['lst'][0] = 0
-        dct['dct']['lst'][0] = 0
+        dct, cfg = init_config(copy_kwargs_=dict(copy_mode="hybrid"), nested_=True)
+        assert isinstance(cfg["dct"], config.Config)
+        assert isinstance(cfg.reset_dct_["dct"], config.Config)
+        dct["const"] = 2
+        dct["dct"]["const"] = 3
+        dct["lst"][0] = 0
+        dct["dct"]["lst"][0] = 0
         assert cfg == config.Config(dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6]))))
         assert cfg.reset_dct_ == dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6])))
 
         dct, cfg = init_config(
-            copy_kwargs_=dict(copy_mode='shallow'),
-            reset_dct_copy_kwargs_=dict(copy_mode='hybrid'),
-            nested_=True
+            copy_kwargs_=dict(copy_mode="shallow"),
+            reset_dct_copy_kwargs_=dict(copy_mode="hybrid"),
+            nested_=True,
         )
-        assert isinstance(cfg['dct'], config.Config)
-        assert isinstance(cfg.reset_dct_['dct'], config.Config)
-        dct['const'] = 2
-        dct['dct']['const'] = 3
-        dct['lst'][0] = 0
-        dct['dct']['lst'][0] = 0
+        assert isinstance(cfg["dct"], config.Config)
+        assert isinstance(cfg.reset_dct_["dct"], config.Config)
+        dct["const"] = 2
+        dct["dct"]["const"] = 3
+        dct["lst"][0] = 0
+        dct["dct"]["lst"][0] = 0
         assert cfg == config.Config(dict(const=0, lst=[0, 2, 3], dct=config.Config(dict(const=1, lst=[0, 5, 6]))))
         assert cfg.reset_dct_ == dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6])))
 
-        dct, cfg = init_config(copy_kwargs_=dict(copy_mode='deep'), nested_=True)
-        assert isinstance(cfg['dct'], config.Config)
-        assert isinstance(cfg.reset_dct_['dct'], config.Config)
-        dct['const'] = 2
-        dct['dct']['const'] = 3
-        dct['lst'][0] = 0
-        dct['dct']['lst'][0] = 0
+        dct, cfg = init_config(copy_kwargs_=dict(copy_mode="deep"), nested_=True)
+        assert isinstance(cfg["dct"], config.Config)
+        assert isinstance(cfg.reset_dct_["dct"], config.Config)
+        dct["const"] = 2
+        dct["dct"]["const"] = 3
+        dct["lst"][0] = 0
+        dct["dct"]["lst"][0] = 0
         assert cfg == config.Config(dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6]))))
         assert cfg.reset_dct_ == dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6])))
 
         init_d, _ = init_config()
-        init_d = config.copy_dict(init_d, 'deep')
-        dct, cfg = init_config(copy_kwargs_=dict(copy_mode='hybrid'), reset_dct_=init_d, nested_=True)
-        assert isinstance(cfg['dct'], config.Config)
-        assert isinstance(cfg.reset_dct_['dct'], config.Config)
-        dct['const'] = 2
-        dct['dct']['const'] = 3
+        init_d = config.copy_dict(init_d, "deep")
+        dct, cfg = init_config(copy_kwargs_=dict(copy_mode="hybrid"), reset_dct_=init_d, nested_=True)
+        assert isinstance(cfg["dct"], config.Config)
+        assert isinstance(cfg.reset_dct_["dct"], config.Config)
+        dct["const"] = 2
+        dct["dct"]["const"] = 3
         assert cfg == config.Config(dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6]))))
-        init_d['lst'][0] = 0
-        init_d['dct']['lst'][0] = 0
+        init_d["lst"][0] = 0
+        init_d["dct"]["lst"][0] = 0
         assert cfg == config.Config(dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6]))))
         assert cfg.reset_dct_ == dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6])))
 
         init_d, _ = init_config()
-        init_d = config.copy_dict(init_d, 'deep')
+        init_d = config.copy_dict(init_d, "deep")
         dct, cfg = init_config(
-            copy_kwargs_=dict(copy_mode='hybrid'),
+            copy_kwargs_=dict(copy_mode="hybrid"),
             reset_dct_=init_d,
-            reset_dct_copy_kwargs_=dict(copy_mode='shallow'),
-            nested_=True
+            reset_dct_copy_kwargs_=dict(copy_mode="shallow"),
+            nested_=True,
         )
-        assert isinstance(cfg['dct'], config.Config)
-        assert isinstance(cfg.reset_dct_['dct'], config.Config)
-        dct['const'] = 2
-        dct['dct']['const'] = 3
-        dct['lst'][0] = 0
-        dct['dct']['lst'][0] = 0
-        init_d['const'] = 2
-        init_d['dct']['const'] = 3
-        init_d['lst'][0] = 0
-        init_d['dct']['lst'][0] = 0
+        assert isinstance(cfg["dct"], config.Config)
+        assert isinstance(cfg.reset_dct_["dct"], config.Config)
+        dct["const"] = 2
+        dct["dct"]["const"] = 3
+        dct["lst"][0] = 0
+        dct["dct"]["lst"][0] = 0
+        init_d["const"] = 2
+        init_d["dct"]["const"] = 3
+        init_d["lst"][0] = 0
+        init_d["dct"]["lst"][0] = 0
         assert cfg == config.Config(dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6]))))
         assert cfg.reset_dct_ == dict(const=0, lst=[0, 2, 3], dct=config.Config(dict(const=1, lst=[0, 5, 6])))
 
         _, cfg = init_config(nested_=True)
         _cfg = copy(cfg)
-        _cfg['const'] = 2
-        _cfg['dct']['const'] = 3
-        _cfg['lst'][0] = 0
-        _cfg['dct']['lst'][0] = 0
-        _cfg.reset_dct_['const'] = 2
-        _cfg.reset_dct_['dct']['const'] = 3
-        _cfg.reset_dct_['lst'][0] = 0
-        _cfg.reset_dct_['dct']['lst'][0] = 0
+        _cfg["const"] = 2
+        _cfg["dct"]["const"] = 3
+        _cfg["lst"][0] = 0
+        _cfg["dct"]["lst"][0] = 0
+        _cfg.reset_dct_["const"] = 2
+        _cfg.reset_dct_["dct"]["const"] = 3
+        _cfg.reset_dct_["lst"][0] = 0
+        _cfg.reset_dct_["dct"]["lst"][0] = 0
         assert cfg == config.Config(dict(const=0, lst=[0, 2, 3], dct=config.Config(dict(const=3, lst=[0, 5, 6]))))
         assert cfg.reset_dct_ == dict(const=2, lst=[0, 2, 3], dct=config.Config(dict(const=3, lst=[0, 5, 6])))
 
         _, cfg = init_config(nested_=True)
         _cfg = deepcopy(cfg)
-        _cfg['const'] = 2
-        _cfg['dct']['const'] = 3
-        _cfg['lst'][0] = 0
-        _cfg['dct']['lst'][0] = 0
-        _cfg.reset_dct_['const'] = 2
-        _cfg.reset_dct_['dct']['const'] = 3
-        _cfg.reset_dct_['lst'][0] = 0
-        _cfg.reset_dct_['dct']['lst'][0] = 0
+        _cfg["const"] = 2
+        _cfg["dct"]["const"] = 3
+        _cfg["lst"][0] = 0
+        _cfg["dct"]["lst"][0] = 0
+        _cfg.reset_dct_["const"] = 2
+        _cfg.reset_dct_["dct"]["const"] = 3
+        _cfg.reset_dct_["lst"][0] = 0
+        _cfg.reset_dct_["dct"]["lst"][0] = 0
         assert cfg == config.Config(dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6]))))
         assert cfg.reset_dct_ == dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6])))
 
-        _, cfg = init_config(copy_kwargs_=dict(copy_mode='hybrid'), nested_=True)
+        _, cfg = init_config(copy_kwargs_=dict(copy_mode="hybrid"), nested_=True)
         _cfg = cfg.copy()
-        _cfg['const'] = 2
-        _cfg['dct']['const'] = 3
-        _cfg['lst'][0] = 0
-        _cfg['dct']['lst'][0] = 0
-        _cfg.reset_dct_['const'] = 2
-        _cfg.reset_dct_['dct']['const'] = 3
-        _cfg.reset_dct_['lst'][0] = 0
-        _cfg.reset_dct_['dct']['lst'][0] = 0
+        _cfg["const"] = 2
+        _cfg["dct"]["const"] = 3
+        _cfg["lst"][0] = 0
+        _cfg["dct"]["lst"][0] = 0
+        _cfg.reset_dct_["const"] = 2
+        _cfg.reset_dct_["dct"]["const"] = 3
+        _cfg.reset_dct_["lst"][0] = 0
+        _cfg.reset_dct_["dct"]["lst"][0] = 0
         assert cfg == config.Config(dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6]))))
         assert cfg.reset_dct_ == dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6])))
 
-        _, cfg = init_config(copy_kwargs_=dict(copy_mode='hybrid'), nested_=True)
-        _cfg = cfg.copy(reset_dct_copy_kwargs=dict(copy_mode='shallow'))
-        _cfg['const'] = 2
-        _cfg['dct']['const'] = 3
-        _cfg['lst'][0] = 0
-        _cfg['dct']['lst'][0] = 0
-        _cfg.reset_dct_['const'] = 2
-        _cfg.reset_dct_['dct']['const'] = 3
-        _cfg.reset_dct_['lst'][0] = 0
-        _cfg.reset_dct_['dct']['lst'][0] = 0
+        _, cfg = init_config(copy_kwargs_=dict(copy_mode="hybrid"), nested_=True)
+        _cfg = cfg.copy(reset_dct_copy_kwargs=dict(copy_mode="shallow"))
+        _cfg["const"] = 2
+        _cfg["dct"]["const"] = 3
+        _cfg["lst"][0] = 0
+        _cfg["dct"]["lst"][0] = 0
+        _cfg.reset_dct_["const"] = 2
+        _cfg.reset_dct_["dct"]["const"] = 3
+        _cfg.reset_dct_["lst"][0] = 0
+        _cfg.reset_dct_["dct"]["lst"][0] = 0
         assert cfg == config.Config(dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6]))))
         assert cfg.reset_dct_ == dict(const=0, lst=[0, 2, 3], dct=config.Config(dict(const=1, lst=[0, 5, 6])))
 
         _, cfg = init_config(nested_=True)
-        _cfg = cfg.copy(copy_mode='deep')
-        _cfg['const'] = 2
-        _cfg['dct']['const'] = 3
-        _cfg['lst'][0] = 0
-        _cfg['dct']['lst'][0] = 0
-        _cfg.reset_dct_['const'] = 2
-        _cfg.reset_dct_['dct']['const'] = 3
-        _cfg.reset_dct_['lst'][0] = 0
-        _cfg.reset_dct_['dct']['lst'][0] = 0
+        _cfg = cfg.copy(copy_mode="deep")
+        _cfg["const"] = 2
+        _cfg["dct"]["const"] = 3
+        _cfg["lst"][0] = 0
+        _cfg["dct"]["lst"][0] = 0
+        _cfg.reset_dct_["const"] = 2
+        _cfg.reset_dct_["dct"]["const"] = 3
+        _cfg.reset_dct_["lst"][0] = 0
+        _cfg.reset_dct_["dct"]["lst"][0] = 0
         assert cfg == config.Config(dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6]))))
         assert cfg.reset_dct_ == dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6])))
 
@@ -500,41 +460,31 @@ class TestConfig:
         cfg = config.Config(dict(dct=dict(dct=config.Config(dict(), nested_=False))), nested_=True, convert_dicts_=True)
         assert cfg.nested_
         assert cfg.convert_dicts_
-        assert isinstance(cfg['dct'], config.Config)
-        assert cfg['dct'].nested_
-        assert cfg['dct'].convert_dicts_
-        assert isinstance(cfg['dct']['dct'], config.Config)
-        assert not cfg['dct']['dct'].nested_
-        assert not cfg['dct']['dct'].convert_dicts_
+        assert isinstance(cfg["dct"], config.Config)
+        assert cfg["dct"].nested_
+        assert cfg["dct"].convert_dicts_
+        assert isinstance(cfg["dct"]["dct"], config.Config)
+        assert not cfg["dct"]["dct"].nested_
+        assert not cfg["dct"]["dct"].convert_dicts_
 
     def test_config_from_config(self):
-        cfg = config.Config(config.Config(
-            dict(a=0),
-            copy_kwargs_=dict(
-                copy_mode='deep',
-                nested=True
-            ),
-            reset_dct_=dict(b=0),
-            reset_dct_copy_kwargs_=dict(
-                copy_mode='deep',
-                nested=True
-            ),
-            frozen_keys_=True,
-            readonly_=True,
-            nested_=True,
-            convert_dicts_=True,
-            as_attrs_=True
-        ))
+        cfg = config.Config(
+            config.Config(
+                dict(a=0),
+                copy_kwargs_=dict(copy_mode="deep", nested=True),
+                reset_dct_=dict(b=0),
+                reset_dct_copy_kwargs_=dict(copy_mode="deep", nested=True),
+                frozen_keys_=True,
+                readonly_=True,
+                nested_=True,
+                convert_dicts_=True,
+                as_attrs_=True,
+            )
+        )
         assert dict(cfg) == dict(a=0)
-        assert cfg.copy_kwargs_ == dict(
-            copy_mode='deep',
-            nested=True
-        )
+        assert cfg.copy_kwargs_ == dict(copy_mode="deep", nested=True)
         assert cfg.reset_dct_ == dict(b=0)
-        assert cfg.reset_dct_copy_kwargs_ == dict(
-            copy_mode='deep',
-            nested=True
-        )
+        assert cfg.reset_dct_copy_kwargs_ == dict(copy_mode="deep", nested=True)
         assert cfg.frozen_keys_
         assert cfg.readonly_
         assert cfg.nested_
@@ -543,29 +493,19 @@ class TestConfig:
 
         c2 = config.Config(
             cfg,
-            copy_kwargs_=dict(
-                copy_mode='hybrid'
-            ),
+            copy_kwargs_=dict(copy_mode="hybrid"),
             reset_dct_=dict(b=0),
-            reset_dct_copy_kwargs_=dict(
-                nested=False
-            ),
+            reset_dct_copy_kwargs_=dict(nested=False),
             frozen_keys_=False,
             readonly_=False,
             nested_=False,
             convert_dicts_=False,
-            as_attrs_=False
+            as_attrs_=False,
         )
         assert dict(c2) == dict(a=0)
-        assert c2.copy_kwargs_ == dict(
-            copy_mode='hybrid',
-            nested=True
-        )
+        assert c2.copy_kwargs_ == dict(copy_mode="hybrid", nested=True)
         assert c2.reset_dct_ == dict(b=0)
-        assert c2.reset_dct_copy_kwargs_ == dict(
-            copy_mode='hybrid',
-            nested=False
-        )
+        assert c2.reset_dct_copy_kwargs_ == dict(copy_mode="hybrid", nested=False)
         assert not c2.frozen_keys_
         assert not c2.readonly_
         assert not c2.nested_
@@ -575,15 +515,9 @@ class TestConfig:
     def test_config_defaults(self):
         cfg = config.Config(dict(a=0))
         assert dict(cfg) == dict(a=0)
-        assert cfg.copy_kwargs_ == dict(
-            copy_mode='none',
-            nested=True
-        )
+        assert cfg.copy_kwargs_ == dict(copy_mode="none", nested=True)
         assert cfg.reset_dct_ == dict(a=0)
-        assert cfg.reset_dct_copy_kwargs_ == dict(
-            copy_mode='hybrid',
-            nested=True
-        )
+        assert cfg.reset_dct_copy_kwargs_ == dict(copy_mode="hybrid", nested=True)
         assert not cfg.frozen_keys_
         assert not cfg.readonly_
         assert cfg.nested_
@@ -591,25 +525,19 @@ class TestConfig:
         assert not cfg.as_attrs_
 
         vbt.settings.config.reset()
-        vbt.settings.config['copy_kwargs_'] = dict(copy_mode='deep')
-        vbt.settings.config['reset_dct_copy_kwargs_'] = dict(copy_mode='deep')
-        vbt.settings.config['frozen_keys_'] = True
-        vbt.settings.config['readonly_'] = True
-        vbt.settings.config['nested_'] = False
-        vbt.settings.config['convert_dicts_'] = True
-        vbt.settings.config['as_attrs_'] = True
+        vbt.settings.config["copy_kwargs_"] = dict(copy_mode="deep")
+        vbt.settings.config["reset_dct_copy_kwargs_"] = dict(copy_mode="deep")
+        vbt.settings.config["frozen_keys_"] = True
+        vbt.settings.config["readonly_"] = True
+        vbt.settings.config["nested_"] = False
+        vbt.settings.config["convert_dicts_"] = True
+        vbt.settings.config["as_attrs_"] = True
 
         cfg = config.Config(dict(a=0))
         assert dict(cfg) == dict(a=0)
-        assert cfg.copy_kwargs_ == dict(
-            copy_mode='deep',
-            nested=False
-        )
+        assert cfg.copy_kwargs_ == dict(copy_mode="deep", nested=False)
         assert cfg.reset_dct_ == dict(a=0)
-        assert cfg.reset_dct_copy_kwargs_ == dict(
-            copy_mode='deep',
-            nested=False
-        )
+        assert cfg.reset_dct_copy_kwargs_ == dict(copy_mode="deep", nested=False)
         assert cfg.frozen_keys_
         assert cfg.readonly_
         assert not cfg.nested_
@@ -626,27 +554,27 @@ class TestConfig:
             assert cfg.dct.d == 0
 
         cfg.e = 0
-        assert cfg['e'] == 0
-        cfg['f'] = 0
+        assert cfg["e"] == 0
+        cfg["f"] = 0
         assert cfg.f == 0
         with pytest.raises(Exception):
             assert cfg.g == 0
-        del cfg['f']
+        del cfg["f"]
         with pytest.raises(Exception):
             assert cfg.f == 0
         del cfg.e
         with pytest.raises(Exception):
-            assert cfg['e'] == 0
+            assert cfg["e"] == 0
         cfg.clear()
         assert dict(cfg) == dict()
-        assert not hasattr(cfg, 'a')
-        assert not hasattr(cfg, 'b')
+        assert not hasattr(cfg, "a")
+        assert not hasattr(cfg, "b")
         cfg.a = 0
         cfg.b = 0
-        cfg.pop('a')
-        assert not hasattr(cfg, 'a')
+        cfg.pop("a")
+        assert not hasattr(cfg, "a")
         cfg.popitem()
-        assert not hasattr(cfg, 'b')
+        assert not hasattr(cfg, "b")
 
         cfg = config.Config(dict(a=0, b=0, dct=dict(d=0)), as_attrs_=True, nested_=True, convert_dicts_=True)
         assert cfg.a == 0
@@ -662,7 +590,7 @@ class TestConfig:
 
     def test_config_frozen_keys(self):
         cfg = config.Config(dict(a=0), frozen_keys_=False)
-        cfg.pop('a')
+        cfg.pop("a")
         assert dict(cfg) == dict()
 
         cfg = config.Config(dict(a=0), frozen_keys_=False)
@@ -682,21 +610,21 @@ class TestConfig:
         assert dict(cfg) == dict(a=0, b=0)
 
         cfg = config.Config(dict(a=0), frozen_keys_=False)
-        del cfg['a']
+        del cfg["a"]
         assert dict(cfg) == dict()
 
         cfg = config.Config(dict(a=0), frozen_keys_=False)
-        cfg['a'] = 1
+        cfg["a"] = 1
         assert dict(cfg) == dict(a=1)
 
         cfg = config.Config(dict(a=0), frozen_keys_=False)
-        cfg['b'] = 0
+        cfg["b"] = 0
         assert dict(cfg) == dict(a=0, b=0)
 
         cfg = config.Config(dict(a=0), frozen_keys_=True)
         with pytest.raises(Exception):
-            cfg.pop('a')
-        cfg.pop('a', force=True)
+            cfg.pop("a")
+        cfg.pop("a", force=True)
         assert dict(cfg) == dict()
 
         cfg = config.Config(dict(a=0), frozen_keys_=True)
@@ -723,23 +651,23 @@ class TestConfig:
 
         cfg = config.Config(dict(a=0), frozen_keys_=True)
         with pytest.raises(Exception):
-            del cfg['a']
-        cfg.__delitem__('a', force=True)
+            del cfg["a"]
+        cfg.__delitem__("a", force=True)
         assert dict(cfg) == dict()
 
         cfg = config.Config(dict(a=0), frozen_keys_=True)
-        cfg['a'] = 1
+        cfg["a"] = 1
         assert dict(cfg) == dict(a=1)
 
         cfg = config.Config(dict(a=0), frozen_keys_=True)
         with pytest.raises(Exception):
-            cfg['b'] = 0
-        cfg.__setitem__('b', 0, force=True)
+            cfg["b"] = 0
+        cfg.__setitem__("b", 0, force=True)
         assert dict(cfg) == dict(a=0, b=0)
 
     def test_config_readonly(self):
         cfg = config.Config(dict(a=0), readonly_=False)
-        cfg.pop('a')
+        cfg.pop("a")
         assert dict(cfg) == dict()
 
         cfg = config.Config(dict(a=0), readonly_=False)
@@ -759,21 +687,21 @@ class TestConfig:
         assert dict(cfg) == dict(a=0, b=0)
 
         cfg = config.Config(dict(a=0), readonly_=False)
-        del cfg['a']
+        del cfg["a"]
         assert dict(cfg) == dict()
 
         cfg = config.Config(dict(a=0), readonly_=False)
-        cfg['a'] = 1
+        cfg["a"] = 1
         assert dict(cfg) == dict(a=1)
 
         cfg = config.Config(dict(a=0), readonly_=False)
-        cfg['b'] = 0
+        cfg["b"] = 0
         assert dict(cfg) == dict(a=0, b=0)
 
         cfg = config.Config(dict(a=0), readonly_=True)
         with pytest.raises(Exception):
-            cfg.pop('a')
-        cfg.pop('a', force=True)
+            cfg.pop("a")
+        cfg.pop("a", force=True)
         assert dict(cfg) == dict()
 
         cfg = config.Config(dict(a=0), readonly_=True)
@@ -802,103 +730,101 @@ class TestConfig:
 
         cfg = config.Config(dict(a=0), readonly_=True)
         with pytest.raises(Exception):
-            del cfg['a']
-        cfg.__delitem__('a', force=True)
+            del cfg["a"]
+        cfg.__delitem__("a", force=True)
         assert dict(cfg) == dict()
 
         cfg = config.Config(dict(a=0), readonly_=True)
         with pytest.raises(Exception):
-            cfg['a'] = 1
-        cfg.__setitem__('a', 1, force=True)
+            cfg["a"] = 1
+        cfg.__setitem__("a", 1, force=True)
         assert dict(cfg) == dict(a=1)
 
         cfg = config.Config(dict(a=0), readonly_=True)
         with pytest.raises(Exception):
-            cfg['b'] = 0
-        cfg.__setitem__('b', 0, force=True)
+            cfg["b"] = 0
+        cfg.__setitem__("b", 0, force=True)
         assert dict(cfg) == dict(a=0, b=0)
 
     def test_config_merge_with(self):
         cfg1 = config.Config(
             dict(a=0, dct=dict(b=1, dct=config.Config(dict(c=2), readonly_=False))),
-            readonly_=False, nested_=False)
+            readonly_=False,
+            nested_=False,
+        )
         cfg2 = config.Config(
             dict(d=3, dct=config.Config(dict(e=4, dct=dict(f=5)), readonly_=True)),
-            readonly_=True, nested_=False)
+            readonly_=True,
+            nested_=False,
+        )
         _cfg = cfg1.merge_with(cfg2)
-        assert _cfg == dict(a=0, d=3, dct=cfg2['dct'])
+        assert _cfg == dict(a=0, d=3, dct=cfg2["dct"])
         assert not isinstance(_cfg, config.Config)
-        assert isinstance(_cfg['dct'], config.Config)
-        assert not isinstance(_cfg['dct']['dct'], config.Config)
+        assert isinstance(_cfg["dct"], config.Config)
+        assert not isinstance(_cfg["dct"]["dct"], config.Config)
 
         _cfg = cfg1.merge_with(cfg2, to_dict=False, nested=False)
-        assert _cfg == config.Config(dict(a=0, d=3, dct=cfg2['dct']))
+        assert _cfg == config.Config(dict(a=0, d=3, dct=cfg2["dct"]))
         assert not _cfg.readonly_
-        assert isinstance(_cfg['dct'], config.Config)
-        assert _cfg['dct'].readonly_
-        assert not isinstance(_cfg['dct']['dct'], config.Config)
+        assert isinstance(_cfg["dct"], config.Config)
+        assert _cfg["dct"].readonly_
+        assert not isinstance(_cfg["dct"]["dct"], config.Config)
 
         _cfg = cfg1.merge_with(cfg2, to_dict=False, nested=True)
         assert _cfg == config.Config(dict(a=0, d=3, dct=dict(b=1, e=4, dct=config.Config(dict(c=2, f=5)))))
         assert not _cfg.readonly_
-        assert not isinstance(_cfg['dct'], config.Config)
-        assert isinstance(_cfg['dct']['dct'], config.Config)
-        assert not _cfg['dct']['dct'].readonly_
+        assert not isinstance(_cfg["dct"], config.Config)
+        assert isinstance(_cfg["dct"]["dct"], config.Config)
+        assert not _cfg["dct"]["dct"].readonly_
 
     def test_config_reset(self):
-        cfg = config.Config(dict(a=0, dct=dict(b=0)), copy_kwargs_=dict(copy_mode='shallow'), nested_=False)
-        cfg['a'] = 1
-        cfg['dct']['b'] = 1
+        cfg = config.Config(dict(a=0, dct=dict(b=0)), copy_kwargs_=dict(copy_mode="shallow"), nested_=False)
+        cfg["a"] = 1
+        cfg["dct"]["b"] = 1
         cfg.reset()
         assert cfg == config.Config(dict(a=0, dct=dict(b=1)))
 
-        cfg = config.Config(dict(a=0, dct=dict(b=0)), copy_kwargs_=dict(copy_mode='hybrid'), nested_=False)
-        cfg['a'] = 1
-        cfg['dct']['b'] = 1
+        cfg = config.Config(dict(a=0, dct=dict(b=0)), copy_kwargs_=dict(copy_mode="hybrid"), nested_=False)
+        cfg["a"] = 1
+        cfg["dct"]["b"] = 1
         cfg.reset()
         assert cfg == config.Config(dict(a=0, dct=dict(b=0)))
 
-        cfg = config.Config(dict(a=0, dct=dict(b=0)), copy_kwargs_=dict(copy_mode='deep'), nested_=False)
-        cfg['a'] = 1
-        cfg['dct']['b'] = 1
+        cfg = config.Config(dict(a=0, dct=dict(b=0)), copy_kwargs_=dict(copy_mode="deep"), nested_=False)
+        cfg["a"] = 1
+        cfg["dct"]["b"] = 1
         cfg.reset()
         assert cfg == config.Config(dict(a=0, dct=dict(b=0)))
 
-        cfg = config.Config(dict(a=0, dct=dict(b=0)), copy_kwargs_=dict(copy_mode='shallow'), nested_=True)
-        cfg['a'] = 1
-        cfg['dct']['b'] = 1
+        cfg = config.Config(dict(a=0, dct=dict(b=0)), copy_kwargs_=dict(copy_mode="shallow"), nested_=True)
+        cfg["a"] = 1
+        cfg["dct"]["b"] = 1
         cfg.reset()
         assert cfg == config.Config(dict(a=0, dct=dict(b=0)))
 
-        cfg = config.Config(dict(a=0, dct=dict(b=0)), copy_kwargs_=dict(copy_mode='hybrid'), nested_=True)
-        cfg['a'] = 1
-        cfg['dct']['b'] = 1
+        cfg = config.Config(dict(a=0, dct=dict(b=0)), copy_kwargs_=dict(copy_mode="hybrid"), nested_=True)
+        cfg["a"] = 1
+        cfg["dct"]["b"] = 1
         cfg.reset()
         assert cfg == config.Config(dict(a=0, dct=dict(b=0)))
 
-        cfg = config.Config(dict(a=0, dct=dict(b=0)), copy_kwargs_=dict(copy_mode='deep'), nested_=True)
-        cfg['a'] = 1
-        cfg['dct']['b'] = 1
+        cfg = config.Config(dict(a=0, dct=dict(b=0)), copy_kwargs_=dict(copy_mode="deep"), nested_=True)
+        cfg["a"] = 1
+        cfg["dct"]["b"] = 1
         cfg.reset()
         assert cfg == config.Config(dict(a=0, dct=dict(b=0)))
 
     def test_config_save_and_load(self, tmp_path):
         cfg = config.Config(
             dict(a=0, dct=dict(b=[1, 2, 3], dct=config.Config(readonly_=False))),
-            copy_kwargs_=dict(
-                copy_mode='deep',
-                nested=True
-            ),
+            copy_kwargs_=dict(copy_mode="deep", nested=True),
             reset_dct_=dict(b=0),
-            reset_dct_copy_kwargs_=dict(
-                copy_mode='deep',
-                nested=True
-            ),
+            reset_dct_copy_kwargs_=dict(copy_mode="deep", nested=True),
             frozen_keys_=True,
             readonly_=True,
             nested_=True,
             convert_dicts_=True,
-            as_attrs_=True
+            as_attrs_=True,
         )
         cfg.save(tmp_path / "config", dump_reset_dct=True)
         new_cfg = config.Config.load(tmp_path / "config")
@@ -908,37 +834,25 @@ class TestConfig:
     def test_config_load_update(self, tmp_path):
         cfg1 = config.Config(
             dict(a=0, dct=dict(b=[1, 2, 3], dct=config.Config(readonly_=False))),
-            copy_kwargs_=dict(
-                copy_mode='deep',
-                nested=True
-            ),
+            copy_kwargs_=dict(copy_mode="deep", nested=True),
             reset_dct_=dict(b=0),
-            reset_dct_copy_kwargs_=dict(
-                copy_mode='deep',
-                nested=True
-            ),
+            reset_dct_copy_kwargs_=dict(copy_mode="deep", nested=True),
             frozen_keys_=True,
             readonly_=True,
             nested_=True,
             convert_dicts_=True,
-            as_attrs_=True
+            as_attrs_=True,
         )
         cfg2 = config.Config(
             dct=dict(a=1, dct=dict(b=[4, 5, 6], dct=config.Config(readonly_=True))),
-            copy_kwargs_=dict(
-                copy_mode='shallow',
-                nested=False
-            ),
+            copy_kwargs_=dict(copy_mode="shallow", nested=False),
             reset_dct_=dict(b=1),
-            reset_dct_copy_kwargs_=dict(
-                copy_mode='shallow',
-                nested=False
-            ),
+            reset_dct_copy_kwargs_=dict(copy_mode="shallow", nested=False),
             frozen_keys_=False,
             readonly_=False,
             nested_=False,
             convert_dicts_=False,
-            as_attrs_=False
+            as_attrs_=False,
         )
         cfg1.save(tmp_path / "config", dump_reset_dct=True)
         cfg2.load_update(tmp_path / "config", clear=True)
@@ -947,15 +861,15 @@ class TestConfig:
 
     def test_configured(self, tmp_path):
         class H(config.Configured):
-            _writeable_attrs = {'my_attr', 'my_cfg'}
+            _writeable_attrs = {"my_attr", "my_cfg"}
 
             def __init__(self, a, b=2, **kwargs):
                 super().__init__(a=a, b=b, **kwargs)
                 self.my_attr = 100
                 self.my_cfg = config.Config(dict(sr=pd.Series([1, 2, 3])))
 
-        assert H(1).config == {'a': 1, 'b': 2}
-        assert H(1).replace(b=3).config == {'a': 1, 'b': 3}
+        assert H(1).config == {"a": 1, "b": 2}
+        assert H(1).replace(b=3).config == {"a": 1, "b": 3}
         assert H(pd.Series([1, 2, 3])) == H(pd.Series([1, 2, 3]))
         assert H(pd.Series([1, 2, 3])) != H(pd.Series([1, 2, 4]))
         assert H(pd.DataFrame([1, 2, 3])) == H(pd.DataFrame([1, 2, 3]))
@@ -965,14 +879,14 @@ class TestConfig:
         assert H(np.array([1, 2, 3])) == H(np.array([1, 2, 3]))
         assert H(np.array([1, 2, 3])) != H(np.array([1, 2, 4]))
         assert H(None) == H(None)
-        assert H(None) != H(10.)
+        assert H(None) != H(10.0)
 
         h = H(1)
         h.my_attr = 200
-        h.my_cfg['df'] = pd.DataFrame([1, 2, 3])
+        h.my_cfg["df"] = pd.DataFrame([1, 2, 3])
         h2 = H(1)
         h2.my_attr = 200
-        h2.my_cfg['df'] = pd.DataFrame([1, 2, 3])
+        h2.my_cfg["df"] = pd.DataFrame([1, 2, 3])
         h.save(tmp_path / "configured")
         new_h = H.load(tmp_path / "configured")
         assert new_h == h2
@@ -984,6 +898,7 @@ class TestConfig:
 
 
 # ############# decorators.py ############# #
+
 
 class TestDecorators:
     def test_class_or_instancemethod(self):
@@ -1010,23 +925,24 @@ class TestDecorators:
 
     def test_custom_property(self):
         class G:
-            @decorators.custom_property(some='key')
+            @decorators.custom_property(some="key")
             def cache_me(self):
                 return np.random.uniform()
 
-        assert 'some' in G.cache_me.options
-        assert G.cache_me.options['some'] == 'key'
+        assert "some" in G.cache_me.options
+        assert G.cache_me.options["some"] == "key"
 
     def test_custom_function(self):
-        @decorators.custom_function(some='key')
+        @decorators.custom_function(some="key")
         def cache_me():
             return np.random.uniform()
 
-        assert 'some' in cache_me.options
-        assert cache_me.options['some'] == 'key'
+        assert "some" in cache_me.options
+        assert cache_me.options["some"] == "key"
 
 
 # ############# attr_.py ############# #
+
 
 class TestAttr:
     def test_deep_getattr(self):
@@ -1055,25 +971,26 @@ class TestAttr:
                 return 0
 
         with pytest.raises(Exception):
-            attr_.deep_getattr(A(), 'a')
+            attr_.deep_getattr(A(), "a")
         with pytest.raises(Exception):
-            attr_.deep_getattr(A(), ('a',))
+            attr_.deep_getattr(A(), ("a",))
         with pytest.raises(Exception):
-            attr_.deep_getattr(A(), ('a', 1))
+            attr_.deep_getattr(A(), ("a", 1))
         with pytest.raises(Exception):
-            attr_.deep_getattr(A(), ('a', (1,)))
-        assert attr_.deep_getattr(A(), ('a', (1,), {'y': 1})) == 2
-        assert attr_.deep_getattr(C(), 'c') == 0
-        assert attr_.deep_getattr(C(), ['c']) == 0
-        assert attr_.deep_getattr(C(), ['b', ('b', (1,))]) == 1
-        assert attr_.deep_getattr(C(), 'b.b(1)') == 1
-        assert attr_.deep_getattr(C(), ['b', ('a',), ('a', (1,), {'y': 1})]) == 2
-        assert attr_.deep_getattr(C(), 'b.a().a(1, y=1)') == 2
-        assert attr_.deep_getattr(C(), 'b.b_prop') == 1
-        assert callable(attr_.deep_getattr(C(), 'b.a.a', call_last_attr=False))
+            attr_.deep_getattr(A(), ("a", (1,)))
+        assert attr_.deep_getattr(A(), ("a", (1,), {"y": 1})) == 2
+        assert attr_.deep_getattr(C(), "c") == 0
+        assert attr_.deep_getattr(C(), ["c"]) == 0
+        assert attr_.deep_getattr(C(), ["b", ("b", (1,))]) == 1
+        assert attr_.deep_getattr(C(), "b.b(1)") == 1
+        assert attr_.deep_getattr(C(), ["b", ("a",), ("a", (1,), {"y": 1})]) == 2
+        assert attr_.deep_getattr(C(), "b.a().a(1, y=1)") == 2
+        assert attr_.deep_getattr(C(), "b.b_prop") == 1
+        assert callable(attr_.deep_getattr(C(), "b.a.a", call_last_attr=False))
 
 
 # ############# checks.py ############# #
+
 
 class TestChecks:
     def test_is_np_array(self):
@@ -1108,13 +1025,13 @@ class TestChecks:
 
     def test_is_sequence(self):
         assert checks.is_sequence([1, 2, 3])
-        assert checks.is_sequence('123')
+        assert checks.is_sequence("123")
         assert not checks.is_sequence(0)
         assert not checks.is_sequence(dict(a=2).items())
 
     def test_is_iterable(self):
         assert checks.is_iterable([1, 2, 3])
-        assert checks.is_iterable('123')
+        assert checks.is_iterable("123")
         assert not checks.is_iterable(0)
         assert checks.is_iterable(dict(a=2).items())
 
@@ -1134,45 +1051,26 @@ class TestChecks:
         assert not checks.is_hashable(np.asarray(2))
 
     def test_is_index_equal(self):
+        assert checks.is_index_equal(pd.Index([0]), pd.Index([0]))
+        assert not checks.is_index_equal(pd.Index([0]), pd.Index([1]))
+        assert not checks.is_index_equal(pd.Index([0], name="name"), pd.Index([0]))
+        assert checks.is_index_equal(pd.Index([0], name="name"), pd.Index([0]), check_names=False)
+        assert not checks.is_index_equal(pd.MultiIndex.from_arrays([[0], [1]]), pd.Index([0]))
+        assert checks.is_index_equal(pd.MultiIndex.from_arrays([[0], [1]]), pd.MultiIndex.from_arrays([[0], [1]]))
         assert checks.is_index_equal(
-            pd.Index([0]),
-            pd.Index([0])
+            pd.MultiIndex.from_arrays([[0], [1]], names=["name1", "name2"]),
+            pd.MultiIndex.from_arrays([[0], [1]], names=["name1", "name2"]),
         )
         assert not checks.is_index_equal(
-            pd.Index([0]),
-            pd.Index([1])
-        )
-        assert not checks.is_index_equal(
-            pd.Index([0], name='name'),
-            pd.Index([0])
-        )
-        assert checks.is_index_equal(
-            pd.Index([0], name='name'),
-            pd.Index([0]),
-            check_names=False
-        )
-        assert not checks.is_index_equal(
-            pd.MultiIndex.from_arrays([[0], [1]]),
-            pd.Index([0])
-        )
-        assert checks.is_index_equal(
-            pd.MultiIndex.from_arrays([[0], [1]]),
-            pd.MultiIndex.from_arrays([[0], [1]])
-        )
-        assert checks.is_index_equal(
-            pd.MultiIndex.from_arrays([[0], [1]], names=['name1', 'name2']),
-            pd.MultiIndex.from_arrays([[0], [1]], names=['name1', 'name2'])
-        )
-        assert not checks.is_index_equal(
-            pd.MultiIndex.from_arrays([[0], [1]], names=['name1', 'name2']),
-            pd.MultiIndex.from_arrays([[0], [1]], names=['name3', 'name4'])
+            pd.MultiIndex.from_arrays([[0], [1]], names=["name1", "name2"]),
+            pd.MultiIndex.from_arrays([[0], [1]], names=["name3", "name4"]),
         )
 
     def test_is_default_index(self):
         assert checks.is_default_index(pd.DataFrame([[1, 2, 3]]).columns)
         assert checks.is_default_index(pd.Series([1, 2, 3]).to_frame().columns)
         assert checks.is_default_index(pd.Index([0, 1, 2]))
-        assert not checks.is_default_index(pd.Index([0, 1, 2], name='name'))
+        assert not checks.is_default_index(pd.Index([0, 1, 2], name="name"))
 
     def test_is_equal(self):
         assert checks.is_equal(np.arange(3), np.arange(3), np.array_equal)
@@ -1181,26 +1079,26 @@ class TestChecks:
         assert checks.is_equal(None, None, np.array_equal)
 
     def test_is_namedtuple(self):
-        assert checks.is_namedtuple(namedtuple('Hello', ['world'])(*range(1)))
+        assert checks.is_namedtuple(namedtuple("Hello", ["world"])(*range(1)))
         assert not checks.is_namedtuple((0,))
 
     def test_func_accepts_arg(self):
         def test(a, *args, b=2, **kwargs):
             pass
 
-        assert checks.func_accepts_arg(test, 'a')
-        assert not checks.func_accepts_arg(test, 'args')
-        assert checks.func_accepts_arg(test, '*args')
-        assert checks.func_accepts_arg(test, 'b')
-        assert not checks.func_accepts_arg(test, 'kwargs')
-        assert checks.func_accepts_arg(test, '**kwargs')
-        assert not checks.func_accepts_arg(test, 'c')
+        assert checks.func_accepts_arg(test, "a")
+        assert not checks.func_accepts_arg(test, "args")
+        assert checks.func_accepts_arg(test, "*args")
+        assert checks.func_accepts_arg(test, "b")
+        assert not checks.func_accepts_arg(test, "kwargs")
+        assert checks.func_accepts_arg(test, "**kwargs")
+        assert not checks.func_accepts_arg(test, "c")
 
     def test_is_deep_equal(self):
-        sr = pd.Series([1, 2, 3], index=pd.Index(['a', 'b', 'c'], name='index'), name='name')
-        sr2 = pd.Series([1., 2., 3.], index=sr.index, name=sr.name)
-        sr3 = pd.Series([np.nan, 2., 3.], index=sr.index, name=sr.name)
-        sr4 = pd.Series([np.nan, 2., 3. + 1e-15], index=sr.index, name=sr.name)
+        sr = pd.Series([1, 2, 3], index=pd.Index(["a", "b", "c"], name="index"), name="name")
+        sr2 = pd.Series([1.0, 2.0, 3.0], index=sr.index, name=sr.name)
+        sr3 = pd.Series([np.nan, 2.0, 3.0], index=sr.index, name=sr.name)
+        sr4 = pd.Series([np.nan, 2.0, 3.0 + 1e-15], index=sr.index, name=sr.name)
         assert checks.is_deep_equal(sr, sr.copy())
         assert checks.is_deep_equal(sr2, sr2.copy())
         assert checks.is_deep_equal(sr3, sr3.copy())
@@ -1209,18 +1107,18 @@ class TestChecks:
         assert checks.is_deep_equal(sr3, sr4)
         assert not checks.is_deep_equal(sr3, sr4, rtol=0, atol=1e-16)
         assert not checks.is_deep_equal(sr3, sr4, check_exact=True)
-        assert not checks.is_deep_equal(sr, sr.rename('name2'))
+        assert not checks.is_deep_equal(sr, sr.rename("name2"))
         assert checks.is_deep_equal(sr.index, sr.copy().index)
         assert not checks.is_deep_equal(sr.index, sr.copy().index[:-1])
-        assert not checks.is_deep_equal(sr.index, sr.copy().rename('indx2'))
+        assert not checks.is_deep_equal(sr.index, sr.copy().rename("indx2"))
         assert checks.is_deep_equal(sr.to_frame(), sr.to_frame().copy())
         assert not checks.is_deep_equal(sr, sr.to_frame().copy())
         assert not checks.is_deep_equal(sr.to_frame(), sr.copy())
 
         arr = np.array([1, 2, 3])
-        arr2 = np.array([1., 2., 3.])
-        arr3 = np.array([np.nan, 2., 3.])
-        arr4 = np.array([np.nan, 2., 3 + 1e-15])
+        arr2 = np.array([1.0, 2.0, 3.0])
+        arr3 = np.array([np.nan, 2.0, 3.0])
+        arr4 = np.array([np.nan, 2.0, 3 + 1e-15])
         assert checks.is_deep_equal(arr, arr.copy())
         assert checks.is_deep_equal(arr2, arr2.copy())
         assert checks.is_deep_equal(arr3, arr3.copy())
@@ -1230,38 +1128,38 @@ class TestChecks:
         assert not checks.is_deep_equal(arr3, arr4, rtol=0, atol=1e-16)
         assert not checks.is_deep_equal(arr3, arr4, check_exact=True)
 
-        records_arr = np.asarray([
-            (1, 1.),
-            (2, 2.),
-            (3, 3.),
-        ], dtype=np.dtype([
-            ('a', np.int32),
-            ('b', np.float64)
-        ]))
-        records_arr2 = np.asarray([
-            (1., 1.),
-            (2., 2.),
-            (3., 3.),
-        ], dtype=np.dtype([
-            ('a', np.float64),
-            ('b', np.float64)
-        ]))
-        records_arr3 = np.asarray([
-            (np.nan, 1.),
-            (2., 2.),
-            (3., 3.),
-        ], dtype=np.dtype([
-            ('a', np.float64),
-            ('b', np.float64)
-        ]))
-        records_arr4 = np.asarray([
-            (np.nan, 1.),
-            (2., 2.),
-            (3. + 1e-15, 3.),
-        ], dtype=np.dtype([
-            ('a', np.float64),
-            ('b', np.float64)
-        ]))
+        records_arr = np.asarray(
+            [
+                (1, 1.0),
+                (2, 2.0),
+                (3, 3.0),
+            ],
+            dtype=np.dtype([("a", np.int32), ("b", np.float64)]),
+        )
+        records_arr2 = np.asarray(
+            [
+                (1.0, 1.0),
+                (2.0, 2.0),
+                (3.0, 3.0),
+            ],
+            dtype=np.dtype([("a", np.float64), ("b", np.float64)]),
+        )
+        records_arr3 = np.asarray(
+            [
+                (np.nan, 1.0),
+                (2.0, 2.0),
+                (3.0, 3.0),
+            ],
+            dtype=np.dtype([("a", np.float64), ("b", np.float64)]),
+        )
+        records_arr4 = np.asarray(
+            [
+                (np.nan, 1.0),
+                (2.0, 2.0),
+                (3.0 + 1e-15, 3.0),
+            ],
+            dtype=np.dtype([("a", np.float64), ("b", np.float64)]),
+        )
         assert checks.is_deep_equal(records_arr, records_arr.copy())
         assert checks.is_deep_equal(records_arr2, records_arr2.copy())
         assert checks.is_deep_equal(records_arr3, records_arr3.copy())
@@ -1275,16 +1173,16 @@ class TestChecks:
         assert not checks.is_deep_equal([sr, arr, records_arr], [sr, arr, records_arr2])
         assert not checks.is_deep_equal([sr, arr, records_arr], [sr, records_arr, arr])
         assert checks.is_deep_equal(
-            {'sr': sr, 'arr': arr, 'records_arr': records_arr},
-            {'sr': sr, 'arr': arr, 'records_arr': records_arr}
+            {"sr": sr, "arr": arr, "records_arr": records_arr},
+            {"sr": sr, "arr": arr, "records_arr": records_arr},
         )
         assert not checks.is_deep_equal(
-            {'sr': sr, 'arr': arr, 'records_arr': records_arr},
-            {'sr': sr, 'arr': arr, 'records_arr2': records_arr}
+            {"sr": sr, "arr": arr, "records_arr": records_arr},
+            {"sr": sr, "arr": arr, "records_arr2": records_arr},
         )
         assert not checks.is_deep_equal(
-            {'sr': sr, 'arr': arr, 'records_arr': records_arr},
-            {'sr': sr, 'arr': arr, 'records_arr': records_arr2}
+            {"sr": sr, "arr": arr, "records_arr": records_arr},
+            {"sr": sr, "arr": arr, "records_arr": records_arr2},
         )
 
         assert checks.is_deep_equal(0, 0)
@@ -1318,12 +1216,12 @@ class TestChecks:
         assert checks.is_instance_of(d, D)
         assert checks.is_instance_of(d, object)
 
-        assert not checks.is_instance_of(d, '_A')
-        assert checks.is_instance_of(d, 'A')
-        assert checks.is_instance_of(d, 'B')
-        assert checks.is_instance_of(d, 'C')
-        assert checks.is_instance_of(d, 'D')
-        assert checks.is_instance_of(d, 'object')
+        assert not checks.is_instance_of(d, "_A")
+        assert checks.is_instance_of(d, "A")
+        assert checks.is_instance_of(d, "B")
+        assert checks.is_instance_of(d, "C")
+        assert checks.is_instance_of(d, "D")
+        assert checks.is_instance_of(d, "object")
 
     def test_is_subclass_of(self):
         class _A:
@@ -1348,17 +1246,17 @@ class TestChecks:
         assert checks.is_subclass_of(D, D)
         assert checks.is_subclass_of(D, object)
 
-        assert not checks.is_subclass_of(D, '_A')
-        assert checks.is_subclass_of(D, 'A')
-        assert checks.is_subclass_of(D, 'B')
-        assert checks.is_subclass_of(D, 'C')
-        assert checks.is_subclass_of(D, 'D')
-        assert checks.is_subclass_of(D, 'object')
+        assert not checks.is_subclass_of(D, "_A")
+        assert checks.is_subclass_of(D, "A")
+        assert checks.is_subclass_of(D, "B")
+        assert checks.is_subclass_of(D, "C")
+        assert checks.is_subclass_of(D, "D")
+        assert checks.is_subclass_of(D, "object")
 
-        assert not checks.is_subclass_of(D, vbt.Regex('_A'))
-        assert checks.is_subclass_of(D, vbt.Regex('[A-D]'))
-        assert not checks.is_subclass_of(D, vbt.Regex('[E-F]'))
-        assert checks.is_subclass_of(D, vbt.Regex('object'))
+        assert not checks.is_subclass_of(D, vbt.Regex("_A"))
+        assert checks.is_subclass_of(D, vbt.Regex("[A-D]"))
+        assert not checks.is_subclass_of(D, vbt.Regex("[E-F]"))
+        assert checks.is_subclass_of(D, vbt.Regex("object"))
 
     def test_assert_in(self):
         checks.assert_in(0, (0, 1))
@@ -1414,25 +1312,25 @@ class TestChecks:
     def test_assert_dtype(self):
         checks.assert_dtype(np.zeros(1), np.float_)
         checks.assert_dtype(pd.Series([1, 2, 3]), np.int_)
-        checks.assert_dtype(pd.DataFrame({'a': [1, 2], 'b': [3, 4]}), np.int_)
+        checks.assert_dtype(pd.DataFrame({"a": [1, 2], "b": [3, 4]}), np.int_)
         with pytest.raises(Exception):
-            checks.assert_dtype(pd.DataFrame({'a': [1, 2], 'b': [3., 4.]}), np.int_)
+            checks.assert_dtype(pd.DataFrame({"a": [1, 2], "b": [3.0, 4.0]}), np.int_)
 
     def test_assert_subdtype(self):
         checks.assert_subdtype([0], np.number)
         checks.assert_subdtype(np.array([1, 2, 3]), np.number)
-        checks.assert_subdtype(pd.DataFrame({'a': [1, 2], 'b': [3., 4.]}), np.number)
+        checks.assert_subdtype(pd.DataFrame({"a": [1, 2], "b": [3.0, 4.0]}), np.number)
         with pytest.raises(Exception):
             checks.assert_subdtype(np.array([1, 2, 3]), np.floating)
         with pytest.raises(Exception):
-            checks.assert_subdtype(pd.DataFrame({'a': [1, 2], 'b': [3., 4.]}), np.floating)
+            checks.assert_subdtype(pd.DataFrame({"a": [1, 2], "b": [3.0, 4.0]}), np.floating)
 
     def test_assert_dtype_equal(self):
         checks.assert_dtype_equal([1], [1, 1, 1])
         checks.assert_dtype_equal(pd.Series([1, 2, 3]), pd.DataFrame([[1, 2, 3]]))
-        checks.assert_dtype_equal(pd.DataFrame([[1, 2, 3.]]), pd.DataFrame([[1, 2, 3.]]))
+        checks.assert_dtype_equal(pd.DataFrame([[1, 2, 3.0]]), pd.DataFrame([[1, 2, 3.0]]))
         with pytest.raises(Exception):
-            checks.assert_dtype_equal(pd.DataFrame([[1, 2, 3]]), pd.DataFrame([[1, 2, 3.]]))
+            checks.assert_dtype_equal(pd.DataFrame([[1, 2, 3]]), pd.DataFrame([[1, 2, 3.0]]))
 
     def test_assert_ndim(self):
         checks.assert_ndim(0, 0)
@@ -1463,8 +1361,8 @@ class TestChecks:
             checks.assert_index_equal(pd.Index([1, 2, 3]), pd.Index([2, 3, 4]))
 
     def test_assert_meta_equal(self):
-        index = ['x', 'y', 'z']
-        columns = ['a', 'b', 'c']
+        index = ["x", "y", "z"]
+        columns = ["a", "b", "c"]
         checks.assert_meta_equal(np.array([1, 2, 3]), np.array([1, 2, 3]))
         checks.assert_meta_equal(pd.Series([1, 2, 3], index=index), pd.Series([1, 2, 3], index=index))
         checks.assert_meta_equal(pd.DataFrame([[1, 2, 3]], columns=columns), pd.DataFrame([[1, 2, 3]], columns=columns))
@@ -1481,23 +1379,25 @@ class TestChecks:
             checks.assert_meta_equal(pd.DataFrame([[1, 2, 3]]), pd.DataFrame([[1, 2, 3]], columns=columns))
 
     def test_assert_array_equal(self):
-        index = ['x', 'y', 'z']
-        columns = ['a', 'b', 'c']
+        index = ["x", "y", "z"]
+        columns = ["a", "b", "c"]
         checks.assert_array_equal(np.array([1, 2, 3]), np.array([1, 2, 3]))
         checks.assert_array_equal(pd.Series([1, 2, 3], index=index), pd.Series([1, 2, 3], index=index))
-        checks.assert_array_equal(pd.DataFrame([[1, 2, 3]], columns=columns),
-                                  pd.DataFrame([[1, 2, 3]], columns=columns))
+        checks.assert_array_equal(
+            pd.DataFrame([[1, 2, 3]], columns=columns),
+            pd.DataFrame([[1, 2, 3]], columns=columns),
+        )
         with pytest.raises(Exception):
             checks.assert_array_equal(np.array([1, 2]), np.array([1, 2, 3]))
 
     def test_assert_level_not_exists(self):
-        i = pd.Index(['x', 'y', 'z'], name='i')
-        multi_i = pd.MultiIndex.from_arrays([['x', 'y', 'z'], ['x2', 'y2', 'z2']], names=['i', 'i2'])
-        checks.assert_level_not_exists(i, 'i2')
-        checks.assert_level_not_exists(multi_i, 'i3')
+        i = pd.Index(["x", "y", "z"], name="i")
+        multi_i = pd.MultiIndex.from_arrays([["x", "y", "z"], ["x2", "y2", "z2"]], names=["i", "i2"])
+        checks.assert_level_not_exists(i, "i2")
+        checks.assert_level_not_exists(multi_i, "i3")
         with pytest.raises(Exception):
-            checks.assert_level_not_exists(i, 'i')
-            checks.assert_level_not_exists(multi_i, 'i')
+            checks.assert_level_not_exists(i, "i")
+            checks.assert_level_not_exists(multi_i, "i")
 
     def test_assert_equal(self):
         checks.assert_equal(0, 0)
@@ -1506,15 +1406,16 @@ class TestChecks:
             checks.assert_equal(0, 1)
 
     def test_assert_dict_valid(self):
-        checks.assert_dict_valid(dict(a=2, b=3), [['a', 'b', 'c']])
+        checks.assert_dict_valid(dict(a=2, b=3), [["a", "b", "c"]])
         with pytest.raises(Exception):
-            checks.assert_dict_valid(dict(a=2, b=3, d=4), [['a', 'b', 'c']])
-        checks.assert_dict_valid(dict(a=2, b=3, c=dict(d=4, e=5)), [['a', 'b', 'c'], ['d', 'e']])
+            checks.assert_dict_valid(dict(a=2, b=3, d=4), [["a", "b", "c"]])
+        checks.assert_dict_valid(dict(a=2, b=3, c=dict(d=4, e=5)), [["a", "b", "c"], ["d", "e"]])
         with pytest.raises(Exception):
-            checks.assert_dict_valid(dict(a=2, b=3, c=dict(d=4, f=5)), [['a', 'b', 'c'], ['d', 'e']])
+            checks.assert_dict_valid(dict(a=2, b=3, c=dict(d=4, f=5)), [["a", "b", "c"], ["d", "e"]])
 
 
 # ############# math_.py ############# #
+
 
 class TestMath:
     def test_is_close(self):
@@ -1613,6 +1514,7 @@ class TestMath:
 
 # ############# array_.py ############# #
 
+
 class TestArray:
     def test_is_sorted(self):
         assert array_.is_sorted(np.array([0, 1, 2, 3, 4]))
@@ -1636,18 +1538,9 @@ class TestArray:
         np.testing.assert_array_equal(a[I], A)
 
     def test_get_ranges_arr(self):
-        np.testing.assert_array_equal(
-            array_.get_ranges_arr(0, 3),
-            np.array([0, 1, 2])
-        )
-        np.testing.assert_array_equal(
-            array_.get_ranges_arr(0, [1, 2, 3]),
-            np.array([0, 0, 1, 0, 1, 2])
-        )
-        np.testing.assert_array_equal(
-            array_.get_ranges_arr([0, 3], [3, 6]),
-            np.array([0, 1, 2, 3, 4, 5])
-        )
+        np.testing.assert_array_equal(array_.get_ranges_arr(0, 3), np.array([0, 1, 2]))
+        np.testing.assert_array_equal(array_.get_ranges_arr(0, [1, 2, 3]), np.array([0, 0, 1, 0, 1, 2]))
+        np.testing.assert_array_equal(array_.get_ranges_arr([0, 3], [3, 6]), np.array([0, 1, 2, 3, 4, 5]))
 
     def test_uniform_summing_to_one_nb(self):
         @njit
@@ -1657,11 +1550,20 @@ class TestArray:
         set_seed()
         np.testing.assert_array_almost_equal(
             array_.uniform_summing_to_one_nb(10),
-            np.array([
-                5.808361e-02, 9.791091e-02, 2.412011e-05, 2.185215e-01,
-                2.241184e-01, 2.456528e-03, 1.308789e-01, 1.341822e-01,
-                8.453816e-02, 4.928569e-02
-            ])
+            np.array(
+                [
+                    5.808361e-02,
+                    9.791091e-02,
+                    2.412011e-05,
+                    2.185215e-01,
+                    2.241184e-01,
+                    2.456528e-03,
+                    1.308789e-01,
+                    1.341822e-01,
+                    8.453816e-02,
+                    4.928569e-02,
+                ]
+            ),
         )
         assert np.sum(array_.uniform_summing_to_one_nb(10)) == 1
 
@@ -1670,39 +1572,39 @@ class TestArray:
         assert array_.renormalize(10, (0, 10), (0, 1)) == 1
         np.testing.assert_array_equal(
             array_.renormalize(np.array([0, 2, 4, 6, 8, 10]), (0, 10), (0, 1)),
-            np.array([0., 0.2, 0.4, 0.6, 0.8, 1.])
+            np.array([0.0, 0.2, 0.4, 0.6, 0.8, 1.0]),
         )
         np.testing.assert_array_equal(
             array_.renormalize_nb(np.array([0, 2, 4, 6, 8, 10]), (0, 10), (0, 1)),
-            np.array([0., 0.2, 0.4, 0.6, 0.8, 1.])
+            np.array([0.0, 0.2, 0.4, 0.6, 0.8, 1.0]),
         )
 
     def test_min_rel_rescale(self):
         np.testing.assert_array_equal(
             array_.min_rel_rescale(np.array([2, 4, 6]), (10, 20)),
-            np.array([10., 15., 20.])
+            np.array([10.0, 15.0, 20.0]),
         )
         np.testing.assert_array_equal(
             array_.min_rel_rescale(np.array([5, 6, 7]), (10, 20)),
-            np.array([10., 12., 14.])
+            np.array([10.0, 12.0, 14.0]),
         )
         np.testing.assert_array_equal(
             array_.min_rel_rescale(np.array([5, 5, 5]), (10, 20)),
-            np.array([10., 10., 10.])
+            np.array([10.0, 10.0, 10.0]),
         )
 
     def test_max_rel_rescale(self):
         np.testing.assert_array_equal(
             array_.max_rel_rescale(np.array([2, 4, 6]), (10, 20)),
-            np.array([10., 15., 20.])
+            np.array([10.0, 15.0, 20.0]),
         )
         np.testing.assert_array_equal(
             array_.max_rel_rescale(np.array([5, 6, 7]), (10, 20)),
-            np.array([14.285714285714286, 17.142857142857142, 20.])
+            np.array([14.285714285714286, 17.142857142857142, 20.0]),
         )
         np.testing.assert_array_equal(
             array_.max_rel_rescale(np.array([5, 5, 5]), (10, 20)),
-            np.array([20., 20., 20.])
+            np.array([20.0, 20.0, 20.0]),
         )
 
     def test_rescale_float_to_int_nb(self):
@@ -1713,7 +1615,7 @@ class TestArray:
         set_seed()
         np.testing.assert_array_equal(
             array_.rescale_float_to_int_nb(np.array([0.3, 0.3, 0.3, 0.1]), (10, 20), 70),
-            np.array([17, 14, 22, 17])
+            np.array([17, 14, 22, 17]),
         )
         assert np.sum(array_.rescale_float_to_int_nb(np.array([0.3, 0.3, 0.3, 0.1]), (10, 20), 70)) == 70
 
@@ -1730,7 +1632,8 @@ class TestRandom:
 
         assert test_seed() == 0.3745401188473625
 
-        if 'NUMBA_DISABLE_JIT' not in os.environ or os.environ['NUMBA_DISABLE_JIT'] != '1':
+        if "NUMBA_DISABLE_JIT" not in os.environ or os.environ["NUMBA_DISABLE_JIT"] != "1":
+
             @njit
             def test_seed_nb():
                 return np.random.uniform(0, 1)
@@ -1740,45 +1643,44 @@ class TestRandom:
 
 # ############# mapping.py ############# #
 
-Enum = namedtuple('Enum', ['Attr1', 'Attr2'])(*range(2))
+Enum = namedtuple("Enum", ["Attr1", "Attr2"])(*range(2))
 
 
 class TestMapping:
     def test_to_mapping(self):
-        assert mapping.to_mapping(Enum) == {0: 'Attr1', 1: 'Attr2', -1: None}
-        assert mapping.to_mapping(Enum, reverse=True) == {'Attr1': 0, 'Attr2': 1, None: -1}
-        assert mapping.to_mapping({0: 'Attr1', 1: 'Attr2', -1: None}) == {0: 'Attr1', 1: 'Attr2', -1: None}
-        assert mapping.to_mapping(['Attr1', 'Attr2']) == {0: 'Attr1', 1: 'Attr2'}
-        assert mapping.to_mapping(pd.Index(['Attr1', 'Attr2'])) == {0: 'Attr1', 1: 'Attr2'}
-        assert mapping.to_mapping(pd.Series(['Attr1', 'Attr2'])) == {0: 'Attr1', 1: 'Attr2'}
+        assert mapping.to_mapping(Enum) == {0: "Attr1", 1: "Attr2", -1: None}
+        assert mapping.to_mapping(Enum, reverse=True) == {"Attr1": 0, "Attr2": 1, None: -1}
+        assert mapping.to_mapping({0: "Attr1", 1: "Attr2", -1: None}) == {0: "Attr1", 1: "Attr2", -1: None}
+        assert mapping.to_mapping(["Attr1", "Attr2"]) == {0: "Attr1", 1: "Attr2"}
+        assert mapping.to_mapping(pd.Index(["Attr1", "Attr2"])) == {0: "Attr1", 1: "Attr2"}
+        assert mapping.to_mapping(pd.Series(["Attr1", "Attr2"])) == {0: "Attr1", 1: "Attr2"}
 
     def test_apply_mapping(self):
-        assert mapping.apply_mapping('Attr1', mapping_like=Enum, reverse=True) == 0
+        assert mapping.apply_mapping("Attr1", mapping_like=Enum, reverse=True) == 0
         with pytest.raises(Exception):
-            mapping.apply_mapping('Attr3', mapping_like=Enum, reverse=True)
-        assert mapping.apply_mapping('attr1', mapping_like=Enum, reverse=True, ignore_case=True) == 0
+            mapping.apply_mapping("Attr3", mapping_like=Enum, reverse=True)
+        assert mapping.apply_mapping("attr1", mapping_like=Enum, reverse=True, ignore_case=True) == 0
         with pytest.raises(Exception):
-            mapping.apply_mapping('attr1', mapping_like=Enum, reverse=True, ignore_case=False)
-        assert mapping.apply_mapping('Attr_1', mapping_like=Enum, reverse=True, ignore_underscores=True) == 0
+            mapping.apply_mapping("attr1", mapping_like=Enum, reverse=True, ignore_case=False)
+        assert mapping.apply_mapping("Attr_1", mapping_like=Enum, reverse=True, ignore_underscores=True) == 0
         with pytest.raises(Exception):
-            mapping.apply_mapping('Attr_1', mapping_like=Enum, reverse=True, ignore_underscores=False)
-        assert mapping.apply_mapping(
-            'attr_1', mapping_like=Enum, reverse=True, ignore_case=True,
-            ignore_underscores=True) == 0
+            mapping.apply_mapping("Attr_1", mapping_like=Enum, reverse=True, ignore_underscores=False)
+        assert (
+            mapping.apply_mapping("attr_1", mapping_like=Enum, reverse=True, ignore_case=True, ignore_underscores=True)
+            == 0
+        )
         with pytest.raises(Exception):
-            mapping.apply_mapping(
-                'attr_1', mapping_like=Enum, reverse=True, ignore_case=True,
-                ignore_underscores=False)
-        assert mapping.apply_mapping(np.array([1]), mapping_like={1: 'hello'})[0] == 'hello'
-        assert mapping.apply_mapping(np.array([1]), mapping_like={1.: 'hello'})[0] == 'hello'
-        assert mapping.apply_mapping(np.array([1.]), mapping_like={1: 'hello'})[0] == 'hello'
-        assert mapping.apply_mapping(np.array([True]), mapping_like={1: 'hello'})[0] == 'hello'
-        assert mapping.apply_mapping(np.array([True]), mapping_like={True: 'hello'})[0] == 'hello'
+            mapping.apply_mapping("attr_1", mapping_like=Enum, reverse=True, ignore_case=True, ignore_underscores=False)
+        assert mapping.apply_mapping(np.array([1]), mapping_like={1: "hello"})[0] == "hello"
+        assert mapping.apply_mapping(np.array([1]), mapping_like={1.0: "hello"})[0] == "hello"
+        assert mapping.apply_mapping(np.array([1.0]), mapping_like={1: "hello"})[0] == "hello"
+        assert mapping.apply_mapping(np.array([True]), mapping_like={1: "hello"})[0] == "hello"
+        assert mapping.apply_mapping(np.array([True]), mapping_like={True: "hello"})[0] == "hello"
         with pytest.raises(Exception):
-            mapping.apply_mapping(np.array([True]), mapping_like={'world': 'hello'})
+            mapping.apply_mapping(np.array([True]), mapping_like={"world": "hello"})
         with pytest.raises(Exception):
-            mapping.apply_mapping(np.array([1]), mapping_like={'world': 'hello'})
-        assert mapping.apply_mapping(np.array(['world']), mapping_like={'world': 'hello'})[0] == 'hello'
+            mapping.apply_mapping(np.array([1]), mapping_like={"world": "hello"})
+        assert mapping.apply_mapping(np.array(["world"]), mapping_like={"world": "hello"})[0] == "hello"
 
 
 # ############# enum_.py ############# #
@@ -1789,162 +1691,116 @@ class TestEnum:
         assert enum_.map_enum_fields(0, Enum) == 0
         assert enum_.map_enum_fields(10, Enum) == 10
         with pytest.raises(Exception):
-            enum_.map_enum_fields(10., Enum)
-        assert enum_.map_enum_fields('Attr1', Enum) == 0
-        assert enum_.map_enum_fields('attr1', Enum) == 0
+            enum_.map_enum_fields(10.0, Enum)
+        assert enum_.map_enum_fields("Attr1", Enum) == 0
+        assert enum_.map_enum_fields("attr1", Enum) == 0
         with pytest.raises(Exception):
-            enum_.map_enum_fields('hello', Enum)
-        assert enum_.map_enum_fields('attr1', Enum) == 0
-        assert enum_.map_enum_fields(('attr1', 'attr2'), Enum) == (0, 1)
-        assert enum_.map_enum_fields([['attr1', 'attr2']], Enum) == [[0, 1]]
-        np.testing.assert_array_equal(
-            enum_.map_enum_fields(np.array([]), Enum),
-            np.array([])
-        )
+            enum_.map_enum_fields("hello", Enum)
+        assert enum_.map_enum_fields("attr1", Enum) == 0
+        assert enum_.map_enum_fields(("attr1", "attr2"), Enum) == (0, 1)
+        assert enum_.map_enum_fields([["attr1", "attr2"]], Enum) == [[0, 1]]
+        np.testing.assert_array_equal(enum_.map_enum_fields(np.array([]), Enum), np.array([]))
         with pytest.raises(Exception):
-            enum_.map_enum_fields(np.array([[0., 1.]]), Enum)
+            enum_.map_enum_fields(np.array([[0.0, 1.0]]), Enum)
         with pytest.raises(Exception):
             enum_.map_enum_fields(np.array([[False, True]]), Enum)
-        np.testing.assert_array_equal(
-            enum_.map_enum_fields(np.array([[0, 1]]), Enum),
-            np.array([[0, 1]])
-        )
-        np.testing.assert_array_equal(
-            enum_.map_enum_fields(np.array([['attr1', 'attr2']]), Enum),
-            np.array([[0, 1]])
-        )
+        np.testing.assert_array_equal(enum_.map_enum_fields(np.array([[0, 1]]), Enum), np.array([[0, 1]]))
+        np.testing.assert_array_equal(enum_.map_enum_fields(np.array([["attr1", "attr2"]]), Enum), np.array([[0, 1]]))
         with pytest.raises(Exception):
-            enum_.map_enum_fields(np.array([['attr1', 1]]), Enum)
-        pd.testing.assert_series_equal(
-            enum_.map_enum_fields(pd.Series([]), Enum),
-            pd.Series([])
-        )
+            enum_.map_enum_fields(np.array([["attr1", 1]]), Enum)
+        pd.testing.assert_series_equal(enum_.map_enum_fields(pd.Series([]), Enum), pd.Series([]))
         with pytest.raises(Exception):
-            enum_.map_enum_fields(pd.Series([0., 1.]), Enum)
+            enum_.map_enum_fields(pd.Series([0.0, 1.0]), Enum)
         with pytest.raises(Exception):
             enum_.map_enum_fields(pd.Series([False, True]), Enum)
-        pd.testing.assert_series_equal(
-            enum_.map_enum_fields(pd.Series([0, 1]), Enum),
-            pd.Series([0, 1])
-        )
-        pd.testing.assert_series_equal(
-            enum_.map_enum_fields(pd.Series(['attr1', 'attr2']), Enum),
-            pd.Series([0, 1])
-        )
+        pd.testing.assert_series_equal(enum_.map_enum_fields(pd.Series([0, 1]), Enum), pd.Series([0, 1]))
+        pd.testing.assert_series_equal(enum_.map_enum_fields(pd.Series(["attr1", "attr2"]), Enum), pd.Series([0, 1]))
         with pytest.raises(Exception):
-            enum_.map_enum_fields(pd.Series(['attr1', 0]), Enum)
-        pd.testing.assert_frame_equal(
-            enum_.map_enum_fields(pd.DataFrame([]), Enum),
-            pd.DataFrame([])
-        )
+            enum_.map_enum_fields(pd.Series(["attr1", 0]), Enum)
+        pd.testing.assert_frame_equal(enum_.map_enum_fields(pd.DataFrame([]), Enum), pd.DataFrame([]))
         with pytest.raises(Exception):
-            enum_.map_enum_fields(pd.DataFrame([[0., 1.]]), Enum)
+            enum_.map_enum_fields(pd.DataFrame([[0.0, 1.0]]), Enum)
+        pd.testing.assert_frame_equal(enum_.map_enum_fields(pd.DataFrame([[0, 1]]), Enum), pd.DataFrame([[0, 1]]))
         pd.testing.assert_frame_equal(
-            enum_.map_enum_fields(pd.DataFrame([[0, 1]]), Enum),
-            pd.DataFrame([[0, 1]])
+            enum_.map_enum_fields(pd.DataFrame([["attr1", "attr2"]]), Enum),
+            pd.DataFrame([[0, 1]]),
         )
-        pd.testing.assert_frame_equal(
-            enum_.map_enum_fields(pd.DataFrame([['attr1', 'attr2']]), Enum),
-            pd.DataFrame([[0, 1]])
-        )
-        pd.testing.assert_frame_equal(
-            enum_.map_enum_fields(pd.DataFrame([[0, 'attr2']]), Enum),
-            pd.DataFrame([[0, 1]])
-        )
+        pd.testing.assert_frame_equal(enum_.map_enum_fields(pd.DataFrame([[0, "attr2"]]), Enum), pd.DataFrame([[0, 1]]))
 
     def test_map_enum_values(self):
-        assert enum_.map_enum_values(0, Enum) == 'Attr1'
+        assert enum_.map_enum_values(0, Enum) == "Attr1"
         assert enum_.map_enum_values(-1, Enum) is None
         with pytest.raises(Exception):
             enum_.map_enum_values(-2, Enum)
-        assert enum_.map_enum_values((0, 1, 'Attr3'), Enum) == ('Attr1', 'Attr2', 'Attr3')
-        assert enum_.map_enum_values([[0, 1, 'Attr3']], Enum) == [['Attr1', 'Attr2', 'Attr3']]
-        assert enum_.map_enum_values('hello', Enum) == 'hello'
+        assert enum_.map_enum_values((0, 1, "Attr3"), Enum) == ("Attr1", "Attr2", "Attr3")
+        assert enum_.map_enum_values([[0, 1, "Attr3"]], Enum) == [["Attr1", "Attr2", "Attr3"]]
+        assert enum_.map_enum_values("hello", Enum) == "hello"
+        np.testing.assert_array_equal(enum_.map_enum_values(np.array([]), Enum), np.array([]))
         np.testing.assert_array_equal(
-            enum_.map_enum_values(np.array([]), Enum),
-            np.array([])
-        )
-        np.testing.assert_array_equal(
-            enum_.map_enum_values(np.array([[0., 1.]]), Enum),
-            np.array([['Attr1', 'Attr2']])
+            enum_.map_enum_values(np.array([[0.0, 1.0]]), Enum),
+            np.array([["Attr1", "Attr2"]]),
         )
         np.testing.assert_array_equal(
-            enum_.map_enum_values(np.array([['Attr1', 'Attr2']]), Enum),
-            np.array([['Attr1', 'Attr2']])
+            enum_.map_enum_values(np.array([["Attr1", "Attr2"]]), Enum),
+            np.array([["Attr1", "Attr2"]]),
         )
-        np.testing.assert_array_equal(
-            enum_.map_enum_values(np.array([[0, 'Attr2']]), Enum),
-            np.array([['0', 'Attr2']])
-        )
+        np.testing.assert_array_equal(enum_.map_enum_values(np.array([[0, "Attr2"]]), Enum), np.array([["0", "Attr2"]]))
+        pd.testing.assert_series_equal(enum_.map_enum_values(pd.Series([]), Enum), pd.Series([]))
         pd.testing.assert_series_equal(
-            enum_.map_enum_values(pd.Series([]), Enum),
-            pd.Series([])
+            enum_.map_enum_values(pd.Series([0.0, 1.0]), Enum),
+            pd.Series(["Attr1", "Attr2"]),
         )
+        pd.testing.assert_series_equal(enum_.map_enum_values(pd.Series([0, 1]), Enum), pd.Series(["Attr1", "Attr2"]))
         pd.testing.assert_series_equal(
-            enum_.map_enum_values(pd.Series([0., 1.]), Enum),
-            pd.Series(['Attr1', 'Attr2'])
-        )
-        pd.testing.assert_series_equal(
-            enum_.map_enum_values(pd.Series([0, 1]), Enum),
-            pd.Series(['Attr1', 'Attr2'])
-        )
-        pd.testing.assert_series_equal(
-            enum_.map_enum_values(pd.Series(['Attr1', 'Attr2']), Enum),
-            pd.Series(['Attr1', 'Attr2'])
+            enum_.map_enum_values(pd.Series(["Attr1", "Attr2"]), Enum),
+            pd.Series(["Attr1", "Attr2"]),
         )
         with pytest.raises(Exception):
-            enum_.map_enum_values(pd.Series([0, 'Attr2']), Enum)
+            enum_.map_enum_values(pd.Series([0, "Attr2"]), Enum)
+        pd.testing.assert_frame_equal(enum_.map_enum_values(pd.DataFrame([]), Enum), pd.DataFrame([]))
         pd.testing.assert_frame_equal(
-            enum_.map_enum_values(pd.DataFrame([]), Enum),
-            pd.DataFrame([])
-        )
-        pd.testing.assert_frame_equal(
-            enum_.map_enum_values(pd.DataFrame([[0., 1.]]), Enum),
-            pd.DataFrame([['Attr1', 'Attr2']])
+            enum_.map_enum_values(pd.DataFrame([[0.0, 1.0]]), Enum),
+            pd.DataFrame([["Attr1", "Attr2"]]),
         )
         pd.testing.assert_frame_equal(
             enum_.map_enum_values(pd.DataFrame([[0, 1]]), Enum),
-            pd.DataFrame([['Attr1', 'Attr2']])
+            pd.DataFrame([["Attr1", "Attr2"]]),
         )
         pd.testing.assert_frame_equal(
-            enum_.map_enum_values(pd.DataFrame([['Attr1', 'Attr2']]), Enum),
-            pd.DataFrame([['Attr1', 'Attr2']])
+            enum_.map_enum_values(pd.DataFrame([["Attr1", "Attr2"]]), Enum),
+            pd.DataFrame([["Attr1", "Attr2"]]),
         )
         pd.testing.assert_frame_equal(
-            enum_.map_enum_values(pd.DataFrame([[0, 'Attr2']]), Enum),
-            pd.DataFrame([['Attr1', 'Attr2']])
+            enum_.map_enum_values(pd.DataFrame([[0, "Attr2"]]), Enum),
+            pd.DataFrame([["Attr1", "Attr2"]]),
         )
 
 
 # ############# params.py ############# #
 
+
 class TestParams:
     def test_create_param_combs(self):
-        assert params.generate_param_combs(
-            (combinations, [0, 1, 2, 3], 2)) == [
-                   [0, 0, 0, 1, 1, 2],
-                   [1, 2, 3, 2, 3, 3]
-               ]
-        assert params.generate_param_combs(
-            (product, (combinations, [0, 1, 2, 3], 2), [4, 5])) == [
-                   [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2],
-                   [1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 3, 3],
-                   [4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5]
-               ]
-        assert params.generate_param_combs(
-            (product, (combinations, [0, 1, 2], 2), (combinations, [3, 4, 5], 2))) == [
-                   [0, 0, 0, 0, 0, 0, 1, 1, 1],
-                   [1, 1, 1, 2, 2, 2, 2, 2, 2],
-                   [3, 3, 4, 3, 3, 4, 3, 3, 4],
-                   [4, 5, 5, 4, 5, 5, 4, 5, 5]
-               ]
+        assert params.generate_param_combs((combinations, [0, 1, 2, 3], 2)) == [[0, 0, 0, 1, 1, 2], [1, 2, 3, 2, 3, 3]]
+        assert params.generate_param_combs((product, (combinations, [0, 1, 2, 3], 2), [4, 5])) == [
+            [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2],
+            [1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 3, 3],
+            [4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5],
+        ]
+        assert params.generate_param_combs((product, (combinations, [0, 1, 2], 2), (combinations, [3, 4, 5], 2))) == [
+            [0, 0, 0, 0, 0, 0, 1, 1, 1],
+            [1, 1, 1, 2, 2, 2, 2, 2, 2],
+            [3, 3, 4, 3, 3, 4, 3, 3, 4],
+            [4, 5, 5, 4, 5, 5, 4, 5, 5],
+        ]
 
 
 # ############# datetime_.py ############# #
 
+
 class TestDatetime:
     def test_to_timedelta(self):
-        assert datetime_.freq_to_timedelta('d') == pd.to_timedelta('1d')
+        assert datetime_.freq_to_timedelta("d") == pd.to_timedelta("1d")
 
     def test_get_utc_tz(self):
         assert datetime_.get_utc_tz().utcoffset(_datetime.now()) == _timedelta(0)
@@ -1954,67 +1810,96 @@ class TestDatetime:
 
     def test_convert_tzaware_time(self):
         assert datetime_.convert_tzaware_time(
-            _time(12, 0, 0, tzinfo=datetime_.get_utc_tz()), _timezone(_timedelta(hours=2))) == \
-               _time(14, 0, 0, tzinfo=_timezone(_timedelta(hours=2)))
+            _time(12, 0, 0, tzinfo=datetime_.get_utc_tz()),
+            _timezone(_timedelta(hours=2)),
+        ) == _time(14, 0, 0, tzinfo=_timezone(_timedelta(hours=2)))
 
     def test_tzaware_to_naive_time(self):
         assert datetime_.tzaware_to_naive_time(
-            _time(12, 0, 0, tzinfo=datetime_.get_utc_tz()), _timezone(_timedelta(hours=2))) == _time(14, 0, 0)
+            _time(12, 0, 0, tzinfo=datetime_.get_utc_tz()),
+            _timezone(_timedelta(hours=2)),
+        ) == _time(14, 0, 0)
 
     def test_naive_to_tzaware_time(self):
         assert datetime_.naive_to_tzaware_time(
-            _time(12, 0, 0), _timezone(_timedelta(hours=2))) == \
-               datetime_.convert_tzaware_time(
-                   _time(12, 0, 0, tzinfo=datetime_.get_local_tz()), _timezone(_timedelta(hours=2)))
+            _time(12, 0, 0),
+            _timezone(_timedelta(hours=2)),
+        ) == datetime_.convert_tzaware_time(
+            _time(12, 0, 0, tzinfo=datetime_.get_local_tz()),
+            _timezone(_timedelta(hours=2)),
+        )
 
     def test_convert_naive_time(self):
         assert datetime_.convert_naive_time(
-            _time(12, 0, 0), _timezone(_timedelta(hours=2))) == \
-               datetime_.tzaware_to_naive_time(
-                   _time(12, 0, 0, tzinfo=datetime_.get_local_tz()), _timezone(_timedelta(hours=2)))
+            _time(12, 0, 0),
+            _timezone(_timedelta(hours=2)),
+        ) == datetime_.tzaware_to_naive_time(
+            _time(12, 0, 0, tzinfo=datetime_.get_local_tz()),
+            _timezone(_timedelta(hours=2)),
+        )
 
     def test_is_tz_aware(self):
-        assert not datetime_.is_tz_aware(pd.Timestamp('2020-01-01'))
-        assert datetime_.is_tz_aware(pd.Timestamp('2020-01-01', tz=datetime_.get_utc_tz()))
+        assert not datetime_.is_tz_aware(pd.Timestamp("2020-01-01"))
+        assert datetime_.is_tz_aware(pd.Timestamp("2020-01-01", tz=datetime_.get_utc_tz()))
 
     def test_to_timezone(self):
-        assert datetime_.to_timezone('UTC') == _timezone.utc
-        assert isinstance(datetime_.to_timezone('Europe/Berlin'), _timezone)
-        assert datetime_.to_timezone('Europe/Berlin', to_py_timezone=False) == pytz.timezone('Europe/Berlin')
-        assert datetime_.to_timezone('+0500') == _timezone(_timedelta(hours=5))
+        assert datetime_.to_timezone("UTC") == _timezone.utc
+        assert isinstance(datetime_.to_timezone("Europe/Berlin"), _timezone)
+        assert datetime_.to_timezone("Europe/Berlin", to_py_timezone=False) == pytz.timezone("Europe/Berlin")
+        assert datetime_.to_timezone("+0500") == _timezone(_timedelta(hours=5))
         assert datetime_.to_timezone(_timezone(_timedelta(hours=1))) == _timezone(_timedelta(hours=1))
-        assert isinstance(datetime_.to_timezone(pytz.timezone('Europe/Berlin')), _timezone)
+        assert isinstance(datetime_.to_timezone(pytz.timezone("Europe/Berlin")), _timezone)
         assert datetime_.to_timezone(1) == _timezone(_timedelta(hours=1))
         assert datetime_.to_timezone(0.5) == _timezone(_timedelta(hours=0.5))
         with pytest.raises(Exception):
-            datetime_.to_timezone('+05')
+            datetime_.to_timezone("+05")
 
     def test_to_tzaware_datetime(self):
-        assert datetime_.to_tzaware_datetime(0.5) == \
-               _datetime(1970, 1, 1, 0, 0, 0, 500000, tzinfo=datetime_.get_utc_tz())
-        assert datetime_.to_tzaware_datetime(0) == \
-               _datetime(1970, 1, 1, 0, 0, 0, 0, tzinfo=datetime_.get_utc_tz())
-        assert datetime_.to_tzaware_datetime(pd.Timestamp('2020-01-01').value) == \
-               _datetime(2020, 1, 1).replace(tzinfo=datetime_.get_utc_tz())
-        assert datetime_.to_tzaware_datetime('2020-01-01') == \
-               _datetime(2020, 1, 1).replace(tzinfo=datetime_.get_local_tz())
-        assert datetime_.to_tzaware_datetime(pd.Timestamp('2020-01-01')) == \
-               _datetime(2020, 1, 1).replace(tzinfo=datetime_.get_local_tz())
-        assert datetime_.to_tzaware_datetime(pd.Timestamp('2020-01-01', tz=datetime_.get_utc_tz())) == \
-               _datetime(2020, 1, 1).replace(tzinfo=datetime_.get_utc_tz())
-        assert datetime_.to_tzaware_datetime(_datetime(2020, 1, 1)) == \
-               _datetime(2020, 1, 1).replace(tzinfo=datetime_.get_local_tz())
-        assert datetime_.to_tzaware_datetime(_datetime(2020, 1, 1, tzinfo=datetime_.get_utc_tz())) == \
-               _datetime(2020, 1, 1).replace(tzinfo=datetime_.get_utc_tz())
+        assert datetime_.to_tzaware_datetime(0.5) == _datetime(
+            1970,
+            1,
+            1,
+            0,
+            0,
+            0,
+            500000,
+            tzinfo=datetime_.get_utc_tz(),
+        )
+        assert datetime_.to_tzaware_datetime(0) == _datetime(1970, 1, 1, 0, 0, 0, 0, tzinfo=datetime_.get_utc_tz())
+        assert datetime_.to_tzaware_datetime(pd.Timestamp("2020-01-01").value) == _datetime(2020, 1, 1).replace(
+            tzinfo=datetime_.get_utc_tz()
+        )
+        assert datetime_.to_tzaware_datetime("2020-01-01") == _datetime(2020, 1, 1).replace(
+            tzinfo=datetime_.get_local_tz()
+        )
+        assert datetime_.to_tzaware_datetime(pd.Timestamp("2020-01-01")) == _datetime(2020, 1, 1).replace(
+            tzinfo=datetime_.get_local_tz()
+        )
+        assert datetime_.to_tzaware_datetime(pd.Timestamp("2020-01-01", tz=datetime_.get_utc_tz())) == _datetime(
+            2020,
+            1,
+            1,
+        ).replace(tzinfo=datetime_.get_utc_tz())
+        assert datetime_.to_tzaware_datetime(_datetime(2020, 1, 1)) == _datetime(2020, 1, 1).replace(
+            tzinfo=datetime_.get_local_tz()
+        )
+        assert datetime_.to_tzaware_datetime(_datetime(2020, 1, 1, tzinfo=datetime_.get_utc_tz())) == _datetime(
+            2020,
+            1,
+            1,
+        ).replace(tzinfo=datetime_.get_utc_tz())
         assert datetime_.to_tzaware_datetime(
-            _datetime(2020, 1, 1, 12, 0, 0, tzinfo=datetime_.get_utc_tz()), tz=datetime_.get_local_tz()) == \
-               _datetime(2020, 1, 1, 12, 0, 0, tzinfo=datetime_.get_utc_tz()).astimezone(datetime_.get_local_tz())
+            _datetime(2020, 1, 1, 12, 0, 0, tzinfo=datetime_.get_utc_tz()),
+            tz=datetime_.get_local_tz(),
+        ) == _datetime(2020, 1, 1, 12, 0, 0, tzinfo=datetime_.get_utc_tz()).astimezone(datetime_.get_local_tz())
         with pytest.raises(Exception):
-            datetime_.to_tzaware_datetime('2020-01-001')
+            datetime_.to_tzaware_datetime("2020-01-001")
 
     def test_datetime_to_ms(self):
-        assert datetime_.datetime_to_ms(_datetime(2020, 1, 1)) == \
-               1577836800000 - _datetime(2020, 1, 1).astimezone(None).utcoffset().total_seconds() * 1000
+        assert (
+            datetime_.datetime_to_ms(_datetime(2020, 1, 1))
+            == 1577836800000 - _datetime(2020, 1, 1).astimezone(None).utcoffset().total_seconds() * 1000
+        )
         assert datetime_.datetime_to_ms(_datetime(2020, 1, 1, tzinfo=datetime_.get_utc_tz())) == 1577836800000
 
 
@@ -2026,56 +1911,58 @@ class TestScheduleManager:
         manager = schedule_.ScheduleManager()
         job = manager.every()
         assert job.interval == 1
-        assert job.unit == 'seconds'
+        assert job.unit == "seconds"
         assert job.at_time is None
         assert job.start_day is None
 
-        job = manager.every(10, 'minutes')
+        job = manager.every(10, "minutes")
         assert job.interval == 10
-        assert job.unit == 'minutes'
+        assert job.unit == "minutes"
         assert job.at_time is None
         assert job.start_day is None
 
-        job = manager.every('hour')
+        job = manager.every("hour")
         assert job.interval == 1
-        assert job.unit == 'hours'
+        assert job.unit == "hours"
         assert job.at_time is None
         assert job.start_day is None
 
-        job = manager.every('10:30')
+        job = manager.every("10:30")
         assert job.interval == 1
-        assert job.unit == 'days'
+        assert job.unit == "days"
         assert job.at_time == _time(10, 30)
         assert job.start_day is None
 
-        job = manager.every('day', '10:30')
+        job = manager.every("day", "10:30")
         assert job.interval == 1
-        assert job.unit == 'days'
+        assert job.unit == "days"
         assert job.at_time == _time(10, 30)
         assert job.start_day is None
 
-        job = manager.every('day', _time(9, 30, tzinfo=datetime_.get_utc_tz()))
+        job = manager.every("day", _time(9, 30, tzinfo=datetime_.get_utc_tz()))
         assert job.interval == 1
-        assert job.unit == 'days'
+        assert job.unit == "days"
         assert job.at_time == datetime_.tzaware_to_naive_time(
-            _time(9, 30, tzinfo=datetime_.get_utc_tz()), datetime_.get_local_tz())
+            _time(9, 30, tzinfo=datetime_.get_utc_tz()),
+            datetime_.get_local_tz(),
+        )
         assert job.start_day is None
 
-        job = manager.every('monday')
+        job = manager.every("monday")
         assert job.interval == 1
-        assert job.unit == 'weeks'
+        assert job.unit == "weeks"
         assert job.at_time is None
-        assert job.start_day == 'monday'
+        assert job.start_day == "monday"
 
-        job = manager.every('wednesday', '13:15')
+        job = manager.every("wednesday", "13:15")
         assert job.interval == 1
-        assert job.unit == 'weeks'
+        assert job.unit == "weeks"
         assert job.at_time == _time(13, 15)
-        assert job.start_day == 'wednesday'
+        assert job.start_day == "wednesday"
 
-        job = manager.every('minute', ':17')
+        job = manager.every("minute", ":17")
         assert job.interval == 1
-        assert job.unit == 'minutes'
+        assert job.unit == "minutes"
         assert job.at_time == _time(0, 0, 17)
         assert job.start_day is None
 
@@ -2083,28 +1970,28 @@ class TestScheduleManager:
         kwargs = dict(call_count=0)
 
         def job_func(kwargs):
-            kwargs['call_count'] += 1
-            if kwargs['call_count'] == 5:
+            kwargs["call_count"] += 1
+            if kwargs["call_count"] == 5:
                 raise KeyboardInterrupt
 
         manager = schedule_.ScheduleManager()
         manager.every().do(job_func, kwargs)
         manager.start()
-        assert kwargs['call_count'] == 5
+        assert kwargs["call_count"] == 5
 
     def test_async_start(self):
         kwargs = dict(call_count=0)
 
         def job_func(kwargs):
-            kwargs['call_count'] += 1
-            if kwargs['call_count'] == 5:
+            kwargs["call_count"] += 1
+            if kwargs["call_count"] == 5:
                 raise schedule_.CancelledError
 
         manager = schedule_.ScheduleManager()
         manager.every().do(job_func, kwargs)
         loop = asyncio.get_event_loop()
         loop.run_until_complete(manager.async_start())
-        assert kwargs['call_count'] == 5
+        assert kwargs["call_count"] == 5
 
 
 # ############# tagging.py ############# #
@@ -2112,12 +1999,12 @@ class TestScheduleManager:
 
 class TestTags:
     def test_match_tags(self):
-        assert tagging.match_tags('hello', 'hello')
-        assert not tagging.match_tags('hello', 'world')
-        assert tagging.match_tags(['hello', 'world'], 'world')
-        assert tagging.match_tags('hello', ['hello', 'world'])
-        assert tagging.match_tags('hello and world', ['hello', 'world'])
-        assert not tagging.match_tags('hello and not world', ['hello', 'world'])
+        assert tagging.match_tags("hello", "hello")
+        assert not tagging.match_tags("hello", "world")
+        assert tagging.match_tags(["hello", "world"], "world")
+        assert tagging.match_tags("hello", ["hello", "world"])
+        assert tagging.match_tags("hello and world", ["hello", "world"])
+        assert not tagging.match_tags("hello and not world", ["hello", "world"])
 
 
 # ############# template.py ############# #
@@ -2125,54 +2012,55 @@ class TestTags:
 
 class TestTemplate:
     def test_sub(self):
-        assert template.Sub('$hello$world', {'hello': 100}).substitute({'world': 300}) == '100300'
-        assert template.Sub('$hello$world', {'hello': 100}).substitute({'hello': 200, 'world': 300}) == '200300'
+        assert template.Sub("$hello$world", {"hello": 100}).substitute({"world": 300}) == "100300"
+        assert template.Sub("$hello$world", {"hello": 100}).substitute({"hello": 200, "world": 300}) == "200300"
 
     def test_rep(self):
-        assert template.Rep('hello', {'hello': 100}).substitute() == 100
-        assert template.Rep('hello', {'hello': 100}).substitute({'hello': 200}) == 200
+        assert template.Rep("hello", {"hello": 100}).substitute() == 100
+        assert template.Rep("hello", {"hello": 100}).substitute({"hello": 200}) == 200
 
     def test_repeval(self):
-        assert template.RepEval('hello == 100', {'hello': 100}).substitute()
-        assert not template.RepEval('hello == 100', {'hello': 100}).substitute({'hello': 200})
+        assert template.RepEval("hello == 100", {"hello": 100}).substitute()
+        assert not template.RepEval("hello == 100", {"hello": 100}).substitute({"hello": 200})
 
     def test_repfunc(self):
-        assert template.RepFunc(lambda hello: hello == 100, {'hello': 100}).substitute()
-        assert not template.RepFunc(lambda hello: hello == 100, {'hello': 100}).substitute({'hello': 200})
+        assert template.RepFunc(lambda hello: hello == 100, {"hello": 100}).substitute()
+        assert not template.RepFunc(lambda hello: hello == 100, {"hello": 100}).substitute({"hello": 200})
 
     def test_deep_substitute(self):
-        assert template.deep_substitute(template.Rep('hello'), {'hello': 100}) == 100
+        assert template.deep_substitute(template.Rep("hello"), {"hello": 100}) == 100
         with pytest.raises(Exception):
-            template.deep_substitute(template.Rep('hello2'), {'hello': 100})
-        assert isinstance(template.deep_substitute(template.Rep('hello2'), {'hello': 100}, strict=False), template.Rep)
-        assert template.deep_substitute(template.Sub('$hello'), {'hello': 100}) == '100'
+            template.deep_substitute(template.Rep("hello2"), {"hello": 100})
+        assert isinstance(template.deep_substitute(template.Rep("hello2"), {"hello": 100}, strict=False), template.Rep)
+        assert template.deep_substitute(template.Sub("$hello"), {"hello": 100}) == "100"
         with pytest.raises(Exception):
-            template.deep_substitute(template.Sub('$hello2'), {'hello': 100})
-        assert template.deep_substitute([template.Rep('hello')], {'hello': 100}) == [100]
-        assert template.deep_substitute((template.Rep('hello'),), {'hello': 100}) == (100,)
-        assert template.deep_substitute({'test': template.Rep('hello')}, {'hello': 100}) == {'test': 100}
-        Tup = namedtuple('Tup', ['a'])
-        tup = Tup(template.Rep('hello'))
-        assert template.deep_substitute(tup, {'hello': 100}) == Tup(100)
+            template.deep_substitute(template.Sub("$hello2"), {"hello": 100})
+        assert template.deep_substitute([template.Rep("hello")], {"hello": 100}) == [100]
+        assert template.deep_substitute((template.Rep("hello"),), {"hello": 100}) == (100,)
+        assert template.deep_substitute({"test": template.Rep("hello")}, {"hello": 100}) == {"test": 100}
+        Tup = namedtuple("Tup", ["a"])
+        tup = Tup(template.Rep("hello"))
+        assert template.deep_substitute(tup, {"hello": 100}) == Tup(100)
 
 
 # ############# parsing.py ############# #
+
 
 class TestParsing:
     def test_get_func_kwargs(self):
         def f(a, *args, b=2, **kwargs):
             pass
 
-        assert parsing.get_func_kwargs(f) == {'b': 2}
+        assert parsing.get_func_kwargs(f) == {"b": 2}
 
     def test_get_func_arg_names(self):
         def f(a, *args, b=2, **kwargs):
             pass
 
-        assert parsing.get_func_arg_names(f) == ['a', 'b']
+        assert parsing.get_func_arg_names(f) == ["a", "b"]
 
     def test_get_expr_var_names(self):
-        assert parsing.get_expr_var_names('d = (a + b) / c') == ['d', 'c', 'a', 'b']
+        assert parsing.get_expr_var_names("d = (a + b) / c") == ["d", "c", "a", "b"]
 
     def test_annotate_args(self):
         def f(a, *args, b=2, **kwargs):
@@ -2181,78 +2069,42 @@ class TestParsing:
         with pytest.raises(Exception):
             parsing.annotate_args(f, (), {})
         assert parsing.annotate_args(f, (1,), {}) == dict(
-            a={
-                'kind': inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                'value': 1
-            },
-            args={
-                'kind': inspect.Parameter.VAR_POSITIONAL,
-                'value': ()
-            },
-            b={
-                'kind': inspect.Parameter.KEYWORD_ONLY,
-                'value': 2
-            },
-            kwargs={
-                'kind': inspect.Parameter.VAR_KEYWORD,
-                'value': {}
-            }
+            a={"kind": inspect.Parameter.POSITIONAL_OR_KEYWORD, "value": 1},
+            args={"kind": inspect.Parameter.VAR_POSITIONAL, "value": ()},
+            b={"kind": inspect.Parameter.KEYWORD_ONLY, "value": 2},
+            kwargs={"kind": inspect.Parameter.VAR_KEYWORD, "value": {}},
         )
         assert parsing.annotate_args(f, (1,), {}, only_passed=True) == dict(
-            a={
-                'kind': inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                'value': 1
-            }
+            a={"kind": inspect.Parameter.POSITIONAL_OR_KEYWORD, "value": 1},
         )
         assert parsing.annotate_args(f, (1, 2, 3), {}) == dict(
-            a={
-                'kind': inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                'value': 1
-            },
-            args={
-                'kind': inspect.Parameter.VAR_POSITIONAL,
-                'value': (2, 3)
-            },
-            b={
-                'kind': inspect.Parameter.KEYWORD_ONLY,
-                'value': 2
-            },
-            kwargs={
-                'kind': inspect.Parameter.VAR_KEYWORD,
-                'value': {}
-            }
+            a={"kind": inspect.Parameter.POSITIONAL_OR_KEYWORD, "value": 1},
+            args={"kind": inspect.Parameter.VAR_POSITIONAL, "value": (2, 3)},
+            b={"kind": inspect.Parameter.KEYWORD_ONLY, "value": 2},
+            kwargs={"kind": inspect.Parameter.VAR_KEYWORD, "value": {}},
         )
 
         def f2(a, b=2, **kwargs):
             pass
 
         assert parsing.annotate_args(f2, (1, 2), dict(c=3)) == dict(
-            a={
-                'kind': inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                'value': 1
-            },
-            b={
-                'kind': inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                'value': 2
-            },
-            kwargs={
-                'kind': inspect.Parameter.VAR_KEYWORD,
-                'value': dict(c=3)
-            }
+            a={"kind": inspect.Parameter.POSITIONAL_OR_KEYWORD, "value": 1},
+            b={"kind": inspect.Parameter.POSITIONAL_OR_KEYWORD, "value": 2},
+            kwargs={"kind": inspect.Parameter.VAR_KEYWORD, "value": dict(c=3)},
         )
 
     def test_ann_args_to_args(self):
         def f(a, *args, b=2, **kwargs):
             pass
 
-        assert parsing.ann_args_to_args(parsing.annotate_args(f, (1,), {})) == ((1,), {'b': 2})
+        assert parsing.ann_args_to_args(parsing.annotate_args(f, (1,), {})) == ((1,), {"b": 2})
         assert parsing.ann_args_to_args(parsing.annotate_args(f, (1,), {}, only_passed=True)) == ((1,), {})
-        assert parsing.ann_args_to_args(parsing.annotate_args(f, (1, 2, 3), {})) == ((1, 2, 3), {'b': 2})
+        assert parsing.ann_args_to_args(parsing.annotate_args(f, (1, 2, 3), {})) == ((1, 2, 3), {"b": 2})
 
         def f2(a, b=2, **kwargs):
             pass
 
-        assert parsing.ann_args_to_args(parsing.annotate_args(f2, (1, 2), dict(c=3))) == ((1, 2), {'c': 3})
+        assert parsing.ann_args_to_args(parsing.annotate_args(f2, (1, 2), dict(c=3))) == ((1, 2), {"c": 3})
 
     def test_match_ann_arg(self):
         def f(a, *args, b=2, **kwargs):
@@ -2264,17 +2116,17 @@ class TestParsing:
         ann_args = parsing.annotate_args(f, (0, 1), dict(c=3))
 
         assert parsing.match_ann_arg(ann_args, 0) == 0
-        assert parsing.match_ann_arg(ann_args, 'a') == 0
+        assert parsing.match_ann_arg(ann_args, "a") == 0
         assert parsing.match_ann_arg(ann_args, 1) == 1
         assert parsing.match_ann_arg(ann_args, 2) == 2
-        assert parsing.match_ann_arg(ann_args, 'b') == 2
-        assert parsing.match_ann_arg(ann_args, parsing.Regex('(a|b)')) == 0
+        assert parsing.match_ann_arg(ann_args, "b") == 2
+        assert parsing.match_ann_arg(ann_args, parsing.Regex("(a|b)")) == 0
         assert parsing.match_ann_arg(ann_args, 3) == 3
-        assert parsing.match_ann_arg(ann_args, 'c') == 3
+        assert parsing.match_ann_arg(ann_args, "c") == 3
         with pytest.raises(Exception):
             parsing.match_ann_arg(ann_args, 4)
         with pytest.raises(Exception):
-            parsing.match_ann_arg(ann_args, 'd')
+            parsing.match_ann_arg(ann_args, "d")
 
     def test_ignore_flat_ann_args(self):
         def f(a, *args, b=2, **kwargs):
@@ -2284,8 +2136,8 @@ class TestParsing:
 
         flat_ann_args = parsing.flatten_ann_args(ann_args)
         assert parsing.ignore_flat_ann_args(flat_ann_args, [0]) == flat_ann_args[1:]
-        assert parsing.ignore_flat_ann_args(flat_ann_args, ['a']) == flat_ann_args[1:]
-        assert parsing.ignore_flat_ann_args(flat_ann_args, [parsing.Regex('a')]) == flat_ann_args[2:]
+        assert parsing.ignore_flat_ann_args(flat_ann_args, ["a"]) == flat_ann_args[1:]
+        assert parsing.ignore_flat_ann_args(flat_ann_args, [parsing.Regex("a")]) == flat_ann_args[2:]
 
     def test_hash_args(self):
         def f(a, *args, b=2, **kwargs):
@@ -2293,23 +2145,25 @@ class TestParsing:
 
         with pytest.raises(Exception):
             parsing.hash_args(f, (0, 1), dict(c=np.array([1, 2, 3])))
-        parsing.hash_args(f, (0, 1), dict(c=np.array([1, 2, 3])), ignore_args=['c'])
+        parsing.hash_args(f, (0, 1), dict(c=np.array([1, 2, 3])), ignore_args=["c"])
 
     def test_get_context_vars(self):
         a = 1
         b = 2
-        assert parsing.get_context_vars(['a', 'b']) == [1, 2]
+        assert parsing.get_context_vars(["a", "b"]) == [1, 2]
         with pytest.raises(Exception):
-            parsing.get_context_vars(['a', 'b', 'c'])
-        assert parsing.get_context_vars(['c', 'd', 'e'], local_dict=dict(c=1, d=2, e=3)) == [1, 2, 3]
-        assert parsing.get_context_vars(['c', 'd', 'e'], global_dict=dict(c=1, d=2, e=3)) == [1, 2, 3]
+            parsing.get_context_vars(["a", "b", "c"])
+        assert parsing.get_context_vars(["c", "d", "e"], local_dict=dict(c=1, d=2, e=3)) == [1, 2, 3]
+        assert parsing.get_context_vars(["c", "d", "e"], global_dict=dict(c=1, d=2, e=3)) == [1, 2, 3]
 
 
 # ############# execution.py ############# #
 
+
 class TestExecution:
     def test_get_ray_refs(self):
         if ray_available:
+
             def f1(*args, **kwargs):
                 pass
 
@@ -2338,12 +2192,12 @@ class TestExecution:
             assert args_refs[0][2] is not args_refs[1][2]
             assert args_refs[0][2] is not args_refs[2][2]
             kwargs_refs = list(zip(*funcs_args_refs))[2]
-            assert kwargs_refs[0]['a'] is not kwargs_refs[1]['a']
-            assert kwargs_refs[0]['a'] is not kwargs_refs[2]['a']
-            assert kwargs_refs[0]['b'] is not kwargs_refs[1]['b']
-            assert kwargs_refs[0]['b'] is not kwargs_refs[2]['b']
-            assert kwargs_refs[0]['c'] is not kwargs_refs[1]['c']
-            assert kwargs_refs[0]['c'] is not kwargs_refs[2]['c']
+            assert kwargs_refs[0]["a"] is not kwargs_refs[1]["a"]
+            assert kwargs_refs[0]["a"] is not kwargs_refs[2]["a"]
+            assert kwargs_refs[0]["b"] is not kwargs_refs[1]["b"]
+            assert kwargs_refs[0]["b"] is not kwargs_refs[2]["b"]
+            assert kwargs_refs[0]["c"] is not kwargs_refs[1]["c"]
+            assert kwargs_refs[0]["c"] is not kwargs_refs[2]["c"]
 
             funcs_args_refs = execution.RayEngine.get_ray_refs(funcs_args, reuse_refs=True)
             func_refs = list(zip(*funcs_args_refs))[0]
@@ -2357,12 +2211,12 @@ class TestExecution:
             assert args_refs[0][2] is not args_refs[1][2]
             assert args_refs[0][2] is args_refs[2][2]
             kwargs_refs = list(zip(*funcs_args_refs))[2]
-            assert kwargs_refs[0]['a'] is not kwargs_refs[1]['a']
-            assert kwargs_refs[0]['a'] is kwargs_refs[2]['a']
-            assert kwargs_refs[0]['b'] is not kwargs_refs[1]['b']
-            assert kwargs_refs[0]['b'] is kwargs_refs[2]['b']
-            assert kwargs_refs[0]['c'] is not kwargs_refs[1]['c']
-            assert kwargs_refs[0]['c'] is kwargs_refs[2]['c']
+            assert kwargs_refs[0]["a"] is not kwargs_refs[1]["a"]
+            assert kwargs_refs[0]["a"] is kwargs_refs[2]["a"]
+            assert kwargs_refs[0]["b"] is not kwargs_refs[1]["b"]
+            assert kwargs_refs[0]["b"] is kwargs_refs[2]["b"]
+            assert kwargs_refs[0]["c"] is not kwargs_refs[1]["c"]
+            assert kwargs_refs[0]["c"] is kwargs_refs[2]["c"]
 
             assert funcs_args_refs == execution.RayEngine.get_ray_refs(funcs_args_refs)
 
@@ -2373,24 +2227,23 @@ class TestExecution:
         funcs_args = [
             (f, (0, 1, 2), dict(b=3, c=4)),
             (f, (5, 6, 7), dict(b=8, c=9)),
-            (f, (10, 11, 12), dict(b=13, c=14))
+            (f, (10, 11, 12), dict(b=13, c=14)),
         ]
         assert execution.execute(funcs_args, show_progress=True) == [10, 35, 60]
-        assert execution.execute(funcs_args, engine='sequence', show_progress=True) == [10, 35, 60]
+        assert execution.execute(funcs_args, engine="sequence", show_progress=True) == [10, 35, 60]
         assert execution.execute(funcs_args, engine=execution.SequenceEngine, show_progress=True) == [10, 35, 60]
         assert execution.execute(funcs_args, engine=execution.SequenceEngine(show_progress=True)) == [10, 35, 60]
         assert execution.execute(
             funcs_args,
-            engine=lambda funcs_args, my_arg:
-            [func(*args, **kwargs) * my_arg for func, args, kwargs in funcs_args],
-            my_arg=100
+            engine=lambda funcs_args, my_arg: [func(*args, **kwargs) * my_arg for func, args, kwargs in funcs_args],
+            my_arg=100,
         ) == [1000, 3500, 6000]
         with pytest.raises(Exception):
             execution.execute(funcs_args, engine=object)
         if dask_available:
-            assert execution.execute(funcs_args, engine='dask') == [10, 35, 60]
+            assert execution.execute(funcs_args, engine="dask") == [10, 35, 60]
         if ray_available:
-            assert execution.execute(funcs_args, engine='ray') == [10, 35, 60]
+            assert execution.execute(funcs_args, engine="ray") == [10, 35, 60]
 
     def test_execute_chunks(self):
         def f(a, *args, b=None, **kwargs):
@@ -2399,50 +2252,84 @@ class TestExecution:
         funcs_args = [
             (f, (0, 1, 2), dict(b=3, c=4)),
             (f, (5, 6, 7), dict(b=8, c=9)),
-            (f, (10, 11, 12), dict(b=13, c=14))
+            (f, (10, 11, 12), dict(b=13, c=14)),
         ]
 
-        assert execution.execute(funcs_args, chunk_meta=[
-            chunking.ChunkMeta(uuid='', idx=0, start=0, end=1, indices=None),
-            chunking.ChunkMeta(uuid='', idx=1, start=1, end=3, indices=None)
-        ]) == [10, 35, 60]
-        assert execution.execute(funcs_args, chunk_meta=[
-            chunking.ChunkMeta(uuid='', idx=1, start=1, end=3, indices=None),
-            chunking.ChunkMeta(uuid='', idx=0, start=0, end=1, indices=None)
-        ]) == [10, 35, 60]
-        assert execution.execute(funcs_args, chunk_meta=[
-            chunking.ChunkMeta(uuid='', idx=1, start=1, end=3, indices=None),
-            chunking.ChunkMeta(uuid='', idx=0, start=0, end=1, indices=None)
-        ], in_chunk_order=True) == [35, 60, 10]
-        assert execution.execute(funcs_args, chunk_meta=[
-            chunking.ChunkMeta(uuid='', idx=1, start=None, end=None, indices=[0]),
-            chunking.ChunkMeta(uuid='', idx=0, start=None, end=None, indices=[1, 2])
-        ]) == [10, 35, 60]
-        assert execution.execute(funcs_args, chunk_meta=[
-            chunking.ChunkMeta(uuid='', idx=1, start=None, end=None, indices=[2, 1]),
-            chunking.ChunkMeta(uuid='', idx=0, start=None, end=None, indices=[0])
-        ], in_chunk_order=True) == [60, 35, 10]
+        assert execution.execute(
+            funcs_args,
+            chunk_meta=[
+                chunking.ChunkMeta(uuid="", idx=0, start=0, end=1, indices=None),
+                chunking.ChunkMeta(uuid="", idx=1, start=1, end=3, indices=None),
+            ],
+        ) == [10, 35, 60]
+        assert execution.execute(
+            funcs_args,
+            chunk_meta=[
+                chunking.ChunkMeta(uuid="", idx=1, start=1, end=3, indices=None),
+                chunking.ChunkMeta(uuid="", idx=0, start=0, end=1, indices=None),
+            ],
+        ) == [10, 35, 60]
+        assert execution.execute(
+            funcs_args,
+            chunk_meta=[
+                chunking.ChunkMeta(uuid="", idx=1, start=1, end=3, indices=None),
+                chunking.ChunkMeta(uuid="", idx=0, start=0, end=1, indices=None),
+            ],
+            in_chunk_order=True,
+        ) == [35, 60, 10]
+        assert execution.execute(
+            funcs_args,
+            chunk_meta=[
+                chunking.ChunkMeta(uuid="", idx=1, start=None, end=None, indices=[0]),
+                chunking.ChunkMeta(uuid="", idx=0, start=None, end=None, indices=[1, 2]),
+            ],
+        ) == [10, 35, 60]
+        assert execution.execute(
+            funcs_args,
+            chunk_meta=[
+                chunking.ChunkMeta(uuid="", idx=1, start=None, end=None, indices=[2, 1]),
+                chunking.ChunkMeta(uuid="", idx=0, start=None, end=None, indices=[0]),
+            ],
+            in_chunk_order=True,
+        ) == [60, 35, 10]
 
-        assert execution.execute(iter(funcs_args), chunk_meta=[
-            chunking.ChunkMeta(uuid='', idx=0, start=0, end=1, indices=None),
-            chunking.ChunkMeta(uuid='', idx=1, start=1, end=3, indices=None)
-        ]) == [10, 35, 60]
-        assert execution.execute(iter(funcs_args), chunk_meta=[
-            chunking.ChunkMeta(uuid='', idx=1, start=1, end=3, indices=None),
-            chunking.ChunkMeta(uuid='', idx=0, start=0, end=1, indices=None)
-        ]) == [10, 35, 60]
-        assert execution.execute(iter(funcs_args), chunk_meta=[
-            chunking.ChunkMeta(uuid='', idx=1, start=1, end=3, indices=None),
-            chunking.ChunkMeta(uuid='', idx=0, start=0, end=1, indices=None)
-        ], in_chunk_order=True) == [35, 60, 10]
-        assert execution.execute(iter(funcs_args), chunk_meta=[
-            chunking.ChunkMeta(uuid='', idx=1, start=None, end=None, indices=[0]),
-            chunking.ChunkMeta(uuid='', idx=0, start=None, end=None, indices=[1, 2])
-        ]) == [10, 35, 60]
-        assert execution.execute(iter(funcs_args), chunk_meta=[
-            chunking.ChunkMeta(uuid='', idx=1, start=None, end=None, indices=[2, 1]),
-            chunking.ChunkMeta(uuid='', idx=0, start=None, end=None, indices=[0])
-        ], in_chunk_order=True) == [60, 35, 10]
+        assert execution.execute(
+            iter(funcs_args),
+            chunk_meta=[
+                chunking.ChunkMeta(uuid="", idx=0, start=0, end=1, indices=None),
+                chunking.ChunkMeta(uuid="", idx=1, start=1, end=3, indices=None),
+            ],
+        ) == [10, 35, 60]
+        assert execution.execute(
+            iter(funcs_args),
+            chunk_meta=[
+                chunking.ChunkMeta(uuid="", idx=1, start=1, end=3, indices=None),
+                chunking.ChunkMeta(uuid="", idx=0, start=0, end=1, indices=None),
+            ],
+        ) == [10, 35, 60]
+        assert execution.execute(
+            iter(funcs_args),
+            chunk_meta=[
+                chunking.ChunkMeta(uuid="", idx=1, start=1, end=3, indices=None),
+                chunking.ChunkMeta(uuid="", idx=0, start=0, end=1, indices=None),
+            ],
+            in_chunk_order=True,
+        ) == [35, 60, 10]
+        assert execution.execute(
+            iter(funcs_args),
+            chunk_meta=[
+                chunking.ChunkMeta(uuid="", idx=1, start=None, end=None, indices=[0]),
+                chunking.ChunkMeta(uuid="", idx=0, start=None, end=None, indices=[1, 2]),
+            ],
+        ) == [10, 35, 60]
+        assert execution.execute(
+            iter(funcs_args),
+            chunk_meta=[
+                chunking.ChunkMeta(uuid="", idx=1, start=None, end=None, indices=[2, 1]),
+                chunking.ChunkMeta(uuid="", idx=0, start=None, end=None, indices=[0]),
+            ],
+            in_chunk_order=True,
+        ) == [60, 35, 10]
 
         assert execution.execute(iter(funcs_args), n_chunks=1) == [10, 35, 60]
         assert execution.execute(iter(funcs_args), n_chunks=2) == [10, 35, 60]
@@ -2450,10 +2337,11 @@ class TestExecution:
         assert execution.execute(iter(funcs_args), chunk_len=1) == [10, 35, 60]
         assert execution.execute(iter(funcs_args), chunk_len=2) == [10, 35, 60]
         assert execution.execute(iter(funcs_args), chunk_len=3) == [10, 35, 60]
-        assert execution.execute(iter(funcs_args), chunk_len='auto') == [10, 35, 60]
+        assert execution.execute(iter(funcs_args), chunk_len="auto") == [10, 35, 60]
 
 
 # ############# chunking.py ############# #
+
 
 class TestChunking:
     def test_arg_getter_mixin(self):
@@ -2463,115 +2351,146 @@ class TestChunking:
         ann_args = parsing.annotate_args(f, (0, 1), dict(c=2))
 
         assert chunking.ArgGetter(0).get_arg(ann_args) == 0
-        assert chunking.ArgGetter('a').get_arg(ann_args) == 0
+        assert chunking.ArgGetter("a").get_arg(ann_args) == 0
         assert chunking.ArgGetter(1).get_arg(ann_args) == 1
         assert chunking.ArgGetter(2).get_arg(ann_args) is None
-        assert chunking.ArgGetter('b').get_arg(ann_args) is None
+        assert chunking.ArgGetter("b").get_arg(ann_args) is None
         assert chunking.ArgGetter(3).get_arg(ann_args) == 2
-        assert chunking.ArgGetter('c').get_arg(ann_args) == 2
+        assert chunking.ArgGetter("c").get_arg(ann_args) == 2
         with pytest.raises(Exception):
             chunking.ArgGetter(4).get_arg(ann_args)
         with pytest.raises(Exception):
-            chunking.ArgGetter('d').get_arg(ann_args)
+            chunking.ArgGetter("d").get_arg(ann_args)
 
     def test_sizers(self):
         def f(a):
             pass
 
         ann_args = parsing.annotate_args(f, (10,), {})
-        assert chunking.ArgSizer(arg_query='a').apply(ann_args) == 10
+        assert chunking.ArgSizer(arg_query="a").apply(ann_args) == 10
 
         ann_args = parsing.annotate_args(f, ([1, 2, 3],), {})
-        assert chunking.LenSizer(arg_query='a').apply(ann_args) == 3
+        assert chunking.LenSizer(arg_query="a").apply(ann_args) == 3
 
         ann_args = parsing.annotate_args(f, (3,), {})
-        assert chunking.LenSizer(arg_query='a', single_type=int).apply(ann_args) == 1
+        assert chunking.LenSizer(arg_query="a", single_type=int).apply(ann_args) == 1
         with pytest.raises(Exception):
             chunking.LenSizer().apply(ann_args)
         with pytest.raises(Exception):
-            chunking.LenSizer(arg_query='a').apply(ann_args)
+            chunking.LenSizer(arg_query="a").apply(ann_args)
 
         ann_args = parsing.annotate_args(f, ((2, 3),), {})
         with pytest.raises(Exception):
             chunking.ShapeSizer().apply(ann_args)
         with pytest.raises(Exception):
-            chunking.ShapeSizer(arg_query='a').apply(ann_args)
-        assert chunking.ShapeSizer(arg_query='a', axis=0).apply(ann_args) == 2
-        assert chunking.ShapeSizer(arg_query='a', axis=1).apply(ann_args) == 3
-        assert chunking.ShapeSizer(arg_query='a', axis=2).apply(ann_args) == 0
+            chunking.ShapeSizer(arg_query="a").apply(ann_args)
+        assert chunking.ShapeSizer(arg_query="a", axis=0).apply(ann_args) == 2
+        assert chunking.ShapeSizer(arg_query="a", axis=1).apply(ann_args) == 3
+        assert chunking.ShapeSizer(arg_query="a", axis=2).apply(ann_args) == 0
 
         ann_args = parsing.annotate_args(f, (np.empty((2, 3)),), {})
         with pytest.raises(Exception):
             chunking.ArraySizer().apply(ann_args)
         with pytest.raises(Exception):
-            chunking.ArraySizer(arg_query='a').apply(ann_args)
-        assert chunking.ArraySizer(arg_query='a', axis=0).apply(ann_args) == 2
-        assert chunking.ArraySizer(arg_query='a', axis=1).apply(ann_args) == 3
-        assert chunking.ArraySizer(arg_query='a', axis=2).apply(ann_args) == 0
+            chunking.ArraySizer(arg_query="a").apply(ann_args)
+        assert chunking.ArraySizer(arg_query="a", axis=0).apply(ann_args) == 2
+        assert chunking.ArraySizer(arg_query="a", axis=1).apply(ann_args) == 3
+        assert chunking.ArraySizer(arg_query="a", axis=2).apply(ann_args) == 0
 
     def test_yield_chunk_meta(self):
         with pytest.raises(Exception):
             list(chunking.yield_chunk_meta(n_chunks=0))
 
-        chunk_meta_equal(list(chunking.yield_chunk_meta(n_chunks=4)), [
-            chunking.ChunkMeta(uuid='', idx=0, start=None, end=None, indices=None),
-            chunking.ChunkMeta(uuid='', idx=1, start=None, end=None, indices=None),
-            chunking.ChunkMeta(uuid='', idx=2, start=None, end=None, indices=None),
-            chunking.ChunkMeta(uuid='', idx=3, start=None, end=None, indices=None)
-        ])
-        chunk_meta_equal(list(chunking.yield_chunk_meta(n_chunks=1, size=4)), [
-            chunking.ChunkMeta(uuid='', idx=0, start=0, end=4, indices=None)
-        ])
-        chunk_meta_equal(list(chunking.yield_chunk_meta(n_chunks=2, size=4)), [
-            chunking.ChunkMeta(uuid='', idx=0, start=0, end=2, indices=None),
-            chunking.ChunkMeta(uuid='', idx=1, start=2, end=4, indices=None)
-        ])
-        chunk_meta_equal(list(chunking.yield_chunk_meta(n_chunks=3, size=4)), [
-            chunking.ChunkMeta(uuid='', idx=0, start=0, end=2, indices=None),
-            chunking.ChunkMeta(uuid='', idx=1, start=2, end=3, indices=None),
-            chunking.ChunkMeta(uuid='', idx=2, start=3, end=4, indices=None)
-        ])
-        chunk_meta_equal(list(chunking.yield_chunk_meta(n_chunks=4, size=4)), [
-            chunking.ChunkMeta(uuid='', idx=0, start=0, end=1, indices=None),
-            chunking.ChunkMeta(uuid='', idx=1, start=1, end=2, indices=None),
-            chunking.ChunkMeta(uuid='', idx=2, start=2, end=3, indices=None),
-            chunking.ChunkMeta(uuid='', idx=3, start=3, end=4, indices=None)
-        ])
-        chunk_meta_equal(list(chunking.yield_chunk_meta(n_chunks=5, size=4)), [
-            chunking.ChunkMeta(uuid='', idx=0, start=0, end=1, indices=None),
-            chunking.ChunkMeta(uuid='', idx=1, start=1, end=2, indices=None),
-            chunking.ChunkMeta(uuid='', idx=2, start=2, end=3, indices=None),
-            chunking.ChunkMeta(uuid='', idx=3, start=3, end=4, indices=None)
-        ])
+        chunk_meta_equal(
+            list(chunking.yield_chunk_meta(n_chunks=4)),
+            [
+                chunking.ChunkMeta(uuid="", idx=0, start=None, end=None, indices=None),
+                chunking.ChunkMeta(uuid="", idx=1, start=None, end=None, indices=None),
+                chunking.ChunkMeta(uuid="", idx=2, start=None, end=None, indices=None),
+                chunking.ChunkMeta(uuid="", idx=3, start=None, end=None, indices=None),
+            ],
+        )
+        chunk_meta_equal(
+            list(chunking.yield_chunk_meta(n_chunks=1, size=4)),
+            [chunking.ChunkMeta(uuid="", idx=0, start=0, end=4, indices=None)],
+        )
+        chunk_meta_equal(
+            list(chunking.yield_chunk_meta(n_chunks=2, size=4)),
+            [
+                chunking.ChunkMeta(uuid="", idx=0, start=0, end=2, indices=None),
+                chunking.ChunkMeta(uuid="", idx=1, start=2, end=4, indices=None),
+            ],
+        )
+        chunk_meta_equal(
+            list(chunking.yield_chunk_meta(n_chunks=3, size=4)),
+            [
+                chunking.ChunkMeta(uuid="", idx=0, start=0, end=2, indices=None),
+                chunking.ChunkMeta(uuid="", idx=1, start=2, end=3, indices=None),
+                chunking.ChunkMeta(uuid="", idx=2, start=3, end=4, indices=None),
+            ],
+        )
+        chunk_meta_equal(
+            list(chunking.yield_chunk_meta(n_chunks=4, size=4)),
+            [
+                chunking.ChunkMeta(uuid="", idx=0, start=0, end=1, indices=None),
+                chunking.ChunkMeta(uuid="", idx=1, start=1, end=2, indices=None),
+                chunking.ChunkMeta(uuid="", idx=2, start=2, end=3, indices=None),
+                chunking.ChunkMeta(uuid="", idx=3, start=3, end=4, indices=None),
+            ],
+        )
+        chunk_meta_equal(
+            list(chunking.yield_chunk_meta(n_chunks=5, size=4)),
+            [
+                chunking.ChunkMeta(uuid="", idx=0, start=0, end=1, indices=None),
+                chunking.ChunkMeta(uuid="", idx=1, start=1, end=2, indices=None),
+                chunking.ChunkMeta(uuid="", idx=2, start=2, end=3, indices=None),
+                chunking.ChunkMeta(uuid="", idx=3, start=3, end=4, indices=None),
+            ],
+        )
         with pytest.raises(Exception):
             list(chunking.yield_chunk_meta(chunk_len=0, size=4))
-        chunk_meta_equal(list(chunking.yield_chunk_meta(chunk_len=1, size=4)), [
-            chunking.ChunkMeta(uuid='', idx=0, start=0, end=1, indices=None),
-            chunking.ChunkMeta(uuid='', idx=1, start=1, end=2, indices=None),
-            chunking.ChunkMeta(uuid='', idx=2, start=2, end=3, indices=None),
-            chunking.ChunkMeta(uuid='', idx=3, start=3, end=4, indices=None)
-        ])
-        chunk_meta_equal(list(chunking.yield_chunk_meta(chunk_len=2, size=4)), [
-            chunking.ChunkMeta(uuid='', idx=0, start=0, end=2, indices=None),
-            chunking.ChunkMeta(uuid='', idx=1, start=2, end=4, indices=None)
-        ])
-        chunk_meta_equal(list(chunking.yield_chunk_meta(chunk_len=3, size=4)), [
-            chunking.ChunkMeta(uuid='', idx=0, start=0, end=3, indices=None),
-            chunking.ChunkMeta(uuid='', idx=1, start=3, end=4, indices=None)
-        ])
-        chunk_meta_equal(list(chunking.yield_chunk_meta(chunk_len=4, size=4)), [
-            chunking.ChunkMeta(uuid='', idx=0, start=0, end=4, indices=None)
-        ])
-        chunk_meta_equal(list(chunking.yield_chunk_meta(chunk_len=5, size=4)), [
-            chunking.ChunkMeta(uuid='', idx=0, start=0, end=4, indices=None)
-        ])
-        chunk_meta_equal(list(chunking.yield_chunk_meta(n_chunks=2, size=2, min_size=2)), [
-            chunking.ChunkMeta(uuid='', idx=0, start=0, end=1, indices=None),
-            chunking.ChunkMeta(uuid='', idx=1, start=1, end=2, indices=None)
-        ])
-        chunk_meta_equal(list(chunking.yield_chunk_meta(n_chunks=2, size=2, min_size=3)), [
-            chunking.ChunkMeta(uuid='', idx=0, start=0, end=2, indices=None)
-        ])
+        chunk_meta_equal(
+            list(chunking.yield_chunk_meta(chunk_len=1, size=4)),
+            [
+                chunking.ChunkMeta(uuid="", idx=0, start=0, end=1, indices=None),
+                chunking.ChunkMeta(uuid="", idx=1, start=1, end=2, indices=None),
+                chunking.ChunkMeta(uuid="", idx=2, start=2, end=3, indices=None),
+                chunking.ChunkMeta(uuid="", idx=3, start=3, end=4, indices=None),
+            ],
+        )
+        chunk_meta_equal(
+            list(chunking.yield_chunk_meta(chunk_len=2, size=4)),
+            [
+                chunking.ChunkMeta(uuid="", idx=0, start=0, end=2, indices=None),
+                chunking.ChunkMeta(uuid="", idx=1, start=2, end=4, indices=None),
+            ],
+        )
+        chunk_meta_equal(
+            list(chunking.yield_chunk_meta(chunk_len=3, size=4)),
+            [
+                chunking.ChunkMeta(uuid="", idx=0, start=0, end=3, indices=None),
+                chunking.ChunkMeta(uuid="", idx=1, start=3, end=4, indices=None),
+            ],
+        )
+        chunk_meta_equal(
+            list(chunking.yield_chunk_meta(chunk_len=4, size=4)),
+            [chunking.ChunkMeta(uuid="", idx=0, start=0, end=4, indices=None)],
+        )
+        chunk_meta_equal(
+            list(chunking.yield_chunk_meta(chunk_len=5, size=4)),
+            [chunking.ChunkMeta(uuid="", idx=0, start=0, end=4, indices=None)],
+        )
+        chunk_meta_equal(
+            list(chunking.yield_chunk_meta(n_chunks=2, size=2, min_size=2)),
+            [
+                chunking.ChunkMeta(uuid="", idx=0, start=0, end=1, indices=None),
+                chunking.ChunkMeta(uuid="", idx=1, start=1, end=2, indices=None),
+            ],
+        )
+        chunk_meta_equal(
+            list(chunking.yield_chunk_meta(n_chunks=2, size=2, min_size=3)),
+            [chunking.ChunkMeta(uuid="", idx=0, start=0, end=2, indices=None)],
+        )
         with pytest.raises(Exception):
             list(chunking.yield_chunk_meta(n_chunks=2, size=4, chunk_len=2))
 
@@ -2580,67 +2499,94 @@ class TestChunking:
             pass
 
         chunk_meta = [
-            chunking.ChunkMeta(uuid='', idx=0, start=0, end=1, indices=None),
-            chunking.ChunkMeta(uuid='', idx=1, start=1, end=3, indices=None),
-            chunking.ChunkMeta(uuid='', idx=2, start=3, end=6, indices=None)
+            chunking.ChunkMeta(uuid="", idx=0, start=0, end=1, indices=None),
+            chunking.ChunkMeta(uuid="", idx=1, start=1, end=3, indices=None),
+            chunking.ChunkMeta(uuid="", idx=2, start=3, end=6, indices=None),
         ]
         ann_args = parsing.annotate_args(f, (chunk_meta,), {})
-        chunk_meta_equal(list(chunking.ArgChunkMeta('a').get_chunk_meta(ann_args)), chunk_meta)
+        chunk_meta_equal(list(chunking.ArgChunkMeta("a").get_chunk_meta(ann_args)), chunk_meta)
 
         ann_args = parsing.annotate_args(f, ([1, 2, 3],), {})
-        chunk_meta_equal(list(chunking.LenChunkMeta('a').get_chunk_meta(ann_args)), chunk_meta)
+        chunk_meta_equal(list(chunking.LenChunkMeta("a").get_chunk_meta(ann_args)), chunk_meta)
 
     def test_get_chunk_meta_from_args(self):
         def f(a, *args, b=None, **kwargs):
             pass
 
         chunk_meta = [
-            chunking.ChunkMeta(uuid='', idx=0, start=0, end=1, indices=None),
-            chunking.ChunkMeta(uuid='', idx=1, start=1, end=2, indices=None),
-            chunking.ChunkMeta(uuid='', idx=2, start=2, end=3, indices=None)
+            chunking.ChunkMeta(uuid="", idx=0, start=0, end=1, indices=None),
+            chunking.ChunkMeta(uuid="", idx=1, start=1, end=2, indices=None),
+            chunking.ChunkMeta(uuid="", idx=2, start=2, end=3, indices=None),
         ]
 
         ann_args = parsing.annotate_args(f, (2, 3, 1), dict(b=[1, 2, 3]))
-        chunk_meta_equal(list(chunking.get_chunk_meta_from_args(
-            ann_args, size=3, n_chunks=3)), chunk_meta)
-        chunk_meta_equal(list(chunking.get_chunk_meta_from_args(
-            ann_args, size=3, n_chunks=lambda ann_args: ann_args['args']['value'][0])), chunk_meta)
-        chunk_meta_equal(list(chunking.get_chunk_meta_from_args(
-            ann_args, size=3, n_chunks=chunking.ArgSizer(arg_query=1))), chunk_meta)
+        chunk_meta_equal(list(chunking.get_chunk_meta_from_args(ann_args, size=3, n_chunks=3)), chunk_meta)
+        chunk_meta_equal(
+            list(
+                chunking.get_chunk_meta_from_args(
+                    ann_args,
+                    size=3,
+                    n_chunks=lambda ann_args: ann_args["args"]["value"][0],
+                )
+            ),
+            chunk_meta,
+        )
+        chunk_meta_equal(
+            list(chunking.get_chunk_meta_from_args(ann_args, size=3, n_chunks=chunking.ArgSizer(arg_query=1))),
+            chunk_meta,
+        )
         with pytest.raises(Exception):
-            list(chunking.get_chunk_meta_from_args(
-                ann_args, size=3, n_chunks='a'))
+            list(chunking.get_chunk_meta_from_args(ann_args, size=3, n_chunks="a"))
 
-        chunk_meta_equal(list(chunking.get_chunk_meta_from_args(
-            ann_args, chunk_len=1, size=3)), chunk_meta)
-        chunk_meta_equal(list(chunking.get_chunk_meta_from_args(
-            ann_args, chunk_len=1, size=lambda ann_args: ann_args['args']['value'][0])), chunk_meta)
-        chunk_meta_equal(list(chunking.get_chunk_meta_from_args(
-            ann_args, chunk_len=1, size=chunking.ArgSizer(arg_query=1))), chunk_meta)
+        chunk_meta_equal(list(chunking.get_chunk_meta_from_args(ann_args, chunk_len=1, size=3)), chunk_meta)
+        chunk_meta_equal(
+            list(
+                chunking.get_chunk_meta_from_args(
+                    ann_args,
+                    chunk_len=1,
+                    size=lambda ann_args: ann_args["args"]["value"][0],
+                )
+            ),
+            chunk_meta,
+        )
+        chunk_meta_equal(
+            list(chunking.get_chunk_meta_from_args(ann_args, chunk_len=1, size=chunking.ArgSizer(arg_query=1))),
+            chunk_meta,
+        )
         with pytest.raises(Exception):
-            list(chunking.get_chunk_meta_from_args(
-                ann_args, chunk_len=1, size='a'))
+            list(chunking.get_chunk_meta_from_args(ann_args, chunk_len=1, size="a"))
 
-        chunk_meta_equal(list(chunking.get_chunk_meta_from_args(
-            ann_args, size=3, chunk_len=1)), chunk_meta)
-        chunk_meta_equal(list(chunking.get_chunk_meta_from_args(
-            ann_args, size=3, chunk_len=lambda ann_args: ann_args['args']['value'][1])), chunk_meta)
-        chunk_meta_equal(list(chunking.get_chunk_meta_from_args(
-            ann_args, size=3, chunk_len=chunking.ArgSizer(arg_query=2))), chunk_meta)
+        chunk_meta_equal(list(chunking.get_chunk_meta_from_args(ann_args, size=3, chunk_len=1)), chunk_meta)
+        chunk_meta_equal(
+            list(
+                chunking.get_chunk_meta_from_args(
+                    ann_args,
+                    size=3,
+                    chunk_len=lambda ann_args: ann_args["args"]["value"][1],
+                )
+            ),
+            chunk_meta,
+        )
+        chunk_meta_equal(
+            list(chunking.get_chunk_meta_from_args(ann_args, size=3, chunk_len=chunking.ArgSizer(arg_query=2))),
+            chunk_meta,
+        )
         with pytest.raises(Exception):
-            list(chunking.get_chunk_meta_from_args(
-                ann_args, size=3, chunk_len='a'))
+            list(chunking.get_chunk_meta_from_args(ann_args, size=3, chunk_len="a"))
 
-        chunk_meta_equal(list(chunking.get_chunk_meta_from_args(
-            ann_args, chunk_meta=chunk_meta)), chunk_meta)
-        chunk_meta_equal(list(chunking.get_chunk_meta_from_args(
-            ann_args, chunk_meta=chunking.LenChunkMeta('b'))), [
-            chunking.ChunkMeta(uuid='', idx=0, start=0, end=1, indices=None),
-            chunking.ChunkMeta(uuid='', idx=1, start=1, end=3, indices=None),
-            chunking.ChunkMeta(uuid='', idx=2, start=3, end=6, indices=None)
-        ])
-        chunk_meta_equal(list(chunking.get_chunk_meta_from_args(
-            ann_args, chunk_meta=lambda ann_args: chunk_meta)), chunk_meta)
+        chunk_meta_equal(list(chunking.get_chunk_meta_from_args(ann_args, chunk_meta=chunk_meta)), chunk_meta)
+        chunk_meta_equal(
+            list(chunking.get_chunk_meta_from_args(ann_args, chunk_meta=chunking.LenChunkMeta("b"))),
+            [
+                chunking.ChunkMeta(uuid="", idx=0, start=0, end=1, indices=None),
+                chunking.ChunkMeta(uuid="", idx=1, start=1, end=3, indices=None),
+                chunking.ChunkMeta(uuid="", idx=2, start=3, end=6, indices=None),
+            ],
+        )
+        chunk_meta_equal(
+            list(chunking.get_chunk_meta_from_args(ann_args, chunk_meta=lambda ann_args: chunk_meta)),
+            chunk_meta,
+        )
 
     def test_take_from_args(self):
         def f(a, b, *args, c=None, d=None, **kwargs):
@@ -2649,25 +2595,21 @@ class TestChunking:
         lst = [0, 1, 2]
 
         ann_args = parsing.annotate_args(
-            f, (lst, lst, lst, (lst, lst)), dict(c=lst, d=lst, e=lst, f=dict(g=lst, h=lst)))
+            f,
+            (lst, lst, lst, (lst, lst)),
+            dict(c=lst, d=lst, e=lst, f=dict(g=lst, h=lst)),
+        )
         arg_take_spec = dict(
             b=chunking.ChunkSelector(),
-            args=chunking.ArgsTaker(
-                None,
-                chunking.SequenceTaker(cont_take_spec=(
-                    None,
-                    chunking.ChunkSlicer()
-                ))
-            ),
+            args=chunking.ArgsTaker(None, chunking.SequenceTaker(cont_take_spec=(None, chunking.ChunkSlicer()))),
             d=chunking.ChunkSelector(),
-            kwargs=chunking.KwargsTaker(
-                f=chunking.MappingTaker(cont_take_spec=dict(
-                    h=chunking.ChunkSlicer()
-                ))
-            )
+            kwargs=chunking.KwargsTaker(f=chunking.MappingTaker(cont_take_spec=dict(h=chunking.ChunkSlicer()))),
         )
         args, kwargs = chunking.take_from_args(
-            ann_args, arg_take_spec, chunking.ChunkMeta(uuid='', idx=0, start=1, end=3, indices=None))
+            ann_args,
+            arg_take_spec,
+            chunking.ChunkMeta(uuid="", idx=0, start=1, end=3, indices=None),
+        )
         assert args == (lst, lst[0], lst, (lst, lst[1:3]))
         assert kwargs == dict(c=lst, d=lst[0], e=lst, f=dict(g=lst, h=lst[1:3]))
 
@@ -2676,106 +2618,95 @@ class TestChunking:
         sr = pd.Series(a[:, 0])
         df = pd.DataFrame(a)
 
-        assert chunking.ChunkSelector().apply(
-            [1, 2, 3], chunking.ChunkMeta('', 0, 0, 1, None)) == 1
-        assert chunking.ChunkSelector(keep_dims=True).apply(
-            [1, 2, 3], chunking.ChunkMeta('', 0, 0, 1, None)) == [1]
-        assert chunking.ChunkSelector().apply(
-            None, chunking.ChunkMeta('', 0, 0, 1, None)) is None
+        assert chunking.ChunkSelector().apply([1, 2, 3], chunking.ChunkMeta("", 0, 0, 1, None)) == 1
+        assert chunking.ChunkSelector(keep_dims=True).apply([1, 2, 3], chunking.ChunkMeta("", 0, 0, 1, None)) == [1]
+        assert chunking.ChunkSelector().apply(None, chunking.ChunkMeta("", 0, 0, 1, None)) is None
         with pytest.raises(Exception):
-            chunking.ChunkSelector(ignore_none=False).apply(
-                None, chunking.ChunkMeta('', 0, 0, 1, None))
-        assert chunking.ChunkSelector(single_type=int).apply(
-            10, chunking.ChunkMeta('', 0, 0, 1, None)) == 10
+            chunking.ChunkSelector(ignore_none=False).apply(None, chunking.ChunkMeta("", 0, 0, 1, None))
+        assert chunking.ChunkSelector(single_type=int).apply(10, chunking.ChunkMeta("", 0, 0, 1, None)) == 10
         with pytest.raises(Exception):
-            chunking.ChunkSelector().apply(
-                10, chunking.ChunkMeta('', 0, 0, 1, None))
-        assert chunking.ChunkSlicer().apply(
-            [1, 2, 3], chunking.ChunkMeta('', 0, 0, 1, None)) == [1]
+            chunking.ChunkSelector().apply(10, chunking.ChunkMeta("", 0, 0, 1, None))
+        assert chunking.ChunkSlicer().apply([1, 2, 3], chunking.ChunkMeta("", 0, 0, 1, None)) == [1]
         np.testing.assert_array_equal(
-            chunking.ChunkSlicer().apply(
-                np.array([1, 2, 3]), chunking.ChunkMeta('', 0, None, None, np.array([0, 0]))),
-            np.array([1, 1])
+            chunking.ChunkSlicer().apply(np.array([1, 2, 3]), chunking.ChunkMeta("", 0, None, None, np.array([0, 0]))),
+            np.array([1, 1]),
         )
         with pytest.raises(Exception):
-            chunking.ChunkSlicer().apply(
-                np.array([1, 2, 3]), chunking.ChunkMeta('', 0, None, None, np.array([3])))
+            chunking.ChunkSlicer().apply(np.array([1, 2, 3]), chunking.ChunkMeta("", 0, None, None, np.array([3])))
 
-        assert chunking.CountAdapter().apply(
-            10, chunking.ChunkMeta('', 0, 0, 1, None)) == 1
-        assert chunking.CountAdapter().apply(
-            10, chunking.ChunkMeta('', 0, 8, 12, None)) == 2
-        assert chunking.CountAdapter().apply(
-            10, chunking.ChunkMeta('', 0, 12, 13, None)) == 0
+        assert chunking.CountAdapter().apply(10, chunking.ChunkMeta("", 0, 0, 1, None)) == 1
+        assert chunking.CountAdapter().apply(10, chunking.ChunkMeta("", 0, 8, 12, None)) == 2
+        assert chunking.CountAdapter().apply(10, chunking.ChunkMeta("", 0, 12, 13, None)) == 0
 
-        assert chunking.ShapeSelector(axis=0).apply(
-            (1, 2, 3), chunking.ChunkMeta('', 0, 0, 1, None)) == (2, 3)
-        assert chunking.ShapeSelector(axis=1).apply(
-            (1, 2, 3), chunking.ChunkMeta('', 0, 0, 1, None)) == (1, 3)
-        assert chunking.ShapeSelector(axis=2).apply(
-            (1, 2, 3), chunking.ChunkMeta('', 0, 0, 1, None)) == (1, 2)
+        assert chunking.ShapeSelector(axis=0).apply((1, 2, 3), chunking.ChunkMeta("", 0, 0, 1, None)) == (2, 3)
+        assert chunking.ShapeSelector(axis=1).apply((1, 2, 3), chunking.ChunkMeta("", 0, 0, 1, None)) == (1, 3)
+        assert chunking.ShapeSelector(axis=2).apply((1, 2, 3), chunking.ChunkMeta("", 0, 0, 1, None)) == (1, 2)
         with pytest.raises(Exception):
-            chunking.ShapeSelector(axis=4).apply(
-                (1, 2, 3), chunking.ChunkMeta('', 0, 0, 1, None))
+            chunking.ShapeSelector(axis=4).apply((1, 2, 3), chunking.ChunkMeta("", 0, 0, 1, None))
         assert chunking.ShapeSelector(axis=0, keep_dims=True).apply(
-            (1, 2, 3), chunking.ChunkMeta('', 0, 0, 1, None)) == (1, 2, 3)
+            (1, 2, 3),
+            chunking.ChunkMeta("", 0, 0, 1, None),
+        ) == (1, 2, 3)
         with pytest.raises(Exception):
-            chunking.ShapeSelector(axis=0).apply(
-                (1, 2, 3), chunking.ChunkMeta('', 1, 0, 1, None))
-        assert chunking.ShapeSelector(axis=0).apply(
-            (1,), chunking.ChunkMeta('', 0, 0, 1, None)) == ()
-        assert chunking.ShapeSlicer(axis=0).apply(
-            (1, 2, 3), chunking.ChunkMeta('', 0, 0, 1, None)) == (1, 2, 3)
-        assert chunking.ShapeSlicer(axis=1).apply(
-            (1, 2, 3), chunking.ChunkMeta('', 0, 0, 1, None)) == (1, 1, 3)
-        assert chunking.ShapeSlicer(axis=2).apply(
-            (1, 2, 3), chunking.ChunkMeta('', 0, 0, 1, None)) == (1, 2, 1)
+            chunking.ShapeSelector(axis=0).apply((1, 2, 3), chunking.ChunkMeta("", 1, 0, 1, None))
+        assert chunking.ShapeSelector(axis=0).apply((1,), chunking.ChunkMeta("", 0, 0, 1, None)) == ()
+        assert chunking.ShapeSlicer(axis=0).apply((1, 2, 3), chunking.ChunkMeta("", 0, 0, 1, None)) == (1, 2, 3)
+        assert chunking.ShapeSlicer(axis=1).apply((1, 2, 3), chunking.ChunkMeta("", 0, 0, 1, None)) == (1, 1, 3)
+        assert chunking.ShapeSlicer(axis=2).apply((1, 2, 3), chunking.ChunkMeta("", 0, 0, 1, None)) == (1, 2, 1)
         with pytest.raises(Exception):
-            chunking.ShapeSlicer(axis=4).apply(
-                (1, 2, 3), chunking.ChunkMeta('', 0, 0, 1, None))
+            chunking.ShapeSlicer(axis=4).apply((1, 2, 3), chunking.ChunkMeta("", 0, 0, 1, None))
+        assert chunking.ShapeSlicer(axis=0).apply((1, 2, 3), chunking.ChunkMeta("", 0, 0, 2, None)) == (1, 2, 3)
+        assert chunking.ShapeSlicer(axis=0).apply((1, 2, 3), chunking.ChunkMeta("", 0, 1, 2, None)) == (2, 3)
         assert chunking.ShapeSlicer(axis=0).apply(
-            (1, 2, 3), chunking.ChunkMeta('', 0, 0, 2, None)) == (1, 2, 3)
-        assert chunking.ShapeSlicer(axis=0).apply(
-            (1, 2, 3), chunking.ChunkMeta('', 0, 1, 2, None)) == (2, 3)
-        assert chunking.ShapeSlicer(axis=0).apply(
-            (1, 2, 3), chunking.ChunkMeta('', 0, None, None, np.array([0, 0]))) == (2, 2, 3)
+            (1, 2, 3),
+            chunking.ChunkMeta("", 0, None, None, np.array([0, 0])),
+        ) == (2, 2, 3)
         with pytest.raises(Exception):
-            chunking.ShapeSlicer(axis=0).apply(
-                (1, 2, 3), chunking.ChunkMeta('', 0, None, None, np.array([1])))
+            chunking.ShapeSlicer(axis=0).apply((1, 2, 3), chunking.ChunkMeta("", 0, None, None, np.array([1])))
 
-        np.testing.assert_array_equal(chunking.ArraySelector(axis=0).apply(
-            a, chunking.ChunkMeta('', 0, 0, 1, None)), a[0])
         np.testing.assert_array_equal(
-            chunking.ArraySelector(axis=0, keep_dims=True).apply(
-                a, chunking.ChunkMeta('', 0, 0, 1, None)), a[[0]])
-        np.testing.assert_array_equal(chunking.ArraySelector(axis=1).apply(
-            a, chunking.ChunkMeta('', 0, 0, 1, None)), a[:, 0])
-        with pytest.raises(Exception):
-            chunking.ArraySelector(axis=2).apply(
-                a, chunking.ChunkMeta('', 0, 0, 1, None))
-        assert chunking.ArraySelector(axis=0).apply(
-            sr, chunking.ChunkMeta('', 0, 0, 1, None)) == sr.iloc[0]
-        pd.testing.assert_series_equal(chunking.ArraySelector(axis=1).apply(
-            df, chunking.ChunkMeta('', 0, 0, 1, None)), df.iloc[:, 0])
-        np.testing.assert_array_equal(chunking.ArraySlicer(axis=0).apply(
-            a, chunking.ChunkMeta('', 0, 0, 1, None)), a[[0]])
-        np.testing.assert_array_equal(chunking.ArraySlicer(axis=1).apply(
-            a, chunking.ChunkMeta('', 0, 0, 1, None)), a[:, [0]])
+            chunking.ArraySelector(axis=0).apply(a, chunking.ChunkMeta("", 0, 0, 1, None)),
+            a[0],
+        )
         np.testing.assert_array_equal(
-            chunking.ArraySlicer(axis=0).apply(
-                a, chunking.ChunkMeta('', 0, None, None, np.array([0]))),
-            a[[0]]
+            chunking.ArraySelector(axis=0, keep_dims=True).apply(a, chunking.ChunkMeta("", 0, 0, 1, None)),
+            a[[0]],
+        )
+        np.testing.assert_array_equal(
+            chunking.ArraySelector(axis=1).apply(a, chunking.ChunkMeta("", 0, 0, 1, None)),
+            a[:, 0],
         )
         with pytest.raises(Exception):
-            chunking.ArraySlicer(axis=0).apply(
-                a, chunking.ChunkMeta('', 0, None, None, np.array([2])))
+            chunking.ArraySelector(axis=2).apply(a, chunking.ChunkMeta("", 0, 0, 1, None))
+        assert chunking.ArraySelector(axis=0).apply(sr, chunking.ChunkMeta("", 0, 0, 1, None)) == sr.iloc[0]
+        pd.testing.assert_series_equal(
+            chunking.ArraySelector(axis=1).apply(df, chunking.ChunkMeta("", 0, 0, 1, None)),
+            df.iloc[:, 0],
+        )
+        np.testing.assert_array_equal(
+            chunking.ArraySlicer(axis=0).apply(a, chunking.ChunkMeta("", 0, 0, 1, None)),
+            a[[0]],
+        )
+        np.testing.assert_array_equal(
+            chunking.ArraySlicer(axis=1).apply(a, chunking.ChunkMeta("", 0, 0, 1, None)),
+            a[:, [0]],
+        )
+        np.testing.assert_array_equal(
+            chunking.ArraySlicer(axis=0).apply(a, chunking.ChunkMeta("", 0, None, None, np.array([0]))),
+            a[[0]],
+        )
         with pytest.raises(Exception):
-            chunking.ArraySlicer(axis=2).apply(
-                a, chunking.ChunkMeta('', 0, 0, 1, None))
-        pd.testing.assert_series_equal(chunking.ArraySlicer(axis=0).apply(
-            sr, chunking.ChunkMeta('', 0, 0, 1, None)), sr.iloc[[0]])
-        pd.testing.assert_frame_equal(chunking.ArraySlicer(axis=1).apply(
-            df, chunking.ChunkMeta('', 0, 0, 1, None)), df.iloc[:, [0]])
+            chunking.ArraySlicer(axis=0).apply(a, chunking.ChunkMeta("", 0, None, None, np.array([2])))
+        with pytest.raises(Exception):
+            chunking.ArraySlicer(axis=2).apply(a, chunking.ChunkMeta("", 0, 0, 1, None))
+        pd.testing.assert_series_equal(
+            chunking.ArraySlicer(axis=0).apply(sr, chunking.ChunkMeta("", 0, 0, 1, None)),
+            sr.iloc[[0]],
+        )
+        pd.testing.assert_frame_equal(
+            chunking.ArraySlicer(axis=1).apply(df, chunking.ChunkMeta("", 0, 0, 1, None)),
+            df.iloc[:, [0]],
+        )
 
     def test_yield_arg_chunks(self):
         def f(a, *args, b=None, **kwargs):
@@ -2783,30 +2714,44 @@ class TestChunking:
 
         ann_args = parsing.annotate_args(f, (2, 3, 1), dict(b=[1, 2, 3]))
         chunk_meta = [
-            chunking.ChunkMeta(uuid='', idx=0, start=0, end=1, indices=None),
-            chunking.ChunkMeta(uuid='', idx=1, start=1, end=2, indices=None),
-            chunking.ChunkMeta(uuid='', idx=2, start=2, end=3, indices=None)
+            chunking.ChunkMeta(uuid="", idx=0, start=0, end=1, indices=None),
+            chunking.ChunkMeta(uuid="", idx=1, start=1, end=2, indices=None),
+            chunking.ChunkMeta(uuid="", idx=2, start=2, end=3, indices=None),
         ]
         arg_take_spec = dict(b=chunking.ChunkSelector())
-        result = [
-            (f, (2, 3, 1), {'b': 1}),
-            (f, (2, 3, 1), {'b': 2}),
-            (f, (2, 3, 1), {'b': 3})
-        ]
+        result = [(f, (2, 3, 1), {"b": 1}), (f, (2, 3, 1), {"b": 2}), (f, (2, 3, 1), {"b": 3})]
         assert list(chunking.yield_arg_chunks(f, ann_args, chunk_meta, arg_take_spec=arg_take_spec)) == result
-        assert list(chunking.yield_arg_chunks(
-            f, ann_args, chunk_meta, arg_take_spec=lambda ann_args, chunk_meta:
-            ((2, 3, 1), dict(b=[1, 2, 3][chunk_meta.idx])))) == result
+        assert (
+            list(
+                chunking.yield_arg_chunks(
+                    f,
+                    ann_args,
+                    chunk_meta,
+                    arg_take_spec=lambda ann_args, chunk_meta: ((2, 3, 1), dict(b=[1, 2, 3][chunk_meta.idx])),
+                )
+            )
+            == result
+        )
         ann_args = parsing.annotate_args(
-            f, (template.RepEval('ann_args["args"]["value"][1] + 1'), 3, 1), dict(b=template.Rep('lst')))
-        assert list(chunking.yield_arg_chunks(
-            f, ann_args, chunk_meta, arg_take_spec=arg_take_spec, template_context={'lst': [1, 2, 3]})) == result
+            f,
+            (template.RepEval('ann_args["args"]["value"][1] + 1'), 3, 1),
+            dict(b=template.Rep("lst")),
+        )
+        assert (
+            list(
+                chunking.yield_arg_chunks(
+                    f,
+                    ann_args,
+                    chunk_meta,
+                    arg_take_spec=arg_take_spec,
+                    template_context={"lst": [1, 2, 3]},
+                )
+            )
+            == result
+        )
 
     def test_chunked(self):
-        @chunking.chunked(
-            n_chunks=2,
-            size=vbt.LenSizer(arg_query='a'),
-            arg_take_spec=dict(a=vbt.ChunkSlicer()))
+        @chunking.chunked(n_chunks=2, size=vbt.LenSizer(arg_query="a"), arg_take_spec=dict(a=vbt.ChunkSlicer()))
         def f(a):
             return a
 
@@ -2832,41 +2777,35 @@ class TestChunking:
         results = f(np.arange(10), _n_chunks=1, _skip_one_chunk=True)
         np.testing.assert_array_equal(results, np.arange(10))
 
-        @vbt.chunked(
-            n_chunks=2,
-            size=vbt.LenSizer(arg_query='a'))
+        @vbt.chunked(n_chunks=2, size=vbt.LenSizer(arg_query="a"))
         def f2(chunk_meta, a):
-            return a[chunk_meta.start:chunk_meta.end]
+            return a[chunk_meta.start : chunk_meta.end]
 
         results = f2(np.arange(10))
         np.testing.assert_array_equal(results[0], np.arange(5))
         np.testing.assert_array_equal(results[1], np.arange(5, 10))
 
-        @vbt.chunked(
-            n_chunks=2,
-            size=vbt.LenSizer(arg_query='a'),
-            prepend_chunk_meta=False)
+        @vbt.chunked(n_chunks=2, size=vbt.LenSizer(arg_query="a"), prepend_chunk_meta=False)
         def f3(chunk_meta, a):
-            return a[chunk_meta.start:chunk_meta.end]
+            return a[chunk_meta.start : chunk_meta.end]
 
-        results = f3(template.Rep('chunk_meta'), np.arange(10))
+        results = f3(template.Rep("chunk_meta"), np.arange(10))
         np.testing.assert_array_equal(results[0], np.arange(5))
         np.testing.assert_array_equal(results[1], np.arange(5, 10))
 
         with pytest.raises(Exception):
-            @vbt.chunked(
-                n_chunks=2,
-                size=vbt.LenSizer(arg_query='a'),
-                prepend_chunk_meta=True)
-            def f4(chunk_meta, a):
-                return a[chunk_meta.start:chunk_meta.end]
 
-            f4(template.Rep('chunk_meta'), np.arange(10))
+            @vbt.chunked(n_chunks=2, size=vbt.LenSizer(arg_query="a"), prepend_chunk_meta=True)
+            def f4(chunk_meta, a):
+                return a[chunk_meta.start : chunk_meta.end]
+
+            f4(template.Rep("chunk_meta"), np.arange(10))
 
         @vbt.chunked(
             n_chunks=2,
-            size=lambda ann_args: len(ann_args['a']['value']),
-            arg_take_spec=dict(a=vbt.ChunkSlicer()))
+            size=lambda ann_args: len(ann_args["a"]["value"]),
+            arg_take_spec=dict(a=vbt.ChunkSlicer()),
+        )
         def f5(a):
             return a
 
@@ -2875,26 +2814,27 @@ class TestChunking:
         np.testing.assert_array_equal(results[1], np.arange(5, 10))
 
         def arg_take_spec(ann_args, chunk_meta, **kwargs):
-            a = ann_args['a']['value']
-            lens = ann_args['lens']['value']
-            lens_chunk = lens[chunk_meta.start:chunk_meta.end]
+            a = ann_args["a"]["value"]
+            lens = ann_args["lens"]["value"]
+            lens_chunk = lens[chunk_meta.start : chunk_meta.end]
             a_end = np.cumsum(lens)
             a_start = a_end - lens
-            a_start = a_start[chunk_meta.start:chunk_meta.end][0]
-            a_end = a_end[chunk_meta.start:chunk_meta.end][-1]
+            a_start = a_start[chunk_meta.start : chunk_meta.end][0]
+            a_end = a_end[chunk_meta.start : chunk_meta.end][-1]
             a_chunk = a[a_start:a_end]
             return (a_chunk, lens_chunk), {}
 
         @vbt.chunked(
             n_chunks=2,
-            size=vbt.LenSizer(arg_query='lens'),
+            size=vbt.LenSizer(arg_query="lens"),
             arg_take_spec=arg_take_spec,
-            merge_func=lambda results: [list(r) for r in results])
+            merge_func=lambda results: [list(r) for r in results],
+        )
         def f6(a, lens):
             ends = np.cumsum(lens)
             starts = ends - lens
             for i in range(len(lens)):
-                yield a[starts[i]:ends[i]]
+                yield a[starts[i] : ends[i]]
 
         results = f6(np.arange(10), [1, 2, 3, 4])
         np.testing.assert_array_equal(results[0][0], np.arange(1))
@@ -2903,24 +2843,28 @@ class TestChunking:
         np.testing.assert_array_equal(results[1][1], np.arange(6, 10))
 
         if dask_available:
+
             @vbt.chunked(
                 n_chunks=2,
-                size=vbt.LenSizer(arg_query='a'),
+                size=vbt.LenSizer(arg_query="a"),
                 arg_take_spec=dict(a=vbt.ChunkSlicer()),
                 merge_func=np.concatenate,
-                engine='dask')
+                engine="dask",
+            )
             def f7(a):
                 return a
 
             np.testing.assert_array_equal(f7(np.arange(10)), np.arange(10))
 
         if ray_available:
+
             @vbt.chunked(
                 n_chunks=2,
-                size=vbt.LenSizer(arg_query='a'),
+                size=vbt.LenSizer(arg_query="a"),
                 arg_take_spec=dict(a=vbt.ChunkSlicer()),
                 merge_func=np.concatenate,
-                engine='ray')
+                engine="ray",
+            )
             def f8(a):
                 return a
 
@@ -2929,6 +2873,7 @@ class TestChunking:
 
 # ############# jitting.py ############# #
 
+
 class TestJitting:
     def test_jitters(self):
         py_func = lambda x: x
@@ -2936,12 +2881,13 @@ class TestJitting:
         assert jitting.NumPyJitter().decorate(py_func) is py_func
         if checks.is_numba_enabled():
             assert isinstance(jitting.NumbaJitter().decorate(py_func), CPUDispatcher)
-            assert not jitting.NumbaJitter(parallel=True) \
-                .decorate(py_func).targetoptions['parallel']
-            assert jitting.NumbaJitter(parallel=True) \
-                .decorate(py_func, tags={'can_parallel'}).targetoptions['parallel']
-            assert jitting.NumbaJitter(parallel=True, fix_cannot_parallel=False) \
-                .decorate(py_func).targetoptions['parallel']
+            assert not jitting.NumbaJitter(parallel=True).decorate(py_func).targetoptions["parallel"]
+            assert jitting.NumbaJitter(parallel=True).decorate(py_func, tags={"can_parallel"}).targetoptions["parallel"]
+            assert (
+                jitting.NumbaJitter(parallel=True, fix_cannot_parallel=False)
+                .decorate(py_func)
+                .targetoptions["parallel"]
+            )
 
     def test_get_func_suffix(self):
         def py_func():
@@ -2952,7 +2898,7 @@ class TestJitting:
 
         assert jitting.get_func_suffix(lambda x: x) is None
         assert jitting.get_func_suffix(py_func) is None
-        assert jitting.get_func_suffix(func_nb) == 'nb'
+        assert jitting.get_func_suffix(func_nb) == "nb"
 
     def test_resolve_jitter_type(self):
         def py_func():
@@ -2966,27 +2912,27 @@ class TestJitting:
         with pytest.raises(Exception):
             jitting.resolve_jitter_type(py_func=py_func)
         assert jitting.resolve_jitter_type(py_func=func_nb) is jitting.NumbaJitter
-        assert jitting.resolve_jitter_type(jitter='numba', py_func=func_nb) is jitting.NumbaJitter
+        assert jitting.resolve_jitter_type(jitter="numba", py_func=func_nb) is jitting.NumbaJitter
         with pytest.raises(Exception):
-            jitting.resolve_jitter_type(jitter='numba2', py_func=func_nb)
+            jitting.resolve_jitter_type(jitter="numba2", py_func=func_nb)
         assert jitting.resolve_jitter_type(jitter=jitting.NumbaJitter, py_func=func_nb) is jitting.NumbaJitter
         assert jitting.resolve_jitter_type(jitter=jitting.NumbaJitter(), py_func=func_nb) is jitting.NumbaJitter
         with pytest.raises(Exception):
             jitting.resolve_jitter_type(jitter=object, py_func=func_nb)
 
     def test_get_id_of_jitter_type(self):
-        assert jitting.get_id_of_jitter_type(jitting.NumbaJitter) == 'nb'
-        assert jitting.get_id_of_jitter_type(jitting.NumPyJitter) == 'np'
+        assert jitting.get_id_of_jitter_type(jitting.NumbaJitter) == "nb"
+        assert jitting.get_id_of_jitter_type(jitting.NumPyJitter) == "np"
         assert jitting.get_id_of_jitter_type(object) is None
 
     def test_resolve_jitted_kwargs(self):
         assert jitting.resolve_jitted_kwargs(option=True) == dict()
         assert jitting.resolve_jitted_kwargs(option=False) is None
-        assert jitting.resolve_jitted_kwargs(option=dict(test='test')) == dict(test='test')
-        assert jitting.resolve_jitted_kwargs(option='numba') == dict(jitter='numba')
+        assert jitting.resolve_jitted_kwargs(option=dict(test="test")) == dict(test="test")
+        assert jitting.resolve_jitted_kwargs(option="numba") == dict(jitter="numba")
         with pytest.raises(Exception):
             jitting.resolve_jitted_kwargs(option=10)
-        assert jitting.resolve_jitted_kwargs(option='numba', jitter='numpy') == dict(jitter='numba')
+        assert jitting.resolve_jitted_kwargs(option="numba", jitter="numpy") == dict(jitter="numba")
 
     def test_jitted(self):
         class MyJitter(jitting.Jitter):
@@ -2998,7 +2944,7 @@ class TestJitting:
                 wrapper.config = self.config
                 return wrapper
 
-        vbt.settings.jitting.jitters['my'] = dict(cls=MyJitter)
+        vbt.settings.jitting.jitters["my"] = dict(cls=MyJitter)
 
         @jitting.jitted
         def func_my():
@@ -3006,8 +2952,8 @@ class TestJitting:
 
         assert dict(func_my.config) == dict()
 
-        @jitting.jitted(test='test')
+        @jitting.jitted(test="test")
         def func_my():
             pass
 
-        assert dict(func_my.config) == dict(test='test')
+        assert dict(func_my.config) == dict(test="test")

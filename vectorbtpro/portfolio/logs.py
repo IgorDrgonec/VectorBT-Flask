@@ -88,14 +88,7 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_dict
-from vectorbtpro.portfolio.enums import (
-    log_dt,
-    SizeType,
-    Direction,
-    OrderSide,
-    OrderStatus,
-    OrderStatusInfo
-)
+from vectorbtpro.portfolio.enums import log_dt, SizeType, Direction, OrderSide, OrderStatus, OrderStatusInfo
 from vectorbtpro.records.base import Records
 from vectorbtpro.records.decorators import attach_fields, override_field_config
 from vectorbtpro.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig
@@ -106,146 +99,57 @@ logs_field_config = ReadonlyConfig(
     dict(
         dtype=log_dt,
         settings=dict(
-            id=dict(
-                title=('Meta', 'Log Id')
-            ),
-            col=dict(
-                title=('Meta', 'Column')
-            ),
-            idx=dict(
-                title=('Meta', 'Timestamp')
-            ),
-            group=dict(
-                title=('Meta', 'Group')
-            ),
-            open=dict(
-                title=('Price Area', 'Open')
-            ),
-            high=dict(
-                title=('Price Area', 'High')
-            ),
-            low=dict(
-                title=('Price Area', 'Low')
-            ),
-            close=dict(
-                title=('Price Area', 'Close')
-            ),
-            cash=dict(
-                title=('State', 'Cash')
-            ),
-            position=dict(
-                title=('State', 'Position')
-            ),
-            debt=dict(
-                title=('State', 'Debt')
-            ),
-            free_cash=dict(
-                title=('State', 'Free Cash')
-            ),
-            val_price=dict(
-                title=('State', 'Valuation Price')
-            ),
-            value=dict(
-                title=('State', 'Value')
-            ),
-            req_size=dict(
-                title=('Request', 'Size')
-            ),
-            req_price=dict(
-                title=('Request', 'Price')
-            ),
-            req_size_type=dict(
-                title=('Request', 'Size Type'),
-                mapping=SizeType
-            ),
-            req_direction=dict(
-                title=('Request', 'Direction'),
-                mapping=Direction
-            ),
-            req_fees=dict(
-                title=('Request', 'Fees')
-            ),
-            req_fixed_fees=dict(
-                title=('Request', 'Fixed Fees')
-            ),
-            req_slippage=dict(
-                title=('Request', 'Slippage')
-            ),
-            req_min_size=dict(
-                title=('Request', 'Min Size')
-            ),
-            req_max_size=dict(
-                title=('Request', 'Max Size')
-            ),
-            req_size_granularity=dict(
-                title=('Request', 'Size Granularity')
-            ),
-            req_reject_prob=dict(
-                title=('Request', 'Rejection Prob')
-            ),
-            req_price_area_vio_mode=dict(
-                title=('Request', 'Price Area Violation Mode')
-            ),
-            req_lock_cash=dict(
-                title=('Request', 'Lock Cash')
-            ),
-            req_allow_partial=dict(
-                title=('Request', 'Allow Partial')
-            ),
-            req_raise_reject=dict(
-                title=('Request', 'Raise Rejection')
-            ),
-            req_log=dict(
-                title=('Request', 'Log')
-            ),
-            new_cash=dict(
-                title=('New State', 'Cash')
-            ),
-            new_position=dict(
-                title=('New State', 'Position')
-            ),
-            new_debt=dict(
-                title=('New State', 'Debt')
-            ),
-            new_free_cash=dict(
-                title=('New State', 'Free Cash')
-            ),
-            new_val_price=dict(
-                title=('New State', 'Valuation Price')
-            ),
-            new_value=dict(
-                title=('New State', 'Value')
-            ),
-            res_size=dict(
-                title=('Result', 'Size')
-            ),
-            res_price=dict(
-                title=('Result', 'Price')
-            ),
-            res_fees=dict(
-                title=('Result', 'Fees')
-            ),
-            res_side=dict(
-                title=('Result', 'Side'),
-                mapping=OrderSide
-            ),
-            res_status=dict(
-                title=('Result', 'Status'),
-                mapping=OrderStatus
-            ),
-            res_status_info=dict(
-                title=('Result', 'Status Info'),
-                mapping=OrderStatusInfo
-            ),
-            order_id=dict(
-                title=('Result', 'Order Id')
-            )
-        )
+            id=dict(title=("Meta", "Log Id")),
+            col=dict(title=("Meta", "Column")),
+            idx=dict(title=("Meta", "Timestamp")),
+            group=dict(title=("Meta", "Group")),
+            open=dict(title=("Price Area", "Open")),
+            high=dict(title=("Price Area", "High")),
+            low=dict(title=("Price Area", "Low")),
+            close=dict(title=("Price Area", "Close")),
+            cash=dict(title=("State", "Cash")),
+            position=dict(title=("State", "Position")),
+            debt=dict(title=("State", "Debt")),
+            free_cash=dict(title=("State", "Free Cash")),
+            val_price=dict(title=("State", "Valuation Price")),
+            value=dict(title=("State", "Value")),
+            req_size=dict(title=("Request", "Size")),
+            req_price=dict(title=("Request", "Price")),
+            req_size_type=dict(title=("Request", "Size Type"), mapping=SizeType),
+            req_direction=dict(title=("Request", "Direction"), mapping=Direction),
+            req_fees=dict(title=("Request", "Fees")),
+            req_fixed_fees=dict(title=("Request", "Fixed Fees")),
+            req_slippage=dict(title=("Request", "Slippage")),
+            req_min_size=dict(title=("Request", "Min Size")),
+            req_max_size=dict(title=("Request", "Max Size")),
+            req_size_granularity=dict(title=("Request", "Size Granularity")),
+            req_reject_prob=dict(title=("Request", "Rejection Prob")),
+            req_price_area_vio_mode=dict(title=("Request", "Price Area Violation Mode")),
+            req_lock_cash=dict(title=("Request", "Lock Cash")),
+            req_allow_partial=dict(title=("Request", "Allow Partial")),
+            req_raise_reject=dict(title=("Request", "Raise Rejection")),
+            req_log=dict(title=("Request", "Log")),
+            new_cash=dict(title=("New State", "Cash")),
+            new_position=dict(title=("New State", "Position")),
+            new_debt=dict(title=("New State", "Debt")),
+            new_free_cash=dict(title=("New State", "Free Cash")),
+            new_val_price=dict(title=("New State", "Valuation Price")),
+            new_value=dict(title=("New State", "Value")),
+            res_size=dict(title=("Result", "Size")),
+            res_price=dict(title=("Result", "Price")),
+            res_fees=dict(title=("Result", "Fees")),
+            res_side=dict(title=("Result", "Side"), mapping=OrderSide),
+            res_status=dict(title=("Result", "Status"), mapping=OrderStatus),
+            res_status_info=dict(title=("Result", "Status Info"), mapping=OrderStatusInfo),
+            order_id=dict(title=("Result", "Order Id")),
+        ),
     )
 )
 """_"""
 
-__pdoc__['logs_field_config'] = f"""Field config for `Logs`.
+__pdoc__[
+    "logs_field_config"
+] = f"""Field config for `Logs`.
 
 ```python
 {logs_field_config.prettify()}
@@ -254,20 +158,16 @@ __pdoc__['logs_field_config'] = f"""Field config for `Logs`.
 
 logs_attach_field_config = ReadonlyConfig(
     dict(
-        res_side=dict(
-            attach_filters=True
-        ),
-        res_status=dict(
-            attach_filters=True
-        ),
-        res_status_info=dict(
-            attach_filters=True
-        )
+        res_side=dict(attach_filters=True),
+        res_status=dict(attach_filters=True),
+        res_status_info=dict(attach_filters=True),
     )
 )
 """_"""
 
-__pdoc__['logs_attach_field_config'] = f"""Config of fields to be attached to `Logs`.
+__pdoc__[
+    "logs_attach_field_config"
+] = f"""Config of fields to be attached to `Logs`.
 
 ```python
 {logs_attach_field_config.prettify()}
@@ -295,52 +195,36 @@ class Logs(Records):
         Merges `vectorbtpro.records.base.Records.stats_defaults` and
         `stats` from `vectorbtpro._settings.logs`."""
         from vectorbtpro._settings import settings
-        logs_stats_cfg = settings['logs']['stats']
 
-        return merge_dicts(
-            Records.stats_defaults.__get__(self),
-            logs_stats_cfg
-        )
+        logs_stats_cfg = settings["logs"]["stats"]
+
+        return merge_dicts(Records.stats_defaults.__get__(self), logs_stats_cfg)
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
-            start=dict(
-                title='Start',
-                calc_func=lambda self: self.wrapper.index[0],
-                agg_func=None,
-                tags='wrapper'
-            ),
-            end=dict(
-                title='End',
-                calc_func=lambda self: self.wrapper.index[-1],
-                agg_func=None,
-                tags='wrapper'
-            ),
+            start=dict(title="Start", calc_func=lambda self: self.wrapper.index[0], agg_func=None, tags="wrapper"),
+            end=dict(title="End", calc_func=lambda self: self.wrapper.index[-1], agg_func=None, tags="wrapper"),
             period=dict(
-                title='Period',
+                title="Period",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,
-                tags='wrapper'
+                tags="wrapper",
             ),
-            total_records=dict(
-                title='Total Records',
-                calc_func='count',
-                tags='records'
-            ),
+            total_records=dict(title="Total Records", calc_func="count", tags="records"),
             res_status_counts=dict(
-                title='Status Counts',
-                calc_func='res_status.value_counts',
+                title="Status Counts",
+                calc_func="res_status.value_counts",
                 incl_all_keys=True,
-                post_calc_func=lambda self, out, settings: to_dict(out, orient='index_series'),
-                tags=['logs', 'res_status', 'value_counts']
+                post_calc_func=lambda self, out, settings: to_dict(out, orient="index_series"),
+                tags=["logs", "res_status", "value_counts"],
             ),
             res_status_info_counts=dict(
-                title='Status Info Counts',
-                calc_func='res_status_info.value_counts',
-                post_calc_func=lambda self, out, settings: to_dict(out, orient='index_series'),
-                tags=['logs', 'res_status_info', 'value_counts']
-            )
+                title="Status Info Counts",
+                calc_func="res_status_info.value_counts",
+                post_calc_func=lambda self, out, settings: to_dict(out, orient="index_series"),
+                tags=["logs", "res_status_info", "value_counts"],
+            ),
         )
     )
 
@@ -357,12 +241,10 @@ class Logs(Records):
         Merges `vectorbtpro.records.base.Records.plots_defaults` and
         `plots` from `vectorbtpro._settings.logs`."""
         from vectorbtpro._settings import settings
-        logs_plots_cfg = settings['logs']['plots']
 
-        return merge_dicts(
-            Records.plots_defaults.__get__(self),
-            logs_plots_cfg
-        )
+        logs_plots_cfg = settings["logs"]["plots"]
+
+        return merge_dicts(Records.plots_defaults.__get__(self), logs_plots_cfg)
 
     @property
     def subplots(self) -> Config:

@@ -10,50 +10,50 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.utils.formatting import prettify
 
 __all__ = [
-    'RejectedOrderError',
-    'InitCashMode',
-    'CallSeqType',
-    'AccumulationMode',
-    'ConflictMode',
-    'DirectionConflictMode',
-    'OppositeEntryMode',
-    'StopEntryPrice',
-    'StopExitPrice',
-    'StopExitMode',
-    'StopUpdateMode',
-    'SignalPriority',
-    'SizeType',
-    'Direction',
-    'PriceAreaVioMode',
-    'OrderStatus',
-    'OrderStatusInfo',
-    'OrderSide',
-    'TradeDirection',
-    'TradeStatus',
-    'TradesType',
-    'PriceArea',
-    'NoPriceArea',
-    'ProcessOrderState',
-    'ExecuteOrderState',
-    'SimulationOutput',
-    'SimulationContext',
-    'GroupContext',
-    'RowContext',
-    'SegmentContext',
-    'OrderContext',
-    'PostOrderContext',
-    'FlexOrderContext',
-    'Order',
-    'NoOrder',
-    'OrderResult',
-    'AdjustSLContext',
-    'AdjustTPContext',
-    'SignalContext',
-    'FSInOutputs',
-    'FOInOutputs',
-    'order_dt',
-    'trade_dt',
-    'log_dt'
+    "RejectedOrderError",
+    "InitCashMode",
+    "CallSeqType",
+    "AccumulationMode",
+    "ConflictMode",
+    "DirectionConflictMode",
+    "OppositeEntryMode",
+    "StopEntryPrice",
+    "StopExitPrice",
+    "StopExitMode",
+    "StopUpdateMode",
+    "SignalPriority",
+    "SizeType",
+    "Direction",
+    "PriceAreaVioMode",
+    "OrderStatus",
+    "OrderStatusInfo",
+    "OrderSide",
+    "TradeDirection",
+    "TradeStatus",
+    "TradesType",
+    "PriceArea",
+    "NoPriceArea",
+    "ProcessOrderState",
+    "ExecuteOrderState",
+    "SimulationOutput",
+    "SimulationContext",
+    "GroupContext",
+    "RowContext",
+    "SegmentContext",
+    "OrderContext",
+    "PostOrderContext",
+    "FlexOrderContext",
+    "Order",
+    "NoOrder",
+    "OrderResult",
+    "AdjustSLContext",
+    "AdjustTPContext",
+    "SignalContext",
+    "FSInOutputs",
+    "FOInOutputs",
+    "order_dt",
+    "trade_dt",
+    "log_dt",
 ]
 
 __pdoc__ = {}
@@ -64,6 +64,7 @@ __pdoc__ = {}
 
 class RejectedOrderError(Exception):
     """Rejected order error."""
+
     pass
 
 
@@ -78,7 +79,9 @@ class InitCashModeT(tp.NamedTuple):
 InitCashMode = InitCashModeT()
 """_"""
 
-__pdoc__['InitCashMode'] = f"""Initial cash mode.
+__pdoc__[
+    "InitCashMode"
+] = f"""Initial cash mode.
 
 ```python
 {prettify(InitCashMode)}
@@ -100,7 +103,9 @@ class CallSeqTypeT(tp.NamedTuple):
 CallSeqType = CallSeqTypeT()
 """_"""
 
-__pdoc__['CallSeqType'] = f"""Call sequence type.
+__pdoc__[
+    "CallSeqType"
+] = f"""Call sequence type.
 
 ```python
 {prettify(CallSeqType)}
@@ -124,7 +129,9 @@ class AccumulationModeT(tp.NamedTuple):
 AccumulationMode = AccumulationModeT()
 """_"""
 
-__pdoc__['AccumulationMode'] = f"""Accumulation mode.
+__pdoc__[
+    "AccumulationMode"
+] = f"""Accumulation mode.
 
 ```python
 {prettify(AccumulationMode)}
@@ -158,7 +165,9 @@ class ConflictModeT(tp.NamedTuple):
 ConflictMode = ConflictModeT()
 """_"""
 
-__pdoc__['ConflictMode'] = f"""Conflict mode.
+__pdoc__[
+    "ConflictMode"
+] = f"""Conflict mode.
 
 ```python
 {prettify(ConflictMode)}
@@ -190,7 +199,9 @@ class DirectionConflictModeT(tp.NamedTuple):
 DirectionConflictMode = DirectionConflictModeT()
 """_"""
 
-__pdoc__['DirectionConflictMode'] = f"""Direction conflict mode.
+__pdoc__[
+    "DirectionConflictMode"
+] = f"""Direction conflict mode.
 
 ```python
 {prettify(DirectionConflictMode)}
@@ -222,7 +233,9 @@ class OppositeEntryModeT(tp.NamedTuple):
 OppositeEntryMode = OppositeEntryModeT()
 """_"""
 
-__pdoc__['OppositeEntryMode'] = f"""Opposite entry mode.
+__pdoc__[
+    "OppositeEntryMode"
+] = f"""Opposite entry mode.
 
 ```python
 {prettify(OppositeEntryMode)}
@@ -249,7 +262,9 @@ class StopEntryPriceT(tp.NamedTuple):
 StopEntryPrice = StopEntryPriceT()
 """_"""
 
-__pdoc__['StopEntryPrice'] = f"""Stop entry price.
+__pdoc__[
+    "StopEntryPrice"
+] = f"""Stop entry price.
 
 ```python
 {prettify(StopEntryPrice)}
@@ -275,7 +290,9 @@ class StopExitPriceT(tp.NamedTuple):
 StopExitPrice = StopExitPriceT()
 """_"""
 
-__pdoc__['StopExitPrice'] = f"""Stop exit price.
+__pdoc__[
+    "StopExitPrice"
+] = f"""Stop exit price.
 
 ```python
 {prettify(StopExitPrice)}
@@ -325,7 +342,9 @@ class StopExitModeT(tp.NamedTuple):
 StopExitMode = StopExitModeT()
 """_"""
 
-__pdoc__['StopExitMode'] = f"""Stop exit mode.
+__pdoc__[
+    "StopExitMode"
+] = f"""Stop exit mode.
 
 ```python
 {prettify(StopExitMode)}
@@ -351,7 +370,9 @@ class StopUpdateModeT(tp.NamedTuple):
 StopUpdateMode = StopUpdateModeT()
 """_"""
 
-__pdoc__['StopUpdateMode'] = f"""Stop update mode.
+__pdoc__[
+    "StopUpdateMode"
+] = f"""Stop update mode.
 
 ```python
 {prettify(StopUpdateMode)}
@@ -374,7 +395,9 @@ class SignalPriorityT(tp.NamedTuple):
 SignalPriority = SignalPriorityT()
 """_"""
 
-__pdoc__['SignalPriority'] = f"""Signal priority.
+__pdoc__[
+    "SignalPriority"
+] = f"""Signal priority.
 
 ```python
 {prettify(SignalPriority)}
@@ -400,7 +423,9 @@ class SizeTypeT(tp.NamedTuple):
 SizeType = SizeTypeT()
 """_"""
 
-__pdoc__['SizeType'] = f"""Size type.
+__pdoc__[
+    "SizeType"
+] = f"""Size type.
 
 ```python
 {prettify(SizeType)}
@@ -447,7 +472,9 @@ class DirectionT(tp.NamedTuple):
 Direction = DirectionT()
 """_"""
 
-__pdoc__['Direction'] = f"""Position direction.
+__pdoc__[
+    "Direction"
+] = f"""Position direction.
 
 ```python
 {prettify(Direction)}
@@ -469,7 +496,9 @@ class PriceAreaVioModeT(tp.NamedTuple):
 PriceAreaVioMode = PriceAreaVioModeT()
 """_"""
 
-__pdoc__['PriceAreaVioMode'] = f"""Price are violation mode.
+__pdoc__[
+    "PriceAreaVioMode"
+] = f"""Price are violation mode.
 
 ```python
 {prettify(PriceAreaVioMode)}
@@ -491,7 +520,9 @@ class OrderStatusT(tp.NamedTuple):
 OrderStatus = OrderStatusT()
 """_"""
 
-__pdoc__['OrderStatus'] = f"""Order status.
+__pdoc__[
+    "OrderStatus"
+] = f"""Order status.
 
 ```python
 {prettify(OrderStatus)}
@@ -524,7 +555,9 @@ class OrderStatusInfoT(tp.NamedTuple):
 OrderStatusInfo = OrderStatusInfoT()
 """_"""
 
-__pdoc__['OrderStatusInfo'] = f"""Order status information.
+__pdoc__[
+    "OrderStatusInfo"
+] = f"""Order status information.
 
 ```python
 {prettify(OrderStatusInfo)}
@@ -545,11 +578,13 @@ status_info_desc = [
     "Random event happened",
     "Not enough cash to cover fees",
     "Final size is less than minimum allowed",
-    "Final size is less than requested"
+    "Final size is less than requested",
 ]
 """_"""
 
-__pdoc__['status_info_desc'] = f"""Order status description.
+__pdoc__[
+    "status_info_desc"
+] = f"""Order status description.
 
 ```python
 {prettify(status_info_desc)}
@@ -565,7 +600,9 @@ class OrderSideT(tp.NamedTuple):
 OrderSide = OrderSideT()
 """_"""
 
-__pdoc__['OrderSide'] = f"""Order side.
+__pdoc__[
+    "OrderSide"
+] = f"""Order side.
 
 ```python
 {prettify(OrderSide)}
@@ -581,7 +618,9 @@ class TradeDirectionT(tp.NamedTuple):
 TradeDirection = TradeDirectionT()
 """_"""
 
-__pdoc__['TradeDirection'] = f"""Event direction.
+__pdoc__[
+    "TradeDirection"
+] = f"""Event direction.
 
 ```python
 {prettify(TradeDirection)}
@@ -597,7 +636,9 @@ class TradeStatusT(tp.NamedTuple):
 TradeStatus = TradeStatusT()
 """_"""
 
-__pdoc__['TradeStatus'] = f"""Event status.
+__pdoc__[
+    "TradeStatus"
+] = f"""Event status.
 
 ```python
 {prettify(TradeStatus)}
@@ -614,7 +655,9 @@ class TradesTypeT(tp.NamedTuple):
 TradesType = TradesTypeT()
 """_"""
 
-__pdoc__['TradesType'] = f"""Trades type.
+__pdoc__[
+    "TradesType"
+] = f"""Trades type.
 
 ```python
 {prettify(TradesType)}
@@ -632,32 +675,35 @@ class PriceArea(tp.NamedTuple):
     close: float
 
 
-__pdoc__['PriceArea'] = """Price area defined by four boundaries.
+__pdoc__[
+    "PriceArea"
+] = """Price area defined by four boundaries.
 
 Used together with `PriceAreaVioMode`."""
-__pdoc__['PriceArea.open'] = "Opening price of the time step."
-__pdoc__['PriceArea.high'] = """Highest price of the time step.
+__pdoc__["PriceArea.open"] = "Opening price of the time step."
+__pdoc__[
+    "PriceArea.high"
+] = """Highest price of the time step.
 
 Violation takes place when adjusted price goes above this value.
 """
-__pdoc__['PriceArea.low'] = """Lowest price of the time step.
+__pdoc__[
+    "PriceArea.low"
+] = """Lowest price of the time step.
 
 Violation takes place when adjusted price goes below this value.
 """
-__pdoc__['PriceArea.close'] = """Closing price of the time step.
+__pdoc__[
+    "PriceArea.close"
+] = """Closing price of the time step.
 
 Violation takes place when adjusted price goes beyond this value.
 """
 
-NoPriceArea = PriceArea(
-    open=np.nan,
-    high=np.nan,
-    low=np.nan,
-    close=np.nan
-)
+NoPriceArea = PriceArea(open=np.nan, high=np.nan, low=np.nan, close=np.nan)
 """_"""
 
-__pdoc__['NoPriceArea'] = "No price area."
+__pdoc__["NoPriceArea"] = "No price area."
 
 
 class ProcessOrderState(tp.NamedTuple):
@@ -669,13 +715,13 @@ class ProcessOrderState(tp.NamedTuple):
     value: float
 
 
-__pdoc__['ProcessOrderState'] = "State before or after order processing."
-__pdoc__['ProcessOrderState.cash'] = "Cash in the current column (or group with cash sharing)."
-__pdoc__['ProcessOrderState.position'] = "Position in the current column."
-__pdoc__['ProcessOrderState.debt'] = "Debt from shorting in the current column."
-__pdoc__['ProcessOrderState.free_cash'] = "Free cash in the current column (or group with cash sharing)."
-__pdoc__['ProcessOrderState.val_price'] = "Valuation price in the current column."
-__pdoc__['ProcessOrderState.value'] = "Value in the current column (or group with cash sharing)."
+__pdoc__["ProcessOrderState"] = "State before or after order processing."
+__pdoc__["ProcessOrderState.cash"] = "Cash in the current column (or group with cash sharing)."
+__pdoc__["ProcessOrderState.position"] = "Position in the current column."
+__pdoc__["ProcessOrderState.debt"] = "Debt from shorting in the current column."
+__pdoc__["ProcessOrderState.free_cash"] = "Free cash in the current column (or group with cash sharing)."
+__pdoc__["ProcessOrderState.val_price"] = "Valuation price in the current column."
+__pdoc__["ProcessOrderState.value"] = "Value in the current column (or group with cash sharing)."
 
 
 class ExecuteOrderState(tp.NamedTuple):
@@ -685,11 +731,11 @@ class ExecuteOrderState(tp.NamedTuple):
     free_cash: float
 
 
-__pdoc__['ExecuteOrderState'] = "State after order execution."
-__pdoc__['ExecuteOrderState.cash'] = "See `ProcessOrderState.cash`."
-__pdoc__['ExecuteOrderState.position'] = "See `ProcessOrderState.position`."
-__pdoc__['ExecuteOrderState.debt'] = "See `ProcessOrderState.debt`."
-__pdoc__['ExecuteOrderState.free_cash'] = "See `ProcessOrderState.free_cash`."
+__pdoc__["ExecuteOrderState"] = "State after order execution."
+__pdoc__["ExecuteOrderState.cash"] = "See `ProcessOrderState.cash`."
+__pdoc__["ExecuteOrderState.position"] = "See `ProcessOrderState.position`."
+__pdoc__["ExecuteOrderState.debt"] = "See `ProcessOrderState.debt`."
+__pdoc__["ExecuteOrderState.free_cash"] = "See `ProcessOrderState.free_cash`."
 
 
 class SimulationOutput(tp.NamedTuple):
@@ -700,12 +746,12 @@ class SimulationOutput(tp.NamedTuple):
     in_outputs: tp.Optional[tp.NamedTuple]
 
 
-__pdoc__['SimulationOutput'] = "A named tuple representing the output of a simulation."
-__pdoc__['SimulationOutput.order_records'] = "Order records (flattened)."
-__pdoc__['SimulationOutput.log_records'] = "Log records (flattened)."
-__pdoc__['SimulationOutput.cash_earnings'] = "Earnings added at each timestamp."
-__pdoc__['SimulationOutput.call_seq'] = "Call sequence."
-__pdoc__['SimulationOutput.in_outputs'] = "Named tuple with in-output objects."
+__pdoc__["SimulationOutput"] = "A named tuple representing the output of a simulation."
+__pdoc__["SimulationOutput.order_records"] = "Order records (flattened)."
+__pdoc__["SimulationOutput.log_records"] = "Log records (flattened)."
+__pdoc__["SimulationOutput.cash_earnings"] = "Earnings added at each timestamp."
+__pdoc__["SimulationOutput.call_seq"] = "Call sequence."
+__pdoc__["SimulationOutput.in_outputs"] = "Named tuple with in-output objects."
 
 
 class SimulationContext(tp.NamedTuple):
@@ -745,12 +791,16 @@ class SimulationContext(tp.NamedTuple):
     last_pos_record: tp.RecordArray
 
 
-__pdoc__['SimulationContext'] = """A named tuple representing the context of a simulation.
+__pdoc__[
+    "SimulationContext"
+] = """A named tuple representing the context of a simulation.
 
 Contains general information available to all other contexts.
 
 Passed to `pre_sim_func_nb` and `post_sim_func_nb`."""
-__pdoc__['SimulationContext.target_shape'] = """Target shape of the simulation.
+__pdoc__[
+    "SimulationContext.target_shape"
+] = """Target shape of the simulation.
 
 A tuple with exactly two elements: the number of rows and columns.
 
@@ -758,7 +808,9 @@ Example:
     One day of minute data for three assets would yield a `target_shape` of `(1440, 3)`,
     where the first axis are rows (minutes) and the second axis are columns (assets).
 """
-__pdoc__['SimulationContext.group_lens'] = """Number of columns in each group.
+__pdoc__[
+    "SimulationContext.group_lens"
+] = """Number of columns in each group.
 
 Even if columns are not grouped, `group_lens` contains ones - one column per group.
 
@@ -769,8 +821,10 @@ Example:
     In pairs trading, `group_lens` would be `np.array([2])`, while three independent
     columns would be represented by `group_lens` of `np.array([1, 1, 1])`.
 """
-__pdoc__['SimulationContext.cash_sharing'] = "Whether cash sharing is enabled."
-__pdoc__['SimulationContext.call_seq'] = """Default sequence of calls per segment.
+__pdoc__["SimulationContext.cash_sharing"] = "Whether cash sharing is enabled."
+__pdoc__[
+    "SimulationContext.call_seq"
+] = """Default sequence of calls per segment.
 
 Controls the sequence in which `order_func_nb` is executed within each segment.
 
@@ -792,7 +846,9 @@ Example:
     ])
     ```
 """
-__pdoc__['SimulationContext.init_cash'] = """Initial capital per column (or per group with cash sharing).
+__pdoc__[
+    "SimulationContext.init_cash"
+] = """Initial capital per column (or per group with cash sharing).
 
 Utilizes flexible indexing using `vectorbtpro.base.indexing.flex_select_auto_nb` and `flex_2d=True`, 
 so it can be passed as 1-dim array per column, or as a scalar. 
@@ -807,7 +863,9 @@ Example:
     and one group of one column, the `init_cash` would be `np.array([200, 100])` with cash sharing
     and `np.array([100, 100, 100])` without cash sharing.
 """
-__pdoc__['SimulationContext.init_position'] = """Initial position per column.
+__pdoc__[
+    "SimulationContext.init_position"
+] = """Initial position per column.
 
 Utilizes flexible indexing using `vectorbtpro.base.indexing.flex_select_auto_nb` and `flex_2d=True`, 
 so it can be passed as 1-dim array per column, or as a scalar. 
@@ -817,7 +875,9 @@ Must broadcast to shape `(target_shape[1],)`.
 !!! note
     Changing this array may produce results inconsistent with those of `vectorbtpro.portfolio.base.Portfolio`.
 """
-__pdoc__['SimulationContext.cash_deposits'] = """Cash to be deposited/withdrawn per column 
+__pdoc__[
+    "SimulationContext.cash_deposits"
+] = """Cash to be deposited/withdrawn per column 
 (or per group with cash sharing).
 
 Utilizes flexible indexing using `vectorbtpro.base.indexing.flex_select_auto_nb` and `flex_2d`, 
@@ -836,7 +896,9 @@ You can modify this array in `pre_segment_func_nb`.
 !!! note
     To modify the array in place, make sure to build an array of the full shape.
 """
-__pdoc__['SimulationContext.cash_earnings'] = """Earnings to be added per column.
+__pdoc__[
+    "SimulationContext.cash_earnings"
+] = """Earnings to be added per column.
 
 Utilizes flexible indexing using `vectorbtpro.base.indexing.flex_select_auto_nb` and `flex_2d`, 
 so it can be passed as 
@@ -854,7 +916,9 @@ in the value of each group. You can modify this array in `pre_segment_func_nb` o
 !!! note
     To modify the array in place, make sure to build an array of the full shape.
 """
-__pdoc__['SimulationContext.segment_mask'] = """Mask of whether a particular segment should be executed.
+__pdoc__[
+    "SimulationContext.segment_mask"
+] = """Mask of whether a particular segment should be executed.
 
 A segment is simply a sequence of `order_func_nb` calls under the same group and row.
 
@@ -885,24 +949,36 @@ Example:
     
     The first group is only executed in the first row and the second group is only executed in the second row.
 """
-__pdoc__['SimulationContext.call_pre_segment'] = """Whether to call `pre_segment_func_nb` regardless of 
+__pdoc__[
+    "SimulationContext.call_pre_segment"
+] = """Whether to call `pre_segment_func_nb` regardless of 
 `SimulationContext.segment_mask`."""
-__pdoc__['SimulationContext.call_post_segment'] = """Whether to call `post_segment_func_nb` regardless of 
+__pdoc__[
+    "SimulationContext.call_post_segment"
+] = """Whether to call `post_segment_func_nb` regardless of 
 `SimulationContext.segment_mask`.
 
 Allows, for example, to write user-defined arrays such as returns at the end of each segment."""
-__pdoc__['SimulationContext.open'] = """Opening price.
+__pdoc__[
+    "SimulationContext.open"
+] = """Opening price.
 
 Replaces `Order.price` in case it's `-np.inf`.
 
 Similar behavior to that of `SimulationContext.close`."""
-__pdoc__['SimulationContext.high'] = """Highest price.
+__pdoc__[
+    "SimulationContext.high"
+] = """Highest price.
 
 Similar behavior to that of `SimulationContext.close`."""
-__pdoc__['SimulationContext.low'] = """Lowest price.
+__pdoc__[
+    "SimulationContext.low"
+] = """Lowest price.
 
 Similar behavior to that of `SimulationContext.close`."""
-__pdoc__['SimulationContext.close'] = """Closing price at each time step.
+__pdoc__[
+    "SimulationContext.close"
+] = """Closing price at each time step.
 
 Replaces `Order.price` in case it's `np.inf`.
 
@@ -921,24 +997,34 @@ Must broadcast to shape `SimulationContext.target_shape`.
 !!! note
     To modify the array in place, make sure to build an array of the full shape.
 """
-__pdoc__['SimulationContext.bm_close'] = """Benchmark closing price at each time step.
+__pdoc__[
+    "SimulationContext.bm_close"
+] = """Benchmark closing price at each time step.
 
 Can be None to indicate that the user should use `SimulationContext.close`.
 
 If an array, has the same shape as `SimulationContext.close`."""
-__pdoc__['SimulationContext.ffill_val_price'] = """Whether to track valuation price only if it's known.
+__pdoc__[
+    "SimulationContext.ffill_val_price"
+] = """Whether to track valuation price only if it's known.
 
 Otherwise, unknown `SimulationContext.close` will lead to NaN in valuation price at the next timestamp."""
-__pdoc__['SimulationContext.update_value'] = """Whether to update group value after each filled order.
+__pdoc__[
+    "SimulationContext.update_value"
+] = """Whether to update group value after each filled order.
 
 Otherwise, stays the same for all columns in the group (the value is calculated
 only once, before executing any order).
 
 The change is marginal and mostly driven by transaction costs and slippage."""
-__pdoc__['SimulationContext.fill_pos_record'] = """Whether to fill position record.
+__pdoc__[
+    "SimulationContext.fill_pos_record"
+] = """Whether to fill position record.
 
 Disable this to make simulation faster for simple use cases."""
-__pdoc__['SimulationContext.track_value'] = """Whether to track value metrics such as 
+__pdoc__[
+    "SimulationContext.track_value"
+] = """Whether to track value metrics such as 
 the current valuation price, value, and return.
 
 If False, 'SimulationContext.last_val_price', 'SimulationContext.last_value', and 
@@ -946,7 +1032,9 @@ If False, 'SimulationContext.last_val_price', 'SimulationContext.last_value', an
 You won't be able to use `SizeType.Value`, `SizeType.TargetValue`, and `SizeType.TargetPercent`.
 
 Disable this to make simulation faster for simple use cases."""
-__pdoc__['SimulationContext.flex_2d'] = """Whether the elements in a 1-dim array should be treated per
+__pdoc__[
+    "SimulationContext.flex_2d"
+] = """Whether the elements in a 1-dim array should be treated per
 column rather than per row.
 
 This flag is set automatically when using `vectorbtpro.portfolio.base.Portfolio.from_order_func` depending upon 
@@ -954,7 +1042,9 @@ whether there is any argument that has been broadcast to 2 dimensions.
 
 Has only effect when using flexible indexing, for example, with `vectorbtpro.base.indexing.flex_select_auto_nb`.
 """
-__pdoc__['SimulationContext.order_records'] = """Order records per column.
+__pdoc__[
+    "SimulationContext.order_records"
+] = """Order records per column.
 
 It's a 2-dimensional array with records of type `order_dt`.
 
@@ -980,13 +1070,19 @@ Example:
     np.array([(0, 0, 1, 50., 1., 0., 1)]
     ```
 """
-__pdoc__['SimulationContext.log_records'] = """Log records per column.
+__pdoc__[
+    "SimulationContext.log_records"
+] = """Log records per column.
 
 Similar to `SimulationContext.order_records` but of type `log_dt` and index `SimulationContext.last_lidx`."""
-__pdoc__['SimulationContext.in_outputs'] = """Named tuple with in-output objects.
+__pdoc__[
+    "SimulationContext.in_outputs"
+] = """Named tuple with in-output objects.
 
 Can contain objects of arbitrary shape and type. Will be returned as part of `SimulationOutput`."""
-__pdoc__['SimulationContext.last_cash'] = """Latest cash per column (or per group with cash sharing).
+__pdoc__[
+    "SimulationContext.last_cash"
+] = """Latest cash per column (or per group with cash sharing).
 
 At the very first timestamp, contains initial capital.
 
@@ -995,7 +1091,9 @@ Gets updated right after `order_func_nb`.
 !!! note
     Changing this array may produce results inconsistent with those of `vectorbtpro.portfolio.base.Portfolio`.
 """
-__pdoc__['SimulationContext.last_position'] = """Latest position per column.
+__pdoc__[
+    "SimulationContext.last_position"
+] = """Latest position per column.
 
 At the very first timestamp, contains initial position.
 
@@ -1006,7 +1104,9 @@ Gets updated right after `order_func_nb`.
 !!! note
     Changing this array may produce results inconsistent with those of `vectorbtpro.portfolio.base.Portfolio`.
 """
-__pdoc__['SimulationContext.last_debt'] = """Latest debt from shorting per column.
+__pdoc__[
+    "SimulationContext.last_debt"
+] = """Latest debt from shorting per column.
 
 Debt is the total value from shorting that hasn't been covered yet. Used to update `OrderContext.free_cash_now`.
 
@@ -1017,7 +1117,9 @@ Gets updated right after `order_func_nb`.
 !!! note
     Changing this array may produce results inconsistent with those of `vectorbtpro.portfolio.base.Portfolio`.
 """
-__pdoc__['SimulationContext.last_free_cash'] = """Latest free cash per column (or per group with cash sharing).
+__pdoc__[
+    "SimulationContext.last_free_cash"
+] = """Latest free cash per column (or per group with cash sharing).
 
 Free cash never goes above the initial level, because an operation always costs money.
 
@@ -1028,7 +1130,9 @@ Gets updated right after `order_func_nb`.
 !!! note
     Changing this array may produce results inconsistent with those of `vectorbtpro.portfolio.base.Portfolio`.
 """
-__pdoc__['SimulationContext.last_val_price'] = """Latest valuation price per column.
+__pdoc__[
+    "SimulationContext.last_val_price"
+] = """Latest valuation price per column.
 
 Has shape `(target_shape[1],)`.
 
@@ -1059,7 +1163,9 @@ Example:
     with cash sharing, the group is valued at $1400 before any `order_func_nb` is called, and can 
     be later accessed via `OrderContext.value_now`.
 """
-__pdoc__['SimulationContext.last_value'] = """Latest value per column (or per group with cash sharing).
+__pdoc__[
+    "SimulationContext.last_value"
+] = """Latest value per column (or per group with cash sharing).
 
 Calculated by multiplying valuation price by the current position.
 The value of each column in a group with cash sharing is summed to get the value of the entire group.
@@ -1072,7 +1178,9 @@ only affected by costs). Finally, gets updated right before `post_segment_func_n
 !!! note
     Changing this array may produce results inconsistent with those of `vectorbtpro.portfolio.base.Portfolio`.
 """
-__pdoc__['SimulationContext.last_return'] = """Latest return per column (or per group with cash sharing).
+__pdoc__[
+    "SimulationContext.last_return"
+] = """Latest return per column (or per group with cash sharing).
 
 Has the same shape as `SimulationContext.last_value`.
 
@@ -1083,7 +1191,9 @@ Gets updated each time `SimulationContext.last_value` is updated.
 !!! note
     Changing this array may produce results inconsistent with those of `vectorbtpro.portfolio.base.Portfolio`.
 """
-__pdoc__['SimulationContext.last_oidx'] = """Index of the latest order record of each column.
+__pdoc__[
+    "SimulationContext.last_oidx"
+] = """Index of the latest order record of each column.
 
 Points to `SimulationContext.order_records` and has shape `(target_shape[1],)`.
 
@@ -1095,14 +1205,18 @@ Example:
     !!! note
         Changing this array may produce results inconsistent with those of `vectorbtpro.portfolio.base.Portfolio`.
 """
-__pdoc__['SimulationContext.last_lidx'] = """Index of the latest log record of each column.
+__pdoc__[
+    "SimulationContext.last_lidx"
+] = """Index of the latest log record of each column.
 
 Similar to `SimulationContext.last_oidx` but for log records.
 
 !!! note
     Changing this array may produce results inconsistent with those of `vectorbtpro.portfolio.base.Portfolio`.
 """
-__pdoc__['SimulationContext.last_pos_record'] = """Latest position record of each column.
+__pdoc__[
+    "SimulationContext.last_pos_record"
+] = """Latest position record of each column.
 
 It's a 1-dimensional array with records of type `trade_dt`.
 
@@ -1211,7 +1325,9 @@ class GroupContext(tp.NamedTuple):
     to_col: int
 
 
-__pdoc__['GroupContext'] = """A named tuple representing the context of a group.
+__pdoc__[
+    "GroupContext"
+] = """A named tuple representing the context of a group.
 
 A group is a set of nearby columns that are somehow related (for example, by sharing the same capital).
 In each row, the columns under the same group are bound to the same segment.
@@ -1231,20 +1347,28 @@ Example:
 """
 for field in GroupContext._fields:
     if field in SimulationContext._fields:
-        __pdoc__['GroupContext.' + field] = f"See `SimulationContext.{field}`."
-__pdoc__['GroupContext.group'] = """Index of the current group.
+        __pdoc__["GroupContext." + field] = f"See `SimulationContext.{field}`."
+__pdoc__[
+    "GroupContext.group"
+] = """Index of the current group.
 
 Has range `[0, group_lens.shape[0])`.
 """
-__pdoc__['GroupContext.group_len'] = """Number of columns in the current group.
+__pdoc__[
+    "GroupContext.group_len"
+] = """Number of columns in the current group.
 
 Scalar value. Same as `group_lens[group]`.
 """
-__pdoc__['GroupContext.from_col'] = """Index of the first column in the current group.
+__pdoc__[
+    "GroupContext.from_col"
+] = """Index of the first column in the current group.
 
 Has range `[0, target_shape[1])`.
 """
-__pdoc__['GroupContext.to_col'] = """Index of the last column in the current group plus one.
+__pdoc__[
+    "GroupContext.to_col"
+] = """Index of the last column in the current group plus one.
 
 Has range `[1, target_shape[1] + 1)`. 
 
@@ -1293,7 +1417,9 @@ class RowContext(tp.NamedTuple):
     i: int
 
 
-__pdoc__['RowContext'] = """A named tuple representing the context of a row.
+__pdoc__[
+    "RowContext"
+] = """A named tuple representing the context of a row.
 
 A row is a time step in which segments are executed.
 
@@ -1303,8 +1429,10 @@ Passed to `pre_row_func_nb` and `post_row_func_nb`.
 """
 for field in RowContext._fields:
     if field in SimulationContext._fields:
-        __pdoc__['RowContext.' + field] = f"See `SimulationContext.{field}`."
-__pdoc__['RowContext.i'] = """Index of the current row.
+        __pdoc__["RowContext." + field] = f"See `SimulationContext.{field}`."
+__pdoc__[
+    "RowContext.i"
+] = """Index of the current row.
 
 Has range `[0, target_shape[0])`.
 """
@@ -1353,7 +1481,9 @@ class SegmentContext(tp.NamedTuple):
     call_seq_now: tp.Optional[tp.Array1d]
 
 
-__pdoc__['SegmentContext'] = """A named tuple representing the context of a segment.
+__pdoc__[
+    "SegmentContext"
+] = """A named tuple representing the context of a segment.
 
 A segment is an intersection between groups and rows. It's an entity that defines
 how and in which order elements within the same group and row are processed.
@@ -1365,12 +1495,14 @@ Passed to `pre_segment_func_nb` and `post_segment_func_nb`.
 """
 for field in SegmentContext._fields:
     if field in SimulationContext._fields:
-        __pdoc__['SegmentContext.' + field] = f"See `SimulationContext.{field}`."
+        __pdoc__["SegmentContext." + field] = f"See `SimulationContext.{field}`."
     elif field in GroupContext._fields:
-        __pdoc__['SegmentContext.' + field] = f"See `GroupContext.{field}`."
+        __pdoc__["SegmentContext." + field] = f"See `GroupContext.{field}`."
     elif field in RowContext._fields:
-        __pdoc__['SegmentContext.' + field] = f"See `RowContext.{field}`."
-__pdoc__['SegmentContext.call_seq_now'] = """Sequence of calls within the current segment.
+        __pdoc__["SegmentContext." + field] = f"See `RowContext.{field}`."
+__pdoc__[
+    "SegmentContext.call_seq_now"
+] = """Sequence of calls within the current segment.
 
 Has shape `(group_len,)`. 
 
@@ -1437,7 +1569,9 @@ class OrderContext(tp.NamedTuple):
     pos_record_now: tp.Record
 
 
-__pdoc__['OrderContext'] = """A named tuple representing the context of an order.
+__pdoc__[
+    "OrderContext"
+] = """A named tuple representing the context of an order.
 
 Contains all fields from `SegmentContext` plus fields describing the current state.
 
@@ -1445,29 +1579,33 @@ Passed to `order_func_nb`.
 """
 for field in OrderContext._fields:
     if field in SimulationContext._fields:
-        __pdoc__['OrderContext.' + field] = f"See `SimulationContext.{field}`."
+        __pdoc__["OrderContext." + field] = f"See `SimulationContext.{field}`."
     elif field in GroupContext._fields:
-        __pdoc__['OrderContext.' + field] = f"See `GroupContext.{field}`."
+        __pdoc__["OrderContext." + field] = f"See `GroupContext.{field}`."
     elif field in RowContext._fields:
-        __pdoc__['OrderContext.' + field] = f"See `RowContext.{field}`."
+        __pdoc__["OrderContext." + field] = f"See `RowContext.{field}`."
     elif field in SegmentContext._fields:
-        __pdoc__['OrderContext.' + field] = f"See `SegmentContext.{field}`."
-__pdoc__['OrderContext.col'] = """Current column.
+        __pdoc__["OrderContext." + field] = f"See `SegmentContext.{field}`."
+__pdoc__[
+    "OrderContext.col"
+] = """Current column.
 
 Has range `[0, target_shape[1])` and is always within `[from_col, to_col)`.
 """
-__pdoc__['OrderContext.call_idx'] = """Index of the current call in `SegmentContext.call_seq_now`.
+__pdoc__[
+    "OrderContext.call_idx"
+] = """Index of the current call in `SegmentContext.call_seq_now`.
 
 Has range `[0, group_len)`.
 """
-__pdoc__['OrderContext.cash_now'] = "`SimulationContext.last_cash` for the current column/group."
-__pdoc__['OrderContext.position_now'] = "`SimulationContext.last_position` for the current column."
-__pdoc__['OrderContext.debt_now'] = "`SimulationContext.last_debt` for the current column."
-__pdoc__['OrderContext.free_cash_now'] = "`SimulationContext.last_free_cash` for the current column/group."
-__pdoc__['OrderContext.val_price_now'] = "`SimulationContext.last_val_price` for the current column."
-__pdoc__['OrderContext.value_now'] = "`SimulationContext.last_value` for the current column/group."
-__pdoc__['OrderContext.return_now'] = "`SimulationContext.last_return` for the current column/group."
-__pdoc__['OrderContext.pos_record_now'] = "`SimulationContext.last_pos_record` for the current column."
+__pdoc__["OrderContext.cash_now"] = "`SimulationContext.last_cash` for the current column/group."
+__pdoc__["OrderContext.position_now"] = "`SimulationContext.last_position` for the current column."
+__pdoc__["OrderContext.debt_now"] = "`SimulationContext.last_debt` for the current column."
+__pdoc__["OrderContext.free_cash_now"] = "`SimulationContext.last_free_cash` for the current column/group."
+__pdoc__["OrderContext.val_price_now"] = "`SimulationContext.last_val_price` for the current column."
+__pdoc__["OrderContext.value_now"] = "`SimulationContext.last_value` for the current column/group."
+__pdoc__["OrderContext.return_now"] = "`SimulationContext.last_return` for the current column/group."
+__pdoc__["OrderContext.pos_record_now"] = "`SimulationContext.last_pos_record` for the current column."
 
 
 class PostOrderContext(tp.NamedTuple):
@@ -1530,7 +1668,9 @@ class PostOrderContext(tp.NamedTuple):
     pos_record_now: tp.Record
 
 
-__pdoc__['PostOrderContext'] = """A named tuple representing the context after an order has been processed.
+__pdoc__[
+    "PostOrderContext"
+] = """A named tuple representing the context after an order has been processed.
 
 Contains all fields from `OrderContext` plus fields describing the order result and the previous state.
 
@@ -1538,40 +1678,46 @@ Passed to `post_order_func_nb`.
 """
 for field in PostOrderContext._fields:
     if field in SimulationContext._fields:
-        __pdoc__['PostOrderContext.' + field] = f"See `SimulationContext.{field}`."
+        __pdoc__["PostOrderContext." + field] = f"See `SimulationContext.{field}`."
     elif field in GroupContext._fields:
-        __pdoc__['PostOrderContext.' + field] = f"See `GroupContext.{field}`."
+        __pdoc__["PostOrderContext." + field] = f"See `GroupContext.{field}`."
     elif field in RowContext._fields:
-        __pdoc__['PostOrderContext.' + field] = f"See `RowContext.{field}`."
+        __pdoc__["PostOrderContext." + field] = f"See `RowContext.{field}`."
     elif field in SegmentContext._fields:
-        __pdoc__['PostOrderContext.' + field] = f"See `SegmentContext.{field}`."
+        __pdoc__["PostOrderContext." + field] = f"See `SegmentContext.{field}`."
     elif field in OrderContext._fields:
-        __pdoc__['PostOrderContext.' + field] = f"See `OrderContext.{field}`."
-__pdoc__['PostOrderContext.cash_before'] = "`OrderContext.cash_now` before execution."
-__pdoc__['PostOrderContext.position_before'] = "`OrderContext.position_now` before execution."
-__pdoc__['PostOrderContext.debt_before'] = "`OrderContext.debt_now` before execution."
-__pdoc__['PostOrderContext.free_cash_before'] = "`OrderContext.free_cash_now` before execution."
-__pdoc__['PostOrderContext.val_price_before'] = "`OrderContext.val_price_now` before execution."
-__pdoc__['PostOrderContext.value_before'] = "`OrderContext.value_now` before execution."
-__pdoc__['PostOrderContext.order_result'] = """Order result of type `OrderResult`.
+        __pdoc__["PostOrderContext." + field] = f"See `OrderContext.{field}`."
+__pdoc__["PostOrderContext.cash_before"] = "`OrderContext.cash_now` before execution."
+__pdoc__["PostOrderContext.position_before"] = "`OrderContext.position_now` before execution."
+__pdoc__["PostOrderContext.debt_before"] = "`OrderContext.debt_now` before execution."
+__pdoc__["PostOrderContext.free_cash_before"] = "`OrderContext.free_cash_now` before execution."
+__pdoc__["PostOrderContext.val_price_before"] = "`OrderContext.val_price_now` before execution."
+__pdoc__["PostOrderContext.value_before"] = "`OrderContext.value_now` before execution."
+__pdoc__[
+    "PostOrderContext.order_result"
+] = """Order result of type `OrderResult`.
 
 Can be used to check whether the order has been filled, ignored, or rejected.
 """
-__pdoc__['PostOrderContext.cash_now'] = "`OrderContext.cash_now` after execution."
-__pdoc__['PostOrderContext.position_now'] = "`OrderContext.position_now` after execution."
-__pdoc__['PostOrderContext.debt_now'] = "`OrderContext.debt_now` after execution."
-__pdoc__['PostOrderContext.free_cash_now'] = "`OrderContext.free_cash_now` after execution."
-__pdoc__['PostOrderContext.val_price_now'] = """`OrderContext.val_price_now` after execution.
+__pdoc__["PostOrderContext.cash_now"] = "`OrderContext.cash_now` after execution."
+__pdoc__["PostOrderContext.position_now"] = "`OrderContext.position_now` after execution."
+__pdoc__["PostOrderContext.debt_now"] = "`OrderContext.debt_now` after execution."
+__pdoc__["PostOrderContext.free_cash_now"] = "`OrderContext.free_cash_now` after execution."
+__pdoc__[
+    "PostOrderContext.val_price_now"
+] = """`OrderContext.val_price_now` after execution.
 
 If `SimulationContext.update_value`, gets replaced with the fill price, 
 as it becomes the most recently known price. Otherwise, stays the same.
 """
-__pdoc__['PostOrderContext.value_now'] = """`OrderContext.value_now` after execution.
+__pdoc__[
+    "PostOrderContext.value_now"
+] = """`OrderContext.value_now` after execution.
 
 If `SimulationContext.update_value`, gets updated with the new cash and value of the column. Otherwise, stays the same.
 """
-__pdoc__['PostOrderContext.return_now'] = "`OrderContext.return_now` after execution."
-__pdoc__['PostOrderContext.pos_record_now'] = "`OrderContext.pos_record_now` after execution."
+__pdoc__["PostOrderContext.return_now"] = "`OrderContext.return_now` after execution."
+__pdoc__["PostOrderContext.pos_record_now"] = "`OrderContext.pos_record_now` after execution."
 
 
 class FlexOrderContext(tp.NamedTuple):
@@ -1618,7 +1764,9 @@ class FlexOrderContext(tp.NamedTuple):
     call_idx: int
 
 
-__pdoc__['FlexOrderContext'] = """A named tuple representing the context of a flexible order.
+__pdoc__[
+    "FlexOrderContext"
+] = """A named tuple representing the context of a flexible order.
 
 Contains all fields from `SegmentContext` plus the current call index.
 
@@ -1626,14 +1774,14 @@ Passed to `flex_order_func_nb`.
 """
 for field in FlexOrderContext._fields:
     if field in SimulationContext._fields:
-        __pdoc__['FlexOrderContext.' + field] = f"See `SimulationContext.{field}`."
+        __pdoc__["FlexOrderContext." + field] = f"See `SimulationContext.{field}`."
     elif field in GroupContext._fields:
-        __pdoc__['FlexOrderContext.' + field] = f"See `GroupContext.{field}`."
+        __pdoc__["FlexOrderContext." + field] = f"See `GroupContext.{field}`."
     elif field in RowContext._fields:
-        __pdoc__['FlexOrderContext.' + field] = f"See `RowContext.{field}`."
+        __pdoc__["FlexOrderContext." + field] = f"See `RowContext.{field}`."
     elif field in SegmentContext._fields:
-        __pdoc__['FlexOrderContext.' + field] = f"See `SegmentContext.{field}`."
-__pdoc__['FlexOrderContext.call_idx'] = "Index of the current call."
+        __pdoc__["FlexOrderContext." + field] = f"See `SegmentContext.{field}`."
+__pdoc__["FlexOrderContext.call_idx"] = "Index of the current call."
 
 
 class Order(tp.NamedTuple):
@@ -1655,12 +1803,16 @@ class Order(tp.NamedTuple):
     log: bool = False
 
 
-__pdoc__['Order'] = """A named tuple representing an order.
+__pdoc__[
+    "Order"
+] = """A named tuple representing an order.
 
 !!! note
     Currently, Numba has issues with using defaults when filling named tuples. 
     Use `vectorbtpro.portfolio.nb.core.order_nb` to create an order."""
-__pdoc__['Order.size'] = """Size in units.
+__pdoc__[
+    "Order.size"
+] = """Size in units.
 
 Behavior depends upon `Order.size_type` and `Order.direction`.
 
@@ -1678,7 +1830,9 @@ For any target size:
 * Set to 0 to close the current position.
 * Set to `np.nan` to skip.
 """
-__pdoc__['Order.price'] = """Price per unit. 
+__pdoc__[
+    "Order.price"
+] = """Price per unit. 
 
 Final price will depend upon slippage.
 
@@ -1687,53 +1841,75 @@ Final price will depend upon slippage.
 
 !!! note
     Make sure to use timestamps that come between (and ideally not including) the current open and close."""
-__pdoc__['Order.size_type'] = "See `SizeType`."
-__pdoc__['Order.direction'] = "See `Direction`."
-__pdoc__['Order.fees'] = """Fees in percentage of the order value.
+__pdoc__["Order.size_type"] = "See `SizeType`."
+__pdoc__["Order.direction"] = "See `Direction`."
+__pdoc__[
+    "Order.fees"
+] = """Fees in percentage of the order value.
 
 Negative trading fees like -0.05 means earning 0.05% per trade instead of paying a fee.
 
 !!! note
     0.01 = 1%."""
-__pdoc__['Order.fixed_fees'] = """Fixed amount of fees to pay for this order.
+__pdoc__[
+    "Order.fixed_fees"
+] = """Fixed amount of fees to pay for this order.
 
 Similar to `Order.fees`, can be negative."""
-__pdoc__['Order.slippage'] = """Slippage in percentage of `Order.price`. 
+__pdoc__[
+    "Order.slippage"
+] = """Slippage in percentage of `Order.price`. 
 
 Slippage is a penalty applied on the price.
 
 !!! note
     0.01 = 1%."""
-__pdoc__['Order.min_size'] = """Minimum size in both directions. 
+__pdoc__[
+    "Order.min_size"
+] = """Minimum size in both directions. 
 
 Lower than that will be rejected."""
-__pdoc__['Order.max_size'] = """Maximum size in both directions. 
+__pdoc__[
+    "Order.max_size"
+] = """Maximum size in both directions. 
 
 Higher than that will be partly filled."""
-__pdoc__['Order.size_granularity'] = """Granularity of the size.
+__pdoc__[
+    "Order.size_granularity"
+] = """Granularity of the size.
 
 For example, granularity of 1.0 makes the quantity to behave like an integer. 
 Placing an order of 12.5 shares (in any direction) will order exactly 12.0 shares.
 
 !!! note
     The filled size remains a floating number."""
-__pdoc__['Order.reject_prob'] = """Probability of rejecting this order to simulate a random rejection event.
+__pdoc__[
+    "Order.reject_prob"
+] = """Probability of rejecting this order to simulate a random rejection event.
 
 Not everything goes smoothly in real life. Use random rejections to test your order management for robustness."""
-__pdoc__['Order.price_area_vio_mode'] = "See `PriceAreaVioMode`."
-__pdoc__['Order.lock_cash'] = """Whether to lock cash when shorting. 
+__pdoc__["Order.price_area_vio_mode"] = "See `PriceAreaVioMode`."
+__pdoc__[
+    "Order.lock_cash"
+] = """Whether to lock cash when shorting. 
 
 If enabled, prevents `free_cash` from turning negative when buying or short selling.
 A negative `free_cash` means one column used collateral of another column, which is generally undesired."""
-__pdoc__['Order.allow_partial'] = """Whether to allow partial fill.
+__pdoc__[
+    "Order.allow_partial"
+] = """Whether to allow partial fill.
 
 Otherwise, the order gets rejected.
 
 Does not apply when `Order.size` is `np.inf`."""
-__pdoc__['Order.raise_reject'] = """Whether to raise exception if order has been rejected.
+__pdoc__[
+    "Order.raise_reject"
+] = """Whether to raise exception if order has been rejected.
 
 Terminates the simulation."""
-__pdoc__['Order.log'] = """Whether to log this order by filling a log record. 
+__pdoc__[
+    "Order.log"
+] = """Whether to log this order by filling a log record. 
 
 Remember to increase `max_logs`."""
 
@@ -1753,11 +1929,11 @@ NoOrder = Order(
     lock_cash=False,
     allow_partial=False,
     raise_reject=False,
-    log=False
+    log=False,
 )
 """_"""
 
-__pdoc__['NoOrder'] = "Order that should not be processed."
+__pdoc__["NoOrder"] = "Order that should not be processed."
 
 
 class OrderResult(tp.NamedTuple):
@@ -1769,13 +1945,13 @@ class OrderResult(tp.NamedTuple):
     status_info: int
 
 
-__pdoc__['OrderResult'] = "A named tuple representing an order result."
-__pdoc__['OrderResult.size'] = "Filled size."
-__pdoc__['OrderResult.price'] = "Filled price per unit, adjusted with slippage."
-__pdoc__['OrderResult.fees'] = "Total fees paid for this order."
-__pdoc__['OrderResult.side'] = "See `OrderSide`."
-__pdoc__['OrderResult.status'] = "See `OrderStatus`."
-__pdoc__['OrderResult.status_info'] = "See `OrderStatusInfo`."
+__pdoc__["OrderResult"] = "A named tuple representing an order result."
+__pdoc__["OrderResult.size"] = "Filled size."
+__pdoc__["OrderResult.price"] = "Filled price per unit, adjusted with slippage."
+__pdoc__["OrderResult.fees"] = "Total fees paid for this order."
+__pdoc__["OrderResult.side"] = "See `OrderSide`."
+__pdoc__["OrderResult.status"] = "See `OrderStatus`."
+__pdoc__["OrderResult.status_info"] = "See `OrderStatusInfo`."
 
 
 class AdjustSLContext(tp.NamedTuple):
@@ -1791,31 +1967,47 @@ class AdjustSLContext(tp.NamedTuple):
     curr_trail: bool
 
 
-__pdoc__['AdjustSLContext'] = "A named tuple representing the context for adjusting (trailing) stop loss."
-__pdoc__['AdjustSLContext.i'] = """Index of the current row.
+__pdoc__["AdjustSLContext"] = "A named tuple representing the context for adjusting (trailing) stop loss."
+__pdoc__[
+    "AdjustSLContext.i"
+] = """Index of the current row.
 
 Has range `[0, target_shape[0])`."""
-__pdoc__['AdjustSLContext.col'] = """Current column.
+__pdoc__[
+    "AdjustSLContext.col"
+] = """Current column.
 
 Has range `[0, target_shape[1])` and is always within `[from_col, to_col)`."""
-__pdoc__['AdjustSLContext.position_now'] = "Latest position."
-__pdoc__['AdjustSLContext.val_price_now'] = "Latest valuation price."
-__pdoc__['AdjustSLContext.init_i'] = """Index of the row of the initial stop.
+__pdoc__["AdjustSLContext.position_now"] = "Latest position."
+__pdoc__["AdjustSLContext.val_price_now"] = "Latest valuation price."
+__pdoc__[
+    "AdjustSLContext.init_i"
+] = """Index of the row of the initial stop.
 
 Doesn't change."""
-__pdoc__['AdjustSLContext.init_price'] = """Price of the initial stop.
+__pdoc__[
+    "AdjustSLContext.init_price"
+] = """Price of the initial stop.
 
 Doesn't change."""
-__pdoc__['AdjustSLContext.curr_i'] = """Index of the row of the updated stop.
+__pdoc__[
+    "AdjustSLContext.curr_i"
+] = """Index of the row of the updated stop.
 
 Gets updated once the price is updated."""
-__pdoc__['AdjustSLContext.curr_price'] = """Current stop price.
+__pdoc__[
+    "AdjustSLContext.curr_price"
+] = """Current stop price.
 
 Gets updated in trailing SL once a higher price is discovered."""
-__pdoc__['AdjustSLContext.curr_stop'] = """Current stop value.
+__pdoc__[
+    "AdjustSLContext.curr_stop"
+] = """Current stop value.
 
 Can be updated by adjustment function."""
-__pdoc__['AdjustSLContext.curr_trail'] = """Current trailing flag.
+__pdoc__[
+    "AdjustSLContext.curr_trail"
+] = """Current trailing flag.
 
 Can be updated by adjustment function."""
 
@@ -1830,14 +2022,14 @@ class AdjustTPContext(tp.NamedTuple):
     curr_stop: float
 
 
-__pdoc__['AdjustTPContext'] = "A named tuple representing the context for adjusting take profit."
-__pdoc__['AdjustTPContext.i'] = "See `AdjustSLContext.i`."
-__pdoc__['AdjustTPContext.col'] = "See `AdjustSLContext.col`."
-__pdoc__['AdjustTPContext.position_now'] = "See `AdjustSLContext.position_now`."
-__pdoc__['AdjustTPContext.val_price_now'] = "See `AdjustSLContext.val_price_now`."
-__pdoc__['AdjustTPContext.init_i'] = "See `AdjustSLContext.init_i`."
-__pdoc__['AdjustTPContext.init_price'] = "See `AdjustSLContext.curr_price`."
-__pdoc__['AdjustTPContext.curr_stop'] = "See `AdjustSLContext.curr_stop`."
+__pdoc__["AdjustTPContext"] = "A named tuple representing the context for adjusting take profit."
+__pdoc__["AdjustTPContext.i"] = "See `AdjustSLContext.i`."
+__pdoc__["AdjustTPContext.col"] = "See `AdjustSLContext.col`."
+__pdoc__["AdjustTPContext.position_now"] = "See `AdjustSLContext.position_now`."
+__pdoc__["AdjustTPContext.val_price_now"] = "See `AdjustSLContext.val_price_now`."
+__pdoc__["AdjustTPContext.init_i"] = "See `AdjustSLContext.init_i`."
+__pdoc__["AdjustTPContext.init_price"] = "See `AdjustSLContext.curr_price`."
+__pdoc__["AdjustTPContext.curr_stop"] = "See `AdjustSLContext.curr_stop`."
 
 
 class SignalContext(tp.NamedTuple):
@@ -1848,26 +2040,33 @@ class SignalContext(tp.NamedTuple):
     flex_2d: bool
 
 
-__pdoc__['AdjustSLContext'] = "A named tuple representing the context for generation of signals."
-__pdoc__['AdjustSLContext.i'] = """Index of the current row.
+__pdoc__["AdjustSLContext"] = "A named tuple representing the context for generation of signals."
+__pdoc__[
+    "AdjustSLContext.i"
+] = """Index of the current row.
 
 Has range `[0, target_shape[0])`."""
-__pdoc__['AdjustSLContext.col'] = """Current column.
+__pdoc__[
+    "AdjustSLContext.col"
+] = """Current column.
 
 Has range `[0, target_shape[1])` and is always within `[from_col, to_col)`."""
-__pdoc__['AdjustSLContext.position_now'] = "Latest position."
-__pdoc__['AdjustSLContext.val_price_now'] = "Latest valuation price."
-__pdoc__['AdjustSLContext.flex_2d'] = "See `vectorbtpro.base.indexing.flex_select_auto_nb`."
+__pdoc__["AdjustSLContext.position_now"] = "Latest position."
+__pdoc__["AdjustSLContext.val_price_now"] = "Latest valuation price."
+__pdoc__["AdjustSLContext.flex_2d"] = "See `vectorbtpro.base.indexing.flex_select_auto_nb`."
 
 
 # ############# In-outputs ############# #
+
 
 class FSInOutputs(tp.NamedTuple):
     returns_pcgs: tp.Optional[tp.Array2d]
 
 
-__pdoc__['FSInOutputs'] = "A named tuple representing the in-outputs for simulation based on signals."
-__pdoc__['FSInOutputs.returns_pcgs'] = """Returns.
+__pdoc__["FSInOutputs"] = "A named tuple representing the in-outputs for simulation based on signals."
+__pdoc__[
+    "FSInOutputs.returns_pcgs"
+] = """Returns.
 
 Gets filled if `fill_returns` is True, otherwise has the shape `(0, 0)`."""
 
@@ -1876,25 +2075,32 @@ class FOInOutputs(tp.NamedTuple):
     returns_pcgs: tp.Optional[tp.Array2d]
 
 
-__pdoc__['FOInOutputs'] = "A named tuple representing the in-outputs for simulation based on orders."
-__pdoc__['FOInOutputs.returns_pcgs'] = """Returns.
+__pdoc__["FOInOutputs"] = "A named tuple representing the in-outputs for simulation based on orders."
+__pdoc__[
+    "FOInOutputs.returns_pcgs"
+] = """Returns.
 
 Gets filled if `fill_returns` is True, otherwise has the shape `(0, 0)`."""
 
 # ############# Records ############# #
 
-order_dt = np.dtype([
-    ('id', np.int_),
-    ('col', np.int_),
-    ('idx', np.int_),
-    ('size', np.float_),
-    ('price', np.float_),
-    ('fees', np.float_),
-    ('side', np.int_),
-], align=True)
+order_dt = np.dtype(
+    [
+        ("id", np.int_),
+        ("col", np.int_),
+        ("idx", np.int_),
+        ("size", np.float_),
+        ("price", np.float_),
+        ("fees", np.float_),
+        ("side", np.int_),
+    ],
+    align=True,
+)
 """_"""
 
-__pdoc__['order_dt'] = f"""`np.dtype` of order records.
+__pdoc__[
+    "order_dt"
+] = f"""`np.dtype` of order records.
 
 ```python
 {prettify(order_dt)}
@@ -1902,26 +2108,28 @@ __pdoc__['order_dt'] = f"""`np.dtype` of order records.
 """
 
 _trade_fields = [
-    ('id', np.int_),
-    ('col', np.int_),
-    ('size', np.float_),
-    ('entry_idx', np.int_),
-    ('entry_price', np.float_),
-    ('entry_fees', np.float_),
-    ('exit_idx', np.int_),
-    ('exit_price', np.float_),
-    ('exit_fees', np.float_),
-    ('pnl', np.float_),
-    ('return', np.float_),
-    ('direction', np.int_),
-    ('status', np.int_),
-    ('parent_id', np.int_)
+    ("id", np.int_),
+    ("col", np.int_),
+    ("size", np.float_),
+    ("entry_idx", np.int_),
+    ("entry_price", np.float_),
+    ("entry_fees", np.float_),
+    ("exit_idx", np.int_),
+    ("exit_price", np.float_),
+    ("exit_fees", np.float_),
+    ("pnl", np.float_),
+    ("return", np.float_),
+    ("direction", np.int_),
+    ("status", np.int_),
+    ("parent_id", np.int_),
 ]
 
 trade_dt = np.dtype(_trade_fields, align=True)
 """_"""
 
-__pdoc__['trade_dt'] = f"""`np.dtype` of trade records.
+__pdoc__[
+    "trade_dt"
+] = f"""`np.dtype` of trade records.
 
 ```python
 {prettify(trade_dt)}
@@ -1929,55 +2137,57 @@ __pdoc__['trade_dt'] = f"""`np.dtype` of trade records.
 """
 
 _log_fields = [
-    ('id', np.int_),
-    ('group', np.int_),
-    ('col', np.int_),
-    ('idx', np.int_),
-    ('open', np.float_),
-    ('high', np.float_),
-    ('low', np.float_),
-    ('close', np.float_),
-    ('cash', np.float_),
-    ('position', np.float_),
-    ('debt', np.float_),
-    ('free_cash', np.float_),
-    ('val_price', np.float_),
-    ('value', np.float_),
-    ('req_size', np.float_),
-    ('req_price', np.float_),
-    ('req_size_type', np.int_),
-    ('req_direction', np.int_),
-    ('req_fees', np.float_),
-    ('req_fixed_fees', np.float_),
-    ('req_slippage', np.float_),
-    ('req_min_size', np.float_),
-    ('req_max_size', np.float_),
-    ('req_size_granularity', np.float_),
-    ('req_reject_prob', np.float_),
-    ('req_price_area_vio_mode', np.int_),
-    ('req_lock_cash', np.bool_),
-    ('req_allow_partial', np.bool_),
-    ('req_raise_reject', np.bool_),
-    ('req_log', np.bool_),
-    ('new_cash', np.float_),
-    ('new_position', np.float_),
-    ('new_debt', np.float_),
-    ('new_free_cash', np.float_),
-    ('new_val_price', np.float_),
-    ('new_value', np.float_),
-    ('res_size', np.float_),
-    ('res_price', np.float_),
-    ('res_fees', np.float_),
-    ('res_side', np.int_),
-    ('res_status', np.int_),
-    ('res_status_info', np.int_),
-    ('order_id', np.int_)
+    ("id", np.int_),
+    ("group", np.int_),
+    ("col", np.int_),
+    ("idx", np.int_),
+    ("open", np.float_),
+    ("high", np.float_),
+    ("low", np.float_),
+    ("close", np.float_),
+    ("cash", np.float_),
+    ("position", np.float_),
+    ("debt", np.float_),
+    ("free_cash", np.float_),
+    ("val_price", np.float_),
+    ("value", np.float_),
+    ("req_size", np.float_),
+    ("req_price", np.float_),
+    ("req_size_type", np.int_),
+    ("req_direction", np.int_),
+    ("req_fees", np.float_),
+    ("req_fixed_fees", np.float_),
+    ("req_slippage", np.float_),
+    ("req_min_size", np.float_),
+    ("req_max_size", np.float_),
+    ("req_size_granularity", np.float_),
+    ("req_reject_prob", np.float_),
+    ("req_price_area_vio_mode", np.int_),
+    ("req_lock_cash", np.bool_),
+    ("req_allow_partial", np.bool_),
+    ("req_raise_reject", np.bool_),
+    ("req_log", np.bool_),
+    ("new_cash", np.float_),
+    ("new_position", np.float_),
+    ("new_debt", np.float_),
+    ("new_free_cash", np.float_),
+    ("new_val_price", np.float_),
+    ("new_value", np.float_),
+    ("res_size", np.float_),
+    ("res_price", np.float_),
+    ("res_fees", np.float_),
+    ("res_side", np.int_),
+    ("res_status", np.int_),
+    ("res_status_info", np.int_),
+    ("order_id", np.int_),
 ]
 
 log_dt = np.dtype(_log_fields, align=True)
 """_"""
 
-__pdoc__['log_dt'] = f"""`np.dtype` of log records.
+__pdoc__[
+    "log_dt"
+] = f"""`np.dtype` of log records.
 
 ```python
 {prettify(log_dt)}

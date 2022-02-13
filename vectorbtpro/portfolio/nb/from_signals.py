@@ -15,9 +15,11 @@ from vectorbtpro.utils.math_ import is_less_nb
 
 
 @register_jitted(cache=True)
-def generate_stop_signal_nb(position_now: float,
-                            upon_stop_exit: int,
-                            accumulate: int) -> tp.Tuple[bool, bool, bool, bool, int]:
+def generate_stop_signal_nb(
+    position_now: float,
+    upon_stop_exit: int,
+    accumulate: int,
+) -> tp.Tuple[bool, bool, bool, bool, int]:
     """Generate stop signal and change accumulation if needed."""
     is_long_entry = False
     is_long_exit = False
@@ -49,27 +51,31 @@ def generate_stop_signal_nb(position_now: float,
 
 
 @register_jitted(cache=True)
-def resolve_stop_price_and_slippage_nb(stop_price: float,
-                                       price: float,
-                                       close: float,
-                                       slippage: float,
-                                       stop_exit_price: int) -> tp.Tuple[float, float]:
+def resolve_stop_price_and_slippage_nb(
+    stop_price: float,
+    price: float,
+    close: float,
+    slippage: float,
+    stop_exit_price: int,
+) -> tp.Tuple[float, float]:
     """Resolve price and slippage of a stop order."""
     if stop_exit_price == StopExitPrice.StopMarket:
         return stop_price, slippage
     elif stop_exit_price == StopExitPrice.StopLimit:
-        return stop_price, 0.
+        return stop_price, 0.0
     elif stop_exit_price == StopExitPrice.Close:
         return close, slippage
     return price, slippage
 
 
 @register_jitted(cache=True)
-def resolve_signal_conflict_nb(position_now: float,
-                               is_entry: bool,
-                               is_exit: bool,
-                               direction: int,
-                               conflict_mode: int) -> tp.Tuple[bool, bool]:
+def resolve_signal_conflict_nb(
+    position_now: float,
+    is_entry: bool,
+    is_exit: bool,
+    direction: int,
+    conflict_mode: int,
+) -> tp.Tuple[bool, bool]:
     """Resolve any conflict between an entry and an exit."""
     if is_entry and is_exit:
         # Conflict
@@ -114,10 +120,12 @@ def resolve_signal_conflict_nb(position_now: float,
 
 
 @register_jitted(cache=True)
-def resolve_dir_conflict_nb(position_now: float,
-                            is_long_entry: bool,
-                            is_short_entry: bool,
-                            upon_dir_conflict: int) -> tp.Tuple[bool, bool]:
+def resolve_dir_conflict_nb(
+    position_now: float,
+    is_long_entry: bool,
+    is_short_entry: bool,
+    upon_dir_conflict: int,
+) -> tp.Tuple[bool, bool]:
     """Resolve any direction conflict between a long entry and a short entry."""
     if is_long_entry and is_short_entry:
         if upon_dir_conflict == DirectionConflictMode.Long:
@@ -147,13 +155,15 @@ def resolve_dir_conflict_nb(position_now: float,
 
 
 @register_jitted(cache=True)
-def resolve_opposite_entry_nb(position_now: float,
-                              is_long_entry: bool,
-                              is_long_exit: bool,
-                              is_short_entry: bool,
-                              is_short_exit: bool,
-                              upon_opposite_entry: int,
-                              accumulate: int) -> tp.Tuple[bool, bool, bool, bool, int]:
+def resolve_opposite_entry_nb(
+    position_now: float,
+    is_long_entry: bool,
+    is_long_exit: bool,
+    is_short_entry: bool,
+    is_short_exit: bool,
+    upon_opposite_entry: int,
+    accumulate: int,
+) -> tp.Tuple[bool, bool, bool, bool, int]:
     """Resolve opposite entry."""
     if position_now > 0 and is_short_entry:
         if upon_opposite_entry == OppositeEntryMode.Ignore:
@@ -183,15 +193,17 @@ def resolve_opposite_entry_nb(position_now: float,
 
 
 @register_jitted(cache=True)
-def signals_to_size_nb(position_now: float,
-                       is_long_entry: bool,
-                       is_long_exit: bool,
-                       is_short_entry: bool,
-                       is_short_exit: bool,
-                       size: float,
-                       size_type: int,
-                       accumulate: int,
-                       val_price_now: float) -> tp.Tuple[float, int, int]:
+def signals_to_size_nb(
+    position_now: float,
+    is_long_entry: bool,
+    is_long_exit: bool,
+    is_short_entry: bool,
+    is_short_exit: bool,
+    size: float,
+    size_type: int,
+    accumulate: int,
+    val_price_now: float,
+) -> tp.Tuple[float, int, int]:
     """Translate direction-aware signals into size, size type, and direction."""
     if size_type != SizeType.Amount and size_type != SizeType.Value and size_type != SizeType.Percent:
         raise ValueError("Only SizeType.Amount, SizeType.Value, and SizeType.Percent are supported")
@@ -212,8 +224,7 @@ def signals_to_size_nb(position_now: float,
                 order_size = -abs_position_now
                 if not np.isnan(size):
                     if size_type == SizeType.Percent:
-                        raise ValueError(
-                            "SizeType.Percent does not support position reversal using signals")
+                        raise ValueError("SizeType.Percent does not support position reversal using signals")
                     if size_type == SizeType.Value:
                         order_size -= size / val_price_now
                     else:
@@ -285,13 +296,15 @@ def should_update_stop_nb(stop: float, upon_stop_update: int) -> bool:
 
 
 @register_jitted(cache=True)
-def get_stop_price_nb(position_now: float,
-                      stop_price: float,
-                      stop: float,
-                      open: float,
-                      high: float,
-                      low: float,
-                      hit_below: bool) -> float:
+def get_stop_price_nb(
+    position_now: float,
+    stop_price: float,
+    stop: float,
+    open: float,
+    high: float,
+    low: float,
+    hit_below: bool,
+) -> float:
     """Get stop price.
 
     If hit before open, returns open."""
@@ -338,7 +351,7 @@ AdjustTPFuncT = tp.Callable[[AdjustTPContext, tp.VarArg()], float]
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='group_lens', axis=0),
+    size=ch.ArraySizer(arg_query="group_lens", axis=0),
     arg_take_spec=dict(
         target_shape=ch.ShapeSlicer(axis=1, mapper=base_ch.group_lens_mapper),
         group_lens=ch.ArraySlicer(axis=0),
@@ -394,66 +407,68 @@ AdjustTPFuncT = tp.Callable[[AdjustTPContext, tp.VarArg()], float]
         fill_returns=None,
         max_orders=None,
         max_logs=None,
-        flex_2d=None
+        flex_2d=None,
     ),
     **portfolio_ch.merge_sim_outs_config
 )
-@register_jitted(tags={'can_parallel'})
-def simulate_from_signal_func_nb(target_shape: tp.Shape,
-                                 group_lens: tp.Array1d,
-                                 call_seq: tp.Array2d,
-                                 init_cash: tp.FlexArray = np.asarray(100.),
-                                 init_position: tp.FlexArray = np.asarray(0.),
-                                 cash_deposits: tp.FlexArray = np.asarray(0.),
-                                 cash_earnings: tp.FlexArray = np.asarray(0.),
-                                 cash_dividends: tp.FlexArray = np.asarray(0.),
-                                 signal_func_nb: SignalFuncT = no_signal_func_nb,
-                                 signal_args: tp.ArgsLike = (),
-                                 size: tp.FlexArray = np.asarray(np.inf),
-                                 price: tp.FlexArray = np.asarray(np.inf),
-                                 size_type: tp.FlexArray = np.asarray(SizeType.Amount),
-                                 fees: tp.FlexArray = np.asarray(0.),
-                                 fixed_fees: tp.FlexArray = np.asarray(0.),
-                                 slippage: tp.FlexArray = np.asarray(0.),
-                                 min_size: tp.FlexArray = np.asarray(0.),
-                                 max_size: tp.FlexArray = np.asarray(np.inf),
-                                 size_granularity: tp.FlexArray = np.asarray(np.nan),
-                                 reject_prob: tp.FlexArray = np.asarray(0.),
-                                 price_area_vio_mode: tp.FlexArray = np.asarray(PriceAreaVioMode.Ignore),
-                                 lock_cash: tp.FlexArray = np.asarray(False),
-                                 allow_partial: tp.FlexArray = np.asarray(True),
-                                 raise_reject: tp.FlexArray = np.asarray(False),
-                                 log: tp.FlexArray = np.asarray(False),
-                                 accumulate: tp.FlexArray = np.asarray(AccumulationMode.Disabled),
-                                 upon_long_conflict: tp.FlexArray = np.asarray(ConflictMode.Ignore),
-                                 upon_short_conflict: tp.FlexArray = np.asarray(ConflictMode.Ignore),
-                                 upon_dir_conflict: tp.FlexArray = np.asarray(DirectionConflictMode.Ignore),
-                                 upon_opposite_entry: tp.FlexArray = np.asarray(OppositeEntryMode.ReverseReduce),
-                                 val_price: tp.FlexArray = np.asarray(np.inf),
-                                 open: tp.FlexArray = np.asarray(np.nan),
-                                 high: tp.FlexArray = np.asarray(np.nan),
-                                 low: tp.FlexArray = np.asarray(np.nan),
-                                 close: tp.FlexArray = np.asarray(np.nan),
-                                 sl_stop: tp.FlexArray = np.asarray(np.nan),
-                                 sl_trail: tp.FlexArray = np.asarray(False),
-                                 tp_stop: tp.FlexArray = np.asarray(np.nan),
-                                 stop_entry_price: tp.FlexArray = np.asarray(StopEntryPrice.Close),
-                                 stop_exit_price: tp.FlexArray = np.asarray(StopExitPrice.StopLimit),
-                                 upon_stop_exit: tp.FlexArray = np.asarray(StopExitMode.Close),
-                                 upon_stop_update: tp.FlexArray = np.asarray(StopUpdateMode.Override),
-                                 signal_priority: tp.FlexArray = np.asarray(SignalPriority.Stop),
-                                 adjust_sl_func_nb: AdjustSLFuncT = no_adjust_sl_func_nb,
-                                 adjust_sl_args: tp.Args = (),
-                                 adjust_tp_func_nb: AdjustTPFuncT = no_adjust_tp_func_nb,
-                                 adjust_tp_args: tp.Args = (),
-                                 use_stops: bool = True,
-                                 auto_call_seq: bool = False,
-                                 ffill_val_price: bool = True,
-                                 update_value: bool = False,
-                                 fill_returns: bool = False,
-                                 max_orders: tp.Optional[int] = None,
-                                 max_logs: tp.Optional[int] = 0,
-                                 flex_2d: bool = True) -> SimulationOutput:
+@register_jitted(tags={"can_parallel"})
+def simulate_from_signal_func_nb(
+    target_shape: tp.Shape,
+    group_lens: tp.Array1d,
+    call_seq: tp.Array2d,
+    init_cash: tp.FlexArray = np.asarray(100.0),
+    init_position: tp.FlexArray = np.asarray(0.0),
+    cash_deposits: tp.FlexArray = np.asarray(0.0),
+    cash_earnings: tp.FlexArray = np.asarray(0.0),
+    cash_dividends: tp.FlexArray = np.asarray(0.0),
+    signal_func_nb: SignalFuncT = no_signal_func_nb,
+    signal_args: tp.ArgsLike = (),
+    size: tp.FlexArray = np.asarray(np.inf),
+    price: tp.FlexArray = np.asarray(np.inf),
+    size_type: tp.FlexArray = np.asarray(SizeType.Amount),
+    fees: tp.FlexArray = np.asarray(0.0),
+    fixed_fees: tp.FlexArray = np.asarray(0.0),
+    slippage: tp.FlexArray = np.asarray(0.0),
+    min_size: tp.FlexArray = np.asarray(0.0),
+    max_size: tp.FlexArray = np.asarray(np.inf),
+    size_granularity: tp.FlexArray = np.asarray(np.nan),
+    reject_prob: tp.FlexArray = np.asarray(0.0),
+    price_area_vio_mode: tp.FlexArray = np.asarray(PriceAreaVioMode.Ignore),
+    lock_cash: tp.FlexArray = np.asarray(False),
+    allow_partial: tp.FlexArray = np.asarray(True),
+    raise_reject: tp.FlexArray = np.asarray(False),
+    log: tp.FlexArray = np.asarray(False),
+    accumulate: tp.FlexArray = np.asarray(AccumulationMode.Disabled),
+    upon_long_conflict: tp.FlexArray = np.asarray(ConflictMode.Ignore),
+    upon_short_conflict: tp.FlexArray = np.asarray(ConflictMode.Ignore),
+    upon_dir_conflict: tp.FlexArray = np.asarray(DirectionConflictMode.Ignore),
+    upon_opposite_entry: tp.FlexArray = np.asarray(OppositeEntryMode.ReverseReduce),
+    val_price: tp.FlexArray = np.asarray(np.inf),
+    open: tp.FlexArray = np.asarray(np.nan),
+    high: tp.FlexArray = np.asarray(np.nan),
+    low: tp.FlexArray = np.asarray(np.nan),
+    close: tp.FlexArray = np.asarray(np.nan),
+    sl_stop: tp.FlexArray = np.asarray(np.nan),
+    sl_trail: tp.FlexArray = np.asarray(False),
+    tp_stop: tp.FlexArray = np.asarray(np.nan),
+    stop_entry_price: tp.FlexArray = np.asarray(StopEntryPrice.Close),
+    stop_exit_price: tp.FlexArray = np.asarray(StopExitPrice.StopLimit),
+    upon_stop_exit: tp.FlexArray = np.asarray(StopExitMode.Close),
+    upon_stop_update: tp.FlexArray = np.asarray(StopUpdateMode.Override),
+    signal_priority: tp.FlexArray = np.asarray(SignalPriority.Stop),
+    adjust_sl_func_nb: AdjustSLFuncT = no_adjust_sl_func_nb,
+    adjust_sl_args: tp.Args = (),
+    adjust_tp_func_nb: AdjustTPFuncT = no_adjust_tp_func_nb,
+    adjust_tp_args: tp.Args = (),
+    use_stops: bool = True,
+    auto_call_seq: bool = False,
+    ffill_val_price: bool = True,
+    update_value: bool = False,
+    fill_returns: bool = False,
+    max_orders: tp.Optional[int] = None,
+    max_logs: tp.Optional[int] = 0,
+    flex_2d: bool = True,
+) -> SimulationOutput:
     """Creates an order out of each element by resolving entry and exit signals returned by `signal_func_nb`.
 
     Iterates in the column-major order. Utilizes flexible broadcasting.
@@ -514,9 +529,9 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
     last_position = prepare_last_position_nb(target_shape, init_position)
     last_value = prepare_last_value_nb(target_shape, group_lens, cash_sharing, init_cash, init_position)
 
-    last_cash_deposits = np.full_like(last_cash, 0.)
+    last_cash_deposits = np.full_like(last_cash, 0.0)
     last_val_price = np.full_like(last_position, np.nan)
-    last_debt = np.full(target_shape[1], 0., dtype=np.float_)
+    last_debt = np.full(target_shape[1], 0.0, dtype=np.float_)
     temp_order_value = np.empty(target_shape[1], dtype=np.float_)
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
@@ -524,9 +539,9 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
     last_lidx = np.full(target_shape[1], -1, dtype=np.int_)
     track_cash_earnings = np.any(cash_earnings) or np.any(cash_dividends)
     if track_cash_earnings:
-        cash_earnings_out = np.full(target_shape, 0., dtype=np.float_)
+        cash_earnings_out = np.full(target_shape, 0.0, dtype=np.float_)
     else:
-        cash_earnings_out = np.full((1, 1), 0., dtype=np.float_)
+        cash_earnings_out = np.full((1, 1), 0.0, dtype=np.float_)
 
     if fill_returns:
         returns_pcgs = np.empty((target_shape[0], len(group_lens)), dtype=np.float_)
@@ -618,7 +633,7 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                         curr_i=sl_curr_i[col],
                         curr_price=sl_curr_price[col],
                         curr_stop=sl_curr_stop[col],
-                        curr_trail=sl_curr_trail[col]
+                        curr_trail=sl_curr_trail[col],
                     )
                     sl_curr_stop[col], sl_curr_trail[col] = adjust_sl_func_nb(adjust_sl_ctx, *adjust_sl_args)
                     adjust_tp_ctx = AdjustTPContext(
@@ -628,7 +643,7 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                         val_price_now=last_val_price[col],
                         init_i=tp_init_i[col],
                         init_price=tp_init_price[col],
-                        curr_stop=tp_curr_stop[col]
+                        curr_stop=tp_curr_stop[col],
                     )
                     tp_curr_stop[col] = adjust_tp_func_nb(adjust_tp_ctx, *adjust_tp_args)
 
@@ -659,16 +674,20 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                                 position_now,
                                 sl_curr_price[col],
                                 sl_curr_stop[col],
-                                _open, _high, _low,
-                                True
+                                _open,
+                                _high,
+                                _low,
+                                True,
                             )
                         if np.isnan(stop_price) and not np.isnan(tp_curr_stop[col]):
                             stop_price = get_stop_price_nb(
                                 position_now,
                                 tp_init_price[col],
                                 tp_curr_stop[col],
-                                _open, _high, _low,
-                                False
+                                _open,
+                                _high,
+                                _low,
+                                False,
                             )
 
                         if not np.isnan(sl_curr_stop[col]) and sl_curr_trail[col]:
@@ -687,8 +706,11 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                 if use_stops and not np.isnan(stop_price):
                     # Get stop signal
                     _upon_stop_exit = flex_select_auto_nb(upon_stop_exit, i, col, flex_2d)
-                    is_long_entry, is_long_exit, is_short_entry, is_short_exit, _accumulate = \
-                        generate_stop_signal_nb(position_now, _upon_stop_exit, _accumulate)
+                    is_long_entry, is_long_exit, is_short_entry, is_short_exit, _accumulate = generate_stop_signal_nb(
+                        position_now,
+                        _upon_stop_exit,
+                        _accumulate,
+                    )
 
                     # Resolve price and slippage
                     _close = flex_select_auto_nb(close, i, col, flex_2d)
@@ -700,7 +722,7 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                         _price,
                         _close,
                         _slippage,
-                        _stop_exit_price
+                        _stop_exit_price,
                     )
 
                     # Convert both signals to size (direction-aware), size type, and direction
@@ -713,7 +735,7 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                         flex_select_auto_nb(size, i, col, flex_2d),
                         flex_select_auto_nb(size_type, i, col, flex_2d),
                         _accumulate,
-                        last_val_price[col]
+                        last_val_price[col],
                     )
                     stop_signal_set = not np.isnan(_stex_size)
 
@@ -723,10 +745,9 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                     col=col,
                     position_now=position_now,
                     val_price_now=last_val_price[col],
-                    flex_2d=flex_2d
+                    flex_2d=flex_2d,
                 )
-                is_long_entry, is_long_exit, is_short_entry, is_short_exit = \
-                    signal_func_nb(signal_ctx, *signal_args)
+                is_long_entry, is_long_exit, is_short_entry, is_short_exit = signal_func_nb(signal_ctx, *signal_args)
 
                 # Resolve signal conflicts
                 if is_long_entry or is_short_entry:
@@ -736,7 +757,7 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                         is_long_entry,
                         is_long_exit,
                         Direction.LongOnly,
-                        _upon_long_conflict
+                        _upon_long_conflict,
                     )
                     _upon_short_conflict = flex_select_auto_nb(upon_short_conflict, i, col, flex_2d)
                     is_short_entry, is_short_exit = resolve_signal_conflict_nb(
@@ -744,7 +765,7 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                         is_short_entry,
                         is_short_exit,
                         Direction.ShortOnly,
-                        _upon_short_conflict
+                        _upon_short_conflict,
                     )
 
                     # Resolve direction conflicts
@@ -753,21 +774,20 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                         position_now,
                         is_long_entry,
                         is_short_entry,
-                        _upon_dir_conflict
+                        _upon_dir_conflict,
                     )
 
                     # Resolve opposite entry
                     _upon_opposite_entry = flex_select_auto_nb(upon_opposite_entry, i, col, flex_2d)
-                    is_long_entry, is_long_exit, is_short_entry, is_short_exit, _accumulate = \
-                        resolve_opposite_entry_nb(
-                            position_now,
-                            is_long_entry,
-                            is_long_exit,
-                            is_short_entry,
-                            is_short_exit,
-                            _upon_opposite_entry,
-                            _accumulate
-                        )
+                    is_long_entry, is_long_exit, is_short_entry, is_short_exit, _accumulate = resolve_opposite_entry_nb(
+                        position_now,
+                        is_long_entry,
+                        is_long_exit,
+                        is_short_entry,
+                        is_short_exit,
+                        _upon_opposite_entry,
+                        _accumulate,
+                    )
 
                 # Resolve price and slippage
                 _price = flex_select_auto_nb(price, i, col, flex_2d)
@@ -783,7 +803,7 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                     flex_select_auto_nb(size, i, col, flex_2d),
                     flex_select_auto_nb(size_type, i, col, flex_2d),
                     _accumulate,
-                    last_val_price[col]
+                    last_val_price[col],
                 )
                 user_signal_set = not np.isnan(_size)
 
@@ -811,7 +831,7 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
 
                 if cash_sharing:
                     if np.isnan(_size):
-                        temp_order_value[k] = 0.
+                        temp_order_value[k] = 0.0
                     else:
                         # Approximate order value
                         if _size_type == SizeType.Amount:
@@ -826,7 +846,7 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                                 if _direction == Direction.LongOnly:
                                     temp_order_value[k] = _size * asset_value_now
                                 else:
-                                    max_exposure = (2 * max(asset_value_now, 0) + max(free_cash_now, 0))
+                                    max_exposure = 2 * max(asset_value_now, 0) + max(free_cash_now, 0)
                                     temp_order_value[k] = _size * max_exposure
 
             if cash_sharing:
@@ -887,7 +907,7 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                         lock_cash=flex_select_auto_nb(lock_cash, i, col, flex_2d),
                         allow_partial=flex_select_auto_nb(allow_partial, i, col, flex_2d),
                         raise_reject=flex_select_auto_nb(raise_reject, i, col, flex_2d),
-                        log=flex_select_auto_nb(log, i, col, flex_2d)
+                        log=flex_select_auto_nb(log, i, col, flex_2d),
                     )
 
                     # Process the order
@@ -895,7 +915,7 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                         open=flex_select_auto_nb(open, i, col, flex_2d),
                         high=flex_select_auto_nb(high, i, col, flex_2d),
                         low=flex_select_auto_nb(low, i, col, flex_2d),
-                        close=flex_select_auto_nb(close, i, col, flex_2d)
+                        close=flex_select_auto_nb(close, i, col, flex_2d),
                     )
                     state = ProcessOrderState(
                         cash=cash_now,
@@ -903,7 +923,7 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                         debt=debt_now,
                         free_cash=free_cash_now,
                         val_price=val_price_now,
-                        value=value_now
+                        value=value_now,
                     )
                     order_result, new_state = process_order_nb(
                         group=group,
@@ -916,7 +936,7 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                         order_records=order_records,
                         last_oidx=last_oidx,
                         log_records=log_records,
-                        last_lidx=last_lidx
+                        last_lidx=last_lidx,
                     )
 
                     # Update state
@@ -1008,7 +1028,7 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                             last_value[col] = cash_now + last_position[col] * last_val_price[col]
                         last_return[col] = get_return_nb(
                             prev_close_value[col],
-                            last_value[col] - last_cash_deposits[col]
+                            last_value[col] - last_cash_deposits[col],
                         )
                         prev_close_value[col] = last_value[col]
                         in_outputs.returns_pcgs[i, group] = last_return[col]
@@ -1017,7 +1037,7 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
                 last_value[group] = group_value
                 last_return[group] = get_return_nb(
                     prev_close_value[group],
-                    last_value[group] - last_cash_deposits[group]
+                    last_value[group] - last_cash_deposits[group],
                 )
                 prev_close_value[group] = last_value[group]
                 in_outputs.returns_pcgs[i, group] = last_return[group]
@@ -1029,15 +1049,17 @@ def simulate_from_signal_func_nb(target_shape: tp.Shape,
         last_lidx=last_lidx,
         cash_earnings=cash_earnings_out,
         call_seq=call_seq,
-        in_outputs=in_outputs
+        in_outputs=in_outputs,
     )
 
 
 @register_jitted
-def dir_enex_signal_func_nb(c: SignalContext,
-                            entries: tp.FlexArray,
-                            exits: tp.FlexArray,
-                            direction: tp.FlexArray) -> tp.Tuple[bool, bool, bool, bool]:
+def dir_enex_signal_func_nb(
+    c: SignalContext,
+    entries: tp.FlexArray,
+    exits: tp.FlexArray,
+    direction: tp.FlexArray,
+) -> tp.Tuple[bool, bool, bool, bool]:
     """Resolve direction-aware signals out of entries, exits, and direction."""
     is_entry = flex_select_auto_nb(entries, c.i, c.col, c.flex_2d)
     is_exit = flex_select_auto_nb(exits, c.i, c.col, c.flex_2d)
@@ -1050,11 +1072,13 @@ def dir_enex_signal_func_nb(c: SignalContext,
 
 
 @register_jitted
-def ls_enex_signal_func_nb(c: SignalContext,
-                           long_entries: tp.FlexArray,
-                           long_exits: tp.FlexArray,
-                           short_entries: tp.FlexArray,
-                           short_exits: tp.FlexArray) -> tp.Tuple[bool, bool, bool, bool]:
+def ls_enex_signal_func_nb(
+    c: SignalContext,
+    long_entries: tp.FlexArray,
+    long_exits: tp.FlexArray,
+    short_entries: tp.FlexArray,
+    short_exits: tp.FlexArray,
+) -> tp.Tuple[bool, bool, bool, bool]:
     """Get an element of direction-aware signals."""
     is_long_entry = flex_select_auto_nb(long_entries, c.i, c.col, c.flex_2d)
     is_long_exit = flex_select_auto_nb(long_exits, c.i, c.col, c.flex_2d)

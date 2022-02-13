@@ -17,7 +17,8 @@ class Pickleable:
     def dumps(self, **kwargs) -> bytes:
         """Pickle to bytes."""
         from vectorbtpro.utils.opt_packages import warn_cannot_import
-        warn_cannot_import('dill')
+
+        warn_cannot_import("dill")
         try:
             import dill as pickle
         except ImportError:
@@ -29,7 +30,8 @@ class Pickleable:
     def loads(cls: tp.Type[PickleableT], dumps: bytes, **kwargs) -> PickleableT:
         """Unpickle from bytes."""
         from vectorbtpro.utils.opt_packages import warn_cannot_import
-        warn_cannot_import('dill')
+
+        warn_cannot_import("dill")
         try:
             import dill as pickle
         except ImportError:
@@ -44,8 +46,8 @@ class Pickleable:
         path = Path(path)
         if mkdir_kwargs is None:
             mkdir_kwargs = {}
-        if path.suffix == '':
-            path = path.with_suffix('.pickle')
+        if path.suffix == "":
+            path = path.with_suffix(".pickle")
         check_mkdir(path.parent, **mkdir_kwargs)
         dumps = self.dumps(**kwargs)
         with open(path, "wb") as f:
@@ -58,11 +60,11 @@ class Pickleable:
         If `path` has no suffix and doesn't exist, checks whether there is the same path
         but with the suffix '.pickle' or '.pkl'."""
         path = Path(path)
-        if path.suffix == '' and not path.exists():
-            if path.with_suffix('.pickle').exists():
-                path = path.with_suffix('.pickle')
-            elif path.with_suffix('.pkl').exists():
-                path = path.with_suffix('.pkl')
+        if path.suffix == "" and not path.exists():
+            if path.with_suffix(".pickle").exists():
+                path = path.with_suffix(".pickle")
+            elif path.with_suffix(".pkl").exists():
+                path = path.with_suffix(".pkl")
         with open(path, "rb") as f:
             dumps = f.read()
         return cls.loads(dumps, **kwargs)

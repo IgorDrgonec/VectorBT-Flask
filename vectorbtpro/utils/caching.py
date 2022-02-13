@@ -16,16 +16,17 @@ class Cacheable:
 
     def __init__(self) -> None:
         from vectorbtpro._settings import settings
-        caching_cfg = settings['caching']
 
-        if not caching_cfg['register_lazily']:
+        caching_cfg = settings["caching"]
+
+        if not caching_cfg["register_lazily"]:
             instance_setup = self.get_ca_setup()
             if instance_setup is not None:
                 for unbound_setup in instance_setup.unbound_setups:
                     unbound_setup.cacheable.get_ca_setup(self)
 
     @class_or_instancemethod
-    def get_ca_setup(cls_or_self) -> tp.Union['CAClassSetup', 'CAInstanceSetup']:
+    def get_ca_setup(cls_or_self) -> tp.Union["CAClassSetup", "CAInstanceSetup"]:
         """Get instance setup of type `vectorbtpro.registries.ca_registry.CAInstanceSetup` if the instance method
         was called and class setup of type `vectorbtpro.registries.ca_registry.CAClassSetup` otherwise."""
         from vectorbtpro.registries.ca_registry import CAClassSetup, CAInstanceSetup

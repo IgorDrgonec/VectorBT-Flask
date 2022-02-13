@@ -83,21 +83,22 @@ def is_iterable(arg: tp.Any) -> bool:
 
 def is_numba_enabled() -> bool:
     """Check whether Numba is enabled globally."""
-    return not os.environ.get('NUMBA_DISABLE_JIT', '0') == '1'
+    return not os.environ.get("NUMBA_DISABLE_JIT", "0") == "1"
 
 
 def is_numba_func(arg: tp.Any) -> bool:
     """Check whether the argument is a Numba-compiled function."""
     from vectorbtpro._settings import settings
-    numba_cfg = settings['numba']
 
-    if not numba_cfg['check_func_type']:
+    numba_cfg = settings["numba"]
+
+    if not numba_cfg["check_func_type"]:
         return True
-    if 'NUMBA_DISABLE_JIT' in os.environ:
+    if "NUMBA_DISABLE_JIT" in os.environ:
         if not is_numba_enabled():
-            if not numba_cfg['check_func_suffix']:
+            if not numba_cfg["check_func_suffix"]:
                 return True
-            if arg.__name__.endswith('_nb'):
+            if arg.__name__.endswith("_nb"):
                 return True
     return isinstance(arg, CPUDispatcher)
 
@@ -143,7 +144,7 @@ def is_namedtuple(x: tp.Any) -> bool:
     b = x.__bases__
     if len(b) != 1 or b[0] != tuple:
         return False
-    f = getattr(x, '_fields', None)
+    f = getattr(x, "_fields", None)
     if not isinstance(f, tuple):
         return False
     return all(type(n) == str for n in f)
@@ -155,28 +156,21 @@ def func_accepts_arg(func: tp.Callable, arg_name: str, arg_kind: tp.Optional[tp.
     if arg_kind is not None and isinstance(arg_kind, int):
         arg_kind = (arg_kind,)
     if arg_kind is None:
-        if arg_name.startswith('**'):
-            return arg_name[2:] in [
-                p.name for p in sig.parameters.values()
-                if p.kind == p.VAR_KEYWORD
-            ]
-        if arg_name.startswith('*'):
-            return arg_name[1:] in [
-                p.name for p in sig.parameters.values()
-                if p.kind == p.VAR_POSITIONAL
-            ]
+        if arg_name.startswith("**"):
+            return arg_name[2:] in [p.name for p in sig.parameters.values() if p.kind == p.VAR_KEYWORD]
+        if arg_name.startswith("*"):
+            return arg_name[1:] in [p.name for p in sig.parameters.values() if p.kind == p.VAR_POSITIONAL]
         return arg_name in [
-            p.name for p in sig.parameters.values()
-            if p.kind != p.VAR_POSITIONAL and p.kind != p.VAR_KEYWORD
+            p.name for p in sig.parameters.values() if p.kind != p.VAR_POSITIONAL and p.kind != p.VAR_KEYWORD
         ]
-    return arg_name in [
-        p.name for p in sig.parameters.values()
-        if p.kind in arg_kind
-    ]
+    return arg_name in [p.name for p in sig.parameters.values() if p.kind in arg_kind]
 
 
-def is_equal(arg1: tp.Any, arg2: tp.Any,
-             equality_func: tp.Callable[[tp.Any, tp.Any], bool] = lambda x, y: x == y) -> bool:
+def is_equal(
+    arg1: tp.Any,
+    arg2: tp.Any,
+    equality_func: tp.Callable[[tp.Any, tp.Any], bool] = lambda x, y: x == y,
+) -> bool:
     """Check whether two objects are equal."""
     try:
         return equality_func(arg1, arg2)
@@ -313,6 +307,7 @@ def is_valid_variable_name(arg: str) -> bool:
 
 # ############# Asserts ############# #
 
+
 def safe_assert(arg: tp.Any, msg: tp.Optional[str] = None) -> None:
     if not arg:
         raise AssertionError(msg)
@@ -442,8 +437,11 @@ def assert_len_equal(arg1: tp.Sized, arg2: tp.Sized) -> None:
         raise AssertionError(f"Lengths of {arg1} and {arg2} do not match")
 
 
-def assert_shape_equal(arg1: tp.ArrayLike, arg2: tp.ArrayLike,
-                       axis: tp.Optional[tp.Union[int, tp.Tuple[int, int]]] = None) -> None:
+def assert_shape_equal(
+    arg1: tp.ArrayLike,
+    arg2: tp.ArrayLike,
+    axis: tp.Optional[tp.Union[int, tp.Tuple[int, int]]] = None,
+) -> None:
     """Raise exception if the first argument and the second argument have different shapes along `axis`."""
     arg1 = _to_any_array(arg1)
     arg2 = _to_any_array(arg2)
@@ -453,8 +451,7 @@ def assert_shape_equal(arg1: tp.ArrayLike, arg2: tp.ArrayLike,
     else:
         if isinstance(axis, tuple):
             if arg1.shape[axis[0]] != arg2.shape[axis[1]]:
-                raise AssertionError(
-                    f"Axis {axis[0]} of {arg1.shape} and axis {axis[1]} of {arg2.shape} do not match")
+                raise AssertionError(f"Axis {axis[0]} of {arg1.shape} and axis {axis[1]} of {arg2.shape} do not match")
         else:
             if arg1.shape[axis] != arg2.shape[axis]:
                 raise AssertionError(f"Axis {axis} of {arg1.shape} and {arg2.shape} do not match")

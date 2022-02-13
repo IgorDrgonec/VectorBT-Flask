@@ -38,14 +38,16 @@ def to_mapping(mapping_like: tp.MappingLike, reverse: bool = False) -> dict:
     return mapping
 
 
-def apply_mapping(obj: tp.Any,
-                  mapping_like: tp.Optional[tp.MappingLike] = None,
-                  reverse: bool = False,
-                  ignore_case: bool = True,
-                  ignore_underscores: bool = True,
-                  ignore_type: tp.Optional[tp.MaybeTuple[tp.DTypeLike]] = None,
-                  ignore_missing: bool = False,
-                  na_sentinel: tp.Any = None) -> tp.Any:
+def apply_mapping(
+    obj: tp.Any,
+    mapping_like: tp.Optional[tp.MappingLike] = None,
+    reverse: bool = False,
+    ignore_case: bool = True,
+    ignore_underscores: bool = True,
+    ignore_type: tp.Optional[tp.MaybeTuple[tp.DTypeLike]] = None,
+    ignore_missing: bool = False,
+    na_sentinel: tp.Any = None,
+) -> tp.Any:
     """Apply mapping on object using a mapping-like object.
 
     Args:
@@ -66,11 +68,11 @@ def apply_mapping(obj: tp.Any,
         return obj
 
     if ignore_case and ignore_underscores:
-        key_func = lambda x: x.lower().replace('_', '')
+        key_func = lambda x: x.lower().replace("_", "")
     elif ignore_case:
         key_func = lambda x: x.lower()
     elif ignore_underscores:
-        key_func = lambda x: x.replace('_', '')
+        key_func = lambda x: x.replace("_", "")
     else:
         key_func = lambda x: x
     if not isinstance(ignore_type, tuple):
@@ -89,7 +91,7 @@ def apply_mapping(obj: tp.Any,
 
     def _compatible_types(x_type: type, item: tp.Any = None) -> bool:
         if item is not None:
-            if np.dtype(x_type) == 'O':
+            if np.dtype(x_type) == "O":
                 x_type = type(item)
         for y_type in ignore_type:
             if y_type is None:
@@ -123,16 +125,19 @@ def apply_mapping(obj: tp.Any,
         return new_mapping[x]
 
     if isinstance(obj, (tuple, list, set, frozenset)):
-        result = [apply_mapping(
-            v,
-            mapping_like=mapping_like,
-            reverse=reverse,
-            ignore_case=ignore_case,
-            ignore_underscores=ignore_underscores,
-            ignore_type=ignore_type,
-            ignore_missing=ignore_missing,
-            na_sentinel=na_sentinel
-        ) for v in obj]
+        result = [
+            apply_mapping(
+                v,
+                mapping_like=mapping_like,
+                reverse=reverse,
+                ignore_case=ignore_case,
+                ignore_underscores=ignore_underscores,
+                ignore_type=ignore_type,
+                ignore_missing=ignore_missing,
+                na_sentinel=na_sentinel,
+            )
+            for v in obj
+        ]
         return type(obj)(result)
     if isinstance(obj, np.ndarray):
         if obj.size == 0:

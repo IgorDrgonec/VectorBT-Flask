@@ -15,7 +15,7 @@ def hstack_image_arrays(a: tp.Array3d, b: tp.Array3d) -> tp.Array3d:
     h2, w2, _ = b.shape
     c = np.full((max(h1, h2), w1 + w2, d), 255, np.uint8)
     c[:h1, :w1, :] = a
-    c[:h2, w1:w1 + w2, :] = b
+    c[:h2, w1 : w1 + w2, :] = b
     return c
 
 
@@ -25,22 +25,24 @@ def vstack_image_arrays(a: tp.Array3d, b: tp.Array3d) -> tp.Array3d:
     h2, w2, _ = b.shape
     c = np.full((h1 + h2, max(w1, w2), d), 255, np.uint8)
     c[:h1, :w1, :] = a
-    c[h1:h1 + h2, :w2, :] = b
+    c[h1 : h1 + h2, :w2, :] = b
     return c
 
 
-def save_animation(fname: str,
-                   index: tp.Sequence,
-                   plot_func: tp.Callable,
-                   *args,
-                   delta: tp.Optional[int] = None,
-                   step: int = 1,
-                   fps: int = 3,
-                   writer_kwargs: dict = None,
-                   show_progress: bool = True,
-                   pbar_kwargs: tp.KwargsLike = None,
-                   to_image_kwargs: tp.KwargsLike = None,
-                   **kwargs) -> None:
+def save_animation(
+    fname: str,
+    index: tp.Sequence,
+    plot_func: tp.Callable,
+    *args,
+    delta: tp.Optional[int] = None,
+    step: int = 1,
+    fps: int = 3,
+    writer_kwargs: dict = None,
+    show_progress: bool = True,
+    pbar_kwargs: tp.KwargsLike = None,
+    to_image_kwargs: tp.KwargsLike = None,
+    **kwargs
+) -> None:
     """Save animation to a file.
 
     Args:
@@ -61,7 +63,8 @@ def save_animation(fname: str,
         **kwargs: Keyword arguments passed to `plot_func`.
     """
     from vectorbtpro.utils.opt_packages import assert_can_import
-    assert_can_import('plotly')
+
+    assert_can_import("plotly")
     import plotly.graph_objects as go
 
     if writer_kwargs is None:
@@ -77,7 +80,7 @@ def save_animation(fname: str,
         pbar = get_pbar(range(0, len(index) - delta + 1, step), show_progress=show_progress, **pbar_kwargs)
         for i in pbar:
             pbar.set_description("{} - {}".format(str(index[i]), str(index[i + delta - 1])))
-            fig = plot_func(index[i:i + delta], *args, **kwargs)
+            fig = plot_func(index[i : i + delta], *args, **kwargs)
             if isinstance(fig, (go.Figure, go.FigureWidget)):
                 fig = fig.to_image(format="png", **to_image_kwargs)
             if not isinstance(fig, np.ndarray):

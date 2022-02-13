@@ -21,9 +21,11 @@ def shuffle_call_seq_nb(call_seq: tp.Array2d, group_lens: tp.Array1d) -> None:
 
 
 @register_jitted(cache=True)
-def build_call_seq_nb(target_shape: tp.Shape,
-                      group_lens: tp.Array1d,
-                      call_seq_type: int = CallSeqType.Default) -> tp.Array2d:
+def build_call_seq_nb(
+    target_shape: tp.Shape,
+    group_lens: tp.Array1d,
+    call_seq_type: int = CallSeqType.Default,
+) -> tp.Array2d:
     """Build a new call sequence array."""
     if call_seq_type == CallSeqType.Reversed:
         out = np.full(target_shape[1], 1, dtype=np.int_)
@@ -42,12 +44,14 @@ def build_call_seq_nb(target_shape: tp.Shape,
 
 def require_call_seq(call_seq: tp.Array2d) -> tp.Array2d:
     """Force the call sequence array to pass our requirements."""
-    return np.require(call_seq, dtype=np.int_, requirements=['A', 'O', 'W', 'F'])
+    return np.require(call_seq, dtype=np.int_, requirements=["A", "O", "W", "F"])
 
 
-def build_call_seq(target_shape: tp.Shape,
-                   group_lens: tp.Array1d,
-                   call_seq_type: int = CallSeqType.Default) -> tp.Array2d:
+def build_call_seq(
+    target_shape: tp.Shape,
+    group_lens: tp.Array1d,
+    call_seq_type: int = CallSeqType.Default,
+) -> tp.Array2d:
     """Not compiled but faster version of `build_call_seq_nb`."""
     call_seq = np.full(target_shape[1], 1, dtype=np.int_)
     if call_seq_type == CallSeqType.Reversed:

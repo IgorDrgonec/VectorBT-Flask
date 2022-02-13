@@ -42,7 +42,7 @@ def apply_and_concat_one_nb(ntimes: int, apply_func_nb: tp.Callable, *args) -> t
             outputs_i = output_0
         else:
             outputs_i = to_2d_one_nb(apply_func_nb(i, *args))
-        output[:, i * outputs_i.shape[1]:(i + 1) * outputs_i.shape[1]] = outputs_i
+        output[:, i * outputs_i.shape[1] : (i + 1) * outputs_i.shape[1]] = outputs_i
     return output
 
 
@@ -68,16 +68,19 @@ def apply_and_concat_multiple_nb(ntimes: int, apply_func_nb: tp.Callable, *args)
         else:
             outputs_i = to_2d_multiple_nb(apply_func_nb(i, *args))
         for j in range(len(outputs_i)):
-            outputs[j][:, i * outputs_i[j].shape[1]:(i + 1) * outputs_i[j].shape[1]] = outputs_i[j]
+            outputs[j][:, i * outputs_i[j].shape[1] : (i + 1) * outputs_i[j].shape[1]] = outputs_i[j]
     return outputs
 
 
-def apply_and_concat(ntimes: int,
-                     apply_func: tp.Callable, *args,
-                     n_outputs: tp.Optional[int] = None,
-                     jitted_loop: bool = False,
-                     execute_kwargs: tp.KwargsLike = None,
-                     **kwargs) -> tp.Union[None, tp.Array2d, tp.List[tp.Array2d]]:
+def apply_and_concat(
+    ntimes: int,
+    apply_func: tp.Callable,
+    *args,
+    n_outputs: tp.Optional[int] = None,
+    jitted_loop: bool = False,
+    execute_kwargs: tp.KwargsLike = None,
+    **kwargs,
+) -> tp.Union[None, tp.Array2d, tp.List[tp.Array2d]]:
     """Run `apply_func` function `ntimes` times and concatenate the results depending upon how
     many array-like objects it generates.
 
@@ -124,35 +127,37 @@ def apply_and_concat(ntimes: int,
 
 
 @register_jitted
-def select_and_combine_nb(i: int,
-                          obj: tp.Any,
-                          others: tp.Sequence,
-                          combine_func_nb: tp.Callable, *args) -> tp.AnyArray:
+def select_and_combine_nb(i: int, obj: tp.Any, others: tp.Sequence, combine_func_nb: tp.Callable, *args) -> tp.AnyArray:
     """Numba-compiled version of `select_and_combine`."""
     return combine_func_nb(obj, others[i], *args)
 
 
 @register_jitted
-def combine_and_concat_nb(obj: tp.Any,
-                          others: tp.Sequence,
-                          combine_func_nb: tp.Callable, *args) -> tp.Array2d:
+def combine_and_concat_nb(obj: tp.Any, others: tp.Sequence, combine_func_nb: tp.Callable, *args) -> tp.Array2d:
     """Numba-compiled version of `combine_and_concat`."""
     return apply_and_concat_one_nb(len(others), select_and_combine_nb, obj, others, combine_func_nb, *args)
 
 
-def select_and_combine(i: int,
-                       obj: tp.Any,
-                       others: tp.Sequence,
-                       combine_func: tp.Callable, *args, **kwargs) -> tp.AnyArray:
+def select_and_combine(
+    i: int,
+    obj: tp.Any,
+    others: tp.Sequence,
+    combine_func: tp.Callable,
+    *args,
+    **kwargs,
+) -> tp.AnyArray:
     """Combine `obj` with an array at position `i` in `others` using `combine_func`."""
     return combine_func(obj, others[i], *args, **kwargs)
 
 
-def combine_and_concat(obj: tp.Any,
-                       others: tp.Sequence,
-                       combine_func: tp.Callable, *args,
-                       jitted_loop: bool = False,
-                       **kwargs) -> tp.Array2d:
+def combine_and_concat(
+    obj: tp.Any,
+    others: tp.Sequence,
+    combine_func: tp.Callable,
+    *args,
+    jitted_loop: bool = False,
+    **kwargs,
+) -> tp.Array2d:
     """Combine `obj` with each in `others` using `combine_func` and concatenate.
 
     `select_and_combine_nb` is resolved using `vectorbtpro.registries.jit_registry.JITRegistry.resolve`."""
@@ -162,10 +167,14 @@ def combine_and_concat(obj: tp.Any,
         apply_func = select_and_combine
     return apply_and_concat(
         len(others),
-        apply_func, obj, others, combine_func, *args,
+        apply_func,
+        obj,
+        others,
+        combine_func,
+        *args,
         n_outputs=1,
         jitted_loop=jitted_loop,
-        **kwargs
+        **kwargs,
     )
 
 
@@ -178,10 +187,13 @@ def combine_multiple_nb(objs: tp.Sequence, combine_func_nb: tp.Callable, *args) 
     return result
 
 
-def combine_multiple(objs: tp.Sequence,
-                     combine_func: tp.Callable, *args,
-                     jitted_loop: bool = False,
-                     **kwargs) -> tp.Any:
+def combine_multiple(
+    objs: tp.Sequence,
+    combine_func: tp.Callable,
+    *args,
+    jitted_loop: bool = False,
+    **kwargs,
+) -> tp.Any:
     """Combine `objs` pairwise into a single object.
 
     Set `jitted_loop` to True to use the JIT-compiled version.

@@ -138,46 +138,31 @@ ranges_field_config = ReadonlyConfig(
     dict(
         dtype=range_dt,
         settings=dict(
-            id=dict(
-                title='Range Id'
-            ),
-            idx=dict(
-                name='end_idx'  # remap field of Records
-            ),
-            start_idx=dict(
-                title='Start Timestamp',
-                mapping='index'
-            ),
-            end_idx=dict(
-                title='End Timestamp',
-                mapping='index'
-            ),
-            status=dict(
-                title='Status',
-                mapping=RangeStatus
-            )
-        )
+            id=dict(title="Range Id"),
+            idx=dict(name="end_idx"),  # remap field of Records
+            start_idx=dict(title="Start Timestamp", mapping="index"),
+            end_idx=dict(title="End Timestamp", mapping="index"),
+            status=dict(title="Status", mapping=RangeStatus),
+        ),
     )
 )
 """_"""
 
-__pdoc__['ranges_field_config'] = f"""Field config for `Ranges`.
+__pdoc__[
+    "ranges_field_config"
+] = f"""Field config for `Ranges`.
 
 ```python
 {ranges_field_config.prettify()}
 ```
 """
 
-ranges_attach_field_config = ReadonlyConfig(
-    dict(
-        status=dict(
-            attach_filters=True
-        )
-    )
-)
+ranges_attach_field_config = ReadonlyConfig(dict(status=dict(attach_filters=True)))
 """_"""
 
-__pdoc__['ranges_attach_field_config'] = f"""Config of fields to be attached to `Ranges`.
+__pdoc__[
+    "ranges_attach_field_config"
+] = f"""Config of fields to be attached to `Ranges`.
 
 ```python
 {ranges_attach_field_config.prettify()}
@@ -186,31 +171,19 @@ __pdoc__['ranges_attach_field_config'] = f"""Config of fields to be attached to 
 
 ranges_shortcut_config = ReadonlyConfig(
     dict(
-        mask=dict(
-            obj_type='array'
-        ),
-        duration=dict(
-            obj_type='mapped_array'
-        ),
-        avg_duration=dict(
-            obj_type='red_array'
-        ),
-        max_duration=dict(
-            obj_type='red_array'
-        ),
-        coverage=dict(
-            obj_type='red_array'
-        ),
-        overlap_coverage=dict(
-            method_name='get_coverage',
-            obj_type='red_array',
-            method_kwargs=dict(overlapping=True)
-        )
+        mask=dict(obj_type="array"),
+        duration=dict(obj_type="mapped_array"),
+        avg_duration=dict(obj_type="red_array"),
+        max_duration=dict(obj_type="red_array"),
+        coverage=dict(obj_type="red_array"),
+        overlap_coverage=dict(method_name="get_coverage", obj_type="red_array", method_kwargs=dict(overlapping=True)),
     )
 )
 """_"""
 
-__pdoc__['ranges_shortcut_config'] = f"""Config of shortcut properties to be attached to `Ranges`.
+__pdoc__[
+    "ranges_shortcut_config"
+] = f"""Config of shortcut properties to be attached to `Ranges`.
 
 ```python
 {ranges_shortcut_config.prettify()}
@@ -233,52 +206,47 @@ class Ranges(Records):
         return self._field_config
 
     @classmethod
-    def from_records(cls: tp.Type[RangesT],
-                     wrapper: ArrayWrapper,
-                     records: tp.RecordArray,
-                     ts: tp.Optional[tp.ArrayLike] = None,
-                     attach_ts: bool = True,
-                     **kwargs) -> RangesT:
+    def from_records(
+        cls: tp.Type[RangesT],
+        wrapper: ArrayWrapper,
+        records: tp.RecordArray,
+        ts: tp.Optional[tp.ArrayLike] = None,
+        attach_ts: bool = True,
+        **kwargs,
+    ) -> RangesT:
         """Build `Trades` from records."""
         return cls(wrapper, records, ts=ts if attach_ts else None, **kwargs)
 
-    def __init__(self,
-                 wrapper: ArrayWrapper,
-                 records_arr: tp.RecordArray,
-                 ts: tp.Optional[tp.SeriesFrame] = None,
-                 **kwargs) -> None:
-        Records.__init__(
-            self,
-            wrapper,
-            records_arr,
-            ts=ts,
-            **kwargs
-        )
+    def __init__(
+        self,
+        wrapper: ArrayWrapper,
+        records_arr: tp.RecordArray,
+        ts: tp.Optional[tp.SeriesFrame] = None,
+        **kwargs,
+    ) -> None:
+        Records.__init__(self, wrapper, records_arr, ts=ts, **kwargs)
         self._ts = ts
 
     def indexing_func(self: RangesT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> RangesT:
         """Perform indexing on `Ranges`."""
-        new_wrapper, new_records_arr, _, col_idxs = \
-            Records.indexing_func_meta(self, pd_indexing_func, **kwargs)
+        new_wrapper, new_records_arr, _, col_idxs = Records.indexing_func_meta(self, pd_indexing_func, **kwargs)
         if self.ts is not None:
             new_ts = to_2d_array(self.ts)[:, col_idxs]
         else:
             new_ts = None
-        return self.replace(
-            wrapper=new_wrapper,
-            records_arr=new_records_arr,
-            ts=new_ts
-        )
+        return self.replace(wrapper=new_wrapper, records_arr=new_records_arr, ts=new_ts)
 
     @classmethod
-    def from_ts(cls: tp.Type[RangesT],
-                ts: tp.ArrayLike,
-                gap_value: tp.Optional[tp.Scalar] = None,
-                attach_ts: bool = True,
-                jitted: tp.JittedOption = None,
-                chunked: tp.ChunkedOption = None,
-                wrapper_kwargs: tp.KwargsLike = None,
-                **kwargs) -> RangesT:
+    def from_ts(
+        cls: tp.Type[RangesT],
+        ts: tp.ArrayLike,
+        gap_value: tp.Optional[tp.Scalar] = None,
+        attach_ts: bool = True,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> RangesT:
         """Build `Ranges` from time series `ts`.
 
         Searches for sequences of
@@ -313,11 +281,13 @@ class Ranges(Records):
             return None
         return self.wrapper.wrap(self._ts, group_by=False)
 
-    def get_mask(self,
-                 group_by: tp.GroupByLike = None,
-                 jitted: tp.JittedOption = None,
-                 chunked: tp.ChunkedOption = None,
-                 wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def get_mask(
+        self,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
         """Get mask from ranges.
 
         See `vectorbtpro.generic.nb.ranges_to_mask_nb`."""
@@ -325,67 +295,54 @@ class Ranges(Records):
         func = jit_reg.resolve_option(nb.ranges_to_mask_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         mask = func(
-            self.get_field_arr('start_idx'),
-            self.get_field_arr('end_idx'),
-            self.get_field_arr('status'),
+            self.get_field_arr("start_idx"),
+            self.get_field_arr("end_idx"),
+            self.get_field_arr("status"),
             col_map,
-            len(self.wrapper.index)
+            len(self.wrapper.index),
         )
         return self.wrapper.wrap(mask, group_by=group_by, **resolve_dict(wrap_kwargs))
 
-    def get_duration(self,
-                     jitted: tp.JittedOption = None,
-                     chunked: tp.ChunkedOption = None,
-                     **kwargs) -> MappedArray:
+    def get_duration(self, jitted: tp.JittedOption = None, chunked: tp.ChunkedOption = None, **kwargs) -> MappedArray:
         """Get duration of each range (in raw format)."""
         func = jit_reg.resolve_option(nb.range_duration_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        duration = func(
-            self.get_field_arr('start_idx'),
-            self.get_field_arr('end_idx'),
-            self.get_field_arr('status')
-        )
+        duration = func(self.get_field_arr("start_idx"), self.get_field_arr("end_idx"), self.get_field_arr("status"))
         return self.map_array(duration, **kwargs)
 
-    def get_avg_duration(self,
-                         group_by: tp.GroupByLike = None,
-                         jitted: tp.JittedOption = None,
-                         chunked: tp.ChunkedOption = None,
-                         wrap_kwargs: tp.KwargsLike = None,
-                         **kwargs) -> tp.MaybeSeries:
+    def get_avg_duration(
+        self,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.MaybeSeries:
         """Get average range duration (as timedelta)."""
-        wrap_kwargs = merge_dicts(dict(to_timedelta=True, name_or_index='avg_duration'), wrap_kwargs)
-        return self.duration.mean(
-            group_by=group_by,
-            jitted=jitted,
-            chunked=chunked,
-            wrap_kwargs=wrap_kwargs,
-            **kwargs
-        )
+        wrap_kwargs = merge_dicts(dict(to_timedelta=True, name_or_index="avg_duration"), wrap_kwargs)
+        return self.duration.mean(group_by=group_by, jitted=jitted, chunked=chunked, wrap_kwargs=wrap_kwargs, **kwargs)
 
-    def get_max_duration(self,
-                         group_by: tp.GroupByLike = None,
-                         jitted: tp.JittedOption = None,
-                         chunked: tp.ChunkedOption = None,
-                         wrap_kwargs: tp.KwargsLike = None,
-                         **kwargs) -> tp.MaybeSeries:
+    def get_max_duration(
+        self,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.MaybeSeries:
         """Get maximum range duration (as timedelta)."""
-        wrap_kwargs = merge_dicts(dict(to_timedelta=True, name_or_index='max_duration'), wrap_kwargs)
-        return self.duration.max(
-            group_by=group_by,
-            jitted=jitted,
-            chunked=chunked,
-            wrap_kwargs=wrap_kwargs,
-            **kwargs
-        )
+        wrap_kwargs = merge_dicts(dict(to_timedelta=True, name_or_index="max_duration"), wrap_kwargs)
+        return self.duration.max(group_by=group_by, jitted=jitted, chunked=chunked, wrap_kwargs=wrap_kwargs, **kwargs)
 
-    def get_coverage(self,
-                     overlapping: bool = False,
-                     normalize: bool = True,
-                     group_by: tp.GroupByLike = None,
-                     jitted: tp.JittedOption = None,
-                     chunked: tp.ChunkedOption = None,
-                     wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def get_coverage(
+        self,
+        overlapping: bool = False,
+        normalize: bool = True,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeSeries:
         """Get coverage, that is, the number of steps that are covered by all ranges.
 
         See `vectorbtpro.generic.nb.range_coverage_nb`."""
@@ -394,15 +351,15 @@ class Ranges(Records):
         func = jit_reg.resolve_option(nb.range_coverage_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         coverage = func(
-            self.get_field_arr('start_idx'),
-            self.get_field_arr('end_idx'),
-            self.get_field_arr('status'),
+            self.get_field_arr("start_idx"),
+            self.get_field_arr("end_idx"),
+            self.get_field_arr("status"),
             col_map,
             index_lens,
             overlapping=overlapping,
-            normalize=normalize
+            normalize=normalize,
         )
-        wrap_kwargs = merge_dicts(dict(name_or_index='coverage'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="coverage"), wrap_kwargs)
         return self.wrapper.wrap_reduced(coverage, group_by=group_by, **wrap_kwargs)
 
     # ############# Stats ############# #
@@ -414,67 +371,51 @@ class Ranges(Records):
         Merges `vectorbtpro.records.base.Records.stats_defaults` and
         `stats` from `vectorbtpro._settings.ranges`."""
         from vectorbtpro._settings import settings
-        ranges_stats_cfg = settings['ranges']['stats']
 
-        return merge_dicts(
-            Records.stats_defaults.__get__(self),
-            ranges_stats_cfg
-        )
+        ranges_stats_cfg = settings["ranges"]["stats"]
+
+        return merge_dicts(Records.stats_defaults.__get__(self), ranges_stats_cfg)
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
-            start=dict(
-                title='Start',
-                calc_func=lambda self: self.wrapper.index[0],
-                agg_func=None,
-                tags='wrapper'
-            ),
-            end=dict(
-                title='End',
-                calc_func=lambda self: self.wrapper.index[-1],
-                agg_func=None,
-                tags='wrapper'
-            ),
+            start=dict(title="Start", calc_func=lambda self: self.wrapper.index[0], agg_func=None, tags="wrapper"),
+            end=dict(title="End", calc_func=lambda self: self.wrapper.index[-1], agg_func=None, tags="wrapper"),
             period=dict(
-                title='Period',
+                title="Period",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,
-                tags='wrapper'
+                tags="wrapper",
             ),
             coverage=dict(
-                title='Coverage',
-                calc_func='coverage',
+                title="Coverage",
+                calc_func="coverage",
                 overlapping=False,
                 normalize=False,
                 apply_to_timedelta=True,
-                tags=['ranges', 'coverage']
+                tags=["ranges", "coverage"],
             ),
             overlap_coverage=dict(
-                title='Overlap Coverage',
-                calc_func='coverage',
+                title="Overlap Coverage",
+                calc_func="coverage",
                 overlapping=True,
                 normalize=False,
                 apply_to_timedelta=True,
-                tags=['ranges', 'coverage']
+                tags=["ranges", "coverage"],
             ),
-            total_records=dict(
-                title='Total Records',
-                calc_func='count',
-                tags='records'
-            ),
+            total_records=dict(title="Total Records", calc_func="count", tags="records"),
             duration=dict(
-                title='Duration',
-                calc_func='duration.describe',
+                title="Duration",
+                calc_func="duration.describe",
                 post_calc_func=lambda self, out, settings: {
-                    'Min': out.loc['min'],
-                    'Median': out.loc['50%'],
-                    'Max': out.loc['max'],
-                    'Mean': out.loc['mean'],
-                    'Std': out.loc['std']
+                    "Min": out.loc["min"],
+                    "Median": out.loc["50%"],
+                    "Max": out.loc["max"],
+                    "Mean": out.loc["mean"],
+                    "Std": out.loc["std"],
                 },
                 apply_to_timedelta=True,
-                tags=['ranges', 'duration']
+                tags=["ranges", "duration"],
             ),
         )
     )
@@ -485,20 +426,22 @@ class Ranges(Records):
 
     # ############# Plotting ############# #
 
-    def plot(self,
-             column: tp.Optional[tp.Label] = None,
-             top_n: int = 5,
-             plot_zones: bool = True,
-             ts_trace_kwargs: tp.KwargsLike = None,
-             start_trace_kwargs: tp.KwargsLike = None,
-             end_trace_kwargs: tp.KwargsLike = None,
-             open_shape_kwargs: tp.KwargsLike = None,
-             closed_shape_kwargs: tp.KwargsLike = None,
-             add_trace_kwargs: tp.KwargsLike = None,
-             xref: str = 'x',
-             yref: str = 'y',
-             fig: tp.Optional[tp.BaseFigure] = None,
-             **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        top_n: int = 5,
+        plot_zones: bool = True,
+        ts_trace_kwargs: tp.KwargsLike = None,
+        start_trace_kwargs: tp.KwargsLike = None,
+        end_trace_kwargs: tp.KwargsLike = None,
+        open_shape_kwargs: tp.KwargsLike = None,
+        closed_shape_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        xref: str = "x",
+        yref: str = "y",
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot ranges.
 
         Args:
@@ -526,11 +469,13 @@ class Ranges(Records):
             ![](/assets/images/ranges_plot.svg)
         """
         from vectorbtpro.utils.opt_packages import assert_can_import
-        assert_can_import('plotly')
+
+        assert_can_import("plotly")
         import plotly.graph_objects as go
         from vectorbtpro.utils.figure import make_figure, get_domain
         from vectorbtpro._settings import settings
-        plotting_cfg = settings['plotting']
+
+        plotting_cfg = settings["plotting"]
 
         self_col = self.select_col(column=column, group_by=False)
         if top_n is not None:
@@ -538,11 +483,7 @@ class Ranges(Records):
 
         if ts_trace_kwargs is None:
             ts_trace_kwargs = {}
-        ts_trace_kwargs = merge_dicts(dict(
-            line=dict(
-                color=plotting_cfg['color_schema']['blue']
-            )
-        ), ts_trace_kwargs)
+        ts_trace_kwargs = merge_dicts(dict(line=dict(color=plotting_cfg["color_schema"]["blue"])), ts_trace_kwargs)
         if start_trace_kwargs is None:
             start_trace_kwargs = {}
         if end_trace_kwargs is None:
@@ -564,47 +505,44 @@ class Ranges(Records):
 
         if self_col.count() > 0:
             # Extract information
-            id_ = self_col.get_field_arr('id')
-            id_title = self_col.get_field_title('id')
+            id_ = self_col.get_field_arr("id")
+            id_title = self_col.get_field_title("id")
 
-            start_idx = self_col.get_map_field_to_index('start_idx')
-            start_idx_title = self_col.get_field_title('start_idx')
+            start_idx = self_col.get_map_field_to_index("start_idx")
+            start_idx_title = self_col.get_field_title("start_idx")
             if self_col.ts is not None:
                 start_val = self_col.ts.loc[start_idx]
             else:
                 start_val = np.full(len(start_idx), 0)
 
-            end_idx = self_col.get_map_field_to_index('end_idx')
-            end_idx_title = self_col.get_field_title('end_idx')
+            end_idx = self_col.get_map_field_to_index("end_idx")
+            end_idx_title = self_col.get_field_title("end_idx")
             if self_col.ts is not None:
                 end_val = self_col.ts.loc[end_idx]
             else:
                 end_val = np.full(len(end_idx), 0)
 
-            duration = np.vectorize(str)(self_col.wrapper.to_timedelta(
-                self_col.duration.values, to_pd=True, silence_warnings=True))
+            duration = np.vectorize(str)(
+                self_col.wrapper.to_timedelta(self_col.duration.values, to_pd=True, silence_warnings=True)
+            )
 
-            status = self_col.get_field_arr('status')
+            status = self_col.get_field_arr("status")
 
             # Plot start markers
             start_customdata = id_[:, None]
             start_scatter = go.Scatter(
                 x=start_idx,
                 y=start_val,
-                mode='markers',
+                mode="markers",
                 marker=dict(
-                    symbol='diamond',
-                    color=plotting_cfg['contrast_color_schema']['blue'],
+                    symbol="diamond",
+                    color=plotting_cfg["contrast_color_schema"]["blue"],
                     size=7,
-                    line=dict(
-                        width=1,
-                        color=adjust_lightness(plotting_cfg['contrast_color_schema']['blue'])
-                    )
+                    line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["blue"])),
                 ),
-                name='Start',
+                name="Start",
                 customdata=start_customdata,
-                hovertemplate=f"{id_title}: %{{customdata[0]}}"
-                              f"<br>{start_idx_title}: %{{x}}"
+                hovertemplate=f"{id_title}: %{{customdata[0]}}" f"<br>{start_idx_title}: %{{x}}",
             )
             start_scatter.update(**start_trace_kwargs)
             fig.add_trace(start_scatter, **add_trace_kwargs)
@@ -612,28 +550,22 @@ class Ranges(Records):
             closed_mask = status == RangeStatus.Closed
             if closed_mask.any():
                 # Plot end markers
-                closed_end_customdata = np.stack((
-                    id_[closed_mask],
-                    duration[closed_mask]
-                ), axis=1)
+                closed_end_customdata = np.stack((id_[closed_mask], duration[closed_mask]), axis=1)
                 closed_end_scatter = go.Scatter(
                     x=end_idx[closed_mask],
                     y=end_val[closed_mask],
-                    mode='markers',
+                    mode="markers",
                     marker=dict(
-                        symbol='diamond',
-                        color=plotting_cfg['contrast_color_schema']['green'],
+                        symbol="diamond",
+                        color=plotting_cfg["contrast_color_schema"]["green"],
                         size=7,
-                        line=dict(
-                            width=1,
-                            color=adjust_lightness(plotting_cfg['contrast_color_schema']['green'])
-                        )
+                        line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["green"])),
                     ),
-                    name='Closed',
+                    name="Closed",
                     customdata=closed_end_customdata,
                     hovertemplate=f"{id_title}: %{{customdata[0]}}"
-                                  f"<br>{end_idx_title}: %{{x}}"
-                                  f"<br>Duration: %{{customdata[1]}}"
+                    f"<br>{end_idx_title}: %{{x}}"
+                    f"<br>Duration: %{{customdata[1]}}",
                 )
                 closed_end_scatter.update(**end_trace_kwargs)
                 fig.add_trace(closed_end_scatter, **add_trace_kwargs)
@@ -641,45 +573,44 @@ class Ranges(Records):
                 if plot_zones:
                     # Plot closed range zones
                     for i in range(len(id_[closed_mask])):
-                        fig.add_shape(**merge_dicts(dict(
-                            type="rect",
-                            xref=xref,
-                            yref="paper",
-                            x0=start_idx[closed_mask][i],
-                            y0=y_domain[0],
-                            x1=end_idx[closed_mask][i],
-                            y1=y_domain[1],
-                            fillcolor='royalblue',
-                            opacity=0.2,
-                            layer="below",
-                            line_width=0,
-                        ), closed_shape_kwargs))
+                        fig.add_shape(
+                            **merge_dicts(
+                                dict(
+                                    type="rect",
+                                    xref=xref,
+                                    yref="paper",
+                                    x0=start_idx[closed_mask][i],
+                                    y0=y_domain[0],
+                                    x1=end_idx[closed_mask][i],
+                                    y1=y_domain[1],
+                                    fillcolor="royalblue",
+                                    opacity=0.2,
+                                    layer="below",
+                                    line_width=0,
+                                ),
+                                closed_shape_kwargs,
+                            )
+                        )
 
             open_mask = status == RangeStatus.Open
             if open_mask.any():
                 # Plot end markers
-                open_end_customdata = np.stack((
-                    id_[open_mask],
-                    duration[open_mask]
-                ), axis=1)
+                open_end_customdata = np.stack((id_[open_mask], duration[open_mask]), axis=1)
                 open_end_scatter = go.Scatter(
                     x=end_idx[open_mask],
                     y=end_val[open_mask],
-                    mode='markers',
+                    mode="markers",
                     marker=dict(
-                        symbol='diamond',
-                        color=plotting_cfg['contrast_color_schema']['orange'],
+                        symbol="diamond",
+                        color=plotting_cfg["contrast_color_schema"]["orange"],
                         size=7,
-                        line=dict(
-                            width=1,
-                            color=adjust_lightness(plotting_cfg['contrast_color_schema']['orange'])
-                        )
+                        line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["orange"])),
                     ),
-                    name='Open',
+                    name="Open",
                     customdata=open_end_customdata,
                     hovertemplate=f"{id_title}: %{{customdata[0]}}"
-                                  f"<br>{end_idx_title}: %{{x}}"
-                                  f"<br>Duration: %{{customdata[1]}}"
+                    f"<br>{end_idx_title}: %{{x}}"
+                    f"<br>Duration: %{{customdata[1]}}",
                 )
                 open_end_scatter.update(**end_trace_kwargs)
                 fig.add_trace(open_end_scatter, **add_trace_kwargs)
@@ -687,19 +618,24 @@ class Ranges(Records):
                 if plot_zones:
                     # Plot open range zones
                     for i in range(len(id_[open_mask])):
-                        fig.add_shape(**merge_dicts(dict(
-                            type="rect",
-                            xref=xref,
-                            yref="paper",
-                            x0=start_idx[open_mask][i],
-                            y0=y_domain[0],
-                            x1=end_idx[open_mask][i],
-                            y1=y_domain[1],
-                            fillcolor='orange',
-                            opacity=0.2,
-                            layer="below",
-                            line_width=0,
-                        ), open_shape_kwargs))
+                        fig.add_shape(
+                            **merge_dicts(
+                                dict(
+                                    type="rect",
+                                    xref=xref,
+                                    yref="paper",
+                                    x0=start_idx[open_mask][i],
+                                    y0=y_domain[0],
+                                    x1=end_idx[open_mask][i],
+                                    y1=y_domain[1],
+                                    fillcolor="orange",
+                                    opacity=0.2,
+                                    layer="below",
+                                    line_width=0,
+                                ),
+                                open_shape_kwargs,
+                            )
+                        )
 
         return fig
 
@@ -710,22 +646,13 @@ class Ranges(Records):
         Merges `vectorbtpro.records.base.Records.plots_defaults` and
         `plots` from `vectorbtpro._settings.ranges`."""
         from vectorbtpro._settings import settings
-        ranges_plots_cfg = settings['ranges']['plots']
 
-        return merge_dicts(
-            Records.plots_defaults.__get__(self),
-            ranges_plots_cfg
-        )
+        ranges_plots_cfg = settings["ranges"]["plots"]
+
+        return merge_dicts(Records.plots_defaults.__get__(self), ranges_plots_cfg)
 
     _subplots: tp.ClassVar[Config] = Config(
-        dict(
-            plot=dict(
-                title="Ranges",
-                check_is_not_grouped=True,
-                plot_func='plot',
-                tags='ranges'
-            )
-        )
+        dict(plot=dict(title="Ranges", check_is_not_grouped=True, plot_func="plot", tags="ranges")),
     )
 
     @property

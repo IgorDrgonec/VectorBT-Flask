@@ -31,7 +31,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
 
     Required to be a subclass of `vectorbtpro.base.wrapping.Wrapping`."""
 
-    _writeable_attrs: tp.ClassVar[tp.Optional[tp.Set[str]]] = {'_subplots'}
+    _writeable_attrs: tp.ClassVar[tp.Optional[tp.Set[str]]] = {"_subplots"}
 
     def __init__(self) -> None:
         checks.assert_instance_of(self, Wrapping)
@@ -45,16 +45,12 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
 
         See `vectorbtpro._settings.plots_builder`."""
         from vectorbtpro._settings import settings
-        plots_builder_cfg = settings['plots_builder']
 
-        return merge_dicts(
-            plots_builder_cfg,
-            dict(settings=dict(freq=self.wrapper.freq))
-        )
+        plots_builder_cfg = settings["plots_builder"]
 
-    _subplots: tp.ClassVar[Config] = Config(
-        dict()
-    )
+        return merge_dicts(plots_builder_cfg, dict(settings=dict(freq=self.wrapper.freq)))
+
+    _subplots: tp.ClassVar[Config] = Config(dict())
 
     @property
     def subplots(self) -> Config:
@@ -71,21 +67,23 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
         or overwrite the instance variable `${cls_name}._subplots`."""
         return self._subplots
 
-    def plots(self,
-              subplots: tp.Optional[tp.MaybeIterable[tp.Union[str, tp.Tuple[str, tp.Kwargs]]]] = None,
-              tags: tp.Optional[tp.MaybeIterable[str]] = None,
-              column: tp.Optional[tp.Label] = None,
-              group_by: tp.GroupByLike = None,
-              silence_warnings: tp.Optional[bool] = None,
-              template_context: tp.Optional[tp.Mapping] = None,
-              settings: tp.KwargsLike = None,
-              filters: tp.KwargsLike = None,
-              subplot_settings: tp.KwargsLike = None,
-              show_titles: bool = None,
-              hide_id_labels: bool = None,
-              group_id_labels: bool = None,
-              make_subplots_kwargs: tp.KwargsLike = None,
-              **layout_kwargs) -> tp.Optional[tp.BaseFigure]:
+    def plots(
+        self,
+        subplots: tp.Optional[tp.MaybeIterable[tp.Union[str, tp.Tuple[str, tp.Kwargs]]]] = None,
+        tags: tp.Optional[tp.MaybeIterable[str]] = None,
+        column: tp.Optional[tp.Label] = None,
+        group_by: tp.GroupByLike = None,
+        silence_warnings: tp.Optional[bool] = None,
+        template_context: tp.Optional[tp.Mapping] = None,
+        settings: tp.KwargsLike = None,
+        filters: tp.KwargsLike = None,
+        subplot_settings: tp.KwargsLike = None,
+        show_titles: bool = None,
+        hide_id_labels: bool = None,
+        group_id_labels: bool = None,
+        make_subplots_kwargs: tp.KwargsLike = None,
+        **layout_kwargs,
+    ) -> tp.Optional[tp.BaseFigure]:
         """Plot various parts of this object.
 
         Args:
@@ -169,58 +167,46 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
         """
         from vectorbtpro.utils.figure import make_subplots, get_domain
         from vectorbtpro._settings import settings as _settings
-        plotting_cfg = _settings['plotting']
+
+        plotting_cfg = _settings["plotting"]
 
         # Resolve defaults
         if silence_warnings is None:
-            silence_warnings = self.plots_defaults['silence_warnings']
+            silence_warnings = self.plots_defaults["silence_warnings"]
         if show_titles is None:
-            show_titles = self.plots_defaults['show_titles']
+            show_titles = self.plots_defaults["show_titles"]
         if hide_id_labels is None:
-            hide_id_labels = self.plots_defaults['hide_id_labels']
+            hide_id_labels = self.plots_defaults["hide_id_labels"]
         if group_id_labels is None:
-            group_id_labels = self.plots_defaults['group_id_labels']
-        template_context = merge_dicts(self.plots_defaults['template_context'], template_context)
-        filters = merge_dicts(self.plots_defaults['filters'], filters)
-        settings = merge_dicts(self.plots_defaults['settings'], settings)
-        subplot_settings = merge_dicts(self.plots_defaults['subplot_settings'], subplot_settings)
-        make_subplots_kwargs = merge_dicts(self.plots_defaults['make_subplots_kwargs'], make_subplots_kwargs)
-        layout_kwargs = merge_dicts(self.plots_defaults['layout_kwargs'], layout_kwargs)
+            group_id_labels = self.plots_defaults["group_id_labels"]
+        template_context = merge_dicts(self.plots_defaults["template_context"], template_context)
+        filters = merge_dicts(self.plots_defaults["filters"], filters)
+        settings = merge_dicts(self.plots_defaults["settings"], settings)
+        subplot_settings = merge_dicts(self.plots_defaults["subplot_settings"], subplot_settings)
+        make_subplots_kwargs = merge_dicts(self.plots_defaults["make_subplots_kwargs"], make_subplots_kwargs)
+        layout_kwargs = merge_dicts(self.plots_defaults["layout_kwargs"], layout_kwargs)
 
         # Replace templates globally (not used at subplot level)
         if len(template_context) > 0:
-            sub_settings = deep_substitute(
-                settings,
-                context=template_context,
-                sub_id='sub_settings',
-                strict=False
-            )
+            sub_settings = deep_substitute(settings, context=template_context, sub_id="sub_settings", strict=False)
             sub_make_subplots_kwargs = deep_substitute(
                 make_subplots_kwargs,
                 context=template_context,
-                sub_id='sub_make_subplots_kwargs'
+                sub_id="sub_make_subplots_kwargs",
             )
-            sub_layout_kwargs = deep_substitute(
-                layout_kwargs,
-                context=template_context,
-                sub_id='sub_layout_kwargs'
-            )
+            sub_layout_kwargs = deep_substitute(layout_kwargs, context=template_context, sub_id="sub_layout_kwargs")
         else:
             sub_settings = settings
             sub_make_subplots_kwargs = make_subplots_kwargs
             sub_layout_kwargs = layout_kwargs
 
         # Resolve self
-        reself = self.resolve_self(
-            cond_kwargs=sub_settings,
-            impacts_caching=False,
-            silence_warnings=silence_warnings
-        )
+        reself = self.resolve_self(cond_kwargs=sub_settings, impacts_caching=False, silence_warnings=silence_warnings)
 
         # Prepare subplots
         if subplots is None:
-            subplots = reself.plots_defaults['subplots']
-        if subplots == 'all':
+            subplots = reself.plots_defaults["subplots"]
+        if subplots == "all":
             subplots = reself.subplots
         if isinstance(subplots, dict):
             subplots = list(subplots.items())
@@ -229,8 +215,8 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
 
         # Prepare tags
         if tags is None:
-            tags = reself.plots_defaults['tags']
-        if isinstance(tags, str) and tags == 'all':
+            tags = reself.plots_defaults["tags"]
+        if isinstance(tags, str) and tags == "all":
             tags = None
         if isinstance(tags, (str, tuple)):
             tags = [tags]
@@ -252,7 +238,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
         for i, (subplot_name, _subplot_settings) in enumerate(subplots):
             if subplot_counts[subplot_name] > 1:
                 subplot_i[subplot_name] += 1
-                subplot_name = subplot_name + '_' + str(subplot_i[subplot_name])
+                subplot_name = subplot_name + "_" + str(subplot_i[subplot_name])
             subplots_dct[subplot_name] = _subplot_settings
 
         # Check subplot_settings
@@ -273,31 +259,27 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                     group_by=group_by,
                     subplot_name=subplot_name,
                     trace_names=[subplot_name],
-                    silence_warnings=silence_warnings
+                    silence_warnings=silence_warnings,
                 ),
-                settings
+                settings,
             )
             _subplot_settings = _subplot_settings.copy()
             passed_subplot_settings = subplot_settings.get(subplot_name, {})
-            merged_settings = merge_dicts(
-                opt_settings,
-                _subplot_settings,
-                passed_subplot_settings
-            )
-            subplot_template_context = merged_settings.pop('template_context', {})
+            merged_settings = merge_dicts(opt_settings, _subplot_settings, passed_subplot_settings)
+            subplot_template_context = merged_settings.pop("template_context", {})
             template_context_merged = merge_dicts(template_context, subplot_template_context)
             template_context_merged = deep_substitute(
                 template_context_merged,
                 context=merged_settings,
-                sub_id='template_context_merged'
+                sub_id="template_context_merged",
             )
             context = merge_dicts(template_context_merged, merged_settings)
             # safe because we will use deep_substitute again once layout params are known
-            merged_settings = deep_substitute(merged_settings, context=context, sub_id='merged_settings')
+            merged_settings = deep_substitute(merged_settings, context=context, sub_id="merged_settings")
 
             # Filter by tag
             if tags is not None:
-                in_tags = merged_settings.get('tags', None)
+                in_tags = merged_settings.get("tags", None)
                 if in_tags is None or not match_tags(tags, in_tags):
                     subplots_dct.pop(subplot_name, None)
                     continue
@@ -308,7 +290,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                 cond_kwargs=merged_settings,
                 custom_arg_names=custom_arg_names,
                 impacts_caching=True,
-                silence_warnings=merged_settings['silence_warnings']
+                silence_warnings=merged_settings["silence_warnings"],
             )
 
             subplots_dct[subplot_name] = merged_settings
@@ -321,15 +303,15 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
         for subplot_name, _subplot_settings in list(subplots_dct.items()):
             custom_reself = resolved_self_dct[subplot_name]
             context = context_dct[subplot_name]
-            _silence_warnings = _subplot_settings.get('silence_warnings')
+            _silence_warnings = _subplot_settings.get("silence_warnings")
 
             subplot_filters = set()
             for k in _subplot_settings.keys():
                 filter_name = None
-                if k.startswith('check_'):
-                    filter_name = k[len('check_'):]
-                elif k.startswith('inv_check_'):
-                    filter_name = k[len('inv_check_'):]
+                if k.startswith("check_"):
+                    filter_name = k[len("check_") :]
+                elif k.startswith("inv_check_"):
+                    filter_name = k[len("inv_check_") :]
                 if filter_name is not None:
                     if filter_name not in filters:
                         raise ValueError(f"Metric '{subplot_name}' requires filter '{filter_name}'")
@@ -337,12 +319,12 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
 
             for filter_name in subplot_filters:
                 filter_settings = filters[filter_name]
-                _filter_settings = deep_substitute(filter_settings, context=context, sub_id='filter_settings')
-                filter_func = _filter_settings['filter_func']
-                warning_message = _filter_settings.get('warning_message', None)
-                inv_warning_message = _filter_settings.get('inv_warning_message', None)
-                to_check = _subplot_settings.get('check_' + filter_name, False)
-                inv_to_check = _subplot_settings.get('inv_check_' + filter_name, False)
+                _filter_settings = deep_substitute(filter_settings, context=context, sub_id="filter_settings")
+                filter_func = _filter_settings["filter_func"]
+                warning_message = _filter_settings.get("warning_message", None)
+                inv_warning_message = _filter_settings.get("inv_warning_message", None)
+                to_check = _subplot_settings.get("check_" + filter_name, False)
+                inv_to_check = _subplot_settings.get("inv_check_" + filter_name, False)
 
                 if to_check or inv_to_check:
                     whether_true = filter_func(custom_reself, _subplot_settings)
@@ -367,18 +349,18 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
             return None
 
         # Set up figure
-        rows = sub_make_subplots_kwargs.pop('rows', len(subplots_dct))
-        cols = sub_make_subplots_kwargs.pop('cols', 1)
-        specs = sub_make_subplots_kwargs.pop('specs', [[{} for _ in range(cols)] for _ in range(rows)])
+        rows = sub_make_subplots_kwargs.pop("rows", len(subplots_dct))
+        cols = sub_make_subplots_kwargs.pop("cols", 1)
+        specs = sub_make_subplots_kwargs.pop("specs", [[{} for _ in range(cols)] for _ in range(rows)])
         row_col_tuples = []
         for row, row_spec in enumerate(specs):
             for col, col_spec in enumerate(row_spec):
                 if col_spec is not None:
                     row_col_tuples.append((row + 1, col + 1))
-        shared_xaxes = sub_make_subplots_kwargs.pop('shared_xaxes', True)
-        shared_yaxes = sub_make_subplots_kwargs.pop('shared_yaxes', False)
-        default_height = plotting_cfg['layout']['height']
-        default_width = plotting_cfg['layout']['width'] + 50
+        shared_xaxes = sub_make_subplots_kwargs.pop("shared_xaxes", True)
+        shared_yaxes = sub_make_subplots_kwargs.pop("shared_yaxes", False)
+        default_height = plotting_cfg["layout"]["height"]
+        default_width = plotting_cfg["layout"]["width"] + 50
         min_space = 10  # space between subplots with no axis sharing
         max_title_spacing = 30
         max_xaxis_spacing = 50
@@ -396,8 +378,8 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
             yaxis_spacing = max_yaxis_spacing
         else:
             yaxis_spacing = 0
-        if 'height' in sub_layout_kwargs:
-            height = sub_layout_kwargs.pop('height')
+        if "height" in sub_layout_kwargs:
+            height = sub_layout_kwargs.pop("height")
         else:
             height = default_height + title_spacing
             if rows > 1:
@@ -406,8 +388,8 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                 height += legend_height - legend_height * rows
                 if shared_xaxes:
                     height += max_xaxis_spacing - max_xaxis_spacing * rows
-        if 'width' in sub_layout_kwargs:
-            width = sub_layout_kwargs.pop('width')
+        if "width" in sub_layout_kwargs:
+            width = sub_layout_kwargs.pop("width")
         else:
             width = default_width
             if cols > 1:
@@ -416,29 +398,29 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                 if shared_yaxes:
                     width += max_yaxis_spacing - max_yaxis_spacing * cols
         if height is not None:
-            if 'vertical_spacing' in sub_make_subplots_kwargs:
-                vertical_spacing = sub_make_subplots_kwargs.pop('vertical_spacing')
+            if "vertical_spacing" in sub_make_subplots_kwargs:
+                vertical_spacing = sub_make_subplots_kwargs.pop("vertical_spacing")
             else:
                 vertical_spacing = min_space + title_spacing + xaxis_spacing
             if vertical_spacing is not None and vertical_spacing > 1:
                 vertical_spacing /= height
             legend_y = 1 + (min_space + title_spacing) / height
         else:
-            vertical_spacing = sub_make_subplots_kwargs.pop('vertical_spacing', None)
+            vertical_spacing = sub_make_subplots_kwargs.pop("vertical_spacing", None)
             legend_y = 1.02
         if width is not None:
-            if 'horizontal_spacing' in sub_make_subplots_kwargs:
-                horizontal_spacing = sub_make_subplots_kwargs.pop('horizontal_spacing')
+            if "horizontal_spacing" in sub_make_subplots_kwargs:
+                horizontal_spacing = sub_make_subplots_kwargs.pop("horizontal_spacing")
             else:
                 horizontal_spacing = min_space + yaxis_spacing
             if horizontal_spacing is not None and horizontal_spacing > 1:
                 horizontal_spacing /= width
         else:
-            horizontal_spacing = sub_make_subplots_kwargs.pop('horizontal_spacing', None)
+            horizontal_spacing = sub_make_subplots_kwargs.pop("horizontal_spacing", None)
         if show_titles:
             _subplot_titles = []
             for i in range(len(subplots_dct)):
-                _subplot_titles.append('$title_' + str(i))
+                _subplot_titles.append("$title_" + str(i))
         else:
             _subplot_titles = None
         fig = make_subplots(
@@ -450,21 +432,17 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
             subplot_titles=_subplot_titles,
             vertical_spacing=vertical_spacing,
             horizontal_spacing=horizontal_spacing,
-            **sub_make_subplots_kwargs
+            **sub_make_subplots_kwargs,
         )
-        sub_layout_kwargs = merge_dicts(dict(
-            showlegend=True,
-            width=width,
-            height=height,
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=legend_y,
-                xanchor="right",
-                x=1,
-                traceorder='normal'
-            )
-        ), sub_layout_kwargs)
+        sub_layout_kwargs = merge_dicts(
+            dict(
+                showlegend=True,
+                width=width,
+                height=height,
+                legend=dict(orientation="h", yanchor="bottom", y=legend_y, xanchor="right", x=1, traceorder="normal"),
+            ),
+            sub_layout_kwargs,
+        )
         fig.update_layout(**sub_layout_kwargs)  # final destination for sub_layout_kwargs
 
         # Plot subplots
@@ -479,10 +457,10 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
 
                 # Compute figure artifacts
                 row, col = row_col_tuples[i]
-                xref = 'x' if i == 0 else 'x' + str(i + 1)
-                yref = 'y' if i == 0 else 'y' + str(i + 1)
-                xaxis = 'xaxis' + xref[1:]
-                yaxis = 'yaxis' + yref[1:]
+                xref = "x" if i == 0 else "x" + str(i + 1)
+                yref = "y" if i == 0 else "y" + str(i + 1)
+                xaxis = "xaxis" + xref[1:]
+                yaxis = "yaxis" + yref[1:]
                 x_domain = get_domain(xref, fig)
                 y_domain = get_domain(yref, fig)
                 subplot_layout_kwargs = dict(
@@ -494,7 +472,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                     x_domain=x_domain,
                     y_domain=y_domain,
                     fig=fig,
-                    pass_fig=True  # force passing fig
+                    pass_fig=True,  # force passing fig
                 )
                 for k in subplot_layout_kwargs:
                     opt_arg_names.add(k)
@@ -502,24 +480,24 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                         custom_arg_names.add(k)
                 final_kwargs = merge_dicts(subplot_layout_kwargs, final_kwargs)
                 context = merge_dicts(subplot_layout_kwargs, context)
-                final_kwargs = deep_substitute(final_kwargs, context=context, sub_id='final_kwargs')
+                final_kwargs = deep_substitute(final_kwargs, context=context, sub_id="final_kwargs")
 
                 # Clean up keys
                 for k, v in list(final_kwargs.items()):
-                    if k.startswith('check_') or k.startswith('inv_check_') or k in ('tags',):
+                    if k.startswith("check_") or k.startswith("inv_check_") or k in ("tags",):
                         final_kwargs.pop(k, None)
 
                 # Get subplot-specific values
-                _column = final_kwargs.get('column')
-                _group_by = final_kwargs.get('group_by')
-                _silence_warnings = final_kwargs.get('silence_warnings')
-                title = final_kwargs.pop('title', subplot_name)
-                plot_func = final_kwargs.pop('plot_func', None)
-                xaxis_kwargs = final_kwargs.pop('xaxis_kwargs', None)
-                yaxis_kwargs = final_kwargs.pop('yaxis_kwargs', None)
-                resolve_plot_func = final_kwargs.pop('resolve_plot_func', True)
-                use_shortcuts = final_kwargs.pop('use_shortcuts', True)
-                use_caching = final_kwargs.pop('use_caching', True)
+                _column = final_kwargs.get("column")
+                _group_by = final_kwargs.get("group_by")
+                _silence_warnings = final_kwargs.get("silence_warnings")
+                title = final_kwargs.pop("title", subplot_name)
+                plot_func = final_kwargs.pop("plot_func", None)
+                xaxis_kwargs = final_kwargs.pop("xaxis_kwargs", None)
+                yaxis_kwargs = final_kwargs.pop("yaxis_kwargs", None)
+                resolve_plot_func = final_kwargs.pop("resolve_plot_func", True)
+                use_shortcuts = final_kwargs.pop("use_shortcuts", True)
+                use_caching = final_kwargs.pop("use_caching", True)
 
                 if plot_func is not None:
                     # Resolve plot_func
@@ -527,17 +505,19 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                         if not callable(plot_func):
                             passed_kwargs_out = {}
 
-                            def _getattr_func(obj: tp.Any,
-                                              attr: str,
-                                              args: tp.ArgsLike = None,
-                                              kwargs: tp.KwargsLike = None,
-                                              call_attr: bool = True,
-                                              _final_kwargs: tp.Kwargs = final_kwargs,
-                                              _opt_arg_names: tp.Set[str] = opt_arg_names,
-                                              _custom_arg_names: tp.Set[str] = custom_arg_names,
-                                              _arg_cache_dct: tp.Kwargs = arg_cache_dct,
-                                              _use_shortcuts: bool = use_shortcuts,
-                                              _use_caching: bool = use_caching) -> tp.Any:
+                            def _getattr_func(
+                                obj: tp.Any,
+                                attr: str,
+                                args: tp.ArgsLike = None,
+                                kwargs: tp.KwargsLike = None,
+                                call_attr: bool = True,
+                                _final_kwargs: tp.Kwargs = final_kwargs,
+                                _opt_arg_names: tp.Set[str] = opt_arg_names,
+                                _custom_arg_names: tp.Set[str] = custom_arg_names,
+                                _arg_cache_dct: tp.Kwargs = arg_cache_dct,
+                                _use_shortcuts: bool = use_shortcuts,
+                                _use_caching: bool = use_caching,
+                            ) -> tp.Any:
                                 if attr in _final_kwargs:
                                     return _final_kwargs[attr]
                                 if args is None:
@@ -546,13 +526,11 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                                     kwargs = {}
 
                                 if obj is custom_reself:
-                                    resolve_path_arg = _final_kwargs.pop('resolve_path_' + attr, True)
+                                    resolve_path_arg = _final_kwargs.pop("resolve_path_" + attr, True)
                                     if resolve_path_arg:
                                         if call_attr:
                                             cond_kwargs = {
-                                                k: v
-                                                for k, v in _final_kwargs.items()
-                                                if k in _opt_arg_names
+                                                k: v for k, v in _final_kwargs.items() if k in _opt_arg_names
                                             }
                                             out = custom_reself.resolve_attr(
                                                 attr,  # do not pass _attr, important for caching
@@ -563,27 +541,27 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                                                 cache_dct=_arg_cache_dct,
                                                 use_caching=_use_caching,
                                                 passed_kwargs_out=passed_kwargs_out,
-                                                use_shortcuts=_use_shortcuts
+                                                use_shortcuts=_use_shortcuts,
                                             )
                                         else:
                                             if isinstance(obj, AttrResolverMixin):
                                                 cls_dir = obj.cls_dir
                                             else:
                                                 cls_dir = dir(type(obj))
-                                            if 'get_' + attr in cls_dir:
-                                                _attr = 'get_' + attr
+                                            if "get_" + attr in cls_dir:
+                                                _attr = "get_" + attr
                                             else:
                                                 _attr = attr
                                             out = getattr(obj, _attr)
-                                        _select_col_arg = _final_kwargs.pop('select_col_' + attr, False)
+                                        _select_col_arg = _final_kwargs.pop("select_col_" + attr, False)
                                         if _select_col_arg and _column is not None:
                                             out = custom_reself.select_col_from_obj(
                                                 out,
                                                 _column,
-                                                wrapper=custom_reself.wrapper.regroup(_group_by)
+                                                wrapper=custom_reself.wrapper.regroup(_group_by),
                                             )
-                                            passed_kwargs_out['group_by'] = _group_by
-                                            passed_kwargs_out['column'] = _column
+                                            passed_kwargs_out["group_by"] = _group_by
+                                            passed_kwargs_out["column"] = _column
                                         return out
 
                                 out = getattr(obj, attr)
@@ -594,15 +572,15 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                             plot_func = custom_reself.deep_getattr(
                                 plot_func,
                                 getattr_func=_getattr_func,
-                                call_last_attr=False
+                                call_last_attr=False,
                             )
 
-                            if 'group_by' in passed_kwargs_out:
-                                if 'pass_group_by' not in final_kwargs:
-                                    final_kwargs.pop('group_by', None)
-                            if 'column' in passed_kwargs_out:
-                                if 'pass_column' not in final_kwargs:
-                                    final_kwargs.pop('column', None)
+                            if "group_by" in passed_kwargs_out:
+                                if "pass_group_by" not in final_kwargs:
+                                    final_kwargs.pop("group_by", None)
+                            if "column" in passed_kwargs_out:
+                                if "pass_column" not in final_kwargs:
+                                    final_kwargs.pop("column", None)
                         if not callable(plot_func):
                             raise TypeError("plot_func must be callable")
 
@@ -610,9 +588,9 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                         func_arg_names = get_func_arg_names(plot_func)
                         for k in func_arg_names:
                             if k not in final_kwargs:
-                                resolve_arg = final_kwargs.pop('resolve_' + k, False)
-                                use_shortcuts_arg = final_kwargs.pop('use_shortcuts_' + k, True)
-                                select_col_arg = final_kwargs.pop('select_col_' + k, False)
+                                resolve_arg = final_kwargs.pop("resolve_" + k, False)
+                                use_shortcuts_arg = final_kwargs.pop("use_shortcuts_" + k, True)
+                                select_col_arg = final_kwargs.pop("select_col_" + k, False)
                                 if resolve_arg:
                                     try:
                                         arg_out = custom_reself.resolve_attr(
@@ -621,7 +599,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                                             custom_arg_names=custom_arg_names,
                                             cache_dct=arg_cache_dct,
                                             use_caching=use_caching,
-                                            use_shortcuts=use_shortcuts_arg
+                                            use_shortcuts=use_shortcuts_arg,
                                         )
                                     except AttributeError:
                                         continue
@@ -630,18 +608,18 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                                         arg_out = custom_reself.select_col_from_obj(
                                             arg_out,
                                             _column,
-                                            wrapper=custom_reself.wrapper.regroup(_group_by)
+                                            wrapper=custom_reself.wrapper.regroup(_group_by),
                                         )
                                     final_kwargs[k] = arg_out
                         for k in list(final_kwargs.keys()):
                             if k in opt_arg_names:
-                                if 'pass_' + k in final_kwargs:
-                                    if not final_kwargs.get('pass_' + k):  # first priority
+                                if "pass_" + k in final_kwargs:
+                                    if not final_kwargs.get("pass_" + k):  # first priority
                                         final_kwargs.pop(k, None)
                                 elif k not in func_arg_names:  # second priority
                                     final_kwargs.pop(k, None)
                         for k in list(final_kwargs.keys()):
-                            if k.startswith('pass_') or k.startswith('resolve_'):
+                            if k.startswith("pass_") or k.startswith("resolve_"):
                                 final_kwargs.pop(k, None)  # cleanup
 
                         # Call plot_func
@@ -652,10 +630,10 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
 
                 # Update global layout
                 for annotation in fig.layout.annotations:
-                    if 'text' in annotation and annotation['text'] == '$title_' + str(i):
-                        annotation['text'] = title
+                    if "text" in annotation and annotation["text"] == "$title_" + str(i):
+                        annotation["text"] = title
                 subplot_layout = dict()
-                subplot_layout[xaxis] = merge_dicts(dict(title='Index'), xaxis_kwargs)
+                subplot_layout[xaxis] = merge_dicts(dict(title="Index"), xaxis_kwargs)
                 subplot_layout[yaxis] = merge_dicts(dict(), yaxis_kwargs)
                 fig.update_layout(**subplot_layout)
             except Exception as e:
@@ -666,44 +644,44 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
         found_ids = dict()
         unique_idx = 0
         for trace in fig.data:
-            if 'name' in trace:
-                name = trace['name']
+            if "name" in trace:
+                name = trace["name"]
             else:
                 name = None
-            if 'marker' in trace:
-                marker = trace['marker']
+            if "marker" in trace:
+                marker = trace["marker"]
             else:
                 marker = {}
-            if 'symbol' in marker:
-                marker_symbol = marker['symbol']
+            if "symbol" in marker:
+                marker_symbol = marker["symbol"]
             else:
                 marker_symbol = None
-            if 'color' in marker:
-                marker_color = marker['color']
+            if "color" in marker:
+                marker_color = marker["color"]
             else:
                 marker_color = None
-            if 'line' in trace:
-                line = trace['line']
+            if "line" in trace:
+                line = trace["line"]
             else:
                 line = {}
-            if 'dash' in line:
-                line_dash = line['dash']
+            if "dash" in line:
+                line_dash = line["dash"]
             else:
                 line_dash = None
-            if 'color' in line:
-                line_color = line['color']
+            if "color" in line:
+                line_color = line["color"]
             else:
                 line_color = None
 
             id = (name, marker_symbol, marker_color, line_dash, line_color)
             if id in found_ids:
                 if hide_id_labels:
-                    trace['showlegend'] = False
+                    trace["showlegend"] = False
                 if group_id_labels:
-                    trace['legendgroup'] = found_ids[id]
+                    trace["legendgroup"] = found_ids[id]
             else:
                 if group_id_labels:
-                    trace['legendgroup'] = unique_idx
+                    trace["legendgroup"] = unique_idx
                 found_ids[id] = unique_idx
                 unique_idx += 1
 
@@ -713,18 +691,18 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
             for row in range(rows):
                 for col in range(cols):
                     if specs[row][col] is not None:
-                        xaxis = 'xaxis' if i == 0 else 'xaxis' + str(i + 1)
+                        xaxis = "xaxis" if i == 0 else "xaxis" + str(i + 1)
                         if row < rows - 1:
-                            fig.layout[xaxis]['title'] = None
+                            fig.layout[xaxis]["title"] = None
                         i += 1
         if shared_yaxes:
             i = 0
             for row in range(rows):
                 for col in range(cols):
                     if specs[row][col] is not None:
-                        yaxis = 'yaxis' if i == 0 else 'yaxis' + str(i + 1)
+                        yaxis = "yaxis" if i == 0 else "yaxis" + str(i + 1)
                         if col > 0:
-                            fig.layout[yaxis]['title'] = None
+                            fig.layout[yaxis]["title"] = None
                         i += 1
 
         # Return the figure
@@ -737,16 +715,14 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
         """Build subplots documentation."""
         if source_cls is None:
             source_cls = PlotsBuilderMixin
-        return string.Template(
-            inspect.cleandoc(get_dict_attr(source_cls, 'subplots').__doc__)
-        ).substitute(
-            {'subplots': cls.subplots.prettify(), 'cls_name': cls.__name__}
+        return string.Template(inspect.cleandoc(get_dict_attr(source_cls, "subplots").__doc__)).substitute(
+            {"subplots": cls.subplots.prettify(), "cls_name": cls.__name__},
         )
 
     @classmethod
     def override_subplots_doc(cls, __pdoc__: dict, source_cls: tp.Optional[type] = None) -> None:
         """Call this method on each subclass that overrides `subplots`."""
-        __pdoc__[cls.__name__ + '.subplots'] = cls.build_subplots_doc(source_cls=source_cls)
+        __pdoc__[cls.__name__ + ".subplots"] = cls.build_subplots_doc(source_cls=source_cls)
 
 
 __pdoc__ = dict()

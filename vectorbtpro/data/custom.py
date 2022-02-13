@@ -75,15 +75,18 @@ class LocalData(Data):
     expressions accepted by `glob.glob`."""
 
     @classmethod
-    def fetch(cls: tp.Type[LocalDataT],
-              symbols: tp.Union[tp.Symbol, tp.Symbols] = None, *,
-              path: tp.Any = None,
-              parse_paths: bool = True,
-              sort_paths: bool = True,
-              unfold_path_func: tp.Callable = unfold_path,
-              unfold_path_kwargs: tp.KwargsLike = None,
-              path_to_symbol_func: tp.Callable = path_to_symbol,
-              **kwargs) -> LocalDataT:
+    def fetch(
+        cls: tp.Type[LocalDataT],
+        symbols: tp.Union[tp.Symbol, tp.Symbols] = None,
+        *,
+        path: tp.Any = None,
+        parse_paths: bool = True,
+        sort_paths: bool = True,
+        unfold_path_func: tp.Callable = unfold_path,
+        unfold_path_kwargs: tp.KwargsLike = None,
+        path_to_symbol_func: tp.Callable = path_to_symbol,
+        **kwargs,
+    ) -> LocalDataT:
         """Override `vectorbtpro.data.base.Data.fetch`.
 
         Set `parse_paths` to False to not parse paths and behave like a regular
@@ -208,16 +211,18 @@ class CSVData(LocalData):
     """
 
     @classmethod
-    def fetch_symbol(cls,
-                     symbol: tp.Symbol,
-                     path: tp.Any = None,
-                     header: tp.MaybeSequence[int] = 0,
-                     index_col: int = 0,
-                     parse_dates: bool = True,
-                     start_row: int = 0,
-                     end_row: tp.Optional[int] = None,
-                     squeeze: bool = True,
-                     **kwargs) -> tp.Tuple[tp.SeriesFrame, dict]:
+    def fetch_symbol(
+        cls,
+        symbol: tp.Symbol,
+        path: tp.Any = None,
+        header: tp.MaybeSequence[int] = 0,
+        index_col: int = 0,
+        parse_dates: bool = True,
+        start_row: int = 0,
+        end_row: tp.Optional[int] = None,
+        squeeze: bool = True,
+        **kwargs,
+    ) -> tp.Tuple[tp.SeriesFrame, dict]:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to load a CSV file.
 
         If `path` is None, uses `symbol` as the path to the CSV file.
@@ -250,33 +255,37 @@ class CSVData(LocalData):
             skiprows=skiprows,
             nrows=nrows,
             squeeze=squeeze,
-            **kwargs
+            **kwargs,
         )
-        if isinstance(obj, pd.Series) and obj.name == '0':
+        if isinstance(obj, pd.Series) and obj.name == "0":
             obj.name = None
         returned_kwargs = dict(last_row=start_row - header_rows + len(obj.index) - 1)
         return obj, returned_kwargs
 
     def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.Tuple[tp.SeriesFrame, dict]:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        fetch_kwargs['start_row'] = self.returned_kwargs[symbol]['last_row']
+        fetch_kwargs["start_row"] = self.returned_kwargs[symbol]["last_row"]
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         return self.fetch_symbol(symbol, **kwargs)
 
 
 class HDFPathNotFoundError(Exception):
     """Gets raised if the path to an HDF file could not be found."""
+
     pass
 
 
 class HDFKeyNotFoundError(Exception):
     """Gets raised if the key to an HDF object could not be found."""
+
     pass
 
 
-def split_hdf_path(path: tp.PathLike,
-                   key: tp.Optional[str] = None,
-                   _full_path: tp.Optional[Path] = None) -> tp.Tuple[Path, tp.Optional[str]]:
+def split_hdf_path(
+    path: tp.PathLike,
+    key: tp.Optional[str] = None,
+    _full_path: tp.Optional[Path] = None,
+) -> tp.Tuple[Path, tp.Optional[str]]:
     """Split the path to an HDF object into the path to the file and the key."""
     path = Path(path)
     if _full_path is None:
@@ -410,20 +419,25 @@ class HDFData(LocalData):
     """
 
     @classmethod
-    def fetch(cls: tp.Type[HDFDataT],
-              symbols: tp.Union[tp.Symbol, tp.Symbols] = None, *,
-              unfold_path_func: tp.Callable = hdf_unfold_path,
-              **kwargs) -> HDFDataT:
+    def fetch(
+        cls: tp.Type[HDFDataT],
+        symbols: tp.Union[tp.Symbol, tp.Symbols] = None,
+        *,
+        unfold_path_func: tp.Callable = hdf_unfold_path,
+        **kwargs,
+    ) -> HDFDataT:
         """Override `LocalData.fetch` to parse paths and HDF keys."""
         return super(HDFData, cls).fetch(symbols, unfold_path_func=unfold_path_func, **kwargs)
 
     @classmethod
-    def fetch_symbol(cls,
-                     symbol: tp.Symbol,
-                     path: tp.Any = None,
-                     start_row: int = 0,
-                     end_row: tp.Optional[int] = None,
-                     **kwargs) -> tp.Tuple[tp.SeriesFrame, dict]:
+    def fetch_symbol(
+        cls,
+        symbol: tp.Symbol,
+        path: tp.Any = None,
+        start_row: int = 0,
+        end_row: tp.Optional[int] = None,
+        **kwargs,
+    ) -> tp.Tuple[tp.SeriesFrame, dict]:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to load an HDF object.
 
         If `path` is None, uses `symbol` as the path to the HDF file.
@@ -441,19 +455,13 @@ class HDFData(LocalData):
         else:
             stop = None
 
-        obj = pd.read_hdf(
-            file_path,
-            key=key,
-            start=start_row,
-            stop=stop,
-            **kwargs
-        )
+        obj = pd.read_hdf(file_path, key=key, start=start_row, stop=stop, **kwargs)
         returned_kwargs = dict(last_row=start_row + len(obj.index) - 1)
         return obj, returned_kwargs
 
     def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.Tuple[tp.SeriesFrame, dict]:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        fetch_kwargs['start_row'] = self.returned_kwargs[symbol]['last_row']
+        fetch_kwargs["start_row"] = self.returned_kwargs[symbol]["last_row"]
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         return self.fetch_symbol(symbol, **kwargs)
 
@@ -470,13 +478,15 @@ class SyntheticData(Data):
         raise NotImplementedError
 
     @classmethod
-    def fetch_symbol(cls,
-                     symbol: tp.Symbol,
-                     start: tp.DatetimeLike = 0,
-                     end: tp.DatetimeLike = 'now',
-                     freq: tp.Union[None, str, pd.DateOffset] = None,
-                     date_range_kwargs: tp.KwargsLike = None,
-                     **kwargs) -> tp.SeriesFrame:
+    def fetch_symbol(
+        cls,
+        symbol: tp.Symbol,
+        start: tp.DatetimeLike = 0,
+        end: tp.DatetimeLike = "now",
+        freq: tp.Union[None, str, pd.DateOffset] = None,
+        date_range_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to generate a symbol.
 
         Generates datetime index and passes it to `SyntheticData.generate_symbol` to fill
@@ -487,7 +497,7 @@ class SyntheticData(Data):
             start=to_tzaware_datetime(start, tz=get_utc_tz()),
             end=to_tzaware_datetime(end, tz=get_utc_tz()),
             freq=freq,
-            **date_range_kwargs
+            **date_range_kwargs,
         )
         if len(index) == 0:
             raise ValueError("Date range is empty")
@@ -495,7 +505,7 @@ class SyntheticData(Data):
 
     def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        fetch_kwargs['start'] = self.last_index[symbol]
+        fetch_kwargs["start"] = self.last_index[symbol]
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         return self.fetch_symbol(symbol, **kwargs)
 
@@ -529,15 +539,17 @@ class RandomData(SyntheticData):
     """
 
     @classmethod
-    def generate_symbol(cls,
-                        symbol: tp.Symbol,
-                        index: tp.Index,
-                        num_paths: int = 1,
-                        start_value: float = 100.,
-                        mean: float = 0.,
-                        std: float = 0.01,
-                        seed: tp.Optional[int] = None,
-                        jitted: tp.JittedOption = None) -> tp.SeriesFrame:
+    def generate_symbol(
+        cls,
+        symbol: tp.Symbol,
+        index: tp.Index,
+        num_paths: int = 1,
+        start_value: float = 100.0,
+        mean: float = 0.0,
+        std: float = 0.01,
+        seed: tp.Optional[int] = None,
+        jitted: tp.JittedOption = None,
+    ) -> tp.SeriesFrame:
         """Generate a symbol.
 
         Args:
@@ -560,15 +572,15 @@ class RandomData(SyntheticData):
 
         if out.shape[1] == 1:
             return pd.Series(out[:, 0], index=index)
-        columns = pd.RangeIndex(stop=out.shape[1], name='path')
+        columns = pd.RangeIndex(stop=out.shape[1], name="path")
         return pd.DataFrame(out, index=index, columns=columns)
 
     def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        fetch_kwargs['start'] = self.last_index[symbol]
-        _ = fetch_kwargs.pop('start_value', None)
+        fetch_kwargs["start"] = self.last_index[symbol]
+        _ = fetch_kwargs.pop("start_value", None)
         start_value = self.data[symbol].iloc[-2]
-        fetch_kwargs['seed'] = None
+        fetch_kwargs["seed"] = None
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         return self.fetch_symbol(symbol, start_value=start_value, **kwargs)
 
@@ -602,16 +614,18 @@ class GBMData(RandomData):
     """
 
     @classmethod
-    def generate_symbol(cls,
-                        symbol: tp.Symbol,
-                        index: tp.Index,
-                        num_paths: int = 1,
-                        start_value: float = 100.,
-                        mean: float = 0.,
-                        std: float = 0.01,
-                        dt: float = 1.,
-                        seed: tp.Optional[int] = None,
-                        jitted: tp.JittedOption = None) -> tp.SeriesFrame:
+    def generate_symbol(
+        cls,
+        symbol: tp.Symbol,
+        index: tp.Index,
+        num_paths: int = 1,
+        start_value: float = 100.0,
+        mean: float = 0.0,
+        std: float = 0.01,
+        dt: float = 1.0,
+        seed: tp.Optional[int] = None,
+        jitted: tp.JittedOption = None,
+    ) -> tp.SeriesFrame:
         """Generate a symbol.
 
         Args:
@@ -635,7 +649,7 @@ class GBMData(RandomData):
 
         if out.shape[1] == 1:
             return pd.Series(out[:, 0], index=index)
-        columns = pd.RangeIndex(stop=out.shape[1], name='path')
+        columns = pd.RangeIndex(stop=out.shape[1], name="path")
         return pd.DataFrame(out, index=index, columns=columns)
 
 
@@ -718,12 +732,14 @@ class YFData(Data):  # pragma: no cover
     """
 
     @classmethod
-    def fetch_symbol(cls,
-                     symbol: str,
-                     period: str = 'max',
-                     start: tp.Optional[tp.DatetimeLike] = None,
-                     end: tp.Optional[tp.DatetimeLike] = None,
-                     **kwargs) -> tp.Frame:
+    def fetch_symbol(
+        cls,
+        symbol: str,
+        period: str = "max",
+        start: tp.Optional[tp.DatetimeLike] = None,
+        end: tp.Optional[tp.DatetimeLike] = None,
+        **kwargs,
+    ) -> tp.Frame:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Yahoo Finance.
 
         Args:
@@ -738,7 +754,8 @@ class YFData(Data):  # pragma: no cover
             **kwargs: Keyword arguments passed to `yfinance.base.TickerBase.history`.
         """
         from vectorbtpro.utils.opt_packages import assert_can_import
-        assert_can_import('yfinance')
+
+        assert_can_import("yfinance")
         import yfinance as yf
 
         # yfinance still uses mktime, which assumes that the passed date is in local time
@@ -751,7 +768,7 @@ class YFData(Data):  # pragma: no cover
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.SeriesFrame:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        fetch_kwargs['start'] = self.last_index[symbol]
+        fetch_kwargs["start"] = self.last_index[symbol]
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         return self.fetch_symbol(symbol, **kwargs)
 
@@ -877,17 +894,22 @@ class BinanceData(Data):  # pragma: no cover
     """
 
     @classmethod
-    def fetch(cls: tp.Type[BinanceDataT],
-              symbols: tp.Union[tp.Symbol, tp.Symbols] = None, *,
-              client: tp.Optional["BinanceClientT"] = None,
-              **kwargs) -> BinanceDataT:
+    def fetch(
+        cls: tp.Type[BinanceDataT],
+        symbols: tp.Union[tp.Symbol, tp.Symbols] = None,
+        *,
+        client: tp.Optional["BinanceClientT"] = None,
+        **kwargs,
+    ) -> BinanceDataT:
         """Override `vectorbtpro.data.base.Data.fetch` to instantiate a Binance client."""
         from vectorbtpro.utils.opt_packages import assert_can_import
-        assert_can_import('binance')
+
+        assert_can_import("binance")
         from binance.client import Client
 
         from vectorbtpro._settings import settings
-        binance_cfg = settings['data']['custom']['binance']
+
+        binance_cfg = settings["data"]["custom"]["binance"]
 
         client_kwargs = dict()
         for k in get_func_kwargs(Client.__init__):
@@ -899,16 +921,18 @@ class BinanceData(Data):  # pragma: no cover
         return super(BinanceData, cls).fetch(symbols, client=client, **kwargs)
 
     @classmethod
-    def fetch_symbol(cls,
-                     symbol: str,
-                     client: tp.Optional["BinanceClientT"] = None,
-                     interval: str = '1d',
-                     start: tp.DatetimeLike = 0,
-                     end: tp.DatetimeLike = 'now UTC',
-                     delay: tp.Optional[float] = 500,
-                     limit: int = 500,
-                     show_progress: bool = True,
-                     pbar_kwargs: tp.KwargsLike = None) -> tp.Frame:
+    def fetch_symbol(
+        cls,
+        symbol: str,
+        client: tp.Optional["BinanceClientT"] = None,
+        interval: str = "1d",
+        start: tp.DatetimeLike = 0,
+        end: tp.DatetimeLike = "now UTC",
+        delay: tp.Optional[float] = 500,
+        limit: int = 500,
+        show_progress: bool = True,
+        pbar_kwargs: tp.KwargsLike = None,
+    ) -> tp.Frame:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Binance.
 
         Args:
@@ -938,13 +962,7 @@ class BinanceData(Data):  # pragma: no cover
         # Establish the timestamps
         start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
         try:
-            first_data = client.get_klines(
-                symbol=symbol,
-                interval=interval,
-                limit=1,
-                startTime=0,
-                endTime=None
-            )
+            first_data = client.get_klines(symbol=symbol, interval=interval, limit=1, startTime=0, endTime=None)
             first_valid_ts = first_data[0][0]
             next_start_ts = start_ts = max(start_ts, first_valid_ts)
         except:
@@ -966,7 +984,7 @@ class BinanceData(Data):  # pragma: no cover
                         interval=interval,
                         limit=limit,
                         startTime=next_start_ts,
-                        endTime=end_ts
+                        endTime=end_ts,
                     )
                     if len(data) > 0:
                         next_data = list(filter(lambda d: next_start_ts < d[0] < end_ts, next_data))
@@ -977,53 +995,56 @@ class BinanceData(Data):  # pragma: no cover
                     if not len(next_data):
                         break
                     data += next_data
-                    pbar.set_description("{} - {}".format(
-                        _ts_to_str(start_ts),
-                        _ts_to_str(next_data[-1][0])
-                    ))
+                    pbar.set_description("{} - {}".format(_ts_to_str(start_ts), _ts_to_str(next_data[-1][0])))
                     pbar.update(1)
                     next_start_ts = next_data[-1][0]
                     if delay is not None:
                         time.sleep(delay / 1000)  # be kind to api
         except Exception as e:
             warnings.warn(traceback.format_exc())
-            warnings.warn(f"Symbol '{str(symbol)}' raised an exception. Returning incomplete data. "
-                          f"Use update() method to fetch missing data.", stacklevel=2)
+            warnings.warn(
+                f"Symbol '{str(symbol)}' raised an exception. Returning incomplete data. "
+                f"Use update() method to fetch missing data.",
+                stacklevel=2,
+            )
 
         # Convert data to a DataFrame
-        df = pd.DataFrame(data, columns=[
-            'Open time',
-            'Open',
-            'High',
-            'Low',
-            'Close',
-            'Volume',
-            'Close time',
-            'Quote volume',
-            'Number of trades',
-            'Taker base volume',
-            'Taker quote volume',
-            'Ignore'
-        ])
-        df.index = pd.to_datetime(df['Open time'], unit='ms', utc=True)
-        del df['Open time']
-        df['Open'] = df['Open'].astype(float)
-        df['High'] = df['High'].astype(float)
-        df['Low'] = df['Low'].astype(float)
-        df['Close'] = df['Close'].astype(float)
-        df['Volume'] = df['Volume'].astype(float)
-        df['Close time'] = pd.to_datetime(df['Close time'], unit='ms', utc=True)
-        df['Quote volume'] = df['Quote volume'].astype(float)
-        df['Number of trades'] = df['Number of trades'].astype(int)
-        df['Taker base volume'] = df['Taker base volume'].astype(float)
-        df['Taker quote volume'] = df['Taker quote volume'].astype(float)
-        del df['Ignore']
+        df = pd.DataFrame(
+            data,
+            columns=[
+                "Open time",
+                "Open",
+                "High",
+                "Low",
+                "Close",
+                "Volume",
+                "Close time",
+                "Quote volume",
+                "Number of trades",
+                "Taker base volume",
+                "Taker quote volume",
+                "Ignore",
+            ],
+        )
+        df.index = pd.to_datetime(df["Open time"], unit="ms", utc=True)
+        del df["Open time"]
+        df["Open"] = df["Open"].astype(float)
+        df["High"] = df["High"].astype(float)
+        df["Low"] = df["Low"].astype(float)
+        df["Close"] = df["Close"].astype(float)
+        df["Volume"] = df["Volume"].astype(float)
+        df["Close time"] = pd.to_datetime(df["Close time"], unit="ms", utc=True)
+        df["Quote volume"] = df["Quote volume"].astype(float)
+        df["Number of trades"] = df["Number of trades"].astype(int)
+        df["Taker base volume"] = df["Taker base volume"].astype(float)
+        df["Taker quote volume"] = df["Taker quote volume"].astype(float)
+        del df["Ignore"]
 
         return df
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.Frame:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        fetch_kwargs['start'] = self.last_index[symbol]
+        fetch_kwargs["start"] = self.last_index[symbol]
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         return self.fetch_symbol(symbol, **kwargs)
 
@@ -1086,19 +1107,21 @@ class CCXTData(Data):  # pragma: no cover
     """
 
     @classmethod
-    def fetch_symbol(cls,
-                     symbol: str,
-                     exchange: tp.Union[str, "ExchangeT"] = 'binance',
-                     config: tp.Optional[dict] = None,
-                     timeframe: str = '1d',
-                     start: tp.DatetimeLike = 0,
-                     end: tp.DatetimeLike = 'now UTC',
-                     delay: tp.Optional[float] = None,
-                     limit: tp.Optional[int] = 500,
-                     retries: int = 3,
-                     show_progress: bool = True,
-                     params: tp.Optional[dict] = None,
-                     pbar_kwargs: tp.KwargsLike = None) -> tp.Frame:
+    def fetch_symbol(
+        cls,
+        symbol: str,
+        exchange: tp.Union[str, "ExchangeT"] = "binance",
+        config: tp.Optional[dict] = None,
+        timeframe: str = "1d",
+        start: tp.DatetimeLike = 0,
+        end: tp.DatetimeLike = "now UTC",
+        delay: tp.Optional[float] = None,
+        limit: tp.Optional[int] = 500,
+        retries: int = 3,
+        show_progress: bool = True,
+        params: tp.Optional[dict] = None,
+        pbar_kwargs: tp.KwargsLike = None,
+    ) -> tp.Frame:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from CCXT.
 
         Args:
@@ -1128,11 +1151,13 @@ class CCXTData(Data):  # pragma: no cover
         For defaults, see `custom.ccxt` in `vectorbtpro._settings.data`.
         """
         from vectorbtpro.utils.opt_packages import assert_can_import
-        assert_can_import('ccxt')
+
+        assert_can_import("ccxt")
         import ccxt
 
         from vectorbtpro._settings import settings
-        ccxt_cfg = settings['data']['custom']['ccxt']
+
+        ccxt_cfg = settings["data"]["custom"]["ccxt"]
 
         if config is None:
             config = {}
@@ -1157,11 +1182,11 @@ class CCXTData(Data):  # pragma: no cover
         else:
             if len(config) > 0:
                 raise ValueError("Cannot apply config after instantiation of the exchange")
-        if not exchange.has['fetchOHLCV']:
+        if not exchange.has["fetchOHLCV"]:
             raise ValueError(f"Exchange {exchange} does not support OHLCV")
         if timeframe not in exchange.timeframes:
             raise ValueError(f"Exchange {exchange} does not support {timeframe} timeframe")
-        if exchange.has['fetchOHLCV'] == 'emulated':
+        if exchange.has["fetchOHLCV"] == "emulated":
             warnings.warn("Using emulated OHLCV candles", stacklevel=2)
 
         def _retry(method):
@@ -1180,13 +1205,7 @@ class CCXTData(Data):  # pragma: no cover
 
         @_retry
         def _fetch(_since, _limit):
-            return exchange.fetch_ohlcv(
-                symbol,
-                timeframe=timeframe,
-                since=_since,
-                limit=_limit,
-                params=params
-            )
+            return exchange.fetch_ohlcv(symbol, timeframe=timeframe, since=_since, limit=_limit, params=params)
 
         # Establish the timestamps
         start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
@@ -1218,41 +1237,34 @@ class CCXTData(Data):  # pragma: no cover
                     if not len(next_data):
                         break
                     data += next_data
-                    pbar.set_description("{} - {}".format(
-                        _ts_to_str(start_ts),
-                        _ts_to_str(next_data[-1][0])
-                    ))
+                    pbar.set_description("{} - {}".format(_ts_to_str(start_ts), _ts_to_str(next_data[-1][0])))
                     pbar.update(1)
                     next_start_ts = next_data[-1][0]
                     if delay is not None:
                         time.sleep(delay / 1000)  # be kind to api
         except Exception as e:
             warnings.warn(traceback.format_exc())
-            warnings.warn(f"Symbol '{str(symbol)}' raised an exception. Returning incomplete data. "
-                          f"Use update() method to fetch missing data.", stacklevel=2)
+            warnings.warn(
+                f"Symbol '{str(symbol)}' raised an exception. Returning incomplete data. "
+                f"Use update() method to fetch missing data.",
+                stacklevel=2,
+            )
 
         # Convert data to a DataFrame
-        df = pd.DataFrame(data, columns=[
-            'Open time',
-            'Open',
-            'High',
-            'Low',
-            'Close',
-            'Volume'
-        ])
-        df.index = pd.to_datetime(df['Open time'], unit='ms', utc=True)
-        del df['Open time']
-        df['Open'] = df['Open'].astype(float)
-        df['High'] = df['High'].astype(float)
-        df['Low'] = df['Low'].astype(float)
-        df['Close'] = df['Close'].astype(float)
-        df['Volume'] = df['Volume'].astype(float)
+        df = pd.DataFrame(data, columns=["Open time", "Open", "High", "Low", "Close", "Volume"])
+        df.index = pd.to_datetime(df["Open time"], unit="ms", utc=True)
+        del df["Open time"]
+        df["Open"] = df["Open"].astype(float)
+        df["High"] = df["High"].astype(float)
+        df["Low"] = df["Low"].astype(float)
+        df["Close"] = df["Close"].astype(float)
+        df["Volume"] = df["Volume"].astype(float)
 
         return df
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.Frame:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        fetch_kwargs['start'] = self.last_index[symbol]
+        fetch_kwargs["start"] = self.last_index[symbol]
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         return self.fetch_symbol(symbol, **kwargs)
 
@@ -1320,17 +1332,22 @@ class AlpacaData(Data):  # pragma: no cover
     """
 
     @classmethod
-    def fetch(cls: tp.Type[AlpacaDataT],
-              symbols: tp.Union[tp.Symbol, tp.Symbols] = None, *,
-              client: tp.Optional["AlpacaClientT"] = None,
-              **kwargs) -> AlpacaDataT:
+    def fetch(
+        cls: tp.Type[AlpacaDataT],
+        symbols: tp.Union[tp.Symbol, tp.Symbols] = None,
+        *,
+        client: tp.Optional["AlpacaClientT"] = None,
+        **kwargs,
+    ) -> AlpacaDataT:
         """Override `vectorbtpro.data.base.Data.fetch` to instantiate an Alpaca client."""
         from vectorbtpro.utils.opt_packages import assert_can_import
-        assert_can_import('alpaca_trade_api')
+
+        assert_can_import("alpaca_trade_api")
         from alpaca_trade_api.rest import REST
 
         from vectorbtpro._settings import settings
-        alpaca_cfg = settings['data']['custom']['alpaca']
+
+        alpaca_cfg = settings["data"]["custom"]["alpaca"]
 
         client_kwargs = dict()
         for k in get_func_kwargs(REST.__init__):
@@ -1342,16 +1359,18 @@ class AlpacaData(Data):  # pragma: no cover
         return super(AlpacaData, cls).fetch(symbols, client=client, **kwargs)
 
     @classmethod
-    def fetch_symbol(cls,
-                     symbol: str,
-                     client: tp.Optional["AlpacaClientT"] = None,
-                     timeframe: str = '1d',
-                     start: tp.DatetimeLike = 0,
-                     end: tp.DatetimeLike = 'now UTC',
-                     adjustment: tp.Optional[str] = 'all',
-                     limit: int = 500,
-                     exchange: tp.Optional[str] = 'CBSE',
-                     **kwargs) -> tp.Frame:
+    def fetch_symbol(
+        cls,
+        symbol: str,
+        client: tp.Optional["AlpacaClientT"] = None,
+        timeframe: str = "1d",
+        start: tp.DatetimeLike = 0,
+        end: tp.DatetimeLike = "now UTC",
+        adjustment: tp.Optional[str] = "all",
+        limit: int = 500,
+        exchange: tp.Optional[str] = "CBSE",
+        **kwargs,
+    ) -> tp.Frame:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Alpaca.
 
         Args:
@@ -1382,10 +1401,11 @@ class AlpacaData(Data):  # pragma: no cover
         For defaults, see `custom.alpaca` in `vectorbtpro._settings.data`.
         """
         from vectorbtpro.utils.opt_packages import assert_can_import
-        assert_can_import('alpaca_trade_api')
+
+        assert_can_import("alpaca_trade_api")
         from alpaca_trade_api.rest import TimeFrameUnit, TimeFrame
 
-        _timeframe_units = {'d': TimeFrameUnit.Day, 'h': TimeFrameUnit.Hour, 'm': TimeFrameUnit.Minute}
+        _timeframe_units = {"d": TimeFrameUnit.Day, "h": TimeFrameUnit.Hour, "m": TimeFrameUnit.Minute}
 
         if len(timeframe) < 2:
             raise ValueError("invalid timeframe")
@@ -1414,7 +1434,7 @@ class AlpacaData(Data):  # pragma: no cover
                 start=start_ts,
                 end=end_ts,
                 limit=limit,
-                exchanges=exchange
+                exchanges=exchange,
             ).df
         else:
             df = client.get_bars(
@@ -1423,33 +1443,36 @@ class AlpacaData(Data):  # pragma: no cover
                 start=start_ts,
                 end=end_ts,
                 adjustment=adjustment,
-                limit=limit
+                limit=limit,
             ).df
 
         # filter for OHLCV
         # remove extra columns
-        df.drop(['trade_count', 'vwap'], axis=1, errors='ignore', inplace=True)
+        df.drop(["trade_count", "vwap"], axis=1, errors="ignore", inplace=True)
 
         # capitalize
-        df.rename(columns={
-            'open': 'Open',
-            'high': 'High',
-            'low': 'Low',
-            'close': 'Close',
-            'volume': 'Volume',
-            'exchange': 'Exchange'
-        }, inplace=True)
+        df.rename(
+            columns={
+                "open": "Open",
+                "high": "High",
+                "low": "Low",
+                "close": "Close",
+                "volume": "Volume",
+                "exchange": "Exchange",
+            },
+            inplace=True,
+        )
 
-        df['Open'] = df['Open'].astype(float)
-        df['High'] = df['High'].astype(float)
-        df['Low'] = df['Low'].astype(float)
-        df['Close'] = df['Close'].astype(float)
-        df['Volume'] = df['Volume'].astype(float)
+        df["Open"] = df["Open"].astype(float)
+        df["High"] = df["High"].astype(float)
+        df["Low"] = df["Low"].astype(float)
+        df["Close"] = df["Close"].astype(float)
+        df["Volume"] = df["Volume"].astype(float)
 
         return df
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.Frame:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        fetch_kwargs['start'] = self.last_index[symbol]
+        fetch_kwargs["start"] = self.last_index[symbol]
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         return self.fetch_symbol(symbol, **kwargs)

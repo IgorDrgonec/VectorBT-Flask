@@ -105,7 +105,8 @@ def register_accessor(name: str, cls: tp.Type[DirNamesMixin]) -> tp.Callable:
 
     def decorator(accessor: tp.Type[AccessorT]) -> tp.Type[AccessorT]:
         from vectorbtpro._settings import settings
-        caching_cfg = settings['caching']
+
+        caching_cfg = settings["caching"]
 
         if hasattr(cls, name):
             warnings.warn(
@@ -115,7 +116,7 @@ def register_accessor(name: str, cls: tp.Type[DirNamesMixin]) -> tp.Callable:
                 UserWarning,
                 stacklevel=2,
             )
-        if caching_cfg['use_cached_accessors']:
+        if caching_cfg["use_cached_accessors"]:
             setattr(cls, name, CachedAccessor(name, accessor))
         else:
             setattr(cls, name, Accessor(name, accessor))

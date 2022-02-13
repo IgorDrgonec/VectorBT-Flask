@@ -42,7 +42,7 @@ def get_return_nb(input_value: float, output_value: float) -> float:
     """Calculate return from input and output value."""
     if input_value == 0:
         if output_value == 0:
-            return 0.
+            return 0.0
         return np.inf * np.sign(output_value)
     return_value = add_nb(output_value, -input_value) / input_value
     if input_value < 0:
@@ -66,14 +66,11 @@ def returns_1d_nb(arr: tp.Array1d, init_value: float = np.nan) -> tp.Array1d:
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='arr', axis=1),
-    arg_take_spec=dict(
-        arr=ch.ArraySlicer(axis=1),
-        init_value=base_ch.FlexArraySlicer(axis=1, flex_2d=True)
-    ),
-    merge_func=base_ch.column_stack
+    size=ch.ArraySizer(arg_query="arr", axis=1),
+    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), init_value=base_ch.FlexArraySlicer(axis=1, flex_2d=True)),
+    merge_func=base_ch.column_stack,
 )
-@register_jitted(cache=True, tags={'can_parallel'})
+@register_jitted(cache=True, tags={"can_parallel"})
 def returns_nb(arr: tp.Array2d, init_value: tp.FlexArray = np.asarray(np.nan)) -> tp.Array2d:
     """2-dim version of `returns_1d_nb`."""
     out = np.empty(arr.shape, dtype=np.float_)
@@ -93,19 +90,16 @@ def cum_returns_1d_nb(rets: tp.Array1d, start_value: float) -> tp.Array1d:
             cumprod *= rets[i] + 1
         out[i] = cumprod
     if start_value == 0:
-        return out - 1.
+        return out - 1.0
     return out * start_value
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='rets', axis=1),
-    arg_take_spec=dict(
-        rets=ch.ArraySlicer(axis=1),
-        start_value=None
-    ),
-    merge_func=base_ch.column_stack
+    size=ch.ArraySizer(arg_query="rets", axis=1),
+    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), start_value=None),
+    merge_func=base_ch.column_stack,
 )
-@register_jitted(cache=True, tags={'can_parallel'})
+@register_jitted(cache=True, tags={"can_parallel"})
 def cum_returns_nb(rets: tp.Array2d, start_value: float) -> tp.Array2d:
     """2-dim version of `cum_returns_1d_nb`."""
     out = np.empty_like(rets, dtype=np.float_)
@@ -115,29 +109,26 @@ def cum_returns_nb(rets: tp.Array2d, start_value: float) -> tp.Array2d:
 
 
 @register_jitted(cache=True)
-def cum_returns_final_1d_nb(rets: tp.Array1d, start_value: float = 0.) -> float:
+def cum_returns_final_1d_nb(rets: tp.Array1d, start_value: float = 0.0) -> float:
     """Total return."""
     out = np.nan
     for i in range(rets.shape[0]):
         if not np.isnan(rets[i]):
             if np.isnan(out):
-                out = 1.
-            out *= rets[i] + 1.
+                out = 1.0
+            out *= rets[i] + 1.0
     if start_value == 0:
-        return out - 1.
+        return out - 1.0
     return out * start_value
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='rets', axis=1),
-    arg_take_spec=dict(
-        rets=ch.ArraySlicer(axis=1),
-        start_value=None
-    ),
-    merge_func=base_ch.concat
+    size=ch.ArraySizer(arg_query="rets", axis=1),
+    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), start_value=None),
+    merge_func=base_ch.concat,
 )
-@register_jitted(cache=True, tags={'can_parallel'})
-def cum_returns_final_nb(rets: tp.Array2d, start_value: float = 0.) -> tp.Array1d:
+@register_jitted(cache=True, tags={"can_parallel"})
+def cum_returns_final_nb(rets: tp.Array2d, start_value: float = 0.0) -> tp.Array1d:
     """2-dim version of `cum_returns_final_1d_nb`."""
     out = np.empty(rets.shape[1], dtype=np.float_)
     for col in prange(rets.shape[1]):
@@ -152,20 +143,16 @@ def annualized_return_1d_nb(rets: tp.Array1d, ann_factor: float, period: tp.Opti
     This is equivalent to the compound annual growth rate."""
     if period is None:
         period = rets.shape[0]
-    cum_return = cum_returns_final_1d_nb(rets, 1.)
+    cum_return = cum_returns_final_1d_nb(rets, 1.0)
     return cum_return ** (ann_factor / period) - 1
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='rets', axis=1),
-    arg_take_spec=dict(
-        rets=ch.ArraySlicer(axis=1),
-        ann_factor=None,
-        period=None
-    ),
-    merge_func=base_ch.concat
+    size=ch.ArraySizer(arg_query="rets", axis=1),
+    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), ann_factor=None, period=None),
+    merge_func=base_ch.concat,
 )
-@register_jitted(cache=True, tags={'can_parallel'})
+@register_jitted(cache=True, tags={"can_parallel"})
 def annualized_return_nb(rets: tp.Array2d, ann_factor: float, period: tp.Optional[float] = None) -> tp.Array1d:
     """2-dim version of `annualized_return_1d_nb`."""
     out = np.empty(rets.shape[1], dtype=np.float_)
@@ -175,29 +162,18 @@ def annualized_return_nb(rets: tp.Array2d, ann_factor: float, period: tp.Optiona
 
 
 @register_jitted(cache=True)
-def annualized_volatility_1d_nb(rets: tp.Array1d,
-                                ann_factor: float,
-                                levy_alpha: float = 2.0,
-                                ddof: int = 0) -> float:
+def annualized_volatility_1d_nb(rets: tp.Array1d, ann_factor: float, levy_alpha: float = 2.0, ddof: int = 0) -> float:
     """Annualized volatility of a strategy."""
     return generic_nb.nanstd_1d_nb(rets, ddof) * ann_factor ** (1.0 / levy_alpha)
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='rets', axis=1),
-    arg_take_spec=dict(
-        rets=ch.ArraySlicer(axis=1),
-        ann_factor=None,
-        levy_alpha=None,
-        ddof=None
-    ),
-    merge_func=base_ch.concat
+    size=ch.ArraySizer(arg_query="rets", axis=1),
+    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), ann_factor=None, levy_alpha=None, ddof=None),
+    merge_func=base_ch.concat,
 )
-@register_jitted(cache=True, tags={'can_parallel'})
-def annualized_volatility_nb(rets: tp.Array2d,
-                             ann_factor: float,
-                             levy_alpha: float = 2.0,
-                             ddof: int = 0) -> tp.Array1d:
+@register_jitted(cache=True, tags={"can_parallel"})
+def annualized_volatility_nb(rets: tp.Array2d, ann_factor: float, levy_alpha: float = 2.0, ddof: int = 0) -> tp.Array1d:
     """2-dim version of `annualized_volatility_1d_nb`."""
     out = np.empty(rets.shape[1], dtype=np.float_)
     for col in prange(rets.shape[1]):
@@ -209,13 +185,13 @@ def annualized_volatility_nb(rets: tp.Array2d,
 def max_drawdown_1d_nb(rets: tp.Array1d) -> float:
     """Total maximum drawdown (MDD)."""
     cum_ret = np.nan
-    value_max = 1.
-    out = 0.
+    value_max = 1.0
+    out = 0.0
     for i in range(rets.shape[0]):
         if not np.isnan(rets[i]):
             if np.isnan(cum_ret):
-                cum_ret = 1.
-            cum_ret *= rets[i] + 1.
+                cum_ret = 1.0
+            cum_ret *= rets[i] + 1.0
         if cum_ret > value_max:
             value_max = cum_ret
         elif cum_ret < value_max:
@@ -228,13 +204,11 @@ def max_drawdown_1d_nb(rets: tp.Array1d) -> float:
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='rets', axis=1),
-    arg_take_spec=dict(
-        rets=ch.ArraySlicer(axis=1)
-    ),
-    merge_func=base_ch.concat
+    size=ch.ArraySizer(arg_query="rets", axis=1),
+    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1)),
+    merge_func=base_ch.concat,
 )
-@register_jitted(cache=True, tags={'can_parallel'})
+@register_jitted(cache=True, tags={"can_parallel"})
 def max_drawdown_nb(rets: tp.Array2d) -> tp.Array1d:
     """2-dim version of `max_drawdown_1d_nb`."""
     out = np.empty(rets.shape[1], dtype=np.float_)
@@ -256,15 +230,11 @@ def calmar_ratio_1d_nb(rets: tp.Array1d, ann_factor: float, period: tp.Optional[
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='rets', axis=1),
-    arg_take_spec=dict(
-        rets=ch.ArraySlicer(axis=1),
-        ann_factor=None,
-        period=None
-    ),
-    merge_func=base_ch.concat
+    size=ch.ArraySizer(arg_query="rets", axis=1),
+    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), ann_factor=None, period=None),
+    merge_func=base_ch.concat,
 )
-@register_jitted(cache=True, tags={'can_parallel'})
+@register_jitted(cache=True, tags={"can_parallel"})
 def calmar_ratio_nb(rets: tp.Array2d, ann_factor: float, period: tp.Optional[float] = None) -> tp.Array1d:
     """2-dim version of `calmar_ratio_1d_nb`."""
     out = np.empty(rets.shape[1], dtype=np.float_)
@@ -280,14 +250,14 @@ def deannualized_return_nb(ret: float, ann_factor: float) -> float:
         return ret
     if ann_factor <= -1:
         return np.nan
-    return (1 + ret) ** (1. / ann_factor) - 1
+    return (1 + ret) ** (1.0 / ann_factor) - 1
 
 
 @register_jitted(cache=True)
 def omega_ratio_1d_nb(adj_rets: tp.Array1d) -> float:
     """Omega ratio of a strategy."""
-    numer = 0.
-    denom = 0.
+    numer = 0.0
+    denom = 0.0
     for i in range(adj_rets.shape[0]):
         ret = adj_rets[i]
         if ret > 0:
@@ -300,13 +270,11 @@ def omega_ratio_1d_nb(adj_rets: tp.Array1d) -> float:
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='adj_rets', axis=1),
-    arg_take_spec=dict(
-        adj_rets=ch.ArraySlicer(axis=1)
-    ),
-    merge_func=base_ch.concat
+    size=ch.ArraySizer(arg_query="adj_rets", axis=1),
+    arg_take_spec=dict(adj_rets=ch.ArraySlicer(axis=1)),
+    merge_func=base_ch.concat,
 )
-@register_jitted(cache=True, tags={'can_parallel'})
+@register_jitted(cache=True, tags={"can_parallel"})
 def omega_ratio_nb(adj_rets: tp.Array2d) -> tp.Array1d:
     """2-dim version of `omega_ratio_1d_nb`."""
     out = np.empty(adj_rets.shape[1], dtype=np.float_)
@@ -316,9 +284,7 @@ def omega_ratio_nb(adj_rets: tp.Array2d) -> tp.Array1d:
 
 
 @register_jitted(cache=True)
-def sharpe_ratio_1d_nb(adj_rets: tp.Array1d,
-                       ann_factor: float,
-                       ddof: int = 0) -> float:
+def sharpe_ratio_1d_nb(adj_rets: tp.Array1d, ann_factor: float, ddof: int = 0) -> float:
     """Sharpe ratio of a strategy."""
     mean = np.nanmean(adj_rets)
     std = generic_nb.nanstd_1d_nb(adj_rets, ddof)
@@ -328,18 +294,12 @@ def sharpe_ratio_1d_nb(adj_rets: tp.Array1d,
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='adj_rets', axis=1),
-    arg_take_spec=dict(
-        adj_rets=ch.ArraySlicer(axis=1),
-        ann_factor=None,
-        ddof=None
-    ),
-    merge_func=base_ch.concat
+    size=ch.ArraySizer(arg_query="adj_rets", axis=1),
+    arg_take_spec=dict(adj_rets=ch.ArraySlicer(axis=1), ann_factor=None, ddof=None),
+    merge_func=base_ch.concat,
 )
-@register_jitted(cache=True, tags={'can_parallel'})
-def sharpe_ratio_nb(adj_rets: tp.Array2d,
-                    ann_factor: float,
-                    ddof: int = 0) -> tp.Array1d:
+@register_jitted(cache=True, tags={"can_parallel"})
+def sharpe_ratio_nb(adj_rets: tp.Array2d, ann_factor: float, ddof: int = 0) -> tp.Array1d:
     """2-dim version of `sharpe_ratio_1d_nb`."""
     out = np.empty(adj_rets.shape[1], dtype=np.float_)
     for col in prange(adj_rets.shape[1]):
@@ -356,7 +316,7 @@ def downside_risk_1d_nb(adj_rets: tp.Array1d, ann_factor: float) -> float:
         if not np.isnan(adj_rets[i]):
             cnt += 1
             if np.isnan(adj_ret_sqrd_sum):
-                adj_ret_sqrd_sum = 0.
+                adj_ret_sqrd_sum = 0.0
             if adj_rets[i] <= 0:
                 adj_ret_sqrd_sum += adj_rets[i] ** 2
     adj_ret_sqrd_mean = adj_ret_sqrd_sum / cnt
@@ -364,14 +324,11 @@ def downside_risk_1d_nb(adj_rets: tp.Array1d, ann_factor: float) -> float:
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='adj_rets', axis=1),
-    arg_take_spec=dict(
-        adj_rets=ch.ArraySlicer(axis=1),
-        ann_factor=None
-    ),
-    merge_func=base_ch.concat
+    size=ch.ArraySizer(arg_query="adj_rets", axis=1),
+    arg_take_spec=dict(adj_rets=ch.ArraySlicer(axis=1), ann_factor=None),
+    merge_func=base_ch.concat,
 )
-@register_jitted(cache=True, tags={'can_parallel'})
+@register_jitted(cache=True, tags={"can_parallel"})
 def downside_risk_nb(adj_rets: tp.Array2d, ann_factor: float) -> tp.Array1d:
     """2-dim version of `downside_risk_1d_nb`."""
     out = np.empty(adj_rets.shape[1], dtype=np.float_)
@@ -391,14 +348,11 @@ def sortino_ratio_1d_nb(adj_rets: tp.Array1d, ann_factor: float) -> float:
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='adj_rets', axis=1),
-    arg_take_spec=dict(
-        adj_rets=ch.ArraySlicer(axis=1),
-        ann_factor=None
-    ),
-    merge_func=base_ch.concat
+    size=ch.ArraySizer(arg_query="adj_rets", axis=1),
+    arg_take_spec=dict(adj_rets=ch.ArraySlicer(axis=1), ann_factor=None),
+    merge_func=base_ch.concat,
 )
-@register_jitted(cache=True, tags={'can_parallel'})
+@register_jitted(cache=True, tags={"can_parallel"})
 def sortino_ratio_nb(adj_rets: tp.Array2d, ann_factor: float) -> tp.Array1d:
     """2-dim version of `sortino_ratio_1d_nb`."""
     out = np.empty(adj_rets.shape[1], dtype=np.float_)
@@ -418,14 +372,11 @@ def information_ratio_1d_nb(adj_rets: tp.Array1d, ddof: int = 0) -> float:
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='adj_rets', axis=1),
-    arg_take_spec=dict(
-        adj_rets=ch.ArraySlicer(axis=1),
-        ddof=None
-    ),
-    merge_func=base_ch.concat
+    size=ch.ArraySizer(arg_query="adj_rets", axis=1),
+    arg_take_spec=dict(adj_rets=ch.ArraySlicer(axis=1), ddof=None),
+    merge_func=base_ch.concat,
 )
-@register_jitted(cache=True, tags={'can_parallel'})
+@register_jitted(cache=True, tags={"can_parallel"})
 def information_ratio_nb(adj_rets: tp.Array2d, ddof: int = 0) -> tp.Array1d:
     """2-dim version of `information_ratio_1d_nb`."""
     out = np.empty(adj_rets.shape[1], dtype=np.float_)
@@ -445,15 +396,11 @@ def beta_1d_nb(rets: tp.Array1d, bm_returns: tp.Array1d, ddof: int = 0) -> float
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='rets', axis=1),
-    arg_take_spec=dict(
-        rets=ch.ArraySlicer(axis=1),
-        bm_returns=ch.ArraySlicer(axis=1),
-        ddof=None
-    ),
-    merge_func=base_ch.concat
+    size=ch.ArraySizer(arg_query="rets", axis=1),
+    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), bm_returns=ch.ArraySlicer(axis=1), ddof=None),
+    merge_func=base_ch.concat,
 )
-@register_jitted(cache=True, tags={'can_parallel'})
+@register_jitted(cache=True, tags={"can_parallel"})
 def beta_nb(rets: tp.Array2d, bm_returns: tp.Array2d, ddof: int = 0) -> tp.Array1d:
     """2-dim version of `beta_1d_nb`."""
     out = np.empty(rets.shape[1], dtype=np.float_)
@@ -463,31 +410,31 @@ def beta_nb(rets: tp.Array2d, bm_returns: tp.Array2d, ddof: int = 0) -> tp.Array
 
 
 @register_jitted
-def beta_rollmeta_nb(from_i: int, to_i: int, col: int, rets: tp.Array2d,
-                     bm_returns: tp.Array1d, ddof: int = 0) -> float:
+def beta_rollmeta_nb(
+    from_i: int,
+    to_i: int,
+    col: int,
+    rets: tp.Array2d,
+    bm_returns: tp.Array1d,
+    ddof: int = 0,
+) -> float:
     """Rolling apply meta function based on `beta_1d_nb`."""
     return beta_1d_nb(rets[from_i:to_i, col], bm_returns[from_i:to_i, col], ddof)
 
 
 @register_jitted(cache=True)
-def alpha_1d_nb(adj_rets: tp.Array1d,
-                adj_bm_returns: tp.Array1d,
-                ann_factor: float) -> float:
+def alpha_1d_nb(adj_rets: tp.Array1d, adj_bm_returns: tp.Array1d, ann_factor: float) -> float:
     """Annualized alpha."""
     beta = beta_1d_nb(adj_rets, adj_bm_returns)
     return (np.nanmean(adj_rets) - beta * np.nanmean(adj_bm_returns) + 1) ** ann_factor - 1
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='adj_rets', axis=1),
-    arg_take_spec=dict(
-        adj_rets=ch.ArraySlicer(axis=1),
-        adj_bm_returns=ch.ArraySlicer(axis=1),
-        ann_factor=None
-    ),
-    merge_func=base_ch.concat
+    size=ch.ArraySizer(arg_query="adj_rets", axis=1),
+    arg_take_spec=dict(adj_rets=ch.ArraySlicer(axis=1), adj_bm_returns=ch.ArraySlicer(axis=1), ann_factor=None),
+    merge_func=base_ch.concat,
 )
-@register_jitted(cache=True, tags={'can_parallel'})
+@register_jitted(cache=True, tags={"can_parallel"})
 def alpha_nb(adj_rets: tp.Array2d, adj_bm_returns: tp.Array2d, ann_factor: float) -> tp.Array1d:
     """2-dim version of `alpha_1d_nb`."""
     out = np.empty(adj_rets.shape[1], dtype=np.float_)
@@ -497,8 +444,14 @@ def alpha_nb(adj_rets: tp.Array2d, adj_bm_returns: tp.Array2d, ann_factor: float
 
 
 @register_jitted
-def alpha_rollmeta_nb(from_i: int, to_i: int, col: int, adj_rets: tp.Array2d,
-                      adj_bm_returns: tp.Array1d, ann_factor: float) -> float:
+def alpha_rollmeta_nb(
+    from_i: int,
+    to_i: int,
+    col: int,
+    adj_rets: tp.Array2d,
+    adj_bm_returns: tp.Array1d,
+    ann_factor: float,
+) -> float:
     """Rolling apply meta function based on `alpha_1d_nb`."""
     return alpha_1d_nb(adj_rets[from_i:to_i, col], adj_bm_returns[from_i:to_i, col], ann_factor)
 
@@ -524,13 +477,11 @@ def tail_ratio_noarr_1d_nb(rets: tp.Array1d) -> float:
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='rets', axis=1),
-    arg_take_spec=dict(
-        rets=ch.ArraySlicer(axis=1)
-    ),
-    merge_func=base_ch.concat
+    size=ch.ArraySizer(arg_query="rets", axis=1),
+    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1)),
+    merge_func=base_ch.concat,
 )
-@register_jitted(cache=True, tags={'can_parallel'})
+@register_jitted(cache=True, tags={"can_parallel"})
 def tail_ratio_nb(rets: tp.Array2d) -> tp.Array1d:
     """2-dim version of `tail_ratio_1d_nb`."""
     out = np.empty(rets.shape[1], dtype=np.float_)
@@ -552,14 +503,11 @@ def value_at_risk_noarr_1d_nb(rets: tp.Array1d, cutoff: float = 0.05) -> float:
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='rets', axis=1),
-    arg_take_spec=dict(
-        rets=ch.ArraySlicer(axis=1),
-        cutoff=None
-    ),
-    merge_func=base_ch.concat
+    size=ch.ArraySizer(arg_query="rets", axis=1),
+    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), cutoff=None),
+    merge_func=base_ch.concat,
 )
-@register_jitted(cache=True, tags={'can_parallel'})
+@register_jitted(cache=True, tags={"can_parallel"})
 def value_at_risk_nb(rets: tp.Array2d, cutoff: float = 0.05) -> tp.Array1d:
     """2-dim version of `value_at_risk_1d_nb`."""
     out = np.empty(rets.shape[1], dtype=np.float_)
@@ -572,7 +520,7 @@ def value_at_risk_nb(rets: tp.Array2d, cutoff: float = 0.05) -> tp.Array1d:
 def cond_value_at_risk_1d_nb(rets: tp.Array1d, cutoff: float = 0.05) -> float:
     """Conditional value at risk (CVaR) of a returns stream."""
     cutoff_index = int((len(rets) - 1) * cutoff)
-    return np.mean(np.partition(rets, cutoff_index)[:cutoff_index + 1])
+    return np.mean(np.partition(rets, cutoff_index)[: cutoff_index + 1])
 
 
 @register_jitted(cache=True)
@@ -582,14 +530,11 @@ def cond_value_at_risk_noarr_1d_nb(rets: tp.Array1d, cutoff: float = 0.05) -> fl
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='rets', axis=1),
-    arg_take_spec=dict(
-        rets=ch.ArraySlicer(axis=1),
-        cutoff=None
-    ),
-    merge_func=base_ch.concat
+    size=ch.ArraySizer(arg_query="rets", axis=1),
+    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), cutoff=None),
+    merge_func=base_ch.concat,
 )
-@register_jitted(cache=True, tags={'can_parallel'})
+@register_jitted(cache=True, tags={"can_parallel"})
 def cond_value_at_risk_nb(rets: tp.Array2d, cutoff: float = 0.05) -> tp.Array1d:
     """2-dim version of `cond_value_at_risk_1d_nb`."""
     out = np.empty(rets.shape[1], dtype=np.float_)
@@ -599,8 +544,12 @@ def cond_value_at_risk_nb(rets: tp.Array2d, cutoff: float = 0.05) -> tp.Array1d:
 
 
 @register_jitted(cache=True)
-def capture_1d_nb(rets: tp.Array1d, bm_returns: tp.Array1d,
-                  ann_factor: float, period: tp.Optional[float] = None) -> float:
+def capture_1d_nb(
+    rets: tp.Array1d,
+    bm_returns: tp.Array1d,
+    ann_factor: float,
+    period: tp.Optional[float] = None,
+) -> float:
     """Capture ratio."""
     annualized_return1 = annualized_return_1d_nb(rets, ann_factor, period=period)
     annualized_return2 = annualized_return_1d_nb(bm_returns, ann_factor, period=period)
@@ -610,18 +559,17 @@ def capture_1d_nb(rets: tp.Array1d, bm_returns: tp.Array1d,
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='rets', axis=1),
-    arg_take_spec=dict(
-        rets=ch.ArraySlicer(axis=1),
-        bm_returns=ch.ArraySlicer(axis=1),
-        ann_factor=None,
-        period=None
-    ),
-    merge_func=base_ch.concat
+    size=ch.ArraySizer(arg_query="rets", axis=1),
+    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), bm_returns=ch.ArraySlicer(axis=1), ann_factor=None, period=None),
+    merge_func=base_ch.concat,
 )
-@register_jitted(cache=True, tags={'can_parallel'})
-def capture_nb(rets: tp.Array2d, bm_returns: tp.Array2d,
-               ann_factor: float, period: tp.Optional[float] = None) -> tp.Array1d:
+@register_jitted(cache=True, tags={"can_parallel"})
+def capture_nb(
+    rets: tp.Array2d,
+    bm_returns: tp.Array2d,
+    ann_factor: float,
+    period: tp.Optional[float] = None,
+) -> tp.Array1d:
     """2-dim version of `capture_1d_nb`."""
     out = np.empty(rets.shape[1], dtype=np.float_)
     for col in prange(rets.shape[1]):
@@ -630,16 +578,26 @@ def capture_nb(rets: tp.Array2d, bm_returns: tp.Array2d,
 
 
 @register_jitted
-def capture_rollmeta_nb(from_i: int, to_i: int, col: int, rets: tp.Array2d,
-                        bm_returns: tp.Array1d, ann_factor: float,
-                        period: tp.Optional[float] = None) -> float:
+def capture_rollmeta_nb(
+    from_i: int,
+    to_i: int,
+    col: int,
+    rets: tp.Array2d,
+    bm_returns: tp.Array1d,
+    ann_factor: float,
+    period: tp.Optional[float] = None,
+) -> float:
     """Rolling apply meta function based on `capture_1d_nb`."""
     return capture_1d_nb(rets[from_i:to_i, col], bm_returns[from_i:to_i, col], ann_factor, period=period)
 
 
 @register_jitted(cache=True)
-def up_capture_1d_nb(rets: tp.Array1d, bm_returns: tp.Array1d,
-                     ann_factor: float, period: tp.Optional[float] = None) -> float:
+def up_capture_1d_nb(
+    rets: tp.Array1d,
+    bm_returns: tp.Array1d,
+    ann_factor: float,
+    period: tp.Optional[float] = None,
+) -> float:
     """Capture ratio for periods when the benchmark return is positive."""
     if period is None:
         period = rets.shape[0]
@@ -650,9 +608,9 @@ def up_capture_1d_nb(rets: tp.Array1d, bm_returns: tp.Array1d,
         for i in range(a.shape[0]):
             if not np.isnan(a[i]):
                 if np.isnan(ann_ret):
-                    ann_ret = 1.
+                    ann_ret = 1.0
                 if a[i] > 0:
-                    ann_ret *= a[i] + 1.
+                    ann_ret *= a[i] + 1.0
                     ret_cnt += 1
         if ret_cnt == 0:
             return np.nan
@@ -666,18 +624,17 @@ def up_capture_1d_nb(rets: tp.Array1d, bm_returns: tp.Array1d,
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='rets', axis=1),
-    arg_take_spec=dict(
-        rets=ch.ArraySlicer(axis=1),
-        bm_returns=ch.ArraySlicer(axis=1),
-        ann_factor=None,
-        period=None
-    ),
-    merge_func=base_ch.concat
+    size=ch.ArraySizer(arg_query="rets", axis=1),
+    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), bm_returns=ch.ArraySlicer(axis=1), ann_factor=None, period=None),
+    merge_func=base_ch.concat,
 )
-@register_jitted(cache=True, tags={'can_parallel'})
-def up_capture_nb(rets: tp.Array2d, bm_returns: tp.Array2d,
-                  ann_factor: float, period: tp.Optional[float] = None) -> tp.Array1d:
+@register_jitted(cache=True, tags={"can_parallel"})
+def up_capture_nb(
+    rets: tp.Array2d,
+    bm_returns: tp.Array2d,
+    ann_factor: float,
+    period: tp.Optional[float] = None,
+) -> tp.Array1d:
     """2-dim version of `up_capture_1d_nb`."""
     out = np.empty(rets.shape[1], dtype=np.float_)
     for col in prange(rets.shape[1]):
@@ -686,16 +643,26 @@ def up_capture_nb(rets: tp.Array2d, bm_returns: tp.Array2d,
 
 
 @register_jitted
-def up_capture_rollmeta_nb(from_i: int, to_i: int, col: int, rets: tp.Array2d,
-                           bm_returns: tp.Array1d, ann_factor: float,
-                           period: tp.Optional[float] = None) -> float:
+def up_capture_rollmeta_nb(
+    from_i: int,
+    to_i: int,
+    col: int,
+    rets: tp.Array2d,
+    bm_returns: tp.Array1d,
+    ann_factor: float,
+    period: tp.Optional[float] = None,
+) -> float:
     """Rolling apply meta function based on `up_capture_1d_nb`."""
     return up_capture_1d_nb(rets[from_i:to_i, col], bm_returns[from_i:to_i, col], ann_factor, period=period)
 
 
 @register_jitted(cache=True)
-def down_capture_1d_nb(rets: tp.Array1d, bm_returns: tp.Array1d,
-                       ann_factor: float, period: tp.Optional[float] = None) -> float:
+def down_capture_1d_nb(
+    rets: tp.Array1d,
+    bm_returns: tp.Array1d,
+    ann_factor: float,
+    period: tp.Optional[float] = None,
+) -> float:
     """Capture ratio for periods when the benchmark return is negative."""
     if period is None:
         period = rets.shape[0]
@@ -706,9 +673,9 @@ def down_capture_1d_nb(rets: tp.Array1d, bm_returns: tp.Array1d,
         for i in range(a.shape[0]):
             if not np.isnan(a[i]):
                 if np.isnan(ann_ret):
-                    ann_ret = 1.
+                    ann_ret = 1.0
                 if a[i] < 0:
-                    ann_ret *= a[i] + 1.
+                    ann_ret *= a[i] + 1.0
                     ret_cnt += 1
         if ret_cnt == 0:
             return np.nan
@@ -722,18 +689,17 @@ def down_capture_1d_nb(rets: tp.Array1d, bm_returns: tp.Array1d,
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='rets', axis=1),
-    arg_take_spec=dict(
-        rets=ch.ArraySlicer(axis=1),
-        bm_returns=ch.ArraySlicer(axis=1),
-        ann_factor=None,
-        period=None
-    ),
-    merge_func=base_ch.concat
+    size=ch.ArraySizer(arg_query="rets", axis=1),
+    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), bm_returns=ch.ArraySlicer(axis=1), ann_factor=None, period=None),
+    merge_func=base_ch.concat,
 )
-@register_jitted(cache=True, tags={'can_parallel'})
-def down_capture_nb(rets: tp.Array2d, bm_returns: tp.Array2d,
-                    ann_factor: float, period: tp.Optional[float] = None) -> tp.Array1d:
+@register_jitted(cache=True, tags={"can_parallel"})
+def down_capture_nb(
+    rets: tp.Array2d,
+    bm_returns: tp.Array2d,
+    ann_factor: float,
+    period: tp.Optional[float] = None,
+) -> tp.Array1d:
     """2-dim version of `down_capture_1d_nb`."""
     out = np.empty(rets.shape[1], dtype=np.float_)
     for col in prange(rets.shape[1]):
@@ -742,8 +708,14 @@ def down_capture_nb(rets: tp.Array2d, bm_returns: tp.Array2d,
 
 
 @register_jitted
-def down_capture_rollmeta_nb(from_i: int, to_i: int, col: int, rets: tp.Array2d,
-                             bm_returns: tp.Array1d, ann_factor: float,
-                             period: tp.Optional[float] = None) -> float:
+def down_capture_rollmeta_nb(
+    from_i: int,
+    to_i: int,
+    col: int,
+    rets: tp.Array2d,
+    bm_returns: tp.Array1d,
+    ann_factor: float,
+    period: tp.Optional[float] = None,
+) -> float:
     """Rolling apply meta function based on `down_capture_1d_nb`."""
     return down_capture_1d_nb(rets[from_i:to_i, col], bm_returns[from_i:to_i, col], ann_factor, period=period)

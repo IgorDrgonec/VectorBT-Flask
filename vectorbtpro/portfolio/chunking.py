@@ -21,7 +21,7 @@ flex_array_gl_slicer = FlexArraySlicer(axis=1, mapper=group_lens_mapper)
 
 def get_init_cash_slicer(ann_args: tp.AnnArgs) -> ArraySlicer:
     """Get slicer for `init_cash` based on cash sharing."""
-    cash_sharing = ann_args['cash_sharing']['value']
+    cash_sharing = ann_args["cash_sharing"]["value"]
     if cash_sharing:
         return FlexArraySlicer(axis=0, flex_2d=True)
     return flex_1d_array_gl_slicer
@@ -29,16 +29,18 @@ def get_init_cash_slicer(ann_args: tp.AnnArgs) -> ArraySlicer:
 
 def get_cash_deposits_slicer(ann_args: tp.AnnArgs) -> ArraySlicer:
     """Get slicer for `cash_deposits` based on cash sharing."""
-    cash_sharing = ann_args['cash_sharing']['value']
+    cash_sharing = ann_args["cash_sharing"]["value"]
     if cash_sharing:
         return FlexArraySlicer(axis=1)
     return flex_array_gl_slicer
 
 
-def in_outputs_merge_func(results: tp.List[SimulationOutput],
-                          chunk_meta: tp.Iterable[ChunkMeta],
-                          ann_args: tp.AnnArgs,
-                          mapper: GroupLensMapper):
+def in_outputs_merge_func(
+    results: tp.List[SimulationOutput],
+    chunk_meta: tp.Iterable[ChunkMeta],
+    ann_args: tp.AnnArgs,
+    mapper: GroupLensMapper,
+):
     """Merge chunks of in-output objects.
 
     Concatenates 1-dim arrays, stacks columns of 2-dim arrays, and fixes and concatenates record arrays
@@ -63,12 +65,14 @@ def in_outputs_merge_func(results: tp.List[SimulationOutput],
     return type(results[0].in_outputs)(**in_outputs)
 
 
-def merge_sim_outs(results: tp.List[SimulationOutput],
-                   chunk_meta: tp.Iterable[ChunkMeta],
-                   ann_args: tp.AnnArgs,
-                   mapper: GroupLensMapper,
-                   in_outputs_merge_func: tp.Callable = in_outputs_merge_func,
-                   **kwargs) -> SimulationOutput:
+def merge_sim_outs(
+    results: tp.List[SimulationOutput],
+    chunk_meta: tp.Iterable[ChunkMeta],
+    ann_args: tp.AnnArgs,
+    mapper: GroupLensMapper,
+    in_outputs_merge_func: tp.Callable = in_outputs_merge_func,
+    **kwargs,
+) -> SimulationOutput:
     """Merge chunks of `vectorbtpro.portfolio.enums.SimulationOutput` instances.
 
     If `SimulationOutput.in_outputs` is not None, must provide `in_outputs_merge_func` or similar."""
@@ -78,7 +82,7 @@ def merge_sim_outs(results: tp.List[SimulationOutput],
     log_records = [r.log_records for r in results]
     log_records = merge_records(log_records, chunk_meta, ann_args=ann_args, mapper=mapper)
 
-    target_shape = ann_args['target_shape']['value']
+    target_shape = ann_args["target_shape"]["value"]
     if results[0].cash_earnings.shape == target_shape:
         cash_earnings = np.column_stack([r.cash_earnings for r in results])
     else:
@@ -96,18 +100,14 @@ def merge_sim_outs(results: tp.List[SimulationOutput],
         log_records=log_records,
         cash_earnings=cash_earnings,
         call_seq=call_seq,
-        in_outputs=in_outputs
+        in_outputs=in_outputs,
     )
 
 
 merge_sim_outs_config = ReadonlyConfig(
     dict(
         merge_func=merge_sim_outs,
-        merge_kwargs=dict(
-            chunk_meta=Rep("chunk_meta"),
-            ann_args=Rep("ann_args"),
-            mapper=group_lens_mapper
-        )
+        merge_kwargs=dict(chunk_meta=Rep("chunk_meta"), ann_args=Rep("ann_args"), mapper=group_lens_mapper),
     )
 )
 """Config for merging using `merge_sim_outs`."""

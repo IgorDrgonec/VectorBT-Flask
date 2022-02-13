@@ -24,7 +24,7 @@ from vectorbtpro.utils.chunking import (
     MappingTaker,
     ArgsTaker,
     KwargsTaker,
-    chunked
+    chunked,
 )
 from vectorbtpro.utils.config import (
     atomic_dict,
@@ -33,7 +33,7 @@ from vectorbtpro.utils.config import (
     ReadonlyConfig,
     HybridConfig,
     Configured,
-    AtomicConfig
+    AtomicConfig,
 )
 from vectorbtpro.utils.decorators import (
     cacheable_property,
@@ -41,7 +41,7 @@ from vectorbtpro.utils.decorators import (
     cacheable,
     cached,
     cacheable_method,
-    cached_method
+    cached_method,
 )
 from vectorbtpro.utils.execution import SequenceEngine, DaskEngine, RayEngine
 from vectorbtpro.utils.formatting import prettify
@@ -60,7 +60,7 @@ __blacklist__ = []
 try:
     import plotly
 except ImportError:
-    __blacklist__.append('figure')
+    __blacklist__.append("figure")
 else:
     from vectorbtpro.utils.figure import Figure, FigureWidget, make_figure, make_subplots
 

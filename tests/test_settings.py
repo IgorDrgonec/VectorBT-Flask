@@ -5,11 +5,13 @@ import vectorbtpro as vbt
 
 # ############# Global ############# #
 
+
 def teardown_module():
     vbt.settings.reset()
 
 
 # ############# settings.py ############# #
+
 
 def is_lambda(v):
     test_lambda = lambda: 0
@@ -30,7 +32,7 @@ def dicts_equal(dct1, dct2):
 
 class TestSettings:
     def test_save_and_load(self, tmp_path):
-        vbt.settings.set_theme('seaborn')
+        vbt.settings.set_theme("seaborn")
         vbt.settings.save(tmp_path / "settings", dump_reset_dct=True)
         new_settings = vbt.settings.load(tmp_path / "settings")
         dicts_equal(vbt.settings, new_settings)

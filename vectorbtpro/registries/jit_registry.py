@@ -364,14 +364,14 @@ from vectorbtpro.utils.jitting import (
     resolve_jitter_type,
     resolve_jitter,
     get_id_of_jitter_type,
-    get_func_suffix
+    get_func_suffix,
 )
 from vectorbtpro.utils.template import RepEval, deep_substitute, CustomTemplate
 
 
 def get_func_full_name(func: tp.Callable) -> str:
     """Get full name of the func to be used as task id."""
-    return func.__module__ + '.' + func.__name__
+    return func.__module__ + "." + func.__name__
 
 
 @attr.s(frozen=True, eq=False)
@@ -398,17 +398,11 @@ class JitableSetup(Hashable):
 
     @staticmethod
     def get_hash(task_id: tp.Hashable, jitter_id: tp.Hashable) -> int:
-        return hash((
-            task_id,
-            jitter_id
-        ))
+        return hash((task_id, jitter_id))
 
     @property
     def hash_key(self) -> tuple:
-        return (
-            self.task_id,
-            self.jitter_id
-        )
+        return (self.task_id, self.jitter_id)
 
 
 @attr.s(frozen=True, eq=False)
@@ -451,19 +445,21 @@ class JITRegistry:
         """Nested dict of registered `JittedSetup` instances by hash of their `JitableSetup` instance."""
         return self._jitted_setups
 
-    def register_jitable_setup(self,
-                               task_id: tp.Hashable,
-                               jitter_id: tp.Hashable,
-                               py_func: tp.Callable,
-                               jitter_kwargs: tp.KwargsLike = None,
-                               tags: tp.Optional[set] = None) -> JitableSetup:
+    def register_jitable_setup(
+        self,
+        task_id: tp.Hashable,
+        jitter_id: tp.Hashable,
+        py_func: tp.Callable,
+        jitter_kwargs: tp.KwargsLike = None,
+        tags: tp.Optional[set] = None,
+    ) -> JitableSetup:
         """Register a jitable setup."""
         jitable_setup = JitableSetup(
             task_id=task_id,
             jitter_id=jitter_id,
             py_func=py_func,
             jitter_kwargs=jitter_kwargs,
-            tags=tags
+            tags=tags,
         )
         if task_id not in self.jitable_setups:
             self.jitable_setups[task_id] = dict()
@@ -471,33 +467,35 @@ class JITRegistry:
             self.jitable_setups[task_id][jitter_id] = jitable_setup
         return jitable_setup
 
-    def register_jitted_setup(self,
-                              jitable_setup: JitableSetup,
-                              jitter: Jitter,
-                              jitted_func: tp.Callable) -> JittedSetup:
+    def register_jitted_setup(
+        self,
+        jitable_setup: JitableSetup,
+        jitter: Jitter,
+        jitted_func: tp.Callable,
+    ) -> JittedSetup:
         """Register a jitted setup."""
         jitable_setup_hash = hash(jitable_setup)
-        jitted_setup = JittedSetup(
-            jitter=jitter,
-            jitted_func=jitted_func
-        )
+        jitted_setup = JittedSetup(jitter=jitter, jitted_func=jitted_func)
         jitted_setup_hash = hash(jitted_setup)
         if jitable_setup_hash in self.jitted_setups:
             if jitted_setup_hash in self.jitted_setups[jitable_setup_hash]:
-                raise ValueError(f"Jitted setup with task id '{jitable_setup.task_id}' and "
-                                 f"jitter {jitter} already registered")
+                raise ValueError(
+                    f"Jitted setup with task id '{jitable_setup.task_id}' and " f"jitter {jitter} already registered"
+                )
         if jitable_setup_hash not in self.jitted_setups:
             self.jitted_setups[jitable_setup_hash] = dict()
         if jitted_setup_hash not in self.jitted_setups[jitable_setup_hash]:
             self.jitted_setups[jitable_setup_hash][jitted_setup_hash] = jitted_setup
         return jitted_setup
 
-    def decorate_and_register(self,
-                              task_id: tp.Hashable,
-                              py_func: tp.Callable,
-                              jitter: tp.Optional[tp.JitterLike] = None,
-                              jitter_kwargs: tp.KwargsLike = None,
-                              tags: tp.Optional[set] = None):
+    def decorate_and_register(
+        self,
+        task_id: tp.Hashable,
+        py_func: tp.Callable,
+        jitter: tp.Optional[tp.JitterLike] = None,
+        jitter_kwargs: tp.KwargsLike = None,
+        tags: tp.Optional[set] = None,
+    ):
         """Decorate a jitable function and register both jitable and jitted setups."""
         if jitter_kwargs is None:
             jitter_kwargs = {}
@@ -505,23 +503,16 @@ class JITRegistry:
         jitter_id = get_id_of_jitter_type(type(jitter))
         if jitter_id is None:
             raise ValueError("Jitter id cannot be None: is jitter registered globally?")
-        jitable_setup = self.register_jitable_setup(
-            task_id,
-            jitter_id,
-            py_func,
-            jitter_kwargs=jitter_kwargs,
-            tags=tags
-        )
+        jitable_setup = self.register_jitable_setup(task_id, jitter_id, py_func, jitter_kwargs=jitter_kwargs, tags=tags)
         jitted_func = jitter.decorate(py_func, tags=tags)
-        self.register_jitted_setup(
-            jitable_setup,
-            jitter,
-            jitted_func
-        )
+        self.register_jitted_setup(jitable_setup, jitter, jitted_func)
         return jitted_func
 
-    def match_jitable_setups(self, expression: tp.Optional[str] = None,
-                             context: tp.KwargsLike = None) -> tp.Set[JitableSetup]:
+    def match_jitable_setups(
+        self,
+        expression: tp.Optional[str] = None,
+        context: tp.KwargsLike = None,
+    ) -> tp.Set[JitableSetup]:
         """Match jitable setups against an expression with each setup being a context."""
         matched_setups = set()
         for setups_by_jitter_id in self.jitable_setups.values():
@@ -536,8 +527,12 @@ class JITRegistry:
                     matched_setups.add(setup)
         return matched_setups
 
-    def match_jitted_setups(self, jitable_setup: JitableSetup, expression: tp.Optional[str] = None,
-                            context: tp.KwargsLike = None) -> tp.Set[JittedSetup]:
+    def match_jitted_setups(
+        self,
+        jitable_setup: JitableSetup,
+        expression: tp.Optional[str] = None,
+        context: tp.KwargsLike = None,
+    ) -> tp.Set[JittedSetup]:
         """Match jitted setups of a jitable setup against an expression with each setup a context."""
         matched_setups = set()
         for setup in self.jitted_setups[hash(jitable_setup)].values():
@@ -551,17 +546,19 @@ class JITRegistry:
                 matched_setups.add(setup)
         return matched_setups
 
-    def resolve(self,
-                task_id_or_func: tp.Union[tp.Hashable, tp.Callable],
-                jitter: tp.Optional[tp.Union[tp.JitterLike, CustomTemplate]] = None,
-                disable: tp.Optional[tp.Union[bool, CustomTemplate]] = None,
-                disable_resolution: tp.Optional[bool] = None,
-                allow_new: tp.Optional[bool] = None,
-                register_new: tp.Optional[bool] = None,
-                return_missing_task: bool = False,
-                template_context: tp.Optional[tp.Mapping] = None,
-                tags: tp.Optional[set] = None,
-                **jitter_kwargs) -> tp.Union[tp.Hashable, tp.Callable]:
+    def resolve(
+        self,
+        task_id_or_func: tp.Union[tp.Hashable, tp.Callable],
+        jitter: tp.Optional[tp.Union[tp.JitterLike, CustomTemplate]] = None,
+        disable: tp.Optional[tp.Union[bool, CustomTemplate]] = None,
+        disable_resolution: tp.Optional[bool] = None,
+        allow_new: tp.Optional[bool] = None,
+        register_new: tp.Optional[bool] = None,
+        return_missing_task: bool = False,
+        template_context: tp.Optional[tp.Mapping] = None,
+        tags: tp.Optional[set] = None,
+        **jitter_kwargs,
+    ) -> tp.Union[tp.Hashable, tp.Callable]:
         """Resolve jitted function for the given task id.
 
         For details on the format of `task_id_or_func`, see `register_jitted`.
@@ -592,19 +589,20 @@ class JITRegistry:
         in `JITRegistry.jitable_setups`.
         """
         from vectorbtpro._settings import settings
-        jitting_cfg = settings['jitting']
+
+        jitting_cfg = settings["jitting"]
 
         if disable_resolution is None:
-            disable_resolution = jitting_cfg['disable_resolution']
+            disable_resolution = jitting_cfg["disable_resolution"]
         if disable_resolution:
             return task_id_or_func
 
         if allow_new is None:
-            allow_new = jitting_cfg['allow_new']
+            allow_new = jitting_cfg["allow_new"]
         if register_new is None:
-            register_new = jitting_cfg['register_new']
+            register_new = jitting_cfg["register_new"]
 
-        if hasattr(task_id_or_func, 'py_func'):
+        if hasattr(task_id_or_func, "py_func"):
             py_func = task_id_or_func.py_func
             task_id = get_func_full_name(py_func)
         elif callable(task_id_or_func):
@@ -622,23 +620,20 @@ class JITRegistry:
         task_setups = self.jitable_setups.get(task_id, dict())
 
         template_context = merge_dicts(
-            jitting_cfg['template_context'],
+            jitting_cfg["template_context"],
             template_context,
-            dict(
-                task_id=task_id,
-                py_func=py_func,
-                task_setups=atomic_dict(task_setups)
-            )
+            dict(task_id=task_id, py_func=py_func, task_setups=atomic_dict(task_setups)),
         )
-        jitter = deep_substitute(jitter, template_context, sub_id='jitter')
+        jitter = deep_substitute(jitter, template_context, sub_id="jitter")
 
         if jitter is None and py_func is not None:
             jitter = get_func_suffix(py_func)
 
         if jitter is None:
             if len(task_setups) > 1:
-                raise ValueError(f"There are multiple registered setups for task id '{task_id}'. "
-                                 f"Please specify the jitter.")
+                raise ValueError(
+                    f"There are multiple registered setups for task id '{task_id}'. " f"Please specify the jitter."
+                )
             elif len(task_setups) == 0:
                 raise ValueError(f"There are no registered setups for task id '{task_id}'")
             jitable_setup = list(task_setups.values())[0]
@@ -649,44 +644,40 @@ class JITRegistry:
             jitter_id = get_id_of_jitter_type(jitter_type)
             if jitter_id not in task_setups:
                 if not allow_new:
-                    raise KeyError(f"Jitable setup with task id '{task_id}' and "
-                                   f"jitter id '{jitter_id}' not registered")
+                    raise KeyError(
+                        f"Jitable setup with task id '{task_id}' and " f"jitter id '{jitter_id}' not registered"
+                    )
                 jitable_setup = None
             else:
                 jitable_setup = task_setups[jitter_id]
         if jitter_id is None:
             raise ValueError("Jitter id cannot be None: is jitter registered globally?")
         if jitable_setup is None and py_func is None:
-            raise ValueError(f"Unable to find Python function for task id '{task_id}' "
-                             f"and jitter id '{jitter_id}'")
+            raise ValueError(f"Unable to find Python function for task id '{task_id}' " f"and jitter id '{jitter_id}'")
 
         template_context = merge_dicts(
             template_context,
-            dict(
-                jitter_id=jitter_id,
-                jitter=jitter,
-                jitable_setup=jitable_setup
-            )
+            dict(jitter_id=jitter_id, jitter=jitter, jitable_setup=jitable_setup),
         )
-        disable = deep_substitute(disable, template_context, sub_id='disable')
+        disable = deep_substitute(disable, template_context, sub_id="disable")
         if disable is None:
-            disable = jitting_cfg['disable']
+            disable = jitting_cfg["disable"]
         if disable:
             if jitable_setup is None:
                 return py_func
             return jitable_setup.py_func
 
         if not isinstance(jitter, Jitter):
-            jitter_cfg = jitting_cfg['jitters'].get(jitter_id, {})
-            setup_cfg = jitter_cfg.get('tasks', {}).get(task_id, {})
+            jitter_cfg = jitting_cfg["jitters"].get(jitter_id, {})
+            setup_cfg = jitter_cfg.get("tasks", {}).get(task_id, {})
 
             jitter_kwargs = merge_dicts(
                 jitable_setup.jitter_kwargs if jitable_setup is not None else None,
-                jitter_cfg.get('resolve_kwargs', None),
-                setup_cfg.get('resolve_kwargs', None),
-                jitter_kwargs
+                jitter_cfg.get("resolve_kwargs", None),
+                setup_cfg.get("resolve_kwargs", None),
+                jitter_kwargs,
             )
-            jitter_kwargs = deep_substitute(jitter_kwargs, template_context, sub_id='jitter_kwargs')
+            jitter_kwargs = deep_substitute(jitter_kwargs, template_context, sub_id="jitter_kwargs")
             jitter = resolve_jitter(jitter=jitter, **jitter_kwargs)
 
         if jitable_setup is not None:
@@ -701,7 +692,7 @@ class JITRegistry:
                     py_func=py_func,
                     jitter=jitter,
                     jitter_kwargs=jitter_kwargs,
-                    tags=tags
+                    tags=tags,
                 )
             return jitter.decorate(py_func, tags=tags)
 
@@ -710,8 +701,12 @@ class JITRegistry:
 
         return jitted_func
 
-    def resolve_option(self, task_id: tp.Union[tp.Hashable, tp.Callable],
-                       option: tp.JittedOption, **kwargs) -> tp.Union[tp.Hashable, tp.Callable]:
+    def resolve_option(
+        self,
+        task_id: tp.Union[tp.Hashable, tp.Callable],
+        option: tp.JittedOption,
+        **kwargs,
+    ) -> tp.Union[tp.Hashable, tp.Callable]:
         """Resolve `option` using `vectorbtpro.utils.jitting.resolve_jitted_kwargs` and call `JITRegistry.resolve`."""
         kwargs = resolve_jitted_kwargs(option=option, **kwargs)
         if kwargs is None:
@@ -723,11 +718,13 @@ jit_reg = JITRegistry()
 """Default registry of type `JITRegistry`."""
 
 
-def register_jitted(py_func: tp.Optional[tp.Callable] = None,
-                    task_id_or_func: tp.Optional[tp.Union[tp.Hashable, tp.Callable]] = None,
-                    registry: JITRegistry = jit_reg,
-                    tags: tp.Optional[set] = None,
-                    **options) -> tp.Callable:
+def register_jitted(
+    py_func: tp.Optional[tp.Callable] = None,
+    task_id_or_func: tp.Optional[tp.Union[tp.Hashable, tp.Callable]] = None,
+    registry: JITRegistry = jit_reg,
+    tags: tp.Optional[set] = None,
+    **options,
+) -> tp.Callable:
     """Decorate and register a jitable function using `JITRegistry.decorate_and_register`.
 
     If `task_id_or_func` is a callable, gets replaced by the callable's module name and function name.
@@ -748,32 +745,33 @@ def register_jitted(py_func: tp.Optional[tp.Callable] = None,
         nonlocal options
 
         from vectorbtpro._settings import settings
-        jitting_cfg = settings['jitting']
+
+        jitting_cfg = settings["jitting"]
 
         if task_id_or_func is None:
             task_id = get_func_full_name(_py_func)
-        elif hasattr(task_id_or_func, 'py_func'):
+        elif hasattr(task_id_or_func, "py_func"):
             task_id = get_func_full_name(task_id_or_func.py_func)
         elif callable(task_id_or_func):
             task_id = get_func_full_name(task_id_or_func)
         else:
             task_id = task_id_or_func
 
-        jitter = options.pop('jitter', None)
+        jitter = options.pop("jitter", None)
         jitter_type = resolve_jitter_type(jitter=jitter, py_func=_py_func)
         jitter_id = get_id_of_jitter_type(jitter_type)
 
-        jitter_cfg = jitting_cfg['jitters'].get(jitter_id, {})
-        setup_cfg = jitter_cfg.get('tasks', {}).get(task_id, {})
+        jitter_cfg = jitting_cfg["jitters"].get(jitter_id, {})
+        setup_cfg = jitter_cfg.get("tasks", {}).get(task_id, {})
         options = merge_dicts(
-            jitter_cfg.get('options', None),
-            setup_cfg.get('options', None),
+            jitter_cfg.get("options", None),
+            setup_cfg.get("options", None),
             options,
-            jitter_cfg.get('override_options', None),
-            setup_cfg.get('override_options', None),
+            jitter_cfg.get("override_options", None),
+            setup_cfg.get("override_options", None),
         )
-        if setup_cfg.get('replace_py_func', None) is not None:
-            _py_func = setup_cfg['replace_py_func']
+        if setup_cfg.get("replace_py_func", None) is not None:
+            _py_func = setup_cfg["replace_py_func"]
             if task_id_or_func is None:
                 task_id = get_func_full_name(_py_func)
 
@@ -782,7 +780,7 @@ def register_jitted(py_func: tp.Optional[tp.Callable] = None,
             py_func=_py_func,
             jitter=jitter,
             jitter_kwargs=options,
-            tags=tags
+            tags=tags,
         )
 
     if py_func is None:

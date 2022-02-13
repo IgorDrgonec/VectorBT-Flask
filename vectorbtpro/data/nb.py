@@ -12,7 +12,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.registries.jit_registry import register_jitted
 
 
-@register_jitted(cache=True, tags={'can_parallel'})
+@register_jitted(cache=True, tags={"can_parallel"})
 def generate_random_data_nb(shape: tp.Shape, start_value: float, mean: float, std: float) -> tp.Array2d:
     """Generate data using cumulative product of returns drawn from normal (Gaussian) distribution."""
     out = np.empty(shape, dtype=np.float_)
@@ -26,7 +26,7 @@ def generate_random_data_nb(shape: tp.Shape, start_value: float, mean: float, st
     return out
 
 
-@register_jitted(cache=True, tags={'can_parallel'})
+@register_jitted(cache=True, tags={"can_parallel"})
 def generate_gbm_data_nb(shape: tp.Shape, start_value: float, mean: float, std: float, dt: float) -> tp.Array2d:
     """Generate data using Geometric Brownian Motion (GBM)."""
     out = np.empty(shape, dtype=np.float_)
@@ -37,5 +37,5 @@ def generate_gbm_data_nb(shape: tp.Shape, start_value: float, mean: float, std: 
             else:
                 prev_value = out[i - 1, col]
             rand = np.random.standard_normal()
-            out[i, col] = prev_value * np.exp((mean - 0.5 * std ** 2) * dt + std * np.sqrt(dt) * rand)
+            out[i, col] = prev_value * np.exp((mean - 0.5 * std**2) * dt + std * np.sqrt(dt) * rand)
     return out

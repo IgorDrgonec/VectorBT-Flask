@@ -10,12 +10,13 @@ from vectorbtpro import _typing as tp
 
 # ############# Generic ############# #
 
+
 class classproperty(object):
     """Property that can be called on a class."""
 
     def __init__(self, func: tp.Callable) -> None:
         self.func = func
-        self.__doc__ = getattr(func, '__doc__')
+        self.__doc__ = getattr(func, "__doc__")
 
     def __get__(self, instance: object, owner: tp.Optional[tp.Type] = None) -> tp.Any:
         return self.func(owner)
@@ -30,7 +31,7 @@ class class_or_instanceproperty(object):
 
     def __init__(self, func: tp.Callable) -> None:
         self.func = func
-        self.__doc__ = getattr(func, '__doc__')
+        self.__doc__ = getattr(func, "__doc__")
 
     def __get__(self, instance: object, owner: tp.Optional[tp.Type] = None) -> tp.Any:
         if instance is None:
@@ -69,16 +70,14 @@ class cachedproperty:
             self.attrname = name
         elif name != self.attrname:
             raise TypeError(
-                "Cannot assign the same cached_property to two different names "
-                f"({self.attrname!r} and {name!r})."
+                "Cannot assign the same cached_property to two different names " f"({self.attrname!r} and {name!r})."
             )
 
     def __get__(self, instance, owner=None):
         if instance is None:
             return self
         if self.attrname is None:
-            raise TypeError(
-                "Cannot use cached_property instance without calling __set_name__ on it.")
+            raise TypeError("Cannot use cached_property instance without calling __set_name__ on it.")
         try:
             cache = instance.__dict__
         except AttributeError:  # not all objects have __dict__ (e.g. class defines slots)
@@ -130,7 +129,7 @@ class custom_property(property):
         self._func = func
         self._name = func.__name__
         self._options = options
-        self.__doc__ = getattr(func, '__doc__')
+        self.__doc__ = getattr(func, "__doc__")
 
     @property
     def func(self) -> tp.Callable:
@@ -171,13 +170,14 @@ class cacheable_property(custom_property):
 
     def __init__(self, func: tp.Callable, use_cache: bool = False, whitelist: bool = False, **options) -> None:
         from vectorbtpro._settings import settings
-        caching_cfg = settings['caching']
+
+        caching_cfg = settings["caching"]
 
         super().__init__(func, **options)
 
         self._init_use_cache = use_cache
         self._init_whitelist = whitelist
-        if not caching_cfg['register_lazily']:
+        if not caching_cfg["register_lazily"]:
             self.get_ca_setup()
 
     @property
@@ -190,7 +190,7 @@ class cacheable_property(custom_property):
         """Initial value for `whitelist`."""
         return self._init_whitelist
 
-    def get_ca_setup(self, instance: tp.Optional[object] = None) -> tp.Optional['CARunSetup']:
+    def get_ca_setup(self, instance: tp.Optional[object] = None) -> tp.Optional["CARunSetup"]:
         """Get setup of type `vectorbtpro.registries.ca_registry.CARunSetup` if instance is known,
         or `vectorbtpro.registries.ca_registry.CAUnboundSetup` otherwise.
 
@@ -219,6 +219,7 @@ class cached_property(cacheable_property):
 
 
 # ############# Custom functions ############# #
+
 
 class custom_functionT(tp.Protocol):
     func: tp.Callable
@@ -254,15 +255,17 @@ def custom_function(*args, **options) -> tp.Union[tp.Callable, custom_functionT]
 
 class cacheable_functionT(custom_functionT):
     is_cacheable: bool
-    get_ca_setup: tp.Callable[[], tp.Optional['CARunSetup']]
+    get_ca_setup: tp.Callable[[], tp.Optional["CARunSetup"]]
 
 
-def cacheable(*args,
-              use_cache: bool = False,
-              whitelist: bool = False,
-              max_size: tp.Optional[int] = None,
-              ignore_args: tp.Optional[tp.Iterable[tp.AnnArgQuery]] = None,
-              **options) -> tp.Union[tp.Callable, cacheable_functionT]:
+def cacheable(
+    *args,
+    use_cache: bool = False,
+    whitelist: bool = False,
+    max_size: tp.Optional[int] = None,
+    ignore_args: tp.Optional[tp.Iterable[tp.AnnArgQuery]] = None,
+    **options,
+) -> tp.Union[tp.Callable, cacheable_functionT]:
     """Cacheable function decorator.
 
     See notes on `cacheable_property`.
@@ -273,7 +276,8 @@ def cacheable(*args,
     def decorator(func: tp.Callable) -> cacheable_functionT:
         from vectorbtpro.registries.ca_registry import CARunSetup
         from vectorbtpro._settings import settings
-        caching_cfg = settings['caching']
+
+        caching_cfg = settings["caching"]
 
         @wraps(func)
         def wrapper(*args, **kwargs) -> tp.Any:
@@ -291,7 +295,7 @@ def cacheable(*args,
                 use_cache=use_cache,
                 whitelist=whitelist,
                 max_size=max_size,
-                ignore_args=ignore_args
+                ignore_args=ignore_args,
             )
 
         wrapper.func = func
@@ -300,7 +304,7 @@ def cacheable(*args,
         wrapper.is_method = False
         wrapper.is_cacheable = True
         wrapper.get_ca_setup = get_ca_setup
-        if not caching_cfg['register_lazily']:
+        if not caching_cfg["register_lazily"]:
             wrapper.get_ca_setup()
 
         return wrapper
@@ -321,6 +325,7 @@ def cached(*args, **options) -> tp.Union[tp.Callable, cacheable_functionT]:
 
 
 # ############# Custom methods ############# #
+
 
 class custom_methodT(custom_functionT):
     def __call__(instance: object, *args, **kwargs) -> tp.Any:
@@ -350,15 +355,17 @@ def custom_method(*args, **options) -> tp.Union[tp.Callable, custom_methodT]:
 
 
 class cacheable_methodT(custom_methodT):
-    get_ca_setup: tp.Callable[[tp.Optional[object]], tp.Optional['CARunSetup']]
+    get_ca_setup: tp.Callable[[tp.Optional[object]], tp.Optional["CARunSetup"]]
 
 
-def cacheable_method(*args,
-                     use_cache: bool = False,
-                     whitelist: bool = False,
-                     max_size: tp.Optional[int] = None,
-                     ignore_args: tp.Optional[tp.Iterable[tp.AnnArgQuery]] = None,
-                     **options) -> tp.Union[tp.Callable, cacheable_methodT]:
+def cacheable_method(
+    *args,
+    use_cache: bool = False,
+    whitelist: bool = False,
+    max_size: tp.Optional[int] = None,
+    ignore_args: tp.Optional[tp.Iterable[tp.AnnArgQuery]] = None,
+    **options,
+) -> tp.Union[tp.Callable, cacheable_methodT]:
     """Cacheable method decorator.
 
     See notes on `cacheable_property`."""
@@ -366,7 +373,8 @@ def cacheable_method(*args,
     def decorator(func: tp.Callable) -> cacheable_methodT:
         from vectorbtpro.registries.ca_registry import CAUnboundSetup, CARunSetup
         from vectorbtpro._settings import settings
-        caching_cfg = settings['caching']
+
+        caching_cfg = settings["caching"]
 
         @wraps(func)
         def wrapper(instance: object, *args, **kwargs) -> tp.Any:
@@ -380,19 +388,10 @@ def cacheable_method(*args,
             or `vectorbtpro.registries.ca_registry.CAUnboundSetup` otherwise.
 
             See `vectorbtpro.registries.ca_registry` for details on the caching procedure."""
-            unbound_setup = CAUnboundSetup.get(
-                wrapper,
-                use_cache=use_cache,
-                whitelist=whitelist
-            )
+            unbound_setup = CAUnboundSetup.get(wrapper, use_cache=use_cache, whitelist=whitelist)
             if instance is None:
                 return unbound_setup
-            return CARunSetup.get(
-                wrapper,
-                instance=instance,
-                max_size=max_size,
-                ignore_args=ignore_args
-            )
+            return CARunSetup.get(wrapper, instance=instance, max_size=max_size, ignore_args=ignore_args)
 
         wrapper.func = func
         wrapper.name = func.__name__
@@ -400,7 +399,7 @@ def cacheable_method(*args,
         wrapper.is_method = True
         wrapper.is_cacheable = True
         wrapper.get_ca_setup = get_ca_setup
-        if not caching_cfg['register_lazily']:
+        if not caching_cfg["register_lazily"]:
             wrapper.get_ca_setup()
 
         return wrapper

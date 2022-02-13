@@ -16,7 +16,7 @@ from vectorbtpro.utils.chunking import (
     ChunkMapper,
     ChunkSlicer,
     ArraySelector,
-    ArraySlicer
+    ArraySlicer,
 )
 from vectorbtpro.utils.parsing import match_ann_arg, Regex
 
@@ -59,13 +59,13 @@ class GroupLensSlicer(ChunkSlicer):
 
     def take(self, obj: tp.Union[tp.GroupLens, tp.GroupMap], chunk_meta: ChunkMeta, **kwargs) -> tp.GroupMap:
         if isinstance(obj, tuple):
-            return obj[1][chunk_meta.start:chunk_meta.end]
-        return obj[chunk_meta.start:chunk_meta.end]
+            return obj[1][chunk_meta.start : chunk_meta.end]
+        return obj[chunk_meta.start : chunk_meta.end]
 
 
 def get_group_lens_slice(group_lens: tp.Array1d, chunk_meta: ChunkMeta) -> slice:
     """Get slice of each chunk in group lengths."""
-    group_lens_cumsum = np.cumsum(group_lens[:chunk_meta.end])
+    group_lens_cumsum = np.cumsum(group_lens[: chunk_meta.end])
     start = group_lens_cumsum[chunk_meta.start] - group_lens[chunk_meta.start]
     end = group_lens_cumsum[-1]
     return slice(start, end)
@@ -87,11 +87,11 @@ class GroupLensMapper(ChunkMapper, ArgGetter):
             idx=chunk_meta.idx,
             start=group_lens_slice.start,
             end=group_lens_slice.stop,
-            indices=None
+            indices=None,
         )
 
 
-group_lens_mapper = GroupLensMapper(arg_query=Regex(r'(group_lens|group_map)'))
+group_lens_mapper = GroupLensMapper(arg_query=Regex(r"(group_lens|group_map)"))
 """Default instance of `GroupLensMapper`."""
 
 
@@ -100,7 +100,7 @@ class GroupMapSlicer(ChunkSlicer):
 
     def take(self, obj: tp.GroupMap, chunk_meta: ChunkMeta, **kwargs) -> tp.GroupMap:
         group_idxs, group_lens = obj
-        group_lens = group_lens[chunk_meta.start:chunk_meta.end]
+        group_lens = group_lens[chunk_meta.start : chunk_meta.end]
         return np.arange(np.sum(group_lens)), group_lens
 
 
@@ -119,11 +119,11 @@ class GroupIdxsMapper(ChunkMapper, ArgGetter):
             idx=chunk_meta.idx,
             start=None,
             end=None,
-            indices=group_idxs[group_lens_slice]
+            indices=group_idxs[group_lens_slice],
         )
 
 
-group_idxs_mapper = GroupIdxsMapper(arg_query='group_map')
+group_idxs_mapper = GroupIdxsMapper(arg_query="group_map")
 """Default instance of `GroupIdxsMapper`."""
 
 
@@ -131,7 +131,7 @@ group_idxs_mapper = GroupIdxsMapper(arg_query='group_map')
 class FlexSpecifier:
     """Class with an attribute for specifying `flex_2d`."""
 
-    flex_2d: tp.Union[bool, tp.AnnArgQuery] = attr.ib(default='flex_2d')
+    flex_2d: tp.Union[bool, tp.AnnArgQuery] = attr.ib(default="flex_2d")
     """`flex_2d` or the query to match in the arguments."""
 
     def get_flex_2d(self, ann_args: tp.AnnArgs) -> bool:
@@ -147,8 +147,13 @@ class FlexArraySelector(ArraySelector, FlexSpecifier):
 
     The result is intended to be used together with `vectorbtpro.base.indexing.flex_select_auto_nb`."""
 
-    def take(self, obj: tp.ArrayLike, chunk_meta: ChunkMeta,
-             ann_args: tp.Optional[tp.AnnArgs] = None, **kwargs) -> tp.ArrayLike:
+    def take(
+        self,
+        obj: tp.ArrayLike,
+        chunk_meta: ChunkMeta,
+        ann_args: tp.Optional[tp.AnnArgs] = None,
+        **kwargs,
+    ) -> tp.ArrayLike:
         flex_2d = self.get_flex_2d(ann_args)
         obj = np.asarray(obj)
         if obj.ndim == 0:
@@ -159,25 +164,25 @@ class FlexArraySelector(ArraySelector, FlexSpecifier):
             if self.axis == 1:
                 if flex_2d:
                     if self.keep_dims:
-                        return obj[chunk_meta.idx:chunk_meta.idx + 1]
+                        return obj[chunk_meta.idx : chunk_meta.idx + 1]
                     return obj[chunk_meta.idx]
                 return obj
             if flex_2d:
                 return obj
             if self.keep_dims:
-                return obj[chunk_meta.idx:chunk_meta.idx + 1]
+                return obj[chunk_meta.idx : chunk_meta.idx + 1]
             return obj[chunk_meta.idx]
         if obj.ndim == 2:
             if self.axis == 1:
                 if obj.shape[1] == 1:
                     return obj
                 if self.keep_dims:
-                    return obj[: chunk_meta.idx:chunk_meta.idx + 1]
+                    return obj[: chunk_meta.idx : chunk_meta.idx + 1]
                 return obj[: chunk_meta.idx]
             if obj.shape[0] == 1:
                 return obj
             if self.keep_dims:
-                return obj[chunk_meta.idx:chunk_meta.idx + 1, :]
+                return obj[chunk_meta.idx : chunk_meta.idx + 1, :]
             return obj[chunk_meta.idx, :]
         raise ValueError(f"FlexArraySelector supports max 2 dimensions, not {obj.ndim}")
 
@@ -188,8 +193,13 @@ class FlexArraySlicer(ArraySlicer, FlexSpecifier):
 
     The result is intended to be used together with `vectorbtpro.base.indexing.flex_select_auto_nb`."""
 
-    def take(self, obj: tp.ArrayLike, chunk_meta: ChunkMeta,
-             ann_args: tp.Optional[tp.AnnArgs] = None, **kwargs) -> tp.ArrayLike:
+    def take(
+        self,
+        obj: tp.ArrayLike,
+        chunk_meta: ChunkMeta,
+        ann_args: tp.Optional[tp.AnnArgs] = None,
+        **kwargs,
+    ) -> tp.ArrayLike:
         flex_2d = self.get_flex_2d(ann_args)
         obj = np.asarray(obj)
         if obj.ndim == 0:
@@ -199,17 +209,17 @@ class FlexArraySlicer(ArraySlicer, FlexSpecifier):
                 return obj
             if self.axis == 1:
                 if flex_2d:
-                    return obj[chunk_meta.start:chunk_meta.end]
+                    return obj[chunk_meta.start : chunk_meta.end]
                 return obj
             if flex_2d:
                 return obj
-            return obj[chunk_meta.start:chunk_meta.end]
+            return obj[chunk_meta.start : chunk_meta.end]
         if obj.ndim == 2:
             if self.axis == 1:
                 if obj.shape[1] == 1:
                     return obj
-                return obj[:, chunk_meta.start:chunk_meta.end]
+                return obj[:, chunk_meta.start : chunk_meta.end]
             if obj.shape[0] == 1:
                 return obj
-            return obj[chunk_meta.start:chunk_meta.end, :]
+            return obj[chunk_meta.start : chunk_meta.end, :]
         raise ValueError(f"FlexArraySlicer supports max 2 dimensions, not {obj.ndim}")

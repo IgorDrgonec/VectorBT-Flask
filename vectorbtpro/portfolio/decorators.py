@@ -23,33 +23,35 @@ def attach_returns_acc_methods(config: Config) -> tp.ClassWrapper:
         checks.assert_subclass_of(cls, "Portfolio")
 
         for target_name, settings in config.items():
-            source_name = settings.get('source_name', target_name)
-            docstring = settings.get('docstring', f"See `vectorbtpro.returns.accessors.ReturnsAccessor.{source_name}`.")
+            source_name = settings.get("source_name", target_name)
+            docstring = settings.get("docstring", f"See `vectorbtpro.returns.accessors.ReturnsAccessor.{source_name}`.")
 
-            def new_method(self,
-                           *,
-                           group_by: tp.GroupByLike = None,
-                           bm_returns: tp.Optional[tp.ArrayLike] = None,
-                           freq: tp.Optional[tp.FrequencyLike] = None,
-                           year_freq: tp.Optional[tp.FrequencyLike] = None,
-                           use_asset_returns: bool = False,
-                           jitted: tp.JittedOption = None,
-                           _source_name: str = source_name,
-                           **kwargs) -> tp.Any:
+            def new_method(
+                self,
+                *,
+                group_by: tp.GroupByLike = None,
+                bm_returns: tp.Optional[tp.ArrayLike] = None,
+                freq: tp.Optional[tp.FrequencyLike] = None,
+                year_freq: tp.Optional[tp.FrequencyLike] = None,
+                use_asset_returns: bool = False,
+                jitted: tp.JittedOption = None,
+                _source_name: str = source_name,
+                **kwargs,
+            ) -> tp.Any:
                 returns_acc = self.get_returns_acc(
                     group_by=group_by,
                     bm_returns=bm_returns,
                     freq=freq,
                     year_freq=year_freq,
                     use_asset_returns=use_asset_returns,
-                    jitted=jitted
+                    jitted=jitted,
                 )
                 ret_method = getattr(returns_acc, _source_name)
-                if 'jitted' in get_func_arg_names(ret_method):
-                    kwargs['jitted'] = jitted
+                if "jitted" in get_func_arg_names(ret_method):
+                    kwargs["jitted"] = jitted
                 return ret_method(**kwargs)
 
-            new_method.__name__ = 'get_' + target_name
+            new_method.__name__ = "get_" + target_name
             new_method.__qualname__ = f"{cls.__name__}.get_{target_name}"
             new_method.__doc__ = docstring
             setattr(cls, new_method.__name__, new_method)
@@ -86,50 +88,48 @@ def attach_shortcut_properties(config: Config) -> tp.ClassWrapper:
         checks.assert_subclass_of(cls, "Portfolio")
 
         for target_name, settings in config.items():
-            if target_name.startswith('get_'):
+            if target_name.startswith("get_"):
                 raise ValueError(f"Property names cannot have prefix 'get_' ('{target_name}')")
-            method_name = settings.get('method_name', 'get_' + target_name)
-            use_in_outputs = settings.get('use_in_outputs', True)
-            field_aliases = settings.get('field_aliases', None)
-            obj_type = settings.get('obj_type', 'array')
-            group_by_aware = settings.get('group_by_aware', True)
-            wrap_kwargs = settings.get('wrap_kwargs', None)
+            method_name = settings.get("method_name", "get_" + target_name)
+            use_in_outputs = settings.get("use_in_outputs", True)
+            field_aliases = settings.get("field_aliases", None)
+            obj_type = settings.get("obj_type", "array")
+            group_by_aware = settings.get("group_by_aware", True)
+            wrap_kwargs = settings.get("wrap_kwargs", None)
             wrap_kwargs = resolve_dict(wrap_kwargs)
-            wrap_func = settings.get('wrap_func', None)
-            method_kwargs = settings.get('method_kwargs', None)
+            wrap_func = settings.get("wrap_func", None)
+            method_kwargs = settings.get("method_kwargs", None)
             method_kwargs = resolve_dict(method_kwargs)
-            decorator = settings.get('decorator', None)
+            decorator = settings.get("decorator", None)
             if decorator is None:
-                if obj_type in ('red_array', 'records'):
+                if obj_type in ("red_array", "records"):
                     decorator = cached_property
                 else:
                     decorator = cacheable_property
             decorator_kwargs = merge_dicts(
                 dict(obj_type=obj_type, group_by_aware=group_by_aware, field_aliases=field_aliases),
-                settings.get('decorator_kwargs', None)
+                settings.get("decorator_kwargs", None),
             )
-            docstring = settings.get('docstring', None)
+            docstring = settings.get("docstring", None)
             if docstring is None:
                 if len(method_kwargs) == 0:
                     docstring = f"`{cls.__name__}.{method_name}` with default arguments."
                 else:
                     docstring = f"`{cls.__name__}.{method_name}` with arguments `{method_kwargs}`."
 
-            def new_prop(self,
-                         _method_name: str = method_name,
-                         _target_name: str = target_name,
-                         _use_in_outputs: bool = use_in_outputs,
-                         _wrap_kwargs: tp.Kwargs = wrap_kwargs,
-                         _wrap_func: tp.Callable = wrap_func,
-                         _method_kwargs: tp.Kwargs = method_kwargs) -> tp.Any:
+            def new_prop(
+                self,
+                _method_name: str = method_name,
+                _target_name: str = target_name,
+                _use_in_outputs: bool = use_in_outputs,
+                _wrap_kwargs: tp.Kwargs = wrap_kwargs,
+                _wrap_func: tp.Callable = wrap_func,
+                _method_kwargs: tp.Kwargs = method_kwargs,
+            ) -> tp.Any:
 
                 if _use_in_outputs and self.use_in_outputs and self.in_outputs is not None:
                     try:
-                        out = self.get_in_output(
-                            _target_name,
-                            wrap_kwargs=_wrap_kwargs,
-                            wrap_func=_wrap_func
-                        )
+                        out = self.get_in_output(_target_name, wrap_kwargs=_wrap_kwargs, wrap_func=_wrap_func)
                         if out is not None:
                             return out
                     except AttributeError:

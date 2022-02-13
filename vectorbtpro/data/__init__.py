@@ -12,7 +12,7 @@ from vectorbtpro.data.custom import (
     YFData,
     BinanceData,
     CCXTData,
-    AlpacaData
+    AlpacaData,
 )
 from vectorbtpro.data.updater import DataUpdater
 from vectorbtpro.utils.module_ import create__all__

@@ -31,6 +31,7 @@ def resolve_dict(dct: tp.DictLikeSequence, i: tp.Optional[int] = None) -> dict:
 
 class atomic_dict(dict):
     """Dict that behaves like a single value when merging."""
+
     pass
 
 
@@ -68,7 +69,7 @@ def set_dict_item(dct: dict, k: tp.Any, v: tp.Any, force: bool = False) -> None:
         dct[k] = v
 
 
-def copy_dict(dct: InConfigLikeT, copy_mode: str = 'shallow', nested: bool = True) -> OutConfigLikeT:
+def copy_dict(dct: InConfigLikeT, copy_mode: str = "shallow", nested: bool = True) -> OutConfigLikeT:
     """Copy dict based on a copy mode.
 
     The following modes are supported:
@@ -82,24 +83,21 @@ def copy_dict(dct: InConfigLikeT, copy_mode: str = 'shallow', nested: bool = Tru
     if dct is None:
         return {}
     copy_mode = copy_mode.lower()
-    if copy_mode not in {'none', 'shallow', 'hybrid', 'deep'}:
+    if copy_mode not in {"none", "shallow", "hybrid", "deep"}:
         raise ValueError(f"Copy mode '{copy_mode}' not supported")
 
-    if copy_mode == 'none':
+    if copy_mode == "none":
         return dct
-    if copy_mode == 'deep':
+    if copy_mode == "deep":
         return deepcopy(dct)
     if isinstance(dct, Config):
-        return dct.copy(
-            copy_mode=copy_mode,
-            nested=nested
-        )
+        return dct.copy(copy_mode=copy_mode, nested=nested)
     dct_copy = copy(dct)  # copy structure using shallow copy
     for k, v in dct_copy.items():
         if nested and isinstance(v, dict):
             _v = copy_dict(v, copy_mode=copy_mode, nested=nested)
         else:
-            if copy_mode == 'hybrid':
+            if copy_mode == "hybrid":
                 _v = copy(v)  # copy values using shallow copy
             else:
                 _v = v
@@ -107,11 +105,13 @@ def copy_dict(dct: InConfigLikeT, copy_mode: str = 'shallow', nested: bool = Tru
     return dct_copy
 
 
-def update_dict(x: InConfigLikeT,
-                y: InConfigLikeT,
-                nested: bool = True,
-                force: bool = False,
-                same_keys: bool = False) -> None:
+def update_dict(
+    x: InConfigLikeT,
+    y: InConfigLikeT,
+    nested: bool = True,
+    force: bool = False,
+    same_keys: bool = False,
+) -> None:
     """Update dict with keys and values from other dict.
 
     Set `nested` to True to update all child dicts in recursive manner.
@@ -129,11 +129,7 @@ def update_dict(x: InConfigLikeT,
     checks.assert_instance_of(y, dict)
 
     for k, v in y.items():
-        if nested \
-                and k in x \
-                and isinstance(x[k], dict) \
-                and isinstance(v, dict) \
-                and not isinstance(v, atomic_dict):
+        if nested and k in x and isinstance(x[k], dict) and isinstance(v, dict) and not isinstance(v, atomic_dict):
             update_dict(x[k], v, force=force)
         else:
             if same_keys and k not in x:
@@ -141,11 +137,13 @@ def update_dict(x: InConfigLikeT,
             set_dict_item(x, k, v, force=force)
 
 
-def merge_dicts(*dicts: InConfigLikeT,
-                to_dict: bool = True,
-                copy_mode: str = 'shallow',
-                nested: tp.Optional[bool] = None,
-                same_keys: bool = False) -> OutConfigLikeT:
+def merge_dicts(
+    *dicts: InConfigLikeT,
+    to_dict: bool = True,
+    copy_mode: str = "shallow",
+    nested: tp.Optional[bool] = None,
+    same_keys: bool = False,
+) -> OutConfigLikeT:
     """Merge dicts.
 
     Args:
@@ -160,11 +158,12 @@ def merge_dicts(*dicts: InConfigLikeT,
     if dicts[0] is None and dicts[1] is None:
         if len(dicts) > 2:
             return merge_dicts(
-                None, *dicts[2:],
+                None,
+                *dicts[2:],
                 to_dict=to_dict,
                 copy_mode=copy_mode,
                 nested=nested,
-                same_keys=same_keys
+                same_keys=same_keys,
             )
         return {}
 
@@ -182,7 +181,7 @@ def merge_dicts(*dicts: InConfigLikeT,
     # Convert dict-like objects to regular dicts
     if to_dict:
         # Shortcut when all dicts are already regular
-        if not nested and copy_mode in {'none', 'shallow'}:  # shortcut
+        if not nested and copy_mode in {"none", "shallow"}:  # shortcut
             out = {}
             for dct in dicts:
                 if dct is not None:
@@ -191,7 +190,7 @@ def merge_dicts(*dicts: InConfigLikeT,
         dicts = tuple([convert_to_dict(dct, nested=True) for dct in dicts])
 
     # Copy all dicts
-    if not to_dict or copy_mode not in {'none', 'shallow'}:
+    if not to_dict or copy_mode not in {"none", "shallow"}:
         # to_dict already does a shallow copy
         dicts = tuple([copy_dict(dct, copy_mode=copy_mode, nested=nested) for dct in dicts])
 
@@ -210,18 +209,19 @@ def merge_dicts(*dicts: InConfigLikeT,
     # Merge resulting dict with remaining dicts
     if len(dicts) > 2:
         return merge_dicts(
-            x, *dicts[2:],
+            x,
+            *dicts[2:],
             to_dict=False,  # executed only once
-            copy_mode='none',  # executed only once
+            copy_mode="none",  # executed only once
             nested=nested,
-            same_keys=same_keys
+            same_keys=same_keys,
         )
     return x
 
 
 _RaiseKeyError = object()
 
-DumpTuple = namedtuple('DumpTuple', ('cls', 'dumps'))
+DumpTuple = namedtuple("DumpTuple", ("cls", "dumps"))
 
 PickleableDictT = tp.TypeVar("PickleableDictT", bound="PickleableDict")
 
@@ -232,7 +232,8 @@ class PickleableDict(Pickleable, dict):
     def dumps(self, **kwargs) -> bytes:
         """Pickle to bytes."""
         from vectorbtpro.utils.opt_packages import warn_cannot_import
-        warn_cannot_import('dill')
+
+        warn_cannot_import("dill")
         try:
             import dill as pickle
         except ImportError:
@@ -250,7 +251,8 @@ class PickleableDict(Pickleable, dict):
     def loads(cls: tp.Type[PickleableDictT], dumps: bytes, **kwargs) -> PickleableDictT:
         """Unpickle from bytes."""
         from vectorbtpro.utils.opt_packages import warn_cannot_import
-        warn_cannot_import('dill')
+
+        warn_cannot_import("dill")
         try:
             import dill as pickle
         except ImportError:
@@ -321,20 +323,23 @@ class Config(PickleableDict, Prettified):
         All arguments are applied only once during initialization.
     """
 
-    def __init__(self,
-                 *args,
-                 copy_kwargs_: tp.KwargsLike = None,
-                 reset_dct_: tp.DictLike = None,
-                 reset_dct_copy_kwargs_: tp.KwargsLike = None,
-                 frozen_keys_: tp.Optional[bool] = None,
-                 readonly_: tp.Optional[bool] = None,
-                 nested_: tp.Optional[bool] = None,
-                 convert_dicts_: tp.Optional[tp.Union[bool, tp.Type["Config"]]] = None,
-                 as_attrs_: tp.Optional[bool] = None,
-                 **kwargs) -> None:
+    def __init__(
+        self,
+        *args,
+        copy_kwargs_: tp.KwargsLike = None,
+        reset_dct_: tp.DictLike = None,
+        reset_dct_copy_kwargs_: tp.KwargsLike = None,
+        frozen_keys_: tp.Optional[bool] = None,
+        readonly_: tp.Optional[bool] = None,
+        nested_: tp.Optional[bool] = None,
+        convert_dicts_: tp.Optional[tp.Union[bool, tp.Type["Config"]]] = None,
+        as_attrs_: tp.Optional[bool] = None,
+        **kwargs,
+    ) -> None:
         try:
             from vectorbtpro._settings import settings
-            config_cfg = settings['config']
+
+            config_cfg = settings["config"]
         except ImportError:
             config_cfg = {}
 
@@ -363,30 +368,19 @@ class Config(PickleableDict, Prettified):
                 return cfg_default
             return default
 
-        reset_dct_ = _resolve_param('reset_dct_', reset_dct_, None)
-        frozen_keys_ = _resolve_param('frozen_keys_', frozen_keys_, False)
-        readonly_ = _resolve_param('readonly_', readonly_, False)
-        nested_ = _resolve_param('nested_', nested_, True)
-        convert_dicts_ = _resolve_param('convert_dicts_', convert_dicts_, False)
-        as_attrs_ = _resolve_param('as_attrs_', as_attrs_, False)
+        reset_dct_ = _resolve_param("reset_dct_", reset_dct_, None)
+        frozen_keys_ = _resolve_param("frozen_keys_", frozen_keys_, False)
+        readonly_ = _resolve_param("readonly_", readonly_, False)
+        nested_ = _resolve_param("nested_", nested_, True)
+        convert_dicts_ = _resolve_param("convert_dicts_", convert_dicts_, False)
+        as_attrs_ = _resolve_param("as_attrs_", as_attrs_, False)
         reset_dct_copy_kwargs_ = merge_dicts(copy_kwargs_, reset_dct_copy_kwargs_)
-        copy_kwargs_ = _resolve_param(
-            'copy_kwargs_',
-            copy_kwargs_,
-            dict(
-                copy_mode='none',
-                nested=nested_
-            ),
-            merge=True
-        )
+        copy_kwargs_ = _resolve_param("copy_kwargs_", copy_kwargs_, dict(copy_mode="none", nested=nested_), merge=True)
         reset_dct_copy_kwargs_ = _resolve_param(
-            'reset_dct_copy_kwargs_',
+            "reset_dct_copy_kwargs_",
             reset_dct_copy_kwargs_,
-            dict(
-                copy_mode='none' if readonly_ else 'hybrid',
-                nested=nested_
-            ),
-            merge=True
+            dict(copy_mode="none" if readonly_ else "hybrid", nested=nested_),
+            merge=True,
         )
 
         # Copy dict
@@ -410,7 +404,7 @@ class Config(PickleableDict, Prettified):
                         readonly_=readonly_,
                         nested_=nested_,
                         convert_dicts_=convert_dicts_,
-                        as_attrs_=as_attrs_
+                        as_attrs_=as_attrs_,
                     )
 
         # Copy initial config
@@ -478,7 +472,7 @@ class Config(PickleableDict, Prettified):
 
     def __getattr__(self, k) -> tp.Any:
         try:
-            _as_attrs_ = object.__getattribute__(self, '_as_attrs_')
+            _as_attrs_ = object.__getattribute__(self, "_as_attrs_")
         except AttributeError:
             return object.__getattribute__(self, k)
         if _as_attrs_:
@@ -490,7 +484,7 @@ class Config(PickleableDict, Prettified):
 
     def __setattr__(self, k: str, v: tp.Any, force: bool = False) -> None:
         try:
-            _as_attrs_ = object.__getattribute__(self, '_as_attrs_')
+            _as_attrs_ = object.__getattribute__(self, "_as_attrs_")
         except AttributeError:
             return object.__setattr__(self, k, v)
         if _as_attrs_:
@@ -499,7 +493,7 @@ class Config(PickleableDict, Prettified):
 
     def __delattr__(self, k: str, force: bool = False) -> None:
         try:
-            _as_attrs_ = object.__getattribute__(self, '_as_attrs_')
+            _as_attrs_ = object.__getattribute__(self, "_as_attrs_")
         except AttributeError:
             return object.__delattr__(self, k)
         if _as_attrs_:
@@ -588,51 +582,55 @@ class Config(PickleableDict, Prettified):
         self_copy.update(deepcopy(dict(self), memo), nested=False, force=True)
         return self_copy
 
-    def copy(self: ConfigT,
-             reset_dct_copy_kwargs: tp.KwargsLike = None,
-             copy_mode: tp.Optional[str] = None,
-             nested: tp.Optional[bool] = None) -> ConfigT:
+    def copy(
+        self: ConfigT,
+        reset_dct_copy_kwargs: tp.KwargsLike = None,
+        copy_mode: tp.Optional[str] = None,
+        nested: tp.Optional[bool] = None,
+    ) -> ConfigT:
         """Copy the instance.
 
         By default, copies in the same way as during the initialization."""
         if copy_mode is None:
-            copy_mode = self.copy_kwargs_['copy_mode']
-            reset_dct_copy_mode = self.reset_dct_copy_kwargs_['copy_mode']
+            copy_mode = self.copy_kwargs_["copy_mode"]
+            reset_dct_copy_mode = self.reset_dct_copy_kwargs_["copy_mode"]
         else:
             reset_dct_copy_mode = copy_mode
         if nested is None:
-            nested = self.copy_kwargs_['nested']
-            reset_dct_nested = self.reset_dct_copy_kwargs_['nested']
+            nested = self.copy_kwargs_["nested"]
+            reset_dct_nested = self.reset_dct_copy_kwargs_["nested"]
         else:
             reset_dct_nested = nested
         reset_dct_copy_kwargs = resolve_dict(reset_dct_copy_kwargs)
-        if 'copy_mode' in reset_dct_copy_kwargs:
-            if reset_dct_copy_kwargs['copy_mode'] is not None:
-                reset_dct_copy_mode = reset_dct_copy_kwargs['copy_mode']
-        if 'nested' in reset_dct_copy_kwargs:
-            if reset_dct_copy_kwargs['nested'] is not None:
-                reset_dct_nested = reset_dct_copy_kwargs['nested']
+        if "copy_mode" in reset_dct_copy_kwargs:
+            if reset_dct_copy_kwargs["copy_mode"] is not None:
+                reset_dct_copy_mode = reset_dct_copy_kwargs["copy_mode"]
+        if "nested" in reset_dct_copy_kwargs:
+            if reset_dct_copy_kwargs["nested"] is not None:
+                reset_dct_nested = reset_dct_copy_kwargs["nested"]
 
         self_copy = self.__copy__()
 
         reset_dct_ = copy_dict(dict(self.reset_dct_), copy_mode=reset_dct_copy_mode, nested=reset_dct_nested)
-        self.__dict__['_reset_dct_'] = reset_dct_
+        self.__dict__["_reset_dct_"] = reset_dct_
 
         dct = copy_dict(dict(self), copy_mode=copy_mode, nested=nested)
         self_copy.update(dct, nested=False, force=True)
 
         return self_copy
 
-    def merge_with(self: ConfigT,
-                   other: InConfigLikeT,
-                   copy_mode: tp.Optional[str] = None,
-                   nested: tp.Optional[bool] = None,
-                   **kwargs) -> OutConfigLikeT:
+    def merge_with(
+        self: ConfigT,
+        other: InConfigLikeT,
+        copy_mode: tp.Optional[str] = None,
+        nested: tp.Optional[bool] = None,
+        **kwargs,
+    ) -> OutConfigLikeT:
         """Merge with another dict into one single dict.
 
         See `merge_dicts`."""
         if copy_mode is None:
-            copy_mode = 'shallow'
+            copy_mode = "shallow"
         if nested is None:
             nested = self.nested_
         return merge_dicts(self, other, copy_mode=copy_mode, nested=nested, **kwargs)
@@ -651,7 +649,7 @@ class Config(PickleableDict, Prettified):
         reset_dct_ = copy_dict(dict(self.reset_dct_), **reset_dct_copy_kwargs)
         self.clear(force=True)
         self.update(self.reset_dct_, nested=False, force=True)
-        self.__dict__['_reset_dct_'] = reset_dct_
+        self.__dict__["_reset_dct_"] = reset_dct_
 
     def make_checkpoint(self, force: bool = False, **reset_dct_copy_kwargs) -> None:
         """Replace `reset_dct_` by the current state.
@@ -661,12 +659,13 @@ class Config(PickleableDict, Prettified):
             raise TypeError("Config is read-only")
         reset_dct_copy_kwargs = merge_dicts(self.reset_dct_copy_kwargs_, reset_dct_copy_kwargs)
         reset_dct_ = copy_dict(dict(self), **reset_dct_copy_kwargs)
-        self.__dict__['_reset_dct_'] = reset_dct_
+        self.__dict__["_reset_dct_"] = reset_dct_
 
     def dumps(self, dump_reset_dct: bool = False, **kwargs) -> bytes:
         """Pickle to bytes."""
         from vectorbtpro.utils.opt_packages import warn_cannot_import
-        warn_cannot_import('dill')
+
+        warn_cannot_import("dill")
         try:
             import dill as pickle
         except ImportError:
@@ -676,47 +675,50 @@ class Config(PickleableDict, Prettified):
             reset_dct_ = PickleableDict(self.reset_dct_).dumps(**kwargs)
         else:
             reset_dct_ = None
-        return pickle.dumps(dict(
-            dct=PickleableDict(self).dumps(**kwargs),
-            copy_kwargs_=self.copy_kwargs_,
-            reset_dct_=reset_dct_,
-            reset_dct_copy_kwargs_=self.reset_dct_copy_kwargs_,
-            frozen_keys_=self.frozen_keys_,
-            readonly_=self.readonly_,
-            nested_=self.nested_,
-            convert_dicts_=self.convert_dicts_,
-            as_attrs_=self.as_attrs_
-        ), **kwargs)
+        return pickle.dumps(
+            dict(
+                dct=PickleableDict(self).dumps(**kwargs),
+                copy_kwargs_=self.copy_kwargs_,
+                reset_dct_=reset_dct_,
+                reset_dct_copy_kwargs_=self.reset_dct_copy_kwargs_,
+                frozen_keys_=self.frozen_keys_,
+                readonly_=self.readonly_,
+                nested_=self.nested_,
+                convert_dicts_=self.convert_dicts_,
+                as_attrs_=self.as_attrs_,
+            ),
+            **kwargs,
+        )
 
     @classmethod
     def loads(cls: tp.Type[ConfigT], dumps: bytes, **kwargs) -> ConfigT:
         """Unpickle from bytes."""
         from vectorbtpro.utils.opt_packages import warn_cannot_import
-        warn_cannot_import('dill')
+
+        warn_cannot_import("dill")
         try:
             import dill as pickle
         except ImportError:
             import pickle
 
         obj = pickle.loads(dumps, **kwargs)
-        if obj['reset_dct_'] is not None:
-            reset_dct_ = PickleableDict.loads(obj['reset_dct_'], **kwargs)
+        if obj["reset_dct_"] is not None:
+            reset_dct_ = PickleableDict.loads(obj["reset_dct_"], **kwargs)
         else:
             reset_dct_ = None
         return cls(
-            PickleableDict.loads(obj['dct'], **kwargs),
-            copy_kwargs_=obj['copy_kwargs_'],
+            PickleableDict.loads(obj["dct"], **kwargs),
+            copy_kwargs_=obj["copy_kwargs_"],
             reset_dct_=reset_dct_,
-            reset_dct_copy_kwargs_=obj['reset_dct_copy_kwargs_'],
-            frozen_keys_=obj['frozen_keys_'],
-            readonly_=obj['readonly_'],
-            nested_=obj['nested_'],
-            convert_dicts_=obj['convert_dicts_'],
-            as_attrs_=obj['as_attrs_']
+            reset_dct_copy_kwargs_=obj["reset_dct_copy_kwargs_"],
+            frozen_keys_=obj["frozen_keys_"],
+            readonly_=obj["readonly_"],
+            nested_=obj["nested_"],
+            convert_dicts_=obj["convert_dicts_"],
+            as_attrs_=obj["as_attrs_"],
         )
 
-    def load_update(self, path: tp.PathLike, clear: bool = False,
-                    nested: tp.Optional[bool] = None, **kwargs) -> None:
+    def load_update(self, path: tp.PathLike, clear: bool = False, nested: tp.Optional[bool] = None, **kwargs) -> None:
         """Load dumps from a file and update this instance in-place.
 
         !!! note
@@ -730,13 +732,15 @@ class Config(PickleableDict, Prettified):
             nested = self.nested_
         self.update(loaded, nested=nested, force=True)
 
-    def prettify(self,
-                 with_params: bool = False,
-                 replace: tp.DictLike = None,
-                 path: str = None,
-                 htchar: str = '    ',
-                 lfchar: str = '\n',
-                 indent: int = 0) -> str:
+    def prettify(
+        self,
+        with_params: bool = False,
+        replace: tp.DictLike = None,
+        path: str = None,
+        htchar: str = "    ",
+        lfchar: str = "\n",
+        indent: int = 0,
+    ) -> str:
         if with_params:
             dct = {
                 **dict(self),
@@ -748,8 +752,8 @@ class Config(PickleableDict, Prettified):
                     readonly=self.readonly_,
                     nested=self.nested_,
                     convert_dicts=self.convert_dicts_,
-                    as_attrs=self.as_attrs_
-                )
+                    as_attrs=self.as_attrs_,
+                ),
             }
         else:
             dct = dict(self)
@@ -761,16 +765,9 @@ class Config(PickleableDict, Prettified):
                 path=path,
                 htchar=htchar,
                 lfchar=lfchar,
-                indent=indent
+                indent=indent,
             )
-        return prettify_dict(
-            self,
-            replace=replace,
-            path=path,
-            htchar=htchar,
-            lfchar=lfchar,
-            indent=indent
-        )
+        return prettify_dict(self, replace=replace, path=path, htchar=htchar, lfchar=lfchar, indent=indent)
 
     def __eq__(self, other: tp.Any) -> bool:
         return checks.is_deep_equal(dict(self), dict(other))
@@ -778,13 +775,14 @@ class Config(PickleableDict, Prettified):
 
 class AtomicConfig(Config, atomic_dict):
     """Config that behaves like a single value when merging."""
+
     pass
 
 
 ReadonlyConfig = functools.partial(Config, readonly_=True)
 """`Config` with `readonly_` flag set to True."""
 
-HybridConfig = functools.partial(Config, copy_kwargs_=dict(copy_mode='hybrid'))
+HybridConfig = functools.partial(Config, copy_kwargs_=dict(copy_mode="hybrid"))
 """`Config` with `copy_kwargs_` set to `copy_mode='hybrid'`."""
 
 ConfiguredT = tp.TypeVar("ConfiguredT", bound="Configured")
@@ -808,9 +806,10 @@ class Configured(Cacheable, Pickleable, Prettified):
 
     def __init__(self, **config) -> None:
         from vectorbtpro._settings import settings
-        configured_cfg = settings['configured']
 
-        self._config = Config(**merge_dicts(configured_cfg['config'], config))
+        configured_cfg = settings["configured"]
+
+        self._config = Config(**merge_dicts(configured_cfg["config"], config))
 
         Cacheable.__init__(self)
 
@@ -832,11 +831,13 @@ class Configured(Cacheable, Pickleable, Prettified):
                 writeable_attrs |= cls._writeable_attrs
         return writeable_attrs
 
-    def replace(self: ConfiguredT,
-                copy_mode_: tp.Optional[str] = None,
-                nested_: tp.Optional[bool] = None,
-                cls_: tp.Optional[type] = None,
-                **new_config) -> ConfiguredT:
+    def replace(
+        self: ConfiguredT,
+        copy_mode_: tp.Optional[str] = None,
+        nested_: tp.Optional[bool] = None,
+        cls_: tp.Optional[type] = None,
+        **new_config,
+    ) -> ConfiguredT:
         """Create a new instance by copying and (optionally) changing the config.
 
         !!! warning
@@ -849,23 +850,22 @@ class Configured(Cacheable, Pickleable, Prettified):
         for attr in self.get_writeable_attrs():
             attr_obj = getattr(self, attr)
             if isinstance(attr_obj, Config):
-                attr_obj = attr_obj.copy(
-                    copy_mode=copy_mode_,
-                    nested=nested_
-                )
+                attr_obj = attr_obj.copy(copy_mode=copy_mode_, nested=nested_)
             else:
                 if copy_mode_ is not None:
-                    if copy_mode_ == 'hybrid':
+                    if copy_mode_ == "hybrid":
                         attr_obj = copy(attr_obj)
-                    elif copy_mode_ == 'deep':
+                    elif copy_mode_ == "deep":
                         attr_obj = deepcopy(attr_obj)
             setattr(new_instance, attr, attr_obj)
         return new_instance
 
-    def copy(self: ConfiguredT,
-             copy_mode: tp.Optional[str] = None,
-             nested: tp.Optional[bool] = None,
-             cls: tp.Optional[type] = None) -> ConfiguredT:
+    def copy(
+        self: ConfiguredT,
+        copy_mode: tp.Optional[str] = None,
+        nested: tp.Optional[bool] = None,
+        cls: tp.Optional[type] = None,
+    ) -> ConfiguredT:
         """Create a new instance by copying the config.
 
         See `Configured.replace`."""
@@ -874,7 +874,8 @@ class Configured(Cacheable, Pickleable, Prettified):
     def dumps(self, **kwargs) -> bytes:
         """Pickle to bytes."""
         from vectorbtpro.utils.opt_packages import warn_cannot_import
-        warn_cannot_import('dill')
+
+        warn_cannot_import("dill")
         try:
             import dill as pickle
         except ImportError:
@@ -889,7 +890,8 @@ class Configured(Cacheable, Pickleable, Prettified):
     def loads(cls: tp.Type[ConfiguredT], dumps: bytes, **kwargs) -> ConfiguredT:
         """Unpickle from bytes."""
         from vectorbtpro.utils.opt_packages import warn_cannot_import
-        warn_cannot_import('dill')
+
+        warn_cannot_import("dill")
         try:
             import dill as pickle
         except ImportError:

@@ -109,15 +109,13 @@ caching = dict(
     disable_machinery=False,
     silence_warnings=False,
     register_lazily=True,
-    ignore_args=[
-        'jitted',
-        'chunked'
-    ],
-    use_cached_accessors=True
+    ignore_args=["jitted", "chunked"],
+    use_cached_accessors=True,
 )
 """_"""
 
-__pdoc__['caching'] = Sub("""Sub-config with settings applied across `vectorbtpro.registries.ca_registry`, 
+__pdoc__["caching"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.registries.ca_registry`, 
 `vectorbtpro.utils.caching`, and cacheable decorators in `vectorbtpro.utils.decorators`.
 
 !!! hint
@@ -127,9 +125,10 @@ __pdoc__['caching'] = Sub("""Sub-config with settings applied across `vectorbtpr
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
-_settings['caching'] = caching
+_settings["caching"] = caching
 
 jitting = dict(
     disable=False,
@@ -142,29 +141,28 @@ jitting = dict(
         dict(
             nb=dict(
                 cls=NumbaJitter,
-                aliases={'numba'},
+                aliases={"numba"},
                 options=dict(),
                 override_options=dict(),
                 resolve_kwargs=dict(),
-                tasks=dict()
+                tasks=dict(),
             ),
             np=dict(
                 cls=NumPyJitter,
-                aliases={'numpy'},
+                aliases={"numpy"},
                 options=dict(),
                 override_options=dict(),
                 resolve_kwargs=dict(),
-                tasks=dict()
-            )
+                tasks=dict(),
+            ),
         )
     ),
-    template_context=Config(  # flex
-        dict()
-    )
+    template_context=Config(dict()),  # flex
 )
 """_"""
 
-__pdoc__['jitting'] = Sub("""Sub-config with settings applied across `vectorbtpro.registries.jit_registry` and 
+__pdoc__["jitting"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.registries.jit_registry` and 
 `vectorbtpro.utils.jitting`.
 
 !!! note
@@ -174,122 +172,100 @@ __pdoc__['jitting'] = Sub("""Sub-config with settings applied across `vectorbtpr
 
 ```python
 ${config_doc}
-```""")
-
-_settings['jitting'] = jitting
-
-numba = dict(
-    parallel=None,
-    silence_warnings=False,
-    check_func_type=True,
-    check_func_suffix=False
+```"""
 )
+
+_settings["jitting"] = jitting
+
+numba = dict(parallel=None, silence_warnings=False, check_func_type=True, check_func_suffix=False)
 """_"""
 
-__pdoc__['numba'] = Sub("""Sub-config with Numba-related settings.
+__pdoc__["numba"] = Sub(
+    """Sub-config with Numba-related settings.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
-_settings['numba'] = numba
+_settings["numba"] = numba
 
 math = dict(
-    use_tol=True,
-    rel_tol=1e-9,  # 1,000,000,000 == 1,000,000,001
-    abs_tol=1e-12  # 0.000000000001 == 0.000000000002
+    use_tol=True, rel_tol=1e-9, abs_tol=1e-12  # 1,000,000,000 == 1,000,000,001  # 0.000000000001 == 0.000000000002,
 )
 """_"""
 
-__pdoc__['math'] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.math_`.
+__pdoc__["math"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.utils.math_`.
 
 !!! note
     All math settings are applied only once.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
-_settings['math'] = math
+_settings["math"] = math
 
 execution = dict(
     show_progress=True,
-    pbar_kwargs=Config(  # flex
-        dict()
-    ),
+    pbar_kwargs=Config(dict()),  # flex
     engines=Config(  # flex
         dict(
             sequence=dict(
                 cls=SequenceEngine,
                 show_progress=False,
-                pbar_kwargs=Config(  # flex
-                    dict()
-                ),
+                pbar_kwargs=Config(dict()),  # flex
                 n_chunks=None,
-                chunk_len=None
+                chunk_len=None,
             ),
-            dask=dict(
-                cls=DaskEngine,
-                compute_kwargs=Config(  # flex
-                    dict()
-                ),
-                n_chunks=None,
-                chunk_len=None
-            ),
+            dask=dict(cls=DaskEngine, compute_kwargs=Config(dict()), n_chunks=None, chunk_len=None),  # flex
             ray=dict(
                 cls=RayEngine,
                 restart=False,
                 reuse_refs=True,
                 del_refs=True,
                 shutdown=False,
-                init_kwargs=Config(  # flex
-                    dict()
-                ),
-                remote_kwargs=Config(  # flex
-                    dict()
-                ),
+                init_kwargs=Config(dict()),  # flex
+                remote_kwargs=Config(dict()),  # flex
                 n_chunks=None,
-                chunk_len=None
+                chunk_len=None,
             ),
         )
     ),
 )
 """_"""
 
-__pdoc__['execution'] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.execution`.
+__pdoc__["execution"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.utils.execution`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
-_settings['execution'] = execution
+_settings["execution"] = execution
 
 chunking = dict(
     disable=False,
     disable_wrapping=False,
     option=False,
-    engine='sequence',
+    engine="sequence",
     n_chunks=None,
     min_size=None,
     chunk_len=None,
     skip_one_chunk=True,
     silence_warnings=False,
-    template_context=Config(  # flex
-        dict()
-    ),
-    options=Config(  # flex
-        dict()
-    ),
-    override_setup_options=Config(  # flex
-        dict()
-    ),
-    override_options=Config(  # flex
-        dict()
-    )
+    template_context=Config(dict()),  # flex
+    options=Config(dict()),  # flex
+    override_setup_options=Config(dict()),  # flex
+    override_options=Config(dict()),  # flex
 )
 """_"""
 
-__pdoc__['chunking'] = Sub("""Sub-config with settings applied across `vectorbtpro.registries.ch_registry` 
+__pdoc__["chunking"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.registries.ch_registry` 
 and `vectorbtpro.utils.chunking`.
 
 !!! note
@@ -297,65 +273,61 @@ and `vectorbtpro.utils.chunking`.
 
 ```python
 ${config_doc}
-```""")
-
-_settings['chunking'] = chunking
-
-template = dict(
-    strict=True,
-    context=Config(  # flex
-        dict()
-    )
+```"""
 )
+
+_settings["chunking"] = chunking
+
+template = dict(strict=True, context=Config(dict()))  # flex
 """_"""
 
-__pdoc__['template'] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.template`.
+__pdoc__["template"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.utils.template`.
 
 ```python
 ${config_doc}
-```""")
-
-_settings['template'] = template
-
-config = Config(  # flex
-    dict()
+```"""
 )
+
+_settings["template"] = template
+
+config = Config(dict())  # flex
 """_"""
 
-__pdoc__['config'] = Sub("""Sub-config with settings applied to `vectorbtpro.utils.config.Config`.
+__pdoc__["config"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.utils.config.Config`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
-_settings['config'] = config
+_settings["config"] = config
 
 configured = dict(
-    config=Config(  # flex
-        dict(
-            readonly_=True
-        )
-    ),
+    config=Config(dict(readonly_=True)),  # flex,
 )
 """_"""
 
-__pdoc__['configured'] = Sub("""Sub-config with settings applied to `vectorbtpro.utils.config.Configured`.
+__pdoc__["configured"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.utils.config.Configured`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
-_settings['configured'] = configured
+_settings["configured"] = configured
 
 broadcasting = dict(
     align_index=False,
     align_columns=True,
-    index_from='strict',
-    columns_from='stack',
+    index_from="strict",
+    columns_from="stack",
     ignore_sr_names=True,
     check_index_names=True,
     drop_duplicates=True,
-    keep='last',
+    keep="last",
     drop_redundant=True,
     ignore_ranges=True,
     keep_wrap_default=False,
@@ -363,88 +335,67 @@ broadcasting = dict(
     min_one_dim=True,
     index_to_product=True,
     repeat_product=True,
-    keys_from_sr_index=True
+    keys_from_sr_index=True,
 )
 """_"""
 
-__pdoc__['broadcasting'] = Sub("""Sub-config with settings applied to broadcasting functions across `vectorbtpro.base`.
+__pdoc__["broadcasting"] = Sub(
+    """Sub-config with settings applied to broadcasting functions across `vectorbtpro.base`.
 
 ```python
 ${config_doc}
-```""")
-
-_settings['broadcasting'] = broadcasting
-
-wrapping = dict(
-    column_only_select=False,
-    group_select=True,
-    freq=None,
-    silence_warnings=False
+```"""
 )
+
+_settings["broadcasting"] = broadcasting
+
+wrapping = dict(column_only_select=False, group_select=True, freq=None, silence_warnings=False)
 """_"""
 
-__pdoc__['wrapping'] = Sub("""Sub-config with settings applied across `vectorbtpro.base.wrapping`.
+__pdoc__["wrapping"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.base.wrapping`.
 
 ```python
 ${config_doc}
-```""")
-
-_settings['wrapping'] = wrapping
-
-datetime = dict(
-    naive_tz=get_local_tz(),
-    to_py_timezone=True
+```"""
 )
+
+_settings["wrapping"] = wrapping
+
+datetime = dict(naive_tz=get_local_tz(), to_py_timezone=True)
 """_"""
 
-__pdoc__['datetime'] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.datetime_`.
+__pdoc__["datetime"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.utils.datetime_`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
-_settings['datetime'] = datetime
+_settings["datetime"] = datetime
 
 data = dict(
     show_progress=True,
-    pbar_kwargs=Config(  # flex
-        dict()
-    ),
+    pbar_kwargs=Config(dict()),  # flex
     tz_localize=get_utc_tz(),
     tz_convert=get_utc_tz(),
-    missing_index='nan',
-    missing_columns='raise',
+    missing_index="nan",
+    missing_columns="raise",
     custom=Config(  # flex
         dict(
-            binance=dict(
-                dict(
-                    api_key=None,
-                    api_secret=None
-                )
-            ),
-            ccxt=dict(
-                dict(
-                    enableRateLimit=True
-                )
-            ),
-            alpaca=Config(
-                dict(
-                    key_id=None,
-                    secret_key=None
-                )
-            )
+            binance=dict(dict(api_key=None, api_secret=None)),
+            ccxt=dict(dict(enableRateLimit=True)),
+            alpaca=Config(dict(key_id=None, secret_key=None)),
         )
     ),
-    stats=Config(  # flex
-        dict()
-    ),
-    plots=Config(  # flex
-        dict()
-    )
+    stats=Config(dict()),  # flex
+    plots=Config(dict()),  # flex
 )
 """_"""
 
-__pdoc__['data'] = Sub("""Sub-config with settings applied across `vectorbtpro.data`.
+__pdoc__["data"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.data`.
 
 ```python
 ${config_doc}
@@ -459,30 +410,18 @@ CCXT:
     
 Alpaca:
     Sign up for Alpaca API keys under https://app.alpaca.markets/signup.
-""")
+"""
+)
 
-_settings['data'] = data
+_settings["data"] = data
 
 plotting = dict(
     use_widgets=True,
-    show_kwargs=Config(  # flex
-        dict()
-    ),
+    show_kwargs=Config(dict()),  # flex
     use_gl=None,
-    color_schema=Config(  # flex
-        dict(
-            increasing="#1b9e76",
-            decreasing="#d95f02"
-        )
-    ),
+    color_schema=Config(dict(increasing="#1b9e76", decreasing="#d95f02")),  # flex
     contrast_color_schema=Config(  # flex
-        dict(
-            blue="#4285F4",
-            orange="#FFAA00",
-            green="#37B13F",
-            red="#EA4335",
-            gray="#E2E2E2"
-        )
+        dict(blue="#4285F4", orange="#FFAA00", green="#37B13F", red="#EA4335", gray="#E2E2E2")
     ),
     themes=dict(
         light=dict(
@@ -497,10 +436,10 @@ plotting = dict(
                     pink="#e377c2",
                     gray="#7f7f7f",
                     yellow="#bcbd22",
-                    cyan="#17becf"
+                    cyan="#17becf",
                 )
             ),
-            template=None
+            template=None,
         ),
         dark=dict(
             color_schema=Config(  # flex
@@ -514,10 +453,10 @@ plotting = dict(
                     pink="#e377c2",
                     gray="#7f7f7f",
                     yellow="#bcbd22",
-                    cyan="#17becf"
+                    cyan="#17becf",
                 )
             ),
-            template=None
+            template=None,
         ),
         seaborn=dict(
             color_schema=Config(  # flex
@@ -531,140 +470,120 @@ plotting = dict(
                     pink="rgb(140,140,140)",
                     gray="rgb(100,181,205)",
                     yellow="rgb(147,120,96)",
-                    cyan="rgb(196,78,82)"
+                    cyan="rgb(196,78,82)",
                 )
             ),
-            template=None
+            template=None,
         ),
     ),
     layout=Config(  # flex
         dict(
             width=700,
             height=350,
-            margin=dict(
-                t=30, b=30, l=30, r=30
-            ),
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=1.02,
-                xanchor="right",
-                x=1,
-                traceorder='normal'
-            )
+            margin=dict(t=30, b=30, l=30, r=30),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, traceorder="normal"),
         )
     ),
 )
 """_"""
 
-__pdoc__['plotting'] = Sub("""Sub-config with settings applied to Plotly figures 
+__pdoc__["plotting"] = Sub(
+    """Sub-config with settings applied to Plotly figures 
 created from `vectorbtpro.utils.figure`.
 
 ```python
 ${config_doc}
 ```
-""")
+"""
+)
 
-_settings['plotting'] = plotting
+_settings["plotting"] = plotting
 
 stats_builder = dict(
-    metrics='all',
-    tags='all',
+    metrics="all",
+    tags="all",
     silence_warnings=False,
-    template_context=Config(  # flex
-        dict()
-    ),
+    template_context=Config(dict()),  # flex
     filters=Config(  # flex
         dict(
             is_not_grouped=dict(
-                filter_func=lambda self, metric_settings:
-                not self.wrapper.grouper.is_grouped(group_by=metric_settings['group_by']),
-                warning_message=Sub("Metric '$metric_name' does not support grouped data")
+                filter_func=lambda self, metric_settings: not self.wrapper.grouper.is_grouped(
+                    group_by=metric_settings["group_by"]
+                ),
+                warning_message=Sub("Metric '$metric_name' does not support grouped data"),
             ),
             has_freq=dict(
-                filter_func=lambda self, metric_settings:
-                self.wrapper.freq is not None,
-                warning_message=Sub("Metric '$metric_name' requires frequency to be set")
-            )
+                filter_func=lambda self, metric_settings: self.wrapper.freq is not None,
+                warning_message=Sub("Metric '$metric_name' requires frequency to be set"),
+            ),
         )
     ),
-    settings=Config(  # flex
-        dict(
-            to_timedelta=None,
-            use_caching=True
-        )
-    ),
-    metric_settings=Config(  # flex
-        dict()
-    ),
+    settings=Config(dict(to_timedelta=None, use_caching=True)),  # flex
+    metric_settings=Config(dict()),  # flex
 )
 """_"""
 
-__pdoc__['stats_builder'] = Sub("""Sub-config with settings applied to 
+__pdoc__["stats_builder"] = Sub(
+    """Sub-config with settings applied to 
 `vectorbtpro.generic.stats_builder.StatsBuilderMixin`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
-_settings['stats_builder'] = stats_builder
+_settings["stats_builder"] = stats_builder
 
 plots_builder = dict(
-    subplots='all',
-    tags='all',
+    subplots="all",
+    tags="all",
     silence_warnings=False,
-    template_context=Config(  # flex
-        dict()
-    ),
+    template_context=Config(dict()),  # flex
     filters=Config(  # flex
         dict(
             is_not_grouped=dict(
-                filter_func=lambda self, subplot_settings:
-                not self.wrapper.grouper.is_grouped(group_by=subplot_settings['group_by']),
-                warning_message=Sub("Subplot '$subplot_name' does not support grouped data")
+                filter_func=lambda self, subplot_settings: not self.wrapper.grouper.is_grouped(
+                    group_by=subplot_settings["group_by"]
+                ),
+                warning_message=Sub("Subplot '$subplot_name' does not support grouped data"),
             ),
             has_freq=dict(
-                filter_func=lambda self, subplot_settings:
-                self.wrapper.freq is not None,
-                warning_message=Sub("Subplot '$subplot_name' requires frequency to be set")
-            )
+                filter_func=lambda self, subplot_settings: self.wrapper.freq is not None,
+                warning_message=Sub("Subplot '$subplot_name' requires frequency to be set"),
+            ),
         )
     ),
     settings=Config(  # flex
         dict(
             use_caching=True,
             hline_shape_kwargs=dict(
-                type='line',
+                type="line",
                 line=dict(
-                    color='gray',
+                    color="gray",
                     dash="dash",
-                )
-            )
+                ),
+            ),
         )
     ),
-    subplot_settings=Config(  # flex
-        dict()
-    ),
+    subplot_settings=Config(dict()),  # flex
     show_titles=True,
     hide_id_labels=True,
     group_id_labels=True,
-    make_subplots_kwargs=Config(  # flex
-        dict()
-    ),
-    layout_kwargs=Config(  # flex
-        dict()
-    ),
+    make_subplots_kwargs=Config(dict()),  # flex
+    layout_kwargs=Config(dict()),  # flex
 )
 """_"""
 
-__pdoc__['plots_builder'] = Sub("""Sub-config with settings applied to 
+__pdoc__["plots_builder"] = Sub(
+    """Sub-config with settings applied to 
 `vectorbtpro.generic.plots_builder.PlotsBuilderMixin`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
-_settings['plots_builder'] = plots_builder
+_settings["plots_builder"] = plots_builder
 
 generic = dict(
     use_jitted=False,
@@ -672,340 +591,285 @@ generic = dict(
         dict(
             filters=dict(
                 has_mapping=dict(
-                    filter_func=lambda self, metric_settings:
-                    metric_settings.get('mapping', self.mapping) is not None
+                    filter_func=lambda self, metric_settings: metric_settings.get("mapping", self.mapping) is not None,
                 )
             ),
-            settings=dict(
-                incl_all_keys=False
-            )
+            settings=dict(incl_all_keys=False),
         )
     ),
-    plots=Config(  # flex
-        dict()
-    )
+    plots=Config(dict()),  # flex
 )
 """_"""
 
-__pdoc__['generic'] = Sub("""Sub-config with settings applied to `vectorbtpro.generic.accessors.GenericAccessor`.
+__pdoc__["generic"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.generic.accessors.GenericAccessor`.
 
 ```python
 ${config_doc}
-```""")
-
-_settings['generic'] = generic
-
-ranges = dict(
-    stats=Config(  # flex
-        dict()
-    ),
-    plots=Config(  # flex
-        dict()
-    )
+```"""
 )
+
+_settings["generic"] = generic
+
+ranges = dict(stats=Config(dict()), plots=Config(dict()))  # flex  # flex
 """_"""
 
-__pdoc__['ranges'] = Sub("""Sub-config with settings applied to `vectorbtpro.generic.ranges.Ranges`.
+__pdoc__["ranges"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.generic.ranges.Ranges`.
 
 ```python
 ${config_doc}
-```""")
-
-_settings['ranges'] = ranges
-
-drawdowns = dict(
-    stats=Config(  # flex
-        dict(
-            settings=dict(
-                incl_active=False
-            )
-        )
-    ),
-    plots=Config(  # flex
-        dict()
-    )
+```"""
 )
+
+_settings["ranges"] = ranges
+
+drawdowns = dict(stats=Config(dict(settings=dict(incl_active=False))), plots=Config(dict()))  # flex  # flex
 """_"""
 
-__pdoc__['drawdowns'] = Sub("""Sub-config with settings applied to `vectorbtpro.generic.drawdowns.Drawdowns`.
+__pdoc__["drawdowns"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.generic.drawdowns.Drawdowns`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
-_settings['drawdowns'] = drawdowns
+_settings["drawdowns"] = drawdowns
 
 ohlcv = dict(
-    plot_type='OHLC',
-    column_names=dict(
-        open='Open',
-        high='High',
-        low='Low',
-        close='Close',
-        volume='Volume'
-    ),
-    stats=Config(  # flex
-        dict()
-    ),
-    plots=Config(  # flex
-        dict()
-    )
+    plot_type="OHLC",
+    column_names=dict(open="Open", high="High", low="Low", close="Close", volume="Volume"),
+    stats=Config(dict()),  # flex
+    plots=Config(dict()),  # flex
 )
 """_"""
 
-__pdoc__['ohlcv'] = Sub("""Sub-config with settings applied across `vectorbtpro.ohlcv`.
+__pdoc__["ohlcv"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.ohlcv`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
-_settings['ohlcv'] = ohlcv
+_settings["ohlcv"] = ohlcv
 
 signals = dict(
     stats=Config(
         dict(
             filters=dict(
                 silent_has_other=dict(
-                    filter_func=lambda self, metric_settings:
-                    metric_settings.get('other', None) is not None
+                    filter_func=lambda self, metric_settings: metric_settings.get("other", None) is not None,
                 ),
             ),
-            settings=dict(
-                other=None,
-                other_name='Other',
-                from_other=False
-            )
+            settings=dict(other=None, other_name="Other", from_other=False),
         )
     ),  # flex
-    plots=Config(  # flex
-        dict()
-    )
+    plots=Config(dict()),  # flex
 )
 """_"""
 
-__pdoc__['signals'] = Sub("""Sub-config with settings applied to `vectorbtpro.signals.accessors.SignalsAccessor`.
+__pdoc__["signals"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.signals.accessors.SignalsAccessor`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
-_settings['signals'] = signals
+_settings["signals"] = signals
 
 returns = dict(
-    year_freq='365 days',
+    year_freq="365 days",
     bm_returns=None,
     defaults=Config(  # flex
         dict(
-            start_value=0.,
+            start_value=0.0,
             window=10,
             minp=None,
             ddof=1,
-            risk_free=0.,
-            levy_alpha=2.,
-            required_return=0.,
-            cutoff=0.05
+            risk_free=0.0,
+            levy_alpha=2.0,
+            required_return=0.0,
+            cutoff=0.05,
         )
     ),
     stats=Config(  # flex
         dict(
             filters=dict(
                 has_year_freq=dict(
-                    filter_func=lambda self, metric_settings:
-                    self.year_freq is not None,
-                    warning_message=Sub("Metric '$metric_name' requires year frequency to be set")
+                    filter_func=lambda self, metric_settings: self.year_freq is not None,
+                    warning_message=Sub("Metric '$metric_name' requires year frequency to be set"),
                 ),
                 has_bm_returns=dict(
-                    filter_func=lambda self, metric_settings:
-                    metric_settings.get('bm_returns', self.bm_returns) is not None,
-                    warning_message=Sub("Metric '$metric_name' requires bm_returns to be set")
-                )
+                    filter_func=lambda self, metric_settings: metric_settings.get("bm_returns", self.bm_returns)
+                    is not None,
+                    warning_message=Sub("Metric '$metric_name' requires bm_returns to be set"),
+                ),
             ),
-            settings=dict(
-                check_is_not_grouped=True
-            )
+            settings=dict(check_is_not_grouped=True),
         )
     ),
-    plots=Config(  # flex
-        dict()
-    )
+    plots=Config(dict()),  # flex
 )
 """_"""
 
-__pdoc__['returns'] = Sub("""Sub-config with settings applied to `vectorbtpro.returns.accessors.ReturnsAccessor`.
+__pdoc__["returns"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.returns.accessors.ReturnsAccessor`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
-_settings['returns'] = returns
+_settings["returns"] = returns
 
 qs_adapter = dict(
-    defaults=Config(  # flex
-        dict()
-    ),
+    defaults=Config(dict()),  # flex,
 )
 """_"""
 
-__pdoc__['qs_adapter'] = Sub("""Sub-config with settings applied to `vectorbtpro.returns.qs_adapter.QSAdapter`.
+__pdoc__["qs_adapter"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.returns.qs_adapter.QSAdapter`.
 
 ```python
 ${config_doc}
-```""")
-
-_settings['qs_adapter'] = qs_adapter
-
-records = dict(
-    stats=Config(  # flex
-        dict()
-    ),
-    plots=Config(  # flex
-        dict()
-    )
+```"""
 )
+
+_settings["qs_adapter"] = qs_adapter
+
+records = dict(stats=Config(dict()), plots=Config(dict()))  # flex  # flex
 """_"""
 
-__pdoc__['records'] = Sub("""Sub-config with settings applied to `vectorbtpro.records.base.Records`.
+__pdoc__["records"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.records.base.Records`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
-_settings['records'] = records
+_settings["records"] = records
 
 mapped_array = dict(
     stats=Config(  # flex
         dict(
             filters=dict(
                 has_mapping=dict(
-                    filter_func=lambda self, metric_settings:
-                    metric_settings.get('mapping', self.mapping) is not None
+                    filter_func=lambda self, metric_settings: metric_settings.get("mapping", self.mapping) is not None,
                 )
             ),
-            settings=dict(
-                incl_all_keys=False
-            )
+            settings=dict(incl_all_keys=False),
         )
     ),
-    plots=Config(  # flex
-        dict()
-    )
+    plots=Config(dict()),  # flex
 )
 """_"""
 
-__pdoc__['mapped_array'] = Sub("""Sub-config with settings applied to `vectorbtpro.records.mapped_array.MappedArray`.
+__pdoc__["mapped_array"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.records.mapped_array.MappedArray`.
 
 ```python
 ${config_doc}
-```""")
-
-_settings['mapped_array'] = mapped_array
-
-orders = dict(
-    stats=Config(  # flex
-        dict()
-    ),
-    plots=Config(  # flex
-        dict()
-    )
+```"""
 )
+
+_settings["mapped_array"] = mapped_array
+
+orders = dict(stats=Config(dict()), plots=Config(dict()))  # flex  # flex
 """_"""
 
-__pdoc__['orders'] = Sub("""Sub-config with settings applied to `vectorbtpro.portfolio.orders.Orders`.
+__pdoc__["orders"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.portfolio.orders.Orders`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
-_settings['orders'] = orders
+_settings["orders"] = orders
 
 trades = dict(
     stats=Config(  # flex
         dict(
-            settings=dict(
-                incl_open=False
-            ),
-            template_context=dict(
-                incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")
-            )
+            settings=dict(incl_open=False),
+            template_context=dict(incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")),
         )
     ),
-    plots=Config(  # flex
-        dict()
-    )
+    plots=Config(dict()),  # flex
 )
 """_"""
 
-__pdoc__['trades'] = Sub("""Sub-config with settings applied to `vectorbtpro.portfolio.trades.Trades`.
+__pdoc__["trades"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.portfolio.trades.Trades`.
 
 ```python
 ${config_doc}
-```""")
-
-_settings['trades'] = trades
-
-logs = dict(
-    stats=Config(  # flex
-        dict()
-    )
+```"""
 )
+
+_settings["trades"] = trades
+
+logs = dict(stats=Config(dict()))  # flex
 """_"""
 
-__pdoc__['logs'] = Sub("""Sub-config with settings applied to `vectorbtpro.portfolio.logs.Logs`.
+__pdoc__["logs"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.portfolio.logs.Logs`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
-_settings['logs'] = logs
+_settings["logs"] = logs
 
 portfolio = dict(
     # Orders
     size=np.inf,
-    size_type='amount',
-    direction='both',
+    size_type="amount",
+    direction="both",
     price=np.inf,
-    fees=0.,
-    fixed_fees=0.,
-    slippage=0.,
-    reject_prob=0.,
+    fees=0.0,
+    fixed_fees=0.0,
+    slippage=0.0,
+    reject_prob=0.0,
     min_size=1e-8,
     max_size=np.inf,
     size_granularity=np.nan,
-    price_area_vio_mode='ignore',
+    price_area_vio_mode="ignore",
     lock_cash=False,
     allow_partial=True,
     raise_reject=False,
     log=False,
-
     # Signals
-    signal_direction='longonly',
+    signal_direction="longonly",
     accumulate=False,
     sl_stop=np.nan,
     sl_trail=False,
     tp_stop=np.nan,
-    stop_entry_price='close',
-    stop_exit_price='stoplimit',
-    stop_conflict_mode='exit',
-    upon_stop_exit='close',
-    upon_stop_update='override',
-    signal_priority='stop',
+    stop_entry_price="close",
+    stop_exit_price="stoplimit",
+    stop_conflict_mode="exit",
+    upon_stop_exit="close",
+    upon_stop_update="override",
+    signal_priority="stop",
     use_stops=None,
-    upon_long_conflict='ignore',
-    upon_short_conflict='ignore',
-    upon_dir_conflict='ignore',
-    upon_opposite_entry='reversereduce',
-
+    upon_long_conflict="ignore",
+    upon_short_conflict="ignore",
+    upon_dir_conflict="ignore",
+    upon_opposite_entry="reversereduce",
     # Holding
-    hold_direction='longonly',
+    hold_direction="longonly",
     sell_at_end=False,
-    hold_base_method='from_signals',
-
+    hold_base_method="from_signals",
     # Setup
-    init_cash=100.,
-    init_position=0.,
-    cash_deposits=0.,
-    cash_earnings=0.,
-    cash_dividends=0.,
+    init_cash=100.0,
+    init_position=0.0,
+    cash_deposits=0.0,
+    cash_earnings=0.0,
+    cash_dividends=0.0,
     val_price=np.inf,
     cash_sharing=False,
     call_pre_segment=False,
@@ -1019,88 +883,64 @@ portfolio = dict(
     flexible=False,
     seed=None,
     group_by=None,
-    broadcast_kwargs=Config(  # flex
-        dict(
-            require_kwargs=dict(
-                requirements='W'
-            )
-        )
-    ),
-    template_context=Config(  # flex
-        dict()
-    ),
+    broadcast_kwargs=Config(dict(require_kwargs=dict(requirements="W"))),  # flex
+    template_context=Config(dict()),  # flex
     keep_inout_raw=True,
-    call_seq='default',
+    call_seq="default",
     attach_call_seq=False,
     bm_close=None,
-
     # Portfolio
     freq=None,
     use_in_outputs=True,
     fillna_close=True,
-    trades_type='exittrades',
+    trades_type="exittrades",
     stats=Config(  # flex
         dict(
             filters=dict(
                 has_year_freq=dict(
-                    filter_func=lambda self, metric_settings:
-                    metric_settings.get('year_freq', None) is not None,
-                    warning_message=Sub("Metric '$metric_name' requires year frequency to be set")
+                    filter_func=lambda self, metric_settings: metric_settings.get("year_freq", None) is not None,
+                    warning_message=Sub("Metric '$metric_name' requires year frequency to be set"),
                 ),
                 has_bm_returns=dict(
-                    filter_func=lambda self, metric_settings:
-                    metric_settings.get('bm_returns', self.bm_returns) is not None,
-                    warning_message=Sub("Metric '$metric_name' requires bm_returns to be set")
-                )
+                    filter_func=lambda self, metric_settings: metric_settings.get("bm_returns", self.bm_returns)
+                    is not None,
+                    warning_message=Sub("Metric '$metric_name' requires bm_returns to be set"),
+                ),
             ),
-            settings=dict(
-                use_asset_returns=False,
-                incl_open=False
-            ),
-            template_context=dict(
-                incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")
-            )
+            settings=dict(use_asset_returns=False, incl_open=False),
+            template_context=dict(incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")),
         )
     ),
-    plots=Config(  # flex
-        dict(
-            subplots=['orders', 'trade_pnl', 'cum_returns'],
-            settings=dict(
-                use_asset_returns=False
-            )
-        )
-    )
+    plots=Config(dict(subplots=["orders", "trade_pnl", "cum_returns"], settings=dict(use_asset_returns=False))),  # flex
 )
 """_"""
 
-__pdoc__['portfolio'] = Sub("""Sub-config with settings applied to `vectorbtpro.portfolio.base.Portfolio`.
+__pdoc__["portfolio"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.portfolio.base.Portfolio`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
-_settings['portfolio'] = portfolio
+_settings["portfolio"] = portfolio
 
 messaging = dict(
     telegram=Config(  # flex
         dict(
             token=None,
             use_context=True,
-            persistence='telegram_bot.pickle',
-            defaults=Config(  # flex
-                dict()
-            ),
-            drop_pending_updates=True
+            persistence="telegram_bot.pickle",
+            defaults=Config(dict()),  # flex
+            drop_pending_updates=True,
         )
     ),
-    giphy=dict(
-        api_key=None,
-        weirdness=5
-    ),
+    giphy=dict(api_key=None, weirdness=5),
 )
 """_"""
 
-__pdoc__['messaging'] = Sub("""Sub-config with settings applied across `vectorbtpro.messaging`.
+__pdoc__["messaging"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.messaging`.
 
 ```python
 ${config_doc}
@@ -1117,95 +957,86 @@ python-telegram-bot:
 GIPHY:
     Sub-config with settings applied to 
     [GIPHY Translate Endpoint](https://developers.giphy.com/docs/api/endpoint#translate).
-""")
-
-_settings['messaging'] = messaging
-
-pbar = dict(
-    disable=False,
-    type='tqdm_auto',
-    kwargs=Config(  # flex
-        dict()
-    )
+"""
 )
+
+_settings["messaging"] = messaging
+
+pbar = dict(disable=False, type="tqdm_auto", kwargs=Config(dict()))  # flex
 """_"""
 
-__pdoc__['pbar'] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.pbar`.
+__pdoc__["pbar"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.utils.pbar`.
 
 ```python
 ${config_doc}
-```""")
-
-_settings['pbar'] = pbar
-
-path = dict(
-    mkdir=dict(
-        mkdir=False,
-        mode=0o777,
-        parents=True,
-        exist_ok=True
-    )
+```"""
 )
+
+_settings["pbar"] = pbar
+
+path = dict(mkdir=dict(mkdir=False, mode=0o777, parents=True, exist_ok=True))
 """_"""
 
-__pdoc__['path'] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.path_`.
+__pdoc__["path"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.utils.path_`.
 
 ```python
 ${config_doc}
-```""")
+```"""
+)
 
-_settings['path'] = path
+_settings["path"] = path
 
 
 # ############# Settings config ############# #
+
 
 class SettingsConfig(Config):
     """Extends `vectorbtpro.utils.config.Config` for global settings."""
 
     def load_json_templates(self) -> None:
         """Load templates from JSON files."""
-        for template_name in ['light', 'dark', 'seaborn']:
+        for template_name in ["light", "dark", "seaborn"]:
             template = Config(json.loads(pkgutil.get_data(__name__, f"templates/{template_name}.json")))
-            self['plotting']['themes'][template_name]['template'] = template
+            self["plotting"]["themes"][template_name]["template"] = template
 
     def register_template(self, theme: str) -> None:
         """Register template of a theme."""
         import plotly.io as pio
         import plotly.graph_objects as go
 
-        pio.templates['vbt_' + theme] = go.layout.Template(self['plotting']['themes'][theme]['template'])
+        pio.templates["vbt_" + theme] = go.layout.Template(self["plotting"]["themes"][theme]["template"])
 
     def register_templates(self) -> None:
         """Register templates of all themes."""
-        for theme in self['plotting']['themes']:
+        for theme in self["plotting"]["themes"]:
             self.register_template(theme)
 
     def set_theme(self, theme: str) -> None:
         """Set default theme."""
         self.register_template(theme)
-        self['plotting']['color_schema'].update(self['plotting']['themes'][theme]['color_schema'])
-        self['plotting']['layout']['template'] = 'vbt_' + theme
+        self["plotting"]["color_schema"].update(self["plotting"]["themes"][theme]["color_schema"])
+        self["plotting"]["layout"]["template"] = "vbt_" + theme
 
     def reset_theme(self) -> None:
         """Reset to default theme."""
-        self.set_theme('light')
+        self.set_theme("light")
 
     def substitute_sub_config_docs(self, __pdoc__: dict, prettify_kwargs) -> None:
         """Substitute templates in sub-config docs."""
         for k, v in __pdoc__.items():
             if k in self:
                 config_doc = self[k].prettify(**prettify_kwargs.get(k, {}))
-                __pdoc__[k] = deep_substitute(v, context=dict(config_doc=config_doc), sub_id='__pdoc__')
+                __pdoc__[k] = deep_substitute(v, context=dict(config_doc=config_doc), sub_id="__pdoc__")
 
 
 settings = SettingsConfig(
     _settings,
-    reset_dct_copy_kwargs_=dict(
-        copy_mode='deep'
-    ),
+    reset_dct_copy_kwargs_=dict(copy_mode="deep"),
     frozen_keys_=True,
     convert_dicts_=Config,
-    as_attrs_=True
+    as_attrs_=True,
 )
 """Global settings config.
 
@@ -1217,11 +1048,11 @@ try:
 except ImportError:
     pass
 
-if 'VBT_SETTINGS_PATH' in os.environ:
-    settings.load_update(os.environ['VBT_SETTINGS_PATH'], clear=True)
+if "VBT_SETTINGS_PATH" in os.environ:
+    settings.load_update(os.environ["VBT_SETTINGS_PATH"], clear=True)
 
-if 'VBT_SETTINGS_OVERRIDE_PATH' in os.environ:
-    settings.load_update(os.environ['VBT_SETTINGS_OVERRIDE_PATH'], clear=False)
+if "VBT_SETTINGS_OVERRIDE_PATH" in os.environ:
+    settings.load_update(os.environ["VBT_SETTINGS_OVERRIDE_PATH"], clear=False)
 
 try:
     settings.register_templates()
@@ -1235,11 +1066,11 @@ settings.substitute_sub_config_docs(
     prettify_kwargs=dict(
         plotting=dict(
             replace={
-                'settings.plotting.themes.light.template': 'Template(\'templates/light.json\')',
-                'settings.plotting.themes.dark.template': 'Template(\'templates/dark.json\')',
-                'settings.plotting.themes.seaborn.template': 'Template(\'templates/seaborn.json\')'
+                "settings.plotting.themes.light.template": "Template('templates/light.json')",
+                "settings.plotting.themes.dark.template": "Template('templates/dark.json')",
+                "settings.plotting.themes.seaborn.template": "Template('templates/seaborn.json')",
             },
-            path='settings.plotting'
+            path="settings.plotting",
         )
-    )
+    ),
 )

@@ -17,7 +17,7 @@ from vectorbtpro.utils.mapping import to_mapping
 def override_field_config(*args, merge_configs: bool = True) -> tp.FlexClassWrapper:
     """Class decorator to override field configs of all base classes in MRO that subclass
     `vectorbtpro.records.base.Records`.
-    
+
     Instead of overriding `_field_config` class attribute, you can pass `config` directly to this decorator.
 
     Disable `merge_configs` to not merge, which will effectively disable field inheritance."""
@@ -52,7 +52,7 @@ def override_field_config(*args, merge_configs: bool = True) -> tp.FlexClassWrap
     raise ValueError("Either class, config, class and config, or keyword arguments must be passed")
 
 
-def attach_fields(*args, on_conflict: str = 'raise') -> tp.FlexClassWrapper:
+def attach_fields(*args, on_conflict: str = "raise") -> tp.FlexClassWrapper:
     """Class decorator to attach field properties in a `vectorbtpro.records.base.Records` class.
 
     Will extract `dtype` and other relevant information from `vectorbtpro.records.base.Records.field_config`
@@ -87,7 +87,7 @@ def attach_fields(*args, on_conflict: str = 'raise') -> tp.FlexClassWrapper:
     def wrapper(cls: tp.Type[tp.T], config: tp.DictLike = None) -> tp.Type[tp.T]:
         checks.assert_subclass_of(cls, "Records")
 
-        dtype = cls.field_config.get('dtype', None)
+        dtype = cls.field_config.get("dtype", None)
         checks.assert_not_none(dtype.fields)
 
         if config is None:
@@ -95,25 +95,25 @@ def attach_fields(*args, on_conflict: str = 'raise') -> tp.FlexClassWrapper:
 
         def _prepare_attr_name(attr_name: str) -> str:
             checks.assert_instance_of(attr_name, str)
-            attr_name = attr_name.replace('NaN', 'Nan')
-            startswith_ = attr_name.startswith('_')
+            attr_name = attr_name.replace("NaN", "Nan")
+            startswith_ = attr_name.startswith("_")
             attr_name = re.sub(r"([A-Z])", r"_\1", attr_name)
-            if not startswith_ and attr_name.startswith('_'):
+            if not startswith_ and attr_name.startswith("_"):
                 attr_name = attr_name[1:]
             attr_name = attr_name.lower()
             if keyword.iskeyword(attr_name):
-                attr_name += '_'
+                attr_name += "_"
             return attr_name
 
         def _check_attr_name(attr_name, _on_conflict: str = on_conflict) -> None:
-            if attr_name not in cls.field_config.get('settings', {}):
+            if attr_name not in cls.field_config.get("settings", {}):
                 # Consider only attributes that are not listed in the field config
                 if hasattr(cls, attr_name):
-                    if _on_conflict.lower() == 'raise':
+                    if _on_conflict.lower() == "raise":
                         raise ValueError(f"An attribute with the name '{attr_name}' already exists in {cls}")
-                    if _on_conflict.lower() == 'ignore':
+                    if _on_conflict.lower() == "ignore":
                         return
-                    if _on_conflict.lower() == 'override':
+                    if _on_conflict.lower() == "override":
                         return
                     raise ValueError(f"Value '{_on_conflict}' is invalid for on_conflict")
                 if keyword.iskeyword(attr_name):
@@ -122,28 +122,30 @@ def attach_fields(*args, on_conflict: str = 'raise') -> tp.FlexClassWrapper:
         if dtype is not None:
             for field_name in dtype.names:
                 settings = config.get(field_name, {})
-                attach = settings.get('attach', True)
+                attach = settings.get("attach", True)
                 if not isinstance(attach, bool):
                     target_name = attach
                     attach = True
                 else:
                     target_name = field_name
-                defaults = settings.get('defaults', None)
+                defaults = settings.get("defaults", None)
                 if defaults is None:
                     defaults = {}
-                attach_filters = settings.get('attach_filters', False)
-                filter_defaults = settings.get('filter_defaults', None)
+                attach_filters = settings.get("attach_filters", False)
+                filter_defaults = settings.get("filter_defaults", None)
                 if filter_defaults is None:
                     filter_defaults = {}
-                _on_conflict = settings.get('on_conflict', on_conflict)
+                _on_conflict = settings.get("on_conflict", on_conflict)
 
                 if attach:
                     target_name = _prepare_attr_name(target_name)
                     _check_attr_name(target_name, _on_conflict)
 
-                    def new_prop(self,
-                                 _field_name: str = field_name,
-                                 _defaults: tp.KwargsLike = defaults) -> MappedArray:
+                    def new_prop(
+                        self,
+                        _field_name: str = field_name,
+                        _defaults: tp.KwargsLike = defaults,
+                    ) -> MappedArray:
                         return self.get_map_field(_field_name, **_defaults)
 
                     new_prop.__doc__ = f"Mapped array of the field `{field_name}`."
@@ -154,10 +156,7 @@ def attach_fields(*args, on_conflict: str = 'raise') -> tp.FlexClassWrapper:
                     if isinstance(attach_filters, bool):
                         if not attach_filters:
                             continue
-                        mapping = cls.field_config \
-                            .get('settings', {}) \
-                            .get(field_name, {}) \
-                            .get('mapping', None)
+                        mapping = cls.field_config.get("settings", {}).get(field_name, {}).get("mapping", None)
                     else:
                         mapping = attach_filters
                     if mapping is None:
@@ -174,10 +173,12 @@ def attach_fields(*args, on_conflict: str = 'raise') -> tp.FlexClassWrapper:
                         else:
                             __filter_defaults = filter_defaults
 
-                        def new_filter_prop(self,
-                                            _field_name: str = field_name,
-                                            _filter_value: tp.Any = filter_value,
-                                            _filter_defaults: tp.KwargsLike = __filter_defaults) -> MappedArray:
+                        def new_filter_prop(
+                            self,
+                            _field_name: str = field_name,
+                            _filter_value: tp.Any = filter_value,
+                            _filter_defaults: tp.KwargsLike = __filter_defaults,
+                        ) -> MappedArray:
                             filter_mask = self.get_field_arr(_field_name) == _filter_value
                             return self.apply_mask(filter_mask, **_filter_defaults)
 
@@ -221,24 +222,24 @@ def attach_shortcut_properties(config: Config) -> tp.ClassWrapper:
         checks.assert_subclass_of(cls, "Records")
 
         for target_name, settings in config.items():
-            if target_name.startswith('get_'):
+            if target_name.startswith("get_"):
                 raise ValueError(f"Property names cannot have prefix 'get_' ('{target_name}')")
-            method_name = settings.get('method_name', 'get_' + target_name)
-            obj_type = settings.get('obj_type', 'records')
-            group_by_aware = settings.get('group_by_aware', True)
-            method_kwargs = settings.get('method_kwargs', None)
+            method_name = settings.get("method_name", "get_" + target_name)
+            obj_type = settings.get("obj_type", "records")
+            group_by_aware = settings.get("group_by_aware", True)
+            method_kwargs = settings.get("method_kwargs", None)
             method_kwargs = resolve_dict(method_kwargs)
-            decorator = settings.get('decorator', None)
+            decorator = settings.get("decorator", None)
             if decorator is None:
-                if obj_type in ('red_array', 'records'):
+                if obj_type in ("red_array", "records"):
                     decorator = cached_property
                 else:
                     decorator = cacheable_property
             decorator_kwargs = merge_dicts(
                 dict(obj_type=obj_type, group_by_aware=group_by_aware),
-                settings.get('decorator_kwargs', None)
+                settings.get("decorator_kwargs", None),
             )
-            docstring = settings.get('docstring', None)
+            docstring = settings.get("docstring", None)
             if docstring is None:
                 if len(method_kwargs) == 0:
                     docstring = f"`{cls.__name__}.{method_name}` with default arguments."

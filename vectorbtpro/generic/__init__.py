@@ -16,7 +16,7 @@ __blacklist__ = []
 try:
     import plotly
 except ImportError:
-    __blacklist__.append('plotting')
+    __blacklist__.append("plotting")
 else:
     from vectorbtpro.generic.plotting import Gauge, Bar, Scatter, Histogram, Box, Heatmap, Volume
 

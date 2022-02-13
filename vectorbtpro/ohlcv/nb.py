@@ -31,15 +31,11 @@ def vwap_1d_nb(high: tp.Array1d, low: tp.Array1d, volume: tp.Array1d) -> tp.Arra
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query='high', axis=1),
-    arg_take_spec=dict(
-        high=ch.ArraySlicer(axis=1),
-        low=ch.ArraySlicer(axis=1),
-        volume=ch.ArraySlicer(axis=1)
-    ),
-    merge_func=base_ch.column_stack
+    size=ch.ArraySizer(arg_query="high", axis=1),
+    arg_take_spec=dict(high=ch.ArraySlicer(axis=1), low=ch.ArraySlicer(axis=1), volume=ch.ArraySlicer(axis=1)),
+    merge_func=base_ch.column_stack,
 )
-@register_jitted(cache=True, tags={'can_parallel'})
+@register_jitted(cache=True, tags={"can_parallel"})
 def vwap_nb(high: tp.Array2d, low: tp.Array2d, volume: tp.Array2d) -> tp.Array2d:
     """2-dim version of `vwap_1d_nb`."""
     out = np.empty_like(high, dtype=np.float_)

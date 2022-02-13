@@ -9,32 +9,22 @@ from vectorbtpro.base.indexing import flex_select_auto_nb
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.portfolio.enums import *
 from vectorbtpro.registries.jit_registry import register_jitted
-from vectorbtpro.utils.math_ import (
-    is_close_nb,
-    is_close_or_less_nb,
-    is_less_nb,
-    add_nb
-)
+from vectorbtpro.utils.math_ import is_close_nb, is_close_or_less_nb, is_less_nb, add_nb
 
 
 @register_jitted(cache=True)
 def order_not_filled_nb(status: int, status_info: int) -> OrderResult:
     """Return `OrderResult` for order that hasn't been filled."""
-    return OrderResult(
-        size=np.nan,
-        price=np.nan,
-        fees=np.nan,
-        side=-1,
-        status=status,
-        status_info=status_info
-    )
+    return OrderResult(size=np.nan, price=np.nan, fees=np.nan, side=-1, status=status, status_info=status_info)
 
 
 @register_jitted(cache=True)
-def check_adj_price_nb(adj_price: float,
-                       price_area: PriceArea,
-                       is_closing_price: bool,
-                       price_area_vio_mode: int) -> float:
+def check_adj_price_nb(
+    adj_price: float,
+    price_area: PriceArea,
+    is_closing_price: bool,
+    price_area_vio_mode: int,
+) -> float:
     """Check whether adjusted price is within price boundaries."""
     if price_area_vio_mode == PriceAreaVioMode.Ignore:
         return adj_price
@@ -57,22 +47,24 @@ def check_adj_price_nb(adj_price: float,
 
 
 @register_jitted(cache=True)
-def buy_nb(exec_state: ExecuteOrderState,
-           size: float,
-           price: float,
-           direction: int = Direction.Both,
-           fees: float = 0.,
-           fixed_fees: float = 0.,
-           slippage: float = 0.,
-           min_size: float = 0.,
-           max_size: float = np.inf,
-           size_granularity: float = np.nan,
-           price_area_vio_mode: int = PriceAreaVioMode.Ignore,
-           lock_cash: bool = False,
-           allow_partial: bool = True,
-           percent: float = np.nan,
-           price_area: PriceArea = NoPriceArea,
-           is_closing_price: bool = False) -> tp.Tuple[ExecuteOrderState, OrderResult]:
+def buy_nb(
+    exec_state: ExecuteOrderState,
+    size: float,
+    price: float,
+    direction: int = Direction.Both,
+    fees: float = 0.0,
+    fixed_fees: float = 0.0,
+    slippage: float = 0.0,
+    min_size: float = 0.0,
+    max_size: float = np.inf,
+    size_granularity: float = np.nan,
+    price_area_vio_mode: int = PriceAreaVioMode.Ignore,
+    lock_cash: bool = False,
+    allow_partial: bool = True,
+    percent: float = np.nan,
+    price_area: PriceArea = NoPriceArea,
+    is_closing_price: bool = False,
+) -> tp.Tuple[ExecuteOrderState, OrderResult]:
     """Buy or/and cover."""
 
     # Get price adjusted with slippage
@@ -94,7 +86,7 @@ def buy_nb(exec_state: ExecuteOrderState,
             elif cover_free_cash < 0:
                 # Not enough cash to close out the short position
                 avg_entry_price = exec_state.debt / abs(exec_state.position)
-                max_short_size = ((exec_state.free_cash - fixed_fees) / (adj_price * (1 + fees) - 2 * avg_entry_price))
+                max_short_size = (exec_state.free_cash - fixed_fees) / (adj_price * (1 + fees) - 2 * avg_entry_price)
                 cash_limit = max_short_size * adj_price * (1 + fees) + fixed_fees
             else:
                 # Exact amount of cash to close out the short position
@@ -198,40 +190,30 @@ def buy_nb(exec_state: ExecuteOrderState,
         new_free_cash = add_nb(exec_state.free_cash, -final_req_cash)
 
     # Return filled order
-    order_result = OrderResult(
-        final_size,
-        adj_price,
-        fees_paid,
-        OrderSide.Buy,
-        OrderStatus.Filled,
-        -1
-    )
-    new_exec_state = ExecuteOrderState(
-        cash=new_cash,
-        position=new_position,
-        debt=new_debt,
-        free_cash=new_free_cash
-    )
+    order_result = OrderResult(final_size, adj_price, fees_paid, OrderSide.Buy, OrderStatus.Filled, -1)
+    new_exec_state = ExecuteOrderState(cash=new_cash, position=new_position, debt=new_debt, free_cash=new_free_cash)
     return new_exec_state, order_result
 
 
 @register_jitted(cache=True)
-def sell_nb(exec_state: ExecuteOrderState,
-            size: float,
-            price: float,
-            direction: int = Direction.Both,
-            fees: float = 0.,
-            fixed_fees: float = 0.,
-            slippage: float = 0.,
-            min_size: float = 0.,
-            max_size: float = np.inf,
-            size_granularity: float = np.nan,
-            price_area_vio_mode: int = PriceAreaVioMode.Ignore,
-            lock_cash: bool = False,
-            allow_partial: bool = True,
-            percent: float = np.nan,
-            price_area: PriceArea = NoPriceArea,
-            is_closing_price: bool = False) -> tp.Tuple[ExecuteOrderState, OrderResult]:
+def sell_nb(
+    exec_state: ExecuteOrderState,
+    size: float,
+    price: float,
+    direction: int = Direction.Both,
+    fees: float = 0.0,
+    fixed_fees: float = 0.0,
+    slippage: float = 0.0,
+    min_size: float = 0.0,
+    max_size: float = np.inf,
+    size_granularity: float = np.nan,
+    price_area_vio_mode: int = PriceAreaVioMode.Ignore,
+    lock_cash: bool = False,
+    allow_partial: bool = True,
+    percent: float = np.nan,
+    price_area: PriceArea = NoPriceArea,
+    is_closing_price: bool = False,
+) -> tp.Tuple[ExecuteOrderState, OrderResult]:
     """Sell or/and short sell."""
 
     # Get price adjusted with slippage
@@ -341,27 +323,17 @@ def sell_nb(exec_state: ExecuteOrderState,
         new_free_cash = exec_state.free_cash + final_acq_cash
 
     # Return filled order
-    order_result = OrderResult(
-        size_limit,
-        adj_price,
-        fees_paid,
-        OrderSide.Sell,
-        OrderStatus.Filled,
-        -1
-    )
-    new_exec_state = ExecuteOrderState(
-        cash=new_cash,
-        position=new_position,
-        debt=new_debt,
-        free_cash=new_free_cash
-    )
+    order_result = OrderResult(size_limit, adj_price, fees_paid, OrderSide.Sell, OrderStatus.Filled, -1)
+    new_exec_state = ExecuteOrderState(cash=new_cash, position=new_position, debt=new_debt, free_cash=new_free_cash)
     return new_exec_state, order_result
 
 
 @register_jitted(cache=True)
-def execute_order_nb(state: ProcessOrderState,
-                     order: Order,
-                     price_area: PriceArea = NoPriceArea) -> tp.Tuple[ExecuteOrderState, OrderResult]:
+def execute_order_nb(
+    state: ProcessOrderState,
+    order: Order,
+    price_area: PriceArea = NoPriceArea,
+) -> tp.Tuple[ExecuteOrderState, OrderResult]:
     """Execute an order given the current state.
 
     Args:
@@ -376,30 +348,25 @@ def execute_order_nb(state: ProcessOrderState,
     # numerical stability
     cash = state.cash
     if is_close_nb(cash, 0):
-        cash = 0.
+        cash = 0.0
     position = state.position
     if is_close_nb(position, 0):
-        position = 0.
+        position = 0.0
     debt = state.debt
     if is_close_nb(debt, 0):
-        debt = 0.
+        debt = 0.0
     free_cash = state.free_cash
     if is_close_nb(free_cash, 0):
-        free_cash = 0.
+        free_cash = 0.0
     val_price = state.val_price
     if is_close_nb(val_price, 0):
-        val_price = 0.
+        val_price = 0.0
     value = state.value
     if is_close_nb(value, 0):
-        value = 0.
+        value = 0.0
 
     # Pre-fill execution state for convenience
-    exec_state = ExecuteOrderState(
-        cash=cash,
-        position=position,
-        debt=debt,
-        free_cash=free_cash
-    )
+    exec_state = ExecuteOrderState(cash=cash, position=position, debt=debt, free_cash=free_cash)
 
     # Check price area
     if np.isinf(price_area.open) or price_area.open < 0:
@@ -502,7 +469,7 @@ def execute_order_nb(state: ProcessOrderState,
         if order.direction == Direction.ShortOnly or order.direction == Direction.Both:
             if order_size < 0 and np.isinf(order_size):
                 # Infinite negative size has a special meaning: 100% to short
-                order_size = -1.
+                order_size = -1.0
                 order_size_type = SizeType.Percent
 
     percent = np.nan
@@ -529,7 +496,7 @@ def execute_order_nb(state: ProcessOrderState,
             allow_partial=order.allow_partial,
             percent=percent,
             price_area=price_area,
-            is_closing_price=is_closing_price
+            is_closing_price=is_closing_price,
         )
     else:
         new_exec_state, order_result = sell_nb(
@@ -548,7 +515,7 @@ def execute_order_nb(state: ProcessOrderState,
             allow_partial=order.allow_partial,
             percent=percent,
             price_area=price_area,
-            is_closing_price=is_closing_price
+            is_closing_price=is_closing_price,
         )
 
     if order.reject_prob > 0:
@@ -559,79 +526,77 @@ def execute_order_nb(state: ProcessOrderState,
 
 
 @register_jitted(cache=True)
-def fill_log_record_nb(records: tp.RecordArray2d,
-                       r: int,
-                       group: int,
-                       col: int,
-                       i: int,
-                       price_area: PriceArea,
-                       state: ProcessOrderState,
-                       order: Order,
-                       new_state: ProcessOrderState,
-                       order_result: OrderResult,
-                       order_id: int) -> None:
+def fill_log_record_nb(
+    records: tp.RecordArray2d,
+    r: int,
+    group: int,
+    col: int,
+    i: int,
+    price_area: PriceArea,
+    state: ProcessOrderState,
+    order: Order,
+    new_state: ProcessOrderState,
+    order_result: OrderResult,
+    order_id: int,
+) -> None:
     """Fill a log record."""
 
-    records['id'][r, col] = r
-    records['group'][r, col] = group
-    records['col'][r, col] = col
-    records['idx'][r, col] = i
-    records['open'][r, col] = price_area.open
-    records['high'][r, col] = price_area.high
-    records['low'][r, col] = price_area.low
-    records['close'][r, col] = price_area.close
-    records['cash'][r, col] = state.cash
-    records['position'][r, col] = state.position
-    records['debt'][r, col] = state.debt
-    records['free_cash'][r, col] = state.free_cash
-    records['val_price'][r, col] = state.val_price
-    records['value'][r, col] = state.value
-    records['req_size'][r, col] = order.size
-    records['req_price'][r, col] = order.price
-    records['req_size_type'][r, col] = order.size_type
-    records['req_direction'][r, col] = order.direction
-    records['req_fees'][r, col] = order.fees
-    records['req_fixed_fees'][r, col] = order.fixed_fees
-    records['req_slippage'][r, col] = order.slippage
-    records['req_min_size'][r, col] = order.min_size
-    records['req_max_size'][r, col] = order.max_size
-    records['req_size_granularity'][r, col] = order.size_granularity
-    records['req_reject_prob'][r, col] = order.reject_prob
-    records['req_price_area_vio_mode'][r, col] = order.price_area_vio_mode
-    records['req_lock_cash'][r, col] = order.lock_cash
-    records['req_allow_partial'][r, col] = order.allow_partial
-    records['req_raise_reject'][r, col] = order.raise_reject
-    records['req_log'][r, col] = order.log
-    records['new_cash'][r, col] = new_state.cash
-    records['new_position'][r, col] = new_state.position
-    records['new_debt'][r, col] = new_state.debt
-    records['new_free_cash'][r, col] = new_state.free_cash
-    records['new_val_price'][r, col] = new_state.val_price
-    records['new_value'][r, col] = new_state.value
-    records['res_size'][r, col] = order_result.size
-    records['res_price'][r, col] = order_result.price
-    records['res_fees'][r, col] = order_result.fees
-    records['res_side'][r, col] = order_result.side
-    records['res_status'][r, col] = order_result.status
-    records['res_status_info'][r, col] = order_result.status_info
-    records['order_id'][r, col] = order_id
+    records["id"][r, col] = r
+    records["group"][r, col] = group
+    records["col"][r, col] = col
+    records["idx"][r, col] = i
+    records["open"][r, col] = price_area.open
+    records["high"][r, col] = price_area.high
+    records["low"][r, col] = price_area.low
+    records["close"][r, col] = price_area.close
+    records["cash"][r, col] = state.cash
+    records["position"][r, col] = state.position
+    records["debt"][r, col] = state.debt
+    records["free_cash"][r, col] = state.free_cash
+    records["val_price"][r, col] = state.val_price
+    records["value"][r, col] = state.value
+    records["req_size"][r, col] = order.size
+    records["req_price"][r, col] = order.price
+    records["req_size_type"][r, col] = order.size_type
+    records["req_direction"][r, col] = order.direction
+    records["req_fees"][r, col] = order.fees
+    records["req_fixed_fees"][r, col] = order.fixed_fees
+    records["req_slippage"][r, col] = order.slippage
+    records["req_min_size"][r, col] = order.min_size
+    records["req_max_size"][r, col] = order.max_size
+    records["req_size_granularity"][r, col] = order.size_granularity
+    records["req_reject_prob"][r, col] = order.reject_prob
+    records["req_price_area_vio_mode"][r, col] = order.price_area_vio_mode
+    records["req_lock_cash"][r, col] = order.lock_cash
+    records["req_allow_partial"][r, col] = order.allow_partial
+    records["req_raise_reject"][r, col] = order.raise_reject
+    records["req_log"][r, col] = order.log
+    records["new_cash"][r, col] = new_state.cash
+    records["new_position"][r, col] = new_state.position
+    records["new_debt"][r, col] = new_state.debt
+    records["new_free_cash"][r, col] = new_state.free_cash
+    records["new_val_price"][r, col] = new_state.val_price
+    records["new_value"][r, col] = new_state.value
+    records["res_size"][r, col] = order_result.size
+    records["res_price"][r, col] = order_result.price
+    records["res_fees"][r, col] = order_result.fees
+    records["res_side"][r, col] = order_result.side
+    records["res_status"][r, col] = order_result.status
+    records["res_status_info"][r, col] = order_result.status_info
+    records["order_id"][r, col] = order_id
 
 
 @register_jitted(cache=True)
-def fill_order_record_nb(records: tp.RecordArray2d,
-                         r: int,
-                         col: int,
-                         i: int,
-                         order_result: OrderResult) -> None:
+def fill_order_record_nb(records: tp.RecordArray2d, r: int, col: int, i: int, order_result: OrderResult) -> None:
     """Fill an order record."""
 
-    records['id'][r, col] = r
-    records['col'][r, col] = col
-    records['idx'][r, col] = i
-    records['size'][r, col] = order_result.size
-    records['price'][r, col] = order_result.price
-    records['fees'][r, col] = order_result.fees
-    records['side'][r, col] = order_result.side
+    records["id"][r, col] = r
+    records["col"][r, col] = col
+    records["idx"][r, col] = i
+    records["size"][r, col] = order_result.size
+    records["price"][r, col] = order_result.price
+    records["fees"][r, col] = order_result.fees
+    records["side"][r, col] = order_result.side
 
 
 @register_jitted(cache=True)
@@ -670,49 +635,49 @@ def raise_rejected_order_nb(order_result: OrderResult) -> None:
 
 
 @register_jitted(cache=True)
-def update_value_nb(cash_before: float,
-                    cash_now: float,
-                    position_before: float,
-                    position_now: float,
-                    val_price_before: float,
-                    price: float,
-                    value_before: float) -> tp.Tuple[float, float]:
+def update_value_nb(
+    cash_before: float,
+    cash_now: float,
+    position_before: float,
+    position_now: float,
+    val_price_before: float,
+    price: float,
+    value_before: float,
+) -> tp.Tuple[float, float]:
     """Update valuation price and value."""
     val_price_now = price
     cash_flow = cash_now - cash_before
     if position_before != 0:
         asset_value_before = position_before * val_price_before
     else:
-        asset_value_before = 0.
+        asset_value_before = 0.0
     if position_now != 0:
         asset_value_now = position_now * val_price_now
     else:
-        asset_value_now = 0.
+        asset_value_now = 0.0
     asset_value_diff = asset_value_now - asset_value_before
     value_now = value_before + cash_flow + asset_value_diff
     return val_price_now, value_now
 
 
 @register_jitted(cache=True)
-def process_order_nb(group: int,
-                     col: int,
-                     i: int,
-                     price_area: PriceArea,
-                     state: ProcessOrderState,
-                     update_value: bool,
-                     order: Order,
-                     order_records: tp.RecordArray2d,
-                     last_oidx: tp.Array1d,
-                     log_records: tp.RecordArray2d,
-                     last_lidx: tp.Array1d) -> tp.Tuple[OrderResult, ProcessOrderState]:
+def process_order_nb(
+    group: int,
+    col: int,
+    i: int,
+    price_area: PriceArea,
+    state: ProcessOrderState,
+    update_value: bool,
+    order: Order,
+    order_records: tp.RecordArray2d,
+    last_oidx: tp.Array1d,
+    log_records: tp.RecordArray2d,
+    last_lidx: tp.Array1d,
+) -> tp.Tuple[OrderResult, ProcessOrderState]:
     """Process an order by executing it, saving relevant information to the logs, and returning a new state."""
 
     # Execute the order
-    exec_state, order_result = execute_order_nb(
-        state=state,
-        order=order,
-        price_area=price_area
-    )
+    exec_state, order_result = execute_order_nb(state=state, order=order, price_area=price_area)
 
     # Raise if order rejected
     is_rejected = order_result.status == OrderStatus.Rejected
@@ -729,7 +694,7 @@ def process_order_nb(group: int,
             exec_state.position,
             state.val_price,
             order_result.price,
-            state.value
+            state.value,
         )
     else:
         new_val_price = state.val_price
@@ -739,13 +704,7 @@ def process_order_nb(group: int,
         # Fill order record
         if last_oidx[col] >= order_records.shape[0] - 1:
             raise IndexError("order_records index out of range. Set a higher max_orders.")
-        fill_order_record_nb(
-            order_records,
-            last_oidx[col] + 1,
-            col,
-            i,
-            order_result
-        )
+        fill_order_record_nb(order_records, last_oidx[col] + 1, col, i, order_result)
         last_oidx[col] += 1
 
     # Create new state
@@ -755,7 +714,7 @@ def process_order_nb(group: int,
         debt=exec_state.debt,
         free_cash=exec_state.free_cash,
         val_price=new_val_price,
-        value=new_value
+        value=new_value,
     )
 
     if order.log and log_records.shape[0] > 0:
@@ -773,7 +732,7 @@ def process_order_nb(group: int,
             order,
             new_state,
             order_result,
-            last_oidx[col] if is_filled else -1
+            last_oidx[col] if is_filled else -1,
         )
         last_lidx[col] += 1
 
@@ -781,22 +740,24 @@ def process_order_nb(group: int,
 
 
 @register_jitted(cache=True)
-def order_nb(size: float = np.inf,
-             price: float = np.inf,
-             size_type: int = SizeType.Amount,
-             direction: int = Direction.Both,
-             fees: float = 0.,
-             fixed_fees: float = 0.,
-             slippage: float = 0.,
-             min_size: float = 0.,
-             max_size: float = np.inf,
-             size_granularity: float = np.nan,
-             reject_prob: float = 0.,
-             price_area_vio_mode: int = PriceAreaVioMode.Ignore,
-             lock_cash: bool = False,
-             allow_partial: bool = True,
-             raise_reject: bool = False,
-             log: bool = False) -> Order:
+def order_nb(
+    size: float = np.inf,
+    price: float = np.inf,
+    size_type: int = SizeType.Amount,
+    direction: int = Direction.Both,
+    fees: float = 0.0,
+    fixed_fees: float = 0.0,
+    slippage: float = 0.0,
+    min_size: float = 0.0,
+    max_size: float = np.inf,
+    size_granularity: float = np.nan,
+    reject_prob: float = 0.0,
+    price_area_vio_mode: int = PriceAreaVioMode.Ignore,
+    lock_cash: bool = False,
+    allow_partial: bool = True,
+    raise_reject: bool = False,
+    log: bool = False,
+) -> Order:
     """Create an order.
 
     See `vectorbtpro.portfolio.enums.Order` for details on arguments."""
@@ -817,28 +778,30 @@ def order_nb(size: float = np.inf,
         lock_cash=bool(lock_cash),
         allow_partial=bool(allow_partial),
         raise_reject=bool(raise_reject),
-        log=bool(log)
+        log=bool(log),
     )
 
 
 @register_jitted(cache=True)
-def close_position_nb(price: float = np.inf,
-                      fees: float = 0.,
-                      fixed_fees: float = 0.,
-                      slippage: float = 0.,
-                      min_size: float = 0.,
-                      max_size: float = np.inf,
-                      size_granularity: float = np.nan,
-                      reject_prob: float = 0.,
-                      price_area_vio_mode: int = PriceAreaVioMode.Ignore,
-                      lock_cash: bool = False,
-                      allow_partial: bool = True,
-                      raise_reject: bool = False,
-                      log: bool = False) -> Order:
+def close_position_nb(
+    price: float = np.inf,
+    fees: float = 0.0,
+    fixed_fees: float = 0.0,
+    slippage: float = 0.0,
+    min_size: float = 0.0,
+    max_size: float = np.inf,
+    size_granularity: float = np.nan,
+    reject_prob: float = 0.0,
+    price_area_vio_mode: int = PriceAreaVioMode.Ignore,
+    lock_cash: bool = False,
+    allow_partial: bool = True,
+    raise_reject: bool = False,
+    log: bool = False,
+) -> Order:
     """Close the current position."""
 
     return order_nb(
-        size=0.,
+        size=0.0,
         price=price,
         size_type=SizeType.TargetAmount,
         direction=Direction.Both,
@@ -853,7 +816,7 @@ def close_position_nb(price: float = np.inf,
         lock_cash=lock_cash,
         allow_partial=allow_partial,
         raise_reject=raise_reject,
-        log=log
+        log=log,
     )
 
 
@@ -877,11 +840,13 @@ def is_grouped_nb(group_lens: tp.Array1d) -> bool:
 
 
 @register_jitted(cache=True)
-def get_group_value_nb(from_col: int,
-                       to_col: int,
-                       cash_now: float,
-                       last_position: tp.Array1d,
-                       last_val_price: tp.Array1d) -> float:
+def get_group_value_nb(
+    from_col: int,
+    to_col: int,
+    cash_now: float,
+    last_position: tp.Array1d,
+    last_val_price: tp.Array1d,
+) -> float:
     """Get group value."""
     group_value = cash_now
     group_len = to_col - from_col
@@ -893,14 +858,16 @@ def get_group_value_nb(from_col: int,
 
 
 @register_jitted(cache=True)
-def approx_order_value_nb(size: float,
-                          size_type: int,
-                          direction: int,
-                          cash_now: float,
-                          position_now: float,
-                          free_cash_now: float,
-                          val_price_now: float,
-                          value_now: float) -> float:
+def approx_order_value_nb(
+    size: float,
+    size_type: int,
+    direction: int,
+    cash_now: float,
+    position_now: float,
+    free_cash_now: float,
+    val_price_now: float,
+    value_now: float,
+) -> float:
     """Approximate value of an order."""
     if direction == Direction.ShortOnly:
         size *= -1
@@ -926,9 +893,11 @@ def approx_order_value_nb(size: float,
 
 
 @register_jitted(cache=True)
-def prepare_records_nb(target_shape: tp.Shape,
-                       max_orders: tp.Optional[int] = None,
-                       max_logs: tp.Optional[int] = 0) -> tp.Tuple[tp.RecordArray2d, tp.RecordArray2d]:
+def prepare_records_nb(
+    target_shape: tp.Shape,
+    max_orders: tp.Optional[int] = None,
+    max_logs: tp.Optional[int] = 0,
+) -> tp.Tuple[tp.RecordArray2d, tp.RecordArray2d]:
     """Prepare records."""
     if max_orders is None:
         order_records = np.empty((target_shape[0], target_shape[1]), dtype=order_dt)
@@ -942,10 +911,12 @@ def prepare_records_nb(target_shape: tp.Shape,
 
 
 @register_jitted(cache=True)
-def prepare_last_cash_nb(target_shape: tp.Shape,
-                         group_lens: tp.Array1d,
-                         cash_sharing: bool,
-                         init_cash: tp.FlexArray) -> tp.Array1d:
+def prepare_last_cash_nb(
+    target_shape: tp.Shape,
+    group_lens: tp.Array1d,
+    cash_sharing: bool,
+    init_cash: tp.FlexArray,
+) -> tp.Array1d:
     """Prepare `last_cash`."""
     if cash_sharing:
         last_cash = np.empty(len(group_lens), dtype=np.float_)
@@ -968,11 +939,13 @@ def prepare_last_position_nb(target_shape: tp.Shape, init_position: tp.FlexArray
 
 
 @register_jitted(cache=True)
-def prepare_last_value_nb(target_shape: tp.Shape,
-                          group_lens: tp.Array1d,
-                          cash_sharing: bool,
-                          init_cash: tp.FlexArray,
-                          init_position: tp.FlexArray) -> tp.Array1d:
+def prepare_last_value_nb(
+    target_shape: tp.Shape,
+    group_lens: tp.Array1d,
+    cash_sharing: bool,
+    init_cash: tp.FlexArray,
+    init_position: tp.FlexArray,
+) -> tp.Array1d:
     """Prepare `last_value`."""
     if cash_sharing:
         last_value = np.empty(len(group_lens), dtype=np.float_)
@@ -1000,12 +973,14 @@ def prepare_last_value_nb(target_shape: tp.Shape,
 
 
 @register_jitted(cache=True)
-def prepare_last_pos_record_nb(target_shape: tp.Shape,
-                               init_position: tp.FlexArray,
-                               fill_pos_record: bool) -> tp.RecordArray:
+def prepare_last_pos_record_nb(
+    target_shape: tp.Shape,
+    init_position: tp.FlexArray,
+    fill_pos_record: bool,
+) -> tp.RecordArray:
     """Prepare `last_pos_record`."""
     last_pos_record = np.empty(target_shape[1], dtype=trade_dt)
-    last_pos_record['id'][:] = -1
+    last_pos_record["id"][:] = -1
     if fill_pos_record:
         for col in range(target_shape[1]):
             _init_position = float(flex_select_auto_nb(init_position, 0, col, True))
@@ -1015,13 +990,15 @@ def prepare_last_pos_record_nb(target_shape: tp.Shape,
 
 
 @register_jitted
-def prepare_simout_nb(order_records: tp.RecordArray2d,
-                      last_oidx: tp.Array1d,
-                      log_records: tp.RecordArray2d,
-                      last_lidx: tp.Array1d,
-                      cash_earnings: tp.Array2d,
-                      call_seq: tp.Optional[tp.Array2d] = None,
-                      in_outputs: tp.Optional[tp.NamedTuple] = None) -> SimulationOutput:
+def prepare_simout_nb(
+    order_records: tp.RecordArray2d,
+    last_oidx: tp.Array1d,
+    log_records: tp.RecordArray2d,
+    last_lidx: tp.Array1d,
+    cash_earnings: tp.Array2d,
+    call_seq: tp.Optional[tp.Array2d] = None,
+    in_outputs: tp.Optional[tp.NamedTuple] = None,
+) -> SimulationOutput:
     """Prepare simulation output."""
     if order_records.shape[0] > 0:
         order_records_repart = generic_nb.repartition_nb(order_records, last_oidx + 1)
@@ -1036,17 +1013,19 @@ def prepare_simout_nb(order_records: tp.RecordArray2d,
         log_records=log_records_repart,
         cash_earnings=cash_earnings,
         call_seq=call_seq,
-        in_outputs=in_outputs
+        in_outputs=in_outputs,
     )
 
 
 @register_jitted(cache=True)
-def get_trade_stats_nb(size: float,
-                       entry_price: float,
-                       entry_fees: float,
-                       exit_price: float,
-                       exit_fees: float,
-                       direction: int) -> tp.Tuple[float, float]:
+def get_trade_stats_nb(
+    size: float,
+    entry_price: float,
+    entry_fees: float,
+    exit_price: float,
+    exit_fees: float,
+    direction: int,
+) -> tp.Tuple[float, float]:
     """Get trade statistics."""
     entry_val = size * entry_price
     exit_val = size * exit_price
@@ -1064,146 +1043,140 @@ def get_trade_stats_nb(size: float,
 @register_jitted(cache=True)
 def update_open_pos_stats_nb(record: tp.Record, position_now: float, price: float) -> None:
     """Update statistics of an open position record using custom price."""
-    if record['id'] >= 0 and record['status'] == TradeStatus.Open:
-        if record['entry_idx'] == -1 and np.isnan(record['entry_price']):
-            record['entry_price'] = price
-        if np.isnan(record['exit_price']):
+    if record["id"] >= 0 and record["status"] == TradeStatus.Open:
+        if record["entry_idx"] == -1 and np.isnan(record["entry_price"]):
+            record["entry_price"] = price
+        if np.isnan(record["exit_price"]):
             exit_price = price
         else:
-            exit_size_sum = record['size'] - abs(position_now)
-            exit_gross_sum = exit_size_sum * record['exit_price']
+            exit_size_sum = record["size"] - abs(position_now)
+            exit_gross_sum = exit_size_sum * record["exit_price"]
             exit_gross_sum += abs(position_now) * price
-            exit_price = exit_gross_sum / record['size']
+            exit_price = exit_gross_sum / record["size"]
         pnl, ret = get_trade_stats_nb(
-            record['size'],
-            record['entry_price'],
-            record['entry_fees'],
+            record["size"],
+            record["entry_price"],
+            record["entry_fees"],
             exit_price,
-            record['exit_fees'],
-            record['direction']
+            record["exit_fees"],
+            record["direction"],
         )
-        record['pnl'] = pnl
-        record['return'] = ret
+        record["pnl"] = pnl
+        record["return"] = ret
 
 
 @register_jitted(cache=True)
 def fill_init_pos_record_nb(record: tp.Record, col: int, position_now: float) -> None:
     """Fill position record for an initial position."""
-    record['id'] = 0
-    record['col'] = col
-    record['size'] = abs(position_now)
-    record['entry_idx'] = -1
-    record['entry_price'] = np.nan
-    record['entry_fees'] = 0.
-    record['exit_idx'] = -1
-    record['exit_price'] = np.nan
-    record['exit_fees'] = 0.
+    record["id"] = 0
+    record["col"] = col
+    record["size"] = abs(position_now)
+    record["entry_idx"] = -1
+    record["entry_price"] = np.nan
+    record["entry_fees"] = 0.0
+    record["exit_idx"] = -1
+    record["exit_price"] = np.nan
+    record["exit_fees"] = 0.0
     if position_now >= 0:
-        record['direction'] = TradeDirection.Long
+        record["direction"] = TradeDirection.Long
     else:
-        record['direction'] = TradeDirection.Short
-    record['status'] = TradeStatus.Open
-    record['parent_id'] = record['id']
+        record["direction"] = TradeDirection.Short
+    record["status"] = TradeStatus.Open
+    record["parent_id"] = record["id"]
 
     # Update open position stats
-    update_open_pos_stats_nb(
-        record,
-        position_now,
-        np.nan
-    )
+    update_open_pos_stats_nb(record, position_now, np.nan)
 
 
 @register_jitted(cache=True)
-def update_pos_record_nb(record: tp.Record,
-                         i: int,
-                         col: int,
-                         position_before: float,
-                         position_now: float,
-                         order_result: OrderResult) -> None:
+def update_pos_record_nb(
+    record: tp.Record,
+    i: int,
+    col: int,
+    position_before: float,
+    position_now: float,
+    order_result: OrderResult,
+) -> None:
     """Update position record after filling an order."""
     if order_result.status == OrderStatus.Filled:
         if position_before == 0 and position_now != 0:
             # New position opened
-            record['id'] += 1
-            record['col'] = col
-            record['size'] = order_result.size
-            record['entry_idx'] = i
-            record['entry_price'] = order_result.price
-            record['entry_fees'] = order_result.fees
-            record['exit_idx'] = -1
-            record['exit_price'] = np.nan
-            record['exit_fees'] = 0.
+            record["id"] += 1
+            record["col"] = col
+            record["size"] = order_result.size
+            record["entry_idx"] = i
+            record["entry_price"] = order_result.price
+            record["entry_fees"] = order_result.fees
+            record["exit_idx"] = -1
+            record["exit_price"] = np.nan
+            record["exit_fees"] = 0.0
             if order_result.side == OrderSide.Buy:
-                record['direction'] = TradeDirection.Long
+                record["direction"] = TradeDirection.Long
             else:
-                record['direction'] = TradeDirection.Short
-            record['status'] = TradeStatus.Open
-            record['parent_id'] = record['id']
+                record["direction"] = TradeDirection.Short
+            record["status"] = TradeStatus.Open
+            record["parent_id"] = record["id"]
         elif position_before != 0 and position_now == 0:
             # Position closed
-            record['exit_idx'] = i
-            if np.isnan(record['exit_price']):
+            record["exit_idx"] = i
+            if np.isnan(record["exit_price"]):
                 exit_price = order_result.price
             else:
-                exit_size_sum = record['size'] - abs(position_before)
-                exit_gross_sum = exit_size_sum * record['exit_price']
+                exit_size_sum = record["size"] - abs(position_before)
+                exit_gross_sum = exit_size_sum * record["exit_price"]
                 exit_gross_sum += abs(position_before) * order_result.price
-                exit_price = exit_gross_sum / record['size']
-            record['exit_price'] = exit_price
-            record['exit_fees'] += order_result.fees
+                exit_price = exit_gross_sum / record["size"]
+            record["exit_price"] = exit_price
+            record["exit_fees"] += order_result.fees
             pnl, ret = get_trade_stats_nb(
-                record['size'],
-                record['entry_price'],
-                record['entry_fees'],
-                record['exit_price'],
-                record['exit_fees'],
-                record['direction']
+                record["size"],
+                record["entry_price"],
+                record["entry_fees"],
+                record["exit_price"],
+                record["exit_fees"],
+                record["direction"],
             )
-            record['pnl'] = pnl
-            record['return'] = ret
-            record['status'] = TradeStatus.Closed
+            record["pnl"] = pnl
+            record["return"] = ret
+            record["status"] = TradeStatus.Closed
         elif np.sign(position_before) != np.sign(position_now):
             # Position reversed
-            record['id'] += 1
-            record['size'] = abs(position_now)
-            record['entry_idx'] = i
-            record['entry_price'] = order_result.price
+            record["id"] += 1
+            record["size"] = abs(position_now)
+            record["entry_idx"] = i
+            record["entry_price"] = order_result.price
             new_pos_fraction = abs(position_now) / abs(position_now - position_before)
-            record['entry_fees'] = new_pos_fraction * order_result.fees
-            record['exit_idx'] = -1
-            record['exit_price'] = np.nan
-            record['exit_fees'] = 0.
+            record["entry_fees"] = new_pos_fraction * order_result.fees
+            record["exit_idx"] = -1
+            record["exit_price"] = np.nan
+            record["exit_fees"] = 0.0
             if order_result.side == OrderSide.Buy:
-                record['direction'] = TradeDirection.Long
+                record["direction"] = TradeDirection.Long
             else:
-                record['direction'] = TradeDirection.Short
-            record['status'] = TradeStatus.Open
-            record['parent_id'] = record['id']
+                record["direction"] = TradeDirection.Short
+            record["status"] = TradeStatus.Open
+            record["parent_id"] = record["id"]
         else:
             # Position changed
             if abs(position_before) <= abs(position_now):
                 # Position increased
-                entry_gross_sum = record['size'] * record['entry_price']
+                entry_gross_sum = record["size"] * record["entry_price"]
                 entry_gross_sum += order_result.size * order_result.price
-                entry_price = entry_gross_sum / (record['size'] + order_result.size)
-                record['entry_price'] = entry_price
-                record['entry_fees'] += order_result.fees
-                record['size'] += order_result.size
+                entry_price = entry_gross_sum / (record["size"] + order_result.size)
+                record["entry_price"] = entry_price
+                record["entry_fees"] += order_result.fees
+                record["size"] += order_result.size
             else:
                 # Position decreased
-                if np.isnan(record['exit_price']):
+                if np.isnan(record["exit_price"]):
                     exit_price = order_result.price
                 else:
-                    exit_size_sum = record['size'] - abs(position_before)
-                    exit_gross_sum = exit_size_sum * record['exit_price']
+                    exit_size_sum = record["size"] - abs(position_before)
+                    exit_gross_sum = exit_size_sum * record["exit_price"]
                     exit_gross_sum += order_result.size * order_result.price
                     exit_price = exit_gross_sum / (exit_size_sum + order_result.size)
-                record['exit_price'] = exit_price
-                record['exit_fees'] += order_result.fees
+                record["exit_price"] = exit_price
+                record["exit_fees"] += order_result.fees
 
         # Update open position stats
-        update_open_pos_stats_nb(
-            record,
-            position_now,
-            order_result.price
-        )
+        update_open_pos_stats_nb(record, position_now, order_result.price)

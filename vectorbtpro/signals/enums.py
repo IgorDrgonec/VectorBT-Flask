@@ -7,10 +7,7 @@ Defines enums and other schemas for `vectorbtpro.signals`."""
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.formatting import prettify
 
-__all__ = [
-    'StopType',
-    'FactoryMode'
-]
+__all__ = ["StopType", "FactoryMode"]
 
 __pdoc__ = {}
 
@@ -27,7 +24,9 @@ class StopTypeT(tp.NamedTuple):
 StopType = StopTypeT()
 """_"""
 
-__pdoc__['StopType'] = f"""Stop type.
+__pdoc__[
+    "StopType"
+] = f"""Stop type.
 
 ```python
 {prettify(StopType)}
@@ -45,7 +44,9 @@ class FactoryModeT(tp.NamedTuple):
 FactoryMode = FactoryModeT()
 """_"""
 
-__pdoc__['FactoryMode'] = f"""Factory mode.
+__pdoc__[
+    "FactoryMode"
+] = f"""Factory mode.
 
 ```python
 {prettify(FactoryMode)}

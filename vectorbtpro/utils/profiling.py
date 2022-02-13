@@ -55,8 +55,8 @@ class Timer:
         elapsed = self.end_time - self.start_time
         elapsed_delta = timedelta(seconds=elapsed)
         if readable:
-            if 'minimum_unit' not in kwargs:
-                kwargs['minimum_unit'] = 'seconds' if elapsed >= 1 else 'milliseconds'
+            if "minimum_unit" not in kwargs:
+                kwargs["minimum_unit"] = "seconds" if elapsed >= 1 else "milliseconds"
             return humanize.precisedelta(elapsed_delta, **kwargs)
         return elapsed_delta
 

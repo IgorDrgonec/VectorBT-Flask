@@ -12,7 +12,7 @@ on using Plotly, see [Getting Started with Plotly in Python](https://plotly.com/
 
 from vectorbtpro.utils.opt_packages import assert_can_import
 
-assert_can_import('plotly')
+assert_can_import("plotly")
 
 import math
 
@@ -63,15 +63,17 @@ class TraceUpdater:
 
 
 class Gauge(Configured, TraceUpdater):
-    def __init__(self,
-                 value: tp.Optional[float] = None,
-                 label: tp.Optional[str] = None,
-                 value_range: tp.Optional[tp.Tuple[float, float]] = None,
-                 cmap_name: str = 'Spectral',
-                 trace_kwargs: tp.KwargsLike = None,
-                 add_trace_kwargs: tp.KwargsLike = None,
-                 fig: tp.Optional[tp.BaseFigure] = None,
-                 **layout_kwargs) -> None:
+    def __init__(
+        self,
+        value: tp.Optional[float] = None,
+        label: tp.Optional[str] = None,
+        value_range: tp.Optional[tp.Tuple[float, float]] = None,
+        cmap_name: str = "Spectral",
+        trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs
+    ) -> None:
         """Create a gauge plot.
 
         Args:
@@ -113,7 +115,8 @@ class Gauge(Configured, TraceUpdater):
         )
 
         from vectorbtpro._settings import settings
-        layout_cfg = settings['plotting']['layout']
+
+        layout_cfg = settings["plotting"]["layout"]
 
         if trace_kwargs is None:
             trace_kwargs = {}
@@ -122,20 +125,12 @@ class Gauge(Configured, TraceUpdater):
 
         if fig is None:
             fig = make_figure()
-            if 'width' in layout_cfg:
+            if "width" in layout_cfg:
                 # Calculate nice width and height
-                fig.update_layout(
-                    width=layout_cfg['width'] * 0.7,
-                    height=layout_cfg['width'] * 0.5,
-                    margin=dict(t=80)
-                )
+                fig.update_layout(width=layout_cfg["width"] * 0.7, height=layout_cfg["width"] * 0.5, margin=dict(t=80))
         fig.update_layout(**layout_kwargs)
 
-        indicator = go.Indicator(
-            domain=dict(x=[0, 1], y=[0, 1]),
-            mode="gauge+number+delta",
-            title=dict(text=label)
-        )
+        indicator = go.Indicator(domain=dict(x=[0, 1], y=[0, 1]), mode="gauge+number+delta", title=dict(text=label))
         indicator.update(**trace_kwargs)
         fig.add_trace(indicator, **add_trace_kwargs)
 
@@ -173,14 +168,16 @@ class Gauge(Configured, TraceUpdater):
 
 
 class Bar(Configured, TraceUpdater):
-    def __init__(self,
-                 data: tp.Optional[tp.ArrayLike] = None,
-                 trace_names: tp.TraceNames = None,
-                 x_labels: tp.Optional[tp.Labels] = None,
-                 trace_kwargs: tp.KwargsLikeSequence = None,
-                 add_trace_kwargs: tp.KwargsLike = None,
-                 fig: tp.Optional[tp.BaseFigure] = None,
-                 **layout_kwargs) -> None:
+    def __init__(
+        self,
+        data: tp.Optional[tp.ArrayLike] = None,
+        trace_names: tp.TraceNames = None,
+        x_labels: tp.Optional[tp.Labels] = None,
+        trace_kwargs: tp.KwargsLikeSequence = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs
+    ) -> None:
         """Create a bar plot.
 
         Args:
@@ -245,18 +242,14 @@ class Bar(Configured, TraceUpdater):
 
         for i, trace_name in enumerate(trace_names):
             _trace_kwargs = resolve_dict(trace_kwargs, i=i)
-            trace_name = _trace_kwargs.pop('name', trace_name)
+            trace_name = _trace_kwargs.pop("name", trace_name)
             if trace_name is not None:
                 trace_name = str(trace_name)
-            bar = go.Bar(
-                x=x_labels,
-                name=trace_name,
-                showlegend=trace_name is not None
-            )
+            bar = go.Bar(x=x_labels, name=trace_name, showlegend=trace_name is not None)
             bar.update(**_trace_kwargs)
             fig.add_trace(bar, **add_trace_kwargs)
 
-        TraceUpdater.__init__(self, fig, fig.data[-len(trace_names):])
+        TraceUpdater.__init__(self, fig, fig.data[-len(trace_names) :])
 
         if data is not None:
             self.update(data)
@@ -281,15 +274,17 @@ class Bar(Configured, TraceUpdater):
 
 
 class Scatter(Configured, TraceUpdater):
-    def __init__(self,
-                 data: tp.Optional[tp.ArrayLike] = None,
-                 trace_names: tp.TraceNames = None,
-                 x_labels: tp.Optional[tp.Labels] = None,
-                 trace_kwargs: tp.KwargsLikeSequence = None,
-                 add_trace_kwargs: tp.KwargsLike = None,
-                 fig: tp.Optional[tp.BaseFigure] = None,
-                 use_gl: tp.Optional[bool] = None,
-                 **layout_kwargs) -> None:
+    def __init__(
+        self,
+        data: tp.Optional[tp.ArrayLike] = None,
+        trace_names: tp.TraceNames = None,
+        x_labels: tp.Optional[tp.Labels] = None,
+        trace_kwargs: tp.KwargsLikeSequence = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        use_gl: tp.Optional[bool] = None,
+        **layout_kwargs
+    ) -> None:
         """Create a scatter plot.
 
         Args:
@@ -335,7 +330,8 @@ class Scatter(Configured, TraceUpdater):
         )
 
         from vectorbtpro._settings import settings
-        plotting_cfg = settings['plotting']
+
+        plotting_cfg = settings["plotting"]
 
         if trace_kwargs is None:
             trace_kwargs = {}
@@ -355,7 +351,7 @@ class Scatter(Configured, TraceUpdater):
         if x_labels is not None:
             x_labels = clean_labels(x_labels)
         if use_gl is None:
-            use_gl = plotting_cfg['use_gl']
+            use_gl = plotting_cfg["use_gl"]
         if use_gl is None:
             use_gl = use_gl is None and data is not None and data.size >= 10000
 
@@ -365,22 +361,18 @@ class Scatter(Configured, TraceUpdater):
 
         for i, trace_name in enumerate(trace_names):
             _trace_kwargs = resolve_dict(trace_kwargs, i=i)
-            trace_name = _trace_kwargs.pop('name', trace_name)
+            trace_name = _trace_kwargs.pop("name", trace_name)
             if trace_name is not None:
                 trace_name = str(trace_name)
             if use_gl:
                 scatter_obj = go.Scattergl
             else:
                 scatter_obj = go.Scatter
-            scatter = scatter_obj(
-                x=x_labels,
-                name=trace_name,
-                showlegend=trace_name is not None
-            )
+            scatter = scatter_obj(x=x_labels, name=trace_name, showlegend=trace_name is not None)
             scatter.update(**_trace_kwargs)
             fig.add_trace(scatter, **add_trace_kwargs)
 
-        TraceUpdater.__init__(self, fig, fig.data[-len(trace_names):])
+        TraceUpdater.__init__(self, fig, fig.data[-len(trace_names) :])
 
         if data is not None:
             self.update(data)
@@ -395,17 +387,19 @@ class Scatter(Configured, TraceUpdater):
 
 
 class Histogram(Configured, TraceUpdater):
-    def __init__(self,
-                 data: tp.Optional[tp.ArrayLike] = None,
-                 trace_names: tp.TraceNames = None,
-                 horizontal: bool = False,
-                 remove_nan: bool = True,
-                 from_quantile: tp.Optional[float] = None,
-                 to_quantile: tp.Optional[float] = None,
-                 trace_kwargs: tp.KwargsLikeSequence = None,
-                 add_trace_kwargs: tp.KwargsLike = None,
-                 fig: tp.Optional[tp.BaseFigure] = None,
-                 **layout_kwargs) -> None:
+    def __init__(
+        self,
+        data: tp.Optional[tp.ArrayLike] = None,
+        trace_names: tp.TraceNames = None,
+        horizontal: bool = False,
+        remove_nan: bool = True,
+        from_quantile: tp.Optional[float] = None,
+        to_quantile: tp.Optional[float] = None,
+        trace_kwargs: tp.KwargsLikeSequence = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs
+    ) -> None:
         """Create a histogram plot.
 
         Args:
@@ -473,23 +467,23 @@ class Histogram(Configured, TraceUpdater):
 
         if fig is None:
             fig = make_figure()
-            fig.update_layout(barmode='overlay')
+            fig.update_layout(barmode="overlay")
         fig.update_layout(**layout_kwargs)
 
         for i, trace_name in enumerate(trace_names):
             _trace_kwargs = resolve_dict(trace_kwargs, i=i)
-            trace_name = _trace_kwargs.pop('name', trace_name)
+            trace_name = _trace_kwargs.pop("name", trace_name)
             if trace_name is not None:
                 trace_name = str(trace_name)
             hist = go.Histogram(
                 opacity=0.75 if len(trace_names) > 1 else 1,
                 name=trace_name,
-                showlegend=trace_name is not None
+                showlegend=trace_name is not None,
             )
             hist.update(**_trace_kwargs)
             fig.add_trace(hist, **add_trace_kwargs)
 
-        TraceUpdater.__init__(self, fig, fig.data[-len(trace_names):])
+        TraceUpdater.__init__(self, fig, fig.data[-len(trace_names) :])
         self._horizontal = horizontal
         self._remove_nan = remove_nan
         self._from_quantile = from_quantile
@@ -542,17 +536,19 @@ class Histogram(Configured, TraceUpdater):
 
 
 class Box(Configured, TraceUpdater):
-    def __init__(self,
-                 data: tp.Optional[tp.ArrayLike] = None,
-                 trace_names: tp.TraceNames = None,
-                 horizontal: bool = False,
-                 remove_nan: bool = True,
-                 from_quantile: tp.Optional[float] = None,
-                 to_quantile: tp.Optional[float] = None,
-                 trace_kwargs: tp.KwargsLikeSequence = None,
-                 add_trace_kwargs: tp.KwargsLike = None,
-                 fig: tp.Optional[tp.BaseFigure] = None,
-                 **layout_kwargs) -> None:
+    def __init__(
+        self,
+        data: tp.Optional[tp.ArrayLike] = None,
+        trace_names: tp.TraceNames = None,
+        horizontal: bool = False,
+        remove_nan: bool = True,
+        from_quantile: tp.Optional[float] = None,
+        to_quantile: tp.Optional[float] = None,
+        trace_kwargs: tp.KwargsLikeSequence = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs
+    ) -> None:
         """Create a box plot.
 
         For keyword arguments, see `Histogram`.
@@ -606,17 +602,14 @@ class Box(Configured, TraceUpdater):
 
         for i, trace_name in enumerate(trace_names):
             _trace_kwargs = resolve_dict(trace_kwargs, i=i)
-            trace_name = _trace_kwargs.pop('name', trace_name)
+            trace_name = _trace_kwargs.pop("name", trace_name)
             if trace_name is not None:
                 trace_name = str(trace_name)
-            box = go.Box(
-                name=trace_name,
-                showlegend=trace_name is not None
-            )
+            box = go.Box(name=trace_name, showlegend=trace_name is not None)
             box.update(**_trace_kwargs)
             fig.add_trace(box, **add_trace_kwargs)
 
-        TraceUpdater.__init__(self, fig, fig.data[-len(trace_names):])
+        TraceUpdater.__init__(self, fig, fig.data[-len(trace_names) :])
         self._horizontal = horizontal
         self._remove_nan = remove_nan
         self._from_quantile = from_quantile
@@ -669,16 +662,18 @@ class Box(Configured, TraceUpdater):
 
 
 class Heatmap(Configured, TraceUpdater):
-    def __init__(self,
-                 data: tp.Optional[tp.ArrayLike] = None,
-                 x_labels: tp.Optional[tp.Labels] = None,
-                 y_labels: tp.Optional[tp.Labels] = None,
-                 is_x_category: bool = False,
-                 is_y_category: bool = False,
-                 trace_kwargs: tp.KwargsLike = None,
-                 add_trace_kwargs: tp.KwargsLike = None,
-                 fig: tp.Optional[tp.BaseFigure] = None,
-                 **layout_kwargs) -> None:
+    def __init__(
+        self,
+        data: tp.Optional[tp.ArrayLike] = None,
+        x_labels: tp.Optional[tp.Labels] = None,
+        y_labels: tp.Optional[tp.Labels] = None,
+        is_x_category: bool = False,
+        is_y_category: bool = False,
+        trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs
+    ) -> None:
         """Create a heatmap plot.
 
         Args:
@@ -720,7 +715,8 @@ class Heatmap(Configured, TraceUpdater):
         )
 
         from vectorbtpro._settings import settings
-        layout_cfg = settings['plotting']['layout']
+
+        layout_cfg = settings["plotting"]["layout"]
 
         if trace_kwargs is None:
             trace_kwargs = {}
@@ -742,52 +738,36 @@ class Heatmap(Configured, TraceUpdater):
 
         if fig is None:
             fig = make_figure()
-            if 'width' in layout_cfg:
+            if "width" in layout_cfg:
                 # Calculate nice width and height
-                max_width = layout_cfg['width']
+                max_width = layout_cfg["width"]
                 if data is not None:
                     x_len = data.shape[1]
                     y_len = data.shape[0]
                 else:
                     x_len = len(x_labels)
                     y_len = len(y_labels)
-                width = math.ceil(renormalize(
-                    x_len / (x_len + y_len),
-                    (0, 1),
-                    (0.3 * max_width, max_width)
-                ))
+                width = math.ceil(renormalize(x_len / (x_len + y_len), (0, 1), (0.3 * max_width, max_width)))
                 width = min(width + 150, max_width)  # account for colorbar
-                height = math.ceil(renormalize(
-                    y_len / (x_len + y_len),
-                    (0, 1),
-                    (0.3 * max_width, max_width)
-                ))
+                height = math.ceil(renormalize(y_len / (x_len + y_len), (0, 1), (0.3 * max_width, max_width)))
                 height = min(height, max_width * 0.7)  # limit height
-                fig.update_layout(
-                    width=width,
-                    height=height
-                )
+                fig.update_layout(width=width, height=height)
 
-        heatmap = go.Heatmap(
-            hoverongaps=False,
-            colorscale='Plasma',
-            x=x_labels,
-            y=y_labels
-        )
+        heatmap = go.Heatmap(hoverongaps=False, colorscale="Plasma", x=x_labels, y=y_labels)
         heatmap.update(**trace_kwargs)
         fig.add_trace(heatmap, **add_trace_kwargs)
 
         axis_kwargs = dict()
         if is_x_category:
-            if fig.data[-1]['xaxis'] is not None:
-                axis_kwargs['xaxis' + fig.data[-1]['xaxis'][1:]] = dict(type='category')
+            if fig.data[-1]["xaxis"] is not None:
+                axis_kwargs["xaxis" + fig.data[-1]["xaxis"][1:]] = dict(type="category")
             else:
-                axis_kwargs['xaxis'] = dict(type='category')
+                axis_kwargs["xaxis"] = dict(type="category")
         if is_y_category:
-            if fig.data[-1]['yaxis'] is not None:
-                axis_kwargs['yaxis' + fig.data[-1]['yaxis'][1:]] = dict(type='category')
+            if fig.data[-1]["yaxis"] is not None:
+                axis_kwargs["yaxis" + fig.data[-1]["yaxis"][1:]] = dict(type="category")
             else:
-                axis_kwargs['yaxis'] = dict(type='category')
+                axis_kwargs["yaxis"] = dict(type="category")
         fig.update_layout(**axis_kwargs)
         fig.update_layout(**layout_kwargs)
 
@@ -805,16 +785,18 @@ class Heatmap(Configured, TraceUpdater):
 
 
 class Volume(Configured, TraceUpdater):
-    def __init__(self,
-                 data: tp.Optional[tp.ArrayLike] = None,
-                 x_labels: tp.Optional[tp.Labels] = None,
-                 y_labels: tp.Optional[tp.Labels] = None,
-                 z_labels: tp.Optional[tp.Labels] = None,
-                 trace_kwargs: tp.KwargsLike = None,
-                 add_trace_kwargs: tp.KwargsLike = None,
-                 scene_name: str = 'scene',
-                 fig: tp.Optional[tp.BaseFigure] = None,
-                 **layout_kwargs) -> None:
+    def __init__(
+        self,
+        data: tp.Optional[tp.ArrayLike] = None,
+        x_labels: tp.Optional[tp.Labels] = None,
+        y_labels: tp.Optional[tp.Labels] = None,
+        z_labels: tp.Optional[tp.Labels] = None,
+        trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        scene_name: str = "scene",
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs
+    ) -> None:
         """Create a volume plot.
 
         Args:
@@ -864,7 +846,8 @@ class Volume(Configured, TraceUpdater):
         )
 
         from vectorbtpro._settings import settings
-        layout_cfg = settings['plotting']['layout']
+
+        layout_cfg = settings["plotting"]["layout"]
 
         if trace_kwargs is None:
             trace_kwargs = {}
@@ -904,12 +887,9 @@ class Volume(Configured, TraceUpdater):
 
         if fig is None:
             fig = make_figure()
-            if 'width' in layout_cfg:
+            if "width" in layout_cfg:
                 # Calculate nice width and height
-                fig.update_layout(
-                    width=layout_cfg['width'],
-                    height=0.7 * layout_cfg['width']
-                )
+                fig.update_layout(width=layout_cfg["width"], height=0.7 * layout_cfg["width"])
 
         # Non-numeric data types are not supported by go.Volume, so use ticktext
         # Note: Currently plotly displays the entire tick array, in future versions it will be more sensible
@@ -917,33 +897,15 @@ class Volume(Configured, TraceUpdater):
         if not np.issubdtype(x_labels.dtype, np.number):
             x_ticktext = x_labels
             x_labels = np.arange(x_len)
-            more_layout[scene_name] = dict(
-                xaxis=dict(
-                    ticktext=x_ticktext,
-                    tickvals=x_labels,
-                    tickmode='array'
-                )
-            )
+            more_layout[scene_name] = dict(xaxis=dict(ticktext=x_ticktext, tickvals=x_labels, tickmode="array"))
         if not np.issubdtype(y_labels.dtype, np.number):
             y_ticktext = y_labels
             y_labels = np.arange(y_len)
-            more_layout[scene_name] = dict(
-                yaxis=dict(
-                    ticktext=y_ticktext,
-                    tickvals=y_labels,
-                    tickmode='array'
-                )
-            )
+            more_layout[scene_name] = dict(yaxis=dict(ticktext=y_ticktext, tickvals=y_labels, tickmode="array"))
         if not np.issubdtype(z_labels.dtype, np.number):
             z_ticktext = z_labels
             z_labels = np.arange(z_len)
-            more_layout[scene_name] = dict(
-                zaxis=dict(
-                    ticktext=z_ticktext,
-                    tickvals=z_labels,
-                    tickmode='array'
-                )
-            )
+            more_layout[scene_name] = dict(zaxis=dict(ticktext=z_ticktext, tickvals=z_labels, tickmode="array"))
         fig.update_layout(**more_layout)
         fig.update_layout(**layout_kwargs)
 
@@ -952,14 +914,7 @@ class Volume(Configured, TraceUpdater):
         y = np.tile(np.repeat(y_labels, len(z_labels)), len(x_labels))
         z = np.tile(z_labels, len(x_labels) * len(y_labels))
 
-        volume = go.Volume(
-            x=x,
-            y=y,
-            z=z,
-            opacity=0.2,
-            surface_count=15,  # keep low for big data
-            colorscale='Plasma'
-        )
+        volume = go.Volume(x=x, y=y, z=z, opacity=0.2, surface_count=15, colorscale="Plasma")  # keep low for big data
         volume.update(**trace_kwargs)
         fig.add_trace(volume, **add_trace_kwargs)
 

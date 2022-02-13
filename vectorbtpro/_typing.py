@@ -32,14 +32,14 @@ if TYPE_CHECKING:
     from vectorbtpro.utils.chunking import Sizer, ChunkTaker, ChunkMeta, ChunkMetaGenerator
     from vectorbtpro.utils.jitting import Jitter
 else:
-    Regex = 'Regex'
-    ExecutionEngine = 'ExecutionEngine'
-    Sizer = 'Sizer'
-    ChunkTaker = 'ChunkTaker'
-    ChunkMeta = 'ChunkMeta'
-    ChunkMetaGenerator = 'ChunkMetaGenerator'
-    TraceUpdater = 'TraceUpdater'
-    Jitter = 'Jitter'
+    Regex = "Regex"
+    ExecutionEngine = "ExecutionEngine"
+    Sizer = "Sizer"
+    ChunkTaker = "ChunkTaker"
+    ChunkMeta = "ChunkMeta"
+    ChunkMetaGenerator = "ChunkMetaGenerator"
+    TraceUpdater = "TraceUpdater"
+    Jitter = "Jitter"
 
 # Generic types
 T = TypeVar("T")
@@ -67,7 +67,8 @@ SetLike = Union[None, Set[T]]
 
 # Arrays
 class SupportsArray(Protocol):
-    def __array__(self) -> np.ndarray: ...
+    def __array__(self) -> np.ndarray:
+        ...
 
 
 DTypeLike = Any

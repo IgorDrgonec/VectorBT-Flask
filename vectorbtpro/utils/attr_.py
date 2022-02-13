@@ -25,11 +25,13 @@ def get_dict_attr(obj: tp.Union[object, type], attr: str) -> tp.Any:
     raise AttributeError
 
 
-def default_getattr_func(obj: tp.Any,
-                         attr: str,
-                         args: tp.Optional[tp.Args] = None,
-                         kwargs: tp.Optional[tp.Kwargs] = None,
-                         call_attr: bool = True) -> tp.Any:
+def default_getattr_func(
+    obj: tp.Any,
+    attr: str,
+    args: tp.Optional[tp.Args] = None,
+    kwargs: tp.Optional[tp.Kwargs] = None,
+    call_attr: bool = True,
+) -> tp.Any:
     """Default `getattr_func`."""
     if args is None:
         args = ()
@@ -41,10 +43,12 @@ def default_getattr_func(obj: tp.Any,
     return out
 
 
-def deep_getattr(obj: tp.Any,
-                 attr_chain: tp.Union[str, tuple, Iterable],
-                 getattr_func: tp.Callable = default_getattr_func,
-                 call_last_attr: bool = True) -> tp.Any:
+def deep_getattr(
+    obj: tp.Any,
+    attr_chain: tp.Union[str, tuple, Iterable],
+    getattr_func: tp.Callable = default_getattr_func,
+    call_last_attr: bool = True,
+) -> tp.Any:
     """Retrieve attribute consecutively.
 
     The attribute chain `attr_chain` can be:
@@ -64,62 +68,46 @@ def deep_getattr(obj: tp.Any,
     checks.assert_instance_of(attr_chain, (str, tuple, Iterable))
 
     if isinstance(attr_chain, str):
-        if '.' in attr_chain:
-            return deep_getattr(
-                obj,
-                attr_chain.split('.'),
-                getattr_func=getattr_func,
-                call_last_attr=call_last_attr
-            )
+        if "." in attr_chain:
+            return deep_getattr(obj, attr_chain.split("."), getattr_func=getattr_func, call_last_attr=call_last_attr)
         outer = re.compile(r"(\w+)\((.*)\)")
         match = outer.match(attr_chain)
         if isinstance(attr_chain, str) and match:
             args = ()
             kwargs = dict()
-            for arg in match.group(2).split(','):
+            for arg in match.group(2).split(","):
                 arg = arg.strip()
                 if len(arg) == 0:
                     continue
-                if '=' in arg:
-                    kwargs[arg.split('=')[0]] = eval(arg.split('=')[1])
+                if "=" in arg:
+                    kwargs[arg.split("=")[0]] = eval(arg.split("=")[1])
                 else:
                     args += (eval(arg),)
             return deep_getattr(
                 obj,
                 (match.group(1), args, kwargs),
                 getattr_func=getattr_func,
-                call_last_attr=call_last_attr
+                call_last_attr=call_last_attr,
             )
         return getattr_func(obj, attr_chain, call_attr=call_last_attr)
     if isinstance(attr_chain, tuple):
-        if len(attr_chain) == 1 \
-                and isinstance(attr_chain[0], str):
+        if len(attr_chain) == 1 and isinstance(attr_chain[0], str):
             return getattr_func(obj, attr_chain[0])
-        if len(attr_chain) == 2 \
-                and isinstance(attr_chain[0], str) \
-                and isinstance(attr_chain[1], tuple):
+        if len(attr_chain) == 2 and isinstance(attr_chain[0], str) and isinstance(attr_chain[1], tuple):
             return getattr_func(obj, attr_chain[0], args=attr_chain[1])
-        if len(attr_chain) == 3 \
-                and isinstance(attr_chain[0], str) \
-                and isinstance(attr_chain[1], tuple) \
-                and isinstance(attr_chain[2], dict):
+        if (
+            len(attr_chain) == 3
+            and isinstance(attr_chain[0], str)
+            and isinstance(attr_chain[1], tuple)
+            and isinstance(attr_chain[2], dict)
+        ):
             return getattr_func(obj, attr_chain[0], args=attr_chain[1], kwargs=attr_chain[2])
     result = obj
     for i, attr in enumerate(attr_chain):
         if i < len(attr_chain) - 1:
-            result = deep_getattr(
-                result,
-                attr,
-                getattr_func=getattr_func,
-                call_last_attr=True
-            )
+            result = deep_getattr(result, attr, getattr_func=getattr_func, call_last_attr=True)
         else:
-            result = deep_getattr(
-                result,
-                attr,
-                getattr_func=getattr_func,
-                call_last_attr=call_last_attr
-            )
+            result = deep_getattr(result, attr, getattr_func=getattr_func, call_last_attr=call_last_attr)
     return result
 
 
@@ -134,13 +122,15 @@ class AttrResolverMixin:
     @property
     def self_aliases(self) -> tp.Set[str]:
         """Names to associate with this object."""
-        return {'self'}
+        return {"self"}
 
-    def resolve_self(self: AttrResolverMixinT,
-                     cond_kwargs: tp.KwargsLike = None,
-                     custom_arg_names: tp.ClassVar[tp.Optional[tp.Set[str]]] = None,
-                     impacts_caching: bool = True,
-                     silence_warnings: bool = False) -> AttrResolverMixinT:
+    def resolve_self(
+        self: AttrResolverMixinT,
+        cond_kwargs: tp.KwargsLike = None,
+        custom_arg_names: tp.ClassVar[tp.Optional[tp.Set[str]]] = None,
+        impacts_caching: bool = True,
+        silence_warnings: bool = False,
+    ) -> AttrResolverMixinT:
         """Resolve self.
 
         !!! note
@@ -166,25 +156,27 @@ class AttrResolverMixin:
 
     def resolve_shortcut_attr(self, attr: str, *args, **kwargs) -> tp.Any:
         """Resolve an attribute that may have shortcut properties."""
-        if not attr.startswith('get_'):
-            if 'get_' + attr not in self.cls_dir or (len(args) == 0 and len(kwargs) == 0):
+        if not attr.startswith("get_"):
+            if "get_" + attr not in self.cls_dir or (len(args) == 0 and len(kwargs) == 0):
                 if isinstance(getattr(type(self), attr), property):
                     return getattr(self, attr)
                 return getattr(self, attr)(*args, **kwargs)
-            attr = 'get_' + attr
+            attr = "get_" + attr
 
         return getattr(self, attr)(*args, **kwargs)
 
-    def resolve_attr(self,
-                     attr: str,
-                     args: tp.ArgsLike = None,
-                     cond_kwargs: tp.KwargsLike = None,
-                     kwargs: tp.KwargsLike = None,
-                     custom_arg_names: tp.Optional[tp.Container[str]] = None,
-                     cache_dct: tp.KwargsLike = None,
-                     use_caching: bool = True,
-                     passed_kwargs_out: tp.KwargsLike = None,
-                     use_shortcuts: bool = True) -> tp.Any:
+    def resolve_attr(
+        self,
+        attr: str,
+        args: tp.ArgsLike = None,
+        cond_kwargs: tp.KwargsLike = None,
+        kwargs: tp.KwargsLike = None,
+        custom_arg_names: tp.Optional[tp.Container[str]] = None,
+        cache_dct: tp.KwargsLike = None,
+        use_caching: bool = True,
+        passed_kwargs_out: tp.KwargsLike = None,
+        use_shortcuts: bool = True,
+    ) -> tp.Any:
         """Resolve an attribute using keyword arguments and built-in caching.
 
         * If there is a `get_{arg}` method, uses `get_{arg}` as `attr`.
@@ -211,8 +203,8 @@ class AttrResolverMixin:
         # Resolve attribute
         cls = type(self)
         _attr = self.pre_resolve_attr(attr, final_kwargs=final_kwargs)
-        if 'get_' + attr in dir(cls):
-            _attr = 'get_' + attr
+        if "get_" + attr in dir(cls):
+            _attr = "get_" + attr
         if inspect.ismethod(getattr(cls, _attr)) or inspect.isfunction(getattr(cls, _attr)):
             attr_func = getattr(self, _attr)
             attr_func_kwargs = dict()

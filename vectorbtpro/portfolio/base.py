@@ -1674,41 +1674,35 @@ def fix_wrapper_for_records(pf: "Portfolio") -> ArrayWrapper:
 
 returns_acc_config = ReadonlyConfig(
     {
-        'daily_returns': dict(
-            source_name='daily'
-        ),
-        'annual_returns': dict(
-            source_name='annual'
-        ),
-        'cumulative_returns': dict(
-            source_name='cumulative'
-        ),
-        'annualized_return': dict(
-            source_name='annualized'
-        ),
-        'annualized_volatility': dict(),
-        'calmar_ratio': dict(),
-        'omega_ratio': dict(),
-        'sharpe_ratio': dict(),
-        'deflated_sharpe_ratio': dict(),
-        'downside_risk': dict(),
-        'sortino_ratio': dict(),
-        'information_ratio': dict(),
-        'beta': dict(),
-        'alpha': dict(),
-        'tail_ratio': dict(),
-        'value_at_risk': dict(),
-        'cond_value_at_risk': dict(),
-        'capture': dict(),
-        'up_capture': dict(),
-        'down_capture': dict(),
-        'drawdown': dict(),
-        'max_drawdown': dict()
+        "daily_returns": dict(source_name="daily"),
+        "annual_returns": dict(source_name="annual"),
+        "cumulative_returns": dict(source_name="cumulative"),
+        "annualized_return": dict(source_name="annualized"),
+        "annualized_volatility": dict(),
+        "calmar_ratio": dict(),
+        "omega_ratio": dict(),
+        "sharpe_ratio": dict(),
+        "deflated_sharpe_ratio": dict(),
+        "downside_risk": dict(),
+        "sortino_ratio": dict(),
+        "information_ratio": dict(),
+        "beta": dict(),
+        "alpha": dict(),
+        "tail_ratio": dict(),
+        "value_at_risk": dict(),
+        "cond_value_at_risk": dict(),
+        "capture": dict(),
+        "up_capture": dict(),
+        "down_capture": dict(),
+        "drawdown": dict(),
+        "max_drawdown": dict(),
     }
 )
 """_"""
 
-__pdoc__['returns_acc_config'] = f"""Config of returns accessor methods to be attached to `Portfolio`.
+__pdoc__[
+    "returns_acc_config"
+] = f"""Config of returns accessor methods to be attached to `Portfolio`.
 
 ```python
 {returns_acc_config.prettify()}
@@ -1717,227 +1711,137 @@ __pdoc__['returns_acc_config'] = f"""Config of returns accessor methods to be at
 
 shortcut_config = ReadonlyConfig(
     {
-        'filled_close': dict(
-            group_by_aware=False,
-            decorator=cached_property
-        ),
-        'filled_bm_close': dict(
-            group_by_aware=False,
-            decorator=cached_property
-        ),
-        'orders': dict(
-            obj_type='records',
-            field_aliases=('order_records',),
+        "filled_close": dict(group_by_aware=False, decorator=cached_property),
+        "filled_bm_close": dict(group_by_aware=False, decorator=cached_property),
+        "orders": dict(
+            obj_type="records",
+            field_aliases=("order_records",),
             wrap_func=lambda pf, obj, **kwargs: Orders(fix_wrapper_for_records(pf), obj, pf.close),
         ),
-        'logs': dict(
-            obj_type='records',
-            field_aliases=('log_records',),
-            wrap_func=lambda pf, obj, **kwargs: Logs(fix_wrapper_for_records(pf), obj)
+        "logs": dict(
+            obj_type="records",
+            field_aliases=("log_records",),
+            wrap_func=lambda pf, obj, **kwargs: Logs(fix_wrapper_for_records(pf), obj),
         ),
-        'entry_trades': dict(
-            obj_type='records',
-            field_aliases=('entry_trade_records',),
-            wrap_func=lambda pf, obj, **kwargs: EntryTrades.from_records(pf.orders.wrapper, obj, pf.close)
+        "entry_trades": dict(
+            obj_type="records",
+            field_aliases=("entry_trade_records",),
+            wrap_func=lambda pf, obj, **kwargs: EntryTrades.from_records(pf.orders.wrapper, obj, pf.close),
         ),
-        'exit_trades': dict(
-            obj_type='records',
-            field_aliases=('exit_trade_records',),
-            wrap_func=lambda pf, obj, **kwargs: ExitTrades.from_records(pf.orders.wrapper, obj, pf.close)
+        "exit_trades": dict(
+            obj_type="records",
+            field_aliases=("exit_trade_records",),
+            wrap_func=lambda pf, obj, **kwargs: ExitTrades.from_records(pf.orders.wrapper, obj, pf.close),
         ),
-        'positions': dict(
-            obj_type='records',
-            field_aliases=('position_records',),
-            wrap_func=lambda pf, obj, **kwargs: Positions.from_records(pf.orders.wrapper, obj, pf.close)
+        "positions": dict(
+            obj_type="records",
+            field_aliases=("position_records",),
+            wrap_func=lambda pf, obj, **kwargs: Positions.from_records(pf.orders.wrapper, obj, pf.close),
         ),
-        'trades': dict(
-            obj_type='records',
-            field_aliases=('trade_records',),
-            wrap_func=lambda pf, obj, **kwargs: Trades.from_records(pf.orders.wrapper, obj, pf.close)
+        "trades": dict(
+            obj_type="records",
+            field_aliases=("trade_records",),
+            wrap_func=lambda pf, obj, **kwargs: Trades.from_records(pf.orders.wrapper, obj, pf.close),
         ),
-        'drawdowns': dict(
-            obj_type='records',
-            field_aliases=('drawdown_records',),
-            wrap_func=lambda pf, obj, **kwargs: Drawdowns.from_records(pf.orders.wrapper.regroup(False), obj, pf.close)
+        "drawdowns": dict(
+            obj_type="records",
+            field_aliases=("drawdown_records",),
+            wrap_func=lambda pf, obj, **kwargs: Drawdowns.from_records(pf.orders.wrapper.regroup(False), obj, pf.close),
         ),
-        'init_position': dict(
-            obj_type='red_array',
-            group_by_aware=False
-        ),
-        'asset_flow': dict(
-            group_by_aware=False
-        ),
-        'longonly_asset_flow': dict(
-            method_name='get_asset_flow',
+        "init_position": dict(obj_type="red_array", group_by_aware=False),
+        "asset_flow": dict(group_by_aware=False),
+        "longonly_asset_flow": dict(
+            method_name="get_asset_flow",
             group_by_aware=False,
-            method_kwargs=dict(direction='longonly')
+            method_kwargs=dict(direction="longonly"),
         ),
-        'shortonly_asset_flow': dict(
-            method_name='get_asset_flow',
+        "shortonly_asset_flow": dict(
+            method_name="get_asset_flow",
             group_by_aware=False,
-            method_kwargs=dict(direction='shortonly')
+            method_kwargs=dict(direction="shortonly"),
         ),
-        'assets': dict(
-            group_by_aware=False
-        ),
-        'longonly_assets': dict(
-            method_name='get_assets',
+        "assets": dict(group_by_aware=False),
+        "longonly_assets": dict(
+            method_name="get_assets",
             group_by_aware=False,
-            method_kwargs=dict(direction='longonly')
+            method_kwargs=dict(direction="longonly"),
         ),
-        'shortonly_assets': dict(
-            method_name='get_assets',
+        "shortonly_assets": dict(
+            method_name="get_assets",
             group_by_aware=False,
-            method_kwargs=dict(direction='shortonly')
+            method_kwargs=dict(direction="shortonly"),
         ),
-        'position_mask': dict(),
-        'longonly_position_mask': dict(
-            method_name='get_position_mask',
-            method_kwargs=dict(direction='longonly')
+        "position_mask": dict(),
+        "longonly_position_mask": dict(method_name="get_position_mask", method_kwargs=dict(direction="longonly")),
+        "shortonly_position_mask": dict(method_name="get_position_mask", method_kwargs=dict(direction="shortonly")),
+        "position_coverage": dict(obj_type="red_array"),
+        "longonly_position_coverage": dict(
+            method_name="get_position_coverage",
+            obj_type="red_array",
+            method_kwargs=dict(direction="longonly"),
         ),
-        'shortonly_position_mask': dict(
-            method_name='get_position_mask',
-            method_kwargs=dict(direction='shortonly')
+        "shortonly_position_coverage": dict(
+            method_name="get_position_coverage",
+            obj_type="red_array",
+            method_kwargs=dict(direction="shortonly"),
         ),
-        'position_coverage': dict(
-            obj_type='red_array'
-        ),
-        'longonly_position_coverage': dict(
-            method_name='get_position_coverage',
-            obj_type='red_array',
-            method_kwargs=dict(direction='longonly')
-        ),
-        'shortonly_position_coverage': dict(
-            method_name='get_position_coverage',
-            obj_type='red_array',
-            method_kwargs=dict(direction='shortonly')
-        ),
-        'init_cash': dict(
-            obj_type='red_array'
-        ),
-        'cash_deposits': dict(),
-        'cash_earnings': dict(),
-        'cash_flow': dict(),
-        'free_cash_flow': dict(
-            method_name='get_cash_flow',
-            method_kwargs=dict(free=True)
-        ),
-        'cash': dict(),
-        'free_cash': dict(
-            method_name='get_cash',
-            method_kwargs=dict(free=True)
-        ),
-        'init_position_value': dict(
-            obj_type='red_array',
-            group_by_aware=False
-        ),
-        'init_value': dict(
-            obj_type='red_array'
-        ),
-        'input_value': dict(
-            obj_type='red_array'
-        ),
-        'asset_value': dict(),
-        'longonly_asset_value': dict(
-            method_name='get_asset_value',
-            method_kwargs=dict(direction='longonly')
-        ),
-        'shortonly_asset_value': dict(
-            method_name='get_asset_value',
-            method_kwargs=dict(direction='shortonly')
-        ),
-        'gross_exposure': dict(),
-        'longonly_gross_exposure': dict(
-            method_name='get_gross_exposure',
-            method_kwargs=dict(direction='longonly')
-        ),
-        'shortonly_gross_exposure': dict(
-            method_name='get_gross_exposure',
-            method_kwargs=dict(direction='shortonly')
-        ),
-        'net_exposure': dict(),
-        'value': dict(),
-        'total_profit': dict(
-            obj_type='red_array'
-        ),
-        'final_value': dict(
-            obj_type='red_array'
-        ),
-        'total_return': dict(
-            obj_type='red_array'
-        ),
-        'returns': dict(),
-        'asset_returns': dict(),
-        'market_value': dict(),
-        'market_returns': dict(),
-        'bm_value': dict(),
-        'bm_returns': dict(),
-        'total_market_return': dict(
-            obj_type='red_array'
-        ),
-        'daily_returns': dict(),
-        'annual_returns': dict(),
-        'cumulative_returns': dict(),
-        'annualized_return': dict(
-            obj_type='red_array'
-        ),
-        'annualized_volatility': dict(
-            obj_type='red_array'
-        ),
-        'calmar_ratio': dict(
-            obj_type='red_array'
-        ),
-        'omega_ratio': dict(
-            obj_type='red_array'
-        ),
-        'sharpe_ratio': dict(
-            obj_type='red_array'
-        ),
-        'deflated_sharpe_ratio': dict(
-            obj_type='red_array'
-        ),
-        'downside_risk': dict(
-            obj_type='red_array'
-        ),
-        'sortino_ratio': dict(
-            obj_type='red_array'
-        ),
-        'information_ratio': dict(
-            obj_type='red_array'
-        ),
-        'beta': dict(
-            obj_type='red_array'
-        ),
-        'alpha': dict(
-            obj_type='red_array'
-        ),
-        'tail_ratio': dict(
-            obj_type='red_array'
-        ),
-        'value_at_risk': dict(
-            obj_type='red_array'
-        ),
-        'cond_value_at_risk': dict(
-            obj_type='red_array'
-        ),
-        'capture': dict(
-            obj_type='red_array'
-        ),
-        'up_capture': dict(
-            obj_type='red_array'
-        ),
-        'down_capture': dict(
-            obj_type='red_array'
-        ),
-        'drawdown': dict(),
-        'max_drawdown': dict(
-            obj_type='red_array'
-        )
+        "init_cash": dict(obj_type="red_array"),
+        "cash_deposits": dict(),
+        "cash_earnings": dict(),
+        "cash_flow": dict(),
+        "free_cash_flow": dict(method_name="get_cash_flow", method_kwargs=dict(free=True)),
+        "cash": dict(),
+        "free_cash": dict(method_name="get_cash", method_kwargs=dict(free=True)),
+        "init_position_value": dict(obj_type="red_array", group_by_aware=False),
+        "init_value": dict(obj_type="red_array"),
+        "input_value": dict(obj_type="red_array"),
+        "asset_value": dict(),
+        "longonly_asset_value": dict(method_name="get_asset_value", method_kwargs=dict(direction="longonly")),
+        "shortonly_asset_value": dict(method_name="get_asset_value", method_kwargs=dict(direction="shortonly")),
+        "gross_exposure": dict(),
+        "longonly_gross_exposure": dict(method_name="get_gross_exposure", method_kwargs=dict(direction="longonly")),
+        "shortonly_gross_exposure": dict(method_name="get_gross_exposure", method_kwargs=dict(direction="shortonly")),
+        "net_exposure": dict(),
+        "value": dict(),
+        "total_profit": dict(obj_type="red_array"),
+        "final_value": dict(obj_type="red_array"),
+        "total_return": dict(obj_type="red_array"),
+        "returns": dict(),
+        "asset_returns": dict(),
+        "market_value": dict(),
+        "market_returns": dict(),
+        "bm_value": dict(),
+        "bm_returns": dict(),
+        "total_market_return": dict(obj_type="red_array"),
+        "daily_returns": dict(),
+        "annual_returns": dict(),
+        "cumulative_returns": dict(),
+        "annualized_return": dict(obj_type="red_array"),
+        "annualized_volatility": dict(obj_type="red_array"),
+        "calmar_ratio": dict(obj_type="red_array"),
+        "omega_ratio": dict(obj_type="red_array"),
+        "sharpe_ratio": dict(obj_type="red_array"),
+        "deflated_sharpe_ratio": dict(obj_type="red_array"),
+        "downside_risk": dict(obj_type="red_array"),
+        "sortino_ratio": dict(obj_type="red_array"),
+        "information_ratio": dict(obj_type="red_array"),
+        "beta": dict(obj_type="red_array"),
+        "alpha": dict(obj_type="red_array"),
+        "tail_ratio": dict(obj_type="red_array"),
+        "value_at_risk": dict(obj_type="red_array"),
+        "cond_value_at_risk": dict(obj_type="red_array"),
+        "capture": dict(obj_type="red_array"),
+        "up_capture": dict(obj_type="red_array"),
+        "down_capture": dict(obj_type="red_array"),
+        "drawdown": dict(),
+        "max_drawdown": dict(obj_type="red_array"),
     }
 )
 """_"""
 
-__pdoc__['shortcut_config'] = f"""Config of shortcut properties to be attached to `Portfolio`.
+__pdoc__[
+    "shortcut_config"
+] = f"""Config of shortcut properties to be attached to `Portfolio`.
 
 ```python
 {shortcut_config.prettify()}
@@ -1998,33 +1902,36 @@ class Portfolio(Analyzable):
     !!! note
         This class is meant to be immutable. To change any attribute, use `Portfolio.replace`."""
 
-    def __init__(self,
-                 wrapper: ArrayWrapper,
-                 close: tp.ArrayLike,
-                 order_records: tp.RecordArray,
-                 log_records: tp.RecordArray,
-                 cash_sharing: bool,
-                 init_cash: tp.Union[int, tp.FlexArray],
-                 init_position: tp.FlexArray = np.asarray(0.),
-                 cash_deposits: tp.FlexArray = np.asarray(0.),
-                 cash_earnings: tp.FlexArray = np.asarray(0.),
-                 call_seq: tp.Optional[tp.Array2d] = None,
-                 in_outputs: tp.Optional[tp.NamedTuple] = None,
-                 use_in_outputs: tp.Optional[bool] = None,
-                 bm_close: tp.Optional[tp.ArrayLike] = None,
-                 fillna_close: tp.Optional[bool] = None,
-                 trades_type: tp.Optional[tp.Union[int, str]] = None,
-                 **kwargs) -> None:
+    def __init__(
+        self,
+        wrapper: ArrayWrapper,
+        close: tp.ArrayLike,
+        order_records: tp.RecordArray,
+        log_records: tp.RecordArray,
+        cash_sharing: bool,
+        init_cash: tp.Union[int, tp.FlexArray],
+        init_position: tp.FlexArray = np.asarray(0.0),
+        cash_deposits: tp.FlexArray = np.asarray(0.0),
+        cash_earnings: tp.FlexArray = np.asarray(0.0),
+        call_seq: tp.Optional[tp.Array2d] = None,
+        in_outputs: tp.Optional[tp.NamedTuple] = None,
+        use_in_outputs: tp.Optional[bool] = None,
+        bm_close: tp.Optional[tp.ArrayLike] = None,
+        fillna_close: tp.Optional[bool] = None,
+        trades_type: tp.Optional[tp.Union[int, str]] = None,
+        **kwargs,
+    ) -> None:
 
         from vectorbtpro._settings import settings
-        portfolio_cfg = settings['portfolio']
+
+        portfolio_cfg = settings["portfolio"]
 
         if use_in_outputs is None:
-            use_in_outputs = portfolio_cfg['use_in_outputs']
+            use_in_outputs = portfolio_cfg["use_in_outputs"]
         if fillna_close is None:
-            fillna_close = portfolio_cfg['fillna_close']
+            fillna_close = portfolio_cfg["fillna_close"]
         if trades_type is None:
-            trades_type = portfolio_cfg['trades_type']
+            trades_type = portfolio_cfg["trades_type"]
         if isinstance(trades_type, str):
             trades_type = map_enum_fields(trades_type, TradesType)
         if cash_sharing:
@@ -2048,7 +1955,7 @@ class Portfolio(Analyzable):
             bm_close=bm_close,
             fillna_close=fillna_close,
             trades_type=trades_type,
-            **kwargs
+            **kwargs,
         )
 
         self._close = close
@@ -2071,14 +1978,16 @@ class Portfolio(Analyzable):
 
     # ############# In-outputs ############# #
 
-    def get_in_output(self,
-                      field: str,
-                      force_wrapping: bool = False,
-                      group_by: tp.GroupByLike = None,
-                      wrapper: tp.Optional[ArrayWrapper] = None,
-                      wrap_kwargs: tp.KwargsLike = None,
-                      wrap_func: tp.Optional[tp.Callable] = None,
-                      **kwargs) -> tp.Optional[tp.AnyArray]:
+    def get_in_output(
+        self,
+        field: str,
+        force_wrapping: bool = False,
+        group_by: tp.GroupByLike = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        wrap_func: tp.Optional[tp.Callable] = None,
+        **kwargs,
+    ) -> tp.Optional[tp.AnyArray]:
         """Get wrapped in-output.
 
         See `Portfolio.in_outputs_indexing_func` for parsing rules.
@@ -2097,26 +2006,26 @@ class Portfolio(Analyzable):
                     return field
                 if is_grouped:
                     if group_by_aware:
-                        if field + '_pg' in fields:
-                            return field + '_pg'
-                        if field + '_pcg' in fields:
-                            return field + '_pcg'
+                        if field + "_pg" in fields:
+                            return field + "_pg"
+                        if field + "_pcg" in fields:
+                            return field + "_pcg"
                         if self.cash_sharing:
-                            if field + '_pcgs' in fields:
-                                return field + '_pcgs'
+                            if field + "_pcgs" in fields:
+                                return field + "_pcgs"
                     else:
-                        if field + '_pc' in fields:
-                            return field + '_pc'
+                        if field + "_pc" in fields:
+                            return field + "_pc"
                         if not self.cash_sharing:
-                            if field + '_pcgs' in fields:
-                                return field + '_pcgs'
+                            if field + "_pcgs" in fields:
+                                return field + "_pcgs"
                 else:
-                    if field + '_pc' in fields:
-                        return field + '_pc'
-                    if field + '_pcg' in fields:
-                        return field + '_pcg'
-                    if field + '_pcgs' in fields:
-                        return field + '_pcgs'
+                    if field + "_pc" in fields:
+                        return field + "_pc"
+                    if field + "_pcg" in fields:
+                        return field + "_pcg"
+                    if field + "_pcgs" in fields:
+                        return field + "_pcgs"
             return None
 
         def _wrap_1d_grouped(obj: tp.Array, name_or_index: str) -> tp.Series:
@@ -2135,10 +2044,10 @@ class Portfolio(Analyzable):
 
         if field in self.cls_dir:
             method_or_prop = getattr(type(self), field)
-            options = getattr(method_or_prop, 'options', {})
-            obj_type = options.get('obj_type', None)
-            group_by_aware = options.get('group_by_aware', None)
-            field_aliases = options.get('field_aliases', None)
+            options = getattr(method_or_prop, "options", {})
+            obj_type = options.get("obj_type", None)
+            group_by_aware = options.get("group_by_aware", None)
+            field_aliases = options.get("field_aliases", None)
             if field_aliases is None:
                 field_aliases = []
             field_aliases = [field, *field_aliases]
@@ -2146,10 +2055,10 @@ class Portfolio(Analyzable):
                 raise TypeError(f"Cannot parse in-output '{field}': option 'obj_type' is missing")
             if group_by_aware is None:
                 raise TypeError(f"Cannot parse in-output '{field}': option 'group_by_aware' is missing")
-            if obj_type == 'array':
-                field_aliases = [*[alias + '_2d' for alias in field_aliases if '_2d' not in alias], *field_aliases]
-            elif obj_type == 'red_array':
-                field_aliases = [*[alias + '_1d' for alias in field_aliases if '_1d' not in alias], *field_aliases]
+            if obj_type == "array":
+                field_aliases = [*[alias + "_2d" for alias in field_aliases if "_2d" not in alias], *field_aliases]
+            elif obj_type == "red_array":
+                field_aliases = [*[alias + "_1d" for alias in field_aliases if "_1d" not in alias], *field_aliases]
 
             found_field = _find_field(field_aliases, group_by_aware=group_by_aware)
             if found_field is None:
@@ -2168,13 +2077,13 @@ class Portfolio(Analyzable):
                     group_by=group_by,
                     wrapper=wrapper,
                     wrap_kwargs=wrap_kwargs,
-                    **kwargs
+                    **kwargs,
                 )
-            if obj_type == 'array':
+            if obj_type == "array":
                 if group_by_aware:
                     return _wrap_2d_grouped(obj)
                 return _wrap_2d(obj)
-            elif obj_type == 'red_array':
+            elif obj_type == "red_array":
                 if group_by_aware:
                     return _wrap_1d_grouped(obj, field)
                 return _wrap_1d(obj, field)
@@ -2197,75 +2106,75 @@ class Portfolio(Analyzable):
                 group_by=group_by,
                 wrapper=wrapper,
                 wrap_kwargs=wrap_kwargs,
-                **kwargs
+                **kwargs,
             )
-        if found_field.endswith('_pcgs'):
-            if '_2d' in field:
+        if found_field.endswith("_pcgs"):
+            if "_2d" in field:
                 if is_grouped and self.cash_sharing:
                     return _wrap_2d_grouped(obj)
                 return _wrap_2d(obj)
-            if '_1d' in field:
+            if "_1d" in field:
                 if is_grouped and self.cash_sharing:
-                    return _wrap_1d_grouped(obj, field.replace('_pcgs', '').replace('_1d', ''))
-                return _wrap_1d(obj, field.replace('_pcgs', '').replace('_1d', ''))
+                    return _wrap_1d_grouped(obj, field.replace("_pcgs", "").replace("_1d", ""))
+                return _wrap_1d(obj, field.replace("_pcgs", "").replace("_1d", ""))
             if obj.ndim == 2:
                 if is_grouped and self.cash_sharing:
                     return _wrap_2d_grouped(obj)
                 return _wrap_2d(obj)
             if obj.ndim == 1:
                 if is_grouped and self.cash_sharing:
-                    return _wrap_1d_grouped(obj, field.replace('_pcgs', ''))
-                return _wrap_1d(obj, field.replace('_pcgs', ''))
-        if found_field.endswith('_pcg'):
-            if '_2d' in field:
+                    return _wrap_1d_grouped(obj, field.replace("_pcgs", ""))
+                return _wrap_1d(obj, field.replace("_pcgs", ""))
+        if found_field.endswith("_pcg"):
+            if "_2d" in field:
                 if is_grouped:
                     return _wrap_2d_grouped(obj)
                 return _wrap_2d(obj)
-            if '_1d' in field:
+            if "_1d" in field:
                 if is_grouped:
-                    return _wrap_1d_grouped(obj, field.replace('_pcg', '').replace('_1d', ''))
-                return _wrap_1d(obj, field.replace('_pcg', '').replace('_1d', ''))
+                    return _wrap_1d_grouped(obj, field.replace("_pcg", "").replace("_1d", ""))
+                return _wrap_1d(obj, field.replace("_pcg", "").replace("_1d", ""))
             if obj.ndim == 2:
                 if is_grouped:
                     return _wrap_2d_grouped(obj)
                 return _wrap_2d(obj)
             if obj.ndim == 1:
                 if is_grouped:
-                    return _wrap_1d_grouped(obj, field.replace('_pcg', ''))
-                return _wrap_1d(obj, field.replace('_pcg', ''))
-        if found_field.endswith('_pg'):
-            if '_2d' in field:
+                    return _wrap_1d_grouped(obj, field.replace("_pcg", ""))
+                return _wrap_1d(obj, field.replace("_pcg", ""))
+        if found_field.endswith("_pg"):
+            if "_2d" in field:
                 return _wrap_2d_grouped(obj)
-            if '_1d' in field:
-                return _wrap_1d_grouped(obj, field.replace('_pg', '').replace('_1d', ''))
+            if "_1d" in field:
+                return _wrap_1d_grouped(obj, field.replace("_pg", "").replace("_1d", ""))
             if obj.ndim == 2:
                 return _wrap_2d_grouped(obj)
             if obj.ndim == 1:
-                return _wrap_1d_grouped(obj, field.replace('_pg', ''))
-        if found_field.endswith('_pc'):
-            if '_2d' in field:
+                return _wrap_1d_grouped(obj, field.replace("_pg", ""))
+        if found_field.endswith("_pc"):
+            if "_2d" in field:
                 return _wrap_2d(obj)
-            if '_1d' in field:
-                return _wrap_1d(obj, field.replace('_pc', '').replace('_1d', ''))
+            if "_1d" in field:
+                return _wrap_1d(obj, field.replace("_pc", "").replace("_1d", ""))
             if obj.ndim == 2:
                 return _wrap_2d(obj)
             if obj.ndim == 1:
-                return _wrap_1d(obj, field.replace('_pc', ''))
-        if not found_field.endswith('_records') and checks.is_np_array(obj):
+                return _wrap_1d(obj, field.replace("_pc", ""))
+        if not found_field.endswith("_records") and checks.is_np_array(obj):
             if is_grouped:
-                if '_2d' in field:
+                if "_2d" in field:
                     return _wrap_2d_grouped(obj)
-                if '_1d' in field:
-                    return _wrap_1d_grouped(obj, field.replace('_1d', ''))
+                if "_1d" in field:
+                    return _wrap_1d_grouped(obj, field.replace("_1d", ""))
                 if obj.shape == self.wrapper.get_shape():
                     return _wrap_2d_grouped(obj)
                 if obj.shape == (self.wrapper.get_shape_2d()[1],):
                     return _wrap_1d_grouped(obj, field)
             else:
-                if '_2d' in field:
+                if "_2d" in field:
                     return _wrap_2d(obj)
-                if '_1d' in field:
-                    return _wrap_1d(obj, field.replace('_1d', ''))
+                if "_1d" in field:
+                    return _wrap_1d(obj, field.replace("_1d", ""))
                 if obj.shape == self.wrapper.shape:
                     return _wrap_2d(obj)
                 if obj.shape == (self.wrapper.shape_2d[1],):
@@ -2274,10 +2183,12 @@ class Portfolio(Analyzable):
             raise NotImplementedError(f"Cannot wrap field '{found_field}'")
         return obj
 
-    def in_outputs_indexing_func(self,
-                                 new_wrapper: ArrayWrapper,
-                                 group_idxs: tp.MaybeArray,
-                                 col_idxs: tp.Array1d) -> tp.Optional[tp.NamedTuple]:
+    def in_outputs_indexing_func(
+        self,
+        new_wrapper: ArrayWrapper,
+        group_idxs: tp.MaybeArray,
+        col_idxs: tp.Array1d,
+    ) -> tp.Optional[tp.NamedTuple]:
         """Perform indexing on `Portfolio.in_outputs`.
 
         If the name of a field can be found as an attribute of `Portfolio`, reads this attribute's
@@ -2326,7 +2237,7 @@ class Portfolio(Analyzable):
 
         def _index_records(obj: tp.RecordArray) -> tp.RecordArray:
             func = jit_reg.resolve_option(records_nb.col_map_nb, None)
-            col_map = func(obj['col'], len(self.wrapper.columns))
+            col_map = func(obj["col"], len(self.wrapper.columns))
             func = jit_reg.resolve_option(records_nb.record_col_map_select_nb, None)
             return func(obj, col_map, to_1d_array(col_idxs))
 
@@ -2337,37 +2248,38 @@ class Portfolio(Analyzable):
                 new_obj = None
                 if field in cls_dir:
                     method_or_prop = getattr(cls, field)
-                    options = getattr(method_or_prop, 'options', {})
-                    obj_type = options.get('obj_type', None)
-                    group_by_aware = options.get('group_by_aware', None)
+                    options = getattr(method_or_prop, "options", {})
+                    obj_type = options.get("obj_type", None)
+                    group_by_aware = options.get("group_by_aware", None)
                     if obj_type is None:
                         raise TypeError(f"Cannot parse in-output '{field}': option 'obj_type' is missing")
                     if group_by_aware is None:
                         raise TypeError(f"Cannot parse in-output '{field}': option 'group_by_aware' is missing")
 
-                    if obj_type == 'array':
+                    if obj_type == "array":
                         if group_by_aware and is_grouped:
                             new_obj = _index_2d_by_group(obj)
                         else:
                             new_obj = _index_2d_by_col(obj)
-                    elif obj_type == 'red_array':
+                    elif obj_type == "red_array":
                         if group_by_aware and is_grouped:
                             new_obj = _index_1d_by_group(obj)
                         else:
                             new_obj = _index_1d_by_col(obj)
-                    elif obj_type == 'records':
+                    elif obj_type == "records":
                         new_obj = _index_records(obj)
                     else:
-                        raise TypeError(f"Cannot index in-output '{field}': "
-                                        f"option 'obj_type={obj_type}' not supported")
+                        raise TypeError(
+                            f"Cannot index in-output '{field}': " f"option 'obj_type={obj_type}' not supported"
+                        )
                 else:
-                    if '_pcgs' in field:
-                        if '_2d' in field:
+                    if "_pcgs" in field:
+                        if "_2d" in field:
                             if is_grouped and self.cash_sharing:
                                 new_obj = _index_2d_by_group(obj)
                             else:
                                 new_obj = _index_2d_by_col(obj)
-                        elif '_1d' in field:
+                        elif "_1d" in field:
                             if is_grouped and self.cash_sharing:
                                 new_obj = _index_1d_by_group(obj)
                             else:
@@ -2382,13 +2294,13 @@ class Portfolio(Analyzable):
                                 new_obj = _index_1d_by_group(obj)
                             else:
                                 new_obj = _index_1d_by_col(obj)
-                    elif field.endswith('_pcg'):
-                        if '_2d' in field:
+                    elif field.endswith("_pcg"):
+                        if "_2d" in field:
                             if is_grouped:
                                 new_obj = _index_2d_by_group(obj)
                             else:
                                 new_obj = _index_2d_by_col(obj)
-                        elif '_1d' in field:
+                        elif "_1d" in field:
                             if is_grouped:
                                 new_obj = _index_1d_by_group(obj)
                             else:
@@ -2403,40 +2315,40 @@ class Portfolio(Analyzable):
                                 new_obj = _index_1d_by_group(obj)
                             else:
                                 new_obj = _index_1d_by_col(obj)
-                    elif field.endswith('_pg'):
-                        if '_2d' in field:
+                    elif field.endswith("_pg"):
+                        if "_2d" in field:
                             new_obj = _index_2d_by_group(obj)
-                        elif '_1d' in field:
+                        elif "_1d" in field:
                             new_obj = _index_1d_by_group(obj)
                         elif obj.ndim == 2:
                             new_obj = _index_2d_by_group(obj)
                         elif obj.ndim == 1:
                             new_obj = _index_1d_by_group(obj)
-                    elif field.endswith('_pc'):
-                        if '_2d' in field:
+                    elif field.endswith("_pc"):
+                        if "_2d" in field:
                             new_obj = _index_2d_by_col(obj)
-                        elif '_1d' in field:
+                        elif "_1d" in field:
                             new_obj = _index_1d_by_col(obj)
                         elif obj.ndim == 2:
                             new_obj = _index_2d_by_col(obj)
                         elif obj.ndim == 1:
                             new_obj = _index_1d_by_col(obj)
-                    elif field.endswith('_records'):
+                    elif field.endswith("_records"):
                         new_obj = _index_records(obj)
                     elif checks.is_np_array(obj):
                         if is_grouped:
-                            if '_2d' in field:
+                            if "_2d" in field:
                                 new_obj = _index_2d_by_group(obj)
-                            elif '_1d' in field:
+                            elif "_1d" in field:
                                 new_obj = _index_1d_by_group(obj)
                             if obj.shape == self.wrapper.get_shape():
                                 new_obj = _index_2d_by_group(obj)
                             elif obj.shape == (self.wrapper.get_shape_2d()[1],):
                                 new_obj = _index_1d_by_group(obj)
                         else:
-                            if '_2d' in field:
+                            if "_2d" in field:
                                 new_obj = _index_2d_by_col(obj)
-                            elif '_1d' in field:
+                            elif "_1d" in field:
                                 new_obj = _index_1d_by_col(obj)
                             if obj.shape == self.wrapper.shape:
                                 new_obj = _index_2d_by_col(obj)
@@ -2444,8 +2356,10 @@ class Portfolio(Analyzable):
                                 new_obj = _index_1d_by_col(obj)
 
                     if new_obj is None:
-                        warnings.warn(f"Cannot figure out how to index in-output '{field}'. "
-                                      f"Please provide a suffix.", stacklevel=2)
+                        warnings.warn(
+                            f"Cannot figure out how to index in-output '{field}'. " f"Please provide a suffix.",
+                            stacklevel=2,
+                        )
 
             new_in_outputs[field] = new_obj
         return type(self.in_outputs)(**new_in_outputs)
@@ -2458,7 +2372,7 @@ class Portfolio(Analyzable):
             pd_indexing_func,
             column_only_select=self.column_only_select,
             group_select=self.group_select,
-            **kwargs
+            **kwargs,
         )
         new_close = to_2d_array(self._close)[:, col_idxs]
         new_order_records = self.orders.get_by_col_idxs(col_idxs)
@@ -2507,56 +2421,58 @@ class Portfolio(Analyzable):
             cash_earnings=new_cash_earnings,
             call_seq=new_call_seq,
             in_outputs=new_in_outputs,
-            bm_close=new_bm_close
+            bm_close=new_bm_close,
         )
 
     # ############# Class methods ############# #
 
     @classmethod
-    def from_orders(cls: tp.Type[PortfolioT],
-                    close: tp.ArrayLike,
-                    size: tp.Optional[tp.ArrayLike] = None,
-                    size_type: tp.Optional[tp.ArrayLike] = None,
-                    direction: tp.Optional[tp.ArrayLike] = None,
-                    price: tp.Optional[tp.ArrayLike] = None,
-                    fees: tp.Optional[tp.ArrayLike] = None,
-                    fixed_fees: tp.Optional[tp.ArrayLike] = None,
-                    slippage: tp.Optional[tp.ArrayLike] = None,
-                    min_size: tp.Optional[tp.ArrayLike] = None,
-                    max_size: tp.Optional[tp.ArrayLike] = None,
-                    size_granularity: tp.Optional[tp.ArrayLike] = None,
-                    reject_prob: tp.Optional[tp.ArrayLike] = None,
-                    price_area_vio_mode: tp.Optional[tp.ArrayLike] = None,
-                    lock_cash: tp.Optional[tp.ArrayLike] = None,
-                    allow_partial: tp.Optional[tp.ArrayLike] = None,
-                    raise_reject: tp.Optional[tp.ArrayLike] = None,
-                    log: tp.Optional[tp.ArrayLike] = None,
-                    val_price: tp.Optional[tp.ArrayLike] = None,
-                    open: tp.ArrayLike = np.nan,
-                    high: tp.ArrayLike = np.nan,
-                    low: tp.ArrayLike = np.nan,
-                    init_cash: tp.Optional[tp.ArrayLike] = None,
-                    init_position: tp.Optional[tp.ArrayLike] = None,
-                    cash_deposits: tp.Optional[tp.ArrayLike] = None,
-                    cash_earnings: tp.Optional[tp.ArrayLike] = None,
-                    cash_dividends: tp.Optional[tp.ArrayLike] = None,
-                    cash_sharing: tp.Optional[bool] = None,
-                    call_seq: tp.Optional[tp.ArrayLike] = None,
-                    attach_call_seq: tp.Optional[bool] = None,
-                    ffill_val_price: tp.Optional[bool] = None,
-                    update_value: tp.Optional[bool] = None,
-                    fill_returns: tp.Optional[bool] = None,
-                    max_orders: tp.Optional[int] = None,
-                    max_logs: tp.Optional[int] = None,
-                    seed: tp.Optional[int] = None,
-                    group_by: tp.GroupByLike = None,
-                    broadcast_kwargs: tp.KwargsLike = None,
-                    jitted: tp.JittedOption = None,
-                    chunked: tp.ChunkedOption = None,
-                    wrapper_kwargs: tp.KwargsLike = None,
-                    freq: tp.Optional[tp.FrequencyLike] = None,
-                    bm_close: tp.Optional[tp.ArrayLike] = None,
-                    **kwargs) -> PortfolioT:
+    def from_orders(
+        cls: tp.Type[PortfolioT],
+        close: tp.ArrayLike,
+        size: tp.Optional[tp.ArrayLike] = None,
+        size_type: tp.Optional[tp.ArrayLike] = None,
+        direction: tp.Optional[tp.ArrayLike] = None,
+        price: tp.Optional[tp.ArrayLike] = None,
+        fees: tp.Optional[tp.ArrayLike] = None,
+        fixed_fees: tp.Optional[tp.ArrayLike] = None,
+        slippage: tp.Optional[tp.ArrayLike] = None,
+        min_size: tp.Optional[tp.ArrayLike] = None,
+        max_size: tp.Optional[tp.ArrayLike] = None,
+        size_granularity: tp.Optional[tp.ArrayLike] = None,
+        reject_prob: tp.Optional[tp.ArrayLike] = None,
+        price_area_vio_mode: tp.Optional[tp.ArrayLike] = None,
+        lock_cash: tp.Optional[tp.ArrayLike] = None,
+        allow_partial: tp.Optional[tp.ArrayLike] = None,
+        raise_reject: tp.Optional[tp.ArrayLike] = None,
+        log: tp.Optional[tp.ArrayLike] = None,
+        val_price: tp.Optional[tp.ArrayLike] = None,
+        open: tp.ArrayLike = np.nan,
+        high: tp.ArrayLike = np.nan,
+        low: tp.ArrayLike = np.nan,
+        init_cash: tp.Optional[tp.ArrayLike] = None,
+        init_position: tp.Optional[tp.ArrayLike] = None,
+        cash_deposits: tp.Optional[tp.ArrayLike] = None,
+        cash_earnings: tp.Optional[tp.ArrayLike] = None,
+        cash_dividends: tp.Optional[tp.ArrayLike] = None,
+        cash_sharing: tp.Optional[bool] = None,
+        call_seq: tp.Optional[tp.ArrayLike] = None,
+        attach_call_seq: tp.Optional[bool] = None,
+        ffill_val_price: tp.Optional[bool] = None,
+        update_value: tp.Optional[bool] = None,
+        fill_returns: tp.Optional[bool] = None,
+        max_orders: tp.Optional[int] = None,
+        max_logs: tp.Optional[int] = None,
+        seed: tp.Optional[int] = None,
+        group_by: tp.GroupByLike = None,
+        broadcast_kwargs: tp.KwargsLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper_kwargs: tp.KwargsLike = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+        bm_close: tp.Optional[tp.ArrayLike] = None,
+        **kwargs,
+    ) -> PortfolioT:
         """Simulate portfolio from orders - size, price, fees, and other information.
 
         See `vectorbtpro.portfolio.nb.from_orders.simulate_from_orders_nb`.
@@ -2920,46 +2836,47 @@ class Portfolio(Analyzable):
         """
         # Get defaults
         from vectorbtpro._settings import settings
-        portfolio_cfg = settings['portfolio']
+
+        portfolio_cfg = settings["portfolio"]
 
         if size is None:
-            size = portfolio_cfg['size']
+            size = portfolio_cfg["size"]
         if size_type is None:
-            size_type = portfolio_cfg['size_type']
+            size_type = portfolio_cfg["size_type"]
         if direction is None:
-            direction = portfolio_cfg['direction']
+            direction = portfolio_cfg["direction"]
         if price is None:
-            price = portfolio_cfg['price']
+            price = portfolio_cfg["price"]
         if size is None:
-            size = portfolio_cfg['size']
+            size = portfolio_cfg["size"]
         if fees is None:
-            fees = portfolio_cfg['fees']
+            fees = portfolio_cfg["fees"]
         if fixed_fees is None:
-            fixed_fees = portfolio_cfg['fixed_fees']
+            fixed_fees = portfolio_cfg["fixed_fees"]
         if slippage is None:
-            slippage = portfolio_cfg['slippage']
+            slippage = portfolio_cfg["slippage"]
         if min_size is None:
-            min_size = portfolio_cfg['min_size']
+            min_size = portfolio_cfg["min_size"]
         if max_size is None:
-            max_size = portfolio_cfg['max_size']
+            max_size = portfolio_cfg["max_size"]
         if size_granularity is None:
-            size_granularity = portfolio_cfg['size_granularity']
+            size_granularity = portfolio_cfg["size_granularity"]
         if reject_prob is None:
-            reject_prob = portfolio_cfg['reject_prob']
+            reject_prob = portfolio_cfg["reject_prob"]
         if price_area_vio_mode is None:
-            price_area_vio_mode = portfolio_cfg['price_area_vio_mode']
+            price_area_vio_mode = portfolio_cfg["price_area_vio_mode"]
         if lock_cash is None:
-            lock_cash = portfolio_cfg['lock_cash']
+            lock_cash = portfolio_cfg["lock_cash"]
         if allow_partial is None:
-            allow_partial = portfolio_cfg['allow_partial']
+            allow_partial = portfolio_cfg["allow_partial"]
         if raise_reject is None:
-            raise_reject = portfolio_cfg['raise_reject']
+            raise_reject = portfolio_cfg["raise_reject"]
         if log is None:
-            log = portfolio_cfg['log']
+            log = portfolio_cfg["log"]
         if val_price is None:
-            val_price = portfolio_cfg['val_price']
+            val_price = portfolio_cfg["val_price"]
         if init_cash is None:
-            init_cash = portfolio_cfg['init_cash']
+            init_cash = portfolio_cfg["init_cash"]
         if isinstance(init_cash, str):
             init_cash = map_enum_fields(init_cash, InitCashMode)
         if isinstance(init_cash, int) and init_cash in InitCashMode:
@@ -2968,19 +2885,19 @@ class Portfolio(Analyzable):
         else:
             init_cash_mode = None
         if init_position is None:
-            init_position = portfolio_cfg['init_position']
+            init_position = portfolio_cfg["init_position"]
         if cash_deposits is None:
-            cash_deposits = portfolio_cfg['cash_deposits']
+            cash_deposits = portfolio_cfg["cash_deposits"]
         if cash_earnings is None:
-            cash_earnings = portfolio_cfg['cash_earnings']
+            cash_earnings = portfolio_cfg["cash_earnings"]
         if cash_dividends is None:
-            cash_dividends = portfolio_cfg['cash_dividends']
+            cash_dividends = portfolio_cfg["cash_dividends"]
         if cash_sharing is None:
-            cash_sharing = portfolio_cfg['cash_sharing']
+            cash_sharing = portfolio_cfg["cash_sharing"]
         if cash_sharing and group_by is None:
             group_by = True
         if call_seq is None:
-            call_seq = portfolio_cfg['call_seq']
+            call_seq = portfolio_cfg["call_seq"]
         auto_call_seq = False
         if isinstance(call_seq, str):
             call_seq = map_enum_fields(call_seq, CallSeqType)
@@ -2989,29 +2906,29 @@ class Portfolio(Analyzable):
                 call_seq = CallSeqType.Default
                 auto_call_seq = True
         if attach_call_seq is None:
-            attach_call_seq = portfolio_cfg['attach_call_seq']
+            attach_call_seq = portfolio_cfg["attach_call_seq"]
         if ffill_val_price is None:
-            ffill_val_price = portfolio_cfg['ffill_val_price']
+            ffill_val_price = portfolio_cfg["ffill_val_price"]
         if update_value is None:
-            update_value = portfolio_cfg['update_value']
+            update_value = portfolio_cfg["update_value"]
         if fill_returns is None:
-            fill_returns = portfolio_cfg['fill_returns']
+            fill_returns = portfolio_cfg["fill_returns"]
         if seed is None:
-            seed = portfolio_cfg['seed']
+            seed = portfolio_cfg["seed"]
         if seed is not None:
             set_seed(seed)
         if group_by is None:
-            group_by = portfolio_cfg['group_by']
+            group_by = portfolio_cfg["group_by"]
         if freq is None:
-            freq = portfolio_cfg['freq']
-        broadcast_kwargs = merge_dicts(portfolio_cfg['broadcast_kwargs'], broadcast_kwargs)
-        require_kwargs = broadcast_kwargs.get('require_kwargs', {})
+            freq = portfolio_cfg["freq"]
+        broadcast_kwargs = merge_dicts(portfolio_cfg["broadcast_kwargs"], broadcast_kwargs)
+        require_kwargs = broadcast_kwargs.get("require_kwargs", {})
         if wrapper_kwargs is None:
             wrapper_kwargs = {}
-        if not wrapper_kwargs.get('group_select', True) and cash_sharing:
+        if not wrapper_kwargs.get("group_select", True) and cash_sharing:
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
         if bm_close is None:
-            bm_close = portfolio_cfg['bm_close']
+            bm_close = portfolio_cfg["bm_close"]
 
         # Prepare the simulation
         # Only close is broadcast, others can remain unchanged thanks to flexible indexing
@@ -3041,29 +2958,26 @@ class Portfolio(Analyzable):
             close=close,
         )
         if bm_close is not None and not isinstance(bm_close, bool):
-            broadcastable_args['bm_close'] = bm_close
-        broadcast_kwargs = merge_dicts(dict(
-            keep_flex=dict(
-                close=False,
-                bm_close=False,
-                _default=True
-            )
-        ), broadcast_kwargs)
+            broadcastable_args["bm_close"] = bm_close
+        broadcast_kwargs = merge_dicts(
+            dict(keep_flex=dict(close=False, bm_close=False, _default=True)),
+            broadcast_kwargs,
+        )
         broadcasted_args = broadcast(broadcastable_args, **broadcast_kwargs)
-        cash_earnings = broadcasted_args.pop('cash_earnings')
-        cash_dividends = broadcasted_args.pop('cash_dividends')
-        close = broadcasted_args['close']
+        cash_earnings = broadcasted_args.pop("cash_earnings")
+        cash_dividends = broadcasted_args.pop("cash_dividends")
+        close = broadcasted_args["close"]
         if not checks.is_pandas(close):
             close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
         if bm_close is not None and not isinstance(bm_close, bool):
-            bm_close = broadcasted_args['bm_close']
+            bm_close = broadcasted_args["bm_close"]
             if not checks.is_pandas(bm_close):
                 bm_close = pd.Series(bm_close) if bm_close.ndim == 1 else pd.DataFrame(bm_close)
-            broadcasted_args['bm_close'] = to_2d_array(bm_close)
+            broadcasted_args["bm_close"] = to_2d_array(bm_close)
         else:
-            broadcasted_args['bm_close'] = None
+            broadcasted_args["bm_close"] = None
         flex_2d = close.ndim == 2
-        broadcasted_args['close'] = to_2d_array(close)
+        broadcasted_args["close"] = to_2d_array(close)
         target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
 
         wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
@@ -3075,7 +2989,7 @@ class Portfolio(Analyzable):
             to_shape=(target_shape_2d[0], len(cs_group_lens)),
             to_pd=False,
             keep_flex=True,
-            **require_kwargs
+            **require_kwargs,
         )
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
         if checks.is_any_array(call_seq):
@@ -3086,12 +3000,12 @@ class Portfolio(Analyzable):
             max_logs = 0
 
         # Convert strings to numbers
-        broadcasted_args['size_type'] = map_enum_fields(
-            broadcasted_args['size_type'], SizeType)
-        broadcasted_args['direction'] = map_enum_fields(
-            broadcasted_args['direction'], Direction)
-        broadcasted_args['price_area_vio_mode'] = map_enum_fields(
-            broadcasted_args['price_area_vio_mode'], PriceAreaVioMode)
+        broadcasted_args["size_type"] = map_enum_fields(broadcasted_args["size_type"], SizeType)
+        broadcasted_args["direction"] = map_enum_fields(broadcasted_args["direction"], Direction)
+        broadcasted_args["price_area_vio_mode"] = map_enum_fields(
+            broadcasted_args["price_area_vio_mode"],
+            PriceAreaVioMode,
+        )
 
         # Check data types
         checks.assert_subdtype(cs_group_lens, np.integer)
@@ -3101,32 +3015,32 @@ class Portfolio(Analyzable):
         checks.assert_subdtype(cash_deposits, np.number)
         checks.assert_subdtype(cash_earnings, np.number)
         checks.assert_subdtype(cash_dividends, np.number)
-        checks.assert_subdtype(broadcasted_args['size'], np.number)
-        checks.assert_subdtype(broadcasted_args['price'], np.number)
-        checks.assert_subdtype(broadcasted_args['size_type'], np.integer)
-        checks.assert_subdtype(broadcasted_args['direction'], np.integer)
-        checks.assert_subdtype(broadcasted_args['fees'], np.number)
-        checks.assert_subdtype(broadcasted_args['fixed_fees'], np.number)
-        checks.assert_subdtype(broadcasted_args['slippage'], np.number)
-        checks.assert_subdtype(broadcasted_args['min_size'], np.number)
-        checks.assert_subdtype(broadcasted_args['max_size'], np.number)
-        checks.assert_subdtype(broadcasted_args['size_granularity'], np.number)
-        checks.assert_subdtype(broadcasted_args['reject_prob'], np.number)
-        checks.assert_subdtype(broadcasted_args['price_area_vio_mode'], np.integer)
-        checks.assert_subdtype(broadcasted_args['lock_cash'], np.bool_)
-        checks.assert_subdtype(broadcasted_args['allow_partial'], np.bool_)
-        checks.assert_subdtype(broadcasted_args['raise_reject'], np.bool_)
-        checks.assert_subdtype(broadcasted_args['log'], np.bool_)
-        checks.assert_subdtype(broadcasted_args['val_price'], np.number)
-        checks.assert_subdtype(broadcasted_args['open'], np.number)
-        checks.assert_subdtype(broadcasted_args['high'], np.number)
-        checks.assert_subdtype(broadcasted_args['low'], np.number)
-        checks.assert_subdtype(broadcasted_args['close'], np.number)
+        checks.assert_subdtype(broadcasted_args["size"], np.number)
+        checks.assert_subdtype(broadcasted_args["price"], np.number)
+        checks.assert_subdtype(broadcasted_args["size_type"], np.integer)
+        checks.assert_subdtype(broadcasted_args["direction"], np.integer)
+        checks.assert_subdtype(broadcasted_args["fees"], np.number)
+        checks.assert_subdtype(broadcasted_args["fixed_fees"], np.number)
+        checks.assert_subdtype(broadcasted_args["slippage"], np.number)
+        checks.assert_subdtype(broadcasted_args["min_size"], np.number)
+        checks.assert_subdtype(broadcasted_args["max_size"], np.number)
+        checks.assert_subdtype(broadcasted_args["size_granularity"], np.number)
+        checks.assert_subdtype(broadcasted_args["reject_prob"], np.number)
+        checks.assert_subdtype(broadcasted_args["price_area_vio_mode"], np.integer)
+        checks.assert_subdtype(broadcasted_args["lock_cash"], np.bool_)
+        checks.assert_subdtype(broadcasted_args["allow_partial"], np.bool_)
+        checks.assert_subdtype(broadcasted_args["raise_reject"], np.bool_)
+        checks.assert_subdtype(broadcasted_args["log"], np.bool_)
+        checks.assert_subdtype(broadcasted_args["val_price"], np.number)
+        checks.assert_subdtype(broadcasted_args["open"], np.number)
+        checks.assert_subdtype(broadcasted_args["high"], np.number)
+        checks.assert_subdtype(broadcasted_args["low"], np.number)
+        checks.assert_subdtype(broadcasted_args["close"], np.number)
         if bm_close is not None and not isinstance(bm_close, bool):
-            checks.assert_subdtype(broadcasted_args['bm_close'], np.number)
+            checks.assert_subdtype(broadcasted_args["bm_close"], np.number)
 
         # Remove arguments
-        broadcasted_args.pop('bm_close', None)
+        broadcasted_args.pop("bm_close", None)
 
         # Perform the simulation
         func = jit_reg.resolve_option(nb.simulate_from_orders_nb, jitted)
@@ -3147,7 +3061,7 @@ class Portfolio(Analyzable):
             fill_returns=fill_returns,
             max_orders=max_orders,
             max_logs=max_logs,
-            flex_2d=flex_2d
+            flex_2d=flex_2d,
         )
 
         # Create an instance
@@ -3164,80 +3078,82 @@ class Portfolio(Analyzable):
             call_seq=call_seq if attach_call_seq else None,
             in_outputs=sim_out.in_outputs,
             bm_close=bm_close,
-            **kwargs
+            **kwargs,
         )
 
     @classmethod
-    def from_signals(cls: tp.Type[PortfolioT],
-                     close: tp.ArrayLike,
-                     entries: tp.Optional[tp.ArrayLike] = None,
-                     exits: tp.Optional[tp.ArrayLike] = None,
-                     short_entries: tp.Optional[tp.ArrayLike] = None,
-                     short_exits: tp.Optional[tp.ArrayLike] = None,
-                     signal_func_nb: nb.SignalFuncT = nb.no_signal_func_nb,
-                     signal_args: tp.ArgsLike = (),
-                     size: tp.Optional[tp.ArrayLike] = None,
-                     size_type: tp.Optional[tp.ArrayLike] = None,
-                     price: tp.Optional[tp.ArrayLike] = None,
-                     fees: tp.Optional[tp.ArrayLike] = None,
-                     fixed_fees: tp.Optional[tp.ArrayLike] = None,
-                     slippage: tp.Optional[tp.ArrayLike] = None,
-                     min_size: tp.Optional[tp.ArrayLike] = None,
-                     max_size: tp.Optional[tp.ArrayLike] = None,
-                     size_granularity: tp.Optional[tp.ArrayLike] = None,
-                     reject_prob: tp.Optional[tp.ArrayLike] = None,
-                     price_area_vio_mode: tp.Optional[tp.ArrayLike] = None,
-                     lock_cash: tp.Optional[tp.ArrayLike] = None,
-                     allow_partial: tp.Optional[tp.ArrayLike] = None,
-                     raise_reject: tp.Optional[tp.ArrayLike] = None,
-                     log: tp.Optional[tp.ArrayLike] = None,
-                     accumulate: tp.Optional[tp.ArrayLike] = None,
-                     upon_long_conflict: tp.Optional[tp.ArrayLike] = None,
-                     upon_short_conflict: tp.Optional[tp.ArrayLike] = None,
-                     upon_dir_conflict: tp.Optional[tp.ArrayLike] = None,
-                     upon_opposite_entry: tp.Optional[tp.ArrayLike] = None,
-                     direction: tp.Optional[tp.ArrayLike] = None,
-                     val_price: tp.Optional[tp.ArrayLike] = None,
-                     open: tp.ArrayLike = np.nan,
-                     high: tp.ArrayLike = np.nan,
-                     low: tp.ArrayLike = np.nan,
-                     sl_stop: tp.Optional[tp.ArrayLike] = None,
-                     sl_trail: tp.Optional[tp.ArrayLike] = None,
-                     tp_stop: tp.Optional[tp.ArrayLike] = None,
-                     stop_entry_price: tp.Optional[tp.ArrayLike] = None,
-                     stop_exit_price: tp.Optional[tp.ArrayLike] = None,
-                     upon_stop_exit: tp.Optional[tp.ArrayLike] = None,
-                     upon_stop_update: tp.Optional[tp.ArrayLike] = None,
-                     signal_priority: tp.Optional[tp.ArrayLike] = None,
-                     adjust_sl_func_nb: nb.AdjustSLFuncT = nb.no_adjust_sl_func_nb,
-                     adjust_sl_args: tp.Args = (),
-                     adjust_tp_func_nb: nb.AdjustTPFuncT = nb.no_adjust_tp_func_nb,
-                     adjust_tp_args: tp.Args = (),
-                     use_stops: tp.Optional[bool] = None,
-                     init_cash: tp.Optional[tp.ArrayLike] = None,
-                     init_position: tp.Optional[tp.ArrayLike] = None,
-                     cash_deposits: tp.Optional[tp.ArrayLike] = None,
-                     cash_earnings: tp.Optional[tp.ArrayLike] = None,
-                     cash_dividends: tp.Optional[tp.ArrayLike] = None,
-                     cash_sharing: tp.Optional[bool] = None,
-                     call_seq: tp.Optional[tp.ArrayLike] = None,
-                     attach_call_seq: tp.Optional[bool] = None,
-                     ffill_val_price: tp.Optional[bool] = None,
-                     update_value: tp.Optional[bool] = None,
-                     fill_returns: tp.Optional[bool] = None,
-                     max_orders: tp.Optional[int] = None,
-                     max_logs: tp.Optional[int] = None,
-                     seed: tp.Optional[int] = None,
-                     group_by: tp.GroupByLike = None,
-                     broadcast_named_args: tp.KwargsLike = None,
-                     broadcast_kwargs: tp.KwargsLike = None,
-                     template_context: tp.Optional[tp.Mapping] = None,
-                     jitted: tp.JittedOption = None,
-                     chunked: tp.ChunkedOption = None,
-                     wrapper_kwargs: tp.KwargsLike = None,
-                     freq: tp.Optional[tp.FrequencyLike] = None,
-                     bm_close: tp.Optional[tp.ArrayLike] = None,
-                     **kwargs) -> PortfolioT:
+    def from_signals(
+        cls: tp.Type[PortfolioT],
+        close: tp.ArrayLike,
+        entries: tp.Optional[tp.ArrayLike] = None,
+        exits: tp.Optional[tp.ArrayLike] = None,
+        short_entries: tp.Optional[tp.ArrayLike] = None,
+        short_exits: tp.Optional[tp.ArrayLike] = None,
+        signal_func_nb: nb.SignalFuncT = nb.no_signal_func_nb,
+        signal_args: tp.ArgsLike = (),
+        size: tp.Optional[tp.ArrayLike] = None,
+        size_type: tp.Optional[tp.ArrayLike] = None,
+        price: tp.Optional[tp.ArrayLike] = None,
+        fees: tp.Optional[tp.ArrayLike] = None,
+        fixed_fees: tp.Optional[tp.ArrayLike] = None,
+        slippage: tp.Optional[tp.ArrayLike] = None,
+        min_size: tp.Optional[tp.ArrayLike] = None,
+        max_size: tp.Optional[tp.ArrayLike] = None,
+        size_granularity: tp.Optional[tp.ArrayLike] = None,
+        reject_prob: tp.Optional[tp.ArrayLike] = None,
+        price_area_vio_mode: tp.Optional[tp.ArrayLike] = None,
+        lock_cash: tp.Optional[tp.ArrayLike] = None,
+        allow_partial: tp.Optional[tp.ArrayLike] = None,
+        raise_reject: tp.Optional[tp.ArrayLike] = None,
+        log: tp.Optional[tp.ArrayLike] = None,
+        accumulate: tp.Optional[tp.ArrayLike] = None,
+        upon_long_conflict: tp.Optional[tp.ArrayLike] = None,
+        upon_short_conflict: tp.Optional[tp.ArrayLike] = None,
+        upon_dir_conflict: tp.Optional[tp.ArrayLike] = None,
+        upon_opposite_entry: tp.Optional[tp.ArrayLike] = None,
+        direction: tp.Optional[tp.ArrayLike] = None,
+        val_price: tp.Optional[tp.ArrayLike] = None,
+        open: tp.ArrayLike = np.nan,
+        high: tp.ArrayLike = np.nan,
+        low: tp.ArrayLike = np.nan,
+        sl_stop: tp.Optional[tp.ArrayLike] = None,
+        sl_trail: tp.Optional[tp.ArrayLike] = None,
+        tp_stop: tp.Optional[tp.ArrayLike] = None,
+        stop_entry_price: tp.Optional[tp.ArrayLike] = None,
+        stop_exit_price: tp.Optional[tp.ArrayLike] = None,
+        upon_stop_exit: tp.Optional[tp.ArrayLike] = None,
+        upon_stop_update: tp.Optional[tp.ArrayLike] = None,
+        signal_priority: tp.Optional[tp.ArrayLike] = None,
+        adjust_sl_func_nb: nb.AdjustSLFuncT = nb.no_adjust_sl_func_nb,
+        adjust_sl_args: tp.Args = (),
+        adjust_tp_func_nb: nb.AdjustTPFuncT = nb.no_adjust_tp_func_nb,
+        adjust_tp_args: tp.Args = (),
+        use_stops: tp.Optional[bool] = None,
+        init_cash: tp.Optional[tp.ArrayLike] = None,
+        init_position: tp.Optional[tp.ArrayLike] = None,
+        cash_deposits: tp.Optional[tp.ArrayLike] = None,
+        cash_earnings: tp.Optional[tp.ArrayLike] = None,
+        cash_dividends: tp.Optional[tp.ArrayLike] = None,
+        cash_sharing: tp.Optional[bool] = None,
+        call_seq: tp.Optional[tp.ArrayLike] = None,
+        attach_call_seq: tp.Optional[bool] = None,
+        ffill_val_price: tp.Optional[bool] = None,
+        update_value: tp.Optional[bool] = None,
+        fill_returns: tp.Optional[bool] = None,
+        max_orders: tp.Optional[int] = None,
+        max_logs: tp.Optional[int] = None,
+        seed: tp.Optional[int] = None,
+        group_by: tp.GroupByLike = None,
+        broadcast_named_args: tp.KwargsLike = None,
+        broadcast_kwargs: tp.KwargsLike = None,
+        template_context: tp.Optional[tp.Mapping] = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper_kwargs: tp.KwargsLike = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+        bm_close: tp.Optional[tp.ArrayLike] = None,
+        **kwargs,
+    ) -> PortfolioT:
         """Simulate portfolio from entry and exit signals.
 
         See `vectorbtpro.portfolio.nb.from_signals.simulate_from_signal_func_nb`.
@@ -3897,7 +3813,8 @@ class Portfolio(Analyzable):
         """
         # Get defaults
         from vectorbtpro._settings import settings
-        portfolio_cfg = settings['portfolio']
+
+        portfolio_cfg = settings["portfolio"]
 
         ls_mode = short_entries is not None or short_exits is not None
         signal_func_mode = signal_func_nb is not nb.no_signal_func_nb
@@ -3920,82 +3837,84 @@ class Portfolio(Analyzable):
             else:
                 signal_func_nb = nb.dir_enex_signal_func_nb
         if size is None:
-            size = portfolio_cfg['size']
+            size = portfolio_cfg["size"]
         if size_type is None:
-            size_type = portfolio_cfg['size_type']
+            size_type = portfolio_cfg["size_type"]
         if price is None:
-            price = portfolio_cfg['price']
+            price = portfolio_cfg["price"]
         if fees is None:
-            fees = portfolio_cfg['fees']
+            fees = portfolio_cfg["fees"]
         if fixed_fees is None:
-            fixed_fees = portfolio_cfg['fixed_fees']
+            fixed_fees = portfolio_cfg["fixed_fees"]
         if slippage is None:
-            slippage = portfolio_cfg['slippage']
+            slippage = portfolio_cfg["slippage"]
         if min_size is None:
-            min_size = portfolio_cfg['min_size']
+            min_size = portfolio_cfg["min_size"]
         if max_size is None:
-            max_size = portfolio_cfg['max_size']
+            max_size = portfolio_cfg["max_size"]
         if size_granularity is None:
-            size_granularity = portfolio_cfg['size_granularity']
+            size_granularity = portfolio_cfg["size_granularity"]
         if reject_prob is None:
-            reject_prob = portfolio_cfg['reject_prob']
+            reject_prob = portfolio_cfg["reject_prob"]
         if price_area_vio_mode is None:
-            price_area_vio_mode = portfolio_cfg['price_area_vio_mode']
+            price_area_vio_mode = portfolio_cfg["price_area_vio_mode"]
         if lock_cash is None:
-            lock_cash = portfolio_cfg['lock_cash']
+            lock_cash = portfolio_cfg["lock_cash"]
         if allow_partial is None:
-            allow_partial = portfolio_cfg['allow_partial']
+            allow_partial = portfolio_cfg["allow_partial"]
         if raise_reject is None:
-            raise_reject = portfolio_cfg['raise_reject']
+            raise_reject = portfolio_cfg["raise_reject"]
         if log is None:
-            log = portfolio_cfg['log']
+            log = portfolio_cfg["log"]
         if accumulate is None:
-            accumulate = portfolio_cfg['accumulate']
+            accumulate = portfolio_cfg["accumulate"]
         if upon_long_conflict is None:
-            upon_long_conflict = portfolio_cfg['upon_long_conflict']
+            upon_long_conflict = portfolio_cfg["upon_long_conflict"]
         if upon_short_conflict is None:
-            upon_short_conflict = portfolio_cfg['upon_short_conflict']
+            upon_short_conflict = portfolio_cfg["upon_short_conflict"]
         if upon_dir_conflict is None:
-            upon_dir_conflict = portfolio_cfg['upon_dir_conflict']
+            upon_dir_conflict = portfolio_cfg["upon_dir_conflict"]
         if upon_opposite_entry is None:
-            upon_opposite_entry = portfolio_cfg['upon_opposite_entry']
+            upon_opposite_entry = portfolio_cfg["upon_opposite_entry"]
         if direction is not None and ls_mode:
             warnings.warn("direction has no effect if short_entries and short_exits are set", stacklevel=2)
         if direction is None:
-            direction = portfolio_cfg['signal_direction']
+            direction = portfolio_cfg["signal_direction"]
         if val_price is None:
-            val_price = portfolio_cfg['val_price']
+            val_price = portfolio_cfg["val_price"]
         if sl_stop is None:
-            sl_stop = portfolio_cfg['sl_stop']
+            sl_stop = portfolio_cfg["sl_stop"]
         if sl_trail is None:
-            sl_trail = portfolio_cfg['sl_trail']
+            sl_trail = portfolio_cfg["sl_trail"]
         if tp_stop is None:
-            tp_stop = portfolio_cfg['tp_stop']
+            tp_stop = portfolio_cfg["tp_stop"]
         if stop_entry_price is None:
-            stop_entry_price = portfolio_cfg['stop_entry_price']
+            stop_entry_price = portfolio_cfg["stop_entry_price"]
         if stop_exit_price is None:
-            stop_exit_price = portfolio_cfg['stop_exit_price']
+            stop_exit_price = portfolio_cfg["stop_exit_price"]
         if upon_stop_exit is None:
-            upon_stop_exit = portfolio_cfg['upon_stop_exit']
+            upon_stop_exit = portfolio_cfg["upon_stop_exit"]
         if upon_stop_update is None:
-            upon_stop_update = portfolio_cfg['upon_stop_update']
+            upon_stop_update = portfolio_cfg["upon_stop_update"]
         if signal_priority is None:
-            signal_priority = portfolio_cfg['signal_priority']
+            signal_priority = portfolio_cfg["signal_priority"]
         if use_stops is None:
-            use_stops = portfolio_cfg['use_stops']
+            use_stops = portfolio_cfg["use_stops"]
         if use_stops is None:
-            if isinstance(sl_stop, float) and \
-                    np.isnan(sl_stop) and \
-                    isinstance(tp_stop, float) and \
-                    np.isnan(tp_stop) and \
-                    adjust_sl_func_nb == nb.no_adjust_sl_func_nb and \
-                    adjust_tp_func_nb == nb.no_adjust_tp_func_nb:
+            if (
+                isinstance(sl_stop, float)
+                and np.isnan(sl_stop)
+                and isinstance(tp_stop, float)
+                and np.isnan(tp_stop)
+                and adjust_sl_func_nb == nb.no_adjust_sl_func_nb
+                and adjust_tp_func_nb == nb.no_adjust_tp_func_nb
+            ):
                 use_stops = False
             else:
                 use_stops = True
 
         if init_cash is None:
-            init_cash = portfolio_cfg['init_cash']
+            init_cash = portfolio_cfg["init_cash"]
         if isinstance(init_cash, str):
             init_cash = map_enum_fields(init_cash, InitCashMode)
         if isinstance(init_cash, int) and init_cash in InitCashMode:
@@ -4004,19 +3923,19 @@ class Portfolio(Analyzable):
         else:
             init_cash_mode = None
         if init_position is None:
-            init_position = portfolio_cfg['init_position']
+            init_position = portfolio_cfg["init_position"]
         if cash_deposits is None:
-            cash_deposits = portfolio_cfg['cash_deposits']
+            cash_deposits = portfolio_cfg["cash_deposits"]
         if cash_earnings is None:
-            cash_earnings = portfolio_cfg['cash_earnings']
+            cash_earnings = portfolio_cfg["cash_earnings"]
         if cash_dividends is None:
-            cash_dividends = portfolio_cfg['cash_dividends']
+            cash_dividends = portfolio_cfg["cash_dividends"]
         if cash_sharing is None:
-            cash_sharing = portfolio_cfg['cash_sharing']
+            cash_sharing = portfolio_cfg["cash_sharing"]
         if cash_sharing and group_by is None:
             group_by = True
         if call_seq is None:
-            call_seq = portfolio_cfg['call_seq']
+            call_seq = portfolio_cfg["call_seq"]
         auto_call_seq = False
         if isinstance(call_seq, str):
             call_seq = map_enum_fields(call_seq, CallSeqType)
@@ -4025,32 +3944,32 @@ class Portfolio(Analyzable):
                 call_seq = CallSeqType.Default
                 auto_call_seq = True
         if attach_call_seq is None:
-            attach_call_seq = portfolio_cfg['attach_call_seq']
+            attach_call_seq = portfolio_cfg["attach_call_seq"]
         if ffill_val_price is None:
-            ffill_val_price = portfolio_cfg['ffill_val_price']
+            ffill_val_price = portfolio_cfg["ffill_val_price"]
         if update_value is None:
-            update_value = portfolio_cfg['update_value']
+            update_value = portfolio_cfg["update_value"]
         if fill_returns is None:
-            fill_returns = portfolio_cfg['fill_returns']
+            fill_returns = portfolio_cfg["fill_returns"]
         if seed is None:
-            seed = portfolio_cfg['seed']
+            seed = portfolio_cfg["seed"]
         if seed is not None:
             set_seed(seed)
         if group_by is None:
-            group_by = portfolio_cfg['group_by']
+            group_by = portfolio_cfg["group_by"]
         if freq is None:
-            freq = portfolio_cfg['freq']
+            freq = portfolio_cfg["freq"]
         if broadcast_named_args is None:
             broadcast_named_args = {}
-        broadcast_kwargs = merge_dicts(portfolio_cfg['broadcast_kwargs'], broadcast_kwargs)
-        require_kwargs = broadcast_kwargs.get('require_kwargs', {})
-        template_context = merge_dicts(portfolio_cfg['template_context'], template_context)
+        broadcast_kwargs = merge_dicts(portfolio_cfg["broadcast_kwargs"], broadcast_kwargs)
+        require_kwargs = broadcast_kwargs.get("require_kwargs", {})
+        template_context = merge_dicts(portfolio_cfg["template_context"], template_context)
         if wrapper_kwargs is None:
             wrapper_kwargs = {}
-        if not wrapper_kwargs.get('group_select', True) and cash_sharing:
+        if not wrapper_kwargs.get("group_select", True) and cash_sharing:
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
         if bm_close is None:
-            bm_close = portfolio_cfg['bm_close']
+            bm_close = portfolio_cfg["bm_close"]
 
         # Prepare the simulation
         broadcastable_args = dict(
@@ -4088,44 +4007,41 @@ class Portfolio(Analyzable):
             stop_exit_price=stop_exit_price,
             upon_stop_exit=upon_stop_exit,
             upon_stop_update=upon_stop_update,
-            signal_priority=signal_priority
+            signal_priority=signal_priority,
         )
         if bm_close is not None and not isinstance(bm_close, bool):
-            broadcastable_args['bm_close'] = bm_close
+            broadcastable_args["bm_close"] = bm_close
         if not signal_func_mode:
             if ls_mode:
-                broadcastable_args['entries'] = entries
-                broadcastable_args['exits'] = exits
-                broadcastable_args['short_entries'] = short_entries
-                broadcastable_args['short_exits'] = short_exits
+                broadcastable_args["entries"] = entries
+                broadcastable_args["exits"] = exits
+                broadcastable_args["short_entries"] = short_entries
+                broadcastable_args["short_exits"] = short_exits
             else:
-                broadcastable_args['entries'] = entries
-                broadcastable_args['exits'] = exits
-                broadcastable_args['direction'] = direction
+                broadcastable_args["entries"] = entries
+                broadcastable_args["exits"] = exits
+                broadcastable_args["direction"] = direction
         broadcastable_args = {**broadcastable_args, **broadcast_named_args}
         # Only close is broadcast, others can remain unchanged thanks to flexible indexing
-        broadcast_kwargs = merge_dicts(dict(
-            keep_flex=dict(
-                close=False,
-                bm_close=False,
-                _default=True
-            )
-        ), broadcast_kwargs)
+        broadcast_kwargs = merge_dicts(
+            dict(keep_flex=dict(close=False, bm_close=False, _default=True)),
+            broadcast_kwargs,
+        )
         broadcasted_args = broadcast(broadcastable_args, **broadcast_kwargs)
-        cash_earnings = broadcasted_args.pop('cash_earnings')
-        cash_dividends = broadcasted_args.pop('cash_dividends')
-        close = broadcasted_args['close']
+        cash_earnings = broadcasted_args.pop("cash_earnings")
+        cash_dividends = broadcasted_args.pop("cash_dividends")
+        close = broadcasted_args["close"]
         if not checks.is_pandas(close):
             close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
         if bm_close is not None and not isinstance(bm_close, bool):
-            bm_close = broadcasted_args['bm_close']
+            bm_close = broadcasted_args["bm_close"]
             if not checks.is_pandas(bm_close):
                 bm_close = pd.Series(bm_close) if bm_close.ndim == 1 else pd.DataFrame(bm_close)
-            broadcasted_args['bm_close'] = to_2d_array(bm_close)
+            broadcasted_args["bm_close"] = to_2d_array(bm_close)
         else:
-            broadcasted_args['bm_close'] = None
+            broadcasted_args["bm_close"] = None
         flex_2d = close.ndim == 2
-        broadcasted_args['close'] = to_2d_array(close)
+        broadcasted_args["close"] = to_2d_array(close)
         target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
 
         wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
@@ -4137,7 +4053,7 @@ class Portfolio(Analyzable):
             to_shape=(target_shape_2d[0], len(cs_group_lens)),
             to_pd=False,
             keep_flex=True,
-            **require_kwargs
+            **require_kwargs,
         )
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
         if checks.is_any_array(call_seq):
@@ -4148,33 +4064,33 @@ class Portfolio(Analyzable):
             max_logs = 0
 
         # Convert strings to numbers
-        broadcasted_args['size_type'] = map_enum_fields(
-            broadcasted_args['size_type'], SizeType)
-        broadcasted_args['price_area_vio_mode'] = map_enum_fields(
-            broadcasted_args['price_area_vio_mode'], PriceAreaVioMode)
-        broadcasted_args['accumulate'] = map_enum_fields(
-            broadcasted_args['accumulate'], AccumulationMode, ignore_type=(int, bool))
-        broadcasted_args['upon_long_conflict'] = map_enum_fields(
-            broadcasted_args['upon_long_conflict'], ConflictMode)
-        broadcasted_args['upon_short_conflict'] = map_enum_fields(
-            broadcasted_args['upon_short_conflict'], ConflictMode)
-        broadcasted_args['upon_dir_conflict'] = map_enum_fields(
-            broadcasted_args['upon_dir_conflict'], DirectionConflictMode)
-        broadcasted_args['upon_opposite_entry'] = map_enum_fields(
-            broadcasted_args['upon_opposite_entry'], OppositeEntryMode)
-        broadcasted_args['stop_entry_price'] = map_enum_fields(
-            broadcasted_args['stop_entry_price'], StopEntryPrice)
-        broadcasted_args['stop_exit_price'] = map_enum_fields(
-            broadcasted_args['stop_exit_price'], StopExitPrice)
-        broadcasted_args['upon_stop_exit'] = map_enum_fields(
-            broadcasted_args['upon_stop_exit'], StopExitMode)
-        broadcasted_args['upon_stop_update'] = map_enum_fields(
-            broadcasted_args['upon_stop_update'], StopUpdateMode)
-        broadcasted_args['signal_priority'] = map_enum_fields(
-            broadcasted_args['signal_priority'], SignalPriority)
-        if 'direction' in broadcasted_args:
-            broadcasted_args['direction'] = map_enum_fields(
-                broadcasted_args['direction'], Direction)
+        broadcasted_args["size_type"] = map_enum_fields(broadcasted_args["size_type"], SizeType)
+        broadcasted_args["price_area_vio_mode"] = map_enum_fields(
+            broadcasted_args["price_area_vio_mode"],
+            PriceAreaVioMode,
+        )
+        broadcasted_args["accumulate"] = map_enum_fields(
+            broadcasted_args["accumulate"],
+            AccumulationMode,
+            ignore_type=(int, bool),
+        )
+        broadcasted_args["upon_long_conflict"] = map_enum_fields(broadcasted_args["upon_long_conflict"], ConflictMode)
+        broadcasted_args["upon_short_conflict"] = map_enum_fields(broadcasted_args["upon_short_conflict"], ConflictMode)
+        broadcasted_args["upon_dir_conflict"] = map_enum_fields(
+            broadcasted_args["upon_dir_conflict"],
+            DirectionConflictMode,
+        )
+        broadcasted_args["upon_opposite_entry"] = map_enum_fields(
+            broadcasted_args["upon_opposite_entry"],
+            OppositeEntryMode,
+        )
+        broadcasted_args["stop_entry_price"] = map_enum_fields(broadcasted_args["stop_entry_price"], StopEntryPrice)
+        broadcasted_args["stop_exit_price"] = map_enum_fields(broadcasted_args["stop_exit_price"], StopExitPrice)
+        broadcasted_args["upon_stop_exit"] = map_enum_fields(broadcasted_args["upon_stop_exit"], StopExitMode)
+        broadcasted_args["upon_stop_update"] = map_enum_fields(broadcasted_args["upon_stop_update"], StopUpdateMode)
+        broadcasted_args["signal_priority"] = map_enum_fields(broadcasted_args["signal_priority"], SignalPriority)
+        if "direction" in broadcasted_args:
+            broadcasted_args["direction"] = map_enum_fields(broadcasted_args["direction"], Direction)
 
         # Check data types
         checks.assert_subdtype(cs_group_lens, np.integer)
@@ -4184,51 +4100,51 @@ class Portfolio(Analyzable):
         checks.assert_subdtype(cash_deposits, np.number)
         checks.assert_subdtype(cash_earnings, np.number)
         checks.assert_subdtype(cash_dividends, np.number)
-        checks.assert_subdtype(broadcasted_args['size'], np.number)
-        checks.assert_subdtype(broadcasted_args['price'], np.number)
-        checks.assert_subdtype(broadcasted_args['size_type'], np.integer)
-        checks.assert_subdtype(broadcasted_args['fees'], np.number)
-        checks.assert_subdtype(broadcasted_args['fixed_fees'], np.number)
-        checks.assert_subdtype(broadcasted_args['slippage'], np.number)
-        checks.assert_subdtype(broadcasted_args['min_size'], np.number)
-        checks.assert_subdtype(broadcasted_args['max_size'], np.number)
-        checks.assert_subdtype(broadcasted_args['size_granularity'], np.number)
-        checks.assert_subdtype(broadcasted_args['reject_prob'], np.number)
-        checks.assert_subdtype(broadcasted_args['price_area_vio_mode'], np.integer)
-        checks.assert_subdtype(broadcasted_args['lock_cash'], np.bool_)
-        checks.assert_subdtype(broadcasted_args['allow_partial'], np.bool_)
-        checks.assert_subdtype(broadcasted_args['raise_reject'], np.bool_)
-        checks.assert_subdtype(broadcasted_args['log'], np.bool_)
-        checks.assert_subdtype(broadcasted_args['accumulate'], (np.integer, np.bool_))
-        checks.assert_subdtype(broadcasted_args['upon_long_conflict'], np.integer)
-        checks.assert_subdtype(broadcasted_args['upon_short_conflict'], np.integer)
-        checks.assert_subdtype(broadcasted_args['upon_dir_conflict'], np.integer)
-        checks.assert_subdtype(broadcasted_args['upon_opposite_entry'], np.integer)
-        checks.assert_subdtype(broadcasted_args['val_price'], np.number)
-        checks.assert_subdtype(broadcasted_args['open'], np.number)
-        checks.assert_subdtype(broadcasted_args['high'], np.number)
-        checks.assert_subdtype(broadcasted_args['low'], np.number)
-        checks.assert_subdtype(broadcasted_args['close'], np.number)
-        checks.assert_subdtype(broadcasted_args['sl_stop'], np.number)
-        checks.assert_subdtype(broadcasted_args['sl_trail'], np.bool_)
-        checks.assert_subdtype(broadcasted_args['tp_stop'], np.number)
-        checks.assert_subdtype(broadcasted_args['stop_entry_price'], np.integer)
-        checks.assert_subdtype(broadcasted_args['stop_exit_price'], np.integer)
-        checks.assert_subdtype(broadcasted_args['upon_stop_exit'], np.integer)
-        checks.assert_subdtype(broadcasted_args['upon_stop_update'], np.integer)
-        checks.assert_subdtype(broadcasted_args['signal_priority'], np.integer)
-        if 'entries' in broadcasted_args:
-            checks.assert_subdtype(broadcasted_args['entries'], np.bool_)
-        if 'exits' in broadcasted_args:
-            checks.assert_subdtype(broadcasted_args['exits'], np.bool_)
-        if 'short_entries' in broadcasted_args:
-            checks.assert_subdtype(broadcasted_args['short_entries'], np.bool_)
-        if 'short_exits' in broadcasted_args:
-            checks.assert_subdtype(broadcasted_args['short_exits'], np.bool_)
-        if 'direction' in broadcasted_args:
-            checks.assert_subdtype(broadcasted_args['direction'], np.integer)
+        checks.assert_subdtype(broadcasted_args["size"], np.number)
+        checks.assert_subdtype(broadcasted_args["price"], np.number)
+        checks.assert_subdtype(broadcasted_args["size_type"], np.integer)
+        checks.assert_subdtype(broadcasted_args["fees"], np.number)
+        checks.assert_subdtype(broadcasted_args["fixed_fees"], np.number)
+        checks.assert_subdtype(broadcasted_args["slippage"], np.number)
+        checks.assert_subdtype(broadcasted_args["min_size"], np.number)
+        checks.assert_subdtype(broadcasted_args["max_size"], np.number)
+        checks.assert_subdtype(broadcasted_args["size_granularity"], np.number)
+        checks.assert_subdtype(broadcasted_args["reject_prob"], np.number)
+        checks.assert_subdtype(broadcasted_args["price_area_vio_mode"], np.integer)
+        checks.assert_subdtype(broadcasted_args["lock_cash"], np.bool_)
+        checks.assert_subdtype(broadcasted_args["allow_partial"], np.bool_)
+        checks.assert_subdtype(broadcasted_args["raise_reject"], np.bool_)
+        checks.assert_subdtype(broadcasted_args["log"], np.bool_)
+        checks.assert_subdtype(broadcasted_args["accumulate"], (np.integer, np.bool_))
+        checks.assert_subdtype(broadcasted_args["upon_long_conflict"], np.integer)
+        checks.assert_subdtype(broadcasted_args["upon_short_conflict"], np.integer)
+        checks.assert_subdtype(broadcasted_args["upon_dir_conflict"], np.integer)
+        checks.assert_subdtype(broadcasted_args["upon_opposite_entry"], np.integer)
+        checks.assert_subdtype(broadcasted_args["val_price"], np.number)
+        checks.assert_subdtype(broadcasted_args["open"], np.number)
+        checks.assert_subdtype(broadcasted_args["high"], np.number)
+        checks.assert_subdtype(broadcasted_args["low"], np.number)
+        checks.assert_subdtype(broadcasted_args["close"], np.number)
+        checks.assert_subdtype(broadcasted_args["sl_stop"], np.number)
+        checks.assert_subdtype(broadcasted_args["sl_trail"], np.bool_)
+        checks.assert_subdtype(broadcasted_args["tp_stop"], np.number)
+        checks.assert_subdtype(broadcasted_args["stop_entry_price"], np.integer)
+        checks.assert_subdtype(broadcasted_args["stop_exit_price"], np.integer)
+        checks.assert_subdtype(broadcasted_args["upon_stop_exit"], np.integer)
+        checks.assert_subdtype(broadcasted_args["upon_stop_update"], np.integer)
+        checks.assert_subdtype(broadcasted_args["signal_priority"], np.integer)
+        if "entries" in broadcasted_args:
+            checks.assert_subdtype(broadcasted_args["entries"], np.bool_)
+        if "exits" in broadcasted_args:
+            checks.assert_subdtype(broadcasted_args["exits"], np.bool_)
+        if "short_entries" in broadcasted_args:
+            checks.assert_subdtype(broadcasted_args["short_entries"], np.bool_)
+        if "short_exits" in broadcasted_args:
+            checks.assert_subdtype(broadcasted_args["short_exits"], np.bool_)
+        if "direction" in broadcasted_args:
+            checks.assert_subdtype(broadcasted_args["direction"], np.integer)
         if bm_close is not None and not isinstance(bm_close, bool):
-            checks.assert_subdtype(broadcasted_args['bm_close'], np.number)
+            checks.assert_subdtype(broadcasted_args["bm_close"], np.number)
 
         # Prepare arguments
         template_context = merge_dicts(
@@ -4254,21 +4170,21 @@ class Portfolio(Analyzable):
                 max_orders=max_orders,
                 max_logs=max_logs,
                 flex_2d=flex_2d,
-                wrapper=wrapper
+                wrapper=wrapper,
             ),
-            template_context
+            template_context,
         )
-        adjust_sl_args = deep_substitute(adjust_sl_args, template_context, sub_id='adjust_sl_args')
-        adjust_tp_args = deep_substitute(adjust_tp_args, template_context, sub_id='adjust_tp_args')
+        adjust_sl_args = deep_substitute(adjust_sl_args, template_context, sub_id="adjust_sl_args")
+        adjust_tp_args = deep_substitute(adjust_tp_args, template_context, sub_id="adjust_tp_args")
         if signal_func_mode:
-            signal_args = deep_substitute(signal_args, template_context, sub_id='signal_args')
+            signal_args = deep_substitute(signal_args, template_context, sub_id="signal_args")
         else:
             if ls_mode:
                 signal_args = (
-                    broadcasted_args.pop('entries'),
-                    broadcasted_args.pop('exits'),
-                    broadcasted_args.pop('short_entries'),
-                    broadcasted_args.pop('short_exits')
+                    broadcasted_args.pop("entries"),
+                    broadcasted_args.pop("exits"),
+                    broadcasted_args.pop("short_entries"),
+                    broadcasted_args.pop("short_exits"),
                 )
                 chunked = ch.specialize_chunked_option(
                     chunked,
@@ -4277,15 +4193,15 @@ class Portfolio(Analyzable):
                             portfolio_ch.flex_array_gl_slicer,
                             portfolio_ch.flex_array_gl_slicer,
                             portfolio_ch.flex_array_gl_slicer,
-                            portfolio_ch.flex_array_gl_slicer
+                            portfolio_ch.flex_array_gl_slicer,
                         )
-                    )
+                    ),
                 )
             else:
                 signal_args = (
-                    broadcasted_args.pop('entries'),
-                    broadcasted_args.pop('exits'),
-                    broadcasted_args.pop('direction')
+                    broadcasted_args.pop("entries"),
+                    broadcasted_args.pop("exits"),
+                    broadcasted_args.pop("direction"),
                 )
                 chunked = ch.specialize_chunked_option(
                     chunked,
@@ -4293,13 +4209,13 @@ class Portfolio(Analyzable):
                         signal_args=ch.ArgsTaker(
                             portfolio_ch.flex_array_gl_slicer,
                             portfolio_ch.flex_array_gl_slicer,
-                            portfolio_ch.flex_array_gl_slicer
+                            portfolio_ch.flex_array_gl_slicer,
                         )
-                    )
+                    ),
                 )
         for k in broadcast_named_args:
             broadcasted_args.pop(k)
-        broadcasted_args.pop('bm_close', None)
+        broadcasted_args.pop("bm_close", None)
 
         # Perform the simulation
         func = jit_reg.resolve_option(nb.simulate_from_signal_func_nb, jitted)
@@ -4327,7 +4243,7 @@ class Portfolio(Analyzable):
             fill_returns=fill_returns,
             max_orders=max_orders,
             max_logs=max_logs,
-            flex_2d=flex_2d
+            flex_2d=flex_2d,
         )
 
         # Create an instance
@@ -4344,17 +4260,19 @@ class Portfolio(Analyzable):
             call_seq=call_seq if attach_call_seq else None,
             in_outputs=sim_out.in_outputs,
             bm_close=bm_close,
-            **kwargs
+            **kwargs,
         )
 
     @classmethod
-    def from_holding(cls: tp.Type[PortfolioT],
-                     close: tp.ArrayLike,
-                     size: tp.Optional[tp.ArrayLike] = None,
-                     direction: tp.Optional[tp.ArrayLike] = None,
-                     sell_at_end: tp.Optional[bool] = None,
-                     base_method: tp.Optional[str] = None,
-                     **kwargs) -> PortfolioT:
+    def from_holding(
+        cls: tp.Type[PortfolioT],
+        close: tp.ArrayLike,
+        size: tp.Optional[tp.ArrayLike] = None,
+        direction: tp.Optional[tp.ArrayLike] = None,
+        sell_at_end: tp.Optional[bool] = None,
+        base_method: tp.Optional[str] = None,
+        **kwargs,
+    ) -> PortfolioT:
         """Simulate portfolio from plain holding.
 
         Has two base methods:
@@ -4387,19 +4305,20 @@ class Portfolio(Analyzable):
             ```
         """
         from vectorbtpro._settings import settings
-        portfolio_cfg = settings['portfolio']
+
+        portfolio_cfg = settings["portfolio"]
 
         if direction is None:
-            direction = portfolio_cfg['hold_direction']
+            direction = portfolio_cfg["hold_direction"]
         if sell_at_end is None:
-            sell_at_end = portfolio_cfg['sell_at_end']
+            sell_at_end = portfolio_cfg["sell_at_end"]
         if base_method is None:
-            base_method = portfolio_cfg['hold_base_method']
+            base_method = portfolio_cfg["hold_base_method"]
 
-        if base_method.lower() == 'from_signals':
+        if base_method.lower() == "from_signals":
             if sell_at_end:
-                entries = broadcast_to(True, close, require_kwargs=dict(requirements='W'))
-                exits = broadcast_to(False, close, require_kwargs=dict(requirements='W'))
+                entries = broadcast_to(True, close, require_kwargs=dict(requirements="W"))
+                exits = broadcast_to(False, close, require_kwargs=dict(requirements="W"))
                 if checks.is_pandas(entries):
                     entries.iloc[1:] = False
                 else:
@@ -4418,13 +4337,13 @@ class Portfolio(Analyzable):
                 accumulate=False,
                 size=size,
                 direction=direction,
-                **kwargs
+                **kwargs,
             )
-        if base_method.lower() == 'from_orders':
+        if base_method.lower() == "from_orders":
             if size is None:
-                size = portfolio_cfg['size']
+                size = portfolio_cfg["size"]
             close = to_pd_array(close)
-            size_arr = broadcast_to(size, close, require_kwargs=dict(requirements='W'))
+            size_arr = broadcast_to(size, close, require_kwargs=dict(requirements="W"))
             if checks.is_pandas(size_arr):
                 size_arr.iloc[1:] = np.nan
                 if sell_at_end:
@@ -4437,16 +4356,18 @@ class Portfolio(Analyzable):
         raise ValueError(f"Unknown base method '{base_method}'")
 
     @classmethod
-    def from_random_signals(cls: tp.Type[PortfolioT],
-                            close: tp.ArrayLike,
-                            n: tp.Optional[tp.ArrayLike] = None,
-                            prob: tp.Optional[tp.ArrayLike] = None,
-                            entry_prob: tp.Optional[tp.ArrayLike] = None,
-                            exit_prob: tp.Optional[tp.ArrayLike] = None,
-                            param_product: bool = False,
-                            seed: tp.Optional[int] = None,
-                            run_kwargs: tp.KwargsLike = None,
-                            **kwargs) -> PortfolioT:
+    def from_random_signals(
+        cls: tp.Type[PortfolioT],
+        close: tp.ArrayLike,
+        n: tp.Optional[tp.ArrayLike] = None,
+        prob: tp.Optional[tp.ArrayLike] = None,
+        entry_prob: tp.Optional[tp.ArrayLike] = None,
+        exit_prob: tp.Optional[tp.ArrayLike] = None,
+        param_product: bool = False,
+        seed: tp.Optional[int] = None,
+        run_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> PortfolioT:
         """Simulate portfolio from random entry and exit signals.
 
         Generates signals based either on the number of signals `n` or the probability
@@ -4499,7 +4420,8 @@ class Portfolio(Analyzable):
             ```
         """
         from vectorbtpro._settings import settings
-        portfolio_cfg = settings['portfolio']
+
+        portfolio_cfg = settings["portfolio"]
 
         close = to_pd_array(close)
         close_wrapper = ArrayWrapper.from_obj(close)
@@ -4508,7 +4430,7 @@ class Portfolio(Analyzable):
         if exit_prob is None:
             exit_prob = prob
         if seed is None:
-            seed = portfolio_cfg['seed']
+            seed = portfolio_cfg["seed"]
         if run_kwargs is None:
             run_kwargs = {}
 
@@ -4521,7 +4443,7 @@ class Portfolio(Analyzable):
                 input_index=close_wrapper.index,
                 input_columns=close_wrapper.columns,
                 seed=seed,
-                **run_kwargs
+                **run_kwargs,
             )
             entries = rand.entries
             exits = rand.exits
@@ -4534,7 +4456,7 @@ class Portfolio(Analyzable):
                 input_index=close_wrapper.index,
                 input_columns=close_wrapper.columns,
                 seed=seed,
-                **run_kwargs
+                **run_kwargs,
             )
             entries = rprobnx.entries
             exits = rprobnx.exits
@@ -4544,62 +4466,64 @@ class Portfolio(Analyzable):
         return cls.from_signals(close, entries, exits, seed=seed, **kwargs)
 
     @classmethod
-    def from_order_func(cls: tp.Type[PortfolioT],
-                        close: tp.ArrayLike,
-                        order_func_nb: tp.Union[nb.OrderFuncT, nb.FlexOrderFuncT],
-                        *order_args,
-                        flexible: tp.Optional[bool] = None,
-                        init_cash: tp.Optional[tp.ArrayLike] = None,
-                        init_position: tp.Optional[tp.ArrayLike] = None,
-                        cash_deposits: tp.Optional[tp.ArrayLike] = None,
-                        cash_earnings: tp.Optional[tp.ArrayLike] = None,
-                        cash_sharing: tp.Optional[bool] = None,
-                        call_seq: tp.Optional[tp.ArrayLike] = None,
-                        attach_call_seq: tp.Optional[bool] = None,
-                        segment_mask: tp.Optional[tp.ArrayLike] = None,
-                        call_pre_segment: tp.Optional[bool] = None,
-                        call_post_segment: tp.Optional[bool] = None,
-                        pre_sim_func_nb: nb.PreSimFuncT = nb.no_pre_func_nb,
-                        pre_sim_args: tp.Args = (),
-                        post_sim_func_nb: nb.PostSimFuncT = nb.no_post_func_nb,
-                        post_sim_args: tp.Args = (),
-                        pre_group_func_nb: nb.PreGroupFuncT = nb.no_pre_func_nb,
-                        pre_group_args: tp.Args = (),
-                        post_group_func_nb: nb.PostGroupFuncT = nb.no_post_func_nb,
-                        post_group_args: tp.Args = (),
-                        pre_row_func_nb: nb.PreRowFuncT = nb.no_pre_func_nb,
-                        pre_row_args: tp.Args = (),
-                        post_row_func_nb: nb.PostRowFuncT = nb.no_post_func_nb,
-                        post_row_args: tp.Args = (),
-                        pre_segment_func_nb: nb.PreSegmentFuncT = nb.no_pre_func_nb,
-                        pre_segment_args: tp.Args = (),
-                        post_segment_func_nb: nb.PostSegmentFuncT = nb.no_post_func_nb,
-                        post_segment_args: tp.Args = (),
-                        post_order_func_nb: nb.PostOrderFuncT = nb.no_post_func_nb,
-                        post_order_args: tp.Args = (),
-                        open: tp.ArrayLike = np.nan,
-                        high: tp.ArrayLike = np.nan,
-                        low: tp.ArrayLike = np.nan,
-                        ffill_val_price: tp.Optional[bool] = None,
-                        update_value: tp.Optional[bool] = None,
-                        fill_pos_record: tp.Optional[bool] = None,
-                        track_value: tp.Optional[bool] = None,
-                        row_wise: tp.Optional[bool] = None,
-                        max_orders: tp.Optional[int] = None,
-                        max_logs: tp.Optional[int] = None,
-                        in_outputs: tp.Optional[tp.MappingLike] = None,
-                        seed: tp.Optional[int] = None,
-                        group_by: tp.GroupByLike = None,
-                        broadcast_named_args: tp.KwargsLike = None,
-                        broadcast_kwargs: tp.KwargsLike = None,
-                        template_context: tp.Optional[tp.Mapping] = None,
-                        keep_inout_raw: tp.Optional[bool] = None,
-                        jitted: tp.JittedOption = None,
-                        chunked: tp.ChunkedOption = None,
-                        wrapper_kwargs: tp.KwargsLike = None,
-                        freq: tp.Optional[tp.FrequencyLike] = None,
-                        bm_close: tp.Optional[tp.ArrayLike] = None,
-                        **kwargs) -> PortfolioT:
+    def from_order_func(
+        cls: tp.Type[PortfolioT],
+        close: tp.ArrayLike,
+        order_func_nb: tp.Union[nb.OrderFuncT, nb.FlexOrderFuncT],
+        *order_args,
+        flexible: tp.Optional[bool] = None,
+        init_cash: tp.Optional[tp.ArrayLike] = None,
+        init_position: tp.Optional[tp.ArrayLike] = None,
+        cash_deposits: tp.Optional[tp.ArrayLike] = None,
+        cash_earnings: tp.Optional[tp.ArrayLike] = None,
+        cash_sharing: tp.Optional[bool] = None,
+        call_seq: tp.Optional[tp.ArrayLike] = None,
+        attach_call_seq: tp.Optional[bool] = None,
+        segment_mask: tp.Optional[tp.ArrayLike] = None,
+        call_pre_segment: tp.Optional[bool] = None,
+        call_post_segment: tp.Optional[bool] = None,
+        pre_sim_func_nb: nb.PreSimFuncT = nb.no_pre_func_nb,
+        pre_sim_args: tp.Args = (),
+        post_sim_func_nb: nb.PostSimFuncT = nb.no_post_func_nb,
+        post_sim_args: tp.Args = (),
+        pre_group_func_nb: nb.PreGroupFuncT = nb.no_pre_func_nb,
+        pre_group_args: tp.Args = (),
+        post_group_func_nb: nb.PostGroupFuncT = nb.no_post_func_nb,
+        post_group_args: tp.Args = (),
+        pre_row_func_nb: nb.PreRowFuncT = nb.no_pre_func_nb,
+        pre_row_args: tp.Args = (),
+        post_row_func_nb: nb.PostRowFuncT = nb.no_post_func_nb,
+        post_row_args: tp.Args = (),
+        pre_segment_func_nb: nb.PreSegmentFuncT = nb.no_pre_func_nb,
+        pre_segment_args: tp.Args = (),
+        post_segment_func_nb: nb.PostSegmentFuncT = nb.no_post_func_nb,
+        post_segment_args: tp.Args = (),
+        post_order_func_nb: nb.PostOrderFuncT = nb.no_post_func_nb,
+        post_order_args: tp.Args = (),
+        open: tp.ArrayLike = np.nan,
+        high: tp.ArrayLike = np.nan,
+        low: tp.ArrayLike = np.nan,
+        ffill_val_price: tp.Optional[bool] = None,
+        update_value: tp.Optional[bool] = None,
+        fill_pos_record: tp.Optional[bool] = None,
+        track_value: tp.Optional[bool] = None,
+        row_wise: tp.Optional[bool] = None,
+        max_orders: tp.Optional[int] = None,
+        max_logs: tp.Optional[int] = None,
+        in_outputs: tp.Optional[tp.MappingLike] = None,
+        seed: tp.Optional[int] = None,
+        group_by: tp.GroupByLike = None,
+        broadcast_named_args: tp.KwargsLike = None,
+        broadcast_kwargs: tp.KwargsLike = None,
+        template_context: tp.Optional[tp.Mapping] = None,
+        keep_inout_raw: tp.Optional[bool] = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper_kwargs: tp.KwargsLike = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+        bm_close: tp.Optional[tp.ArrayLike] = None,
+        **kwargs,
+    ) -> PortfolioT:
         """Build portfolio from a custom order function.
 
         !!! hint
@@ -5100,12 +5024,13 @@ class Portfolio(Analyzable):
         """
         # Get defaults
         from vectorbtpro._settings import settings
-        portfolio_cfg = settings['portfolio']
+
+        portfolio_cfg = settings["portfolio"]
 
         if flexible is None:
-            flexible = portfolio_cfg['flexible']
+            flexible = portfolio_cfg["flexible"]
         if init_cash is None:
-            init_cash = portfolio_cfg['init_cash']
+            init_cash = portfolio_cfg["init_cash"]
         if isinstance(init_cash, str):
             init_cash = map_enum_fields(init_cash, InitCashMode)
         if isinstance(init_cash, int) and init_cash in InitCashMode:
@@ -5114,101 +5039,93 @@ class Portfolio(Analyzable):
         else:
             init_cash_mode = None
         if init_position is None:
-            init_position = portfolio_cfg['init_position']
+            init_position = portfolio_cfg["init_position"]
         if cash_deposits is None:
-            cash_deposits = portfolio_cfg['cash_deposits']
+            cash_deposits = portfolio_cfg["cash_deposits"]
         if cash_earnings is None:
-            cash_earnings = portfolio_cfg['cash_earnings']
+            cash_earnings = portfolio_cfg["cash_earnings"]
         if cash_sharing is None:
-            cash_sharing = portfolio_cfg['cash_sharing']
+            cash_sharing = portfolio_cfg["cash_sharing"]
         if cash_sharing and group_by is None:
             group_by = True
         if not flexible:
             if call_seq is None:
-                call_seq = portfolio_cfg['call_seq']
+                call_seq = portfolio_cfg["call_seq"]
             call_seq = map_enum_fields(call_seq, CallSeqType)
             if isinstance(call_seq, int):
                 if call_seq == CallSeqType.Auto:
-                    raise ValueError("CallSeqType.Auto must be implemented manually. "
-                                     "Use sort_call_seq_nb in pre_segment_func_nb.")
+                    raise ValueError(
+                        "CallSeqType.Auto must be implemented manually. " "Use sort_call_seq_nb in pre_segment_func_nb."
+                    )
         if attach_call_seq is None:
-            attach_call_seq = portfolio_cfg['attach_call_seq']
+            attach_call_seq = portfolio_cfg["attach_call_seq"]
         if segment_mask is None:
             segment_mask = True
         if call_pre_segment is None:
-            call_pre_segment = portfolio_cfg['call_pre_segment']
+            call_pre_segment = portfolio_cfg["call_pre_segment"]
         if call_post_segment is None:
-            call_post_segment = portfolio_cfg['call_post_segment']
+            call_post_segment = portfolio_cfg["call_post_segment"]
         if ffill_val_price is None:
-            ffill_val_price = portfolio_cfg['ffill_val_price']
+            ffill_val_price = portfolio_cfg["ffill_val_price"]
         if update_value is None:
-            update_value = portfolio_cfg['update_value']
+            update_value = portfolio_cfg["update_value"]
         if fill_pos_record is None:
-            fill_pos_record = portfolio_cfg['fill_pos_record']
+            fill_pos_record = portfolio_cfg["fill_pos_record"]
         if track_value is None:
-            track_value = portfolio_cfg['track_value']
+            track_value = portfolio_cfg["track_value"]
         if row_wise is None:
-            row_wise = portfolio_cfg['row_wise']
+            row_wise = portfolio_cfg["row_wise"]
         if seed is None:
-            seed = portfolio_cfg['seed']
+            seed = portfolio_cfg["seed"]
         if seed is not None:
             set_seed(seed)
         if in_outputs is not None and not checks.is_namedtuple(in_outputs):
             in_outputs = to_mapping(in_outputs)
             in_outputs = namedtuple("InOutputs", in_outputs)(**in_outputs)
         if group_by is None:
-            group_by = portfolio_cfg['group_by']
+            group_by = portfolio_cfg["group_by"]
         if freq is None:
-            freq = portfolio_cfg['freq']
+            freq = portfolio_cfg["freq"]
         if broadcast_named_args is None:
             broadcast_named_args = {}
-        broadcast_kwargs = merge_dicts(portfolio_cfg['broadcast_kwargs'], broadcast_kwargs)
-        require_kwargs = broadcast_kwargs.get('require_kwargs', {})
-        template_context = merge_dicts(portfolio_cfg['template_context'], template_context)
+        broadcast_kwargs = merge_dicts(portfolio_cfg["broadcast_kwargs"], broadcast_kwargs)
+        require_kwargs = broadcast_kwargs.get("require_kwargs", {})
+        template_context = merge_dicts(portfolio_cfg["template_context"], template_context)
         if keep_inout_raw is None:
-            keep_inout_raw = portfolio_cfg['keep_inout_raw']
+            keep_inout_raw = portfolio_cfg["keep_inout_raw"]
         if template_context is None:
             template_context = {}
         if wrapper_kwargs is None:
             wrapper_kwargs = {}
-        if not wrapper_kwargs.get('group_select', True) and cash_sharing:
+        if not wrapper_kwargs.get("group_select", True) and cash_sharing:
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
         if bm_close is None:
-            bm_close = portfolio_cfg['bm_close']
+            bm_close = portfolio_cfg["bm_close"]
 
         # Prepare the simulation
-        broadcastable_args = dict(
-            cash_earnings=cash_earnings,
-            open=open,
-            high=high,
-            low=low,
-            close=close
-        )
+        broadcastable_args = dict(cash_earnings=cash_earnings, open=open, high=high, low=low, close=close)
         if bm_close is not None and not isinstance(bm_close, bool):
-            broadcastable_args['bm_close'] = bm_close
+            broadcastable_args["bm_close"] = bm_close
         broadcastable_args = {**broadcastable_args, **broadcast_named_args}
         # Only close is broadcast, others can remain unchanged thanks to flexible indexing
-        broadcast_kwargs = merge_dicts(dict(
-            keep_flex=dict(
-                close=False,
-                bm_close=False,
-                _default=True
-            )
-        ), broadcast_kwargs)
+        broadcast_kwargs = merge_dicts(
+            dict(keep_flex=dict(close=False, bm_close=False, _default=True)),
+            broadcast_kwargs,
+        )
         broadcasted_args = broadcast(broadcastable_args, **broadcast_kwargs)
-        cash_earnings = broadcasted_args.pop('cash_earnings')
-        close = broadcasted_args['close']
+        cash_earnings = broadcasted_args.pop("cash_earnings")
+        close = broadcasted_args["close"]
         if not checks.is_pandas(close):
             close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
         if bm_close is not None and not isinstance(bm_close, bool):
-            bm_close = broadcasted_args['bm_close']
+            bm_close = broadcasted_args["bm_close"]
             if not checks.is_pandas(bm_close):
                 bm_close = pd.Series(bm_close) if bm_close.ndim == 1 else pd.DataFrame(bm_close)
-            broadcasted_args['bm_close'] = to_2d_array(bm_close)
+            broadcasted_args["bm_close"] = to_2d_array(bm_close)
         else:
-            broadcasted_args['bm_close'] = None
+            broadcasted_args["bm_close"] = None
         flex_2d = close.ndim == 2
-        broadcasted_args['close'] = to_2d_array(close)
+        broadcasted_args["close"] = to_2d_array(close)
         target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
 
         wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
@@ -5220,7 +5137,7 @@ class Portfolio(Analyzable):
             to_shape=(target_shape_2d[0], len(cs_group_lens)),
             to_pd=False,
             keep_flex=keep_inout_raw,
-            **require_kwargs
+            **require_kwargs,
         )
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
         if isinstance(segment_mask, int):
@@ -5236,7 +5153,7 @@ class Portfolio(Analyzable):
                 to_shape=(target_shape_2d[0], len(group_lens)),
                 to_pd=False,
                 keep_flex=keep_inout_raw,
-                **require_kwargs
+                **require_kwargs,
             )
         if not flexible:
             if checks.is_any_array(call_seq):
@@ -5253,12 +5170,12 @@ class Portfolio(Analyzable):
         checks.assert_subdtype(cash_deposits, np.number)
         checks.assert_subdtype(cash_earnings, np.number)
         checks.assert_subdtype(segment_mask, np.bool_)
-        checks.assert_subdtype(broadcasted_args['open'], np.number)
-        checks.assert_subdtype(broadcasted_args['high'], np.number)
-        checks.assert_subdtype(broadcasted_args['low'], np.number)
-        checks.assert_subdtype(broadcasted_args['close'], np.number)
+        checks.assert_subdtype(broadcasted_args["open"], np.number)
+        checks.assert_subdtype(broadcasted_args["high"], np.number)
+        checks.assert_subdtype(broadcasted_args["low"], np.number)
+        checks.assert_subdtype(broadcasted_args["close"], np.number)
         if bm_close is not None and not isinstance(bm_close, bool):
-            checks.assert_subdtype(broadcasted_args['bm_close'], np.number)
+            checks.assert_subdtype(broadcasted_args["bm_close"], np.number)
 
         # Prepare arguments
         template_context = merge_dicts(
@@ -5302,21 +5219,21 @@ class Portfolio(Analyzable):
                 max_orders=max_orders,
                 max_logs=max_logs,
                 flex_2d=flex_2d,
-                wrapper=wrapper
+                wrapper=wrapper,
             ),
-            template_context
+            template_context,
         )
-        pre_sim_args = deep_substitute(pre_sim_args, template_context, sub_id='pre_sim_args')
-        post_sim_args = deep_substitute(post_sim_args, template_context, sub_id='post_sim_args')
-        pre_group_args = deep_substitute(pre_group_args, template_context, sub_id='pre_group_args')
-        post_group_args = deep_substitute(post_group_args, template_context, sub_id='post_group_args')
-        pre_row_args = deep_substitute(pre_row_args, template_context, sub_id='pre_row_args')
-        post_row_args = deep_substitute(post_row_args, template_context, sub_id='post_row_args')
-        pre_segment_args = deep_substitute(pre_segment_args, template_context, sub_id='pre_segment_args')
-        post_segment_args = deep_substitute(post_segment_args, template_context, sub_id='post_segment_args')
-        order_args = deep_substitute(order_args, template_context, sub_id='order_args')
-        post_order_args = deep_substitute(post_order_args, template_context, sub_id='post_order_args')
-        in_outputs = deep_substitute(in_outputs, template_context, sub_id='in_outputs')
+        pre_sim_args = deep_substitute(pre_sim_args, template_context, sub_id="pre_sim_args")
+        post_sim_args = deep_substitute(post_sim_args, template_context, sub_id="post_sim_args")
+        pre_group_args = deep_substitute(pre_group_args, template_context, sub_id="pre_group_args")
+        post_group_args = deep_substitute(post_group_args, template_context, sub_id="post_group_args")
+        pre_row_args = deep_substitute(pre_row_args, template_context, sub_id="pre_row_args")
+        post_row_args = deep_substitute(post_row_args, template_context, sub_id="post_row_args")
+        pre_segment_args = deep_substitute(pre_segment_args, template_context, sub_id="pre_segment_args")
+        post_segment_args = deep_substitute(post_segment_args, template_context, sub_id="post_segment_args")
+        order_args = deep_substitute(order_args, template_context, sub_id="order_args")
+        post_order_args = deep_substitute(post_order_args, template_context, sub_id="post_order_args")
+        in_outputs = deep_substitute(in_outputs, template_context, sub_id="in_outputs")
         for k in broadcast_named_args:
             broadcasted_args.pop(k)
 
@@ -5352,11 +5269,11 @@ class Portfolio(Analyzable):
                     flex_order_args=order_args,
                     post_order_func_nb=post_order_func_nb,
                     post_order_args=post_order_args,
-                    open=broadcasted_args['open'],
-                    high=broadcasted_args['high'],
-                    low=broadcasted_args['low'],
-                    close=broadcasted_args['close'],
-                    bm_close=broadcasted_args['bm_close'],
+                    open=broadcasted_args["open"],
+                    high=broadcasted_args["high"],
+                    low=broadcasted_args["low"],
+                    close=broadcasted_args["close"],
+                    bm_close=broadcasted_args["bm_close"],
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
@@ -5364,7 +5281,7 @@ class Portfolio(Analyzable):
                     max_orders=max_orders,
                     max_logs=max_logs,
                     flex_2d=flex_2d,
-                    in_outputs=in_outputs
+                    in_outputs=in_outputs,
                 )
             else:
                 func = jit_reg.resolve_option(nb.simulate_row_wise_nb, jitted)
@@ -5397,11 +5314,11 @@ class Portfolio(Analyzable):
                     order_args=order_args,
                     post_order_func_nb=post_order_func_nb,
                     post_order_args=post_order_args,
-                    open=broadcasted_args['open'],
-                    high=broadcasted_args['high'],
-                    low=broadcasted_args['low'],
-                    close=broadcasted_args['close'],
-                    bm_close=broadcasted_args['bm_close'],
+                    open=broadcasted_args["open"],
+                    high=broadcasted_args["high"],
+                    low=broadcasted_args["low"],
+                    close=broadcasted_args["close"],
+                    bm_close=broadcasted_args["bm_close"],
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
@@ -5409,7 +5326,7 @@ class Portfolio(Analyzable):
                     max_orders=max_orders,
                     max_logs=max_logs,
                     flex_2d=flex_2d,
-                    in_outputs=in_outputs
+                    in_outputs=in_outputs,
                 )
         else:
             if flexible:
@@ -5442,11 +5359,11 @@ class Portfolio(Analyzable):
                     flex_order_args=order_args,
                     post_order_func_nb=post_order_func_nb,
                     post_order_args=post_order_args,
-                    open=broadcasted_args['open'],
-                    high=broadcasted_args['high'],
-                    low=broadcasted_args['low'],
-                    close=broadcasted_args['close'],
-                    bm_close=broadcasted_args['bm_close'],
+                    open=broadcasted_args["open"],
+                    high=broadcasted_args["high"],
+                    low=broadcasted_args["low"],
+                    close=broadcasted_args["close"],
+                    bm_close=broadcasted_args["bm_close"],
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
@@ -5454,7 +5371,7 @@ class Portfolio(Analyzable):
                     max_orders=max_orders,
                     max_logs=max_logs,
                     flex_2d=flex_2d,
-                    in_outputs=in_outputs
+                    in_outputs=in_outputs,
                 )
             else:
                 func = jit_reg.resolve_option(nb.simulate_nb, jitted)
@@ -5487,11 +5404,11 @@ class Portfolio(Analyzable):
                     order_args=order_args,
                     post_order_func_nb=post_order_func_nb,
                     post_order_args=post_order_args,
-                    open=broadcasted_args['open'],
-                    high=broadcasted_args['high'],
-                    low=broadcasted_args['low'],
-                    close=broadcasted_args['close'],
-                    bm_close=broadcasted_args['bm_close'],
+                    open=broadcasted_args["open"],
+                    high=broadcasted_args["high"],
+                    low=broadcasted_args["low"],
+                    close=broadcasted_args["close"],
+                    bm_close=broadcasted_args["bm_close"],
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
@@ -5499,7 +5416,7 @@ class Portfolio(Analyzable):
                     max_orders=max_orders,
                     max_logs=max_logs,
                     flex_2d=flex_2d,
-                    in_outputs=in_outputs
+                    in_outputs=in_outputs,
                 )
 
         # Create an instance
@@ -5516,36 +5433,38 @@ class Portfolio(Analyzable):
             call_seq=call_seq if not flexible and attach_call_seq else None,
             in_outputs=sim_out.in_outputs,
             bm_close=bm_close,
-            **kwargs
+            **kwargs,
         )
 
     @classmethod
-    def from_def_order_func(cls: tp.Type[PortfolioT],
-                            close: tp.ArrayLike,
-                            size: tp.Optional[tp.ArrayLike] = None,
-                            size_type: tp.Optional[tp.ArrayLike] = None,
-                            direction: tp.Optional[tp.ArrayLike] = None,
-                            price: tp.Optional[tp.ArrayLike] = None,
-                            fees: tp.Optional[tp.ArrayLike] = None,
-                            fixed_fees: tp.Optional[tp.ArrayLike] = None,
-                            slippage: tp.Optional[tp.ArrayLike] = None,
-                            min_size: tp.Optional[tp.ArrayLike] = None,
-                            max_size: tp.Optional[tp.ArrayLike] = None,
-                            size_granularity: tp.Optional[tp.ArrayLike] = None,
-                            reject_prob: tp.Optional[tp.ArrayLike] = None,
-                            price_area_vio_mode: tp.Optional[tp.ArrayLike] = None,
-                            lock_cash: tp.Optional[tp.ArrayLike] = None,
-                            allow_partial: tp.Optional[tp.ArrayLike] = None,
-                            raise_reject: tp.Optional[tp.ArrayLike] = None,
-                            log: tp.Optional[tp.ArrayLike] = None,
-                            pre_segment_func_nb: tp.Optional[nb.PreSegmentFuncT] = None,
-                            order_func_nb: tp.Optional[tp.Union[nb.OrderFuncT, nb.FlexOrderFuncT]] = None,
-                            val_price: tp.Optional[tp.ArrayLike] = None,
-                            call_seq: tp.Optional[tp.ArrayLike] = None,
-                            flexible: tp.Optional[bool] = None,
-                            broadcast_named_args: tp.KwargsLike = None,
-                            chunked: tp.ChunkedOption = None,
-                            **kwargs) -> PortfolioT:
+    def from_def_order_func(
+        cls: tp.Type[PortfolioT],
+        close: tp.ArrayLike,
+        size: tp.Optional[tp.ArrayLike] = None,
+        size_type: tp.Optional[tp.ArrayLike] = None,
+        direction: tp.Optional[tp.ArrayLike] = None,
+        price: tp.Optional[tp.ArrayLike] = None,
+        fees: tp.Optional[tp.ArrayLike] = None,
+        fixed_fees: tp.Optional[tp.ArrayLike] = None,
+        slippage: tp.Optional[tp.ArrayLike] = None,
+        min_size: tp.Optional[tp.ArrayLike] = None,
+        max_size: tp.Optional[tp.ArrayLike] = None,
+        size_granularity: tp.Optional[tp.ArrayLike] = None,
+        reject_prob: tp.Optional[tp.ArrayLike] = None,
+        price_area_vio_mode: tp.Optional[tp.ArrayLike] = None,
+        lock_cash: tp.Optional[tp.ArrayLike] = None,
+        allow_partial: tp.Optional[tp.ArrayLike] = None,
+        raise_reject: tp.Optional[tp.ArrayLike] = None,
+        log: tp.Optional[tp.ArrayLike] = None,
+        pre_segment_func_nb: tp.Optional[nb.PreSegmentFuncT] = None,
+        order_func_nb: tp.Optional[tp.Union[nb.OrderFuncT, nb.FlexOrderFuncT]] = None,
+        val_price: tp.Optional[tp.ArrayLike] = None,
+        call_seq: tp.Optional[tp.ArrayLike] = None,
+        flexible: tp.Optional[bool] = None,
+        broadcast_named_args: tp.KwargsLike = None,
+        chunked: tp.ChunkedOption = None,
+        **kwargs,
+    ) -> PortfolioT:
         """Build portfolio from the default order function.
 
         Default order function takes size, price, fees, and other available information, and issues
@@ -5628,48 +5547,49 @@ class Portfolio(Analyzable):
         """
         # Get defaults
         from vectorbtpro._settings import settings
-        portfolio_cfg = settings['portfolio']
+
+        portfolio_cfg = settings["portfolio"]
 
         if flexible is None:
-            flexible = portfolio_cfg['flexible']
+            flexible = portfolio_cfg["flexible"]
         if size is None:
-            size = portfolio_cfg['size']
+            size = portfolio_cfg["size"]
         if size_type is None:
-            size_type = portfolio_cfg['size_type']
+            size_type = portfolio_cfg["size_type"]
         if direction is None:
-            direction = portfolio_cfg['direction']
+            direction = portfolio_cfg["direction"]
         if price is None:
-            price = portfolio_cfg['price']
+            price = portfolio_cfg["price"]
         if size is None:
-            size = portfolio_cfg['size']
+            size = portfolio_cfg["size"]
         if fees is None:
-            fees = portfolio_cfg['fees']
+            fees = portfolio_cfg["fees"]
         if fixed_fees is None:
-            fixed_fees = portfolio_cfg['fixed_fees']
+            fixed_fees = portfolio_cfg["fixed_fees"]
         if slippage is None:
-            slippage = portfolio_cfg['slippage']
+            slippage = portfolio_cfg["slippage"]
         if min_size is None:
-            min_size = portfolio_cfg['min_size']
+            min_size = portfolio_cfg["min_size"]
         if max_size is None:
-            max_size = portfolio_cfg['max_size']
+            max_size = portfolio_cfg["max_size"]
         if size_granularity is None:
-            size_granularity = portfolio_cfg['size_granularity']
+            size_granularity = portfolio_cfg["size_granularity"]
         if reject_prob is None:
-            reject_prob = portfolio_cfg['reject_prob']
+            reject_prob = portfolio_cfg["reject_prob"]
         if price_area_vio_mode is None:
-            price_area_vio_mode = portfolio_cfg['price_area_vio_mode']
+            price_area_vio_mode = portfolio_cfg["price_area_vio_mode"]
         if lock_cash is None:
-            lock_cash = portfolio_cfg['lock_cash']
+            lock_cash = portfolio_cfg["lock_cash"]
         if allow_partial is None:
-            allow_partial = portfolio_cfg['allow_partial']
+            allow_partial = portfolio_cfg["allow_partial"]
         if raise_reject is None:
-            raise_reject = portfolio_cfg['raise_reject']
+            raise_reject = portfolio_cfg["raise_reject"]
         if log is None:
-            log = portfolio_cfg['log']
+            log = portfolio_cfg["log"]
         if val_price is None:
-            val_price = portfolio_cfg['val_price']
+            val_price = portfolio_cfg["val_price"]
         if call_seq is None:
-            call_seq = portfolio_cfg['call_seq']
+            call_seq = portfolio_cfg["call_seq"]
         auto_call_seq = False
         if isinstance(call_seq, str):
             call_seq = map_enum_fields(call_seq, CallSeqType)
@@ -5697,9 +5617,9 @@ class Portfolio(Analyzable):
                 allow_partial=allow_partial,
                 raise_reject=raise_reject,
                 log=log,
-                val_price=val_price
+                val_price=val_price,
             ),
-            **broadcast_named_args
+            **broadcast_named_args,
         }
 
         # Check data types
@@ -5745,49 +5665,44 @@ class Portfolio(Analyzable):
             if order_func_nb is None:
                 order_func_nb = nb.def_order_func_nb
         order_args = (
-            Rep('size'),
-            Rep('price'),
+            Rep("size"),
+            Rep("price"),
             RepFunc(_postprocess_size_type),
             RepFunc(_postprocess_direction),
-            Rep('fees'),
-            Rep('fixed_fees'),
-            Rep('slippage'),
-            Rep('min_size'),
-            Rep('max_size'),
-            Rep('size_granularity'),
-            Rep('reject_prob'),
+            Rep("fees"),
+            Rep("fixed_fees"),
+            Rep("slippage"),
+            Rep("min_size"),
+            Rep("max_size"),
+            Rep("size_granularity"),
+            Rep("reject_prob"),
             RepFunc(_postprocess_price_area_vio_mode),
-            Rep('lock_cash'),
-            Rep('allow_partial'),
-            Rep('raise_reject'),
-            Rep('log')
+            Rep("lock_cash"),
+            Rep("allow_partial"),
+            Rep("raise_reject"),
+            Rep("log"),
         )
         pre_segment_args = (
-            Rep('val_price'),
-            Rep('price'),
-            Rep('size'),
+            Rep("val_price"),
+            Rep("price"),
+            Rep("size"),
             RepFunc(_postprocess_size_type),
             RepFunc(_postprocess_direction),
-            auto_call_seq
+            auto_call_seq,
         )
         arg_take_spec = dict(
-            pre_segment_args=ch.ArgsTaker(*[
-                portfolio_ch.flex_array_gl_slicer if isinstance(x, Rep) else None
-                for x in pre_segment_args
-            ])
+            pre_segment_args=ch.ArgsTaker(
+                *[portfolio_ch.flex_array_gl_slicer if isinstance(x, Rep) else None for x in pre_segment_args],
+            )
         )
-        order_args_taker = ch.ArgsTaker(*[
-            portfolio_ch.flex_array_gl_slicer if isinstance(x, Rep) else None
-            for x in order_args
-        ])
+        order_args_taker = ch.ArgsTaker(
+            *[portfolio_ch.flex_array_gl_slicer if isinstance(x, Rep) else None for x in order_args],
+        )
         if flexible:
-            arg_take_spec['flex_order_args'] = order_args_taker
+            arg_take_spec["flex_order_args"] = order_args_taker
         else:
-            arg_take_spec['order_args'] = order_args_taker
-        chunked = ch.specialize_chunked_option(
-            chunked,
-            arg_take_spec=arg_take_spec
-        )
+            arg_take_spec["order_args"] = order_args_taker
+        chunked = ch.specialize_chunked_option(chunked, arg_take_spec=arg_take_spec)
         return cls.from_order_func(
             close,
             order_func_nb,
@@ -5798,7 +5713,7 @@ class Portfolio(Analyzable):
             call_seq=call_seq,
             broadcast_named_args=broadcast_named_args,
             chunked=chunked,
-            **kwargs
+            **kwargs,
         )
 
     # ############# Grouping ############# #
@@ -5842,10 +5757,10 @@ class Portfolio(Analyzable):
         """Named tuple with in-output objects."""
         return self._in_outputs
 
-    @custom_property(obj_type='array', group_by_aware=False)
+    @custom_property(obj_type="array", group_by_aware=False)
     def call_seq(self) -> tp.Optional[tp.SeriesFrame]:
         """Sequence of calls per row and group."""
-        if self.use_in_outputs and self.in_outputs is not None and hasattr(self.in_outputs, 'call_seq'):
+        if self.use_in_outputs and self.in_outputs is not None and hasattr(self.in_outputs, "call_seq"):
             call_seq = self.in_outputs.call_seq
         else:
             call_seq = self._call_seq
@@ -5856,10 +5771,10 @@ class Portfolio(Analyzable):
 
     # ############# Price ############# #
 
-    @custom_property(obj_type='array', group_by_aware=False)
+    @custom_property(obj_type="array", group_by_aware=False)
     def close(self) -> tp.SeriesFrame:
         """Price per unit series."""
-        if self.use_in_outputs and self.in_outputs is not None and hasattr(self.in_outputs, 'close'):
+        if self.use_in_outputs and self.in_outputs is not None and hasattr(self.in_outputs, "close"):
             close = self.in_outputs.close
         else:
             close = self._close
@@ -5867,12 +5782,14 @@ class Portfolio(Analyzable):
         return self.wrapper.wrap(close, group_by=False)
 
     @class_or_instancemethod
-    def get_filled_close(cls_or_self,
-                         close: tp.Optional[tp.SeriesFrame] = None,
-                         jitted: tp.JittedOption = None,
-                         chunked: tp.ChunkedOption = None,
-                         wrapper: tp.Optional[ArrayWrapper] = None,
-                         wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def get_filled_close(
+        cls_or_self,
+        close: tp.Optional[tp.SeriesFrame] = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
         """Get forward and backward filled closing price.
 
         See `vectorbtpro.generic.nb.fbfill_nb`."""
@@ -5890,10 +5807,10 @@ class Portfolio(Analyzable):
         filled_close = func(to_2d_array(close))
         return wrapper.wrap(filled_close, group_by=False, **resolve_dict(wrap_kwargs))
 
-    @custom_property(obj_type='array', group_by_aware=False)
+    @custom_property(obj_type="array", group_by_aware=False)
     def bm_close(self) -> tp.Union[None, bool, tp.SeriesFrame]:
         """Benchmark price per unit series."""
-        if self.use_in_outputs and self.in_outputs is not None and hasattr(self.in_outputs, 'bm_close'):
+        if self.use_in_outputs and self.in_outputs is not None and hasattr(self.in_outputs, "bm_close"):
             bm_close = self.in_outputs.bm_close
         else:
             bm_close = self._bm_close
@@ -5903,12 +5820,14 @@ class Portfolio(Analyzable):
         return self.wrapper.wrap(bm_close, group_by=False)
 
     @class_or_instancemethod
-    def get_filled_bm_close(cls_or_self,
-                            bm_close: tp.Optional[tp.SeriesFrame] = None,
-                            jitted: tp.JittedOption = None,
-                            chunked: tp.ChunkedOption = None,
-                            wrapper: tp.Optional[ArrayWrapper] = None,
-                            wrap_kwargs: tp.KwargsLike = None) -> tp.Union[None, bool, tp.SeriesFrame]:
+    def get_filled_bm_close(
+        cls_or_self,
+        bm_close: tp.Optional[tp.SeriesFrame] = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.Union[None, bool, tp.SeriesFrame]:
         """Get forward and backward filled benchmark closing price.
 
         See `vectorbtpro.generic.nb.fbfill_nb`."""
@@ -5936,12 +5855,14 @@ class Portfolio(Analyzable):
         return self._order_records
 
     @class_or_instancemethod
-    def get_orders(cls_or_self,
-                   order_records: tp.Optional[tp.RecordArray] = None,
-                   close: tp.Optional[tp.SeriesFrame] = None,
-                   group_by: tp.GroupByLike = None,
-                   wrapper: tp.Optional[ArrayWrapper] = None,
-                   **kwargs) -> Orders:
+    def get_orders(
+        cls_or_self,
+        order_records: tp.Optional[tp.RecordArray] = None,
+        close: tp.Optional[tp.SeriesFrame] = None,
+        group_by: tp.GroupByLike = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        **kwargs,
+    ) -> Orders:
         """Get order records.
 
         See `vectorbtpro.portfolio.orders.Orders`."""
@@ -5965,11 +5886,13 @@ class Portfolio(Analyzable):
         return self._log_records
 
     @class_or_instancemethod
-    def get_logs(cls_or_self,
-                 log_records: tp.Optional[tp.RecordArray] = None,
-                 group_by: tp.GroupByLike = None,
-                 wrapper: tp.Optional[ArrayWrapper] = None,
-                 **kwargs) -> Logs:
+    def get_logs(
+        cls_or_self,
+        log_records: tp.Optional[tp.RecordArray] = None,
+        group_by: tp.GroupByLike = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        **kwargs,
+    ) -> Logs:
         """Get log records.
 
         See `vectorbtpro.portfolio.logs.Logs`."""
@@ -5985,11 +5908,13 @@ class Portfolio(Analyzable):
         return Logs(wrapper, log_records, **kwargs).regroup(group_by)
 
     @class_or_instancemethod
-    def get_entry_trades(cls_or_self,
-                         orders: tp.Optional[Orders] = None,
-                         init_position: tp.Optional[tp.ArrayLike] = None,
-                         group_by: tp.GroupByLike = None,
-                         **kwargs) -> EntryTrades:
+    def get_entry_trades(
+        cls_or_self,
+        orders: tp.Optional[Orders] = None,
+        init_position: tp.Optional[tp.ArrayLike] = None,
+        group_by: tp.GroupByLike = None,
+        **kwargs,
+    ) -> EntryTrades:
         """Get entry trade records.
 
         See `vectorbtpro.portfolio.trades.EntryTrades`."""
@@ -6001,16 +5926,18 @@ class Portfolio(Analyzable):
         else:
             checks.assert_not_none(orders)
             if init_position is None:
-                init_position = 0.
+                init_position = 0.0
 
         return EntryTrades.from_orders(orders, init_position=init_position, **kwargs).regroup(group_by)
 
     @class_or_instancemethod
-    def get_exit_trades(cls_or_self,
-                        orders: tp.Optional[Orders] = None,
-                        init_position: tp.Optional[tp.ArrayLike] = None,
-                        group_by: tp.GroupByLike = None,
-                        **kwargs) -> ExitTrades:
+    def get_exit_trades(
+        cls_or_self,
+        orders: tp.Optional[Orders] = None,
+        init_position: tp.Optional[tp.ArrayLike] = None,
+        group_by: tp.GroupByLike = None,
+        **kwargs,
+    ) -> ExitTrades:
         """Get exit trade records.
 
         See `vectorbtpro.portfolio.trades.ExitTrades`."""
@@ -6022,15 +5949,17 @@ class Portfolio(Analyzable):
         else:
             checks.assert_not_none(orders)
             if init_position is None:
-                init_position = 0.
+                init_position = 0.0
 
         return ExitTrades.from_orders(orders, init_position=init_position, **kwargs).regroup(group_by)
 
     @class_or_instancemethod
-    def get_positions(cls_or_self,
-                      trades: tp.Optional[Trades] = None,
-                      group_by: tp.GroupByLike = None,
-                      **kwargs) -> Positions:
+    def get_positions(
+        cls_or_self,
+        trades: tp.Optional[Trades] = None,
+        group_by: tp.GroupByLike = None,
+        **kwargs,
+    ) -> Positions:
         """Get position records.
 
         See `vectorbtpro.portfolio.trades.Positions`."""
@@ -6045,23 +5974,25 @@ class Portfolio(Analyzable):
     def get_trades(self, group_by: tp.GroupByLike = None, **kwargs) -> Trades:
         """Get trade/position records depending upon `Portfolio.trades_type`."""
         if self.trades_type == TradesType.EntryTrades:
-            return self.resolve_shortcut_attr('entry_trades', group_by=group_by, **kwargs)
+            return self.resolve_shortcut_attr("entry_trades", group_by=group_by, **kwargs)
         elif self.trades_type == TradesType.ExitTrades:
-            return self.resolve_shortcut_attr('exit_trades', group_by=group_by, **kwargs)
-        return self.resolve_shortcut_attr('positions', group_by=group_by, **kwargs)
+            return self.resolve_shortcut_attr("exit_trades", group_by=group_by, **kwargs)
+        return self.resolve_shortcut_attr("positions", group_by=group_by, **kwargs)
 
     @class_or_instancemethod
-    def get_drawdowns(cls_or_self,
-                      value: tp.Optional[tp.SeriesFrame] = None,
-                      group_by: tp.GroupByLike = None,
-                      wrapper_kwargs: tp.KwargsLike = None,
-                      **kwargs) -> Drawdowns:
+    def get_drawdowns(
+        cls_or_self,
+        value: tp.Optional[tp.SeriesFrame] = None,
+        group_by: tp.GroupByLike = None,
+        wrapper_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> Drawdowns:
         """Get drawdown records from `Portfolio.get_value`.
 
         See `vectorbtpro.generic.drawdowns.Drawdowns`."""
         if not isinstance(cls_or_self, type):
             if value is None:
-                value = cls_or_self.resolve_shortcut_attr('value', group_by=group_by)
+                value = cls_or_self.resolve_shortcut_attr("value", group_by=group_by)
             wrapper_kwargs = merge_dicts(cls_or_self.orders.wrapper.config, wrapper_kwargs, dict(group_by=None))
         else:
             checks.assert_not_none(value)
@@ -6071,10 +6002,12 @@ class Portfolio(Analyzable):
     # ############# Assets ############# #
 
     @class_or_instancemethod
-    def get_init_position(cls_or_self,
-                          init_position_raw: tp.Optional[tp.ArrayLike] = None,
-                          wrapper: tp.Optional[ArrayWrapper] = None,
-                          wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def get_init_position(
+        cls_or_self,
+        init_position_raw: tp.Optional[tp.ArrayLike] = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeSeries:
         """Get initial position per column."""
         if not isinstance(cls_or_self, type):
             if init_position_raw is None:
@@ -6086,18 +6019,20 @@ class Portfolio(Analyzable):
             checks.assert_not_none(wrapper)
 
         init_position = np.broadcast_to(to_1d_array(init_position_raw), (wrapper.shape_2d[1],))
-        wrap_kwargs = merge_dicts(dict(name_or_index='init_position'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="init_position"), wrap_kwargs)
         return wrapper.wrap_reduced(init_position, group_by=False, **wrap_kwargs)
 
     @class_or_instancemethod
-    def get_asset_flow(cls_or_self,
-                       direction: tp.Union[str, int] = 'both',
-                       orders: tp.Optional[Orders] = None,
-                       init_position: tp.Optional[tp.ArrayLike] = None,
-                       jitted: tp.JittedOption = None,
-                       chunked: tp.ChunkedOption = None,
-                       wrapper: tp.Optional[ArrayWrapper] = None,
-                       wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def get_asset_flow(
+        cls_or_self,
+        direction: tp.Union[str, int] = "both",
+        orders: tp.Optional[Orders] = None,
+        init_position: tp.Optional[tp.ArrayLike] = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
         """Get asset flow series per column.
 
         Returns the total transacted amount of assets at each time step."""
@@ -6111,7 +6046,7 @@ class Portfolio(Analyzable):
         else:
             checks.assert_not_none(orders)
             if init_position is None:
-                init_position = 0.
+                init_position = 0.0
             if wrapper is None:
                 wrapper = orders.wrapper
 
@@ -6123,29 +6058,31 @@ class Portfolio(Analyzable):
             orders.values,
             orders.col_mapper.col_map,
             direction=direction,
-            init_position=to_1d_array(init_position)
+            init_position=to_1d_array(init_position),
         )
         return wrapper.wrap(asset_flow, group_by=False, **resolve_dict(wrap_kwargs))
 
     @class_or_instancemethod
-    def get_assets(cls_or_self,
-                   direction: tp.Union[str, int] = 'both',
-                   asset_flow: tp.Optional[tp.SeriesFrame] = None,
-                   init_position: tp.Optional[tp.ArrayLike] = None,
-                   jitted: tp.JittedOption = None,
-                   chunked: tp.ChunkedOption = None,
-                   wrapper: tp.Optional[ArrayWrapper] = None,
-                   wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def get_assets(
+        cls_or_self,
+        direction: tp.Union[str, int] = "both",
+        asset_flow: tp.Optional[tp.SeriesFrame] = None,
+        init_position: tp.Optional[tp.ArrayLike] = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
         """Get asset series per column.
 
         Returns the position at each time step."""
         if not isinstance(cls_or_self, type):
             if asset_flow is None:
                 asset_flow = cls_or_self.resolve_shortcut_attr(
-                    'asset_flow',
+                    "asset_flow",
                     direction=Direction.Both,
                     jitted=jitted,
-                    chunked=chunked
+                    chunked=chunked,
                 )
             if init_position is None:
                 init_position = cls_or_self._init_position
@@ -6154,16 +6091,13 @@ class Portfolio(Analyzable):
         else:
             checks.assert_not_none(asset_flow)
             if init_position is None:
-                init_position = 0.
+                init_position = 0.0
             checks.assert_not_none(wrapper)
 
         direction = map_enum_fields(direction, Direction)
         func = jit_reg.resolve_option(nb.assets_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        assets = func(
-            to_2d_array(asset_flow),
-            init_position=to_1d_array(init_position)
-        )
+        assets = func(to_2d_array(asset_flow), init_position=to_1d_array(init_position))
         if direction == Direction.LongOnly:
             func = jit_reg.resolve_option(nb.longonly_assets_nb, jitted)
             assets = func(assets)
@@ -6173,24 +6107,26 @@ class Portfolio(Analyzable):
         return wrapper.wrap(assets, group_by=False, **resolve_dict(wrap_kwargs))
 
     @class_or_instancemethod
-    def get_position_mask(cls_or_self,
-                          direction: tp.Union[str, int] = 'both',
-                          group_by: tp.GroupByLike = None,
-                          assets: tp.Optional[tp.SeriesFrame] = None,
-                          jitted: tp.JittedOption = None,
-                          chunked: tp.ChunkedOption = None,
-                          wrapper: tp.Optional[ArrayWrapper] = None,
-                          wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def get_position_mask(
+        cls_or_self,
+        direction: tp.Union[str, int] = "both",
+        group_by: tp.GroupByLike = None,
+        assets: tp.Optional[tp.SeriesFrame] = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
         """Get position mask per column/group.
 
         An element is True if there is a position at the given time step."""
         if not isinstance(cls_or_self, type):
             if assets is None:
                 assets = cls_or_self.resolve_shortcut_attr(
-                    'assets',
+                    "assets",
                     direction=direction,
                     jitted=jitted,
-                    chunked=chunked
+                    chunked=chunked,
                 )
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -6200,36 +6136,40 @@ class Portfolio(Analyzable):
 
         position_mask = to_2d_array(assets) != 0
         if wrapper.grouper.is_grouped(group_by=group_by):
-            position_mask = wrapper.wrap(position_mask, group_by=False) \
-                .vbt(wrapper=wrapper) \
+            position_mask = (
+                wrapper.wrap(position_mask, group_by=False)
+                .vbt(wrapper=wrapper)
                 .squeeze_grouped(
-                jit_reg.resolve_option(generic_nb.any_reduce_nb, jitted),
-                group_by=group_by,
-                jitted=jitted,
-                chunked=chunked
+                    jit_reg.resolve_option(generic_nb.any_reduce_nb, jitted),
+                    group_by=group_by,
+                    jitted=jitted,
+                    chunked=chunked,
+                )
             )
         return wrapper.wrap(position_mask, group_by=group_by, **resolve_dict(wrap_kwargs))
 
     @class_or_instancemethod
-    def get_position_coverage(cls_or_self,
-                              direction: tp.Union[str, int] = 'both',
-                              group_by: tp.GroupByLike = None,
-                              position_mask: tp.Optional[tp.SeriesFrame] = None,
-                              jitted: tp.JittedOption = None,
-                              chunked: tp.ChunkedOption = None,
-                              wrapper: tp.Optional[ArrayWrapper] = None,
-                              wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def get_position_coverage(
+        cls_or_self,
+        direction: tp.Union[str, int] = "both",
+        group_by: tp.GroupByLike = None,
+        position_mask: tp.Optional[tp.SeriesFrame] = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeSeries:
         """Get position coverage per column/group.
 
         Position coverage is the number of time steps in the market divided by the total number of time steps."""
         if not isinstance(cls_or_self, type):
             if position_mask is None:
                 position_mask = cls_or_self.resolve_shortcut_attr(
-                    'position_mask',
+                    "position_mask",
                     direction=direction,
                     jitted=jitted,
                     chunked=chunked,
-                    group_by=False
+                    group_by=False,
                 )
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -6237,31 +6177,31 @@ class Portfolio(Analyzable):
             checks.assert_not_none(position_mask)
             checks.assert_not_none(wrapper)
 
-        position_coverage = position_mask \
-            .vbt(wrapper=wrapper) \
-            .reduce(
+        position_coverage = position_mask.vbt(wrapper=wrapper).reduce(
             jit_reg.resolve_option(generic_nb.mean_reduce_nb, jitted),
             group_by=group_by,
             jitted=jitted,
-            chunked=chunked
+            chunked=chunked,
         )
-        wrap_kwargs = merge_dicts(dict(name_or_index='position_coverage'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="position_coverage"), wrap_kwargs)
         return wrapper.wrap_reduced(position_coverage, group_by=group_by, **wrap_kwargs)
 
     # ############# Cash ############# #
 
     @class_or_instancemethod
-    def get_cash_deposits(cls_or_self,
-                          group_by: tp.GroupByLike = None,
-                          cash_deposits_raw: tp.Optional[tp.ArrayLike] = None,
-                          cash_sharing: tp.Optional[bool] = None,
-                          split_shared: bool = False,
-                          flex_2d: bool = False,
-                          keep_flex: bool = False,
-                          jitted: tp.JittedOption = None,
-                          chunked: tp.ChunkedOption = None,
-                          wrapper: tp.Optional[ArrayWrapper] = None,
-                          wrap_kwargs: tp.KwargsLike = None) -> tp.ArrayLike:
+    def get_cash_deposits(
+        cls_or_self,
+        group_by: tp.GroupByLike = None,
+        cash_deposits_raw: tp.Optional[tp.ArrayLike] = None,
+        cash_sharing: tp.Optional[bool] = None,
+        split_shared: bool = False,
+        flex_2d: bool = False,
+        keep_flex: bool = False,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.ArrayLike:
         """Get cash deposit series per column/group.
 
         Set `keep_flex` to True to keep format suitable for flexible indexing.
@@ -6275,7 +6215,7 @@ class Portfolio(Analyzable):
                 wrapper = cls_or_self.wrapper
         else:
             if cash_deposits_raw is None:
-                cash_deposits_raw = 0.
+                cash_deposits_raw = 0.0
             checks.assert_not_none(cash_sharing)
             checks.assert_not_none(wrapper)
 
@@ -6286,13 +6226,7 @@ class Portfolio(Analyzable):
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
             func = jit_reg.resolve_option(nb.cash_deposits_grouped_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
-            cash_deposits = func(
-                wrapper.shape_2d,
-                cash_deposits_raw,
-                group_lens,
-                cash_sharing,
-                flex_2d=flex_2d
-            )
+            cash_deposits = func(wrapper.shape_2d, cash_deposits_raw, group_lens, cash_sharing, flex_2d=flex_2d)
         else:
             if keep_flex and not cash_sharing:
                 return cash_deposits_raw
@@ -6305,21 +6239,23 @@ class Portfolio(Analyzable):
                 group_lens,
                 cash_sharing,
                 split_shared=split_shared,
-                flex_2d=flex_2d
+                flex_2d=flex_2d,
             )
         if keep_flex:
             return cash_deposits
         return wrapper.wrap(cash_deposits, group_by=group_by, **resolve_dict(wrap_kwargs))
 
     @class_or_instancemethod
-    def get_cash_earnings(cls_or_self,
-                          group_by: tp.GroupByLike = None,
-                          cash_earnings_raw: tp.Optional[tp.ArrayLike] = None,
-                          keep_flex: bool = False,
-                          jitted: tp.JittedOption = None,
-                          chunked: tp.ChunkedOption = None,
-                          wrapper: tp.Optional[ArrayWrapper] = None,
-                          wrap_kwargs: tp.KwargsLike = None) -> tp.ArrayLike:
+    def get_cash_earnings(
+        cls_or_self,
+        group_by: tp.GroupByLike = None,
+        cash_earnings_raw: tp.Optional[tp.ArrayLike] = None,
+        keep_flex: bool = False,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.ArrayLike:
         """Get earnings in cash series per column/group.
 
         Set `keep_flex` to True to keep format suitable for flexible indexing.
@@ -6331,7 +6267,7 @@ class Portfolio(Analyzable):
                 wrapper = cls_or_self.wrapper
         else:
             if cash_earnings_raw is None:
-                cash_earnings_raw = 0.
+                cash_earnings_raw = 0.0
             checks.assert_not_none(wrapper)
 
         cash_earnings_raw = to_2d_array(cash_earnings_raw)
@@ -6350,16 +6286,18 @@ class Portfolio(Analyzable):
         return wrapper.wrap(cash_earnings, group_by=group_by, **resolve_dict(wrap_kwargs))
 
     @class_or_instancemethod
-    def get_cash_flow(cls_or_self,
-                      group_by: tp.GroupByLike = None,
-                      free: bool = False,
-                      orders: tp.Optional[Orders] = None,
-                      cash_earnings: tp.Optional[tp.ArrayLike] = None,
-                      flex_2d: bool = False,
-                      jitted: tp.JittedOption = None,
-                      chunked: tp.ChunkedOption = None,
-                      wrapper: tp.Optional[ArrayWrapper] = None,
-                      wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def get_cash_flow(
+        cls_or_self,
+        group_by: tp.GroupByLike = None,
+        free: bool = False,
+        orders: tp.Optional[Orders] = None,
+        cash_earnings: tp.Optional[tp.ArrayLike] = None,
+        flex_2d: bool = False,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
         """Get cash flow series per column/group.
 
         Use `free` to return the flow of the free cash, which never goes above the initial level,
@@ -6377,7 +6315,7 @@ class Portfolio(Analyzable):
         else:
             checks.assert_not_none(orders)
             if cash_earnings is None:
-                cash_earnings = 0.
+                cash_earnings = 0.0
             if wrapper is None:
                 wrapper = orders.wrapper
 
@@ -6389,7 +6327,7 @@ class Portfolio(Analyzable):
             orders.col_mapper.col_map,
             free=free,
             cash_earnings=to_2d_array(cash_earnings),
-            flex_2d=flex_2d
+            flex_2d=flex_2d,
         )
         if wrapper.grouper.is_grouped(group_by=group_by):
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
@@ -6399,18 +6337,20 @@ class Portfolio(Analyzable):
         return wrapper.wrap(cash_flow, group_by=group_by, **resolve_dict(wrap_kwargs))
 
     @class_or_instancemethod
-    def get_init_cash(cls_or_self,
-                      group_by: tp.GroupByLike = None,
-                      init_cash_raw: tp.Optional[tp.ArrayLike] = None,
-                      cash_deposits: tp.Optional[tp.ArrayLike] = None,
-                      cash_sharing: tp.Optional[bool] = None,
-                      free_cash_flow: tp.Optional[tp.SeriesFrame] = None,
-                      split_shared: bool = False,
-                      flex_2d: bool = False,
-                      jitted: tp.JittedOption = None,
-                      chunked: tp.ChunkedOption = None,
-                      wrapper: tp.Optional[ArrayWrapper] = None,
-                      wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def get_init_cash(
+        cls_or_self,
+        group_by: tp.GroupByLike = None,
+        init_cash_raw: tp.Optional[tp.ArrayLike] = None,
+        cash_deposits: tp.Optional[tp.ArrayLike] = None,
+        cash_sharing: tp.Optional[bool] = None,
+        free_cash_flow: tp.Optional[tp.SeriesFrame] = None,
+        split_shared: bool = False,
+        flex_2d: bool = False,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeSeries:
         """Get initial amount of cash per column/group."""
         if not isinstance(cls_or_self, type):
             if init_cash_raw is None:
@@ -6428,31 +6368,31 @@ class Portfolio(Analyzable):
             if not isinstance(cls_or_self, type):
                 if free_cash_flow is None:
                     free_cash_flow = cls_or_self.resolve_shortcut_attr(
-                        'cash_flow',
+                        "cash_flow",
                         group_by=group_by,
                         free=True,
                         jitted=jitted,
-                        chunked=chunked
+                        chunked=chunked,
                     )
                 if cash_deposits is None:
                     cash_deposits = cls_or_self.resolve_shortcut_attr(
-                        'cash_deposits',
+                        "cash_deposits",
                         group_by=group_by,
                         jitted=jitted,
                         chunked=chunked,
-                        keep_flex=True
+                        keep_flex=True,
                     )
             else:
                 checks.assert_not_none(free_cash_flow)
                 if cash_deposits is None:
-                    cash_deposits = 0.
+                    cash_deposits = 0.0
             func = jit_reg.resolve_option(nb.align_init_cash_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             init_cash = func(
                 init_cash_raw,
                 to_2d_array(free_cash_flow),
                 cash_deposits=to_2d_array(cash_deposits),
-                flex_2d=flex_2d
+                flex_2d=flex_2d,
             )
         else:
             init_cash_raw = to_1d_array(init_cash_raw)
@@ -6464,22 +6404,24 @@ class Portfolio(Analyzable):
                 group_lens = wrapper.grouper.get_group_lens()
                 func = jit_reg.resolve_option(nb.init_cash_nb, jitted)
                 init_cash = func(init_cash_raw, group_lens, cash_sharing, split_shared=split_shared)
-        wrap_kwargs = merge_dicts(dict(name_or_index='init_cash'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="init_cash"), wrap_kwargs)
         return wrapper.wrap_reduced(init_cash, group_by=group_by, **wrap_kwargs)
 
     @class_or_instancemethod
-    def get_cash(cls_or_self,
-                 group_by: tp.GroupByLike = None,
-                 free: bool = False,
-                 cash_sharing: tp.Optional[bool] = None,
-                 init_cash: tp.Optional[tp.ArrayLike] = None,
-                 cash_deposits: tp.Optional[tp.ArrayLike] = None,
-                 cash_flow: tp.Optional[tp.SeriesFrame] = None,
-                 flex_2d: bool = False,
-                 jitted: tp.JittedOption = None,
-                 chunked: tp.ChunkedOption = None,
-                 wrapper: tp.Optional[ArrayWrapper] = None,
-                 wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def get_cash(
+        cls_or_self,
+        group_by: tp.GroupByLike = None,
+        free: bool = False,
+        cash_sharing: tp.Optional[bool] = None,
+        init_cash: tp.Optional[tp.ArrayLike] = None,
+        cash_deposits: tp.Optional[tp.ArrayLike] = None,
+        cash_flow: tp.Optional[tp.SeriesFrame] = None,
+        flex_2d: bool = False,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
         """Get cash balance series per column/group.
 
         For `free`, see `Portfolio.get_cash_flow`."""
@@ -6488,11 +6430,11 @@ class Portfolio(Analyzable):
                 cash_sharing = cls_or_self.cash_sharing
             if cash_flow is None:
                 cash_flow = cls_or_self.resolve_shortcut_attr(
-                    'cash_flow',
+                    "cash_flow",
                     group_by=group_by,
                     free=free,
                     jitted=jitted,
-                    chunked=chunked
+                    chunked=chunked,
                 )
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -6500,7 +6442,7 @@ class Portfolio(Analyzable):
             checks.assert_not_none(cash_sharing)
             checks.assert_not_none(init_cash)
             if cash_deposits is None:
-                cash_deposits = 0.
+                cash_deposits = 0.0
             checks.assert_not_none(cash_flow)
             checks.assert_not_none(wrapper)
 
@@ -6508,18 +6450,18 @@ class Portfolio(Analyzable):
             if not isinstance(cls_or_self, type):
                 if init_cash is None:
                     init_cash = cls_or_self.resolve_shortcut_attr(
-                        'init_cash',
-                        group_by=group_by,
-                        jitted=jitted,
-                        chunked=chunked
-                    )
-                if cash_deposits is None:
-                    cash_deposits = cls_or_self.resolve_shortcut_attr(
-                        'cash_deposits',
+                        "init_cash",
                         group_by=group_by,
                         jitted=jitted,
                         chunked=chunked,
-                        keep_flex=True
+                    )
+                if cash_deposits is None:
+                    cash_deposits = cls_or_self.resolve_shortcut_attr(
+                        "cash_deposits",
+                        group_by=group_by,
+                        jitted=jitted,
+                        chunked=chunked,
+                        keep_flex=True,
                     )
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
             func = jit_reg.resolve_option(nb.cash_grouped_nb, jitted)
@@ -6530,24 +6472,24 @@ class Portfolio(Analyzable):
                 group_lens,
                 to_1d_array(init_cash),
                 cash_deposits_grouped=to_2d_array(cash_deposits),
-                flex_2d=flex_2d
+                flex_2d=flex_2d,
             )
         else:
             if not isinstance(cls_or_self, type):
                 if init_cash is None:
                     init_cash = cls_or_self.resolve_shortcut_attr(
-                        'init_cash',
-                        group_by=False,
-                        jitted=jitted,
-                        chunked=chunked
-                    )
-                if cash_deposits is None:
-                    cash_deposits = cls_or_self.resolve_shortcut_attr(
-                        'cash_deposits',
+                        "init_cash",
                         group_by=False,
                         jitted=jitted,
                         chunked=chunked,
-                        keep_flex=True
+                    )
+                if cash_deposits is None:
+                    cash_deposits = cls_or_self.resolve_shortcut_attr(
+                        "cash_deposits",
+                        group_by=False,
+                        jitted=jitted,
+                        chunked=chunked,
+                        keep_flex=True,
                     )
             func = jit_reg.resolve_option(nb.cash_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
@@ -6555,20 +6497,22 @@ class Portfolio(Analyzable):
                 to_2d_array(cash_flow),
                 to_1d_array(init_cash),
                 cash_deposits=to_2d_array(cash_deposits),
-                flex_2d=flex_2d
+                flex_2d=flex_2d,
             )
         return wrapper.wrap(cash, group_by=group_by, **resolve_dict(wrap_kwargs))
 
     # ############# Value ############# #
 
     @class_or_instancemethod
-    def get_init_position_value(cls_or_self,
-                                close: tp.Optional[tp.SeriesFrame] = None,
-                                init_position: tp.Optional[tp.ArrayLike] = None,
-                                jitted: tp.JittedOption = None,
-                                chunked: tp.ChunkedOption = None,
-                                wrapper: tp.Optional[ArrayWrapper] = None,
-                                wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def get_init_position_value(
+        cls_or_self,
+        close: tp.Optional[tp.SeriesFrame] = None,
+        init_position: tp.Optional[tp.ArrayLike] = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeSeries:
         """Get initial position value per column."""
         if not isinstance(cls_or_self, type):
             if close is None:
@@ -6583,24 +6527,26 @@ class Portfolio(Analyzable):
         else:
             checks.assert_not_none(close)
             if init_position is None:
-                init_position = 0.
+                init_position = 0.0
             checks.assert_not_none(wrapper)
 
         func = jit_reg.resolve_option(nb.init_position_value_nb, jitted)
         init_position_value = func(to_2d_array(close), init_position=to_1d_array(init_position))
-        wrap_kwargs = merge_dicts(dict(name_or_index='init_position_value'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="init_position_value"), wrap_kwargs)
         return wrapper.wrap_reduced(init_position_value, group_by=False, **wrap_kwargs)
 
     @class_or_instancemethod
-    def get_init_value(cls_or_self,
-                       group_by: tp.GroupByLike = None,
-                       init_position_value: tp.Optional[tp.MaybeSeries] = None,
-                       init_cash: tp.Optional[tp.MaybeSeries] = None,
-                       split_shared: bool = False,
-                       jitted: tp.JittedOption = None,
-                       chunked: tp.ChunkedOption = None,
-                       wrapper: tp.Optional[ArrayWrapper] = None,
-                       wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def get_init_value(
+        cls_or_self,
+        group_by: tp.GroupByLike = None,
+        init_position_value: tp.Optional[tp.MaybeSeries] = None,
+        init_cash: tp.Optional[tp.MaybeSeries] = None,
+        split_shared: bool = False,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeSeries:
         """Get initial value per column/group.
 
         Includes initial cash and the value of initial position."""
@@ -6609,11 +6555,11 @@ class Portfolio(Analyzable):
                 init_position_value = cls_or_self.init_position_value
             if init_cash is None:
                 init_cash = cls_or_self.resolve_shortcut_attr(
-                    'init_cash',
+                    "init_cash",
                     group_by=group_by,
                     split_shared=split_shared,
                     jitted=jitted,
-                    chunked=chunked
+                    chunked=chunked,
                 )
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -6625,41 +6571,36 @@ class Portfolio(Analyzable):
         if wrapper.grouper.is_grouped(group_by=group_by):
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
             func = jit_reg.resolve_option(nb.init_value_grouped_nb, jitted)
-            init_value = func(
-                group_lens,
-                to_1d_array(init_position_value),
-                to_1d_array(init_cash)
-            )
+            init_value = func(group_lens, to_1d_array(init_position_value), to_1d_array(init_cash))
         else:
             func = jit_reg.resolve_option(nb.init_value_nb, jitted)
-            init_value = func(
-                to_1d_array(init_position_value),
-                to_1d_array(init_cash)
-            )
-        wrap_kwargs = merge_dicts(dict(name_or_index='init_value'), wrap_kwargs)
+            init_value = func(to_1d_array(init_position_value), to_1d_array(init_cash))
+        wrap_kwargs = merge_dicts(dict(name_or_index="init_value"), wrap_kwargs)
         return wrapper.wrap_reduced(init_value, group_by=group_by, **wrap_kwargs)
 
     @class_or_instancemethod
-    def get_input_value(cls_or_self,
-                        group_by: tp.GroupByLike = None,
-                        cash_sharing: tp.Optional[bool] = None,
-                        init_value: tp.Optional[tp.MaybeSeries] = None,
-                        cash_deposits_raw: tp.Optional[tp.ArrayLike] = None,
-                        split_shared: bool = False,
-                        jitted: tp.JittedOption = None,
-                        chunked: tp.ChunkedOption = None,
-                        wrapper: tp.Optional[ArrayWrapper] = None,
-                        wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def get_input_value(
+        cls_or_self,
+        group_by: tp.GroupByLike = None,
+        cash_sharing: tp.Optional[bool] = None,
+        init_value: tp.Optional[tp.MaybeSeries] = None,
+        cash_deposits_raw: tp.Optional[tp.ArrayLike] = None,
+        split_shared: bool = False,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeSeries:
         """Get total input value per column/group.
 
         Includes initial value and any cash deposited at any point in time."""
         if not isinstance(cls_or_self, type):
             if init_value is None:
                 init_value = cls_or_self.resolve_shortcut_attr(
-                    'init_value',
+                    "init_value",
                     group_by=group_by,
                     jitted=jitted,
-                    chunked=chunked
+                    chunked=chunked,
                 )
             if cash_deposits_raw is None:
                 cash_deposits_raw = cls_or_self._cash_deposits
@@ -6671,7 +6612,7 @@ class Portfolio(Analyzable):
             checks.assert_not_none(cash_sharing)
             checks.assert_not_none(init_value)
             if cash_deposits_raw is None:
-                cash_deposits_raw = 0.
+                cash_deposits_raw = 0.0
             checks.assert_not_none(wrapper)
 
         cash_deposits_raw = to_2d_array(cash_deposits_raw)
@@ -6685,19 +6626,21 @@ class Portfolio(Analyzable):
             func = jit_reg.resolve_option(nb.init_cash_nb, jitted)
             input_value = func(cash_deposits_sum, group_lens, cash_sharing, split_shared=split_shared)
         input_value += to_1d_array(init_value)
-        wrap_kwargs = merge_dicts(dict(name_or_index='input_value'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="input_value"), wrap_kwargs)
         return wrapper.wrap_reduced(input_value, group_by=group_by, **wrap_kwargs)
 
     @class_or_instancemethod
-    def get_asset_value(cls_or_self,
-                        direction: tp.Union[str, int] = 'both',
-                        group_by: tp.GroupByLike = None,
-                        close: tp.Optional[tp.SeriesFrame] = None,
-                        assets: tp.Optional[tp.SeriesFrame] = None,
-                        jitted: tp.JittedOption = None,
-                        chunked: tp.ChunkedOption = None,
-                        wrapper: tp.Optional[ArrayWrapper] = None,
-                        wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def get_asset_value(
+        cls_or_self,
+        direction: tp.Union[str, int] = "both",
+        group_by: tp.GroupByLike = None,
+        close: tp.Optional[tp.SeriesFrame] = None,
+        assets: tp.Optional[tp.SeriesFrame] = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
         """Get asset value series per column/group."""
         if not isinstance(cls_or_self, type):
             if close is None:
@@ -6707,10 +6650,10 @@ class Portfolio(Analyzable):
                     close = cls_or_self.close
             if assets is None:
                 assets = cls_or_self.resolve_shortcut_attr(
-                    'assets',
+                    "assets",
                     direction=direction,
                     jitted=jitted,
-                    chunked=chunked
+                    chunked=chunked,
                 )
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -6721,7 +6664,7 @@ class Portfolio(Analyzable):
 
         close = to_2d_array(close).copy()
         assets = to_2d_array(assets)
-        close[assets == 0] = 0.  # for price being NaN
+        close[assets == 0] = 0.0  # for price being NaN
         func = jit_reg.resolve_option(nb.asset_value_nb, jitted)
         asset_value = func(close, assets)
         if wrapper.grouper.is_grouped(group_by=group_by):
@@ -6732,34 +6675,36 @@ class Portfolio(Analyzable):
         return wrapper.wrap(asset_value, group_by=group_by, **resolve_dict(wrap_kwargs))
 
     @class_or_instancemethod
-    def get_gross_exposure(cls_or_self,
-                           direction: tp.Union[str, int] = 'both',
-                           group_by: tp.GroupByLike = None,
-                           asset_value: tp.Optional[tp.SeriesFrame] = None,
-                           free_cash: tp.Optional[tp.SeriesFrame] = None,
-                           jitted: tp.JittedOption = None,
-                           chunked: tp.ChunkedOption = None,
-                           wrapper: tp.Optional[ArrayWrapper] = None,
-                           wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def get_gross_exposure(
+        cls_or_self,
+        direction: tp.Union[str, int] = "both",
+        group_by: tp.GroupByLike = None,
+        asset_value: tp.Optional[tp.SeriesFrame] = None,
+        free_cash: tp.Optional[tp.SeriesFrame] = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
         """Get gross exposure."""
         direction = map_enum_fields(direction, Direction)
 
         if not isinstance(cls_or_self, type):
             if asset_value is None:
                 asset_value = cls_or_self.resolve_shortcut_attr(
-                    'asset_value',
+                    "asset_value",
                     group_by=group_by,
                     direction=direction,
                     jitted=jitted,
-                    chunked=chunked
+                    chunked=chunked,
                 )
             if free_cash is None:
                 free_cash = cls_or_self.resolve_shortcut_attr(
-                    'cash',
+                    "cash",
                     group_by=group_by,
                     free=True,
                     jitted=jitted,
-                    chunked=chunked
+                    chunked=chunked,
                 )
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -6774,31 +6719,33 @@ class Portfolio(Analyzable):
         return wrapper.wrap(gross_exposure, group_by=group_by, **resolve_dict(wrap_kwargs))
 
     @class_or_instancemethod
-    def get_net_exposure(cls_or_self,
-                         group_by: tp.GroupByLike = None,
-                         long_exposure: tp.Optional[tp.SeriesFrame] = None,
-                         short_exposure: tp.Optional[tp.SeriesFrame] = None,
-                         jitted: tp.JittedOption = None,
-                         chunked: tp.ChunkedOption = None,
-                         wrapper: tp.Optional[ArrayWrapper] = None,
-                         wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def get_net_exposure(
+        cls_or_self,
+        group_by: tp.GroupByLike = None,
+        long_exposure: tp.Optional[tp.SeriesFrame] = None,
+        short_exposure: tp.Optional[tp.SeriesFrame] = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
         """Get net exposure."""
         if not isinstance(cls_or_self, type):
             if long_exposure is None:
                 long_exposure = cls_or_self.resolve_shortcut_attr(
-                    'gross_exposure',
+                    "gross_exposure",
                     direction=Direction.LongOnly,
                     group_by=group_by,
                     jitted=jitted,
-                    chunked=chunked
+                    chunked=chunked,
                 )
             if short_exposure is None:
                 short_exposure = cls_or_self.resolve_shortcut_attr(
-                    'gross_exposure',
+                    "gross_exposure",
                     direction=Direction.ShortOnly,
                     group_by=group_by,
                     jitted=jitted,
-                    chunked=chunked
+                    chunked=chunked,
                 )
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -6811,14 +6758,16 @@ class Portfolio(Analyzable):
         return wrapper.wrap(net_exposure, group_by=group_by, **resolve_dict(wrap_kwargs))
 
     @class_or_instancemethod
-    def get_value(cls_or_self,
-                  group_by: tp.GroupByLike = None,
-                  cash: tp.Optional[tp.SeriesFrame] = None,
-                  asset_value: tp.Optional[tp.SeriesFrame] = None,
-                  jitted: tp.JittedOption = None,
-                  chunked: tp.ChunkedOption = None,
-                  wrapper: tp.Optional[ArrayWrapper] = None,
-                  wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def get_value(
+        cls_or_self,
+        group_by: tp.GroupByLike = None,
+        cash: tp.Optional[tp.SeriesFrame] = None,
+        asset_value: tp.Optional[tp.SeriesFrame] = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
         """Get portfolio value series per column/group.
 
         By default, will generate portfolio value for each asset based on cash flows and thus
@@ -6826,18 +6775,13 @@ class Portfolio(Analyzable):
         entire group. Useful for generating returns and comparing assets within the same group."""
         if not isinstance(cls_or_self, type):
             if cash is None:
-                cash = cls_or_self.resolve_shortcut_attr(
-                    'cash',
-                    group_by=group_by,
-                    jitted=jitted,
-                    chunked=chunked
-                )
+                cash = cls_or_self.resolve_shortcut_attr("cash", group_by=group_by, jitted=jitted, chunked=chunked)
             if asset_value is None:
                 asset_value = cls_or_self.resolve_shortcut_attr(
-                    'asset_value',
+                    "asset_value",
                     group_by=group_by,
                     jitted=jitted,
-                    chunked=chunked
+                    chunked=chunked,
                 )
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -6851,17 +6795,19 @@ class Portfolio(Analyzable):
         return wrapper.wrap(value, group_by=group_by, **resolve_dict(wrap_kwargs))
 
     @class_or_instancemethod
-    def get_total_profit(cls_or_self,
-                         group_by: tp.GroupByLike = None,
-                         close: tp.Optional[tp.SeriesFrame] = None,
-                         orders: tp.Optional[Orders] = None,
-                         init_position: tp.Optional[tp.ArrayLike] = None,
-                         cash_earnings: tp.Optional[tp.ArrayLike] = None,
-                         flex_2d: bool = False,
-                         jitted: tp.JittedOption = None,
-                         chunked: tp.ChunkedOption = None,
-                         wrapper: tp.Optional[ArrayWrapper] = None,
-                         wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def get_total_profit(
+        cls_or_self,
+        group_by: tp.GroupByLike = None,
+        close: tp.Optional[tp.SeriesFrame] = None,
+        orders: tp.Optional[Orders] = None,
+        init_position: tp.Optional[tp.ArrayLike] = None,
+        cash_earnings: tp.Optional[tp.ArrayLike] = None,
+        flex_2d: bool = False,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeSeries:
         """Get total profit per column/group.
 
         Calculated directly from order records (fast)."""
@@ -6885,9 +6831,9 @@ class Portfolio(Analyzable):
                 close = orders.close
             checks.assert_not_none(close)
             if init_position is None:
-                init_position = 0.
+                init_position = 0.0
             if cash_earnings is None:
-                cash_earnings = 0.
+                cash_earnings = 0.0
             if wrapper is None:
                 wrapper = orders.wrapper
 
@@ -6900,39 +6846,41 @@ class Portfolio(Analyzable):
             orders.col_mapper.col_map,
             init_position=to_1d_array(init_position),
             cash_earnings=to_2d_array(cash_earnings),
-            flex_2d=flex_2d
+            flex_2d=flex_2d,
         )
         if wrapper.grouper.is_grouped(group_by=group_by):
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
             func = jit_reg.resolve_option(nb.total_profit_grouped_nb, jitted)
             total_profit = func(total_profit, group_lens)
-        wrap_kwargs = merge_dicts(dict(name_or_index='total_profit'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="total_profit"), wrap_kwargs)
         return wrapper.wrap_reduced(total_profit, group_by=group_by, **wrap_kwargs)
 
     @class_or_instancemethod
-    def get_final_value(cls_or_self,
-                        group_by: tp.GroupByLike = None,
-                        input_value: tp.Optional[tp.MaybeSeries] = None,
-                        total_profit: tp.Optional[tp.MaybeSeries] = None,
-                        jitted: tp.JittedOption = None,
-                        chunked: tp.ChunkedOption = None,
-                        wrapper: tp.Optional[ArrayWrapper] = None,
-                        wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def get_final_value(
+        cls_or_self,
+        group_by: tp.GroupByLike = None,
+        input_value: tp.Optional[tp.MaybeSeries] = None,
+        total_profit: tp.Optional[tp.MaybeSeries] = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeSeries:
         """Get total profit per column/group."""
         if not isinstance(cls_or_self, type):
             if input_value is None:
                 input_value = cls_or_self.resolve_shortcut_attr(
-                    'input_value',
+                    "input_value",
                     group_by=group_by,
                     jitted=jitted,
-                    chunked=chunked
+                    chunked=chunked,
                 )
             if total_profit is None:
                 total_profit = cls_or_self.resolve_shortcut_attr(
-                    'total_profit',
+                    "total_profit",
                     group_by=group_by,
                     jitted=jitted,
-                    chunked=chunked
+                    chunked=chunked,
                 )
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -6942,33 +6890,35 @@ class Portfolio(Analyzable):
             checks.assert_not_none(wrapper)
 
         final_value = to_1d_array(input_value) + to_1d_array(total_profit)
-        wrap_kwargs = merge_dicts(dict(name_or_index='final_value'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="final_value"), wrap_kwargs)
         return wrapper.wrap_reduced(final_value, group_by=group_by, **wrap_kwargs)
 
     @class_or_instancemethod
-    def get_total_return(cls_or_self,
-                         group_by: tp.GroupByLike = None,
-                         input_value: tp.Optional[tp.MaybeSeries] = None,
-                         total_profit: tp.Optional[tp.MaybeSeries] = None,
-                         jitted: tp.JittedOption = None,
-                         chunked: tp.ChunkedOption = None,
-                         wrapper: tp.Optional[ArrayWrapper] = None,
-                         wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def get_total_return(
+        cls_or_self,
+        group_by: tp.GroupByLike = None,
+        input_value: tp.Optional[tp.MaybeSeries] = None,
+        total_profit: tp.Optional[tp.MaybeSeries] = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeSeries:
         """Get total return per column/group."""
         if not isinstance(cls_or_self, type):
             if input_value is None:
                 input_value = cls_or_self.resolve_shortcut_attr(
-                    'input_value',
+                    "input_value",
                     group_by=group_by,
                     jitted=jitted,
-                    chunked=chunked
+                    chunked=chunked,
                 )
             if total_profit is None:
                 total_profit = cls_or_self.resolve_shortcut_attr(
-                    'total_profit',
+                    "total_profit",
                     group_by=group_by,
                     jitted=jitted,
-                    chunked=chunked
+                    chunked=chunked,
                 )
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -6978,50 +6928,47 @@ class Portfolio(Analyzable):
             checks.assert_not_none(wrapper)
 
         total_return = to_1d_array(total_profit) / to_1d_array(input_value)
-        wrap_kwargs = merge_dicts(dict(name_or_index='total_return'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="total_return"), wrap_kwargs)
         return wrapper.wrap_reduced(total_return, group_by=group_by, **wrap_kwargs)
 
     @class_or_instancemethod
-    def get_returns(cls_or_self,
-                    group_by: tp.GroupByLike = None,
-                    init_value: tp.Optional[tp.MaybeSeries] = None,
-                    cash_deposits: tp.Optional[tp.ArrayLike] = None,
-                    value: tp.Optional[tp.SeriesFrame] = None,
-                    flex_2d: bool = False,
-                    jitted: tp.JittedOption = None,
-                    chunked: tp.ChunkedOption = None,
-                    wrapper: tp.Optional[ArrayWrapper] = None,
-                    wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def get_returns(
+        cls_or_self,
+        group_by: tp.GroupByLike = None,
+        init_value: tp.Optional[tp.MaybeSeries] = None,
+        cash_deposits: tp.Optional[tp.ArrayLike] = None,
+        value: tp.Optional[tp.SeriesFrame] = None,
+        flex_2d: bool = False,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
         """Get return series per column/group based on portfolio value."""
         if not isinstance(cls_or_self, type):
             if init_value is None:
                 init_value = cls_or_self.resolve_shortcut_attr(
-                    'init_value',
-                    group_by=group_by,
-                    jitted=jitted,
-                    chunked=chunked
-                )
-            if cash_deposits is None:
-                cash_deposits = cls_or_self.resolve_shortcut_attr(
-                    'cash_deposits',
+                    "init_value",
                     group_by=group_by,
                     jitted=jitted,
                     chunked=chunked,
-                    keep_flex=True
                 )
-            if value is None:
-                value = cls_or_self.resolve_shortcut_attr(
-                    'value',
+            if cash_deposits is None:
+                cash_deposits = cls_or_self.resolve_shortcut_attr(
+                    "cash_deposits",
                     group_by=group_by,
                     jitted=jitted,
-                    chunked=chunked
+                    chunked=chunked,
+                    keep_flex=True,
                 )
+            if value is None:
+                value = cls_or_self.resolve_shortcut_attr("value", group_by=group_by, jitted=jitted, chunked=chunked)
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
             checks.assert_not_none(init_value)
             if cash_deposits is None:
-                cash_deposits = 0.
+                cash_deposits = 0.0
             checks.assert_not_none(value)
             checks.assert_not_none(wrapper)
 
@@ -7031,20 +6978,22 @@ class Portfolio(Analyzable):
             to_2d_array(value),
             to_1d_array(init_value),
             cash_deposits=to_2d_array(cash_deposits),
-            flex_2d=flex_2d
+            flex_2d=flex_2d,
         )
         return wrapper.wrap(returns, group_by=group_by, **resolve_dict(wrap_kwargs))
 
     @class_or_instancemethod
-    def get_asset_returns(cls_or_self,
-                          group_by: tp.GroupByLike = None,
-                          init_position_value: tp.Optional[tp.MaybeSeries] = None,
-                          asset_value: tp.Optional[tp.SeriesFrame] = None,
-                          cash_flow: tp.Optional[tp.SeriesFrame] = None,
-                          jitted: tp.JittedOption = None,
-                          chunked: tp.ChunkedOption = None,
-                          wrapper: tp.Optional[ArrayWrapper] = None,
-                          wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def get_asset_returns(
+        cls_or_self,
+        group_by: tp.GroupByLike = None,
+        init_position_value: tp.Optional[tp.MaybeSeries] = None,
+        asset_value: tp.Optional[tp.SeriesFrame] = None,
+        cash_flow: tp.Optional[tp.SeriesFrame] = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
         """Get asset return series per column/group.
 
         This type of returns is based solely on cash flows and asset value rather than portfolio
@@ -7056,17 +7005,17 @@ class Portfolio(Analyzable):
                 init_position_value = cls_or_self.init_position_value
             if asset_value is None:
                 asset_value = cls_or_self.resolve_shortcut_attr(
-                    'asset_value',
+                    "asset_value",
                     group_by=group_by,
                     jitted=jitted,
-                    chunked=chunked
+                    chunked=chunked,
                 )
             if cash_flow is None:
                 cash_flow = cls_or_self.resolve_shortcut_attr(
-                    'cash_flow',
+                    "cash_flow",
                     group_by=group_by,
                     jitted=jitted,
-                    chunked=chunked
+                    chunked=chunked,
                 )
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -7078,24 +7027,22 @@ class Portfolio(Analyzable):
 
         func = jit_reg.resolve_option(nb.asset_returns_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        asset_returns = func(
-            to_1d_array(init_position_value),
-            to_2d_array(asset_value),
-            to_2d_array(cash_flow)
-        )
+        asset_returns = func(to_1d_array(init_position_value), to_2d_array(asset_value), to_2d_array(cash_flow))
         return wrapper.wrap(asset_returns, group_by=group_by, **resolve_dict(wrap_kwargs))
 
     @class_or_instancemethod
-    def get_market_value(cls_or_self,
-                         group_by: tp.GroupByLike = None,
-                         close: tp.Optional[tp.SeriesFrame] = None,
-                         init_value: tp.Optional[tp.MaybeSeries] = None,
-                         cash_deposits: tp.Optional[tp.ArrayLike] = None,
-                         flex_2d: bool = False,
-                         jitted: tp.JittedOption = None,
-                         chunked: tp.ChunkedOption = None,
-                         wrapper: tp.Optional[ArrayWrapper] = None,
-                         wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def get_market_value(
+        cls_or_self,
+        group_by: tp.GroupByLike = None,
+        close: tp.Optional[tp.SeriesFrame] = None,
+        init_value: tp.Optional[tp.MaybeSeries] = None,
+        cash_deposits: tp.Optional[tp.ArrayLike] = None,
+        flex_2d: bool = False,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
         """Get market value series per column/group.
 
         If grouped, evenly distributes the initial cash among assets in the group.
@@ -7114,27 +7061,27 @@ class Portfolio(Analyzable):
             checks.assert_not_none(close)
             checks.assert_not_none(init_value)
             if cash_deposits is None:
-                cash_deposits = 0.
+                cash_deposits = 0.0
             checks.assert_not_none(wrapper)
 
         if wrapper.grouper.is_grouped(group_by=group_by):
             if not isinstance(cls_or_self, type):
                 if init_value is None:
                     init_value = cls_or_self.resolve_shortcut_attr(
-                        'init_value',
-                        group_by=False,
-                        split_shared=True,
-                        jitted=jitted,
-                        chunked=chunked
-                    )
-                if cash_deposits is None:
-                    cash_deposits = cls_or_self.resolve_shortcut_attr(
-                        'cash_deposits',
+                        "init_value",
                         group_by=False,
                         split_shared=True,
                         jitted=jitted,
                         chunked=chunked,
-                        keep_flex=True
+                    )
+                if cash_deposits is None:
+                    cash_deposits = cls_or_self.resolve_shortcut_attr(
+                        "cash_deposits",
+                        group_by=False,
+                        split_shared=True,
+                        jitted=jitted,
+                        chunked=chunked,
+                        keep_flex=True,
                     )
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
             func = jit_reg.resolve_option(nb.market_value_grouped_nb, jitted)
@@ -7144,24 +7091,24 @@ class Portfolio(Analyzable):
                 group_lens,
                 to_1d_array(init_value),
                 cash_deposits=to_2d_array(cash_deposits),
-                flex_2d=flex_2d
+                flex_2d=flex_2d,
             )
         else:
             if not isinstance(cls_or_self, type):
                 if init_value is None:
                     init_value = cls_or_self.resolve_shortcut_attr(
-                        'init_value',
-                        group_by=False,
-                        jitted=jitted,
-                        chunked=chunked
-                    )
-                if cash_deposits is None:
-                    cash_deposits = cls_or_self.resolve_shortcut_attr(
-                        'cash_deposits',
+                        "init_value",
                         group_by=False,
                         jitted=jitted,
                         chunked=chunked,
-                        keep_flex=True
+                    )
+                if cash_deposits is None:
+                    cash_deposits = cls_or_self.resolve_shortcut_attr(
+                        "cash_deposits",
+                        group_by=False,
+                        jitted=jitted,
+                        chunked=chunked,
+                        keep_flex=True,
                     )
             func = jit_reg.resolve_option(nb.market_value_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
@@ -7169,51 +7116,53 @@ class Portfolio(Analyzable):
                 to_2d_array(close),
                 to_1d_array(init_value),
                 cash_deposits=to_2d_array(cash_deposits),
-                flex_2d=flex_2d
+                flex_2d=flex_2d,
             )
         return wrapper.wrap(market_value, group_by=group_by, **resolve_dict(wrap_kwargs))
 
     @class_or_instancemethod
-    def get_market_returns(cls_or_self,
-                           group_by: tp.GroupByLike = None,
-                           init_value: tp.Optional[tp.MaybeSeries] = None,
-                           cash_deposits: tp.Optional[tp.ArrayLike] = None,
-                           market_value: tp.Optional[tp.SeriesFrame] = None,
-                           flex_2d: bool = False,
-                           jitted: tp.JittedOption = None,
-                           chunked: tp.ChunkedOption = None,
-                           wrapper: tp.Optional[ArrayWrapper] = None,
-                           wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def get_market_returns(
+        cls_or_self,
+        group_by: tp.GroupByLike = None,
+        init_value: tp.Optional[tp.MaybeSeries] = None,
+        cash_deposits: tp.Optional[tp.ArrayLike] = None,
+        market_value: tp.Optional[tp.SeriesFrame] = None,
+        flex_2d: bool = False,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
         """Get market return series per column/group."""
         if not isinstance(cls_or_self, type):
             if init_value is None:
                 init_value = cls_or_self.resolve_shortcut_attr(
-                    'init_value',
-                    group_by=group_by,
-                    jitted=jitted,
-                    chunked=chunked
-                )
-            if cash_deposits is None:
-                cash_deposits = cls_or_self.resolve_shortcut_attr(
-                    'cash_deposits',
+                    "init_value",
                     group_by=group_by,
                     jitted=jitted,
                     chunked=chunked,
-                    keep_flex=True
+                )
+            if cash_deposits is None:
+                cash_deposits = cls_or_self.resolve_shortcut_attr(
+                    "cash_deposits",
+                    group_by=group_by,
+                    jitted=jitted,
+                    chunked=chunked,
+                    keep_flex=True,
                 )
             if market_value is None:
                 market_value = cls_or_self.resolve_shortcut_attr(
-                    'market_value',
+                    "market_value",
                     group_by=group_by,
                     jitted=jitted,
-                    chunked=chunked
+                    chunked=chunked,
                 )
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
             checks.assert_not_none(init_value)
             if cash_deposits is None:
-                cash_deposits = 0.
+                cash_deposits = 0.0
             checks.assert_not_none(market_value)
             checks.assert_not_none(wrapper)
 
@@ -7223,21 +7172,23 @@ class Portfolio(Analyzable):
             to_2d_array(market_value),
             to_1d_array(init_value),
             cash_deposits=to_2d_array(cash_deposits),
-            flex_2d=flex_2d
+            flex_2d=flex_2d,
         )
         return wrapper.wrap(market_returns, group_by=group_by, **resolve_dict(wrap_kwargs))
 
     @class_or_instancemethod
-    def get_bm_value(cls_or_self,
-                     group_by: tp.GroupByLike = None,
-                     bm_close: tp.Optional[tp.ArrayLike] = None,
-                     init_value: tp.Optional[tp.MaybeSeries] = None,
-                     cash_deposits: tp.Optional[tp.ArrayLike] = None,
-                     flex_2d: bool = False,
-                     jitted: tp.JittedOption = None,
-                     chunked: tp.ChunkedOption = None,
-                     wrapper: tp.Optional[ArrayWrapper] = None,
-                     wrap_kwargs: tp.KwargsLike = None) -> tp.Optional[tp.SeriesFrame]:
+    def get_bm_value(
+        cls_or_self,
+        group_by: tp.GroupByLike = None,
+        bm_close: tp.Optional[tp.ArrayLike] = None,
+        init_value: tp.Optional[tp.MaybeSeries] = None,
+        cash_deposits: tp.Optional[tp.ArrayLike] = None,
+        flex_2d: bool = False,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.Optional[tp.SeriesFrame]:
         """Get benchmark value series per column/group.
 
         Based on `Portfolio.bm_close` and `Portfolio.get_market_value`."""
@@ -7260,30 +7211,27 @@ class Portfolio(Analyzable):
             jitted=jitted,
             chunked=chunked,
             wrapper=wrapper,
-            wrap_kwargs=wrap_kwargs
+            wrap_kwargs=wrap_kwargs,
         )
 
     @class_or_instancemethod
-    def get_bm_returns(cls_or_self,
-                       group_by: tp.GroupByLike = None,
-                       init_value: tp.Optional[tp.MaybeSeries] = None,
-                       cash_deposits: tp.Optional[tp.ArrayLike] = None,
-                       bm_value: tp.Optional[tp.SeriesFrame] = None,
-                       flex_2d: bool = False,
-                       jitted: tp.JittedOption = None,
-                       chunked: tp.ChunkedOption = None,
-                       wrapper: tp.Optional[ArrayWrapper] = None,
-                       wrap_kwargs: tp.KwargsLike = None) -> tp.Optional[tp.SeriesFrame]:
+    def get_bm_returns(
+        cls_or_self,
+        group_by: tp.GroupByLike = None,
+        init_value: tp.Optional[tp.MaybeSeries] = None,
+        cash_deposits: tp.Optional[tp.ArrayLike] = None,
+        bm_value: tp.Optional[tp.SeriesFrame] = None,
+        flex_2d: bool = False,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.Optional[tp.SeriesFrame]:
         """Get benchmark return series per column/group.
 
         Based on `Portfolio.bm_close` and `Portfolio.get_market_returns`."""
         if not isinstance(cls_or_self, type):
-            bm_value = cls_or_self.resolve_shortcut_attr(
-                'bm_value',
-                group_by=group_by,
-                jitted=jitted,
-                chunked=chunked
-            )
+            bm_value = cls_or_self.resolve_shortcut_attr("bm_value", group_by=group_by, jitted=jitted, chunked=chunked)
             if bm_value is None:
                 return None
         return cls_or_self.get_market_returns(
@@ -7295,33 +7243,35 @@ class Portfolio(Analyzable):
             jitted=jitted,
             chunked=chunked,
             wrapper=wrapper,
-            wrap_kwargs=wrap_kwargs
+            wrap_kwargs=wrap_kwargs,
         )
 
     @class_or_instancemethod
-    def get_total_market_return(cls_or_self,
-                                group_by: tp.GroupByLike = None,
-                                input_value: tp.Optional[tp.MaybeSeries] = None,
-                                market_value: tp.Optional[tp.SeriesFrame] = None,
-                                jitted: tp.JittedOption = None,
-                                chunked: tp.ChunkedOption = None,
-                                wrapper: tp.Optional[ArrayWrapper] = None,
-                                wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
+    def get_total_market_return(
+        cls_or_self,
+        group_by: tp.GroupByLike = None,
+        input_value: tp.Optional[tp.MaybeSeries] = None,
+        market_value: tp.Optional[tp.SeriesFrame] = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeSeries:
         """Get total market return."""
         if not isinstance(cls_or_self, type):
             if input_value is None:
                 input_value = cls_or_self.resolve_shortcut_attr(
-                    'input_value',
+                    "input_value",
                     group_by=group_by,
                     jitted=jitted,
-                    chunked=chunked
+                    chunked=chunked,
                 )
             if market_value is None:
                 market_value = cls_or_self.resolve_shortcut_attr(
-                    'market_value',
+                    "market_value",
                     group_by=group_by,
                     jitted=jitted,
-                    chunked=chunked
+                    chunked=chunked,
                 )
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -7333,21 +7283,23 @@ class Portfolio(Analyzable):
         input_value = to_1d_array(input_value)
         final_value = to_2d_array(market_value)[-1]
         total_return = (final_value - input_value) / input_value
-        wrap_kwargs = merge_dicts(dict(name_or_index='total_market_return'), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="total_market_return"), wrap_kwargs)
         return wrapper.wrap_reduced(total_return, group_by=group_by, **wrap_kwargs)
 
     @class_or_instancemethod
-    def get_returns_acc(cls_or_self,
-                        group_by: tp.GroupByLike = None,
-                        returns: tp.Optional[tp.SeriesFrame] = None,
-                        bm_returns: tp.Optional[tp.ArrayLike] = None,
-                        freq: tp.Optional[tp.FrequencyLike] = None,
-                        year_freq: tp.Optional[tp.FrequencyLike] = None,
-                        use_asset_returns: bool = False,
-                        jitted: tp.JittedOption = None,
-                        chunked: tp.ChunkedOption = None,
-                        defaults: tp.KwargsLike = None,
-                        **kwargs) -> ReturnsAccessor:
+    def get_returns_acc(
+        cls_or_self,
+        group_by: tp.GroupByLike = None,
+        returns: tp.Optional[tp.SeriesFrame] = None,
+        bm_returns: tp.Optional[tp.ArrayLike] = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+        year_freq: tp.Optional[tp.FrequencyLike] = None,
+        use_asset_returns: bool = False,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        defaults: tp.KwargsLike = None,
+        **kwargs,
+    ) -> ReturnsAccessor:
         """Get returns accessor of type `vectorbtpro.returns.accessors.ReturnsAccessor`.
 
         !!! hint
@@ -7356,24 +7308,24 @@ class Portfolio(Analyzable):
             if returns is None:
                 if use_asset_returns:
                     returns = cls_or_self.resolve_shortcut_attr(
-                        'asset_returns',
+                        "asset_returns",
                         group_by=group_by,
                         jitted=jitted,
-                        chunked=chunked
+                        chunked=chunked,
                     )
                 else:
                     returns = cls_or_self.resolve_shortcut_attr(
-                        'returns',
+                        "returns",
                         group_by=group_by,
                         jitted=jitted,
-                        chunked=chunked
+                        chunked=chunked,
                     )
             if bm_returns is None or (isinstance(bm_returns, bool) and bm_returns):
                 bm_returns = cls_or_self.resolve_shortcut_attr(
-                    'bm_returns',
+                    "bm_returns",
                     group_by=group_by,
                     jitted=jitted,
-                    chunked=chunked
+                    chunked=chunked,
                 )
             elif isinstance(bm_returns, bool) and not bm_returns:
                 bm_returns = None
@@ -7382,13 +7334,7 @@ class Portfolio(Analyzable):
         else:
             checks.assert_not_none(returns)
 
-        return returns.vbt.returns(
-            bm_returns=bm_returns,
-            freq=freq,
-            year_freq=year_freq,
-            defaults=defaults,
-            **kwargs
-        )
+        return returns.vbt.returns(bm_returns=bm_returns, freq=freq, year_freq=year_freq, defaults=defaults, **kwargs)
 
     @property
     def returns_acc(self) -> ReturnsAccessor:
@@ -7396,17 +7342,19 @@ class Portfolio(Analyzable):
         return self.get_returns_acc()
 
     @class_or_instancemethod
-    def get_qs(cls_or_self,
-               group_by: tp.GroupByLike = None,
-               returns: tp.Optional[tp.SeriesFrame] = None,
-               bm_returns: tp.Optional[tp.ArrayLike] = None,
-               freq: tp.Optional[tp.FrequencyLike] = None,
-               year_freq: tp.Optional[tp.FrequencyLike] = None,
-               use_asset_returns: bool = False,
-               jitted: tp.JittedOption = None,
-               chunked: tp.ChunkedOption = None,
-               defaults: tp.KwargsLike = None,
-               **kwargs) -> QSAdapterT:
+    def get_qs(
+        cls_or_self,
+        group_by: tp.GroupByLike = None,
+        returns: tp.Optional[tp.SeriesFrame] = None,
+        bm_returns: tp.Optional[tp.ArrayLike] = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+        year_freq: tp.Optional[tp.FrequencyLike] = None,
+        use_asset_returns: bool = False,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        defaults: tp.KwargsLike = None,
+        **kwargs,
+    ) -> QSAdapterT:
         """Get quantstats adapter of type `vectorbtpro.returns.qs_adapter.QSAdapter`.
 
         `**kwargs` are passed to the adapter constructor."""
@@ -7421,7 +7369,7 @@ class Portfolio(Analyzable):
             use_asset_returns=use_asset_returns,
             jitted=jitted,
             chunked=chunked,
-            defaults=defaults
+            defaults=defaults,
         )
         return QSAdapter(returns_acc, **kwargs)
 
@@ -7435,7 +7383,7 @@ class Portfolio(Analyzable):
     @property
     def self_aliases(self) -> tp.Set[str]:
         """Names to associate with this object."""
-        return {'self', 'portfolio', 'pf'}
+        return {"self", "portfolio", "pf"}
 
     def pre_resolve_attr(self, attr: str, final_kwargs: tp.KwargsLike = None) -> str:
         """Pre-process an attribute before resolution.
@@ -7444,20 +7392,20 @@ class Portfolio(Analyzable):
 
         * `use_asset_returns`: Whether to use `Portfolio.get_asset_returns` when resolving `returns` argument.
         * `trades_type`: Which trade type to use when resolving `trades` argument."""
-        if 'use_asset_returns' in final_kwargs:
-            if attr == 'returns' and final_kwargs['use_asset_returns']:
-                attr = 'asset_returns'
-        if 'trades_type' in final_kwargs:
-            trades_type = final_kwargs['trades_type']
-            if isinstance(final_kwargs['trades_type'], str):
+        if "use_asset_returns" in final_kwargs:
+            if attr == "returns" and final_kwargs["use_asset_returns"]:
+                attr = "asset_returns"
+        if "trades_type" in final_kwargs:
+            trades_type = final_kwargs["trades_type"]
+            if isinstance(final_kwargs["trades_type"], str):
                 trades_type = map_enum_fields(trades_type, TradesType)
-            if attr == 'trades' and trades_type != self.trades_type:
+            if attr == "trades" and trades_type != self.trades_type:
                 if trades_type == TradesType.EntryTrades:
-                    attr = 'entry_trades'
+                    attr = "entry_trades"
                 elif trades_type == TradesType.ExitTrades:
-                    attr = 'exit_trades'
+                    attr = "exit_trades"
                 else:
-                    attr = 'positions'
+                    attr = "positions"
         return attr
 
     def post_resolve_attr(self, attr: str, out: tp.Any, final_kwargs: tp.KwargsLike = None) -> str:
@@ -7467,8 +7415,8 @@ class Portfolio(Analyzable):
 
         * `incl_open`: Whether to include open trades/positions when resolving an argument
             that is an instance of `vectorbtpro.portfolio.trades.Trades`."""
-        if 'incl_open' in final_kwargs:
-            if isinstance(out, Trades) and not final_kwargs['incl_open']:
+        if "incl_open" in final_kwargs:
+            if isinstance(out, Trades) and not final_kwargs["incl_open"]:
                 out = out.closed
         return out
 
@@ -7477,46 +7425,46 @@ class Portfolio(Analyzable):
 
         If `attr_name` has a prefix `get_`, checks whether the respective shortcut property can be called.
         This way, complex call hierarchies can utilize cacheable properties."""
-        if not attr_name.startswith('get_'):
-            if 'get_' + attr_name not in self.cls_dir or (len(args) == 0 and len(kwargs) == 0):
+        if not attr_name.startswith("get_"):
+            if "get_" + attr_name not in self.cls_dir or (len(args) == 0 and len(kwargs) == 0):
                 if isinstance(getattr(type(self), attr_name), property):
                     return getattr(self, attr_name)
                 return getattr(self, attr_name)(*args, **kwargs)
-            attr_name = 'get_' + attr_name
+            attr_name = "get_" + attr_name
 
         if len(args) == 0:
             naked_attr_name = attr_name[4:]
             prop_name = naked_attr_name
             _kwargs = dict(kwargs)
 
-            if 'free' in _kwargs:
-                if _kwargs.pop('free'):
-                    prop_name = 'free_' + naked_attr_name
-            if 'direction' in _kwargs:
-                direction = map_enum_fields(_kwargs.pop('direction'), Direction)
+            if "free" in _kwargs:
+                if _kwargs.pop("free"):
+                    prop_name = "free_" + naked_attr_name
+            if "direction" in _kwargs:
+                direction = map_enum_fields(_kwargs.pop("direction"), Direction)
                 if direction == Direction.LongOnly:
-                    prop_name = 'longonly_' + naked_attr_name
+                    prop_name = "longonly_" + naked_attr_name
                 elif direction == Direction.ShortOnly:
-                    prop_name = 'shortonly_' + naked_attr_name
+                    prop_name = "shortonly_" + naked_attr_name
 
             if prop_name in self.cls_dir:
                 prop = getattr(type(self), prop_name)
-                options = getattr(prop, 'options', {})
+                options = getattr(prop, "options", {})
 
                 can_call_prop = True
-                if 'group_by' in _kwargs:
-                    group_by = _kwargs.pop('group_by')
-                    group_aware = options.get('group_aware', True)
+                if "group_by" in _kwargs:
+                    group_by = _kwargs.pop("group_by")
+                    group_aware = options.get("group_aware", True)
                     if group_aware:
                         if self.wrapper.grouper.is_grouping_modified(group_by=group_by):
                             can_call_prop = False
                     else:
-                        group_by = _kwargs.pop('group_by')
+                        group_by = _kwargs.pop("group_by")
                         if self.wrapper.grouper.is_grouping_enabled(group_by=group_by):
                             can_call_prop = False
                 if can_call_prop:
-                    _kwargs.pop('jitted', None)
-                    _kwargs.pop('chunked', None)
+                    _kwargs.pop("jitted", None)
+                    _kwargs.pop("chunked", None)
                     for k, v in get_func_kwargs(getattr(type(self), attr_name)).items():
                         if k in _kwargs and v is not _kwargs.pop(k):
                             can_call_prop = False
@@ -7538,190 +7486,164 @@ class Portfolio(Analyzable):
         Merges `vectorbtpro.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
         `stats` from `vectorbtpro._settings.portfolio`."""
         from vectorbtpro._settings import settings
-        returns_cfg = settings['returns']
-        portfolio_stats_cfg = settings['portfolio']['stats']
+
+        returns_cfg = settings["returns"]
+        portfolio_stats_cfg = settings["portfolio"]["stats"]
 
         return merge_dicts(
             Analyzable.stats_defaults.__get__(self),
-            dict(
-                settings=dict(
-                    year_freq=returns_cfg['year_freq'],
-                    trades_type=self.trades_type
-                )
-            ),
-            portfolio_stats_cfg
+            dict(settings=dict(year_freq=returns_cfg["year_freq"], trades_type=self.trades_type)),
+            portfolio_stats_cfg,
         )
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
-            start=dict(
-                title='Start',
-                calc_func=lambda self: self.wrapper.index[0],
-                agg_func=None,
-                tags='wrapper'
-            ),
-            end=dict(
-                title='End',
-                calc_func=lambda self: self.wrapper.index[-1],
-                agg_func=None,
-                tags='wrapper'
-            ),
+            start=dict(title="Start", calc_func=lambda self: self.wrapper.index[0], agg_func=None, tags="wrapper"),
+            end=dict(title="End", calc_func=lambda self: self.wrapper.index[-1], agg_func=None, tags="wrapper"),
             period=dict(
-                title='Period',
+                title="Period",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,
-                tags='wrapper'
+                tags="wrapper",
             ),
-            start_value=dict(
-                title='Start Value',
-                calc_func='init_cash',
-                tags='portfolio'
-            ),
-            end_value=dict(
-                title='End Value',
-                calc_func='final_value',
-                tags='portfolio'
-            ),
+            start_value=dict(title="Start Value", calc_func="init_cash", tags="portfolio"),
+            end_value=dict(title="End Value", calc_func="final_value", tags="portfolio"),
             total_return=dict(
-                title='Total Return [%]',
-                calc_func='total_return',
+                title="Total Return [%]",
+                calc_func="total_return",
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags='portfolio'
+                tags="portfolio",
             ),
             bm_return=dict(
-                title='Benchmark Return [%]',
-                calc_func='bm_returns.vbt.returns.total',
+                title="Benchmark Return [%]",
+                calc_func="bm_returns.vbt.returns.total",
                 post_calc_func=lambda self, out, settings: out * 100,
                 check_has_bm_returns=True,
-                tags='portfolio'
+                tags="portfolio",
             ),
             max_gross_exposure=dict(
-                title='Max Gross Exposure [%]',
-                calc_func='gross_exposure.vbt.max',
+                title="Max Gross Exposure [%]",
+                calc_func="gross_exposure.vbt.max",
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags='portfolio'
+                tags="portfolio",
             ),
-            total_fees_paid=dict(
-                title='Total Fees Paid',
-                calc_func='orders.fees.sum',
-                tags=['portfolio', 'orders']
-            ),
+            total_fees_paid=dict(title="Total Fees Paid", calc_func="orders.fees.sum", tags=["portfolio", "orders"]),
             max_dd=dict(
-                title='Max Drawdown [%]',
-                calc_func='drawdowns.max_drawdown',
+                title="Max Drawdown [%]",
+                calc_func="drawdowns.max_drawdown",
                 post_calc_func=lambda self, out, settings: -out * 100,
-                tags=['portfolio', 'drawdowns']
+                tags=["portfolio", "drawdowns"],
             ),
             max_dd_duration=dict(
-                title='Max Drawdown Duration',
-                calc_func='drawdowns.max_duration',
+                title="Max Drawdown Duration",
+                calc_func="drawdowns.max_duration",
                 fill_wrap_kwargs=True,
-                tags=['portfolio', 'drawdowns', 'duration']
+                tags=["portfolio", "drawdowns", "duration"],
             ),
             total_trades=dict(
-                title='Total Trades',
-                calc_func='trades.count',
+                title="Total Trades",
+                calc_func="trades.count",
                 incl_open=True,
-                tags=['portfolio', 'trades']
+                tags=["portfolio", "trades"],
             ),
             total_closed_trades=dict(
-                title='Total Closed Trades',
-                calc_func='trades.closed.count',
-                tags=['portfolio', 'trades', 'closed']
+                title="Total Closed Trades",
+                calc_func="trades.closed.count",
+                tags=["portfolio", "trades", "closed"],
             ),
             total_open_trades=dict(
-                title='Total Open Trades',
-                calc_func='trades.open.count',
+                title="Total Open Trades",
+                calc_func="trades.open.count",
                 incl_open=True,
-                tags=['portfolio', 'trades', 'open']
+                tags=["portfolio", "trades", "open"],
             ),
             open_trade_pnl=dict(
-                title='Open Trade PnL',
-                calc_func='trades.open.pnl.sum',
+                title="Open Trade PnL",
+                calc_func="trades.open.pnl.sum",
                 incl_open=True,
-                tags=['portfolio', 'trades', 'open']
+                tags=["portfolio", "trades", "open"],
             ),
             win_rate=dict(
-                title='Win Rate [%]',
-                calc_func='trades.win_rate',
+                title="Win Rate [%]",
+                calc_func="trades.win_rate",
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=RepEval("['portfolio', 'trades', *incl_open_tags]")
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags]"),
             ),
             best_trade=dict(
-                title='Best Trade [%]',
-                calc_func='trades.returns.max',
+                title="Best Trade [%]",
+                calc_func="trades.returns.max",
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=RepEval("['portfolio', 'trades', *incl_open_tags]")
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags]"),
             ),
             worst_trade=dict(
-                title='Worst Trade [%]',
-                calc_func='trades.returns.min',
+                title="Worst Trade [%]",
+                calc_func="trades.returns.min",
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=RepEval("['portfolio', 'trades', *incl_open_tags]")
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags]"),
             ),
             avg_winning_trade=dict(
-                title='Avg Winning Trade [%]',
-                calc_func='trades.winning.returns.mean',
+                title="Avg Winning Trade [%]",
+                calc_func="trades.winning.returns.mean",
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=RepEval("['portfolio', 'trades', *incl_open_tags, 'winning']")
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags, 'winning']"),
             ),
             avg_losing_trade=dict(
-                title='Avg Losing Trade [%]',
-                calc_func='trades.losing.returns.mean',
+                title="Avg Losing Trade [%]",
+                calc_func="trades.losing.returns.mean",
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags=RepEval("['portfolio', 'trades', *incl_open_tags, 'losing']")
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags, 'losing']"),
             ),
             avg_winning_trade_duration=dict(
-                title='Avg Winning Trade Duration',
-                calc_func='trades.winning.duration.mean',
+                title="Avg Winning Trade Duration",
+                calc_func="trades.winning.duration.mean",
                 apply_to_timedelta=True,
-                tags=RepEval("['portfolio', 'trades', *incl_open_tags, 'winning', 'duration']")
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags, 'winning', 'duration']"),
             ),
             avg_losing_trade_duration=dict(
-                title='Avg Losing Trade Duration',
-                calc_func='trades.losing.duration.mean',
+                title="Avg Losing Trade Duration",
+                calc_func="trades.losing.duration.mean",
                 apply_to_timedelta=True,
-                tags=RepEval("['portfolio', 'trades', *incl_open_tags, 'losing', 'duration']")
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags, 'losing', 'duration']"),
             ),
             profit_factor=dict(
-                title='Profit Factor',
-                calc_func='trades.profit_factor',
-                tags=RepEval("['portfolio', 'trades', *incl_open_tags]")
+                title="Profit Factor",
+                calc_func="trades.profit_factor",
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags]"),
             ),
             expectancy=dict(
-                title='Expectancy',
-                calc_func='trades.expectancy',
-                tags=RepEval("['portfolio', 'trades', *incl_open_tags]")
+                title="Expectancy",
+                calc_func="trades.expectancy",
+                tags=RepEval("['portfolio', 'trades', *incl_open_tags]"),
             ),
             sharpe_ratio=dict(
-                title='Sharpe Ratio',
-                calc_func='returns_acc.sharpe_ratio',
+                title="Sharpe Ratio",
+                calc_func="returns_acc.sharpe_ratio",
                 check_has_freq=True,
                 check_has_year_freq=True,
-                tags=['portfolio', 'returns']
+                tags=["portfolio", "returns"],
             ),
             calmar_ratio=dict(
-                title='Calmar Ratio',
-                calc_func='returns_acc.calmar_ratio',
+                title="Calmar Ratio",
+                calc_func="returns_acc.calmar_ratio",
                 check_has_freq=True,
                 check_has_year_freq=True,
-                tags=['portfolio', 'returns']
+                tags=["portfolio", "returns"],
             ),
             omega_ratio=dict(
-                title='Omega Ratio',
-                calc_func='returns_acc.omega_ratio',
+                title="Omega Ratio",
+                calc_func="returns_acc.omega_ratio",
                 check_has_freq=True,
                 check_has_year_freq=True,
-                tags=['portfolio', 'returns']
+                tags=["portfolio", "returns"],
             ),
             sortino_ratio=dict(
-                title='Sortino Ratio',
-                calc_func='returns_acc.sortino_ratio',
+                title="Sortino Ratio",
+                calc_func="returns_acc.sortino_ratio",
                 check_has_freq=True,
                 check_has_year_freq=True,
-                tags=['portfolio', 'returns']
-            )
+                tags=["portfolio", "returns"],
+            ),
         )
     )
 
@@ -7729,15 +7651,17 @@ class Portfolio(Analyzable):
     def metrics(self) -> Config:
         return self._metrics
 
-    def returns_stats(self,
-                      group_by: tp.GroupByLike = None,
-                      bm_returns: tp.Optional[tp.ArrayLike] = None,
-                      freq: tp.Optional[tp.FrequencyLike] = None,
-                      year_freq: tp.Optional[tp.FrequencyLike] = None,
-                      use_asset_returns: bool = False,
-                      defaults: tp.KwargsLike = None,
-                      chunked: tp.ChunkedOption = None,
-                      **kwargs) -> tp.SeriesFrame:
+    def returns_stats(
+        self,
+        group_by: tp.GroupByLike = None,
+        bm_returns: tp.Optional[tp.ArrayLike] = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+        year_freq: tp.Optional[tp.FrequencyLike] = None,
+        use_asset_returns: bool = False,
+        defaults: tp.KwargsLike = None,
+        chunked: tp.ChunkedOption = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
         """Compute various statistics on returns of this portfolio.
 
         See `Portfolio.returns_acc` and `vectorbtpro.returns.accessors.ReturnsAccessor.metrics`.
@@ -7751,615 +7675,589 @@ class Portfolio(Analyzable):
             year_freq=year_freq,
             use_asset_returns=use_asset_returns,
             defaults=defaults,
-            chunked=chunked
+            chunked=chunked,
         )
-        return getattr(returns_acc, 'stats')(**kwargs)
+        return getattr(returns_acc, "stats")(**kwargs)
 
     # ############# Plotting ############# #
 
     def plot_orders(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of orders."""
-        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name='Close')), kwargs)
+        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name="Close")), kwargs)
         return self.orders.regroup(False).plot(column=column, **kwargs)
 
     def plot_trades(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of trades."""
-        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name='Close')), kwargs)
+        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name="Close")), kwargs)
         return self.trades.regroup(False).plot(column=column, **kwargs)
 
     def plot_trade_pnl(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of trade PnL."""
-        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name='Close')), kwargs)
+        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name="Close")), kwargs)
         return self.trades.regroup(False).plot_pnl(column=column, **kwargs)
 
     def plot_positions(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of positions."""
-        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name='Close')), kwargs)
+        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name="Close")), kwargs)
         return self.positions.regroup(False).plot(column=column, **kwargs)
 
     def plot_position_pnl(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of position PnL."""
-        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name='Close')), kwargs)
+        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name="Close")), kwargs)
         return self.positions.regroup(False).plot_pnl(column=column, **kwargs)
 
-    def plot_asset_flow(self,
-                        column: tp.Optional[tp.Label] = None,
-                        direction: tp.Union[str, int] = 'both',
-                        jitted: tp.JittedOption = None,
-                        chunked: tp.ChunkedOption = None,
-                        xref: str = 'x',
-                        yref: str = 'y',
-                        hline_shape_kwargs: tp.KwargsLike = None,
-                        **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_asset_flow(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        direction: tp.Union[str, int] = "both",
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        xref: str = "x",
+        yref: str = "y",
+        hline_shape_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column of asset flow.
 
         `**kwargs` are passed to `vectorbtpro.generic.accessors.GenericAccessor.plot`."""
         from vectorbtpro.utils.figure import get_domain
         from vectorbtpro._settings import settings
-        plotting_cfg = settings['plotting']
 
-        asset_flow = self.resolve_shortcut_attr(
-            'asset_flow',
-            direction=direction,
-            jitted=jitted,
-            chunked=chunked
-        )
+        plotting_cfg = settings["plotting"]
+
+        asset_flow = self.resolve_shortcut_attr("asset_flow", direction=direction, jitted=jitted, chunked=chunked)
         asset_flow = self.select_col_from_obj(asset_flow, column, wrapper=self.wrapper.regroup(False))
-        kwargs = merge_dicts(dict(
-            trace_kwargs=dict(
-                line=dict(
-                    color=plotting_cfg['color_schema']['brown']
-                ),
-                name='Assets'
-            )
-        ), kwargs)
+        kwargs = merge_dicts(
+            dict(trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["brown"]), name="Assets")),
+            kwargs,
+        )
         fig = asset_flow.vbt.plot(**kwargs)
         x_domain = get_domain(xref, fig)
-        fig.add_shape(**merge_dicts(dict(
-            type='line',
-            line=dict(
-                color='gray',
-                dash="dash",
-            ),
-            xref="paper",
-            yref=yref,
-            x0=x_domain[0],
-            y0=0,
-            x1=x_domain[1],
-            y1=0
-        ), hline_shape_kwargs))
+        fig.add_shape(
+            **merge_dicts(
+                dict(
+                    type="line",
+                    line=dict(
+                        color="gray",
+                        dash="dash",
+                    ),
+                    xref="paper",
+                    yref=yref,
+                    x0=x_domain[0],
+                    y0=0,
+                    x1=x_domain[1],
+                    y1=0,
+                ),
+                hline_shape_kwargs,
+            )
+        )
         return fig
 
-    def plot_cash_flow(self,
-                       column: tp.Optional[tp.Label] = None,
-                       group_by: tp.GroupByLike = None,
-                       jitted: tp.JittedOption = None,
-                       chunked: tp.ChunkedOption = None,
-                       free: bool = False,
-                       xref: str = 'x',
-                       yref: str = 'y',
-                       hline_shape_kwargs: tp.KwargsLike = None,
-                       **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_cash_flow(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        free: bool = False,
+        xref: str = "x",
+        yref: str = "y",
+        hline_shape_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of cash flow.
 
         `**kwargs` are passed to `vectorbtpro.generic.accessors.GenericAccessor.plot`."""
         from vectorbtpro.utils.figure import get_domain
         from vectorbtpro._settings import settings
-        plotting_cfg = settings['plotting']
+
+        plotting_cfg = settings["plotting"]
 
         cash_flow = self.resolve_shortcut_attr(
-            'cash_flow',
+            "cash_flow",
             group_by=group_by,
             free=free,
             jitted=jitted,
-            chunked=chunked
+            chunked=chunked,
         )
         cash_flow = self.select_col_from_obj(cash_flow, column, wrapper=self.wrapper.regroup(group_by))
-        kwargs = merge_dicts(dict(
-            trace_kwargs=dict(
-                line=dict(
-                    color=plotting_cfg['color_schema']['green']
-                ),
-                name='Cash'
-            )
-        ), kwargs)
+        kwargs = merge_dicts(
+            dict(trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["green"]), name="Cash")),
+            kwargs,
+        )
         fig = cash_flow.vbt.plot(**kwargs)
         x_domain = get_domain(xref, fig)
-        fig.add_shape(**merge_dicts(dict(
-            type='line',
-            line=dict(
-                color='gray',
-                dash="dash",
-            ),
-            xref="paper",
-            yref=yref,
-            x0=x_domain[0],
-            y0=0.,
-            x1=x_domain[1],
-            y1=0.
-        ), hline_shape_kwargs))
+        fig.add_shape(
+            **merge_dicts(
+                dict(
+                    type="line",
+                    line=dict(
+                        color="gray",
+                        dash="dash",
+                    ),
+                    xref="paper",
+                    yref=yref,
+                    x0=x_domain[0],
+                    y0=0.0,
+                    x1=x_domain[1],
+                    y1=0.0,
+                ),
+                hline_shape_kwargs,
+            )
+        )
         return fig
 
-    def plot_assets(self,
-                    column: tp.Optional[tp.Label] = None,
-                    direction: tp.Union[str, int] = 'both',
-                    jitted: tp.JittedOption = None,
-                    chunked: tp.ChunkedOption = None,
-                    xref: str = 'x',
-                    yref: str = 'y',
-                    hline_shape_kwargs: tp.KwargsLike = None,
-                    **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_assets(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        direction: tp.Union[str, int] = "both",
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        xref: str = "x",
+        yref: str = "y",
+        hline_shape_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column of assets.
 
         `**kwargs` are passed to `vectorbtpro.generic.accessors.GenericSRAccessor.plot_against`."""
         from vectorbtpro.utils.figure import get_domain
         from vectorbtpro._settings import settings
-        plotting_cfg = settings['plotting']
 
-        assets = self.resolve_shortcut_attr(
-            'assets',
-            direction=direction,
-            jitted=jitted,
-            chunked=chunked
-        )
+        plotting_cfg = settings["plotting"]
+
+        assets = self.resolve_shortcut_attr("assets", direction=direction, jitted=jitted, chunked=chunked)
         assets = self.select_col_from_obj(assets, column, wrapper=self.wrapper.regroup(False))
-        kwargs = merge_dicts(dict(
-            trace_kwargs=dict(
-                line=dict(
-                    color=plotting_cfg['color_schema']['brown']
-                ),
-                name='Assets'
+        kwargs = merge_dicts(
+            dict(
+                trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["brown"]), name="Assets"),
+                pos_trace_kwargs=dict(fillcolor=adjust_opacity(plotting_cfg["color_schema"]["brown"], 0.3)),
+                neg_trace_kwargs=dict(fillcolor=adjust_opacity(plotting_cfg["color_schema"]["orange"], 0.3)),
+                other_trace_kwargs="hidden",
             ),
-            pos_trace_kwargs=dict(
-                fillcolor=adjust_opacity(plotting_cfg['color_schema']['brown'], 0.3)
-            ),
-            neg_trace_kwargs=dict(
-                fillcolor=adjust_opacity(plotting_cfg['color_schema']['orange'], 0.3)
-            ),
-            other_trace_kwargs='hidden'
-        ), kwargs)
+            kwargs,
+        )
         fig = assets.vbt.plot_against(0, **kwargs)
         x_domain = get_domain(xref, fig)
-        fig.add_shape(**merge_dicts(dict(
-            type='line',
-            line=dict(
-                color='gray',
-                dash="dash",
-            ),
-            xref="paper",
-            yref=yref,
-            x0=x_domain[0],
-            y0=0.,
-            x1=x_domain[1],
-            y1=0.
-        ), hline_shape_kwargs))
+        fig.add_shape(
+            **merge_dicts(
+                dict(
+                    type="line",
+                    line=dict(
+                        color="gray",
+                        dash="dash",
+                    ),
+                    xref="paper",
+                    yref=yref,
+                    x0=x_domain[0],
+                    y0=0.0,
+                    x1=x_domain[1],
+                    y1=0.0,
+                ),
+                hline_shape_kwargs,
+            )
+        )
         return fig
 
-    def plot_cash(self,
-                  column: tp.Optional[tp.Label] = None,
-                  group_by: tp.GroupByLike = None,
-                  jitted: tp.JittedOption = None,
-                  chunked: tp.ChunkedOption = None,
-                  free: bool = False,
-                  xref: str = 'x',
-                  yref: str = 'y',
-                  hline_shape_kwargs: tp.KwargsLike = None,
-                  **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_cash(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        free: bool = False,
+        xref: str = "x",
+        yref: str = "y",
+        hline_shape_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of cash balance.
 
         `**kwargs` are passed to `vectorbtpro.generic.accessors.GenericSRAccessor.plot_against`."""
         from vectorbtpro.utils.figure import get_domain
         from vectorbtpro._settings import settings
-        plotting_cfg = settings['plotting']
 
-        init_cash = self.resolve_shortcut_attr(
-            'init_cash',
-            group_by=group_by,
-            jitted=jitted,
-            chunked=chunked
-        )
+        plotting_cfg = settings["plotting"]
+
+        init_cash = self.resolve_shortcut_attr("init_cash", group_by=group_by, jitted=jitted, chunked=chunked)
         init_cash = self.select_col_from_obj(init_cash, column, wrapper=self.wrapper.regroup(group_by))
-        cash = self.resolve_shortcut_attr(
-            'cash',
-            group_by=group_by,
-            free=free,
-            jitted=jitted,
-            chunked=chunked
-        )
+        cash = self.resolve_shortcut_attr("cash", group_by=group_by, free=free, jitted=jitted, chunked=chunked)
         cash = self.select_col_from_obj(cash, column, wrapper=self.wrapper.regroup(group_by))
-        kwargs = merge_dicts(dict(
-            trace_kwargs=dict(
-                line=dict(
-                    color=plotting_cfg['color_schema']['green']
-                ),
-                name='Cash'
+        kwargs = merge_dicts(
+            dict(
+                trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["green"]), name="Cash"),
+                pos_trace_kwargs=dict(fillcolor=adjust_opacity(plotting_cfg["color_schema"]["green"], 0.3)),
+                neg_trace_kwargs=dict(fillcolor=adjust_opacity(plotting_cfg["color_schema"]["red"], 0.3)),
+                other_trace_kwargs="hidden",
             ),
-            pos_trace_kwargs=dict(
-                fillcolor=adjust_opacity(plotting_cfg['color_schema']['green'], 0.3)
-            ),
-            neg_trace_kwargs=dict(
-                fillcolor=adjust_opacity(plotting_cfg['color_schema']['red'], 0.3)
-            ),
-            other_trace_kwargs='hidden'
-        ), kwargs)
+            kwargs,
+        )
         fig = cash.vbt.plot_against(init_cash, **kwargs)
         x_domain = get_domain(xref, fig)
-        fig.add_shape(**merge_dicts(dict(
-            type='line',
-            line=dict(
-                color='gray',
-                dash="dash",
-            ),
-            xref="paper",
-            yref=yref,
-            x0=x_domain[0],
-            y0=init_cash,
-            x1=x_domain[1],
-            y1=init_cash
-        ), hline_shape_kwargs))
+        fig.add_shape(
+            **merge_dicts(
+                dict(
+                    type="line",
+                    line=dict(
+                        color="gray",
+                        dash="dash",
+                    ),
+                    xref="paper",
+                    yref=yref,
+                    x0=x_domain[0],
+                    y0=init_cash,
+                    x1=x_domain[1],
+                    y1=init_cash,
+                ),
+                hline_shape_kwargs,
+            )
+        )
         return fig
 
-    def plot_asset_value(self,
-                         column: tp.Optional[tp.Label] = None,
-                         group_by: tp.GroupByLike = None,
-                         direction: tp.Union[str, int] = 'both',
-                         jitted: tp.JittedOption = None,
-                         chunked: tp.ChunkedOption = None,
-                         xref: str = 'x',
-                         yref: str = 'y',
-                         hline_shape_kwargs: tp.KwargsLike = None,
-                         **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_asset_value(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        group_by: tp.GroupByLike = None,
+        direction: tp.Union[str, int] = "both",
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        xref: str = "x",
+        yref: str = "y",
+        hline_shape_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of asset value.
 
         `**kwargs` are passed to `vectorbtpro.generic.accessors.GenericSRAccessor.plot_against`."""
         from vectorbtpro.utils.figure import get_domain
         from vectorbtpro._settings import settings
-        plotting_cfg = settings['plotting']
+
+        plotting_cfg = settings["plotting"]
 
         asset_value = self.resolve_shortcut_attr(
-            'asset_value',
+            "asset_value",
             direction=direction,
             group_by=group_by,
             jitted=jitted,
-            chunked=chunked
+            chunked=chunked,
         )
         asset_value = self.select_col_from_obj(asset_value, column, wrapper=self.wrapper.regroup(group_by))
-        kwargs = merge_dicts(dict(
-            trace_kwargs=dict(
-                line=dict(
-                    color=plotting_cfg['color_schema']['cyan']
-                ),
-                name='Asset Value'
+        kwargs = merge_dicts(
+            dict(
+                trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["cyan"]), name="Asset Value"),
+                pos_trace_kwargs=dict(fillcolor=adjust_opacity(plotting_cfg["color_schema"]["cyan"], 0.3)),
+                neg_trace_kwargs=dict(fillcolor=adjust_opacity(plotting_cfg["color_schema"]["orange"], 0.3)),
+                other_trace_kwargs="hidden",
             ),
-            pos_trace_kwargs=dict(
-                fillcolor=adjust_opacity(plotting_cfg['color_schema']['cyan'], 0.3)
-            ),
-            neg_trace_kwargs=dict(
-                fillcolor=adjust_opacity(plotting_cfg['color_schema']['orange'], 0.3)
-            ),
-            other_trace_kwargs='hidden'
-        ), kwargs)
+            kwargs,
+        )
         fig = asset_value.vbt.plot_against(0, **kwargs)
         x_domain = get_domain(xref, fig)
-        fig.add_shape(**merge_dicts(dict(
-            type='line',
-            line=dict(
-                color='gray',
-                dash="dash",
-            ),
-            xref="paper",
-            yref=yref,
-            x0=x_domain[0],
-            y0=0.,
-            x1=x_domain[1],
-            y1=0.
-        ), hline_shape_kwargs))
+        fig.add_shape(
+            **merge_dicts(
+                dict(
+                    type="line",
+                    line=dict(
+                        color="gray",
+                        dash="dash",
+                    ),
+                    xref="paper",
+                    yref=yref,
+                    x0=x_domain[0],
+                    y0=0.0,
+                    x1=x_domain[1],
+                    y1=0.0,
+                ),
+                hline_shape_kwargs,
+            )
+        )
         return fig
 
-    def plot_value(self,
-                   column: tp.Optional[tp.Label] = None,
-                   group_by: tp.GroupByLike = None,
-                   jitted: tp.JittedOption = None,
-                   chunked: tp.ChunkedOption = None,
-                   xref: str = 'x',
-                   yref: str = 'y',
-                   hline_shape_kwargs: tp.KwargsLike = None,
-                   **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_value(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        xref: str = "x",
+        yref: str = "y",
+        hline_shape_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of value.
 
         `**kwargs` are passed to `vectorbtpro.generic.accessors.GenericSRAccessor.plot_against`."""
         from vectorbtpro.utils.figure import get_domain
         from vectorbtpro._settings import settings
-        plotting_cfg = settings['plotting']
 
-        init_cash = self.resolve_shortcut_attr(
-            'init_cash',
-            group_by=group_by,
-            jitted=jitted,
-            chunked=chunked
-        )
+        plotting_cfg = settings["plotting"]
+
+        init_cash = self.resolve_shortcut_attr("init_cash", group_by=group_by, jitted=jitted, chunked=chunked)
         init_cash = self.select_col_from_obj(init_cash, column, wrapper=self.wrapper.regroup(group_by))
-        value = self.resolve_shortcut_attr(
-            'value',
-            group_by=group_by,
-            jitted=jitted,
-            chunked=chunked
-        )
+        value = self.resolve_shortcut_attr("value", group_by=group_by, jitted=jitted, chunked=chunked)
         value = self.select_col_from_obj(value, column, wrapper=self.wrapper.regroup(group_by))
-        kwargs = merge_dicts(dict(
-            trace_kwargs=dict(
-                line=dict(
-                    color=plotting_cfg['color_schema']['purple']
-                ),
-                name='Value'
+        kwargs = merge_dicts(
+            dict(
+                trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["purple"]), name="Value"),
+                other_trace_kwargs="hidden",
             ),
-            other_trace_kwargs='hidden'
-        ), kwargs)
+            kwargs,
+        )
         fig = value.vbt.plot_against(init_cash, **kwargs)
         x_domain = get_domain(xref, fig)
-        fig.add_shape(**merge_dicts(dict(
-            type='line',
-            line=dict(
-                color='gray',
-                dash="dash",
-            ),
-            xref="paper",
-            yref=yref,
-            x0=x_domain[0],
-            y0=init_cash,
-            x1=x_domain[1],
-            y1=init_cash
-        ), hline_shape_kwargs))
+        fig.add_shape(
+            **merge_dicts(
+                dict(
+                    type="line",
+                    line=dict(
+                        color="gray",
+                        dash="dash",
+                    ),
+                    xref="paper",
+                    yref=yref,
+                    x0=x_domain[0],
+                    y0=init_cash,
+                    x1=x_domain[1],
+                    y1=init_cash,
+                ),
+                hline_shape_kwargs,
+            )
+        )
         return fig
 
-    def plot_cum_returns(self,
-                         column: tp.Optional[tp.Label] = None,
-                         group_by: tp.GroupByLike = None,
-                         bm_returns: tp.Optional[tp.ArrayLike] = None,
-                         use_asset_returns: bool = False,
-                         jitted: tp.JittedOption = None,
-                         chunked: tp.ChunkedOption = None,
-                         **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_cum_returns(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        group_by: tp.GroupByLike = None,
+        bm_returns: tp.Optional[tp.ArrayLike] = None,
+        use_asset_returns: bool = False,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        **kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of cumulative returns.
 
         If `bm_returns` is None, will use `Portfolio.get_market_returns`.
 
         `**kwargs` are passed to `vectorbtpro.returns.accessors.ReturnsSRAccessor.plot_cumulative`."""
         from vectorbtpro._settings import settings
-        plotting_cfg = settings['plotting']
+
+        plotting_cfg = settings["plotting"]
 
         if bm_returns is None or (isinstance(bm_returns, bool) and bm_returns):
-            bm_returns = self.resolve_shortcut_attr(
-                'bm_returns',
-                group_by=group_by,
-                jitted=jitted,
-                chunked=chunked
-            )
+            bm_returns = self.resolve_shortcut_attr("bm_returns", group_by=group_by, jitted=jitted, chunked=chunked)
         elif isinstance(bm_returns, bool) and not bm_returns:
             bm_returns = None
         else:
             bm_returns = broadcast_to(bm_returns, self.obj)
         bm_returns = self.select_col_from_obj(bm_returns, column, wrapper=self.wrapper.regroup(group_by))
         if use_asset_returns:
-            returns = self.resolve_shortcut_attr(
-                'asset_returns',
-                group_by=group_by,
-                jitted=jitted,
-                chunked=chunked
-            )
+            returns = self.resolve_shortcut_attr("asset_returns", group_by=group_by, jitted=jitted, chunked=chunked)
         else:
-            returns = self.resolve_shortcut_attr(
-                'returns',
-                group_by=group_by,
-                jitted=jitted,
-                chunked=chunked
-            )
+            returns = self.resolve_shortcut_attr("returns", group_by=group_by, jitted=jitted, chunked=chunked)
         returns = self.select_col_from_obj(returns, column, wrapper=self.wrapper.regroup(group_by))
-        kwargs = merge_dicts(dict(
-            bm_returns=bm_returns,
-            main_kwargs=dict(
-                trace_kwargs=dict(
+        kwargs = merge_dicts(
+            dict(
+                bm_returns=bm_returns,
+                main_kwargs=dict(
+                    trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["purple"]), name="Value"),
+                ),
+                hline_shape_kwargs=dict(
+                    type="line",
                     line=dict(
-                        color=plotting_cfg['color_schema']['purple']
+                        color="gray",
+                        dash="dash",
                     ),
-                    name='Value'
-                )
+                ),
             ),
-            hline_shape_kwargs=dict(
-                type='line',
-                line=dict(
-                    color='gray',
-                    dash="dash",
-                )
-            )
-        ), kwargs)
+            kwargs,
+        )
         return returns.vbt.returns.plot_cumulative(**kwargs)
 
-    def plot_drawdowns(self,
-                       column: tp.Optional[tp.Label] = None,
-                       group_by: tp.GroupByLike = None,
-                       **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_drawdowns(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        group_by: tp.GroupByLike = None,
+        **kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of drawdowns.
 
         `**kwargs` are passed to `vectorbtpro.generic.drawdowns.Drawdowns.plot`."""
         from vectorbtpro._settings import settings
-        plotting_cfg = settings['plotting']
 
-        kwargs = merge_dicts(dict(
-            ts_trace_kwargs=dict(
-                line=dict(
-                    color=plotting_cfg['color_schema']['purple']
-                ),
-                name='Value'
-            )
-        ), kwargs)
-        return self.resolve_shortcut_attr(
-            'drawdowns',
-            group_by=group_by
-        ).plot(column=column, **kwargs)
+        plotting_cfg = settings["plotting"]
 
-    def plot_underwater(self,
-                        column: tp.Optional[tp.Label] = None,
-                        group_by: tp.GroupByLike = None,
-                        jitted: tp.JittedOption = None,
-                        chunked: tp.ChunkedOption = None,
-                        xref: str = 'x',
-                        yref: str = 'y',
-                        hline_shape_kwargs: tp.KwargsLike = None,
-                        **kwargs) -> tp.BaseFigure:  # pragma: no cover
+        kwargs = merge_dicts(
+            dict(ts_trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["purple"]), name="Value")),
+            kwargs,
+        )
+        return self.resolve_shortcut_attr("drawdowns", group_by=group_by).plot(column=column, **kwargs)
+
+    def plot_underwater(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        xref: str = "x",
+        yref: str = "y",
+        hline_shape_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of underwater.
 
         `**kwargs` are passed to `vectorbtpro.generic.accessors.GenericAccessor.plot`."""
         from vectorbtpro.utils.figure import get_domain
         from vectorbtpro._settings import settings
-        plotting_cfg = settings['plotting']
 
-        drawdown = self.resolve_shortcut_attr(
-            'drawdown',
-            group_by=group_by,
-            jitted=jitted,
-            chunked=chunked
-        )
+        plotting_cfg = settings["plotting"]
+
+        drawdown = self.resolve_shortcut_attr("drawdown", group_by=group_by, jitted=jitted, chunked=chunked)
         drawdown = self.select_col_from_obj(drawdown, column, wrapper=self.wrapper.regroup(group_by))
-        kwargs = merge_dicts(dict(
-            trace_kwargs=dict(
-                line=dict(
-                    color=plotting_cfg['color_schema']['red']
-                ),
-                fillcolor=adjust_opacity(plotting_cfg['color_schema']['red'], 0.3),
-                fill='tozeroy',
-                name='Drawdown'
-            )
-        ), kwargs)
+        kwargs = merge_dicts(
+            dict(
+                trace_kwargs=dict(
+                    line=dict(color=plotting_cfg["color_schema"]["red"]),
+                    fillcolor=adjust_opacity(plotting_cfg["color_schema"]["red"], 0.3),
+                    fill="tozeroy",
+                    name="Drawdown",
+                )
+            ),
+            kwargs,
+        )
         fig = drawdown.vbt.plot(**kwargs)
         x_domain = get_domain(xref, fig)
-        fig.add_shape(**merge_dicts(dict(
-            type='line',
-            line=dict(
-                color='gray',
-                dash="dash",
-            ),
-            xref="paper",
-            yref=yref,
-            x0=x_domain[0],
-            y0=0,
-            x1=x_domain[1],
-            y1=0
-        ), hline_shape_kwargs))
-        yaxis = 'yaxis' + yref[1:]
-        fig.layout[yaxis]['tickformat'] = '%'
+        fig.add_shape(
+            **merge_dicts(
+                dict(
+                    type="line",
+                    line=dict(
+                        color="gray",
+                        dash="dash",
+                    ),
+                    xref="paper",
+                    yref=yref,
+                    x0=x_domain[0],
+                    y0=0,
+                    x1=x_domain[1],
+                    y1=0,
+                ),
+                hline_shape_kwargs,
+            )
+        )
+        yaxis = "yaxis" + yref[1:]
+        fig.layout[yaxis]["tickformat"] = "%"
         return fig
 
-    def plot_gross_exposure(self,
-                            column: tp.Optional[tp.Label] = None,
-                            group_by: tp.GroupByLike = None,
-                            direction: tp.Union[str, int] = 'both',
-                            jitted: tp.JittedOption = None,
-                            chunked: tp.ChunkedOption = None,
-                            xref: str = 'x',
-                            yref: str = 'y',
-                            hline_shape_kwargs: tp.KwargsLike = None,
-                            **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_gross_exposure(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        group_by: tp.GroupByLike = None,
+        direction: tp.Union[str, int] = "both",
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        xref: str = "x",
+        yref: str = "y",
+        hline_shape_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of gross exposure.
 
         `**kwargs` are passed to `vectorbtpro.generic.accessors.GenericSRAccessor.plot_against`."""
         from vectorbtpro.utils.figure import get_domain
         from vectorbtpro._settings import settings
-        plotting_cfg = settings['plotting']
+
+        plotting_cfg = settings["plotting"]
 
         gross_exposure = self.resolve_shortcut_attr(
-            'gross_exposure',
+            "gross_exposure",
             direction=direction,
             group_by=group_by,
             jitted=jitted,
-            chunked=chunked
+            chunked=chunked,
         )
         gross_exposure = self.select_col_from_obj(gross_exposure, column, wrapper=self.wrapper.regroup(group_by))
-        kwargs = merge_dicts(dict(
-            trace_kwargs=dict(
-                line=dict(
-                    color=plotting_cfg['color_schema']['pink']
-                ),
-                name='Exposure'
+        kwargs = merge_dicts(
+            dict(
+                trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["pink"]), name="Exposure"),
+                pos_trace_kwargs=dict(fillcolor=adjust_opacity(plotting_cfg["color_schema"]["orange"], 0.3)),
+                neg_trace_kwargs=dict(fillcolor=adjust_opacity(plotting_cfg["color_schema"]["pink"], 0.3)),
+                other_trace_kwargs="hidden",
             ),
-            pos_trace_kwargs=dict(
-                fillcolor=adjust_opacity(plotting_cfg['color_schema']['orange'], 0.3)
-            ),
-            neg_trace_kwargs=dict(
-                fillcolor=adjust_opacity(plotting_cfg['color_schema']['pink'], 0.3)
-            ),
-            other_trace_kwargs='hidden'
-        ), kwargs)
+            kwargs,
+        )
         fig = gross_exposure.vbt.plot_against(1, **kwargs)
         x_domain = get_domain(xref, fig)
-        fig.add_shape(**merge_dicts(dict(
-            type='line',
-            line=dict(
-                color='gray',
-                dash="dash",
-            ),
-            xref="paper",
-            yref=yref,
-            x0=x_domain[0],
-            y0=1,
-            x1=x_domain[1],
-            y1=1
-        ), hline_shape_kwargs))
+        fig.add_shape(
+            **merge_dicts(
+                dict(
+                    type="line",
+                    line=dict(
+                        color="gray",
+                        dash="dash",
+                    ),
+                    xref="paper",
+                    yref=yref,
+                    x0=x_domain[0],
+                    y0=1,
+                    x1=x_domain[1],
+                    y1=1,
+                ),
+                hline_shape_kwargs,
+            )
+        )
         return fig
 
-    def plot_net_exposure(self,
-                          column: tp.Optional[tp.Label] = None,
-                          group_by: tp.GroupByLike = None,
-                          jitted: tp.JittedOption = None,
-                          chunked: tp.ChunkedOption = None,
-                          xref: str = 'x',
-                          yref: str = 'y',
-                          hline_shape_kwargs: tp.KwargsLike = None,
-                          **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_net_exposure(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        xref: str = "x",
+        yref: str = "y",
+        hline_shape_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot one column/group of net exposure.
 
         `**kwargs` are passed to `vectorbtpro.generic.accessors.GenericSRAccessor.plot_against`."""
         from vectorbtpro.utils.figure import get_domain
         from vectorbtpro._settings import settings
-        plotting_cfg = settings['plotting']
 
-        net_exposure = self.resolve_shortcut_attr(
-            'net_exposure',
-            group_by=group_by,
-            jitted=jitted,
-            chunked=chunked
-        )
+        plotting_cfg = settings["plotting"]
+
+        net_exposure = self.resolve_shortcut_attr("net_exposure", group_by=group_by, jitted=jitted, chunked=chunked)
         net_exposure = self.select_col_from_obj(net_exposure, column, wrapper=self.wrapper.regroup(group_by))
-        kwargs = merge_dicts(dict(
-            trace_kwargs=dict(
-                line=dict(
-                    color=plotting_cfg['color_schema']['pink']
-                ),
-                name='Exposure'
+        kwargs = merge_dicts(
+            dict(
+                trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["pink"]), name="Exposure"),
+                pos_trace_kwargs=dict(fillcolor=adjust_opacity(plotting_cfg["color_schema"]["pink"], 0.3)),
+                neg_trace_kwargs=dict(fillcolor=adjust_opacity(plotting_cfg["color_schema"]["orange"], 0.3)),
+                other_trace_kwargs="hidden",
             ),
-            pos_trace_kwargs=dict(
-                fillcolor=adjust_opacity(plotting_cfg['color_schema']['pink'], 0.3)
-            ),
-            neg_trace_kwargs=dict(
-                fillcolor=adjust_opacity(plotting_cfg['color_schema']['orange'], 0.3)
-            ),
-            other_trace_kwargs='hidden'
-        ), kwargs)
+            kwargs,
+        )
         fig = net_exposure.vbt.plot_against(0, **kwargs)
         x_domain = get_domain(xref, fig)
-        fig.add_shape(**merge_dicts(dict(
-            type='line',
-            line=dict(
-                color='gray',
-                dash="dash",
-            ),
-            xref="paper",
-            yref=yref,
-            x0=x_domain[0],
-            y0=0,
-            x1=x_domain[1],
-            y1=0
-        ), hline_shape_kwargs))
+        fig.add_shape(
+            **merge_dicts(
+                dict(
+                    type="line",
+                    line=dict(
+                        color="gray",
+                        dash="dash",
+                    ),
+                    xref="paper",
+                    yref=yref,
+                    x0=x_domain[0],
+                    y0=0,
+                    x1=x_domain[1],
+                    y1=0,
+                ),
+                hline_shape_kwargs,
+            )
+        )
         return fig
 
     @property
@@ -8369,18 +8267,14 @@ class Portfolio(Analyzable):
         Merges `vectorbtpro.generic.plots_builder.PlotsBuilderMixin.plots_defaults` and
         `plots` from `vectorbtpro._settings.portfolio`."""
         from vectorbtpro._settings import settings
-        returns_cfg = settings['returns']
-        portfolio_plots_cfg = settings['portfolio']['plots']
+
+        returns_cfg = settings["returns"]
+        portfolio_plots_cfg = settings["portfolio"]["plots"]
 
         return merge_dicts(
             Analyzable.plots_defaults.__get__(self),
-            dict(
-                settings=dict(
-                    year_freq=returns_cfg['year_freq'],
-                    trades_type=self.trades_type
-                )
-            ),
-            portfolio_plots_cfg
+            dict(settings=dict(year_freq=returns_cfg["year_freq"], trades_type=self.trades_type)),
+            portfolio_plots_cfg,
         )
 
     _subplots: tp.ClassVar[Config] = Config(
@@ -8389,107 +8283,107 @@ class Portfolio(Analyzable):
                 title="Orders",
                 yaxis_kwargs=dict(title="Price"),
                 check_is_not_grouped=True,
-                plot_func='orders.plot',
-                tags=['portfolio', 'orders']
+                plot_func="orders.plot",
+                tags=["portfolio", "orders"],
             ),
             trades=dict(
                 title="Trades",
                 yaxis_kwargs=dict(title="Price"),
                 check_is_not_grouped=True,
-                plot_func='trades.plot',
-                tags=['portfolio', 'trades']
+                plot_func="trades.plot",
+                tags=["portfolio", "trades"],
             ),
             trade_pnl=dict(
                 title="Trade PnL",
                 yaxis_kwargs=dict(title="Trade PnL"),
                 check_is_not_grouped=True,
-                plot_func='trades.plot_pnl',
-                tags=['portfolio', 'trades']
+                plot_func="trades.plot_pnl",
+                tags=["portfolio", "trades"],
             ),
             asset_flow=dict(
                 title="Asset Flow",
                 yaxis_kwargs=dict(title="Asset flow"),
                 check_is_not_grouped=True,
-                plot_func='plot_asset_flow',
+                plot_func="plot_asset_flow",
                 pass_add_trace_kwargs=True,
-                tags=['portfolio', 'assets']
+                tags=["portfolio", "assets"],
             ),
             cash_flow=dict(
                 title="Cash Flow",
                 yaxis_kwargs=dict(title="Cash flow"),
-                plot_func='plot_cash_flow',
+                plot_func="plot_cash_flow",
                 pass_add_trace_kwargs=True,
-                tags=['portfolio', 'cash']
+                tags=["portfolio", "cash"],
             ),
             assets=dict(
                 title="Assets",
                 yaxis_kwargs=dict(title="Assets"),
                 check_is_not_grouped=True,
-                plot_func='plot_assets',
+                plot_func="plot_assets",
                 pass_add_trace_kwargs=True,
-                tags=['portfolio', 'assets']
+                tags=["portfolio", "assets"],
             ),
             cash=dict(
                 title="Cash",
                 yaxis_kwargs=dict(title="Cash"),
-                plot_func='plot_cash',
+                plot_func="plot_cash",
                 pass_add_trace_kwargs=True,
-                tags=['portfolio', 'cash']
+                tags=["portfolio", "cash"],
             ),
             asset_value=dict(
                 title="Asset Value",
                 yaxis_kwargs=dict(title="Asset value"),
-                plot_func='plot_asset_value',
+                plot_func="plot_asset_value",
                 pass_add_trace_kwargs=True,
-                tags=['portfolio', 'assets', 'value']
+                tags=["portfolio", "assets", "value"],
             ),
             value=dict(
                 title="Value",
                 yaxis_kwargs=dict(title="Value"),
-                plot_func='plot_value',
+                plot_func="plot_value",
                 pass_add_trace_kwargs=True,
-                tags=['portfolio', 'value']
+                tags=["portfolio", "value"],
             ),
             cum_returns=dict(
                 title="Cumulative Returns",
                 yaxis_kwargs=dict(title="Cumulative returns"),
-                plot_func='plot_cum_returns',
+                plot_func="plot_cum_returns",
                 pass_hline_shape_kwargs=True,
                 pass_add_trace_kwargs=True,
                 pass_xref=True,
                 pass_yref=True,
-                tags=['portfolio', 'returns']
+                tags=["portfolio", "returns"],
             ),
             drawdowns=dict(
                 title="Drawdowns",
                 yaxis_kwargs=dict(title="Value"),
-                plot_func='plot_drawdowns',
+                plot_func="plot_drawdowns",
                 pass_add_trace_kwargs=True,
                 pass_xref=True,
                 pass_yref=True,
-                tags=['portfolio', 'value', 'drawdowns']
+                tags=["portfolio", "value", "drawdowns"],
             ),
             underwater=dict(
                 title="Underwater",
                 yaxis_kwargs=dict(title="Drawdown"),
-                plot_func='plot_underwater',
+                plot_func="plot_underwater",
                 pass_add_trace_kwargs=True,
-                tags=['portfolio', 'value', 'drawdowns']
+                tags=["portfolio", "value", "drawdowns"],
             ),
             gross_exposure=dict(
                 title="Gross Exposure",
                 yaxis_kwargs=dict(title="Gross exposure"),
-                plot_func='plot_gross_exposure',
+                plot_func="plot_gross_exposure",
                 pass_add_trace_kwargs=True,
-                tags=['portfolio', 'exposure']
+                tags=["portfolio", "exposure"],
             ),
             net_exposure=dict(
                 title="Net Exposure",
                 yaxis_kwargs=dict(title="Net exposure"),
-                plot_func='plot_net_exposure',
+                plot_func="plot_net_exposure",
                 pass_add_trace_kwargs=True,
-                tags=['portfolio', 'exposure']
-            )
+                tags=["portfolio", "exposure"],
+            ),
         )
     )
 
@@ -8503,4 +8397,4 @@ class Portfolio(Analyzable):
 Portfolio.override_metrics_doc(__pdoc__)
 Portfolio.override_subplots_doc(__pdoc__)
 
-__pdoc__['Portfolio.plot'] = "See `vectorbtpro.generic.plots_builder.PlotsBuilderMixin.plots`."
+__pdoc__["Portfolio.plot"] = "See `vectorbtpro.generic.plots_builder.PlotsBuilderMixin.plots`."

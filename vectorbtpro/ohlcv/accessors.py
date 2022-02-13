@@ -104,8 +104,8 @@ from vectorbtpro.utils.decorators import class_or_instancemethod
 __pdoc__ = {}
 
 
-@register_df_vbt_accessor('ohlc')
-@register_df_vbt_accessor('ohlcv')
+@register_df_vbt_accessor("ohlc")
+@register_df_vbt_accessor("ohlcv")
 class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
     """Accessor on top of OHLCV data. For DataFrames only.
 
@@ -120,9 +120,10 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
     def column_names(self) -> tp.Kwargs:
         """Column names."""
         from vectorbtpro._settings import settings
-        ohlcv_cfg = settings['ohlcv']
 
-        return merge_dicts(ohlcv_cfg['column_names'], self._column_names)
+        ohlcv_cfg = settings["ohlcv"]
+
+        return merge_dicts(ohlcv_cfg["column_names"], self._column_names)
 
     def get_column(self, col_name: str) -> tp.Optional[tp.Series]:
         """Get column from `OHLCVDFAccessor.column_names`."""
@@ -135,22 +136,22 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
     @property
     def open(self) -> tp.Optional[tp.Series]:
         """Open series."""
-        return self.get_column('open')
+        return self.get_column("open")
 
     @property
     def high(self) -> tp.Optional[tp.Series]:
         """High series."""
-        return self.get_column('high')
+        return self.get_column("high")
 
     @property
     def low(self) -> tp.Optional[tp.Series]:
         """Low series."""
-        return self.get_column('low')
+        return self.get_column("low")
 
     @property
     def close(self) -> tp.Optional[tp.Series]:
         """Close series."""
-        return self.get_column('close')
+        return self.get_column("close")
 
     @property
     def ohlc(self) -> tp.Optional[tp.Frame]:
@@ -171,17 +172,19 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
     @property
     def volume(self) -> tp.Optional[tp.Series]:
         """Volume series."""
-        return self.get_column('volume')
+        return self.get_column("volume")
 
     @class_or_instancemethod
-    def vwap(cls_or_self,
-             high: tp.ArrayLike = None,
-             low: tp.ArrayLike = None,
-             volume: tp.ArrayLike = None,
-             jitted: tp.JittedOption = None,
-             chunked: tp.ChunkedOption = None,
-             wrapper: tp.Optional[ArrayWrapper] = None,
-             wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def vwap(
+        cls_or_self,
+        high: tp.ArrayLike = None,
+        low: tp.ArrayLike = None,
+        volume: tp.ArrayLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
         """See `vectorbtpro.ohlcv.nb.vwap_nb`."""
         if not isinstance(cls_or_self, type):
             if high is None:
@@ -196,7 +199,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
         if wrapper is None:
             wrapper = ArrayWrapper.from_obj(volume)
             if wrapper.ndim == 1 and not isinstance(cls_or_self, type):
-                wrapper = wrapper.replace(columns=['vwap'])
+                wrapper = wrapper.replace(columns=["vwap"])
         return wrapper.wrap(out, **resolve_dict(wrap_kwargs))
 
     # ############# Stats ############# #
@@ -208,81 +211,69 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
         Merges `vectorbtpro.generic.accessors.GenericAccessor.stats_defaults` and
         `stats` from `vectorbtpro._settings.ohlcv`."""
         from vectorbtpro._settings import settings
-        ohlcv_stats_cfg = settings['ohlcv']['stats']
 
-        return merge_dicts(
-            GenericAccessor.stats_defaults.__get__(self),
-            ohlcv_stats_cfg
-        )
+        ohlcv_stats_cfg = settings["ohlcv"]["stats"]
+
+        return merge_dicts(GenericAccessor.stats_defaults.__get__(self), ohlcv_stats_cfg)
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
-            start=dict(
-                title='Start',
-                calc_func=lambda self: self.wrapper.index[0],
-                agg_func=None,
-                tags='wrapper'
-            ),
-            end=dict(
-                title='End',
-                calc_func=lambda self: self.wrapper.index[-1],
-                agg_func=None,
-                tags='wrapper'
-            ),
+            start=dict(title="Start", calc_func=lambda self: self.wrapper.index[0], agg_func=None, tags="wrapper"),
+            end=dict(title="End", calc_func=lambda self: self.wrapper.index[-1], agg_func=None, tags="wrapper"),
             period=dict(
-                title='Period',
+                title="Period",
                 calc_func=lambda self: len(self.wrapper.index),
                 apply_to_timedelta=True,
                 agg_func=None,
-                tags='wrapper'
+                tags="wrapper",
             ),
             first_price=dict(
-                title='First Price',
+                title="First Price",
                 calc_func=lambda ohlc: generic_nb.bfill_1d_nb(ohlc.values.flatten())[0],
                 resolve_ohlc=True,
-                tags=['ohlcv', 'ohlc']
+                tags=["ohlcv", "ohlc"],
             ),
             lowest_price=dict(
-                title='Lowest Price',
+                title="Lowest Price",
                 calc_func=lambda ohlc: ohlc.values.min(),
                 resolve_ohlc=True,
-                tags=['ohlcv', 'ohlc']
+                tags=["ohlcv", "ohlc"],
             ),
             highest_price=dict(
-                title='Highest Price',
+                title="Highest Price",
                 calc_func=lambda ohlc: ohlc.values.max(),
                 resolve_ohlc=True,
-                tags=['ohlcv', 'ohlc']
+                tags=["ohlcv", "ohlc"],
             ),
             last_price=dict(
-                title='Last Price',
+                title="Last Price",
                 calc_func=lambda ohlc: generic_nb.ffill_1d_nb(ohlc.values.flatten())[-1],
                 resolve_ohlc=True,
-                tags=['ohlcv', 'ohlc']
+                tags=["ohlcv", "ohlc"],
             ),
             first_volume=dict(
-                title='First Volume',
+                title="First Volume",
                 calc_func=lambda volume: generic_nb.bfill_1d_nb(volume.values)[0],
                 resolve_volume=True,
-                tags=['ohlcv', 'volume']
+                tags=["ohlcv", "volume"],
             ),
             lowest_volume=dict(
-                title='Lowest Volume',
+                title="Lowest Volume",
                 calc_func=lambda volume: volume.values.min(),
                 resolve_volume=True,
-                tags=['ohlcv', 'volume']
+                tags=["ohlcv", "volume"],
             ),
             highest_volume=dict(
-                title='Highest Volume',
+                title="Highest Volume",
                 calc_func=lambda volume: volume.values.max(),
                 resolve_volume=True,
-                tags=['ohlcv', 'volume']
+                tags=["ohlcv", "volume"],
             ),
             last_volume=dict(
-                title='Last Volume',
+                title="Last Volume",
                 calc_func=lambda volume: generic_nb.ffill_1d_nb(volume.values)[-1],
                 resolve_volume=True,
-                tags=['ohlcv', 'volume']
+                tags=["ohlcv", "volume"],
             ),
         )
     )
@@ -293,15 +284,17 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
 
     # ############# Plotting ############# #
 
-    def plot(self,
-             plot_type: tp.Union[None, str, tp.BaseTraceType] = None,
-             show_volume: tp.Optional[bool] = None,
-             ohlc_kwargs: tp.KwargsLike = None,
-             volume_kwargs: tp.KwargsLike = None,
-             ohlc_add_trace_kwargs: tp.KwargsLike = None,
-             volume_add_trace_kwargs: tp.KwargsLike = None,
-             fig: tp.Optional[tp.BaseFigure] = None,
-             **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot(
+        self,
+        plot_type: tp.Union[None, str, tp.BaseTraceType] = None,
+        show_volume: tp.Optional[bool] = None,
+        ohlc_kwargs: tp.KwargsLike = None,
+        volume_kwargs: tp.KwargsLike = None,
+        ohlc_add_trace_kwargs: tp.KwargsLike = None,
+        volume_add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs
+    ) -> tp.BaseFigure:  # pragma: no cover
         """Plot OHLCV data.
 
         Args:
@@ -328,12 +321,14 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             ![](/assets/images/ohlcv_plot.svg)
         """
         from vectorbtpro.utils.opt_packages import assert_can_import
-        assert_can_import('plotly')
+
+        assert_can_import("plotly")
         import plotly.graph_objects as go
         from vectorbtpro.utils.figure import make_figure, make_subplots
         from vectorbtpro._settings import settings
-        plotting_cfg = settings['plotting']
-        ohlcv_cfg = settings['ohlcv']
+
+        plotting_cfg = settings["plotting"]
+        ohlcv_cfg = settings["ohlcv"]
 
         if ohlc_kwargs is None:
             ohlc_kwargs = {}
@@ -357,33 +352,20 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
                 fig = make_figure()
             fig.update_layout(
                 showlegend=True,
-                xaxis=dict(
-                    rangeslider_visible=False,
-                    showgrid=True
-                ),
-                yaxis=dict(
-                    showgrid=True
-                )
+                xaxis=dict(rangeslider_visible=False, showgrid=True),
+                yaxis=dict(showgrid=True),
             )
             if show_volume:
-                fig.update_layout(
-                    xaxis2=dict(
-                        showgrid=True
-                    ),
-                    yaxis2=dict(
-                        showgrid=True
-                    ),
-                    bargap=0
-                )
+                fig.update_layout(xaxis2=dict(showgrid=True), yaxis2=dict(showgrid=True), bargap=0)
         fig.update_layout(**layout_kwargs)
         if plot_type is None:
-            plot_type = ohlcv_cfg['plot_type']
+            plot_type = ohlcv_cfg["plot_type"]
         if isinstance(plot_type, str):
-            if plot_type.lower() == 'ohlc':
-                plot_type = 'OHLC'
+            if plot_type.lower() == "ohlc":
+                plot_type = "OHLC"
                 plot_obj = go.Ohlc
-            elif plot_type.lower() == 'candlestick':
-                plot_type = 'Candlestick'
+            elif plot_type.lower() == "candlestick":
+                plot_type = "Candlestick"
                 plot_obj = go.Candlestick
             else:
                 raise ValueError("Plot type can be either 'OHLC' or 'Candlestick'")
@@ -396,34 +378,23 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             low=self.low,
             close=self.close,
             name=plot_type,
-            increasing=dict(
-                line=dict(
-                    color=plotting_cfg['color_schema']['increasing']
-                )
-            ),
-            decreasing=dict(
-                line=dict(
-                    color=plotting_cfg['color_schema']['decreasing']
-                )
-            )
+            increasing=dict(line=dict(color=plotting_cfg["color_schema"]["increasing"])),
+            decreasing=dict(line=dict(color=plotting_cfg["color_schema"]["decreasing"])),
         )
         ohlc.update(**ohlc_kwargs)
         fig.add_trace(ohlc, **ohlc_add_trace_kwargs)
 
         if show_volume:
             marker_colors = np.empty(self.volume.shape, dtype=object)
-            marker_colors[(self.close.values - self.open.values) > 0] = plotting_cfg['color_schema']['increasing']
-            marker_colors[(self.close.values - self.open.values) == 0] = plotting_cfg['color_schema']['gray']
-            marker_colors[(self.close.values - self.open.values) < 0] = plotting_cfg['color_schema']['decreasing']
+            marker_colors[(self.close.values - self.open.values) > 0] = plotting_cfg["color_schema"]["increasing"]
+            marker_colors[(self.close.values - self.open.values) == 0] = plotting_cfg["color_schema"]["gray"]
+            marker_colors[(self.close.values - self.open.values) < 0] = plotting_cfg["color_schema"]["decreasing"]
             volume_bar = go.Bar(
                 x=self.wrapper.index,
                 y=self.volume,
-                marker=dict(
-                    color=marker_colors,
-                    line_width=0
-                ),
+                marker=dict(color=marker_colors, line_width=0),
                 opacity=0.5,
-                name='Volume'
+                name="Volume",
             )
             volume_bar.update(**volume_kwargs)
             fig.add_trace(volume_bar, **volume_add_trace_kwargs)
@@ -437,28 +408,21 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
         Merges `vectorbtpro.generic.accessors.GenericAccessor.plots_defaults` and
         `plots` from `vectorbtpro._settings.ohlcv`."""
         from vectorbtpro._settings import settings
-        ohlcv_plots_cfg = settings['ohlcv']['plots']
 
-        return merge_dicts(
-            GenericAccessor.plots_defaults.__get__(self),
-            ohlcv_plots_cfg
-        )
+        ohlcv_plots_cfg = settings["ohlcv"]["plots"]
+
+        return merge_dicts(GenericAccessor.plots_defaults.__get__(self), ohlcv_plots_cfg)
 
     _subplots: tp.ClassVar[Config] = Config(
         dict(
             plot=dict(
-                title='OHLC',
-                xaxis_kwargs=dict(
-                    showgrid=True,
-                    rangeslider_visible=False
-                ),
-                yaxis_kwargs=dict(
-                    showgrid=True
-                ),
+                title="OHLC",
+                xaxis_kwargs=dict(showgrid=True, rangeslider_visible=False),
+                yaxis_kwargs=dict(showgrid=True),
                 check_is_not_grouped=True,
-                plot_func='plot',
+                plot_func="plot",
                 show_volume=False,
-                tags='ohlcv'
+                tags="ohlcv",
             )
         )
     )
