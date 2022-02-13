@@ -612,7 +612,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                             if not _silence_warnings:
                                 warnings.warn(
                                     f"Metric '{metric_name}' returned multiple values "
-                                    f"despite having no aggregation function",
+                                    "despite having no aggregation function",
                                     stacklevel=2,
                                 )
                             continue
@@ -635,7 +635,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
             if used_agg_func and not silence_warnings:
                 warnings.warn(
                     f"Object has multiple columns. Aggregating using {agg_func}. "
-                    f"Pass column to select a single column/group.",
+                    "Pass column to select a single column/group.",
                     stacklevel=2,
                 )
             return pd.Series(stats_dct, name="agg_func_" + agg_func.__name__, dtype=object)

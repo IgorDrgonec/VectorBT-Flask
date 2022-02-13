@@ -1275,7 +1275,7 @@ class Trades(Ranges):
                             f"<br>{pnl_title}: %{{customdata[3]:.6f}}"
                             f"<br>{return_title}: %{{customdata[4]:.2%}}"
                             f"<br>{direction_title}: %{{customdata[5]}}"
-                            f"<br>Duration: %{{customdata[6]}}"
+                            "<br>Duration: %{customdata[6]}"
                         )
                     else:
                         parent_id = self_col.get_field_arr("parent_id")
@@ -1303,7 +1303,7 @@ class Trades(Ranges):
                             f"<br>{pnl_title}: %{{customdata[4]:.6f}}"
                             f"<br>{return_title}: %{{customdata[5]:.2%}}"
                             f"<br>{direction_title}: %{{customdata[6]}}"
-                            f"<br>Duration: %{{customdata[7]}}"
+                            "<br>Duration: %{customdata[7]}"
                         )
                     scatter = go.Scatter(
                         x=exit_idx[mask],

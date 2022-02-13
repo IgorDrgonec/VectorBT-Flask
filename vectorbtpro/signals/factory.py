@@ -701,7 +701,7 @@ class SignalFactory(IndicatorFactory):
                 entry_args = args
             elif mode == FactoryMode.Exits or (mode == FactoryMode.Chain and entry_place_func == first_place_nb):
                 if len(exit_args) > 0:
-                    raise ValueError("Use *args instead of exit_args " "with FactoryMode.Exits or FactoryMode.Chain")
+                    raise ValueError("Use *args instead of exit_args with FactoryMode.Exits or FactoryMode.Chain")
                 exit_args = args
             else:
                 if len(args) > 0:
@@ -719,9 +719,7 @@ class SignalFactory(IndicatorFactory):
                 entry_kwargs = _kwargs
             elif mode == FactoryMode.Exits or (mode == FactoryMode.Chain and entry_place_func == first_place_nb):
                 if len(exit_kwargs) > 0:
-                    raise ValueError(
-                        "Use **kwargs instead of exit_kwargs " "with FactoryMode.Exits or FactoryMode.Chain"
-                    )
+                    raise ValueError("Use **kwargs instead of exit_kwargs with FactoryMode.Exits or FactoryMode.Chain")
                 exit_kwargs = _kwargs
             else:
                 if len(_kwargs) > 0:

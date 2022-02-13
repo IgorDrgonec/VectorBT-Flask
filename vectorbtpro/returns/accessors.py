@@ -269,12 +269,10 @@ class ReturnsAccessor(GenericAccessor):
         """Get annualization factor."""
         if self.wrapper.freq is None:
             raise ValueError(
-                "Index frequency is None. " "Pass it as `freq` or define it globally under `settings.wrapping`."
+                "Index frequency is None. Pass it as `freq` or define it globally under `settings.wrapping`."
             )
         if self.year_freq is None:
-            raise ValueError(
-                "Year frequency is None. " "Pass `year_freq` or define it globally under `settings.returns`."
-            )
+            raise ValueError("Year frequency is None. Pass `year_freq` or define it globally under `settings.returns`.")
         return self.year_freq / self.wrapper.freq
 
     @property

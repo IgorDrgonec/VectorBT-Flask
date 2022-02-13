@@ -351,11 +351,13 @@ class Orders(Records):
                     ),
                     name="Buy",
                     customdata=buy_customdata,
-                    hovertemplate=f"{id_title}: %{{customdata[0]}}"
-                    f"<br>{idx_title}: %{{x}}"
-                    f"<br>{price_title}: %{{y}}"
-                    f"<br>{size_title}: %{{customdata[1]:.6f}}"
-                    f"<br>{fees_title}: %{{customdata[2]:.6f}}",
+                    hovertemplate=(
+                        f"{id_title}: %{{customdata[0]}}"
+                        f"<br>{idx_title}: %{{x}}"
+                        f"<br>{price_title}: %{{y}}"
+                        f"<br>{size_title}: %{{customdata[1]:.6f}}"
+                        f"<br>{fees_title}: %{{customdata[2]:.6f}}"
+                    ),
                 )
                 buy_scatter.update(**buy_trace_kwargs)
                 fig.add_trace(buy_scatter, **add_trace_kwargs)
@@ -376,11 +378,13 @@ class Orders(Records):
                     ),
                     name="Sell",
                     customdata=sell_customdata,
-                    hovertemplate=f"{id_title}: %{{customdata[0]}}"
-                    f"<br>{idx_title}: %{{x}}"
-                    f"<br>{price_title}: %{{y}}"
-                    f"<br>{size_title}: %{{customdata[1]:.6f}}"
-                    f"<br>{fees_title}: %{{customdata[2]:.6f}}",
+                    hovertemplate=(
+                        f"{id_title}: %{{customdata[0]}}"
+                        f"<br>{idx_title}: %{{x}}"
+                        f"<br>{price_title}: %{{y}}"
+                        f"<br>{size_title}: %{{customdata[1]:.6f}}"
+                        f"<br>{fees_title}: %{{customdata[2]:.6f}}"
+                    ),
                 )
                 sell_scatter.update(**sell_trace_kwargs)
                 fig.add_trace(sell_scatter, **add_trace_kwargs)

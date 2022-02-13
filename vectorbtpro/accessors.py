@@ -112,7 +112,7 @@ def register_accessor(name: str, cls: tp.Type[DirNamesMixin]) -> tp.Callable:
             warnings.warn(
                 f"registration of accessor {repr(accessor)} under name "
                 f"{repr(name)} for type {repr(cls)} is overriding a preexisting "
-                f"attribute with the same name.",
+                "attribute with the same name.",
                 UserWarning,
                 stacklevel=2,
             )

@@ -1999,7 +1999,7 @@ class SignalsAccessor(GenericAccessor):
             norm_avg_index=dict(title="Norm Avg Index [-1, 1]", calc_func="norm_avg_index", tags=["signals", "index"]),
             distance=dict(
                 title=RepEval(
-                    'f\'Distance {"<-" if from_other else "->"} {other_name}\' ' "if other is not None else 'Distance'"
+                    "f'Distance {\"<-\" if from_other else \"->\"} {other_name}' if other is not None else 'Distance'"
                 ),
                 calc_func="between_ranges.duration",
                 post_calc_func=lambda self, out, settings: {

@@ -144,7 +144,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                 col_mapper = pd_indexing_func(i_wrapper.wrap_reduced(np.arange(n_cols), columns=columns))
             except pd.core.indexing.IndexingError as e:
                 warnings.warn(
-                    "Columns only: Make sure to treat this object " "as a Series of columns rather than a DataFrame",
+                    "Columns only: Make sure to treat this object as a Series of columns rather than a DataFrame",
                     stacklevel=2,
                 )
                 raise e

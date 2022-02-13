@@ -2427,7 +2427,7 @@ class TestFactory:
         assert I.param_names == ("window",)
         pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
         I = vbt.IndicatorFactory.from_expr(
-            "rolling_mean(@in_ts1, @p_window1)," "rolling_mean(@in_ts2, @p_window2)",
+            "rolling_mean(@in_ts1, @p_window1),rolling_mean(@in_ts2, @p_window2)",
             window1=2,
             window2=3,
         )
@@ -2480,7 +2480,7 @@ class TestFactory:
         assert I.param_names == ("window",)
         pd.testing.assert_frame_equal(I.run(ts).o, ts.vbt.rolling_mean(2))
         I = vbt.IndicatorFactory.from_expr(
-            "@out_o1:rolling_mean(@in_ts1, @p_window1)," "@out_o2:rolling_mean(@in_ts2, @p_window2)",
+            "@out_o1:rolling_mean(@in_ts1, @p_window1),@out_o2:rolling_mean(@in_ts2, @p_window2)",
             window1=2,
             window2=3,
         )

@@ -1474,7 +1474,7 @@ class MappedArray(Analyzable):
         else:
             if has_conflicts and not silence_warnings:
                 warnings.warn(
-                    "Multiple values are pointing to the same position. " "Only the latest value is used.",
+                    "Multiple values are pointing to the same position. Only the latest value is used.",
                     stacklevel=2,
                 )
             func = jit_reg.resolve_option(nb.unstack_mapped_nb, jitted)

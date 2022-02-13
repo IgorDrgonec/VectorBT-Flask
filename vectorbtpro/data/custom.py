@@ -1004,7 +1004,7 @@ class BinanceData(Data):  # pragma: no cover
             warnings.warn(traceback.format_exc())
             warnings.warn(
                 f"Symbol '{str(symbol)}' raised an exception. Returning incomplete data. "
-                f"Use update() method to fetch missing data.",
+                "Use update() method to fetch missing data.",
                 stacklevel=2,
             )
 
@@ -1246,7 +1246,7 @@ class CCXTData(Data):  # pragma: no cover
             warnings.warn(traceback.format_exc())
             warnings.warn(
                 f"Symbol '{str(symbol)}' raised an exception. Returning incomplete data. "
-                f"Use update() method to fetch missing data.",
+                "Use update() method to fetch missing data.",
                 stacklevel=2,
             )
 

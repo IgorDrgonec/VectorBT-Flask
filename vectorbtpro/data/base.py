@@ -511,12 +511,12 @@ class Data(Analyzable):
                 if len(index.intersection(obj.index)) != len(index.union(obj.index)):
                     if missing == "nan":
                         warnings.warn(
-                            "Symbols have mismatching index. " "Setting missing data points to NaN.",
+                            "Symbols have mismatching index. Setting missing data points to NaN.",
                             stacklevel=2,
                         )
                         index = index.union(obj.index)
                     elif missing == "drop":
-                        warnings.warn("Symbols have mismatching index. " "Dropping missing data points.", stacklevel=2)
+                        warnings.warn("Symbols have mismatching index. Dropping missing data points.", stacklevel=2)
                         index = index.intersection(obj.index)
                     elif missing == "raise":
                         raise ValueError("Symbols have mismatching index")
@@ -558,13 +558,13 @@ class Data(Analyzable):
                 if len(columns.intersection(obj.columns)) != len(columns.union(obj.columns)):
                     if missing == "nan":
                         warnings.warn(
-                            "Symbols have mismatching columns. " "Setting missing data points to NaN.",
+                            "Symbols have mismatching columns. Setting missing data points to NaN.",
                             stacklevel=2,
                         )
                         columns = columns.union(obj.columns)
                     elif missing == "drop":
                         warnings.warn(
-                            "Symbols have mismatching columns. " "Dropping missing data points.",
+                            "Symbols have mismatching columns. Dropping missing data points.",
                             stacklevel=2,
                         )
                         columns = columns.intersection(obj.columns)

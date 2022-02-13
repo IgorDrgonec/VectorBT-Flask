@@ -542,7 +542,7 @@ class Ranges(Records):
                 ),
                 name="Start",
                 customdata=start_customdata,
-                hovertemplate=f"{id_title}: %{{customdata[0]}}" f"<br>{start_idx_title}: %{{x}}",
+                hovertemplate=f"{id_title}: %{{customdata[0]}}<br>{start_idx_title}: %{{x}}",
             )
             start_scatter.update(**start_trace_kwargs)
             fig.add_trace(start_scatter, **add_trace_kwargs)
@@ -563,9 +563,9 @@ class Ranges(Records):
                     ),
                     name="Closed",
                     customdata=closed_end_customdata,
-                    hovertemplate=f"{id_title}: %{{customdata[0]}}"
-                    f"<br>{end_idx_title}: %{{x}}"
-                    f"<br>Duration: %{{customdata[1]}}",
+                    hovertemplate=(
+                        f"{id_title}: %{{customdata[0]}}<br>{end_idx_title}: %{{x}}<br>Duration: %{{customdata[1]}}"
+                    ),
                 )
                 closed_end_scatter.update(**end_trace_kwargs)
                 fig.add_trace(closed_end_scatter, **add_trace_kwargs)
@@ -608,9 +608,9 @@ class Ranges(Records):
                     ),
                     name="Open",
                     customdata=open_end_customdata,
-                    hovertemplate=f"{id_title}: %{{customdata[0]}}"
-                    f"<br>{end_idx_title}: %{{x}}"
-                    f"<br>Duration: %{{customdata[1]}}",
+                    hovertemplate=(
+                        f"{id_title}: %{{customdata[0]}}<br>{end_idx_title}: %{{x}}<br>Duration: %{{customdata[1]}}"
+                    ),
                 )
                 open_end_scatter.update(**end_trace_kwargs)
                 fig.add_trace(open_end_scatter, **add_trace_kwargs)

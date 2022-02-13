@@ -842,9 +842,9 @@ class Drawdowns(Ranges):
                     ),
                     name="Peak",
                     customdata=peak_customdata,
-                    hovertemplate=f"{id_title}: %{{customdata[0]}}"
-                    f"<br>{peak_idx_title}: %{{x}}"
-                    f"<br>{peak_val_title}: %{{y}}",
+                    hovertemplate=(
+                        f"{id_title}: %{{customdata[0]}}<br>{peak_idx_title}: %{{x}}<br>{peak_val_title}: %{{y}}"
+                    ),
                 )
                 peak_scatter.update(**peak_trace_kwargs)
                 fig.add_trace(peak_scatter, **add_trace_kwargs)
@@ -868,11 +868,13 @@ class Drawdowns(Ranges):
                     ),
                     name="Valley",
                     customdata=valley_customdata,
-                    hovertemplate=f"{id_title}: %{{customdata[0]}}"
-                    f"<br>{valley_idx_title}: %{{x}}"
-                    f"<br>{valley_val_title}: %{{y}}"
-                    f"<br>Drawdown: %{{customdata[1]:.2%}}"
-                    f"<br>Duration: %{{customdata[2]}}",
+                    hovertemplate=(
+                        f"{id_title}: %{{customdata[0]}}"
+                        f"<br>{valley_idx_title}: %{{x}}"
+                        f"<br>{valley_val_title}: %{{y}}"
+                        "<br>Drawdown: %{customdata[1]:.2%}"
+                        "<br>Duration: %{customdata[2]}"
+                    ),
                 )
                 valley_scatter.update(**valley_trace_kwargs)
                 fig.add_trace(valley_scatter, **add_trace_kwargs)
@@ -916,11 +918,13 @@ class Drawdowns(Ranges):
                     ),
                     name="Recovery/Peak",
                     customdata=recovery_customdata,
-                    hovertemplate=f"{id_title}: %{{customdata[0]}}"
-                    f"<br>{end_idx_title}: %{{x}}"
-                    f"<br>{end_val_title}: %{{y}}"
-                    f"<br>Return: %{{customdata[1]:.2%}}"
-                    f"<br>Duration: %{{customdata[2]}}",
+                    hovertemplate=(
+                        f"{id_title}: %{{customdata[0]}}"
+                        f"<br>{end_idx_title}: %{{x}}"
+                        f"<br>{end_val_title}: %{{y}}"
+                        "<br>Return: %{customdata[1]:.2%}"
+                        "<br>Duration: %{customdata[2]}"
+                    ),
                 )
                 recovery_scatter.update(**recovery_trace_kwargs)
                 fig.add_trace(recovery_scatter, **add_trace_kwargs)
@@ -963,11 +967,13 @@ class Drawdowns(Ranges):
                     ),
                     name="Active",
                     customdata=active_customdata,
-                    hovertemplate=f"{id_title}: %{{customdata[0]}}"
-                    f"<br>{end_idx_title}: %{{x}}"
-                    f"<br>{end_val_title}: %{{y}}"
-                    f"<br>Return: %{{customdata[1]:.2%}}"
-                    f"<br>Duration: %{{customdata[2]}}",
+                    hovertemplate=(
+                        f"{id_title}: %{{customdata[0]}}"
+                        f"<br>{end_idx_title}: %{{x}}"
+                        f"<br>{end_val_title}: %{{y}}"
+                        "<br>Return: %{customdata[1]:.2%}"
+                        "<br>Duration: %{customdata[2]}"
+                    ),
                 )
                 active_scatter.update(**active_trace_kwargs)
                 fig.add_trace(active_scatter, **add_trace_kwargs)

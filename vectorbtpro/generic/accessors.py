@@ -3722,7 +3722,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
 
         if contains_nan:
             warnings.warn(
-                "Data contains NaNs. Use `fillna` argument or " "`show` method in case of visualization issues.",
+                "Data contains NaNs. Use `fillna` argument or `show` method in case of visualization issues.",
                 stacklevel=2,
             )
         return fig

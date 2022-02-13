@@ -2269,9 +2269,7 @@ class Portfolio(Analyzable):
                     elif obj_type == "records":
                         new_obj = _index_records(obj)
                     else:
-                        raise TypeError(
-                            f"Cannot index in-output '{field}': " f"option 'obj_type={obj_type}' not supported"
-                        )
+                        raise TypeError(f"Cannot index in-output '{field}': option 'obj_type={obj_type}' not supported")
                 else:
                     if "_pcgs" in field:
                         if "_2d" in field:
@@ -2357,7 +2355,7 @@ class Portfolio(Analyzable):
 
                     if new_obj is None:
                         warnings.warn(
-                            f"Cannot figure out how to index in-output '{field}'. " f"Please provide a suffix.",
+                            f"Cannot figure out how to index in-output '{field}'. Please provide a suffix.",
                             stacklevel=2,
                         )
 
@@ -5055,7 +5053,7 @@ class Portfolio(Analyzable):
             if isinstance(call_seq, int):
                 if call_seq == CallSeqType.Auto:
                     raise ValueError(
-                        "CallSeqType.Auto must be implemented manually. " "Use sort_call_seq_nb in pre_segment_func_nb."
+                        "CallSeqType.Auto must be implemented manually. Use sort_call_seq_nb in pre_segment_func_nb."
                     )
         if attach_call_seq is None:
             attach_call_seq = portfolio_cfg["attach_call_seq"]

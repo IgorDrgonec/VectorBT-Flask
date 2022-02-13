@@ -1115,12 +1115,12 @@ class CABaseSetup(CAMetrics, Hashable):
         else:
             if caching_cfg["disable"] and not caching_cfg["disable_whitelist"] and not silence_warnings:
                 warnings.warn(
-                    "This operation has no effect: caching is disabled globally and this setup " "is not whitelisted",
+                    "This operation has no effect: caching is disabled globally and this setup is not whitelisted",
                     stacklevel=2,
                 )
         if caching_cfg["disable"] and caching_cfg["disable_whitelist"] and not silence_warnings:
             warnings.warn(
-                "This operation has no effect: caching and whitelisting " "are disabled globally",
+                "This operation has no effect: caching and whitelisting are disabled globally",
                 stacklevel=2,
             )
         object.__setattr__(self, "_use_cache_lut", datetime.now(timezone.utc))
@@ -2277,9 +2277,9 @@ class CARunSetup(CABaseSetup):
         if self.contains_garbage:
             return "_GARBAGE"
         if is_cacheable_property(self.cacheable):
-            return f"{type(self.instance_obj).__name__.lower()}." f"{self.cacheable.func.__name__}"
+            return f"{type(self.instance_obj).__name__.lower()}.{self.cacheable.func.__name__}"
         if is_cacheable_method(self.cacheable):
-            return f"{type(self.instance_obj).__name__.lower()}." f"{self.cacheable.func.__name__}()"
+            return f"{type(self.instance_obj).__name__.lower()}.{self.cacheable.func.__name__}()"
         return f"{self.cacheable.__name__}()"
 
     @property

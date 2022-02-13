@@ -480,7 +480,7 @@ class JITRegistry:
         if jitable_setup_hash in self.jitted_setups:
             if jitted_setup_hash in self.jitted_setups[jitable_setup_hash]:
                 raise ValueError(
-                    f"Jitted setup with task id '{jitable_setup.task_id}' and " f"jitter {jitter} already registered"
+                    f"Jitted setup with task id '{jitable_setup.task_id}' and jitter {jitter} already registered"
                 )
         if jitable_setup_hash not in self.jitted_setups:
             self.jitted_setups[jitable_setup_hash] = dict()
@@ -632,7 +632,7 @@ class JITRegistry:
         if jitter is None:
             if len(task_setups) > 1:
                 raise ValueError(
-                    f"There are multiple registered setups for task id '{task_id}'. " f"Please specify the jitter."
+                    f"There are multiple registered setups for task id '{task_id}'. Please specify the jitter."
                 )
             elif len(task_setups) == 0:
                 raise ValueError(f"There are no registered setups for task id '{task_id}'")
@@ -644,16 +644,14 @@ class JITRegistry:
             jitter_id = get_id_of_jitter_type(jitter_type)
             if jitter_id not in task_setups:
                 if not allow_new:
-                    raise KeyError(
-                        f"Jitable setup with task id '{task_id}' and " f"jitter id '{jitter_id}' not registered"
-                    )
+                    raise KeyError(f"Jitable setup with task id '{task_id}' and jitter id '{jitter_id}' not registered")
                 jitable_setup = None
             else:
                 jitable_setup = task_setups[jitter_id]
         if jitter_id is None:
             raise ValueError("Jitter id cannot be None: is jitter registered globally?")
         if jitable_setup is None and py_func is None:
-            raise ValueError(f"Unable to find Python function for task id '{task_id}' " f"and jitter id '{jitter_id}'")
+            raise ValueError(f"Unable to find Python function for task id '{task_id}' and jitter id '{jitter_id}'")
 
         template_context = merge_dicts(
             template_context,

@@ -60,7 +60,7 @@ def assert_can_import(pkg_name: str) -> None:
         raise KeyError(f"Package '{pkg_name}' not found in opt_package_config")
     if not check_installed(pkg_name):
         raise ImportError(
-            f"Please install {opt_package_config[pkg_name]['name']}: " f"{opt_package_config[pkg_name]['link']}"
+            f"Please install {opt_package_config[pkg_name]['name']}: {opt_package_config[pkg_name]['link']}"
         )
 
 
@@ -70,6 +70,6 @@ def warn_cannot_import(pkg_name: str) -> None:
         raise KeyError(f"Package '{pkg_name}' not found in opt_package_config")
     if not check_installed(pkg_name):
         warnings.warn(
-            f"Consider installing {opt_package_config[pkg_name]['name']}: " f"{opt_package_config[pkg_name]['link']}",
+            f"Consider installing {opt_package_config[pkg_name]['name']}: {opt_package_config[pkg_name]['link']}",
             stacklevel=2,
         )

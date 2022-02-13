@@ -31,5 +31,5 @@ def check_mkdir(
     if dir_path.exists() and not dir_path.is_dir():
         raise TypeError(f"Path '{dir_path}' is not a directory")
     if not dir_path.exists() and not mkdir:
-        raise ValueError(f"Path '{dir_path}' not exists. " f"Pass mkdir=True to create parent directories.")
+        raise ValueError(f"Path '{dir_path}' not exists. Pass mkdir=True to create parent directories.")
     dir_path.mkdir(mode=mode, parents=parents, exist_ok=exist_ok)

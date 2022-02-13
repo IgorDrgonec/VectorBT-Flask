@@ -517,7 +517,7 @@ class SequenceTaker(ContainerTaker):
             else:
                 if not silence_warnings:
                     warnings.warn(
-                        f"Argument at index {i} not found in SequenceTaker.cont_take_spec. " f"Setting to None.",
+                        f"Argument at index {i} not found in SequenceTaker.cont_take_spec. Setting to None.",
                         stacklevel=2,
                     )
                 take_spec = None
@@ -540,7 +540,7 @@ class MappingTaker(ContainerTaker):
             else:
                 if not silence_warnings:
                     warnings.warn(
-                        f"Argument with key '{k}' not found in MappingTaker.cont_take_spec. " f"Setting to None.",
+                        f"Argument with key '{k}' not found in MappingTaker.cont_take_spec. Setting to None.",
                         stacklevel=2,
                     )
                 take_spec = None
@@ -607,7 +607,7 @@ def take_from_args(
                     found_take_spec = take_spec
                     break
         if not take_spec_found and not silence_warnings:
-            warnings.warn(f"Argument '{arg_name}' not found in arg_take_spec. " f"Setting to None.", stacklevel=2)
+            warnings.warn(f"Argument '{arg_name}' not found in arg_take_spec. Setting to None.", stacklevel=2)
         result = take_from_arg(
             ann_arg["value"],
             found_take_spec,

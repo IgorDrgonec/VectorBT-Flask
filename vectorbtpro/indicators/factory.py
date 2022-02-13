@@ -634,7 +634,7 @@ def run_pipeline(
         if kwargs.get("return_cache", False):
             if use_run_unique and not silence_warnings:
                 warnings.warn(
-                    "Cache is produced by unique parameter " "combinations when run_unique=True",
+                    "Cache is produced by unique parameter combinations when run_unique=True",
                     stacklevel=2,
                 )
             return output
@@ -653,8 +653,7 @@ def run_pipeline(
                 other_list = output_list[num_ret_outputs:]
                 if use_run_unique and not silence_warnings:
                     warnings.warn(
-                        "Additional output objects are produced by unique parameter "
-                        "combinations when run_unique=True",
+                        "Additional output objects are produced by unique parameter combinations when run_unique=True",
                         stacklevel=2,
                     )
             else:
@@ -688,7 +687,7 @@ def run_pipeline(
         if return_raw:
             if use_run_unique and not silence_warnings:
                 warnings.warn(
-                    "Raw output is produced by unique parameter " "combinations when run_unique=True",
+                    "Raw output is produced by unique parameter combinations when run_unique=True",
                     stacklevel=2,
                 )
             return raw
@@ -1640,7 +1639,7 @@ class IndicatorFactory(Configured):
             args = args[len(in_output_names) :]
             if not var_args and len(args) > 0:
                 raise TypeError(
-                    "Variable length arguments are not supported by this function " "(var_args is set to False)"
+                    "Variable length arguments are not supported by this function (var_args is set to False)"
                 )
 
             return inputs, in_outputs, params, args
