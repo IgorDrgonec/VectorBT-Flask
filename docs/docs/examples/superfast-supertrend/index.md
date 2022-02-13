@@ -1,9 +1,9 @@
 ---
-title: Superfast SuperTrend
-description: How to design and implement the fastest SuperTrend indicator on Earth
+title: SuperFast SuperTrend
+description: How to design, implement, and backtest the fastest SuperTrend indicator in Python
 ---
 
-# Superfast SuperTrend
+# SuperFast SuperTrend
 
 While Python is slower than many compiled languages, it's easy to use and extremely diverse. 
 For many, especially in the data science domain, the practicality of the language beats the 
@@ -13,16 +13,18 @@ Unfortunately for quants, Python becomes a real bottleneck when iterating over (
 For this reason, there is an entire ecosystem of scientific packages such as NumPy and Pandas, 
 which are highly optimized for performance, with critical code paths often written in Cython or C.
 Those packages mostly work on arrays, giving us a common interface for processing data in
-an efficient manner. This ability is highly appreciated when constructing indicators that can
-be translated into a set of vectorized operations, such as [OBV](https://www.investopedia.com/terms/o/onbalancevolume.asp).
+an efficient manner. 
+
+This ability is highly appreciated when constructing indicators that can be translated into a set of 
+vectorized operations, such as [OBV](https://www.investopedia.com/terms/o/onbalancevolume.asp).
 But even non-vectorized operations, such as the exponential weighted moving average (EMA) powering 
 numerous indicators such as [MACD](https://www.investopedia.com/terms/m/macd.asp), were implemented 
-in a compiled language and are offered as a ready-to-use Python function.
+in a compiled language and are offered as a ready-to-use Python function. But sometimes, an indicator 
+is difficult or even impossible to develop solely using standard array operations because the indicator 
+introduces a path dependency, where a decision today depends upon a decision made yesterday. One member 
+of such a family of indicators is SuperTrend.
 
-But sometimes, an indicator is difficult or even impossible to develop solely using standard array 
-operations because the indicator introduces a path dependency, where a decision today 
-depends upon a decision made yesterday. One member of such a family of indicators is SuperTrend.
-This example will show you how to design and implement a SuperTrend indicator, and gradually 
+In this example, you will learn how to design and implement a SuperTrend indicator, and gradually 
 optimize it towards a never-seen performance using [TA-Lib](https://github.com/mrjbq7/ta-lib) 
 and [Numba](http://numba.pydata.org/). We will also backtest the newly created indicator on a range 
 of parameters using vectorbt (PRO).
