@@ -14,7 +14,7 @@ locked_notebooks = {
 
 
 def get_gists():
-    url = 'https://api.github.com/gists?since=2022-01-01T00:00:00Z'
+    url = 'https://api.github.com/gists?since=2022-01-01T00:00:00Z&per_page=100'
     payload = {}
     headers = {
         'Accept': 'application/vnd.github.v3+json',
