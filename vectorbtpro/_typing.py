@@ -141,7 +141,6 @@ PathLike = Union[str, Path]
 # Data
 Symbol = Hashable
 Symbols = Sequence[Symbol]
-DataDict = Dict[Symbol, SeriesFrame]
 
 # Plotting
 TraceName = Union[str, None]

@@ -78,10 +78,10 @@ class MyData(vbt.Data):
 
     def update_symbol(self, symbol, n=1, **kwargs):
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        fetch_kwargs["start_date"] = self.last_index[symbol]
+        start_date = self.last_index[symbol]
         shape = fetch_kwargs.pop("shape", (5, 3))
         new_shape = (n, shape[1]) if len(shape) > 1 else (n,)
-        kwargs = merge_dicts(fetch_kwargs, kwargs)
+        kwargs = merge_dicts(fetch_kwargs, dict(start_date=start_date), kwargs)
         return self.fetch_symbol(symbol, shape=new_shape, is_update=True, **kwargs)
 
 
@@ -797,6 +797,12 @@ class TestData:
         assert data.select([0]) != MyData.fetch(0, shape=(5, 3), columns=["feat0", "feat1", "feat2"])
         assert data.select([0, 2]) == MyData.fetch([0, 2], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
         assert data.select([0, 2]) != MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
+
+    def test_merge(self):
+        data = MyData.fetch([0, 1, 2], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
+        data0 = MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
+        data12 = MyData.fetch([2], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
+        assert MyData.merge(data0, data12) == data
 
     def test_to_csv(self, tmp_path):
         data = MyData.fetch(["S1", "S2"], shape=(5, 3), columns=["feat0", "feat1", "feat2"])

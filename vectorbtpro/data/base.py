@@ -41,19 +41,22 @@ class Data(Analyzable):
     def __init__(
         self,
         wrapper: ArrayWrapper,
-        data: tp.DataDict,
+        data: symbol_dict,
         single_symbol: bool,
         tz_localize: tp.Optional[tp.TimezoneLike],
         tz_convert: tp.Optional[tp.TimezoneLike],
         missing_index: str,
         missing_columns: str,
-        fetch_kwargs: tp.Kwargs,
-        last_index: tp.Dict[tp.Symbol, int],
-        returned_kwargs: tp.Dict[tp.Symbol, tp.Any],
+        fetch_kwargs: symbol_dict,
+        returned_kwargs: symbol_dict,
+        last_index: symbol_dict,
         **kwargs,
     ) -> None:
 
         checks.assert_instance_of(data, dict)
+        checks.assert_instance_of(fetch_kwargs, dict)
+        checks.assert_instance_of(returned_kwargs, dict)
+        checks.assert_instance_of(last_index, dict)
         for symbol, obj in data.items():
             checks.assert_meta_equal(obj, data[list(data.keys())[0]])
 
@@ -67,20 +70,20 @@ class Data(Analyzable):
             missing_index=missing_index,
             missing_columns=missing_columns,
             fetch_kwargs=fetch_kwargs,
-            last_index=last_index,
             returned_kwargs=returned_kwargs,
+            last_index=last_index,
             **kwargs,
         )
 
-        self._data = data
+        self._data = symbol_dict(data)
         self._single_symbol = single_symbol
         self._tz_localize = tz_localize
         self._tz_convert = tz_convert
         self._missing_index = missing_index
         self._missing_columns = missing_columns
-        self._fetch_kwargs = fetch_kwargs
-        self._last_index = last_index
-        self._returned_kwargs = returned_kwargs
+        self._fetch_kwargs = symbol_dict(fetch_kwargs)
+        self._returned_kwargs = symbol_dict(returned_kwargs)
+        self._last_index = symbol_dict(last_index)
 
     def indexing_func(self: DataT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> DataT:
         """Perform indexing on `Data`."""
@@ -89,8 +92,8 @@ class Data(Analyzable):
         return self.replace(wrapper=new_wrapper, data=new_data)
 
     @property
-    def data(self) -> tp.DataDict:
-        """Data dictionary keyed by symbol."""
+    def data(self) -> symbol_dict:
+        """Data dictionary keyed by symbol of type `symbol_dict`."""
         return self._data
 
     @property
@@ -124,19 +127,19 @@ class Data(Analyzable):
         return self._missing_columns
 
     @property
-    def fetch_kwargs(self) -> tp.Kwargs:
-        """Keyword arguments initially passed to `Data.fetch_symbol`."""
+    def fetch_kwargs(self) -> symbol_dict:
+        """Keyword arguments of type `symbol_dict` initially passed to `Data.fetch_symbol`."""
         return self._fetch_kwargs
 
     @property
-    def last_index(self) -> tp.Dict[tp.Symbol, int]:
-        """Last fetched index per symbol."""
-        return self._last_index
+    def returned_kwargs(self) -> symbol_dict:
+        """Keyword arguments of type `symbol_dict` returned by `Data.fetch_symbol`."""
+        return self._returned_kwargs
 
     @property
-    def returned_kwargs(self) -> tp.Dict[tp.Symbol, tp.Any]:
-        """Keyword arguments returned by `Data.fetch_symbol` along with the data."""
-        return self._returned_kwargs
+    def last_index(self) -> symbol_dict:
+        """Last fetched index per symbol of type `symbol_dict`."""
+        return self._last_index
 
     # ############# Pre- and post-processing ############# #
 
@@ -172,7 +175,7 @@ class Data(Analyzable):
         return obj
 
     @classmethod
-    def align_index(cls, data: tp.DataDict, missing: tp.Optional[str] = None) -> tp.DataDict:
+    def align_index(cls, data: symbol_dict, missing: tp.Optional[str] = None) -> symbol_dict:
         """Align data to have the same index.
 
         The argument `missing` accepts the following values:
@@ -213,11 +216,11 @@ class Data(Analyzable):
                         raise ValueError(f"missing='{missing}' is not recognized")
 
         # reindex
-        new_data = {symbol: obj.reindex(index=index) for symbol, obj in data.items()}
+        new_data = symbol_dict({symbol: obj.reindex(index=index) for symbol, obj in data.items()})
         return new_data
 
     @classmethod
-    def align_columns(cls, data: tp.DataDict, missing: tp.Optional[str] = None) -> tp.DataDict:
+    def align_columns(cls, data: symbol_dict, missing: tp.Optional[str] = None) -> symbol_dict:
         """Align data to have the same columns.
 
         See `Data.align_index` for `missing`."""
@@ -263,7 +266,7 @@ class Data(Analyzable):
                         raise ValueError(f"missing='{missing}' is not recognized")
 
         # reindex
-        new_data = {}
+        new_data = symbol_dict()
         for symbol, obj in data.items():
             if isinstance(obj, pd.Series):
                 obj = obj.to_frame(name=obj.name)
@@ -278,6 +281,8 @@ class Data(Analyzable):
     @staticmethod
     def select_symbol_kwargs(symbol: tp.Symbol, kwargs: tp.DictLike) -> dict:
         """Select keyword arguments belonging to `symbol`."""
+        if isinstance(kwargs, symbol_dict):
+            kwargs = kwargs[symbol]
         if kwargs is None:
             kwargs = {}
         _kwargs = {}
@@ -292,16 +297,16 @@ class Data(Analyzable):
     @classmethod
     def from_data(
         cls: tp.Type[DataT],
-        data: tp.DataDict,
+        data: symbol_dict,
         single_symbol: bool = False,
         tz_localize: tp.Optional[tp.TimezoneLike] = None,
         tz_convert: tp.Optional[tp.TimezoneLike] = None,
         missing_index: tp.Optional[str] = None,
         missing_columns: tp.Optional[str] = None,
         wrapper_kwargs: tp.KwargsLike = None,
-        fetch_kwargs: tp.KwargsLike = None,
-        last_index: tp.Optional[tp.Dict[tp.Symbol, int]] = None,
-        returned_kwargs: tp.Optional[tp.Dict[tp.Symbol, tp.Any]] = None,
+        fetch_kwargs: tp.Optional[symbol_dict] = None,
+        returned_kwargs: tp.Optional[symbol_dict] = None,
+        last_index: tp.Optional[symbol_dict] = None,
         **kwargs,
     ) -> DataT:
         """Create a new `Data` instance from data.
@@ -314,22 +319,22 @@ class Data(Analyzable):
             missing_index (str): See `Data.align_index`.
             missing_columns (str): See `Data.align_columns`.
             wrapper_kwargs (dict): Keyword arguments passed to `vectorbtpro.base.wrapping.ArrayWrapper`.
-            fetch_kwargs (dict): Keyword arguments initially passed to `Data.fetch_symbol`.
-            last_index (dict): Last fetched index per symbol.
-            returned_kwargs (dict): Keyword arguments returned by `Data.fetch_symbol` along with the data.
+            fetch_kwargs (symbol_dict): Keyword arguments initially passed to `Data.fetch_symbol`.
+            returned_kwargs (symbol_dict): Keyword arguments returned by `Data.fetch_symbol`.
+            last_index (symbol_dict): Last fetched index per symbol.
             **kwargs: Keyword arguments passed to the `__init__` method.
 
         For defaults, see `vectorbtpro._settings.data`."""
         if wrapper_kwargs is None:
             wrapper_kwargs = {}
         if fetch_kwargs is None:
-            fetch_kwargs = {}
-        if last_index is None:
-            last_index = {}
+            fetch_kwargs = symbol_dict()
         if returned_kwargs is None:
-            returned_kwargs = {}
+            returned_kwargs = symbol_dict()
+        if last_index is None:
+            last_index = symbol_dict()
 
-        data = data.copy()
+        data = symbol_dict(data)
         for symbol, obj in data.items():
             obj = to_pd_array(obj)
             obj = cls.prepare_tzaware_index(obj, tz_localize=tz_localize, tz_convert=tz_convert)
@@ -355,8 +360,8 @@ class Data(Analyzable):
             missing_index=missing_index,
             missing_columns=missing_columns,
             fetch_kwargs=fetch_kwargs,
-            last_index=last_index,
             returned_kwargs=returned_kwargs,
+            last_index=last_index,
             **kwargs,
         )
 
@@ -424,8 +429,9 @@ class Data(Analyzable):
             show_progress = data_cfg["show_progress"] and not single_symbol
         pbar_kwargs = merge_dicts(data_cfg["pbar_kwargs"], pbar_kwargs)
 
-        data = {}
-        returned_kwargs = {}
+        data = symbol_dict()
+        fetch_kwargs = symbol_dict()
+        returned_kwargs = symbol_dict()
         with get_pbar(total=len(symbols), show_progress=show_progress, **pbar_kwargs) as pbar:
             for symbol in symbols:
                 if symbol is not None:
@@ -444,6 +450,7 @@ class Data(Analyzable):
                 else:
                     data[symbol] = out
                     returned_kwargs[symbol] = {}
+                fetch_kwargs[symbol] = _kwargs
 
                 pbar.update(1)
 
@@ -456,7 +463,7 @@ class Data(Analyzable):
             missing_index=missing_index,
             missing_columns=missing_columns,
             wrapper_kwargs=wrapper_kwargs,
-            fetch_kwargs=kwargs,
+            fetch_kwargs=fetch_kwargs,
             returned_kwargs=returned_kwargs,
         )
 
@@ -473,10 +480,10 @@ class Data(Analyzable):
             show_progress (bool): Whether to show the progress bar.
                 Defaults to False.
 
-                Will also forward this argument to `Data.update_symbol` if in `Data.fetch_kwargs`.
+                Will also forward this argument to `Data.update_symbol` if accepted by `Data.fetch_symbol`.
             pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`.
 
-                Will also forward this argument to `Data.update_symbol` if in `Data.fetch_kwargs`.
+                Will also forward this argument to `Data.update_symbol` if accepted by `Data.fetch_symbol`.
             **kwargs: Passed to `Data.update_symbol`.
 
                 If two symbols require different keyword arguments, pass `symbol_dict` for each argument.
@@ -489,9 +496,9 @@ class Data(Analyzable):
 
         pbar_kwargs = merge_dicts(data_cfg["pbar_kwargs"], pbar_kwargs)
 
-        new_data = {}
-        new_last_index = {}
-        new_returned_kwargs = {}
+        new_data = symbol_dict()
+        new_last_index = symbol_dict()
+        new_returned_kwargs = symbol_dict()
         with get_pbar(total=len(self.data), show_progress=show_progress, **pbar_kwargs) as pbar:
             for symbol, obj in self.data.items():
                 if symbol is not None:
@@ -543,9 +550,15 @@ class Data(Analyzable):
                 obj = obj[shared_columns]
                 new_obj = new_obj[shared_columns]
             elif isinstance(new_obj, pd.DataFrame):
-                new_obj = new_obj[obj.name]
+                if obj.name is not None:
+                    new_obj = new_obj[obj.name]
+                else:
+                    new_obj = new_obj[0]
             elif isinstance(obj, pd.DataFrame):
-                obj = obj[new_obj.name]
+                if new_obj.name is not None:
+                    obj = obj[new_obj.name]
+                else:
+                    obj = obj[0]
             obj = obj.loc[from_index:to_index]
             new_obj = pd.concat((obj, new_obj), axis=0)
             new_obj = new_obj[~new_obj.index.duplicated(keep="last")]
@@ -560,7 +573,10 @@ class Data(Analyzable):
             if isinstance(obj, pd.DataFrame) and isinstance(new_obj, pd.DataFrame):
                 new_obj = new_obj[obj.columns]
             elif isinstance(new_obj, pd.DataFrame):
-                new_obj = new_obj[obj.name]
+                if obj.name is not None:
+                    new_obj = new_obj[obj.name]
+                else:
+                    new_obj = new_obj[0]
             obj = obj.loc[:from_index]
             if obj.index[-1] == from_index:
                 obj = obj.iloc[:-1]
@@ -574,13 +590,13 @@ class Data(Analyzable):
         return self.replace(
             wrapper=self.wrapper.replace(index=new_index),
             data=new_data,
-            last_index=new_last_index,
             returned_kwargs=new_returned_kwargs,
+            last_index=new_last_index,
         )
 
     # ############# Getting ############# #
 
-    def concat(self, symbols: tp.Optional[tp.Symbols] = None, level_name: str = "symbol") -> tp.DataDict:
+    def concat(self, symbols: tp.Optional[tp.Symbols] = None, level_name: str = "symbol") -> dict:
         """Return a dict of Series/DataFrames with symbols as columns, keyed by column name."""
         if symbols is None:
             symbols = self.symbols
@@ -646,26 +662,48 @@ class Data(Analyzable):
     # ############# Selecting ############# #
 
     def select(self: DataT, symbols: tp.Union[tp.Symbol, tp.Symbols], **kwargs) -> DataT:
-        """Create a new instance with one or more symbols from this instance."""
+        """Create a new `Data` instance with one or more symbols from this instance."""
         if isinstance(symbols, list):
             single_symbol = False
         else:
             single_symbol = True
             symbols = [symbols]
-        fetch_kwargs = {}
-        for k, v in self.fetch_kwargs.items():
-            if isinstance(v, symbol_dict):
-                if single_symbol:
-                    v = symbol_dict({_k: _v for _k, _v in v.items() if _k in symbols})
-                else:
-                    v = v[symbols[0]]
-            fetch_kwargs[k] = v
         return self.replace(
-            data={k: v for k, v in self.data.items() if k in symbols},
+            data=symbol_dict({k: v for k, v in self.data.items() if k in symbols}),
             single_symbol=single_symbol,
+            fetch_kwargs=symbol_dict({k: v for k, v in self.fetch_kwargs.items() if k in symbols}),
+            returned_kwargs=symbol_dict({k: v for k, v in self.returned_kwargs.items() if k in symbols}),
+            last_index=symbol_dict({k: v for k, v in self.last_index.items() if k in symbols}),
+            **kwargs
+        )
+
+    # ############# Merging ############# #
+
+    @classmethod
+    def merge(cls: tp.Type[DataT], *datas: "Data", **kwargs) -> DataT:
+        """Merge multiple `Data` instances."""
+        if len(datas) < 2:
+            raise ValueError("Merging requires at least two Data instances")
+
+        data = symbol_dict()
+        fetch_kwargs = symbol_dict()
+        returned_kwargs = symbol_dict()
+        last_index = symbol_dict()
+        for instance in datas:
+            for s in instance.symbols:
+                if s in data:
+                    raise ValueError(f"Found a duplicate symbol '{s}'")
+                data[s] = instance.data[s]
+                fetch_kwargs[s] = instance.fetch_kwargs[s]
+                returned_kwargs[s] = instance.returned_kwargs[s]
+                last_index[s] = instance.last_index[s]
+
+        return cls.from_data(
+            data=data,
+            single_symbol=False,
             fetch_kwargs=fetch_kwargs,
-            last_index={k: v for k, v in self.last_index.items() if k in symbols},
-            returned_kwargs={k: v for k, v in self.returned_kwargs.items() if k in symbols},
+            returned_kwargs=returned_kwargs,
+            last_index=last_index,
             **kwargs
         )
 
