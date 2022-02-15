@@ -177,7 +177,12 @@ ${config_doc}
 
 _settings["jitting"] = jitting
 
-numba = dict(parallel=None, silence_warnings=False, check_func_type=True, check_func_suffix=False)
+numba = dict(
+    parallel=None,
+    silence_warnings=False,
+    check_func_type=True,
+    check_func_suffix=False,
+)
 """_"""
 
 __pdoc__["numba"] = Sub(
@@ -191,7 +196,9 @@ ${config_doc}
 _settings["numba"] = numba
 
 math = dict(
-    use_tol=True, rel_tol=1e-9, abs_tol=1e-12  # 1,000,000,000 == 1,000,000,001  # 0.000000000001 == 0.000000000002,
+    use_tol=True,
+    rel_tol=1e-9,
+    abs_tol=1e-12,  # 1,000,000,000 == 1,000,000,001  # 0.000000000001 == 0.000000000002,
 )
 """_"""
 
@@ -220,7 +227,12 @@ execution = dict(
                 n_chunks=None,
                 chunk_len=None,
             ),
-            dask=dict(cls=DaskEngine, compute_kwargs=Config(dict()), n_chunks=None, chunk_len=None),  # flex
+            dask=dict(
+                cls=DaskEngine,
+                compute_kwargs=Config(dict()),  # flex
+                n_chunks=None,
+                chunk_len=None,
+            ),
             ray=dict(
                 cls=RayEngine,
                 restart=False,
@@ -278,7 +290,10 @@ ${config_doc}
 
 _settings["chunking"] = chunking
 
-template = dict(strict=True, context=Config(dict()))  # flex
+template = dict(
+    strict=True,
+    context=Config(dict()),  # flex
+)
 """_"""
 
 __pdoc__["template"] = Sub(
@@ -305,7 +320,12 @@ ${config_doc}
 _settings["config"] = config
 
 configured = dict(
-    config=Config(dict(readonly_=True)),  # flex,
+    config=Config(  # flex
+        dict(
+            readonly_=True,
+            nested_=False
+        )
+    ),
 )
 """_"""
 
@@ -349,7 +369,12 @@ ${config_doc}
 
 _settings["broadcasting"] = broadcasting
 
-wrapping = dict(column_only_select=False, group_select=True, freq=None, silence_warnings=False)
+wrapping = dict(
+    column_only_select=False,
+    group_select=True,
+    freq=None,
+    silence_warnings=False,
+)
 """_"""
 
 __pdoc__["wrapping"] = Sub(
@@ -362,7 +387,10 @@ ${config_doc}
 
 _settings["wrapping"] = wrapping
 
-datetime = dict(naive_tz=get_local_tz(), to_py_timezone=True)
+datetime = dict(
+    naive_tz=get_local_tz(),
+    to_py_timezone=True,
+)
 """_"""
 
 __pdoc__["datetime"] = Sub(
@@ -384,9 +412,21 @@ data = dict(
     missing_columns="raise",
     custom=Config(  # flex
         dict(
-            binance=dict(dict(api_key=None, api_secret=None)),
-            ccxt=dict(dict(enableRateLimit=True)),
-            alpaca=Config(dict(key_id=None, secret_key=None)),
+            binance=dict(
+                dict(
+                    api_key=None,
+                    api_secret=None,
+                )
+            ),
+            ccxt=dict(
+                dict(
+                    enableRateLimit=True,
+                )
+            ),
+            alpaca=dict(
+                key_id=None,
+                secret_key=None,
+            ),
         )
     ),
     stats=Config(dict()),  # flex
@@ -419,9 +459,20 @@ plotting = dict(
     use_widgets=True,
     show_kwargs=Config(dict()),  # flex
     use_gl=None,
-    color_schema=Config(dict(increasing="#1b9e76", decreasing="#d95f02")),  # flex
+    color_schema=Config(  # flex
+        dict(
+            increasing="#1b9e76",
+            decreasing="#d95f02",
+        )
+    ),
     contrast_color_schema=Config(  # flex
-        dict(blue="#4285F4", orange="#FFAA00", green="#37B13F", red="#EA4335", gray="#E2E2E2")
+        dict(
+            blue="#4285F4",
+            orange="#FFAA00",
+            green="#37B13F",
+            red="#EA4335",
+            gray="#E2E2E2",
+        )
     ),
     themes=dict(
         light=dict(
@@ -480,8 +531,20 @@ plotting = dict(
         dict(
             width=700,
             height=350,
-            margin=dict(t=30, b=30, l=30, r=30),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, traceorder="normal"),
+            margin=dict(
+                t=30,
+                b=30,
+                l=30,
+                r=30,
+            ),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1,
+                traceorder="normal",
+            ),
         )
     ),
 )
@@ -518,7 +581,12 @@ stats_builder = dict(
             ),
         )
     ),
-    settings=Config(dict(to_timedelta=None, use_caching=True)),  # flex
+    settings=Config(  # flex
+        dict(
+            to_timedelta=None,
+            use_caching=True,
+        )
+    ),
     metric_settings=Config(dict()),  # flex
 )
 """_"""
@@ -591,10 +659,15 @@ generic = dict(
         dict(
             filters=dict(
                 has_mapping=dict(
-                    filter_func=lambda self, metric_settings: metric_settings.get("mapping", self.mapping) is not None,
+                    filter_func=lambda self, metric_settings: metric_settings.get(
+                        "mapping", self.mapping
+                    )
+                    is not None,
                 )
             ),
-            settings=dict(incl_all_keys=False),
+            settings=dict(
+                incl_all_keys=False,
+            ),
         )
     ),
     plots=Config(dict()),  # flex
@@ -611,7 +684,10 @@ ${config_doc}
 
 _settings["generic"] = generic
 
-ranges = dict(stats=Config(dict()), plots=Config(dict()))  # flex  # flex
+ranges = dict(
+    stats=Config(dict()),  # flex
+    plots=Config(dict()),  # flex
+)
 """_"""
 
 __pdoc__["ranges"] = Sub(
@@ -624,7 +700,16 @@ ${config_doc}
 
 _settings["ranges"] = ranges
 
-drawdowns = dict(stats=Config(dict(settings=dict(incl_active=False))), plots=Config(dict()))  # flex  # flex
+drawdowns = dict(
+    stats=Config(  # flex
+        dict(
+            settings=dict(
+                incl_active=False,
+            )
+        )
+    ),
+    plots=Config(dict()),  # flex
+)
 """_"""
 
 __pdoc__["drawdowns"] = Sub(
@@ -639,7 +724,13 @@ _settings["drawdowns"] = drawdowns
 
 ohlcv = dict(
     plot_type="OHLC",
-    column_names=dict(open="Open", high="High", low="Low", close="Close", volume="Volume"),
+    column_names=dict(
+        open="Open",
+        high="High",
+        low="Low",
+        close="Close",
+        volume="Volume",
+    ),
     stats=Config(dict()),  # flex
     plots=Config(dict()),  # flex
 )
@@ -656,16 +747,21 @@ ${config_doc}
 _settings["ohlcv"] = ohlcv
 
 signals = dict(
-    stats=Config(
+    stats=Config(  # flex
         dict(
             filters=dict(
                 silent_has_other=dict(
-                    filter_func=lambda self, metric_settings: metric_settings.get("other", None) is not None,
+                    filter_func=lambda self, metric_settings: metric_settings.get("other", None)
+                    is not None,
                 ),
             ),
-            settings=dict(other=None, other_name="Other", from_other=False),
+            settings=dict(
+                other=None,
+                other_name="Other",
+                from_other=False,
+            ),
         )
-    ),  # flex
+    ),
     plots=Config(dict()),  # flex
 )
 """_"""
@@ -703,12 +799,16 @@ returns = dict(
                     warning_message=Sub("Metric '$metric_name' requires year frequency to be set"),
                 ),
                 has_bm_returns=dict(
-                    filter_func=lambda self, metric_settings: metric_settings.get("bm_returns", self.bm_returns)
+                    filter_func=lambda self, metric_settings: metric_settings.get(
+                        "bm_returns", self.bm_returns
+                    )
                     is not None,
                     warning_message=Sub("Metric '$metric_name' requires bm_returns to be set"),
                 ),
             ),
-            settings=dict(check_is_not_grouped=True),
+            settings=dict(
+                check_is_not_grouped=True,
+            ),
         )
     ),
     plots=Config(dict()),  # flex
@@ -740,7 +840,10 @@ ${config_doc}
 
 _settings["qs_adapter"] = qs_adapter
 
-records = dict(stats=Config(dict()), plots=Config(dict()))  # flex  # flex
+records = dict(
+    stats=Config(dict()),  # flex
+    plots=Config(dict()),  # flex
+)
 """_"""
 
 __pdoc__["records"] = Sub(
@@ -758,10 +861,15 @@ mapped_array = dict(
         dict(
             filters=dict(
                 has_mapping=dict(
-                    filter_func=lambda self, metric_settings: metric_settings.get("mapping", self.mapping) is not None,
+                    filter_func=lambda self, metric_settings: metric_settings.get(
+                        "mapping", self.mapping
+                    )
+                    is not None,
                 )
             ),
-            settings=dict(incl_all_keys=False),
+            settings=dict(
+                incl_all_keys=False,
+            ),
         )
     ),
     plots=Config(dict()),  # flex
@@ -778,7 +886,10 @@ ${config_doc}
 
 _settings["mapped_array"] = mapped_array
 
-orders = dict(stats=Config(dict()), plots=Config(dict()))  # flex  # flex
+orders = dict(
+    stats=Config(dict()),  # flex
+    plots=Config(dict()),  # flex
+)
 """_"""
 
 __pdoc__["orders"] = Sub(
@@ -794,8 +905,12 @@ _settings["orders"] = orders
 trades = dict(
     stats=Config(  # flex
         dict(
-            settings=dict(incl_open=False),
-            template_context=dict(incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")),
+            settings=dict(
+                incl_open=False,
+            ),
+            template_context=dict(
+                incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")
+            ),
         )
     ),
     plots=Config(dict()),  # flex
@@ -812,7 +927,9 @@ ${config_doc}
 
 _settings["trades"] = trades
 
-logs = dict(stats=Config(dict()))  # flex
+logs = dict(
+    stats=Config(dict()),  # flex
+)
 """_"""
 
 __pdoc__["logs"] = Sub(
@@ -883,7 +1000,11 @@ portfolio = dict(
     flexible=False,
     seed=None,
     group_by=None,
-    broadcast_kwargs=Config(dict(require_kwargs=dict(requirements="W"))),  # flex
+    broadcast_kwargs=Config(  # flex
+        dict(
+            require_kwargs=dict(requirements="W"),
+        )
+    ),
     template_context=Config(dict()),  # flex
     keep_inout_raw=True,
     call_seq="default",
@@ -898,20 +1019,35 @@ portfolio = dict(
         dict(
             filters=dict(
                 has_year_freq=dict(
-                    filter_func=lambda self, metric_settings: metric_settings.get("year_freq", None) is not None,
+                    filter_func=lambda self, metric_settings: metric_settings.get("year_freq", None)
+                    is not None,
                     warning_message=Sub("Metric '$metric_name' requires year frequency to be set"),
                 ),
                 has_bm_returns=dict(
-                    filter_func=lambda self, metric_settings: metric_settings.get("bm_returns", self.bm_returns)
+                    filter_func=lambda self, metric_settings: metric_settings.get(
+                        "bm_returns", self.bm_returns
+                    )
                     is not None,
                     warning_message=Sub("Metric '$metric_name' requires bm_returns to be set"),
                 ),
             ),
-            settings=dict(use_asset_returns=False, incl_open=False),
-            template_context=dict(incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")),
+            settings=dict(
+                use_asset_returns=False,
+                incl_open=False,
+            ),
+            template_context=dict(
+                incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")
+            ),
         )
     ),
-    plots=Config(dict(subplots=["orders", "trade_pnl", "cum_returns"], settings=dict(use_asset_returns=False))),  # flex
+    plots=Config(  # flex
+        dict(
+            subplots=["orders", "trade_pnl", "cum_returns"],
+            settings=dict(
+                use_asset_returns=False,
+            ),
+        )
+    ),
 )
 """_"""
 
@@ -935,7 +1071,10 @@ messaging = dict(
             drop_pending_updates=True,
         )
     ),
-    giphy=dict(api_key=None, weirdness=5),
+    giphy=dict(
+        api_key=None,
+        weirdness=5,
+    ),
 )
 """_"""
 
@@ -962,7 +1101,11 @@ GIPHY:
 
 _settings["messaging"] = messaging
 
-pbar = dict(disable=False, type="tqdm_auto", kwargs=Config(dict()))  # flex
+pbar = dict(
+    disable=False,
+    type="tqdm_auto",
+    kwargs=Config(dict()),  # flex
+)
 """_"""
 
 __pdoc__["pbar"] = Sub(
@@ -975,7 +1118,14 @@ ${config_doc}
 
 _settings["pbar"] = pbar
 
-path = dict(mkdir=dict(mkdir=False, mode=0o777, parents=True, exist_ok=True))
+path = dict(
+    mkdir=dict(
+        mkdir=False,
+        mode=0o777,
+        parents=True,
+        exist_ok=True,
+    ),
+)
 """_"""
 
 __pdoc__["path"] = Sub(
@@ -998,7 +1148,9 @@ class SettingsConfig(Config):
     def load_json_templates(self) -> None:
         """Load templates from JSON files."""
         for template_name in ["light", "dark", "seaborn"]:
-            template = Config(json.loads(pkgutil.get_data(__name__, f"templates/{template_name}.json")))
+            template = Config(
+                json.loads(pkgutil.get_data(__name__, f"templates/{template_name}.json"))
+            )
             self["plotting"]["themes"][template_name]["template"] = template
 
     def register_template(self, theme: str) -> None:
@@ -1006,7 +1158,9 @@ class SettingsConfig(Config):
         import plotly.io as pio
         import plotly.graph_objects as go
 
-        pio.templates["vbt_" + theme] = go.layout.Template(self["plotting"]["themes"][theme]["template"])
+        pio.templates["vbt_" + theme] = go.layout.Template(
+            self["plotting"]["themes"][theme]["template"]
+        )
 
     def register_templates(self) -> None:
         """Register templates of all themes."""
@@ -1028,7 +1182,9 @@ class SettingsConfig(Config):
         for k, v in __pdoc__.items():
             if k in self:
                 config_doc = self[k].prettify(**prettify_kwargs.get(k, {}))
-                __pdoc__[k] = deep_substitute(v, context=dict(config_doc=config_doc), sub_id="__pdoc__")
+                __pdoc__[k] = deep_substitute(
+                    v, context=dict(config_doc=config_doc), sub_id="__pdoc__"
+                )
 
 
 settings = SettingsConfig(

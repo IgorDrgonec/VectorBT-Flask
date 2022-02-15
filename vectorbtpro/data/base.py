@@ -5,324 +5,11 @@
 Class `Data` allows storing, downloading, updating, and managing data. It stores data
 as a dictionary of Series/DataFrames keyed by symbol, and makes sure that
 all pandas objects have the same index and columns by aligning them.
-
-## Downloading
-
-Data can be fetched by overriding the `Data.fetch_symbol` class method. What `Data` does
-under the hood is iterating over all symbols and calling this method.
-
-Let's create a simple data class `RandomSNData` that generates price based on
-standard-normally distributed returns:
-
-```pycon
->>> import numpy as np
->>> import pandas as pd
->>> import vectorbtpro as vbt
-
->>> class RandomSNData(vbt.Data):
-...     @classmethod
-...     def fetch_symbol(cls, symbol, start_value=100, start_dt='2021-01-01', end_dt='2021-01-10'):
-...         index = pd.date_range(start_dt, end_dt)
-...         rand_returns = np.random.standard_normal(size=len(index))
-...         rand_price = start_value + np.cumprod(rand_returns + 1)
-...         return pd.Series(rand_price, index=index)
-
->>> rand_data = RandomSNData.fetch(['RANDNX1', 'RANDNX2'])
-```
-
-[=100% "100%"]{: .candystripe}
-
-```pycon
->>> rand_data.get()
-symbol         RANDNX1     RANDNX2
-2021-01-01  101.042956  100.920462
-2021-01-02  100.987327  100.956455
-2021-01-03  101.022333  100.955128
-2021-01-04  101.084243  100.791793
-2021-01-05  101.158619  100.781000
-2021-01-06  101.172688  100.786198
-2021-01-07  101.311609  100.848192
-2021-01-08  101.331841  100.861500
-2021-01-09  101.440530  100.944935
-2021-01-10  101.585689  100.993223
-```
-
-To provide different keyword arguments for different symbols, we can use `symbol_dict`:
-
-```pycon
->>> start_value = vbt.symbol_dict({'RANDNX2': 200})
->>> rand_data = RandomSNData.fetch(['RANDNX1', 'RANDNX2'], start_value=start_value)
-```
-
-[=100% "100%"]{: .candystripe}
-
-```pycon
->>> rand_data.get()
-symbol         RANDNX1     RANDNX2
-2021-01-01  101.083324  200.886078
-2021-01-02  101.113405  200.791934
-2021-01-03  101.169194  200.852877
-2021-01-04  101.164033  200.820111
-2021-01-05  101.326248  201.060448
-2021-01-06  101.394482  200.876984
-2021-01-07  101.494227  200.845519
-2021-01-08  101.422012  200.963474
-2021-01-09  101.493162  200.790369
-2021-01-10  101.606052  200.752296
-```
-
-In case two symbols have different index or columns, they are automatically aligned based on
-`missing_index` and `missing_columns` respectively (see `vectorbtpro._settings.data`):
-
-```pycon
->>> start_dt = vbt.symbol_dict({'RANDNX2': '2021-01-03'})
->>> end_dt = vbt.symbol_dict({'RANDNX2': '2021-01-07'})
->>> rand_data = RandomSNData.fetch(
-...     ['RANDNX1', 'RANDNX2'], start_value=start_value,
-...     start_dt=start_dt, end_dt=end_dt)
-```
-
-[=100% "100%"]{: .candystripe}
-
-```pycon
->>> rand_data.get()
-UserWarning: Symbols have mismatching index. Setting missing data points to NaN.
-
-symbol         RANDNX1     RANDNX2
-2021-01-01  101.028054         NaN
-2021-01-02  101.032090         NaN
-2021-01-03  101.038531  200.936283
-2021-01-04  101.068265  200.926764
-2021-01-05  100.878492  200.898898
-2021-01-06  100.857444  200.922368
-2021-01-07  100.933123  200.987094
-2021-01-08  100.938034         NaN
-2021-01-09  101.044736         NaN
-2021-01-10  101.098133         NaN
-```
-
-## Updating
-
-Updating can be used to either update existing data points or to add new ones. It requires a
-starting timestamp or row, and assumes that all data points before this timestamp or row remain unchanged.
-
-Updating can be implemented by overriding the `Data.update_symbol` instance method, which mostly
-just prepares the arguments and calls `Data.fetch_symbol`. In contrast to the fetch method, the update
-method is an instance method and can access the data fetched earlier. It can also access the
-keyword arguments initially passed to the fetch method, accessible under `Data.fetch_kwargs`.
-Those arguments can be used as default arguments and overriden by arguments passed directly
-to the update method, using `vectorbtpro.utils.config.merge_dicts`. Any instance of `Data` also
-has the property `Data.last_index`, which contains the last fetched index for each symbol.
-We can use this index to as the starting point for the next update.
-
-Let's define an update method that updates the latest data point and adds a couple more.
-
-!!! note
-    Updating data always returns a new `Data` instance.
-
-```pycon
->>> from datetime import timedelta
->>> from vectorbtpro.utils.config import merge_dicts
-
->>> class RandomSNData(vbt.Data):
-...     @classmethod
-...     def fetch_symbol(cls, symbol, start_value=100, start_dt='2021-01-01', end_dt='2021-01-10'):
-...         index = pd.date_range(start_dt, end_dt)
-...         rand_returns = np.random.standard_normal(size=len(index))
-...         rand_price = start_value + np.cumprod(rand_returns + 1)
-...         return pd.Series(rand_price, index=index)
-...
-...     def update_symbol(self, symbol, days_more=2, **kwargs):
-...         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-...         fetch_kwargs['start_dt'] = self.last_index[symbol]
-...         fetch_kwargs['end_dt'] = fetch_kwargs['start_dt'] + timedelta(days=days_more)
-...         kwargs = merge_dicts(fetch_kwargs, kwargs)
-...         return self.fetch_symbol(symbol, **kwargs)
-
->>> rand_data = RandomSNData.fetch(['RANDNX1', 'RANDNX2'], end_dt='2021-01-05')
-```
-
-[=100% "100%"]{: .candystripe}
-
-```pycon
->>> rand_data.get()
-symbol         RANDNX1     RANDNX2
-2021-01-01  100.956601  100.970865
-2021-01-02  100.919011  100.987026
-2021-01-03  101.062733  100.835376
-2021-01-04  100.960535  100.820817
-2021-01-05  100.834387  100.866549
-
->>> rand_data = rand_data.update()
->>> rand_data.get()
-symbol         RANDNX1     RANDNX2
-2021-01-01  100.956601  100.970865
-2021-01-02  100.919011  100.987026
-2021-01-03  101.062733  100.835376
-2021-01-04  100.960535  100.820817
-2021-01-05  101.011255  100.887049  << updated last
-2021-01-06  101.004149  100.808410  << added new
-2021-01-07  101.023673  100.714583  << added new
-
->>> rand_data = rand_data.update()
->>> rand_data.get()
-symbol         RANDNX1     RANDNX2
-2021-01-01  100.956601  100.970865
-2021-01-02  100.919011  100.987026
-2021-01-03  101.062733  100.835376
-2021-01-04  100.960535  100.820817
-2021-01-05  101.011255  100.887049
-2021-01-06  101.004149  100.808410
-2021-01-07  100.883400  100.874922  << updated last
-2021-01-08  101.011738  100.780188  << added new
-2021-01-09  100.912639  100.934014  << added new
-```
-
-## Handling exceptions
-
-`Data.fetch` won't catch exceptions coming from `Data.fetch_symbol` - it's the task
-of `Data.fetch_symbol` to handle them. The best approach is to show a user warning
-whenever an exception has been thrown and return the data fetched up to this point in time
-(`vectorbtpro.data.custom.BinanceData` and `vectorbtpro.data.custom.CCXTData` do this).
-In such case, vectorbt will replace all missing data with NaN and keep track of the last valid index.
-You can then wait until your connection is stable and re-fetch the missing data using `Data.update`.
-
-## Merging
-
-You can merge symbols from different `Data` instances either by subclassing `Data` and
-defining custom fetch and update methods, or by manually merging their data dicts
-into one data dict and passing it to the `Data.from_data` class method.
-
-```pycon
->>> rand_data1 = RandomSNData.fetch('RANDNX1')
-```
-
-[=100% "100%"]{: .candystripe}
-
-```pycon
->>> rand_data2 = RandomSNData.fetch('RANDNX2', start_value=200, start_dt='2021-01-05')
-```
-
-[=100% "100%"]{: .candystripe}
-
-```pycon
->>> merged_data = vbt.Data.from_data(vbt.merge_dicts(rand_data1.data, rand_data2.data))
->>> merged_data.get()
-symbol         RANDNX1     RANDNX2
-2021-01-01  101.160718         NaN
-2021-01-02  101.421020         NaN
-2021-01-03  101.959176         NaN
-2021-01-04  102.076670         NaN
-2021-01-05  102.447234  200.916198
-2021-01-06  103.195187  201.033907
-2021-01-07  103.595915  200.908229
-2021-01-08  104.332550  201.000497
-2021-01-09  105.159708  201.019157
-2021-01-10  106.729495  200.910210
-```
-
-## Indexing
-
-Like any other class subclassing `vectorbtpro.base.wrapping.Wrapping`, we can do pandas indexing
-on a `Data` instance, which forwards indexing operation to each Series/DataFrame:
-
-```pycon
->>> rand_data.loc['2021-01-07':'2021-01-09']
-<__main__.RandomSNData at 0x7fdba4e36198>
-
->>> rand_data.loc['2021-01-07':'2021-01-09'].get()
-symbol         RANDNX1     RANDNX2
-2021-01-07  100.883400  100.874922
-2021-01-08  101.011738  100.780188
-2021-01-09  100.912639  100.934014
-```
-
-## Saving and loading
-
-Like any other class subclassing `vectorbtpro.utils.pickling.Pickleable`, we can save a `Data`
-instance to the disk with `Data.save` and load it with `Data.load`:
-
-```pycon
->>> rand_data.save('rand_data')
->>> rand_data = RandomSNData.load('rand_data')
->>> rand_data.get()
-symbol         RANDNX1     RANDNX2
-2021-01-01  100.956601  100.970865
-2021-01-02  100.919011  100.987026
-2021-01-03  101.062733  100.835376
-2021-01-04  100.960535  100.820817
-2021-01-05  101.011255  100.887049
-2021-01-06  101.004149  100.808410
-2021-01-07  100.883400  100.874922
-2021-01-08  101.011738  100.780188
-2021-01-09  100.912639  100.934014
-```
-
-Instead of pickling, we can save the actual pandas objects to CSV or HDF5 files:
-
-```pycon
->>> rand_data.to_hdf('rand_data.h5')
-
->>> with pd.HDFStore('rand_data.h5') as store:
-...     print(store.keys())
-['/RANDNX1', '/RANDNX2']
-```
-
-This data can be later easily retrieved, for example, using pandas or `vectorbtpro.data.custom.HDFData`.
-
-## Stats
-
-!!! hint
-    See `vectorbtpro.generic.stats_builder.StatsBuilderMixin.stats` and `Data.metrics`.
-
-```pycon
->>> rand_data = RandomSNData.fetch(['RANDNX1', 'RANDNX2'])
-```
-
-[=100% "100%"]{: .candystripe}
-
-```pycon
->>> rand_data.stats(column='a')
-Start                   2021-01-01 00:00:00+00:00
-End                     2021-01-10 00:00:00+00:00
-Period                           10 days 00:00:00
-Total Symbols                                   2
-Null Counts: RANDNX1                            0
-Null Counts: RANDNX2                            0
-dtype: object
-```
-
-`Data.stats` also supports (re-)grouping:
-
-```pycon
->>> rand_data.stats(group_by=True)
-Start                   2021-01-01 00:00:00+00:00
-End                     2021-01-10 00:00:00+00:00
-Period                           10 days 00:00:00
-Total Symbols                                   2
-Null Counts: RANDNX1                            0
-Null Counts: RANDNX2                            0
-Name: group, dtype: object
-```
-
-## Plots
-
-!!! hint
-    See `vectorbtpro.generic.plots_builder.PlotsBuilderMixin.plots` and `Data.subplots`.
-
-`Data` class has a single subplot based on `Data.plot`:
-
-```pycon
->>> rand_data.plots(settings=dict(base=100)).show()
-```
-
-![](/assets/images/data_plots.svg)
 """
 
 import warnings
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
@@ -450,6 +137,8 @@ class Data(Analyzable):
     def returned_kwargs(self) -> tp.Dict[tp.Symbol, tp.Any]:
         """Keyword arguments returned by `Data.fetch_symbol` along with the data."""
         return self._returned_kwargs
+
+    # ############# Pre- and post-processing ############# #
 
     @classmethod
     def prepare_tzaware_index(
@@ -671,6 +360,8 @@ class Data(Analyzable):
             **kwargs,
         )
 
+    # ############# Fetching ############# #
+
     @classmethod
     def fetch_symbol(cls, symbol: tp.Symbol, **kwargs) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
         """Fetch a symbol.
@@ -768,6 +459,8 @@ class Data(Analyzable):
             fetch_kwargs=kwargs,
             returned_kwargs=returned_kwargs,
         )
+
+    # ############# Updating ############# #
 
     def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
         """Update a symbol."""
@@ -885,6 +578,8 @@ class Data(Analyzable):
             returned_kwargs=new_returned_kwargs,
         )
 
+    # ############# Getting ############# #
+
     def concat(self, symbols: tp.Optional[tp.Symbols] = None, level_name: str = "symbol") -> tp.DataDict:
         """Return a dict of Series/DataFrames with symbols as columns, keyed by column name."""
         if symbols is None:
@@ -916,38 +611,63 @@ class Data(Analyzable):
 
     def get(
         self,
-        column: tp.Optional[tp.Union[tp.Label, tp.Labels]] = None,
-        symbol: tp.Optional[tp.Union[tp.Symbol, tp.Symbols]] = None,
+        columns: tp.Optional[tp.Union[tp.Label, tp.Labels]] = None,
+        symbols: tp.Optional[tp.Union[tp.Symbol, tp.Symbols]] = None,
         **kwargs,
     ) -> tp.MaybeTuple[tp.SeriesFrame]:
-        """Get column data.
+        """Get one or more columns of one or more symbols of data.
 
         If one symbol, returns data for that symbol. If multiple symbols, performs concatenation
         first and returns a DataFrame if one column and a tuple of DataFrames if a list of columns passed."""
-        if symbol is None:
+        if symbols is None:
             single_symbol = self.single_symbol
             symbols = self.symbols
         else:
-            if isinstance(symbol, list):
+            if isinstance(symbols, list):
                 single_symbol = False
-                symbols = symbol
             else:
                 single_symbol = True
-                symbols = [symbol]
+                symbols = [symbols]
 
         if single_symbol:
-            if column is None:
+            if columns is None:
                 return self.data[symbols[0]]
-            return self.data[symbols[0]][column]
+            return self.data[symbols[0]][columns]
 
         concat_data = self.concat(symbols=symbols, **kwargs)
         if len(concat_data) == 1:
             return tuple(concat_data.values())[0]
-        if column is not None:
-            if isinstance(column, list):
-                return tuple([concat_data[c] for c in column])
-            return concat_data[column]
+        if columns is not None:
+            if isinstance(columns, list):
+                return tuple([concat_data[c] for c in columns])
+            return concat_data[columns]
         return tuple(concat_data.values())
+
+    # ############# Selecting ############# #
+
+    def select(self: DataT, symbols: tp.Union[tp.Symbol, tp.Symbols], **kwargs) -> DataT:
+        """Create a new instance with one or more symbols from this instance."""
+        if isinstance(symbols, list):
+            single_symbol = False
+        else:
+            single_symbol = True
+            symbols = [symbols]
+        fetch_kwargs = {}
+        for k, v in self.fetch_kwargs.items():
+            if isinstance(v, symbol_dict):
+                if single_symbol:
+                    v = symbol_dict({_k: _v for _k, _v in v.items() if _k in symbols})
+                else:
+                    v = v[symbols[0]]
+            fetch_kwargs[k] = v
+        return self.replace(
+            data={k: v for k, v in self.data.items() if k in symbols},
+            single_symbol=single_symbol,
+            fetch_kwargs=fetch_kwargs,
+            last_index={k: v for k, v in self.last_index.items() if k in symbols},
+            returned_kwargs={k: v for k, v in self.returned_kwargs.items() if k in symbols},
+            **kwargs
+        )
 
     # ############# Saving ############# #
 

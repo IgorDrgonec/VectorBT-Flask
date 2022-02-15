@@ -774,21 +774,29 @@ class TestData:
             ),
         )
         pd.testing.assert_frame_equal(
-            MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"]).get(symbol=0),
+            MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"]).get(symbols=0),
             MyData.fetch(0, shape=(5, 3), columns=["feat0", "feat1", "feat2"]).get(),
         )
         pd.testing.assert_frame_equal(
-            MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"]).get(symbol=[0])[0],
+            MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"]).get(symbols=[0])[0],
             MyData.fetch([0], shape=(5, 3), columns=["feat0", "feat1", "feat2"]).get()[0],
         )
         pd.testing.assert_series_equal(
-            MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"]).get("feat0", symbol=0),
+            MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"]).get("feat0", symbols=0),
             MyData.fetch(0, shape=(5, 3), columns=["feat0", "feat1", "feat2"]).get("feat0"),
         )
         pd.testing.assert_frame_equal(
-            MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"]).get(["feat0"], symbol=0),
+            MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"]).get(["feat0"], symbols=0),
             MyData.fetch(0, shape=(5, 3), columns=["feat0", "feat1", "feat2"]).get(["feat0"]),
         )
+
+    def test_select(self):
+        data = MyData.fetch([0, 1, 2], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
+        assert data.select(0) == MyData.fetch(0, shape=(5, 3), columns=["feat0", "feat1", "feat2"])
+        assert data.select([0]) == MyData.fetch([0], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
+        assert data.select([0]) != MyData.fetch(0, shape=(5, 3), columns=["feat0", "feat1", "feat2"])
+        assert data.select([0, 2]) == MyData.fetch([0, 2], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
+        assert data.select([0, 2]) != MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
 
     def test_to_csv(self, tmp_path):
         data = MyData.fetch(["S1", "S2"], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
