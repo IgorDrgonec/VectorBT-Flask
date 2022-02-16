@@ -983,7 +983,7 @@ Sharpe Ratio                                   1.936813
 Calmar Ratio                                   8.923935
 Omega Ratio                                     1.55757
 Sortino Ratio                                  3.440712
-Name: agg_func_mean, dtype: object
+Name: agg_stats, dtype: object
 ```
 
 Here, the Sortino ratio of 2.624107 (column=10) and 4.257318 (column=20) lead to the avarage of 3.440712.

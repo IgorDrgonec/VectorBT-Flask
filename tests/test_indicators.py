@@ -2040,7 +2040,7 @@ class TestFactory:
                     ["Start", "End", "Period", "Count", "Mean", "Std", "Min", "Median", "Max"],
                     dtype="object",
                 ),
-                name="agg_func_mean",
+                name="agg_stats",
             ),
         )
 
@@ -2140,7 +2140,7 @@ class TestFactory:
                     ],
                     dtype="object",
                 ),
-                name="agg_func_mean",
+                name="agg_stats",
             ),
         )
 
@@ -2161,7 +2161,7 @@ class TestFactory:
                     ["Start", "End", "Period", "Value Counts: None", "Value Counts: Hello", "Value Counts: World"],
                     dtype="object",
                 ),
-                name="agg_func_mean",
+                name="agg_stats",
                 dtype=object,
             ),
         )
@@ -2181,7 +2181,7 @@ class TestFactory:
         myind = MyInd.run(ts)
         pd.testing.assert_series_equal(
             myind.stats(),
-            pd.Series([9535.0], index=["sum_diff"], name="agg_func_mean", dtype=object),
+            pd.Series([9535.0], index=["sum_diff"], name="agg_stats", dtype=object),
         )
 
     def test_dir(self):

@@ -55,8 +55,18 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
-            start=dict(title="Start", calc_func=lambda self: self.wrapper.index[0], agg_func=None, tags="wrapper"),
-            end=dict(title="End", calc_func=lambda self: self.wrapper.index[-1], agg_func=None, tags="wrapper"),
+            start=dict(
+                title="Start",
+                calc_func=lambda self: self.wrapper.index[0],
+                agg_func=None,
+                tags="wrapper",
+            ),
+            end=dict(
+                title="End",
+                calc_func=lambda self: self.wrapper.index[-1],
+                agg_func=None,
+                tags="wrapper",
+            ),
             period=dict(
                 title="Period",
                 calc_func=lambda self: len(self.wrapper.index),
@@ -179,16 +189,16 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                     most attributes have already been cached.
             group_by (any): Group or ungroup columns. See `vectorbtpro.base.grouping.base.Grouper`.
             agg_func (callable): Aggregation function to aggregate statistics across all columns.
-                Defaults to mean.
+                By default, takes the mean of all columns. If None, returns all columns as a DataFrame.
 
                 Must take `pd.Series` and return a const.
 
-                Has only effect if `column` was specified or this object contains only one column of data.
+                Takes effect if `column` was specified or this object contains only one column of data.
 
                 If `agg_func` has been overridden by a metric:
 
-                * it only takes effect if global `agg_func` is not None
-                * will raise a warning if it's None but the result of calculation has multiple values
+                * Takes effect if global `agg_func` is not None
+                * Raises a warning if it's None but the result of calculation has multiple values
             silence_warnings (bool): Whether to silence all warnings.
             template_context (mapping): Global context to replace templates.
 
@@ -239,19 +249,34 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
         # Resolve defaults
         if silence_warnings is None:
             silence_warnings = self.stats_defaults.get("silence_warnings", False)
-        template_context = merge_dicts(self.stats_defaults.get("template_context", {}), template_context)
+        template_context = merge_dicts(
+            self.stats_defaults.get("template_context", {}),
+            template_context,
+        )
         filters = merge_dicts(self.stats_defaults.get("filters", {}), filters)
         settings = merge_dicts(self.stats_defaults.get("settings", {}), settings)
-        metric_settings = merge_dicts(self.stats_defaults.get("metric_settings", {}), metric_settings)
+        metric_settings = merge_dicts(
+            self.stats_defaults.get("metric_settings", {}),
+            metric_settings,
+        )
 
         # Replace templates globally (not used at metric level)
         if len(template_context) > 0:
-            sub_settings = deep_substitute(settings, context=template_context, sub_id="sub_settings", strict=False)
+            sub_settings = deep_substitute(
+                settings,
+                context=template_context,
+                sub_id="sub_settings",
+                strict=False,
+            )
         else:
             sub_settings = settings
 
         # Resolve self
-        reself = self.resolve_self(cond_kwargs=sub_settings, impacts_caching=False, silence_warnings=silence_warnings)
+        reself = self.resolve_self(
+            cond_kwargs=sub_settings,
+            impacts_caching=False,
+            silence_warnings=silence_warnings,
+        )
 
         # Prepare metrics
         if metrics is None:
@@ -294,7 +319,9 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
         # Check metric_settings
         missed_keys = set(metric_settings.keys()).difference(set(metrics_dct.keys()))
         if len(missed_keys) > 0:
-            raise ValueError(f"Keys {missed_keys} in metric_settings could not be matched with any metric")
+            raise ValueError(
+                f"Keys {missed_keys} in metric_settings could not be matched with any metric"
+            )
 
         # Merge settings
         opt_arg_names_dct = {}
@@ -325,7 +352,11 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                 sub_id="template_context_merged",
             )
             context = merge_dicts(template_context_merged, merged_settings)
-            merged_settings = deep_substitute(merged_settings, context=context, sub_id="merged_settings")
+            merged_settings = deep_substitute(
+                merged_settings,
+                context=context,
+                sub_id="merged_settings",
+            )
 
             # Filter by tag
             if tags is not None:
@@ -334,7 +365,9 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                     metrics_dct.pop(metric_name, None)
                     continue
 
-            custom_arg_names = set(_metric_settings.keys()).union(set(passed_metric_settings.keys()))
+            custom_arg_names = set(_metric_settings.keys()).union(
+                set(passed_metric_settings.keys())
+            )
             opt_arg_names = set(opt_settings.keys())
             custom_reself = reself.resolve_self(
                 cond_kwargs=merged_settings,
@@ -369,7 +402,11 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
             for filter_name in metric_filters:
                 filter_settings = filters[filter_name]
-                _filter_settings = deep_substitute(filter_settings, context=context, sub_id="filter_settings")
+                _filter_settings = deep_substitute(
+                    filter_settings,
+                    context=context,
+                    sub_id="filter_settings",
+                )
                 filter_func = _filter_settings["filter_func"]
                 warning_message = _filter_settings.get("warning_message", None)
                 inv_warning_message = _filter_settings.get("inv_warning_message", None)
@@ -382,7 +419,11 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                     if to_remove:
                         if to_check and warning_message is not None and not _silence_warnings:
                             warnings.warn(warning_message)
-                        if inv_to_check and inv_warning_message is not None and not _silence_warnings:
+                        if (
+                            inv_to_check
+                            and inv_warning_message is not None
+                            and not _silence_warnings
+                        ):
                             warnings.warn(inv_warning_message)
 
                         metrics_dct.pop(metric_name, None)
@@ -465,7 +506,11 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                                 resolve_path_arg = _final_kwargs.pop("resolve_path_" + attr, True)
                                 if resolve_path_arg:
                                     if call_attr:
-                                        cond_kwargs = {k: v for k, v in _final_kwargs.items() if k in _opt_arg_names}
+                                        cond_kwargs = {
+                                            k: v
+                                            for k, v in _final_kwargs.items()
+                                            if k in _opt_arg_names
+                                        }
                                         out = custom_reself.resolve_attr(
                                             attr,  # do not pass _attr, important for caching
                                             args=args,
@@ -593,7 +638,10 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
                     # Handle apply_to_timedelta
                     if apply_to_timedelta and to_timedelta:
-                        v = custom_reself.wrapper.to_timedelta(v, silence_warnings=_silence_warnings)
+                        v = custom_reself.wrapper.to_timedelta(
+                            v,
+                            silence_warnings=_silence_warnings,
+                        )
 
                     # Select column or aggregate
                     if checks.is_series(v):
@@ -607,7 +655,8 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                             )
                         elif _agg_func is not None and agg_func is not None:
                             v = _agg_func(v)
-                            used_agg_func = True
+                            if _agg_func is agg_func:
+                                used_agg_func = True
                         elif _agg_func is None and agg_func is not None:
                             if not _silence_warnings:
                                 warnings.warn(
@@ -628,17 +677,21 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
         # Return the stats
         if reself.wrapper.get_ndim(group_by=group_by) == 1:
-            return pd.Series(stats_dct, name=reself.wrapper.get_name(group_by=group_by), dtype=object)
+            return pd.Series(
+                stats_dct,
+                name=reself.wrapper.get_name(group_by=group_by),
+                dtype=object,
+            )
         if column is not None:
             return pd.Series(stats_dct, name=column, dtype=object)
         if agg_func is not None:
             if used_agg_func and not silence_warnings:
                 warnings.warn(
-                    f"Object has multiple columns. Aggregating using {agg_func}. "
+                    f"Object has multiple columns. Aggregated some metrics using {agg_func}. "
                     "Pass column to select a single column/group.",
                     stacklevel=2,
                 )
-            return pd.Series(stats_dct, name="agg_func_" + agg_func.__name__, dtype=object)
+            return pd.Series(stats_dct, name="agg_stats", dtype=object)
         new_index = reself.wrapper.grouper.get_index(group_by=group_by)
         stats_df = pd.DataFrame(stats_dct, index=new_index)
         return stats_df
@@ -650,7 +703,9 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
         """Build metrics documentation."""
         if source_cls is None:
             source_cls = StatsBuilderMixin
-        return string.Template(inspect.cleandoc(get_dict_attr(source_cls, "metrics").__doc__)).substitute(
+        return string.Template(
+            inspect.cleandoc(get_dict_attr(source_cls, "metrics").__doc__),
+        ).substitute(
             {"metrics": cls.metrics.prettify(), "cls_name": cls.__name__},
         )
 

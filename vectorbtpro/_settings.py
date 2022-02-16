@@ -320,12 +320,7 @@ ${config_doc}
 _settings["config"] = config
 
 configured = dict(
-    config=Config(  # flex
-        dict(
-            readonly_=True,
-            nested_=False
-        )
-    ),
+    config=Config(dict(readonly_=True, nested_=False)),  # flex
 )
 """_"""
 
@@ -660,7 +655,8 @@ generic = dict(
             filters=dict(
                 has_mapping=dict(
                     filter_func=lambda self, metric_settings: metric_settings.get(
-                        "mapping", self.mapping
+                        "mapping",
+                        self.mapping,
                     )
                     is not None,
                 )
@@ -800,7 +796,8 @@ returns = dict(
                 ),
                 has_bm_returns=dict(
                     filter_func=lambda self, metric_settings: metric_settings.get(
-                        "bm_returns", self.bm_returns
+                        "bm_returns",
+                        self.bm_returns,
                     )
                     is not None,
                     warning_message=Sub("Metric '$metric_name' requires bm_returns to be set"),
@@ -862,7 +859,8 @@ mapped_array = dict(
             filters=dict(
                 has_mapping=dict(
                     filter_func=lambda self, metric_settings: metric_settings.get(
-                        "mapping", self.mapping
+                        "mapping",
+                        self.mapping,
                     )
                     is not None,
                 )
@@ -1025,7 +1023,8 @@ portfolio = dict(
                 ),
                 has_bm_returns=dict(
                     filter_func=lambda self, metric_settings: metric_settings.get(
-                        "bm_returns", self.bm_returns
+                        "bm_returns",
+                        self.bm_returns,
                     )
                     is not None,
                     warning_message=Sub("Metric '$metric_name' requires bm_returns to be set"),
@@ -1183,7 +1182,9 @@ class SettingsConfig(Config):
             if k in self:
                 config_doc = self[k].prettify(**prettify_kwargs.get(k, {}))
                 __pdoc__[k] = deep_substitute(
-                    v, context=dict(config_doc=config_doc), sub_id="__pdoc__"
+                    v,
+                    context=dict(config_doc=config_doc),
+                    sub_id="__pdoc__",
                 )
 
 

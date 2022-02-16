@@ -930,7 +930,7 @@ class TestAccessors:
                     28.397734844335613,
                 ],
                 index=stats_index,
-                name="agg_func_mean",
+                name="agg_stats",
             ),
         )
         pd.testing.assert_series_equal(

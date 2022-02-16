@@ -3339,7 +3339,7 @@ class TestAccessors:
                     3.3333333333333335,
                 ],
                 index=stats_index[:-2],
-                name="agg_func_mean",
+                name="agg_stats",
             ),
         )
         pd.testing.assert_series_equal(
@@ -3426,7 +3426,7 @@ class TestAccessors:
                     1.0,
                 ],
                 index=stats_index,
-                name="agg_func_mean",
+                name="agg_stats",
             ),
         )
         pd.testing.assert_series_equal(

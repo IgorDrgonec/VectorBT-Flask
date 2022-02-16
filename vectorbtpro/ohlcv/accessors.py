@@ -69,7 +69,7 @@ First Volume                   10
 Lowest Volume                   9
 Highest Volume                 11
 Last Volume                    10
-Name: agg_func_mean, dtype: object
+Name: agg_stats, dtype: object
 ```
 
 ## Plots

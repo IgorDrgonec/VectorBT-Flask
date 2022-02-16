@@ -1259,7 +1259,7 @@ class TestMappedArray:
                     12.666666666666666,
                 ],
                 index=stats_index[:-2],
-                name="agg_func_mean",
+                name="agg_stats",
             ),
         )
         pd.testing.assert_series_equal(
@@ -1322,7 +1322,7 @@ class TestMappedArray:
             pd.Series(
                 ["x", "z", pd.Timedelta("3 days 00:00:00"), 2.25, 0.5, 0.5, 0.5, 0.5, 0.25],
                 index=stats_index,
-                name="agg_func_mean",
+                name="agg_stats",
             ),
         )
         pd.testing.assert_series_equal(
@@ -1721,7 +1721,7 @@ class TestRecords:
         stats_index = pd.Index(["Start", "End", "Period", "Count"], dtype="object")
         pd.testing.assert_series_equal(
             records.stats(),
-            pd.Series(["x", "z", pd.Timedelta("3 days 00:00:00"), 2.25], index=stats_index, name="agg_func_mean"),
+            pd.Series(["x", "z", pd.Timedelta("3 days 00:00:00"), 2.25], index=stats_index, name="agg_stats"),
         )
         pd.testing.assert_series_equal(
             records.stats(column="a"),
@@ -1961,7 +1961,7 @@ class TestRanges:
                     pd.Timedelta("0 days 00:00:00"),
                 ],
                 index=stats_index,
-                name="agg_func_mean",
+                name="agg_stats",
             ),
         )
         pd.testing.assert_series_equal(
@@ -2561,7 +2561,7 @@ class TestDrawdowns:
                     1.0,
                 ],
                 index=stats_index,
-                name="agg_func_mean",
+                name="agg_stats",
             ),
         )
         pd.testing.assert_series_equal(
@@ -2591,7 +2591,7 @@ class TestDrawdowns:
                     1.0,
                 ],
                 index=stats_index,
-                name="agg_func_mean",
+                name="agg_stats",
             ),
         )
         pd.testing.assert_series_equal(
@@ -3007,7 +3007,7 @@ class TestOrders:
                     0.050222222222222224,
                 ],
                 index=stats_index,
-                name="agg_func_mean",
+                name="agg_stats",
             ),
         )
         pd.testing.assert_series_equal(
@@ -3632,7 +3632,7 @@ class TestExitTrades:
                     0.18931590012681135,
                 ],
                 index=stats_index,
-                name="agg_func_mean",
+                name="agg_stats",
             ),
         )
         pd.testing.assert_series_equal(
@@ -3666,7 +3666,7 @@ class TestExitTrades:
                     0.07356215977397455,
                 ],
                 index=stats_index,
-                name="agg_func_mean",
+                name="agg_stats",
             ),
         )
         pd.testing.assert_series_equal(
@@ -5574,7 +5574,7 @@ class TestLogs:
                     2.75,
                 ],
                 index=stats_index,
-                name="agg_func_mean",
+                name="agg_stats",
             ),
         )
         pd.testing.assert_series_equal(

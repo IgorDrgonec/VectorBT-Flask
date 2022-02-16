@@ -13454,7 +13454,7 @@ class TestPortfolio:
                     ]
                 ),
                 index=stats_index,
-                name="agg_func_mean",
+                name="agg_stats",
                 dtype=object,
             ),
         )
@@ -13494,7 +13494,7 @@ class TestPortfolio:
                     ]
                 ),
                 index=stats_index,
-                name="agg_func_mean",
+                name="agg_stats",
                 dtype=object,
             ),
         )
@@ -13564,7 +13564,7 @@ class TestPortfolio:
                     ],
                     dtype="object",
                 ),
-                name="agg_func_mean",
+                name="agg_stats",
                 dtype=object,
             ),
         )

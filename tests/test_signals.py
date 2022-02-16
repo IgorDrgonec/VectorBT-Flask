@@ -2433,7 +2433,7 @@ class TestAccessors:
                     np.nan,
                 ],
                 index=stats_index,
-                name="agg_func_mean",
+                name="agg_stats",
             ),
         )
         pd.testing.assert_series_equal(

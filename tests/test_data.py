@@ -915,7 +915,16 @@ class TestData:
         )
 
         stats_index = pd.Index(
-            ["Start", "End", "Period", "Total Symbols", "Null Counts: 0", "Null Counts: 1"],
+            [
+                "Start",
+                "End",
+                "Period",
+                "Total Symbols",
+                "Last Index: 0",
+                "Last Index: 1",
+                "Null Counts: 0",
+                "Null Counts: 1",
+            ],
             dtype="object",
         )
         pd.testing.assert_series_equal(
@@ -926,11 +935,13 @@ class TestData:
                     pd.Timestamp("2020-01-05 00:00:00+0000", tz="UTC"),
                     pd.Timedelta("5 days 00:00:00"),
                     2,
-                    2.3333333333333335,
-                    2.3333333333333335,
+                    pd.Timestamp("2020-01-05 00:00:00+0000", tz="UTC"),
+                    pd.Timestamp("2020-01-04 00:00:00+0000", tz="UTC"),
+                    7,
+                    7,
                 ],
                 index=stats_index,
-                name="agg_func_mean",
+                name="agg_stats",
             ),
         )
         pd.testing.assert_series_equal(
@@ -941,6 +952,8 @@ class TestData:
                     pd.Timestamp("2020-01-05 00:00:00+0000", tz="UTC"),
                     pd.Timedelta("5 days 00:00:00"),
                     2,
+                    pd.Timestamp("2020-01-05 00:00:00+0000", tz="UTC"),
+                    pd.Timestamp("2020-01-04 00:00:00+0000", tz="UTC"),
                     5,
                     1,
                 ],
@@ -956,6 +969,8 @@ class TestData:
                     pd.Timestamp("2020-01-05 00:00:00+0000", tz="UTC"),
                     pd.Timedelta("5 days 00:00:00"),
                     2,
+                    pd.Timestamp("2020-01-05 00:00:00+0000", tz="UTC"),
+                    pd.Timestamp("2020-01-04 00:00:00+0000", tz="UTC"),
                     7,
                     7,
                 ],
@@ -969,7 +984,7 @@ class TestData:
             data.stats(group_by=True),
         )
         stats_df = data.stats(agg_func=None)
-        assert stats_df.shape == (3, 6)
+        assert stats_df.shape == (3, 8)
         pd.testing.assert_index_equal(stats_df.index, data.wrapper.columns)
         pd.testing.assert_index_equal(stats_df.columns, stats_index)
 

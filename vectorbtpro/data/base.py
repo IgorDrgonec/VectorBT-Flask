@@ -208,7 +208,10 @@ class Data(Analyzable):
                         )
                         index = index.union(obj.index)
                     elif missing == "drop":
-                        warnings.warn("Symbols have mismatching index. Dropping missing data points.", stacklevel=2)
+                        warnings.warn(
+                            "Symbols have mismatching index. Dropping missing data points.",
+                            stacklevel=2,
+                        )
                         index = index.intersection(obj.index)
                     elif missing == "raise":
                         raise ValueError("Symbols have mismatching index")
@@ -368,7 +371,11 @@ class Data(Analyzable):
     # ############# Fetching ############# #
 
     @classmethod
-    def fetch_symbol(cls, symbol: tp.Symbol, **kwargs) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
+    def fetch_symbol(
+        cls,
+        symbol: tp.Symbol,
+        **kwargs,
+    ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
         """Fetch a symbol.
 
         May also return a dictionary that will be accessible as `Data.returned_kwargs`."""
@@ -473,7 +480,13 @@ class Data(Analyzable):
         """Update a symbol."""
         raise NotImplementedError
 
-    def update(self: DataT, *, show_progress: bool = False, pbar_kwargs: tp.KwargsLike = None, **kwargs) -> DataT:
+    def update(
+        self: DataT,
+        *,
+        show_progress: bool = False,
+        pbar_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> DataT:
         """Fetch additional data using `Data.update_symbol` and append it to the existing data.
 
         Args:
@@ -520,8 +533,16 @@ class Data(Analyzable):
 
                 if not isinstance(new_obj, (pd.Series, pd.DataFrame)):
                     new_obj = to_pd_array(new_obj)
-                    new_obj.index = pd.RangeIndex(start=obj.index[-1], stop=obj.index[-1] + new_obj.shape[0], step=1)
-                new_obj = self.prepare_tzaware_index(new_obj, tz_localize=self.tz_localize, tz_convert=self.tz_convert)
+                    new_obj.index = pd.RangeIndex(
+                        start=obj.index[-1],
+                        stop=obj.index[-1] + new_obj.shape[0],
+                        step=1,
+                    )
+                new_obj = self.prepare_tzaware_index(
+                    new_obj,
+                    tz_localize=self.tz_localize,
+                    tz_convert=self.tz_convert,
+                )
                 new_data[symbol] = new_obj
                 if len(new_obj.index) > 0:
                     new_last_index[symbol] = new_obj.index[-1]
@@ -672,9 +693,11 @@ class Data(Analyzable):
             data=symbol_dict({k: v for k, v in self.data.items() if k in symbols}),
             single_symbol=single_symbol,
             fetch_kwargs=symbol_dict({k: v for k, v in self.fetch_kwargs.items() if k in symbols}),
-            returned_kwargs=symbol_dict({k: v for k, v in self.returned_kwargs.items() if k in symbols}),
+            returned_kwargs=symbol_dict(
+                {k: v for k, v in self.returned_kwargs.items() if k in symbols},
+            ),
             last_index=symbol_dict({k: v for k, v in self.last_index.items() if k in symbols}),
-            **kwargs
+            **kwargs,
         )
 
     # ############# Renaming ############# #
@@ -685,17 +708,17 @@ class Data(Analyzable):
             data={rename.get(k, k): v for k, v in self.data.items()},
             fetch_kwargs={rename.get(k, k): v for k, v in self.fetch_kwargs.items()},
             returned_kwargs={rename.get(k, k): v for k, v in self.returned_kwargs.items()},
-            last_index={rename.get(k, k): v for k, v in self.last_index.items()}
+            last_index={rename.get(k, k): v for k, v in self.last_index.items()},
         )
 
     # ############# Merging ############# #
 
     @classmethod
     def merge(
-            cls: tp.Type[DataT],
-            *datas: "Data",
-            rename: tp.Optional[tp.Dict[tp.Hashable, tp.Hashable]] = None,
-            **kwargs,
+        cls: tp.Type[DataT],
+        *datas: "Data",
+        rename: tp.Optional[tp.Dict[tp.Hashable, tp.Hashable]] = None,
+        **kwargs,
     ) -> DataT:
         """Merge multiple `Data` instances."""
         if len(datas) < 2:
@@ -724,7 +747,7 @@ class Data(Analyzable):
             fetch_kwargs=fetch_kwargs,
             returned_kwargs=returned_kwargs,
             last_index=last_index,
-            **kwargs
+            **kwargs,
         )
 
     # ############# Saving ############# #
@@ -824,8 +847,18 @@ class Data(Analyzable):
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
-            start=dict(title="Start", calc_func=lambda self: self.wrapper.index[0], agg_func=None, tags="wrapper"),
-            end=dict(title="End", calc_func=lambda self: self.wrapper.index[-1], agg_func=None, tags="wrapper"),
+            start=dict(
+                title="Start",
+                calc_func=lambda self: self.wrapper.index[0],
+                agg_func=None,
+                tags="wrapper",
+            ),
+            end=dict(
+                title="End",
+                calc_func=lambda self: self.wrapper.index[-1],
+                agg_func=None,
+                tags="wrapper",
+            ),
             period=dict(
                 title="Period",
                 calc_func=lambda self: len(self.wrapper.index),
@@ -839,12 +872,19 @@ class Data(Analyzable):
                 agg_func=None,
                 tags="data",
             ),
+            last_index=dict(
+                title="Last Index",
+                calc_func="last_index",
+                agg_func=None,
+                tags="data",
+            ),
             null_counts=dict(
                 title="Null Counts",
                 calc_func=lambda self, group_by: {
                     symbol: obj.isnull().vbt(wrapper=self.wrapper).sum(group_by=group_by)
                     for symbol, obj in self.data.items()
                 },
+                agg_func=lambda x: x.sum(),
                 tags="data",
             ),
         )
@@ -908,7 +948,14 @@ class Data(Analyzable):
         return merge_dicts(Analyzable.plots_defaults.__get__(self), data_plots_cfg)
 
     _subplots: tp.ClassVar[Config] = Config(
-        dict(plot=dict(check_is_not_grouped=True, plot_func="plot", pass_add_trace_kwargs=True, tags="data")),
+        dict(
+            plot=dict(
+                check_is_not_grouped=True,
+                plot_func="plot",
+                pass_add_trace_kwargs=True,
+                tags="data",
+            )
+        ),
     )
 
     @property

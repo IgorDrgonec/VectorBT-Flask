@@ -373,7 +373,7 @@ Avg Losing Trade Duration                5 days 00:00:00
 Profit Factor                                   1.022425
 Expectancy                                      0.028157
 SQN                                             0.039174
-Name: agg_func_mean, dtype: object
+Name: agg_stats, dtype: object
 ```
 
 Positions share almost identical metrics with trades:
@@ -405,7 +405,7 @@ Avg Losing Trade Duration               4 days 00:00:00
 Profit Factor                                       0.0
 Expectancy                                    -5.446748
 SQN                                           -1.794214
-Name: agg_func_mean, dtype: object
+Name: agg_stats, dtype: object
 ```
 
 To also include open trades/positions when calculating metrics such as win rate, pass `incl_open=True`:
@@ -437,7 +437,7 @@ Avg Losing Trade Duration               5 days 00:00:00
 Profit Factor                                  1.733143
 Expectancy                                     0.872096
 SQN                                            0.804714
-Name: agg_func_mean, dtype: object
+Name: agg_stats, dtype: object
 ```
 
 `Trades.stats` also supports (re-)grouping:
