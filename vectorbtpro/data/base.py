@@ -899,20 +899,31 @@ class Data(Analyzable):
     def plot(
         self,
         column: tp.Optional[tp.Label] = None,
+        symbol: tp.Optional[tp.Symbol] = None,
+        column_names: tp.KwargsLike = None,
         base: tp.Optional[float] = None,
         **kwargs,
     ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:  # pragma: no cover
-        """Plot orders.
+        """Plot either one column of multiple symbols, or OHLC(V) of one symbol.
 
         Args:
             column (str): Name of the column to plot.
+            symbol (str): Symbol to plot.
+            column_names (sequence of str): Dictionary mapping the column names to OHLCV.
+
+                Applied only if OHLC(V) is plotted.
             base (float): Rebase all series of a column to a given intial base.
 
                 !!! note
                     The column must contain prices.
-            kwargs (dict): Keyword arguments passed to `vectorbtpro.generic.accessors.GenericAccessor.plot`.
+
+                Applied only if lines are plotted.
+            kwargs (dict): Keyword arguments passed to `vectorbtpro.generic.accessors.GenericAccessor.plot`
+                for lines and to `vectorbtpro.ohlcv.accessors.OHLCVDFAccessor.plot` for OHLC(V).
 
         Usage:
+            * Plot the lines of one column across all symbols:
+
             ```pycon
             >>> import vectorbtpro as vbt
 
@@ -927,9 +938,30 @@ class Data(Analyzable):
             >>> data.plot(column='Close', base=1)
             ```
 
+            * Plot OHLC(V) of one symbol (only if data contains the respective columns):
+
             ![](/assets/images/data_plot.svg)
+
+            ```pycon
+            >>> data.plot(symbol='BTC-USD')
+            ```
+
+            ![](/assets/images/data_plot_ohlcv.svg)
         """
+        if column is None:
+            first_data = self.data[self.symbols[0]]
+            if isinstance(first_data, pd.DataFrame):
+                ohlc = first_data.vbt.ohlcv(column_names=column_names).ohlc
+                if ohlc is not None and len(ohlc.columns) == 4:
+                    if symbol is None:
+                        if self.single_symbol or len(self.symbols) == 1:
+                            symbol = self.symbols[0]
+                        else:
+                            raise ValueError("Only one symbol is allowed. Use indexing or symbol argument.")
+                    return self.get(symbols=symbol).vbt.ohlcv(column_names=column_names).plot(**kwargs)
         self_col = self.select_col(column=column, group_by=False)
+        if symbol is not None:
+            self_col = self_col.select(symbol)
         data = self_col.get()
         if base is not None:
             data = data.vbt.rebase(base)
