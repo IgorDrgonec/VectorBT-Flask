@@ -17,7 +17,7 @@ from vectorbtpro.utils.attr_ import get_dict_attr, AttrResolverMixin
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.tagging import match_tags
-from vectorbtpro.utils.template import deep_substitute
+from vectorbtpro.utils.template import deep_substitute, CustomTemplate
 
 
 class MetaStatsBuilderMixin(type):
@@ -112,8 +112,10 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
                 Each element can be either:
 
-                * a metric name (see keys in `StatsBuilderMixin.metrics`)
-                * a tuple of a metric name and a settings dict as in `StatsBuilderMixin.metrics`.
+                * Metric name (see keys in `StatsBuilderMixin.metrics`)
+                * Tuple of a metric name and a settings dict as in `StatsBuilderMixin.metrics`
+                * Tuple of a metric name and a template of instance `vectorbtpro.utils.template.CustomTemplate`
+                * Tuple of a metric name and a list of settings dicts to be expanded into multiple metrics
 
                 The settings dict can contain the following keys:
 
@@ -304,6 +306,40 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
             if not isinstance(metric, tuple):
                 raise TypeError(f"Metric at index {i} must be either a string or a tuple")
             new_metrics.append(metric)
+        metrics = new_metrics
+
+        # Expand metrics
+        new_metrics = []
+        for i, (metric_name, _metric_settings) in enumerate(metrics):
+            if isinstance(_metric_settings, CustomTemplate):
+                metric_context = merge_dicts(
+                    template_context,
+                    {name: reself for name in reself.self_aliases},
+                    dict(
+                        column=column,
+                        group_by=group_by,
+                        metric_name=metric_name,
+                        agg_func=agg_func,
+                        silence_warnings=silence_warnings,
+                        to_timedelta=None,
+                    ),
+                    settings,
+                )
+                metric_context = deep_substitute(
+                    metric_context,
+                    context=metric_context,
+                    sub_id="metric_context",
+                )
+                _metric_settings = _metric_settings.substitute(
+                    context=metric_context,
+                    strict=True,
+                    sub_id="metric",
+                )
+            if isinstance(_metric_settings, list):
+                for __metric_settings in _metric_settings:
+                    new_metrics.append((metric_name, __metric_settings))
+            else:
+                new_metrics.append((metric_name, _metric_settings))
         metrics = new_metrics
 
         # Handle duplicate names
