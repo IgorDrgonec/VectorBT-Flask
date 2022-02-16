@@ -22,6 +22,7 @@ from vectorbtpro.utils.datetime_ import is_tz_aware, to_timezone
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.path_ import check_mkdir
 from vectorbtpro.utils.pbar import get_pbar
+from vectorbtpro.utils.template import RepEval
 
 __pdoc__ = {}
 
@@ -901,6 +902,7 @@ class Data(Analyzable):
         column: tp.Optional[tp.Label] = None,
         symbol: tp.Optional[tp.Symbol] = None,
         column_names: tp.KwargsLike = None,
+        plot_volume: bool = True,
         base: tp.Optional[float] = None,
         **kwargs,
     ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:  # pragma: no cover
@@ -910,6 +912,9 @@ class Data(Analyzable):
             column (str): Name of the column to plot.
             symbol (str): Symbol to plot.
             column_names (sequence of str): Dictionary mapping the column names to OHLCV.
+
+                Applied only if OHLC(V) is plotted.
+            plot_volume (bool): Whether to plot volume beneath.
 
                 Applied only if OHLC(V) is plotted.
             base (float): Rebase all series of a column to a given intial base.
@@ -957,8 +962,21 @@ class Data(Analyzable):
                         if self.single_symbol or len(self.symbols) == 1:
                             symbol = self.symbols[0]
                         else:
-                            raise ValueError("Only one symbol is allowed. Use indexing or symbol argument.")
-                    return self.get(symbols=symbol).vbt.ohlcv(column_names=column_names).plot(**kwargs)
+                            raise ValueError(
+                                "Only one symbol is allowed. Use indexing or symbol argument."
+                            )
+                    return (
+                        self.get(
+                            symbols=symbol,
+                        )
+                        .vbt.ohlcv(
+                            column_names=column_names,
+                        )
+                        .plot(
+                            plot_volume=plot_volume,
+                            **kwargs,
+                        )
+                    )
         self_col = self.select_col(column=column, group_by=False)
         if symbol is not None:
             self_col = self_col.select(symbol)
@@ -981,11 +999,26 @@ class Data(Analyzable):
 
     _subplots: tp.ClassVar[Config] = Config(
         dict(
-            plot=dict(
-                check_is_not_grouped=True,
-                plot_func="plot",
-                pass_add_trace_kwargs=True,
-                tags="data",
+            plot=RepEval(
+                """
+                if symbols is None:
+                    symbols = self.symbols
+                if not isinstance(symbols, list):
+                    symbols = [symbols]
+                [
+                    dict(
+                        check_is_not_grouped=True,
+                        plot_func="plot",
+                        plot_volume=False,
+                        symbol=s,
+                        title=s,
+                        pass_add_trace_kwargs=True,
+                        xaxis_kwargs=dict(rangeslider_visible=False, showgrid=True),
+                        yaxis_kwargs=dict(showgrid=True),
+                        tags="data",
+                    )
+                    for s in symbols
+                ]""", context=dict(symbols=None)
             )
         ),
     )

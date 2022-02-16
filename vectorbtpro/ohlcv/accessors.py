@@ -216,8 +216,18 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
-            start=dict(title="Start", calc_func=lambda self: self.wrapper.index[0], agg_func=None, tags="wrapper"),
-            end=dict(title="End", calc_func=lambda self: self.wrapper.index[-1], agg_func=None, tags="wrapper"),
+            start=dict(
+                title="Start",
+                calc_func=lambda self: self.wrapper.index[0],
+                agg_func=None,
+                tags="wrapper",
+            ),
+            end=dict(
+                title="End",
+                calc_func=lambda self: self.wrapper.index[-1],
+                agg_func=None,
+                tags="wrapper",
+            ),
             period=dict(
                 title="Period",
                 calc_func=lambda self: len(self.wrapper.index),
@@ -285,10 +295,10 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
     def plot(
         self,
         plot_type: tp.Union[None, str, tp.BaseTraceType] = None,
-        show_volume: tp.Optional[bool] = None,
+        plot_volume: tp.Optional[bool] = None,
         ohlc_kwargs: tp.KwargsLike = None,
         volume_kwargs: tp.KwargsLike = None,
-        ohlc_add_trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
         volume_add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs
@@ -299,10 +309,10 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             plot_type: Either 'OHLC', 'Candlestick' or Plotly trace.
 
                 Pass None to use the default.
-            show_volume (bool): If True, shows volume as bar chart.
+            plot_volume (bool): Whether to plot volume beneath.
             ohlc_kwargs (dict): Keyword arguments passed to `plot_type`.
             volume_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Bar`.
-            ohlc_add_trace_kwargs (dict): Keyword arguments passed to `add_trace` for OHLC.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace` for OHLC.
             volume_add_trace_kwargs (dict): Keyword arguments passed to `add_trace` for volume.
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
@@ -332,20 +342,26 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             ohlc_kwargs = {}
         if volume_kwargs is None:
             volume_kwargs = {}
-        if ohlc_add_trace_kwargs is None:
-            ohlc_add_trace_kwargs = {}
+        if add_trace_kwargs is None:
+            add_trace_kwargs = {}
         if volume_add_trace_kwargs is None:
             volume_add_trace_kwargs = {}
-        if show_volume is None:
-            show_volume = self.volume is not None
-        if show_volume:
-            ohlc_add_trace_kwargs = merge_dicts(dict(row=1, col=1), ohlc_add_trace_kwargs)
+        if plot_volume is None:
+            plot_volume = self.volume is not None
+        if plot_volume:
+            add_trace_kwargs = merge_dicts(dict(row=1, col=1), add_trace_kwargs)
             volume_add_trace_kwargs = merge_dicts(dict(row=2, col=1), volume_add_trace_kwargs)
 
         # Set up figure
         if fig is None:
-            if show_volume:
-                fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0, row_heights=[0.7, 0.3])
+            if plot_volume:
+                fig = make_subplots(
+                    rows=2,
+                    cols=1,
+                    shared_xaxes=True,
+                    vertical_spacing=0,
+                    row_heights=[0.7, 0.3],
+                )
             else:
                 fig = make_figure()
             fig.update_layout(
@@ -353,8 +369,12 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
                 xaxis=dict(rangeslider_visible=False, showgrid=True),
                 yaxis=dict(showgrid=True),
             )
-            if show_volume:
-                fig.update_layout(xaxis2=dict(showgrid=True), yaxis2=dict(showgrid=True), bargap=0)
+            if plot_volume:
+                fig.update_layout(
+                    xaxis2=dict(showgrid=True),
+                    yaxis2=dict(showgrid=True),
+                    bargap=0,
+                )
         fig.update_layout(**layout_kwargs)
         if plot_type is None:
             plot_type = ohlcv_cfg["plot_type"]
@@ -380,13 +400,19 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             decreasing=dict(line=dict(color=plotting_cfg["color_schema"]["decreasing"])),
         )
         ohlc.update(**ohlc_kwargs)
-        fig.add_trace(ohlc, **ohlc_add_trace_kwargs)
+        fig.add_trace(ohlc, **add_trace_kwargs)
 
-        if show_volume:
+        if plot_volume:
             marker_colors = np.empty(self.volume.shape, dtype=object)
-            marker_colors[(self.close.values - self.open.values) > 0] = plotting_cfg["color_schema"]["increasing"]
-            marker_colors[(self.close.values - self.open.values) == 0] = plotting_cfg["color_schema"]["gray"]
-            marker_colors[(self.close.values - self.open.values) < 0] = plotting_cfg["color_schema"]["decreasing"]
+            marker_colors[(self.close.values - self.open.values) > 0] = plotting_cfg[
+                "color_schema"
+            ]["increasing"]
+            marker_colors[(self.close.values - self.open.values) == 0] = plotting_cfg[
+                "color_schema"
+            ]["gray"]
+            marker_colors[(self.close.values - self.open.values) < 0] = plotting_cfg[
+                "color_schema"
+            ]["decreasing"]
             volume_bar = go.Bar(
                 x=self.wrapper.index,
                 y=self.volume,
@@ -419,7 +445,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
                 yaxis_kwargs=dict(showgrid=True),
                 check_is_not_grouped=True,
                 plot_func="plot",
-                show_volume=False,
+                plot_volume=False,
                 tags="ohlcv",
             )
         )
