@@ -798,6 +798,15 @@ class TestData:
         assert data.select([0, 2]) == MyData.fetch([0, 2], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
         assert data.select([0, 2]) != MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
 
+    def test_rename(self):
+        data = MyData.fetch([0, 1, 2], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
+        renamed_data = data.rename({0: 2, 2: 0})
+        assert renamed_data.symbols == [2, 1, 0]
+        assert list(renamed_data.data.keys()) == [2, 1, 0]
+        assert list(renamed_data.fetch_kwargs.keys()) == [2, 1, 0]
+        assert list(renamed_data.returned_kwargs.keys()) == [2, 1, 0]
+        assert list(renamed_data.last_index.keys()) == [2, 1, 0]
+
     def test_merge(self):
         data = MyData.fetch([0, 1, 2], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
         data0 = MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"])

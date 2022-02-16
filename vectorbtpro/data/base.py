@@ -677,10 +677,26 @@ class Data(Analyzable):
             **kwargs
         )
 
+    # ############# Renaming ############# #
+
+    def rename(self: DataT, rename: tp.Dict[tp.Hashable, tp.Hashable]) -> DataT:
+        """Rename symbols using `rename` dict that maps old symbols and new symbols."""
+        return self.replace(
+            data={rename.get(k, k): v for k, v in self.data.items()},
+            fetch_kwargs={rename.get(k, k): v for k, v in self.fetch_kwargs.items()},
+            returned_kwargs={rename.get(k, k): v for k, v in self.returned_kwargs.items()},
+            last_index={rename.get(k, k): v for k, v in self.last_index.items()}
+        )
+
     # ############# Merging ############# #
 
     @classmethod
-    def merge(cls: tp.Type[DataT], *datas: "Data", **kwargs) -> DataT:
+    def merge(
+            cls: tp.Type[DataT],
+            *datas: "Data",
+            rename: tp.Optional[tp.Dict[tp.Hashable, tp.Hashable]] = None,
+            **kwargs,
+    ) -> DataT:
         """Merge multiple `Data` instances."""
         if len(datas) < 2:
             raise ValueError("Merging requires at least two Data instances")
@@ -693,10 +709,14 @@ class Data(Analyzable):
             for s in instance.symbols:
                 if s in data:
                     raise ValueError(f"Found a duplicate symbol '{s}'")
-                data[s] = instance.data[s]
-                fetch_kwargs[s] = instance.fetch_kwargs[s]
-                returned_kwargs[s] = instance.returned_kwargs[s]
-                last_index[s] = instance.last_index[s]
+                if rename is None:
+                    new_s = s
+                else:
+                    new_s = rename[s]
+                data[new_s] = instance.data[s]
+                fetch_kwargs[new_s] = instance.fetch_kwargs[s]
+                returned_kwargs[new_s] = instance.returned_kwargs[s]
+                last_index[new_s] = instance.last_index[s]
 
         return cls.from_data(
             data=data,
