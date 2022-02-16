@@ -4,7 +4,6 @@
 
 Methods can be accessed as follows:
 
-* `OHLCVDFAccessor` -> `pd.DataFrame.vbt.ohlc.*`
 * `OHLCVDFAccessor` -> `pd.DataFrame.vbt.ohlcv.*`
 
 The accessors inherit `vectorbtpro.generic.accessors`.
@@ -104,7 +103,6 @@ from vectorbtpro.utils.decorators import class_or_instancemethod
 __pdoc__ = {}
 
 
-@register_df_vbt_accessor("ohlc")
 @register_df_vbt_accessor("ohlcv")
 class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
     """Accessor on top of OHLCV data. For DataFrames only.

@@ -12,7 +12,7 @@ vbt.base.accessors.BaseSR/DFAccessor           -> pd.Series/DataFrame.vbt.*
 vbt.generic.accessors.GenericSR/DFAccessor     -> pd.Series/DataFrame.vbt.*
 vbt.signals.accessors.SignalsSR/DFAccessor     -> pd.Series/DataFrame.vbt.signals.*
 vbt.returns.accessors.ReturnsSR/DFAccessor     -> pd.Series/DataFrame.vbt.returns.*
-vbt.ohlcv.accessors.OHLCVDFAccessor            -> pd.DataFrame.vbt.ohlc.* and pd.DataFrame.vbt.ohlcv.*
+vbt.ohlcv.accessors.OHLCVDFAccessor            -> pd.DataFrame.vbt.ohlcv.*
 vbt.px.accessors.PXSR/DFAccessor               -> pd.Series/DataFrame.vbt.px.*
 ```
 
