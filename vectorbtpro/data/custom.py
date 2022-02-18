@@ -49,6 +49,20 @@ try:
 except ImportError:
     AlpacaClientT = tp.Any
 
+__all__ = [
+    "LocalData",
+    "CSVData",
+    "HDFData",
+    "RemoteData",
+    "YFData",
+    "BinanceData",
+    "CCXTData",
+    "AlpacaData",
+    "SyntheticData",
+    "RandomData",
+    "GBMData",
+]
+
 # ############# Local ############# #
 
 LocalDataT = tp.TypeVar("LocalDataT", bound="LocalData")
@@ -100,7 +114,6 @@ class LocalData(Data):
         sort_paths: bool = True,
         match_path_kwargs: tp.KwargsLike = None,
         path_to_symbol_kwargs: tp.KwargsLike = None,
-        show_progress: tp.Optional[bool] = None,
         **kwargs,
     ) -> LocalDataT:
         """Override `vectorbtpro.data.base.Data.fetch` to take care of paths.
@@ -173,12 +186,9 @@ class LocalData(Data):
             if len(symbols) == 1 and single_symbol:
                 symbols = symbols[0]
 
-        if show_progress is None:
-            show_progress = False
         return super(LocalData, cls).fetch(
             symbols,
             path=paths,
-            show_progress=show_progress,
             **kwargs,
         )
 
@@ -1445,8 +1455,8 @@ class RandomData(SyntheticData):
 
         >>> rand_data = vbt.RandomData.fetch(
         ...     list(range(5)),
-        ...     start='2010-01-01',
-        ...     end='2020-01-01'
+        ...     start='2020-01-01',
+        ...     end='2022-01-01'
         ... )
         ```
 
@@ -1520,8 +1530,8 @@ class GBMData(RandomData):
 
         >>> gbm_data = vbt.GBMData.fetch(
         ...     list(range(5)),
-        ...     start='2010-01-01',
-        ...     end='2020-01-01'
+        ...     start='2020-01-01',
+        ...     end='2022-01-01'
         ... )
         ```
 

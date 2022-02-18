@@ -6,7 +6,7 @@ Technical indicators are used to see past trends and anticipate future moves.
 See [Using Technical Indicators to Develop Trading Strategies](https://www.investopedia.com/articles/trading/11/indicators-and-strategies-explained.asp)."""
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.indicators.custom import MA, MSTD, BBANDS, RSI, STOCH, MACD, ATR, OBV
+from vectorbtpro.indicators.custom import *
 from vectorbtpro.indicators.factory import IndicatorFactory, IndicatorBase
 from vectorbtpro.indicators.configs import flex_col_param_config, flex_elem_param_config
 from vectorbtpro.utils.module_ import create__all__

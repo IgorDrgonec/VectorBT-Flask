@@ -18,7 +18,7 @@ try:
 except ImportError:
     __blacklist__.append("plotting")
 else:
-    from vectorbtpro.generic.plotting import Gauge, Bar, Scatter, Histogram, Box, Heatmap, Volume
+    from vectorbtpro.generic.plotting import *
 
 __all__ = create__all__(__name__)
 __pdoc__ = {k: False for k in __all__}

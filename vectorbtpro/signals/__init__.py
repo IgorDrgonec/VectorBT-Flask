@@ -4,19 +4,7 @@
 
 from vectorbtpro.signals.enums import *
 from vectorbtpro.signals.factory import SignalFactory
-from vectorbtpro.signals.generators import (
-    RAND,
-    RANDX,
-    RANDNX,
-    RPROB,
-    RPROBX,
-    RPROBCX,
-    RPROBNX,
-    STX,
-    STCX,
-    OHLCSTX,
-    OHLCSTCX,
-)
+from vectorbtpro.signals.generators import *
 from vectorbtpro.utils.module_ import create__all__
 
 __all__ = create__all__(__name__)

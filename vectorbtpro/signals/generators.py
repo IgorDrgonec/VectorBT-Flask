@@ -17,6 +17,20 @@ from vectorbtpro.signals.nb import (
 )
 from vectorbtpro.utils.config import ReadonlyConfig
 
+__all__ = [
+    "RAND",
+    "RANDX",
+    "RANDNX",
+    "RPROB",
+    "RPROBX",
+    "RPROBCX",
+    "RPROBNX",
+    "STX",
+    "STCX",
+    "OHLCSTX",
+    "OHLCSTCX",
+]
+
 # ############# RAND ############# #
 
 RAND = SignalFactory(

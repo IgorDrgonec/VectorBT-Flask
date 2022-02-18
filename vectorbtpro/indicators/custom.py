@@ -18,8 +18,8 @@ ma_ewm    False False
 ```
 
 The advantage of these indicators over TA-Lib's is that they work primarily on 2-dimensional arrays
-and utilize caching, which makes them faster for matrices with huge number of columns. They also
-have plotting methods.
+and utilize caching, which makes them faster for matrices with huge number of (repeating) columns.
+They also have plotting methods.
 
 Run for the examples below:
 
@@ -72,6 +72,8 @@ from vectorbtpro.indicators import nb
 from vectorbtpro.indicators.factory import IndicatorFactory
 from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.config import merge_dicts
+
+__all__ = ["MA", "MSTD", "BBANDS", "RSI", "STOCH", "MACD", "ATR", "OBV"]
 
 # ############# MA ############# #
 

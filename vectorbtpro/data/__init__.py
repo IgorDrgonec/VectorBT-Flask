@@ -3,18 +3,7 @@
 """Modules for working with data sources."""
 
 from vectorbtpro.data.base import symbol_dict, Data
-from vectorbtpro.data.custom import (
-    LocalData,
-    CSVData,
-    HDFData,
-    SyntheticData,
-    RandomData,
-    GBMData,
-    YFData,
-    BinanceData,
-    CCXTData,
-    AlpacaData,
-)
+from vectorbtpro.data.custom import *
 from vectorbtpro.data.updater import DataUpdater
 from vectorbtpro.utils.module_ import create__all__
 
