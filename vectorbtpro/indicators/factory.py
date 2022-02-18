@@ -2468,13 +2468,18 @@ Other keyword arguments are passed to `{0}.run`.
             2020-01-05      4.5  1.5  4.0  2.0
             ```
 
-            * To get help on running the indicator, use the `help` command:
+            * To get help on running the indicator, use `vectorbtpro.utils.formatting.format_func`:
 
             ```pycon
-            >>> help(SMA.run)
-            Help on method run:
-
-            run(close, timeperiod=30, short_name='sma', hide_params=None, hide_default=True, **kwargs) method of vectorbtpro.generic.analyzable.MetaAnalyzable instance
+            >>> print(vbt.format_func(SMA.run))
+            SMA.run(
+                close,
+                timeperiod=Default(value=30),
+                short_name='sma',
+                hide_params=None,
+                hide_default=True,
+                **kwargs
+            ):
                 Run `SMA` indicator.
 
                 * Inputs: `close`
@@ -2850,17 +2855,24 @@ Args:
             2020-01-05  4.5  1.5  4.0  2.0
             ```
 
-            * To get help on running the indicator, use the `help` command:
+            * To get help on running the indicator, use `vectorbtpro.utils.formatting.format_func`:
 
             ```pycon
-            >>> help(SMA.run)
-            Help on method run:
-
-            run(close, length=None, offset=None, short_name='sma', hide_params=None, hide_default=True, **kwargs) method of vectorbtpro.generic.analyzable.MetaAnalyzable instance
+            >>> print(vbt.format_func(SMA.run))
+            SMA.run(
+                close,
+                length=Default(value=None),
+                talib=Default(value=None),
+                offset=Default(value=None),
+                short_name='sma',
+                hide_params=None,
+                hide_default=True,
+                **kwargs
+            ):
                 Run `SMA` indicator.
 
                 * Inputs: `close`
-                * Parameters: `length`, `offset`
+                * Parameters: `length`, `talib`, `offset`
                 * Outputs: `sma`
 
                 Pass a list of parameter names as `hide_params` to hide their column levels.
@@ -3060,13 +3072,19 @@ Args:
             2020-01-05           4.5  1.5  4.0  2.0
             ```
 
-            * To get help on running the indicator, use the `help` command:
+            * To get help on running the indicator, use `vectorbtpro.utils.formatting.format_func`:
 
             ```pycon
-            >>> help(SMAIndicator.run)
-            Help on method run:
-
-            run(close, window, fillna=False, short_name='smaindicator', hide_params=None, hide_default=True, **kwargs) method of vectorbtpro.generic.analyzable.MetaAnalyzable instance
+            >>> print(vbt.format_func(SMAIndicator.run))
+            SMAIndicator.run(
+                close,
+                window,
+                fillna=Default(value=False),
+                short_name='smaindicator',
+                hide_params=None,
+                hide_default=True,
+                **kwargs
+            ):
                 Run `SMAIndicator` indicator.
 
                 * Inputs: `close`
@@ -3731,13 +3749,17 @@ Args:
             [2688 rows x 2 columns]
             ```
 
-            * To get help on running the indicator, use the `help` command:
+            * To get help on running the indicator, use `vectorbtpro.utils.formatting.format_func`:
 
             ```pycon
-            >>> help(WQA1.run)
-            Help on method run:
-
-            run(close, short_name='wqa1', hide_params=None, hide_default=True, **kwargs) method of vectorbtpro.generic.analyzable.MetaAnalyzable instance
+            >>> print(vbt.format_func(WQA1.run))
+            WQA1.run(
+                close,
+                short_name='wqa1',
+                hide_params=None,
+                hide_default=True,
+                **kwargs
+            ):
                 Run `WQA1` indicator.
 
                 * Inputs: `close`

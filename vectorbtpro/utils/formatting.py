@@ -3,6 +3,7 @@
 """Utilities for formatting."""
 
 import attr
+import inspect
 import numpy as np
 
 from vectorbtpro import _typing as tp
@@ -162,3 +163,92 @@ def prettify(
         if np.isneginf(obj):
             return "-np.inf"
     return repr(obj)
+
+
+def format_parameter(param: inspect.Parameter, annotate: bool = False) -> str:
+    """Format a parameter of a signature."""
+    kind = param.kind
+    formatted = param.name
+
+    if annotate and param.annotation is not param.empty:
+        formatted = "{}: {}".format(formatted, inspect.formatannotation(param.annotation))
+
+    if param.default is not param.empty:
+        if annotate and param.annotation is not param.empty:
+            formatted = "{} = {}".format(formatted, repr(param.default))
+        else:
+            formatted = "{}={}".format(formatted, repr(param.default))
+
+    if kind == param.VAR_POSITIONAL:
+        formatted = "*" + formatted
+    elif kind == param.VAR_KEYWORD:
+        formatted = "**" + formatted
+
+    return formatted
+
+
+def format_signature(
+    signature: inspect.signature,
+    annotate: bool = False,
+    start: str = "\n    ",
+    separator: str = ",\n    ",
+    end: str = "\n",
+) -> str:
+    """Format a signature."""
+    result = []
+    render_pos_only_separator = False
+    render_kw_only_separator = True
+
+    for param in signature.parameters.values():
+        formatted = format_parameter(param, annotate=annotate)
+
+        kind = param.kind
+
+        if kind == param.POSITIONAL_ONLY:
+            render_pos_only_separator = True
+        elif render_pos_only_separator:
+            result.append("/")
+            render_pos_only_separator = False
+
+        if kind == param.VAR_POSITIONAL:
+            render_kw_only_separator = False
+        elif kind == param.KEYWORD_ONLY and render_kw_only_separator:
+            result.append("*")
+            render_kw_only_separator = False
+
+        result.append(formatted)
+
+    if render_pos_only_separator:
+        result.append("/")
+
+    if len(result) == 0:
+        rendered = "()"
+    else:
+        rendered = "({})".format(start + separator.join(result) + end)
+
+    if annotate and signature.return_annotation is not inspect._empty:
+        anno = inspect.formatannotation(signature.return_annotation)
+        rendered += " -> {}".format(anno)
+
+    return rendered
+
+
+def format_func(func: tp.Callable, **kwargs) -> str:
+    """Format a function."""
+    if inspect.isclass(func):
+        func_name = func.__name__ + ".__init__"
+        func = func.__init__
+    elif inspect.ismethod(func):
+        func_name = func.__self__.__name__ + "." + func.__name__
+    else:
+        func_name = func.__name__
+    if func.__doc__ is not None:
+        return "{}{}:\n{}".format(
+            func_name,
+            format_signature(inspect.signature(func), **kwargs),
+            "    " + "\n    ".join(inspect.cleandoc(func.__doc__).splitlines()),
+        )
+    return "{}{}".format(
+        func_name,
+        format_signature(inspect.signature(func), **kwargs),
+    )
