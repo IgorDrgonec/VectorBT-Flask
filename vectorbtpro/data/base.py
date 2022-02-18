@@ -795,7 +795,7 @@ class Data(Analyzable):
                 _path_or_buf = path_or_buf
 
             _kwargs = self.select_symbol_kwargs(k, kwargs)
-            sep = _kwargs.pop('sep', None)
+            sep = _kwargs.pop("sep", None)
             if isinstance(_path_or_buf, (str, Path)):
                 _path_or_buf = Path(_path_or_buf)
                 if isinstance(mkdir_kwargs, symbol_dict):
@@ -803,14 +803,14 @@ class Data(Analyzable):
                 else:
                     _mkdir_kwargs = self.select_symbol_kwargs(k, mkdir_kwargs)
                 check_mkdir(_path_or_buf.parent, **_mkdir_kwargs)
-                if _path_or_buf.suffix.lower() == '.csv':
+                if _path_or_buf.suffix.lower() == ".csv":
                     if sep is None:
-                        sep = ','
-                if _path_or_buf.suffix.lower() == '.tsv':
+                        sep = ","
+                if _path_or_buf.suffix.lower() == ".tsv":
                     if sep is None:
-                        sep = '\t'
+                        sep = "\t"
             if sep is None:
-                sep = ','
+                sep = ","
             v.to_csv(path_or_buf=_path_or_buf, sep=sep, **_kwargs)
 
     def to_hdf(
@@ -987,9 +987,7 @@ class Data(Analyzable):
                         if self.single_symbol or len(self.symbols) == 1:
                             symbol = self.symbols[0]
                         else:
-                            raise ValueError(
-                                "Only one symbol is allowed. Use indexing or symbol argument."
-                            )
+                            raise ValueError("Only one symbol is allowed. Use indexing or symbol argument.")
                     return (
                         self.get(
                             symbols=symbol,
@@ -1043,7 +1041,8 @@ class Data(Analyzable):
                         tags="data",
                     )
                     for s in symbols
-                ]""", context=dict(symbols=None)
+                ]""",
+                context=dict(symbols=None),
             )
         ),
     )

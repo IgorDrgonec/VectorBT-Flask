@@ -14,8 +14,9 @@ import time
 import traceback
 import warnings
 from functools import wraps
-from pathlib import Path
+from pathlib import Path, PurePath
 from glob import glob
+import re
 
 import pandas as pd
 
@@ -25,7 +26,12 @@ from vectorbtpro.data.base import Data, symbol_dict
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.utils.datetime_ import get_utc_tz, get_local_tz, to_tzaware_datetime, datetime_to_ms
+from vectorbtpro.utils.datetime_ import (
+    get_utc_tz,
+    get_local_tz,
+    to_tzaware_datetime,
+    datetime_to_ms,
+)
 from vectorbtpro.utils.parsing import get_func_kwargs
 from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.random_ import set_seed
@@ -46,27 +52,6 @@ except ImportError:
 LocalDataT = tp.TypeVar("LocalDataT", bound="LocalData")
 
 
-def unfold_path(path: tp.PathLike, sort_paths: bool = True) -> tp.List[Path]:
-    """`unfold_path_func` that returns a list of files matching a path."""
-    path = Path(path)
-    if path.exists():
-        if path.is_dir():
-            sub_paths = [p for p in path.iterdir() if p.is_file()]
-            if sort_paths:
-                sub_paths = sorted(sub_paths)
-            return sub_paths
-        return [path]
-    sub_paths = list([Path(p) for p in glob(str(path))])
-    if sort_paths:
-        sub_paths = sorted(sub_paths)
-    return sub_paths
-
-
-def path_to_symbol(path: tp.PathLike) -> str:
-    """`path_to_symbol_func` that returns the stem of a path."""
-    return Path(path).stem
-
-
 class LocalData(Data):
     """`Data` for local data distributed over multiple files.
 
@@ -75,39 +60,64 @@ class LocalData(Data):
     expressions accepted by `glob.glob`."""
 
     @classmethod
+    def match_path(
+        cls,
+        path: tp.PathLike,
+        match_regex: tp.Optional[str] = None,
+        sort_paths: bool = True,
+        **kwargs,
+    ) -> tp.List[Path]:
+        """Get the list of all paths matching a path."""
+        path = Path(path)
+        if path.exists():
+            if path.is_dir():
+                sub_paths = [p for p in path.iterdir() if p.is_file()]
+            else:
+                sub_paths = [path]
+        else:
+            sub_paths = list([Path(p) for p in glob(str(path), recursive=True)])
+        if match_regex is not None:
+            sub_paths = [p for p in sub_paths if re.match(match_regex, str(p))]
+        if sort_paths:
+            sub_paths = sorted(sub_paths)
+        return sub_paths
+
+    @classmethod
+    def path_to_symbol(cls, path: tp.PathLike, **kwargs) -> str:
+        """Convert a path into a symbol."""
+        return Path(path).stem
+
+    @classmethod
     def fetch(
         cls: tp.Type[LocalDataT],
         symbols: tp.Union[tp.Symbol, tp.Symbols] = None,
         *,
-        path: tp.Any = None,
-        parse_paths: bool = True,
+        paths: tp.Any = None,
+        match_paths: bool = True,
+        match_regex: tp.Optional[str] = None,
         sort_paths: bool = True,
-        unfold_path_func: tp.Callable = unfold_path,
-        unfold_path_kwargs: tp.KwargsLike = None,
-        path_to_symbol_func: tp.Callable = path_to_symbol,
+        match_path_kwargs: tp.KwargsLike = None,
+        path_to_symbol_kwargs: tp.KwargsLike = None,
+        show_progress: tp.Optional[bool] = None,
         **kwargs,
     ) -> LocalDataT:
-        """Override `vectorbtpro.data.base.Data.fetch`.
+        """Override `vectorbtpro.data.base.Data.fetch` to take care of paths.
 
-        Set `parse_paths` to False to not parse paths and behave like a regular
-        `vectorbtpro.data.base.Data` instance.
-
-        Use `unfold_path_func` to unfold a path into multiple paths. Won't get applied
-        if `path` is already an instance of `vectorbtpro.data.base.symbol_dict`.
-
-        Use `path_to_symbol_func` to get the symbol from a path. Gets applied only when
-        either `symbols` or `path` is None."""
-        if parse_paths:
+        Set `match_paths` to False to not parse paths and behave like a regular
+        `vectorbtpro.data.base.Data` instance."""
+        if match_paths:
             sync = False
-            if path is None:
-                path = symbols
+            if paths is None:
+                paths = symbols
                 sync = True
             elif symbols is None:
                 sync = True
-            if path is None:
-                raise ValueError("At least symbols or path must be set")
-            if unfold_path_kwargs is None:
-                unfold_path_kwargs = {}
+            if paths is None:
+                raise ValueError("At least symbols or paths must be set")
+            if match_path_kwargs is None:
+                match_path_kwargs = {}
+            if path_to_symbol_kwargs is None:
+                path_to_symbol_kwargs = {}
 
             single_symbol = False
             if isinstance(symbols, (str, Path)):
@@ -116,43 +126,59 @@ class LocalData(Data):
                 single_symbol = True
 
             single_path = False
-            if isinstance(path, (str, Path)):
+            if isinstance(paths, (str, Path)):
                 # Single path
-                path = [path]
+                paths = [paths]
                 single_path = True
                 if sync:
                     single_symbol = True
 
-            if isinstance(path, symbol_dict):
+            if isinstance(paths, symbol_dict):
                 # Dict of path per symbol
                 if sync:
-                    symbols = list(path.keys())
-                elif len(symbols) != len(path):
-                    raise ValueError("The number of symbols must match the number of paths")
-            elif checks.is_iterable(path) or checks.is_sequence(path):
+                    symbols = list(paths.keys())
+                elif len(symbols) != len(paths):
+                    raise ValueError("The number of symbols must be equal to the number of matched paths")
+            elif checks.is_iterable(paths) or checks.is_sequence(paths):
                 # Multiple paths
-                paths = [p for sub_path in path for p in unfold_path_func(sub_path, **unfold_path_kwargs)]
-                if len(paths) == 0:
-                    raise FileNotFoundError(f"No paths could be matched with {path}")
+                matched_paths = [
+                    p
+                    for sub_path in paths
+                    for p in cls.match_path(
+                        sub_path,
+                        match_regex=match_regex,
+                        sort_paths=sort_paths,
+                        **match_path_kwargs,
+                    )
+                ]
+                if len(matched_paths) == 0:
+                    raise FileNotFoundError(f"No paths could be matched with {paths}")
                 if sync:
                     symbols = []
-                    path = symbol_dict()
-                    for p in paths:
-                        s = path_to_symbol_func(p)
+                    paths = symbol_dict()
+                    for p in matched_paths:
+                        s = cls.path_to_symbol(p, **path_to_symbol_kwargs)
                         symbols.append(s)
-                        path[s] = p
-                elif len(symbols) != len(paths):
-                    raise ValueError("The number of symbols must match the number of paths")
+                        paths[s] = p
+                elif len(symbols) != len(matched_paths):
+                    raise ValueError("The number of symbols must be equal to the number of matched paths")
                 else:
-                    path = symbol_dict({s: paths[i] for i, s in enumerate(symbols)})
-                if len(paths) == 1 and single_path:
-                    path = paths[0]
+                    paths = symbol_dict({s: matched_paths[i] for i, s in enumerate(symbols)})
+                if len(matched_paths) == 1 and single_path:
+                    paths = matched_paths[0]
             else:
-                raise TypeError(f"Path '{path}' is not supported")
+                raise TypeError(f"Path '{paths}' is not supported")
             if len(symbols) == 1 and single_symbol:
                 symbols = symbols[0]
 
-        return super(LocalData, cls).fetch(symbols, path=path, **kwargs)
+        if show_progress is None:
+            show_progress = False
+        return super(LocalData, cls).fetch(
+            symbols,
+            path=paths,
+            show_progress=show_progress,
+            **kwargs,
+        )
 
 
 CSVDataT = tp.TypeVar("CSVDataT", bound="CSVData")
@@ -247,8 +273,22 @@ class CSVData(LocalData):
         else:
             nrows = None
 
+        sep = kwargs.pop("sep", None)
+        if isinstance(path, (str, Path)):
+            path = Path(path)
+            if path.suffix.lower() == ".csv":
+                if sep is None:
+                    sep = ","
+            if path.suffix.lower() == ".tsv":
+                if sep is None:
+                    sep = "\t"
+            path = str(path)
+        if sep is None:
+            sep = ","
+
         obj = pd.read_csv(
             path,
+            sep=sep,
             header=header,
             index_col=index_col,
             parse_dates=parse_dates,
@@ -279,68 +319,6 @@ class HDFKeyNotFoundError(Exception):
     """Gets raised if the key to an HDF object could not be found."""
 
     pass
-
-
-def split_hdf_path(
-    path: tp.PathLike,
-    key: tp.Optional[str] = None,
-    _full_path: tp.Optional[Path] = None,
-) -> tp.Tuple[Path, tp.Optional[str]]:
-    """Split the path to an HDF object into the path to the file and the key."""
-    path = Path(path)
-    if _full_path is None:
-        _full_path = path
-    if path.exists():
-        if path.is_dir():
-            raise HDFPathNotFoundError(f"No HDF files could be matched with {_full_path}")
-        return path, key
-    new_path = path.parent
-    if key is None:
-        new_key = path.name
-    else:
-        new_key = str(Path(path.name) / key)
-    return split_hdf_path(new_path, new_key, _full_path=_full_path)
-
-
-def hdf_unfold_path(path: tp.PathLike, sort_paths: bool = True) -> tp.List[Path]:
-    """`unfold_path_func` that returns a list of HDF paths (path to file + key) matching a path."""
-    path = Path(path)
-    if path.exists():
-        if path.is_dir():
-            sub_paths = [p for p in path.iterdir() if p.is_file()]
-            key_paths = [p for sub_path in sub_paths for p in hdf_unfold_path(sub_path)]
-            if sort_paths:
-                key_paths = sorted(key_paths)
-            return key_paths
-        with pd.HDFStore(str(path)) as store:
-            keys = [k[1:] for k in store.keys()]
-        if sort_paths:
-            keys = sorted(keys)
-        return [path / k for k in keys]
-    try:
-        file_path, key = split_hdf_path(path)
-        with pd.HDFStore(str(file_path)) as store:
-            keys = [k[1:] for k in store.keys()]
-        if sort_paths:
-            keys = sorted(keys)
-        if key is None:
-            return [file_path / k for k in keys]
-        if key in keys:
-            return [file_path / key]
-        matching_keys = []
-        for k in keys:
-            if k.startswith(key):
-                matching_keys.append(k)
-        if len(matching_keys) == 0:
-            raise HDFKeyNotFoundError(f"No HDF keys could be matched with {key}")
-        return [file_path / k for k in matching_keys]
-    except HDFPathNotFoundError:
-        pass
-    sub_paths = list([Path(p) for p in glob(str(path))])
-    key_paths = [p for sub_path in sub_paths for p in hdf_unfold_path(sub_path)]
-    if sort_paths:
-        key_paths = sorted(key_paths)
-    return key_paths
 
 
 HDFDataT = tp.TypeVar("HDFDataT", bound="HDFData")
@@ -419,15 +397,92 @@ class HDFData(LocalData):
     """
 
     @classmethod
-    def fetch(
-        cls: tp.Type[HDFDataT],
-        symbols: tp.Union[tp.Symbol, tp.Symbols] = None,
-        *,
-        unfold_path_func: tp.Callable = hdf_unfold_path,
+    def split_hdf_path(
+        cls,
+        path: tp.PathLike,
+        key: tp.Optional[str] = None,
+        _full_path: tp.Optional[Path] = None,
+    ) -> tp.Tuple[Path, tp.Optional[str]]:
+        """Split the path to an HDF object into the path to the file and the key."""
+        path = Path(path)
+        if _full_path is None:
+            _full_path = path
+        if path.exists():
+            if path.is_dir():
+                raise HDFPathNotFoundError(f"No HDF files could be matched with {_full_path}")
+            return path, key
+        new_path = path.parent
+        if key is None:
+            new_key = path.name
+        else:
+            new_key = str(Path(path.name) / key)
+        return cls.split_hdf_path(new_path, new_key, _full_path=_full_path)
+
+    @classmethod
+    def match_path(
+        cls,
+        path: tp.PathLike,
+        match_regex: tp.Optional[str] = None,
+        sort_paths: bool = True,
         **kwargs,
-    ) -> HDFDataT:
-        """Override `LocalData.fetch` to parse paths and HDF keys."""
-        return super(HDFData, cls).fetch(symbols, unfold_path_func=unfold_path_func, **kwargs)
+    ) -> tp.List[Path]:
+        """Override `LocalData.match_path` to return a list of HDF paths
+        (path to file + key) matching a path."""
+        path = Path(path)
+        if path.exists():
+            if path.is_dir():
+                sub_paths = [p for p in path.iterdir() if p.is_file()]
+                key_paths = [p for sub_path in sub_paths for p in cls.match_path(sub_path, sort_paths=False, **kwargs)]
+            else:
+                with pd.HDFStore(str(path)) as store:
+                    keys = [k[1:] for k in store.keys()]
+                key_paths = [path / k for k in keys]
+        else:
+            try:
+                file_path, key = cls.split_hdf_path(path)
+                with pd.HDFStore(str(file_path)) as store:
+                    keys = [k[1:] for k in store.keys()]
+                if key is None:
+                    key_paths = [file_path / k for k in keys]
+                elif key in keys:
+                    key_paths = [file_path / key]
+                else:
+                    matching_keys = []
+                    for k in keys:
+                        if k.startswith(key) or PurePath("/" + str(k)).match("/" + str(key)):
+                            matching_keys.append(k)
+                    if len(matching_keys) == 0:
+                        raise HDFKeyNotFoundError(f"No HDF keys could be matched with {key}")
+                    key_paths = [file_path / k for k in matching_keys]
+            except HDFPathNotFoundError:
+                sub_paths = list([Path(p) for p in glob(str(path))])
+                if len(sub_paths) == 0 and re.match(r".+\..+", str(path)):
+                    base_path = None
+                    base_ended = False
+                    key_path = None
+                    for part in path.parts:
+                        part = Path(part)
+                        if base_ended:
+                            if key_path is None:
+                                key_path = part
+                            else:
+                                key_path /= part
+                        else:
+                            if re.match(r".+\..+", str(part)):
+                                base_ended = True
+                            if base_path is None:
+                                base_path = part
+                            else:
+                                base_path /= part
+                    sub_paths = list([Path(p) for p in glob(str(base_path))])
+                    if key_path is not None:
+                        sub_paths = [p / key_path for p in sub_paths]
+                key_paths = [p for sub_path in sub_paths for p in cls.match_path(sub_path, sort_paths=False, **kwargs)]
+        if match_regex is not None:
+            key_paths = [p for p in key_paths if re.match(match_regex, str(p))]
+        if sort_paths:
+            key_paths = sorted(key_paths)
+        return key_paths
 
     @classmethod
     def fetch_symbol(
@@ -449,7 +504,7 @@ class HDFData(LocalData):
         if path is None:
             path = symbol
         path = Path(path)
-        file_path, key = split_hdf_path(path)
+        file_path, key = cls.split_hdf_path(path)
         if end_row is not None:
             stop = end_row + 1
         else:
@@ -962,7 +1017,13 @@ class BinanceData(Data):  # pragma: no cover
         # Establish the timestamps
         start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
         try:
-            first_data = client.get_klines(symbol=symbol, interval=interval, limit=1, startTime=0, endTime=None)
+            first_data = client.get_klines(
+                symbol=symbol,
+                interval=interval,
+                limit=1,
+                startTime=0,
+                endTime=None,
+            )
             first_valid_ts = first_data[0][0]
             next_start_ts = start_ts = max(start_ts, first_valid_ts)
         except:
@@ -995,7 +1056,12 @@ class BinanceData(Data):  # pragma: no cover
                     if not len(next_data):
                         break
                     data += next_data
-                    pbar.set_description("{} - {}".format(_ts_to_str(start_ts), _ts_to_str(next_data[-1][0])))
+                    pbar.set_description(
+                        "{} - {}".format(
+                            _ts_to_str(start_ts),
+                            _ts_to_str(next_data[-1][0]),
+                        )
+                    )
                     pbar.update(1)
                     next_start_ts = next_data[-1][0]
                     if delay is not None:
@@ -1205,7 +1271,13 @@ class CCXTData(Data):  # pragma: no cover
 
         @_retry
         def _fetch(_since, _limit):
-            return exchange.fetch_ohlcv(symbol, timeframe=timeframe, since=_since, limit=_limit, params=params)
+            return exchange.fetch_ohlcv(
+                symbol,
+                timeframe=timeframe,
+                since=_since,
+                limit=_limit,
+                params=params,
+            )
 
         # Establish the timestamps
         start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
@@ -1237,7 +1309,12 @@ class CCXTData(Data):  # pragma: no cover
                     if not len(next_data):
                         break
                     data += next_data
-                    pbar.set_description("{} - {}".format(_ts_to_str(start_ts), _ts_to_str(next_data[-1][0])))
+                    pbar.set_description(
+                        "{} - {}".format(
+                            _ts_to_str(start_ts),
+                            _ts_to_str(next_data[-1][0]),
+                        )
+                    )
                     pbar.update(1)
                     next_start_ts = next_data[-1][0]
                     if delay is not None:
@@ -1405,7 +1482,11 @@ class AlpacaData(Data):  # pragma: no cover
         assert_can_import("alpaca_trade_api")
         from alpaca_trade_api.rest import TimeFrameUnit, TimeFrame
 
-        _timeframe_units = {"d": TimeFrameUnit.Day, "h": TimeFrameUnit.Hour, "m": TimeFrameUnit.Minute}
+        _timeframe_units = {
+            "d": TimeFrameUnit.Day,
+            "h": TimeFrameUnit.Hour,
+            "m": TimeFrameUnit.Minute,
+        }
 
         if len(timeframe) < 2:
             raise ValueError("invalid timeframe")
