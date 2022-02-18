@@ -431,6 +431,8 @@ class Data(Analyzable):
             **kwargs: Passed to `Data.fetch_symbol`.
 
                 If two symbols require different keyword arguments, pass `symbol_dict` for each argument.
+
+        For defaults, see `vectorbtpro._settings.data`.
         """
         from vectorbtpro._settings import settings
 
@@ -464,16 +466,34 @@ class Data(Analyzable):
                     _kwargs["show_progress"] = show_symbol_progress
                 if "pbar_kwargs" in func_arg_names:
                     _kwargs["pbar_kwargs"] = pbar_kwargs
+
                 out = cls.fetch_symbol(symbol, **_kwargs)
-                if isinstance(out, tuple):
-                    data[symbol] = out[0]
-                    returned_kwargs[symbol] = out[1]
+
+                if out is None:
+                    warnings.warn(
+                        f"Symbol '{symbol}' returned None. Skipping.",
+                        stacklevel=2,
+                    )
                 else:
-                    data[symbol] = out
-                    returned_kwargs[symbol] = {}
-                fetch_kwargs[symbol] = _kwargs
+                    if isinstance(out, tuple):
+                        _data = out[0]
+                        _returned_kwargs = out[1]
+                    else:
+                        _data = out
+                        _returned_kwargs = {}
+                    if _data.size == 0:
+                        warnings.warn(
+                            f"Symbol '{symbol}' returned an empty array. Skipping.",
+                            stacklevel=2,
+                        )
+                    else:
+                        data[symbol] = _data
+                        returned_kwargs[symbol] = _returned_kwargs
+                        fetch_kwargs[symbol] = _kwargs
 
                 pbar.update(1)
+        if len(data) == 0:
+            raise ValueError("No symbols could be fetched")
 
         # Create new instance from data
         return cls.from_data(
@@ -537,7 +557,9 @@ class Data(Analyzable):
                     _kwargs["show_progress"] = show_progress
                 if "pbar_kwargs" in func_arg_names:
                     _kwargs["pbar_kwargs"] = pbar_kwargs
+
                 out = self.update_symbol(symbol, **_kwargs)
+
                 if isinstance(out, tuple):
                     new_obj = out[0]
                     new_returned_kwargs[symbol] = out[1]
