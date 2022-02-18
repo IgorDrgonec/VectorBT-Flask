@@ -44,13 +44,13 @@ class Data(Analyzable):
         wrapper: ArrayWrapper,
         data: symbol_dict,
         single_symbol: bool,
+        fetch_kwargs: symbol_dict,
+        returned_kwargs: symbol_dict,
+        last_index: symbol_dict,
         tz_localize: tp.Optional[tp.TimezoneLike],
         tz_convert: tp.Optional[tp.TimezoneLike],
         missing_index: str,
         missing_columns: str,
-        fetch_kwargs: symbol_dict,
-        returned_kwargs: symbol_dict,
-        last_index: symbol_dict,
         **kwargs,
     ) -> None:
 
@@ -66,25 +66,25 @@ class Data(Analyzable):
             wrapper,
             data=data,
             single_symbol=single_symbol,
+            fetch_kwargs=fetch_kwargs,
+            returned_kwargs=returned_kwargs,
+            last_index=last_index,
             tz_localize=tz_localize,
             tz_convert=tz_convert,
             missing_index=missing_index,
             missing_columns=missing_columns,
-            fetch_kwargs=fetch_kwargs,
-            returned_kwargs=returned_kwargs,
-            last_index=last_index,
             **kwargs,
         )
 
         self._data = symbol_dict(data)
         self._single_symbol = single_symbol
+        self._fetch_kwargs = symbol_dict(fetch_kwargs)
+        self._returned_kwargs = symbol_dict(returned_kwargs)
+        self._last_index = symbol_dict(last_index)
         self._tz_localize = tz_localize
         self._tz_convert = tz_convert
         self._missing_index = missing_index
         self._missing_columns = missing_columns
-        self._fetch_kwargs = symbol_dict(fetch_kwargs)
-        self._returned_kwargs = symbol_dict(returned_kwargs)
-        self._last_index = symbol_dict(last_index)
 
     def indexing_func(self: DataT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> DataT:
         """Perform indexing on `Data`."""
@@ -108,6 +108,21 @@ class Data(Analyzable):
         return list(self.data.keys())
 
     @property
+    def fetch_kwargs(self) -> symbol_dict:
+        """Keyword arguments of type `symbol_dict` initially passed to `Data.fetch_symbol`."""
+        return self._fetch_kwargs
+
+    @property
+    def returned_kwargs(self) -> symbol_dict:
+        """Keyword arguments of type `symbol_dict` returned by `Data.fetch_symbol`."""
+        return self._returned_kwargs
+
+    @property
+    def last_index(self) -> symbol_dict:
+        """Last fetched index per symbol of type `symbol_dict`."""
+        return self._last_index
+
+    @property
     def tz_localize(self) -> tp.Optional[tp.TimezoneLike]:
         """`tz_localize` initially passed to `Data.fetch_symbol`."""
         return self._tz_localize
@@ -126,21 +141,6 @@ class Data(Analyzable):
     def missing_columns(self) -> str:
         """`missing_columns` initially passed to `Data.fetch_symbol`."""
         return self._missing_columns
-
-    @property
-    def fetch_kwargs(self) -> symbol_dict:
-        """Keyword arguments of type `symbol_dict` initially passed to `Data.fetch_symbol`."""
-        return self._fetch_kwargs
-
-    @property
-    def returned_kwargs(self) -> symbol_dict:
-        """Keyword arguments of type `symbol_dict` returned by `Data.fetch_symbol`."""
-        return self._returned_kwargs
-
-    @property
-    def last_index(self) -> symbol_dict:
-        """Last fetched index per symbol of type `symbol_dict`."""
-        return self._last_index
 
     # ############# Pre- and post-processing ############# #
 
@@ -329,6 +329,19 @@ class Data(Analyzable):
             **kwargs: Keyword arguments passed to the `__init__` method.
 
         For defaults, see `vectorbtpro._settings.data`."""
+        from vectorbtpro._settings import settings
+
+        data_cfg = settings["data"]
+
+        if tz_localize is None:
+            tz_localize = data_cfg["tz_localize"]
+        if tz_convert is None:
+            tz_convert = data_cfg["tz_convert"]
+        if missing_index is None:
+            missing_index = data_cfg["missing_index"]
+        if missing_columns is None:
+            missing_columns = data_cfg["missing_columns"]
+
         if wrapper_kwargs is None:
             wrapper_kwargs = {}
         if fetch_kwargs is None:
@@ -359,13 +372,13 @@ class Data(Analyzable):
             wrapper,
             data,
             single_symbol,
+            fetch_kwargs=fetch_kwargs,
+            returned_kwargs=returned_kwargs,
+            last_index=last_index,
             tz_localize=tz_localize,
             tz_convert=tz_convert,
             missing_index=missing_index,
             missing_columns=missing_columns,
-            fetch_kwargs=fetch_kwargs,
-            returned_kwargs=returned_kwargs,
-            last_index=last_index,
             **kwargs,
         )
 
@@ -771,11 +784,6 @@ class Data(Analyzable):
                 else:
                     _dir_path = dir_path
                 _dir_path = Path(_dir_path)
-                if isinstance(mkdir_kwargs, symbol_dict):
-                    _mkdir_kwargs = mkdir_kwargs[k]
-                else:
-                    _mkdir_kwargs = self.select_symbol_kwargs(k, mkdir_kwargs)
-                check_mkdir(_dir_path, **_mkdir_kwargs)
                 if isinstance(ext, symbol_dict):
                     _ext = ext[k]
                 else:
@@ -785,8 +793,25 @@ class Data(Analyzable):
                 _path_or_buf = path_or_buf[k]
             else:
                 _path_or_buf = path_or_buf
+
             _kwargs = self.select_symbol_kwargs(k, kwargs)
-            v.to_csv(path_or_buf=_path_or_buf, **_kwargs)
+            sep = _kwargs.pop('sep', None)
+            if isinstance(_path_or_buf, (str, Path)):
+                _path_or_buf = Path(_path_or_buf)
+                if isinstance(mkdir_kwargs, symbol_dict):
+                    _mkdir_kwargs = mkdir_kwargs[k]
+                else:
+                    _mkdir_kwargs = self.select_symbol_kwargs(k, mkdir_kwargs)
+                check_mkdir(_path_or_buf.parent, **_mkdir_kwargs)
+                if _path_or_buf.suffix.lower() == '.csv':
+                    if sep is None:
+                        sep = ','
+                if _path_or_buf.suffix.lower() == '.tsv':
+                    if sep is None:
+                        sep = '\t'
+            if sep is None:
+                sep = ','
+            v.to_csv(path_or_buf=_path_or_buf, sep=sep, **_kwargs)
 
     def to_hdf(
         self,
@@ -800,7 +825,7 @@ class Data(Analyzable):
 
         Any argument can be provided per symbol using `symbol_dict`.
 
-        If `file_path` exists and it's a directory, will inside of it create a file named
+        If `file_path` exists, and it's a directory, will create inside it a file named
         after this class. This won't work with directories that do not exist, otherwise
         they could be confused with file names."""
         for k, v in self.data.items():

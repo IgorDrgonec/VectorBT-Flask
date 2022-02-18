@@ -4,6 +4,7 @@
 
 from vectorbtpro.data.base import symbol_dict, Data
 from vectorbtpro.data.custom import (
+    LocalData,
     CSVData,
     HDFData,
     SyntheticData,
