@@ -45,7 +45,10 @@ class MyData(vbt.Data):
         is_update=False,
         return_none=False,
         return_empty=False,
+        raise_error=False
     ):
+        if raise_error:
+            raise ValueError()
         if return_none:
             return None
         if return_empty:
@@ -342,6 +345,31 @@ class TestData:
                 index=index,
             ),
         )
+        assert len(MyData.fetch(
+            [0, 1], shape=(5, 3),
+            raise_error=vbt.symbol_dict({0: True, 1: False}),
+            skip_on_error=True).symbols) == 1
+        pd.testing.assert_frame_equal(
+            MyData.fetch(
+                [0, 1], shape=(5, 3),
+                raise_error=vbt.symbol_dict({0: True, 1: False}),
+                skip_on_error=True).data[1],
+            pd.DataFrame(
+                [
+                    ["1_0_0", "1_1_0", "1_2_0"],
+                    ["1_0_1", "1_1_1", "1_2_1"],
+                    ["1_0_2", "1_1_2", "1_2_2"],
+                    ["1_0_3", "1_1_3", "1_2_3"],
+                    ["1_0_4", "1_1_4", "1_2_4"],
+                ],
+                index=index,
+            ),
+        )
+        with pytest.raises(Exception):
+            MyData.fetch(
+                [0, 1], shape=(5, 3),
+                raise_error=vbt.symbol_dict({0: True, 1: False}),
+                skip_on_error=False)
         with pytest.raises(Exception):
             MyData.fetch(
                 [0, 1],
@@ -377,6 +405,32 @@ class TestData:
                 column_mask=column_mask,
                 missing_index="nan",
                 missing_columns="test",
+            )
+        with pytest.raises(Exception):
+            MyData.fetch(
+                [0, 1],
+                shape=(5, 3),
+                return_none=True
+            )
+        with pytest.raises(Exception):
+            MyData.fetch(
+                [0, 1],
+                shape=(5, 3),
+                return_empty=True
+            )
+        with pytest.raises(Exception):
+            MyData.fetch(
+                [0, 1],
+                shape=(5, 3),
+                raise_error=True,
+                skip_on_error=False
+            )
+        with pytest.raises(Exception):
+            MyData.fetch(
+                [0, 1],
+                shape=(5, 3),
+                raise_error=True,
+                skip_on_error=True
             )
 
     def test_update(self):
@@ -695,6 +749,148 @@ class TestData:
             missing_index="drop",
             missing_columns="drop",
         ).update(n=3, index_mask=update_index_mask2).last_index == {0: updated_index[4], 1: updated_index[5]}
+        pd.testing.assert_frame_equal(
+            MyData.fetch(
+                [0, 1], shape=(5, 3)
+            ).update(
+                n=2, return_none=vbt.symbol_dict({0: True, 1: False})
+            ).data[0],
+            pd.DataFrame(
+                [
+                    ['0_0_0', '0_1_0', '0_2_0'],
+                    ['0_0_1', '0_1_1', '0_2_1'],
+                    ['0_0_2', '0_1_2', '0_2_2'],
+                    ['0_0_3', '0_1_3', '0_2_3'],
+                    ['0_0_4', '0_1_4', '0_2_4'],
+                    [np.nan, np.nan, np.nan]
+                ],
+                index=updated_index,
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            MyData.fetch(
+                [0, 1], shape=(5, 3)
+            ).update(
+                n=2, return_none=vbt.symbol_dict({0: True, 1: False})
+            ).data[1],
+            pd.DataFrame(
+                [
+                    ['1_0_0', '1_1_0', '1_2_0'],
+                    ['1_0_1', '1_1_1', '1_2_1'],
+                    ['1_0_2', '1_1_2', '1_2_2'],
+                    ['1_0_3', '1_1_3', '1_2_3'],
+                    ["1_0_0_u", "1_1_0_u", "1_2_0_u"],
+                    ["1_0_1_u", "1_1_1_u", "1_2_1_u"]
+                ],
+                index=updated_index,
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            MyData.fetch(
+                [0, 1], shape=(5, 3)
+            ).update(
+                n=2, return_empty=vbt.symbol_dict({0: True, 1: False})
+            ).data[0],
+            pd.DataFrame(
+                [
+                    ['0_0_0', '0_1_0', '0_2_0'],
+                    ['0_0_1', '0_1_1', '0_2_1'],
+                    ['0_0_2', '0_1_2', '0_2_2'],
+                    ['0_0_3', '0_1_3', '0_2_3'],
+                    ['0_0_4', '0_1_4', '0_2_4'],
+                    [np.nan, np.nan, np.nan]
+                ],
+                index=updated_index,
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            MyData.fetch(
+                [0, 1], shape=(5, 3)
+            ).update(
+                n=2, return_empty=vbt.symbol_dict({0: True, 1: False})
+            ).data[1],
+            pd.DataFrame(
+                [
+                    ['1_0_0', '1_1_0', '1_2_0'],
+                    ['1_0_1', '1_1_1', '1_2_1'],
+                    ['1_0_2', '1_1_2', '1_2_2'],
+                    ['1_0_3', '1_1_3', '1_2_3'],
+                    ["1_0_0_u", "1_1_0_u", "1_2_0_u"],
+                    ["1_0_1_u", "1_1_1_u", "1_2_1_u"]
+                ],
+                index=updated_index,
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            MyData.fetch(
+                [0, 1], shape=(5, 3)
+            ).update(
+                n=2, raise_error=vbt.symbol_dict({0: True, 1: False}), skip_on_error=True
+            ).data[0],
+            pd.DataFrame(
+                [
+                    ['0_0_0', '0_1_0', '0_2_0'],
+                    ['0_0_1', '0_1_1', '0_2_1'],
+                    ['0_0_2', '0_1_2', '0_2_2'],
+                    ['0_0_3', '0_1_3', '0_2_3'],
+                    ['0_0_4', '0_1_4', '0_2_4'],
+                    [np.nan, np.nan, np.nan]
+                ],
+                index=updated_index,
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            MyData.fetch(
+                [0, 1], shape=(5, 3)
+            ).update(
+                n=2, raise_error=vbt.symbol_dict({0: True, 1: False}), skip_on_error=True
+            ).data[1],
+            pd.DataFrame(
+                [
+                    ['1_0_0', '1_1_0', '1_2_0'],
+                    ['1_0_1', '1_1_1', '1_2_1'],
+                    ['1_0_2', '1_1_2', '1_2_2'],
+                    ['1_0_3', '1_1_3', '1_2_3'],
+                    ["1_0_0_u", "1_1_0_u", "1_2_0_u"],
+                    ["1_0_1_u", "1_1_1_u", "1_2_1_u"]
+                ],
+                index=updated_index,
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            MyData.fetch(
+                [0, 1], shape=(5, 3)
+            ).update(
+                n=2, raise_error=True, skip_on_error=True
+            ).data[0],
+            pd.DataFrame(
+                [
+                    ['0_0_0', '0_1_0', '0_2_0'],
+                    ['0_0_1', '0_1_1', '0_2_1'],
+                    ['0_0_2', '0_1_2', '0_2_2'],
+                    ['0_0_3', '0_1_3', '0_2_3'],
+                    ['0_0_4', '0_1_4', '0_2_4']
+                ],
+                index=index,
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            MyData.fetch(
+                [0, 1], shape=(5, 3)
+            ).update(
+                n=2, raise_error=True, skip_on_error=True
+            ).data[1],
+            pd.DataFrame(
+                [
+                    ['1_0_0', '1_1_0', '1_2_0'],
+                    ['1_0_1', '1_1_1', '1_2_1'],
+                    ['1_0_2', '1_1_2', '1_2_2'],
+                    ['1_0_3', '1_1_3', '1_2_3'],
+                    ['1_0_4', '1_1_4', '1_2_4']
+                ],
+                index=index,
+            ),
+        )
 
     def test_concat(self):
         index = pd.DatetimeIndex(

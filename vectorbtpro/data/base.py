@@ -9,11 +9,12 @@ all pandas objects have the same index and columns by aligning them.
 
 import warnings
 from pathlib import Path
+import traceback
 
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.reshaping import to_pd_array
+from vectorbtpro.base.reshaping import to_any_array, to_pd_array
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.utils import checks
@@ -176,7 +177,12 @@ class Data(Analyzable):
         return obj
 
     @classmethod
-    def align_index(cls, data: symbol_dict, missing: tp.Optional[str] = None) -> symbol_dict:
+    def align_index(
+        cls,
+        data: symbol_dict,
+        missing: tp.Optional[str] = None,
+        silence_warnings: tp.Optional[bool] = None,
+    ) -> symbol_dict:
         """Align data to have the same index.
 
         The argument `missing` accepts the following values:
@@ -195,6 +201,8 @@ class Data(Analyzable):
 
         if missing is None:
             missing = data_cfg["missing_index"]
+        if silence_warnings is None:
+            silence_warnings = data_cfg["silence_warnings"]
 
         index = None
         for symbol, obj in data.items():
@@ -203,16 +211,18 @@ class Data(Analyzable):
             else:
                 if len(index.intersection(obj.index)) != len(index.union(obj.index)):
                     if missing == "nan":
-                        warnings.warn(
-                            "Symbols have mismatching index. Setting missing data points to NaN.",
-                            stacklevel=2,
-                        )
+                        if not silence_warnings:
+                            warnings.warn(
+                                "Symbols have mismatching index. Setting missing data points to NaN.",
+                                stacklevel=2,
+                            )
                         index = index.union(obj.index)
                     elif missing == "drop":
-                        warnings.warn(
-                            "Symbols have mismatching index. Dropping missing data points.",
-                            stacklevel=2,
-                        )
+                        if not silence_warnings:
+                            warnings.warn(
+                                "Symbols have mismatching index. Dropping missing data points.",
+                                stacklevel=2,
+                            )
                         index = index.intersection(obj.index)
                     elif missing == "raise":
                         raise ValueError("Symbols have mismatching index")
@@ -224,7 +234,12 @@ class Data(Analyzable):
         return new_data
 
     @classmethod
-    def align_columns(cls, data: symbol_dict, missing: tp.Optional[str] = None) -> symbol_dict:
+    def align_columns(
+        cls,
+        data: symbol_dict,
+        missing: tp.Optional[str] = None,
+        silence_warnings: tp.Optional[bool] = None,
+    ) -> symbol_dict:
         """Align data to have the same columns.
 
         See `Data.align_index` for `missing`."""
@@ -237,6 +252,8 @@ class Data(Analyzable):
 
         if missing is None:
             missing = data_cfg["missing_columns"]
+        if silence_warnings is None:
+            silence_warnings = data_cfg["silence_warnings"]
 
         columns = None
         multiple_columns = False
@@ -253,16 +270,18 @@ class Data(Analyzable):
             else:
                 if len(columns.intersection(obj.columns)) != len(columns.union(obj.columns)):
                     if missing == "nan":
-                        warnings.warn(
-                            "Symbols have mismatching columns. Setting missing data points to NaN.",
-                            stacklevel=2,
-                        )
+                        if not silence_warnings:
+                            warnings.warn(
+                                "Symbols have mismatching columns. Setting missing data points to NaN.",
+                                stacklevel=2,
+                            )
                         columns = columns.union(obj.columns)
                     elif missing == "drop":
-                        warnings.warn(
-                            "Symbols have mismatching columns. Dropping missing data points.",
-                            stacklevel=2,
-                        )
+                        if not silence_warnings:
+                            warnings.warn(
+                                "Symbols have mismatching columns. Dropping missing data points.",
+                                stacklevel=2,
+                            )
                         columns = columns.intersection(obj.columns)
                     elif missing == "raise":
                         raise ValueError("Symbols have mismatching columns")
@@ -311,6 +330,7 @@ class Data(Analyzable):
         fetch_kwargs: tp.Optional[symbol_dict] = None,
         returned_kwargs: tp.Optional[symbol_dict] = None,
         last_index: tp.Optional[symbol_dict] = None,
+        silence_warnings: tp.Optional[bool] = None,
         **kwargs,
     ) -> DataT:
         """Create a new `Data` instance from data.
@@ -326,6 +346,7 @@ class Data(Analyzable):
             fetch_kwargs (symbol_dict): Keyword arguments initially passed to `Data.fetch_symbol`.
             returned_kwargs (symbol_dict): Keyword arguments returned by `Data.fetch_symbol`.
             last_index (symbol_dict): Last fetched index per symbol.
+            silence_warnings (bool): Whether to silence all warnings.
             **kwargs: Keyword arguments passed to the `__init__` method.
 
         For defaults, see `vectorbtpro._settings.data`."""
@@ -341,6 +362,8 @@ class Data(Analyzable):
             missing_index = data_cfg["missing_index"]
         if missing_columns is None:
             missing_columns = data_cfg["missing_columns"]
+        if silence_warnings is None:
+            silence_warnings = data_cfg["silence_warnings"]
 
         if wrapper_kwargs is None:
             wrapper_kwargs = {}
@@ -359,8 +382,8 @@ class Data(Analyzable):
             if symbol not in last_index:
                 last_index[symbol] = obj.index[-1]
 
-        data = cls.align_index(data, missing=missing_index)
-        data = cls.align_columns(data, missing=missing_columns)
+        data = cls.align_index(data, missing=missing_index, silence_warnings=silence_warnings)
+        data = cls.align_columns(data, missing=missing_columns, silence_warnings=silence_warnings)
 
         for symbol, obj in data.items():
             if isinstance(obj.index, pd.DatetimeIndex):
@@ -407,6 +430,8 @@ class Data(Analyzable):
         wrapper_kwargs: tp.KwargsLike = None,
         show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
+        skip_on_error: tp.Optional[bool] = None,
+        silence_warnings: tp.Optional[bool] = None,
         **kwargs,
     ) -> DataT:
         """Fetch data using `Data.fetch_symbol` and pass to `Data.from_data`.
@@ -428,6 +453,8 @@ class Data(Analyzable):
             pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`.
 
                 Will also forward this argument to `Data.fetch_symbol` if in the signature.
+            skip_on_error (bool): Whether to skip the symbol when an exception is raised.
+            silence_warnings (bool): Whether to silence all warnings.
             **kwargs: Passed to `Data.fetch_symbol`.
 
                 If two symbols require different keyword arguments, pass `symbol_dict` for each argument.
@@ -451,6 +478,10 @@ class Data(Analyzable):
         if show_progress is None:
             show_progress = data_cfg["show_progress"] and not single_symbol
         pbar_kwargs = merge_dicts(data_cfg["pbar_kwargs"], pbar_kwargs)
+        if skip_on_error is None:
+            skip_on_error = data_cfg["skip_on_error"]
+        if silence_warnings is None:
+            silence_warnings = data_cfg["silence_warnings"]
 
         data = symbol_dict()
         fetch_kwargs = symbol_dict()
@@ -467,29 +498,42 @@ class Data(Analyzable):
                 if "pbar_kwargs" in func_arg_names:
                     _kwargs["pbar_kwargs"] = pbar_kwargs
 
-                out = cls.fetch_symbol(symbol, **_kwargs)
-
-                if out is None:
-                    warnings.warn(
-                        f"Symbol '{symbol}' returned None. Skipping.",
-                        stacklevel=2,
-                    )
-                else:
-                    if isinstance(out, tuple):
-                        _data = out[0]
-                        _returned_kwargs = out[1]
-                    else:
-                        _data = out
-                        _returned_kwargs = {}
-                    if _data.size == 0:
+                try:
+                    out = cls.fetch_symbol(symbol, **_kwargs)
+                except Exception as e:
+                    if not skip_on_error:
+                        raise e
+                    if not silence_warnings:
+                        warnings.warn(traceback.format_exc(), stacklevel=2)
                         warnings.warn(
-                            f"Symbol '{symbol}' returned an empty array. Skipping.",
+                            f"Symbol '{str(symbol)}' raised an exception. Skipping.",
                             stacklevel=2,
                         )
+                else:
+                    if out is None:
+                        if not silence_warnings:
+                            warnings.warn(
+                                f"Symbol '{str(symbol)}' returned None. Skipping.",
+                                stacklevel=2,
+                            )
                     else:
-                        data[symbol] = _data
-                        returned_kwargs[symbol] = _returned_kwargs
-                        fetch_kwargs[symbol] = _kwargs
+                        if isinstance(out, tuple):
+                            _data = out[0]
+                            _returned_kwargs = out[1]
+                        else:
+                            _data = out
+                            _returned_kwargs = {}
+                        _data = to_any_array(_data)
+                        if _data.size == 0:
+                            if not silence_warnings:
+                                warnings.warn(
+                                    f"Symbol '{str(symbol)}' returned an empty array. Skipping.",
+                                    stacklevel=2,
+                                )
+                        else:
+                            data[symbol] = _data
+                            returned_kwargs[symbol] = _returned_kwargs
+                            fetch_kwargs[symbol] = _kwargs
 
                 pbar.update(1)
         if len(data) == 0:
@@ -506,6 +550,7 @@ class Data(Analyzable):
             wrapper_kwargs=wrapper_kwargs,
             fetch_kwargs=fetch_kwargs,
             returned_kwargs=returned_kwargs,
+            silence_warnings=silence_warnings,
         )
 
     # ############# Updating ############# #
@@ -519,6 +564,8 @@ class Data(Analyzable):
         *,
         show_progress: bool = False,
         pbar_kwargs: tp.KwargsLike = None,
+        skip_on_error: tp.Optional[bool] = None,
+        silence_warnings: tp.Optional[bool] = None,
         **kwargs,
     ) -> DataT:
         """Fetch additional data using `Data.update_symbol` and append it to the existing data.
@@ -531,6 +578,8 @@ class Data(Analyzable):
             pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`.
 
                 Will also forward this argument to `Data.update_symbol` if accepted by `Data.fetch_symbol`.
+            skip_on_error (bool): Whether to skip the symbol when an exception is raised.
+            silence_warnings (bool): Whether to silence all warnings.
             **kwargs: Passed to `Data.update_symbol`.
 
                 If two symbols require different keyword arguments, pass `symbol_dict` for each argument.
@@ -542,6 +591,10 @@ class Data(Analyzable):
         data_cfg = settings["data"]
 
         pbar_kwargs = merge_dicts(data_cfg["pbar_kwargs"], pbar_kwargs)
+        if skip_on_error is None:
+            skip_on_error = data_cfg["skip_on_error"]
+        if silence_warnings is None:
+            silence_warnings = data_cfg["silence_warnings"]
 
         new_data = symbol_dict()
         new_last_index = symbol_dict()
@@ -558,33 +611,64 @@ class Data(Analyzable):
                 if "pbar_kwargs" in func_arg_names:
                     _kwargs["pbar_kwargs"] = pbar_kwargs
 
-                out = self.update_symbol(symbol, **_kwargs)
-
-                if isinstance(out, tuple):
-                    new_obj = out[0]
-                    new_returned_kwargs[symbol] = out[1]
+                skip_symbol = False
+                try:
+                    out = self.update_symbol(symbol, **_kwargs)
+                except Exception as e:
+                    if not skip_on_error:
+                        raise e
+                    if not silence_warnings:
+                        warnings.warn(traceback.format_exc(), stacklevel=2)
+                        warnings.warn(
+                            f"Symbol '{str(symbol)}' raised an exception. Skipping.",
+                            stacklevel=2,
+                        )
+                    skip_symbol = True
                 else:
-                    new_obj = out
-                    new_returned_kwargs[symbol] = {}
+                    if out is None:
+                        if not silence_warnings:
+                            warnings.warn(
+                                f"Symbol '{str(symbol)}' returned None. Skipping.",
+                                stacklevel=2,
+                            )
+                        skip_symbol = True
+                    else:
+                        if isinstance(out, tuple):
+                            new_obj = out[0]
+                            new_returned_kwargs[symbol] = out[1]
+                        else:
+                            new_obj = out
+                            new_returned_kwargs[symbol] = {}
+                        new_obj = to_any_array(new_obj)
+                        if new_obj.size == 0:
+                            if not silence_warnings:
+                                warnings.warn(
+                                    f"Symbol '{str(symbol)}' returned an empty array. Skipping.",
+                                    stacklevel=2,
+                                )
+                            skip_symbol = True
+                        else:
+                            if not isinstance(new_obj, (pd.Series, pd.DataFrame)):
+                                new_obj = to_pd_array(new_obj)
+                                new_obj.index = pd.RangeIndex(
+                                    start=obj.index[-1],
+                                    stop=obj.index[-1] + new_obj.shape[0],
+                                    step=1,
+                                )
+                            new_obj = self.prepare_tzaware_index(
+                                new_obj,
+                                tz_localize=self.tz_localize,
+                                tz_convert=self.tz_convert,
+                            )
+                            new_data[symbol] = new_obj
+                            if len(new_obj.index) > 0:
+                                new_last_index[symbol] = new_obj.index[-1]
+                            else:
+                                new_last_index[symbol] = self.last_index[symbol]
 
-                if not isinstance(new_obj, (pd.Series, pd.DataFrame)):
-                    new_obj = to_pd_array(new_obj)
-                    new_obj.index = pd.RangeIndex(
-                        start=obj.index[-1],
-                        stop=obj.index[-1] + new_obj.shape[0],
-                        step=1,
-                    )
-                new_obj = self.prepare_tzaware_index(
-                    new_obj,
-                    tz_localize=self.tz_localize,
-                    tz_convert=self.tz_convert,
-                )
-                new_data[symbol] = new_obj
-                if len(new_obj.index) > 0:
-                    new_last_index[symbol] = new_obj.index[-1]
-                else:
+                if skip_symbol:
+                    new_data[symbol] = obj.iloc[0:0]
                     new_last_index[symbol] = self.last_index[symbol]
-
                 pbar.update(1)
 
         # Prepend existing data starting from lowest updated index (including) to new data
@@ -596,6 +680,14 @@ class Data(Analyzable):
                 continue
             if from_index is None or index < from_index:
                 from_index = index
+        if from_index is None:
+            if not silence_warnings:
+                warnings.warn(
+                    f"None of the symbols have been updated",
+                    stacklevel=2,
+                )
+            return self.copy()
+
         for symbol, new_obj in new_data.items():
             if len(new_obj.index) > 0:
                 to_index = new_obj.index[0]
@@ -621,8 +713,8 @@ class Data(Analyzable):
             new_obj = new_obj[~new_obj.index.duplicated(keep="last")]
             new_data[symbol] = new_obj
 
-        new_data = self.align_index(new_data, missing=self.missing_index)
-        new_data = self.align_columns(new_data, missing=self.missing_columns)
+        new_data = self.align_index(new_data, missing=self.missing_index, silence_warnings=silence_warnings)
+        new_data = self.align_columns(new_data, missing=self.missing_columns, silence_warnings=silence_warnings)
 
         # Append new data to existing data ending at lowest updated index (excluding)
         for symbol, new_obj in new_data.items():

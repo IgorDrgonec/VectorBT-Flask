@@ -49,11 +49,13 @@ try:
 except ImportError:
     AlpacaClientT = tp.Any
 
+# ############# Local ############# #
+
 LocalDataT = tp.TypeVar("LocalDataT", bound="LocalData")
 
 
 class LocalData(Data):
-    """`Data` for local data distributed over multiple files.
+    """Subclass of `Data` for local data.
 
     Use either `symbols` or `path` to specify the path to one or multiple files.
     Allowed are paths in string or `pathlib.Path` format. Also allowed are string
@@ -185,7 +187,7 @@ CSVDataT = tp.TypeVar("CSVDataT", bound="CSVData")
 
 
 class CSVData(LocalData):
-    """`Data` for data that can be fetched and updated using `pd.read_csv`.
+    """Subclass of `Data` for data that can be fetched and updated using `pd.read_csv`.
 
     Usage:
         * Generate three random time series, save them to the disk, and load using `CSVData`:
@@ -294,9 +296,10 @@ class CSVData(LocalData):
             parse_dates=parse_dates,
             skiprows=skiprows,
             nrows=nrows,
-            squeeze=squeeze,
             **kwargs,
         )
+        if isinstance(obj, pd.DataFrame) and squeeze:
+            obj = obj.squeeze("columns")
         if isinstance(obj, pd.Series) and obj.name == "0":
             obj.name = None
         returned_kwargs = dict(last_row=start_row - header_rows + len(obj.index) - 1)
@@ -325,7 +328,7 @@ HDFDataT = tp.TypeVar("HDFDataT", bound="HDFData")
 
 
 class HDFData(LocalData):
-    """`Data` for data that can be fetched and updated using `pd.read_hdf`.
+    """Subclass of `Data` for data that can be fetched and updated using `pd.read_hdf`.
 
     Usage:
         * Generate four random time series, save them to two HDF files, and load using `HDFData`:
@@ -521,195 +524,17 @@ class HDFData(LocalData):
         return self.fetch_symbol(symbol, **kwargs)
 
 
-class SyntheticData(Data):
-    """`Data` for synthetically generated data.
-
-    Exposes an abstract class method `SyntheticData.generate_symbol`.
-    Everything else is taken care of."""
-
-    @classmethod
-    def generate_symbol(cls, symbol: tp.Symbol, index: tp.Index, **kwargs) -> tp.SeriesFrame:
-        """Abstract method to generate data of a symbol."""
-        raise NotImplementedError
-
-    @classmethod
-    def fetch_symbol(
-        cls,
-        symbol: tp.Symbol,
-        start: tp.DatetimeLike = 0,
-        end: tp.DatetimeLike = "now",
-        freq: tp.Union[None, str, pd.DateOffset] = None,
-        date_range_kwargs: tp.KwargsLike = None,
-        **kwargs,
-    ) -> tp.SeriesFrame:
-        """Override `vectorbtpro.data.base.Data.fetch_symbol` to generate a symbol.
-
-        Generates datetime index and passes it to `SyntheticData.generate_symbol` to fill
-        the Series/DataFrame with generated data."""
-        if date_range_kwargs is None:
-            date_range_kwargs = {}
-        index = pd.date_range(
-            start=to_tzaware_datetime(start, tz=get_utc_tz()),
-            end=to_tzaware_datetime(end, tz=get_utc_tz()),
-            freq=freq,
-            **date_range_kwargs,
-        )
-        if len(index) == 0:
-            raise ValueError("Date range is empty")
-        return cls.generate_symbol(symbol, index, **kwargs)
-
-    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
-        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        fetch_kwargs["start"] = self.last_index[symbol]
-        kwargs = merge_dicts(fetch_kwargs, kwargs)
-        return self.fetch_symbol(symbol, **kwargs)
+# ############# Remote ############# #
 
 
-class RandomData(SyntheticData):
-    """`SyntheticData` for data generated using `vectorbtpro.data.nb.generate_random_data_nb`.
+class RemoteData(Data):
+    """Subclass of `Data` for remote data."""
 
-    !!! note
-        When setting a seed, remember to pass a seed per symbol using `vectorbtpro.data.base.symbol_dict`.
-
-    Usage:
-        * Generate random data:
-
-        ```pycon
-        >>> import vectorbtpro as vbt
-
-        >>> rand_data = vbt.RandomData.fetch(
-        ...     list(range(5)),
-        ...     start='2010-01-01',
-        ...     end='2020-01-01'
-        ... )
-        ```
-
-        [=100% "100%"]{: .candystripe}
-
-        ```pycon
-        >>> rand_data.plot(showlegend=False)
-        ```
-
-        ![](/assets/images/RandomData.svg)
-    """
-
-    @classmethod
-    def generate_symbol(
-        cls,
-        symbol: tp.Symbol,
-        index: tp.Index,
-        num_paths: int = 1,
-        start_value: float = 100.0,
-        mean: float = 0.0,
-        std: float = 0.01,
-        seed: tp.Optional[int] = None,
-        jitted: tp.JittedOption = None,
-    ) -> tp.SeriesFrame:
-        """Generate a symbol.
-
-        Args:
-            symbol (str): Symbol.
-            index (pd.Index): Pandas index.
-            num_paths (int): Number of generated paths (columns in our case).
-            start_value (float): Value at time 0.
-
-                Does not appear as the first value in the output data.
-            mean (float): Drift, or mean of the percentage change.
-            std (float): Standard deviation of the percentage change.
-            seed (int): Set seed to make output deterministic.
-            jitted (any): See `vectorbtpro.utils.jitting.resolve_jitted_option`.
-        """
-        if seed is not None:
-            set_seed(seed)
-
-        func = jit_reg.resolve_option(nb.generate_random_data_nb, jitted)
-        out = func((len(index), num_paths), start_value, mean, std)
-
-        if out.shape[1] == 1:
-            return pd.Series(out[:, 0], index=index)
-        columns = pd.RangeIndex(stop=out.shape[1], name="path")
-        return pd.DataFrame(out, index=index, columns=columns)
-
-    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
-        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        fetch_kwargs["start"] = self.last_index[symbol]
-        _ = fetch_kwargs.pop("start_value", None)
-        start_value = self.data[symbol].iloc[-2]
-        fetch_kwargs["seed"] = None
-        kwargs = merge_dicts(fetch_kwargs, kwargs)
-        return self.fetch_symbol(symbol, start_value=start_value, **kwargs)
+    pass
 
 
-class GBMData(RandomData):
-    """`RandomData` for data generated using `vectorbtpro.data.nb.generate_gbm_data_nb`.
-
-    !!! note
-        When setting a seed, remember to pass a seed per symbol using `vectorbtpro.data.base.symbol_dict`.
-
-    Usage:
-        * Generate random data:
-
-        ```pycon
-        >>> import vectorbtpro as vbt
-
-        >>> gbm_data = vbt.GBMData.fetch(
-        ...     list(range(5)),
-        ...     start='2010-01-01',
-        ...     end='2020-01-01'
-        ... )
-        ```
-
-        [=100% "100%"]{: .candystripe}
-
-        ```pycon
-        >>> gbm_data.plot(showlegend=False)
-        ```
-
-        ![](/assets/images/GBMData.svg)
-    """
-
-    @classmethod
-    def generate_symbol(
-        cls,
-        symbol: tp.Symbol,
-        index: tp.Index,
-        num_paths: int = 1,
-        start_value: float = 100.0,
-        mean: float = 0.0,
-        std: float = 0.01,
-        dt: float = 1.0,
-        seed: tp.Optional[int] = None,
-        jitted: tp.JittedOption = None,
-    ) -> tp.SeriesFrame:
-        """Generate a symbol.
-
-        Args:
-            symbol (str): Symbol.
-            index (pd.Index): Pandas index.
-            num_paths (int): Number of generated paths (columns in our case).
-            start_value (float): Value at time 0.
-
-                Does not appear as the first value in the output data.
-            mean (float): Drift, or mean of the percentage change.
-            std (float): Standard deviation of the percentage change.
-            dt (float): Time change (one period of time).
-            seed (int): Set seed to make output deterministic.
-            jitted (any): See `vectorbtpro.utils.jitting.resolve_jitted_option`.
-        """
-        if seed is not None:
-            set_seed(seed)
-
-        func = jit_reg.resolve_option(nb.generate_gbm_data_nb, jitted)
-        out = func((len(index), num_paths), start_value, mean, std, dt)
-
-        if out.shape[1] == 1:
-            return pd.Series(out[:, 0], index=index)
-        columns = pd.RangeIndex(stop=out.shape[1], name="path")
-        return pd.DataFrame(out, index=index, columns=columns)
-
-
-class YFData(Data):  # pragma: no cover
-    """`Data` for data coming from `yfinance`.
+class YFData(RemoteData):  # pragma: no cover
+    """Subclass of `Data` for data coming from `yfinance`.
 
     Stocks are usually in the timezone "+0500" and cryptocurrencies in UTC.
 
@@ -831,8 +656,8 @@ class YFData(Data):  # pragma: no cover
 BinanceDataT = tp.TypeVar("BinanceDataT", bound="BinanceData")
 
 
-class BinanceData(Data):  # pragma: no cover
-    """`Data` for data coming from `python-binance`.
+class BinanceData(RemoteData):  # pragma: no cover
+    """Subclass of `Data` for data coming from `python-binance`.
 
     Usage:
         * Fetch the 1-minute data of the last 2 hours:
@@ -1067,7 +892,7 @@ class BinanceData(Data):  # pragma: no cover
                     if delay is not None:
                         time.sleep(delay / 1000)  # be kind to api
         except Exception as e:
-            warnings.warn(traceback.format_exc())
+            warnings.warn(traceback.format_exc(), stacklevel=2)
             warnings.warn(
                 f"Symbol '{str(symbol)}' raised an exception. Returning incomplete data. "
                 "Use update() method to fetch missing data.",
@@ -1115,8 +940,8 @@ class BinanceData(Data):  # pragma: no cover
         return self.fetch_symbol(symbol, **kwargs)
 
 
-class CCXTData(Data):  # pragma: no cover
-    """`Data` for data coming from `ccxt`.
+class CCXTData(RemoteData):  # pragma: no cover
+    """Subclass of `Data` for data coming from `ccxt`.
 
     Usage:
         * Fetch the 1-minute data of the last 2 hours:
@@ -1320,7 +1145,7 @@ class CCXTData(Data):  # pragma: no cover
                     if delay is not None:
                         time.sleep(delay / 1000)  # be kind to api
         except Exception as e:
-            warnings.warn(traceback.format_exc())
+            warnings.warn(traceback.format_exc(), stacklevel=2)
             warnings.warn(
                 f"Symbol '{str(symbol)}' raised an exception. Returning incomplete data. "
                 "Use update() method to fetch missing data.",
@@ -1349,8 +1174,8 @@ class CCXTData(Data):  # pragma: no cover
 AlpacaDataT = tp.TypeVar("AlpacaDataT", bound="AlpacaData")
 
 
-class AlpacaData(Data):  # pragma: no cover
-    """`Data` for data coming from `alpaca-trade-api`.
+class AlpacaData(RemoteData):  # pragma: no cover
+    """Subclass of `Data` for data coming from `alpaca-trade-api`.
 
     Sign up for Alpaca API keys under https://app.alpaca.markets/signup.
 
@@ -1557,3 +1382,193 @@ class AlpacaData(Data):  # pragma: no cover
         fetch_kwargs["start"] = self.last_index[symbol]
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         return self.fetch_symbol(symbol, **kwargs)
+
+
+# ############# Synthetic ############# #
+
+
+class SyntheticData(Data):
+    """Subclass of `Data` for synthetically generated data.
+
+    Exposes an abstract class method `SyntheticData.generate_symbol`.
+    Everything else is taken care of."""
+
+    @classmethod
+    def generate_symbol(cls, symbol: tp.Symbol, index: tp.Index, **kwargs) -> tp.SeriesFrame:
+        """Abstract method to generate data of a symbol."""
+        raise NotImplementedError
+
+    @classmethod
+    def fetch_symbol(
+        cls,
+        symbol: tp.Symbol,
+        start: tp.DatetimeLike = 0,
+        end: tp.DatetimeLike = "now",
+        freq: tp.Union[None, str, pd.DateOffset] = None,
+        date_range_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
+        """Override `vectorbtpro.data.base.Data.fetch_symbol` to generate a symbol.
+
+        Generates datetime index and passes it to `SyntheticData.generate_symbol` to fill
+        the Series/DataFrame with generated data."""
+        if date_range_kwargs is None:
+            date_range_kwargs = {}
+        index = pd.date_range(
+            start=to_tzaware_datetime(start, tz=get_utc_tz()),
+            end=to_tzaware_datetime(end, tz=get_utc_tz()),
+            freq=freq,
+            **date_range_kwargs,
+        )
+        if len(index) == 0:
+            raise ValueError("Date range is empty")
+        return cls.generate_symbol(symbol, index, **kwargs)
+
+    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
+        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
+        fetch_kwargs["start"] = self.last_index[symbol]
+        kwargs = merge_dicts(fetch_kwargs, kwargs)
+        return self.fetch_symbol(symbol, **kwargs)
+
+
+class RandomData(SyntheticData):
+    """`SyntheticData` for data generated using `vectorbtpro.data.nb.generate_random_data_nb`.
+
+    !!! note
+        When setting a seed, remember to pass a seed per symbol using `vectorbtpro.data.base.symbol_dict`.
+
+    Usage:
+        * Generate random data:
+
+        ```pycon
+        >>> import vectorbtpro as vbt
+
+        >>> rand_data = vbt.RandomData.fetch(
+        ...     list(range(5)),
+        ...     start='2010-01-01',
+        ...     end='2020-01-01'
+        ... )
+        ```
+
+        [=100% "100%"]{: .candystripe}
+
+        ```pycon
+        >>> rand_data.plot(showlegend=False)
+        ```
+
+        ![](/assets/images/RandomData.svg)
+    """
+
+    @classmethod
+    def generate_symbol(
+        cls,
+        symbol: tp.Symbol,
+        index: tp.Index,
+        num_paths: int = 1,
+        start_value: float = 100.0,
+        mean: float = 0.0,
+        std: float = 0.01,
+        seed: tp.Optional[int] = None,
+        jitted: tp.JittedOption = None,
+    ) -> tp.SeriesFrame:
+        """Generate a symbol.
+
+        Args:
+            symbol (str): Symbol.
+            index (pd.Index): Pandas index.
+            num_paths (int): Number of generated paths (columns in our case).
+            start_value (float): Value at time 0.
+
+                Does not appear as the first value in the output data.
+            mean (float): Drift, or mean of the percentage change.
+            std (float): Standard deviation of the percentage change.
+            seed (int): Set seed to make output deterministic.
+            jitted (any): See `vectorbtpro.utils.jitting.resolve_jitted_option`.
+        """
+        if seed is not None:
+            set_seed(seed)
+
+        func = jit_reg.resolve_option(nb.generate_random_data_nb, jitted)
+        out = func((len(index), num_paths), start_value, mean, std)
+
+        if out.shape[1] == 1:
+            return pd.Series(out[:, 0], index=index)
+        columns = pd.RangeIndex(stop=out.shape[1], name="path")
+        return pd.DataFrame(out, index=index, columns=columns)
+
+    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
+        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
+        fetch_kwargs["start"] = self.last_index[symbol]
+        _ = fetch_kwargs.pop("start_value", None)
+        start_value = self.data[symbol].iloc[-2]
+        fetch_kwargs["seed"] = None
+        kwargs = merge_dicts(fetch_kwargs, kwargs)
+        return self.fetch_symbol(symbol, start_value=start_value, **kwargs)
+
+
+class GBMData(RandomData):
+    """`RandomData` for data generated using `vectorbtpro.data.nb.generate_gbm_data_nb`.
+
+    !!! note
+        When setting a seed, remember to pass a seed per symbol using `vectorbtpro.data.base.symbol_dict`.
+
+    Usage:
+        * Generate random data:
+
+        ```pycon
+        >>> import vectorbtpro as vbt
+
+        >>> gbm_data = vbt.GBMData.fetch(
+        ...     list(range(5)),
+        ...     start='2010-01-01',
+        ...     end='2020-01-01'
+        ... )
+        ```
+
+        [=100% "100%"]{: .candystripe}
+
+        ```pycon
+        >>> gbm_data.plot(showlegend=False)
+        ```
+
+        ![](/assets/images/GBMData.svg)
+    """
+
+    @classmethod
+    def generate_symbol(
+        cls,
+        symbol: tp.Symbol,
+        index: tp.Index,
+        num_paths: int = 1,
+        start_value: float = 100.0,
+        mean: float = 0.0,
+        std: float = 0.01,
+        dt: float = 1.0,
+        seed: tp.Optional[int] = None,
+        jitted: tp.JittedOption = None,
+    ) -> tp.SeriesFrame:
+        """Generate a symbol.
+
+        Args:
+            symbol (str): Symbol.
+            index (pd.Index): Pandas index.
+            num_paths (int): Number of generated paths (columns in our case).
+            start_value (float): Value at time 0.
+
+                Does not appear as the first value in the output data.
+            mean (float): Drift, or mean of the percentage change.
+            std (float): Standard deviation of the percentage change.
+            dt (float): Time change (one period of time).
+            seed (int): Set seed to make output deterministic.
+            jitted (any): See `vectorbtpro.utils.jitting.resolve_jitted_option`.
+        """
+        if seed is not None:
+            set_seed(seed)
+
+        func = jit_reg.resolve_option(nb.generate_gbm_data_nb, jitted)
+        out = func((len(index), num_paths), start_value, mean, std, dt)
+
+        if out.shape[1] == 1:
+            return pd.Series(out[:, 0], index=index)
+        columns = pd.RangeIndex(stop=out.shape[1], name="path")
+        return pd.DataFrame(out, index=index, columns=columns)

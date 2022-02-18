@@ -405,6 +405,8 @@ data = dict(
     tz_convert=get_utc_tz(),
     missing_index="nan",
     missing_columns="raise",
+    skip_on_error=False,
+    silence_warnings=False,
     custom=Config(  # flex
         dict(
             binance=dict(
