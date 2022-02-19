@@ -8,7 +8,49 @@ All notable changes in reverse chronological order.
 
 ## Version 1.1.0 (20 Feb, 2022)
 
-- 
+- Removed support for Python 3.6. Wanted to add support for Python 3.10 but stumbled upon issues
+that can be followed in numba/numba#7812 and numba/numba#7839.
+- Removed [Bottleneck](https://github.com/pydata/bottleneck) from optional requirements as it 
+causes installation issues, but it can still be installed manually
+- Formatted the entire codebase with [Black](https://black.readthedocs.io/en/stable/) :black_large_square:
+- One or more symbols can be selected from a [Data](/api/data/base/#vectorbtpro.data.base.Data) instance
+- Refactored [Data.fetch_kwargs](/api/data/base/#vectorbtpro.data.base.Data.fetch_kwargs) into a symbol dictionary.
+Getting the keyword arguments used for fetching a specific symbol is now as simple as `fetch_kwargs[symbol]`.
+- Implemented the method [Data.merge](/api/data/base/#vectorbtpro.data.base.Data.merge) for merging
+multiple [Data](/api/data/base/#vectorbtpro.data.base.Data) instances
+- One or more symbols can be renamed in a [Data](/api/data/base/#vectorbtpro.data.base.Data) instance
+- Improved aggregation of metrics in [StatsBuilderMixin](/api/generic/stats_builder/#vectorbtpro.generic.stats_builder.StatsBuilderMixin)
+- Removed `ohlc` accessor to avoid confusion. The only accessor is now `ohlcv`.
+- [Data.plot](/api/data/base/#vectorbtpro.data.base.Data.plot) automatically plots the data as a candlestick
+chart if it can find the right price columns, otherwise, it plots each column as a separate line 
+(as it was previously). Also, one can now select a symbol to plot using the `symbol` argument.
+- One metric/subplot can be expanded into multiple metrics/subplots using templates. This enables
+displaying a variable number of metrics/subplots.
+- [Data.plots](/api/data/base/#vectorbtpro.data.base.Data.plots) now plots one subplot per symbol.
+- Delimiter is recognized automatically when dealing with CSV and TSV files
+- Implemented a function for pretty-printing directory trees - [tree](/api/utils/path_/#vectorbtpro.utils.path_.tree)
+- Refactored the path matching mechanism for CSV and HDF files. In particular:
+    - Path unfolding has been renamed to path matching
+    - Wildcards (`*`) are now supported for groups and keys in HDF files
+    - Paths can be further filtered using a regex pattern `match_regex`
+    - Functions for path matching have become class methods for seamless inheritance
+    - The argument `parse_paths` in [LocalData.fetch](/api/data/custom/#vectorbtpro.data.custom.LocalData.fetch) has been renamed to `match_paths`
+    - The argument `path` in [LocalData.fetch](/api/data/custom/#vectorbtpro.data.custom.LocalData.fetch) has been renamed to `paths`
+- Symbols that return `None` or an empty array are skipped. When `raise_on_error` is True, any
+symbol raising an error is skipped as well.
+- Similar to the Python's `help` command, vectorbt now has a function 
+[format_func](https://vectorbt.pro/api/utils/formatting/#vectorbtpro.utils.formatting.format_func) that 
+pretty-prints the arguments and docstring of any function. It's main advantage is the ability to skip 
+annotations, which sometimes reduce readability when exploring more complex vectorbt functions using `help`.
+- Settings have been refactored once again: it's now clearly visible which key can be accessed
+via the dot notation (_hint_: it must be of type [ChildDict](/api/utils/config/#vectorbtpro.utils.config.ChildDict)).
+Also, the argument `convert_dicts_` in [Config](/api/utils/config/#vectorbtpro.utils.config.Config) 
+has been renamed to `convert_children_`.
+- Moved default values of various [Data](/api/data/base/#vectorbtpro.data.base.Data) classes from the 
+[custom](/api/data/custom/) module to [_settings.data](/api/_settings/#vectorbtpro._settings.data) 
+to be able to set them globally
+- Minor fixes and enhancements across the project
+- Wrote [Data](/documentation/data) :notebook_with_decorative_cover:
 
 ## Version 1.0.10 (11 Feb, 2022)
 

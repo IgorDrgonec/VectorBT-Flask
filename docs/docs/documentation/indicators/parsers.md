@@ -119,7 +119,7 @@ of 20 and an overbought limit of 80:
 ...     cols=1, 
 ...     shared_xaxes=True,  # (1)!
 ...     vertical_spacing=0.05)
->>> ohlc.vbt.ohlc.plot(
+>>> ohlc.vbt.ohlcv.plot(
 ...     ohlc_add_trace_kwargs=dict(row=1, col=1),  # (2)!
 ...     fig=fig,
 ...     xaxis=dict(rangeslider_visible=False))  # (3)!
@@ -619,7 +619,7 @@ Here's a single-line expression for basic SuperTrend bands with multiple outputs
 ...     mult=3)
 >>> st = SuperTrend.run(ohlc['high'], ohlc['low'], ohlc['close'])
 
->>> fig = ohlc.vbt.ohlc.plot()
+>>> fig = ohlc.vbt.ohlcv.plot()
 >>> st.up.rename('Upper').vbt.plot(fig=fig)
 >>> st.down.rename('Lower').vbt.plot(fig=fig)
 ```
