@@ -5,6 +5,7 @@
 
 yfinance>=0.1.63:           data, base
 python-binance:             data
+alpaca_trade_api:           data
 ccxt:                       data
 tables:                     data
 ta:                         ta

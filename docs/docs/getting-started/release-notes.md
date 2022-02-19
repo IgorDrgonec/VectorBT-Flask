@@ -6,6 +6,10 @@ title: Release notes
 
 All notable changes in reverse chronological order.
 
+## Version 1.1.0 (20 Feb, 2022)
+
+- 
+
 ## Version 1.0.10 (11 Feb, 2022)
 
 - Moved the `per_column` logic from [run_pipeline](/api/indicators/factory/#vectorbtpro.indicators.factory.run_pipeline) 

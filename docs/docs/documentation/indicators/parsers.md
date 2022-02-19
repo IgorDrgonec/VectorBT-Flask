@@ -1,5 +1,6 @@
 ---
 title: Parsers
+icon: material/code-tags
 ---
 
 # Parsers
@@ -79,23 +80,24 @@ OrderedDict([('slowk', ['Dashed Line']), ('slowd', ['Dashed Line'])])
 
 ![](/assets/images/indicators_stoch.svg)
 
-To see what arguments the `plot` function takes, use the Python's `help` command:
+To see what arguments the `plot` function takes, use 
+[format_func](https://vectorbt.pro/api/utils/formatting/#vectorbtpro.utils.formatting.format_func):
 
 ```pycon
->>> help(stoch.plot)
-Help on function plot in module vectorbtpro.indicators.factory:
-
-plot(self, 
-     column: ... = None, 
-     limits: ... = None,
-     add_shape_kwargs: ... = None,
-     add_trace_kwargs: ... = None, 
-     fig: ... = None, 
-     slowk_trace_kwargs: ... = None, 
-     slowd_trace_kwargs: ... = None, 
-     **layout_kwargs) -> plotly.basedatatypes.BaseFigure
+>>> print(vbt.format_func(STOCH.plot))
+plot(
+    self,
+    column=None,
+    limits=None,
+    add_shape_kwargs=None,
+    add_trace_kwargs=None,
+    fig=None,
+    slowk_trace_kwargs=None,
+    slowd_trace_kwargs=None,
+    **layout_kwargs
+):
     Plot the outputs of the indicator based on their flags.
-                
+            
     Args:
         column (str): Name of the column to plot.
         limits (tuple of float): Tuple of the lower and upper limit.
@@ -578,7 +580,7 @@ indicator instance instead:
 ...     atr_kwargs=dict(return_raw=False))  # (1)!
 ```
 
-1. If we printed `help(vbt.talib('ATR').run)`, we would see that any additional keyword argument
+1. If we printed `vbt.format_func(vbt.talib('ATR').run)`, we would see that any additional keyword argument
 is passed as `**kwargs`, so we can specify `atr_kwargs` to target those variable arguments
 
 #### One-liners

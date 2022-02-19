@@ -123,9 +123,14 @@ nav:
   - Documentation:
     - Fundamentals: documentation/fundamentals.md
     - Building blocks: documentation/building-blocks.md
+    - Data:
+      - documentation/data/index.md
+      - Local: documentation/data/local.md
+      - Remote: documentation/data/remote.md
+      - Synthetic: documentation/data/synthetic.md
+      - Scheduling: documentation/data/scheduling.md
     - Indicators:
       - documentation/indicators/index.md
-      - Design: documentation/indicators/design.md
       - Development: documentation/indicators/development.md
       - Analysis: documentation/indicators/analysis.md
       - Parsers: documentation/indicators/parsers.md

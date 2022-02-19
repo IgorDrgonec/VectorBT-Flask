@@ -120,13 +120,19 @@ Here's a rule of thumb on which implementation to choose:
 3. Use indicators from other libraries in case they provide more options
 
 To run any indicator, use the method `run`. To see what arguments the method accepts, pass it to 
-the Python's `help` function:
+[format_func](https://vectorbt.pro/api/utils/formatting/#vectorbtpro.utils.formatting.format_func):
 
 ```pycon
->>> help(vbt.RSI.run)
-Help on method run:
-
-run(close, window=Default(value=14), ewm=Default(value=False), short_name='rsi', hide_params=None, hide_default=True, **kwargs) method of vectorbtpro.generic.analyzable.MetaAnalyzable instance
+>>> print(vbt.format_func(vbt.RSI.run))
+RSI.run(
+    close,
+    window=Default(value=14),
+    ewm=Default(value=False),
+    short_name='rsi',
+    hide_params=None,
+    hide_default=True,
+    **kwargs
+):
     Run `RSI` indicator.
     
     * Inputs: `close`
@@ -152,7 +158,7 @@ Since we want to make decisions using the opening price, we will pass `open_pric
 That's all! By executing the method [RSI.run](/api/indicators/custom/#vectorbtpro.indicators.custom.RSI.run), 
 we calculated the RSI values and received an instance with various methods and properties for their 
 analysis. To retrieve the resulting Pandas object, we need to query the `rsi` attribute (see "Outputs" 
-in the output of `help`).
+in the output of `format_func`).
 
 ```pycon
 >>> rsi.rsi

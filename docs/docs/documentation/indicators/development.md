@@ -1,8 +1,12 @@
 ---
 title: Development
+icon: material/order-bool-descending-variant
 ---
 
 # Development
+
+vectorbt implements a ton of functions and arguments for seamless development of indicators.
+All it takes is an indicator function and a specification of how to handle it.
 
 ## Parameters
 
@@ -1571,12 +1575,26 @@ Since both moving averages are computed from the same time series, our only inpu
 The parameter `timeperiod` should be different for both moving averages, thus we need to define two
 parameters: `timeperiod1` and `timeperiod2` (you can choose any other names).
 
-
 ```pycon
->>> help(vbt.talib('SMA').run)
-Help on method run:
-
-run(close, timeperiod=Default(value=30), ...
+>>> print(vbt.format_func(vbt.talib('SMA').run))
+SMA.run(
+    close,
+    timeperiod=Default(value=30),
+    short_name='sma',
+    hide_params=None,
+    hide_default=True,
+    **kwargs
+):
+    Run `SMA` indicator.
+    
+    * Inputs: `close`
+    * Parameters: `timeperiod`
+    * Outputs: `real`
+    
+    Pass a list of parameter names as `hide_params` to hide their column levels.
+    Set `hide_default` to False to show the column levels of the parameters with a default value.
+    
+    Other keyword arguments are passed to `vectorbtpro.indicators.factory.run_pipeline`.
 
 >>> def apply_func(close, timeperiod1, timeperiod2):
 ...     fast_ma = vbt.talib('SMA').run(close, timeperiod1)
@@ -1634,25 +1652,16 @@ our `apply_func`. Just note that `apply_func` of all parsed indicators was creat
 with `pass_packed` set to True, and thus it accepts arguments in the packed form:
 
 ```pycon
->>> help(vbt.talib('SMA').apply_func)
-Help on function apply_func in module vectorbtpro.indicators.factory:
-
-apply_func(input_tuple: ..., in_output_tuple: ..., param_tuple: ..., **_kwargs) ...
+>>> print(vbt.format_func(vbt.talib('SMA').apply_func))
+apply_func(
+    input_tuple,
+    in_output_tuple,
+    param_tuple,
+    **_kwargs
+)
 
 >>> def sma(close, timeperiod):
 ...     return vbt.talib('SMA').apply_func((close,), (), (timeperiod,))
 ```
 
 That's the fastest it can get!
-
-## Preset indicators
-
-vectorbt implements a collection of preset, fully Numba-compiled indicators (such as 
-[ATR](/api/indicators/custom/#vectorbtpro.indicators.custom.ATR)) that take advantage of 
-manual caching, extending, and plotting. You can use them to take an inspiration
-on how to create indicators in a classic but performant way.
-
-!!! note
-    vectorbt uses SMA and EMA, while other technical analysis libraries and TradingView use 
-    the Wilder's method. There is no right or wrong method. 
-    See [different smoothing methods](https://www.macroption.com/atr-calculation/).

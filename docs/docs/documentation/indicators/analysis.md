@@ -1,5 +1,6 @@
 ---
 title: Analysis
+icon: material/chart-timeline-variant-shimmer
 ---
 
 # Analysis

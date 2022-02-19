@@ -595,10 +595,18 @@ and once we supplied `faster_supertrend_talib` to
 it attached a method `SuperTrend.run` for running the indicator. Let's try it out!
 
 ```pycon
->>> help(SuperTrend.run)  # (1)!
-Help on method run:
-
-run(high, low, close, period=Default(value=7), multiplier=Default(value=3), short_name='st', hide_params=None, hide_default=True, **kwargs) method of vectorbtpro.generic.analyzable.MetaAnalyzable instance
+>>> print(vbt.format_func(SuperTrend.run))  # (1)!
+SuperTrend.run(
+    high,
+    low,
+    close,
+    period=Default(value=7),
+    multiplier=Default(value=3),
+    short_name='st',
+    hide_params=None,
+    hide_default=True,
+    **kwargs
+):
     Run `SuperTrend` indicator.
     
     * Inputs: `high`, `low`, `close`
@@ -629,7 +637,8 @@ Open time
 [17514 rows x 2 columns]
 ```
 
-1. Use the Python's help command to see what arguments are accepted by `SuperTrend.run`
+1. Use [format_func](https://vectorbt.pro/api/utils/formatting/#vectorbtpro.utils.formatting.format_func) 
+to see what arguments are accepted by `SuperTrend.run`
 
 Notice how our SuperTrend indicator magically accepted two-dimensional Pandas arrays, even though
 the function itself can only work on one-dimensional NumPy arrays. Not only it computed the SuperTrend
@@ -960,7 +969,7 @@ Since we have an additional column level that contains symbols, we'll make it a 
 ... )
 ```
 
-![](/assets/images/examples_supertrend_heatmap.svg)
+![](/assets/images/examples_supertrend_heatmap.gif){: style="width:650px"}
 
 We now have a nice overview of any parameter regions that performed well during 
 the backtesting period, yay! :partying_face:
