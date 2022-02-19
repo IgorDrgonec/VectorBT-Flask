@@ -70,7 +70,7 @@ def update_gist(gist_id, file_name, content, description):
 
 
 parser = ArgumentParser()
-parser.add_argument("--renew", dest="renew", default=False)
+parser.add_argument("--renew", action='store_true')
 args = parser.parse_args()
 
 

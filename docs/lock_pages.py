@@ -27,7 +27,7 @@ def namespace(element):
 
 
 parser = ArgumentParser()
-parser.add_argument("--renew", dest="renew", default=False)
+parser.add_argument("--renew", action='store_true')
 args = parser.parse_args()
 
 if __name__ == "__main__":
