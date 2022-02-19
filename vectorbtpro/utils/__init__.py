@@ -29,7 +29,9 @@ from vectorbtpro.utils.chunking import (
 from vectorbtpro.utils.config import (
     atomic_dict,
     merge_dicts,
+    ChildDict,
     Config,
+    FrozenConfig,
     ReadonlyConfig,
     HybridConfig,
     Configured,

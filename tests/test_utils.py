@@ -456,16 +456,20 @@ class TestConfig:
         assert cfg == config.Config(dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6]))))
         assert cfg.reset_dct_ == dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6])))
 
-    def test_config_convert_dicts(self):
-        cfg = config.Config(dict(dct=dict(dct=config.Config(dict(), nested_=False))), nested_=True, convert_dicts_=True)
+    def test_config_convert_children(self):
+        cfg = config.Config(
+            dict(dct=config.ChildDict(dct=config.Config(dict(), nested_=False))),
+            nested_=True,
+            convert_children_=True,
+        )
         assert cfg.nested_
-        assert cfg.convert_dicts_
+        assert cfg.convert_children_
         assert isinstance(cfg["dct"], config.Config)
         assert cfg["dct"].nested_
-        assert cfg["dct"].convert_dicts_
+        assert cfg["dct"].convert_children_
         assert isinstance(cfg["dct"]["dct"], config.Config)
         assert not cfg["dct"]["dct"].nested_
-        assert not cfg["dct"]["dct"].convert_dicts_
+        assert not cfg["dct"]["dct"].convert_children_
 
     def test_config_from_config(self):
         cfg = config.Config(
@@ -477,7 +481,7 @@ class TestConfig:
                 frozen_keys_=True,
                 readonly_=True,
                 nested_=True,
-                convert_dicts_=True,
+                convert_children_=True,
                 as_attrs_=True,
             )
         )
@@ -488,7 +492,7 @@ class TestConfig:
         assert cfg.frozen_keys_
         assert cfg.readonly_
         assert cfg.nested_
-        assert cfg.convert_dicts_
+        assert cfg.convert_children_
         assert cfg.as_attrs_
 
         c2 = config.Config(
@@ -499,7 +503,7 @@ class TestConfig:
             frozen_keys_=False,
             readonly_=False,
             nested_=False,
-            convert_dicts_=False,
+            convert_children_=False,
             as_attrs_=False,
         )
         assert dict(c2) == dict(a=0)
@@ -509,7 +513,7 @@ class TestConfig:
         assert not c2.frozen_keys_
         assert not c2.readonly_
         assert not c2.nested_
-        assert not c2.convert_dicts_
+        assert not c2.convert_children_
         assert not c2.as_attrs_
 
     def test_config_defaults(self):
@@ -521,7 +525,7 @@ class TestConfig:
         assert not cfg.frozen_keys_
         assert not cfg.readonly_
         assert cfg.nested_
-        assert not cfg.convert_dicts_
+        assert not cfg.convert_children_
         assert not cfg.as_attrs_
 
         vbt.settings.config.reset()
@@ -530,7 +534,7 @@ class TestConfig:
         vbt.settings.config["frozen_keys_"] = True
         vbt.settings.config["readonly_"] = True
         vbt.settings.config["nested_"] = False
-        vbt.settings.config["convert_dicts_"] = True
+        vbt.settings.config["convert_children_"] = True
         vbt.settings.config["as_attrs_"] = True
 
         cfg = config.Config(dict(a=0))
@@ -541,7 +545,7 @@ class TestConfig:
         assert cfg.frozen_keys_
         assert cfg.readonly_
         assert not cfg.nested_
-        assert cfg.convert_dicts_
+        assert cfg.convert_children_
         assert cfg.as_attrs_
 
         vbt.settings.config.reset()
@@ -576,7 +580,12 @@ class TestConfig:
         cfg.popitem()
         assert not hasattr(cfg, "b")
 
-        cfg = config.Config(dict(a=0, b=0, dct=dict(d=0)), as_attrs_=True, nested_=True, convert_dicts_=True)
+        cfg = config.Config(
+            config.ChildDict(a=0, b=0, dct=config.ChildDict(d=0)),
+            as_attrs_=True,
+            nested_=True,
+            convert_children_=True,
+        )
         assert cfg.a == 0
         assert cfg.b == 0
         assert cfg.dct.d == 0
@@ -823,7 +832,7 @@ class TestConfig:
             frozen_keys_=True,
             readonly_=True,
             nested_=True,
-            convert_dicts_=True,
+            convert_children_=True,
             as_attrs_=True,
         )
         cfg.save(tmp_path / "config", dump_reset_dct=True)
@@ -840,7 +849,7 @@ class TestConfig:
             frozen_keys_=True,
             readonly_=True,
             nested_=True,
-            convert_dicts_=True,
+            convert_children_=True,
             as_attrs_=True,
         )
         cfg2 = config.Config(
@@ -851,7 +860,7 @@ class TestConfig:
             frozen_keys_=False,
             readonly_=False,
             nested_=False,
-            convert_dicts_=False,
+            convert_children_=False,
             as_attrs_=False,
         )
         cfg1.save(tmp_path / "config", dump_reset_dct=True)

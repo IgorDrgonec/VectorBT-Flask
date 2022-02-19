@@ -15,9 +15,10 @@ Here are the main properties of the `settings` config:
     one per sub-package (e.g., 'data'), module (e.g., 'wrapping'), or even class (e.g., 'configured').
     Each sub-config may consist of other sub-configs.
 * It has frozen keys - you cannot add other sub-configs or remove the existing ones, but you can modify them.
-* Each sub-config can either inherit the properties of the parent one by using `dict` or overwrite them
-    by using its own `vectorbtpro.utils.config.Config`. The main reason for defining an own config is to allow
-    adding new keys (e.g., 'plotting.layout').
+* Each sub-config can either inherit the properties of the parent one by being an instance of
+    `vectorbtpro.utils.config.ChildDict` or overwrite them by being an instance of
+    `vectorbtpro.utils.config.Config` or a regular `dict`. The main reason for defining an own config
+    is to allow adding new keys (e.g., 'plotting.layout').
 
 For example, you can change default width and height of each plot:
 
@@ -91,19 +92,19 @@ import pkgutil
 
 import numpy as np
 
-from vectorbtpro.utils.config import Config
+from vectorbtpro.utils.config import ChildDict, Config, FrozenConfig
 from vectorbtpro.utils.datetime_ import get_local_tz, get_utc_tz
 from vectorbtpro.utils.execution import SequenceEngine, DaskEngine, RayEngine
 from vectorbtpro.utils.jitting import NumPyJitter, NumbaJitter
 from vectorbtpro.utils.template import Sub, RepEval, deep_substitute
 
-__pdoc__ = {}
+__pdoc__: dict = {}
 
 # ############# Settings sub-configs ############# #
 
 _settings = {}
 
-caching = dict(
+caching = ChildDict(
     disable=False,
     disable_whitelist=False,
     disable_machinery=False,
@@ -130,34 +131,32 @@ ${config_doc}
 
 _settings["caching"] = caching
 
-jitting = dict(
+jitting = ChildDict(
     disable=False,
     disable_wrapping=False,
     disable_resolution=False,
     option=True,
     allow_new=False,
     register_new=False,
-    jitters=Config(  # flex
-        dict(
-            nb=dict(
-                cls=NumbaJitter,
-                aliases={"numba"},
-                options=dict(),
-                override_options=dict(),
-                resolve_kwargs=dict(),
-                tasks=dict(),
-            ),
-            np=dict(
-                cls=NumPyJitter,
-                aliases={"numpy"},
-                options=dict(),
-                override_options=dict(),
-                resolve_kwargs=dict(),
-                tasks=dict(),
-            ),
-        )
+    jitters=Config(
+        nb=FrozenConfig(
+            cls=NumbaJitter,
+            aliases={"numba"},
+            options=dict(),
+            override_options=dict(),
+            resolve_kwargs=dict(),
+            tasks=dict(),
+        ),
+        np=FrozenConfig(
+            cls=NumPyJitter,
+            aliases={"numpy"},
+            options=dict(),
+            override_options=dict(),
+            resolve_kwargs=dict(),
+            tasks=dict(),
+        ),
     ),
-    template_context=Config(dict()),  # flex
+    template_context=Config(),
 )
 """_"""
 
@@ -177,7 +176,7 @@ ${config_doc}
 
 _settings["jitting"] = jitting
 
-numba = dict(
+numba = ChildDict(
     parallel=None,
     silence_warnings=False,
     check_func_type=True,
@@ -195,7 +194,7 @@ ${config_doc}
 
 _settings["numba"] = numba
 
-math = dict(
+math = ChildDict(
     use_tol=True,
     rel_tol=1e-9,
     abs_tol=1e-12,  # 1,000,000,000 == 1,000,000,001  # 0.000000000001 == 0.000000000002,
@@ -215,36 +214,34 @@ ${config_doc}
 
 _settings["math"] = math
 
-execution = dict(
+execution = ChildDict(
     show_progress=True,
-    pbar_kwargs=Config(dict()),  # flex
-    engines=Config(  # flex
-        dict(
-            sequence=dict(
-                cls=SequenceEngine,
-                show_progress=False,
-                pbar_kwargs=Config(dict()),  # flex
-                n_chunks=None,
-                chunk_len=None,
-            ),
-            dask=dict(
-                cls=DaskEngine,
-                compute_kwargs=Config(dict()),  # flex
-                n_chunks=None,
-                chunk_len=None,
-            ),
-            ray=dict(
-                cls=RayEngine,
-                restart=False,
-                reuse_refs=True,
-                del_refs=True,
-                shutdown=False,
-                init_kwargs=Config(dict()),  # flex
-                remote_kwargs=Config(dict()),  # flex
-                n_chunks=None,
-                chunk_len=None,
-            ),
-        )
+    pbar_kwargs=Config(),
+    engines=Config(
+        sequence=FrozenConfig(
+            cls=SequenceEngine,
+            show_progress=False,
+            pbar_kwargs=Config(),
+            n_chunks=None,
+            chunk_len=None,
+        ),
+        dask=FrozenConfig(
+            cls=DaskEngine,
+            compute_kwargs=Config(),
+            n_chunks=None,
+            chunk_len=None,
+        ),
+        ray=FrozenConfig(
+            cls=RayEngine,
+            restart=False,
+            reuse_refs=True,
+            del_refs=True,
+            shutdown=False,
+            init_kwargs=Config(),
+            remote_kwargs=Config(),
+            n_chunks=None,
+            chunk_len=None,
+        ),
     ),
 )
 """_"""
@@ -259,7 +256,7 @@ ${config_doc}
 
 _settings["execution"] = execution
 
-chunking = dict(
+chunking = ChildDict(
     disable=False,
     disable_wrapping=False,
     option=False,
@@ -269,10 +266,10 @@ chunking = dict(
     chunk_len=None,
     skip_one_chunk=True,
     silence_warnings=False,
-    template_context=Config(dict()),  # flex
-    options=Config(dict()),  # flex
-    override_setup_options=Config(dict()),  # flex
-    override_options=Config(dict()),  # flex
+    template_context=Config(),
+    options=Config(),
+    override_setup_options=Config(),
+    override_options=Config(),
 )
 """_"""
 
@@ -290,9 +287,9 @@ ${config_doc}
 
 _settings["chunking"] = chunking
 
-template = dict(
+template = ChildDict(
     strict=True,
-    context=Config(dict()),  # flex
+    context=Config(),
 )
 """_"""
 
@@ -306,7 +303,7 @@ ${config_doc}
 
 _settings["template"] = template
 
-config = Config(dict())  # flex
+config = Config(dict())
 """_"""
 
 __pdoc__["config"] = Sub(
@@ -319,8 +316,13 @@ ${config_doc}
 
 _settings["config"] = config
 
-configured = dict(
-    config=Config(dict(readonly_=True, nested_=False)),  # flex
+configured = ChildDict(
+    config=Config(
+        dict(
+            readonly_=True,
+            nested_=False,
+        )
+    ),
 )
 """_"""
 
@@ -334,7 +336,7 @@ ${config_doc}
 
 _settings["configured"] = configured
 
-broadcasting = dict(
+broadcasting = ChildDict(
     align_index=False,
     align_columns=True,
     index_from="strict",
@@ -364,7 +366,7 @@ ${config_doc}
 
 _settings["broadcasting"] = broadcasting
 
-wrapping = dict(
+wrapping = ChildDict(
     column_only_select=False,
     group_select=True,
     freq=None,
@@ -382,7 +384,7 @@ ${config_doc}
 
 _settings["wrapping"] = wrapping
 
-datetime = dict(
+datetime = ChildDict(
     naive_tz=get_local_tz(),
     to_py_timezone=True,
 )
@@ -398,36 +400,114 @@ ${config_doc}
 
 _settings["datetime"] = datetime
 
-data = dict(
+data = ChildDict(
     show_progress=True,
-    pbar_kwargs=Config(dict()),  # flex
+    pbar_kwargs=Config(),
     tz_localize=get_utc_tz(),
     tz_convert=get_utc_tz(),
     missing_index="nan",
     missing_columns="raise",
     skip_on_error=False,
     silence_warnings=False,
-    custom=Config(  # flex
-        dict(
-            binance=dict(
-                dict(
-                    api_key=None,
-                    api_secret=None,
-                )
+    custom=Config(
+        # Synthetic
+        synthetic=FrozenConfig(
+            start=0,
+            end="now",
+            freq=None,
+            date_range_kwargs=dict(),
+        ),
+        random=FrozenConfig(
+            num_paths=1,
+            start_value=100.0,
+            mean=0.0,
+            std=0.01,
+            seed=None,
+            jitted=None,
+        ),
+        gbm=FrozenConfig(
+            num_paths=1,
+            start_value=100.0,
+            mean=0.0,
+            std=0.01,
+            dt=1.0,
+            seed=None,
+            jitted=None,
+        ),
+        # Local
+        local=FrozenConfig(
+            match_paths=True,
+            match_regex=None,
+            sort_paths=True,
+        ),
+        csv=FrozenConfig(
+            start_row=0,
+            end_row=None,
+            header=0,
+            index_col=0,
+            parse_dates=True,
+            squeeze=True,
+            read_csv_kwargs=dict(),
+        ),
+        hdf=FrozenConfig(
+            start_row=0,
+            end_row=None,
+            read_hdf_kwargs=dict(),
+        ),
+        # Remote
+        yf=FrozenConfig(
+            period="max",
+            start=None,
+            end=None,
+            history_kwargs=dict(),
+        ),
+        binance=FrozenConfig(
+            client=None,
+            client_kwargs=dict(
+                api_key=None,
+                api_secret=None,
             ),
-            ccxt=dict(
-                dict(
-                    enableRateLimit=True,
-                )
+            start=0,
+            end="now UTC",
+            interval="1d",
+            delay=500,
+            limit=500,
+            show_progress=True,
+            pbar_kwargs=dict(),
+        ),
+        ccxt=FrozenConfig(
+            exchange='binance',
+            exchange_config=dict(
+                enableRateLimit=True,
             ),
-            alpaca=dict(
+            timeframe='1d',
+            start=0,
+            end="now UTC",
+            delay=None,
+            limit=500,
+            retries=3,
+            show_progress=True,
+            pbar_kwargs=dict(),
+            fetch_params=dict(),
+            exchanges=dict(),
+        ),
+        alpaca=FrozenConfig(
+            client=None,
+            client_kwargs=dict(
                 key_id=None,
                 secret_key=None,
             ),
-        )
+            timeframe='1d',
+            start=0,
+            end="now UTC",
+            adjustment="all",
+            limit=500,
+            exchange="CBSE",
+            exchanges=dict(),
+        ),
     ),
-    stats=Config(dict()),  # flex
-    plots=Config(dict()),  # flex
+    stats=Config(),
+    plots=Config(),
 )
 """_"""
 
@@ -452,97 +532,85 @@ Alpaca:
 
 _settings["data"] = data
 
-plotting = dict(
+plotting = ChildDict(
     use_widgets=True,
-    show_kwargs=Config(dict()),  # flex
+    show_kwargs=Config(),
     use_gl=None,
-    color_schema=Config(  # flex
-        dict(
-            increasing="#1b9e76",
-            decreasing="#d95f02",
-        )
+    color_schema=Config(
+        increasing="#1b9e76",
+        decreasing="#d95f02",
     ),
-    contrast_color_schema=Config(  # flex
-        dict(
-            blue="#4285F4",
-            orange="#FFAA00",
-            green="#37B13F",
-            red="#EA4335",
-            gray="#E2E2E2",
-        )
+    contrast_color_schema=Config(
+        blue="#4285F4",
+        orange="#FFAA00",
+        green="#37B13F",
+        red="#EA4335",
+        gray="#E2E2E2",
     ),
-    themes=dict(
-        light=dict(
-            color_schema=Config(  # flex
-                dict(
-                    blue="#1f77b4",
-                    orange="#ff7f0e",
-                    green="#2ca02c",
-                    red="#dc3912",
-                    purple="#9467bd",
-                    brown="#8c564b",
-                    pink="#e377c2",
-                    gray="#7f7f7f",
-                    yellow="#bcbd22",
-                    cyan="#17becf",
-                )
+    themes=ChildDict(
+        light=ChildDict(
+            color_schema=Config(
+                blue="#1f77b4",
+                orange="#ff7f0e",
+                green="#2ca02c",
+                red="#dc3912",
+                purple="#9467bd",
+                brown="#8c564b",
+                pink="#e377c2",
+                gray="#7f7f7f",
+                yellow="#bcbd22",
+                cyan="#17becf",
             ),
             template=None,
         ),
-        dark=dict(
-            color_schema=Config(  # flex
-                dict(
-                    blue="#1f77b4",
-                    orange="#ff7f0e",
-                    green="#2ca02c",
-                    red="#dc3912",
-                    purple="#9467bd",
-                    brown="#8c564b",
-                    pink="#e377c2",
-                    gray="#7f7f7f",
-                    yellow="#bcbd22",
-                    cyan="#17becf",
-                )
+        dark=ChildDict(
+            color_schema=Config(
+                blue="#1f77b4",
+                orange="#ff7f0e",
+                green="#2ca02c",
+                red="#dc3912",
+                purple="#9467bd",
+                brown="#8c564b",
+                pink="#e377c2",
+                gray="#7f7f7f",
+                yellow="#bcbd22",
+                cyan="#17becf",
             ),
             template=None,
         ),
-        seaborn=dict(
-            color_schema=Config(  # flex
-                dict(
-                    blue="rgb(76,114,176)",
-                    orange="rgb(221,132,82)",
-                    green="rgb(129,114,179)",
-                    red="rgb(85,168,104)",
-                    purple="rgb(218,139,195)",
-                    brown="rgb(204,185,116)",
-                    pink="rgb(140,140,140)",
-                    gray="rgb(100,181,205)",
-                    yellow="rgb(147,120,96)",
-                    cyan="rgb(196,78,82)",
-                )
+        seaborn=ChildDict(
+            color_schema=Config(
+                blue="rgb(76,114,176)",
+                orange="rgb(221,132,82)",
+                green="rgb(129,114,179)",
+                red="rgb(85,168,104)",
+                purple="rgb(218,139,195)",
+                brown="rgb(204,185,116)",
+                pink="rgb(140,140,140)",
+                gray="rgb(100,181,205)",
+                yellow="rgb(147,120,96)",
+                cyan="rgb(196,78,82)",
             ),
             template=None,
         ),
     ),
-    layout=Config(  # flex
-        dict(
-            width=700,
-            height=350,
-            margin=dict(
-                t=30,
-                b=30,
-                l=30,
-                r=30,
-            ),
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=1.02,
-                xanchor="right",
-                x=1,
-                traceorder="normal",
-            ),
-        )
+    layout=Config(
+        width=700,
+        height=350,
+        margin=dict(
+            t=30,
+            b=30,
+            l=30,
+            r=30,
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1,
+            traceorder="normal",
+        ),
     ),
 )
 """_"""
@@ -559,32 +627,28 @@ ${config_doc}
 
 _settings["plotting"] = plotting
 
-stats_builder = dict(
+stats_builder = ChildDict(
     metrics="all",
     tags="all",
     silence_warnings=False,
-    template_context=Config(dict()),  # flex
-    filters=Config(  # flex
-        dict(
-            is_not_grouped=dict(
-                filter_func=lambda self, metric_settings: not self.wrapper.grouper.is_grouped(
-                    group_by=metric_settings["group_by"]
-                ),
-                warning_message=Sub("Metric '$metric_name' does not support grouped data"),
+    template_context=Config(),
+    filters=Config(
+        is_not_grouped=dict(
+            filter_func=lambda self, metric_settings: not self.wrapper.grouper.is_grouped(
+                group_by=metric_settings["group_by"]
             ),
-            has_freq=dict(
-                filter_func=lambda self, metric_settings: self.wrapper.freq is not None,
-                warning_message=Sub("Metric '$metric_name' requires frequency to be set"),
-            ),
-        )
+            warning_message=Sub("Metric '$metric_name' does not support grouped data"),
+        ),
+        has_freq=dict(
+            filter_func=lambda self, metric_settings: self.wrapper.freq is not None,
+            warning_message=Sub("Metric '$metric_name' requires frequency to be set"),
+        ),
     ),
-    settings=Config(  # flex
-        dict(
-            to_timedelta=None,
-            use_caching=True,
-        )
+    settings=Config(
+        to_timedelta=None,
+        use_caching=True,
     ),
-    metric_settings=Config(dict()),  # flex
+    metric_settings=Config(),
 )
 """_"""
 
@@ -599,43 +663,39 @@ ${config_doc}
 
 _settings["stats_builder"] = stats_builder
 
-plots_builder = dict(
+plots_builder = ChildDict(
     subplots="all",
     tags="all",
     silence_warnings=False,
-    template_context=Config(dict()),  # flex
-    filters=Config(  # flex
-        dict(
-            is_not_grouped=dict(
-                filter_func=lambda self, subplot_settings: not self.wrapper.grouper.is_grouped(
-                    group_by=subplot_settings["group_by"]
-                ),
-                warning_message=Sub("Subplot '$subplot_name' does not support grouped data"),
+    template_context=Config(),
+    filters=Config(
+        is_not_grouped=dict(
+            filter_func=lambda self, subplot_settings: not self.wrapper.grouper.is_grouped(
+                group_by=subplot_settings["group_by"]
             ),
-            has_freq=dict(
-                filter_func=lambda self, subplot_settings: self.wrapper.freq is not None,
-                warning_message=Sub("Subplot '$subplot_name' requires frequency to be set"),
-            ),
-        )
+            warning_message=Sub("Subplot '$subplot_name' does not support grouped data"),
+        ),
+        has_freq=dict(
+            filter_func=lambda self, subplot_settings: self.wrapper.freq is not None,
+            warning_message=Sub("Subplot '$subplot_name' requires frequency to be set"),
+        ),
     ),
-    settings=Config(  # flex
-        dict(
-            use_caching=True,
-            hline_shape_kwargs=dict(
-                type="line",
-                line=dict(
-                    color="gray",
-                    dash="dash",
-                ),
+    settings=Config(
+        use_caching=True,
+        hline_shape_kwargs=dict(
+            type="line",
+            line=dict(
+                color="gray",
+                dash="dash",
             ),
-        )
+        ),
     ),
-    subplot_settings=Config(dict()),  # flex
+    subplot_settings=Config(),
     show_titles=True,
     hide_id_labels=True,
     group_id_labels=True,
-    make_subplots_kwargs=Config(dict()),  # flex
-    layout_kwargs=Config(dict()),  # flex
+    make_subplots_kwargs=Config(),
+    layout_kwargs=Config(),
 )
 """_"""
 
@@ -650,25 +710,23 @@ ${config_doc}
 
 _settings["plots_builder"] = plots_builder
 
-generic = dict(
+generic = ChildDict(
     use_jitted=False,
-    stats=Config(  # flex
-        dict(
-            filters=dict(
-                has_mapping=dict(
-                    filter_func=lambda self, metric_settings: metric_settings.get(
-                        "mapping",
-                        self.mapping,
-                    )
-                    is not None,
+    stats=Config(
+        filters=dict(
+            has_mapping=dict(
+                filter_func=lambda self, metric_settings: metric_settings.get(
+                    "mapping",
+                    self.mapping,
                 )
-            ),
-            settings=dict(
-                incl_all_keys=False,
-            ),
-        )
+                                                          is not None,
+            )
+        ),
+        settings=dict(
+            incl_all_keys=False,
+        ),
     ),
-    plots=Config(dict()),  # flex
+    plots=Config(),
 )
 """_"""
 
@@ -682,9 +740,9 @@ ${config_doc}
 
 _settings["generic"] = generic
 
-ranges = dict(
-    stats=Config(dict()),  # flex
-    plots=Config(dict()),  # flex
+ranges = ChildDict(
+    stats=Config(),
+    plots=Config(),
 )
 """_"""
 
@@ -698,15 +756,13 @@ ${config_doc}
 
 _settings["ranges"] = ranges
 
-drawdowns = dict(
-    stats=Config(  # flex
-        dict(
-            settings=dict(
-                incl_active=False,
-            )
-        )
+drawdowns = ChildDict(
+    stats=Config(
+        settings=dict(
+            incl_active=False,
+        ),
     ),
-    plots=Config(dict()),  # flex
+    plots=Config(),
 )
 """_"""
 
@@ -720,17 +776,17 @@ ${config_doc}
 
 _settings["drawdowns"] = drawdowns
 
-ohlcv = dict(
+ohlcv = ChildDict(
     plot_type="OHLC",
-    column_names=dict(
+    column_names=ChildDict(
         open="Open",
         high="High",
         low="Low",
         close="Close",
         volume="Volume",
     ),
-    stats=Config(dict()),  # flex
-    plots=Config(dict()),  # flex
+    stats=Config(),
+    plots=Config(),
 )
 """_"""
 
@@ -744,23 +800,20 @@ ${config_doc}
 
 _settings["ohlcv"] = ohlcv
 
-signals = dict(
-    stats=Config(  # flex
-        dict(
-            filters=dict(
-                silent_has_other=dict(
-                    filter_func=lambda self, metric_settings: metric_settings.get("other", None)
-                    is not None,
-                ),
+signals = ChildDict(
+    stats=Config(
+        filters=dict(
+            silent_has_other=dict(
+                filter_func=lambda self, metric_settings: metric_settings.get("other", None) is not None,
             ),
-            settings=dict(
-                other=None,
-                other_name="Other",
-                from_other=False,
-            ),
-        )
+        ),
+        settings=dict(
+            other=None,
+            other_name="Other",
+            from_other=False,
+        ),
     ),
-    plots=Config(dict()),  # flex
+    plots=Config(),
 )
 """_"""
 
@@ -774,43 +827,39 @@ ${config_doc}
 
 _settings["signals"] = signals
 
-returns = dict(
+returns = ChildDict(
     year_freq="365 days",
     bm_returns=None,
-    defaults=Config(  # flex
-        dict(
-            start_value=0.0,
-            window=10,
-            minp=None,
-            ddof=1,
-            risk_free=0.0,
-            levy_alpha=2.0,
-            required_return=0.0,
-            cutoff=0.05,
-        )
+    defaults=Config(
+        start_value=0.0,
+        window=10,
+        minp=None,
+        ddof=1,
+        risk_free=0.0,
+        levy_alpha=2.0,
+        required_return=0.0,
+        cutoff=0.05,
     ),
-    stats=Config(  # flex
-        dict(
-            filters=dict(
-                has_year_freq=dict(
-                    filter_func=lambda self, metric_settings: self.year_freq is not None,
-                    warning_message=Sub("Metric '$metric_name' requires year frequency to be set"),
-                ),
-                has_bm_returns=dict(
-                    filter_func=lambda self, metric_settings: metric_settings.get(
-                        "bm_returns",
-                        self.bm_returns,
-                    )
-                    is not None,
-                    warning_message=Sub("Metric '$metric_name' requires bm_returns to be set"),
-                ),
+    stats=Config(
+        filters=dict(
+            has_year_freq=dict(
+                filter_func=lambda self, metric_settings: self.year_freq is not None,
+                warning_message=Sub("Metric '$metric_name' requires year frequency to be set"),
             ),
-            settings=dict(
-                check_is_not_grouped=True,
+            has_bm_returns=dict(
+                filter_func=lambda self, metric_settings: metric_settings.get(
+                    "bm_returns",
+                    self.bm_returns,
+                )
+                                                          is not None,
+                warning_message=Sub("Metric '$metric_name' requires bm_returns to be set"),
             ),
-        )
+        ),
+        settings=dict(
+            check_is_not_grouped=True,
+        ),
     ),
-    plots=Config(dict()),  # flex
+    plots=Config(),
 )
 """_"""
 
@@ -824,8 +873,8 @@ ${config_doc}
 
 _settings["returns"] = returns
 
-qs_adapter = dict(
-    defaults=Config(dict()),  # flex,
+qs_adapter = ChildDict(
+    defaults=Config(),
 )
 """_"""
 
@@ -839,9 +888,9 @@ ${config_doc}
 
 _settings["qs_adapter"] = qs_adapter
 
-records = dict(
-    stats=Config(dict()),  # flex
-    plots=Config(dict()),  # flex
+records = ChildDict(
+    stats=Config(),
+    plots=Config(),
 )
 """_"""
 
@@ -855,24 +904,21 @@ ${config_doc}
 
 _settings["records"] = records
 
-mapped_array = dict(
-    stats=Config(  # flex
-        dict(
-            filters=dict(
-                has_mapping=dict(
-                    filter_func=lambda self, metric_settings: metric_settings.get(
-                        "mapping",
-                        self.mapping,
-                    )
-                    is not None,
-                )
-            ),
-            settings=dict(
-                incl_all_keys=False,
-            ),
-        )
+mapped_array = ChildDict(
+    stats=Config(
+        filters=dict(
+            has_mapping=dict(
+                filter_func=lambda self, metric_settings: metric_settings.get(
+                    "mapping",
+                    self.mapping,
+                ) is not None,
+            )
+        ),
+        settings=dict(
+            incl_all_keys=False,
+        ),
     ),
-    plots=Config(dict()),  # flex
+    plots=Config(),
 )
 """_"""
 
@@ -886,9 +932,9 @@ ${config_doc}
 
 _settings["mapped_array"] = mapped_array
 
-orders = dict(
-    stats=Config(dict()),  # flex
-    plots=Config(dict()),  # flex
+orders = ChildDict(
+    stats=Config(),
+    plots=Config(),
 )
 """_"""
 
@@ -902,18 +948,16 @@ ${config_doc}
 
 _settings["orders"] = orders
 
-trades = dict(
-    stats=Config(  # flex
-        dict(
-            settings=dict(
-                incl_open=False,
-            ),
-            template_context=dict(
-                incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")
-            ),
-        )
+trades = ChildDict(
+    stats=Config(
+        settings=dict(
+            incl_open=False,
+        ),
+        template_context=dict(
+            incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")
+        ),
     ),
-    plots=Config(dict()),  # flex
+    plots=Config(),
 )
 """_"""
 
@@ -927,8 +971,8 @@ ${config_doc}
 
 _settings["trades"] = trades
 
-logs = dict(
-    stats=Config(dict()),  # flex
+logs = ChildDict(
+    stats=Config(),
 )
 """_"""
 
@@ -942,7 +986,7 @@ ${config_doc}
 
 _settings["logs"] = logs
 
-portfolio = dict(
+portfolio = ChildDict(
     # Orders
     size=np.inf,
     size_type="amount",
@@ -1000,12 +1044,10 @@ portfolio = dict(
     flexible=False,
     seed=None,
     group_by=None,
-    broadcast_kwargs=Config(  # flex
-        dict(
-            require_kwargs=dict(requirements="W"),
-        )
+    broadcast_kwargs=Config(
+        require_kwargs=dict(requirements="W"),
     ),
-    template_context=Config(dict()),  # flex
+    template_context=Config(),
     keep_inout_raw=True,
     call_seq="default",
     attach_call_seq=False,
@@ -1015,39 +1057,35 @@ portfolio = dict(
     use_in_outputs=True,
     fillna_close=True,
     trades_type="exittrades",
-    stats=Config(  # flex
-        dict(
-            filters=dict(
-                has_year_freq=dict(
-                    filter_func=lambda self, metric_settings: metric_settings.get("year_freq", None)
-                    is not None,
-                    warning_message=Sub("Metric '$metric_name' requires year frequency to be set"),
-                ),
-                has_bm_returns=dict(
-                    filter_func=lambda self, metric_settings: metric_settings.get(
-                        "bm_returns",
-                        self.bm_returns,
-                    )
-                    is not None,
-                    warning_message=Sub("Metric '$metric_name' requires bm_returns to be set"),
-                ),
+    stats=Config(
+        filters=dict(
+            has_year_freq=dict(
+                filter_func=lambda self, metric_settings: metric_settings.get("year_freq", None)
+                                                          is not None,
+                warning_message=Sub("Metric '$metric_name' requires year frequency to be set"),
             ),
-            settings=dict(
-                use_asset_returns=False,
-                incl_open=False,
+            has_bm_returns=dict(
+                filter_func=lambda self, metric_settings: metric_settings.get(
+                    "bm_returns",
+                    self.bm_returns,
+                )
+                                                          is not None,
+                warning_message=Sub("Metric '$metric_name' requires bm_returns to be set"),
             ),
-            template_context=dict(
-                incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")
-            ),
-        )
+        ),
+        settings=dict(
+            use_asset_returns=False,
+            incl_open=False,
+        ),
+        template_context=dict(
+            incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")
+        ),
     ),
-    plots=Config(  # flex
-        dict(
-            subplots=["orders", "trade_pnl", "cum_returns"],
-            settings=dict(
-                use_asset_returns=False,
-            ),
-        )
+    plots=Config(
+        subplots=["orders", "trade_pnl", "cum_returns"],
+        settings=dict(
+            use_asset_returns=False,
+        ),
     ),
 )
 """_"""
@@ -1062,17 +1100,15 @@ ${config_doc}
 
 _settings["portfolio"] = portfolio
 
-messaging = dict(
-    telegram=Config(  # flex
-        dict(
-            token=None,
-            use_context=True,
-            persistence="telegram_bot.pickle",
-            defaults=Config(dict()),  # flex
-            drop_pending_updates=True,
-        )
+messaging = ChildDict(
+    telegram=Config(
+        token=None,
+        use_context=True,
+        persistence="telegram_bot.pickle",
+        defaults=Config(),
+        drop_pending_updates=True,
     ),
-    giphy=dict(
+    giphy=ChildDict(
         api_key=None,
         weirdness=5,
     ),
@@ -1102,10 +1138,10 @@ GIPHY:
 
 _settings["messaging"] = messaging
 
-pbar = dict(
+pbar = ChildDict(
     disable=False,
     type="tqdm_auto",
-    kwargs=Config(dict()),  # flex
+    kwargs=Config(),
 )
 """_"""
 
@@ -1119,8 +1155,8 @@ ${config_doc}
 
 _settings["pbar"] = pbar
 
-path = dict(
-    mkdir=dict(
+path = ChildDict(
+    mkdir=ChildDict(
         mkdir=False,
         mode=0o777,
         parents=True,
@@ -1194,7 +1230,7 @@ settings = SettingsConfig(
     _settings,
     reset_dct_copy_kwargs_=dict(copy_mode="deep"),
     frozen_keys_=True,
-    convert_dicts_=Config,
+    convert_children_=Config,
     as_attrs_=True,
 )
 """Global settings config.

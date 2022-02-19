@@ -271,6 +271,11 @@ class PickleableDict(Pickleable, dict):
         self.update(self.load(path, **kwargs))
 
 
+class ChildDict(dict):
+    """Subclass of `dict` acting as a child dict."""
+    pass
+
+
 ConfigT = tp.TypeVar("ConfigT", bound="Config")
 
 
@@ -301,17 +306,19 @@ class Config(PickleableDict, Prettified):
 
             Such operations include copy, update, and merge.
             Disable to treat each child dict as a single value. Defaults to True.
-        convert_dicts_ (bool or type): Whether to convert child dicts to configs with the same configuration.
+        convert_children_ (bool or type): Whether to convert child dicts of type `ChildDict` to configs
+            with the same configuration.
 
-            This will trigger a waterfall reaction across all child dicts.
-            Won't convert dicts that are already configs.
-            Apart from boolean, you can set it to any subclass of `Config` to use it for construction.
-            Requires `nested_` to be True. Defaults to False.
+            This will trigger a waterfall reaction across all child dicts. Won't convert dicts that
+            are already configs. Apart from boolean, you can set it to any subclass of `Config` to use
+            it for construction. Requires `nested_` to be True. Defaults to False.
         as_attrs_ (bool): Whether to enable accessing dict keys via the dot notation.
 
-            Enables autocompletion (but only during runtime!).
-            Raises error in case of naming conflicts.
+            Enables autocompletion (but only during runtime!). Raises error in case of naming conflicts.
             Defaults to True if `frozen_keys_` or `readonly_`, otherwise False.
+
+            To make nested dictionaries also accessible via the dot notation, wrap
+            them with `ChildDict` and set `convert_children_` and `nested_` to True.
         **kwargs: Keyword arguments to construct the dict from.
 
     Defaults can be overridden with settings under `vectorbtpro._settings.config`.
@@ -332,7 +339,7 @@ class Config(PickleableDict, Prettified):
         frozen_keys_: tp.Optional[bool] = None,
         readonly_: tp.Optional[bool] = None,
         nested_: tp.Optional[bool] = None,
-        convert_dicts_: tp.Optional[tp.Union[bool, tp.Type["Config"]]] = None,
+        convert_children_: tp.Optional[tp.Union[bool, tp.Type["Config"]]] = None,
         as_attrs_: tp.Optional[bool] = None,
         **kwargs,
     ) -> None:
@@ -372,7 +379,7 @@ class Config(PickleableDict, Prettified):
         frozen_keys_ = _resolve_param("frozen_keys_", frozen_keys_, False)
         readonly_ = _resolve_param("readonly_", readonly_, False)
         nested_ = _resolve_param("nested_", nested_, True)
-        convert_dicts_ = _resolve_param("convert_dicts_", convert_dicts_, False)
+        convert_children_ = _resolve_param("convert_children_", convert_children_, False)
         as_attrs_ = _resolve_param("as_attrs_", as_attrs_, False)
         reset_dct_copy_kwargs_ = merge_dicts(copy_kwargs_, reset_dct_copy_kwargs_)
         copy_kwargs_ = _resolve_param("copy_kwargs_", copy_kwargs_, dict(copy_mode="none", nested=nested_), merge=True)
@@ -387,15 +394,15 @@ class Config(PickleableDict, Prettified):
         dct = copy_dict(dict(dct), **copy_kwargs_)
 
         # Convert child dicts
-        if convert_dicts_ and nested_:
+        if convert_children_ and nested_:
             for k, v in dct.items():
-                if isinstance(v, dict) and not isinstance(v, Config):
-                    if isinstance(convert_dicts_, bool):
+                if isinstance(v, ChildDict):
+                    if isinstance(convert_children_, bool):
                         config_cls = type(self)
-                    elif issubclass(convert_dicts_, Config):
-                        config_cls = convert_dicts_
+                    elif issubclass(convert_children_, Config):
+                        config_cls = convert_children_
                     else:
-                        raise TypeError("convert_dicts_ must be either boolean or a subclass of Config")
+                        raise TypeError("convert_children_ must be either boolean or a subclass of Config")
                     dct[k] = config_cls(
                         v,
                         copy_kwargs_=copy_kwargs_,
@@ -403,7 +410,7 @@ class Config(PickleableDict, Prettified):
                         frozen_keys_=frozen_keys_,
                         readonly_=readonly_,
                         nested_=nested_,
-                        convert_dicts_=convert_dicts_,
+                        convert_children_=convert_children_,
                         as_attrs_=as_attrs_,
                     )
 
@@ -420,7 +427,7 @@ class Config(PickleableDict, Prettified):
         self._frozen_keys_ = frozen_keys_
         self._readonly_ = readonly_
         self._nested_ = nested_
-        self._convert_dicts_ = convert_dicts_
+        self._convert_children_ = convert_children_
         self._as_attrs_ = as_attrs_
 
         # Set keys as attributes for autocomplete
@@ -461,9 +468,9 @@ class Config(PickleableDict, Prettified):
         return self._nested_
 
     @property
-    def convert_dicts_(self) -> tp.Union[bool, tp.Type["Config"]]:
-        """Whether to convert child dicts to configs with the same configuration."""
-        return self._convert_dicts_
+    def convert_children_(self) -> tp.Union[bool, tp.Type["Config"]]:
+        """Whether to convert child dicts of type `ChildDict` to configs with the same configuration."""
+        return self._convert_children_
 
     @property
     def as_attrs_(self) -> bool:
@@ -684,7 +691,7 @@ class Config(PickleableDict, Prettified):
                 frozen_keys_=self.frozen_keys_,
                 readonly_=self.readonly_,
                 nested_=self.nested_,
-                convert_dicts_=self.convert_dicts_,
+                convert_children_=self.convert_children_,
                 as_attrs_=self.as_attrs_,
             ),
             **kwargs,
@@ -714,7 +721,7 @@ class Config(PickleableDict, Prettified):
             frozen_keys_=obj["frozen_keys_"],
             readonly_=obj["readonly_"],
             nested_=obj["nested_"],
-            convert_dicts_=obj["convert_dicts_"],
+            convert_children_=obj["convert_children_"],
             as_attrs_=obj["as_attrs_"],
         )
 
@@ -745,14 +752,14 @@ class Config(PickleableDict, Prettified):
             dct = {
                 **dict(self),
                 **dict(
-                    copy_kwargs=self.copy_kwargs_,
-                    reset_dct=self.reset_dct_,
-                    reset_dct_copy_kwargs=self.reset_dct_copy_kwargs_,
-                    frozen_keys=self.frozen_keys_,
-                    readonly=self.readonly_,
-                    nested=self.nested_,
-                    convert_dicts=self.convert_dicts_,
-                    as_attrs=self.as_attrs_,
+                    copy_kwargs_=self.copy_kwargs_,
+                    reset_dct_=self.reset_dct_,
+                    reset_dct_copy_kwargs_=self.reset_dct_copy_kwargs_,
+                    frozen_keys_=self.frozen_keys_,
+                    readonly_=self.readonly_,
+                    nested_=self.nested_,
+                    convert_children_=self.convert_children_,
+                    as_attrs_=self.as_attrs_,
                 ),
             }
         else:
@@ -778,6 +785,9 @@ class AtomicConfig(Config, atomic_dict):
 
     pass
 
+
+FrozenConfig = functools.partial(Config, frozen_keys_=True)
+"""`Config` with `frozen_keys_` flag set to True."""
 
 ReadonlyConfig = functools.partial(Config, readonly_=True)
 """`Config` with `readonly_` flag set to True."""
