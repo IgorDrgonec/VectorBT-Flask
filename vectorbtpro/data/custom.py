@@ -50,6 +50,9 @@ except ImportError:
     AlpacaClientT = tp.Any
 
 __all__ = [
+    "SyntheticData",
+    "RandomData",
+    "GBMData",
     "LocalData",
     "CSVData",
     "HDFData",
@@ -58,10 +61,247 @@ __all__ = [
     "BinanceData",
     "CCXTData",
     "AlpacaData",
-    "SyntheticData",
-    "RandomData",
-    "GBMData",
 ]
+
+# ############# Synthetic ############# #
+
+
+class SyntheticData(Data):
+    """Subclass of `Data` for synthetically generated data.
+
+    Exposes an abstract class method `SyntheticData.generate_symbol`.
+    Everything else is taken care of."""
+
+    @classmethod
+    def generate_symbol(cls, symbol: tp.Symbol, index: tp.Index, **kwargs) -> tp.SeriesFrame:
+        """Abstract method to generate data of a symbol."""
+        raise NotImplementedError
+
+    @classmethod
+    def fetch_symbol(
+        cls,
+        symbol: tp.Symbol,
+        start: tp.Optional[tp.DatetimeLike] = None,
+        end: tp.Optional[tp.DatetimeLike] = None,
+        freq: tp.Union[None, str, pd.DateOffset] = None,
+        date_range_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
+        """Override `vectorbtpro.data.base.Data.fetch_symbol` to generate a symbol.
+
+        Generates datetime index and passes it to `SyntheticData.generate_symbol` to fill
+        the Series/DataFrame with generated data.
+
+        For defaults, see `custom.synthetic` in `vectorbtpro._settings.data`."""
+        from vectorbtpro._settings import settings
+
+        synthetic_cfg = settings["data"]["custom"]["synthetic"]
+
+        if start is None:
+            start = synthetic_cfg["start"]
+        if end is None:
+            end = synthetic_cfg["end"]
+        if freq is None:
+            freq = synthetic_cfg["freq"]
+        date_range_kwargs = merge_dicts(synthetic_cfg["date_range_kwargs"], date_range_kwargs)
+
+        index = pd.date_range(
+            start=to_tzaware_datetime(start, tz=get_utc_tz()),
+            end=to_tzaware_datetime(end, tz=get_utc_tz()),
+            freq=freq,
+            **date_range_kwargs,
+        )
+        if len(index) == 0:
+            raise ValueError("Date range is empty")
+        return cls.generate_symbol(symbol, index, **kwargs)
+
+    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
+        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
+        fetch_kwargs["start"] = self.last_index[symbol]
+        kwargs = merge_dicts(fetch_kwargs, kwargs)
+        return self.fetch_symbol(symbol, **kwargs)
+
+
+class RandomData(SyntheticData):
+    """`SyntheticData` for data generated using `vectorbtpro.data.nb.generate_random_data_nb`.
+
+    !!! note
+        When setting a seed, remember to pass a seed per symbol using `vectorbtpro.data.base.symbol_dict`.
+
+    Usage:
+        * Generate random data:
+
+        ```pycon
+        >>> import vectorbtpro as vbt
+
+        >>> rand_data = vbt.RandomData.fetch(
+        ...     list(range(5)),
+        ...     start='2020-01-01',
+        ...     end='2022-01-01'
+        ... )
+        ```
+
+        [=100% "100%"]{: .candystripe}
+
+        ```pycon
+        >>> rand_data.plot(showlegend=False)
+        ```
+
+        ![](/assets/images/RandomData.svg)
+    """
+
+    @classmethod
+    def generate_symbol(
+        cls,
+        symbol: tp.Symbol,
+        index: tp.Index,
+        num_paths: tp.Optional[int] = None,
+        start_value: tp.Optional[float] = None,
+        mean: tp.Optional[float] = None,
+        std: tp.Optional[float] = None,
+        seed: tp.Optional[int] = None,
+        jitted: tp.JittedOption = None,
+    ) -> tp.SeriesFrame:
+        """Generate a symbol.
+
+        Args:
+            symbol (str): Symbol.
+            index (pd.Index): Pandas index.
+            num_paths (int): Number of generated paths (columns in our case).
+            start_value (float): Value at time 0.
+
+                Does not appear as the first value in the output data.
+            mean (float): Drift, or mean of the percentage change.
+            std (float): Standard deviation of the percentage change.
+            seed (int): Set seed to make output deterministic.
+            jitted (any): See `vectorbtpro.utils.jitting.resolve_jitted_option`.
+
+        For defaults, see `custom.random` in `vectorbtpro._settings.data`.
+        """
+        from vectorbtpro._settings import settings
+
+        random_cfg = settings["data"]["custom"]["random"]
+
+        if num_paths is None:
+            num_paths = random_cfg["num_paths"]
+        if start_value is None:
+            start_value = random_cfg["start_value"]
+        if mean is None:
+            mean = random_cfg["mean"]
+        if std is None:
+            std = random_cfg["std"]
+        if seed is None:
+            seed = random_cfg["seed"]
+        if seed is not None:
+            set_seed(seed)
+        if jitted is None:
+            jitted = random_cfg["jitted"]
+
+        func = jit_reg.resolve_option(nb.generate_random_data_nb, jitted)
+        out = func((len(index), num_paths), start_value, mean, std)
+
+        if out.shape[1] == 1:
+            return pd.Series(out[:, 0], index=index)
+        columns = pd.RangeIndex(stop=out.shape[1], name="path")
+        return pd.DataFrame(out, index=index, columns=columns)
+
+    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
+        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
+        fetch_kwargs["start"] = self.last_index[symbol]
+        _ = fetch_kwargs.pop("start_value", None)
+        start_value = self.data[symbol].iloc[-2]
+        fetch_kwargs["seed"] = None
+        kwargs = merge_dicts(fetch_kwargs, kwargs)
+        return self.fetch_symbol(symbol, start_value=start_value, **kwargs)
+
+
+class GBMData(RandomData):
+    """`RandomData` for data generated using `vectorbtpro.data.nb.generate_gbm_data_nb`.
+
+    !!! note
+        When setting a seed, remember to pass a seed per symbol using `vectorbtpro.data.base.symbol_dict`.
+
+    Usage:
+        * Generate random data:
+
+        ```pycon
+        >>> import vectorbtpro as vbt
+
+        >>> gbm_data = vbt.GBMData.fetch(
+        ...     list(range(5)),
+        ...     start='2020-01-01',
+        ...     end='2022-01-01'
+        ... )
+        ```
+
+        [=100% "100%"]{: .candystripe}
+
+        ```pycon
+        >>> gbm_data.plot(showlegend=False)
+        ```
+
+        ![](/assets/images/GBMData.svg)
+    """
+
+    @classmethod
+    def generate_symbol(
+        cls,
+        symbol: tp.Symbol,
+        index: tp.Index,
+        num_paths: tp.Optional[int] = None,
+        start_value: tp.Optional[float] = None,
+        mean: tp.Optional[float] = None,
+        std: tp.Optional[float] = None,
+        dt: tp.Optional[float] = None,
+        seed: tp.Optional[int] = None,
+        jitted: tp.JittedOption = None,
+    ) -> tp.SeriesFrame:
+        """Generate a symbol.
+
+        Args:
+            symbol (str): Symbol.
+            index (pd.Index): Pandas index.
+            num_paths (int): Number of generated paths (columns in our case).
+            start_value (float): Value at time 0.
+
+                Does not appear as the first value in the output data.
+            mean (float): Drift, or mean of the percentage change.
+            std (float): Standard deviation of the percentage change.
+            dt (float): Time change (one period of time).
+            seed (int): Set seed to make output deterministic.
+            jitted (any): See `vectorbtpro.utils.jitting.resolve_jitted_option`.
+
+        For defaults, see `custom.gbm` in `vectorbtpro._settings.data`.
+        """
+        from vectorbtpro._settings import settings
+
+        gbm_cfg = settings["data"]["custom"]["gbm"]
+
+        if num_paths is None:
+            num_paths = gbm_cfg["num_paths"]
+        if start_value is None:
+            start_value = gbm_cfg["start_value"]
+        if mean is None:
+            mean = gbm_cfg["mean"]
+        if std is None:
+            std = gbm_cfg["std"]
+        if dt is None:
+            dt = gbm_cfg["dt"]
+        if seed is None:
+            seed = gbm_cfg["seed"]
+        if seed is not None:
+            set_seed(seed)
+        if jitted is None:
+            jitted = gbm_cfg["jitted"]
+
+        func = jit_reg.resolve_option(nb.generate_gbm_data_nb, jitted)
+        out = func((len(index), num_paths), start_value, mean, std, dt)
+
+        if out.shape[1] == 1:
+            return pd.Series(out[:, 0], index=index)
+        columns = pd.RangeIndex(stop=out.shape[1], name="path")
+        return pd.DataFrame(out, index=index, columns=columns)
+
 
 # ############# Local ############# #
 
@@ -109,9 +349,9 @@ class LocalData(Data):
         symbols: tp.Union[tp.Symbol, tp.Symbols] = None,
         *,
         paths: tp.Any = None,
-        match_paths: bool = True,
+        match_paths: tp.Optional[bool] = None,
         match_regex: tp.Optional[str] = None,
-        sort_paths: bool = True,
+        sort_paths: tp.Optional[bool] = None,
         match_path_kwargs: tp.KwargsLike = None,
         path_to_symbol_kwargs: tp.KwargsLike = None,
         **kwargs,
@@ -119,7 +359,21 @@ class LocalData(Data):
         """Override `vectorbtpro.data.base.Data.fetch` to take care of paths.
 
         Set `match_paths` to False to not parse paths and behave like a regular
-        `vectorbtpro.data.base.Data` instance."""
+        `vectorbtpro.data.base.Data` instance.
+
+        For defaults, see `custom.local` in `vectorbtpro._settings.data`.
+        """
+        from vectorbtpro._settings import settings
+
+        local_cfg = settings["data"]["custom"]["local"]
+
+        if match_paths is None:
+            match_paths = local_cfg["match_paths"]
+        if match_regex is None:
+            match_regex = local_cfg["match_regex"]
+        if sort_paths is None:
+            sort_paths = local_cfg["sort_paths"]
+
         if match_paths:
             sync = False
             if paths is None:
@@ -253,13 +507,13 @@ class CSVData(LocalData):
         cls,
         symbol: tp.Symbol,
         path: tp.Any = None,
-        header: tp.MaybeSequence[int] = 0,
-        index_col: int = 0,
-        parse_dates: bool = True,
-        start_row: int = 0,
+        start_row: tp.Optional[int] = None,
         end_row: tp.Optional[int] = None,
-        squeeze: bool = True,
-        **kwargs,
+        header: tp.Optional[tp.MaybeSequence[int]] = None,
+        index_col: tp.Optional[int] = None,
+        parse_dates: tp.Optional[bool] = None,
+        squeeze: tp.Optional[bool] = None,
+        **read_csv_kwargs,
     ) -> tp.Tuple[tp.SeriesFrame, dict]:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to load a CSV file.
 
@@ -270,7 +524,28 @@ class CSVData(LocalData):
         !!! note
             `start_row` and `end_row` must exclude header rows, while `end_row` must include the last row.
 
-        See https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html for other arguments."""
+        See https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html for other arguments.
+
+        For defaults, see `custom.csv` in `vectorbtpro._settings.data`.
+        """
+        from vectorbtpro._settings import settings
+
+        csv_cfg = settings["data"]["custom"]["csv"]
+
+        if start_row is None:
+            start_row = csv_cfg["start_row"]
+        if end_row is None:
+            end_row = csv_cfg["end_row"]
+        if header is None:
+            header = csv_cfg["header"]
+        if index_col is None:
+            index_col = csv_cfg["index_col"]
+        if parse_dates is None:
+            parse_dates = csv_cfg["parse_dates"]
+        if squeeze is None:
+            squeeze = csv_cfg["squeeze"]
+        read_csv_kwargs = merge_dicts(csv_cfg["read_csv_kwargs"], read_csv_kwargs)
+
         if path is None:
             path = symbol
         if isinstance(header, int):
@@ -285,16 +560,18 @@ class CSVData(LocalData):
         else:
             nrows = None
 
-        sep = kwargs.pop("sep", None)
+        sep = read_csv_kwargs.pop("sep", None)
         if isinstance(path, (str, Path)):
-            path = Path(path)
-            if path.suffix.lower() == ".csv":
-                if sep is None:
-                    sep = ","
-            if path.suffix.lower() == ".tsv":
-                if sep is None:
-                    sep = "\t"
-            path = str(path)
+            try:
+                _path = Path(path)
+                if _path.suffix.lower() == ".csv":
+                    if sep is None:
+                        sep = ","
+                if _path.suffix.lower() == ".tsv":
+                    if sep is None:
+                        sep = "\t"
+            except Exception as e:
+                pass
         if sep is None:
             sep = ","
 
@@ -306,7 +583,7 @@ class CSVData(LocalData):
             parse_dates=parse_dates,
             skiprows=skiprows,
             nrows=nrows,
-            **kwargs,
+            **read_csv_kwargs,
         )
         if isinstance(obj, pd.DataFrame) and squeeze:
             obj = obj.squeeze("columns")
@@ -502,9 +779,9 @@ class HDFData(LocalData):
         cls,
         symbol: tp.Symbol,
         path: tp.Any = None,
-        start_row: int = 0,
+        start_row: tp.Optional[int] = None,
         end_row: tp.Optional[int] = None,
-        **kwargs,
+        **read_hdf_kwargs,
     ) -> tp.Tuple[tp.SeriesFrame, dict]:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to load an HDF object.
 
@@ -513,7 +790,20 @@ class HDFData(LocalData):
         !!! note
             `end_row` must include the last row.
 
-        See https://pandas.pydata.org/docs/reference/api/pandas.read_hdf.html for other arguments."""
+        See https://pandas.pydata.org/docs/reference/api/pandas.read_hdf.html for other arguments.
+
+        For defaults, see `custom.hdf` in `vectorbtpro._settings.data`.
+        """
+        from vectorbtpro._settings import settings
+
+        hdf_cfg = settings["data"]["custom"]["hdf"]
+
+        if start_row is None:
+            start_row = hdf_cfg["start_row"]
+        if end_row is None:
+            end_row = hdf_cfg["end_row"]
+        read_hdf_kwargs = merge_dicts(hdf_cfg["read_hdf_kwargs"], read_hdf_kwargs)
+
         if path is None:
             path = symbol
         path = Path(path)
@@ -523,7 +813,7 @@ class HDFData(LocalData):
         else:
             stop = None
 
-        obj = pd.read_hdf(file_path, key=key, start=start_row, stop=stop, **kwargs)
+        obj = pd.read_hdf(file_path, key=key, start=start_row, stop=stop, **read_hdf_kwargs)
         returned_kwargs = dict(last_row=start_row + len(obj.index) - 1)
         return obj, returned_kwargs
 
@@ -625,10 +915,10 @@ class YFData(RemoteData):  # pragma: no cover
     def fetch_symbol(
         cls,
         symbol: str,
-        period: str = "max",
+        period: tp.Optional[str] = None,
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
-        **kwargs,
+        **history_kwargs,
     ) -> tp.Frame:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Yahoo Finance.
 
@@ -641,12 +931,26 @@ class YFData(RemoteData):  # pragma: no cover
             end (any): End datetime.
 
                 See `vectorbtpro.utils.datetime_.to_tzaware_datetime`.
-            **kwargs: Keyword arguments passed to `yfinance.base.TickerBase.history`.
+            **history_kwargs: Keyword arguments passed to `yfinance.base.TickerBase.history`.
+
+        For defaults, see `custom.yf` in `vectorbtpro._settings.data`.
         """
         from vectorbtpro.utils.opt_packages import assert_can_import
 
         assert_can_import("yfinance")
         import yfinance as yf
+
+        from vectorbtpro._settings import settings
+
+        yf_cfg = settings["data"]["custom"]["yf"]
+
+        if period is None:
+            period = yf_cfg["period"]
+        if start is None:
+            start = yf_cfg["start"]
+        if end is None:
+            end = yf_cfg["end"]
+        history_kwargs = merge_dicts(yf_cfg["history_kwargs"], history_kwargs)
 
         # yfinance still uses mktime, which assumes that the passed date is in local time
         if start is not None:
@@ -654,7 +958,7 @@ class YFData(RemoteData):  # pragma: no cover
         if end is not None:
             end = to_tzaware_datetime(end, tz=get_local_tz())
 
-        return yf.Ticker(symbol).history(period=period, start=start, end=end, **kwargs)
+        return yf.Ticker(symbol).history(period=period, start=start, end=end, **history_kwargs)
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.SeriesFrame:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
@@ -789,9 +1093,12 @@ class BinanceData(RemoteData):  # pragma: no cover
         symbols: tp.Union[tp.Symbol, tp.Symbols] = None,
         *,
         client: tp.Optional["BinanceClientT"] = None,
+        client_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> BinanceDataT:
-        """Override `vectorbtpro.data.base.Data.fetch` to instantiate a Binance client."""
+        """Override `vectorbtpro.data.base.Data.fetch` to instantiate a Binance client.
+
+        For defaults, see `custom.binance` in `vectorbtpro._settings.data`."""
         from vectorbtpro.utils.opt_packages import assert_can_import
 
         assert_can_import("binance")
@@ -801,13 +1108,16 @@ class BinanceData(RemoteData):  # pragma: no cover
 
         binance_cfg = settings["data"]["custom"]["binance"]
 
-        client_kwargs = dict()
-        for k in get_func_kwargs(Client.__init__):
-            if k in kwargs:
-                client_kwargs[k] = kwargs.pop(k)
-        client_kwargs = merge_dicts(binance_cfg, client_kwargs)
+        if client is None:
+            client = binance_cfg["client"]
+        if client_kwargs is None:
+            client_kwargs = {}
+        has_client_kwargs = len(client_kwargs) > 0
+        client_kwargs = merge_dicts(binance_cfg["client_kwargs"], client_kwargs)
         if client is None:
             client = Client(**client_kwargs)
+        elif has_client_kwargs:
+            raise ValueError("Cannot apply config after instantiation of the client")
         return super(BinanceData, cls).fetch(symbols, client=client, **kwargs)
 
     @classmethod
@@ -815,12 +1125,12 @@ class BinanceData(RemoteData):  # pragma: no cover
         cls,
         symbol: str,
         client: tp.Optional["BinanceClientT"] = None,
-        interval: str = "1d",
-        start: tp.DatetimeLike = 0,
-        end: tp.DatetimeLike = "now UTC",
-        delay: tp.Optional[float] = 500,
-        limit: int = 500,
-        show_progress: bool = True,
+        start: tp.Optional[tp.DatetimeLike] = None,
+        end: tp.Optional[tp.DatetimeLike] = None,
+        interval: tp.Optional[str] = None,
+        delay: tp.Optional[float] = None,
+        limit: tp.Optional[int] = None,
+        show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
     ) -> tp.Frame:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Binance.
@@ -828,15 +1138,17 @@ class BinanceData(RemoteData):  # pragma: no cover
         Args:
             symbol (str): Symbol.
             client (binance.client.Client): Client of type `binance.client.Client`.
-            interval (str): Kline interval.
 
-                See [Binance Constants](https://python-binance.readthedocs.io/en/latest/constants.html).
+                Must be provided.
             start (any): Start datetime.
 
                 See `vectorbtpro.utils.datetime_.to_tzaware_datetime`.
             end (any): End datetime.
 
                 See `vectorbtpro.utils.datetime_.to_tzaware_datetime`.
+            interval (str): Kline interval.
+
+                See [Binance Constants](https://python-binance.readthedocs.io/en/latest/constants.html).
             delay (float): Time to sleep after each request (in milliseconds).
             limit (int): The maximum number of returned items.
             show_progress (bool): Whether to show the progress bar.
@@ -844,11 +1156,28 @@ class BinanceData(RemoteData):  # pragma: no cover
 
         For defaults, see `custom.binance` in `vectorbtpro._settings.data`.
         """
-        if client is None:
-            raise ValueError("client must be provided")
+        from vectorbtpro._settings import settings
 
-        if pbar_kwargs is None:
-            pbar_kwargs = {}
+        binance_cfg = settings["data"]["custom"]["binance"]
+
+        if client is None:
+            client = binance_cfg["client"]
+        if client is None:
+            raise ValueError("Client must be provided")
+        if start is None:
+            start = binance_cfg["start"]
+        if end is None:
+            end = binance_cfg["end"]
+        if interval is None:
+            interval = binance_cfg["interval"]
+        if delay is None:
+            delay = binance_cfg["delay"]
+        if limit is None:
+            limit = binance_cfg["limit"]
+        if show_progress is None:
+            show_progress = binance_cfg["show_progress"]
+        pbar_kwargs = merge_dicts(binance_cfg["pbar_kwargs"], pbar_kwargs)
+
         # Establish the timestamps
         start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
         try:
@@ -861,7 +1190,7 @@ class BinanceData(RemoteData):  # pragma: no cover
             )
             first_valid_ts = first_data[0][0]
             next_start_ts = start_ts = max(start_ts, first_valid_ts)
-        except:
+        except Exception as e:
             next_start_ts = start_ts
         end_ts = datetime_to_ms(to_tzaware_datetime(end, tz=get_utc_tz()))
 
@@ -1011,16 +1340,16 @@ class CCXTData(RemoteData):  # pragma: no cover
     def fetch_symbol(
         cls,
         symbol: str,
-        exchange: tp.Union[str, "ExchangeT"] = "binance",
-        config: tp.Optional[dict] = None,
-        timeframe: str = "1d",
-        start: tp.DatetimeLike = 0,
-        end: tp.DatetimeLike = "now UTC",
+        exchange: tp.Optional[tp.Union[str, "ExchangeT"]] = None,
+        start: tp.Optional[tp.DatetimeLike] = None,
+        end: tp.Optional[tp.DatetimeLike] = None,
+        timeframe: tp.Optional[str] = None,
         delay: tp.Optional[float] = None,
-        limit: tp.Optional[int] = 500,
-        retries: int = 3,
-        show_progress: bool = True,
-        params: tp.Optional[dict] = None,
+        limit: tp.Optional[int] = None,
+        retries: tp.Optional[int] = None,
+        exchange_config: tp.Optional[tp.KwargsLike] = None,
+        fetch_params: tp.Optional[tp.KwargsLike] = None,
+        show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
     ) -> tp.Frame:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from CCXT.
@@ -1029,27 +1358,28 @@ class CCXTData(RemoteData):  # pragma: no cover
             symbol (str): Symbol.
             exchange (str or object): Exchange identifier or an exchange object of type
                 `ccxt.base.exchange.Exchange`.
-            config (dict): Config passed to the exchange upon instantiation.
-
-                Will raise an exception if exchange has been already instantiated.
-            timeframe (str): Timeframe supported by the exchange.
             start (any): Start datetime.
 
                 See `vectorbtpro.utils.datetime_.to_tzaware_datetime`.
             end (any): End datetime.
 
                 See `vectorbtpro.utils.datetime_.to_tzaware_datetime`.
+            timeframe (str): Timeframe supported by the exchange.
             delay (float): Time to sleep after each request (in milliseconds).
 
                 !!! note
                     Use only if `enableRateLimit` is not set.
             limit (int): The maximum number of returned items.
             retries (int): The number of retries on failure to fetch data.
+            exchange_config (dict): Keyword arguments passed to the exchange upon instantiation.
+
+                Will raise an exception if exchange has been already instantiated.
+            fetch_params (dict): Exchange-specific keyword arguments passed to `fetch_ohlcv`.
             show_progress (bool): Whether to show the progress bar.
             pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`.
-            params (dict): Exchange-specific key-value parameters.
 
         For defaults, see `custom.ccxt` in `vectorbtpro._settings.data`.
+        Global settings can be provided per exchange id using the `exchanges` dictionary.
         """
         from vectorbtpro.utils.opt_packages import assert_can_import
 
@@ -1060,28 +1390,53 @@ class CCXTData(RemoteData):  # pragma: no cover
 
         ccxt_cfg = settings["data"]["custom"]["ccxt"]
 
-        if config is None:
-            config = {}
-        if pbar_kwargs is None:
-            pbar_kwargs = {}
-        if params is None:
-            params = {}
+        if exchange is None:
+            exchange = ccxt_cfg["exchange"]
+        if isinstance(exchange, str):
+            exchange_name = exchange
+        elif isinstance(exchange, ccxt.Exchange):
+            exchange_name = exchange.__name__
+        else:
+            raise ValueError(f"Unknown exchange of type {type(exchange)}")
+        if start is None:
+            start = ccxt_cfg["exchanges"].get(exchange_name, {}).get("start", ccxt_cfg["start"])
+        if end is None:
+            end = ccxt_cfg["exchanges"].get(exchange_name, {}).get("end", ccxt_cfg["end"])
+        if timeframe is None:
+            timeframe = ccxt_cfg["exchanges"].get(exchange_name, {}).get("timeframe", ccxt_cfg["timeframe"])
+        if delay is None:
+            delay = ccxt_cfg["exchanges"].get(exchange_name, {}).get("delay", ccxt_cfg["delay"])
+        if limit is None:
+            limit = ccxt_cfg["exchanges"].get(exchange_name, {}).get("limit", ccxt_cfg["limit"])
+        if retries is None:
+            retries = ccxt_cfg["exchanges"].get(exchange_name, {}).get("retries", ccxt_cfg["retries"])
+        if exchange_config is None:
+            exchange_config = {}
+        has_exchange_config = len(exchange_config) > 0
+        exchange_config = merge_dicts(
+            ccxt_cfg["exchange_config"],
+            ccxt_cfg["exchanges"].get(exchange_name, {}).get("exchange_config", {}),
+            exchange_config,
+        )
+        fetch_params = merge_dicts(
+            ccxt_cfg["fetch_params"],
+            ccxt_cfg["exchanges"].get(exchange_name, {}).get("fetch_params", {}),
+            fetch_params,
+        )
+        if show_progress is None:
+            show_progress = ccxt_cfg["exchanges"].get(exchange_name, {}).get("show_progress", ccxt_cfg["show_progress"])
+        pbar_kwargs = merge_dicts(
+            ccxt_cfg["pbar_kwargs"],
+            ccxt_cfg["exchanges"].get(exchange_name, {}).get("pbar_kwargs", {}),
+            pbar_kwargs,
+        )
+
         if isinstance(exchange, str):
             if not hasattr(ccxt, exchange):
-                raise ValueError(f"Exchange {exchange} not found")
-            # Resolve config
-            default_config = {}
-            for k, v in ccxt_cfg.items():
-                # Get general (not per exchange) settings
-                if k in ccxt.exchanges:
-                    continue
-                default_config[k] = v
-            if exchange in ccxt_cfg:
-                default_config = merge_dicts(default_config, ccxt_cfg[exchange])
-            config = merge_dicts(default_config, config)
-            exchange = getattr(ccxt, exchange)(config)
+                raise ValueError(f"Exchange '{exchange}' not found in CCXT")
+            exchange = getattr(ccxt, exchange)(exchange_config)
         else:
-            if len(config) > 0:
+            if has_exchange_config:
                 raise ValueError("Cannot apply config after instantiation of the exchange")
         if not exchange.has["fetchOHLCV"]:
             raise ValueError(f"Exchange {exchange} does not support OHLCV")
@@ -1111,7 +1466,7 @@ class CCXTData(RemoteData):  # pragma: no cover
                 timeframe=timeframe,
                 since=_since,
                 limit=_limit,
-                params=params,
+                params=fetch_params,
             )
 
         # Establish the timestamps
@@ -1120,7 +1475,7 @@ class CCXTData(RemoteData):  # pragma: no cover
             first_data = _fetch(0, 1)
             first_valid_ts = first_data[0][0]
             next_start_ts = start_ts = max(start_ts, first_valid_ts)
-        except:
+        except Exception as e:
             next_start_ts = start_ts
         end_ts = datetime_to_ms(to_tzaware_datetime(end, tz=get_utc_tz()))
 
@@ -1198,8 +1553,8 @@ class AlpacaData(RemoteData):  # pragma: no cover
         ```pycon
         >>> import vectorbtpro as vbt
 
-        >>> vbt.settings['data']['custom']['alpaca']['key_id'] = "{API Key ID}"
-        >>> vbt.settings['data']['custom']['alpaca']['secret_key'] = "{Secret Key}"
+        >>> vbt.settings['data']['custom']['alpaca']['client_kwargs']['key_id'] = "{API Key ID}"
+        >>> vbt.settings['data']['custom']['alpaca']['client_kwargs']['secret_key'] = "{Secret Key}"
 
         >>> alpaca_data = vbt.AlpacaData.fetch(
         ...     "AAPL",
@@ -1249,9 +1604,12 @@ class AlpacaData(RemoteData):  # pragma: no cover
         symbols: tp.Union[tp.Symbol, tp.Symbols] = None,
         *,
         client: tp.Optional["AlpacaClientT"] = None,
+        client_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> AlpacaDataT:
-        """Override `vectorbtpro.data.base.Data.fetch` to instantiate an Alpaca client."""
+        """Override `vectorbtpro.data.base.Data.fetch` to instantiate an Alpaca client.
+
+        For defaults, see `custom.alpaca` in `vectorbtpro._settings.data`."""
         from vectorbtpro.utils.opt_packages import assert_can_import
 
         assert_can_import("alpaca_trade_api")
@@ -1261,13 +1619,16 @@ class AlpacaData(RemoteData):  # pragma: no cover
 
         alpaca_cfg = settings["data"]["custom"]["alpaca"]
 
-        client_kwargs = dict()
-        for k in get_func_kwargs(REST.__init__):
-            if k in kwargs:
-                client_kwargs[k] = kwargs.pop(k)
-        client_kwargs = merge_dicts(alpaca_cfg, client_kwargs)
+        if client is None:
+            client = alpaca_cfg["client"]
+        if client_kwargs is None:
+            client_kwargs = {}
+        has_client_kwargs = len(client_kwargs) > 0
+        client_kwargs = merge_dicts(alpaca_cfg["client_kwargs"], client_kwargs)
         if client is None:
             client = REST(**client_kwargs)
+        elif has_client_kwargs:
+            raise ValueError("Cannot apply config after instantiation of the client")
         return super(AlpacaData, cls).fetch(symbols, client=client, **kwargs)
 
     @classmethod
@@ -1275,19 +1636,26 @@ class AlpacaData(RemoteData):  # pragma: no cover
         cls,
         symbol: str,
         client: tp.Optional["AlpacaClientT"] = None,
-        timeframe: str = "1d",
-        start: tp.DatetimeLike = 0,
-        end: tp.DatetimeLike = "now UTC",
-        adjustment: tp.Optional[str] = "all",
-        limit: int = 500,
-        exchange: tp.Optional[str] = "CBSE",
-        **kwargs,
+        start: tp.Optional[tp.DatetimeLike] = None,
+        end: tp.Optional[tp.DatetimeLike] = None,
+        timeframe: tp.Optional[str] = None,
+        adjustment: tp.Optional[str] = None,
+        limit: tp.Optional[int] = None,
+        exchange: tp.Optional[str] = None,
     ) -> tp.Frame:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Alpaca.
 
         Args:
             symbol (str): Symbol.
             client (alpaca_trade_api.rest.REST): Client of type `alpaca_trade_api.rest.REST`.
+
+                Must be provided.
+            start (any): Start datetime.
+
+                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
+            end (any): End datetime.
+
+                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
             timeframe (str): Timeframe of data.
 
                 Must be integer multiple of 'm' (minute), 'h' (hour) or 'd' (day). i.e. '15m'.
@@ -1295,13 +1663,6 @@ class AlpacaData(RemoteData):  # pragma: no cover
 
                 !!! note
                     Data from the latest 15 minutes is not available with a free data plan.
-
-            start (any): Start datetime.
-
-                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
-            end (any): End datetime.
-
-                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
             adjustment (str): Specifies the corporate action adjustment for the stocks.
 
                 Allowed are `raw`, `split`, `dividend`, and `all`.
@@ -1311,11 +1672,37 @@ class AlpacaData(RemoteData):  # pragma: no cover
                 Allowed are `FTX`, `ERSX`, and `CBSE`.
 
         For defaults, see `custom.alpaca` in `vectorbtpro._settings.data`.
+        Global settings can be provided per exchange id using the `exchanges` dictionary.
         """
         from vectorbtpro.utils.opt_packages import assert_can_import
 
         assert_can_import("alpaca_trade_api")
         from alpaca_trade_api.rest import TimeFrameUnit, TimeFrame
+
+        from vectorbtpro._settings import settings
+
+        alpaca_cfg = settings["data"]["custom"]["alpaca"]
+
+        if exchange is None:
+            exchange = alpaca_cfg["exchange"]
+        if isinstance(exchange, str):
+            exchange_name = exchange
+        else:
+            raise ValueError(f"Unknown exchange of type {type(exchange)}")
+        if client is None:
+            client = alpaca_cfg["client"]
+        if client is None:
+            raise ValueError("Client must be provided")
+        if start is None:
+            start = alpaca_cfg["exchanges"].get(exchange_name, {}).get("start", alpaca_cfg["start"])
+        if end is None:
+            end = alpaca_cfg["exchanges"].get(exchange_name, {}).get("end", alpaca_cfg["end"])
+        if timeframe is None:
+            timeframe = alpaca_cfg["exchanges"].get(exchange_name, {}).get("timeframe", alpaca_cfg["timeframe"])
+        if adjustment is None:
+            adjustment = alpaca_cfg["exchanges"].get(exchange_name, {}).get("adjustment", alpaca_cfg["adjustment"])
+        if limit is None:
+            limit = alpaca_cfg["exchanges"].get(exchange_name, {}).get("limit", alpaca_cfg["limit"])
 
         _timeframe_units = {
             "d": TimeFrameUnit.Day,
@@ -1324,13 +1711,13 @@ class AlpacaData(RemoteData):  # pragma: no cover
         }
 
         if len(timeframe) < 2:
-            raise ValueError("invalid timeframe")
+            raise ValueError(f"Invalid timeframe '{timeframe}'")
 
         amount_str = timeframe[:-1]
         unit_str = timeframe[-1]
 
         if not amount_str.isnumeric() or unit_str not in _timeframe_units:
-            raise ValueError("invalid timeframe")
+            raise ValueError(f"Invalid timeframe '{timeframe}'")
 
         amount = int(amount_str)
         unit = _timeframe_units[unit_str]
@@ -1350,7 +1737,7 @@ class AlpacaData(RemoteData):  # pragma: no cover
                 start=start_ts,
                 end=end_ts,
                 limit=limit,
-                exchanges=exchange,
+                exchanges=[exchange],
             ).df
         else:
             df = client.get_bars(
@@ -1362,11 +1749,7 @@ class AlpacaData(RemoteData):  # pragma: no cover
                 limit=limit,
             ).df
 
-        # filter for OHLCV
-        # remove extra columns
-        df.drop(["trade_count", "vwap"], axis=1, errors="ignore", inplace=True)
-
-        # capitalize
+        df.drop(["exchange"], axis=1, errors="ignore", inplace=True)
         df.rename(
             columns={
                 "open": "Open",
@@ -1374,7 +1757,8 @@ class AlpacaData(RemoteData):  # pragma: no cover
                 "low": "Low",
                 "close": "Close",
                 "volume": "Volume",
-                "exchange": "Exchange",
+                "trade_count": "Trade count",
+                "vwap": "VWAP",
             },
             inplace=True,
         )
@@ -1384,6 +1768,8 @@ class AlpacaData(RemoteData):  # pragma: no cover
         df["Low"] = df["Low"].astype(float)
         df["Close"] = df["Close"].astype(float)
         df["Volume"] = df["Volume"].astype(float)
+        df["Trade count"] = df["Trade count"].astype(int)
+        df["VWAP"] = df["VWAP"].astype(float)
 
         return df
 
@@ -1392,193 +1778,3 @@ class AlpacaData(RemoteData):  # pragma: no cover
         fetch_kwargs["start"] = self.last_index[symbol]
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         return self.fetch_symbol(symbol, **kwargs)
-
-
-# ############# Synthetic ############# #
-
-
-class SyntheticData(Data):
-    """Subclass of `Data` for synthetically generated data.
-
-    Exposes an abstract class method `SyntheticData.generate_symbol`.
-    Everything else is taken care of."""
-
-    @classmethod
-    def generate_symbol(cls, symbol: tp.Symbol, index: tp.Index, **kwargs) -> tp.SeriesFrame:
-        """Abstract method to generate data of a symbol."""
-        raise NotImplementedError
-
-    @classmethod
-    def fetch_symbol(
-        cls,
-        symbol: tp.Symbol,
-        start: tp.DatetimeLike = 0,
-        end: tp.DatetimeLike = "now",
-        freq: tp.Union[None, str, pd.DateOffset] = None,
-        date_range_kwargs: tp.KwargsLike = None,
-        **kwargs,
-    ) -> tp.SeriesFrame:
-        """Override `vectorbtpro.data.base.Data.fetch_symbol` to generate a symbol.
-
-        Generates datetime index and passes it to `SyntheticData.generate_symbol` to fill
-        the Series/DataFrame with generated data."""
-        if date_range_kwargs is None:
-            date_range_kwargs = {}
-        index = pd.date_range(
-            start=to_tzaware_datetime(start, tz=get_utc_tz()),
-            end=to_tzaware_datetime(end, tz=get_utc_tz()),
-            freq=freq,
-            **date_range_kwargs,
-        )
-        if len(index) == 0:
-            raise ValueError("Date range is empty")
-        return cls.generate_symbol(symbol, index, **kwargs)
-
-    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
-        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        fetch_kwargs["start"] = self.last_index[symbol]
-        kwargs = merge_dicts(fetch_kwargs, kwargs)
-        return self.fetch_symbol(symbol, **kwargs)
-
-
-class RandomData(SyntheticData):
-    """`SyntheticData` for data generated using `vectorbtpro.data.nb.generate_random_data_nb`.
-
-    !!! note
-        When setting a seed, remember to pass a seed per symbol using `vectorbtpro.data.base.symbol_dict`.
-
-    Usage:
-        * Generate random data:
-
-        ```pycon
-        >>> import vectorbtpro as vbt
-
-        >>> rand_data = vbt.RandomData.fetch(
-        ...     list(range(5)),
-        ...     start='2020-01-01',
-        ...     end='2022-01-01'
-        ... )
-        ```
-
-        [=100% "100%"]{: .candystripe}
-
-        ```pycon
-        >>> rand_data.plot(showlegend=False)
-        ```
-
-        ![](/assets/images/RandomData.svg)
-    """
-
-    @classmethod
-    def generate_symbol(
-        cls,
-        symbol: tp.Symbol,
-        index: tp.Index,
-        num_paths: int = 1,
-        start_value: float = 100.0,
-        mean: float = 0.0,
-        std: float = 0.01,
-        seed: tp.Optional[int] = None,
-        jitted: tp.JittedOption = None,
-    ) -> tp.SeriesFrame:
-        """Generate a symbol.
-
-        Args:
-            symbol (str): Symbol.
-            index (pd.Index): Pandas index.
-            num_paths (int): Number of generated paths (columns in our case).
-            start_value (float): Value at time 0.
-
-                Does not appear as the first value in the output data.
-            mean (float): Drift, or mean of the percentage change.
-            std (float): Standard deviation of the percentage change.
-            seed (int): Set seed to make output deterministic.
-            jitted (any): See `vectorbtpro.utils.jitting.resolve_jitted_option`.
-        """
-        if seed is not None:
-            set_seed(seed)
-
-        func = jit_reg.resolve_option(nb.generate_random_data_nb, jitted)
-        out = func((len(index), num_paths), start_value, mean, std)
-
-        if out.shape[1] == 1:
-            return pd.Series(out[:, 0], index=index)
-        columns = pd.RangeIndex(stop=out.shape[1], name="path")
-        return pd.DataFrame(out, index=index, columns=columns)
-
-    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
-        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        fetch_kwargs["start"] = self.last_index[symbol]
-        _ = fetch_kwargs.pop("start_value", None)
-        start_value = self.data[symbol].iloc[-2]
-        fetch_kwargs["seed"] = None
-        kwargs = merge_dicts(fetch_kwargs, kwargs)
-        return self.fetch_symbol(symbol, start_value=start_value, **kwargs)
-
-
-class GBMData(RandomData):
-    """`RandomData` for data generated using `vectorbtpro.data.nb.generate_gbm_data_nb`.
-
-    !!! note
-        When setting a seed, remember to pass a seed per symbol using `vectorbtpro.data.base.symbol_dict`.
-
-    Usage:
-        * Generate random data:
-
-        ```pycon
-        >>> import vectorbtpro as vbt
-
-        >>> gbm_data = vbt.GBMData.fetch(
-        ...     list(range(5)),
-        ...     start='2020-01-01',
-        ...     end='2022-01-01'
-        ... )
-        ```
-
-        [=100% "100%"]{: .candystripe}
-
-        ```pycon
-        >>> gbm_data.plot(showlegend=False)
-        ```
-
-        ![](/assets/images/GBMData.svg)
-    """
-
-    @classmethod
-    def generate_symbol(
-        cls,
-        symbol: tp.Symbol,
-        index: tp.Index,
-        num_paths: int = 1,
-        start_value: float = 100.0,
-        mean: float = 0.0,
-        std: float = 0.01,
-        dt: float = 1.0,
-        seed: tp.Optional[int] = None,
-        jitted: tp.JittedOption = None,
-    ) -> tp.SeriesFrame:
-        """Generate a symbol.
-
-        Args:
-            symbol (str): Symbol.
-            index (pd.Index): Pandas index.
-            num_paths (int): Number of generated paths (columns in our case).
-            start_value (float): Value at time 0.
-
-                Does not appear as the first value in the output data.
-            mean (float): Drift, or mean of the percentage change.
-            std (float): Standard deviation of the percentage change.
-            dt (float): Time change (one period of time).
-            seed (int): Set seed to make output deterministic.
-            jitted (any): See `vectorbtpro.utils.jitting.resolve_jitted_option`.
-        """
-        if seed is not None:
-            set_seed(seed)
-
-        func = jit_reg.resolve_option(nb.generate_gbm_data_nb, jitted)
-        out = func((len(index), num_paths), start_value, mean, std, dt)
-
-        if out.shape[1] == 1:
-            return pd.Series(out[:, 0], index=index)
-        columns = pd.RangeIndex(stop=out.shape[1], name="path")
-        return pd.DataFrame(out, index=index, columns=columns)
