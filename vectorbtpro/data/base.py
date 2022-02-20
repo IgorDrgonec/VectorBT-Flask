@@ -259,7 +259,7 @@ class Data(Analyzable):
         multiple_columns = False
         name_is_none = False
         for symbol, obj in data.items():
-            if isinstance(obj, pd.Series):
+            if checks.is_series(obj):
                 if obj.name is None:
                     name_is_none = True
                 obj = obj.to_frame()
@@ -291,7 +291,7 @@ class Data(Analyzable):
         # reindex
         new_data = symbol_dict()
         for symbol, obj in data.items():
-            if isinstance(obj, pd.Series):
+            if checks.is_series(obj):
                 obj = obj.to_frame(name=obj.name)
             obj = obj.reindex(columns=columns)
             if not multiple_columns:
@@ -377,6 +377,7 @@ class Data(Analyzable):
         data = symbol_dict(data)
         for symbol, obj in data.items():
             obj = to_pd_array(obj)
+            obj = obj[~obj.index.duplicated(keep="last")]
             obj = cls.prepare_tzaware_index(obj, tz_localize=tz_localize, tz_convert=tz_convert)
             data[symbol] = obj
             if symbol not in last_index:
@@ -648,13 +649,14 @@ class Data(Analyzable):
                                 )
                             skip_symbol = True
                         else:
-                            if not isinstance(new_obj, (pd.Series, pd.DataFrame)):
+                            if not checks.is_pandas(new_obj):
                                 new_obj = to_pd_array(new_obj)
                                 new_obj.index = pd.RangeIndex(
                                     start=obj.index[-1],
                                     stop=obj.index[-1] + new_obj.shape[0],
                                     step=1,
                                 )
+                            new_obj = new_obj[~new_obj.index.duplicated(keep="last")]
                             new_obj = self.prepare_tzaware_index(
                                 new_obj,
                                 tz_localize=self.tz_localize,
@@ -694,16 +696,16 @@ class Data(Analyzable):
             else:
                 to_index = None
             obj = self.data[symbol]
-            if isinstance(obj, pd.DataFrame) and isinstance(new_obj, pd.DataFrame):
+            if checks.is_frame(obj) and checks.is_frame(new_obj):
                 shared_columns = obj.columns.intersection(new_obj.columns)
                 obj = obj[shared_columns]
                 new_obj = new_obj[shared_columns]
-            elif isinstance(new_obj, pd.DataFrame):
+            elif checks.is_frame(new_obj):
                 if obj.name is not None:
                     new_obj = new_obj[obj.name]
                 else:
                     new_obj = new_obj[0]
-            elif isinstance(obj, pd.DataFrame):
+            elif checks.is_frame(obj):
                 if new_obj.name is not None:
                     obj = obj[new_obj.name]
                 else:
@@ -719,9 +721,9 @@ class Data(Analyzable):
         # Append new data to existing data ending at lowest updated index (excluding)
         for symbol, new_obj in new_data.items():
             obj = self.data[symbol]
-            if isinstance(obj, pd.DataFrame) and isinstance(new_obj, pd.DataFrame):
+            if checks.is_frame(obj) and checks.is_frame(new_obj):
                 new_obj = new_obj[obj.columns]
-            elif isinstance(new_obj, pd.DataFrame):
+            elif checks.is_frame(new_obj):
                 if obj.name is not None:
                     new_obj = new_obj[obj.name]
                 else:
@@ -753,20 +755,20 @@ class Data(Analyzable):
         new_data = {}
         first_data = self.data[symbols[0]]
         if self.single_symbol:
-            if isinstance(first_data, pd.Series):
+            if checks.is_series(first_data):
                 new_data[first_data.name] = first_data.rename(symbols[0])
             else:
                 for c in first_data.columns:
                     new_data[c] = first_data[c].rename(symbols[0])
         else:
-            if isinstance(first_data, pd.Series):
+            if checks.is_series(first_data):
                 columns = pd.Index([first_data.name])
             else:
                 columns = first_data.columns
             for c in columns:
                 col_data = []
                 for s in symbols:
-                    if isinstance(self.data[s], pd.Series):
+                    if checks.is_series(self.data[s]):
                         col_data.append(self.data[s].rename(None))
                     else:
                         col_data.append(self.data[s][c].rename(None))
@@ -1094,7 +1096,7 @@ class Data(Analyzable):
         """
         if column is None:
             first_data = self.data[self.symbols[0]]
-            if isinstance(first_data, pd.DataFrame):
+            if checks.is_frame(first_data):
                 ohlc = first_data.vbt.ohlcv(column_names=column_names).ohlc
                 if ohlc is not None and len(ohlc.columns) == 4:
                     if symbol is None:
