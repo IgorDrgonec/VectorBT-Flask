@@ -439,8 +439,16 @@ class TestData:
             pd.Series(["0_0", "0_1", "0_2", "0_3", "0_0_u"]),
         )
         pd.testing.assert_series_equal(
+            MyData.fetch(0, shape=(5,), return_arr=True).update(return_update=True).data[0],
+            pd.Series(["0_0_u"], index=pd.Int64Index([4], dtype='int64')),
+        )
+        pd.testing.assert_series_equal(
             MyData.fetch(0, shape=(5,), return_arr=True).update(n=2).data[0],
             pd.Series(["0_0", "0_1", "0_2", "0_3", "0_0_u", "0_1_u"]),
+        )
+        pd.testing.assert_series_equal(
+            MyData.fetch(0, shape=(5,), return_arr=True).update(n=2, return_update=True).data[0],
+            pd.Series(["0_0_u", "0_1_u"], index=pd.Int64Index([4, 5], dtype='int64')),
         )
         pd.testing.assert_frame_equal(
             MyData.fetch(0, shape=(5, 3), return_arr=True).update().data[0],
@@ -455,6 +463,14 @@ class TestData:
             ),
         )
         pd.testing.assert_frame_equal(
+            MyData.fetch(0, shape=(5, 3), return_arr=True).update(return_update=True).data[0],
+            pd.DataFrame(
+                [
+                    ["0_0_0_u", "0_1_0_u", "0_2_0_u"],
+                ], index=pd.Int64Index([4], dtype='int64')
+            ),
+        )
+        pd.testing.assert_frame_equal(
             MyData.fetch(0, shape=(5, 3), return_arr=True).update(n=2).data[0],
             pd.DataFrame(
                 [
@@ -465,6 +481,15 @@ class TestData:
                     ["0_0_0_u", "0_1_0_u", "0_2_0_u"],
                     ["0_0_1_u", "0_1_1_u", "0_2_1_u"],
                 ]
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            MyData.fetch(0, shape=(5, 3), return_arr=True).update(n=2, return_update=True).data[0],
+            pd.DataFrame(
+                [
+                    ["0_0_0_u", "0_1_0_u", "0_2_0_u"],
+                    ["0_0_1_u", "0_1_1_u", "0_2_1_u"],
+                ], index=pd.Int64Index([4, 5], dtype='int64')
             ),
         )
         index = pd.DatetimeIndex(
@@ -482,6 +507,10 @@ class TestData:
             MyData.fetch(0, shape=(5,)).update().data[0],
             pd.Series(["0_0", "0_1", "0_2", "0_3", "0_0_u"], index=index),
         )
+        pd.testing.assert_series_equal(
+            MyData.fetch(0, shape=(5,)).update(return_update=True).data[0],
+            pd.Series(["0_0_u"], index=index[[-1]]),
+        )
         updated_index = pd.DatetimeIndex(
             [
                 "2020-01-01 00:00:00",
@@ -498,6 +527,12 @@ class TestData:
             MyData.fetch(0, shape=(5,)).update(n=2).data[0],
             pd.Series(["0_0", "0_1", "0_2", "0_3", "0_0_u", "0_1_u"], index=updated_index),
         )
+        pd.testing.assert_series_equal(
+            MyData.fetch(0, shape=(5,)).update(n=2, return_update=True).data[0],
+            pd.Series(["0_0_u", "0_1_u"], index=pd.DatetimeIndex(
+                ['2020-01-05 00:00:00+00:00', '2020-01-06 00:00:00+00:00'],
+                dtype='datetime64[ns, UTC]', freq=None)),
+        )
         index2 = pd.DatetimeIndex(
             [
                 "2020-01-01 00:00:00",
@@ -510,8 +545,14 @@ class TestData:
             tz=pytz.utc,
         ).tz_convert(to_timezone("Europe/Berlin"))
         pd.testing.assert_series_equal(
-            MyData.fetch(0, shape=(5,), tz_localize="UTC", tz_convert="Europe/Berlin").update(tz_localize=None).data[0],
+            MyData.fetch(0, shape=(5,), tz_localize="UTC", tz_convert="Europe/Berlin")
+                .update(tz_localize=None).data[0],
             pd.Series(["0_0", "0_1", "0_2", "0_3", "0_0_u"], index=index2),
+        )
+        pd.testing.assert_series_equal(
+            MyData.fetch(0, shape=(5,), tz_localize="UTC", tz_convert="Europe/Berlin")
+                .update(tz_localize=None, return_update=True).data[0],
+            pd.Series(["0_0_u"], index=index2[[-1]]),
         )
         index_mask = vbt.symbol_dict({0: [False, True, True, True, True], 1: [True, True, True, True, False]})
         update_index_mask = vbt.symbol_dict({0: [True], 1: [False]})
@@ -526,6 +567,18 @@ class TestData:
             .update(index_mask=update_index_mask)
             .data[1],
             pd.Series(["1_0", "1_1", "1_2", "1_3", np.nan], index=index),
+        )
+        pd.testing.assert_series_equal(
+            MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="nan")
+                .update(index_mask=update_index_mask, return_update=True)
+                .data[0],
+            pd.Series(["0_0_u"], index=index[[-1]], dtype=object),
+        )
+        pd.testing.assert_series_equal(
+            MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="nan")
+                .update(index_mask=update_index_mask, return_update=True)
+                .data[1],
+            pd.Series([np.nan], index=index[[-1]], dtype=object),
         )
         update_index_mask2 = vbt.symbol_dict({0: [True, False, False], 1: [True, False, True]})
         pd.testing.assert_series_equal(
@@ -551,6 +604,25 @@ class TestData:
             ),
         )
         pd.testing.assert_series_equal(
+            MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="nan")
+                .update(n=3, index_mask=update_index_mask2, return_update=True)
+                .data[0],
+            pd.Series(["0_3", "0_0_u", np.nan], index=updated_index[-3:]),
+        )
+        pd.testing.assert_series_equal(
+            MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="nan")
+                .update(n=3, index_mask=update_index_mask2, return_update=True)
+                .data[1],
+            pd.Series(
+                [
+                    "1_0_u",
+                    np.nan,
+                    "1_2_u",
+                ],
+                index=updated_index[-3:]
+            ),
+        )
+        pd.testing.assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="drop")
             .update(index_mask=update_index_mask)
             .data[0],
@@ -564,6 +636,18 @@ class TestData:
         )
         pd.testing.assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="drop")
+                .update(index_mask=update_index_mask, return_update=True)
+                .data[0],
+            pd.Series([], index=pd.DatetimeIndex([], dtype='datetime64[ns, UTC]', freq=None), dtype=object),
+        )
+        pd.testing.assert_series_equal(
+            MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="drop")
+                .update(index_mask=update_index_mask, return_update=True)
+                .data[1],
+            pd.Series([], index=pd.DatetimeIndex([], dtype='datetime64[ns, UTC]', freq=None), dtype=object),
+        )
+        pd.testing.assert_series_equal(
+            MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="drop")
             .update(n=3, index_mask=update_index_mask2)
             .data[0],
             pd.Series(["0_1", "0_2", "0_3"], index=index[1:4]),
@@ -573,6 +657,20 @@ class TestData:
             .update(n=3, index_mask=update_index_mask2)
             .data[1],
             pd.Series(["1_1", "1_2", "1_0_u"], index=index[1:4]),
+        )
+        pd.testing.assert_series_equal(
+            MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="drop")
+                .update(n=3, index_mask=update_index_mask2, return_update=True)
+                .data[0],
+            pd.Series(["0_3"], index=pd.DatetimeIndex(
+                ['2020-01-04 00:00:00+00:00'], dtype='datetime64[ns, UTC]', freq=None)),
+        )
+        pd.testing.assert_series_equal(
+            MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="drop")
+                .update(n=3, index_mask=update_index_mask2, return_update=True)
+                .data[1],
+            pd.Series(["1_0_u"], index=pd.DatetimeIndex(
+                ['2020-01-04 00:00:00+00:00'], dtype='datetime64[ns, UTC]', freq=None)),
         )
         column_mask = vbt.symbol_dict({0: [False, True, True], 1: [True, True, False]})
         pd.testing.assert_frame_equal(
@@ -628,6 +726,42 @@ class TestData:
                 missing_index="nan",
                 missing_columns="nan",
             )
+                .update(index_mask=update_index_mask, return_update=True)
+                .data[0],
+            pd.DataFrame(
+                [
+                    [np.nan, "0_1_0_u", "0_2_0_u"],
+                ],
+                index=pd.DatetimeIndex(['2020-01-05 00:00:00+00:00'], dtype='datetime64[ns, UTC]', freq=None)
+            ).astype({0: float, 1: object, 2: object}),
+        )
+        pd.testing.assert_frame_equal(
+            MyData.fetch(
+                [0, 1],
+                shape=(5, 3),
+                index_mask=index_mask,
+                column_mask=column_mask,
+                missing_index="nan",
+                missing_columns="nan",
+            )
+                .update(index_mask=update_index_mask, return_update=True)
+                .data[1],
+            pd.DataFrame(
+                [
+                    [np.nan, np.nan, np.nan],
+                ],
+                index=pd.DatetimeIndex(['2020-01-05 00:00:00+00:00'], dtype='datetime64[ns, UTC]', freq=None)
+            ).astype({0: object, 1: object, 2: float}),
+        )
+        pd.testing.assert_frame_equal(
+            MyData.fetch(
+                [0, 1],
+                shape=(5, 3),
+                index_mask=index_mask,
+                column_mask=column_mask,
+                missing_index="nan",
+                missing_columns="nan",
+            )
             .update(n=3, index_mask=update_index_mask2)
             .data[0],
             pd.DataFrame(
@@ -663,6 +797,46 @@ class TestData:
                     ["1_0_2_u", "1_1_2_u", np.nan],
                 ],
                 index=updated_index,
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            MyData.fetch(
+                [0, 1],
+                shape=(5, 3),
+                index_mask=index_mask,
+                column_mask=column_mask,
+                missing_index="nan",
+                missing_columns="nan",
+            )
+                .update(n=3, index_mask=update_index_mask2, return_update=True)
+                .data[0],
+            pd.DataFrame(
+                [
+                    [np.nan, "0_1_3", "0_2_3"],
+                    [np.nan, "0_1_0_u", "0_2_0_u"],
+                    [np.nan, np.nan, np.nan],
+                ],
+                index=updated_index[3:],
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            MyData.fetch(
+                [0, 1],
+                shape=(5, 3),
+                index_mask=index_mask,
+                column_mask=column_mask,
+                missing_index="nan",
+                missing_columns="nan",
+            )
+                .update(n=3, index_mask=update_index_mask2, return_update=True)
+                .data[1],
+            pd.DataFrame(
+                [
+                    ["1_0_0_u", "1_1_0_u", np.nan],
+                    [np.nan, np.nan, np.nan],
+                    ["1_0_2_u", "1_1_2_u", np.nan],
+                ],
+                index=updated_index[3:],
             ),
         )
         pd.testing.assert_frame_equal(
@@ -708,6 +882,40 @@ class TestData:
                 missing_index="drop",
                 missing_columns="drop",
             )
+                .update(index_mask=update_index_mask, return_update=True)
+                .data[0],
+            pd.DataFrame(
+                [],
+                index=pd.DatetimeIndex([], dtype='datetime64[ns, UTC]', freq=None),
+                columns=pd.Int64Index([1], dtype="int64"),
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            MyData.fetch(
+                [0, 1],
+                shape=(5, 3),
+                index_mask=index_mask,
+                column_mask=column_mask,
+                missing_index="drop",
+                missing_columns="drop",
+            )
+                .update(index_mask=update_index_mask, return_update=True)
+                .data[1],
+            pd.DataFrame(
+                [],
+                index=pd.DatetimeIndex([], dtype='datetime64[ns, UTC]', freq=None),
+                columns=pd.Int64Index([1], dtype="int64"),
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            MyData.fetch(
+                [0, 1],
+                shape=(5, 3),
+                index_mask=index_mask,
+                column_mask=column_mask,
+                missing_index="drop",
+                missing_columns="drop",
+            )
             .update(n=3, index_mask=update_index_mask2)
             .data[0],
             pd.DataFrame(
@@ -733,6 +941,40 @@ class TestData:
                 columns=pd.Int64Index([1], dtype="int64"),
             ),
         )
+        pd.testing.assert_frame_equal(
+            MyData.fetch(
+                [0, 1],
+                shape=(5, 3),
+                index_mask=index_mask,
+                column_mask=column_mask,
+                missing_index="drop",
+                missing_columns="drop",
+            )
+                .update(n=3, index_mask=update_index_mask2, return_update=True)
+                .data[0],
+            pd.DataFrame(
+                [["0_1_3"]],
+                index=pd.DatetimeIndex(['2020-01-04 00:00:00+00:00'], dtype='datetime64[ns, UTC]', freq=None),
+                columns=pd.Int64Index([1], dtype="int64"),
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            MyData.fetch(
+                [0, 1],
+                shape=(5, 3),
+                index_mask=index_mask,
+                column_mask=column_mask,
+                missing_index="drop",
+                missing_columns="drop",
+            )
+                .update(n=3, index_mask=update_index_mask2, return_update=True)
+                .data[1],
+            pd.DataFrame(
+                [["1_1_0_u"]],
+                index=pd.DatetimeIndex(['2020-01-04 00:00:00+00:00'], dtype='datetime64[ns, UTC]', freq=None),
+                columns=pd.Int64Index([1], dtype="int64"),
+            ),
+        )
         assert MyData.fetch(
             [0, 1],
             shape=(5, 3),
@@ -748,7 +990,19 @@ class TestData:
             column_mask=column_mask,
             missing_index="drop",
             missing_columns="drop",
-        ).update(n=3, index_mask=update_index_mask2).last_index == {0: updated_index[4], 1: updated_index[5]}
+        ).update(
+            n=3, index_mask=update_index_mask2
+        ).last_index == {0: updated_index[4], 1: updated_index[5]}
+        assert MyData.fetch(
+            [0, 1],
+            shape=(5, 3),
+            index_mask=index_mask,
+            column_mask=column_mask,
+            missing_index="drop",
+            missing_columns="drop",
+        ).update(
+            n=3, index_mask=update_index_mask2, return_update=True
+        ).last_index == {0: updated_index[4], 1: updated_index[5]}
         pd.testing.assert_frame_equal(
             MyData.fetch(
                 [0, 1], shape=(5, 3)
@@ -783,6 +1037,38 @@ class TestData:
                     ["1_0_1_u", "1_1_1_u", "1_2_1_u"]
                 ],
                 index=updated_index,
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            MyData.fetch(
+                [0, 1], shape=(5, 3)
+            ).update(
+                n=2, return_none=vbt.symbol_dict({0: True, 1: False}), return_update=True
+            ).data[0],
+            pd.DataFrame(
+                [
+                    ['0_0_4', '0_1_4', '0_2_4'],
+                    [np.nan, np.nan, np.nan]
+                ],
+                index=pd.DatetimeIndex(
+                    ['2020-01-05 00:00:00+00:00', '2020-01-06 00:00:00+00:00'],
+                    dtype='datetime64[ns, UTC]', freq=None),
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            MyData.fetch(
+                [0, 1], shape=(5, 3)
+            ).update(
+                n=2, return_none=vbt.symbol_dict({0: True, 1: False}), return_update=True
+            ).data[1],
+            pd.DataFrame(
+                [
+                    ["1_0_0_u", "1_1_0_u", "1_2_0_u"],
+                    ["1_0_1_u", "1_1_1_u", "1_2_1_u"]
+                ],
+                index=pd.DatetimeIndex(
+                    ['2020-01-05 00:00:00+00:00', '2020-01-06 00:00:00+00:00'],
+                    dtype='datetime64[ns, UTC]', freq=None),
             ),
         )
         pd.testing.assert_frame_equal(

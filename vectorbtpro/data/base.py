@@ -563,6 +563,7 @@ class Data(Analyzable):
     def update(
         self: DataT,
         *,
+        return_update: bool = False,
         show_progress: bool = False,
         pbar_kwargs: tp.KwargsLike = None,
         skip_on_error: tp.Optional[bool] = None,
@@ -572,6 +573,8 @@ class Data(Analyzable):
         """Fetch additional data using `Data.update_symbol` and append it to the existing data.
 
         Args:
+            return_update (bool): Whether to return the updated data only.
+                Defaults to False.
             show_progress (bool): Whether to show the progress bar.
                 Defaults to False.
 
@@ -673,7 +676,7 @@ class Data(Analyzable):
                     new_last_index[symbol] = self.last_index[symbol]
                 pbar.update(1)
 
-        # Prepend existing data starting from lowest updated index (including) to new data
+        # Get the last index in the old data from where the new data should begin
         from_index = None
         for symbol, new_obj in new_data.items():
             if len(new_obj.index) > 0:
@@ -689,7 +692,8 @@ class Data(Analyzable):
                     stacklevel=2,
                 )
             return self.copy()
-
+        
+        # Concatenate the updated old data and the new data
         for symbol, new_obj in new_data.items():
             if len(new_obj.index) > 0:
                 to_index = new_obj.index[0]
@@ -715,10 +719,11 @@ class Data(Analyzable):
             new_obj = new_obj[~new_obj.index.duplicated(keep="last")]
             new_data[symbol] = new_obj
 
+        # Align the index and columns in the new data
         new_data = self.align_index(new_data, missing=self.missing_index, silence_warnings=silence_warnings)
         new_data = self.align_columns(new_data, missing=self.missing_columns, silence_warnings=silence_warnings)
-
-        # Append new data to existing data ending at lowest updated index (excluding)
+        
+        # Align the columns and data type in the old and new data
         for symbol, new_obj in new_data.items():
             obj = self.data[symbol]
             if checks.is_frame(obj) and checks.is_frame(new_obj):
@@ -728,6 +733,28 @@ class Data(Analyzable):
                     new_obj = new_obj[obj.name]
                 else:
                     new_obj = new_obj[0]
+            if checks.is_frame(obj):
+                new_obj = new_obj.astype(obj.dtypes)
+            else:
+                new_obj = new_obj.astype(obj.dtype)
+            new_data[symbol] = new_obj
+
+        if return_update:
+            # Do not concatenate with the old data
+            for symbol, new_obj in new_data.items():
+                if isinstance(new_obj.index, pd.DatetimeIndex):
+                    new_obj.index.freq = new_obj.index.inferred_freq
+            new_index = new_data[self.symbols[0]].index
+            return self.replace(
+                wrapper=self.wrapper.replace(index=new_index),
+                data=new_data,
+                returned_kwargs=new_returned_kwargs,
+                last_index=new_last_index,
+            )
+
+        # Append the new data to the old data
+        for symbol, new_obj in new_data.items():
+            obj = self.data[symbol]
             obj = obj.loc[:from_index]
             if obj.index[-1] == from_index:
                 obj = obj.iloc[:-1]
