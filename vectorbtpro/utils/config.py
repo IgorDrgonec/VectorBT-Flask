@@ -477,7 +477,14 @@ class Config(PickleableDict, Prettified):
         """Whether to enable accessing dict keys via dot notation."""
         return self._as_attrs_
 
-    def __getattr__(self, k) -> tp.Any:
+    def _safe_getattr(self, k: str, v: tp.Any) -> bool:
+        """Get an attribute without triggering `Config.__getattr__`."""
+        try:
+            return object.__getattribute__(self, k)
+        except AttributeError:
+            return v
+
+    def __getattr__(self, k: str) -> tp.Any:
         try:
             _as_attrs_ = object.__getattribute__(self, "_as_attrs_")
         except AttributeError:
@@ -508,25 +515,25 @@ class Config(PickleableDict, Prettified):
         return object.__delattr__(self, k)
 
     def __setitem__(self, k: str, v: tp.Any, force: bool = False) -> None:
-        if not force and self.readonly_:
+        if not force and self._safe_getattr("readonly_", False):
             raise TypeError("Config is read-only")
-        if not force and self.frozen_keys_:
+        if not force and self._safe_getattr("frozen_keys_", False):
             if k not in self:
                 raise KeyError(f"Config keys are frozen: key '{k}' not found")
         dict.__setitem__(self, k, v)
 
     def __delitem__(self, k: str, force: bool = False) -> None:
-        if not force and self.readonly_:
+        if not force and self._safe_getattr("readonly_", False):
             raise TypeError("Config is read-only")
-        if not force and self.frozen_keys_:
+        if not force and self._safe_getattr("frozen_keys_", False):
             raise KeyError(f"Config keys are frozen")
         dict.__delitem__(self, k)
 
     def pop(self, k: str, v: tp.Any = _RaiseKeyError, force: bool = False) -> tp.Any:
         """Remove and return the pair by the key."""
-        if not force and self.readonly_:
+        if not force and self._safe_getattr("readonly_", False):
             raise TypeError("Config is read-only")
-        if not force and self.frozen_keys_:
+        if not force and self._safe_getattr("frozen_keys_", False):
             raise KeyError(f"Config keys are frozen")
         if v is _RaiseKeyError:
             result = dict.pop(self, k)
@@ -536,18 +543,18 @@ class Config(PickleableDict, Prettified):
 
     def popitem(self, force: bool = False) -> tp.Tuple[tp.Any, tp.Any]:
         """Remove and return some pair."""
-        if not force and self.readonly_:
+        if not force and self._safe_getattr("readonly_", False):
             raise TypeError("Config is read-only")
-        if not force and self.frozen_keys_:
+        if not force and self._safe_getattr("frozen_keys_", False):
             raise KeyError(f"Config keys are frozen")
         result = dict.popitem(self)
         return result
 
     def clear(self, force: bool = False) -> None:
         """Remove all items."""
-        if not force and self.readonly_:
+        if not force and self._safe_getattr("readonly_", False):
             raise TypeError("Config is read-only")
-        if not force and self.frozen_keys_:
+        if not force and self._safe_getattr("frozen_keys_", False):
             raise KeyError(f"Config keys are frozen")
         dict.clear(self)
 
@@ -650,7 +657,7 @@ class Config(PickleableDict, Prettified):
         """Clears the config and updates it with the initial config.
 
         `reset_dct_copy_kwargs` override `Config.reset_dct_copy_kwargs_`."""
-        if not force and self.readonly_:
+        if not force and self._safe_getattr("readonly_", False):
             raise TypeError("Config is read-only")
         reset_dct_copy_kwargs = merge_dicts(self.reset_dct_copy_kwargs_, reset_dct_copy_kwargs)
         reset_dct_ = copy_dict(dict(self.reset_dct_), **reset_dct_copy_kwargs)
@@ -662,7 +669,7 @@ class Config(PickleableDict, Prettified):
         """Replace `reset_dct_` by the current state.
 
         `reset_dct_copy_kwargs` override `Config.reset_dct_copy_kwargs_`."""
-        if not force and self.readonly_:
+        if not force and self._safe_getattr("readonly_", False):
             raise TypeError("Config is read-only")
         reset_dct_copy_kwargs = merge_dicts(self.reset_dct_copy_kwargs_, reset_dct_copy_kwargs)
         reset_dct_ = copy_dict(dict(self), **reset_dct_copy_kwargs)
