@@ -19,6 +19,8 @@ from glob import glob
 import re
 
 import pandas as pd
+from pandas.io.parsers import TextFileReader
+from pandas.io.pytables import TableIterator
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.data import nb
@@ -513,6 +515,7 @@ class CSVData(LocalData):
         index_col: tp.Optional[int] = None,
         parse_dates: tp.Optional[bool] = None,
         squeeze: tp.Optional[bool] = None,
+        chunk_func: tp.Optional[tp.Callable] = None,
         **read_csv_kwargs,
     ) -> tp.Tuple[tp.SeriesFrame, dict]:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to load a CSV file.
@@ -523,6 +526,9 @@ class CSVData(LocalData):
 
         !!! note
             `start_row` and `end_row` must exclude header rows, while `end_row` must include the last row.
+
+        Use `chunk_func` to select and concatenate chunks from `TextFileReader`. Gets called
+        only if `iterator` or `chunksize` are set.
 
         See https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html for other arguments.
 
@@ -585,6 +591,11 @@ class CSVData(LocalData):
             nrows=nrows,
             **read_csv_kwargs,
         )
+        if isinstance(obj, TextFileReader):
+            if chunk_func is None:
+                obj = pd.concat(list(obj), axis=0)
+            else:
+                obj = chunk_func(obj)
         if isinstance(obj, pd.DataFrame) and squeeze:
             obj = obj.squeeze("columns")
         if isinstance(obj, pd.Series) and obj.name == "0":
@@ -781,6 +792,7 @@ class HDFData(LocalData):
         path: tp.Any = None,
         start_row: tp.Optional[int] = None,
         end_row: tp.Optional[int] = None,
+        chunk_func: tp.Optional[tp.Callable] = None,
         **read_hdf_kwargs,
     ) -> tp.Tuple[tp.SeriesFrame, dict]:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to load an HDF object.
@@ -789,6 +801,9 @@ class HDFData(LocalData):
 
         !!! note
             `end_row` must include the last row.
+
+        Use `chunk_func` to select and concatenate chunks from `TableIterator`. Gets called
+        only if `iterator` or `chunksize` are set.
 
         See https://pandas.pydata.org/docs/reference/api/pandas.read_hdf.html for other arguments.
 
@@ -814,6 +829,11 @@ class HDFData(LocalData):
             stop = None
 
         obj = pd.read_hdf(file_path, key=key, start=start_row, stop=stop, **read_hdf_kwargs)
+        if isinstance(obj, TableIterator):
+            if chunk_func is None:
+                obj = pd.concat(list(obj), axis=0)
+            else:
+                obj = chunk_func(obj)
         returned_kwargs = dict(last_row=start_row + len(obj.index) - 1)
         return obj, returned_kwargs
 
