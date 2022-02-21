@@ -77,7 +77,7 @@ class DataSaver(DataUpdater):
         Override to do pre- and postprocessing.
 
         To stop this method from running again, raise `vectorbtpro.utils.schedule_.CancelledError`."""
-        self._data = self.data.update(return_update=True, **kwargs)
+        self._data = self.data.update(concat=False, **kwargs)
         self.update_config(data=self.data)
         if save_kwargs is None:
             save_kwargs = {}

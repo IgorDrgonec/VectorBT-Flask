@@ -573,7 +573,7 @@ class Data(Analyzable):
     def update(
         self: DataT,
         *,
-        return_update: bool = False,
+        concat: bool = True,
         show_progress: bool = False,
         pbar_kwargs: tp.KwargsLike = None,
         skip_on_error: tp.Optional[bool] = None,
@@ -583,7 +583,7 @@ class Data(Analyzable):
         """Fetch additional data using `Data.update_symbol` and append it to the existing data.
 
         Args:
-            return_update (bool): Whether to return the updated data only.
+            concat (bool): Whether to concatenate existing and updated/new data.
                 Defaults to False.
             show_progress (bool): Whether to show the progress bar.
                 Defaults to False.
@@ -749,7 +749,7 @@ class Data(Analyzable):
                 new_obj = new_obj.astype(obj.dtype)
             new_data[symbol] = new_obj
 
-        if return_update:
+        if not concat:
             # Do not concatenate with the old data
             for symbol, new_obj in new_data.items():
                 if isinstance(new_obj.index, pd.DatetimeIndex):

@@ -413,7 +413,7 @@ class TestData:
             pd.Series(["0_0", "0_1", "0_2", "0_3", "0_0_u"]),
         )
         pd.testing.assert_series_equal(
-            MyData.fetch(0, shape=(5,), return_arr=True).update(return_update=True).data[0],
+            MyData.fetch(0, shape=(5,), return_arr=True).update(concat=False).data[0],
             pd.Series(["0_0_u"], index=pd.Int64Index([4], dtype="int64")),
         )
         pd.testing.assert_series_equal(
@@ -421,7 +421,7 @@ class TestData:
             pd.Series(["0_0", "0_1", "0_2", "0_3", "0_0_u", "0_1_u"]),
         )
         pd.testing.assert_series_equal(
-            MyData.fetch(0, shape=(5,), return_arr=True).update(n=2, return_update=True).data[0],
+            MyData.fetch(0, shape=(5,), return_arr=True).update(n=2, concat=False).data[0],
             pd.Series(["0_0_u", "0_1_u"], index=pd.Int64Index([4, 5], dtype="int64")),
         )
         pd.testing.assert_frame_equal(
@@ -437,7 +437,7 @@ class TestData:
             ),
         )
         pd.testing.assert_frame_equal(
-            MyData.fetch(0, shape=(5, 3), return_arr=True).update(return_update=True).data[0],
+            MyData.fetch(0, shape=(5, 3), return_arr=True).update(concat=False).data[0],
             pd.DataFrame(
                 [
                     ["0_0_0_u", "0_1_0_u", "0_2_0_u"],
@@ -459,7 +459,7 @@ class TestData:
             ),
         )
         pd.testing.assert_frame_equal(
-            MyData.fetch(0, shape=(5, 3), return_arr=True).update(n=2, return_update=True).data[0],
+            MyData.fetch(0, shape=(5, 3), return_arr=True).update(n=2, concat=False).data[0],
             pd.DataFrame(
                 [
                     ["0_0_0_u", "0_1_0_u", "0_2_0_u"],
@@ -484,7 +484,7 @@ class TestData:
             pd.Series(["0_0", "0_1", "0_2", "0_3", "0_0_u"], index=index),
         )
         pd.testing.assert_series_equal(
-            MyData.fetch(0, shape=(5,)).update(return_update=True).data[0],
+            MyData.fetch(0, shape=(5,)).update(concat=False).data[0],
             pd.Series(["0_0_u"], index=index[[-1]]),
         )
         updated_index = pd.DatetimeIndex(
@@ -504,7 +504,7 @@ class TestData:
             pd.Series(["0_0", "0_1", "0_2", "0_3", "0_0_u", "0_1_u"], index=updated_index),
         )
         pd.testing.assert_series_equal(
-            MyData.fetch(0, shape=(5,)).update(n=2, return_update=True).data[0],
+            MyData.fetch(0, shape=(5,)).update(n=2, concat=False).data[0],
             pd.Series(
                 ["0_0_u", "0_1_u"],
                 index=pd.DatetimeIndex(
@@ -529,7 +529,7 @@ class TestData:
         )
         pd.testing.assert_series_equal(
             MyData.fetch(0, shape=(5,), tz_localize="UTC", tz_convert="Europe/Berlin")
-            .update(tz_localize=None, return_update=True)
+            .update(tz_localize=None, concat=False)
             .data[0],
             pd.Series(["0_0_u"], index=index2[[-1]]),
         )
@@ -549,13 +549,13 @@ class TestData:
         )
         pd.testing.assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="nan")
-            .update(index_mask=update_index_mask, return_update=True)
+            .update(index_mask=update_index_mask, concat=False)
             .data[0],
             pd.Series(["0_0_u"], index=index[[-1]], dtype=object),
         )
         pd.testing.assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="nan")
-            .update(index_mask=update_index_mask, return_update=True)
+            .update(index_mask=update_index_mask, concat=False)
             .data[1],
             pd.Series([np.nan], index=index[[-1]], dtype=object),
         )
@@ -584,13 +584,13 @@ class TestData:
         )
         pd.testing.assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="nan")
-            .update(n=3, index_mask=update_index_mask2, return_update=True)
+            .update(n=3, index_mask=update_index_mask2, concat=False)
             .data[0],
             pd.Series(["0_3", "0_0_u", np.nan], index=updated_index[-3:]),
         )
         pd.testing.assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="nan")
-            .update(n=3, index_mask=update_index_mask2, return_update=True)
+            .update(n=3, index_mask=update_index_mask2, concat=False)
             .data[1],
             pd.Series(
                 [
@@ -615,13 +615,13 @@ class TestData:
         )
         pd.testing.assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="drop")
-            .update(index_mask=update_index_mask, return_update=True)
+            .update(index_mask=update_index_mask, concat=False)
             .data[0],
             pd.Series([], index=pd.DatetimeIndex([], dtype="datetime64[ns, UTC]", freq=None), dtype=object),
         )
         pd.testing.assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="drop")
-            .update(index_mask=update_index_mask, return_update=True)
+            .update(index_mask=update_index_mask, concat=False)
             .data[1],
             pd.Series([], index=pd.DatetimeIndex([], dtype="datetime64[ns, UTC]", freq=None), dtype=object),
         )
@@ -639,7 +639,7 @@ class TestData:
         )
         pd.testing.assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="drop")
-            .update(n=3, index_mask=update_index_mask2, return_update=True)
+            .update(n=3, index_mask=update_index_mask2, concat=False)
             .data[0],
             pd.Series(
                 ["0_3"], index=pd.DatetimeIndex(["2020-01-04 00:00:00+00:00"], dtype="datetime64[ns, UTC]", freq=None)
@@ -647,7 +647,7 @@ class TestData:
         )
         pd.testing.assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="drop")
-            .update(n=3, index_mask=update_index_mask2, return_update=True)
+            .update(n=3, index_mask=update_index_mask2, concat=False)
             .data[1],
             pd.Series(
                 ["1_0_u"], index=pd.DatetimeIndex(["2020-01-04 00:00:00+00:00"], dtype="datetime64[ns, UTC]", freq=None)
@@ -707,7 +707,7 @@ class TestData:
                 missing_index="nan",
                 missing_columns="nan",
             )
-            .update(index_mask=update_index_mask, return_update=True)
+            .update(index_mask=update_index_mask, concat=False)
             .data[0],
             pd.DataFrame(
                 [
@@ -725,7 +725,7 @@ class TestData:
                 missing_index="nan",
                 missing_columns="nan",
             )
-            .update(index_mask=update_index_mask, return_update=True)
+            .update(index_mask=update_index_mask, concat=False)
             .data[1],
             pd.DataFrame(
                 [
@@ -789,7 +789,7 @@ class TestData:
                 missing_index="nan",
                 missing_columns="nan",
             )
-            .update(n=3, index_mask=update_index_mask2, return_update=True)
+            .update(n=3, index_mask=update_index_mask2, concat=False)
             .data[0],
             pd.DataFrame(
                 [
@@ -809,7 +809,7 @@ class TestData:
                 missing_index="nan",
                 missing_columns="nan",
             )
-            .update(n=3, index_mask=update_index_mask2, return_update=True)
+            .update(n=3, index_mask=update_index_mask2, concat=False)
             .data[1],
             pd.DataFrame(
                 [
@@ -863,7 +863,7 @@ class TestData:
                 missing_index="drop",
                 missing_columns="drop",
             )
-            .update(index_mask=update_index_mask, return_update=True)
+            .update(index_mask=update_index_mask, concat=False)
             .data[0],
             pd.DataFrame(
                 [],
@@ -880,7 +880,7 @@ class TestData:
                 missing_index="drop",
                 missing_columns="drop",
             )
-            .update(index_mask=update_index_mask, return_update=True)
+            .update(index_mask=update_index_mask, concat=False)
             .data[1],
             pd.DataFrame(
                 [],
@@ -931,7 +931,7 @@ class TestData:
                 missing_index="drop",
                 missing_columns="drop",
             )
-            .update(n=3, index_mask=update_index_mask2, return_update=True)
+            .update(n=3, index_mask=update_index_mask2, concat=False)
             .data[0],
             pd.DataFrame(
                 [["0_1_3"]],
@@ -948,7 +948,7 @@ class TestData:
                 missing_index="drop",
                 missing_columns="drop",
             )
-            .update(n=3, index_mask=update_index_mask2, return_update=True)
+            .update(n=3, index_mask=update_index_mask2, concat=False)
             .data[1],
             pd.DataFrame(
                 [["1_1_0_u"]],
@@ -979,7 +979,7 @@ class TestData:
             column_mask=column_mask,
             missing_index="drop",
             missing_columns="drop",
-        ).update(n=3, index_mask=update_index_mask2, return_update=True).last_index == {
+        ).update(n=3, index_mask=update_index_mask2, concat=False).last_index == {
             0: updated_index[4],
             1: updated_index[5],
         }
@@ -1013,7 +1013,7 @@ class TestData:
         )
         pd.testing.assert_frame_equal(
             MyData.fetch([0, 1], shape=(5, 3))
-            .update(n=2, return_none=vbt.symbol_dict({0: True, 1: False}), return_update=True)
+            .update(n=2, return_none=vbt.symbol_dict({0: True, 1: False}), concat=False)
             .data[0],
             pd.DataFrame(
                 [["0_0_4", "0_1_4", "0_2_4"], [np.nan, np.nan, np.nan]],
@@ -1024,7 +1024,7 @@ class TestData:
         )
         pd.testing.assert_frame_equal(
             MyData.fetch([0, 1], shape=(5, 3))
-            .update(n=2, return_none=vbt.symbol_dict({0: True, 1: False}), return_update=True)
+            .update(n=2, return_none=vbt.symbol_dict({0: True, 1: False}), concat=False)
             .data[1],
             pd.DataFrame(
                 [["1_0_0_u", "1_1_0_u", "1_2_0_u"], ["1_0_1_u", "1_1_1_u", "1_2_1_u"]],
@@ -1896,7 +1896,7 @@ class TestCSVDataSaver:
             )
         )
         saver.update(n=2, save_kwargs=dict(dir_path=tmp_path / "saver"))
-        updated_data = data.update(n=2, return_update=True)
+        updated_data = data.update(n=2, concat=False)
         assert saver.data == updated_data
         saved_result0 = pd.concat((data.data[0].iloc[:-1], updated_data.data[0]), axis=0)
         saved_result0.index.freq = "D"
@@ -1915,7 +1915,7 @@ class TestCSVDataSaver:
             init_save=False
         )
         new_saver.update(n=2, save_kwargs=dict(dir_path=tmp_path / "saver"))
-        new_updated_data = new_data.update(n=2, return_update=True)
+        new_updated_data = new_data.update(n=2, concat=False)
         assert new_saver.data == new_updated_data
         new_saved_result0 = pd.concat((
             data.data[0].iloc[:-1],
@@ -1969,7 +1969,7 @@ class TestHDFDataSaver:
             )
         )
         saver.update(n=2, save_kwargs=dict(file_path=tmp_path / "saver.h5"))
-        updated_data = data.update(n=2, return_update=True)
+        updated_data = data.update(n=2, concat=False)
         assert saver.data == updated_data
         saved_result0 = pd.concat((data.data[0].iloc[:-1], updated_data.data[0]), axis=0)
         saved_result0.index.freq = "D"
@@ -1989,7 +1989,7 @@ class TestHDFDataSaver:
             init_save=False
         )
         new_saver.update(n=2, save_kwargs=dict(file_path=tmp_path / "saver.h5"))
-        new_updated_data = new_data.update(n=2, return_update=True)
+        new_updated_data = new_data.update(n=2, concat=False)
         assert new_saver.data == new_updated_data
         new_saved_result0 = pd.concat((
             data.data[0].iloc[:-1],
