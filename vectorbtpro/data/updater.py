@@ -1,113 +1,46 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Class for scheduling data updates."""
+"""Classes for scheduling data updates."""
 
 import logging
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.data.base import Data
-from vectorbtpro.utils.config import Configured
+from vectorbtpro.utils.config import Configured, merge_dicts
 from vectorbtpro.utils.schedule_ import ScheduleManager
 
 logger = logging.getLogger(__name__)
 
 
 class DataUpdater(Configured):
-    """Class for scheduling data updates.
+    """Base class for scheduling data updates.
 
-    Usage:
-        * Update in the foreground:
-
-        ```pycon
-        >>> import vectorbtpro as vbt
-
-        >>> class MyDataUpdater(vbt.DataUpdater):
-        ...     def __init__(self, *args, **kwargs):
-        ...         super().__init__(*args, **kwargs)
-        ...         self.update_count = 0
-        ...
-        ...     def update(self, count_limit=None):
-        ...         prev_index_len = len(self.data.wrapper.index)
-        ...         super().update()
-        ...         new_index_len = len(self.data.wrapper.index)
-        ...         print(f"Data updated with {new_index_len - prev_index_len} data points")
-        ...         self.update_count += 1
-        ...         if count_limit is not None and self.update_count >= count_limit:
-        ...             raise vbt.CancelledError
-
-        >>> data = vbt.GBMData.fetch('SYMBOL', start='1 minute ago', freq='1s')
-        ```
-
-        [=100% "100%"]{: .candystripe}
-
-        ```pycon
-        >>> my_updater = MyDataUpdater(data)
-        >>> my_updater.update_every(count_limit=10)
-        Data updated with 1 data points
-        Data updated with 1 data points
-        Data updated with 1 data points
-        Data updated with 1 data points
-        Data updated with 1 data points
-        Data updated with 1 data points
-        Data updated with 1 data points
-        Data updated with 1 data points
-        Data updated with 1 data points
-        Data updated with 1 data points
-
-        >>> my_updater.data.get()
-        2021-05-02 16:53:51.755347+00:00    96.830482
-        2021-05-02 16:53:52.755347+00:00    94.481883
-        2021-05-02 16:53:53.755347+00:00    94.327835
-        2021-05-02 16:53:54.755347+00:00    90.178038
-        2021-05-02 16:53:55.755347+00:00    88.260168
-                                              ...
-        2021-05-02 16:54:57.755347+00:00    99.342590
-        2021-05-02 16:54:58.755347+00:00    94.872893
-        2021-05-02 16:54:59.755347+00:00    93.212823
-        2021-05-02 16:55:00.755347+00:00    95.199882
-        2021-05-02 16:55:01.755347+00:00    93.070532
-        Freq: S, Length: 71, dtype: float64
-        ```
-
-        * Update in the background:
-
-        ```pycon
-        >>> my_updater = MyDataUpdater(my_updater.data)
-        >>> my_updater.update_every(in_background=True, count_limit=10)
-        Data updated with 1 data points
-        Data updated with 1 data points
-        Data updated with 1 data points
-        Data updated with 1 data points
-        Data updated with 1 data points
-        Data updated with 1 data points
-        Data updated with 1 data points
-        Data updated with 1 data points
-        Data updated with 1 data points
-        Data updated with 1 data points
-
-        >>> my_updater.data.get()
-        2021-05-02 16:53:51.755347+00:00    96.830482
-        2021-05-02 16:53:52.755347+00:00    94.481883
-        2021-05-02 16:53:53.755347+00:00    94.327835
-        2021-05-02 16:53:54.755347+00:00    90.178038
-        2021-05-02 16:53:55.755347+00:00    88.260168
-                                              ...
-        2021-05-02 16:55:07.755347+00:00    94.502885
-        2021-05-02 16:55:08.755347+00:00    94.823707
-        2021-05-02 16:55:09.755347+00:00    92.570025
-        2021-05-02 16:55:10.755347+00:00    84.239018
-        2021-05-02 16:55:11.755347+00:00    81.294486
-        Freq: S, Length: 81, dtype: float64
-        ```
+    Args:
+        data (Data): Data instance.
+        update_kwargs (dict): Keyword arguments passed to `DataSaver.update`.
+        **kwargs: Keyword arguments passed to the constructor of `Configured`.
     """
 
-    def __init__(self, data: Data, schedule_manager: tp.Optional[ScheduleManager] = None, **kwargs) -> None:
-        self._data = data
+    def __init__(
+        self,
+        data: Data,
+        schedule_manager: tp.Optional[ScheduleManager] = None,
+        update_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> None:
         if schedule_manager is None:
             schedule_manager = ScheduleManager()
-        self._schedule_manager = schedule_manager
+        Configured.__init__(
+            self,
+            data=data,
+            schedule_manager=schedule_manager,
+            update_kwargs=update_kwargs,
+            **kwargs,
+        )
 
-        Configured.__init__(self, data=data, schedule_manager=schedule_manager, **kwargs)
+        self._data = data
+        self._schedule_manager = schedule_manager
+        self._update_kwargs = update_kwargs
 
     @property
     def data(self) -> Data:
@@ -123,6 +56,11 @@ class DataUpdater(Configured):
         See `vectorbtpro.utils.schedule_.ScheduleManager`."""
         return self._schedule_manager
 
+    @property
+    def update_kwargs(self) -> tp.KwargsLike:
+        """Keyword arguments passed to `DataSaver.update`."""
+        return self._update_kwargs
+
     def update(self, **kwargs) -> None:
         """Method that updates data.
 
@@ -132,7 +70,7 @@ class DataUpdater(Configured):
         self._data = self.data.update(**kwargs)
         self.update_config(data=self.data)
         new_index = self.data.wrapper.index
-        logger.info(f"Updated data has {len(new_index)} rows from {new_index[0]} to {new_index[-1]}")
+        logger.info(f"New data has {len(new_index)} rows from {new_index[0]} to {new_index[-1]}")
 
     def update_every(
         self,
@@ -141,7 +79,7 @@ class DataUpdater(Configured):
         tags: tp.Optional[tp.Iterable[tp.Hashable]] = None,
         in_background: bool = False,
         start_kwargs: dict = None,
-        **kwargs,
+        **update_kwargs,
     ) -> None:
         """Schedule `DataUpdater.update`.
 
@@ -150,10 +88,11 @@ class DataUpdater(Configured):
         If `in_background` is set to True, starts in the background as an `asyncio` task.
         The task can be stopped with `vectorbtpro.utils.schedule_.ScheduleManager.stop`.
 
-        `**kwargs` are passed to `DataUpdater.update`."""
+        `**update_kwargs` are merged over `DataUpdater.update_kwargs` and passed to `DataUpdater.update`."""
         if start_kwargs is None:
             start_kwargs = {}
-        self.schedule_manager.every(*args, to=to, tags=tags).do(self.update, **kwargs)
+        update_kwargs = merge_dicts(self.update_kwargs, update_kwargs)
+        self.schedule_manager.every(*args, to=to, tags=tags).do(self.update, **update_kwargs)
         if in_background:
             self.schedule_manager.start_in_background(**start_kwargs)
         else:

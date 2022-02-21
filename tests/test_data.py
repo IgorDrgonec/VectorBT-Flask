@@ -45,7 +45,7 @@ class MyData(vbt.Data):
         is_update=False,
         return_none=False,
         return_empty=False,
-        raise_error=False
+        raise_error=False,
     ):
         if raise_error:
             raise ValueError()
@@ -309,13 +309,9 @@ class TestData:
                 columns=pd.Int64Index([1], dtype="int64"),
             ),
         )
-        assert len(MyData.fetch(
-            [0, 1], shape=(5, 3),
-            return_none=vbt.symbol_dict({0: True, 1: False})).symbols) == 1
+        assert len(MyData.fetch([0, 1], shape=(5, 3), return_none=vbt.symbol_dict({0: True, 1: False})).symbols) == 1
         pd.testing.assert_frame_equal(
-            MyData.fetch(
-                [0, 1], shape=(5, 3),
-                return_none=vbt.symbol_dict({0: True, 1: False})).data[1],
+            MyData.fetch([0, 1], shape=(5, 3), return_none=vbt.symbol_dict({0: True, 1: False})).data[1],
             pd.DataFrame(
                 [
                     ["1_0_0", "1_1_0", "1_2_0"],
@@ -327,13 +323,9 @@ class TestData:
                 index=index,
             ),
         )
-        assert len(MyData.fetch(
-            [0, 1], shape=(5, 3),
-            return_empty=vbt.symbol_dict({0: True, 1: False})).symbols) == 1
+        assert len(MyData.fetch([0, 1], shape=(5, 3), return_empty=vbt.symbol_dict({0: True, 1: False})).symbols) == 1
         pd.testing.assert_frame_equal(
-            MyData.fetch(
-                [0, 1], shape=(5, 3),
-                return_empty=vbt.symbol_dict({0: True, 1: False})).data[1],
+            MyData.fetch([0, 1], shape=(5, 3), return_empty=vbt.symbol_dict({0: True, 1: False})).data[1],
             pd.DataFrame(
                 [
                     ["1_0_0", "1_1_0", "1_2_0"],
@@ -345,15 +337,18 @@ class TestData:
                 index=index,
             ),
         )
-        assert len(MyData.fetch(
-            [0, 1], shape=(5, 3),
-            raise_error=vbt.symbol_dict({0: True, 1: False}),
-            skip_on_error=True).symbols) == 1
+        assert (
+            len(
+                MyData.fetch(
+                    [0, 1], shape=(5, 3), raise_error=vbt.symbol_dict({0: True, 1: False}), skip_on_error=True
+                ).symbols
+            )
+            == 1
+        )
         pd.testing.assert_frame_equal(
             MyData.fetch(
-                [0, 1], shape=(5, 3),
-                raise_error=vbt.symbol_dict({0: True, 1: False}),
-                skip_on_error=True).data[1],
+                [0, 1], shape=(5, 3), raise_error=vbt.symbol_dict({0: True, 1: False}), skip_on_error=True
+            ).data[1],
             pd.DataFrame(
                 [
                     ["1_0_0", "1_1_0", "1_2_0"],
@@ -366,10 +361,7 @@ class TestData:
             ),
         )
         with pytest.raises(Exception):
-            MyData.fetch(
-                [0, 1], shape=(5, 3),
-                raise_error=vbt.symbol_dict({0: True, 1: False}),
-                skip_on_error=False)
+            MyData.fetch([0, 1], shape=(5, 3), raise_error=vbt.symbol_dict({0: True, 1: False}), skip_on_error=False)
         with pytest.raises(Exception):
             MyData.fetch(
                 [0, 1],
@@ -407,31 +399,13 @@ class TestData:
                 missing_columns="test",
             )
         with pytest.raises(Exception):
-            MyData.fetch(
-                [0, 1],
-                shape=(5, 3),
-                return_none=True
-            )
+            MyData.fetch([0, 1], shape=(5, 3), return_none=True)
         with pytest.raises(Exception):
-            MyData.fetch(
-                [0, 1],
-                shape=(5, 3),
-                return_empty=True
-            )
+            MyData.fetch([0, 1], shape=(5, 3), return_empty=True)
         with pytest.raises(Exception):
-            MyData.fetch(
-                [0, 1],
-                shape=(5, 3),
-                raise_error=True,
-                skip_on_error=False
-            )
+            MyData.fetch([0, 1], shape=(5, 3), raise_error=True, skip_on_error=False)
         with pytest.raises(Exception):
-            MyData.fetch(
-                [0, 1],
-                shape=(5, 3),
-                raise_error=True,
-                skip_on_error=True
-            )
+            MyData.fetch([0, 1], shape=(5, 3), raise_error=True, skip_on_error=True)
 
     def test_update(self):
         pd.testing.assert_series_equal(
@@ -440,7 +414,7 @@ class TestData:
         )
         pd.testing.assert_series_equal(
             MyData.fetch(0, shape=(5,), return_arr=True).update(return_update=True).data[0],
-            pd.Series(["0_0_u"], index=pd.Int64Index([4], dtype='int64')),
+            pd.Series(["0_0_u"], index=pd.Int64Index([4], dtype="int64")),
         )
         pd.testing.assert_series_equal(
             MyData.fetch(0, shape=(5,), return_arr=True).update(n=2).data[0],
@@ -448,7 +422,7 @@ class TestData:
         )
         pd.testing.assert_series_equal(
             MyData.fetch(0, shape=(5,), return_arr=True).update(n=2, return_update=True).data[0],
-            pd.Series(["0_0_u", "0_1_u"], index=pd.Int64Index([4, 5], dtype='int64')),
+            pd.Series(["0_0_u", "0_1_u"], index=pd.Int64Index([4, 5], dtype="int64")),
         )
         pd.testing.assert_frame_equal(
             MyData.fetch(0, shape=(5, 3), return_arr=True).update().data[0],
@@ -467,7 +441,8 @@ class TestData:
             pd.DataFrame(
                 [
                     ["0_0_0_u", "0_1_0_u", "0_2_0_u"],
-                ], index=pd.Int64Index([4], dtype='int64')
+                ],
+                index=pd.Int64Index([4], dtype="int64"),
             ),
         )
         pd.testing.assert_frame_equal(
@@ -489,7 +464,8 @@ class TestData:
                 [
                     ["0_0_0_u", "0_1_0_u", "0_2_0_u"],
                     ["0_0_1_u", "0_1_1_u", "0_2_1_u"],
-                ], index=pd.Int64Index([4, 5], dtype='int64')
+                ],
+                index=pd.Int64Index([4, 5], dtype="int64"),
             ),
         )
         index = pd.DatetimeIndex(
@@ -529,9 +505,12 @@ class TestData:
         )
         pd.testing.assert_series_equal(
             MyData.fetch(0, shape=(5,)).update(n=2, return_update=True).data[0],
-            pd.Series(["0_0_u", "0_1_u"], index=pd.DatetimeIndex(
-                ['2020-01-05 00:00:00+00:00', '2020-01-06 00:00:00+00:00'],
-                dtype='datetime64[ns, UTC]', freq=None)),
+            pd.Series(
+                ["0_0_u", "0_1_u"],
+                index=pd.DatetimeIndex(
+                    ["2020-01-05 00:00:00+00:00", "2020-01-06 00:00:00+00:00"], dtype="datetime64[ns, UTC]", freq=None
+                ),
+            ),
         )
         index2 = pd.DatetimeIndex(
             [
@@ -545,13 +524,13 @@ class TestData:
             tz=pytz.utc,
         ).tz_convert(to_timezone("Europe/Berlin"))
         pd.testing.assert_series_equal(
-            MyData.fetch(0, shape=(5,), tz_localize="UTC", tz_convert="Europe/Berlin")
-                .update(tz_localize=None).data[0],
+            MyData.fetch(0, shape=(5,), tz_localize="UTC", tz_convert="Europe/Berlin").update(tz_localize=None).data[0],
             pd.Series(["0_0", "0_1", "0_2", "0_3", "0_0_u"], index=index2),
         )
         pd.testing.assert_series_equal(
             MyData.fetch(0, shape=(5,), tz_localize="UTC", tz_convert="Europe/Berlin")
-                .update(tz_localize=None, return_update=True).data[0],
+            .update(tz_localize=None, return_update=True)
+            .data[0],
             pd.Series(["0_0_u"], index=index2[[-1]]),
         )
         index_mask = vbt.symbol_dict({0: [False, True, True, True, True], 1: [True, True, True, True, False]})
@@ -570,14 +549,14 @@ class TestData:
         )
         pd.testing.assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="nan")
-                .update(index_mask=update_index_mask, return_update=True)
-                .data[0],
+            .update(index_mask=update_index_mask, return_update=True)
+            .data[0],
             pd.Series(["0_0_u"], index=index[[-1]], dtype=object),
         )
         pd.testing.assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="nan")
-                .update(index_mask=update_index_mask, return_update=True)
-                .data[1],
+            .update(index_mask=update_index_mask, return_update=True)
+            .data[1],
             pd.Series([np.nan], index=index[[-1]], dtype=object),
         )
         update_index_mask2 = vbt.symbol_dict({0: [True, False, False], 1: [True, False, True]})
@@ -605,21 +584,21 @@ class TestData:
         )
         pd.testing.assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="nan")
-                .update(n=3, index_mask=update_index_mask2, return_update=True)
-                .data[0],
+            .update(n=3, index_mask=update_index_mask2, return_update=True)
+            .data[0],
             pd.Series(["0_3", "0_0_u", np.nan], index=updated_index[-3:]),
         )
         pd.testing.assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="nan")
-                .update(n=3, index_mask=update_index_mask2, return_update=True)
-                .data[1],
+            .update(n=3, index_mask=update_index_mask2, return_update=True)
+            .data[1],
             pd.Series(
                 [
                     "1_0_u",
                     np.nan,
                     "1_2_u",
                 ],
-                index=updated_index[-3:]
+                index=updated_index[-3:],
             ),
         )
         pd.testing.assert_series_equal(
@@ -636,15 +615,15 @@ class TestData:
         )
         pd.testing.assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="drop")
-                .update(index_mask=update_index_mask, return_update=True)
-                .data[0],
-            pd.Series([], index=pd.DatetimeIndex([], dtype='datetime64[ns, UTC]', freq=None), dtype=object),
+            .update(index_mask=update_index_mask, return_update=True)
+            .data[0],
+            pd.Series([], index=pd.DatetimeIndex([], dtype="datetime64[ns, UTC]", freq=None), dtype=object),
         )
         pd.testing.assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="drop")
-                .update(index_mask=update_index_mask, return_update=True)
-                .data[1],
-            pd.Series([], index=pd.DatetimeIndex([], dtype='datetime64[ns, UTC]', freq=None), dtype=object),
+            .update(index_mask=update_index_mask, return_update=True)
+            .data[1],
+            pd.Series([], index=pd.DatetimeIndex([], dtype="datetime64[ns, UTC]", freq=None), dtype=object),
         )
         pd.testing.assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="drop")
@@ -660,17 +639,19 @@ class TestData:
         )
         pd.testing.assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="drop")
-                .update(n=3, index_mask=update_index_mask2, return_update=True)
-                .data[0],
-            pd.Series(["0_3"], index=pd.DatetimeIndex(
-                ['2020-01-04 00:00:00+00:00'], dtype='datetime64[ns, UTC]', freq=None)),
+            .update(n=3, index_mask=update_index_mask2, return_update=True)
+            .data[0],
+            pd.Series(
+                ["0_3"], index=pd.DatetimeIndex(["2020-01-04 00:00:00+00:00"], dtype="datetime64[ns, UTC]", freq=None)
+            ),
         )
         pd.testing.assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="drop")
-                .update(n=3, index_mask=update_index_mask2, return_update=True)
-                .data[1],
-            pd.Series(["1_0_u"], index=pd.DatetimeIndex(
-                ['2020-01-04 00:00:00+00:00'], dtype='datetime64[ns, UTC]', freq=None)),
+            .update(n=3, index_mask=update_index_mask2, return_update=True)
+            .data[1],
+            pd.Series(
+                ["1_0_u"], index=pd.DatetimeIndex(["2020-01-04 00:00:00+00:00"], dtype="datetime64[ns, UTC]", freq=None)
+            ),
         )
         column_mask = vbt.symbol_dict({0: [False, True, True], 1: [True, True, False]})
         pd.testing.assert_frame_equal(
@@ -726,13 +707,13 @@ class TestData:
                 missing_index="nan",
                 missing_columns="nan",
             )
-                .update(index_mask=update_index_mask, return_update=True)
-                .data[0],
+            .update(index_mask=update_index_mask, return_update=True)
+            .data[0],
             pd.DataFrame(
                 [
                     [np.nan, "0_1_0_u", "0_2_0_u"],
                 ],
-                index=pd.DatetimeIndex(['2020-01-05 00:00:00+00:00'], dtype='datetime64[ns, UTC]', freq=None)
+                index=pd.DatetimeIndex(["2020-01-05 00:00:00+00:00"], dtype="datetime64[ns, UTC]", freq=None),
             ).astype({0: float, 1: object, 2: object}),
         )
         pd.testing.assert_frame_equal(
@@ -744,13 +725,13 @@ class TestData:
                 missing_index="nan",
                 missing_columns="nan",
             )
-                .update(index_mask=update_index_mask, return_update=True)
-                .data[1],
+            .update(index_mask=update_index_mask, return_update=True)
+            .data[1],
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
                 ],
-                index=pd.DatetimeIndex(['2020-01-05 00:00:00+00:00'], dtype='datetime64[ns, UTC]', freq=None)
+                index=pd.DatetimeIndex(["2020-01-05 00:00:00+00:00"], dtype="datetime64[ns, UTC]", freq=None),
             ).astype({0: object, 1: object, 2: float}),
         )
         pd.testing.assert_frame_equal(
@@ -808,8 +789,8 @@ class TestData:
                 missing_index="nan",
                 missing_columns="nan",
             )
-                .update(n=3, index_mask=update_index_mask2, return_update=True)
-                .data[0],
+            .update(n=3, index_mask=update_index_mask2, return_update=True)
+            .data[0],
             pd.DataFrame(
                 [
                     [np.nan, "0_1_3", "0_2_3"],
@@ -828,8 +809,8 @@ class TestData:
                 missing_index="nan",
                 missing_columns="nan",
             )
-                .update(n=3, index_mask=update_index_mask2, return_update=True)
-                .data[1],
+            .update(n=3, index_mask=update_index_mask2, return_update=True)
+            .data[1],
             pd.DataFrame(
                 [
                     ["1_0_0_u", "1_1_0_u", np.nan],
@@ -882,11 +863,11 @@ class TestData:
                 missing_index="drop",
                 missing_columns="drop",
             )
-                .update(index_mask=update_index_mask, return_update=True)
-                .data[0],
+            .update(index_mask=update_index_mask, return_update=True)
+            .data[0],
             pd.DataFrame(
                 [],
-                index=pd.DatetimeIndex([], dtype='datetime64[ns, UTC]', freq=None),
+                index=pd.DatetimeIndex([], dtype="datetime64[ns, UTC]", freq=None),
                 columns=pd.Int64Index([1], dtype="int64"),
             ),
         )
@@ -899,11 +880,11 @@ class TestData:
                 missing_index="drop",
                 missing_columns="drop",
             )
-                .update(index_mask=update_index_mask, return_update=True)
-                .data[1],
+            .update(index_mask=update_index_mask, return_update=True)
+            .data[1],
             pd.DataFrame(
                 [],
-                index=pd.DatetimeIndex([], dtype='datetime64[ns, UTC]', freq=None),
+                index=pd.DatetimeIndex([], dtype="datetime64[ns, UTC]", freq=None),
                 columns=pd.Int64Index([1], dtype="int64"),
             ),
         )
@@ -950,11 +931,11 @@ class TestData:
                 missing_index="drop",
                 missing_columns="drop",
             )
-                .update(n=3, index_mask=update_index_mask2, return_update=True)
-                .data[0],
+            .update(n=3, index_mask=update_index_mask2, return_update=True)
+            .data[0],
             pd.DataFrame(
                 [["0_1_3"]],
-                index=pd.DatetimeIndex(['2020-01-04 00:00:00+00:00'], dtype='datetime64[ns, UTC]', freq=None),
+                index=pd.DatetimeIndex(["2020-01-04 00:00:00+00:00"], dtype="datetime64[ns, UTC]", freq=None),
                 columns=pd.Int64Index([1], dtype="int64"),
             ),
         )
@@ -967,11 +948,11 @@ class TestData:
                 missing_index="drop",
                 missing_columns="drop",
             )
-                .update(n=3, index_mask=update_index_mask2, return_update=True)
-                .data[1],
+            .update(n=3, index_mask=update_index_mask2, return_update=True)
+            .data[1],
             pd.DataFrame(
                 [["1_1_0_u"]],
-                index=pd.DatetimeIndex(['2020-01-04 00:00:00+00:00'], dtype='datetime64[ns, UTC]', freq=None),
+                index=pd.DatetimeIndex(["2020-01-04 00:00:00+00:00"], dtype="datetime64[ns, UTC]", freq=None),
                 columns=pd.Int64Index([1], dtype="int64"),
             ),
         )
@@ -990,9 +971,7 @@ class TestData:
             column_mask=column_mask,
             missing_index="drop",
             missing_columns="drop",
-        ).update(
-            n=3, index_mask=update_index_mask2
-        ).last_index == {0: updated_index[4], 1: updated_index[5]}
+        ).update(n=3, index_mask=update_index_mask2).last_index == {0: updated_index[4], 1: updated_index[5]}
         assert MyData.fetch(
             [0, 1],
             shape=(5, 3),
@@ -1000,179 +979,142 @@ class TestData:
             column_mask=column_mask,
             missing_index="drop",
             missing_columns="drop",
-        ).update(
-            n=3, index_mask=update_index_mask2, return_update=True
-        ).last_index == {0: updated_index[4], 1: updated_index[5]}
+        ).update(n=3, index_mask=update_index_mask2, return_update=True).last_index == {
+            0: updated_index[4],
+            1: updated_index[5],
+        }
         pd.testing.assert_frame_equal(
-            MyData.fetch(
-                [0, 1], shape=(5, 3)
-            ).update(
-                n=2, return_none=vbt.symbol_dict({0: True, 1: False})
-            ).data[0],
+            MyData.fetch([0, 1], shape=(5, 3)).update(n=2, return_none=vbt.symbol_dict({0: True, 1: False})).data[0],
             pd.DataFrame(
                 [
-                    ['0_0_0', '0_1_0', '0_2_0'],
-                    ['0_0_1', '0_1_1', '0_2_1'],
-                    ['0_0_2', '0_1_2', '0_2_2'],
-                    ['0_0_3', '0_1_3', '0_2_3'],
-                    ['0_0_4', '0_1_4', '0_2_4'],
-                    [np.nan, np.nan, np.nan]
+                    ["0_0_0", "0_1_0", "0_2_0"],
+                    ["0_0_1", "0_1_1", "0_2_1"],
+                    ["0_0_2", "0_1_2", "0_2_2"],
+                    ["0_0_3", "0_1_3", "0_2_3"],
+                    ["0_0_4", "0_1_4", "0_2_4"],
+                    [np.nan, np.nan, np.nan],
                 ],
                 index=updated_index,
             ),
         )
         pd.testing.assert_frame_equal(
-            MyData.fetch(
-                [0, 1], shape=(5, 3)
-            ).update(
-                n=2, return_none=vbt.symbol_dict({0: True, 1: False})
-            ).data[1],
+            MyData.fetch([0, 1], shape=(5, 3)).update(n=2, return_none=vbt.symbol_dict({0: True, 1: False})).data[1],
             pd.DataFrame(
                 [
-                    ['1_0_0', '1_1_0', '1_2_0'],
-                    ['1_0_1', '1_1_1', '1_2_1'],
-                    ['1_0_2', '1_1_2', '1_2_2'],
-                    ['1_0_3', '1_1_3', '1_2_3'],
+                    ["1_0_0", "1_1_0", "1_2_0"],
+                    ["1_0_1", "1_1_1", "1_2_1"],
+                    ["1_0_2", "1_1_2", "1_2_2"],
+                    ["1_0_3", "1_1_3", "1_2_3"],
                     ["1_0_0_u", "1_1_0_u", "1_2_0_u"],
-                    ["1_0_1_u", "1_1_1_u", "1_2_1_u"]
+                    ["1_0_1_u", "1_1_1_u", "1_2_1_u"],
                 ],
                 index=updated_index,
             ),
         )
         pd.testing.assert_frame_equal(
-            MyData.fetch(
-                [0, 1], shape=(5, 3)
-            ).update(
-                n=2, return_none=vbt.symbol_dict({0: True, 1: False}), return_update=True
-            ).data[0],
+            MyData.fetch([0, 1], shape=(5, 3))
+            .update(n=2, return_none=vbt.symbol_dict({0: True, 1: False}), return_update=True)
+            .data[0],
             pd.DataFrame(
-                [
-                    ['0_0_4', '0_1_4', '0_2_4'],
-                    [np.nan, np.nan, np.nan]
-                ],
+                [["0_0_4", "0_1_4", "0_2_4"], [np.nan, np.nan, np.nan]],
                 index=pd.DatetimeIndex(
-                    ['2020-01-05 00:00:00+00:00', '2020-01-06 00:00:00+00:00'],
-                    dtype='datetime64[ns, UTC]', freq=None),
+                    ["2020-01-05 00:00:00+00:00", "2020-01-06 00:00:00+00:00"], dtype="datetime64[ns, UTC]", freq=None
+                ),
             ),
         )
         pd.testing.assert_frame_equal(
-            MyData.fetch(
-                [0, 1], shape=(5, 3)
-            ).update(
-                n=2, return_none=vbt.symbol_dict({0: True, 1: False}), return_update=True
-            ).data[1],
+            MyData.fetch([0, 1], shape=(5, 3))
+            .update(n=2, return_none=vbt.symbol_dict({0: True, 1: False}), return_update=True)
+            .data[1],
             pd.DataFrame(
-                [
-                    ["1_0_0_u", "1_1_0_u", "1_2_0_u"],
-                    ["1_0_1_u", "1_1_1_u", "1_2_1_u"]
-                ],
+                [["1_0_0_u", "1_1_0_u", "1_2_0_u"], ["1_0_1_u", "1_1_1_u", "1_2_1_u"]],
                 index=pd.DatetimeIndex(
-                    ['2020-01-05 00:00:00+00:00', '2020-01-06 00:00:00+00:00'],
-                    dtype='datetime64[ns, UTC]', freq=None),
+                    ["2020-01-05 00:00:00+00:00", "2020-01-06 00:00:00+00:00"], dtype="datetime64[ns, UTC]", freq=None
+                ),
             ),
         )
         pd.testing.assert_frame_equal(
-            MyData.fetch(
-                [0, 1], shape=(5, 3)
-            ).update(
-                n=2, return_empty=vbt.symbol_dict({0: True, 1: False})
-            ).data[0],
+            MyData.fetch([0, 1], shape=(5, 3)).update(n=2, return_empty=vbt.symbol_dict({0: True, 1: False})).data[0],
             pd.DataFrame(
                 [
-                    ['0_0_0', '0_1_0', '0_2_0'],
-                    ['0_0_1', '0_1_1', '0_2_1'],
-                    ['0_0_2', '0_1_2', '0_2_2'],
-                    ['0_0_3', '0_1_3', '0_2_3'],
-                    ['0_0_4', '0_1_4', '0_2_4'],
-                    [np.nan, np.nan, np.nan]
+                    ["0_0_0", "0_1_0", "0_2_0"],
+                    ["0_0_1", "0_1_1", "0_2_1"],
+                    ["0_0_2", "0_1_2", "0_2_2"],
+                    ["0_0_3", "0_1_3", "0_2_3"],
+                    ["0_0_4", "0_1_4", "0_2_4"],
+                    [np.nan, np.nan, np.nan],
                 ],
                 index=updated_index,
             ),
         )
         pd.testing.assert_frame_equal(
-            MyData.fetch(
-                [0, 1], shape=(5, 3)
-            ).update(
-                n=2, return_empty=vbt.symbol_dict({0: True, 1: False})
-            ).data[1],
+            MyData.fetch([0, 1], shape=(5, 3)).update(n=2, return_empty=vbt.symbol_dict({0: True, 1: False})).data[1],
             pd.DataFrame(
                 [
-                    ['1_0_0', '1_1_0', '1_2_0'],
-                    ['1_0_1', '1_1_1', '1_2_1'],
-                    ['1_0_2', '1_1_2', '1_2_2'],
-                    ['1_0_3', '1_1_3', '1_2_3'],
+                    ["1_0_0", "1_1_0", "1_2_0"],
+                    ["1_0_1", "1_1_1", "1_2_1"],
+                    ["1_0_2", "1_1_2", "1_2_2"],
+                    ["1_0_3", "1_1_3", "1_2_3"],
                     ["1_0_0_u", "1_1_0_u", "1_2_0_u"],
-                    ["1_0_1_u", "1_1_1_u", "1_2_1_u"]
+                    ["1_0_1_u", "1_1_1_u", "1_2_1_u"],
                 ],
                 index=updated_index,
             ),
         )
         pd.testing.assert_frame_equal(
-            MyData.fetch(
-                [0, 1], shape=(5, 3)
-            ).update(
-                n=2, raise_error=vbt.symbol_dict({0: True, 1: False}), skip_on_error=True
-            ).data[0],
+            MyData.fetch([0, 1], shape=(5, 3))
+            .update(n=2, raise_error=vbt.symbol_dict({0: True, 1: False}), skip_on_error=True)
+            .data[0],
             pd.DataFrame(
                 [
-                    ['0_0_0', '0_1_0', '0_2_0'],
-                    ['0_0_1', '0_1_1', '0_2_1'],
-                    ['0_0_2', '0_1_2', '0_2_2'],
-                    ['0_0_3', '0_1_3', '0_2_3'],
-                    ['0_0_4', '0_1_4', '0_2_4'],
-                    [np.nan, np.nan, np.nan]
+                    ["0_0_0", "0_1_0", "0_2_0"],
+                    ["0_0_1", "0_1_1", "0_2_1"],
+                    ["0_0_2", "0_1_2", "0_2_2"],
+                    ["0_0_3", "0_1_3", "0_2_3"],
+                    ["0_0_4", "0_1_4", "0_2_4"],
+                    [np.nan, np.nan, np.nan],
                 ],
                 index=updated_index,
             ),
         )
         pd.testing.assert_frame_equal(
-            MyData.fetch(
-                [0, 1], shape=(5, 3)
-            ).update(
-                n=2, raise_error=vbt.symbol_dict({0: True, 1: False}), skip_on_error=True
-            ).data[1],
+            MyData.fetch([0, 1], shape=(5, 3))
+            .update(n=2, raise_error=vbt.symbol_dict({0: True, 1: False}), skip_on_error=True)
+            .data[1],
             pd.DataFrame(
                 [
-                    ['1_0_0', '1_1_0', '1_2_0'],
-                    ['1_0_1', '1_1_1', '1_2_1'],
-                    ['1_0_2', '1_1_2', '1_2_2'],
-                    ['1_0_3', '1_1_3', '1_2_3'],
+                    ["1_0_0", "1_1_0", "1_2_0"],
+                    ["1_0_1", "1_1_1", "1_2_1"],
+                    ["1_0_2", "1_1_2", "1_2_2"],
+                    ["1_0_3", "1_1_3", "1_2_3"],
                     ["1_0_0_u", "1_1_0_u", "1_2_0_u"],
-                    ["1_0_1_u", "1_1_1_u", "1_2_1_u"]
+                    ["1_0_1_u", "1_1_1_u", "1_2_1_u"],
                 ],
                 index=updated_index,
             ),
         )
         pd.testing.assert_frame_equal(
-            MyData.fetch(
-                [0, 1], shape=(5, 3)
-            ).update(
-                n=2, raise_error=True, skip_on_error=True
-            ).data[0],
+            MyData.fetch([0, 1], shape=(5, 3)).update(n=2, raise_error=True, skip_on_error=True).data[0],
             pd.DataFrame(
                 [
-                    ['0_0_0', '0_1_0', '0_2_0'],
-                    ['0_0_1', '0_1_1', '0_2_1'],
-                    ['0_0_2', '0_1_2', '0_2_2'],
-                    ['0_0_3', '0_1_3', '0_2_3'],
-                    ['0_0_4', '0_1_4', '0_2_4']
+                    ["0_0_0", "0_1_0", "0_2_0"],
+                    ["0_0_1", "0_1_1", "0_2_1"],
+                    ["0_0_2", "0_1_2", "0_2_2"],
+                    ["0_0_3", "0_1_3", "0_2_3"],
+                    ["0_0_4", "0_1_4", "0_2_4"],
                 ],
                 index=index,
             ),
         )
         pd.testing.assert_frame_equal(
-            MyData.fetch(
-                [0, 1], shape=(5, 3)
-            ).update(
-                n=2, raise_error=True, skip_on_error=True
-            ).data[1],
+            MyData.fetch([0, 1], shape=(5, 3)).update(n=2, raise_error=True, skip_on_error=True).data[1],
             pd.DataFrame(
                 [
-                    ['1_0_0', '1_1_0', '1_2_0'],
-                    ['1_0_1', '1_1_1', '1_2_1'],
-                    ['1_0_2', '1_1_2', '1_2_2'],
-                    ['1_0_3', '1_1_3', '1_2_3'],
-                    ['1_0_4', '1_1_4', '1_2_4']
+                    ["1_0_0", "1_1_0", "1_2_0"],
+                    ["1_0_1", "1_1_1", "1_2_1"],
+                    ["1_0_2", "1_1_2", "1_2_2"],
+                    ["1_0_3", "1_1_3", "1_2_3"],
+                    ["1_0_4", "1_1_4", "1_2_4"],
                 ],
                 index=index,
             ),
@@ -1542,7 +1484,7 @@ class TestCustom:
         csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv", start_row=2, end_row=3)
         pd.testing.assert_series_equal(csv_data.get(), sr.iloc[2:4])
         df = pd.DataFrame(np.arange(20).reshape((10, 2)))
-        df.columns = pd.Index(['0', '1'], dtype='object')
+        df.columns = pd.Index(["0", "1"], dtype="object")
         df.to_csv(tmp_path / "temp.csv")
         csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv", iterator=True)
         pd.testing.assert_frame_equal(csv_data.get(), df)
@@ -1640,13 +1582,13 @@ class TestCustom:
         hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "s", start_row=2, end_row=3)
         pd.testing.assert_series_equal(hdf_data.get(), sr.iloc[2:4])
         df = pd.DataFrame(np.arange(20).reshape((10, 2)))
-        df.columns = pd.Index(['0', '1'], dtype='object')
-        df.to_hdf(tmp_path / "temp.h5", "df", format='table')
-        hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / 'df', iterator=True)
+        df.columns = pd.Index(["0", "1"], dtype="object")
+        df.to_hdf(tmp_path / "temp.h5", "df", format="table")
+        hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "df", iterator=True)
         pd.testing.assert_frame_equal(hdf_data.get(), df)
-        hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / 'df', chunksize=1)
+        hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "df", chunksize=1)
         pd.testing.assert_frame_equal(hdf_data.get(), df)
-        hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / 'df', chunksize=1, chunk_func=lambda x: list(x)[-1])
+        hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "df", chunksize=1, chunk_func=lambda x: list(x)[-1])
         pd.testing.assert_frame_equal(hdf_data.get(), df.iloc[[-1]])
         df = pd.DataFrame(np.arange(20).reshape((10, 2)))
         df.columns = pd.MultiIndex.from_tuples([("1", "2"), ("3", "4")], names=["a", "b"])
@@ -1938,3 +1880,153 @@ class TestDataUpdater:
             data = data.update()
         assert updater.data == data
         assert updater.config["data"] == data
+
+
+# ############# saver.py ############# #
+
+
+class TestCSVDataSaver:
+    def test_update(self, tmp_path):
+        data = MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
+        saver = vbt.CSVDataSaver(
+            data,
+            save_kwargs=dict(
+                dir_path=tmp_path / "saver",
+                mkdir_kwargs=dict(mkdir=True),
+            )
+        )
+        saver.update(n=2, save_kwargs=dict(dir_path=tmp_path / "saver"))
+        updated_data = data.update(n=2, return_update=True)
+        assert saver.data == updated_data
+        saved_result0 = pd.concat((data.data[0].iloc[:-1], updated_data.data[0]), axis=0)
+        saved_result0.index.freq = "D"
+        saved_result1 = pd.concat((data.data[1].iloc[:-1], updated_data.data[1]), axis=0)
+        saved_result1.index.freq = "D"
+        pd.testing.assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["0"], saved_result0)
+        pd.testing.assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["1"], saved_result1)
+
+        new_data = saver.data
+        new_saver = vbt.CSVDataSaver(
+            new_data,
+            save_kwargs=dict(
+                dir_path=tmp_path / "saver",
+                mkdir_kwargs=dict(mkdir=True),
+            ),
+            init_save=False
+        )
+        new_saver.update(n=2, save_kwargs=dict(dir_path=tmp_path / "saver"))
+        new_updated_data = new_data.update(n=2, return_update=True)
+        assert new_saver.data == new_updated_data
+        new_saved_result0 = pd.concat((
+            data.data[0].iloc[:-1],
+            new_data.data[0].iloc[:-1],
+            new_updated_data.data[0]
+        ), axis=0)
+        new_saved_result0.index.freq = "D"
+        new_saved_result1 = pd.concat((
+            data.data[1].iloc[:-1],
+            new_data.data[1].iloc[:-1],
+            new_updated_data.data[1]
+        ), axis=0)
+        new_saved_result1.index.freq = "D"
+        pd.testing.assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["0"], new_saved_result0)
+        pd.testing.assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["1"], new_saved_result1)
+
+    def test_update_every(self, tmp_path):
+        data = MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
+        kwargs = dict(call_count=0)
+
+        class CSVDataSaver(vbt.CSVDataSaver):
+            def update(self, kwargs):
+                super().update()
+                kwargs["call_count"] += 1
+                if kwargs["call_count"] == 5:
+                    raise vbt.CancelledError
+
+        saver = CSVDataSaver(
+            data,
+            save_kwargs=dict(
+                dir_path=tmp_path / "saver",
+                mkdir_kwargs=dict(mkdir=True),
+            )
+        )
+        saver.update_every(kwargs=kwargs)
+        for i in range(5):
+            data = data.update()
+        pd.testing.assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["0"], data.data[0])
+        pd.testing.assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["1"], data.data[1])
+
+
+class TestHDFDataSaver:
+    def test_update(self, tmp_path):
+        data = MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
+        saver = vbt.HDFDataSaver(
+            data,
+            save_kwargs=dict(
+                file_path=tmp_path / "saver.h5",
+                mkdir_kwargs=dict(mkdir=True),
+                min_itemsize=10,
+            )
+        )
+        saver.update(n=2, save_kwargs=dict(file_path=tmp_path / "saver.h5"))
+        updated_data = data.update(n=2, return_update=True)
+        assert saver.data == updated_data
+        saved_result0 = pd.concat((data.data[0].iloc[:-1], updated_data.data[0]), axis=0)
+        saved_result0.index.freq = "D"
+        saved_result1 = pd.concat((data.data[1].iloc[:-1], updated_data.data[1]), axis=0)
+        saved_result1.index.freq = "D"
+        pd.testing.assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["0"], saved_result0)
+        pd.testing.assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["1"], saved_result1)
+
+        new_data = saver.data
+        new_saver = vbt.HDFDataSaver(
+            new_data,
+            save_kwargs=dict(
+                file_path=tmp_path / "saver.h5",
+                mkdir_kwargs=dict(mkdir=True),
+                min_itemsize=10,
+            ),
+            init_save=False
+        )
+        new_saver.update(n=2, save_kwargs=dict(file_path=tmp_path / "saver.h5"))
+        new_updated_data = new_data.update(n=2, return_update=True)
+        assert new_saver.data == new_updated_data
+        new_saved_result0 = pd.concat((
+            data.data[0].iloc[:-1],
+            new_data.data[0].iloc[:-1],
+            new_updated_data.data[0]
+        ), axis=0)
+        new_saved_result0.index.freq = "D"
+        new_saved_result1 = pd.concat((
+            data.data[1].iloc[:-1],
+            new_data.data[1].iloc[:-1],
+            new_updated_data.data[1]
+        ), axis=0)
+        new_saved_result1.index.freq = "D"
+        pd.testing.assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["0"], new_saved_result0)
+        pd.testing.assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["1"], new_saved_result1)
+
+    def test_update_every(self, tmp_path):
+        data = MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
+        kwargs = dict(call_count=0)
+
+        class HDFDataSaver(vbt.HDFDataSaver):
+            def update(self, kwargs):
+                super().update()
+                kwargs["call_count"] += 1
+                if kwargs["call_count"] == 5:
+                    raise vbt.CancelledError
+
+        saver = HDFDataSaver(
+            data,
+            save_kwargs=dict(
+                file_path=tmp_path / "saver.h5",
+                mkdir_kwargs=dict(mkdir=True),
+                min_itemsize=10,
+            )
+        )
+        saver.update_every(kwargs=kwargs)
+        for i in range(5):
+            data = data.update()
+        pd.testing.assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["0"], data.data[0])
+        pd.testing.assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["1"], data.data[1])

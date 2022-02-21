@@ -416,7 +416,9 @@ class Data(Analyzable):
     ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
         """Fetch a symbol.
 
-        May also return a dictionary that will be accessible as `Data.returned_kwargs`."""
+        Can also return a dictionary that will be accessible in `Data.returned_kwargs`.
+
+        This is an abstract method - override it to define custom logic."""
         raise NotImplementedError
 
     @classmethod
@@ -556,8 +558,16 @@ class Data(Analyzable):
 
     # ############# Updating ############# #
 
-    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
-        """Update a symbol."""
+    def update_symbol(
+            self,
+            symbol: tp.Symbol,
+            **kwargs,
+    ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
+        """Update a symbol.
+
+        Can also return a dictionary that will be accessible in `Data.returned_kwargs`.
+
+        This is an abstract method - override it to define custom logic."""
         raise NotImplementedError
 
     def update(

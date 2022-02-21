@@ -1,0 +1,124 @@
+# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+
+"""Classes for scheduling data saves."""
+
+import logging
+
+from vectorbtpro import _typing as tp
+from vectorbtpro.data.base import Data
+from vectorbtpro.data.updater import DataUpdater
+from vectorbtpro.utils.config import merge_dicts
+
+logger = logging.getLogger(__name__)
+
+
+class DataSaver(DataUpdater):
+    """Base class for scheduling data saves.
+
+    Subclasses `vectorbtpro.data.updater.DataUpdater`.
+
+    Args:
+        data (Data): Data instance.
+        save_kwargs (dict): Keyword arguments passed to `DataSaver.init_save` and `DataSaver.save`.
+        init_save (bool): Whether to save initial data using `DataSaver.init_save`.
+        init_save_kwargs (dict): Keyword arguments overriding `save_kwargs` for `DataSaver.init_save`.
+        **kwargs: Keyword arguments passed to the constructor of `DataUpdater`.
+    """
+
+    def __init__(
+        self,
+        data: Data,
+        save_kwargs: tp.KwargsLike = None,
+        init_save: bool = True,
+        init_save_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> None:
+        DataUpdater.__init__(
+            self,
+            data=data,
+            save_kwargs=save_kwargs,
+            init_save=init_save,
+            init_save_kwargs=init_save_kwargs,
+            **kwargs,
+        )
+        self._save_kwargs = save_kwargs
+        init_save_kwargs = merge_dicts(save_kwargs, init_save_kwargs)
+        self._init_save_kwargs = init_save_kwargs
+        if init_save:
+            if init_save_kwargs is None:
+                init_save_kwargs = {}
+            self.init_save(**init_save_kwargs)
+
+    @property
+    def save_kwargs(self) -> tp.KwargsLike:
+        """Keyword arguments passed to `DataSaver.save`."""
+        return self._save_kwargs
+
+    @property
+    def init_save_kwargs(self) -> tp.KwargsLike:
+        """Keyword arguments passed to `DataSaver.init_save`."""
+        return self._init_save_kwargs
+
+    def init_save(self, **kwargs) -> None:
+        """Save initial data.
+
+        This is an abstract method - override it to define custom logic."""
+        raise NotImplementedError
+
+    def save(self, **kwargs) -> None:
+        """Save data.
+
+        This is an abstract method - override it to define custom logic."""
+        raise NotImplementedError
+
+    def update(self, save_kwargs: tp.KwargsLike = None, **kwargs) -> None:
+        """Update and save data using `DataSaver.save`.
+
+        Override to do pre- and postprocessing.
+
+        To stop this method from running again, raise `vectorbtpro.utils.schedule_.CancelledError`."""
+        self._data = self.data.update(return_update=True, **kwargs)
+        self.update_config(data=self.data)
+        if save_kwargs is None:
+            save_kwargs = {}
+        save_kwargs = merge_dicts(self.save_kwargs, save_kwargs)
+        self.save(**save_kwargs)
+
+
+class CSVDataSaver(DataSaver):
+    """Subclass of `DataSaver` for saving data to CSV files using `vectorbtpro.data.base.Data.to_csv`."""
+
+    def init_save(self, **to_csv_kwargs) -> None:
+        """Save initial data."""
+        self._data.to_csv(**to_csv_kwargs)
+        new_index = self.data.wrapper.index
+        logger.info(f"Saved initial {len(new_index)} rows from {new_index[0]} to {new_index[-1]}")
+
+    def save(self, **to_csv_kwargs) -> None:
+        """Save data.
+
+        By default, appends new data without header."""
+        to_csv_kwargs = merge_dicts(dict(mode="a", header=False), to_csv_kwargs)
+        self._data.to_csv(**to_csv_kwargs)
+        new_index = self.data.wrapper.index
+        logger.info(f"Saved {len(new_index)} rows from {new_index[0]} to {new_index[-1]}")
+
+
+class HDFDataSaver(DataSaver):
+    """Subclass of `DataSaver` for saving data to HDF files using `vectorbtpro.data.base.Data.to_hdf`."""
+
+    def init_save(self, **to_hdf_kwargs) -> None:
+        """Save initial data."""
+        to_hdf_kwargs = merge_dicts(dict(format="table"), to_hdf_kwargs)
+        self._data.to_hdf(**to_hdf_kwargs)
+        new_index = self.data.wrapper.index
+        logger.info(f"Saved initial {len(new_index)} rows from {new_index[0]} to {new_index[-1]}")
+
+    def save(self, **to_hdf_kwargs) -> None:
+        """Save data.
+
+        By default, appends new data in a table format."""
+        to_hdf_kwargs = merge_dicts(dict(mode="a", format="table", append=True), to_hdf_kwargs)
+        self._data.to_hdf(**to_hdf_kwargs)
+        new_index = self.data.wrapper.index
+        logger.info(f"Saved {len(new_index)} rows from {new_index[0]} to {new_index[-1]}")
