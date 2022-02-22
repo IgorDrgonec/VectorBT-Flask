@@ -24,6 +24,8 @@ class CancelledError(asyncio.CancelledError):
 
 
 class AsyncJob(Job):
+    """Async `schedule.Job`."""
+
     async def async_run(self) -> tp.Any:
         """Async `Job.run`."""
         logger.info("Running job %s", self)
@@ -36,6 +38,8 @@ class AsyncJob(Job):
 
 
 class AsyncScheduler(Scheduler):
+    """Async `schedule.Scheduler`."""
+
     async def async_run_pending(self) -> None:
         """Async `Scheduler.run_pending`."""
         runnable_jobs = (job for job in self.jobs if job.should_run)
@@ -235,7 +239,7 @@ class ScheduleManager:
 
         return job
 
-    def start(self, sleep: int = 1) -> None:
+    def start(self, sleep: int = 1, clear_after: bool = False) -> None:
         """Run pending jobs in a loop."""
         logger.info("Starting schedule manager with jobs %s", str(self.scheduler.jobs))
         try:
@@ -244,8 +248,10 @@ class ScheduleManager:
                 time.sleep(sleep)
         except (KeyboardInterrupt, asyncio.CancelledError):
             logger.info("Stopping schedule manager")
+        if clear_after:
+            self.scheduler.clear()
 
-    async def async_start(self, sleep: int = 1) -> None:
+    async def async_start(self, sleep: int = 1, clear_after: bool = False) -> None:
         """Async run pending jobs in a loop."""
         logger.info("Starting schedule manager in the background with jobs %s", str(self.scheduler.jobs))
         logger.info("Jobs: %s", str(self.scheduler.jobs))
@@ -255,6 +261,8 @@ class ScheduleManager:
                 await asyncio.sleep(sleep)
         except asyncio.CancelledError:
             logger.info("Stopping schedule manager")
+        if clear_after:
+            self.scheduler.clear()
 
     def done_callback(self, async_task: asyncio.Task) -> None:
         """Callback run when the async task is finished."""
@@ -276,3 +284,12 @@ class ScheduleManager:
         """Stop the async task."""
         if self.async_task_running:
             self.async_task.cancel()
+
+    def clear_jobs(self, tags: tp.Optional[tp.Iterable[tp.Hashable]] = None) -> None:
+        """Delete scheduled jobs with the given tags, or all jobs if tag is omitted."""
+        if tags is None:
+            self.scheduler.clear()
+        else:
+            tags = set(tags)
+            logger.debug('Deleting all jobs tagged "%s"', tags)
+            self.scheduler.jobs[:] = (job for job in self.scheduler.jobs if tags == job.tags)

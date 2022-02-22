@@ -17,7 +17,7 @@ class DataUpdater(Configured):
 
     Args:
         data (Data): Data instance.
-        update_kwargs (dict): Keyword arguments passed to `DataSaver.update`.
+        update_kwargs (dict): Default keyword arguments for `DataSaver.update`.
         **kwargs: Keyword arguments passed to the constructor of `Configured`.
     """
 
@@ -67,6 +67,9 @@ class DataUpdater(Configured):
         Override to do pre- and postprocessing.
 
         To stop this method from running again, raise `vectorbtpro.utils.schedule_.CancelledError`."""
+        # In case the method was called by the user
+        kwargs = merge_dicts(self.update_kwargs, kwargs)
+
         self._data = self.data.update(**kwargs)
         self.update_config(data=self.data)
         new_index = self.data.wrapper.index
@@ -78,22 +81,31 @@ class DataUpdater(Configured):
         to: int = None,
         tags: tp.Optional[tp.Iterable[tp.Hashable]] = None,
         in_background: bool = False,
-        start_kwargs: dict = None,
+        replace: bool = True,
+        start: bool = True,
+        start_kwargs: tp.KwargsLike = None,
         **update_kwargs,
     ) -> None:
-        """Schedule `DataUpdater.update`.
+        """Schedule `DataUpdater.update` as a job.
 
         For `*args`, `to` and `tags`, see `vectorbtpro.utils.schedule_.ScheduleManager.every`.
 
         If `in_background` is set to True, starts in the background as an `asyncio` task.
         The task can be stopped with `vectorbtpro.utils.schedule_.ScheduleManager.stop`.
 
+        If `replace` is True, will delete scheduled jobs with the same tags, or all jobs if tags are omitted.
+
+        If `start` is False, will add the job to the scheduler without starting.
+
         `**update_kwargs` are merged over `DataUpdater.update_kwargs` and passed to `DataUpdater.update`."""
-        if start_kwargs is None:
-            start_kwargs = {}
+        if replace:
+            self.schedule_manager.clear_jobs(tags)
         update_kwargs = merge_dicts(self.update_kwargs, update_kwargs)
         self.schedule_manager.every(*args, to=to, tags=tags).do(self.update, **update_kwargs)
-        if in_background:
-            self.schedule_manager.start_in_background(**start_kwargs)
-        else:
-            self.schedule_manager.start(**start_kwargs)
+        if start:
+            if start_kwargs is None:
+                start_kwargs = {}
+            if in_background:
+                self.schedule_manager.start_in_background(**start_kwargs)
+            else:
+                self.schedule_manager.start(**start_kwargs)

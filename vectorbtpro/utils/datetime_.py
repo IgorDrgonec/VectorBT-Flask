@@ -73,9 +73,6 @@ def to_timezone(tz: tp.TimezoneLike, to_py_timezone: tp.Optional[bool] = None, *
 
     Strings are parsed by `pytz` and `dateparser`, while integers and floats are treated as hour offsets.
 
-    If the timezone object can't be checked for equality based on its properties,
-    it's automatically converted to `datetime.timezone`.
-
     If `to_py_timezone` is set to True, will convert to `datetime.timezone`. See global settings.
 
     `**kwargs` are passed to `dateparser.parse`."""

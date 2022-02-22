@@ -1895,7 +1895,8 @@ class TestCSVDataSaver:
                 mkdir_kwargs=dict(mkdir=True),
             )
         )
-        saver.update(n=2, save_kwargs=dict(dir_path=tmp_path / "saver"))
+        saver.init_save_data()
+        saver.update(n=2)
         updated_data = data.update(n=2, concat=False)
         assert saver.data == updated_data
         saved_result0 = pd.concat((data.data[0].iloc[:-1], updated_data.data[0]), axis=0)
@@ -1911,10 +1912,9 @@ class TestCSVDataSaver:
             save_kwargs=dict(
                 dir_path=tmp_path / "saver",
                 mkdir_kwargs=dict(mkdir=True),
-            ),
-            init_save=False
+            )
         )
-        new_saver.update(n=2, save_kwargs=dict(dir_path=tmp_path / "saver"))
+        new_saver.update(n=2)
         new_updated_data = new_data.update(n=2, concat=False)
         assert new_saver.data == new_updated_data
         new_saved_result0 = pd.concat((
@@ -1950,6 +1950,7 @@ class TestCSVDataSaver:
                 mkdir_kwargs=dict(mkdir=True),
             )
         )
+        saver.init_save_data()
         saver.update_every(kwargs=kwargs)
         for i in range(5):
             data = data.update()
@@ -1968,7 +1969,8 @@ class TestHDFDataSaver:
                 min_itemsize=10,
             )
         )
-        saver.update(n=2, save_kwargs=dict(file_path=tmp_path / "saver.h5"))
+        saver.init_save_data()
+        saver.update(n=2)
         updated_data = data.update(n=2, concat=False)
         assert saver.data == updated_data
         saved_result0 = pd.concat((data.data[0].iloc[:-1], updated_data.data[0]), axis=0)
@@ -1985,10 +1987,9 @@ class TestHDFDataSaver:
                 file_path=tmp_path / "saver.h5",
                 mkdir_kwargs=dict(mkdir=True),
                 min_itemsize=10,
-            ),
-            init_save=False
+            )
         )
-        new_saver.update(n=2, save_kwargs=dict(file_path=tmp_path / "saver.h5"))
+        new_saver.update(n=2)
         new_updated_data = new_data.update(n=2, concat=False)
         assert new_saver.data == new_updated_data
         new_saved_result0 = pd.concat((
@@ -2025,6 +2026,7 @@ class TestHDFDataSaver:
                 min_itemsize=10,
             )
         )
+        saver.init_save_data()
         saver.update_every(kwargs=kwargs)
         for i in range(5):
             data = data.update()

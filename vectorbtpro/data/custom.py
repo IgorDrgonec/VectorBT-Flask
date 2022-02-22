@@ -311,8 +311,8 @@ class LocalData(Data):
     ) -> LocalDataT:
         """Override `vectorbtpro.data.base.Data.fetch` to take care of paths.
 
-        Use either `symbols` or `path` to specify the path to one or multiple files.
-        Allowed are paths in string or `pathlib.Path` format, or string expressions accepted by `glob.glob`.
+        Use either `symbols` or `paths` to specify the path to one or multiple files.
+        Allowed are paths in a string or `pathlib.Path` format, or string expressions accepted by `glob.glob`.
 
         Set `match_paths` to False to not parse paths and behave like a regular
         `vectorbtpro.data.base.Data` instance.
