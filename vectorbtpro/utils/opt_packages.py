@@ -30,6 +30,7 @@ opt_package_config = ReadonlyConfig(
         quantstats=dict(name="QuantStats", link="https://github.com/ranaroussi/quantstats"),
         dill=dict(name="dill", link="https://github.com/uqfoundation/dill"),
         alpaca_trade_api=dict(name="Alpaca Trade API", link="https://github.com/alpacahq/alpaca-trade-api-python"),
+        polygon=dict(name="Polygon API Client", link="https://github.com/polygon-io/client-python"),
     )
 )
 """_"""

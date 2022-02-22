@@ -17,6 +17,7 @@ from functools import wraps
 from pathlib import Path, PurePath
 from glob import glob
 import re
+import requests
 
 import pandas as pd
 from pandas.io.parsers import TextFileReader
@@ -42,13 +43,17 @@ try:
 except ImportError:
     BinanceClientT = tp.Any
 try:
-    from ccxt.base.exchange import Exchange as ExchangeT
+    from ccxt.base.exchange import Exchange as CCXTExchangeT
 except ImportError:
-    ExchangeT = tp.Any
+    CCXTExchangeT = tp.Any
 try:
     from alpaca_trade_api.rest import REST as AlpacaClientT
 except ImportError:
     AlpacaClientT = tp.Any
+try:
+    from polygon import RESTClient as PolygonClientT
+except ImportError:
+    PolygonClientT = tp.Any
 
 __all__ = [
     "SyntheticData",
@@ -62,6 +67,7 @@ __all__ = [
     "BinanceData",
     "CCXTData",
     "AlpacaData",
+    "PolygonData",
 ]
 
 # ############# Synthetic ############# #
@@ -684,9 +690,17 @@ class HDFData(LocalData):
 
 
 class RemoteData(Data):
-    """Subclass of `Data` for remote data."""
+    """Subclass of `Data` for remote data.
 
-    pass
+    Remote data usually has arguments such as `start`, `end`, and `timeframe`.
+
+    Overrides `vectorbtpro.data.base.Data.update_symbol` to update data based on the `start` argument."""
+
+    def update_symbol(self, symbol: str, **kwargs) -> tp.Frame:
+        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
+        fetch_kwargs["start"] = self.last_index[symbol]
+        kwargs = merge_dicts(fetch_kwargs, kwargs)
+        return self.fetch_symbol(symbol, **kwargs)
 
 
 class YFData(RemoteData):  # pragma: no cover
@@ -701,6 +715,7 @@ class YFData(RemoteData):  # pragma: no cover
         period: tp.Optional[str] = None,
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
+        timeframe: tp.Optional[str] = None,
         **history_kwargs,
     ) -> tp.Frame:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Yahoo Finance.
@@ -714,6 +729,7 @@ class YFData(RemoteData):  # pragma: no cover
             end (any): End datetime.
 
                 See `vectorbtpro.utils.datetime_.to_tzaware_datetime`.
+            timeframe (str): Interval.
             **history_kwargs: Keyword arguments passed to `yfinance.base.TickerBase.history`.
 
         For defaults, see `custom.yf` in `vectorbtpro._settings.data`.
@@ -740,6 +756,8 @@ class YFData(RemoteData):  # pragma: no cover
             start = yf_cfg["start"]
         if end is None:
             end = yf_cfg["end"]
+        if timeframe is None:
+            timeframe = yf_cfg["timeframe"]
         history_kwargs = merge_dicts(yf_cfg["history_kwargs"], history_kwargs)
 
         # yfinance still uses mktime, which assumes that the passed date is in local time
@@ -748,13 +766,7 @@ class YFData(RemoteData):  # pragma: no cover
         if end is not None:
             end = to_tzaware_datetime(end, tz=get_local_tz())
 
-        return yf.Ticker(symbol).history(period=period, start=start, end=end, **history_kwargs)
-
-    def update_symbol(self, symbol: str, **kwargs) -> tp.SeriesFrame:
-        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        fetch_kwargs["start"] = self.last_index[symbol]
-        kwargs = merge_dicts(fetch_kwargs, kwargs)
-        return self.fetch_symbol(symbol, **kwargs)
+        return yf.Ticker(symbol).history(period=period, start=start, end=end, interval=timeframe, **history_kwargs)
 
 
 BinanceDataT = tp.TypeVar("BinanceDataT", bound="BinanceData")
@@ -770,7 +782,7 @@ class BinanceData(RemoteData):  # pragma: no cover
         cls: tp.Type[BinanceDataT],
         symbols: tp.Union[tp.Symbol, tp.Symbols] = None,
         *,
-        client: tp.Optional["BinanceClientT"] = None,
+        client: tp.Optional[BinanceClientT] = None,
         client_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> BinanceDataT:
@@ -802,14 +814,15 @@ class BinanceData(RemoteData):  # pragma: no cover
     def fetch_symbol(
         cls,
         symbol: str,
-        client: tp.Optional["BinanceClientT"] = None,
+        client: tp.Optional[BinanceClientT] = None,
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
-        interval: tp.Optional[str] = None,
-        delay: tp.Optional[float] = None,
+        timeframe: tp.Optional[str] = None,
         limit: tp.Optional[int] = None,
+        delay: tp.Optional[float] = None,
         show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
+        silence_warnings: tp.Optional[bool] = None,
     ) -> tp.Frame:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Binance.
 
@@ -824,13 +837,14 @@ class BinanceData(RemoteData):  # pragma: no cover
             end (any): End datetime.
 
                 See `vectorbtpro.utils.datetime_.to_tzaware_datetime`.
-            interval (str): Kline interval.
+            timeframe (str): Kline timeframe.
 
                 See [Binance Constants](https://python-binance.readthedocs.io/en/latest/constants.html).
-            delay (float): Time to sleep after each request (in milliseconds).
             limit (int): The maximum number of returned items.
+            delay (float): Time to sleep after each request (in milliseconds).
             show_progress (bool): Whether to show the progress bar.
             pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`.
+            silence_warnings (bool): Whether to silence all warnings.
 
         For defaults, see `custom.binance` in `vectorbtpro._settings.data`.
         """
@@ -846,22 +860,24 @@ class BinanceData(RemoteData):  # pragma: no cover
             start = binance_cfg["start"]
         if end is None:
             end = binance_cfg["end"]
-        if interval is None:
-            interval = binance_cfg["interval"]
-        if delay is None:
-            delay = binance_cfg["delay"]
+        if timeframe is None:
+            timeframe = binance_cfg["timeframe"]
         if limit is None:
             limit = binance_cfg["limit"]
+        if delay is None:
+            delay = binance_cfg["delay"]
         if show_progress is None:
             show_progress = binance_cfg["show_progress"]
         pbar_kwargs = merge_dicts(binance_cfg["pbar_kwargs"], pbar_kwargs)
+        if silence_warnings is None:
+            silence_warnings = binance_cfg["silence_warnings"]
 
         # Establish the timestamps
         start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
         try:
             first_data = client.get_klines(
                 symbol=symbol,
-                interval=interval,
+                interval=timeframe,
                 limit=1,
                 startTime=0,
                 endTime=None,
@@ -881,10 +897,10 @@ class BinanceData(RemoteData):  # pragma: no cover
             with get_pbar(show_progress=show_progress, **pbar_kwargs) as pbar:
                 pbar.set_description(_ts_to_str(start_ts))
                 while True:
-                    # Fetch the klines for the next interval
+                    # Fetch the klines for the next timeframe
                     next_data = client.get_klines(
                         symbol=symbol,
-                        interval=interval,
+                        interval=timeframe,
                         limit=limit,
                         startTime=next_start_ts,
                         endTime=end_ts,
@@ -909,12 +925,13 @@ class BinanceData(RemoteData):  # pragma: no cover
                     if delay is not None:
                         time.sleep(delay / 1000)  # be kind to api
         except Exception as e:
-            warnings.warn(traceback.format_exc(), stacklevel=2)
-            warnings.warn(
-                f"Symbol '{str(symbol)}' raised an exception. Returning incomplete data. "
-                "Use update() method to fetch missing data.",
-                stacklevel=2,
-            )
+            if not silence_warnings:
+                warnings.warn(traceback.format_exc(), stacklevel=2)
+                warnings.warn(
+                    f"Symbol '{str(symbol)}' raised an exception. Returning incomplete data. "
+                    "Use update() method to fetch missing data.",
+                    stacklevel=2,
+                )
 
         # Convert data to a DataFrame
         df = pd.DataFrame(
@@ -950,12 +967,6 @@ class BinanceData(RemoteData):  # pragma: no cover
 
         return df
 
-    def update_symbol(self, symbol: str, **kwargs) -> tp.Frame:
-        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        fetch_kwargs["start"] = self.last_index[symbol]
-        kwargs = merge_dicts(fetch_kwargs, kwargs)
-        return self.fetch_symbol(symbol, **kwargs)
-
 
 class CCXTData(RemoteData):  # pragma: no cover
     """Subclass of `Data` for `ccxt`.
@@ -966,17 +977,18 @@ class CCXTData(RemoteData):  # pragma: no cover
     def fetch_symbol(
         cls,
         symbol: str,
-        exchange: tp.Optional[tp.Union[str, "ExchangeT"]] = None,
+        exchange: tp.Optional[tp.Union[str, CCXTExchangeT]] = None,
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
         timeframe: tp.Optional[str] = None,
-        delay: tp.Optional[float] = None,
         limit: tp.Optional[int] = None,
+        delay: tp.Optional[float] = None,
         retries: tp.Optional[int] = None,
         exchange_config: tp.Optional[tp.KwargsLike] = None,
         fetch_params: tp.Optional[tp.KwargsLike] = None,
         show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
+        silence_warnings: tp.Optional[bool] = None,
     ) -> tp.Frame:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from CCXT.
 
@@ -991,11 +1003,11 @@ class CCXTData(RemoteData):  # pragma: no cover
 
                 See `vectorbtpro.utils.datetime_.to_tzaware_datetime`.
             timeframe (str): Timeframe supported by the exchange.
+            limit (int): The maximum number of returned items.
             delay (float): Time to sleep after each request (in milliseconds).
 
                 !!! note
                     Use only if `enableRateLimit` is not set.
-            limit (int): The maximum number of returned items.
             retries (int): The number of retries on failure to fetch data.
             exchange_config (dict): Keyword arguments passed to the exchange upon instantiation.
 
@@ -1003,6 +1015,7 @@ class CCXTData(RemoteData):  # pragma: no cover
             fetch_params (dict): Exchange-specific keyword arguments passed to `fetch_ohlcv`.
             show_progress (bool): Whether to show the progress bar.
             pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`.
+            silence_warnings (bool): Whether to silence all warnings.
 
         For defaults, see `custom.ccxt` in `vectorbtpro._settings.data`.
         Global settings can be provided per exchange id using the `exchanges` dictionary.
@@ -1030,10 +1043,10 @@ class CCXTData(RemoteData):  # pragma: no cover
             end = ccxt_cfg["exchanges"].get(exchange_name, {}).get("end", ccxt_cfg["end"])
         if timeframe is None:
             timeframe = ccxt_cfg["exchanges"].get(exchange_name, {}).get("timeframe", ccxt_cfg["timeframe"])
-        if delay is None:
-            delay = ccxt_cfg["exchanges"].get(exchange_name, {}).get("delay", ccxt_cfg["delay"])
         if limit is None:
             limit = ccxt_cfg["exchanges"].get(exchange_name, {}).get("limit", ccxt_cfg["limit"])
+        if delay is None:
+            delay = ccxt_cfg["exchanges"].get(exchange_name, {}).get("delay", ccxt_cfg["delay"])
         if retries is None:
             retries = ccxt_cfg["exchanges"].get(exchange_name, {}).get("retries", ccxt_cfg["retries"])
         if exchange_config is None:
@@ -1056,6 +1069,10 @@ class CCXTData(RemoteData):  # pragma: no cover
             ccxt_cfg["exchanges"].get(exchange_name, {}).get("pbar_kwargs", {}),
             pbar_kwargs,
         )
+        if silence_warnings is None:
+            silence_warnings = (
+                ccxt_cfg["exchanges"].get(exchange_name, {}).get("silence_warnings", ccxt_cfg["silence_warnings"])
+            )
 
         if isinstance(exchange, str):
             if not hasattr(ccxt, exchange):
@@ -1069,7 +1086,8 @@ class CCXTData(RemoteData):  # pragma: no cover
         if timeframe not in exchange.timeframes:
             raise ValueError(f"Exchange {exchange} does not support {timeframe} timeframe")
         if exchange.has["fetchOHLCV"] == "emulated":
-            warnings.warn("Using emulated OHLCV candles", stacklevel=2)
+            if not silence_warnings:
+                warnings.warn("Using emulated OHLCV candles", stacklevel=2)
 
         def _retry(method):
             @wraps(method)
@@ -1077,11 +1095,13 @@ class CCXTData(RemoteData):  # pragma: no cover
                 for i in range(retries):
                     try:
                         return method(*args, **kwargs)
-                    except (ccxt.NetworkError, ccxt.ExchangeError) as e:
+                    except ccxt.NetworkError as e:
                         if i == retries - 1:
                             raise e
-                    if delay is not None:
-                        time.sleep(delay / 1000)
+                        if not silence_warnings:
+                            warnings.warn(traceback.format_exc(), stacklevel=2)
+                        if delay is not None:
+                            time.sleep(delay / 1000)
 
             return retry_method
 
@@ -1114,7 +1134,7 @@ class CCXTData(RemoteData):  # pragma: no cover
             with get_pbar(show_progress=show_progress, **pbar_kwargs) as pbar:
                 pbar.set_description(_ts_to_str(start_ts))
                 while True:
-                    # Fetch the klines for the next interval
+                    # Fetch the klines for the next timeframe
                     next_data = _fetch(next_start_ts, limit)
                     if len(data) > 0:
                         next_data = list(filter(lambda d: next_start_ts < d[0] < end_ts, next_data))
@@ -1136,12 +1156,13 @@ class CCXTData(RemoteData):  # pragma: no cover
                     if delay is not None:
                         time.sleep(delay / 1000)  # be kind to api
         except Exception as e:
-            warnings.warn(traceback.format_exc(), stacklevel=2)
-            warnings.warn(
-                f"Symbol '{str(symbol)}' raised an exception. Returning incomplete data. "
-                "Use update() method to fetch missing data.",
-                stacklevel=2,
-            )
+            if not silence_warnings:
+                warnings.warn(traceback.format_exc(), stacklevel=2)
+                warnings.warn(
+                    f"Symbol '{str(symbol)}' raised an exception. Returning incomplete data. "
+                    "Use update() method to fetch missing data.",
+                    stacklevel=2,
+                )
 
         # Convert data to a DataFrame
         df = pd.DataFrame(data, columns=["Open time", "Open", "High", "Low", "Close", "Volume"])
@@ -1159,12 +1180,6 @@ class CCXTData(RemoteData):  # pragma: no cover
             df["Volume"] = df["Volume"].astype(float)
 
         return df
-
-    def update_symbol(self, symbol: str, **kwargs) -> tp.Frame:
-        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        fetch_kwargs["start"] = self.last_index[symbol]
-        kwargs = merge_dicts(fetch_kwargs, kwargs)
-        return self.fetch_symbol(symbol, **kwargs)
 
 
 AlpacaDataT = tp.TypeVar("AlpacaDataT", bound="AlpacaData")
@@ -1185,7 +1200,7 @@ class AlpacaData(RemoteData):  # pragma: no cover
         cls: tp.Type[AlpacaDataT],
         symbols: tp.Union[tp.Symbol, tp.Symbols] = None,
         *,
-        client: tp.Optional["AlpacaClientT"] = None,
+        client: tp.Optional[AlpacaClientT] = None,
         client_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> AlpacaDataT:
@@ -1217,7 +1232,7 @@ class AlpacaData(RemoteData):  # pragma: no cover
     def fetch_symbol(
         cls,
         symbol: str,
-        client: tp.Optional["AlpacaClientT"] = None,
+        client: tp.Optional[AlpacaClientT] = None,
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
         timeframe: tp.Optional[str] = None,
@@ -1362,8 +1377,307 @@ class AlpacaData(RemoteData):  # pragma: no cover
 
         return df
 
-    def update_symbol(self, symbol: str, **kwargs) -> tp.Frame:
-        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        fetch_kwargs["start"] = self.last_index[symbol]
-        kwargs = merge_dicts(fetch_kwargs, kwargs)
-        return self.fetch_symbol(symbol, **kwargs)
+
+PolygonDataT = tp.TypeVar("PolygonDataT", bound="PolygonData")
+
+
+class PolygonData(RemoteData):  # pragma: no cover
+    """Subclass of `Data` for `polygon-api-client`.
+
+    See https://github.com/polygon-io/client-python."""
+
+    @classmethod
+    def fetch(
+        cls: tp.Type[PolygonDataT],
+        symbols: tp.Union[tp.Symbol, tp.Symbols] = None,
+        *,
+        client: tp.Optional[PolygonClientT] = None,
+        client_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> PolygonDataT:
+        """Override `vectorbtpro.data.base.Data.fetch` to instantiate a Polygon REST client.
+
+        For defaults, see `custom.polygon` in `vectorbtpro._settings.data`."""
+        from vectorbtpro.utils.opt_packages import assert_can_import
+
+        assert_can_import("polygon")
+        from polygon import RESTClient
+
+        from vectorbtpro._settings import settings
+
+        polygon_cfg = settings["data"]["custom"]["polygon"]
+
+        if client is None:
+            client = polygon_cfg["client"]
+        if client_kwargs is None:
+            client_kwargs = {}
+        has_client_kwargs = len(client_kwargs) > 0
+        client_kwargs = merge_dicts(polygon_cfg["client_kwargs"], client_kwargs)
+        if client is None:
+            client = RESTClient(**client_kwargs)
+        elif has_client_kwargs:
+            raise ValueError("Cannot apply config after instantiation of the client")
+        return super(PolygonData, cls).fetch(symbols, client=client, **kwargs)
+
+    @classmethod
+    def fetch_symbol(
+        cls,
+        symbol: str,
+        client: tp.Optional[PolygonClientT] = None,
+        start: tp.Optional[tp.DatetimeLike] = None,
+        end: tp.Optional[tp.DatetimeLike] = None,
+        timeframe: tp.Optional[str] = None,
+        adjusted: tp.Optional[bool] = None,
+        limit: tp.Optional[int] = None,
+        delay: tp.Optional[float] = None,
+        retries: tp.Optional[int] = None,
+        show_progress: tp.Optional[bool] = None,
+        pbar_kwargs: tp.KwargsLike = None,
+        silence_warnings: tp.Optional[bool] = None,
+    ) -> tp.Frame:
+        """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Polygon.
+
+        Args:
+            symbol (str): Symbol.
+
+                Supports the following APIs:
+
+                * Stocks and equities
+                * Currencies - symbol must have the prefix `C:`
+                * Crypto - symbol must have the prefix `X:`
+            client (polygon.rest.RESTClient): Client of type `polygon.rest.RESTClient`.
+
+                Must be provided.
+            start (any): The start of the aggregate time window.
+
+                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
+            end (any): The end of the aggregate time window.
+
+                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
+            timeframe (str): Timeframe of data, which is multiplier and timespan provided as a string, i.e. '15m'.
+
+                Must be integer multiple of
+
+                * 'm' or 'minute(s)'
+                * 'h' or 'hour(s)'
+                * 'd' or 'day(s)'
+                * 'w' or 'week(s)'
+                * 'M' or 'month(s)'
+                * 'Q' or 'quarter(s)'
+                * 'Y' or 'year(s)'
+            adjusted (str): Whether the results are adjusted for splits.
+
+                By default, results are adjusted.
+                Set this to False to get results that are NOT adjusted for splits.
+            limit (int): Limits the number of base aggregates queried to create the aggregate results.
+
+                Max 50000 and Default 5000.
+            delay (float): Time to sleep after each request (in milliseconds).
+
+                !!! note
+                    Use only if `enableRateLimit` is not set.
+            retries (int): The number of retries on failure to fetch data.
+            show_progress (bool): Whether to show the progress bar.
+            pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`.
+            silence_warnings (bool): Whether to silence all warnings.
+
+        For defaults, see `custom.polygon` in `vectorbtpro._settings.data`.
+
+        !!! note
+            If you're using a free plan that has an API rate limit of several requests per minute,
+            make sure to set `delay` to a higher number, such as 12000 (which makes 5 requests per minute).
+        """
+        from vectorbtpro._settings import settings
+
+        polygon_cfg = settings["data"]["custom"]["polygon"]
+
+        if client is None:
+            client = polygon_cfg["client"]
+        if client is None:
+            raise ValueError("Client must be provided")
+        if start is None:
+            start = polygon_cfg["start"]
+        if end is None:
+            end = polygon_cfg["end"]
+        if timeframe is None:
+            timeframe = polygon_cfg["timeframe"]
+        if adjusted is None:
+            adjusted = polygon_cfg["adjusted"]
+        if limit is None:
+            limit = polygon_cfg["limit"]
+        if delay is None:
+            delay = polygon_cfg["delay"]
+        if retries is None:
+            retries = polygon_cfg["retries"]
+        if show_progress is None:
+            show_progress = polygon_cfg["show_progress"]
+        pbar_kwargs = merge_dicts(polygon_cfg["pbar_kwargs"], pbar_kwargs)
+        if silence_warnings is None:
+            silence_warnings = polygon_cfg["silence_warnings"]
+
+        start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
+        end_ts = datetime_to_ms(to_tzaware_datetime(end, tz=get_utc_tz()))
+
+        if not isinstance(timeframe, str):
+            raise ValueError(f"Invalid timeframe '{timeframe}'")
+        match = re.match(r"^(\d*)\s*(\w+)$", timeframe)
+        if not match:
+            raise ValueError(f"Invalid timeframe '{timeframe}'")
+        multiplier = match.group(1).strip()
+        if len(multiplier) == 0:
+            multiplier = 1
+        else:
+            multiplier = int(multiplier)
+        timespan = match.group(2).strip()
+
+        if timespan in ("m", "day", "days"):
+            timespan = "day"
+        if timespan in ("h", "hour", "hours"):
+            timespan = "hour"
+        if timespan in ("d", "day", "days"):
+            timespan = "day"
+        if timespan in ("w", "week", "weeks"):
+            timespan = "week"
+        if timespan in ("M", "month", "months"):
+            timespan = "month"
+        if timespan in ("Q", "quarter", "quarters"):
+            timespan = "quarter"
+        if timespan in ("Y", "year", "years"):
+            timespan = "year"
+
+        def _retry(method):
+            @wraps(method)
+            def retry_method(*args, **kwargs):
+                for i in range(retries):
+                    try:
+                        return method(*args, **kwargs)
+                    except requests.exceptions.HTTPError as e:
+                        if isinstance(e, requests.exceptions.HTTPError) and e.response.status_code == 429:
+                            if not silence_warnings:
+                                warnings.warn(traceback.format_exc(), stacklevel=2)
+                                # Polygon.io API rate limit is per minute
+                                warnings.warn("Waiting 1 minute...", stacklevel=2)
+                            time.sleep(60)
+                        else:
+                            raise e
+                    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+                        if i == retries - 1:
+                            raise e
+                        if not silence_warnings:
+                            warnings.warn(traceback.format_exc(), stacklevel=2)
+                        if delay is not None:
+                            time.sleep(delay / 1000)
+
+            return retry_method
+
+        @_retry
+        def _fetch(_start_ts, _limit):
+            if symbol.startswith("C:"):
+                return client.forex_currencies_aggregates(
+                    ticker=symbol,
+                    multiplier=multiplier,
+                    timespan=timespan,
+                    from_=_start_ts,
+                    to=end_ts,
+                    adjusted=adjusted,
+                    limit=_limit,
+                )
+            if symbol.startswith("X:"):
+                return client.crypto_aggregates(
+                    ticker=symbol,
+                    multiplier=multiplier,
+                    timespan=timespan,
+                    from_=_start_ts,
+                    to=end_ts,
+                    adjusted=adjusted,
+                    limit=_limit,
+                )
+            return client.stocks_equities_aggregates(
+                ticker=symbol,
+                multiplier=multiplier,
+                timespan=timespan,
+                from_=_start_ts,
+                to=end_ts,
+                adjusted=adjusted,
+                limit=_limit,
+            )
+
+        # Establish the timestamps
+        try:
+            first_data = _fetch(0, 1).results
+            first_valid_ts = first_data[0]["t"]
+            next_start_ts = start_ts = max(start_ts, first_valid_ts)
+        except Exception as e:
+            next_start_ts = start_ts
+
+        def _ts_to_str(ts):
+            return str(pd.Timestamp(to_tzaware_datetime(ts, tz=get_utc_tz())))
+
+        # Iteratively collect the data
+        data = []
+        try:
+            with get_pbar(show_progress=show_progress, **pbar_kwargs) as pbar:
+                pbar.set_description(_ts_to_str(start_ts))
+                while True:
+                    # Fetch the klines for the next timeframe
+                    next_data = _fetch(next_start_ts, limit).results
+                    if len(data) > 0:
+                        next_data = list(filter(lambda d: next_start_ts < d["t"] < end_ts, next_data))
+                    else:
+                        next_data = list(filter(lambda d: d["t"] < end_ts, next_data))
+
+                    # Update the timestamps and the progress bar
+                    if not len(next_data):
+                        break
+                    data += next_data
+                    pbar.set_description(
+                        "{} - {}".format(
+                            _ts_to_str(start_ts),
+                            _ts_to_str(next_data[-1]["t"]),
+                        )
+                    )
+                    pbar.update(1)
+                    next_start_ts = next_data[-1]["t"]
+                    if delay is not None:
+                        time.sleep(delay / 1000)  # be kind to api
+        except Exception as e:
+            if not silence_warnings:
+                warnings.warn(traceback.format_exc(), stacklevel=2)
+                warnings.warn(
+                    f"Symbol '{str(symbol)}' raised an exception. Returning incomplete data. "
+                    "Use update() method to fetch missing data.",
+                    stacklevel=2,
+                )
+
+        df = pd.DataFrame(data)
+        df = df[["t", "o", "h", "l", "c", "v", "n", "vw"]]
+        df = df.rename(
+            columns={
+                "t": "Open time",
+                "o": "Open",
+                "h": "High",
+                "l": "Low",
+                "c": "Close",
+                "v": "Volume",
+                "n": "Trade count",
+                "vw": "VWAP",
+            }
+        )
+        df.index = pd.to_datetime(df["Open time"], unit="ms", utc=True)
+        del df["Open time"]
+        if "Open" in df.columns:
+            df["Open"] = df["Open"].astype(float)
+        if "High" in df.columns:
+            df["High"] = df["High"].astype(float)
+        if "Low" in df.columns:
+            df["Low"] = df["Low"].astype(float)
+        if "Close" in df.columns:
+            df["Close"] = df["Close"].astype(float)
+        if "Volume" in df.columns:
+            df["Volume"] = df["Volume"].astype(float)
+        if "Trade count" in df.columns:
+            df["Trade count"] = df["Trade count"].astype(int)
+        if "VWAP" in df.columns:
+            df["VWAP"] = df["VWAP"].astype(float)
+
+        return df

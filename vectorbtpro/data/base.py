@@ -458,6 +458,8 @@ class Data(Analyzable):
                 Will also forward this argument to `Data.fetch_symbol` if in the signature.
             skip_on_error (bool): Whether to skip the symbol when an exception is raised.
             silence_warnings (bool): Whether to silence all warnings.
+
+                Will also forward this argument to `Data.fetch_symbol` if in the signature.
             **kwargs: Passed to `Data.fetch_symbol`.
 
                 If two symbols require different keyword arguments, pass `symbol_dict` for each argument.
@@ -500,6 +502,8 @@ class Data(Analyzable):
                     _kwargs["show_progress"] = show_symbol_progress
                 if "pbar_kwargs" in func_arg_names:
                     _kwargs["pbar_kwargs"] = pbar_kwargs
+                if "silence_warnings" in func_arg_names:
+                    _kwargs["silence_warnings"] = silence_warnings
 
                 try:
                     out = cls.fetch_symbol(symbol, **_kwargs)
@@ -594,6 +598,8 @@ class Data(Analyzable):
                 Will also forward this argument to `Data.update_symbol` if accepted by `Data.fetch_symbol`.
             skip_on_error (bool): Whether to skip the symbol when an exception is raised.
             silence_warnings (bool): Whether to silence all warnings.
+
+                Will also forward this argument to `Data.update_symbol` if accepted by `Data.fetch_symbol`.
             **kwargs: Passed to `Data.update_symbol`.
 
                 If two symbols require different keyword arguments, pass `symbol_dict` for each argument.
@@ -624,6 +630,8 @@ class Data(Analyzable):
                     _kwargs["show_progress"] = show_progress
                 if "pbar_kwargs" in func_arg_names:
                     _kwargs["pbar_kwargs"] = pbar_kwargs
+                if "silence_warnings" in func_arg_names:
+                    _kwargs["silence_warnings"] = silence_warnings
 
                 skip_symbol = False
                 try:
