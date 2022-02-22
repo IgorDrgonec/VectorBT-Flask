@@ -160,6 +160,8 @@ def attach_qs_methods(cls: tp.Type[tp.T], replace_signature: bool = True) -> tp.
                         null_mask = null_mask | bm_null_mask
                         pass_kwargs["benchmark"] = pass_kwargs["benchmark"].loc[~null_mask]
                     returns = returns.loc[~null_mask]
+                    if isinstance(returns.index, (pd.DatetimeIndex, pd.PeriodIndex)):
+                        returns = returns.tz_localize(None)
 
                     signature(_func).bind(returns=returns, **pass_kwargs)
                     return _func(returns=returns, **pass_kwargs)
