@@ -2051,8 +2051,10 @@ Other keyword arguments are passed to `{0}.run`.
                 Defaults to []. Order matters.
             jit_select_params (bool): Whether to JIT-compile the parameter selection function.
 
-                Defaults to `jitted_loop`.
+                Defaults to True if `jitted_loop` is True or `apply_func` is Numba-compiled.
             jit_kwargs (dict): Keyword arguments passed to `@njit` decorator of the parameter selection function.
+
+                By default, has `nogil` set to True.
             jitted_loop (bool): Whether to loop using a jitter.
 
                 Parameter selector will be automatically compiled using Numba.
@@ -2142,7 +2144,7 @@ Other keyword arguments are passed to `{0}.run`.
         if kwargs_as_args is None:
             kwargs_as_args = []
         if jit_select_params is None:
-            jit_select_params = jitted_loop
+            jit_select_params = jitted_loop or checks.is_numba_func(apply_func)
         if remove_kwargs is None:
             remove_kwargs = jit_select_params
 
@@ -2195,7 +2197,8 @@ Other keyword arguments are passed to `{0}.run`.
         if module_name is not None:
             select_params_func.__module__ = module_name
         if jit_select_params:
-            select_params_func = njit(select_params_func, **resolve_dict(jit_kwargs))
+            jit_kwargs = merge_dicts(dict(nogil=True), jit_kwargs)
+            select_params_func = njit(select_params_func, **jit_kwargs)
 
         setattr(Indicator, "select_params_func", select_params_func)
 
@@ -2209,6 +2212,7 @@ Other keyword arguments are passed to `{0}.run`.
             per_column: tp.Optional[bool] = None,
             return_cache: bool = False,
             use_cache: tp.Optional[CacheOutputT] = None,
+            execute_kwargs: tp.KwargsLike = None,
             **_kwargs,
         ) -> tp.Union[None, CacheOutputT, tp.Array2d, tp.List[tp.Array2d]]:
             """Custom function that forwards inputs and parameters to `apply_func`."""
@@ -2421,6 +2425,7 @@ Other keyword arguments are passed to `{0}.run`.
                 **_kwargs,
                 n_outputs=num_ret_outputs,
                 jitted_loop=jitted_loop,
+                execute_kwargs=execute_kwargs
             )
 
         return self.with_custom_func(custom_func, pass_packed=True, **kwargs)

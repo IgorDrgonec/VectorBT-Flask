@@ -20,7 +20,13 @@ FMEAN = IndicatorFactory(
     input_names=["close"],
     param_names=["window", "ewm"],
     output_names=["fmean"],
-).with_apply_func(nb.future_mean_nb, kwargs_as_args=["wait", "adjust"], ewm=False, wait=1, adjust=False)
+).with_apply_func(
+    nb.future_mean_nb,
+    kwargs_as_args=["wait", "adjust"],
+    ewm=False,
+    wait=1,
+    adjust=False,
+)
 
 FMEAN.__doc__ = """Look-ahead indicator based on `vectorbtpro.labels.nb.future_mean_nb`."""
 
@@ -30,7 +36,14 @@ FSTD = IndicatorFactory(
     input_names=["close"],
     param_names=["window", "ewm"],
     output_names=["fstd"],
-).with_apply_func(nb.future_std_nb, kwargs_as_args=["wait", "adjust", "ddof"], ewm=False, wait=1, adjust=False, ddof=0)
+).with_apply_func(
+    nb.future_std_nb,
+    kwargs_as_args=["wait", "adjust", "ddof"],
+    ewm=False,
+    wait=1,
+    adjust=False,
+    ddof=0,
+)
 
 FSTD.__doc__ = """Look-ahead indicator based on `vectorbtpro.labels.nb.future_std_nb`."""
 
@@ -40,7 +53,11 @@ FMIN = IndicatorFactory(
     input_names=["close"],
     param_names=["window"],
     output_names=["fmin"],
-).with_apply_func(nb.future_min_nb, kwargs_as_args=["wait"], wait=1)
+).with_apply_func(
+    nb.future_min_nb,
+    kwargs_as_args=["wait"],
+    wait=1,
+)
 
 FMIN.__doc__ = """Look-ahead indicator based on `vectorbtpro.labels.nb.future_min_nb`."""
 
@@ -50,7 +67,11 @@ FMAX = IndicatorFactory(
     input_names=["close"],
     param_names=["window"],
     output_names=["fmax"],
-).with_apply_func(nb.future_max_nb, kwargs_as_args=["wait"], wait=1)
+).with_apply_func(
+    nb.future_max_nb,
+    kwargs_as_args=["wait"],
+    wait=1,
+)
 
 FMAX.__doc__ = """Look-ahead indicator based on `vectorbtpro.labels.nb.future_max_nb`."""
 
@@ -73,7 +94,9 @@ FIXLB = IndicatorFactory(
     input_names=["close"],
     param_names=["n"],
     output_names=["labels"],
-).with_apply_func(nb.fixed_labels_nb)
+).with_apply_func(
+    nb.fixed_labels_nb,
+)
 
 
 class _FIXLB(FIXLB):
@@ -91,7 +114,13 @@ MEANLB = IndicatorFactory(
     input_names=["close"],
     param_names=["window", "ewm"],
     output_names=["labels"],
-).with_apply_func(nb.mean_labels_nb, kwargs_as_args=["wait", "adjust"], ewm=False, wait=1, adjust=False)
+).with_apply_func(
+    nb.mean_labels_nb,
+    kwargs_as_args=["wait", "adjust"],
+    ewm=False,
+    wait=1,
+    adjust=False,
+)
 
 
 class _MEANLB(MEANLB):
@@ -111,7 +140,10 @@ LEXLB = IndicatorFactory(
     output_names=["labels"],
 ).with_apply_func(
     nb.local_extrema_nb,
-    param_settings=dict(pos_th=flex_elem_param_config, neg_th=flex_elem_param_config),
+    param_settings=dict(
+        pos_th=flex_elem_param_config,
+        neg_th=flex_elem_param_config,
+    ),
     pass_flex_2d=True,
 )
 
@@ -133,7 +165,11 @@ TRENDLB = IndicatorFactory(
     output_names=["labels"],
 ).with_apply_func(
     nb.trend_labels_nb,
-    param_settings=dict(pos_th=flex_elem_param_config, neg_th=flex_elem_param_config, mode=dict(dtype=TrendMode)),
+    param_settings=dict(
+        pos_th=flex_elem_param_config,
+        neg_th=flex_elem_param_config,
+        mode=dict(dtype=TrendMode),
+    ),
     pass_flex_2d=True,
     mode=TrendMode.Binary,
 )
@@ -156,7 +192,10 @@ BOLB = IndicatorFactory(
     output_names=["labels"],
 ).with_apply_func(
     nb.breakout_labels_nb,
-    param_settings=dict(pos_th=flex_elem_param_config, neg_th=flex_elem_param_config),
+    param_settings=dict(
+        pos_th=flex_elem_param_config,
+        neg_th=flex_elem_param_config,
+    ),
     pass_flex_2d=True,
     kwargs_as_args=["wait"],
     pos_th=0.0,
