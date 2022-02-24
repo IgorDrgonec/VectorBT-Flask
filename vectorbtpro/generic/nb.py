@@ -186,7 +186,9 @@ def fbfill_nb(arr: tp.Array2d) -> tp.Array2d:
     """Forward and backward fill NaN values.
 
     !!! note
-        If there are no NaN values, will return `arr`."""
+        If there are no NaN (or any) values, will return `arr`."""
+    if arr.size == 0:
+        return arr
     need_fbfill = False
     for col in range(arr.shape[1]):
         for i in range(arr.shape[0]):
@@ -201,14 +203,11 @@ def fbfill_nb(arr: tp.Array2d) -> tp.Array2d:
     out = np.empty_like(arr)
     for col in prange(arr.shape[1]):
         last_valid = np.nan
-        need_bfill = False
         for i in range(arr.shape[0]):
             if not np.isnan(arr[i, col]):
                 last_valid = arr[i, col]
-            else:
-                need_bfill = np.isnan(last_valid)
             out[i, col] = last_valid
-        if need_bfill:
+        if np.isnan(out[0, col]):
             last_valid = np.nan
             for i in range(arr.shape[0] - 1, -1, -1):
                 if not np.isnan(arr[i, col]):
