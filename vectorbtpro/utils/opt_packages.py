@@ -31,6 +31,7 @@ opt_package_config = ReadonlyConfig(
         dill=dict(name="dill", link="https://github.com/uqfoundation/dill"),
         alpaca_trade_api=dict(name="Alpaca Trade API", link="https://github.com/alpacahq/alpaca-trade-api-python"),
         polygon=dict(name="Polygon API Client", link="https://github.com/polygon-io/client-python"),
+        bs4=dict(name="Beautiful Soup", link="https://www.crummy.com/software/BeautifulSoup/bs4/doc/"),
     )
 )
 """_"""

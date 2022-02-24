@@ -62,7 +62,7 @@ setup(
         'typing_extensions; python_version < "3.8"',
         'mypy_extensions',
         'humanize',
-        'attrs'
+        'attrs>=19.2.0'
     ],
     extras_require=get_extra_requires('extra-requirements.txt'),
     classifiers=[

@@ -1934,13 +1934,13 @@ class TestCSVDataSaver:
 
     def test_update_every(self, tmp_path):
         data = MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
-        kwargs = dict(call_count=0)
+        call_count = [0]
 
         class CSVDataSaver(vbt.CSVDataSaver):
-            def update(self, kwargs):
-                super().update()
-                kwargs["call_count"] += 1
-                if kwargs["call_count"] == 5:
+            def update(self, call_count, **kwargs):
+                super().update(**kwargs)
+                call_count[0] += 1
+                if call_count[0] == 5:
                     raise vbt.CancelledError
 
         saver = CSVDataSaver(
@@ -1951,7 +1951,7 @@ class TestCSVDataSaver:
             )
         )
         saver.init_save_data()
-        saver.update_every(kwargs=kwargs)
+        saver.update_every(call_count=call_count)
         for i in range(5):
             data = data.update()
         pd.testing.assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["0"], data.data[0])
@@ -2009,13 +2009,13 @@ class TestHDFDataSaver:
 
     def test_update_every(self, tmp_path):
         data = MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
-        kwargs = dict(call_count=0)
+        call_count = [0]
 
         class HDFDataSaver(vbt.HDFDataSaver):
-            def update(self, kwargs):
-                super().update()
-                kwargs["call_count"] += 1
-                if kwargs["call_count"] == 5:
+            def update(self, call_count, **kwargs):
+                super().update(**kwargs)
+                call_count[0] += 1
+                if call_count[0] == 5:
                     raise vbt.CancelledError
 
         saver = HDFDataSaver(
@@ -2027,7 +2027,7 @@ class TestHDFDataSaver:
             )
         )
         saver.init_save_data()
-        saver.update_every(kwargs=kwargs)
+        saver.update_every(call_count=call_count)
         for i in range(5):
             data = data.update()
         pd.testing.assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["0"], data.data[0])
