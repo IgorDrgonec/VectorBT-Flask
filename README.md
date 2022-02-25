@@ -7,14 +7,14 @@
 </div>
 <br>
 <p align="center">
-    <a href="https://github.com/polakowo/vectorbt.pro/blob/main/setup.py" alt="Python Versions">
-        <img src="https://github.com/polakowo/vectorbt.pro/blob/main/assets/badges/python_version.svg" />
+    <a href="setup.py" alt="Python Versions">
+        <img src="assets/badges/python_version.svg" />
     </a>
-    <a href="https://github.com/polakowo/vectorbt.pro/blob/master/LICENSE.md" alt="License">
-        <img src="https://github.com/polakowo/vectorbt.pro/blob/main/assets/badges/license.svg" />
+    <a href="LICENSE.md" alt="License">
+        <img src="assets/badges/license.svg" />
     </a>
-    <a href="https://github.com/polakowo/vectorbt.pro" alt="Version">
-        <img src="https://github.com/polakowo/vectorbt.pro/blob/main/assets/badges/version.svg" />
+    <a href="#" alt="Version">
+        <img src="assets/badges/version.svg" />
     </a>
     <a href="https://discord.gg/63jZZzCwzp" alt="Discord">
         <img src="https://img.shields.io/discord/918629562441695344?logo=discord" />
@@ -48,8 +48,4 @@ Visit [Getting Started](https://vectorbt.pro/getting-started/) and follow the in
 
 Thank you for using vectorbt PRO legally :heart:
 
-## Support
-
-## [Documentation](https://vectorbt.pro) · [New issue](https://github.com/polakowo/vectorbt.pro/issues) · <sub>[![Discord](https://img.shields.io/discord/918629562441695344?logo=discord&logoColor=white)](https://discord.gg/63jZZzCwzp)</sub> · [Contact Us](mailto:olegpolakow@gmail.com)
-
-© 2021 vectorbt PRO
+© 2022 vectorbt PRO
