@@ -75,6 +75,7 @@ __all__ = [
     "AlpacaData",
     "PolygonData",
     "AlphaVantageData",
+    "NDLData",
 ]
 
 # ############# Synthetic ############# #
@@ -1782,7 +1783,7 @@ class AlphaVantageData(RemoteData):  # pragma: no cover
         See https://www.alphavantage.co/documentation/ for API endpoints and their parameters.
 
         !!! note
-            Supports only the CSV format.
+            Supports the CSV format only.
 
         Args:
             symbol (str): Symbol.
@@ -1888,7 +1889,10 @@ class AlphaVantageData(RemoteData):  # pragma: no cover
         if api_meta is None and (function is None or match_params):
             if not silence_warnings and cls.parse_api_meta.cache_info().misses == 0:
                 warnings.warn("Parsing API documentation...", stacklevel=2)
-            api_meta = cls.parse_api_meta()
+            try:
+                api_meta = cls.parse_api_meta()
+            except Exception as e:
+                raise ValueError("Can't fetch/parse the API documentation. Specify function and disable match_params.")
 
         # Resolve the timeframe
         interval = None
@@ -2043,5 +2047,114 @@ class AlphaVantageData(RemoteData):  # pragma: no cover
         df = df.rename(columns=dict(zip(df.columns, new_columns)))
         if df.index[0] > df.index[1]:
             df = df.iloc[::-1]
+
+        return df
+
+    def update_symbol(self, symbol: str, **kwargs) -> tp.Frame:
+        raise NotImplementedError
+
+
+NDLDataT = tp.TypeVar("NDLDataT", bound="NDLData")
+
+
+class NDLData(RemoteData):  # pragma: no cover
+    """Subclass of `Data` for `nasdaqdatalink`.
+
+    See https://github.com/Nasdaq/data-link-python."""
+
+    @classmethod
+    def fetch_symbol(
+        cls,
+        symbol: str,
+        api_key: tp.Optional[str] = None,
+        start: tp.Optional[tp.DatetimeLike] = None,
+        end: tp.Optional[tp.DatetimeLike] = None,
+        column_indices: tp.Optional[tp.MaybeIterable[int]] = None,
+        collapse: tp.Optional[str] = None,
+        transform: tp.Optional[str] = None,
+        **params,
+    ) -> tp.Frame:
+        """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Nasdaq Data Link.
+
+        Args:
+            symbol (str): Symbol.
+            api_key (str): API key.
+
+                Required if not set globally.
+            start (any): Retrieve data rows on and after the specified start date.
+
+                See `vectorbtpro.utils.datetime_.to_tzaware_datetime`.
+            end (any): Retrieve data rows up to and including the specified end date.
+
+                See `vectorbtpro.utils.datetime_.to_tzaware_datetime`.
+            column_indices (int or iterable): Request one or more specific columns.
+
+                Column 0 is the date column and is always returned. Data begins at column 1.
+            collapse (str): Change the sampling frequency of the returned data.
+            transform (str): Perform elementary calculations on the data prior to downloading.
+            **params: Keyword arguments sent as field/value params to Nasdaq Data Link with no interference.
+
+        For defaults, see `custom.ndl` in `vectorbtpro._settings.data`.
+        """
+        from vectorbtpro.utils.opt_packages import assert_can_import
+
+        assert_can_import("nasdaqdatalink")
+
+        import nasdaqdatalink
+
+        from vectorbtpro._settings import settings
+
+        ndl_cfg = settings["data"]["custom"]["ndl"]
+
+        if api_key is None:
+            api_key = ndl_cfg["api_key"]
+        if start is None:
+            start = ndl_cfg["start"]
+        if end is None:
+            end = ndl_cfg["end"]
+        if column_indices is None:
+            column_indices = ndl_cfg["column_indices"]
+        if column_indices is not None:
+            if isinstance(column_indices, int):
+                dataset = symbol + "." + str(column_indices)
+            else:
+                dataset = [symbol + "." + str(index) for index in column_indices]
+        else:
+            dataset = symbol
+        if collapse is None:
+            collapse = ndl_cfg["collapse"]
+        if transform is None:
+            transform = ndl_cfg["transform"]
+        params = merge_dicts(ndl_cfg["params"], params)
+
+        # Establish the timestamps
+        if start is not None:
+            start_date = pd.Timestamp(to_tzaware_datetime(start, tz=get_utc_tz())).isoformat()
+        else:
+            start_date = None
+        if end is not None:
+            end_date = pd.Timestamp(to_tzaware_datetime(end, tz=get_utc_tz())).isoformat()
+        else:
+            end_date = None
+
+        # Collect and format the data
+        df = nasdaqdatalink.get(
+            dataset,
+            api_key=api_key,
+            start_date=start_date,
+            end_date=end_date,
+            collapse=collapse,
+            transform=transform,
+            **params,
+        )
+        new_columns = []
+        for c in df.columns:
+            new_c = c
+            if isinstance(symbol, str):
+                new_c = new_c.replace(symbol + ' - ', '')
+            if new_c == "Last":
+                new_c = "Close"
+            new_columns.append(new_c)
+        df = df.rename(columns=dict(zip(df.columns, new_columns)))
 
         return df

@@ -478,13 +478,13 @@ data = ChildDict(
             silence_warnings=False,
         ),
         ccxt=FrozenConfig(
-            exchange='binance',
+            exchange="binance",
             exchange_config=dict(
                 enableRateLimit=True,
             ),
             start=0,
             end="now UTC",
-            timeframe='1d',
+            timeframe="1d",
             limit=500,
             delay=None,
             retries=3,
@@ -502,7 +502,7 @@ data = ChildDict(
             ),
             start=0,
             end="now UTC",
-            timeframe='1d',
+            timeframe="1d",
             adjustment="all",
             limit=500,
             exchange="CBSE",
@@ -515,7 +515,7 @@ data = ChildDict(
             ),
             start=0,
             end="now UTC",
-            timeframe='1d',
+            timeframe="1d",
             adjusted=True,
             limit=5000,
             delay=500,
@@ -544,6 +544,15 @@ data = ChildDict(
             match_params=True,
             params=dict(),
             silence_warnings=False,
+        ),
+        ndl=dict(
+            api_key=None,
+            start=None,
+            end=None,
+            column_indices=None,
+            collapse=None,
+            transform=None,
+            params=dict(),
         ),
     ),
     stats=Config(),
@@ -759,7 +768,7 @@ generic = ChildDict(
                     "mapping",
                     self.mapping,
                 )
-                                                          is not None,
+                is not None,
             )
         ),
         settings=dict(
@@ -891,7 +900,7 @@ returns = ChildDict(
                     "bm_returns",
                     self.bm_returns,
                 )
-                                                          is not None,
+                is not None,
                 warning_message=Sub("Metric '$metric_name' requires bm_returns to be set"),
             ),
         ),
@@ -951,7 +960,8 @@ mapped_array = ChildDict(
                 filter_func=lambda self, metric_settings: metric_settings.get(
                     "mapping",
                     self.mapping,
-                ) is not None,
+                )
+                is not None,
             )
         ),
         settings=dict(
@@ -993,9 +1003,7 @@ trades = ChildDict(
         settings=dict(
             incl_open=False,
         ),
-        template_context=dict(
-            incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")
-        ),
+        template_context=dict(incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")),
     ),
     plots=Config(),
 )
@@ -1100,8 +1108,7 @@ portfolio = ChildDict(
     stats=Config(
         filters=dict(
             has_year_freq=dict(
-                filter_func=lambda self, metric_settings: metric_settings.get("year_freq", None)
-                                                          is not None,
+                filter_func=lambda self, metric_settings: metric_settings.get("year_freq", None) is not None,
                 warning_message=Sub("Metric '$metric_name' requires year frequency to be set"),
             ),
             has_bm_returns=dict(
@@ -1109,7 +1116,7 @@ portfolio = ChildDict(
                     "bm_returns",
                     self.bm_returns,
                 )
-                                                          is not None,
+                is not None,
                 warning_message=Sub("Metric '$metric_name' requires bm_returns to be set"),
             ),
         ),
@@ -1117,9 +1124,7 @@ portfolio = ChildDict(
             use_asset_returns=False,
             incl_open=False,
         ),
-        template_context=dict(
-            incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")
-        ),
+        template_context=dict(incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")),
     ),
     plots=Config(
         subplots=["orders", "trade_pnl", "cum_returns"],
@@ -1225,9 +1230,7 @@ class SettingsConfig(Config):
     def load_json_templates(self) -> None:
         """Load templates from JSON files."""
         for template_name in ["light", "dark", "seaborn"]:
-            template = Config(
-                json.loads(pkgutil.get_data(__name__, f"templates/{template_name}.json"))
-            )
+            template = Config(json.loads(pkgutil.get_data(__name__, f"templates/{template_name}.json")))
             self["plotting"]["themes"][template_name]["template"] = template
 
     def register_template(self, theme: str) -> None:
@@ -1235,9 +1238,7 @@ class SettingsConfig(Config):
         import plotly.io as pio
         import plotly.graph_objects as go
 
-        pio.templates["vbt_" + theme] = go.layout.Template(
-            self["plotting"]["themes"][theme]["template"]
-        )
+        pio.templates["vbt_" + theme] = go.layout.Template(self["plotting"]["themes"][theme]["template"])
 
     def register_templates(self) -> None:
         """Register templates of all themes."""

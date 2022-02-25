@@ -8,6 +8,9 @@ python-binance:             data
 alpaca_trade_api:           data
 ccxt:                       data
 tables:                     data
+polygon-api-client:         data
+beautifulsoup4:             data
+nasdaqdatalink:             data
 ta:                         ta
 pandas_ta:                  ta
 TA-Lib:                     ta, base
