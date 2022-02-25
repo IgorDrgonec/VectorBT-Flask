@@ -312,10 +312,11 @@ which takes care of communicating with our custom function.
 
 The method [IndicatorFactory.with_apply_func](/api/indicators/factory/#vectorbtpro.indicators.factory.IndicatorFactory.with_apply_func)
 simplifies indicator development a lot: it creates `custom_func` that handles caching, 
-iteration over parameters, and output concatenation, and passes this function to 
-[IndicatorFactory.with_custom_func](/api/indicators/factory/#vectorbtpro.indicators.factory.IndicatorFactory.with_custom_func).
+iteration over parameters with [apply_and_concat](/api/base/combining/#vectorbtpro.base.combining.apply_and_concat), 
+output concatenation with [column_stack](/api/base/reshaping/#vectorbtpro.base.reshaping.column_stack), and passes 
+this function to [IndicatorFactory.with_custom_func](/api/indicators/factory/#vectorbtpro.indicators.factory.IndicatorFactory.with_custom_func).
 Our part is writing a so-called "apply function", which accepts a single parameter combination and does 
-the calculation. It then automatically concatenates the resulting outputs along the column axis.
+the calculation. The resulting outputs are automatically concatenated along the column axis.
 
 !!! note
     An apply function has mostly the same signature as a custom function, but the parameters
@@ -425,6 +426,53 @@ and `select_params=False`:
 ...     output_names=['rollcov'],
 ... ).with_apply_func(apply_func, select_params=False)
 ```
+
+#### Execution
+
+Since the same apply function is being called multiple times - once per parameter combination -, we can 
+use one of the vectorbt's preset execution engines to distribute those calls sequentially (default), 
+across multiple threads, or across multiple processes. In fact, the function 
+[apply_and_concat](/api/base/combining/#vectorbtpro.base.combining.apply_and_concat),
+which is used to iterate over all parameter combinations, takes care of this automatically by forwarding 
+all calls to the executor function [execute](/api/utils/execution/#vectorbtpro.utils.execution.execute). 
+Using keyword arguments in `execute_kwargs`, we can define the rules by which to distribute those calls. 
+For example, to follow the execution of each parameter combination using a progress bar:
+
+```pycon
+>>> RollCov = vbt.IF(
+...     class_name='RollCov',
+...     input_names=['ts1', 'ts2'],
+...     param_names=['w'],
+...     output_names=['rollcov'],
+... ).with_apply_func(vbt.nb.rolling_cov_nb)
+
+>>> RollCov.run(
+...     ts1, ts2, np.full(100, 2),
+...     execute_kwargs=dict(show_progress=True)
+... )
+```
+
+[=100% "Iteration 100/100"]{: .candystripe}
+
+#### Numba
+
+When the apply function is Numba-compiled, the indicator factory makes the parameter selection
+function Numba-compiled as well (+ with GIL released), so we can utilize multithreading. 
+This entire behavior can be disabled by setting `jit_select_params` to False. The keyword 
+arguments used to set up the Numba-compiled function can be passed via the `jit_kwargs` argument.
+
+!!! note
+    Setting `jit_select_params` will remove all keyword arguments since variable keyword arguments
+    aren't supported by Numba (yet). To pass keyword arguments to the apply function anyway, 
+    set `remove_kwargs` to False or use the `kwargs_as_args` argument, which specifies which keyword 
+    arguments should be supplied as (variable) positional arguments.
+
+Additionally, we can explicitly set `jitted_loop` to True to loop over each parameter combination
+in a Numba loop, which speeds up the iteration for shallow inputs over a huge number of columns,
+but slows it down otherwise.
+
+!!! note
+    In this case, the execution will be performed by Numba, so you can't use `execute_kwargs` anymore.
 
 #### Debugging
 

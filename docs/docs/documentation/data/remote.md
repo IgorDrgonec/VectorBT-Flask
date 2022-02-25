@@ -6,7 +6,7 @@ icon: material/web
 # Remote
 
 Data classes that subclass [RemoteData](/api/data/custom/#vectorbtpro.data.custom.RemoteData) specialize
-in pulling data from remote data sources. In contrast to the classes for locally stored data,
+in pulling (mostly OHLCV) data from remote data sources. In contrast to the classes for locally stored data,
 they communicate with remote API endpoints and are subject to authentication, authorization, throttling, 
 and other mechanisms that must be taken into account. Also, the amount of data to be fetched is
 usually not known in advance, and because most data providers have API rate limits and can return only
@@ -126,7 +126,8 @@ Let's illustrate this by fetching the last 10 minutes of the symbols `BTC/USDT` 
 ```
 
 !!! note
-    Binance, Yahoo Finance, and CCXT have different symbol notations.
+    Different remote data classes may have different symbol notations, such as `BTC/USDT` in CCXT,
+    `BTC-USD` in Yahoo Finance, `BTCUSDT` in Binance, `X:BTCUSD` in Polygon.io, etc.
 
 [=100% "Symbol 2/2"]{: .candystripe}
 
@@ -231,6 +232,27 @@ timestamp
 2022-02-18 20:58:00+00:00          568  39973.988031  
 2022-02-18 20:59:00+00:00          709  39979.397976 
 ```
+
+### Common arguments
+
+Most remote data classes have the following arguments in common:
+
+| Argument           | Description                                                                                                                                                                                                                                                                                                                                                                                             |
+|--------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `client`           | Client required to make a request. Usually, the data class overrides the method [Data.fetch](/api/data/base/#vectorbtpro.data.base.Data.fetch) to instantiate the client only once based on keyword arguments in `client_kwargs`. If `client` has been provided, this step is omitted and the client is forwarded down to [Data.fetch_symbol](/api/data/base/#vectorbtpro.data.base.Data.fetch_symbol). |
+| `start`            | Start datetime. Will be converted into a `datetime.datetime` using [to_tzaware_datetime](/api/utils/datetime_/#vectorbtpro.utils.datetime_.to_tzaware_datetime) and may be further post-processed to fit the format accepted by the data provider.                                                                                                                                                      |
+| `end`              | End datetime. Will be converted into a `datetime.datetime` using [to_tzaware_datetime](/api/utils/datetime_/#vectorbtpro.utils.datetime_.to_tzaware_datetime) and may be further post-processed to fit the format accepted by the data provider.                                                                                                                                                        |
+| `timeframe`        | Timeframe supplied as a string (such as `1d`) consisting of a multiplier (`1`) and a timespan (`d`).                                                                                                                                                                                                                                                                                                    |
+| `limit`            | Maximum number of data items to return per request.                                                                                                                                                                                                                                                                                                                                                     |
+| `delay`            | Delay in milliseconds between requests. Helps to deal with API rate limits.                                                                                                                                                                                                                                                                                                                             | 
+| `retries`          | Number of retries in case of connectivity and other request-specific issues. Usually, only applied if the data class is capable of collecting data in bunches.                                                                                                                                                                                                                                          |
+| `show_progress`    | Whether to shop the progress bar using [get_pbar](/api/utils/pbar/#vectorbtpro.utils.pbar.get_pbar). Usually, only applied if the data class is capable of collecting data in bunches.                                                                                                                                                                                                                  | 
+| `pbar_kwargs`      | Keyword arguments used for setting up the progress bar.                                                                                                                                                                                                                                                                                                                                                 |
+| `silence_warnings` | Whether to silence all warnings to avoid being overflooded with messages such as in case of timeouts.                                                                                                                                                                                                                                                                                                   |
+| `exchange`         | Exchange to fetch from in case the data class supports multiple.                                                                                                                                                                                                                                                                                                                                        |
+
+All of these arguments can be set globally in [settings.data](/api/_settings/#vectorbtpro._settings.data).
+When the data class supports multiple exchanges, they can also be set per exchange!
 
 ## CSV
 

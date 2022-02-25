@@ -9,7 +9,7 @@ with open('../.github_gist_token', 'r') as f:
 
 locked_notebooks = {
     Path('../notebooks/BasicRSI.ipynb'): 'Basic RSI strategy',
-    Path('../notebooks/SuperTrend.ipynb'): 'Superfast SuperTrend'
+    Path('../notebooks/SuperTrend.ipynb'): 'SuperFast SuperTrend'
 }
 
 

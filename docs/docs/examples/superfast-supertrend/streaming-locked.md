@@ -2,7 +2,7 @@
 title: Streaming
 ---
 
-# :material-lock-open: Superfast SuperTrend - Streaming
+# :material-lock-open: SuperFast SuperTrend - Streaming
 
 If you look closely at the implementation of `faster_supertrend`, you will notice that 
 it repeatedly iterates over the full length of the input data: multiple times in `get_med_price`, 

@@ -452,6 +452,61 @@ Any other argument is being passed directly to
 [CSVData.fetch_symbol](/api/data/custom/#vectorbtpro.data.custom.CSVData.fetch_symbol) and then
 to [pandas.read_csv](https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html).
 
+#### Chunking
+
+As an alternative to reading everything into memory, Pandas allows us to read data in chunks. 
+In the case of CSV, we can load only a subset of lines into memory at any given time.
+Even though this is a very useful concept for processing big data, chunking doesn't provide many
+benefits when the only goal is to load the entire data into memory anyway.
+
+Where chunking becomes really useful though is data filtering! The class 
+[CSVData](/api/data/custom/#vectorbtpro.data.custom.CSVData) as well as the function
+[pandas.read_csv](https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html) it's based on 
+don't have arguments for skipping rows based on their content, only based on their row index. For example, 
+to skip all the data that comes before `2020-01-03`, we would need to load the entire data into memory first.
+But once data becomes too large, we may run out of RAM. To account for this, we can split
+data into chunks and check the condition on each chunk at a time.
+
+We have two options from here:
+
+1. Use `chunksize` to split data into chunks of a fixed length
+2. Use `iterator` to return an iterator that can be used to read chunks of a variable length
+
+Both options make [pandas.read_csv](https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html)
+return an iterator of type `TextFileReader`. To make use of this iterator, 
+[CSVData.fetch_symbol](/api/data/custom/#vectorbtpro.data.custom.CSVData.fetch_symbol)
+accepts a user-defined function `chunk_func` that should 1) accept the iterator, 2) select, process, and 
+concatenate chunks, and 3) return a Series or a DataFrame. 
+
+Let's fetch only those rows that have the date ending with an even day:
+
+```pycon
+>>> csv_data = vbt.CSVData.fetch(
+...     ['data/*.csv', 'data/*.tsv'],
+...     chunksize=1,  # (1)!
+...     chunk_func=lambda iterator: pd.concat([
+...         df 
+...         for df in iterator
+...         if (df.index.day % 2 == 0).all()
+...     ], axis=0)
+... )
+```
+
+1. Each chunk will be a DataFrame with one row
+
+[=100% "Symbol 2/2"]{: .candystripe}
+
+```pycon
+>>> csv_data.get('Close')
+symbol                         BTC-USD     ETH-USD
+Date                                              
+2020-01-02 00:00:00+00:00  6985.470215  127.410179
+2020-01-04 00:00:00+00:00  7410.656738  135.069366
+```
+
+!!! note
+    Chunking should mainly be used when memory considerations are more important than speed considerations.
+
 ### HDF
 
 Each HDF dataset can be manually imported using 
@@ -523,6 +578,36 @@ as subdirectories and files respectively. This makes importing HDF datasets as e
 Any other argument behaves the same as for [CSVData](/api/data/custom/#vectorbtpro.data.custom.CSVData),
 but now it's being passed directly to [HDFData.fetch_symbol](/api/data/custom/#vectorbtpro.data.custom.HDFData.fetch_symbol) 
 and then to [pandas.read_hdf](https://pandas.pydata.org/docs/reference/api/pandas.read_hdf.html).
+
+#### Chunking
+
+Chunking for HDF files is identical to that for CSV files, but with two exceptions: the data must be
+saved as a [PyTables](https://www.pytables.org/) Table structure by using `format='table'`, and
+the iterator is now of type `TableIterator` instead of `TextFileReader`.
+
+```pycon
+>>> yf_data.to_hdf(format='table')
+
+>>> hdf_data = vbt.HDFData.fetch(
+...     'YFData.h5',
+...     chunksize=1,
+...     chunk_func=lambda iterator: pd.concat([
+...         df 
+...         for df in iterator
+...         if (df.index.day % 2 == 0).all()
+...     ], axis=0)
+... )
+```
+
+[=100% "Symbol 2/2"]{: .candystripe}
+
+```pycon
+>>> hdf_data.get('Close')
+symbol                         BTC-USD     ETH-USD
+Date                                              
+2020-01-02 00:00:00+00:00  6985.470215  127.410179
+2020-01-04 00:00:00+00:00  7410.656738  135.069366
+```
 
 ## Updating
 

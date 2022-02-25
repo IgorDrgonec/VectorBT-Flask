@@ -2,7 +2,7 @@
 title: Pipelines
 ---
 
-# :material-lock-open: Superfast SuperTrend - Pipelines
+# :material-lock-open: SuperFast SuperTrend - Pipelines
 
 Most of the time, we not only care about the performance of all the deployed indicators, but about
 the health of the entire backtesting pipeline in general - having an ultrafast indicator 

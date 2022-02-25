@@ -412,6 +412,38 @@ symbol                             R1         R2          R3
 2020-01-04 23:00:00+00:00  100.119515  96.278695  101.840087
 ```
 
+### Remote data
+
+- [x] Supports more data classes for pulling remote data, such as from [Polygon.io](https://polygon.io/), 
+[Alpha Vantage](https://www.alphavantage.co/), and [Nasdaq Data Link](https://data.nasdaq.com/).
+Allows for gradually collecting and persisting any remote data.
+
+```pycon
+>>> data = vbt.NDLData.fetch('NSE/OIL')
+>>> data.get()
+                              Open     High      Low    Close    Close  \\
+Date                                                                     
+2009-09-30 00:00:00+00:00  1096.00  1156.70  1090.00  1135.00  1141.20   
+2009-10-01 00:00:00+00:00  1102.00  1173.70  1102.00  1167.00  1166.35   
+2009-10-05 00:00:00+00:00  1152.00  1165.90  1136.60  1143.00  1140.55   
+...                            ...      ...      ...      ...      ...   
+2019-01-02 00:00:00+00:00   175.80   176.20   171.00   172.35   172.40   
+2019-01-03 00:00:00+00:00   172.80   175.70   171.50   172.00   172.00   
+2019-01-04 00:00:00+00:00   172.05   174.95   172.05   174.55   174.55   
+
+                           Total Trade Quantity  Turnover (Lacs)  
+Date                                                              
+2009-09-30 00:00:00+00:00            19748012.0        223877.07  
+2009-10-01 00:00:00+00:00             3074254.0         35463.78  
+2009-10-05 00:00:00+00:00              919832.0         10581.13  
+...                                         ...              ...  
+2019-01-02 00:00:00+00:00              722532.0          1251.85  
+2019-01-03 00:00:00+00:00              698190.0          1212.34  
+2019-01-04 00:00:00+00:00              431122.0           749.99  
+
+[2299 rows x 7 columns]
+```
+
 ## Indicators
 
 ### Plotting TA-Lib

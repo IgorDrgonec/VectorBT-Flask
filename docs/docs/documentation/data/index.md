@@ -20,23 +20,25 @@ The steps discussed below can be visualized using the following graph:
 
 ```mermaid
 flowchart TD;
-    id1["Fetching"]
-    id2["Alignment"]
-    id3["Merging"]
-    id4["Pandas objects"]
-    id5["Data instances"]
-    id6["Querying"]
+    id1["Data class"]
+    id2["Fetching"]
+    id3["Pandas objects"]
+    id4["Data instances"]
+    id5["Alignment"]
+    id6["Merging"]
     id7["Data instance"]
-    id8["Data class"]
+    id8["Updating"]
+    id9["Querying"]
     
-    id8 --> id1;
     id1 --> id2;
-    id4 --> id2;
-    id5 --> id2;
-    id2 --> id3;
-    id3 -->|"creates"| id7;
-    id7 --> id6;
-    id7 -->|"Updating"| id2;
+    id2 --> id5;
+    id3 --> id5;
+    id4 --> id5;
+    id5 --> id6;
+    id6 -->|"creates"| id7;
+    id7 --> id8;
+    id8 --> id5;
+    id7 --> id9;
 ```
 
 (Reload the page if the diagram doesn't show up)
@@ -204,17 +206,18 @@ what happens if we fetched symbol data from different date ranges or with differ
 to [Data.from_data](/api/data/base/#vectorbtpro.data.base.Data.from_data), it does several things:
 
 1. Converts any array-like data into a Pandas object
-2. Calls [Data.prepare_tzaware_index](/api/data/base/#vectorbtpro.data.base.Data.prepare_tzaware_index)
+2. Removes rows with duplicate indices apart from the latest one
+3. Calls [Data.prepare_tzaware_index](/api/data/base/#vectorbtpro.data.base.Data.prepare_tzaware_index)
 to convert each object's index into a timezone-aware index using 
 [DataFrame.tz_localize](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.tz_localize.html) 
 and [DataFrame.tz_convert](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.tz_convert.html)
-3. Calls [Data.align_index](/api/data/base/#vectorbtpro.data.base.Data.align_index) to align the index labels
+4. Calls [Data.align_index](/api/data/base/#vectorbtpro.data.base.Data.align_index) to align the index labels
 of all objects based on some rule. By default, it builds the union of all indexes, sorts the resulting index, 
 and sets the missing data points in any object to NaN.
-4. Calls [Data.align_columns](/api/data/base/#vectorbtpro.data.base.Data.align_columns) to align the column 
+5. Calls [Data.align_columns](/api/data/base/#vectorbtpro.data.base.Data.align_columns) to align the column 
 labels of all objects based on some rule - a similar procedure to aligning indexes.
-5. Having the same index and columns across all objects, it builds a [wrapper](/documentation/building-blocks/#wrapping)
-6. Finally, it passes all information to the class constructor for instantiation
+6. Having the same index and columns across all objects, it builds a [wrapper](/documentation/building-blocks/#wrapping)
+7. Finally, it passes all information to the class constructor for instantiation
 
 Let's illustrate this workflow in practice:
 
@@ -377,9 +380,9 @@ The `start` argument of each symbol will be replaced by its respective entry in
 Let's update both symbols up to the same date:
 
 ```pycon
->>> yf_data = yf_data.update(end='2020-01-06')  # (1)!
+>>> yf_data_updated = yf_data.update(end='2020-01-06')  # (1)!
 
->>> yf_data.data['BTC-USD']
+>>> yf_data_updated.data['BTC-USD']
                                   Open         High          Low        Close  \\
 Date                                                                            
 2019-12-31 00:00:00+00:00  7294.438965  7335.290039  7169.777832  7193.599121   
@@ -398,7 +401,7 @@ Date
 2020-01-04 00:00:00+00:00  1.844427e+10        0.0           0.0  
 2020-01-05 00:00:00+00:00  1.972507e+10        0.0           0.0  
 
->>> yf_data.data['ETH-USD']
+>>> yf_data_updated.data['ETH-USD']
                                  Open        High         Low       Close  \\
 Date                                                                        
 2019-12-31 00:00:00+00:00         NaN         NaN         NaN         NaN   
@@ -426,7 +429,7 @@ new rows between `2020-01-04` to `2020-01-05`. We can now see that both symbols 
 up to the same ending date:
 
 ```pycon
->>> yf_data.last_index
+>>> yf_data_updated.last_index
 {'BTC-USD': Timestamp('2020-01-05 00:00:00+0000', tz='UTC'),
  'ETH-USD': Timestamp('2020-01-05 00:00:00+0000', tz='UTC')}
 ```
@@ -435,9 +438,9 @@ If the last index of the data update lies before the current `last_index` (that 
 any data in the middle), all the data after the new last index will be disregarded:
 
 ```pycon
->>> yf_data = yf_data.update(start='2020-01-01', end='2020-01-02')
+>>> yf_data_updated = yf_data_updated.update(start='2020-01-01', end='2020-01-02')
 
->>> yf_data.data['BTC-USD']
+>>> yf_data_updated.data['BTC-USD']
                                   Open         High          Low        Close  \\
 Date                                                                            
 2019-12-31 00:00:00+00:00  7294.438965  7335.290039  7169.777832  7193.599121   
@@ -448,7 +451,7 @@ Date
 2019-12-31 00:00:00+00:00  2.116795e+10        0.0           0.0  
 2020-01-01 00:00:00+00:00  1.856566e+10        0.0           0.0 
 
->>> yf_data.data['ETH-USD']
+>>> yf_data_updated.data['ETH-USD']
                                  Open        High         Low       Close  \\
 Date                                                                        
 2019-12-31 00:00:00+00:00  132.612274  133.732681  128.798157  129.610855   
@@ -463,6 +466,51 @@ Date
 !!! note
     The last data point of an update is considered to be the most up-to-date point, thus
     no data stored previously can come after it.
+
+### Concatenation
+
+By default, the returned data instance contains the whole data - the old data with the new data
+concatenated together. To return only the updated data, disable `concat`:
+
+```pycon
+>>> yf_data_new = yf_data.update(end='2020-01-06', concat=False)
+
+>>> yf_data_new.data['BTC-USD']
+                                  Open         High          Low        Close  \\
+Date                                                                            
+2020-01-02 00:00:00+00:00  7202.551270  7212.155273  6935.270020  6985.470215   
+2020-01-03 00:00:00+00:00  6984.428711  7413.715332  6914.996094  7344.884277   
+2020-01-04 00:00:00+00:00  7345.375488  7427.385742  7309.514160  7410.656738   
+2020-01-05 00:00:00+00:00  7410.451660  7544.497070  7400.535645  7411.317383   
+
+                                 Volume  Dividends  Stock Splits  
+Date                                                              
+2020-01-02 00:00:00+00:00  2.080208e+10        0.0           0.0  
+2020-01-03 00:00:00+00:00  2.811148e+10        0.0           0.0  
+2020-01-04 00:00:00+00:00  1.844427e+10        0.0           0.0  
+2020-01-05 00:00:00+00:00  1.972507e+10        0.0           0.0  
+
+>>> yf_data_new.data['ETH-USD']
+                                 Open        High         Low       Close  \\
+Date                                                                        
+2020-01-02 00:00:00+00:00  130.820038  130.820038  126.954910  127.410179   
+2020-01-03 00:00:00+00:00  127.411263  134.554016  126.490021  134.171707   
+2020-01-04 00:00:00+00:00  134.168518  136.052719  133.040558  135.069366   
+2020-01-05 00:00:00+00:00  135.072098  139.410202  135.045624  136.276779   
+
+                                 Volume  Dividends  Stock Splits  
+Date                                                              
+2020-01-02 00:00:00+00:00  8.032709e+09        0.0           0.0  
+2020-01-03 00:00:00+00:00  1.047685e+10        0.0           0.0  
+2020-01-04 00:00:00+00:00  7.430905e+09        0.0           0.0  
+2020-01-05 00:00:00+00:00  7.526675e+09        0.0           0.0 
+```
+
+The returned data instance skips two timestamps: `2019-12-31` and `2020-01-01`,
+which weren't changed during that update. But even though the symbol `ETH-USD` only received 
+new rows between `2020-01-04` to `2020-01-05`, it contains the old data for `2020-01-02` and
+`2020-01-03` as well, why so? Those timestamps were updated in the `BTC-USD` dataset, and because the
+index across all symbols must be aligned, we need to include some old data to avoid setting NaNs.
 
 ## Querying
 

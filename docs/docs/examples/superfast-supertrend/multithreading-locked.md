@@ -2,7 +2,7 @@
 title: Multithreading
 ---
 
-# :material-lock-open: Superfast SuperTrend - Multithreading
+# :material-lock-open: SuperFast SuperTrend - Multithreading
 
 Having a purely Numba-compiled indicator function has one major benefit - multithreading support.
 So, what exactly is multithreading and how it compares to multiprocessing?
@@ -35,16 +35,14 @@ did above).
 ... ).with_apply_func(
 ...     superfast_supertrend_nb, 
 ...     takes_1d=True,
-...     jit_select_params=True,  # (1)!
-...     jit_kwargs=dict(nogil=True),
 ...     period=7, 
 ...     multiplier=3
 ... )
 ```
 
-1. Indicator factory dynamically generates a function that selects one parameter combination
-at each time step and calls our `superfast_supertrend_nb`. These two arguments make it Numba-compiled
-and release the GIL.
+The indicator factory recognizes that `superfast_supertrend_nb` is Numba-compiled and dynamically generates 
+another Numba-compiled function that selects one parameter combination at each time step and calls our 
+`superfast_supertrend_nb`. By default, it also forces this selection function to release the GIL.
 
 Let's benchmark this indicator on 336 parameter combinations per symbol:
 

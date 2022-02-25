@@ -6,6 +6,39 @@ title: Release notes
 
 All notable changes in reverse chronological order.
 
+## Version 1.1.1 (25 Feb, 2022)
+
+- [Data](/api/data/base/#vectorbtpro.data.base.Data) now removes duplicates in index while keeping only the last entry
+- Added option `concat` to [Data.update](/api/data/base/#vectorbtpro.data.base.Data.update) for being
+able to disable concatenation of new data with existing data and to only return new data
+- Added support for chunking in [CSVData](/api/data/custom/#vectorbtpro.data.custom.CSVData) and
+[HDFData](/api/data/custom/#vectorbtpro.data.custom.HDFData) using `chunk_func`
+- Implemented class [DataSaver](/api/data/saver/#vectorbtpro.data.saver.DataSaver) that can periodically
+collect and save data to disk, and two its subclasses: [CSVDataSaver](/api/data/saver/#vectorbtpro.data.saver.CSVDataSaver)
+for writing to CSV files and [HDFDataSaver](/api/data/saver/#vectorbtpro.data.saver.HDFDataSaver) 
+for writing to HDF files. This way, one can gradually collect and persist any data from any data provider!
+- Fixed unpickling of [Config](/api/utils/config/#vectorbtpro.utils.config.Config) 
+- Fixed scheduling in [DataUpdater](/api/data/updater/#vectorbtpro.data.updater.DataUpdater) such that
+repeatedly stopping and starting the same updater won't trigger the same job more than once
+- [QSAdapter](/api/returns/qs_adapter/#vectorbtpro.returns.qs_adapter.QSAdapter) will now remove
+timezone info automatically to prevent issues in QuantStats
+- Implemented three new data classes:
+    1. [PolygonData](/api/data/custom/#vectorbtpro.data.custom.PolygonData) for [Polygon.io](https://polygon.io/).
+Can load data of any size in bunches and respects the API rate limits.
+    2. [AlphaVantageData](/api/data/custom/#vectorbtpro.data.custom.AlphaVantageData) for [Alpha Vantage](https://www.alphavantage.co/).
+Does not use the `alpha_vantage` library, which isn't actively developed. Instead, it implements a parser
+of the Alpha Vantage's documentation website and handles communication with the API using the parsed metadata.
+This enables instant reaction to any changes in the Alpha Vantage's API. The user can still disable the parsing 
+and specify every bit of information manually.
+    3. [NDLData](/api/data/custom/#vectorbtpro.data.custom.NDLData) for [Nasdaq Data Link](https://data.nasdaq.com/).
+Supports (time-series) datasets. 
+- Fixed the condition for a backward fill in [fbfill_nb](/api/generic/nb/#vectorbtpro.generic.nb.fbfill_nb)
+- Fixed passing `execute_kwargs` in [IndicatorFactory.with_apply_func](/api/indicators/factory/#vectorbtpro.indicators.factory.IndicatorFactory.from_apply_func).
+Also, whenever `apply_func` is Numba compiled, makes the parameter selection function Numba compiled
+as well (`jit_select_params=True`) and also releases the GIL (`nogil=True`), so the indicator can be used 
+in multithreading right away.
+
+
 ## Version 1.1.0 (20 Feb, 2022)
 
 - Removed support for Python 3.6. Wanted to add support for Python 3.10 but stumbled upon issues
@@ -26,7 +59,7 @@ chart if it can find the right price columns, otherwise, it plots each column as
 (as it was previously). Also, one can now select a symbol to plot using the `symbol` argument.
 - One metric/subplot can be expanded into multiple metrics/subplots using templates. This enables
 displaying a variable number of metrics/subplots.
-- [Data.plots](/api/data/base/#vectorbtpro.data.base.Data.plots) now plots one subplot per symbol.
+- [Data.plots](/api/data/base/#vectorbtpro.data.base.Data.plots) now plots one subplot per symbol
 - Delimiter is recognized automatically when dealing with CSV and TSV files
 - Implemented a function for pretty-printing directory trees - [tree](/api/utils/path_/#vectorbtpro.utils.path_.tree)
 - Refactored the path matching mechanism for CSV and HDF files. In particular:
@@ -89,7 +122,7 @@ and [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Por
 by passing the `fill_returns=True` flag
 - Fixed [save_animation](/api/utils/image_/#vectorbtpro.utils.image_.save_animation), which previously
 produced one less iteration
-- Wrote [Superfast SuperTrend](/examples/superfast-supertrend) :notebook_with_decorative_cover:
+- Wrote [SuperFast SuperTrend](/examples/superfast-supertrend) :notebook_with_decorative_cover:
 
 ## Version 1.0.9 (2 Feb, 2022)
 

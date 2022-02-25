@@ -9,11 +9,11 @@ from argparse import ArgumentParser
 
 locked_pages = {
     Path('examples/superfast-supertrend/streaming-locked'):
-        'Superfast SuperTrend - Streaming',
+        'SuperFast SuperTrend - Streaming',
     Path('examples/superfast-supertrend/multithreading-locked'):
-        'Superfast SuperTrend - Multithreading',
+        'SuperFast SuperTrend - Multithreading',
     Path('examples/superfast-supertrend/pipelines-locked'):
-        'Superfast SuperTrend - Pipelines'
+        'SuperFast SuperTrend - Pipelines'
 }
 
 
