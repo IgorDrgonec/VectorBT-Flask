@@ -157,6 +157,7 @@ nav:
       - base: api/data/base.md
       - custom: api/data/custom.md
       - nb: api/data/nb.md
+      - saver: api/data/saver.md
       - updater: api/data/updater.md
     - generic:
       - api/generic/index.md
