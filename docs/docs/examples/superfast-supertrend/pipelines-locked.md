@@ -470,8 +470,8 @@ also retain the full control over their calculation.
 We've already designed a streaming SuperTrend indicator, but what about Sharpe? Making it a one-pass 
 algorithm requires implementing an accumulator, which is a fairly easy task because the Sharpe ratio 
 essentially depends on the rolling mean and the standard deviation. Thus, we'll make an accumulator 
-by simply combining other two accumulators: [rolling_mean_acc_nb](/api/generic/nb/#vectorbtpro.generic.nb.rolling_mean_acc_nb) 
-and [rolling_std_acc_nb](/api/generic/nb/#vectorbtpro.generic.nb.rolling_std_acc_nb). 
+by simply combining other two accumulators: [rolling_mean_acc_nb](/api/generic/nb/#vectorbtpro.generic.nb.rolling.rolling_mean_acc_nb) 
+and [rolling_std_acc_nb](/api/generic/nb/#vectorbtpro.generic.nb.rolling.rolling_std_acc_nb). 
 If you followed me through the implementation of the streaming SuperTrend, you would have no difficulties 
 understanding the following code:
 

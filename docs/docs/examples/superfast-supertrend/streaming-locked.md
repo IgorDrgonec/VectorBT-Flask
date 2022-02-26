@@ -22,14 +22,14 @@ contains no arrays - only constants. Since both input and output states are regu
 continue from where we left off.
 
 Let's take a look at the accumulator for the rolling mean: 
-[rolling_mean_acc_nb](/api/generic/nb/#vectorbtpro.generic.nb.rolling_mean_acc_nb).
+[rolling_mean_acc_nb](/api/generic/nb/#vectorbtpro.generic.nb.rolling.rolling_mean_acc_nb).
 It takes an input state of type [RollMeanAIS](/api/generic/nb/#vectorbtpro.generic.enums.RollMeanAIS)
 and returns an output state of type [RollMeanAOS](/api/generic/nb/#vectorbtpro.generic.enums.RollMeanAOS).
 The main pieces of information required by this accumulator are the length of the window and the sum
 of the elements contained in it (recall how the sum of the values divided by the number of values 
 is the definition of the arithmetic mean).
 
-The function [rolling_mean_1d_nb](/api/generic/nb/#vectorbtpro.generic.nb.rolling_mean_1d_nb) then implements
+The function [rolling_mean_1d_nb](/api/generic/nb/#vectorbtpro.generic.nb.rolling.rolling_mean_1d_nb) then implements
 a simple for-loop that goes through all elements, and for each one:
 
 1. Creates the input state and passes it to the accumulator
@@ -135,7 +135,7 @@ But let's define the input and output state for our future accumulator first:
 As you can see, the fields in both states are all constants. The fields from `i` to `prev_dir_` 
 and `multiplier` in the input state will be used by our own accumulator, while the fields `nobs`, 
 `weighted_avg`, `old_wt`, and `period` are required by the accumulator for EMA - 
-[ewm_mean_acc_nb](/api/generic/nb/#vectorbtpro.generic.nb.ewm_mean_acc_nb). The output state
+[ewm_mean_acc_nb](/api/generic/nb/#vectorbtpro.generic.nb.rolling.ewm_mean_acc_nb). The output state
 contains input fields that are updated by the accumulator, but also fields that might
 be interesting to the user.
 

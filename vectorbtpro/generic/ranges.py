@@ -290,7 +290,7 @@ class Ranges(Records):
     ) -> tp.SeriesFrame:
         """Get mask from ranges.
 
-        See `vectorbtpro.generic.nb.ranges_to_mask_nb`."""
+        See `vectorbtpro.generic.nb.records.ranges_to_mask_nb`."""
         col_map = self.col_mapper.get_col_map(group_by=group_by)
         func = jit_reg.resolve_option(nb.ranges_to_mask_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -345,7 +345,7 @@ class Ranges(Records):
     ) -> tp.MaybeSeries:
         """Get coverage, that is, the number of steps that are covered by all ranges.
 
-        See `vectorbtpro.generic.nb.range_coverage_nb`."""
+        See `vectorbtpro.generic.nb.records.range_coverage_nb`."""
         col_map = self.col_mapper.get_col_map(group_by=group_by)
         index_lens = self.wrapper.grouper.get_group_lens(group_by=group_by) * self.wrapper.shape[0]
         func = jit_reg.resolve_option(nb.range_coverage_nb, jitted)

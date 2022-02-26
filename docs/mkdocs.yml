@@ -166,7 +166,12 @@ nav:
       - decorators: api/generic/decorators.md
       - drawdowns: api/generic/drawdowns.md
       - enums: api/generic/enums.md
-      - nb: api/generic/nb.md
+      - nb:
+        - api/generic/nb/index.md
+        - apply_reduce: api/generic/nb/apply_reduce.md
+        - base: api/generic/nb/base.md
+        - records: api/generic/nb/records.md
+        - rolling: api/generic/nb/rolling.md
       - plots_builder: api/generic/plots_builder.md
       - plotting: api/generic/plotting.md
       - ranges: api/generic/ranges.md

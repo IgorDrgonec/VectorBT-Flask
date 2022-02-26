@@ -307,7 +307,7 @@ class Drawdowns(Ranges):
     # ############# Drawdown ############# #
 
     def get_drawdown(self, jitted: tp.JittedOption = None, chunked: tp.ChunkedOption = None, **kwargs) -> MappedArray:
-        """See `vectorbtpro.generic.nb.dd_drawdown_nb`.
+        """See `vectorbtpro.generic.nb.records.dd_drawdown_nb`.
 
         Takes into account both recovered and active drawdowns."""
         func = jit_reg.resolve_option(nb.dd_drawdown_nb, jitted)
@@ -351,7 +351,7 @@ class Drawdowns(Ranges):
         chunked: tp.ChunkedOption = None,
         **kwargs,
     ) -> MappedArray:
-        """See `vectorbtpro.generic.nb.dd_recovery_return_nb`.
+        """See `vectorbtpro.generic.nb.records.dd_recovery_return_nb`.
 
         Takes into account both recovered and active drawdowns."""
         func = jit_reg.resolve_option(nb.dd_recovery_return_nb, jitted)
@@ -407,7 +407,7 @@ class Drawdowns(Ranges):
         chunked: tp.ChunkedOption = None,
         **kwargs,
     ) -> MappedArray:
-        """See `vectorbtpro.generic.nb.dd_decline_duration_nb`.
+        """See `vectorbtpro.generic.nb.records.dd_decline_duration_nb`.
 
         Takes into account both recovered and active drawdowns."""
         func = jit_reg.resolve_option(nb.dd_decline_duration_nb, jitted)
@@ -421,7 +421,7 @@ class Drawdowns(Ranges):
         chunked: tp.ChunkedOption = None,
         **kwargs,
     ) -> MappedArray:
-        """See `vectorbtpro.generic.nb.dd_recovery_duration_nb`.
+        """See `vectorbtpro.generic.nb.records.dd_recovery_duration_nb`.
 
         A value higher than 1 means the recovery was slower than the decline.
 
@@ -437,7 +437,7 @@ class Drawdowns(Ranges):
         chunked: tp.ChunkedOption = None,
         **kwargs,
     ) -> MappedArray:
-        """See `vectorbtpro.generic.nb.dd_recovery_duration_ratio_nb`.
+        """See `vectorbtpro.generic.nb.records.dd_recovery_duration_ratio_nb`.
 
         Takes into account both recovered and active drawdowns."""
         func = jit_reg.resolve_option(nb.dd_recovery_duration_ratio_nb, jitted)

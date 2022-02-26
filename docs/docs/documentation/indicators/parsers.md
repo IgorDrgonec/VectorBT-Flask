@@ -375,7 +375,7 @@ two-dimensional data!
 So, how can we define our own functions and rules? Any additional keyword argument passed to
 [IndicatorFactory.from_expr](/api/indicators/factory/#vectorbtpro.indicators.factory.IndicatorFactory.from_expr)
 acts as a context for the evaluation and can replace a variable with the same name. Let's define our 
-own function `shift_close` that acts as an alias for [fshift_nb](/api/generic/nb/#vectorbtpro.generic.nb.fshift_nb):
+own function `shift_close` that acts as an alias for [fshift_nb](/api/generic/nb/#vectorbtpro.generic.nb.base.fshift_nb):
 
 ```pycon
 >>> expr = """

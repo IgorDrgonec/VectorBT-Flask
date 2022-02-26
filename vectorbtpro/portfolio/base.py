@@ -5790,7 +5790,7 @@ class Portfolio(Analyzable):
     ) -> tp.SeriesFrame:
         """Get forward and backward filled closing price.
 
-        See `vectorbtpro.generic.nb.fbfill_nb`."""
+        See `vectorbtpro.generic.nb.base.fbfill_nb`."""
         if not isinstance(cls_or_self, type):
             if close is None:
                 close = cls_or_self.close
@@ -5828,7 +5828,7 @@ class Portfolio(Analyzable):
     ) -> tp.Union[None, bool, tp.SeriesFrame]:
         """Get forward and backward filled benchmark closing price.
 
-        See `vectorbtpro.generic.nb.fbfill_nb`."""
+        See `vectorbtpro.generic.nb.base.fbfill_nb`."""
         if not isinstance(cls_or_self, type):
             if bm_close is None:
                 bm_close = cls_or_self.bm_close

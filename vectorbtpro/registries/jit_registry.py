@@ -178,7 +178,7 @@ Options are usually specified upon registration using `register_jitted`:
 ```
 
 But what if we wanted to change the registration options of vectorbt's own jitable functions,
-such as `vectorbtpro.generic.nb.diff_nb`? For example, let's disable caching for all Numba functions.
+such as `vectorbtpro.generic.nb.base.diff_nb`? For example, let's disable caching for all Numba functions.
 
 ```pycon
 >>> vbt.settings.jitting.jitters['nb']['override_options'] = dict(cache=False)
@@ -187,7 +187,7 @@ such as `vectorbtpro.generic.nb.diff_nb`? For example, let's disable caching for
 Since all functions have already been registered, the above statement has no effect:
 
 ```pycon
->>> vbt.jit_reg.jitable_setups['vectorbtpro.generic.nb.diff_nb']['nb'].jitter_kwargs
+>>> vbt.jit_reg.jitable_setups['vectorbtpro.generic.nb.base.diff_nb']['nb'].jitter_kwargs
 {'cache': True}
 ```
 
@@ -205,13 +205,13 @@ Let's restart the runtime and instruct vectorbt to load the file with settings b
 >>> os.environ['VBT_SETTINGS_PATH'] = "my_settings"
 
 >>> import vectorbtpro as vbt
->>> vbt.jit_reg.jitable_setups['vectorbtpro.generic.nb.diff_nb']['nb'].jitter_kwargs
+>>> vbt.jit_reg.jitable_setups['vectorbtpro.generic.nb.base.diff_nb']['nb'].jitter_kwargs
 {'cache': False}
 ```
 
 We can also change the registration options for some specific tasks, and even replace Python functions.
 For example, we can change the implementation in the deepest places of the core.
-Let's change the default `ddof` from 0 to 1 in `vectorbtpro.generic.nb.nanstd_1d_nb` and disable caching with Numba:
+Let's change the default `ddof` from 0 to 1 in `vectorbtpro.generic.nb.base.nanstd_1d_nb` and disable caching with Numba:
 
 ```pycon
 >>> from vectorbtpro.generic.nb import nanstd_1d_nb, nanvar_1d_nb
@@ -222,7 +222,7 @@ Let's change the default `ddof` from 0 to 1 in `vectorbtpro.generic.nb.nanstd_1d
 >>> def new_nanstd_1d_nb(arr, ddof=1):
 ...     return np.sqrt(nanvar_1d_nb(arr, ddof=ddof))
 
->>> vbt.settings.jitting.jitters['nb']['tasks']['vectorbtpro.generic.nb.nanstd_1d_nb'] = dict(
+>>> vbt.settings.jitting.jitters['nb']['tasks']['vectorbtpro.generic.nb.base.nanstd_1d_nb'] = dict(
 ...     replace_py_func=new_nanstd_1d_nb,
 ...     override_options=dict(
 ...         cache=False
@@ -256,14 +256,14 @@ upon resolution using `JITRegistry.resolve_option`:
 
 ```pycon
 >>> # On specific Numba function
->>> vbt.settings.jitting.jitters['nb']['tasks']['vectorbtpro.generic.nb.diff_nb'] = dict(
+>>> vbt.settings.jitting.jitters['nb']['tasks']['vectorbtpro.generic.nb.base.diff_nb'] = dict(
 ...     resolve_kwargs=dict(
 ...         nogil=False
 ...     )
 ... )
 
 >>> # disabled
->>> vbt.jit_reg.resolve('vectorbtpro.generic.nb.diff_nb', jitter='nb').targetoptions
+>>> vbt.jit_reg.resolve('vectorbtpro.generic.nb.base.diff_nb', jitter='nb').targetoptions
 {'nopython': True, 'nogil': False, 'parallel': False, 'boundscheck': False}
 
 >>> # still enabled
@@ -274,7 +274,7 @@ upon resolution using `JITRegistry.resolve_option`:
 >>> vbt.settings.jitting.jitters['nb']['resolve_kwargs'] = dict(nogil=False)
 
 >>> # disabled
->>> vbt.jit_reg.resolve('vectorbtpro.generic.nb.diff_nb', jitter='nb').targetoptions
+>>> vbt.jit_reg.resolve('vectorbtpro.generic.nb.base.diff_nb', jitter='nb').targetoptions
 {'nopython': True, 'nogil': False, 'parallel': False, 'boundscheck': False}
 
 >>> # disabled

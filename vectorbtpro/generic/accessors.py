@@ -394,7 +394,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """See `vectorbtpro.generic.nb.rolling_argmin_nb`."""
+        """See `vectorbtpro.generic.nb.rolling.rolling_argmin_nb`."""
         if window is None:
             window = self.wrapper.shape[0]
         func = jit_reg.resolve_option(nb.rolling_argmin_nb, jitted)
@@ -417,7 +417,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """See `vectorbtpro.generic.nb.rolling_argmax_nb`."""
+        """See `vectorbtpro.generic.nb.rolling.rolling_argmax_nb`."""
         if window is None:
             window = self.wrapper.shape[0]
         func = jit_reg.resolve_option(nb.rolling_argmax_nb, jitted)
@@ -439,7 +439,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """See `vectorbtpro.generic.nb.rolling_mean_nb`."""
+        """See `vectorbtpro.generic.nb.rolling.rolling_mean_nb`."""
         if window is None:
             window = self.wrapper.shape[0]
         func = jit_reg.resolve_option(nb.rolling_mean_nb, jitted)
@@ -460,7 +460,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """See `vectorbtpro.generic.nb.rolling_std_nb`."""
+        """See `vectorbtpro.generic.nb.rolling.rolling_std_nb`."""
         if window is None:
             window = self.wrapper.shape[0]
         func = jit_reg.resolve_option(nb.rolling_std_nb, jitted)
@@ -480,7 +480,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """See `vectorbtpro.generic.nb.wm_mean_nb`."""
+        """See `vectorbtpro.generic.nb.rolling.wm_mean_nb`."""
         func = jit_reg.resolve_option(nb.wm_mean_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         out = func(self.to_2d_array(), span, minp=minp)
@@ -495,7 +495,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """See `vectorbtpro.generic.nb.ewm_mean_nb`."""
+        """See `vectorbtpro.generic.nb.rolling.ewm_mean_nb`."""
         func = jit_reg.resolve_option(nb.ewm_mean_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         out = func(self.to_2d_array(), span, minp=minp, adjust=adjust)
@@ -510,7 +510,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """See `vectorbtpro.generic.nb.ewm_std_nb`."""
+        """See `vectorbtpro.generic.nb.rolling.ewm_std_nb`."""
         func = jit_reg.resolve_option(nb.ewm_std_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         out = func(self.to_2d_array(), span, minp=minp, adjust=adjust)
@@ -524,7 +524,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """See `vectorbtpro.generic.nb.wwm_mean_nb`."""
+        """See `vectorbtpro.generic.nb.rolling.wwm_mean_nb`."""
         func = jit_reg.resolve_option(nb.wwm_mean_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         out = func(self.to_2d_array(), period, minp=minp)
@@ -538,7 +538,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """See `vectorbtpro.generic.nb.wwm_std_nb`."""
+        """See `vectorbtpro.generic.nb.rolling.wwm_std_nb`."""
         func = jit_reg.resolve_option(nb.wwm_std_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         out = func(self.to_2d_array(), period, minp=minp)
@@ -555,7 +555,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """See `vectorbtpro.generic.nb.rolling_cov_nb`."""
+        """See `vectorbtpro.generic.nb.rolling.rolling_cov_nb`."""
         self_obj, other_obj = reshaping.broadcast(self.obj, other, **resolve_dict(broadcast_kwargs))
         if window is None:
             window = self_obj.shape[0]
@@ -578,7 +578,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """See `vectorbtpro.generic.nb.rolling_corr_nb`."""
+        """See `vectorbtpro.generic.nb.rolling.rolling_corr_nb`."""
         self_obj, other_obj = reshaping.broadcast(self.obj, other, **resolve_dict(broadcast_kwargs))
         if window is None:
             window = self_obj.shape[0]
@@ -600,7 +600,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """See `vectorbtpro.generic.nb.rolling_rank_nb`."""
+        """See `vectorbtpro.generic.nb.rolling.rolling_rank_nb`."""
         if window is None:
             window = self.wrapper.shape[0]
         func = jit_reg.resolve_option(nb.rolling_rank_nb, jitted)
@@ -627,9 +627,9 @@ class GenericAccessor(BaseAccessor, Analyzable):
         wrapper: tp.Optional[ArrayWrapper] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """See `vectorbtpro.generic.nb.map_nb`.
+        """See `vectorbtpro.generic.nb.apply_reduce.map_nb`.
 
-        For details on the meta version, see `vectorbtpro.generic.nb.map_meta_nb`.
+        For details on the meta version, see `vectorbtpro.generic.nb.apply_reduce.map_meta_nb`.
 
         Usage:
             * Using regular function:
@@ -737,11 +737,11 @@ class GenericAccessor(BaseAccessor, Analyzable):
         wrapper: tp.Optional[ArrayWrapper] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """See `vectorbtpro.generic.nb.apply_nb` for `axis=1` and
-        `vectorbtpro.generic.nb.row_apply_nb` for `axis=0`.
+        """See `vectorbtpro.generic.nb.apply_reduce.apply_nb` for `axis=1` and
+        `vectorbtpro.generic.nb.apply_reduce.row_apply_nb` for `axis=0`.
 
-        For details on the meta version, see `vectorbtpro.generic.nb.apply_meta_nb`
-        for `axis=1` and `vectorbtpro.generic.nb.row_apply_meta_nb` for `axis=0`.
+        For details on the meta version, see `vectorbtpro.generic.nb.apply_reduce.apply_meta_nb`
+        for `axis=1` and `vectorbtpro.generic.nb.apply_reduce.row_apply_meta_nb` for `axis=0`.
 
         Usage:
             * Using regular function:
@@ -857,9 +857,9 @@ class GenericAccessor(BaseAccessor, Analyzable):
         wrapper: tp.Optional[ArrayWrapper] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """See `vectorbtpro.generic.nb.rolling_apply_nb`.
+        """See `vectorbtpro.generic.nb.apply_reduce.rolling_apply_nb`.
 
-        For details on the meta version, see `vectorbtpro.generic.nb.rolling_apply_meta_nb`.
+        For details on the meta version, see `vectorbtpro.generic.nb.apply_reduce.rolling_apply_meta_nb`.
 
         If `window` is None, it will become an expanding window.
 
@@ -994,9 +994,9 @@ class GenericAccessor(BaseAccessor, Analyzable):
         wrap_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> tp.SeriesFrame:
-        """See `vectorbtpro.generic.nb.groupby_apply_nb`.
+        """See `vectorbtpro.generic.nb.apply_reduce.groupby_apply_nb`.
 
-        For details on the meta version, see `vectorbtpro.generic.nb.groupby_apply_meta_nb`.
+        For details on the meta version, see `vectorbtpro.generic.nb.apply_reduce.groupby_apply_meta_nb`.
 
         For details on `by`, see `pd.DataFrame.groupby`.
 
@@ -1244,9 +1244,9 @@ class GenericAccessor(BaseAccessor, Analyzable):
         wrapper: tp.Optional[ArrayWrapper] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
-        """See `vectorbtpro.generic.nb.apply_and_reduce_nb`.
+        """See `vectorbtpro.generic.nb.apply_reduce.apply_and_reduce_nb`.
 
-        For details on the meta version, see `vectorbtpro.generic.nb.apply_and_reduce_meta_nb`.
+        For details on the meta version, see `vectorbtpro.generic.nb.apply_reduce.apply_and_reduce_meta_nb`.
 
         Usage:
             * Using regular function:
@@ -1389,19 +1389,19 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         For implementation details, see
 
-        * `vectorbtpro.generic.nb.reduce_flat_grouped_to_array_nb` if grouped, `returns_array` is True, and `flatten` is True
-        * `vectorbtpro.generic.nb.reduce_flat_grouped_nb` if grouped, `returns_array` is False, and `flatten` is True
-        * `vectorbtpro.generic.nb.reduce_grouped_to_array_nb` if grouped, `returns_array` is True, and `flatten` is False
-        * `vectorbtpro.generic.nb.reduce_grouped_nb` if grouped, `returns_array` is False, and `flatten` is False
-        * `vectorbtpro.generic.nb.reduce_to_array_nb` if not grouped and `returns_array` is True
-        * `vectorbtpro.generic.nb.reduce_nb` if not grouped and `returns_array` is False
+        * `vectorbtpro.generic.nb.apply_reduce.reduce_flat_grouped_to_array_nb` if grouped, `returns_array` is True, and `flatten` is True
+        * `vectorbtpro.generic.nb.apply_reduce.reduce_flat_grouped_nb` if grouped, `returns_array` is False, and `flatten` is True
+        * `vectorbtpro.generic.nb.apply_reduce.reduce_grouped_to_array_nb` if grouped, `returns_array` is True, and `flatten` is False
+        * `vectorbtpro.generic.nb.apply_reduce.reduce_grouped_nb` if grouped, `returns_array` is False, and `flatten` is False
+        * `vectorbtpro.generic.nb.apply_reduce.reduce_to_array_nb` if not grouped and `returns_array` is True
+        * `vectorbtpro.generic.nb.apply_reduce.reduce_nb` if not grouped and `returns_array` is False
 
         For implementation details on the meta versions, see
 
-        * `vectorbtpro.generic.nb.reduce_grouped_to_array_meta_nb` if grouped and `returns_array` is True
-        * `vectorbtpro.generic.nb.reduce_grouped_meta_nb` if grouped and `returns_array` is False
-        * `vectorbtpro.generic.nb.reduce_to_array_meta_nb` if not grouped and `returns_array` is True
-        * `vectorbtpro.generic.nb.reduce_meta_nb` if not grouped and `returns_array` is False
+        * `vectorbtpro.generic.nb.apply_reduce.reduce_grouped_to_array_meta_nb` if grouped and `returns_array` is True
+        * `vectorbtpro.generic.nb.apply_reduce.reduce_grouped_meta_nb` if grouped and `returns_array` is False
+        * `vectorbtpro.generic.nb.apply_reduce.reduce_to_array_meta_nb` if not grouped and `returns_array` is True
+        * `vectorbtpro.generic.nb.apply_reduce.reduce_meta_nb` if not grouped and `returns_array` is False
 
         Usage:
             * Using regular function:
@@ -1616,8 +1616,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
     ) -> tp.SeriesFrame:
         """Squeeze each group of columns into a single column.
 
-        See `vectorbtpro.generic.nb.squeeze_grouped_nb`.
-        For details on the meta version, see `vectorbtpro.generic.nb.squeeze_grouped_meta_nb`.
+        See `vectorbtpro.generic.nb.apply_reduce.squeeze_grouped_nb`.
+        For details on the meta version, see `vectorbtpro.generic.nb.apply_reduce.squeeze_grouped_meta_nb`.
 
         Usage:
             * Using regular function:
@@ -1734,8 +1734,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
     ) -> tp.SeriesFrame:
         """Flatten each group of columns.
 
-        See `vectorbtpro.generic.nb.flatten_grouped_nb`.
-        If all groups have the same length, see `vectorbtpro.generic.nb.flatten_uniform_grouped_nb`.
+        See `vectorbtpro.generic.nb.apply_reduce.flatten_grouped_nb`.
+        If all groups have the same length, see `vectorbtpro.generic.nb.apply_reduce.flatten_uniform_grouped_nb`.
 
         !!! warning
             Make sure that the distribution of group lengths is close to uniform, otherwise
@@ -2206,7 +2206,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         group_by: tp.GroupByLike = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """See `vectorbtpro.generic.nb.describe_reduce_nb`.
+        """See `vectorbtpro.generic.nb.apply_reduce.describe_reduce_nb`.
 
         For `percentiles`, see `pd.DataFrame.describe`.
 
@@ -2348,8 +2348,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 See `vectorbtpro.base.grouping.base.Grouper`.
             mapping (mapping_like): Mapping of values to labels.
             incl_all_keys (bool): Whether to include all mapping keys, no only those that are present in the array.
-            jitted (any): Whether to JIT-compile `vectorbtpro.generic.nb.value_counts_nb` or options.
-            chunked (any): Whether to chunk `vectorbtpro.generic.nb.value_counts_nb` or options.
+            jitted (any): Whether to JIT-compile `vectorbtpro.generic.nb.base.value_counts_nb` or options.
+            chunked (any): Whether to chunk `vectorbtpro.generic.nb.base.value_counts_nb` or options.
 
                 See `vectorbtpro.utils.chunking.resolve_chunked`.
             wrap_kwargs (dict): Keyword arguments passed to `vectorbtpro.base.wrapping.ArrayWrapper.wrap`.
@@ -2511,7 +2511,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         group_by: tp.GroupByLike = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """See `vectorbtpro.generic.nb.demean_nb`."""
+        """See `vectorbtpro.generic.nb.base.demean_nb`."""
         func = jit_reg.resolve_option(nb.demean_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         group_map = self.wrapper.grouper.get_group_map(group_by=group_by)
@@ -2931,7 +2931,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
     ) -> tp.SeriesFrame:
         """Generate crossover above another array.
 
-        See `vectorbtpro.generic.nb.crossed_above_nb`.
+        See `vectorbtpro.generic.nb.base.crossed_above_nb`.
 
         Usage:
             ```pycon
@@ -2977,7 +2977,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
     ) -> tp.SeriesFrame:
         """Generate crossover below another array.
 
-        See `vectorbtpro.generic.nb.crossed_above_nb` but in reversed order."""
+        See `vectorbtpro.generic.nb.base.crossed_above_nb` but in reversed order."""
         self_obj, other_obj = reshaping.broadcast(self.obj, other, **resolve_dict(broadcast_kwargs))
         func = jit_reg.resolve_option(nb.crossed_above_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)

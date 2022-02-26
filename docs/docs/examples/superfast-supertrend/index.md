@@ -398,11 +398,11 @@ can be re-implemented using NumPy and vectorbt's own arsenal of Numba-compiled f
 ...     return atr
 ```
 
-1. Using [fshift_1d_nb](/api/generic/nb/#vectorbtpro.generic.nb.fshift_1d_nb), which shifts
+1. Using [fshift_1d_nb](/api/generic/nb/#vectorbtpro.generic.nb.base.fshift_1d_nb), which shifts
 one-dimensional data by one to `n` elements forward
 2. Similarly to Pandas, this one also concatenates three arrays as columns and finds 
 the maximum at each time step
-3. Using [wwm_mean_1d_nb](/api/generic/nb/#vectorbtpro.generic.nb.wwm_mean_1d_nb), which
+3. Using [wwm_mean_1d_nb](/api/generic/nb/#vectorbtpro.generic.nb.rolling.wwm_mean_1d_nb), which
 calculates the Wilder's exponential weighted moving average on one-dimensional data
 
 The latter, on the other hand, is an iterative algorithm - it's rather a poor fit for NumPy

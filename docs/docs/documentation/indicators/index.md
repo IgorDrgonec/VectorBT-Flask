@@ -160,7 +160,7 @@ Let's rewrite the above example a bit:
  [])
 ```
 
-1. Using [rolling_mean_nb](/api/generic/nb/#vectorbtpro.generic.nb.rolling_mean_nb)
+1. Using [rolling_mean_nb](/api/generic/nb/#vectorbtpro.generic.nb.rolling.rolling_mean_nb)
 2. Concatenate the NumPy arrays along the column axis
 3. Calculate the difference of both concatenated NumPy arrays
 
@@ -383,7 +383,7 @@ rollcov_w            2                   3
 ```
 
 Here, the both input arrays and the window parameter were passed directly to 
-[rolling_cov_nb](/api/generic/nb/#vectorbtpro.generic.nb.rolling_cov_nb).
+[rolling_cov_nb](/api/generic/nb/#vectorbtpro.generic.nb.rolling.rolling_cov_nb).
 
 #### Custom iteration
 

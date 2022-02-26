@@ -42,6 +42,9 @@ other Numba-compatible types.
     For example, reduce by `np.inf` or `position_now` to close a long/short position.
 
     See `vectorbtpro.utils.math_` for current tolerance values.
+
+!!! warning
+    Make sure to use `parallel=True` only if your columns are independent.
 """
 
 from vectorbtpro.portfolio.nb.analysis import *

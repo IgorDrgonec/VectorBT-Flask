@@ -32,7 +32,7 @@ This enables instant reaction to any changes in the Alpha Vantage's API. The use
 and specify every bit of information manually.
     3. [NDLData](/api/data/custom/#vectorbtpro.data.custom.NDLData) for [Nasdaq Data Link](https://data.nasdaq.com/).
 Supports (time-series) datasets. 
-- Fixed the condition for a backward fill in [fbfill_nb](/api/generic/nb/#vectorbtpro.generic.nb.fbfill_nb)
+- Fixed the condition for a backward fill in [fbfill_nb](/api/generic/nb/#vectorbtpro.generic.nb.base.fbfill_nb)
 - Fixed passing `execute_kwargs` in [IndicatorFactory.with_apply_func](/api/indicators/factory/#vectorbtpro.indicators.factory.IndicatorFactory.from_apply_func).
 Also, whenever `apply_func` is Numba compiled, makes the parameter selection function Numba compiled
 as well (`jit_select_params=True`) and also releases the GIL (`nogil=True`), so the indicator can be used 
@@ -111,7 +111,7 @@ one tick behind.
 Keys won't be attached to the config instance anymore but managed dynamically (= less side effects
 when pickling and unpickling).
 - Implemented a wide range of inputs states, output states, and accumulators for the use in 
-streaming functions, such as in [rolling_mean_1d_nb](/api/generic/nb/#vectorbtpro.generic.nb.rolling_mean_1d_nb)
+streaming functions, such as in [rolling_mean_1d_nb](/api/generic/nb/#vectorbtpro.generic.nb.rolling.rolling_mean_1d_nb)
 - Made flexible indexing with [flex_select_auto_nb](/api/base/indexing/#vectorbtpro.base.indexing.flex_select_auto_nb) 
 rotational. For example, if there is a smaller array with 3 columns and a bigger one with 6 columns,
 there is no need to tile the smaller array 2 times to match the bigger one - we can simply rotate 
