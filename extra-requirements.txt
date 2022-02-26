@@ -10,7 +10,7 @@ ccxt:                       data
 tables:                     data
 polygon-api-client:         data
 beautifulsoup4:             data
-nasdaqdatalink:             data
+nasdaq-data-link:           data
 ta:                         ta
 pandas_ta:                  ta
 TA-Lib:                     ta, base
