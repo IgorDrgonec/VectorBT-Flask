@@ -831,6 +831,7 @@ class BinanceData(RemoteData):  # pragma: no cover
         show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
         silence_warnings: tp.Optional[bool] = None,
+        **get_klines_kwargs,
     ) -> tp.Frame:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Binance.
 
@@ -853,6 +854,7 @@ class BinanceData(RemoteData):  # pragma: no cover
             show_progress (bool): Whether to show the progress bar.
             pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`.
             silence_warnings (bool): Whether to silence all warnings.
+            **get_klines_kwargs: Keyword arguments passed to `binance.client.Client.get_klines`.
 
         For defaults, see `custom.binance` in `vectorbtpro._settings.data`.
         """
@@ -879,6 +881,7 @@ class BinanceData(RemoteData):  # pragma: no cover
         pbar_kwargs = merge_dicts(binance_cfg["pbar_kwargs"], pbar_kwargs)
         if silence_warnings is None:
             silence_warnings = binance_cfg["silence_warnings"]
+        get_klines_kwargs = merge_dicts(binance_cfg["get_klines_kwargs"], get_klines_kwargs)
 
         # Establish the timestamps
         start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
@@ -889,6 +892,7 @@ class BinanceData(RemoteData):  # pragma: no cover
                 limit=1,
                 startTime=0,
                 endTime=None,
+                **get_klines_kwargs
             )
             first_valid_ts = first_data[0][0]
             next_start_ts = start_ts = max(start_ts, first_valid_ts)
@@ -912,6 +916,7 @@ class BinanceData(RemoteData):  # pragma: no cover
                         limit=limit,
                         startTime=next_start_ts,
                         endTime=end_ts,
+                        **get_klines_kwargs
                     )
                     if len(data) > 0:
                         next_data = list(filter(lambda d: next_start_ts < d[0] < end_ts, next_data))

@@ -476,6 +476,7 @@ data = ChildDict(
             show_progress=True,
             pbar_kwargs=dict(),
             silence_warnings=False,
+            get_klines_kwargs=dict(),
         ),
         ccxt=FrozenConfig(
             exchange="binance",
