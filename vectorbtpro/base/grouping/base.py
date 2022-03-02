@@ -147,7 +147,13 @@ class Grouper(Configured):
         group_start_idxs = np.cumsum(group_lens)[1:] - group_lens[1:]
         groups[group_start_idxs] = 1
         groups = np.cumsum(groups)
-        return cls(index=pd.Index(np.concatenate(indices)), group_by=pd_group_by.count().index[groups], **kwargs)
+        index = pd.Index(np.concatenate(indices))
+        group_by = pd.Index(list(pd_group_by.indices.keys()))[groups]
+        return cls(
+            index=index,
+            group_by=group_by,
+            **kwargs,
+        )
 
     @property
     def index(self) -> tp.Index:

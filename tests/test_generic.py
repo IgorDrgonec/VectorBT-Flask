@@ -1221,6 +1221,18 @@ class TestAccessors:
             ),  # any clean way to do column-wise grouping in pandas?
         )
         pd.testing.assert_frame_equal(
+            df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb, use_groupby=True),
+            df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb, use_groupby=False),
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.groupby_apply(df.groupby(np.asarray([1, 1, 2, 2, 3])), mean_nb),
+            df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb),
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.groupby_apply(vbt.Grouper(df.index, np.asarray([1, 1, 2, 2, 3])), mean_nb),
+            df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb),
+        )
+        pd.testing.assert_frame_equal(
             df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb, jitted=dict(parallel=True)),
             df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb, jitted=dict(parallel=False)),
         )
@@ -1301,7 +1313,7 @@ class TestAccessors:
 
     @pytest.mark.parametrize(
         "test_freq",
-        ["1h", "3d", "1w"],
+        ["1h", "3d", "7d"],
     )
     def test_resample_apply(self, test_freq):
         @njit
@@ -1309,8 +1321,8 @@ class TestAccessors:
             return np.nanmean(x)
 
         @njit
-        def mean_meta_nb(idxs, group, col, x):
-            return np.nanmean(x[idxs, col])
+        def mean_meta_nb(from_i, to_i, col, x):
+            return np.nanmean(x[from_i:to_i, col])
 
         pd.testing.assert_series_equal(
             df["a"].vbt.resample_apply(test_freq, mean_nb),
@@ -1321,6 +1333,14 @@ class TestAccessors:
             df.resample(test_freq).apply(lambda x: mean_nb(x.values)),
         )
         pd.testing.assert_frame_equal(
+            df.vbt.resample_apply(test_freq, mean_nb, use_groupby_apply=True),
+            df.vbt.resample_apply(test_freq, mean_nb, use_groupby_apply=False),
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.resample_apply(df.resample(test_freq), mean_nb),
+            df.vbt.resample_apply(test_freq, mean_nb),
+        )
+        pd.testing.assert_frame_equal(
             df.vbt.resample_apply(test_freq, mean_nb, jitted=dict(parallel=True)),
             df.vbt.resample_apply(test_freq, mean_nb, jitted=dict(parallel=False)),
         )
@@ -1329,7 +1349,12 @@ class TestAccessors:
             df.vbt.resample_apply(test_freq, mean_nb, chunked=False),
         )
         pd.testing.assert_frame_equal(
-            pd.DataFrame.vbt.resample_apply(test_freq, mean_meta_nb, df.vbt.to_2d_array(), wrapper=df.vbt.wrapper),
+            pd.DataFrame.vbt.resample_apply(
+                test_freq,
+                mean_meta_nb,
+                df.vbt.to_2d_array(),
+                wrapper=df.vbt.wrapper,
+            ),
             df.vbt.resample_apply(test_freq, mean_nb),
         )
         pd.testing.assert_frame_equal(
@@ -1373,8 +1398,8 @@ class TestAccessors:
         )
 
         @njit
-        def mean_diff_meta_nb(idxs, group, col, x, y):
-            return np.nanmean(x[idxs, col]) / np.nanmean(y[idxs, col])
+        def mean_diff_meta_nb(from_i, to_i, col, x, y):
+            return np.nanmean(x[from_i:to_i, col]) / np.nanmean(y[from_i:to_i, col])
 
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.resample_apply(
@@ -1386,10 +1411,138 @@ class TestAccessors:
                     x=pd.Series([1, 2, 3, 4, 5], index=df.index),
                     y=pd.DataFrame([[1, 2, 3]], columns=df.columns),
                 ),
-                template_context=dict(
-                    to_2d_array=vbt.base.reshaping.to_2d_array,
-                    group_by_evenly_nb=vbt.base.grouping.nb.group_by_evenly_nb,
+                template_context=dict(to_2d_array=vbt.base.reshaping.to_2d_array),
+            ),
+            pd.DataFrame(
+                [[1.5, 0.75, 0.5], [3.5, 1.75, 1.1666666666666667], [5.0, 2.5, 1.6666666666666667]],
+                index=pd.DatetimeIndex(["2018-01-01", "2018-01-03", "2018-01-05"], dtype="datetime64[ns]", freq="2D"),
+                columns=df.columns,
+            ),
+        )
+
+    @pytest.mark.parametrize(
+        "test_freq",
+        ["1h", "3d", "7d"],
+    )
+    def test_latest_at_index(self, test_freq):
+        target_index = df.resample(test_freq, closed='right', label='right').count().index
+        np.testing.assert_array_equal(
+            df["a"].vbt.latest_at_index(target_index).values,
+            df["a"].resample(test_freq, closed='right', label='right').last().ffill().values,
+        )
+        np.testing.assert_array_equal(
+            df.vbt.latest_at_index(target_index).values,
+            df.resample(test_freq, closed='right', label='right').last().ffill().values,
+        )
+        np.testing.assert_array_equal(
+            df.vbt.latest_at_index(target_index, ffill=False).values,
+            df.resample(test_freq, closed='right', label='right').last().values,
+        )
+        np.testing.assert_array_equal(
+            df.vbt.latest_at_index(target_index, ffill=False, nan_value=-1).values,
+            df.resample(test_freq, closed='right', label='right').last().fillna(-1).values,
+        )
+
+    @pytest.mark.parametrize(
+        "test_freq",
+        ["1h", "3d", "7d"],
+    )
+    def test_resample_to_index(self, test_freq):
+        @njit
+        def mean_nb(x):
+            return np.nanmean(x)
+
+        @njit
+        def mean_meta_nb(from_i, to_i, col, x):
+            return np.nanmean(x[from_i:to_i, col])
+
+        target_index = df.resample(test_freq).asfreq().index
+        target_index_before = df.resample(test_freq, closed='right', label='right').asfreq().index
+
+        pd.testing.assert_series_equal(
+            df["a"].vbt.resample_to_index(target_index, mean_nb),
+            df["a"].resample(test_freq).apply(lambda x: mean_nb(x.values)),
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.resample_to_index(target_index, mean_nb),
+            df.resample(test_freq).apply(lambda x: mean_nb(x.values)),
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.resample_to_index(target_index_before, mean_nb, before=True),
+            df.resample(test_freq, closed='right', label='right').apply(lambda x: mean_nb(x.values)),
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.resample_to_index(target_index, mean_nb, jitted=dict(parallel=True)),
+            df.vbt.resample_to_index(target_index, mean_nb, jitted=dict(parallel=False)),
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.resample_to_index(target_index, mean_nb, chunked=True),
+            df.vbt.resample_to_index(target_index, mean_nb, chunked=False),
+        )
+        pd.testing.assert_frame_equal(
+            pd.DataFrame.vbt.resample_to_index(
+                target_index,
+                mean_meta_nb,
+                df.vbt.to_2d_array(),
+                wrapper=df.vbt.wrapper,
+            ),
+            df.vbt.resample_to_index(target_index, mean_nb),
+        )
+        pd.testing.assert_frame_equal(
+            pd.DataFrame.vbt.resample_to_index(
+                target_index,
+                mean_meta_nb,
+                df.vbt.to_2d_array(),
+                wrapper=df.vbt.wrapper,
+                jitted=dict(parallel=True),
+            ),
+            pd.DataFrame.vbt.resample_to_index(
+                target_index,
+                mean_meta_nb,
+                df.vbt.to_2d_array(),
+                wrapper=df.vbt.wrapper,
+                jitted=dict(parallel=False),
+            ),
+        )
+        chunked = dict(
+            arg_take_spec=dict(
+                args=vbt.ArgsTaker(
+                    vbt.ArraySlicer(axis=1),
+                )
+            )
+        )
+        pd.testing.assert_frame_equal(
+            pd.DataFrame.vbt.resample_to_index(
+                target_index,
+                mean_meta_nb,
+                df.vbt.to_2d_array(),
+                wrapper=df.vbt.wrapper,
+                chunked=chunked,
+            ),
+            pd.DataFrame.vbt.resample_to_index(
+                target_index,
+                mean_meta_nb,
+                df.vbt.to_2d_array(),
+                wrapper=df.vbt.wrapper,
+                chunked=False,
+            ),
+        )
+
+        @njit
+        def mean_diff_meta_nb(from_i, to_i, col, x, y):
+            return np.nanmean(x[from_i:to_i, col]) / np.nanmean(y[from_i:to_i, col])
+
+        pd.testing.assert_frame_equal(
+            pd.DataFrame.vbt.resample_to_index(
+                df.resample('2d').asfreq().index,
+                mean_diff_meta_nb,
+                vbt.RepEval("to_2d_array(x)"),
+                vbt.RepEval("to_2d_array(y)"),
+                broadcast_named_args=dict(
+                    x=pd.Series([1, 2, 3, 4, 5], index=df.index),
+                    y=pd.DataFrame([[1, 2, 3]], columns=df.columns),
                 ),
+                template_context=dict(to_2d_array=vbt.base.reshaping.to_2d_array),
             ),
             pd.DataFrame(
                 [[1.5, 0.75, 0.5], [3.5, 1.75, 1.1666666666666667], [5.0, 2.5, 1.6666666666666667]],

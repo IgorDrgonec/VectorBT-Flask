@@ -4,7 +4,6 @@
 
 import inspect
 import multiprocessing
-import re
 import uuid
 import warnings
 from functools import wraps
@@ -17,7 +16,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts, Config
 from vectorbtpro.utils.execution import execute
-from vectorbtpro.utils.parsing import annotate_args, match_ann_arg, get_func_arg_names
+from vectorbtpro.utils.parsing import annotate_args, match_ann_arg, get_func_arg_names, Regex
 from vectorbtpro.utils.template import deep_substitute, Rep
 
 __pdoc__ = {}
@@ -601,8 +600,18 @@ def take_from_args(
                     take_spec_found = True
                     found_take_spec = take_spec
                     break
+            elif isinstance(take_spec_name, Regex):
+                if take_spec_name.matches(arg_name):
+                    take_spec_found = True
+                    found_take_spec = take_spec
+                    break
+            elif isinstance(take_spec, Regex):
+                if take_spec.matches(take_spec_name):
+                    take_spec_found = True
+                    found_take_spec = take_spec
+                    break
             else:
-                if re.match(take_spec_name, arg_name):
+                if take_spec_name == arg_name:
                     take_spec_found = True
                     found_take_spec = take_spec
                     break

@@ -2046,7 +2046,7 @@ class AlphaVantageData(RemoteData):  # pragma: no cover
         df.index.name = None
         new_columns = []
         for c in df.columns:
-            new_c = re.sub("^\d+\w*\.\s*", "", c)
+            new_c = re.sub(r"^\d+\w*\.\s*", "", c)
             new_c = new_c[0].title() + new_c[1:]
             new_columns.append(new_c)
         df = df.rename(columns=dict(zip(df.columns, new_columns)))

@@ -187,6 +187,7 @@ This class inherits subplots from `vectorbtpro.generic.accessors.GenericAccessor
 """
 
 import warnings
+from functools import partialmethod
 
 import numpy as np
 import pandas as pd
@@ -254,6 +255,8 @@ class SignalsAccessor(GenericAccessor):
     def empty_like(cls, *args, fill_value: bool = False, **kwargs) -> tp.SeriesFrame:
         """`vectorbtpro.base.accessors.BaseAccessor.empty_like` with `fill_value=False`."""
         return GenericAccessor.empty_like(*args, fill_value=fill_value, dtype=np.bool_, **kwargs)
+
+    latest_at_index = partialmethod(GenericAccessor.latest_at_index, nan_value=False)
 
     # ############# Generation ############# #
 

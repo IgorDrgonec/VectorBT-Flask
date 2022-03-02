@@ -203,6 +203,8 @@ from functools import partial
 
 import numpy as np
 import pandas as pd
+from pandas.core.groupby import GroupBy as PandasGroupBy
+from pandas.core.resample import Resampler as PandasResampler
 from scipy import stats
 from sklearn.exceptions import NotFittedError
 from sklearn.preprocessing import (
@@ -612,12 +614,12 @@ class GenericAccessor(BaseAccessor, Analyzable):
         """Expanding version of `GenericAccessor.rolling_rank`."""
         return self.rolling_rank(None, minp=minp, **kwargs)
 
-    # ############# Taking UDFs ############# #
+    # ############# Mapping ############# #
 
     @class_or_instancemethod
     def map(
         cls_or_self,
-        apply_func_nb: tp.Union[tp.MapFunc, tp.MapMetaFunc],
+        map_func_nb: tp.Union[tp.MapFunc, tp.MapMetaFunc],
         *args,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
@@ -713,15 +715,17 @@ class GenericAccessor(BaseAccessor, Analyzable):
             args = deep_substitute(args, template_context, sub_id="args")
             func = jit_reg.resolve_option(nb.map_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
-            out = func(wrapper.shape_2d, apply_func_nb, *args)
+            out = func(wrapper.shape_2d, map_func_nb, *args)
         else:
             func = jit_reg.resolve_option(nb.map_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
-            out = func(cls_or_self.to_2d_array(), apply_func_nb, *args)
+            out = func(cls_or_self.to_2d_array(), map_func_nb, *args)
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
 
         return wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
+
+    # ############# Applying ############# #
 
     @class_or_instancemethod
     def apply_along_axis(
@@ -842,11 +846,13 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         return wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
+    # ############# Reducing ############# #
+
     @class_or_instancemethod
     def rolling_apply(
         cls_or_self,
         window: tp.Optional[int],
-        apply_func_nb: tp.Union[tp.ApplyFunc, tp.RollApplyMetaFunc],
+        reduce_func_nb: tp.Union[tp.ReduceFunc, tp.RangeReduceMetaFunc],
         *args,
         minp: tp.Optional[int] = None,
         broadcast_named_args: tp.KwargsLike = None,
@@ -857,9 +863,9 @@ class GenericAccessor(BaseAccessor, Analyzable):
         wrapper: tp.Optional[ArrayWrapper] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """See `vectorbtpro.generic.nb.apply_reduce.rolling_apply_nb`.
+        """See `vectorbtpro.generic.nb.apply_reduce.rolling_reduce_nb`.
 
-        For details on the meta version, see `vectorbtpro.generic.nb.apply_reduce.rolling_apply_meta_nb`.
+        For details on the meta version, see `vectorbtpro.generic.nb.apply_reduce.rolling_reduce_meta_nb`.
 
         If `window` is None, it will become an expanding window.
 
@@ -956,9 +962,9 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 template_context,
             )
             args = deep_substitute(args, template_context, sub_id="args")
-            func = jit_reg.resolve_option(nb.rolling_apply_meta_nb, jitted)
+            func = jit_reg.resolve_option(nb.rolling_reduce_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
-            out = func(wrapper.shape_2d, window, minp, apply_func_nb, *args)
+            out = func(wrapper.shape_2d, window, minp, reduce_func_nb, *args)
         else:
             if minp is None and window is None:
                 minp = 1
@@ -966,9 +972,9 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 window = cls_or_self.wrapper.shape[0]
             if minp is None:
                 minp = window
-            func = jit_reg.resolve_option(nb.rolling_apply_nb, jitted)
+            func = jit_reg.resolve_option(nb.rolling_reduce_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
-            out = func(cls_or_self.to_2d_array(), window, minp, apply_func_nb, *args)
+            out = func(cls_or_self.to_2d_array(), window, minp, reduce_func_nb, *args)
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
 
@@ -982,9 +988,11 @@ class GenericAccessor(BaseAccessor, Analyzable):
     @class_or_instancemethod
     def groupby_apply(
         cls_or_self,
-        by: tp.PandasGroupByLike,
-        apply_func_nb: tp.Union[tp.ApplyFunc, tp.GroupByApplyMetaFunc],
+        by: tp.Union[tp.PandasGroupByLike, PandasGroupBy, PandasResampler, Grouper],
+        reduce_func_nb: tp.Union[tp.ReduceFunc, tp.GroupByReduceMetaFunc],
         *args,
+        use_groupby: tp.Optional[bool] = None,
+        groupby_kwargs: tp.KwargsLike = None,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
         template_context: tp.Optional[tp.Mapping] = None,
@@ -992,13 +1000,16 @@ class GenericAccessor(BaseAccessor, Analyzable):
         chunked: tp.ChunkedOption = None,
         wrapper: tp.Optional[ArrayWrapper] = None,
         wrap_kwargs: tp.KwargsLike = None,
-        **kwargs,
     ) -> tp.SeriesFrame:
-        """See `vectorbtpro.generic.nb.apply_reduce.groupby_apply_nb`.
+        """See `vectorbtpro.generic.nb.apply_reduce.groupby_reduce_nb`.
 
-        For details on the meta version, see `vectorbtpro.generic.nb.apply_reduce.groupby_apply_meta_nb`.
+        For details on the meta version, see `vectorbtpro.generic.nb.apply_reduce.groupby_reduce_meta_nb`.
 
-        For details on `by`, see `pd.DataFrame.groupby`.
+        Argument `by` can be an instance of `vectorbtpro.base.grouping.base.Grouper`,
+        `pandas.core.groupby.GroupBy`, `pandas.core.resample.Resampler`, or any other groupby-like
+        object that can be accepted by `vectorbtpro.base.grouping.base.Grouper`, or if it fails,
+        then by `pd.DataFrame.groupby` with `groupby_kwargs` passed as keyword arguments.
+        Set `use_groupby` to True to use exclusively `pandas.core.groupby.GroupBy`.
 
         Usage:
             * Using regular function:
@@ -1083,45 +1094,64 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 checks.assert_not_none(wrapper)
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
             by = deep_substitute(by, template_context, sub_id="by")
-            pd_group_by = wrapper.dummy().groupby(by, axis=0, **kwargs)
-            grouper = Grouper.from_pd_group_by(pd_group_by)
-            group_map = grouper.get_group_map()
-            template_context = merge_dicts(dict(by=by, grouper=grouper), template_context)
-            args = deep_substitute(args, template_context, sub_id="args")
-            func = jit_reg.resolve_option(nb.groupby_apply_meta_nb, jitted)
-            func = ch_reg.resolve_option(func, chunked)
-            out = func(wrapper.shape_2d[1], group_map, apply_func_nb, *args)
         else:
-            pd_group_by = cls_or_self.obj.groupby(by, axis=0, **kwargs)
-            grouper = Grouper.from_pd_group_by(pd_group_by)
-            group_map = grouper.get_group_map()
-            func = jit_reg.resolve_option(nb.groupby_apply_nb, jitted)
-            func = ch_reg.resolve_option(func, chunked)
-            out = func(cls_or_self.to_2d_array(), group_map, apply_func_nb, *args)
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
 
-        wrap_kwargs = merge_dicts(dict(name_or_index=list(pd_group_by.indices.keys())), wrap_kwargs)
+        if isinstance(by, Grouper):
+            grouper = by
+        elif isinstance(by, (PandasGroupBy, PandasResampler)):
+            grouper = Grouper.from_pd_group_by(by)
+        else:
+            grouper = None
+            if use_groupby is None:
+                try:
+                    grouper = Grouper(index=wrapper.index, group_by=by)
+                except Exception as e:
+                    use_groupby = True
+            if grouper is None:
+                if use_groupby:
+                    pd_group_by = wrapper.dummy().groupby(by, axis=0, **resolve_dict(groupby_kwargs))
+                    grouper = Grouper.from_pd_group_by(pd_group_by)
+                else:
+                    grouper = Grouper(index=wrapper.index, group_by=by)
+
+        if isinstance(cls_or_self, type):
+            group_map = grouper.get_group_map()
+            template_context = merge_dicts(dict(by=by, grouper=grouper), template_context)
+            args = deep_substitute(args, template_context, sub_id="args")
+            func = jit_reg.resolve_option(nb.groupby_reduce_meta_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
+            out = func(wrapper.shape_2d[1], group_map, reduce_func_nb, *args)
+        else:
+            group_map = grouper.get_group_map()
+            func = jit_reg.resolve_option(nb.groupby_reduce_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
+            out = func(cls_or_self.to_2d_array(), group_map, reduce_func_nb, *args)
+
+        wrap_kwargs = merge_dicts(dict(name_or_index=grouper.get_index()), wrap_kwargs)
         return wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     @class_or_instancemethod
     def resample_apply(
         cls_or_self,
-        rule: tp.PandasFrequencyLike,
-        apply_func_nb: tp.Union[tp.ApplyFunc, tp.GroupByApplyMetaFunc],
+        rule: tp.Union[PandasResampler, tp.PandasFrequencyLike],
+        reduce_func_nb: tp.Union[tp.ReduceFunc, tp.GroupByReduceMetaFunc, tp.RangeReduceMetaFunc],
         *args,
+        use_groupby_apply: bool = False,
+        resample_kwargs: tp.KwargsLike = None,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
         template_context: tp.Optional[tp.Mapping] = None,
-        jitted: tp.JittedOption = None,
-        chunked: tp.ChunkedOption = None,
         wrapper: tp.Optional[ArrayWrapper] = None,
         wrap_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> tp.SeriesFrame:
-        """`GenericAccessor.groupby_apply` but using resampling.
+        """Resample.
 
-        For details on `rule`, see `pd.DataFrame.resample`.
+        If `use_groupby_apply` is True, uses `GenericAccessor.groupby_apply` (with some post-processing).
+        Otherwise, uses `GenericAccessor.resample_to_index`. In either case, uses `pd.DataFrame.resample`
+        with `resample_kwargs` as keyword arguments.
 
         Usage:
             * Using regular function:
@@ -1200,34 +1230,52 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 checks.assert_not_none(wrapper)
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
             rule = deep_substitute(rule, template_context, sub_id="rule")
-            pd_group_by = wrapper.dummy().resample(rule, axis=0, **kwargs)
-            grouper = Grouper.from_pd_group_by(pd_group_by)
-            group_map = grouper.get_group_map()
-            template_context = merge_dicts(dict(rule=rule, grouper=grouper), template_context)
-            args = deep_substitute(args, template_context, sub_id="args")
-            func = jit_reg.resolve_option(nb.groupby_apply_meta_nb, jitted)
-            func = ch_reg.resolve_option(func, chunked)
-            out = func(wrapper.shape_2d[1], group_map, apply_func_nb, *args)
         else:
-            pd_group_by = cls_or_self.obj.resample(rule, axis=0, **kwargs)
-            grouper = Grouper.from_pd_group_by(pd_group_by)
-            group_map = grouper.get_group_map()
-            func = jit_reg.resolve_option(nb.groupby_apply_nb, jitted)
-            func = ch_reg.resolve_option(func, chunked)
-            out = func(cls_or_self.to_2d_array(), group_map, apply_func_nb, *args)
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
 
-        out_obj = wrapper.wrap(out, group_by=False, index=list(pd_group_by.indices.keys()))
-        resampled_arr = np.full((pd_group_by.ngroups, wrapper.shape_2d[1]), np.nan)
-        resampled_obj = wrapper.wrap(
-            resampled_arr,
-            index=pd_group_by.asfreq().index,
-            group_by=False,
-            **resolve_dict(wrap_kwargs),
+        if isinstance(rule, PandasResampler):
+            pd_group_by = rule
+        else:
+            if not use_groupby_apply:
+                resample_kwargs = merge_dicts(
+                    dict(closed='left', label='left'),
+                    resample_kwargs,
+                )
+            pd_group_by = wrapper.dummy().resample(rule, axis=0, **resolve_dict(resample_kwargs))
+        new_index = pd_group_by.count().index
+
+        if use_groupby_apply:
+            out_obj = cls_or_self.groupby_apply(
+                pd_group_by,
+                reduce_func_nb,
+                *args,
+                use_groupby=False,
+                template_context=template_context,
+                wrapper=wrapper,
+                **kwargs,
+            )
+            if pd.Index.equals(out_obj.index, new_index):
+                if new_index.freq is not None:
+                    out_obj.index.freq = new_index.freq
+                return out_obj
+            resampled_arr = np.full((pd_group_by.ngroups, wrapper.shape_2d[1]), np.nan)
+            resampled_obj = wrapper.wrap(
+                resampled_arr,
+                index=new_index,
+                **resolve_dict(wrap_kwargs),
+            )
+            resampled_obj.loc[out_obj.index] = out_obj.values
+            return resampled_obj
+
+        return cls_or_self.resample_to_index(
+            new_index,
+            reduce_func_nb,
+            *args,
+            template_context=template_context,
+            wrapper=wrapper,
+            **kwargs,
         )
-        resampled_obj.loc[out_obj.index] = out_obj.values
-        return resampled_obj
 
     @class_or_instancemethod
     def apply_and_reduce(
@@ -1600,6 +1648,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
         )
         return wrapper.wrap_reduced(out, group_by=group_by, **wrap_kwargs)
 
+    # ############# Squeezing ############# #
+
     @class_or_instancemethod
     def squeeze_grouped(
         cls_or_self,
@@ -1725,6 +1775,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         return wrapper.wrap(out, group_by=group_by, **resolve_dict(wrap_kwargs))
 
+    # ############# Flattening ############# #
+
     def flatten_grouped(
         self,
         order: str = "C",
@@ -1788,6 +1840,242 @@ class GenericAccessor(BaseAccessor, Analyzable):
             new_index = indexes.tile_index(self.wrapper.index, np.max(group_map[1]))
         wrap_kwargs = merge_dicts(dict(index=new_index), wrap_kwargs)
         return self.wrapper.wrap(out, group_by=group_by, **wrap_kwargs)
+
+    # ############# Resampling ############# #
+
+    def latest_at_index(
+        self,
+        target_index: tp.IndexLike,
+        nan_value: tp.Optional[tp.Scalar] = None,
+        ffill: bool = True,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ):
+        """See `vectorbtpro.generic.nb.apply_reduce.latest_at_index_nb`.
+
+        Gives the same results as `df.resample(closed='right', label='right').last().ffill()`
+        when applied on the target index of the resampler.
+
+        !!! warning
+            Do not use this method when upsampling information that belongs somewhere in-between
+            two dates, such as the high, low, and close price at '2020-01-01' - it will be interpreted
+            as happening exactly at '2020-01-01T00:00:00'. Use shifting to account for this.
+
+        Usage:
+            * Downsampling:
+
+            ```pycon
+            >>> h_index = pd.date_range('2020-01-01', '2020-01-05', freq='1h')
+            >>> d_index = pd.date_range('2020-01-01', '2020-01-05', freq='1d')
+
+            >>> h_sr = pd.Series(range(len(h_index)), index=h_index)
+            >>> h_sr.vbt.latest_at_index(d_index)
+            2020-01-01     0.0
+            2020-01-02    24.0
+            2020-01-03    48.0
+            2020-01-04    72.0
+            2020-01-05    96.0
+            Freq: D, dtype: float64
+            ```
+
+            * Upsampling:
+
+            ```pycon
+            >>> d_sr = pd.Series(range(len(d_index)), index=d_index)
+            >>> d_sr.vbt.latest_at_index(h_index)
+            2020-01-01 00:00:00    0.0
+            2020-01-01 01:00:00    0.0
+            2020-01-01 02:00:00    0.0
+            2020-01-01 03:00:00    0.0
+            2020-01-01 04:00:00    0.0
+            ...                    ...
+            2020-01-04 20:00:00    3.0
+            2020-01-04 21:00:00    3.0
+            2020-01-04 22:00:00    3.0
+            2020-01-04 23:00:00    3.0
+            2020-01-05 00:00:00    4.0
+            Freq: H, Length: 97, dtype: float64
+            ```
+        """
+        if not checks.is_index(target_index):
+            target_index = pd.Index(target_index)
+        if nan_value is None:
+            if self.mapping is not None:
+                nan_value = -1
+            else:
+                nan_value = np.nan
+        func = jit_reg.resolve_option(nb.latest_at_index_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        out = func(
+            self.to_2d_array(),
+            self.wrapper.index.values,
+            target_index.values,
+            nan_value=nan_value,
+            ffill=ffill,
+        )
+        return self.wrapper.wrap(out, group_by=False, index=target_index, **resolve_dict(wrap_kwargs))
+
+    @class_or_instancemethod
+    def resample_to_index(
+        cls_or_self,
+        target_index: tp.IndexLike,
+        reduce_func_nb: tp.Union[tp.ReduceFunc, tp.RangeReduceMetaFunc],
+        *args,
+        before: bool = False,
+        reduce_one: bool = False,
+        broadcast_named_args: tp.KwargsLike = None,
+        broadcast_kwargs: tp.KwargsLike = None,
+        template_context: tp.Optional[tp.Mapping] = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """See `vectorbtpro.generic.nb.apply_reduce.resample_to_index_nb`.
+
+        For details on the meta version, see `vectorbtpro.generic.nb.apply_reduce.resample_to_index_meta_nb`.
+
+        Usage:
+            * Downsampling:
+
+            ```pycon
+            >>> h_index = pd.date_range('2020-01-01', '2020-01-05', freq='1h')
+            >>> d_index = pd.date_range('2020-01-01', '2020-01-05', freq='1d')
+
+            >>> h_sr = pd.Series(range(len(h_index)), index=h_index)
+            >>> h_sr.vbt.resample_to_index(d_index, njit(lambda x: x.mean()))
+            2020-01-01    11.5
+            2020-01-02    35.5
+            2020-01-03    59.5
+            2020-01-04    83.5
+            2020-01-05    96.0
+            Freq: D, dtype: float64
+
+            >>> h_sr.vbt.resample_to_index(d_index, njit(lambda x: x.mean()), before=True)
+            2020-01-01     0.0
+            2020-01-02    12.5
+            2020-01-03    36.5
+            2020-01-04    60.5
+            2020-01-05    84.5
+            Freq: D, dtype: float64
+            ```
+
+            * Upsampling:
+
+            ```pycon
+            >>> d_sr = pd.Series(range(len(d_index)), index=d_index)
+            >>> d_sr.vbt.resample_to_index(h_index, njit(lambda x: x[-1]))
+            2020-01-01 00:00:00    0.0
+            2020-01-01 01:00:00    NaN
+            2020-01-01 02:00:00    NaN
+            2020-01-01 03:00:00    NaN
+            2020-01-01 04:00:00    NaN
+            ...                    ...
+            2020-01-04 20:00:00    NaN
+            2020-01-04 21:00:00    NaN
+            2020-01-04 22:00:00    NaN
+            2020-01-04 23:00:00    NaN
+            2020-01-05 00:00:00    4.0
+            Freq: H, Length: 97, dtype: float64
+            ```
+
+            * Using meta function:
+
+            ```pycon
+            >>> mean_ratio_meta_nb = njit(lambda from_i, to_i, col, a, b: \\
+            ...     np.mean(a[from_i:to_i][col]) / np.mean(b[from_i:to_i][col]))
+
+            >>> vbt.pd_acc.resample_to_index(
+            ...     d_index,
+            ...     mean_ratio_meta_nb,
+            ...     h_sr.vbt.to_2d_array() - 1,
+            ...     h_sr.vbt.to_2d_array() + 1,
+            ...     wrapper=h_sr.vbt.wrapper
+            ... )
+            2020-01-01   -1.000000
+            2020-01-02    0.920000
+            2020-01-03    0.959184
+            2020-01-04    0.972603
+            2020-01-05    0.979381
+            Freq: D, dtype: float64
+            ```
+
+            * Using templates and broadcasting:
+
+            ```pycon
+            >>> vbt.pd_acc.resample_to_index(
+            ...     d_index,
+            ...     mean_ratio_meta_nb,
+            ...     vbt.Rep('a'),
+            ...     vbt.Rep('b'),
+            ...     broadcast_named_args=dict(
+            ...         a=h_sr - 1,
+            ...         b=h_sr + 1
+            ...     )
+            ... )
+            2020-01-01   -1.000000
+            2020-01-02    0.920000
+            2020-01-03    0.959184
+            2020-01-04    0.972603
+            2020-01-05    0.979381
+            Freq: D, dtype: float64
+            ```
+        """
+        if not checks.is_index(target_index):
+            target_index = pd.Index(target_index)
+        if broadcast_named_args is None:
+            broadcast_named_args = {}
+        if broadcast_kwargs is None:
+            broadcast_kwargs = {}
+        if template_context is None:
+            template_context = {}
+
+        if isinstance(cls_or_self, type):
+            if len(broadcast_named_args) > 0:
+                broadcast_kwargs = merge_dicts(dict(to_pd=False, post_func=reshaping.to_2d_array), broadcast_kwargs)
+                if wrapper is not None:
+                    broadcast_named_args = reshaping.broadcast(
+                        broadcast_named_args,
+                        to_shape=wrapper.shape_2d,
+                        **broadcast_kwargs,
+                    )
+                else:
+                    broadcast_named_args, wrapper = reshaping.broadcast(
+                        broadcast_named_args,
+                        return_wrapper=True,
+                        **broadcast_kwargs,
+                    )
+            else:
+                checks.assert_not_none(wrapper)
+            template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
+            args = deep_substitute(args, template_context, sub_id="args")
+            func = jit_reg.resolve_option(nb.resample_to_index_meta_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
+            out = func(
+                wrapper.shape_2d[1],
+                wrapper.index.values,
+                target_index.values,
+                before,
+                reduce_func_nb,
+                *args,
+            )
+        else:
+            func = jit_reg.resolve_option(nb.resample_to_index_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
+            out = func(
+                cls_or_self.to_2d_array(),
+                cls_or_self.wrapper.index.values,
+                target_index.values,
+                before,
+                reduce_one,
+                reduce_func_nb,
+                *args,
+            )
+            if wrapper is None:
+                wrapper = cls_or_self.wrapper
+
+        return wrapper.wrap(out, group_by=False, index=target_index, **resolve_dict(wrap_kwargs))
 
     # ############# Describing ############# #
 

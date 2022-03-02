@@ -4,6 +4,7 @@
 
 import numpy as np
 from numba import prange
+from numba.np.numpy_support import as_dtype
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import chunking as base_ch
@@ -143,16 +144,16 @@ def row_apply_meta_nb(target_shape: tp.Shape, apply_func_nb: tp.ApplyMetaFunc, *
 
 
 @register_jitted
-def rolling_apply_1d_nb(
+def rolling_reduce_1d_nb(
     arr: tp.Array1d,
     window: int,
     minp: tp.Optional[int],
-    apply_func_nb: tp.ApplyFunc,
+    reduce_func_nb: tp.ReduceFunc,
     *args,
 ) -> tp.Array1d:
     """Provide rolling window calculations.
 
-    `apply_func_nb` must accept the array and `*args`. Must return a single value."""
+    `reduce_func_nb` must accept the array and `*args`. Must return a single value."""
     if minp is None:
         minp = window
     out = np.empty_like(arr, dtype=np.float_)
@@ -172,42 +173,42 @@ def rolling_apply_1d_nb(
             from_i = max(0, i + 1 - window)
             to_i = i + 1
             window_a = arr[from_i:to_i]
-            out[i] = apply_func_nb(window_a, *args)
+            out[i] = reduce_func_nb(window_a, *args)
     return out
 
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
-    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None, minp=None, apply_func_nb=None, args=ch.ArgsTaker()),
+    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None, minp=None, reduce_func_nb=None, args=ch.ArgsTaker()),
     merge_func=base_ch.column_stack,
 )
 @register_jitted(tags={"can_parallel"})
-def rolling_apply_nb(
+def rolling_reduce_nb(
     arr: tp.Array2d,
     window: int,
     minp: tp.Optional[int],
-    apply_func_nb: tp.ApplyFunc,
+    reduce_func_nb: tp.ReduceFunc,
     *args,
 ) -> tp.Array2d:
-    """2-dim version of `rolling_apply_1d_nb`."""
+    """2-dim version of `rolling_reduce_1d_nb`."""
     out = np.empty_like(arr, dtype=np.float_)
     for col in prange(arr.shape[1]):
-        out[:, col] = rolling_apply_1d_nb(arr[:, col], window, minp, apply_func_nb, *args)
+        out[:, col] = rolling_reduce_1d_nb(arr[:, col], window, minp, reduce_func_nb, *args)
     return out
 
 
 @register_jitted
-def rolling_apply_1d_meta_nb(
+def rolling_reduce_1d_meta_nb(
     n: int,
     col: int,
     window: int,
     minp: tp.Optional[int],
-    apply_func_nb: tp.RollApplyMetaFunc,
+    reduce_func_nb: tp.RangeReduceMetaFunc,
     *args,
 ) -> tp.Array1d:
-    """Meta version of `rolling_apply_1d_nb`.
+    """Meta version of `rolling_reduce_1d_nb`.
 
-    `apply_func_nb` must accept the start row index, the end row index, the column, and `*args`.
+    `reduce_func_nb` must accept the start row index, the end row index, the column, and `*args`.
     Must return a single value."""
     if minp is None:
         minp = window
@@ -219,7 +220,7 @@ def rolling_apply_1d_meta_nb(
         else:
             from_i = max(0, i + 1 - window)
             to_i = i + 1
-            out[i] = apply_func_nb(from_i, to_i, col, *args)
+            out[i] = reduce_func_nb(from_i, to_i, col, *args)
     return out
 
 
@@ -229,35 +230,35 @@ def rolling_apply_1d_meta_nb(
         target_shape=ch.ShapeSlicer(axis=1),
         window=None,
         minp=None,
-        apply_func_nb=None,
+        reduce_func_nb=None,
         args=ch.ArgsTaker(),
     ),
     merge_func=base_ch.column_stack,
 )
 @register_jitted(tags={"can_parallel"})
-def rolling_apply_meta_nb(
+def rolling_reduce_meta_nb(
     target_shape: tp.Shape,
     window: int,
     minp: tp.Optional[int],
-    apply_func_nb: tp.RollApplyMetaFunc,
+    reduce_func_nb: tp.RangeReduceMetaFunc,
     *args,
 ) -> tp.Array2d:
-    """2-dim version of `rolling_apply_1d_meta_nb`."""
+    """2-dim version of `rolling_reduce_1d_meta_nb`."""
     out = np.empty(target_shape, dtype=np.float_)
     for col in prange(target_shape[1]):
-        out[:, col] = rolling_apply_1d_meta_nb(target_shape[0], col, window, minp, apply_func_nb, *args)
+        out[:, col] = rolling_reduce_1d_meta_nb(target_shape[0], col, window, minp, reduce_func_nb, *args)
     return out
 
 
 @register_jitted
-def groupby_apply_1d_nb(arr: tp.Array1d, group_map: tp.GroupMap, apply_func_nb: tp.ApplyFunc, *args) -> tp.Array1d:
+def groupby_reduce_1d_nb(arr: tp.Array1d, group_map: tp.GroupMap, reduce_func_nb: tp.ReduceFunc, *args) -> tp.Array1d:
     """Provide group-by calculations.
 
-    `apply_func_nb` must accept the array and `*args`. Must return a single value."""
+    `reduce_func_nb` must accept the array and `*args`. Must return a single value."""
     group_idxs, group_lens = group_map
     group_start_idxs = np.cumsum(group_lens) - group_lens
     group_0_idxs = group_idxs[group_start_idxs[0] : group_start_idxs[0] + group_lens[0]]
-    group_0_out = apply_func_nb(arr[group_0_idxs], *args)
+    group_0_out = reduce_func_nb(arr[group_0_idxs], *args)
     out = np.empty(group_lens.shape[0], dtype=np.asarray(group_0_out).dtype)
     out[0] = group_0_out
 
@@ -265,41 +266,41 @@ def groupby_apply_1d_nb(arr: tp.Array1d, group_map: tp.GroupMap, apply_func_nb: 
         group_len = group_lens[group]
         start_idx = group_start_idxs[group]
         idxs = group_idxs[start_idx : start_idx + group_len]
-        out[group] = apply_func_nb(arr[idxs], *args)
+        out[group] = reduce_func_nb(arr[idxs], *args)
     return out
 
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
-    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), group_map=None, apply_func_nb=None, args=ch.ArgsTaker()),
+    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), group_map=None, reduce_func_nb=None, args=ch.ArgsTaker()),
     merge_func=base_ch.column_stack,
 )
 @register_jitted(tags={"can_parallel"})
-def groupby_apply_nb(arr: tp.Array2d, group_map: tp.GroupMap, apply_func_nb: tp.ApplyFunc, *args) -> tp.Array2d:
-    """2-dim version of `groupby_apply_1d_nb`."""
-    col_0_out = groupby_apply_1d_nb(arr[:, 0], group_map, apply_func_nb, *args)
+def groupby_reduce_nb(arr: tp.Array2d, group_map: tp.GroupMap, reduce_func_nb: tp.ReduceFunc, *args) -> tp.Array2d:
+    """2-dim version of `groupby_reduce_1d_nb`."""
+    col_0_out = groupby_reduce_1d_nb(arr[:, 0], group_map, reduce_func_nb, *args)
     out = np.empty((col_0_out.shape[0], arr.shape[1]), dtype=col_0_out.dtype)
     out[:, 0] = col_0_out
     for col in prange(1, arr.shape[1]):
-        out[:, col] = groupby_apply_1d_nb(arr[:, col], group_map, apply_func_nb, *args)
+        out[:, col] = groupby_reduce_1d_nb(arr[:, col], group_map, reduce_func_nb, *args)
     return out
 
 
 @register_jitted
-def groupby_apply_1d_meta_nb(
+def groupby_reduce_1d_meta_nb(
     col: int,
     group_map: tp.GroupMap,
-    apply_func_nb: tp.GroupByApplyMetaFunc,
+    reduce_func_nb: tp.GroupByReduceMetaFunc,
     *args,
 ) -> tp.Array1d:
-    """Meta version of `groupby_apply_1d_nb`.
+    """Meta version of `groupby_reduce_1d_nb`.
 
-    `apply_func_nb` must accept the array of indices in the group, the group index, the column index,
+    `reduce_func_nb` must accept the array of indices in the group, the group index, the column index,
     and `*args`. Must return a single value."""
     group_idxs, group_lens = group_map
     group_start_idxs = np.cumsum(group_lens) - group_lens
     group_0_idxs = group_idxs[group_start_idxs[0] : group_start_idxs[0] + group_lens[0]]
-    group_0_out = apply_func_nb(group_0_idxs, 0, col, *args)
+    group_0_out = reduce_func_nb(group_0_idxs, 0, col, *args)
     out = np.empty(group_lens.shape[0], dtype=np.asarray(group_0_out).dtype)
     out[0] = group_0_out
 
@@ -307,28 +308,28 @@ def groupby_apply_1d_meta_nb(
         group_len = group_lens[group]
         start_idx = group_start_idxs[group]
         idxs = group_idxs[start_idx : start_idx + group_len]
-        out[group] = apply_func_nb(idxs, group, col, *args)
+        out[group] = reduce_func_nb(idxs, group, col, *args)
     return out
 
 
 @register_chunkable(
     size=ch.ArgSizer(arg_query="n_cols"),
-    arg_take_spec=dict(n_cols=ch.CountAdapter(), group_map=None, apply_func_nb=None, args=ch.ArgsTaker()),
+    arg_take_spec=dict(n_cols=ch.CountAdapter(), group_map=None, reduce_func_nb=None, args=ch.ArgsTaker()),
     merge_func=base_ch.column_stack,
 )
 @register_jitted(tags={"can_parallel"})
-def groupby_apply_meta_nb(
+def groupby_reduce_meta_nb(
     n_cols: int,
     group_map: tp.GroupMap,
-    apply_func_nb: tp.GroupByApplyMetaFunc,
+    reduce_func_nb: tp.GroupByReduceMetaFunc,
     *args,
 ) -> tp.Array2d:
-    """2-dim version of `groupby_apply_1d_meta_nb`."""
-    col_0_out = groupby_apply_1d_meta_nb(0, group_map, apply_func_nb, *args)
+    """2-dim version of `groupby_reduce_1d_meta_nb`."""
+    col_0_out = groupby_reduce_1d_meta_nb(0, group_map, reduce_func_nb, *args)
     out = np.empty((col_0_out.shape[0], n_cols), dtype=col_0_out.dtype)
     out[:, 0] = col_0_out
     for col in prange(1, n_cols):
-        out[:, col] = groupby_apply_1d_meta_nb(col, group_map, apply_func_nb, *args)
+        out[:, col] = groupby_reduce_1d_meta_nb(col, group_map, reduce_func_nb, *args)
     return out
 
 
@@ -820,6 +821,295 @@ def flatten_uniform_grouped_nb(arr: tp.Array2d, group_map: tp.GroupMap, in_c_ord
                 out[k::max_len, group] = arr[:, col]
             else:
                 out[k * arr.shape[0] : (k + 1) * arr.shape[0], group] = arr[:, col]
+    return out
+
+
+# ############# Resampling ############# #
+
+
+@register_jitted(cache=True, is_generated_jit=True)
+def latest_at_index_1d_nb(
+    arr: tp.Array1d,
+    arr_index: tp.Array1d,
+    target_index: tp.Array1d,
+    nan_value: tp.Scalar = np.nan,
+    ffill: bool = True,
+) -> tp.Array1d:
+    """Get the latest in `arr` at each index in `target_index` based on `arr_index`."""
+    nb_enabled = not isinstance(arr, np.ndarray)
+    if nb_enabled:
+        a_dtype = as_dtype(arr.dtype)
+        value_dtype = as_dtype(nan_value)
+    else:
+        a_dtype = arr.dtype
+        value_dtype = np.array(nan_value).dtype
+    dtype = np.promote_types(a_dtype, value_dtype)
+
+    def _latest_at_index_1d_nb(arr, arr_index, target_index, nan_value, ffill):
+        out = np.empty(target_index.shape[0], dtype=dtype)
+        curr_j = -1
+        last_j = curr_j
+        last_valid = np.nan
+        for i in range(len(target_index)):
+            last_valid_at_i = np.nan
+            if i > 0 and target_index[i] < target_index[i - 1]:
+                raise ValueError("Target index must be strictly increasing")
+            for j in range(curr_j + 1, arr_index.shape[0]):
+                if j > 0 and arr_index[j] < arr_index[j - 1]:
+                    raise ValueError("Array index must be strictly increasing")
+                if arr_index[j] == target_index[i]:
+                    curr_j = j
+                    if not np.isnan(arr[curr_j]):
+                        last_valid_at_i = arr[curr_j]
+                    break
+                if arr_index[j] > target_index[i]:
+                    break
+                curr_j = j
+                if not np.isnan(arr[curr_j]):
+                    last_valid_at_i = arr[curr_j]
+            if ffill and not np.isnan(last_valid_at_i):
+                last_valid = last_valid_at_i
+            if curr_j == -1 or (not ffill and curr_j == last_j):
+                out[i] = nan_value
+            else:
+                if ffill:
+                    if np.isnan(last_valid):
+                        out[i] = nan_value
+                    else:
+                        out[i] = last_valid
+                else:
+                    if np.isnan(last_valid_at_i):
+                        out[i] = nan_value
+                    else:
+                        out[i] = last_valid_at_i
+                last_j = curr_j
+        return out
+
+    if not nb_enabled:
+        return _latest_at_index_1d_nb(arr, arr_index, target_index, nan_value, ffill)
+
+    return _latest_at_index_1d_nb
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="arr", axis=1),
+    arg_take_spec=dict(
+        arr=ch.ArraySlicer(axis=1),
+        arr_index=None,
+        target_index=None,
+        nan_value=None,
+        ffill=None,
+    ),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(cache=True, tags={"can_parallel"}, is_generated_jit=True)
+def latest_at_index_nb(
+    arr: tp.Array2d,
+    arr_index: tp.Array1d,
+    target_index: tp.Array1d,
+    nan_value: tp.Scalar = np.nan,
+    ffill: bool = True,
+) -> tp.Array2d:
+    """2-dim version of `latest_at_index_1d_nb`."""
+    nb_enabled = not isinstance(arr, np.ndarray)
+    if nb_enabled:
+        a_dtype = as_dtype(arr.dtype)
+        value_dtype = as_dtype(nan_value)
+    else:
+        a_dtype = arr.dtype
+        value_dtype = np.array(nan_value).dtype
+    dtype = np.promote_types(a_dtype, value_dtype)
+
+    def _latest_at_index_nb(arr, arr_index, target_index, nan_value, ffill):
+        out = np.empty((target_index.shape[0], arr.shape[1]), dtype=dtype)
+        for col in prange(arr.shape[1]):
+            out[:, col] = latest_at_index_1d_nb(
+                arr[:, col],
+                arr_index,
+                target_index,
+                nan_value=nan_value,
+                ffill=ffill,
+            )
+        return out
+
+    if not nb_enabled:
+        return _latest_at_index_nb(arr, arr_index, target_index, nan_value, ffill)
+
+    return _latest_at_index_nb
+
+
+@register_jitted
+def resample_to_index_1d_nb(
+    arr: tp.Array1d,
+    arr_index: tp.Array1d,
+    target_index: tp.Array1d,
+    before: bool,
+    reduce_one: bool,
+    reduce_func_nb: tp.ReduceFunc,
+    *args,
+) -> tp.Array1d:
+    """Reduce `arr` after/before each index in `target_index` based on `arr_index`.
+
+    If `before` is True, applied on elements that come before and including that index.
+    Otherwise, applied on elements that come after and including that index.
+
+    If `reduce_one` is True, applies also on arrays with one element. Otherwise, directly sets
+    that element to the output index.
+
+    `reduce_func_nb` must accept the array and `*args`. Must return a single value."""
+    out = np.empty(len(target_index), dtype=np.float_)
+    from_j = 0
+    to_j = 0
+    for i in range(len(target_index)):
+        if (
+            to_j == len(arr_index)
+            or (before and arr_index[to_j] > target_index[i])
+            or (not before and arr_index[to_j] < target_index[i])
+        ):
+            out[i] = np.nan
+            continue
+        found = False
+        for j in range(to_j, len(arr_index)):
+            if j > 0 and arr_index[j] < arr_index[j - 1]:
+                raise ValueError("Array index must be strictly increasing")
+            if (before and arr_index[j] >= target_index[i]) or (
+                not before and i < len(target_index) - 1 and arr_index[j] >= target_index[i + 1]
+            ):
+                found = True
+                if before:
+                    to_j = j + 1
+                else:
+                    to_j = j
+                break
+        if not found:
+            to_j = len(arr_index)
+        if to_j - from_j == 0:
+            out[i] = np.nan
+        elif to_j - from_j == 1 and not reduce_one:
+            out[i] = arr[from_j]
+        else:
+            out[i] = reduce_func_nb(arr[from_j:to_j], *args)
+        from_j = to_j
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="arr", axis=1),
+    arg_take_spec=dict(
+        arr=ch.ArraySlicer(axis=1),
+        arr_index=None,
+        target_index=None,
+        before=None,
+        reduce_one=None,
+        reduce_func_nb=None,
+        args=ch.ArgsTaker(),
+    ),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(tags={"can_parallel"})
+def resample_to_index_nb(
+    arr: tp.Array2d,
+    arr_index: tp.Array1d,
+    target_index: tp.Array1d,
+    before: bool,
+    reduce_one: bool,
+    reduce_func_nb: tp.ReduceFunc,
+    *args,
+) -> tp.Array2d:
+    """2-dim version of `resample_to_index_1d_nb`."""
+    out = np.empty((target_index.shape[0], arr.shape[1]), dtype=np.float_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = resample_to_index_1d_nb(
+            arr[:, col],
+            arr_index,
+            target_index,
+            before,
+            reduce_one,
+            reduce_func_nb,
+            *args,
+        )
+    return out
+
+
+@register_jitted
+def resample_to_index_1d_meta_nb(
+    col: int,
+    arr_index: tp.Array1d,
+    target_index: tp.Array1d,
+    before: bool,
+    reduce_func_nb: tp.RangeReduceMetaFunc,
+    *args,
+) -> tp.Array1d:
+    """Meta version of `resample_to_index_1d_nb`.
+
+    `reduce_func_nb` must accept the (absolute) start row index, the end row index, the column index,
+    and `*args`. Must return a single value."""
+    out = np.empty(len(target_index), dtype=np.float_)
+    from_j = 0
+    to_j = 0
+    for i in range(len(target_index)):
+        if (
+            to_j == len(arr_index)
+            or (before and arr_index[to_j] > target_index[i])
+            or (not before and arr_index[to_j] < target_index[i])
+        ):
+            out[i] = np.nan
+            continue
+        found = False
+        for j in range(to_j, len(arr_index)):
+            if j > 0 and arr_index[j] < arr_index[j - 1]:
+                raise ValueError("Array index must be strictly increasing")
+            if (before and arr_index[j] >= target_index[i]) or (
+                not before and i < len(target_index) - 1 and arr_index[j] >= target_index[i + 1]
+            ):
+                found = True
+                if before:
+                    to_j = j + 1
+                else:
+                    to_j = j
+                break
+        if not found:
+            to_j = len(arr_index)
+        if to_j - from_j == 0:
+            out[i] = np.nan
+        else:
+            out[i] = reduce_func_nb(from_j, to_j, col, *args)
+        from_j = to_j
+    return out
+
+
+@register_chunkable(
+    size=ch.ArgSizer(arg_query="n_cols"),
+    arg_take_spec=dict(
+        n_cols=ch.CountAdapter(),
+        arr_index=None,
+        target_index=None,
+        before=None,
+        reduce_func_nb=None,
+        args=ch.ArgsTaker(),
+    ),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(tags={"can_parallel"})
+def resample_to_index_meta_nb(
+    n_cols: int,
+    arr_index: tp.Array1d,
+    target_index: tp.Array1d,
+    before: bool,
+    reduce_func_nb: tp.RangeReduceMetaFunc,
+    *args,
+) -> tp.Array2d:
+    """2-dim version of `resample_to_index_1d_meta_nb`."""
+    out = np.empty((target_index.shape[0], n_cols), dtype=np.float_)
+    for col in prange(n_cols):
+        out[:, col] = resample_to_index_1d_meta_nb(
+            col,
+            arr_index,
+            target_index,
+            before,
+            reduce_func_nb,
+            *args,
+        )
     return out
 
 
