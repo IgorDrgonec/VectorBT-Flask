@@ -1117,18 +1117,25 @@ def resample_to_index_meta_nb(
 def date_range_nb(
     start: np.datetime64,
     end: np.datetime64,
-    freq: np.timedelta64,
-    incl_last: bool = False,
+    freq: np.timedelta64 = np.timedelta64(86400000000000, "ns"),
+    incl_left: bool = True,
+    incl_right: bool = True,
 ) -> tp.Array1d:
     """Generate a datetime index from a date range."""
-    if incl_last:
-        n_periods = int(np.ceil((end - start) / freq)) + 1
+    values_len = int(np.floor((end - start) / freq)) + 1
+    values = np.empty(values_len, dtype=type(start))
+    for i in range(values_len):
+        values[i] = start + i * freq
+    if start == end:
+        if not incl_left and not incl_right:
+            values = values[1:-1]
     else:
-        n_periods = int(np.floor((end - start) / freq)) + 1
-    out = np.empty(n_periods, dtype=type(start))
-    for i in range(n_periods):
-        out[i] = start + i * freq
-    return out
+        if not incl_left or not incl_right:
+            if not incl_left and len(values) and values[0] == start:
+                values = values[1:]
+            if not incl_right and len(values) and values[-1] == end:
+                values = values[:-1]
+    return values
 
 
 # ############# Reducers ############# #
