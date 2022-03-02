@@ -1551,6 +1551,20 @@ class TestAccessors:
             ),
         )
 
+    @pytest.mark.parametrize("test_freq", ["1h", "3d", "7d"])
+    @pytest.mark.parametrize("test_closed", ["left", "right"])
+    def test_date_range_nb(self, test_freq, test_closed):
+        np.testing.assert_array_equal(
+            vbt.nb.date_range_nb(
+                df.index[0].to_datetime64(),
+                df.index[-1].to_datetime64(),
+                pd.Timedelta(test_freq).to_timedelta64(),
+                incl_left=test_closed == "left",
+                incl_right=test_closed == "right",
+            ),
+            pd.date_range(df.index[0], df.index[-1], freq=test_freq, closed=test_closed).values,
+        )
+
     def test_apply_and_reduce(self):
         @njit
         def every_nth_nb(a, n):

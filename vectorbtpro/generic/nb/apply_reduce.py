@@ -1121,9 +1121,9 @@ def date_range_nb(
     incl_left: bool = True,
     incl_right: bool = True,
 ) -> tp.Array1d:
-    """Generate a datetime index from a date range."""
+    """Generate a datetime index with nanosecond precision from a date range."""
     values_len = int(np.floor((end - start) / freq)) + 1
-    values = np.empty(values_len, dtype=type(start))
+    values = np.empty(values_len, dtype="datetime64[ns]")
     for i in range(values_len):
         values[i] = start + i * freq
     if start == end:
