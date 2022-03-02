@@ -2519,6 +2519,13 @@ class TestFactory:
         assert I.input_names == ("ts",)
         assert I.param_names == ("window",)
         pd.testing.assert_frame_equal(I.run(ts).out, vbt.IF.from_talib("SMA", timeperiod=2).run(ts).real)
+        I = vbt.IndicatorFactory.from_expr("@talib_sma(@in_ts, @p_window, skipna=True)", window=2)
+        assert I.input_names == ("ts",)
+        assert I.param_names == ("window",)
+        pd.testing.assert_series_equal(
+            I.run(pd.Series([np.nan, 1, np.nan, 2, np.nan, 3])).out,
+            vbt.IF.from_talib("SMA", timeperiod=2, skipna=True).run(pd.Series([np.nan, 1, np.nan, 2, np.nan, 3])).real,
+        )
         I = vbt.IndicatorFactory.from_expr("@talib_sma(@in_ts, @p_window)", window=2)
         assert I.input_names == ("ts",)
         assert I.param_names == ("window",)
@@ -2666,6 +2673,19 @@ class TestFactory:
 
     def test_from_talib(self):
         if talib_available:
+            SMA = vbt.talib("SMA")
+            pd.testing.assert_frame_equal(
+                SMA.run(ts, vbt.Default(2)).real,
+                ts.rolling(2).mean()
+            )
+            pd.testing.assert_series_equal(
+                SMA.run(pd.Series([1, np.nan, 2, np.nan]), vbt.Default(2)).real,
+                pd.Series([1, np.nan, 2, np.nan]).rolling(2).mean(),
+            )
+            pd.testing.assert_series_equal(
+                SMA.run(pd.Series([1, np.nan, 2, np.nan, 3]), vbt.Default(2), skipna=True).real,
+                pd.Series([np.nan, np.nan, 1.5, np.nan, 2.5]),
+            )
             # with params
             target = pd.DataFrame(
                 np.array(

@@ -56,6 +56,7 @@ from vectorbtpro.indicators.expr import expr_func_config, expr_res_func_config, 
 from vectorbtpro.registries.ca_registry import is_cacheable
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
+from vectorbtpro.utils.array_ import build_nan_mask, squeeze_nan, unsqueeze_nan
 from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config, Configured
 from vectorbtpro.utils.decorators import classproperty, cacheable_property, class_or_instancemethod
@@ -2526,26 +2527,26 @@ Other keyword arguments are passed to `{0}.run`.
         output_names = info["output_names"]
         output_flags = info["output_flags"]
 
-        def apply_func(
-            input_tuple: tp.Tuple[tp.AnyArray, ...],
-            in_output_tuple: tp.Tuple[tp.AnyArray, ...],
+        def apply_func_1d(
+            input_tuple: tp.Tuple[tp.Array1d, ...],
+            in_output_tuple: tp.Tuple[tp.Array1d, ...],
             param_tuple: tp.Tuple[tp.Param, ...],
+            skipna: bool = False,
             **_kwargs,
-        ) -> tp.Union[tp.Array2d, tp.List[tp.Array2d]]:
-            # TA-Lib functions can only process 1-dim arrays
-            n_input_cols = input_tuple[0].shape[1]
-            outputs = []
-            for col in range(n_input_cols):
-                output = talib_func(
-                    *map(lambda x: np.require(x[:, col], dtype=np.double), input_tuple),
-                    *param_tuple,
-                    **_kwargs,
-                )
-                outputs.append(output)
-            if isinstance(outputs[0], tuple):  # multiple outputs
-                outputs = list(zip(*outputs))
-                return list(map(column_stack, outputs))
-            return column_stack(outputs)
+        ) -> tp.Union[tp.Array1d, tp.Tuple[tp.Array1d]]:
+            """1-dim apply function wrapping a TA-Lib function.
+
+            Set `skipna` to True to run the TA-Lib function on non-NA values only."""
+            if skipna:
+                nan_mask = build_nan_mask(*input_tuple)
+                input_tuple = squeeze_nan(*input_tuple, nan_mask=nan_mask)
+            else:
+                nan_mask = None
+            input_tuple = tuple([arr.astype(np.double) for arr in input_tuple])
+            output = talib_func(*input_tuple, *param_tuple, **_kwargs)
+            if isinstance(output, tuple):
+                return unsqueeze_nan(*output, nan_mask=nan_mask)
+            return unsqueeze_nan(output, nan_mask=nan_mask)[0]
 
         kwargs = merge_dicts({k: Default(v) for k, v in info["parameters"].items()}, kwargs)
         TALibIndicator = cls(
@@ -2561,7 +2562,7 @@ Other keyword arguments are passed to `{0}.run`.
                 ),
                 factory_kwargs,
             )
-        ).with_apply_func(apply_func, pass_packed=True, **kwargs)
+        ).with_apply_func(apply_func_1d, pass_packed=True, takes_1d=True, **kwargs)
 
         def plot(
             self,
@@ -3257,7 +3258,7 @@ Args:
         * `@p_*`: parameter variable
         * `@out_*`: output variable
         * `@out_*:`: indicates that the next part until a comma is an output
-        * `@talib_*`: name of a TA-Lib function
+        * `@talib_*`: name of a TA-Lib function. Uses the indicator's `apply_func`.
         * `@res_*`: name of the indicator to resolve automatically. Input names can overlap with
             those of other indicators, while all other information gets a prefix with the indicator's short name.
         * `@settings(*)`: settings to be merged with the current `IndicatorFactory.from_expr` settings.
@@ -3646,42 +3647,29 @@ Args:
                     from talib import abstract
 
                     talib_func_name = var_name[8:].upper()
-                    talib_func = getattr(talib, talib_func_name)
-                    talib_info = abstract.Function(talib_func_name).info
-                    talib_input_names = []
-                    for in_names in talib_info["input_names"].values():
-                        if isinstance(in_names, (list, tuple)):
-                            talib_input_names.extend(list(in_names))
-                        else:
-                            talib_input_names.append(in_names)
+                    talib_ind = cls_or_self.from_talib(talib_func_name)
 
-                    def _talib_func(
-                        *args,
-                        _talib_func: tp.Callable = talib_func,
-                        _talib_input_names: tp.List[str] = talib_input_names,
-                        **kwargs,
-                    ) -> tp.Any:
+                    def _talib_func(*_args, _talib_ind: tp.Callable = talib_ind, **_kwargs) -> tp.Any:
                         inputs = {}
                         other_args = []
-                        for k in range(len(args)):
-                            if k < len(talib_input_names) and len(inputs) < len(talib_input_names):
-                                inputs[talib_input_names[k]] = args[k]
+                        input_names = _talib_ind.input_names
+                        for k in range(len(_args)):
+                            if k < len(input_names) and len(inputs) < len(input_names):
+                                inputs[input_names[k]] = _args[k]
                             else:
-                                other_args.append(args[k])
-                        if len(inputs) < len(talib_input_names):
-                            for k, v in kwargs.items():
-                                if k in talib_input_names:
-                                    inputs[k] = v
-                                else:
-                                    other_args.append(v)
+                                other_args.append(_args[k])
+                        if len(inputs) < len(input_names):
+                            for k in _kwargs:
+                                if k in input_names:
+                                    inputs[k] = _kwargs.pop(k)
 
                         bc_inputs = tuple(np.broadcast_arrays(*inputs.values()))
                         if bc_inputs[0].ndim == 1:
-                            return _talib_func(*args, **kwargs)
+                            return _talib_ind.apply_func(bc_inputs, (), other_args, **_kwargs)
                         outputs = []
                         for col in range(bc_inputs[0].shape[1]):
                             col_inputs = [input[:, col] for input in bc_inputs]
-                            outputs.append(_talib_func(*col_inputs, *other_args))
+                            outputs.append(_talib_ind.apply_func(col_inputs, (), other_args, **_kwargs))
                         if isinstance(outputs[0], tuple):  # multiple outputs
                             outputs = list(zip(*outputs))
                             return list(map(column_stack, outputs))
