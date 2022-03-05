@@ -421,7 +421,6 @@ from vectorbtpro.base.reshaping import to_1d_array
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.generic.analyzable import Analyzable
-from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.records import nb
 from vectorbtpro.records.col_mapper import ColumnMapper
 from vectorbtpro.records.mapped_array import MappedArray

@@ -1850,10 +1850,36 @@ __pdoc__[
 
 PortfolioT = tp.TypeVar("PortfolioT", bound="Portfolio")
 
+class MetaInOutputs(type):
+    """Meta class that exposes a read-only class property `MetaFields.in_output_config`."""
+
+    @property
+    def in_output_config(cls) -> Config:
+        """In-output config."""
+        return cls._in_output_config
+
+
+class PortfolioWithInOutputs(metaclass=MetaInOutputs):
+    """Class exposes a read-only class property `RecordsWithFields.field_config`."""
+
+    @property
+    def in_output_config(self) -> Config:
+        """In-output config of `${cls_name}`.
+
+        ```python
+        ${in_output_config}
+        ```
+        """
+        return self._in_output_config
+
+
+class MetaPortfolio(type(Analyzable), type(PortfolioWithInOutputs)):
+    pass
+
 
 @attach_shortcut_properties(shortcut_config)
 @attach_returns_acc_methods(returns_acc_config)
-class Portfolio(Analyzable):
+class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     """Class for modeling portfolio and measuring its performance.
 
     Args:
@@ -1901,6 +1927,8 @@ class Portfolio(Analyzable):
 
     !!! note
         This class is meant to be immutable. To change any attribute, use `Portfolio.replace`."""
+
+    _writeable_attrs: tp.ClassVar[tp.Optional[tp.Set[str]]] = {"_in_output_config"}
 
     def __init__(
         self,
@@ -1976,7 +2004,28 @@ class Portfolio(Analyzable):
         # Cannot select rows
         self._column_only_select = True
 
+        # Copy writeable attrs
+        self._in_output_config = type(self)._in_output_config.copy()
+
     # ############# In-outputs ############# #
+
+    _in_output_config: tp.ClassVar[Config] = HybridConfig()
+
+    @property
+    def in_output_config(self) -> Config:
+        """In-output config of `${cls_name}`.
+
+        ```python
+        ${in_output_config}
+        ```
+
+        Returns `${cls_name}._in_output_config`, which gets (hybrid-) copied upon creation of each instance.
+        Thus, changing this config won't affect the class.
+
+        To change in_outputs, you can either change the config in-place, override this property,
+        or overwrite the instance variable `${cls_name}._in_output_config`.
+        """
+        return self._in_output_config
 
     def get_in_output(
         self,
@@ -2194,7 +2243,8 @@ class Portfolio(Analyzable):
         """Perform indexing on `Portfolio.in_outputs`.
 
         If the name of a field can be found as an attribute of `Portfolio`, reads this attribute's
-        annotations to figure out the type and layout of the indexed object.
+        annotations to figure out the type and layout of the indexed object. The same goes for
+        `Portfolio.in_output_config`. In both, `indexing_func` can be explicitly specified.
 
         !!! note
             Aliases are not supported.
@@ -2215,7 +2265,9 @@ class Portfolio(Analyzable):
         * '_1d': element per column/group (reduced time series)
 
         Finally, looks for the field object having the same shape as that of `Portfolio.wrapper`,
-        both grouped and ungrouped. Cash sharing plays no role in this case."""
+        both grouped and ungrouped. Cash sharing plays no role in this case.
+
+        If the object is None, boolean, or empty, returns as-is."""
         if self.in_outputs is None:
             return None
 
@@ -2244,34 +2296,41 @@ class Portfolio(Analyzable):
             return func(obj, col_map, to_1d_array(col_idxs))
 
         for field, obj in in_outputs.items():
-            if obj is None or isinstance(obj, bool) or (isinstance(obj, np.ndarray) and obj.shape == (0, 0)):
+            if obj is None or isinstance(obj, bool) or (isinstance(obj, np.ndarray) and obj.size == 0):
                 new_obj = obj
             else:
                 new_obj = None
-                if field in cls_dir:
-                    method_or_prop = getattr(cls, field)
-                    options = getattr(method_or_prop, "options", {})
-                    obj_type = options.get("obj_type", None)
-                    group_by_aware = options.get("group_by_aware", None)
-                    if obj_type is None:
-                        raise TypeError(f"Cannot parse in-output '{field}': option 'obj_type' is missing")
-                    if group_by_aware is None:
-                        raise TypeError(f"Cannot parse in-output '{field}': option 'group_by_aware' is missing")
-
-                    if obj_type == "array":
-                        if group_by_aware and is_grouped:
-                            new_obj = _index_2d_by_group(obj)
-                        else:
-                            new_obj = _index_2d_by_col(obj)
-                    elif obj_type == "red_array":
-                        if group_by_aware and is_grouped:
-                            new_obj = _index_1d_by_group(obj)
-                        else:
-                            new_obj = _index_1d_by_col(obj)
-                    elif obj_type == "records":
-                        new_obj = _index_records(obj)
+                if field in cls_dir or field in self.in_output_config:
+                    if field in cls_dir:
+                        method_or_prop = getattr(cls, field)
+                        options = getattr(method_or_prop, "options", {})
                     else:
-                        raise TypeError(f"Cannot index in-output '{field}': option 'obj_type={obj_type}' not supported")
+                        options = self.in_output_config[field]
+                    indexing_func = options.get("indexing_func", None)
+                    if indexing_func is not None:
+                        new_obj = indexing_func(obj)
+                    else:
+                        obj_type = options.get("obj_type", None)
+                        group_by_aware = options.get("group_by_aware", None)
+                        if obj_type is None:
+                            raise TypeError(f"Cannot parse in-output '{field}': option 'obj_type' is missing")
+                        if group_by_aware is None:
+                            raise TypeError(f"Cannot parse in-output '{field}': option 'group_by_aware' is missing")
+
+                        if obj_type == "array":
+                            if group_by_aware and is_grouped:
+                                new_obj = _index_2d_by_group(obj)
+                            else:
+                                new_obj = _index_2d_by_col(obj)
+                        elif obj_type == "red_array":
+                            if group_by_aware and is_grouped:
+                                new_obj = _index_1d_by_group(obj)
+                            else:
+                                new_obj = _index_1d_by_col(obj)
+                        elif obj_type == "records":
+                            new_obj = _index_records(obj)
+                        else:
+                            raise TypeError(f"Cannot index in-output '{field}': option 'obj_type={obj_type}' not supported")
                 else:
                     if "_pcgs" in field:
                         if "_2d" in field:
@@ -2424,7 +2483,14 @@ class Portfolio(Analyzable):
     # ############# Resampling ############# #
 
     def resample_in_outputs(self, resampler: tp.PandasResampler) -> tp.Optional[tp.NamedTuple]:
-        """Perform resampling on `Portfolio.in_outputs`."""
+        """Perform resampling on `Portfolio.in_outputs`.
+
+        If the name of a field can be found as an attribute of `Portfolio`, reads this attribute's
+        annotations to figure out the type and layout of the indexed object. The same goes for
+        `Portfolio.in_output_config`. In both, `resample_func` can be explicitly specified.
+
+        If a specification for an in-output field wasn't found, throws an error.
+        If the object is None, boolean, empty, or 1-dim, returns as-is."""
         if self.in_outputs is None:
             return None
 
@@ -2434,21 +2500,25 @@ class Portfolio(Analyzable):
         cls_dir = dir(cls)
 
         for field, obj in in_outputs.items():
-            if obj is None or isinstance(obj, bool) or (isinstance(obj, np.ndarray) and obj.shape == (0, 0)):
+            if obj is None or isinstance(obj, bool) or (isinstance(obj, np.ndarray) and obj.size == 0):
                 new_obj = obj
             else:
                 new_obj = None
-                if field in cls_dir:
-                    method_or_prop = getattr(cls, field)
-                    options = getattr(method_or_prop, "options", {})
-                    obj_type = options.get("obj_type", None)
+                if field in cls_dir or field in self.in_output_config:
+                    if field in cls_dir:
+                        method_or_prop = getattr(cls, field)
+                        options = getattr(method_or_prop, "options", {})
+                    else:
+                        options = self.in_output_config[field]
                     resample_func = options.get("resample_func", None)
-                    if obj_type is None:
-                        raise TypeError(f"Cannot parse in-output '{field}': option 'obj_type' is missing")
-                    if obj_type == "red_array":
-                        new_obj = obj
-                    elif resample_func is not None:
+                    if resample_func is not None:
                         new_obj = resample_func(obj)
+                    else:
+                        obj_type = options.get("obj_type", None)
+                        if obj_type is None:
+                            raise TypeError(f"Cannot parse in-output '{field}': option 'obj_type' is missing")
+                        if obj_type == "red_array":
+                            new_obj = obj
                 else:
                     if "_1d" in field or obj.shape == (self.wrapper.get_shape_2d()[1],):
                         new_obj = obj
@@ -2477,7 +2547,9 @@ class Portfolio(Analyzable):
                 price of the first bar futher into the future will affect this computation and almost
                 certainly produce a different market value and returns. To mitigate this, make sure
                 to downsample to an index with the first bar containing only the first bar from the
-                origin timeframe."""
+                origin timeframe.
+            * Initial position is valued by the first non-NA close. If the close is moved further into
+                the future, the total return and other metrics will also change."""
         if self._call_seq is not None:
             raise ValueError("Cannot resample call_seq")
         resampler, new_wrapper = self.wrapper.resample_meta(*args, **kwargs)
