@@ -1,6 +1,6 @@
 # Copyright (c) 2022 Oleg Polakow. All rights reserved.
 
-"""Class that exposes methods for grouping.
+"""Base classes and functions for grouping.
 
 Class `Grouper` stores metadata related to grouping index. It can return, for example,
 the number of groups, the start indices of groups, and other information useful for reducing

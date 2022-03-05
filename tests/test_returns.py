@@ -1070,3 +1070,10 @@ class TestAccessors:
                 qs.stats.sharpe(rets.dropna()),
             )
             assert ret_acc["a"].qs.r_squared() == 0.8038014307754487
+
+    @pytest.mark.parametrize("test_freq", ["1h", "10h", "3d"])
+    def test_resample(self, test_freq):
+        pd.testing.assert_frame_equal(
+            ts.vbt.to_returns().vbt.returns.resample(test_freq).obj,
+            (1 + ts.vbt.to_returns()).resample(test_freq).apply(lambda x: x.prod() - 1 if len(x) > 0 else np.nan),
+        )

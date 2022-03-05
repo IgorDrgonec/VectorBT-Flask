@@ -180,9 +180,9 @@ class BaseAccessor(Wrapping):
         """Accessor class for `pd.DataFrame`."""
         return BaseDFAccessor
 
-    def indexing_func(self: BaseAccessorT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> BaseAccessorT:
+    def indexing_func(self: BaseAccessorT, *args, **kwargs) -> BaseAccessorT:
         """Perform indexing on `BaseAccessor`."""
-        new_wrapper, idx_idxs, _, col_idxs = self.wrapper.indexing_func_meta(pd_indexing_func, **kwargs)
+        new_wrapper, idx_idxs, _, col_idxs = self.wrapper.indexing_func_meta(*args, **kwargs)
         new_obj = new_wrapper.wrap(self.to_2d_array()[idx_idxs, :][:, col_idxs], group_by=False)
         if checks.is_series(new_obj):
             return self.replace(cls_=self.sr_accessor_cls, obj=new_obj, wrapper=new_wrapper)

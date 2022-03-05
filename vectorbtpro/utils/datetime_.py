@@ -8,14 +8,23 @@ import dateparser
 import numpy as np
 import pandas as pd
 import pytz
+import re
 
 from vectorbtpro import _typing as tp
 
-DatetimeIndexes = (pd.DatetimeIndex, pd.TimedeltaIndex, pd.PeriodIndex)
+
+PandasDatetimeIndex = (pd.DatetimeIndex, pd.PeriodIndex)
 
 
 def freq_to_timedelta(arg: tp.FrequencyLike) -> pd.Timedelta:
     """`pd.to_timedelta` that uses unit abbreviation with number."""
+    if isinstance(arg, str):
+        arg = "".join(arg.strip().split())
+        match = re.match(r"^(\d*)([m]?)$", arg)
+        if match:
+            arg = match.group(1) + match.group(2)
+        if re.match(r"^\d*[MyY]?$", arg):
+            raise ValueError("Units 'M', 'Y' and 'y' do not represent unambiguous timedelta values")
     if isinstance(arg, str) and not arg[0].isdigit():
         # Otherwise "ValueError: unit abbreviation w/o a number"
         return pd.Timedelta(1, unit=arg)

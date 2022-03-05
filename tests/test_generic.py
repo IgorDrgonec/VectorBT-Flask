@@ -1311,10 +1311,7 @@ class TestAccessors:
             pd.DataFrame([[2.0, 1.0, 0.6666666666666666], [4.5, 2.25, 1.5]], columns=df.columns),
         )
 
-    @pytest.mark.parametrize(
-        "test_freq",
-        ["1h", "3d", "7d"],
-    )
+    @pytest.mark.parametrize("test_freq", ["1h", "10h", "3d"])
     def test_resample_apply(self, test_freq):
         @njit
         def mean_nb(x):
@@ -1337,7 +1334,21 @@ class TestAccessors:
             df.vbt.resample_apply(test_freq, mean_nb, use_groupby_apply=False),
         )
         pd.testing.assert_frame_equal(
+            df.vbt.resample_apply(df.resample(test_freq), mean_nb, use_groupby_apply=True),
+            df.vbt.resample_apply(test_freq, mean_nb, use_groupby_apply=False),
+        )
+        with pytest.raises(Exception):
+            df.vbt.resample_apply(
+                vbt.Resampler.from_pd_resampler(df.index, df.resample(test_freq)),
+                mean_nb,
+                use_groupby_apply=True,
+            )
+        pd.testing.assert_frame_equal(
             df.vbt.resample_apply(df.resample(test_freq), mean_nb),
+            df.vbt.resample_apply(test_freq, mean_nb),
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.resample_apply(vbt.Resampler.from_pd_resampler(df.index, df.resample(test_freq)), mean_nb),
             df.vbt.resample_apply(test_freq, mean_nb),
         )
         pd.testing.assert_frame_equal(
@@ -1425,22 +1436,22 @@ class TestAccessors:
         ["1h", "3d", "7d"],
     )
     def test_latest_at_index(self, test_freq):
-        target_index = df.resample(test_freq, closed='right', label='right').count().index
+        target_index = df.resample(test_freq, closed="right", label="right").count().index
         np.testing.assert_array_equal(
             df["a"].vbt.latest_at_index(target_index).values,
-            df["a"].resample(test_freq, closed='right', label='right').last().ffill().values,
+            df["a"].resample(test_freq, closed="right", label="right").last().ffill().values,
         )
         np.testing.assert_array_equal(
             df.vbt.latest_at_index(target_index).values,
-            df.resample(test_freq, closed='right', label='right').last().ffill().values,
+            df.resample(test_freq, closed="right", label="right").last().ffill().values,
         )
         np.testing.assert_array_equal(
             df.vbt.latest_at_index(target_index, ffill=False).values,
-            df.resample(test_freq, closed='right', label='right').last().values,
+            df.resample(test_freq, closed="right", label="right").last().values,
         )
         np.testing.assert_array_equal(
             df.vbt.latest_at_index(target_index, ffill=False, nan_value=-1).values,
-            df.resample(test_freq, closed='right', label='right').last().fillna(-1).values,
+            df.resample(test_freq, closed="right", label="right").last().fillna(-1).values,
         )
 
     @pytest.mark.parametrize(
@@ -1457,7 +1468,7 @@ class TestAccessors:
             return np.nanmean(x[from_i:to_i, col])
 
         target_index = df.resample(test_freq).asfreq().index
-        target_index_before = df.resample(test_freq, closed='right', label='right').asfreq().index
+        target_index_before = df.resample(test_freq, closed="right", label="right").asfreq().index
 
         pd.testing.assert_series_equal(
             df["a"].vbt.resample_to_index(target_index, mean_nb),
@@ -1469,7 +1480,7 @@ class TestAccessors:
         )
         pd.testing.assert_frame_equal(
             df.vbt.resample_to_index(target_index_before, mean_nb, before=True),
-            df.resample(test_freq, closed='right', label='right').apply(lambda x: mean_nb(x.values)),
+            df.resample(test_freq, closed="right", label="right").apply(lambda x: mean_nb(x.values)),
         )
         pd.testing.assert_frame_equal(
             df.vbt.resample_to_index(target_index, mean_nb, jitted=dict(parallel=True)),
@@ -1534,7 +1545,7 @@ class TestAccessors:
 
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.resample_to_index(
-                df.resample('2d').asfreq().index,
+                df.resample("2d").asfreq().index,
                 mean_diff_meta_nb,
                 vbt.RepEval("to_2d_array(x)"),
                 vbt.RepEval("to_2d_array(y)"),
@@ -1549,20 +1560,6 @@ class TestAccessors:
                 index=pd.DatetimeIndex(["2018-01-01", "2018-01-03", "2018-01-05"], dtype="datetime64[ns]", freq="2D"),
                 columns=df.columns,
             ),
-        )
-
-    @pytest.mark.parametrize("test_freq", ["1h", "3d", "7d"])
-    @pytest.mark.parametrize("test_closed", ["left", "right"])
-    def test_date_range_nb(self, test_freq, test_closed):
-        np.testing.assert_array_equal(
-            vbt.nb.date_range_nb(
-                df.index[0].to_datetime64(),
-                df.index[-1].to_datetime64(),
-                pd.Timedelta(test_freq).to_timedelta64(),
-                incl_left=test_closed == "left",
-                incl_right=test_closed == "right",
-            ),
-            pd.date_range(df.index[0], df.index[-1], freq=test_freq, closed=test_closed).values,
         )
 
     def test_apply_and_reduce(self):

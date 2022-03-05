@@ -2,6 +2,7 @@
 
 """Class for analyzing data."""
 
+from vectorbtpro import _typing as tp
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.generic.plots_builder import PlotsBuilderMixin
 from vectorbtpro.generic.stats_builder import StatsBuilderMixin
@@ -9,6 +10,9 @@ from vectorbtpro.generic.stats_builder import StatsBuilderMixin
 
 class MetaAnalyzable(type(StatsBuilderMixin), type(PlotsBuilderMixin)):
     pass
+
+
+AnalyzableT = tp.TypeVar("AnalyzableT", bound="Analyzable")
 
 
 class Analyzable(Wrapping, StatsBuilderMixin, PlotsBuilderMixin, metaclass=MetaAnalyzable):

@@ -14149,3 +14149,12 @@ class TestPortfolio:
             pf.plot(subplots="all")
         with pytest.raises(Exception):
             pf_grouped.plot(subplots="all")
+
+    @pytest.mark.parametrize("test_freq", ["1h", "10h", "3d"])
+    def test_resample(self, test_freq):
+        pd.testing.assert_frame_equal(
+            pf.replace(call_seq=None).resample(test_freq).value,
+            pf.value.resample(test_freq).last().ffill(),
+        )
+        with pytest.raises(Exception):
+            pf.resample(test_freq).stats()

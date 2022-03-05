@@ -10,7 +10,9 @@ import numpy as np
 import pandas as pd
 from mypy_extensions import VarArg
 from pandas import Series, DataFrame as Frame, Index
-from pandas.tseries.offsets import DateOffset
+from pandas.tseries.offsets import BaseOffset
+from pandas.core.groupby import GroupBy as PandasGroupBy
+from pandas.core.resample import Resampler as PandasResampler
 
 try:
     from plotly.graph_objects import Figure, FigureWidget
@@ -104,11 +106,13 @@ LevelSequence = Sequence[Level]
 MaybeLevelSequence = Union[Level, LevelSequence]
 
 # Datetime
-FrequencyLike = Union[str, float, pd.Timedelta, timedelta, np.timedelta64, DateOffset]
-PandasFrequencyLike = Union[str, pd.Timedelta, timedelta, np.timedelta64, DateOffset]
+FrequencyLike = Union[str, float, pd.Timedelta, timedelta, np.timedelta64, BaseOffset]
+PandasFrequencyLike = Union[str, pd.Timedelta, timedelta, np.timedelta64, BaseOffset]
+PandasGroupByLike = Union[PandasGroupBy, PandasResampler, PandasFrequencyLike]
 TimezoneLike = Union[None, str, float, timedelta, tzinfo]
-DatetimeLikeIndex = Union[pd.DatetimeIndex, pd.TimedeltaIndex, pd.PeriodIndex]
 DatetimeLike = Union[str, float, pd.Timestamp, np.datetime64, datetime]
+PandasFrequency = Union[pd.Timedelta, pd.DateOffset]
+PandasDatetimeIndex = Union[pd.DatetimeIndex, pd.PeriodIndex]
 
 
 class SupportsTZInfo(Protocol):

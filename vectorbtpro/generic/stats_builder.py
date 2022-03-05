@@ -747,7 +747,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
     @classmethod
     def override_metrics_doc(cls, __pdoc__: dict, source_cls: tp.Optional[type] = None) -> None:
-        """Call this method on each subclass that overrides `metrics`."""
+        """Call this method on each subclass that overrides `StatsBuilderMixin.metrics`."""
         __pdoc__[cls.__name__ + ".metrics"] = cls.build_metrics_doc(source_cls=source_cls)
 
 

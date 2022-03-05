@@ -20,6 +20,7 @@ import re
 import requests
 import urllib.parse
 
+import numpy as np
 import pandas as pd
 from pandas.io.parsers import TextFileReader
 from pandas.io.pytables import TableIterator
@@ -27,9 +28,10 @@ from pandas.io.pytables import TableIterator
 from vectorbtpro import _typing as tp
 from vectorbtpro.data import nb
 from vectorbtpro.data.base import Data, symbol_dict
+from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.config import merge_dicts
+from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.datetime_ import (
     get_utc_tz,
     get_local_tz,
@@ -38,7 +40,6 @@ from vectorbtpro.utils.datetime_ import (
 )
 from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.random_ import set_seed
-from vectorbtpro.utils.parsing import get_func_arg_names
 
 try:
     from binance.client import Client as BinanceClientT
@@ -716,6 +717,23 @@ class YFData(RemoteData):  # pragma: no cover
 
     See https://github.com/ranaroussi/yfinance."""
 
+    _column_config: tp.ClassVar[Config] = HybridConfig(
+        {
+            "Dividends": dict(
+                resample_func=lambda obj, resampler: obj.vbt.resample_apply(
+                    resampler,
+                    generic_nb.sum_reduce_nb,
+                )
+            ),
+            "Stock Splits": dict(
+                resample_func=lambda obj, resampler: obj.vbt.resample_apply(
+                    resampler,
+                    generic_nb.sum_reduce_nb,
+                )
+            ),
+        }
+    )
+
     @classmethod
     def fetch_symbol(
         cls,
@@ -784,6 +802,44 @@ class BinanceData(RemoteData):  # pragma: no cover
     """Subclass of `Data` for `python-binance`.
 
     See https://github.com/sammchardy/python-binance."""
+
+    _column_config: tp.ClassVar[Config] = HybridConfig(
+        {
+            "Close time": dict(
+                resample_func=lambda obj, resampler: obj.view(np.int_).vbt.resample_apply(
+                    resampler,
+                    generic_nb.nth_reduce_nb,
+                    -1,
+                    wrap_kwargs=dict(dtype=obj.dtype),
+                )
+            ),
+            "Quote volume": dict(
+                resample_func=lambda obj, resampler: obj.vbt.resample_apply(
+                    resampler,
+                    generic_nb.sum_reduce_nb,
+                )
+            ),
+            "Number of trades": dict(
+                resample_func=lambda obj, resampler: obj.vbt.resample_apply(
+                    resampler,
+                    generic_nb.sum_reduce_nb,
+                    wrap_kwargs=dict(dtype=np.int_),
+                )
+            ),
+            "Taker base volume": dict(
+                resample_func=lambda obj, resampler: obj.vbt.resample_apply(
+                    resampler,
+                    generic_nb.sum_reduce_nb,
+                )
+            ),
+            "Taker quote volume": dict(
+                resample_func=lambda obj, resampler: obj.vbt.resample_apply(
+                    resampler,
+                    generic_nb.sum_reduce_nb,
+                )
+            ),
+        }
+    )
 
     @classmethod
     def fetch(
@@ -887,12 +943,7 @@ class BinanceData(RemoteData):  # pragma: no cover
         start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
         try:
             first_data = client.get_klines(
-                symbol=symbol,
-                interval=timeframe,
-                limit=1,
-                startTime=0,
-                endTime=None,
-                **get_klines_kwargs
+                symbol=symbol, interval=timeframe, limit=1, startTime=0, endTime=None, **get_klines_kwargs
             )
             first_valid_ts = first_data[0][0]
             next_start_ts = start_ts = max(start_ts, first_valid_ts)
@@ -916,7 +967,7 @@ class BinanceData(RemoteData):  # pragma: no cover
                         limit=limit,
                         startTime=next_start_ts,
                         endTime=end_ts,
-                        **get_klines_kwargs
+                        **get_klines_kwargs,
                     )
                     if len(data) > 0:
                         next_data = list(filter(lambda d: next_start_ts < d[0] < end_ts, next_data))
@@ -1208,6 +1259,18 @@ class AlpacaData(RemoteData):  # pragma: no cover
     Contributed to vectorbt by @haxdds. Licensed under Apache 2.0 with Commons Clause license.
     Adapted to vectorbtpro by @polakowo."""
 
+    _column_config: tp.ClassVar[Config] = HybridConfig(
+        {
+            "Trade count": dict(
+                resample_func=lambda obj, resampler: obj.vbt.resample_apply(
+                    resampler,
+                    generic_nb.sum_reduce_nb,
+                    wrap_kwargs=dict(dtype=np.int_),
+                )
+            ),
+        }
+    )
+
     @classmethod
     def fetch(
         cls: tp.Type[AlpacaDataT],
@@ -1398,6 +1461,18 @@ class PolygonData(RemoteData):  # pragma: no cover
     """Subclass of `Data` for `polygon-api-client`.
 
     See https://github.com/polygon-io/client-python."""
+
+    _column_config: tp.ClassVar[Config] = HybridConfig(
+        {
+            "Trade count": dict(
+                resample_func=lambda obj, resampler: obj.vbt.resample_apply(
+                    resampler,
+                    generic_nb.sum_reduce_nb,
+                    wrap_kwargs=dict(dtype=np.int_),
+                )
+            ),
+        }
+    )
 
     @classmethod
     def fetch(
@@ -2156,7 +2231,7 @@ class NDLData(RemoteData):  # pragma: no cover
         for c in df.columns:
             new_c = c
             if isinstance(symbol, str):
-                new_c = new_c.replace(symbol + ' - ', '')
+                new_c = new_c.replace(symbol + " - ", "")
             if new_c == "Last":
                 new_c = "Close"
             new_columns.append(new_c)

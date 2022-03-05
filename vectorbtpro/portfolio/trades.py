@@ -493,6 +493,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_1d_array, to_2d_array
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic.ranges import Ranges
+from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.portfolio import nb
 from vectorbtpro.portfolio.enums import TradeDirection, TradeStatus, trade_dt
 from vectorbtpro.portfolio.orders import Orders
@@ -620,14 +621,31 @@ class Trades(Ranges):
         Ranges.__init__(self, wrapper, records_arr, close=close, **kwargs)
         self._close = close
 
-    def indexing_func(self: TradesT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> TradesT:
+    def indexing_func(self: TradesT, *args, **kwargs) -> TradesT:
         """Perform indexing on `Trades`."""
-        new_wrapper, new_records_arr, group_idxs, col_idxs = Ranges.indexing_func_meta(self, pd_indexing_func, **kwargs)
+        new_wrapper, new_records_arr, group_idxs, col_idxs = Ranges.indexing_func_meta(self, *args, **kwargs)
         if self.close is not None:
             new_close = to_2d_array(self.close)[:, col_idxs]
         else:
             new_close = None
         return self.replace(wrapper=new_wrapper, records_arr=new_records_arr, close=new_close)
+
+    def resample(self: TradesT, *args, bfill_close: bool = False, **kwargs) -> TradesT:
+        """Perform resampling on `Trades`."""
+        resampler, new_wrapper, new_records_arr = self.resample_meta(*args, **kwargs)
+        if self.close is None:
+            new_close = self.close
+        else:
+            new_close = self.close.vbt.resample_apply(resampler, generic_nb.last_reduce_nb)
+            if bfill_close:
+                new_close = new_close.vbt.fbfill()
+            else:
+                new_close = new_close.vbt.ffill()
+        return self.replace(
+            wrapper=new_wrapper,
+            records_arr=new_records_arr,
+            close=new_close,
+        )
 
     @property
     def close(self) -> tp.Optional[tp.SeriesFrame]:

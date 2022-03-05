@@ -227,14 +227,31 @@ class Ranges(Records):
         Records.__init__(self, wrapper, records_arr, ts=ts, **kwargs)
         self._ts = ts
 
-    def indexing_func(self: RangesT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> RangesT:
+    def indexing_func(self: RangesT, *args, **kwargs) -> RangesT:
         """Perform indexing on `Ranges`."""
-        new_wrapper, new_records_arr, _, col_idxs = Records.indexing_func_meta(self, pd_indexing_func, **kwargs)
+        new_wrapper, new_records_arr, _, col_idxs = Records.indexing_func_meta(self, *args, **kwargs)
         if self.ts is not None:
             new_ts = to_2d_array(self.ts)[:, col_idxs]
         else:
             new_ts = None
         return self.replace(wrapper=new_wrapper, records_arr=new_records_arr, ts=new_ts)
+
+    def resample(self: RangesT, *args, bfill_ts: bool = False, **kwargs) -> RangesT:
+        """Perform resampling on `Ranges`."""
+        resampler, new_wrapper, new_records_arr = self.resample_meta(*args, **kwargs)
+        if self.ts is None:
+            new_ts = self.ts
+        else:
+            new_ts = self.ts.vbt.resample_apply(resampler, nb.last_reduce_nb)
+            if bfill_ts:
+                new_ts = new_ts.vbt.fbfill()
+            else:
+                new_ts = new_ts.vbt.ffill()
+        return self.replace(
+            wrapper=new_wrapper,
+            records_arr=new_records_arr,
+            ts=new_ts,
+        )
 
     @classmethod
     def from_ts(

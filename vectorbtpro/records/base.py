@@ -418,8 +418,10 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_1d_array
+from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.generic.analyzable import Analyzable
+from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.records import nb
 from vectorbtpro.records.col_mapper import ColumnMapper
 from vectorbtpro.records.mapped_array import MappedArray
@@ -574,10 +576,10 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
             new_records_arr = func(self.values, self.col_mapper.col_map, to_1d_array(col_idxs))  # more flexible
         return new_records_arr
 
-    def indexing_func_meta(self, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> IndexingMetaT:
+    def indexing_func_meta(self, *args, **kwargs) -> IndexingMetaT:
         """Perform indexing on `Records` and return metadata."""
         new_wrapper, _, group_idxs, col_idxs = self.wrapper.indexing_func_meta(
-            pd_indexing_func,
+            *args,
             column_only_select=self.column_only_select,
             group_select=self.group_select,
             **kwargs,
@@ -585,10 +587,41 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
         new_records_arr = self.get_by_col_idxs(col_idxs)
         return new_wrapper, new_records_arr, group_idxs, col_idxs
 
-    def indexing_func(self: RecordsT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> RecordsT:
+    def indexing_func(self: RecordsT, *args, **kwargs) -> RecordsT:
         """Perform indexing on `Records`."""
-        new_wrapper, new_records_arr, _, _ = self.indexing_func_meta(pd_indexing_func, **kwargs)
+        new_wrapper, new_records_arr, _, _ = self.indexing_func_meta(*args, **kwargs)
         return self.replace(wrapper=new_wrapper, records_arr=new_records_arr)
+
+    def resample_records_arr(self, resampler: tp.Union[Resampler, tp.PandasResampler]) -> tp.RecordArray:
+        """Perform resampling on the record array."""
+        if isinstance(resampler, Resampler):
+            _resampler = resampler
+        else:
+            _resampler = Resampler.from_pd_resampler(self.wrapper.index, resampler)
+        new_records_arr = self.records_arr.copy()
+        for field_name in self.values.dtype.names:
+            if self.get_field_mapping(field_name) == "index":
+                index_map = _resampler.map_to_index()
+                new_records_arr[field_name] = index_map[new_records_arr[field_name]]
+        return new_records_arr
+
+    def resample_meta(
+        self: RecordsT,
+        *args,
+        **kwargs,
+    ) -> tp.Tuple[tp.Union[Resampler, tp.PandasResampler], ArrayWrapper, tp.RecordArray]:
+        """Perform resampling on `Records` and also return metadata."""
+        resampler, new_wrapper = self.wrapper.resample_meta(*args, **kwargs)
+        new_records_arr = self.resample_records_arr(resampler)
+        return resampler, new_wrapper, new_records_arr
+
+    def resample(self: RecordsT, *args, **kwargs) -> RecordsT:
+        """Perform resampling on `Records`."""
+        _, new_wrapper, new_records_arr = self.resample_meta(*args, **kwargs)
+        return self.replace(
+            wrapper=new_wrapper,
+            records_arr=new_records_arr,
+        )
 
     @property
     def records_arr(self) -> tp.RecordArray:
@@ -921,7 +954,7 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
 
     @classmethod
     def override_field_config_doc(cls, __pdoc__: dict, source_cls: tp.Optional[type] = None) -> None:
-        """Call this method on each subclass that overrides `field_config`."""
+        """Call this method on each subclass that overrides `Records.field_config`."""
         __pdoc__[cls.__name__ + ".field_config"] = cls.build_field_config_doc(source_cls=source_cls)
 
 

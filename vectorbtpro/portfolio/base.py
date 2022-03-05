@@ -1987,7 +1987,7 @@ class Portfolio(Analyzable):
         wrap_kwargs: tp.KwargsLike = None,
         wrap_func: tp.Optional[tp.Callable] = None,
         **kwargs,
-    ) -> tp.Optional[tp.AnyArray]:
+    ) -> tp.Union[None, bool, tp.AnyArray]:
         """Get wrapped in-output.
 
         See `Portfolio.in_outputs_indexing_func` for parsing rules.
@@ -2183,6 +2183,8 @@ class Portfolio(Analyzable):
             raise NotImplementedError(f"Cannot wrap field '{found_field}'")
         return obj
 
+    # ############# Indexing ############# #
+
     def in_outputs_indexing_func(
         self,
         new_wrapper: ArrayWrapper,
@@ -2352,22 +2354,19 @@ class Portfolio(Analyzable):
                                 new_obj = _index_2d_by_col(obj)
                             elif obj.shape == (self.wrapper.shape_2d[1],):
                                 new_obj = _index_1d_by_col(obj)
-
                     if new_obj is None:
                         warnings.warn(
                             f"Cannot figure out how to index in-output '{field}'. Please provide a suffix.",
                             stacklevel=2,
                         )
-
             new_in_outputs[field] = new_obj
+
         return type(self.in_outputs)(**new_in_outputs)
 
-    # ############# Indexing ############# #
-
-    def indexing_func(self: PortfolioT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> PortfolioT:
+    def indexing_func(self: PortfolioT, *args, **kwargs) -> PortfolioT:
         """Perform indexing on `Portfolio`."""
         new_wrapper, _, group_idxs, col_idxs = self.wrapper.indexing_func_meta(
-            pd_indexing_func,
+            *args,
             column_only_select=self.column_only_select,
             group_select=self.group_select,
             **kwargs,
@@ -2418,6 +2417,113 @@ class Portfolio(Analyzable):
             cash_deposits=new_cash_deposits,
             cash_earnings=new_cash_earnings,
             call_seq=new_call_seq,
+            in_outputs=new_in_outputs,
+            bm_close=new_bm_close,
+        )
+
+    # ############# Resampling ############# #
+
+    def resample_in_outputs(self, resampler: tp.PandasResampler) -> tp.Optional[tp.NamedTuple]:
+        """Perform resampling on `Portfolio.in_outputs`."""
+        if self.in_outputs is None:
+            return None
+
+        in_outputs = self.in_outputs._asdict()
+        new_in_outputs = {}
+        cls = type(self)
+        cls_dir = dir(cls)
+
+        for field, obj in in_outputs.items():
+            if obj is None or isinstance(obj, bool) or (isinstance(obj, np.ndarray) and obj.shape == (0, 0)):
+                new_obj = obj
+            else:
+                new_obj = None
+                if field in cls_dir:
+                    method_or_prop = getattr(cls, field)
+                    options = getattr(method_or_prop, "options", {})
+                    obj_type = options.get("obj_type", None)
+                    resample_func = options.get("resample_func", None)
+                    if obj_type is None:
+                        raise TypeError(f"Cannot parse in-output '{field}': option 'obj_type' is missing")
+                    if obj_type == "red_array":
+                        new_obj = obj
+                    elif resample_func is not None:
+                        new_obj = resample_func(obj)
+                else:
+                    if "_1d" in field or obj.shape == (self.wrapper.get_shape_2d()[1],):
+                        new_obj = obj
+                if new_obj is None:
+                    warnings.warn(
+                        f"Cannot figure out how to resample in-output '{field}'",
+                        stacklevel=2,
+                    )
+            new_in_outputs[field] = new_obj
+
+        return type(self.in_outputs)(**new_in_outputs)
+
+    def resample(self: PortfolioT, *args, bfill_close: bool = False, **kwargs) -> PortfolioT:
+        """Perform resampling on `Portfolio`.
+
+        !!! warning
+            Downsampling is associated with information loss:
+
+            * Cash deposits and earnings are assumed to be added/removed at the beginning of each time step.
+                Imagine depositing $100 and using them up in the same bar, and then depositing another $100
+                and using them up. Downsampling both bars into a single bar will aggregate cash deposits
+                and earnings, and put both of them at the beginning of the new bar, even though the second
+                deposit was added later in time.
+            * Market/benchmark returns are computed by applying the initial value on the close price
+                of the first bar and by tracking the price change to simulate holding. Moving the close
+                price of the first bar futher into the future will affect this computation and almost
+                certainly produce a different market value and returns. To mitigate this, make sure
+                to downsample to an index with the first bar containing only the first bar from the
+                origin timeframe."""
+        if self._call_seq is not None:
+            raise ValueError("Cannot resample call_seq")
+        resampler, new_wrapper = self.wrapper.resample_meta(*args, **kwargs)
+        new_close = self.close.vbt.resample_apply(resampler, generic_nb.last_reduce_nb)
+        if bfill_close:
+            new_close = new_close.vbt.fbfill()
+        else:
+            new_close = new_close.vbt.ffill()
+        new_close = new_close.values
+        new_order_records = self.orders.resample_records_arr(resampler)
+        new_log_records = self.logs.resample_records_arr(resampler)
+        if self._cash_deposits.size > 1 or self._cash_deposits.item() != 0:
+            new_cash_deposits = self.get_cash_deposits()
+            new_cash_deposits = new_cash_deposits.vbt.resample_apply(resampler, generic_nb.sum_reduce_nb)
+            new_cash_deposits = new_cash_deposits.fillna(0.0)
+            new_cash_deposits = new_cash_deposits.values
+        else:
+            new_cash_deposits = self._cash_deposits
+        if self._cash_earnings.size > 1 or self._cash_earnings.item() != 0:
+            new_cash_earnings = self.get_cash_earnings(group_by=False)
+            new_cash_earnings = new_cash_earnings.vbt.resample_apply(resampler, generic_nb.sum_reduce_nb)
+            new_cash_earnings = new_cash_earnings.fillna(0.0)
+            new_cash_earnings = new_cash_earnings.values
+        else:
+            new_cash_earnings = self._cash_earnings
+        if self._bm_close is not None and not isinstance(self._bm_close, bool):
+            new_bm_close = self.bm_close.vbt.resample_apply(resampler, generic_nb.last_reduce_nb)
+            if bfill_close:
+                new_bm_close = new_bm_close.vbt.fbfill()
+            else:
+                new_bm_close = new_bm_close.vbt.ffill()
+            new_bm_close = new_bm_close.values
+        else:
+            new_bm_close = self._bm_close
+        if self._in_outputs is not None:
+            new_in_outputs = self.resample_in_outputs(resampler)
+        else:
+            new_in_outputs = None
+
+        return self.replace(
+            wrapper=new_wrapper,
+            close=new_close,
+            order_records=new_order_records,
+            log_records=new_log_records,
+            cash_deposits=new_cash_deposits,
+            cash_earnings=new_cash_earnings,
             in_outputs=new_in_outputs,
             bm_close=new_bm_close,
         )

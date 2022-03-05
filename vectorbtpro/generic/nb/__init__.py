@@ -1,3 +1,5 @@
+# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+
 """Numba-compiled functions for generic data.
 
 Provides an arsenal of Numba-compiled functions that are used by accessors
@@ -23,3 +25,4 @@ from vectorbtpro.generic.nb.base import *
 from vectorbtpro.generic.nb.rolling import *
 from vectorbtpro.generic.nb.apply_reduce import *
 from vectorbtpro.generic.nb.records import *
+from vectorbtpro.generic.nb.resample import *

@@ -39,10 +39,10 @@ class ColumnMapper(Wrapping):
             new_indices, new_col_arr = func(self.col_map, to_1d_array(col_idxs))  # more flexible
         return new_indices, new_col_arr
 
-    def indexing_func_meta(self, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> IndexingMetaT:
+    def indexing_func_meta(self, *args, **kwargs) -> IndexingMetaT:
         """Perform indexing on `ColumnMapper` and return metadata."""
         new_wrapper, _, group_idxs, col_idxs = self.wrapper.indexing_func_meta(
-            pd_indexing_func,
+            *args,
             column_only_select=self.column_only_select,
             group_select=self.group_select,
             **kwargs,
@@ -50,9 +50,9 @@ class ColumnMapper(Wrapping):
         _, new_col_arr = self.select_cols(col_idxs)
         return new_wrapper, new_col_arr, group_idxs, col_idxs
 
-    def indexing_func(self: ColumnMapperT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> ColumnMapperT:
+    def indexing_func(self: ColumnMapperT, *args, **kwargs) -> ColumnMapperT:
         """Perform indexing on `ColumnMapper`."""
-        new_wrapper, new_col_arr, _, _ = self.indexing_func_meta(pd_indexing_func, **kwargs)
+        new_wrapper, new_col_arr, _, _ = self.indexing_func_meta(*args, **kwargs)
         return self.replace(wrapper=new_wrapper, col_arr=new_col_arr)
 
     @property

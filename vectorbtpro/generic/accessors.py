@@ -223,6 +223,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base import indexes, reshaping
 from vectorbtpro.base.accessors import BaseAccessor, BaseDFAccessor, BaseSRAccessor
 from vectorbtpro.base.grouping.base import Grouper
+from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.generic import nb
 from vectorbtpro.generic.analyzable import Analyzable
@@ -289,8 +290,9 @@ nb_config = ReadonlyConfig(
         "fshift": dict(func=nb.fshift_nb),
         "diff": dict(func=nb.diff_nb),
         "pct_change": dict(func=nb.pct_change_nb),
-        "bfill": dict(func=nb.bfill_nb),
         "ffill": dict(func=nb.ffill_nb),
+        "bfill": dict(func=nb.bfill_nb),
+        "fbfill": dict(func=nb.fbfill_nb),
         "cumsum": dict(func=nb.nancumsum_nb),
         "cumprod": dict(func=nb.nancumprod_nb),
         "rolling_sum": dict(func=nb.rolling_sum_nb),
@@ -355,13 +357,6 @@ class GenericAccessor(BaseAccessor, Analyzable):
         StatsBuilderMixin.__init__(self)
         PlotsBuilderMixin.__init__(self)
 
-        if mapping is not None:
-            if isinstance(mapping, str):
-                if mapping.lower() == "index":
-                    mapping = self.wrapper.index
-                elif mapping.lower() == "columns":
-                    mapping = self.wrapper.columns
-            mapping = to_mapping(mapping)
         self._mapping = mapping
 
     @property
@@ -377,13 +372,32 @@ class GenericAccessor(BaseAccessor, Analyzable):
     # ############# Mapping ############# #
 
     @property
-    def mapping(self) -> tp.Optional[tp.Mapping]:
+    def mapping(self) -> tp.Optional[tp.MappingLike]:
         """Mapping."""
         return self._mapping
 
-    def apply_mapping(self, **kwargs) -> tp.SeriesFrame:
+    def resolve_mapping(self, mapping: tp.Union[None, bool, tp.MappingLike] = None) -> tp.Optional[tp.Mapping]:
+        """Resolve mapping.
+
+        Set `mapping` to False to disable mapping completely."""
+        if mapping is None:
+            mapping = self.mapping
+        if isinstance(mapping, bool):
+            if not mapping:
+                return None
+            raise ValueError("Mapping cannot be True")
+        if isinstance(mapping, str):
+            if mapping.lower() == "index":
+                mapping = self.wrapper.index
+            elif mapping.lower() == "columns":
+                mapping = self.wrapper.columns
+            mapping = to_mapping(mapping)
+        return mapping
+
+    def apply_mapping(self, mapping: tp.Union[None, bool, tp.MappingLike] = None, **kwargs) -> tp.SeriesFrame:
         """See `vectorbtpro.utils.mapping.apply_mapping`."""
-        return apply_mapping(self.obj, self.mapping, **kwargs)
+        mapping = self.resolve_mapping(mapping)
+        return apply_mapping(self.obj, mapping, **kwargs)
 
     # ############# Rolling ############# #
 
@@ -988,7 +1002,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
     @class_or_instancemethod
     def groupby_apply(
         cls_or_self,
-        by: tp.Union[tp.PandasGroupByLike, PandasGroupBy, PandasResampler, Grouper],
+        by: tp.Union[Grouper, tp.PandasGroupBy, tp.PandasResampler, tp.PandasGroupByLike],
         reduce_func_nb: tp.Union[tp.ReduceFunc, tp.GroupByReduceMetaFunc],
         *args,
         use_groupby: tp.Optional[bool] = None,
@@ -1135,7 +1149,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
     @class_or_instancemethod
     def resample_apply(
         cls_or_self,
-        rule: tp.Union[PandasResampler, tp.PandasFrequencyLike],
+        rule: tp.Union[Resampler, tp.PandasResampler, tp.PandasFrequencyLike],
         reduce_func_nb: tp.Union[tp.ReduceFunc, tp.GroupByReduceMetaFunc, tp.RangeReduceMetaFunc],
         *args,
         use_groupby_apply: bool = False,
@@ -1149,9 +1163,11 @@ class GenericAccessor(BaseAccessor, Analyzable):
     ) -> tp.SeriesFrame:
         """Resample.
 
+        Argument `rule` can be an instance of `vectorbtpro.base.resampling.base.Resampler`,
+        `pandas.core.resample.Resampler`, or any other frequency-like object that can be accepted by
+        `pd.DataFrame.resample` with `resample_kwargs` passed as keyword arguments.
         If `use_groupby_apply` is True, uses `GenericAccessor.groupby_apply` (with some post-processing).
-        Otherwise, uses `GenericAccessor.resample_to_index`. In either case, uses `pd.DataFrame.resample`
-        with `resample_kwargs` as keyword arguments.
+        Otherwise, uses `GenericAccessor.resample_to_index`.
 
         Usage:
             * Using regular function:
@@ -1234,32 +1250,30 @@ class GenericAccessor(BaseAccessor, Analyzable):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
 
-        if isinstance(rule, PandasResampler):
-            pd_group_by = rule
-        else:
-            if not use_groupby_apply:
-                resample_kwargs = merge_dicts(
-                    dict(closed='left', label='left'),
-                    resample_kwargs,
-                )
-            pd_group_by = wrapper.dummy().resample(rule, axis=0, **resolve_dict(resample_kwargs))
-        new_index = pd_group_by.count().index
-
         if use_groupby_apply:
+            if isinstance(rule, Resampler):
+                raise TypeError("Resampler cannot be used with use_groupby_apply=True")
+            if not isinstance(rule, PandasResampler):
+                rule = pd.Series(index=wrapper.index, dtype=object).resample(rule, **resolve_dict(resample_kwargs))
             out_obj = cls_or_self.groupby_apply(
-                pd_group_by,
+                rule,
                 reduce_func_nb,
                 *args,
                 use_groupby=False,
                 template_context=template_context,
                 wrapper=wrapper,
+                wrap_kwargs=wrap_kwargs,
                 **kwargs,
             )
+            new_index = rule.count().index
             if pd.Index.equals(out_obj.index, new_index):
                 if new_index.freq is not None:
-                    out_obj.index.freq = new_index.freq
+                    try:
+                        out_obj.index.freq = new_index.freq
+                    except ValueError as e:
+                        pass
                 return out_obj
-            resampled_arr = np.full((pd_group_by.ngroups, wrapper.shape_2d[1]), np.nan)
+            resampled_arr = np.full((rule.ngroups, wrapper.shape_2d[1]), np.nan)
             resampled_obj = wrapper.wrap(
                 resampled_arr,
                 index=new_index,
@@ -1268,12 +1282,21 @@ class GenericAccessor(BaseAccessor, Analyzable):
             resampled_obj.loc[out_obj.index] = out_obj.values
             return resampled_obj
 
+        if not isinstance(rule, Resampler):
+            if not isinstance(rule, PandasResampler):
+                resample_kwargs = merge_dicts(
+                    dict(closed='left', label='left'),
+                    resample_kwargs,
+                )
+                rule = pd.Series(index=wrapper.index, dtype=object).resample(rule, **resolve_dict(resample_kwargs))
+            rule = Resampler.from_pd_resampler(wrapper.index, rule)
         return cls_or_self.resample_to_index(
-            new_index,
+            rule.to_index,
             reduce_func_nb,
             *args,
             template_context=template_context,
             wrapper=wrapper,
+            wrap_kwargs=wrap_kwargs,
             **kwargs,
         )
 
@@ -1852,7 +1875,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ):
-        """See `vectorbtpro.generic.nb.apply_reduce.latest_at_index_nb`.
+        """See `vectorbtpro.generic.nb.resample.latest_at_index_nb`.
 
         Gives the same results as `df.resample(closed='right', label='right').last().ffill()`
         when applied on the target index of the resampler.
@@ -1932,9 +1955,9 @@ class GenericAccessor(BaseAccessor, Analyzable):
         wrapper: tp.Optional[ArrayWrapper] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """See `vectorbtpro.generic.nb.apply_reduce.resample_to_index_nb`.
+        """See `vectorbtpro.generic.nb.resample.resample_to_index_nb`.
 
-        For details on the meta version, see `vectorbtpro.generic.nb.apply_reduce.resample_to_index_meta_nb`.
+        For details on the meta version, see `vectorbtpro.generic.nb.resample.resample_to_index_meta_nb`.
 
         Usage:
             * Downsampling:
@@ -2615,7 +2638,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         ascending: bool = False,
         dropna: bool = False,
         group_by: tp.GroupByLike = None,
-        mapping: tp.Optional[tp.MappingLike] = None,
+        mapping: tp.Union[None, bool, tp.MappingLike] = None,
         incl_all_keys: bool = False,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -2710,14 +2733,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         """
         checks.assert_in(axis, (-1, 0, 1))
 
-        if mapping is None:
-            mapping = self.mapping
-        if isinstance(mapping, str):
-            if mapping.lower() == "index":
-                mapping = self.wrapper.index
-            elif mapping.lower() == "columns":
-                mapping = self.wrapper.columns
-            mapping = to_mapping(mapping)
+        mapping = self.resolve_mapping(mapping=mapping)
         codes, uniques = pd.factorize(self.obj.values.flatten(), sort=False, na_sentinel=None)
         if axis == 0:
             func = jit_reg.resolve_option(nb.value_counts_per_row_nb, jitted)

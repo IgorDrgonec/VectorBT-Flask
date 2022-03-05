@@ -885,9 +885,9 @@ class IndicatorBase(Analyzable):
             tuple_mapper = list(zip(*list(mapper_list)))
             setattr(self, "_tuple_mapper", tuple_mapper)
 
-    def indexing_func(self: IndicatorBaseT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> IndicatorBaseT:
+    def indexing_func(self: IndicatorBaseT, *args, **kwargs) -> IndicatorBaseT:
         """Perform indexing on `IndicatorBase`."""
-        new_wrapper, idx_idxs, _, col_idxs = self.wrapper.indexing_func_meta(pd_indexing_func, **kwargs)
+        new_wrapper, idx_idxs, _, col_idxs = self.wrapper.indexing_func_meta(*args, **kwargs)
         idx_idxs_arr = reshaping.to_1d_array(idx_idxs)
         col_idxs_arr = reshaping.to_1d_array(col_idxs)
         if np.array_equal(idx_idxs_arr, np.arange(self.wrapper.shape_2d[0])):

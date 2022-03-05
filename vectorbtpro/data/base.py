@@ -10,6 +10,8 @@ all pandas objects have the same index and columns by aligning them.
 import warnings
 from pathlib import Path
 import traceback
+import inspect
+import string
 
 import pandas as pd
 
@@ -17,7 +19,9 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_any_array, to_pd_array
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic.analyzable import Analyzable
+from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.utils import checks
+from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.datetime_ import is_tz_aware, to_timezone
 from vectorbtpro.utils.parsing import get_func_arg_names
@@ -37,8 +41,55 @@ class symbol_dict(dict):
 DataT = tp.TypeVar("DataT", bound="Data")
 
 
-class Data(Analyzable):
+class MetaColumns(type):
+    """Meta class that exposes a read-only class property `MetaColumns.column_config`."""
+
+    @property
+    def column_config(cls) -> Config:
+        """Column config."""
+        return cls._column_config
+
+
+class DataWithColumns(metaclass=MetaColumns):
+    """Class exposes a read-only class property `DataWithColumns.field_config`."""
+
+    @property
+    def column_config(self) -> Config:
+        """Column config of `${cls_name}`.
+
+        ```python
+        ${column_config}
+        ```
+        """
+        return self._column_config
+
+
+class MetaData(type(Analyzable), type(DataWithColumns)):
+    pass
+
+
+class Data(Analyzable, DataWithColumns, metaclass=MetaData):
     """Class that downloads, updates, and manages data coming from a data source."""
+
+    _writeable_attrs: tp.ClassVar[tp.Optional[tp.Set[str]]] = {"_column_config"}
+
+    _column_config: tp.ClassVar[Config] = HybridConfig()
+
+    @property
+    def column_config(self) -> Config:
+        """Column config of `${cls_name}`.
+
+        ```python
+        ${column_config}
+        ```
+
+        Returns `${cls_name}._column_config`, which gets (hybrid-) copied upon creation of each instance.
+        Thus, changing this config won't affect the class.
+
+        To change fields, you can either change the config in-place, override this property,
+        or overwrite the instance variable `${cls_name}._column_config`.
+        """
+        return self._column_config
 
     def __init__(
         self,
@@ -86,6 +137,9 @@ class Data(Analyzable):
         self._tz_convert = tz_convert
         self._missing_index = missing_index
         self._missing_columns = missing_columns
+
+        # Copy writeable attrs
+        self._column_config = type(self)._column_config.copy()
 
     def indexing_func(self: DataT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> DataT:
         """Perform indexing on `Data`."""
@@ -563,9 +617,9 @@ class Data(Analyzable):
     # ############# Updating ############# #
 
     def update_symbol(
-            self,
-            symbol: tp.Symbol,
-            **kwargs,
+        self,
+        symbol: tp.Symbol,
+        **kwargs,
     ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
         """Update a symbol.
 
@@ -710,7 +764,7 @@ class Data(Analyzable):
                     stacklevel=2,
                 )
             return self.copy()
-        
+
         # Concatenate the updated old data and the new data
         for symbol, new_obj in new_data.items():
             if len(new_obj.index) > 0:
@@ -740,7 +794,7 @@ class Data(Analyzable):
         # Align the index and columns in the new data
         new_data = self.align_index(new_data, missing=self.missing_index, silence_warnings=silence_warnings)
         new_data = self.align_columns(new_data, missing=self.missing_columns, silence_warnings=silence_warnings)
-        
+
         # Align the columns and data type in the old and new data
         for symbol, new_obj in new_data.items():
             obj = self.data[symbol]
@@ -1018,6 +1072,52 @@ class Data(Analyzable):
             _kwargs = self.select_symbol_kwargs(k, kwargs)
             v.to_hdf(path_or_buf=_path_or_buf, key=_key, **_kwargs)
 
+    # ############# Resampling ############# #
+
+    def resample(self: DataT, *args, **kwargs) -> DataT:
+        """Perform resampling on `Data` based on `Data.column_config`.
+
+        Columns `open`, `high`, `low`, `close`, and `volume` (case-insensitive) are recognized
+        and resampled automatically."""
+        resampler, new_wrapper = self.wrapper.resample_meta(*args, **kwargs)
+        new_data = symbol_dict()
+        for k, v in self.data.items():
+            if checks.is_series(v):
+                columns = [v.name]
+            else:
+                columns = v.columns
+            new_v = []
+            for c in columns:
+                if checks.is_series(v):
+                    obj = v
+                else:
+                    obj = v[c]
+                resample_func = self.column_config.get(c, {}).get("resample_func", None)
+                if resample_func is not None:
+                    new_v.append(resample_func(obj, resampler))
+                elif isinstance(c, str) and c.lower() in ("open", "high", "low", "close", "volume"):
+                    if c.lower() == "open":
+                        new_v.append(obj.vbt.resample_apply(resampler, generic_nb.nth_reduce_nb, 0))
+                    elif c.lower() == "high":
+                        new_v.append(obj.vbt.resample_apply(resampler, generic_nb.max_reduce_nb))
+                    elif c.lower() == "low":
+                        new_v.append(obj.vbt.resample_apply(resampler, generic_nb.min_reduce_nb))
+                    elif c.lower() == "close":
+                        new_v.append(obj.vbt.resample_apply(resampler, generic_nb.last_reduce_nb))
+                    else:
+                        new_v.append(obj.vbt.resample_apply(resampler, generic_nb.sum_reduce_nb))
+                else:
+                    raise ValueError(f"Cannot resample column '{c}'. Specify resample_func in column_config.")
+            if checks.is_series(v):
+                new_v = new_v[0]
+            else:
+                new_v = pd.concat(new_v, axis=1)
+            new_data[k] = new_v
+        return self.replace(
+            wrapper=new_wrapper,
+            data=new_data,
+        )
+
     # ############# Stats ############# #
 
     @property
@@ -1212,6 +1312,23 @@ class Data(Analyzable):
     def subplots(self) -> Config:
         return self._subplots
 
+    # ############# Docs ############# #
 
+    @classmethod
+    def build_column_config_doc(cls, source_cls: tp.Optional[type] = None) -> str:
+        """Build column config documentation."""
+        if source_cls is None:
+            source_cls = Data
+        return string.Template(inspect.cleandoc(get_dict_attr(source_cls, "column_config").__doc__)).substitute(
+            {"column_config": cls.column_config.prettify(), "cls_name": cls.__name__},
+        )
+
+    @classmethod
+    def override_column_config_doc(cls, __pdoc__: dict, source_cls: tp.Optional[type] = None) -> None:
+        """Call this method on each subclass that overrides `Data.column_config`."""
+        __pdoc__[cls.__name__ + ".column_config"] = cls.build_column_config_doc(source_cls=source_cls)
+
+
+Data.override_column_config_doc(__pdoc__)
 Data.override_metrics_doc(__pdoc__)
 Data.override_subplots_doc(__pdoc__)

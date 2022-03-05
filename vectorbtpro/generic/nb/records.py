@@ -1,3 +1,5 @@
+# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+
 """Generic Numba-compiled functions for records."""
 
 import numpy as np

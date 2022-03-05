@@ -1355,6 +1355,25 @@ class TestMappedArray:
         pd.testing.assert_index_equal(stats_df.index, mp_mapped_array.wrapper.columns)
         pd.testing.assert_index_equal(stats_df.columns, stats_index)
 
+    def test_resample(self):
+        dt_mapped_array = mapped_array.replace(
+            wrapper=mapped_array.wrapper.replace(
+                index=pd.date_range("2020-01-01", periods=len(mapped_array.wrapper.index))
+            )
+        )
+        np.testing.assert_array_equal(
+            dt_mapped_array.resample("1h").idx_arr,
+            np.array([0, 24, 48, 0, 24, 48, 0, 24, 48]),
+        )
+        np.testing.assert_array_equal(
+            dt_mapped_array.resample("10h").idx_arr,
+            np.array([0, 2, 4, 0, 2, 4, 0, 2, 4]),
+        )
+        np.testing.assert_array_equal(
+            dt_mapped_array.resample("3d").idx_arr,
+            np.array([0, 0, 0, 0, 0, 0, 0, 0, 0]),
+        )
+
 
 # ############# base.py ############# #
 
@@ -1740,6 +1759,23 @@ class TestRecords:
         pd.testing.assert_index_equal(stats_df.index, records.wrapper.columns)
         pd.testing.assert_index_equal(stats_df.columns, stats_index)
 
+    def test_resample(self):
+        dt_records = records.replace(
+            wrapper=records.wrapper.replace(index=pd.date_range("2020-01-01", periods=len(records.wrapper.index)))
+        )
+        np.testing.assert_array_equal(
+            dt_records.resample("1h").idx_arr,
+            np.array([0, 24, 48, 0, 24, 48, 0, 24, 48]),
+        )
+        np.testing.assert_array_equal(
+            dt_records.resample("10h").idx_arr,
+            np.array([0, 2, 4, 0, 2, 4, 0, 2, 4]),
+        )
+        np.testing.assert_array_equal(
+            dt_records.resample("3d").idx_arr,
+            np.array([0, 0, 0, 0, 0, 0, 0, 0, 0]),
+        )
+
 
 # ############# ranges.py ############# #
 
@@ -2012,6 +2048,44 @@ class TestRanges:
         assert stats_df.shape == (4, 11)
         pd.testing.assert_index_equal(stats_df.index, ranges.wrapper.columns)
         pd.testing.assert_index_equal(stats_df.columns, stats_index)
+
+    def test_resample(self):
+        np.testing.assert_array_equal(
+            ranges.resample("1h").start_idx.values,
+            np.array([0, 48, 96, 72, 0]),
+        )
+        np.testing.assert_array_equal(
+            ranges.resample("1h").end_idx.values,
+            np.array([24, 72, 120, 120, 72]),
+        )
+        np.testing.assert_array_equal(
+            ranges.resample("10h").start_idx.values,
+            np.array([0, 4, 9, 7, 0]),
+        )
+        np.testing.assert_array_equal(
+            ranges.resample("10h").end_idx.values,
+            np.array([2, 7, 12, 12, 7]),
+        )
+        np.testing.assert_array_equal(
+            ranges.resample("3d").start_idx.values,
+            np.array([0, 0, 1, 1, 0]),
+        )
+        np.testing.assert_array_equal(
+            ranges.resample("3d").end_idx.values,
+            np.array([0, 1, 1, 1, 1]),
+        )
+        pd.testing.assert_frame_equal(
+            ranges.resample("1h").ts,
+            ranges.ts.resample("1h").last().ffill().bfill().astype(np.float_),
+        )
+        pd.testing.assert_frame_equal(
+            ranges.resample("10h").ts,
+            ranges.ts.resample("10h").last().ffill().bfill().astype(np.float_),
+        )
+        pd.testing.assert_frame_equal(
+            ranges.resample("3d").ts,
+            ranges.ts.resample("3d").last().ffill().bfill().astype(np.float_),
+        )
 
 
 # ############# drawdowns.py ############# #
@@ -2678,6 +2752,44 @@ class TestDrawdowns:
         pd.testing.assert_index_equal(stats_df.index, drawdowns.wrapper.columns)
         pd.testing.assert_index_equal(stats_df.columns, stats_index)
 
+    def test_resample(self):
+        np.testing.assert_array_equal(
+            drawdowns.resample("1h").start_idx.values,
+            np.array([24, 72, 120, 48, 96, 72]),
+        )
+        np.testing.assert_array_equal(
+            drawdowns.resample("1h").end_idx.values,
+            np.array([48, 96, 120, 72, 120, 120]),
+        )
+        np.testing.assert_array_equal(
+            drawdowns.resample("10h").start_idx.values,
+            np.array([2, 7, 12, 4, 9, 7]),
+        )
+        np.testing.assert_array_equal(
+            drawdowns.resample("10h").end_idx.values,
+            np.array([4, 9, 12, 7, 12, 12]),
+        )
+        np.testing.assert_array_equal(
+            drawdowns.resample("3d").start_idx.values,
+            np.array([0, 1, 1, 0, 1, 1]),
+        )
+        np.testing.assert_array_equal(
+            drawdowns.resample("3d").end_idx.values,
+            np.array([0, 1, 1, 1, 1, 1]),
+        )
+        pd.testing.assert_frame_equal(
+            drawdowns.resample("1h").ts,
+            drawdowns.ts.resample("1h").last().ffill().bfill().astype(np.float_),
+        )
+        pd.testing.assert_frame_equal(
+            drawdowns.resample("10h").ts,
+            drawdowns.ts.resample("10h").last().ffill().bfill().astype(np.float_),
+        )
+        pd.testing.assert_frame_equal(
+            drawdowns.resample("3d").ts,
+            drawdowns.ts.resample("3d").last().ffill().bfill().astype(np.float_),
+        )
+
 
 # ############# orders.py ############# #
 
@@ -3074,6 +3186,32 @@ class TestOrders:
         assert stats_df.shape == (4, 19)
         pd.testing.assert_index_equal(stats_df.index, orders.wrapper.columns)
         pd.testing.assert_index_equal(stats_df.columns, stats_index)
+
+    def test_resample(self):
+        np.testing.assert_array_equal(
+            orders.resample("1h").idx_arr,
+            np.array([0, 24, 48, 72, 120, 144, 168, 0, 24, 48, 72, 120, 144, 168, 0, 24, 48, 72, 120, 144, 168]),
+        )
+        np.testing.assert_array_equal(
+            orders.resample("10h").idx_arr,
+            np.array([0, 2, 4, 7, 12, 14, 16, 0, 2, 4, 7, 12, 14, 16, 0, 2, 4, 7, 12, 14, 16]),
+        )
+        np.testing.assert_array_equal(
+            orders.resample("3d").idx_arr,
+            np.array([0, 0, 0, 1, 1, 2, 2, 0, 0, 0, 1, 1, 2, 2, 0, 0, 0, 1, 1, 2, 2]),
+        )
+        pd.testing.assert_frame_equal(
+            orders.resample("1h").close,
+            orders.close.resample("1h").last().ffill().bfill().astype(np.float_),
+        )
+        pd.testing.assert_frame_equal(
+            orders.resample("10h").close,
+            orders.close.resample("10h").last().ffill().bfill().astype(np.float_),
+        )
+        pd.testing.assert_frame_equal(
+            orders.resample("3d").close,
+            orders.close.resample("3d").last().ffill().bfill().astype(np.float_),
+        )
 
 
 # ############# trades.py ############# #
@@ -3775,6 +3913,44 @@ class TestExitTrades:
         assert stats_df.shape == (4, 25)
         pd.testing.assert_index_equal(stats_df.index, exit_trades.wrapper.columns)
         pd.testing.assert_index_equal(stats_df.columns, stats_index)
+
+    def test_resample(self):
+        np.testing.assert_array_equal(
+            exit_trades.resample("1h").start_idx.values,
+            np.array([0, 0, 120, 168, 0, 0, 120, 168, 0, 0, 120, 144, 168]),
+        )
+        np.testing.assert_array_equal(
+            exit_trades.resample("1h").end_idx.values,
+            np.array([48, 72, 144, 168, 48, 72, 144, 168, 48, 72, 144, 168, 168]),
+        )
+        np.testing.assert_array_equal(
+            exit_trades.resample("10h").start_idx.values,
+            np.array([0, 0, 12, 16, 0, 0, 12, 16, 0, 0, 12, 14, 16]),
+        )
+        np.testing.assert_array_equal(
+            exit_trades.resample("10h").end_idx.values,
+            np.array([4, 7, 14, 16, 4, 7, 14, 16, 4, 7, 14, 16, 16]),
+        )
+        np.testing.assert_array_equal(
+            exit_trades.resample("3d").start_idx.values,
+            np.array([0, 0, 1, 2, 0, 0, 1, 2, 0, 0, 1, 2, 2]),
+        )
+        np.testing.assert_array_equal(
+            exit_trades.resample("3d").end_idx.values,
+            np.array([0, 1, 2, 2, 0, 1, 2, 2, 0, 1, 2, 2, 2]),
+        )
+        pd.testing.assert_frame_equal(
+            exit_trades.resample("1h").close,
+            exit_trades.close.resample("1h").last().ffill().bfill().astype(np.float_),
+        )
+        pd.testing.assert_frame_equal(
+            exit_trades.resample("10h").close,
+            exit_trades.close.resample("10h").last().ffill().bfill().astype(np.float_),
+        )
+        pd.testing.assert_frame_equal(
+            exit_trades.resample("3d").close,
+            exit_trades.close.resample("3d").last().ffill().bfill().astype(np.float_),
+        )
 
 
 entry_trades = vbt.EntryTrades.from_orders(orders)
@@ -5549,7 +5725,6 @@ class TestLogs:
                 "End",
                 "Period",
                 "Total Records",
-                "Status Counts: None",
                 "Status Counts: Filled",
                 "Status Counts: Ignored",
                 "Status Counts: Rejected",
@@ -5566,7 +5741,6 @@ class TestLogs:
                     pd.Timestamp("2020-01-08 00:00:00"),
                     pd.Timedelta("8 days 00:00:00"),
                     8.0,
-                    0.0,
                     5.25,
                     2.75,
                     0.0,
@@ -5585,7 +5759,6 @@ class TestLogs:
                     pd.Timestamp("2020-01-08 00:00:00"),
                     pd.Timedelta("8 days 00:00:00"),
                     8,
-                    0,
                     7,
                     1,
                     0,
@@ -5604,7 +5777,6 @@ class TestLogs:
                     pd.Timestamp("2020-01-08 00:00:00"),
                     pd.Timedelta("8 days 00:00:00"),
                     16,
-                    0,
                     14,
                     2,
                     0,
@@ -5620,7 +5792,7 @@ class TestLogs:
         pd.testing.assert_series_equal(logs_grouped["g2"].stats(), logs_grouped.stats(column="g2"))
         pd.testing.assert_series_equal(logs_grouped["g2"].stats(), logs.stats(column="g2", group_by=group_by))
         stats_df = logs.stats(agg_func=None)
-        assert stats_df.shape == (4, 10)
+        assert stats_df.shape == (4, 9)
         pd.testing.assert_index_equal(stats_df.index, logs.wrapper.columns)
         pd.testing.assert_index_equal(stats_df.columns, stats_index)
 
@@ -5633,4 +5805,88 @@ class TestLogs:
         pd.testing.assert_series_equal(
             logs_grouped.count(),
             pd.Series(np.array([16, 16]), index=pd.Index(["g1", "g2"], dtype="object")).rename("count"),
+        )
+
+    def test_resample(self):
+        np.testing.assert_array_equal(
+            logs.resample("1h").idx_arr,
+            np.array(
+                [
+                    0,
+                    24,
+                    48,
+                    72,
+                    96,
+                    120,
+                    144,
+                    168,
+                    0,
+                    24,
+                    48,
+                    72,
+                    96,
+                    120,
+                    144,
+                    168,
+                    0,
+                    24,
+                    48,
+                    72,
+                    96,
+                    120,
+                    144,
+                    168,
+                    0,
+                    24,
+                    48,
+                    72,
+                    96,
+                    120,
+                    144,
+                    168,
+                ]
+            ),
+        )
+        np.testing.assert_array_equal(
+            logs.resample("10h").idx_arr,
+            np.array(
+                [
+                    0,
+                    2,
+                    4,
+                    7,
+                    9,
+                    12,
+                    14,
+                    16,
+                    0,
+                    2,
+                    4,
+                    7,
+                    9,
+                    12,
+                    14,
+                    16,
+                    0,
+                    2,
+                    4,
+                    7,
+                    9,
+                    12,
+                    14,
+                    16,
+                    0,
+                    2,
+                    4,
+                    7,
+                    9,
+                    12,
+                    14,
+                    16,
+                ]
+            ),
+        )
+        np.testing.assert_array_equal(
+            logs.resample("3d").idx_arr,
+            np.array([0, 0, 0, 1, 1, 1, 2, 2, 0, 0, 0, 1, 1, 1, 2, 2, 0, 0, 0, 1, 1, 1, 2, 2, 0, 0, 0, 1, 1, 1, 2, 2]),
         )

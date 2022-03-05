@@ -6,15 +6,17 @@ import warnings
 
 import numpy as np
 import pandas as pd
+from pandas.core.resample import Resampler as PandasResampler
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import indexes, reshaping
 from vectorbtpro.base.grouping.base import Grouper
+from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.indexing import IndexingError, PandasIndexer
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import AttrResolverMixin, AttrResolverMixinT
-from vectorbtpro.utils.config import Configured
-from vectorbtpro.utils.datetime_ import freq_to_timedelta, DatetimeIndexes
+from vectorbtpro.utils.config import Configured, merge_dicts, resolve_dict
+from vectorbtpro.utils.datetime_ import freq_to_timedelta, PandasDatetimeIndex
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.decorators import class_or_instancemethod
 
@@ -98,7 +100,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         group_select: tp.Optional[bool] = None,
         group_by: tp.GroupByLike = None,
     ) -> IndexingMetaT:
-        """Perform indexing on `ArrayWrapper` and also return indexing metadata.
+        """Perform indexing on `ArrayWrapper` and also return metadata.
 
         Takes into account column grouping.
 
@@ -260,9 +262,9 @@ class ArrayWrapper(Configured, PandasIndexer):
             col_idxs,
         )
 
-    def indexing_func(self: ArrayWrapperT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> ArrayWrapperT:
+    def indexing_func(self: ArrayWrapperT, *args, **kwargs) -> ArrayWrapperT:
         """Perform indexing on `ArrayWrapper`"""
-        return self.indexing_func_meta(pd_indexing_func, **kwargs)[0]
+        return self.indexing_func_meta(*args, **kwargs)[0]
 
     @classmethod
     def from_obj(cls: tp.Type[ArrayWrapperT], obj: tp.ArrayLike, *args, **kwargs) -> ArrayWrapperT:
@@ -368,7 +370,7 @@ class ArrayWrapper(Configured, PandasIndexer):
             freq = wrapping_cfg["freq"]
         if freq is not None:
             return freq_to_timedelta(freq)
-        if isinstance(self.index, DatetimeIndexes):
+        if isinstance(self.index, PandasDatetimeIndex):
             if self.index.freq is not None:
                 return freq_to_timedelta(self.index.freq)
             if self.index.inferred_freq is not None:
@@ -538,7 +540,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         else:
             name = None
 
-        def _wrap(arr):
+        def _wrap(arr, dtype):
             arr = np.asarray(arr)
             checks.assert_ndim(arr, (1, 2))
             if fillna is not None:
@@ -547,6 +549,12 @@ class ArrayWrapper(Configured, PandasIndexer):
             checks.assert_shape_equal(arr, index, axis=(0, 0))
             if arr.ndim == 2:
                 checks.assert_shape_equal(arr, columns, axis=(1, 0))
+            try:
+                if np.issubdtype(arr.dtype, np.floating) and np.issubdtype(dtype, np.integer):
+                    if np.isnan(arr).any():
+                        dtype = np.float_
+            except TypeError as e:  # dtype may be native to pandas
+                pass
             if arr.ndim == 1:
                 return pd.Series(arr, index=index, name=name, dtype=dtype)
             if arr.ndim == 2:
@@ -555,7 +563,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                 return pd.DataFrame(arr, index=index, columns=columns, dtype=dtype)
             raise ValueError(f"{arr.ndim}-d input is not supported")
 
-        out = _wrap(arr)
+        out = _wrap(arr, dtype)
         if to_index:
             # Convert to index
             if checks.is_series(out):
@@ -675,6 +683,47 @@ class ArrayWrapper(Configured, PandasIndexer):
         _self = self.resolve(group_by=group_by)
         return _self.wrap(np.full(_self.shape_2d[1], fill_value), **kwargs)
 
+    def build_resampler(
+        self,
+        rule: tp.Union[Resampler, tp.PandasResampler, tp.PandasFrequencyLike],
+        resample_kwargs: tp.KwargsLike = None,
+        return_pd_resampler: bool = False,
+    ) -> tp.Union[Resampler, tp.PandasResampler]:
+        """Create resampler of type `vectorbtpro.base.resampling.base.Resampler`."""
+        if not isinstance(rule, Resampler):
+            if not isinstance(rule, PandasResampler):
+                resample_kwargs = merge_dicts(
+                    dict(closed="left", label="left"),
+                    resample_kwargs,
+                )
+                rule = pd.Series(index=self.index, dtype=object).resample(rule, **resolve_dict(resample_kwargs))
+            if return_pd_resampler:
+                return rule
+            rule = Resampler.from_pd_resampler(self.index, rule)
+        if return_pd_resampler:
+            raise TypeError("Cannot convert Resampler to Pandas Resampler")
+        return rule
+
+    def resample_meta(
+        self: ArrayWrapperT,
+        *args,
+        **kwargs,
+    ) -> tp.Tuple[tp.Union[Resampler, tp.PandasResampler], ArrayWrapperT]:
+        """Perform resampling on `ArrayWrapper` and also return metadata."""
+        resampler = self.build_resampler(*args, **kwargs)
+        if isinstance(resampler, Resampler):
+            _resampler = resampler
+        else:
+            _resampler = Resampler.from_pd_resampler(self.index, resampler)
+        new_index = _resampler.to_index
+        new_freq = freq_to_timedelta(_resampler.to_freq)
+        new_wrapper = self.replace(index=new_index, freq=new_freq)
+        return resampler, new_wrapper
+
+    def resample(self: ArrayWrapperT, *args, **kwargs) -> ArrayWrapperT:
+        """Perform resampling on `ArrayWrapper`."""
+        return self.resample_meta(*args, **kwargs)[1]
+
 
 WrappingT = tp.TypeVar("WrappingT", bound="Wrapping")
 
@@ -690,15 +739,19 @@ class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
         PandasIndexer.__init__(self)
         AttrResolverMixin.__init__(self)
 
-    def indexing_func(self: WrappingT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> WrappingT:
+    def indexing_func(self: WrappingT, *args, **kwargs) -> WrappingT:
         """Perform indexing on `Wrapping`."""
         new_wrapper = self.wrapper.indexing_func(
-            pd_indexing_func,
+            *args,
             column_only_select=self.column_only_select,
             group_select=self.group_select,
             **kwargs,
         )
         return self.replace(wrapper=new_wrapper)
+
+    def resample(self: WrappingT, *args, **kwargs) -> WrappingT:
+        """Perform resampling on `Wrapping`."""
+        raise NotImplementedError
 
     @property
     def wrapper(self) -> ArrayWrapper:

@@ -275,15 +275,6 @@ class Drawdowns(Ranges):
     def field_config(self) -> Config:
         return self._field_config
 
-    def indexing_func(self: DrawdownsT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> DrawdownsT:
-        """Perform indexing on `Drawdowns`."""
-        new_wrapper, new_records_arr, _, col_idxs = Ranges.indexing_func_meta(self, pd_indexing_func, **kwargs)
-        if self.ts is not None:
-            new_ts = new_wrapper.wrap(self.ts.values[:, col_idxs], group_by=False)
-        else:
-            new_ts = None
-        return self.replace(wrapper=new_wrapper, records_arr=new_records_arr, ts=new_ts)
-
     @classmethod
     def from_ts(
         cls: tp.Type[DrawdownsT],

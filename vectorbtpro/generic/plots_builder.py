@@ -807,7 +807,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
 
     @classmethod
     def override_subplots_doc(cls, __pdoc__: dict, source_cls: tp.Optional[type] = None) -> None:
-        """Call this method on each subclass that overrides `subplots`."""
+        """Call this method on each subclass that overrides `PlotsBuilderMixin.subplots`."""
         __pdoc__[cls.__name__ + ".subplots"] = cls.build_subplots_doc(source_cls=source_cls)
 
 

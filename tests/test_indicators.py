@@ -2314,6 +2314,7 @@ class TestFactory:
             "prettify",
             "regroup",
             "replace",
+            "resample",
             "resolve_attr",
             "resolve_self",
             "resolve_shortcut_attr",
@@ -2674,10 +2675,7 @@ class TestFactory:
     def test_from_talib(self):
         if talib_available:
             SMA = vbt.talib("SMA")
-            pd.testing.assert_frame_equal(
-                SMA.run(ts, vbt.Default(2)).real,
-                ts.rolling(2).mean()
-            )
+            pd.testing.assert_frame_equal(SMA.run(ts, vbt.Default(2)).real, ts.rolling(2).mean())
             pd.testing.assert_series_equal(
                 SMA.run(pd.Series([1, np.nan, 2, np.nan]), vbt.Default(2)).real,
                 pd.Series([1, np.nan, 2, np.nan]).rolling(2).mean(),

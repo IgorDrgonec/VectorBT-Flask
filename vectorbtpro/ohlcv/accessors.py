@@ -103,6 +103,9 @@ from vectorbtpro.utils.decorators import class_or_instancemethod
 __pdoc__ = {}
 
 
+OHLCVDFAccessorT = tp.TypeVar("OHLCVDFAccessorT", bound="OHLCVDFAccessor")
+
+
 @register_df_vbt_accessor("ohlcv")
 class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
     """Accessor on top of OHLCV data. For DataFrames only.
@@ -199,6 +202,38 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             if wrapper.ndim == 1 and not isinstance(cls_or_self, type):
                 wrapper = wrapper.replace(columns=["vwap"])
         return wrapper.wrap(out, **resolve_dict(wrap_kwargs))
+
+    # ############# Resampling ############# #
+
+    def resample(self: OHLCVDFAccessorT, *args, **kwargs) -> OHLCVDFAccessorT:
+        """Perform resampling on `OHLCVDFAccessor`."""
+        resampler, new_wrapper = self.wrapper.resample_meta(*args, **kwargs)
+        sr_dct = {}
+        for column in self.obj.columns:
+            found = False
+            for k, v in self.column_names.items():
+                if column.lower() == v.lower():
+                    if k == "open":
+                        sr_dct[column] = self.obj[column].vbt.resample_apply(resampler, generic_nb.nth_reduce_nb, 0)
+                    elif k == "high":
+                        sr_dct[column] = self.obj[column].vbt.resample_apply(resampler, generic_nb.max_reduce_nb)
+                    elif k == "low":
+                        sr_dct[column] = self.obj[column].vbt.resample_apply(resampler, generic_nb.min_reduce_nb)
+                    elif k == "close":
+                        sr_dct[column] = self.obj[column].vbt.resample_apply(resampler, generic_nb.last_reduce_nb)
+                    elif k == "volume":
+                        sr_dct[column] = self.obj[column].vbt.resample_apply(resampler, generic_nb.sum_reduce_nb)
+                    else:
+                        raise ValueError(f"Unknown key '{k}' in column_names")
+                    found = True
+                    break
+            if not found:
+                raise ValueError(f"Cannot match column '{column}'")
+        new_obj = pd.DataFrame(sr_dct)
+        return self.replace(
+            wrapper=new_wrapper,
+            obj=new_obj,
+        )
 
     # ############# Stats ############# #
 

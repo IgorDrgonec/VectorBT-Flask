@@ -413,6 +413,7 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_1d_array, to_dict
+from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.analyzable import Analyzable
@@ -492,7 +493,7 @@ class MappedArray(Analyzable):
         mapping: tp.Optional[tp.MappingLike] = None,
         col_mapper: tp.Optional[ColumnMapper] = None,
         jitted: tp.JittedOption = None,
-        **kwargs
+        **kwargs,
     ) -> None:
 
         mapped_arr = np.asarray(mapped_arr)
@@ -507,13 +508,6 @@ class MappedArray(Analyzable):
         else:
             id_arr = np.asarray(id_arr)
             checks.assert_shape_equal(mapped_arr, id_arr, axis=0)
-        if mapping is not None:
-            if isinstance(mapping, str):
-                if mapping.lower() == "index":
-                    mapping = wrapper.index
-                elif mapping.lower() == "columns":
-                    mapping = wrapper.columns
-            mapping = to_mapping(mapping)
         if col_mapper is None:
             col_mapper = ColumnMapper(wrapper, col_arr)
 
@@ -552,10 +546,10 @@ class MappedArray(Analyzable):
                     kwargs["col_mapper"] = None
         return Wrapping.replace(self, **kwargs)
 
-    def indexing_func_meta(self, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> IndexingMetaT:
+    def indexing_func_meta(self, *args, **kwargs) -> IndexingMetaT:
         """Perform indexing on `MappedArray` and return metadata."""
         new_wrapper, _, group_idxs, col_idxs = self.wrapper.indexing_func_meta(
-            pd_indexing_func,
+            *args,
             column_only_select=self.column_only_select,
             group_select=self.group_select,
             **kwargs,
@@ -569,10 +563,10 @@ class MappedArray(Analyzable):
             new_idx_arr = None
         return new_wrapper, new_mapped_arr, new_col_arr, new_id_arr, new_idx_arr, group_idxs, col_idxs
 
-    def indexing_func(self: MappedArrayT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> MappedArrayT:
+    def indexing_func(self: MappedArrayT, *args, **kwargs) -> MappedArrayT:
         """Perform indexing on `MappedArray`."""
         new_wrapper, new_mapped_arr, new_col_arr, new_id_arr, new_idx_arr, _, _ = self.indexing_func_meta(
-            pd_indexing_func,
+            *args,
             **kwargs,
         )
         return self.replace(
@@ -580,6 +574,28 @@ class MappedArray(Analyzable):
             mapped_arr=new_mapped_arr,
             col_arr=new_col_arr,
             id_arr=new_id_arr,
+            idx_arr=new_idx_arr,
+        )
+
+    def resample_meta(self: MappedArrayT, *args, **kwargs) -> tp.Tuple[tp.PandasResampler, ArrayWrapper, tp.Array1d]:
+        """Perform resampling on `MappedArray` and also return metadata."""
+        resampler, new_wrapper = self.wrapper.resample_meta(*args, **kwargs)
+        if isinstance(resampler, Resampler):
+            _resampler = resampler
+        else:
+            _resampler = Resampler.from_pd_resampler(self.wrapper.index, resampler)
+        if self.idx_arr is not None:
+            index_map = _resampler.map_to_index()
+            new_idx_arr = index_map[self.idx_arr]
+        else:
+            new_idx_arr = None
+        return resampler, new_wrapper, new_idx_arr
+
+    def resample(self: MappedArrayT, *args, **kwargs) -> MappedArrayT:
+        """Perform resampling on `MappedArray`."""
+        _, new_wrapper, new_idx_arr = self.resample_meta(*args, **kwargs)
+        return self.replace(
+            wrapper=new_wrapper,
             idx_arr=new_idx_arr,
         )
 
@@ -619,7 +635,7 @@ class MappedArray(Analyzable):
         return self._idx_arr
 
     @property
-    def mapping(self) -> tp.Optional[tp.Mapping]:
+    def mapping(self) -> tp.Optional[tp.MappingLike]:
         """Mapping."""
         return self._mapping
 
@@ -639,7 +655,7 @@ class MappedArray(Analyzable):
         incl_id: bool = False,
         idx_arr: tp.Optional[tp.Array1d] = None,
         group_by: tp.GroupByLike = None,
-        **kwargs
+        **kwargs,
     ) -> MappedArrayT:
         """Sort mapped array by column array (primary) and id array (secondary, optional).
 
@@ -667,7 +683,7 @@ class MappedArray(Analyzable):
         mask: tp.Array1d,
         idx_arr: tp.Optional[tp.Array1d] = None,
         group_by: tp.GroupByLike = None,
-        **kwargs
+        **kwargs,
     ) -> MappedArrayT:
         """Return a new class instance, filtered by mask.
 
@@ -715,7 +731,7 @@ class MappedArray(Analyzable):
         group_by: tp.GroupByLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
-        **kwargs
+        **kwargs,
     ) -> MappedArrayT:
         """Filter top N elements from each column/group."""
         return self.apply_mask(self.top_n_mask(n, group_by=group_by, jitted=jitted, chunked=chunked), **kwargs)
@@ -726,24 +742,40 @@ class MappedArray(Analyzable):
         group_by: tp.GroupByLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
-        **kwargs
+        **kwargs,
     ) -> MappedArrayT:
         """Filter bottom N elements from each column/group."""
         return self.apply_mask(self.bottom_n_mask(n, group_by=group_by, jitted=jitted, chunked=chunked), **kwargs)
 
     # ############# Mapping ############# #
 
-    def apply_mapping(self: MappedArrayT, mapping: tp.Optional[tp.MappingLike] = None, **kwargs) -> MappedArrayT:
-        """Apply mapping on each element."""
+    def resolve_mapping(self, mapping: tp.Union[None, bool, tp.MappingLike] = None) -> tp.Optional[tp.Mapping]:
+        """Resolve mapping.
+
+        Set `mapping` to False to disable mapping completely."""
         if mapping is None:
             mapping = self.mapping
+        if isinstance(mapping, bool):
+            if not mapping:
+                return None
+            raise ValueError("Mapping cannot be True")
         if isinstance(mapping, str):
             if mapping.lower() == "index":
                 mapping = self.wrapper.index
             elif mapping.lower() == "columns":
                 mapping = self.wrapper.columns
             mapping = to_mapping(mapping)
-        return self.replace(mapped_arr=apply_mapping(self.values, mapping), **kwargs)
+        return mapping
+
+    def apply_mapping(
+        self: MappedArrayT,
+        mapping: tp.Union[None, bool, tp.MappingLike] = None,
+        **kwargs,
+    ) -> MappedArrayT:
+        """Apply mapping on each element."""
+        mapping = self.resolve_mapping(mapping)
+        new_mapped_arr = apply_mapping(self.values, mapping)
+        return self.replace(mapped_arr=new_mapped_arr, **kwargs)
 
     def to_index(self, minus_one_to_zero: bool = False) -> tp.Index:
         """Convert to index.
@@ -769,7 +801,7 @@ class MappedArray(Analyzable):
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         col_mapper: tp.Optional[ColumnMapper] = None,
-        **kwargs
+        **kwargs,
     ) -> MappedArrayT:
         """Apply function on mapped array per column/group. Returns a new mapped array.
 
@@ -808,7 +840,7 @@ class MappedArray(Analyzable):
         apply_per_group: bool = False,
         dtype: tp.Optional[tp.DTypeLike] = None,
         chunked: tp.ChunkedOption = None,
-        **kwargs
+        **kwargs,
     ) -> MappedArrayT:
         """Reduce each segment of values in mapped array. Returns a new mapped array.
 
@@ -873,7 +905,7 @@ class MappedArray(Analyzable):
         chunked: tp.ChunkedOption = None,
         col_mapper: tp.Optional[ColumnMapper] = None,
         group_by: tp.GroupByLike = None,
-        wrap_kwargs: tp.KwargsLike = None
+        wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeriesFrame:
         """Reduce mapped array by column/group.
 
@@ -971,7 +1003,7 @@ class MappedArray(Analyzable):
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
-        **kwargs
+        **kwargs,
     ) -> tp.MaybeSeries:
         """Return n-th element of each column/group."""
         wrap_kwargs = merge_dicts(dict(name_or_index="nth"), wrap_kwargs)
@@ -1003,7 +1035,7 @@ class MappedArray(Analyzable):
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
-        **kwargs
+        **kwargs,
     ) -> tp.MaybeSeries:
         """Return index of n-th element of each column/group."""
         wrap_kwargs = merge_dicts(dict(name_or_index="nth_index"), wrap_kwargs)
@@ -1034,7 +1066,7 @@ class MappedArray(Analyzable):
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
-        **kwargs
+        **kwargs,
     ) -> tp.MaybeSeries:
         """Return min by column/group."""
         wrap_kwargs = merge_dicts(dict(name_or_index="min"), wrap_kwargs)
@@ -1056,7 +1088,7 @@ class MappedArray(Analyzable):
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
-        **kwargs
+        **kwargs,
     ) -> tp.MaybeSeries:
         """Return max by column/group."""
         wrap_kwargs = merge_dicts(dict(name_or_index="max"), wrap_kwargs)
@@ -1078,7 +1110,7 @@ class MappedArray(Analyzable):
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
-        **kwargs
+        **kwargs,
     ) -> tp.MaybeSeries:
         """Return mean by column/group."""
         wrap_kwargs = merge_dicts(dict(name_or_index="mean"), wrap_kwargs)
@@ -1100,7 +1132,7 @@ class MappedArray(Analyzable):
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
-        **kwargs
+        **kwargs,
     ) -> tp.MaybeSeries:
         """Return median by column/group."""
         wrap_kwargs = merge_dicts(dict(name_or_index="median"), wrap_kwargs)
@@ -1123,7 +1155,7 @@ class MappedArray(Analyzable):
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
-        **kwargs
+        **kwargs,
     ) -> tp.MaybeSeries:
         """Return std by column/group."""
         wrap_kwargs = merge_dicts(dict(name_or_index="std"), wrap_kwargs)
@@ -1155,7 +1187,7 @@ class MappedArray(Analyzable):
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
-        **kwargs
+        **kwargs,
     ) -> tp.MaybeSeries:
         """Return sum by column/group."""
         wrap_kwargs = merge_dicts(dict(name_or_index="sum"), wrap_kwargs)
@@ -1178,7 +1210,7 @@ class MappedArray(Analyzable):
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
-        **kwargs
+        **kwargs,
     ) -> tp.MaybeSeries:
         """Return index of min by column/group."""
         wrap_kwargs = merge_dicts(dict(name_or_index="idxmin"), wrap_kwargs)
@@ -1200,7 +1232,7 @@ class MappedArray(Analyzable):
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
-        **kwargs
+        **kwargs,
     ) -> tp.MaybeSeries:
         """Return index of max by column/group."""
         wrap_kwargs = merge_dicts(dict(name_or_index="idxmax"), wrap_kwargs)
@@ -1224,7 +1256,7 @@ class MappedArray(Analyzable):
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
-        **kwargs
+        **kwargs,
     ) -> tp.SeriesFrame:
         """Return statistics by column/group."""
         if percentiles is not None:
@@ -1281,27 +1313,17 @@ class MappedArray(Analyzable):
         ascending: bool = False,
         dropna: bool = False,
         group_by: tp.GroupByLike = None,
-        mapping: tp.Optional[tp.MappingLike] = None,
+        mapping: tp.Union[None, bool, tp.MappingLike] = None,
         incl_all_keys: bool = False,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
-        **kwargs
+        **kwargs,
     ) -> tp.SeriesFrame:
-        """See `vectorbtpro.generic.accessors.GenericAccessor.value_counts`.
-
-        !!! note
-            Does not take into account missing values."""
+        """See `vectorbtpro.generic.accessors.GenericAccessor.value_counts`."""
         checks.assert_in(axis, (-1, 0, 1))
 
-        if mapping is None:
-            mapping = self.mapping
-        if isinstance(mapping, str):
-            if mapping.lower() == "index":
-                mapping = self.wrapper.index
-            elif mapping.lower() == "columns":
-                mapping = self.wrapper.columns
-            mapping = to_mapping(mapping)
+        mapping = self.resolve_mapping(mapping)
         mapped_codes, mapped_uniques = pd.factorize(self.values, sort=False, na_sentinel=None)
         if axis == 0:
             if idx_arr is None:

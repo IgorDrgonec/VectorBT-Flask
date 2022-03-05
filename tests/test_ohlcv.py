@@ -1,6 +1,8 @@
 import os
 from datetime import datetime
+import pytest
 
+import numpy as np
 import pandas as pd
 
 import vectorbtpro as vbt
@@ -54,3 +56,16 @@ class TestAccessors:
         low.columns = result.columns
         volume.columns = result.columns
         pd.testing.assert_frame_equal(pd.DataFrame.vbt.ohlcv.vwap(high=high, low=low, volume=volume), result)
+
+    @pytest.mark.parametrize("test_freq", ["1h", "10h", "3d"])
+    def test_resample(self, test_freq):
+        pd.testing.assert_frame_equal(
+            ohlcv_ts.vbt.ohlcv.resample(test_freq).obj,
+            ohlcv_ts.resample(test_freq).agg({
+                "open": lambda x: float(x[0] if len(x) > 0 else np.nan),
+                "high": lambda x: float(x.max() if len(x) > 0 else np.nan),
+                "low": lambda x: float(x.min() if len(x) > 0 else np.nan),
+                "close": lambda x: float(x[-1] if len(x) > 0 else np.nan),
+                "volume": lambda x: float(x.sum() if len(x) > 0 else np.nan)
+            })
+        )

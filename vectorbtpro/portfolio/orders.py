@@ -116,6 +116,7 @@ import pandas as pd
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_2d_array
 from vectorbtpro.base.wrapping import ArrayWrapper
+from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.portfolio.enums import order_dt, OrderSide
 from vectorbtpro.records.base import Records
 from vectorbtpro.records.decorators import attach_fields, override_field_config
@@ -181,11 +182,11 @@ class Orders(Records):
         Records.__init__(self, wrapper, records_arr, close=close, **kwargs)
         self._close = close
 
-    def indexing_func(self: OrdersT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> OrdersT:
+    def indexing_func(self: OrdersT, *args, **kwargs) -> OrdersT:
         """Perform indexing on `Orders`."""
         new_wrapper, new_records_arr, group_idxs, col_idxs = Records.indexing_func_meta(
             self,
-            pd_indexing_func,
+            *args,
             **kwargs,
         )
         if self.close is not None:
@@ -193,6 +194,23 @@ class Orders(Records):
         else:
             new_close = None
         return self.replace(wrapper=new_wrapper, records_arr=new_records_arr, close=new_close)
+
+    def resample(self: OrdersT, *args, bfill_close: bool = False, **kwargs) -> OrdersT:
+        """Perform resampling on `Orders`."""
+        resampler, new_wrapper, new_records_arr = self.resample_meta(*args, **kwargs)
+        if self.close is None:
+            new_close = None
+        else:
+            new_close = self.close.vbt.resample_apply(resampler, generic_nb.last_reduce_nb)
+            if bfill_close:
+                new_close = new_close.vbt.fbfill()
+            else:
+                new_close = new_close.vbt.ffill()
+        return self.replace(
+            wrapper=new_wrapper,
+            records_arr=new_records_arr,
+            close=new_close,
+        )
 
     @property
     def close(self) -> tp.Optional[tp.SeriesFrame]:

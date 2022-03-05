@@ -1462,6 +1462,35 @@ class TestData:
         pd.testing.assert_index_equal(stats_df.index, data.wrapper.columns)
         pd.testing.assert_index_equal(stats_df.columns, stats_index)
 
+    @pytest.mark.parametrize("test_freq", ["1h", "10h", "3d"])
+    def test_resample(self, test_freq):
+        ohlcv_data = vbt.Data.from_data(
+            vbt.symbol_dict(
+                S1=pd.DataFrame(
+                    {
+                        "Open": [1, 2, 3, 4, 5],
+                        "High": [2.5, 3.5, 4.5, 5.5, 6.5],
+                        "Low": [0.5, 1.5, 2.5, 3.5, 4.5],
+                        "Close": [2, 3, 4, 5, 6],
+                        "Volume": [1, 2, 3, 2, 1],
+                        "Other": [3, 2, 1, 2, 3],
+                    },
+                    index=pd.date_range("2020-01-01", "2020-01-05"),
+                )
+            ),
+            single_symbol=True,
+        )
+        ohlcv_data.column_config["Other"] = dict(
+            resample_func=lambda obj, resampler: obj.vbt.resample_apply(resampler, vbt.nb.mean_reduce_nb)
+        )
+        pd.testing.assert_frame_equal(
+            ohlcv_data.resample(test_freq).get(),
+            pd.concat((
+                ohlcv_data.get(["Open", "High", "Low", "Close", "Volume"]).vbt.ohlcv.resample(test_freq).obj,
+                ohlcv_data.get(["Other"]).resample(test_freq).mean(),
+            ), axis=1)
+        )
+
 
 # ############# custom.py ############# #
 
@@ -1893,7 +1922,7 @@ class TestCSVDataSaver:
             save_kwargs=dict(
                 dir_path=tmp_path / "saver",
                 mkdir_kwargs=dict(mkdir=True),
-            )
+            ),
         )
         saver.init_save_data()
         saver.update(n=2)
@@ -1912,22 +1941,18 @@ class TestCSVDataSaver:
             save_kwargs=dict(
                 dir_path=tmp_path / "saver",
                 mkdir_kwargs=dict(mkdir=True),
-            )
+            ),
         )
         new_saver.update(n=2)
         new_updated_data = new_data.update(n=2, concat=False)
         assert new_saver.data == new_updated_data
-        new_saved_result0 = pd.concat((
-            data.data[0].iloc[:-1],
-            new_data.data[0].iloc[:-1],
-            new_updated_data.data[0]
-        ), axis=0)
+        new_saved_result0 = pd.concat(
+            (data.data[0].iloc[:-1], new_data.data[0].iloc[:-1], new_updated_data.data[0]), axis=0
+        )
         new_saved_result0.index.freq = "D"
-        new_saved_result1 = pd.concat((
-            data.data[1].iloc[:-1],
-            new_data.data[1].iloc[:-1],
-            new_updated_data.data[1]
-        ), axis=0)
+        new_saved_result1 = pd.concat(
+            (data.data[1].iloc[:-1], new_data.data[1].iloc[:-1], new_updated_data.data[1]), axis=0
+        )
         new_saved_result1.index.freq = "D"
         pd.testing.assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["0"], new_saved_result0)
         pd.testing.assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["1"], new_saved_result1)
@@ -1948,7 +1973,7 @@ class TestCSVDataSaver:
             save_kwargs=dict(
                 dir_path=tmp_path / "saver",
                 mkdir_kwargs=dict(mkdir=True),
-            )
+            ),
         )
         saver.init_save_data()
         saver.update_every(call_count=call_count)
@@ -1967,7 +1992,7 @@ class TestHDFDataSaver:
                 file_path=tmp_path / "saver.h5",
                 mkdir_kwargs=dict(mkdir=True),
                 min_itemsize=10,
-            )
+            ),
         )
         saver.init_save_data()
         saver.update(n=2)
@@ -1987,22 +2012,18 @@ class TestHDFDataSaver:
                 file_path=tmp_path / "saver.h5",
                 mkdir_kwargs=dict(mkdir=True),
                 min_itemsize=10,
-            )
+            ),
         )
         new_saver.update(n=2)
         new_updated_data = new_data.update(n=2, concat=False)
         assert new_saver.data == new_updated_data
-        new_saved_result0 = pd.concat((
-            data.data[0].iloc[:-1],
-            new_data.data[0].iloc[:-1],
-            new_updated_data.data[0]
-        ), axis=0)
+        new_saved_result0 = pd.concat(
+            (data.data[0].iloc[:-1], new_data.data[0].iloc[:-1], new_updated_data.data[0]), axis=0
+        )
         new_saved_result0.index.freq = "D"
-        new_saved_result1 = pd.concat((
-            data.data[1].iloc[:-1],
-            new_data.data[1].iloc[:-1],
-            new_updated_data.data[1]
-        ), axis=0)
+        new_saved_result1 = pd.concat(
+            (data.data[1].iloc[:-1], new_data.data[1].iloc[:-1], new_updated_data.data[1]), axis=0
+        )
         new_saved_result1.index.freq = "D"
         pd.testing.assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["0"], new_saved_result0)
         pd.testing.assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["1"], new_saved_result1)
@@ -2024,7 +2045,7 @@ class TestHDFDataSaver:
                 file_path=tmp_path / "saver.h5",
                 mkdir_kwargs=dict(mkdir=True),
                 min_itemsize=10,
-            )
+            ),
         )
         saver.init_save_data()
         saver.update_every(call_count=call_count)

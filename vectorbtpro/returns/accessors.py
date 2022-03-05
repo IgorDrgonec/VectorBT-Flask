@@ -135,7 +135,7 @@ from vectorbtpro.returns import nb, metrics
 from vectorbtpro.utils import checks
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, HybridConfig, Config
-from vectorbtpro.utils.datetime_ import freq_to_timedelta, DatetimeIndexes
+from vectorbtpro.utils.datetime_ import freq_to_timedelta, PandasDatetimeIndex
 
 __pdoc__ = {}
 
@@ -181,9 +181,9 @@ class ReturnsAccessor(GenericAccessor):
         """Accessor class for `pd.DataFrame`."""
         return ReturnsDFAccessor
 
-    def indexing_func(self: ReturnsAccessorT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> ReturnsAccessorT:
+    def indexing_func(self: ReturnsAccessorT, *args, **kwargs) -> ReturnsAccessorT:
         """Perform indexing on `ReturnsAccessor`."""
-        new_wrapper, idx_idxs, _, col_idxs = self.wrapper.indexing_func_meta(pd_indexing_func, **kwargs)
+        new_wrapper, idx_idxs, _, col_idxs = self.wrapper.indexing_func_meta(*args, **kwargs)
         new_obj = new_wrapper.wrap(self.to_2d_array()[idx_idxs, :][:, col_idxs], group_by=False)
         if self.bm_returns is not None:
             new_bm_returns = new_wrapper.wrap(to_2d_array(self.bm_returns)[idx_idxs, :][:, col_idxs], group_by=False)
@@ -289,7 +289,7 @@ class ReturnsAccessor(GenericAccessor):
 
     def daily(self, jitted: tp.JittedOption = None, **kwargs) -> tp.SeriesFrame:
         """Daily returns."""
-        checks.assert_instance_of(self.wrapper.index, DatetimeIndexes)
+        checks.assert_instance_of(self.wrapper.index, PandasDatetimeIndex)
 
         if self.wrapper.freq == pd.Timedelta("1D"):
             return self.obj
@@ -298,7 +298,7 @@ class ReturnsAccessor(GenericAccessor):
 
     def annual(self, jitted: tp.JittedOption = None, **kwargs) -> tp.SeriesFrame:
         """Annual returns."""
-        checks.assert_instance_of(self.obj.index, DatetimeIndexes)
+        checks.assert_instance_of(self.obj.index, PandasDatetimeIndex)
 
         if self.wrapper.freq == self.year_freq:
             return self.obj
@@ -1341,6 +1341,17 @@ class ReturnsAccessor(GenericAccessor):
                     cond_kwargs["use_caching"] = False
                 return self_copy
         return reself
+
+    # ############# Resampling ############# #
+
+    def resample(self: ReturnsAccessorT, *args, **kwargs) -> ReturnsAccessorT:
+        """Perform resampling on `ReturnsAccessor`."""
+        resampler, new_wrapper = self.wrapper.resample_meta(*args, **kwargs)
+        new_obj = self.resample_apply(resampler, nb.cum_returns_final_1d_nb, **kwargs)
+        return self.replace(
+            wrapper=new_wrapper,
+            obj=new_obj,
+        )
 
     # ############# Stats ############# #
 
