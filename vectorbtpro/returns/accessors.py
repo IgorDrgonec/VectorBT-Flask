@@ -1344,13 +1344,22 @@ class ReturnsAccessor(GenericAccessor):
 
     # ############# Resampling ############# #
 
-    def resample(self: ReturnsAccessorT, *args, **kwargs) -> ReturnsAccessorT:
+    def resample(self: ReturnsAccessorT, *args, fill_with_zero: bool = True, **kwargs) -> ReturnsAccessorT:
         """Perform resampling on `ReturnsAccessor`."""
         resampler, new_wrapper = self.wrapper.resample_meta(*args, **kwargs)
-        new_obj = self.resample_apply(resampler, nb.cum_returns_final_1d_nb, **kwargs)
+        new_obj = self.resample_apply(resampler, nb.cum_returns_final_1d_nb)
+        if fill_with_zero:
+            new_obj = new_obj.vbt.fillna(0.)
+        if self.bm_returns is not None:
+            new_bm_returns = self.bm_returns.vbt.resample_apply(resampler, nb.cum_returns_final_1d_nb)
+            if fill_with_zero:
+                new_bm_returns = new_bm_returns.vbt.fillna(0.)
+        else:
+            new_bm_returns = None
         return self.replace(
             wrapper=new_wrapper,
             obj=new_obj,
+            bm_returns=new_bm_returns,
         )
 
     # ############# Stats ############# #

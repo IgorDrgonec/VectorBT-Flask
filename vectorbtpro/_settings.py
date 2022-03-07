@@ -1077,6 +1077,7 @@ portfolio = ChildDict(
     # Setup
     init_cash=100.0,
     init_position=0.0,
+    init_price=np.nan,
     cash_deposits=0.0,
     cash_earnings=0.0,
     cash_dividends=0.0,

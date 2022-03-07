@@ -1490,6 +1490,7 @@ class EntryTrades(Trades):
         orders: Orders,
         close: tp.Optional[tp.ArrayLike] = None,
         init_position: tp.ArrayLike = 0.0,
+        init_price: tp.ArrayLike = np.nan,
         attach_close: bool = True,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -1505,6 +1506,7 @@ class EntryTrades(Trades):
             to_2d_array(close),
             orders.col_mapper.col_map,
             init_position=to_1d_array(init_position),
+            init_price=to_1d_array(init_price),
         )
         return cls(orders.wrapper, trade_records_arr, close=close if attach_close else None, **kwargs)
 
@@ -1536,6 +1538,7 @@ class ExitTrades(Trades):
         orders: Orders,
         close: tp.Optional[tp.ArrayLike] = None,
         init_position: tp.ArrayLike = 0.0,
+        init_price: tp.ArrayLike = np.nan,
         attach_close: bool = True,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -1551,6 +1554,7 @@ class ExitTrades(Trades):
             to_2d_array(close),
             orders.col_mapper.col_map,
             init_position=to_1d_array(init_position),
+            init_price=to_1d_array(init_price),
         )
         return cls(orders.wrapper, trade_records_arr, close=close if attach_close else None, **kwargs)
 

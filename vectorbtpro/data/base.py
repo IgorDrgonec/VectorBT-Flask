@@ -1078,7 +1078,10 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         """Perform resampling on `Data` based on `Data.column_config`.
 
         Columns `open`, `high`, `low`, `close`, and `volume` (case-insensitive) are recognized
-        and resampled automatically."""
+        and resampled automatically.
+
+        Looks for `resample_func` of each column in `Data.column_config`. The function must
+        accept the `Data` instance, object, and resampler."""
         resampler, new_wrapper = self.wrapper.resample_meta(*args, **kwargs)
         new_data = symbol_dict()
         for k, v in self.data.items():
@@ -1094,7 +1097,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                     obj = v[c]
                 resample_func = self.column_config.get(c, {}).get("resample_func", None)
                 if resample_func is not None:
-                    new_v.append(resample_func(obj, resampler))
+                    new_v.append(resample_func(self, obj, resampler))
                 elif isinstance(c, str) and c.lower() in ("open", "high", "low", "close", "volume"):
                     if c.lower() == "open":
                         new_v.append(obj.vbt.resample_apply(resampler, generic_nb.nth_reduce_nb, 0))

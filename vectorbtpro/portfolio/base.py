@@ -632,7 +632,7 @@ because then, during the simulation, the portfolio value is `np.inf` and the ret
 You should also take care of grouping the pre-computed array during the simulation.
 For example, running the above function with grouping but without cash sharing will throw an error.
 To provide a hint to vectorbt that the array should only be used when cash sharing is enabled,
-add the suffix '_pcgs' to the name of the array (see `Portfolio.in_outputs_indexing_func` on supported suffixes).
+add the suffix '_cs' to the name of the array (see `Portfolio.in_outputs_indexing_func` on supported suffixes).
 
 ### Chunking simulation
 
@@ -1627,6 +1627,7 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, broadcast, broadcast_to, to_pd_array
+from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.analyzable import Analyzable
@@ -1792,6 +1793,7 @@ shortcut_config = ReadonlyConfig(
         "free_cash_flow": dict(method_name="get_cash_flow", method_kwargs=dict(free=True)),
         "cash": dict(),
         "free_cash": dict(method_name="get_cash", method_kwargs=dict(free=True)),
+        "init_price": dict(obj_type="red_array", group_by_aware=False),
         "init_position_value": dict(obj_type="red_array", group_by_aware=False),
         "init_value": dict(obj_type="red_array"),
         "input_value": dict(obj_type="red_array"),
@@ -1849,6 +1851,7 @@ __pdoc__[
 """
 
 PortfolioT = tp.TypeVar("PortfolioT", bound="Portfolio")
+
 
 class MetaInOutputs(type):
     """Meta class that exposes a read-only class property `MetaFields.in_output_config`."""
@@ -1939,6 +1942,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cash_sharing: bool,
         init_cash: tp.Union[int, tp.FlexArray],
         init_position: tp.FlexArray = np.asarray(0.0),
+        init_price: tp.FlexArray = np.asarray(np.nan),
         cash_deposits: tp.FlexArray = np.asarray(0.0),
         cash_earnings: tp.FlexArray = np.asarray(0.0),
         call_seq: tp.Optional[tp.Array2d] = None,
@@ -1975,6 +1979,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             cash_sharing=cash_sharing,
             init_cash=init_cash,
             init_position=init_position,
+            init_price=init_price,
             cash_deposits=cash_deposits,
             cash_earnings=cash_earnings,
             call_seq=call_seq,
@@ -1992,6 +1997,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         self._cash_sharing = cash_sharing
         self._init_cash = init_cash
         self._init_position = init_position
+        self._init_price = init_price
         self._cash_deposits = cash_deposits
         self._cash_earnings = cash_earnings
         self._call_seq = call_seq
@@ -2009,7 +2015,18 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
     # ############# In-outputs ############# #
 
-    _in_output_config: tp.ClassVar[Config] = HybridConfig()
+    _in_output_config: tp.ClassVar[Config] = HybridConfig(
+        dict(
+            returns=dict(
+                grouping="cash_sharing",
+                resample_func=lambda self, obj, resampler, wrapper, fill_with_zero=True, **kwargs: pd.DataFrame(
+                    obj, index=wrapper.index
+                )
+                .vbt.returns.resample(resampler, fill_with_zero=fill_with_zero)
+                .obj.values,
+            ),
+        )
+    )
 
     @property
     def in_output_config(self) -> Config:
@@ -2027,255 +2044,357 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         """
         return self._in_output_config
 
-    def get_in_output(
-        self,
-        field: str,
-        force_wrapping: bool = False,
-        group_by: tp.GroupByLike = None,
-        wrapper: tp.Optional[ArrayWrapper] = None,
-        wrap_kwargs: tp.KwargsLike = None,
-        wrap_func: tp.Optional[tp.Callable] = None,
-        **kwargs,
-    ) -> tp.Union[None, bool, tp.AnyArray]:
-        """Get wrapped in-output.
+    @classmethod
+    def parse_field_options(cls, field: str) -> tp.Kwargs:
+        """Parse options based on the name of a field.
 
-        See `Portfolio.in_outputs_indexing_func` for parsing rules.
+        Returns a dictionary with the parsed grouping, object type, and cleaned field name.
 
-        `**kwargs` are passed together with `self`, the object, `group_by`, and `wrap_kwargs` to `wrap_func`."""
-        if wrapper is None:
-            wrapper = self.wrapper
-        if wrap_kwargs is None:
-            wrap_kwargs = {}
-        is_grouped = wrapper.grouper.is_grouped(group_by=group_by)
+        Grouping is parsed by looking for the following suffixes:
 
-        def _find_field(field_aliases: tp.Iterable[str], group_by_aware: bool = True) -> tp.Optional[str]:
-            fields = set(self.in_outputs._fields)
-            for field in field_aliases:
-                if field in fields:
-                    return field
-                if is_grouped:
-                    if group_by_aware:
-                        if field + "_pg" in fields:
-                            return field + "_pg"
-                        if field + "_pcg" in fields:
-                            return field + "_pcg"
-                        if self.cash_sharing:
-                            if field + "_pcgs" in fields:
-                                return field + "_pcgs"
-                    else:
-                        if field + "_pc" in fields:
-                            return field + "_pc"
-                        if not self.cash_sharing:
-                            if field + "_pcgs" in fields:
-                                return field + "_pcgs"
-                else:
-                    if field + "_pc" in fields:
-                        return field + "_pc"
-                    if field + "_pcg" in fields:
-                        return field + "_pcg"
-                    if field + "_pcgs" in fields:
-                        return field + "_pcgs"
-            return None
-
-        def _wrap_1d_grouped(obj: tp.Array, name_or_index: str) -> tp.Series:
-            _wrap_kwargs = merge_dicts(dict(name_or_index=name_or_index), wrap_kwargs)
-            return wrapper.wrap_reduced(obj, group_by=group_by, **_wrap_kwargs)
-
-        def _wrap_1d(obj: tp.Array, name_or_index: str) -> tp.Series:
-            _wrap_kwargs = merge_dicts(dict(name_or_index=name_or_index), wrap_kwargs)
-            return wrapper.wrap_reduced(obj, group_by=False, **_wrap_kwargs)
-
-        def _wrap_2d_grouped(obj: tp.Array) -> tp.Frame:
-            return wrapper.wrap(obj, group_by=group_by, **wrap_kwargs)
-
-        def _wrap_2d(obj: tp.Array) -> tp.Frame:
-            return wrapper.wrap(obj, group_by=False, **wrap_kwargs)
-
-        if field in self.cls_dir:
-            method_or_prop = getattr(type(self), field)
-            options = getattr(method_or_prop, "options", {})
-            obj_type = options.get("obj_type", None)
-            group_by_aware = options.get("group_by_aware", None)
-            field_aliases = options.get("field_aliases", None)
-            if field_aliases is None:
-                field_aliases = []
-            field_aliases = [field, *field_aliases]
-            if obj_type is None:
-                raise TypeError(f"Cannot parse in-output '{field}': option 'obj_type' is missing")
-            if group_by_aware is None:
-                raise TypeError(f"Cannot parse in-output '{field}': option 'group_by_aware' is missing")
-            if obj_type == "array":
-                field_aliases = [*[alias + "_2d" for alias in field_aliases if "_2d" not in alias], *field_aliases]
-            elif obj_type == "red_array":
-                field_aliases = [*[alias + "_1d" for alias in field_aliases if "_1d" not in alias], *field_aliases]
-
-            found_field = _find_field(field_aliases, group_by_aware=group_by_aware)
-            if found_field is None:
-                raise AttributeError(f"Field '{field}' not found in in_outputs")
-            obj = getattr(self.in_outputs, found_field)
-            if obj is None or isinstance(obj, bool):
-                return obj
-            if isinstance(obj, np.ndarray) and obj.shape == (0, 0):
-                return None
-            if wrap_func is not None:
-                return wrap_func(
-                    self,
-                    obj,
-                    field=field,
-                    force_wrapping=force_wrapping,
-                    group_by=group_by,
-                    wrapper=wrapper,
-                    wrap_kwargs=wrap_kwargs,
-                    **kwargs,
-                )
-            if obj_type == "array":
-                if group_by_aware:
-                    return _wrap_2d_grouped(obj)
-                return _wrap_2d(obj)
-            elif obj_type == "red_array":
-                if group_by_aware:
-                    return _wrap_1d_grouped(obj, field)
-                return _wrap_1d(obj, field)
-            if force_wrapping:
-                raise NotImplementedError(f"Cannot wrap field '{found_field}'")
-            return obj
-
-        found_field = _find_field([field])
-        if found_field is None:
-            raise AttributeError(f"Field '{field}' not found in in_outputs")
-        obj = getattr(self.in_outputs, found_field)
-        if obj is None or isinstance(obj, bool):
-            return obj
-        if wrap_func is not None:
-            return wrap_func(
-                self,
-                obj,
-                field=field,
-                force_wrapping=force_wrapping,
-                group_by=group_by,
-                wrapper=wrapper,
-                wrap_kwargs=wrap_kwargs,
-                **kwargs,
-            )
-        if found_field.endswith("_pcgs"):
-            if "_2d" in field:
-                if is_grouped and self.cash_sharing:
-                    return _wrap_2d_grouped(obj)
-                return _wrap_2d(obj)
-            if "_1d" in field:
-                if is_grouped and self.cash_sharing:
-                    return _wrap_1d_grouped(obj, field.replace("_pcgs", "").replace("_1d", ""))
-                return _wrap_1d(obj, field.replace("_pcgs", "").replace("_1d", ""))
-            if obj.ndim == 2:
-                if is_grouped and self.cash_sharing:
-                    return _wrap_2d_grouped(obj)
-                return _wrap_2d(obj)
-            if obj.ndim == 1:
-                if is_grouped and self.cash_sharing:
-                    return _wrap_1d_grouped(obj, field.replace("_pcgs", ""))
-                return _wrap_1d(obj, field.replace("_pcgs", ""))
-        if found_field.endswith("_pcg"):
-            if "_2d" in field:
-                if is_grouped:
-                    return _wrap_2d_grouped(obj)
-                return _wrap_2d(obj)
-            if "_1d" in field:
-                if is_grouped:
-                    return _wrap_1d_grouped(obj, field.replace("_pcg", "").replace("_1d", ""))
-                return _wrap_1d(obj, field.replace("_pcg", "").replace("_1d", ""))
-            if obj.ndim == 2:
-                if is_grouped:
-                    return _wrap_2d_grouped(obj)
-                return _wrap_2d(obj)
-            if obj.ndim == 1:
-                if is_grouped:
-                    return _wrap_1d_grouped(obj, field.replace("_pcg", ""))
-                return _wrap_1d(obj, field.replace("_pcg", ""))
-        if found_field.endswith("_pg"):
-            if "_2d" in field:
-                return _wrap_2d_grouped(obj)
-            if "_1d" in field:
-                return _wrap_1d_grouped(obj, field.replace("_pg", "").replace("_1d", ""))
-            if obj.ndim == 2:
-                return _wrap_2d_grouped(obj)
-            if obj.ndim == 1:
-                return _wrap_1d_grouped(obj, field.replace("_pg", ""))
-        if found_field.endswith("_pc"):
-            if "_2d" in field:
-                return _wrap_2d(obj)
-            if "_1d" in field:
-                return _wrap_1d(obj, field.replace("_pc", "").replace("_1d", ""))
-            if obj.ndim == 2:
-                return _wrap_2d(obj)
-            if obj.ndim == 1:
-                return _wrap_1d(obj, field.replace("_pc", ""))
-        if not found_field.endswith("_records") and checks.is_np_array(obj):
-            if is_grouped:
-                if "_2d" in field:
-                    return _wrap_2d_grouped(obj)
-                if "_1d" in field:
-                    return _wrap_1d_grouped(obj, field.replace("_1d", ""))
-                if obj.shape == self.wrapper.get_shape():
-                    return _wrap_2d_grouped(obj)
-                if obj.shape == (self.wrapper.get_shape_2d()[1],):
-                    return _wrap_1d_grouped(obj, field)
-            else:
-                if "_2d" in field:
-                    return _wrap_2d(obj)
-                if "_1d" in field:
-                    return _wrap_1d(obj, field.replace("_1d", ""))
-                if obj.shape == self.wrapper.shape:
-                    return _wrap_2d(obj)
-                if obj.shape == (self.wrapper.shape_2d[1],):
-                    return _wrap_1d(obj, field)
-        if force_wrapping:
-            raise NotImplementedError(f"Cannot wrap field '{found_field}'")
-        return obj
-
-    # ############# Indexing ############# #
-
-    def in_outputs_indexing_func(
-        self,
-        new_wrapper: ArrayWrapper,
-        group_idxs: tp.MaybeArray,
-        col_idxs: tp.Array1d,
-    ) -> tp.Optional[tp.NamedTuple]:
-        """Perform indexing on `Portfolio.in_outputs`.
-
-        If the name of a field can be found as an attribute of `Portfolio`, reads this attribute's
-        annotations to figure out the type and layout of the indexed object. The same goes for
-        `Portfolio.in_output_config`. In both, `indexing_func` can be explicitly specified.
-
-        !!! note
-            Aliases are not supported.
-
-        If not found, you can provide a grouping suffix to specify whether the array is
-        grouped per column or group:
-
-        * '_pcgs': per group if grouped with cash sharing, otherwise per column
+        * '_cs': per group if grouped with cash sharing, otherwise per column
         * '_pcg': per group if grouped, otherwise per column
         * '_pg': per group
         * '_pc': per column
-        * '_records': records per column
+        * '_records': records
 
-        Additionally, you can provide a shape suffix to specify whether the object is
-        a regular or reduced time series:
+        Object type is parsed by looking for the following suffixes:
 
         * '_2d': element per timestamp and column/group (time series)
         * '_1d': element per column/group (reduced time series)
 
-        Finally, looks for the field object having the same shape as that of `Portfolio.wrapper`,
-        both grouped and ungrouped. Cash sharing plays no role in this case.
+        Those substrings are then removed to produce a clean field name."""
+        options = dict()
+        new_parts = []
+        for part in field.split("_"):
+            if part == "1d":
+                options["obj_type"] = "red_array"
+            elif part == "2d":
+                options["obj_type"] = "array"
+            elif part == "records":
+                options["obj_type"] = "records"
+            elif part == "pc":
+                options["grouping"] = "columns"
+            elif part == "pg":
+                options["grouping"] = "groups"
+            elif part == "pcg":
+                options["grouping"] = "columns_or_groups"
+            elif part == "cs":
+                options["grouping"] = "cash_sharing"
+            else:
+                new_parts.append(part)
+        field = "_".join(new_parts)
+        options["field"] = field
+        return options
+
+    def matches_field_options(
+        self,
+        options: tp.Kwargs,
+        obj_type: tp.Optional[str] = None,
+        group_by_aware: bool = True,
+        group_by: tp.GroupByLike = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+    ) -> bool:
+        """Return whether options of a field match the requirements.
+
+        Requirements include the type of the object (array, reduced array, records),
+        the grouping of the object (1/2 dimensions, group/column-wise layout). The current
+        grouping and cash sharing of this portfolio object are also taken into account.
+
+        When an option is not in `options`, it's automatically marked as matching."""
+        field_obj_type = options.get("obj_type", None)
+        field_grouping = options.get("grouping", None)
+        if field_obj_type is not None and obj_type is not None:
+            if field_obj_type != obj_type:
+                return False
+        if field_grouping is not None:
+            if wrapper is None:
+                wrapper = self.wrapper
+            is_grouped = wrapper.grouper.is_grouped(group_by=group_by)
+            if is_grouped:
+                if group_by_aware:
+                    if field_grouping == "groups":
+                        return True
+                    if field_grouping == "columns_or_groups":
+                        return True
+                    if self.cash_sharing:
+                        if field_grouping == "cash_sharing":
+                            return True
+                else:
+                    if field_grouping == "columns":
+                        return True
+                    if not self.cash_sharing:
+                        if field_grouping == "cash_sharing":
+                            return True
+            else:
+                if field_grouping == "columns":
+                    return True
+                if field_grouping == "columns_or_groups":
+                    return True
+                if field_grouping == "cash_sharing":
+                    return True
+            return False
+        return True
+
+    def wrap_obj(
+        self,
+        obj: tp.Any,
+        obj_name: tp.Optional[str] = None,
+        grouping: str = "columns_or_groups",
+        obj_type: tp.Optional[str] = None,
+        group_by: tp.GroupByLike = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_func: tp.Optional[tp.Callable] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        force_wrapping: bool = False,
+        silence_warnings: bool = False,
+        **kwargs,
+    ) -> tp.Any:
+        """Wrap an object.
+
+        `wrap_func` must take the portfolio, `obj`, all the arguments passed to this method, and `**kwargs`.
+        If you don't need any of the arguments, make `indexing_func` accept them as `**kwargs`.
+
+        If the object is None or boolean, returns as-is."""
+        if obj is None or isinstance(obj, bool):
+            return obj
+        if wrapper is None:
+            wrapper = self.wrapper
+        if wrap_func is not None:
+            return wrap_func(
+                self,
+                obj,
+                obj_name=obj_name,
+                grouping=grouping,
+                obj_type=obj_type,
+                group_by=group_by,
+                wrapper=wrapper,
+                wrap_kwargs=wrap_kwargs,
+                force_wrapping=force_wrapping,
+                silence_warnings=silence_warnings,
+                **kwargs,
+            )
+
+        def _wrap_1d_grouped(obj: tp.Array) -> tp.Series:
+            _wrap_kwargs = merge_dicts(dict(name_or_index=obj_name), wrap_kwargs)
+            return wrapper.wrap_reduced(obj, group_by=group_by, **_wrap_kwargs)
+
+        def _wrap_1d(obj: tp.Array) -> tp.Series:
+            _wrap_kwargs = merge_dicts(dict(name_or_index=obj_name), wrap_kwargs)
+            return wrapper.wrap_reduced(obj, group_by=False, **_wrap_kwargs)
+
+        def _wrap_2d_grouped(obj: tp.Array) -> tp.Frame:
+            return wrapper.wrap(obj, group_by=group_by, **resolve_dict(wrap_kwargs))
+
+        def _wrap_2d(obj: tp.Array) -> tp.Frame:
+            return wrapper.wrap(obj, group_by=False, **resolve_dict(wrap_kwargs))
+
+        if obj_type is not None and obj_type not in {"records"}:
+            is_grouped = wrapper.grouper.is_grouped(group_by=group_by)
+            if grouping == "cash_sharing":
+                if obj_type == "array":
+                    if is_grouped and self.cash_sharing:
+                        return _wrap_2d_grouped(obj)
+                    return _wrap_2d(obj)
+                if obj_type == "red_array":
+                    if is_grouped and self.cash_sharing:
+                        return _wrap_1d_grouped(obj)
+                    return _wrap_1d(obj)
+                if obj.ndim == 2:
+                    if is_grouped and self.cash_sharing:
+                        return _wrap_2d_grouped(obj)
+                    return _wrap_2d(obj)
+                if obj.ndim == 1:
+                    if is_grouped and self.cash_sharing:
+                        return _wrap_1d_grouped(obj)
+                    return _wrap_1d(obj)
+            if grouping == "columns_or_groups":
+                if obj_type == "array":
+                    if is_grouped:
+                        return _wrap_2d_grouped(obj)
+                    return _wrap_2d(obj)
+                if obj_type == "red_array":
+                    if is_grouped:
+                        return _wrap_1d_grouped(obj)
+                    return _wrap_1d(obj)
+                if obj.ndim == 2:
+                    if is_grouped:
+                        return _wrap_2d_grouped(obj)
+                    return _wrap_2d(obj)
+                if obj.ndim == 1:
+                    if is_grouped:
+                        return _wrap_1d_grouped(obj)
+                    return _wrap_1d(obj)
+            if grouping == "groups":
+                if obj_type == "array":
+                    return _wrap_2d_grouped(obj)
+                if obj_type == "red_array":
+                    return _wrap_1d_grouped(obj)
+                if obj.ndim == 2:
+                    return _wrap_2d_grouped(obj)
+                if obj.ndim == 1:
+                    return _wrap_1d_grouped(obj)
+            if grouping == "columns":
+                if obj_type == "array":
+                    return _wrap_2d(obj)
+                if obj_type == "red_array":
+                    return _wrap_1d(obj)
+                if obj.ndim == 2:
+                    return _wrap_2d(obj)
+                if obj.ndim == 1:
+                    return _wrap_1d(obj)
+            if checks.is_np_array(obj):
+                if is_grouped:
+                    if obj_type == "array":
+                        return _wrap_2d_grouped(obj)
+                    if obj_type == "red_array":
+                        return _wrap_1d_grouped(obj)
+                    if obj.shape == wrapper.get_shape():
+                        return _wrap_2d_grouped(obj)
+                    if obj.shape == (wrapper.get_shape_2d()[1],):
+                        return _wrap_1d_grouped(obj)
+                if obj_type == "array":
+                    return _wrap_2d(obj)
+                if obj_type == "red_array":
+                    return _wrap_1d(obj)
+                if obj.shape == wrapper.shape:
+                    return _wrap_2d(obj)
+                if obj.shape == (wrapper.shape_2d[1],):
+                    return _wrap_1d(obj)
+        if force_wrapping:
+            raise NotImplementedError(f"Cannot wrap object '{obj_name}'")
+        if not silence_warnings:
+            warnings.warn(
+                f"Cannot figure out how to wrap object '{obj_name}'",
+                stacklevel=2,
+            )
+        return obj
+
+    def get_in_output(
+        self,
+        field: str,
+        group_by: tp.GroupByLike = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        **kwargs,
+    ) -> tp.Union[None, bool, tp.AnyArray]:
+        """Find and wrap an in-output object matching the field.
+
+        If the field can be found in the attributes of this `Portfolio` instance, reads the
+        attribute's options to get requirements for the type and layout of the in-output object.
+
+        For each field in `Portfolio.in_outputs`, resolves the field's options by parsing its name with
+        `Portfolio.parse_field_options` and also looks for options in `Portfolio.in_output_config`.
+        If `field` is not in `Portfolio.in_outputs`, searches for the field in aliases and options.
+        In such case, to narrow down the number of candidates, options are additionally matched against
+        the requirements using `Portfolio.matches_field_options`. Finally, the matched in-output object is
+        wrapped using `Portfolio.wrap_obj`."""
+        if self.in_outputs is None:
+            raise ValueError("No in-outputs attached")
+
+        if field in self.cls_dir:
+            prop = getattr(type(self), field)
+            prop_options = getattr(prop, "options", {})
+            obj_type = prop_options.get("obj_type", "array")
+            group_by_aware = prop_options.get("group_by_aware", True)
+            field_aliases = prop_options.get("field_aliases", None)
+            if field_aliases is None:
+                field_aliases = []
+            field_aliases = {field, *field_aliases}
+            found_attr = True
+        else:
+            obj_type = None
+            group_by_aware = True
+            field_aliases = {field}
+            found_attr = False
+
+        found_field = None
+        found_field_options = None
+        for _field in set(self.in_outputs._fields):
+            _field_options = merge_dicts(
+                self.parse_field_options(_field),
+                self.in_output_config.get(_field, None),
+            )
+            if (not found_attr and field == _field) or (
+                (_field in field_aliases or _field_options.get("field", _field) in field_aliases)
+                and self.matches_field_options(
+                    _field_options,
+                    obj_type=obj_type,
+                    group_by_aware=group_by_aware,
+                    group_by=group_by,
+                    wrapper=wrapper,
+                )
+            ):
+                if found_field is not None:
+                    raise ValueError(f"Multiple fields for '{field}' found in in_outputs")
+                found_field = _field
+                found_field_options = _field_options
+        if found_field is None:
+            raise AttributeError(f"No compatible field for '{field}' found in in_outputs")
+        obj = getattr(self.in_outputs, found_field)
+        if found_attr and checks.is_np_array(obj) and obj.shape == (0, 0):  # for returns
+            return None
+        kwargs = merge_dicts(
+            dict(
+                grouping=found_field_options.get("grouping", "columns_or_groups" if group_by_aware else "columns"),
+                obj_type=found_field_options.get("obj_type", obj_type),
+                wrap_func=found_field_options.get("wrap_func", None),
+                wrap_kwargs=found_field_options.get("wrap_kwargs", None),
+                force_wrapping=found_field_options.get("force_wrapping", False),
+                silence_warnings=found_field_options.get("silence_warnings", False),
+            ),
+            kwargs,
+        )
+        return self.wrap_obj(
+            obj,
+            found_field_options.get("field", found_field),
+            group_by=group_by,
+            wrapper=wrapper,
+            **kwargs,
+        )
+
+    # ############# Indexing ############# #
+
+    def index_obj(
+        self,
+        obj: tp.Any,
+        group_idxs: tp.MaybeArray,
+        col_idxs: tp.Array1d,
+        obj_name: tp.Optional[str] = None,
+        grouping: str = "columns_or_groups",
+        obj_type: tp.Optional[str] = None,
+        group_by: tp.GroupByLike = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        indexing_func: tp.Optional[tp.Callable] = None,
+        force_indexing: bool = False,
+        silence_warnings: bool = False,
+        **kwargs,
+    ) -> tp.Any:
+        """Perform indexing on an object.
+
+        `indexing_func` must take the portfolio, `obj`, `group_idxs`, `col_idxs`,
+        all the arguments passed to this method, and `**kwargs`. If you don't need any of
+        the arguments, make `indexing_func` accept them as `**kwargs`.
 
         If the object is None, boolean, or empty, returns as-is."""
-        if self.in_outputs is None:
-            return None
-
-        in_outputs = self.in_outputs._asdict()
-        new_in_outputs = {}
-        cls = type(self)
-        cls_dir = dir(cls)
-        is_grouped = self.wrapper.grouper.is_grouped()
+        if obj is None or isinstance(obj, bool) or (checks.is_np_array(obj) and obj.size == 0):
+            return obj
+        if wrapper is None:
+            wrapper = self.wrapper
+        if indexing_func is not None:
+            return indexing_func(
+                self,
+                obj,
+                group_idxs,
+                col_idxs,
+                obj_name=obj_name,
+                grouping=grouping,
+                obj_type=obj_type,
+                group_by=group_by,
+                wrapper=wrapper,
+                force_indexing=force_indexing,
+                silence_warnings=silence_warnings,
+                **kwargs,
+            )
 
         def _index_1d_by_group(obj: tp.ArrayLike) -> tp.ArrayLike:
             return to_1d_array(obj)[group_idxs]
@@ -2295,135 +2414,144 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             func = jit_reg.resolve_option(records_nb.record_col_map_select_nb, None)
             return func(obj, col_map, to_1d_array(col_idxs))
 
-        for field, obj in in_outputs.items():
-            if obj is None or isinstance(obj, bool) or (isinstance(obj, np.ndarray) and obj.size == 0):
-                new_obj = obj
+        if obj_type is not None:
+            is_grouped = wrapper.grouper.is_grouped(group_by=group_by)
+            if obj_type == "records":
+                return _index_records(obj)
+            if grouping == "cash_sharing":
+                if obj_type == "array":
+                    if is_grouped and self.cash_sharing:
+                        return _index_2d_by_group(obj)
+                    return _index_2d_by_col(obj)
+                if obj_type == "red_array":
+                    if is_grouped and self.cash_sharing:
+                        return _index_1d_by_group(obj)
+                    return _index_1d_by_col(obj)
+                if obj.ndim == 2:
+                    if is_grouped and self.cash_sharing:
+                        return _index_2d_by_group(obj)
+                    return _index_2d_by_col(obj)
+                if obj.ndim == 1:
+                    if is_grouped and self.cash_sharing:
+                        return _index_1d_by_group(obj)
+                    return _index_1d_by_col(obj)
+            if grouping == "columns_or_groups":
+                if obj_type == "array":
+                    if is_grouped:
+                        return _index_2d_by_group(obj)
+                    return _index_2d_by_col(obj)
+                if obj_type == "red_array":
+                    if is_grouped:
+                        return _index_1d_by_group(obj)
+                    return _index_1d_by_col(obj)
+                if obj.ndim == 2:
+                    if is_grouped:
+                        return _index_2d_by_group(obj)
+                    return _index_2d_by_col(obj)
+                if obj.ndim == 1:
+                    if is_grouped:
+                        return _index_1d_by_group(obj)
+                    return _index_1d_by_col(obj)
+            if grouping == "groups":
+                if obj_type == "array":
+                    return _index_2d_by_group(obj)
+                if obj_type == "red_array":
+                    return _index_1d_by_group(obj)
+                if obj.ndim == 2:
+                    return _index_2d_by_group(obj)
+                if obj.ndim == 1:
+                    return _index_1d_by_group(obj)
+            if grouping == "columns":
+                if obj_type == "array":
+                    return _index_2d_by_col(obj)
+                if obj_type == "red_array":
+                    return _index_1d_by_col(obj)
+                if obj.ndim == 2:
+                    return _index_2d_by_col(obj)
+                if obj.ndim == 1:
+                    return _index_1d_by_col(obj)
+            if checks.is_np_array(obj):
+                if is_grouped:
+                    if obj_type == "array":
+                        return _index_2d_by_group(obj)
+                    if obj_type == "red_array":
+                        return _index_1d_by_group(obj)
+                    if obj.shape == wrapper.get_shape():
+                        return _index_2d_by_group(obj)
+                    if obj.shape == (wrapper.get_shape_2d()[1],):
+                        return _index_1d_by_group(obj)
+                if obj_type == "array":
+                    return _index_2d_by_col(obj)
+                if obj_type == "red_array":
+                    return _index_1d_by_col(obj)
+                if obj.shape == wrapper.shape:
+                    return _index_2d_by_col(obj)
+                if obj.shape == (wrapper.shape_2d[1],):
+                    return _index_1d_by_col(obj)
+        if force_indexing:
+            raise NotImplementedError(f"Cannot index object '{obj_name}'")
+        if not silence_warnings:
+            warnings.warn(
+                f"Cannot figure out how to index object '{obj_name}'",
+                stacklevel=2,
+            )
+        return obj
+
+    def in_outputs_indexing_func(
+        self,
+        group_idxs: tp.MaybeArray,
+        col_idxs: tp.Array1d,
+        **kwargs,
+    ) -> tp.Optional[tp.NamedTuple]:
+        """Perform indexing on `Portfolio.in_outputs`.
+
+        If the field can be found in the attributes of this `Portfolio` instance, reads the
+        attribute's options to get requirements for the type and layout of the in-output object.
+
+        For each field in `Portfolio.in_outputs`, resolves the field's options by parsing its name with
+        `Portfolio.parse_field_options` and also looks for options in `Portfolio.in_output_config`.
+        Performs indexing on the in-output object using `Portfolio.index_obj`."""
+        if self.in_outputs is None:
+            return None
+
+        new_in_outputs = {}
+        for field, obj in self.in_outputs._asdict().items():
+            field_options = merge_dicts(
+                self.parse_field_options(field),
+                self.in_output_config.get(field, None),
+            )
+            if field_options.get("field", field) in self.cls_dir:
+                prop = getattr(type(self), field_options["field"])
+                prop_options = getattr(prop, "options", {})
+                obj_type = prop_options.get("obj_type", "array")
+                group_by_aware = prop_options.get("group_by_aware", True)
             else:
-                new_obj = None
-                if field in cls_dir or field in self.in_output_config:
-                    if field in cls_dir:
-                        method_or_prop = getattr(cls, field)
-                        options = getattr(method_or_prop, "options", {})
-                    else:
-                        options = self.in_output_config[field]
-                    indexing_func = options.get("indexing_func", None)
-                    if indexing_func is not None:
-                        new_obj = indexing_func(obj)
-                    else:
-                        obj_type = options.get("obj_type", None)
-                        group_by_aware = options.get("group_by_aware", None)
-                        if obj_type is None:
-                            raise TypeError(f"Cannot parse in-output '{field}': option 'obj_type' is missing")
-                        if group_by_aware is None:
-                            raise TypeError(f"Cannot parse in-output '{field}': option 'group_by_aware' is missing")
-
-                        if obj_type == "array":
-                            if group_by_aware and is_grouped:
-                                new_obj = _index_2d_by_group(obj)
-                            else:
-                                new_obj = _index_2d_by_col(obj)
-                        elif obj_type == "red_array":
-                            if group_by_aware and is_grouped:
-                                new_obj = _index_1d_by_group(obj)
-                            else:
-                                new_obj = _index_1d_by_col(obj)
-                        elif obj_type == "records":
-                            new_obj = _index_records(obj)
-                        else:
-                            raise TypeError(f"Cannot index in-output '{field}': option 'obj_type={obj_type}' not supported")
-                else:
-                    if "_pcgs" in field:
-                        if "_2d" in field:
-                            if is_grouped and self.cash_sharing:
-                                new_obj = _index_2d_by_group(obj)
-                            else:
-                                new_obj = _index_2d_by_col(obj)
-                        elif "_1d" in field:
-                            if is_grouped and self.cash_sharing:
-                                new_obj = _index_1d_by_group(obj)
-                            else:
-                                new_obj = _index_1d_by_col(obj)
-                        elif obj.ndim == 2:
-                            if is_grouped and self.cash_sharing:
-                                new_obj = _index_2d_by_group(obj)
-                            else:
-                                new_obj = _index_2d_by_col(obj)
-                        elif obj.ndim == 1:
-                            if is_grouped and self.cash_sharing:
-                                new_obj = _index_1d_by_group(obj)
-                            else:
-                                new_obj = _index_1d_by_col(obj)
-                    elif field.endswith("_pcg"):
-                        if "_2d" in field:
-                            if is_grouped:
-                                new_obj = _index_2d_by_group(obj)
-                            else:
-                                new_obj = _index_2d_by_col(obj)
-                        elif "_1d" in field:
-                            if is_grouped:
-                                new_obj = _index_1d_by_group(obj)
-                            else:
-                                new_obj = _index_1d_by_col(obj)
-                        elif obj.ndim == 2:
-                            if is_grouped:
-                                new_obj = _index_2d_by_group(obj)
-                            else:
-                                new_obj = _index_2d_by_col(obj)
-                        elif obj.ndim == 1:
-                            if is_grouped:
-                                new_obj = _index_1d_by_group(obj)
-                            else:
-                                new_obj = _index_1d_by_col(obj)
-                    elif field.endswith("_pg"):
-                        if "_2d" in field:
-                            new_obj = _index_2d_by_group(obj)
-                        elif "_1d" in field:
-                            new_obj = _index_1d_by_group(obj)
-                        elif obj.ndim == 2:
-                            new_obj = _index_2d_by_group(obj)
-                        elif obj.ndim == 1:
-                            new_obj = _index_1d_by_group(obj)
-                    elif field.endswith("_pc"):
-                        if "_2d" in field:
-                            new_obj = _index_2d_by_col(obj)
-                        elif "_1d" in field:
-                            new_obj = _index_1d_by_col(obj)
-                        elif obj.ndim == 2:
-                            new_obj = _index_2d_by_col(obj)
-                        elif obj.ndim == 1:
-                            new_obj = _index_1d_by_col(obj)
-                    elif field.endswith("_records"):
-                        new_obj = _index_records(obj)
-                    elif checks.is_np_array(obj):
-                        if is_grouped:
-                            if "_2d" in field:
-                                new_obj = _index_2d_by_group(obj)
-                            elif "_1d" in field:
-                                new_obj = _index_1d_by_group(obj)
-                            if obj.shape == self.wrapper.get_shape():
-                                new_obj = _index_2d_by_group(obj)
-                            elif obj.shape == (self.wrapper.get_shape_2d()[1],):
-                                new_obj = _index_1d_by_group(obj)
-                        else:
-                            if "_2d" in field:
-                                new_obj = _index_2d_by_col(obj)
-                            elif "_1d" in field:
-                                new_obj = _index_1d_by_col(obj)
-                            if obj.shape == self.wrapper.shape:
-                                new_obj = _index_2d_by_col(obj)
-                            elif obj.shape == (self.wrapper.shape_2d[1],):
-                                new_obj = _index_1d_by_col(obj)
-                    if new_obj is None:
-                        warnings.warn(
-                            f"Cannot figure out how to index in-output '{field}'. Please provide a suffix.",
-                            stacklevel=2,
-                        )
+                obj_type = None
+                group_by_aware = True
+            _kwargs = merge_dicts(
+                dict(
+                    grouping=field_options.get("grouping", "columns_or_groups" if group_by_aware else "columns"),
+                    obj_type=field_options.get("obj_type", obj_type),
+                    indexing_func=field_options.get("indexing_func", None),
+                    force_indexing=field_options.get("force_indexing", False),
+                    silence_warnings=field_options.get("silence_warnings", False),
+                ),
+                kwargs,
+            )
+            new_obj = self.index_obj(
+                obj,
+                group_idxs,
+                col_idxs,
+                field=field_options.get("field", field),
+                **_kwargs,
+            )
             new_in_outputs[field] = new_obj
-
         return type(self.in_outputs)(**new_in_outputs)
 
-    def indexing_func(self: PortfolioT, *args, **kwargs) -> PortfolioT:
-        """Perform indexing on `Portfolio`."""
+    def indexing_func(self: PortfolioT, *args, in_output_kwargs: tp.KwargsLike = None, **kwargs) -> PortfolioT:
+        """Perform indexing on `Portfolio`.
+
+        In-outputs are indexed using `Portfolio.in_outputs_indexing_func`."""
         new_wrapper, _, group_idxs, col_idxs = self.wrapper.indexing_func_meta(
             *args,
             column_only_select=self.column_only_select,
@@ -2445,6 +2573,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         new_init_position = to_1d_array(self._init_position)
         if new_init_position.shape[0] > 1:
             new_init_position = new_init_position[col_idxs]
+        new_init_price = to_1d_array(self._init_price)
+        if new_init_price.shape[0] > 1:
+            new_init_price = new_init_price[col_idxs]
         new_cash_deposits = to_2d_array(self._cash_deposits)
         if new_cash_deposits.shape[1] > 1:
             if self.cash_sharing:
@@ -2464,7 +2595,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             new_bm_close = bm_close[:, col_idxs]
         else:
             new_bm_close = self._bm_close
-        new_in_outputs = self.in_outputs_indexing_func(new_wrapper, group_idxs, col_idxs)
+        new_in_outputs = self.in_outputs_indexing_func(group_idxs, col_idxs, **resolve_dict(in_output_kwargs))
 
         return self.replace(
             wrapper=new_wrapper,
@@ -2473,6 +2604,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             log_records=new_log_records,
             init_cash=new_init_cash,
             init_position=new_init_position,
+            init_price=new_init_price,
             cash_deposits=new_cash_deposits,
             cash_earnings=new_cash_earnings,
             call_seq=new_call_seq,
@@ -2482,57 +2614,117 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
     # ############# Resampling ############# #
 
-    def resample_in_outputs(self, resampler: tp.PandasResampler) -> tp.Optional[tp.NamedTuple]:
-        """Perform resampling on `Portfolio.in_outputs`.
+    def resample_obj(
+        self,
+        obj: tp.Any,
+        resampler: tp.Union[Resampler, tp.PandasResampler],
+        obj_name: tp.Optional[str] = None,
+        obj_type: tp.Optional[str] = None,
+        group_by: tp.GroupByLike = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        resample_func: tp.Optional[tp.Callable] = None,
+        force_resampling: bool = False,
+        silence_warnings: bool = False,
+        **kwargs,
+    ) -> tp.Any:
+        """Resample an object.
 
-        If the name of a field can be found as an attribute of `Portfolio`, reads this attribute's
-        annotations to figure out the type and layout of the indexed object. The same goes for
-        `Portfolio.in_output_config`. In both, `resample_func` can be explicitly specified.
+        `resample_func` must take the portfolio, `obj`, `resampler`, all the arguments passed to this method,
+        and `**kwargs`. If you don't need any of the arguments, make `resample_func` accept them as `**kwargs`.
 
-        If a specification for an in-output field wasn't found, throws an error.
-        If the object is None, boolean, empty, or 1-dim, returns as-is."""
+        If the object is None, boolean, or empty, returns as-is."""
+        if obj is None or isinstance(obj, bool) or (checks.is_np_array(obj) and obj.size == 0):
+            return obj
+        if wrapper is None:
+            wrapper = self.wrapper
+        if resample_func is not None:
+            return resample_func(
+                self,
+                obj,
+                resampler,
+                obj_name=obj_name,
+                obj_type=obj_type,
+                group_by=group_by,
+                wrapper=wrapper,
+                force_resampling=force_resampling,
+                silence_warnings=silence_warnings,
+                **kwargs,
+            )
+
+        if obj_type is not None:
+            if obj_type == "red_array":
+                return obj
+            if obj_type not in {"records"}:
+                is_grouped = wrapper.grouper.is_grouped(group_by=group_by)
+                if checks.is_np_array(obj):
+                    if is_grouped:
+                        if obj.shape == (wrapper.get_shape_2d()[1],):
+                            return obj
+                    if obj.shape == (wrapper.shape_2d[1],):
+                        return obj
+        if force_resampling:
+            raise NotImplementedError(f"Cannot resample object '{obj_name}'")
+        if not silence_warnings:
+            warnings.warn(
+                f"Cannot figure out how to resample object '{obj_name}'",
+                stacklevel=2,
+            )
+        return obj
+
+    def resample_in_outputs(
+        self,
+        resampler: tp.Union[Resampler, tp.PandasResampler],
+        **kwargs,
+    ) -> tp.Optional[tp.NamedTuple]:
+        """Resample `Portfolio.in_outputs`.
+
+        If the field can be found in the attributes of this `Portfolio` instance, reads the
+        attribute's options to get requirements for the type and layout of the in-output object.
+
+        For each field in `Portfolio.in_outputs`, resolves the field's options by parsing its name with
+        `Portfolio.parse_field_options` and also looks for options in `Portfolio.in_output_config`.
+        Performs indexing on the in-output object using `Portfolio.resample_obj`."""
         if self.in_outputs is None:
             return None
 
-        in_outputs = self.in_outputs._asdict()
         new_in_outputs = {}
-        cls = type(self)
-        cls_dir = dir(cls)
-
-        for field, obj in in_outputs.items():
-            if obj is None or isinstance(obj, bool) or (isinstance(obj, np.ndarray) and obj.size == 0):
-                new_obj = obj
+        for field, obj in self.in_outputs._asdict().items():
+            field_options = merge_dicts(
+                self.parse_field_options(field),
+                self.in_output_config.get(field, None),
+            )
+            if field_options.get("field", field) in self.cls_dir:
+                prop = getattr(type(self), field_options["field"])
+                prop_options = getattr(prop, "options", {})
+                obj_type = prop_options.get("obj_type", "array")
             else:
-                new_obj = None
-                if field in cls_dir or field in self.in_output_config:
-                    if field in cls_dir:
-                        method_or_prop = getattr(cls, field)
-                        options = getattr(method_or_prop, "options", {})
-                    else:
-                        options = self.in_output_config[field]
-                    resample_func = options.get("resample_func", None)
-                    if resample_func is not None:
-                        new_obj = resample_func(obj)
-                    else:
-                        obj_type = options.get("obj_type", None)
-                        if obj_type is None:
-                            raise TypeError(f"Cannot parse in-output '{field}': option 'obj_type' is missing")
-                        if obj_type == "red_array":
-                            new_obj = obj
-                else:
-                    if "_1d" in field or obj.shape == (self.wrapper.get_shape_2d()[1],):
-                        new_obj = obj
-                if new_obj is None:
-                    warnings.warn(
-                        f"Cannot figure out how to resample in-output '{field}'",
-                        stacklevel=2,
-                    )
+                obj_type = None
+            _kwargs = merge_dicts(
+                dict(
+                    obj_type=field_options.get("obj_type", obj_type),
+                    resample_func=field_options.get("resample_func", None),
+                    force_resampling=field_options.get("force_resampling", False),
+                    silence_warnings=field_options.get("silence_warnings", False),
+                ),
+                kwargs,
+            )
+            new_obj = self.resample_obj(
+                obj,
+                resampler,
+                field=field_options.get("field", field),
+                **_kwargs,
+            )
             new_in_outputs[field] = new_obj
-
         return type(self.in_outputs)(**new_in_outputs)
 
-    def resample(self: PortfolioT, *args, bfill_close: bool = False, **kwargs) -> PortfolioT:
-        """Perform resampling on `Portfolio`.
+    def resample(
+        self: PortfolioT,
+        *args,
+        bfill_close: bool = False,
+        in_output_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> PortfolioT:
+        """Resample the `Portfolio` instance.
 
         !!! warning
             Downsampling is associated with information loss:
@@ -2544,12 +2736,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 deposit was added later in time.
             * Market/benchmark returns are computed by applying the initial value on the close price
                 of the first bar and by tracking the price change to simulate holding. Moving the close
-                price of the first bar futher into the future will affect this computation and almost
+                price of the first bar further into the future will affect this computation and almost
                 certainly produce a different market value and returns. To mitigate this, make sure
                 to downsample to an index with the first bar containing only the first bar from the
-                origin timeframe.
-            * Initial position is valued by the first non-NA close. If the close is moved further into
-                the future, the total return and other metrics will also change."""
+                origin timeframe."""
         if self._call_seq is not None:
             raise ValueError("Cannot resample call_seq")
         resampler, new_wrapper = self.wrapper.resample_meta(*args, **kwargs)
@@ -2562,7 +2752,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         new_order_records = self.orders.resample_records_arr(resampler)
         new_log_records = self.logs.resample_records_arr(resampler)
         if self._cash_deposits.size > 1 or self._cash_deposits.item() != 0:
-            new_cash_deposits = self.get_cash_deposits()
+            new_cash_deposits = self.get_cash_deposits(group_by=None if self.cash_sharing else False)
             new_cash_deposits = new_cash_deposits.vbt.resample_apply(resampler, generic_nb.sum_reduce_nb)
             new_cash_deposits = new_cash_deposits.fillna(0.0)
             new_cash_deposits = new_cash_deposits.values
@@ -2585,7 +2775,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         else:
             new_bm_close = self._bm_close
         if self._in_outputs is not None:
-            new_in_outputs = self.resample_in_outputs(resampler)
+            new_in_outputs = self.resample_in_outputs(resampler, **resolve_dict(in_output_kwargs))
         else:
             new_in_outputs = None
 
@@ -2628,6 +2818,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         low: tp.ArrayLike = np.nan,
         init_cash: tp.Optional[tp.ArrayLike] = None,
         init_position: tp.Optional[tp.ArrayLike] = None,
+        init_price: tp.Optional[tp.ArrayLike] = None,
         cash_deposits: tp.Optional[tp.ArrayLike] = None,
         cash_earnings: tp.Optional[tp.ArrayLike] = None,
         cash_dividends: tp.Optional[tp.ArrayLike] = None,
@@ -2742,6 +2933,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             init_position (float or array_like): Initial position.
 
                 By default, will broadcast to the final number of columns.
+            init_price (float or array_like): Initial position price.
+
+                By default, will broadcast to the final number of columns.
             cash_deposits (float or array_like): Cash to be deposited/withdrawn at each timestamp.
                 Will broadcast to the final shape. Must have the same number of columns as `init_cash`.
 
@@ -2804,7 +2998,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             update_value (bool): Whether to update group value after each filled order.
             fill_returns (bool): Whether to fill returns.
 
-                The array will be avaiable as `returns_pcgs` in in-outputs.
+                The array will be avaiable as `returns` in in-outputs.
             max_orders (int): The max number of order records expected to be filled at each column.
                 Defaults to the number of rows in the broadcasted shape.
 
@@ -3062,6 +3256,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             init_cash_mode = None
         if init_position is None:
             init_position = portfolio_cfg["init_position"]
+        if init_price is None:
+            init_price = portfolio_cfg["init_price"]
         if cash_deposits is None:
             cash_deposits = portfolio_cfg["cash_deposits"]
         if cash_earnings is None:
@@ -3160,6 +3356,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
         init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)
         init_position = np.require(np.broadcast_to(init_position, (target_shape_2d[1],)), dtype=np.float_)
+        init_price = np.require(np.broadcast_to(init_price, (target_shape_2d[1],)), dtype=np.float_)
         cash_deposits = broadcast(
             to_2d_array(cash_deposits, expand_axis=int(not flex_2d)),
             to_shape=(target_shape_2d[0], len(cs_group_lens)),
@@ -3188,6 +3385,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         checks.assert_subdtype(call_seq, np.integer)
         checks.assert_subdtype(init_cash, np.number)
         checks.assert_subdtype(init_position, np.number)
+        checks.assert_subdtype(init_price, np.number)
         checks.assert_subdtype(cash_deposits, np.number)
         checks.assert_subdtype(cash_earnings, np.number)
         checks.assert_subdtype(cash_dividends, np.number)
@@ -3227,6 +3425,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             call_seq=call_seq,
             init_cash=init_cash,
             init_position=init_position,
+            init_price=init_price,
             cash_deposits=cash_deposits,
             cash_earnings=cash_earnings,
             cash_dividends=cash_dividends,
@@ -3249,6 +3448,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             cash_sharing,
             init_cash if init_cash_mode is None else init_cash_mode,
             init_position=init_position,
+            init_price=init_price,
             cash_deposits=cash_deposits,
             cash_earnings=sim_out.cash_earnings,
             call_seq=call_seq if attach_call_seq else None,
@@ -3307,6 +3507,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         use_stops: tp.Optional[bool] = None,
         init_cash: tp.Optional[tp.ArrayLike] = None,
         init_position: tp.Optional[tp.ArrayLike] = None,
+        init_price: tp.Optional[tp.ArrayLike] = None,
         cash_deposits: tp.Optional[tp.ArrayLike] = None,
         cash_earnings: tp.Optional[tp.ArrayLike] = None,
         cash_dividends: tp.Optional[tp.ArrayLike] = None,
@@ -3504,6 +3705,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 Disable this to make simulation a bit faster for simple use cases.
             init_cash (InitCashMode, float or array_like): See `Portfolio.from_orders`.
             init_position (float or array_like): See `Portfolio.from_orders`.
+            init_price (float or array_like): See `Portfolio.from_orders`.
             cash_deposits (float or array_like): See `Portfolio.from_orders`.
             cash_earnings (float or array_like): See `Portfolio.from_orders`.
             cash_dividends (float or array_like): See `Portfolio.from_orders`.
@@ -4100,6 +4302,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             init_cash_mode = None
         if init_position is None:
             init_position = portfolio_cfg["init_position"]
+        if init_price is None:
+            init_price = portfolio_cfg["init_price"]
         if cash_deposits is None:
             cash_deposits = portfolio_cfg["cash_deposits"]
         if cash_earnings is None:
@@ -4224,6 +4428,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
         init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)
         init_position = np.require(np.broadcast_to(init_position, (target_shape_2d[1],)), dtype=np.float_)
+        init_price = np.require(np.broadcast_to(init_price, (target_shape_2d[1],)), dtype=np.float_)
         cash_deposits = broadcast(
             to_2d_array(cash_deposits, expand_axis=int(not flex_2d)),
             to_shape=(target_shape_2d[0], len(cs_group_lens)),
@@ -4273,6 +4478,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         checks.assert_subdtype(call_seq, np.integer)
         checks.assert_subdtype(init_cash, np.number)
         checks.assert_subdtype(init_position, np.number)
+        checks.assert_subdtype(init_price, np.number)
         checks.assert_subdtype(cash_deposits, np.number)
         checks.assert_subdtype(cash_earnings, np.number)
         checks.assert_subdtype(cash_dividends, np.number)
@@ -4331,6 +4537,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 call_seq=call_seq,
                 init_cash=init_cash,
                 init_position=init_position,
+                init_price=init_price,
                 cash_deposits=cash_deposits,
                 cash_earnings=cash_earnings,
                 cash_dividends=cash_dividends,
@@ -4402,6 +4609,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             call_seq=call_seq,
             init_cash=init_cash,
             init_position=init_position,
+            init_price=init_price,
             cash_deposits=cash_deposits,
             cash_earnings=cash_earnings,
             cash_dividends=cash_dividends,
@@ -4431,6 +4639,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             cash_sharing,
             init_cash if init_cash_mode is None else init_cash_mode,
             init_position=init_position,
+            init_price=init_price,
             cash_deposits=cash_deposits,
             cash_earnings=sim_out.cash_earnings,
             call_seq=call_seq if attach_call_seq else None,
@@ -4650,6 +4859,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         flexible: tp.Optional[bool] = None,
         init_cash: tp.Optional[tp.ArrayLike] = None,
         init_position: tp.Optional[tp.ArrayLike] = None,
+        init_price: tp.Optional[tp.ArrayLike] = None,
         cash_deposits: tp.Optional[tp.ArrayLike] = None,
         cash_earnings: tp.Optional[tp.ArrayLike] = None,
         cash_sharing: tp.Optional[bool] = None,
@@ -4724,6 +4934,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 This lifts the limit of one order per tick and symbol.
             init_cash (InitCashMode, float or array_like): See `Portfolio.from_orders`.
             init_position (float or array_like): See `Portfolio.from_orders`.
+            init_price (float or array_like): See `Portfolio.from_orders`.
             cash_deposits (float or array_like): See `Portfolio.from_orders`.
             cash_earnings (float or array_like): See `Portfolio.from_orders`.
             cash_sharing (bool): Whether to share cash within the same group.
@@ -5216,6 +5427,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             init_cash_mode = None
         if init_position is None:
             init_position = portfolio_cfg["init_position"]
+        if init_price is None:
+            init_price = portfolio_cfg["init_price"]
         if cash_deposits is None:
             cash_deposits = portfolio_cfg["cash_deposits"]
         if cash_earnings is None:
@@ -5308,6 +5521,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
         init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)
         init_position = np.require(np.broadcast_to(init_position, (target_shape_2d[1],)), dtype=np.float_)
+        init_price = np.require(np.broadcast_to(init_price, (target_shape_2d[1],)), dtype=np.float_)
         cash_deposits = broadcast(
             to_2d_array(cash_deposits, expand_axis=int(not flex_2d)),
             to_shape=(target_shape_2d[0], len(cs_group_lens)),
@@ -5343,6 +5557,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             checks.assert_subdtype(call_seq, np.integer)
         checks.assert_subdtype(init_cash, np.number)
         checks.assert_subdtype(init_position, np.number)
+        checks.assert_subdtype(init_price, np.number)
         checks.assert_subdtype(cash_deposits, np.number)
         checks.assert_subdtype(cash_earnings, np.number)
         checks.assert_subdtype(segment_mask, np.bool_)
@@ -5363,6 +5578,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 cash_sharing=cash_sharing,
                 init_cash=init_cash,
                 init_position=init_position,
+                init_price=init_price,
                 cash_deposits=cash_deposits,
                 cash_earnings=cash_earnings,
                 segment_mask=segment_mask,
@@ -5424,6 +5640,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     cash_sharing=cash_sharing,
                     init_cash=init_cash,
                     init_position=init_position,
+                    init_price=init_price,
                     cash_deposits=cash_deposits,
                     cash_earnings=cash_earnings,
                     segment_mask=segment_mask,
@@ -5469,6 +5686,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     call_seq=call_seq,
                     init_cash=init_cash,
                     init_position=init_position,
+                    init_price=init_price,
                     cash_deposits=cash_deposits,
                     cash_earnings=cash_earnings,
                     segment_mask=segment_mask,
@@ -5514,6 +5732,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     cash_sharing=cash_sharing,
                     init_cash=init_cash,
                     init_position=init_position,
+                    init_price=init_price,
                     cash_deposits=cash_deposits,
                     cash_earnings=cash_earnings,
                     segment_mask=segment_mask,
@@ -5559,6 +5778,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     call_seq=call_seq,
                     init_cash=init_cash,
                     init_position=init_position,
+                    init_price=init_price,
                     cash_deposits=cash_deposits,
                     cash_earnings=cash_earnings,
                     segment_mask=segment_mask,
@@ -5604,6 +5824,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             cash_sharing,
             init_cash if init_cash_mode is None else init_cash_mode,
             init_position=init_position,
+            init_price=init_price,
             cash_deposits=cash_deposits,
             cash_earnings=sim_out.cash_earnings,
             call_seq=call_seq if not flexible and attach_call_seq else None,
@@ -5933,7 +6154,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         """Named tuple with in-output objects."""
         return self._in_outputs
 
-    @custom_property(obj_type="array", group_by_aware=False)
+    @custom_property(group_by_aware=False)
     def call_seq(self) -> tp.Optional[tp.SeriesFrame]:
         """Sequence of calls per row and group."""
         if self.use_in_outputs and self.in_outputs is not None and hasattr(self.in_outputs, "call_seq"):
@@ -5947,7 +6168,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
     # ############# Price ############# #
 
-    @custom_property(obj_type="array", group_by_aware=False)
+    @custom_property(group_by_aware=False)
     def close(self) -> tp.SeriesFrame:
         """Price per unit series."""
         if self.use_in_outputs and self.in_outputs is not None and hasattr(self.in_outputs, "close"):
@@ -5983,7 +6204,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         filled_close = func(to_2d_array(close))
         return wrapper.wrap(filled_close, group_by=False, **resolve_dict(wrap_kwargs))
 
-    @custom_property(obj_type="array", group_by_aware=False)
+    @custom_property(group_by_aware=False)
     def bm_close(self) -> tp.Union[None, bool, tp.SeriesFrame]:
         """Benchmark price per unit series."""
         if self.use_in_outputs and self.in_outputs is not None and hasattr(self.in_outputs, "bm_close"):
@@ -6046,7 +6267,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if order_records is None:
                 order_records = cls_or_self.order_records
             if close is None:
-                close = cls_or_self.close
+                if cls_or_self.fillna_close:
+                    close = cls_or_self.filled_close
+                else:
+                    close = cls_or_self.close
             if wrapper is None:
                 wrapper = fix_wrapper_for_records(cls_or_self)
         else:
@@ -6088,6 +6312,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cls_or_self,
         orders: tp.Optional[Orders] = None,
         init_position: tp.Optional[tp.ArrayLike] = None,
+        init_price: tp.Optional[tp.ArrayLike] = None,
         group_by: tp.GroupByLike = None,
         **kwargs,
     ) -> EntryTrades:
@@ -6098,19 +6323,27 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if orders is None:
                 orders = cls_or_self.orders
             if init_position is None:
-                init_position = cls_or_self.init_position
+                init_position = cls_or_self._init_position
+            if init_price is None:
+                init_price = cls_or_self._init_price
         else:
             checks.assert_not_none(orders)
             if init_position is None:
                 init_position = 0.0
 
-        return EntryTrades.from_orders(orders, init_position=init_position, **kwargs).regroup(group_by)
+        return EntryTrades.from_orders(
+            orders,
+            init_position=init_position,
+            init_price=init_price,
+            **kwargs,
+        ).regroup(group_by)
 
     @class_or_instancemethod
     def get_exit_trades(
         cls_or_self,
         orders: tp.Optional[Orders] = None,
         init_position: tp.Optional[tp.ArrayLike] = None,
+        init_price: tp.Optional[tp.ArrayLike] = None,
         group_by: tp.GroupByLike = None,
         **kwargs,
     ) -> ExitTrades:
@@ -6121,13 +6354,20 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if orders is None:
                 orders = cls_or_self.orders
             if init_position is None:
-                init_position = cls_or_self.init_position
+                init_position = cls_or_self._init_position
+            if init_price is None:
+                init_price = cls_or_self._init_price
         else:
             checks.assert_not_none(orders)
             if init_position is None:
                 init_position = 0.0
 
-        return ExitTrades.from_orders(orders, init_position=init_position, **kwargs).regroup(group_by)
+        return ExitTrades.from_orders(
+            orders,
+            init_position=init_position,
+            init_price=init_price,
+            **kwargs,
+        ).regroup(group_by)
 
     @class_or_instancemethod
     def get_positions(
@@ -6680,34 +6920,55 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     # ############# Value ############# #
 
     @class_or_instancemethod
+    def get_init_price(
+        cls_or_self,
+        init_price_raw: tp.Optional[tp.ArrayLike] = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeSeries:
+        """Get initial price per column."""
+        if not isinstance(cls_or_self, type):
+            if init_price_raw is None:
+                init_price_raw = cls_or_self._init_price
+            if wrapper is None:
+                wrapper = cls_or_self.wrapper
+        else:
+            checks.assert_not_none(init_price_raw)
+            checks.assert_not_none(wrapper)
+
+        init_price = np.broadcast_to(to_1d_array(init_price_raw), (wrapper.shape_2d[1],))
+        wrap_kwargs = merge_dicts(dict(name_or_index="init_price"), wrap_kwargs)
+        return wrapper.wrap_reduced(init_price, group_by=False, **wrap_kwargs)
+
+    @class_or_instancemethod
     def get_init_position_value(
         cls_or_self,
-        close: tp.Optional[tp.SeriesFrame] = None,
         init_position: tp.Optional[tp.ArrayLike] = None,
+        init_price: tp.Optional[tp.ArrayLike] = None,
         jitted: tp.JittedOption = None,
-        chunked: tp.ChunkedOption = None,
         wrapper: tp.Optional[ArrayWrapper] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
         """Get initial position value per column."""
         if not isinstance(cls_or_self, type):
-            if close is None:
-                if cls_or_self.fillna_close:
-                    close = cls_or_self.filled_close
-                else:
-                    close = cls_or_self.close
             if init_position is None:
                 init_position = cls_or_self._init_position
+            if init_price is None:
+                init_price = cls_or_self._init_price
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(close)
             if init_position is None:
                 init_position = 0.0
+            checks.assert_not_none(init_price)
             checks.assert_not_none(wrapper)
 
         func = jit_reg.resolve_option(nb.init_position_value_nb, jitted)
-        init_position_value = func(to_2d_array(close), init_position=to_1d_array(init_position))
+        init_position_value = func(
+            n_cols=wrapper.shape_2d[1],
+            init_position=to_1d_array(init_position),
+            init_price=to_1d_array(init_price),
+        )
         wrap_kwargs = merge_dicts(dict(name_or_index="init_position_value"), wrap_kwargs)
         return wrapper.wrap_reduced(init_position_value, group_by=False, **wrap_kwargs)
 
@@ -6977,6 +7238,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         close: tp.Optional[tp.SeriesFrame] = None,
         orders: tp.Optional[Orders] = None,
         init_position: tp.Optional[tp.ArrayLike] = None,
+        init_price: tp.Optional[tp.ArrayLike] = None,
         cash_earnings: tp.Optional[tp.ArrayLike] = None,
         flex_2d: bool = False,
         jitted: tp.JittedOption = None,
@@ -6997,6 +7259,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 orders = cls_or_self.orders
             if init_position is None:
                 init_position = cls_or_self._init_position
+            if init_price is None:
+                init_price = cls_or_self._init_price
             if cash_earnings is None:
                 cash_earnings = cls_or_self._cash_earnings
             if wrapper is None:
@@ -7006,6 +7270,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if close is None:
                 close = orders.close
             checks.assert_not_none(close)
+            checks.assert_not_none(init_price)
             if init_position is None:
                 init_position = 0.0
             if cash_earnings is None:
@@ -7021,6 +7286,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             orders.values,
             orders.col_mapper.col_map,
             init_position=to_1d_array(init_position),
+            init_price=to_1d_array(init_price),
             cash_earnings=to_2d_array(cash_earnings),
             flex_2d=flex_2d,
         )

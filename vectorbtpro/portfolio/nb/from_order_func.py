@@ -291,6 +291,7 @@ PostOrderFuncT = tp.Callable[[PostOrderContext, OrderResult, tp.VarArg()], None]
         call_seq=ch.ArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
         init_cash=RepFunc(portfolio_ch.get_init_cash_slicer),
         init_position=portfolio_ch.flex_1d_array_gl_slicer,
+        init_price=portfolio_ch.flex_1d_array_gl_slicer,
         cash_deposits=RepFunc(portfolio_ch.get_cash_deposits_slicer),
         cash_earnings=portfolio_ch.flex_array_gl_slicer,
         segment_mask=base_ch.FlexArraySlicer(axis=1),
@@ -336,6 +337,7 @@ def simulate_nb(
     call_seq: tp.Array2d,
     init_cash: tp.FlexArray = np.asarray(100.0),
     init_position: tp.FlexArray = np.asarray(0.0),
+    init_price: tp.FlexArray = np.asarray(np.nan),
     cash_deposits: tp.FlexArray = np.asarray(0.0),
     cash_earnings: tp.FlexArray = np.asarray(0.0),
     segment_mask: tp.FlexArray = np.asarray(True),
@@ -389,6 +391,7 @@ def simulate_nb(
         call_seq (array_like of int): See `vectorbtpro.portfolio.enums.SimulationContext.call_seq`.
         init_cash (array_like of float): See `vectorbtpro.portfolio.enums.SimulationContext.init_cash`.
         init_position (array_like of float): See `vectorbtpro.portfolio.enums.SimulationContext.init_position`.
+        init_price (array_like of float): See `vectorbtpro.portfolio.enums.SimulationContext.init_price`.
         cash_deposits (array_like of float): See `vectorbtpro.portfolio.enums.SimulationContext.cash_deposits`.
         cash_earnings (array_like of float): See `vectorbtpro.portfolio.enums.SimulationContext.cash_earnings`.
         segment_mask (array_like of bool): See `vectorbtpro.portfolio.enums.SimulationContext.segment_mask`.
@@ -735,8 +738,20 @@ def simulate_nb(
     order_records, log_records = prepare_records_nb(target_shape, max_orders, max_logs)
     last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash)
     last_position = prepare_last_position_nb(target_shape, init_position)
-    last_value = prepare_last_value_nb(target_shape, group_lens, cash_sharing, init_cash, init_position)
-    last_pos_record = prepare_last_pos_record_nb(target_shape, init_position, fill_pos_record)
+    last_value = prepare_last_value_nb(
+        target_shape,
+        group_lens,
+        cash_sharing,
+        init_cash,
+        init_position=init_position,
+        init_price=init_price,
+    )
+    last_pos_record = prepare_last_pos_record_nb(
+        target_shape,
+        init_position=init_position,
+        init_price=init_price,
+        fill_pos_record=fill_pos_record,
+    )
 
     last_cash_deposits = np.full_like(last_cash, 0.0)
     last_val_price = np.full_like(last_position, np.nan)
@@ -758,6 +773,7 @@ def simulate_nb(
         call_seq=call_seq,
         init_cash=init_cash,
         init_position=init_position,
+        init_price=init_price,
         cash_deposits=cash_deposits,
         cash_earnings=cash_earnings,
         segment_mask=segment_mask,
@@ -802,6 +818,7 @@ def simulate_nb(
             call_seq=call_seq,
             init_cash=init_cash,
             init_position=init_position,
+            init_price=init_price,
             cash_deposits=cash_deposits,
             cash_earnings=cash_earnings,
             segment_mask=segment_mask,
@@ -881,6 +898,7 @@ def simulate_nb(
                     call_seq=call_seq,
                     init_cash=init_cash,
                     init_position=init_position,
+                    init_price=init_price,
                     cash_deposits=cash_deposits,
                     cash_earnings=cash_earnings,
                     segment_mask=segment_mask,
@@ -996,6 +1014,7 @@ def simulate_nb(
                         call_seq=call_seq,
                         init_cash=init_cash,
                         init_position=init_position,
+                        init_price=init_price,
                         cash_deposits=cash_deposits,
                         cash_earnings=cash_earnings,
                         segment_mask=segment_mask,
@@ -1129,6 +1148,7 @@ def simulate_nb(
                         call_seq=call_seq,
                         init_cash=init_cash,
                         init_position=init_position,
+                        init_price=init_price,
                         cash_deposits=cash_deposits,
                         cash_earnings=cash_earnings,
                         segment_mask=segment_mask,
@@ -1242,6 +1262,7 @@ def simulate_nb(
                     call_seq=call_seq,
                     init_cash=init_cash,
                     init_position=init_position,
+                    init_price=init_price,
                     cash_deposits=cash_deposits,
                     cash_earnings=cash_earnings,
                     segment_mask=segment_mask,
@@ -1287,6 +1308,7 @@ def simulate_nb(
             call_seq=call_seq,
             init_cash=init_cash,
             init_position=init_position,
+            init_price=init_price,
             cash_deposits=cash_deposits,
             cash_earnings=cash_earnings,
             segment_mask=segment_mask,
@@ -1330,6 +1352,7 @@ def simulate_nb(
         call_seq=call_seq,
         init_cash=init_cash,
         init_position=init_position,
+        init_price=init_price,
         cash_deposits=cash_deposits,
         cash_earnings=cash_earnings,
         segment_mask=segment_mask,
@@ -1381,6 +1404,7 @@ def simulate_nb(
         call_seq=ch.ArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
         init_cash=RepFunc(portfolio_ch.get_init_cash_slicer),
         init_position=portfolio_ch.flex_1d_array_gl_slicer,
+        init_price=portfolio_ch.flex_1d_array_gl_slicer,
         cash_deposits=RepFunc(portfolio_ch.get_cash_deposits_slicer),
         cash_earnings=portfolio_ch.flex_array_gl_slicer,
         segment_mask=base_ch.FlexArraySlicer(axis=1),
@@ -1426,6 +1450,7 @@ def simulate_row_wise_nb(
     call_seq: tp.Array2d,
     init_cash: tp.FlexArray = np.asarray(100.0),
     init_position: tp.FlexArray = np.asarray(0.0),
+    init_price: tp.FlexArray = np.asarray(np.nan),
     cash_deposits: tp.FlexArray = np.asarray(0.0),
     cash_earnings: tp.FlexArray = np.asarray(0.0),
     segment_mask: tp.FlexArray = np.asarray(True),
@@ -1573,8 +1598,20 @@ def simulate_row_wise_nb(
     order_records, log_records = prepare_records_nb(target_shape, max_orders, max_logs)
     last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash)
     last_position = prepare_last_position_nb(target_shape, init_position)
-    last_value = prepare_last_value_nb(target_shape, group_lens, cash_sharing, init_cash, init_position)
-    last_pos_record = prepare_last_pos_record_nb(target_shape, init_position, fill_pos_record)
+    last_value = prepare_last_value_nb(
+        target_shape,
+        group_lens,
+        cash_sharing,
+        init_cash,
+        init_position=init_position,
+        init_price=init_price,
+    )
+    last_pos_record = prepare_last_pos_record_nb(
+        target_shape,
+        init_position=init_position,
+        init_price=init_price,
+        fill_pos_record=fill_pos_record,
+    )
 
     last_cash_deposits = np.full_like(last_cash, 0.0)
     last_val_price = np.full_like(last_position, np.nan)
@@ -1596,6 +1633,7 @@ def simulate_row_wise_nb(
         call_seq=call_seq,
         init_cash=init_cash,
         init_position=init_position,
+        init_price=init_price,
         cash_deposits=cash_deposits,
         cash_earnings=cash_earnings,
         segment_mask=segment_mask,
@@ -1637,6 +1675,7 @@ def simulate_row_wise_nb(
             call_seq=call_seq,
             init_cash=init_cash,
             init_position=init_position,
+            init_price=init_price,
             cash_deposits=cash_deposits,
             cash_earnings=cash_earnings,
             segment_mask=segment_mask,
@@ -1716,6 +1755,7 @@ def simulate_row_wise_nb(
                     call_seq=call_seq,
                     init_cash=init_cash,
                     init_position=init_position,
+                    init_price=init_price,
                     cash_deposits=cash_deposits,
                     cash_earnings=cash_earnings,
                     segment_mask=segment_mask,
@@ -1831,6 +1871,7 @@ def simulate_row_wise_nb(
                         call_seq=call_seq,
                         init_cash=init_cash,
                         init_position=init_position,
+                        init_price=init_price,
                         cash_deposits=cash_deposits,
                         cash_earnings=cash_earnings,
                         segment_mask=segment_mask,
@@ -1964,6 +2005,7 @@ def simulate_row_wise_nb(
                         call_seq=call_seq,
                         init_cash=init_cash,
                         init_position=init_position,
+                        init_price=init_price,
                         cash_deposits=cash_deposits,
                         cash_earnings=cash_earnings,
                         segment_mask=segment_mask,
@@ -2077,6 +2119,7 @@ def simulate_row_wise_nb(
                     call_seq=call_seq,
                     init_cash=init_cash,
                     init_position=init_position,
+                    init_price=init_price,
                     cash_deposits=cash_deposits,
                     cash_earnings=cash_earnings,
                     segment_mask=segment_mask,
@@ -2122,6 +2165,7 @@ def simulate_row_wise_nb(
             call_seq=call_seq,
             init_cash=init_cash,
             init_position=init_position,
+            init_price=init_price,
             cash_deposits=cash_deposits,
             cash_earnings=cash_earnings,
             segment_mask=segment_mask,
@@ -2162,6 +2206,7 @@ def simulate_row_wise_nb(
         call_seq=call_seq,
         init_cash=init_cash,
         init_position=init_position,
+        init_price=init_price,
         cash_deposits=cash_deposits,
         cash_earnings=cash_earnings,
         segment_mask=segment_mask,
@@ -2286,6 +2331,7 @@ FlexOrderFuncT = tp.Callable[[FlexOrderContext, tp.VarArg()], tp.Tuple[int, Orde
         cash_sharing=None,
         init_cash=RepFunc(portfolio_ch.get_init_cash_slicer),
         init_position=portfolio_ch.flex_1d_array_gl_slicer,
+        init_price=portfolio_ch.flex_1d_array_gl_slicer,
         cash_deposits=RepFunc(portfolio_ch.get_cash_deposits_slicer),
         cash_earnings=portfolio_ch.flex_array_gl_slicer,
         segment_mask=base_ch.FlexArraySlicer(axis=1),
@@ -2330,6 +2376,7 @@ def flex_simulate_nb(
     cash_sharing: bool,
     init_cash: tp.FlexArray = np.asarray(100.0),
     init_position: tp.FlexArray = np.asarray(0.0),
+    init_price: tp.FlexArray = np.asarray(0.0),
     cash_deposits: tp.FlexArray = np.asarray(0.0),
     cash_earnings: tp.FlexArray = np.asarray(0.0),
     segment_mask: tp.FlexArray = np.asarray(True),
@@ -2554,8 +2601,20 @@ def flex_simulate_nb(
     order_records, log_records = prepare_records_nb(target_shape, max_orders, max_logs)
     last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash)
     last_position = prepare_last_position_nb(target_shape, init_position)
-    last_value = prepare_last_value_nb(target_shape, group_lens, cash_sharing, init_cash, init_position)
-    last_pos_record = prepare_last_pos_record_nb(target_shape, init_position, fill_pos_record)
+    last_value = prepare_last_value_nb(
+        target_shape,
+        group_lens,
+        cash_sharing,
+        init_cash,
+        init_position=init_position,
+        init_price=init_price,
+    )
+    last_pos_record = prepare_last_pos_record_nb(
+        target_shape,
+        init_position=init_position,
+        init_price=init_price,
+        fill_pos_record=fill_pos_record,
+    )
 
     last_cash_deposits = np.full_like(last_cash, 0.0)
     last_val_price = np.full_like(last_position, np.nan)
@@ -2577,6 +2636,7 @@ def flex_simulate_nb(
         call_seq=None,
         init_cash=init_cash,
         init_position=init_position,
+        init_price=init_price,
         cash_deposits=cash_deposits,
         cash_earnings=cash_earnings,
         segment_mask=segment_mask,
@@ -2621,6 +2681,7 @@ def flex_simulate_nb(
             call_seq=None,
             init_cash=init_cash,
             init_position=init_position,
+            init_price=init_price,
             cash_deposits=cash_deposits,
             cash_earnings=cash_earnings,
             segment_mask=segment_mask,
@@ -2699,6 +2760,7 @@ def flex_simulate_nb(
                     call_seq=None,
                     init_cash=init_cash,
                     init_position=init_position,
+                    init_price=init_price,
                     cash_deposits=cash_deposits,
                     cash_earnings=cash_earnings,
                     segment_mask=segment_mask,
@@ -2795,6 +2857,7 @@ def flex_simulate_nb(
                         call_seq=None,
                         init_cash=init_cash,
                         init_position=init_position,
+                        init_price=init_price,
                         cash_deposits=cash_deposits,
                         cash_earnings=cash_earnings,
                         segment_mask=segment_mask,
@@ -2947,6 +3010,7 @@ def flex_simulate_nb(
                         call_seq=None,
                         init_cash=init_cash,
                         init_position=init_position,
+                        init_price=init_price,
                         cash_deposits=cash_deposits,
                         cash_earnings=cash_earnings,
                         segment_mask=segment_mask,
@@ -3060,6 +3124,7 @@ def flex_simulate_nb(
                     call_seq=None,
                     init_cash=init_cash,
                     init_position=init_position,
+                    init_price=init_price,
                     cash_deposits=cash_deposits,
                     cash_earnings=cash_earnings,
                     segment_mask=segment_mask,
@@ -3105,6 +3170,7 @@ def flex_simulate_nb(
             call_seq=None,
             init_cash=init_cash,
             init_position=init_position,
+            init_price=init_price,
             cash_deposits=cash_deposits,
             cash_earnings=cash_earnings,
             segment_mask=segment_mask,
@@ -3148,6 +3214,7 @@ def flex_simulate_nb(
         call_seq=None,
         init_cash=init_cash,
         init_position=init_position,
+        init_price=init_price,
         cash_deposits=cash_deposits,
         cash_earnings=cash_earnings,
         segment_mask=segment_mask,
@@ -3198,6 +3265,7 @@ def flex_simulate_nb(
         cash_sharing=None,
         init_cash=RepFunc(portfolio_ch.get_init_cash_slicer),
         init_position=portfolio_ch.flex_1d_array_gl_slicer,
+        init_price=portfolio_ch.flex_1d_array_gl_slicer,
         cash_deposits=RepFunc(portfolio_ch.get_cash_deposits_slicer),
         cash_earnings=portfolio_ch.flex_array_gl_slicer,
         segment_mask=base_ch.FlexArraySlicer(axis=1),
@@ -3242,6 +3310,7 @@ def flex_simulate_row_wise_nb(
     cash_sharing: bool,
     init_cash: tp.FlexArray = np.asarray(100.0),
     init_position: tp.FlexArray = np.asarray(0.0),
+    init_price: tp.FlexArray = np.asarray(np.nan),
     cash_deposits: tp.FlexArray = np.asarray(0.0),
     cash_earnings: tp.FlexArray = np.asarray(0.0),
     segment_mask: tp.FlexArray = np.asarray(True),
@@ -3306,8 +3375,20 @@ def flex_simulate_row_wise_nb(
     order_records, log_records = prepare_records_nb(target_shape, max_orders, max_logs)
     last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash)
     last_position = prepare_last_position_nb(target_shape, init_position)
-    last_value = prepare_last_value_nb(target_shape, group_lens, cash_sharing, init_cash, init_position)
-    last_pos_record = prepare_last_pos_record_nb(target_shape, init_position, fill_pos_record)
+    last_value = prepare_last_value_nb(
+        target_shape,
+        group_lens,
+        cash_sharing,
+        init_cash,
+        init_position=init_position,
+        init_price=init_price,
+    )
+    last_pos_record = prepare_last_pos_record_nb(
+        target_shape,
+        init_position=init_position,
+        init_price=init_price,
+        fill_pos_record=fill_pos_record,
+    )
 
     last_cash_deposits = np.full_like(last_cash, 0.0)
     last_val_price = np.full_like(last_position, np.nan)
@@ -3329,6 +3410,7 @@ def flex_simulate_row_wise_nb(
         call_seq=None,
         init_cash=init_cash,
         init_position=init_position,
+        init_price=init_price,
         cash_deposits=cash_deposits,
         cash_earnings=cash_earnings,
         segment_mask=segment_mask,
@@ -3370,6 +3452,7 @@ def flex_simulate_row_wise_nb(
             call_seq=None,
             init_cash=init_cash,
             init_position=init_position,
+            init_price=init_price,
             cash_deposits=cash_deposits,
             cash_earnings=cash_earnings,
             segment_mask=segment_mask,
@@ -3448,6 +3531,7 @@ def flex_simulate_row_wise_nb(
                     call_seq=None,
                     init_cash=init_cash,
                     init_position=init_position,
+                    init_price=init_price,
                     cash_deposits=cash_deposits,
                     cash_earnings=cash_earnings,
                     segment_mask=segment_mask,
@@ -3544,6 +3628,7 @@ def flex_simulate_row_wise_nb(
                         call_seq=None,
                         init_cash=init_cash,
                         init_position=init_position,
+                        init_price=init_price,
                         cash_deposits=cash_deposits,
                         cash_earnings=cash_earnings,
                         segment_mask=segment_mask,
@@ -3696,6 +3781,7 @@ def flex_simulate_row_wise_nb(
                         call_seq=None,
                         init_cash=init_cash,
                         init_position=init_position,
+                        init_price=init_price,
                         cash_deposits=cash_deposits,
                         cash_earnings=cash_earnings,
                         segment_mask=segment_mask,
@@ -3809,6 +3895,7 @@ def flex_simulate_row_wise_nb(
                     call_seq=None,
                     init_cash=init_cash,
                     init_position=init_position,
+                    init_price=init_price,
                     cash_deposits=cash_deposits,
                     cash_earnings=cash_earnings,
                     segment_mask=segment_mask,
@@ -3854,6 +3941,7 @@ def flex_simulate_row_wise_nb(
             call_seq=None,
             init_cash=init_cash,
             init_position=init_position,
+            init_price=init_price,
             cash_deposits=cash_deposits,
             cash_earnings=cash_earnings,
             segment_mask=segment_mask,
@@ -3894,6 +3982,7 @@ def flex_simulate_row_wise_nb(
         call_seq=None,
         init_cash=init_cash,
         init_position=init_position,
+        init_price=init_price,
         cash_deposits=cash_deposits,
         cash_earnings=cash_earnings,
         segment_mask=segment_mask,

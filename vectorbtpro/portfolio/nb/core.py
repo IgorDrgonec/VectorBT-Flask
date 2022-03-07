@@ -944,7 +944,8 @@ def prepare_last_value_nb(
     group_lens: tp.Array1d,
     cash_sharing: bool,
     init_cash: tp.FlexArray,
-    init_position: tp.FlexArray,
+    init_position: tp.FlexArray = np.asarray(0.),
+    init_price: tp.FlexArray = np.asarray(np.nan),
 ) -> tp.Array1d:
     """Prepare `last_value`."""
     if cash_sharing:
@@ -952,31 +953,33 @@ def prepare_last_value_nb(
         from_col = 0
         for group in range(len(group_lens)):
             to_col = from_col + group_lens[group]
-            init_position_zero = True
+            _init_cash = float(flex_select_auto_nb(init_cash, 0, group, True))
+            last_value[group] = _init_cash
             for col in range(from_col, to_col):
-                if flex_select_auto_nb(init_position, 0, col, True) != 0:
-                    init_position_zero = False
-                    break
-            if init_position_zero:
-                last_value[group] = float(flex_select_auto_nb(init_cash, 0, group, True))
-            else:
-                last_value[group] = np.nan
+                _init_position = float(flex_select_auto_nb(init_position, 0, col, True))
+                _init_price = float(flex_select_auto_nb(init_price, 0, col, True))
+                if _init_position != 0:
+                    last_value[group] += _init_position * _init_price
             from_col = to_col
     else:
         last_value = np.empty(target_shape[1], dtype=np.float_)
         for col in range(target_shape[1]):
-            if flex_select_auto_nb(init_position, 0, col, True) == 0:
-                last_value[col] = float(flex_select_auto_nb(init_cash, 0, col, True))
+            _init_cash = float(flex_select_auto_nb(init_cash, 0, col, True))
+            _init_position = float(flex_select_auto_nb(init_position, 0, col, True))
+            _init_price = float(flex_select_auto_nb(init_price, 0, col, True))
+            if _init_position == 0:
+                last_value[col] = _init_cash
             else:
-                last_value[col] = np.nan
+                last_value[col] = _init_cash + _init_position * _init_price
     return last_value
 
 
 @register_jitted(cache=True)
 def prepare_last_pos_record_nb(
     target_shape: tp.Shape,
-    init_position: tp.FlexArray,
-    fill_pos_record: bool,
+    init_position: tp.FlexArray = np.asarray(0.),
+    init_price: tp.FlexArray = np.asarray(np.nan),
+    fill_pos_record: bool = True,
 ) -> tp.RecordArray:
     """Prepare `last_pos_record`."""
     last_pos_record = np.empty(target_shape[1], dtype=trade_dt)
@@ -984,8 +987,9 @@ def prepare_last_pos_record_nb(
     if fill_pos_record:
         for col in range(target_shape[1]):
             _init_position = float(flex_select_auto_nb(init_position, 0, col, True))
+            _init_price = float(flex_select_auto_nb(init_price, 0, col, True))
             if _init_position != 0:
-                fill_init_pos_record_nb(last_pos_record[col], col, _init_position)
+                fill_init_pos_record_nb(last_pos_record[col], col, _init_position, _init_price)
     return last_pos_record
 
 
@@ -1044,8 +1048,6 @@ def get_trade_stats_nb(
 def update_open_pos_stats_nb(record: tp.Record, position_now: float, price: float) -> None:
     """Update statistics of an open position record using custom price."""
     if record["id"] >= 0 and record["status"] == TradeStatus.Open:
-        if record["entry_idx"] == -1 and np.isnan(record["entry_price"]):
-            record["entry_price"] = price
         if np.isnan(record["exit_price"]):
             exit_price = price
         else:
@@ -1066,13 +1068,13 @@ def update_open_pos_stats_nb(record: tp.Record, position_now: float, price: floa
 
 
 @register_jitted(cache=True)
-def fill_init_pos_record_nb(record: tp.Record, col: int, position_now: float) -> None:
+def fill_init_pos_record_nb(record: tp.Record, col: int, position_now: float, price: float) -> None:
     """Fill position record for an initial position."""
     record["id"] = 0
     record["col"] = col
     record["size"] = abs(position_now)
     record["entry_idx"] = -1
-    record["entry_price"] = np.nan
+    record["entry_price"] = price
     record["entry_fees"] = 0.0
     record["exit_idx"] = -1
     record["exit_price"] = np.nan

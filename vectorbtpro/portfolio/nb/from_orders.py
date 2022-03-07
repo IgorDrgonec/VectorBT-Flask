@@ -21,6 +21,7 @@ from vectorbtpro.utils.array_ import insert_argsort_nb
         call_seq=ch.ArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
         init_cash=ch.ArraySlicer(axis=0),
         init_position=portfolio_ch.flex_1d_array_gl_slicer,
+        init_price=portfolio_ch.flex_1d_array_gl_slicer,
         cash_deposits=base_ch.FlexArraySlicer(axis=1),
         cash_earnings=base_ch.FlexArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
         cash_dividends=base_ch.FlexArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
@@ -62,6 +63,7 @@ def simulate_from_orders_nb(
     call_seq: tp.Array2d,
     init_cash: tp.FlexArray = np.asarray(100.0),
     init_position: tp.FlexArray = np.asarray(0.0),
+    init_price: tp.FlexArray = np.asarray(np.nan),
     cash_deposits: tp.FlexArray = np.asarray(0.0),
     cash_earnings: tp.FlexArray = np.asarray(0.0),
     cash_dividends: tp.FlexArray = np.asarray(0.0),
@@ -137,9 +139,15 @@ def simulate_from_orders_nb(
     order_records, log_records = prepare_records_nb(target_shape, max_orders, max_logs)
     last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash)
     last_position = prepare_last_position_nb(target_shape, init_position)
-    last_value = prepare_last_value_nb(target_shape, group_lens, cash_sharing, init_cash, init_position)
+    last_value = prepare_last_value_nb(
+        target_shape,
+        group_lens,
+        cash_sharing,
+        init_cash,
+        init_position=init_position,
+        init_price=init_price,
+    )
 
-    last_cash_deposits = np.full_like(last_cash, 0.0)
     last_val_price = np.full_like(last_position, np.nan)
     last_debt = np.full(target_shape[1], 0.0, dtype=np.float_)
     temp_order_value = np.empty(target_shape[1], dtype=np.float_)
@@ -154,10 +162,10 @@ def simulate_from_orders_nb(
         cash_earnings_out = np.full((1, 1), 0.0, dtype=np.float_)
 
     if fill_returns:
-        returns_pcgs = np.empty((target_shape[0], len(group_lens)), dtype=np.float_)
+        returns = np.empty((target_shape[0], len(group_lens)), dtype=np.float_)
     else:
-        returns_pcgs = np.empty((0, 0), dtype=np.float_)
-    in_outputs = FSInOutputs(returns_pcgs=returns_pcgs)
+        returns = np.empty((0, 0), dtype=np.float_)
+    in_outputs = FSInOutputs(returns=returns)
 
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
@@ -335,19 +343,19 @@ def simulate_from_orders_nb(
                             last_value[col] = cash_now + last_position[col] * last_val_price[col]
                         last_return[col] = get_return_nb(
                             prev_close_value[col],
-                            last_value[col] - last_cash_deposits[col],
+                            last_value[col] - _cash_deposits,
                         )
                         prev_close_value[col] = last_value[col]
-                        in_outputs.returns_pcgs[i, group] = last_return[col]
+                        in_outputs.returns[i, group] = last_return[col]
 
             if fill_returns and cash_sharing:
                 last_value[group] = group_value
                 last_return[group] = get_return_nb(
                     prev_close_value[group],
-                    last_value[group] - last_cash_deposits[group],
+                    last_value[group] - _cash_deposits,
                 )
                 prev_close_value[group] = last_value[group]
-                in_outputs.returns_pcgs[i, group] = last_return[group]
+                in_outputs.returns[i, group] = last_return[group]
 
     return prepare_simout_nb(
         order_records=order_records,

@@ -289,7 +289,7 @@ write the entire pipeline in Numba... Let's do this!
 ...             fees=fees,
 ...             fill_returns=True
 ...         )
-...         returns = sim_out.in_outputs.returns_pcgs
+...         returns = sim_out.in_outputs.returns
 ...         _sharpe = ret_nb.sharpe_ratio_nb(returns, ann_factor, ddof=1)  # (6)!
 ...         sharpe[k:k + close.shape[1]] = _sharpe  # (7)!
 ...         k += close.shape[1]

@@ -720,13 +720,13 @@ class YFData(RemoteData):  # pragma: no cover
     _column_config: tp.ClassVar[Config] = HybridConfig(
         {
             "Dividends": dict(
-                resample_func=lambda obj, resampler: obj.vbt.resample_apply(
+                resample_func=lambda self, obj, resampler: obj.vbt.resample_apply(
                     resampler,
                     generic_nb.sum_reduce_nb,
                 )
             ),
             "Stock Splits": dict(
-                resample_func=lambda obj, resampler: obj.vbt.resample_apply(
+                resample_func=lambda self, obj, resampler: obj.vbt.resample_apply(
                     resampler,
                     generic_nb.sum_reduce_nb,
                 )
@@ -806,7 +806,7 @@ class BinanceData(RemoteData):  # pragma: no cover
     _column_config: tp.ClassVar[Config] = HybridConfig(
         {
             "Close time": dict(
-                resample_func=lambda obj, resampler: obj.view(np.int_).vbt.resample_apply(
+                resample_func=lambda self, obj, resampler: obj.view(np.int_).vbt.resample_apply(
                     resampler,
                     generic_nb.nth_reduce_nb,
                     -1,
@@ -814,26 +814,26 @@ class BinanceData(RemoteData):  # pragma: no cover
                 )
             ),
             "Quote volume": dict(
-                resample_func=lambda obj, resampler: obj.vbt.resample_apply(
+                resample_func=lambda self, obj, resampler: obj.vbt.resample_apply(
                     resampler,
                     generic_nb.sum_reduce_nb,
                 )
             ),
             "Number of trades": dict(
-                resample_func=lambda obj, resampler: obj.vbt.resample_apply(
+                resample_func=lambda self, obj, resampler: obj.vbt.resample_apply(
                     resampler,
                     generic_nb.sum_reduce_nb,
                     wrap_kwargs=dict(dtype=np.int_),
                 )
             ),
             "Taker base volume": dict(
-                resample_func=lambda obj, resampler: obj.vbt.resample_apply(
+                resample_func=lambda self, obj, resampler: obj.vbt.resample_apply(
                     resampler,
                     generic_nb.sum_reduce_nb,
                 )
             ),
             "Taker quote volume": dict(
-                resample_func=lambda obj, resampler: obj.vbt.resample_apply(
+                resample_func=lambda self, obj, resampler: obj.vbt.resample_apply(
                     resampler,
                     generic_nb.sum_reduce_nb,
                 )
@@ -1262,7 +1262,7 @@ class AlpacaData(RemoteData):  # pragma: no cover
     _column_config: tp.ClassVar[Config] = HybridConfig(
         {
             "Trade count": dict(
-                resample_func=lambda obj, resampler: obj.vbt.resample_apply(
+                resample_func=lambda self, obj, resampler: obj.vbt.resample_apply(
                     resampler,
                     generic_nb.sum_reduce_nb,
                     wrap_kwargs=dict(dtype=np.int_),
@@ -1465,7 +1465,7 @@ class PolygonData(RemoteData):  # pragma: no cover
     _column_config: tp.ClassVar[Config] = HybridConfig(
         {
             "Trade count": dict(
-                resample_func=lambda obj, resampler: obj.vbt.resample_apply(
+                resample_func=lambda self, obj, resampler: obj.vbt.resample_apply(
                     resampler,
                     generic_nb.sum_reduce_nb,
                     wrap_kwargs=dict(dtype=np.int_),

@@ -761,6 +761,7 @@ class SimulationContext(tp.NamedTuple):
     call_seq: tp.Optional[tp.Array2d]
     init_cash: tp.FlexArray
     init_position: tp.FlexArray
+    init_price: tp.FlexArray
     cash_deposits: tp.FlexArray
     cash_earnings: tp.FlexArray
     segment_mask: tp.Array
@@ -866,6 +867,18 @@ Example:
 __pdoc__[
     "SimulationContext.init_position"
 ] = """Initial position per column.
+
+Utilizes flexible indexing using `vectorbtpro.base.indexing.flex_select_auto_nb` and `flex_2d=True`, 
+so it can be passed as 1-dim array per column, or as a scalar. 
+
+Must broadcast to shape `(target_shape[1],)`.
+
+!!! note
+    Changing this array may produce results inconsistent with those of `vectorbtpro.portfolio.base.Portfolio`.
+"""
+__pdoc__[
+    "SimulationContext.init_price"
+] = """Initial position price per column.
 
 Utilizes flexible indexing using `vectorbtpro.base.indexing.flex_select_auto_nb` and `flex_2d=True`, 
 so it can be passed as 1-dim array per column, or as a scalar. 
@@ -1228,8 +1241,8 @@ the `id` becomes 0 and the record materializes. Once the position is closed, the
 fixates its identifier and other data until the next position is entered. 
 
 If `SimulationContext.init_position` is not zero in a column, that column's position record
-is automatically filled before the simulation with `entry_price` of NaN and `entry_idx` of -1.
-Once a non-NaN price such as the opening price is discovered, the entry price gets substituted by this price.
+is automatically filled before the simulation with `entry_price` set to `SimulationContext.init_price` and 
+`entry_idx` of -1.
 
 The fields `entry_price` and `exit_price` are average entry and exit price respectively.
 The average exit price does **not** contain open statistics, as opposed to `vectorbtpro.portfolio.trades.Positions`.
@@ -1291,6 +1304,7 @@ class GroupContext(tp.NamedTuple):
     call_seq: tp.Optional[tp.Array2d]
     init_cash: tp.FlexArray
     init_position: tp.FlexArray
+    init_price: tp.FlexArray
     cash_deposits: tp.FlexArray
     cash_earnings: tp.FlexArray
     segment_mask: tp.Array
@@ -1386,6 +1400,7 @@ class RowContext(tp.NamedTuple):
     call_seq: tp.Optional[tp.Array2d]
     init_cash: tp.FlexArray
     init_position: tp.FlexArray
+    init_price: tp.FlexArray
     cash_deposits: tp.FlexArray
     cash_earnings: tp.FlexArray
     segment_mask: tp.Array
@@ -1445,6 +1460,7 @@ class SegmentContext(tp.NamedTuple):
     call_seq: tp.Optional[tp.Array2d]
     init_cash: tp.FlexArray
     init_position: tp.FlexArray
+    init_price: tp.FlexArray
     cash_deposits: tp.FlexArray
     cash_earnings: tp.FlexArray
     segment_mask: tp.Array
@@ -1523,6 +1539,7 @@ class OrderContext(tp.NamedTuple):
     call_seq: tp.Optional[tp.Array2d]
     init_cash: tp.FlexArray
     init_position: tp.FlexArray
+    init_price: tp.FlexArray
     cash_deposits: tp.FlexArray
     cash_earnings: tp.FlexArray
     segment_mask: tp.Array
@@ -1615,6 +1632,7 @@ class PostOrderContext(tp.NamedTuple):
     call_seq: tp.Optional[tp.Array2d]
     init_cash: tp.FlexArray
     init_position: tp.FlexArray
+    init_price: tp.FlexArray
     cash_deposits: tp.FlexArray
     cash_earnings: tp.FlexArray
     segment_mask: tp.Array
@@ -1727,6 +1745,7 @@ class FlexOrderContext(tp.NamedTuple):
     call_seq: tp.Optional[tp.Array2d]
     init_cash: tp.FlexArray
     init_position: tp.FlexArray
+    init_price: tp.FlexArray
     cash_deposits: tp.FlexArray
     cash_earnings: tp.FlexArray
     segment_mask: tp.Array
@@ -2060,24 +2079,24 @@ __pdoc__["AdjustSLContext.flex_2d"] = "See `vectorbtpro.base.indexing.flex_selec
 
 
 class FSInOutputs(tp.NamedTuple):
-    returns_pcgs: tp.Optional[tp.Array2d]
+    returns: tp.Optional[tp.Array2d]
 
 
 __pdoc__["FSInOutputs"] = "A named tuple representing the in-outputs for simulation based on signals."
 __pdoc__[
-    "FSInOutputs.returns_pcgs"
+    "FSInOutputs.returns"
 ] = """Returns.
 
 Gets filled if `fill_returns` is True, otherwise has the shape `(0, 0)`."""
 
 
 class FOInOutputs(tp.NamedTuple):
-    returns_pcgs: tp.Optional[tp.Array2d]
+    returns: tp.Optional[tp.Array2d]
 
 
 __pdoc__["FOInOutputs"] = "A named tuple representing the in-outputs for simulation based on orders."
 __pdoc__[
-    "FOInOutputs.returns_pcgs"
+    "FOInOutputs.returns"
 ] = """Returns.
 
 Gets filled if `fill_returns` is True, otherwise has the shape `(0, 0)`."""

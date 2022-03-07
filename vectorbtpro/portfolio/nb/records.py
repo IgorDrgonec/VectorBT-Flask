@@ -140,6 +140,7 @@ def fill_entry_trades_in_position_nb(
         close=ch.ArraySlicer(axis=1),
         col_map=base_ch.GroupMapSlicer(),
         init_position=base_ch.FlexArraySlicer(axis=1, flex_2d=True),
+        init_price=base_ch.FlexArraySlicer(axis=1, flex_2d=True),
     ),
     merge_func=records_ch.merge_records,
     merge_kwargs=dict(chunk_meta=Rep("chunk_meta")),
@@ -150,6 +151,7 @@ def get_entry_trades_nb(
     close: tp.Array2d,
     col_map: tp.GroupMap,
     init_position: tp.FlexArray = np.asarray(0.0),
+    init_price: tp.FlexArray = np.asarray(np.nan),
 ) -> tp.RecordArray:
     """Fill entry trade records by aggregating order records.
 
@@ -225,8 +227,8 @@ def get_entry_trades_nb(
     counts = np.full(len(col_lens), 0, dtype=np.int_)
 
     for col in prange(col_lens.shape[0]):
-
-        _init_position = flex_select_auto_nb(init_position, 0, col, True)
+        _init_position = float(flex_select_auto_nb(init_position, 0, col, True))
+        _init_price = float(flex_select_auto_nb(init_price, 0, col, True))
         if _init_position != 0:
             # Prepare initial position
             first_c = -1
@@ -237,12 +239,7 @@ def get_entry_trades_nb(
             else:
                 direction = TradeDirection.Short
             entry_size_sum = abs(_init_position)
-            init_price = np.nan
-            for i in range(close.shape[0]):
-                if not np.isnan(close[i, col]):
-                    init_price = close[i, col]
-                    break
-            entry_gross_sum = abs(_init_position) * init_price
+            entry_gross_sum = abs(_init_position) * _init_price
             entry_fees_sum = 0.0
             exit_size_sum = 0.0
             exit_gross_sum = 0.0
@@ -421,6 +418,7 @@ def get_entry_trades_nb(
         close=ch.ArraySlicer(axis=1),
         col_map=base_ch.GroupMapSlicer(),
         init_position=base_ch.FlexArraySlicer(axis=1, flex_2d=True),
+        init_price=base_ch.FlexArraySlicer(axis=1, flex_2d=True),
     ),
     merge_func=records_ch.merge_records,
     merge_kwargs=dict(chunk_meta=Rep("chunk_meta")),
@@ -431,6 +429,7 @@ def get_exit_trades_nb(
     close: tp.Array2d,
     col_map: tp.GroupMap,
     init_position: tp.FlexArray = np.asarray(0.0),
+    init_price: tp.FlexArray = np.asarray(np.nan),
 ) -> tp.RecordArray:
     """Fill exit trade records by aggregating order records.
 
@@ -472,8 +471,8 @@ def get_exit_trades_nb(
     counts = np.full(len(col_lens), 0, dtype=np.int_)
 
     for col in prange(col_lens.shape[0]):
-
-        _init_position = flex_select_auto_nb(init_position, 0, col, True)
+        _init_position = float(flex_select_auto_nb(init_position, 0, col, True))
+        _init_price = float(flex_select_auto_nb(init_price, 0, col, True))
         if _init_position != 0:
             # Prepare initial position
             in_position = True
@@ -484,12 +483,7 @@ def get_exit_trades_nb(
             else:
                 direction = TradeDirection.Short
             entry_size_sum = abs(_init_position)
-            init_price = np.nan
-            for i in range(close.shape[0]):
-                if not np.isnan(close[i, col]):
-                    init_price = close[i, col]
-                    break
-            entry_gross_sum = abs(_init_position) * init_price
+            entry_gross_sum = abs(_init_position) * _init_price
             entry_fees_sum = 0.0
         else:
             in_position = False

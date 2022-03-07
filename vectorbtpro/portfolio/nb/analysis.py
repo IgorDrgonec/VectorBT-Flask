@@ -502,11 +502,20 @@ def cash_grouped_nb(
 
 
 @register_jitted(cache=True)
-def init_position_value_nb(close: tp.Array2d, init_position: tp.FlexArray = np.asarray(0.0)) -> tp.Array1d:
+def init_position_value_nb(
+    n_cols: int,
+    init_position: tp.FlexArray = np.asarray(0.0),
+    init_price: tp.FlexArray = np.asarray(np.nan),
+) -> tp.Array1d:
     """Get initial position value per column."""
-    out = np.empty(close.shape[1], dtype=np.float_)
-    for col in range(close.shape[1]):
-        out[col] = close[0, col] * flex_select_auto_nb(init_position, 0, col, True)
+    out = np.empty(n_cols, dtype=np.float_)
+    for col in range(n_cols):
+        _init_position = float(flex_select_auto_nb(init_position, 0, col, True))
+        _init_price = float(flex_select_auto_nb(init_price, 0, col, True))
+        if _init_position == 0:
+            out[col] = 0.
+        else:
+            out[col] = _init_position * _init_price
     return out
 
 
@@ -586,6 +595,7 @@ def value_nb(cash: tp.Array2d, asset_value: tp.Array2d) -> tp.Array2d:
         order_records=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
         col_map=base_ch.GroupMapSlicer(),
         init_position=base_ch.FlexArraySlicer(axis=1, flex_2d=True),
+        init_price=base_ch.FlexArraySlicer(axis=1, flex_2d=True),
         cash_earnings=base_ch.FlexArraySlicer(axis=1),
         flex_2d=None,
     ),
@@ -598,6 +608,7 @@ def total_profit_nb(
     order_records: tp.RecordArray,
     col_map: tp.GroupMap,
     init_position: tp.FlexArray = np.asarray(0.0),
+    init_price: tp.FlexArray = np.asarray(np.nan),
     cash_earnings: tp.FlexArray = np.asarray(0.0),
     flex_2d: bool = False,
 ) -> tp.Array1d:
@@ -611,10 +622,11 @@ def total_profit_nb(
     zero_mask = np.full(target_shape[1], False, dtype=np.bool_)
 
     for col in prange(target_shape[1]):
-        _init_position = flex_select_auto_nb(init_position, 0, col, True)
+        _init_position = float(flex_select_auto_nb(init_position, 0, col, True))
+        _init_price = float(flex_select_auto_nb(init_price, 0, col, True))
         if _init_position != 0:
             assets[col] = _init_position
-            cash[col] = -close[0, col] * _init_position
+            cash[col] = -_init_position * _init_price
 
         for i in range(target_shape[0]):
             cash[col] += flex_select_auto_nb(cash_earnings, i, col, flex_2d)

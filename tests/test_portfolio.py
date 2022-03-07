@@ -7916,6 +7916,7 @@ class TestFromOrderFunc:
             jitted=False,
             init_cash=0.0,
             init_position=1.0,
+            init_price=0.5,
             pre_segment_func_nb=pre_segment_func_nb,
             row_wise=test_row_wise,
             flexible=test_flexible,
@@ -9212,9 +9213,9 @@ init_position = [1.0, -1.0, 0.0]
 directions = ["longonly", "shortonly", "both"]
 group_by = pd.Index(["first", "first", "second"], name="group")
 
-pf = vbt.Portfolio.from_orders(
-    price_na,
-    order_size_new,
+pf_kwargs = dict(
+    close=price_na,
+    size=order_size_new,
     size_type="amount",
     direction=directions,
     fees=0.01,
@@ -9225,6 +9226,7 @@ pf = vbt.Portfolio.from_orders(
     group_by=None,
     init_cash=[100.0, 100.0, 100.0],
     init_position=init_position,
+    init_price=price_na.bfill().values[0],
     cash_deposits=pd.DataFrame(
         {"a": [0.0, 0.0, 100.0, 0.0, 0.0], "b": [0.0, 0.0, 100.0, 0.0, 0.0], "c": [0.0, 0.0, 0.0, 0.0, 0.0]},
         index=price.index,
@@ -9232,11 +9234,14 @@ pf = vbt.Portfolio.from_orders(
     freq="1D",
     attach_call_seq=True,
     bm_close=bm_price_na,
-)  # independent
+)
 
-pf_grouped = vbt.Portfolio.from_orders(
-    price_na,
-    order_size_new,
+pf = vbt.Portfolio.from_orders(**pf_kwargs)  # independent
+pf_filled = vbt.Portfolio.from_orders(**pf_kwargs, fill_returns=True)
+
+pf_grouped_kwargs = dict(
+    close=price_na,
+    size=order_size_new,
     size_type="amount",
     direction=directions,
     fees=0.01,
@@ -9248,6 +9253,7 @@ pf_grouped = vbt.Portfolio.from_orders(
     cash_sharing=False,
     init_cash=[100.0, 100.0, 100.0],
     init_position=init_position,
+    init_price=price_na.bfill().values[0],
     cash_deposits=pd.DataFrame(
         {"a": [0.0, 0.0, 100.0, 0.0, 0.0], "b": [0.0, 0.0, 100.0, 0.0, 0.0], "c": [0.0, 0.0, 0.0, 0.0, 0.0]},
         index=price.index,
@@ -9255,11 +9261,14 @@ pf_grouped = vbt.Portfolio.from_orders(
     freq="1D",
     attach_call_seq=True,
     bm_close=bm_price_na,
-)  # grouped
+)
 
-pf_shared = vbt.Portfolio.from_orders(
-    price_na,
-    order_size_new,
+pf_grouped = vbt.Portfolio.from_orders(**pf_grouped_kwargs)  # grouped
+pf_grouped_filled = vbt.Portfolio.from_orders(**pf_grouped_kwargs, fill_returns=True)
+
+pf_shared_kwargs = dict(
+    close=price_na,
+    size=order_size_new,
     size_type="amount",
     direction=directions,
     fees=0.01,
@@ -9271,6 +9280,7 @@ pf_shared = vbt.Portfolio.from_orders(
     cash_sharing=True,
     init_cash=[200.0, 100.0],
     init_position=init_position,
+    init_price=price_na.bfill().values[0],
     cash_deposits=pd.DataFrame(
         {"first": [0.0, 0.0, 200.0, 0.0, 0.0], "second": [0.0, 0.0, 0.0, 0.0, 0.0]},
         index=price.index,
@@ -9278,7 +9288,10 @@ pf_shared = vbt.Portfolio.from_orders(
     freq="1D",
     attach_call_seq=True,
     bm_close=bm_price_na,
-)  # shared
+)
+
+pf_shared = vbt.Portfolio.from_orders(**pf_shared_kwargs)  # shared
+pf_shared_filled = vbt.Portfolio.from_orders(**pf_shared_kwargs, fill_returns=True)
 
 
 class TestPortfolio:
@@ -9505,7 +9518,7 @@ class TestPortfolio:
             np.arange(2),
         )
         np.testing.assert_array_equal(
-            pf_shared.replace(in_outputs=create_in_outputs(init_cash_pcgs=np.arange(2))).init_cash.values,
+            pf_shared.replace(in_outputs=create_in_outputs(init_cash_cs=np.arange(2))).init_cash.values,
             np.arange(2),
         )
         np.testing.assert_array_equal(
@@ -9516,7 +9529,7 @@ class TestPortfolio:
         )
         np.testing.assert_array_equal(
             pf_grouped.replace(
-                in_outputs=create_in_outputs(init_position_value_pcgs=np.arange(3))
+                in_outputs=create_in_outputs(init_position_value_cs=np.arange(3))
             ).init_position_value.values,
             np.arange(3),
         )
@@ -9529,14 +9542,14 @@ class TestPortfolio:
             np.arange(3),
         )
         np.testing.assert_array_equal(
-            pf.replace(in_outputs=create_in_outputs(init_cash_pcgs=np.arange(3))).init_cash.values,
+            pf.replace(in_outputs=create_in_outputs(init_cash_cs=np.arange(3))).init_cash.values,
             np.arange(3),
         )
 
     def test_custom_in_outputs(self):
         in_outputs = dict(
-            arr_1d_pcgs=np.arange(3),
-            arr_2d_pcgs=np.arange(15).reshape((5, 3)),
+            arr_1d_cs=np.arange(3),
+            arr_2d_cs=np.arange(15).reshape((5, 3)),
             arr_1d_pcg=np.arange(3),
             arr_2d_pcg=np.arange(15).reshape((5, 3)),
             arr_1d_pg=np.arange(3),
@@ -9560,10 +9573,10 @@ class TestPortfolio:
             pf2.get_in_output("my_arr")
 
         pd.testing.assert_series_equal(
-            pf2.get_in_output("arr_1d_pcgs"),
-            pf2.wrapper.wrap_reduced(pf2.in_outputs.arr_1d_pcgs, name_or_index="arr"),
+            pf2.get_in_output("arr_1d_cs"),
+            pf2.wrapper.wrap_reduced(pf2.in_outputs.arr_1d_cs, name_or_index="arr"),
         )
-        pd.testing.assert_frame_equal(pf2.get_in_output("arr_2d_pcgs"), pf2.wrapper.wrap(pf2.in_outputs.arr_2d_pcgs))
+        pd.testing.assert_frame_equal(pf2.get_in_output("arr_2d_cs"), pf2.wrapper.wrap(pf2.in_outputs.arr_2d_cs))
         pd.testing.assert_series_equal(
             pf2.get_in_output("arr_1d_pcg"),
             pf2.wrapper.wrap_reduced(pf2.in_outputs.arr_1d_pcg, name_or_index="arr"),
@@ -9588,8 +9601,8 @@ class TestPortfolio:
         with pytest.raises(NotImplementedError):
             pf2.get_in_output("arr_records", force_wrapping=True)
 
-        assert pf2["a"].in_outputs.arr_1d_pcgs == in_outputs.arr_1d_pcgs[0]
-        np.testing.assert_array_equal(pf2["a"].in_outputs.arr_2d_pcgs, in_outputs.arr_2d_pcgs[:, 0])
+        assert pf2["a"].in_outputs.arr_1d_cs == in_outputs.arr_1d_cs[0]
+        np.testing.assert_array_equal(pf2["a"].in_outputs.arr_2d_cs, in_outputs.arr_2d_cs[:, 0])
         assert pf2["a"].in_outputs.arr_1d_pcg == in_outputs.arr_1d_pcg[0]
         np.testing.assert_array_equal(pf2["a"].in_outputs.arr_2d_pcg, in_outputs.arr_2d_pcg[:, 0])
         assert pf2["a"].in_outputs.arr_1d_pg == in_outputs.arr_1d_pg[0]
@@ -9599,8 +9612,8 @@ class TestPortfolio:
         np.testing.assert_array_equal(pf2["a"].in_outputs.arr_records, in_outputs.arr_records[:5])
 
         in_outputs = dict(
-            arr_1d_pcgs=np.arange(3),
-            arr_2d_pcgs=np.arange(15).reshape((5, 3)),
+            arr_1d_cs=np.arange(3),
+            arr_2d_cs=np.arange(15).reshape((5, 3)),
             arr_1d_pcg=np.arange(2),
             arr_2d_pcg=np.arange(10).reshape((5, 2)),
             arr_1d_pg=np.arange(2),
@@ -9621,12 +9634,12 @@ class TestPortfolio:
         pf_grouped2 = pf_grouped.replace(in_outputs=in_outputs)
 
         pd.testing.assert_series_equal(
-            pf_grouped2.get_in_output("arr_1d_pcgs"),
-            pf_grouped2.wrapper.wrap_reduced(pf_grouped2.in_outputs.arr_1d_pcgs, name_or_index="arr", group_by=False),
+            pf_grouped2.get_in_output("arr_1d_cs"),
+            pf_grouped2.wrapper.wrap_reduced(pf_grouped2.in_outputs.arr_1d_cs, name_or_index="arr", group_by=False),
         )
         pd.testing.assert_frame_equal(
-            pf_grouped2.get_in_output("arr_2d_pcgs"),
-            pf_grouped2.wrapper.wrap(pf_grouped2.in_outputs.arr_2d_pcgs, group_by=False),
+            pf_grouped2.get_in_output("arr_2d_cs"),
+            pf_grouped2.wrapper.wrap(pf_grouped2.in_outputs.arr_2d_cs, group_by=False),
         )
         pd.testing.assert_series_equal(
             pf_grouped2.get_in_output("arr_1d_pcg"),
@@ -9664,8 +9677,8 @@ class TestPortfolio:
         with pytest.raises(NotImplementedError):
             pf_grouped2.get_in_output("arr_records", force_wrapping=True)
 
-        np.testing.assert_array_equal(pf_grouped2["first"].in_outputs.arr_1d_pcgs, in_outputs.arr_1d_pcgs[:2])
-        np.testing.assert_array_equal(pf_grouped2["first"].in_outputs.arr_2d_pcgs, in_outputs.arr_2d_pcgs[:, :2])
+        np.testing.assert_array_equal(pf_grouped2["first"].in_outputs.arr_1d_cs, in_outputs.arr_1d_cs[:2])
+        np.testing.assert_array_equal(pf_grouped2["first"].in_outputs.arr_2d_cs, in_outputs.arr_2d_cs[:, :2])
         assert pf_grouped2["first"].in_outputs.arr_1d_pcg == in_outputs.arr_1d_pcg[0]
         np.testing.assert_array_equal(pf_grouped2["first"].in_outputs.arr_2d_pcg, in_outputs.arr_2d_pcg[:, 0])
         assert pf_grouped2["first"].in_outputs.arr_1d_pg == in_outputs.arr_1d_pg[0]
@@ -9675,8 +9688,8 @@ class TestPortfolio:
         np.testing.assert_array_equal(pf_grouped2["first"].in_outputs.arr_records, in_outputs.arr_records[:10])
 
         in_outputs = dict(
-            arr_1d_pcgs=np.arange(2),
-            arr_2d_pcgs=np.arange(10).reshape((5, 2)),
+            arr_1d_cs=np.arange(2),
+            arr_2d_cs=np.arange(10).reshape((5, 2)),
             arr_1d_pcg=np.arange(2),
             arr_2d_pcg=np.arange(10).reshape((5, 2)),
             arr_1d_pg=np.arange(2),
@@ -9697,12 +9710,12 @@ class TestPortfolio:
         pf_shared2 = pf_shared.replace(in_outputs=in_outputs)
 
         pd.testing.assert_series_equal(
-            pf_shared2.get_in_output("arr_1d_pcgs"),
-            pf_shared2.wrapper.wrap_reduced(pf_shared2.in_outputs.arr_1d_pcgs, name_or_index="arr"),
+            pf_shared2.get_in_output("arr_1d_cs"),
+            pf_shared2.wrapper.wrap_reduced(pf_shared2.in_outputs.arr_1d_cs, name_or_index="arr"),
         )
         pd.testing.assert_frame_equal(
-            pf_shared2.get_in_output("arr_2d_pcgs"),
-            pf_shared2.wrapper.wrap(pf_shared2.in_outputs.arr_2d_pcgs),
+            pf_shared2.get_in_output("arr_2d_cs"),
+            pf_shared2.wrapper.wrap(pf_shared2.in_outputs.arr_2d_cs),
         )
         pd.testing.assert_series_equal(
             pf_shared2.get_in_output("arr_1d_pcg"),
@@ -9740,8 +9753,8 @@ class TestPortfolio:
         with pytest.raises(NotImplementedError):
             pf_shared2.get_in_output("arr_records", force_wrapping=True)
 
-        assert pf_shared2["first"].in_outputs.arr_1d_pcgs == in_outputs.arr_1d_pcgs[0]
-        np.testing.assert_array_equal(pf_shared2["first"].in_outputs.arr_2d_pcgs, in_outputs.arr_2d_pcgs[:, 0])
+        assert pf_shared2["first"].in_outputs.arr_1d_cs == in_outputs.arr_1d_cs[0]
+        np.testing.assert_array_equal(pf_shared2["first"].in_outputs.arr_2d_cs, in_outputs.arr_2d_cs[:, 0])
         assert pf_shared2["first"].in_outputs.arr_1d_pcg == in_outputs.arr_1d_pcg[0]
         np.testing.assert_array_equal(pf_shared2["first"].in_outputs.arr_2d_pcg, in_outputs.arr_2d_pcg[:, 0])
         assert pf_shared2["first"].in_outputs.arr_1d_pg == in_outputs.arr_1d_pg[0]
@@ -11198,7 +11211,7 @@ class TestPortfolio:
     def test_entry_trades(self):
         result = np.array(
             [
-                (0, 0, 1.0, -1, np.nan, 0.0, 3, 3.0599999999999996, 0.21241818181818184, np.nan, np.nan, 0, 1, 0),
+                (0, 0, 1.0, -1, 2.0, 0.0, 3, 3.0599999999999996, 0.21241818181818184, 0.84758182, 0.42379091, 0, 1, 0),
                 (
                     1,
                     0,
@@ -12203,7 +12216,7 @@ class TestPortfolio:
         pd.testing.assert_series_equal(
             pf.init_position_value,
             vbt.Portfolio.get_init_position_value(
-                close=pf.filled_close,
+                init_price=pf.init_price,
                 init_position=pf.init_position,
                 wrapper=pf.wrapper,
             ),
@@ -12211,7 +12224,7 @@ class TestPortfolio:
         pd.testing.assert_series_equal(
             pf_grouped.init_position_value,
             vbt.Portfolio.get_init_position_value(
-                close=pf_grouped.filled_close,
+                init_price=pf_grouped.init_price,
                 init_position=pf_grouped.init_position,
                 wrapper=pf_grouped.wrapper,
             ),
@@ -12219,7 +12232,7 @@ class TestPortfolio:
         pd.testing.assert_series_equal(
             pf_shared.init_position_value,
             vbt.Portfolio.get_init_position_value(
-                close=pf_shared.filled_close,
+                init_price=pf_shared.init_price,
                 init_position=pf_shared.init_position,
                 wrapper=pf_shared.wrapper,
             ),
@@ -12717,6 +12730,7 @@ class TestPortfolio:
                 close=pf.filled_close,
                 orders=pf.orders,
                 init_position=pf.init_position,
+                init_price=pf.init_price,
                 wrapper=pf.wrapper,
             ),
         )
@@ -12726,6 +12740,7 @@ class TestPortfolio:
                 close=pf_grouped.filled_close,
                 orders=pf_grouped.orders,
                 init_position=pf.init_position,
+                init_price=pf.init_price,
                 wrapper=pf_grouped.wrapper,
             ),
         )
@@ -12735,6 +12750,7 @@ class TestPortfolio:
                 close=pf_shared.filled_close,
                 orders=pf_shared.orders,
                 init_position=pf.init_position,
+                init_price=pf.init_price,
                 wrapper=pf_shared.wrapper,
             ),
         )
@@ -14153,8 +14169,40 @@ class TestPortfolio:
     @pytest.mark.parametrize("test_freq", ["1h", "10h", "3d"])
     def test_resample(self, test_freq):
         pd.testing.assert_frame_equal(
-            pf.replace(call_seq=None).resample(test_freq).value,
-            pf.value.resample(test_freq).last().ffill(),
+            pf.replace(call_seq=None).resample(test_freq).returns,
+            pf.returns_acc.resample(test_freq).obj,
+        )
+        pd.testing.assert_series_equal(
+            pf.replace(call_seq=None).resample(test_freq).total_return,
+            pf.total_return,
+        )
+        pd.testing.assert_frame_equal(
+            pf_filled.replace(call_seq=None).resample(test_freq).returns,
+            pf_filled.replace(call_seq=None).returns_acc.resample(test_freq).obj,
+        )
+        pd.testing.assert_frame_equal(
+            pf_grouped.replace(call_seq=None).resample(test_freq).returns,
+            pf_grouped.returns_acc.resample(test_freq).obj,
+        )
+        pd.testing.assert_series_equal(
+            pf_grouped.replace(call_seq=None).resample(test_freq).total_return,
+            pf_grouped.total_return,
+        )
+        pd.testing.assert_frame_equal(
+            pf_grouped_filled.replace(call_seq=None).resample(test_freq).returns,
+            pf_grouped_filled.replace(call_seq=None).returns_acc.resample(test_freq).obj,
+        )
+        pd.testing.assert_frame_equal(
+            pf_shared.replace(call_seq=None).resample(test_freq).returns,
+            pf_shared.returns_acc.resample(test_freq).obj,
+        )
+        pd.testing.assert_series_equal(
+            pf_shared.replace(call_seq=None).resample(test_freq).total_return,
+            pf_shared.total_return,
+        )
+        pd.testing.assert_frame_equal(
+            pf_shared_filled.replace(call_seq=None).resample(test_freq).returns,
+            pf_shared_filled.replace(call_seq=None).returns_acc.resample(test_freq).obj,
         )
         with pytest.raises(Exception):
             pf.resample(test_freq).stats()
