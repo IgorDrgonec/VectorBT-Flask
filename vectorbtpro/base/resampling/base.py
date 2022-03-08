@@ -134,7 +134,7 @@ class Resampler(Configured):
         self,
         before: bool = False,
         raise_missing: bool = True,
-        return_index: bool = False,
+        return_index: bool = True,
         jitted: tp.JittedOption = None,
     ) -> tp.Union[tp.Array1d, tp.Index]:
         """See `vectorbtpro.base.resampling.nb.map_to_index_nb`."""
@@ -155,4 +155,20 @@ class Resampler(Configured):
             else:
                 mapped_index = self.to_index[mapped_arr]
             return mapped_index
+        return mapped_arr
+
+    def index_difference(
+        self,
+        reverse: bool = False,
+        return_index: bool = True,
+        jitted: tp.JittedOption = None,
+    ) -> tp.Union[tp.Array1d, tp.Index]:
+        """See `vectorbtpro.base.resampling.nb.index_difference_nb`."""
+        func = jit_reg.resolve_option(nb.index_difference_nb, jitted)
+        if reverse:
+            mapped_arr = func(self.to_index.values, self.from_index.values)
+        else:
+            mapped_arr = func(self.from_index.values, self.to_index.values)
+        if return_index:
+            return self.to_index[mapped_arr]
         return mapped_arr

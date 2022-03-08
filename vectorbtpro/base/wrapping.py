@@ -683,7 +683,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         _self = self.resolve(group_by=group_by)
         return _self.wrap(np.full(_self.shape_2d[1], fill_value), **kwargs)
 
-    def build_resampler(
+    def create_resampler(
         self,
         rule: tp.Union[Resampler, tp.PandasResampler, tp.PandasFrequencyLike],
         resample_kwargs: tp.KwargsLike = None,
@@ -710,7 +710,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         **kwargs,
     ) -> tp.Tuple[tp.Union[Resampler, tp.PandasResampler], ArrayWrapperT]:
         """Perform resampling on `ArrayWrapper` and also return metadata."""
-        resampler = self.build_resampler(*args, **kwargs)
+        resampler = self.create_resampler(*args, **kwargs)
         if isinstance(resampler, Resampler):
             _resampler = resampler
         else:

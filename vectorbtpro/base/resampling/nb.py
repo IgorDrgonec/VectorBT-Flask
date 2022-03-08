@@ -78,11 +78,11 @@ def map_to_index_nb(
     out = np.empty(len(from_index), dtype=np.int_)
     from_j = 0
     for i in range(len(from_index)):
-        if i > 0 and from_index[i] < from_index[i - 1]:
+        if i > 0 and from_index[i] <= from_index[i - 1]:
             raise ValueError("Array index must be strictly increasing")
         found = False
         for j in range(from_j, len(to_index)):
-            if j > 0 and to_index[j] < to_index[j - 1]:
+            if j > 0 and to_index[j] <= to_index[j - 1]:
                 raise ValueError("Target index must be strictly increasing")
             if before and from_index[i] <= to_index[j]:
                 if j == 0 or to_index[j - 1] < from_index[i]:
@@ -99,3 +99,32 @@ def map_to_index_nb(
                 raise ValueError("Resampling failed: cannot map some indices")
             out[i] = -1
     return out
+
+
+@register_jitted(cache=True)
+def index_difference_nb(
+    from_index: tp.Array1d,
+    to_index: tp.Array1d,
+) -> tp.Array1d:
+    """Get elements in `from_index` not present in `to_index`."""
+    out = np.empty(len(from_index), dtype=np.int_)
+    from_j = 0
+    k = 0
+    for i in range(len(from_index)):
+        if i > 0 and from_index[i] <= from_index[i - 1]:
+            raise ValueError("Array index must be strictly increasing")
+        found = False
+        for j in range(from_j, len(to_index)):
+            if j > 0 and to_index[j] <= to_index[j - 1]:
+                raise ValueError("Target index must be strictly increasing")
+            if from_index[i] < to_index[j]:
+                break
+            if from_index[i] == to_index[j]:
+                from_j = j
+                found = True
+                break
+            from_j = j
+        if not found:
+            out[k] = i
+            k += 1
+    return out[:k]
