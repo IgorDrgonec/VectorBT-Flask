@@ -771,7 +771,7 @@ class Config(PickleableDict, Prettified):
             }
         else:
             dct = dict(self)
-        if all([isinstance(k, str) for k in dct]):
+        if all([isinstance(k, str) and k.isidentifier() for k in dct]):
             return prettify_inited(
                 type(self),
                 dct,
