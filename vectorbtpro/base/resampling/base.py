@@ -50,9 +50,9 @@ class Resampler(Configured):
                 infer_target_freq = False
             target_freq = None
         if infer_source_freq:
-            source_freq = infer_index_freq(source_index, freq=source_freq, allow_date_offset=True, allow_numeric=True)
+            source_freq = infer_index_freq(source_index, freq=source_freq)
         if infer_target_freq:
-            target_freq = infer_index_freq(target_index, freq=target_freq, allow_date_offset=True, allow_numeric=True)
+            target_freq = infer_index_freq(target_index, freq=target_freq)
 
         self._source_index = source_index
         self._target_index = target_index

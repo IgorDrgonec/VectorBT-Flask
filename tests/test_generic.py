@@ -3206,7 +3206,7 @@ class TestAccessors:
             pd.DataFrame(
                 np.array([[1.0, 1.0], [2.0, 2.0], [3.0, 3.0], [np.nan, 4.0]]),
                 index=pd.RangeIndex(start=0, stop=4, step=1),
-                columns=pd.Int64Index([0, 1], dtype="int64", name="split_idx"),
+                columns=pd.Index([0, 1], dtype="int64", name="split_idx"),
             ),
         )
         target = [
@@ -3230,7 +3230,7 @@ class TestAccessors:
             pd.DataFrame(
                 np.array([[4.0, np.nan]]),
                 index=pd.RangeIndex(start=0, stop=1, step=1),
-                columns=pd.Int64Index([0, 1], dtype="int64", name="split_idx"),
+                columns=pd.Index([0, 1], dtype="int64", name="split_idx"),
             ),
         )
         target = [
@@ -3298,7 +3298,7 @@ class TestAccessors:
             pd.DataFrame(
                 np.array([[1.0, 4.0], [2.0, np.nan]]),
                 index=pd.RangeIndex(start=0, stop=2, step=1),
-                columns=pd.Int64Index([0, 1], dtype="int64", name="split_idx"),
+                columns=pd.Index([0, 1], dtype="int64", name="split_idx"),
             ),
         )
         target = [
@@ -3312,7 +3312,7 @@ class TestAccessors:
             pd.DataFrame(
                 np.array([[1.0, 2.0, 3.0, 4.0], [2.0, 3.0, 4.0, np.nan]]),
                 index=pd.RangeIndex(start=0, stop=2, step=1),
-                columns=pd.Int64Index([0, 1, 2, 3], dtype="int64", name="split_idx"),
+                columns=pd.Index([0, 1, 2, 3], dtype="int64", name="split_idx"),
             ),
         )
         target = [
@@ -3328,7 +3328,7 @@ class TestAccessors:
             pd.DataFrame(
                 np.array([[1.0, 3.0, 4.0], [2.0, 4.0, np.nan]]),
                 index=pd.RangeIndex(start=0, stop=2, step=1),
-                columns=pd.Int64Index([0, 1, 2], dtype="int64", name="split_idx"),
+                columns=pd.Index([0, 1, 2], dtype="int64", name="split_idx"),
             ),
         )
         target = [
@@ -3343,7 +3343,7 @@ class TestAccessors:
             pd.DataFrame(
                 np.array([[1.0, 3.0], [2.0, 4.0], [3.0, np.nan]]),
                 index=pd.RangeIndex(start=0, stop=3, step=1),
-                columns=pd.Int64Index([0, 1], dtype="int64", name="split_idx"),
+                columns=pd.Index([0, 1], dtype="int64", name="split_idx"),
             ),
         )
         target = [
@@ -3369,7 +3369,7 @@ class TestAccessors:
                 index=pd.RangeIndex(start=0, stop=2, step=1),
                 columns=pd.MultiIndex.from_arrays(
                     [
-                        pd.Int64Index([0, 0, 0, 1, 1, 1], dtype="int64", name="split_idx"),
+                        pd.Index([0, 0, 0, 1, 1, 1], dtype="int64", name="split_idx"),
                         pd.Index(["a", "b", "c", "a", "b", "c"], dtype="object"),
                     ]
                 ),
@@ -3394,7 +3394,7 @@ class TestAccessors:
                 index=pd.RangeIndex(start=0, stop=3, step=1),
                 columns=pd.MultiIndex.from_arrays(
                     [
-                        pd.Int64Index([0, 0, 0, 1, 1, 1], dtype="int64", name="split_idx"),
+                        pd.Index([0, 0, 0, 1, 1, 1], dtype="int64", name="split_idx"),
                         pd.Index(["a", "b", "c", "a", "b", "c"], dtype="object"),
                     ]
                 ),
@@ -3429,7 +3429,7 @@ class TestAccessors:
                 index=pd.RangeIndex(start=0, stop=3, step=1),
                 columns=pd.MultiIndex.from_arrays(
                     [
-                        pd.Int64Index([0, 0, 0, 1, 1, 1], dtype="int64", name="split_idx"),
+                        pd.Index([0, 0, 0, 1, 1, 1], dtype="int64", name="split_idx"),
                         pd.Index(["a", "b", "c", "a", "b", "c"], dtype="object"),
                     ]
                 ),
@@ -3468,7 +3468,7 @@ class TestAccessors:
                 index=pd.RangeIndex(start=0, stop=4, step=1),
                 columns=pd.MultiIndex.from_arrays(
                     [
-                        pd.Int64Index([0, 0, 0, 1, 1, 1], dtype="int64", name="split_idx"),
+                        pd.Index([0, 0, 0, 1, 1, 1], dtype="int64", name="split_idx"),
                         pd.Index(["a", "b", "c", "a", "b", "c"], dtype="object"),
                     ]
                 ),
@@ -3515,7 +3515,7 @@ class TestAccessors:
             pd.DataFrame(
                 np.array([[1.0, 2.0], [2.0, 3.0]]),
                 index=pd.RangeIndex(start=0, stop=2, step=1),
-                columns=pd.Int64Index([0, 1], dtype="int64", name="split_idx"),
+                columns=pd.Index([0, 1], dtype="int64", name="split_idx"),
             ),
         )
         target = [
@@ -3529,7 +3529,7 @@ class TestAccessors:
             pd.DataFrame(
                 np.array([[3.0, 4.0]]),
                 index=pd.RangeIndex(start=0, stop=1, step=1),
-                columns=pd.Int64Index([0, 1], dtype="int64", name="split_idx"),
+                columns=pd.Index([0, 1], dtype="int64", name="split_idx"),
             ),
         )
         target = [
@@ -3543,7 +3543,7 @@ class TestAccessors:
             pd.DataFrame(
                 np.array([[4.0, np.nan]]),
                 index=pd.RangeIndex(start=0, stop=1, step=1),
-                columns=pd.Int64Index([0, 1], dtype="int64", name="split_idx"),
+                columns=pd.Index([0, 1], dtype="int64", name="split_idx"),
             ),
         )
         target = [
@@ -3562,7 +3562,7 @@ class TestAccessors:
             pd.DataFrame(
                 np.array([[1.0, 2.0]]),
                 index=pd.RangeIndex(start=0, stop=1, step=1),
-                columns=pd.Int64Index([0, 1], dtype="int64", name="split_idx"),
+                columns=pd.Index([0, 1], dtype="int64", name="split_idx"),
             ),
         )
         target = [
@@ -3576,7 +3576,7 @@ class TestAccessors:
             pd.DataFrame(
                 np.array([[2.0, 3.0]]),
                 index=pd.RangeIndex(start=0, stop=1, step=1),
-                columns=pd.Int64Index([0, 1], dtype="int64", name="split_idx"),
+                columns=pd.Index([0, 1], dtype="int64", name="split_idx"),
             ),
         )
         target = [
@@ -3590,7 +3590,7 @@ class TestAccessors:
             pd.DataFrame(
                 np.array([[3.0, 4.0], [4.0, np.nan]]),
                 index=pd.RangeIndex(start=0, stop=2, step=1),
-                columns=pd.Int64Index([0, 1], dtype="int64", name="split_idx"),
+                columns=pd.Index([0, 1], dtype="int64", name="split_idx"),
             ),
         )
         target = [
@@ -3609,7 +3609,7 @@ class TestAccessors:
             pd.DataFrame(
                 np.array([[1.0, 2.0], [2.0, np.nan]]),
                 index=pd.RangeIndex(start=0, stop=2, step=1),
-                columns=pd.Int64Index([0, 1], dtype="int64", name="split_idx"),
+                columns=pd.Index([0, 1], dtype="int64", name="split_idx"),
             ),
         )
         target = [
@@ -3623,7 +3623,7 @@ class TestAccessors:
             pd.DataFrame(
                 np.array([[3.0, 3.0]]),
                 index=pd.RangeIndex(start=0, stop=1, step=1),
-                columns=pd.Int64Index([0, 1], dtype="int64", name="split_idx"),
+                columns=pd.Index([0, 1], dtype="int64", name="split_idx"),
             ),
         )
         target = [
@@ -3637,7 +3637,7 @@ class TestAccessors:
             pd.DataFrame(
                 np.array([[4.0, 4.0], [np.nan, np.nan]]),
                 index=pd.RangeIndex(start=0, stop=2, step=1),
-                columns=pd.Int64Index([0, 1], dtype="int64", name="split_idx"),
+                columns=pd.Index([0, 1], dtype="int64", name="split_idx"),
             ),
         )
         target = [
@@ -3652,7 +3652,7 @@ class TestAccessors:
             pd.DataFrame(
                 np.array([[1.0, 4.0], [2.0, np.nan]]),
                 index=pd.RangeIndex(start=0, stop=2, step=1),
-                columns=pd.Int64Index([0, 1], dtype="int64", name="split_idx"),
+                columns=pd.Index([0, 1], dtype="int64", name="split_idx"),
             ),
         )
         target = [
@@ -3665,7 +3665,7 @@ class TestAccessors:
             pd.DataFrame(
                 np.array([[1.0, 4.0], [2.0, np.nan]]),
                 index=pd.RangeIndex(start=0, stop=2, step=1),
-                columns=pd.Int64Index([0, 1], dtype="int64", name="split_idx"),
+                columns=pd.Index([0, 1], dtype="int64", name="split_idx"),
             ),
         )
         target = [
@@ -3696,7 +3696,7 @@ class TestAccessors:
             pd.DataFrame(
                 np.array([[1.0, 1.0], [2.0, 2.0], [np.nan, 3.0]]),
                 index=pd.RangeIndex(start=0, stop=3, step=1),
-                columns=pd.Int64Index([0, 1], dtype="int64", name="split_idx"),
+                columns=pd.Index([0, 1], dtype="int64", name="split_idx"),
             ),
         )
         target = [
@@ -3715,7 +3715,7 @@ class TestAccessors:
             pd.DataFrame(
                 np.array([[3.0, 4.0]]),
                 index=pd.RangeIndex(start=0, stop=1, step=1),
-                columns=pd.Int64Index([0, 1], dtype="int64", name="split_idx"),
+                columns=pd.Index([0, 1], dtype="int64", name="split_idx"),
             ),
         )
         target = [
@@ -3729,7 +3729,7 @@ class TestAccessors:
             pd.DataFrame(
                 np.array([[4.0, np.nan]]),
                 index=pd.RangeIndex(start=0, stop=1, step=1),
-                columns=pd.Int64Index([0, 1], dtype="int64", name="split_idx"),
+                columns=pd.Index([0, 1], dtype="int64", name="split_idx"),
             ),
         )
         target = [
@@ -3744,7 +3744,7 @@ class TestAccessors:
             pd.DataFrame(
                 np.array([[1.0, 1.0], [2.0, 2.0], [np.nan, 3.0], [np.nan, 4.0], [np.nan, np.nan]]),
                 index=pd.RangeIndex(start=0, stop=5, step=1),
-                columns=pd.Int64Index([0, 1], dtype="int64", name="split_idx"),
+                columns=pd.Index([0, 1], dtype="int64", name="split_idx"),
             ),
         )
         target = [

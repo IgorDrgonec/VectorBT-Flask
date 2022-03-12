@@ -16,7 +16,7 @@ from vectorbtpro.base.indexing import IndexingError, PandasIndexer
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import AttrResolverMixin, AttrResolverMixinT
 from vectorbtpro.utils.config import Configured, merge_dicts, resolve_dict
-from vectorbtpro.utils.datetime_ import infer_index_freq, freq_to_timedelta
+from vectorbtpro.utils.datetime_ import infer_index_freq, try_to_datetime_index
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.decorators import class_or_instancemethod
 
@@ -53,8 +53,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         checks.assert_not_none(index)
         checks.assert_not_none(columns)
         checks.assert_not_none(ndim)
-        if not isinstance(index, pd.Index):
-            index = pd.Index(index)
+        index = try_to_datetime_index(index)
         if not isinstance(columns, pd.Index):
             columns = pd.Index(columns)
 
@@ -360,7 +359,9 @@ class ArrayWrapper(Configured, PandasIndexer):
 
     @property
     def freq(self) -> tp.Optional[pd.Timedelta]:
-        """Index frequency."""
+        """Index frequency as `pd.Timedelta` or None if it cannot be converted.
+
+        Date offsets and integer frequencies are not allowed."""
         from vectorbtpro._settings import settings
 
         wrapping_cfg = settings["wrapping"]
@@ -368,7 +369,10 @@ class ArrayWrapper(Configured, PandasIndexer):
         freq = self._freq
         if freq is None:
             freq = wrapping_cfg["freq"]
-        return infer_index_freq(self.index, freq=freq)
+        try:
+            return infer_index_freq(self.index, freq=freq, allow_date_offset=False, allow_numeric=False)
+        except Exception as e:
+            return None
 
     @property
     def period(self) -> int:
@@ -709,7 +713,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         else:
             _resampler = Resampler.from_pd_resampler(resampler)
         new_index = _resampler.target_index
-        new_freq = freq_to_timedelta(_resampler.target_freq)
+        new_freq = infer_index_freq(new_index)
         new_wrapper = self.replace(index=new_index, freq=new_freq)
         return resampler, new_wrapper
 

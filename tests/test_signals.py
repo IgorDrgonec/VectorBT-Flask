@@ -2642,7 +2642,7 @@ class TestFactory:
             my_sig.entries,
             pd.DataFrame(
                 np.array([[True, True], [False, False], [False, False], [False, False], [False, False]]),
-                columns=pd.Int64Index([1, 0], dtype="int64", name="custom_n2"),
+                columns=pd.Index([1, 0], dtype="int64", name="custom_n2"),
             ),
         )
         pd.testing.assert_frame_equal(
@@ -2657,7 +2657,7 @@ class TestFactory:
                         [np.nan, np.nan],
                     ]
                 ),
-                columns=pd.Int64Index([1, 0], dtype="int64", name="custom_n2"),
+                columns=pd.Index([1, 0], dtype="int64", name="custom_n2"),
             ),
         )
 
@@ -2691,14 +2691,14 @@ class TestFactory:
             my_sig.entries,
             pd.DataFrame(
                 np.array([[True, True], [False, False], [True, True], [False, False], [True, True]]),
-                columns=pd.Int64Index([1, 0], dtype="int64", name="custom_n2"),
+                columns=pd.Index([1, 0], dtype="int64", name="custom_n2"),
             ),
         )
         pd.testing.assert_frame_equal(
             my_sig.exits,
             pd.DataFrame(
                 np.array([[False, False], [True, True], [False, False], [True, True], [False, False]]),
-                columns=pd.Int64Index([1, 0], dtype="int64", name="custom_n2"),
+                columns=pd.Index([1, 0], dtype="int64", name="custom_n2"),
             ),
         )
         pd.testing.assert_frame_equal(
@@ -2713,7 +2713,7 @@ class TestFactory:
                         [np.nan, np.nan],
                     ]
                 ),
-                columns=pd.Int64Index([1, 0], dtype="int64", name="custom_n2"),
+                columns=pd.Index([1, 0], dtype="int64", name="custom_n2"),
             ),
         )
         e = np.array([True, False, False, True, False, False])
@@ -2722,14 +2722,14 @@ class TestFactory:
             my_sig.entries,
             pd.DataFrame(
                 np.array([[True, True], [False, False], [False, False], [True, True], [False, False], [False, False]]),
-                columns=pd.Int64Index([1, 0], dtype="int64", name="custom_n2"),
+                columns=pd.Index([1, 0], dtype="int64", name="custom_n2"),
             ),
         )
         pd.testing.assert_frame_equal(
             my_sig.exits,
             pd.DataFrame(
                 np.array([[False, False], [False, False], [True, True], [False, False], [False, False], [True, True]]),
-                columns=pd.Int64Index([1, 0], dtype="int64", name="custom_n2"),
+                columns=pd.Index([1, 0], dtype="int64", name="custom_n2"),
             ),
         )
         pd.testing.assert_frame_equal(
@@ -2745,7 +2745,7 @@ class TestFactory:
                         [1105.0, 1100.0],
                     ]
                 ),
-                columns=pd.Int64Index([1, 0], dtype="int64", name="custom_n2"),
+                columns=pd.Index([1, 0], dtype="int64", name="custom_n2"),
             ),
         )
 
@@ -2779,21 +2779,21 @@ class TestFactory:
             my_sig.entries,
             pd.DataFrame(
                 np.array([[True, True], [True, True], [True, True], [True, True], [True, True]]),
-                columns=pd.Int64Index([1, 0], dtype="int64", name="custom_n2"),
+                columns=pd.Index([1, 0], dtype="int64", name="custom_n2"),
             ),
         )
         pd.testing.assert_frame_equal(
             my_sig.new_entries,
             pd.DataFrame(
                 np.array([[True, True], [False, False], [True, True], [False, False], [True, True]]),
-                columns=pd.Int64Index([1, 0], dtype="int64", name="custom_n2"),
+                columns=pd.Index([1, 0], dtype="int64", name="custom_n2"),
             ),
         )
         pd.testing.assert_frame_equal(
             my_sig.exits,
             pd.DataFrame(
                 np.array([[False, False], [True, True], [False, False], [True, True], [False, False]]),
-                columns=pd.Int64Index([1, 0], dtype="int64", name="custom_n2"),
+                columns=pd.Index([1, 0], dtype="int64", name="custom_n2"),
             ),
         )
         pd.testing.assert_frame_equal(
@@ -2808,7 +2808,7 @@ class TestFactory:
                         [np.nan, np.nan],
                     ]
                 ),
-                columns=pd.Int64Index([1, 0], dtype="int64", name="custom_n2"),
+                columns=pd.Index([1, 0], dtype="int64", name="custom_n2"),
             ),
         )
         e = np.array([True, True, True, True, True, True])
@@ -2817,21 +2817,21 @@ class TestFactory:
             my_sig.entries,
             pd.DataFrame(
                 np.array([[True, True], [True, True], [True, True], [True, True], [True, True], [True, True]]),
-                columns=pd.Int64Index([1, 0], dtype="int64", name="custom_n2"),
+                columns=pd.Index([1, 0], dtype="int64", name="custom_n2"),
             ),
         )
         pd.testing.assert_frame_equal(
             my_sig.new_entries,
             pd.DataFrame(
                 np.array([[True, True], [False, False], [False, False], [True, True], [False, False], [False, False]]),
-                columns=pd.Int64Index([1, 0], dtype="int64", name="custom_n2"),
+                columns=pd.Index([1, 0], dtype="int64", name="custom_n2"),
             ),
         )
         pd.testing.assert_frame_equal(
             my_sig.exits,
             pd.DataFrame(
                 np.array([[False, False], [False, False], [True, True], [False, False], [False, False], [True, True]]),
-                columns=pd.Int64Index([1, 0], dtype="int64", name="custom_n2"),
+                columns=pd.Index([1, 0], dtype="int64", name="custom_n2"),
             ),
         )
         pd.testing.assert_frame_equal(
@@ -2847,7 +2847,7 @@ class TestFactory:
                         [1105.0, 1100.0],
                     ]
                 ),
-                columns=pd.Int64Index([1, 0], dtype="int64", name="custom_n2"),
+                columns=pd.Index([1, 0], dtype="int64", name="custom_n2"),
             ),
         )
 
@@ -3053,7 +3053,7 @@ class TestGenerators:
                         [False, False, False],
                     ]
                 ),
-                columns=pd.Int64Index([1, 2, 3], dtype="int64", name="rand_n"),
+                columns=pd.Index([1, 2, 3], dtype="int64", name="rand_n"),
             ),
         )
         rand = vbt.RAND.run(n=[np.array([1, 2]), np.array([3, 4])], input_shape=(8, 2), seed=seed)
@@ -3119,7 +3119,7 @@ class TestGenerators:
                         [False, False, False],
                     ]
                 ),
-                columns=pd.Int64Index([1, 2, 3], dtype="int64", name="randnx_n"),
+                columns=pd.Index([1, 2, 3], dtype="int64", name="randnx_n"),
             ),
         )
         pd.testing.assert_frame_equal(
@@ -3135,7 +3135,7 @@ class TestGenerators:
                         [False, False, True],
                     ]
                 ),
-                columns=pd.Int64Index([1, 2, 3], dtype="int64", name="randnx_n"),
+                columns=pd.Index([1, 2, 3], dtype="int64", name="randnx_n"),
             ),
         )
         randnx = vbt.RANDNX.run(n=[np.array([1, 2]), np.array([3, 4])], input_shape=(8, 2), seed=seed)

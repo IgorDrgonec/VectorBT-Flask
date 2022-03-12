@@ -137,7 +137,7 @@ class TestFactory:
         target = pd.DataFrame(
             np.array([[110.0, 111.0], [110.0, 112.0], [110.0, 113.0], [110.0, 114.0], [110.0, 115.0]]),
             index=ts.index,
-            columns=pd.Int64Index([0, 1], dtype="int64", name="custom_p"),
+            columns=pd.Index([0, 1], dtype="int64", name="custom_p"),
         )
         pd.testing.assert_frame_equal(
             F.with_custom_func(custom_func, var_args=True, per_column=False).run(ts["a"], [0, 1], 10, b=100).out,
@@ -236,7 +236,7 @@ class TestFactory:
         target = pd.DataFrame(
             np.array([[110.0, 111.0], [110.0, 112.0], [110.0, 113.0], [110.0, 114.0], [110.0, 115.0]]),
             index=ts.index,
-            columns=pd.Int64Index([0, 1], dtype="int64", name="custom_p"),
+            columns=pd.Index([0, 1], dtype="int64", name="custom_p"),
         )
         pd.testing.assert_frame_equal(
             F.with_apply_func(apply_func, var_args=True).run(ts["a"], [0, 1], 10, b=100).out,
@@ -350,7 +350,7 @@ class TestFactory:
         target = pd.DataFrame(
             np.array([[0, 1], [0, 1], [0, 1], [0, 1], [0, 1]]),
             index=pd.RangeIndex(start=0, stop=5, step=1),
-            columns=pd.Int64Index([0, 1], dtype="int64", name="custom_p"),
+            columns=pd.Index([0, 1], dtype="int64", name="custom_p"),
         )
         pd.testing.assert_frame_equal(
             F.with_apply_func(apply_func, require_input_shape=True).run(5, [0, 1]).out,
@@ -2760,7 +2760,7 @@ class TestFactory:
                         )
                     ),
                     index=ts.index,
-                    columns=pd.Int64Index([2, 3, 4], dtype="int64", name="sma_length"),
+                    columns=pd.Index([2, 3, 4], dtype="int64", name="sma_length"),
                 ),
             )
 
@@ -2792,7 +2792,7 @@ class TestFactory:
                         )
                     ),
                     index=ts.index,
-                    columns=pd.Int64Index([2, 3, 4], dtype="int64", name="smaindicator_window"),
+                    columns=pd.Index([2, 3, 4], dtype="int64", name="smaindicator_window"),
                 ),
             )
             target = pd.DataFrame(

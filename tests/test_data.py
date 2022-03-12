@@ -291,7 +291,7 @@ class TestData:
             pd.DataFrame(
                 [["0_1_1"], ["0_1_2"], ["0_1_3"]],
                 index=index[1:4],
-                columns=pd.Int64Index([1], dtype="int64"),
+                columns=pd.Index([1], dtype="int64"),
             ),
         )
         pd.testing.assert_frame_equal(
@@ -306,7 +306,7 @@ class TestData:
             pd.DataFrame(
                 [["1_1_1"], ["1_1_2"], ["1_1_3"]],
                 index=index[1:4],
-                columns=pd.Int64Index([1], dtype="int64"),
+                columns=pd.Index([1], dtype="int64"),
             ),
         )
         assert len(MyData.fetch([0, 1], shape=(5, 3), return_none=vbt.symbol_dict({0: True, 1: False})).symbols) == 1
@@ -414,7 +414,7 @@ class TestData:
         )
         pd.testing.assert_series_equal(
             MyData.fetch(0, shape=(5,), return_arr=True).update(concat=False).data[0],
-            pd.Series(["0_0_u"], index=pd.Int64Index([4], dtype="int64")),
+            pd.Series(["0_0_u"], index=pd.Index([4], dtype="int64")),
         )
         pd.testing.assert_series_equal(
             MyData.fetch(0, shape=(5,), return_arr=True).update(n=2).data[0],
@@ -422,7 +422,7 @@ class TestData:
         )
         pd.testing.assert_series_equal(
             MyData.fetch(0, shape=(5,), return_arr=True).update(n=2, concat=False).data[0],
-            pd.Series(["0_0_u", "0_1_u"], index=pd.Int64Index([4, 5], dtype="int64")),
+            pd.Series(["0_0_u", "0_1_u"], index=pd.Index([4, 5], dtype="int64")),
         )
         pd.testing.assert_frame_equal(
             MyData.fetch(0, shape=(5, 3), return_arr=True).update().data[0],
@@ -442,7 +442,7 @@ class TestData:
                 [
                     ["0_0_0_u", "0_1_0_u", "0_2_0_u"],
                 ],
-                index=pd.Int64Index([4], dtype="int64"),
+                index=pd.Index([4], dtype="int64"),
             ),
         )
         pd.testing.assert_frame_equal(
@@ -465,7 +465,7 @@ class TestData:
                     ["0_0_0_u", "0_1_0_u", "0_2_0_u"],
                     ["0_0_1_u", "0_1_1_u", "0_2_1_u"],
                 ],
-                index=pd.Int64Index([4, 5], dtype="int64"),
+                index=pd.Index([4, 5], dtype="int64"),
             ),
         )
         index = pd.DatetimeIndex(
@@ -834,7 +834,7 @@ class TestData:
             pd.DataFrame(
                 [["0_1_1"], ["0_1_2"], ["0_1_3"]],
                 index=index[1:4],
-                columns=pd.Int64Index([1], dtype="int64"),
+                columns=pd.Index([1], dtype="int64"),
             ),
         )
         pd.testing.assert_frame_equal(
@@ -851,7 +851,7 @@ class TestData:
             pd.DataFrame(
                 [["1_1_1"], ["1_1_2"], ["1_1_3"]],
                 index=index[1:4],
-                columns=pd.Int64Index([1], dtype="int64"),
+                columns=pd.Index([1], dtype="int64"),
             ),
         )
         pd.testing.assert_frame_equal(
@@ -868,7 +868,7 @@ class TestData:
             pd.DataFrame(
                 [],
                 index=pd.DatetimeIndex([], dtype="datetime64[ns, UTC]", freq=None),
-                columns=pd.Int64Index([1], dtype="int64"),
+                columns=pd.Index([1], dtype="int64"),
             ),
         )
         pd.testing.assert_frame_equal(
@@ -885,7 +885,7 @@ class TestData:
             pd.DataFrame(
                 [],
                 index=pd.DatetimeIndex([], dtype="datetime64[ns, UTC]", freq=None),
-                columns=pd.Int64Index([1], dtype="int64"),
+                columns=pd.Index([1], dtype="int64"),
             ),
         )
         pd.testing.assert_frame_equal(
@@ -902,7 +902,7 @@ class TestData:
             pd.DataFrame(
                 [["0_1_1"], ["0_1_2"], ["0_1_3"]],
                 index=index[1:4],
-                columns=pd.Int64Index([1], dtype="int64"),
+                columns=pd.Index([1], dtype="int64"),
             ),
         )
         pd.testing.assert_frame_equal(
@@ -919,7 +919,7 @@ class TestData:
             pd.DataFrame(
                 [["1_1_1"], ["1_1_2"], ["1_1_0_u"]],
                 index=index[1:4],
-                columns=pd.Int64Index([1], dtype="int64"),
+                columns=pd.Index([1], dtype="int64"),
             ),
         )
         pd.testing.assert_frame_equal(
@@ -936,7 +936,7 @@ class TestData:
             pd.DataFrame(
                 [["0_1_3"]],
                 index=pd.DatetimeIndex(["2020-01-04 00:00:00+00:00"], dtype="datetime64[ns, UTC]", freq=None),
-                columns=pd.Int64Index([1], dtype="int64"),
+                columns=pd.Index([1], dtype="int64"),
             ),
         )
         pd.testing.assert_frame_equal(
@@ -953,7 +953,7 @@ class TestData:
             pd.DataFrame(
                 [["1_1_0_u"]],
                 index=pd.DatetimeIndex(["2020-01-04 00:00:00+00:00"], dtype="datetime64[ns, UTC]", freq=None),
-                columns=pd.Int64Index([1], dtype="int64"),
+                columns=pd.Index([1], dtype="int64"),
             ),
         )
         assert MyData.fetch(
@@ -1141,7 +1141,7 @@ class TestData:
             pd.DataFrame(
                 [["0_0", "1_0"], ["0_1", "1_1"], ["0_2", "1_2"], ["0_3", "1_3"], ["0_4", "1_4"]],
                 index=index,
-                columns=pd.Int64Index([0, 1], dtype="int64", name="symbol"),
+                columns=pd.Index([0, 1], dtype="int64", name="symbol"),
             ),
         )
         pd.testing.assert_series_equal(
@@ -1161,7 +1161,7 @@ class TestData:
             pd.DataFrame(
                 [["0_0_0", "1_0_0"], ["0_0_1", "1_0_1"], ["0_0_2", "1_0_2"], ["0_0_3", "1_0_3"], ["0_0_4", "1_0_4"]],
                 index=index,
-                columns=pd.Int64Index([0, 1], dtype="int64", name="symbol"),
+                columns=pd.Index([0, 1], dtype="int64", name="symbol"),
             ),
         )
         pd.testing.assert_frame_equal(
@@ -1169,7 +1169,7 @@ class TestData:
             pd.DataFrame(
                 [["0_1_0", "1_1_0"], ["0_1_1", "1_1_1"], ["0_1_2", "1_1_2"], ["0_1_3", "1_1_3"], ["0_1_4", "1_1_4"]],
                 index=index,
-                columns=pd.Int64Index([0, 1], dtype="int64", name="symbol"),
+                columns=pd.Index([0, 1], dtype="int64", name="symbol"),
             ),
         )
         pd.testing.assert_frame_equal(
@@ -1177,7 +1177,7 @@ class TestData:
             pd.DataFrame(
                 [["0_2_0", "1_2_0"], ["0_2_1", "1_2_1"], ["0_2_2", "1_2_2"], ["0_2_3", "1_2_3"], ["0_2_4", "1_2_4"]],
                 index=index,
-                columns=pd.Int64Index([0, 1], dtype="int64", name="symbol"),
+                columns=pd.Index([0, 1], dtype="int64", name="symbol"),
             ),
         )
 
@@ -1220,7 +1220,7 @@ class TestData:
             pd.DataFrame(
                 [["0_0", "1_0"], ["0_1", "1_1"], ["0_2", "1_2"], ["0_3", "1_3"], ["0_4", "1_4"]],
                 index=index,
-                columns=pd.Int64Index([0, 1], dtype="int64", name="symbol"),
+                columns=pd.Index([0, 1], dtype="int64", name="symbol"),
             ),
         )
         pd.testing.assert_frame_equal(
@@ -1228,7 +1228,7 @@ class TestData:
             pd.DataFrame(
                 [["0_0_0", "1_0_0"], ["0_0_1", "1_0_1"], ["0_0_2", "1_0_2"], ["0_0_3", "1_0_3"], ["0_0_4", "1_0_4"]],
                 index=index,
-                columns=pd.Int64Index([0, 1], dtype="int64", name="symbol"),
+                columns=pd.Index([0, 1], dtype="int64", name="symbol"),
             ),
         )
         pd.testing.assert_frame_equal(
@@ -1236,7 +1236,7 @@ class TestData:
             pd.DataFrame(
                 [["0_0_0", "1_0_0"], ["0_0_1", "1_0_1"], ["0_0_2", "1_0_2"], ["0_0_3", "1_0_3"], ["0_0_4", "1_0_4"]],
                 index=index,
-                columns=pd.Int64Index([0, 1], dtype="int64", name="symbol"),
+                columns=pd.Index([0, 1], dtype="int64", name="symbol"),
             ),
         )
         pd.testing.assert_frame_equal(
@@ -1244,7 +1244,7 @@ class TestData:
             pd.DataFrame(
                 [["0_0_0", "1_0_0"], ["0_0_1", "1_0_1"], ["0_0_2", "1_0_2"], ["0_0_3", "1_0_3"], ["0_0_4", "1_0_4"]],
                 index=index,
-                columns=pd.Int64Index([0, 1], dtype="int64", name="symbol"),
+                columns=pd.Index([0, 1], dtype="int64", name="symbol"),
             ),
         )
         pd.testing.assert_frame_equal(
@@ -1291,7 +1291,7 @@ class TestData:
         data = MyData.fetch(["S1", "S2"], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
 
         def _load_and_check_symbol(s, path, **kwargs):
-            df = pd.read_csv(path, parse_dates=True, squeeze=True, index_col=0, **kwargs)
+            df = pd.read_csv(path, parse_dates=True, index_col=0, **kwargs).squeeze("columns")
             df.index.freq = df.index.inferred_freq
             pd.testing.assert_frame_equal(df, data.data[s])
 

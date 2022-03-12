@@ -71,14 +71,14 @@ def try_to_datetime_index(index: tp.IndexLike, **kwargs) -> tp.Index:
 def infer_index_freq(
     index: pd.Index,
     freq: tp.Optional[tp.FrequencyLike] = None,
-    allow_date_offset: bool = False,
-    allow_numeric: bool = False,
+    allow_date_offset: bool = True,
+    allow_numeric: bool = True,
     detect_via_diff: bool = False,
 ) -> tp.Union[None, float, tp.PandasFrequency]:
     """Infer frequency of a datetime index if `freq` is None, otherwise convert `freq`."""
     if freq is None and isinstance(index, pd.DatetimeIndex):
         if index.freqstr is not None:
-            freq = freq_to_timedelta(index.freqstr)
+            freq = to_offset(index.freqstr)
         elif index.freq is not None:
             freq = index.freq
         elif len(index) >= 3:
