@@ -29,6 +29,7 @@ flowchart TD;
     id7["Data instance"]
     id8["Updating"]
     id9["Querying"]
+    id10["Resampling"]
     
     id1 --> id2;
     id2 --> id5;
@@ -37,6 +38,8 @@ flowchart TD;
     id5 --> id6;
     id6 -->|"creates"| id7;
     id7 --> id8;
+    id7 --> id10;
+    id10 -->|"creates"| id7;
     id8 --> id5;
     id7 --> id9;
 ```
@@ -845,6 +848,118 @@ Open time
 
 We just created a flexible data class that can fetch, update, and manage symbols from multiple 
 data providers. Great!
+
+## Resampling
+
+As a subclass of [Wrapping](/api/base/wrapping/#vectorbtpro.base.wrapping.Wrapping), each data instance
+stores the normalized metadata of all Pandas objects stored in that instance. This metadata
+can be used for resampling (i.e., changing the time frame) of all Pandas objects at once. Since 
+many data classes, such as [CCXTData](/api/data/custom/#vectorbtpro.data.custom.CCXTData), have a 
+fixed column layout, we can define the resampling function for each of their columns in a special 
+config called "column config" (stored under [Data.column_config](/api/data/base/#vectorbtpro.data.base.Data.column_config)) 
+and bind that config to the class itself for the use by all instances. Similar to field configs
+in [Records](/api/records/base/#vectorbtpro.records.base.Records), this config also can be attached
+to an entire data class or on any of its instances. Whenever a new instance is created, the config
+of the class is copied over such that rewriting it wouldn't affect the class config.
+
+Here's, for example, how the column config of [BinanceData](/api/data/custom/#vectorbtpro.data.custom.BinanceData) 
+looks like:
+
+```pycon
+>>> print(vbt.BinanceData.column_config.prettify())
+Config({
+    'Close time': {
+        'resample_func': <function BinanceData.<lambda> at 0x7f89cbac9e18>
+    },
+    'Quote volume': {
+        'resample_func': <function BinanceData.<lambda> at 0x7f89cbac9ea0>
+    },
+    'Number of trades': {
+        'resample_func': <function BinanceData.<lambda> at 0x7f89cbac9f28>
+    },
+    'Taker base volume': {
+        'resample_func': <function BinanceData.<lambda> at 0x7f89cbaf3048>
+    },
+    'Taker quote volume': {
+        'resample_func': <function BinanceData.<lambda> at 0x7f89cbaf30d0>
+    }
+})
+```
+
+Wondering where are the resampling functions for all the OHLCV columns? Those columns are universal, 
+and recognized and resampled automatically.
+
+Let's resample the entire daily BTC/USD data from Yahoo Finance to the monthly frequency:
+
+```pycon
+>>> full_yf_data = YFData.fetch("BTC-USD")
+
+>>> ms_yf_data = full_yf_data.resample("MS")
+>>> ms_yf_data.get("Close")
+Date
+2014-09-01 00:00:00+00:00      386.944000
+2014-10-01 00:00:00+00:00      338.321014
+2014-11-01 00:00:00+00:00      378.046997
+...                                   ...
+2022-01-01 00:00:00+00:00    38483.125000
+2022-02-01 00:00:00+00:00    43193.234375
+2022-03-01 00:00:00+00:00    39145.449219
+Freq: MS, Name: Close, Length: 91, dtype: float64
+```
+
+Since vectorbt works with custom target indexes just as well as with frequencies,
+we can provide a custom index to resample to:
+
+```pycon
+>>> resampler = vbt.Resampler.from_pd_date_range(
+...     full_yf_data.wrapper.index,
+...     start=full_yf_data.wrapper.index[0],
+...     end=full_yf_data.wrapper.index[-1],
+...     freq="Y"
+... )
+>>> y_yf_data = full_yf_data.resample(resampler)
+>>> y_yf_data.get("Close")
+2014-12-31 00:00:00+00:00      426.619995
+2015-12-31 00:00:00+00:00      961.237976
+2016-12-31 00:00:00+00:00    12952.200195
+2017-12-31 00:00:00+00:00     3865.952637
+2018-12-31 00:00:00+00:00     7292.995117
+2019-12-31 00:00:00+00:00    28840.953125
+2020-12-31 00:00:00+00:00    47178.125000
+2021-12-31 00:00:00+00:00    39194.972656
+Freq: A-DEC, Name: Close, dtype: float64
+```
+
+!!! note
+    Whenever providing a custom index, vectorbt will aggregate all the values after each index entry.
+    The last entry aggregates all the values up to infinity. See [GenericAccessor.resample_to_index](/api/generic/accessors/#vectorbtpro.generic.accessors.GenericAccessor.resample_to_index).
+
+If a data class doesn't have a fixed column layout, such as [HDFData](/api/data/custom/#vectorbtpro.data.custom.HDFData),
+we need to adapt the column config to each **data instance** instead of setting it to the entire data class.
+For example, if we convert `bn_data_btc` to a generic [Data](/api/data/base/#vectorbtpro.data.base.Data) instance:
+
+```pycon
+>>> data_btc = vbt.Data.from_data(bn_data_btc.data, single_symbol=True)
+>>> data_btc.resample("MS")
+ValueError: Cannot resample column 'Close time'. Specify resample_func in column_config.
+
+>>> for k, v in vbt.BinanceData.column_config.items():
+...     data_btc.column_config[k] = v
+>>> data_btc.resample("MS")
+<vectorbtpro.data.base.Data at 0x7fc0dfce1630>
+```
+
+The same can be done with a single copy operation using 
+[Data.use_column_config_of](/api/data/base/#vectorbtpro.data.base.Data.use_column_config_of):
+
+```pycon
+>>> data_btc = vbt.Data.from_data(bn_data_btc.data, single_symbol=True)
+>>> data_btc.use_column_config_of(vbt.BinanceData)
+>>> data_btc.resample("MS").get("Close")
+Open time
+2020-01-01 00:00:00+00:00    7344.96
+Freq: MS, Name: Close, dtype: float64
+```
 
 ## Analysis
 

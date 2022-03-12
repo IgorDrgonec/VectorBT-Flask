@@ -6,6 +6,45 @@ title: Release notes
 
 All notable changes in reverse chronological order.
 
+## Version 1.1.2 (12 Mar, 2022)
+
+- Added option `skipna` to run a TA-Lib indicator on non-NA values only (TA-Lib hates NaN)
+- Implemented a range of (NB and SP) resampling functions for
+    1. Getting the latest information at each timestamp, supporting bar data ([GenericAccessor.latest_at_index](/api/generic/accessors/#vectorbtpro.generic.accessors.GenericAccessor.latest_at_index))
+    2. Resampling to a custom index, both as a regular and meta method ([GenericAccessor.resample_to_index](/api/generic/accessors/#vectorbtpro.generic.accessors.GenericAccessor.resample_to_index))
+    3. Resampling between custom bounds, both as a regular and meta method ([GenericAccessor.resample_between_bounds](/api/generic/accessors/#vectorbtpro.generic.accessors.GenericAccessor.resample_between_bounds))
+- Implemented the [Resampler](/api/base/resampling/base/#vectorbtpro.base.resampling.base.Resampler) class, 
+which acts as a mapper between the source and target index for best flexibility. It can parse a resampler
+from Pandas. Also, implemented a range of helper functions for
+    1. Generating a datetime index from frequency (NB)
+    2. Getting the right bound of a datetime index
+    3. Mapping one datetime index to another (NB, [Resampler.map_index](/api/base/resampling/base/#vectorbtpro.base.resampling.base.Resampler.map_index))
+    4. Getting datetime index difference (NB, [Resampler.index_difference](/api/base/resampling/base/#vectorbtpro.base.resampling.base.Resampler.index_difference))
+- Implemented an interface for resampling complex vectorbt objects in form of an abstract method
+[Wrapping.resample](/api/base/wrapping/#vectorbtpro.base.wrapping.Wrapping.resample). Also, defined
+resampling logic for all classes whose Pandas objects can be resampled:
+    1. [Data](/api/data/base/#vectorbtpro.data.base.Data)
+    2. [OHLCVDFAccessor](/api/ohlcv/accessors/#vectorbtpro.ohlcv.accessors.OHLCVDFAccessor)
+    3. [ReturnsAccessor](/api/returns/accessors/#vectorbtpro.returns.accessors.ReturnsAccessor)
+    4. [Portfolio](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio)
+    5. [Records](/api/records/base/#vectorbtpro.records.base.Records) and all its subclasses
+- Introduced the column config [Data.column_config](/api/data/base/#vectorbtpro.data.base.Data.column_config),
+which can be used to define resampling function for each custom column in [Data](/api/data/base/#vectorbtpro.data.base.Data).
+OHLCV data is resampled automatically.
+- Completely refactored handling of in-outputs in [Portfolio](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio).
+Introduced the in-output config [Portfolio.in_output_config](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.in_output_config),
+which can be used to define the layout, array type, and resampling function for each custom in-output.
+Appending suffixes (such as `_pcg`) to in-output names is now optional. The suffix `_pcgs` has been renamed to `_cs`.
+The resolution mechanism for in-outputs has been distributed over multiple class methods and made more transparent.
+- The in-output name for returns has been changed from `returns_pcgs` to just `returns`
+- Added argument `init_price` to specify the original entry price of `init_position`. This makes calculation
+of P&L and other metrics more precise and flexible.
+- Fixed the issue where only the first row in `cash_deposits` was applied in 
+[Portfolio.from_orders](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_orders) 
+and [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_signals)
+- Distributed generic Numba-compiled functions across multiple files
+- Enabled passing additional keyword arguments to `get_klines` in [BinanceData](/api/data/custom/#vectorbtpro.data.custom.BinanceData)
+
 ## Version 1.1.1 (25 Feb, 2022)
 
 - [Data](/api/data/base/#vectorbtpro.data.base.Data) now removes duplicates in index while keeping only the last entry
@@ -495,3 +534,4 @@ to a settings file and updates/replaces the current settings in-place.
 - Created and set up a private repository :sparkler:
 
 *[SP]: Single-pass algorithm for best performance
+*[NB]: Numba-compiled

@@ -6,10 +6,10 @@ title: Getting started
 
 ![](/assets/logo/header.svg)
 
-vectorbt PRO (Beta) is the ultimate engine for backtesting, algorithmic trading, and research. 
-It's a high-performance superset of the [vectorbt](https://github.com/polakowo/vectorbt) 
-library, one of the world's most innovative open-source backtesting engines. 
-The PRO version extends the standard library with new impressive features and useful enhancements.
+vectorbt PRO is the next-generation engine for backtesting, algorithmic trading, and research. 
+It's a high-performance, actively-developed, commercial successor to the [vectorbt](https://github.com/polakowo/vectorbt) 
+library, one of the world's most innovative open-source backtesting engines. The PRO version extends the 
+standard library with new impressive features and useful enhancements for professionals.
 
 We bring many [SOTA](https://en.wikipedia.org/wiki/State_of_the_art){target=_blank} tools and libraries
 under one umbrella and automate them. Our vision is to make quantitative analysis and 
@@ -65,23 +65,25 @@ algorithmic trading accessible to everyone. Join us!
   </div>
 </div>
 
-!!! info
-    vectorbt PRO is a successor of the open-source version of vectorbt. Due to a vast and growing
-    difference between both packages, most of the PRO features will remain exclusive and won't be merged back!
+!!! note
+    vectorbt PRO is a commercial successor to the community version of vectorbt. The entire functionality
+    of this package is proprietary and __won't__ be open-sourced.
 
 ## What is vectorbt PRO?
 
 vectorbt PRO is a private fork of vectorbt, hosted as a private GitHub repository. 
-Almost all new features are developed as part of this fork, which means that they are 
-immediately available to all eligible sponsors, as they are made collaborators of this repository.
+All new features are developed as part of this fork, which means that they are immediately 
+and exclusively available to all eligible sponsors, as they are made collaborators of this repository.
 
-During the beta phase, sponsorships start as low as [__$25 a month or $500 one time__](#how-to-become-a-sponsor).[^1]
+Sponsorships start as low as [__$25 a month or $500 one time__](#how-to-become-a-sponsor).[^1]
+
+!!! info
+    With each new milestone, the price will steadily increase to match that of competitors. By subscribing now, 
+    you will become an early contributor and secure this price to access all features that will follow!
 
 [^1]:
-    After the beta phase, the price will stay the same for all existing sponsors.
-    Note that $25 a month or $500 one time is the minimum amount to become eligible 
-    for the PRO version. While GitHub Sponsors also allows sponsoring lower amounts, 
-    those can't be granted access to the PRO version due to technical reasons.
+    This rate applies to individuals only. To grant access for an organization, please 
+    [contact us](emailto:olegpolakow@gmail.com).
 
 ## What sponsorships achieve
 
@@ -92,33 +94,15 @@ features, bug fixing, stability improvement, issue triage and general support.
 ## How to become a sponsor
 
 In order to become an eligible sponsor with your GitHub account, visit @polakowo, 
-and complete a sponsorship of __$25 a month or more__. You can use your individual or
-organization GitHub account for sponsoring.
+and complete a sponsorship of __$25 a month or more__.
 
-__Important__: If you're sponsoring @polakowo through a GitHub organization,
-please send a short email to olegpolakow@gmail.com with the name of your
-organization and the GitHub account of the individual that should be added as a 
-collaborator.[^2]
+You can cancel your sponsorship anytime.[^2]
 
 [^2]:
-    It's currently not possible to grant access to each member of an
-    organization, as GitHub only allows for adding users. Thus, after
-    sponsoring, please email me at olegpolakow@gmail.com, stating which
-    account should become a collaborator of the PRO repository.
-    To ensure that access is not tied to a particular individual GitHub account,
-    create a bot account (i.e. a GitHub account that is not tied to a specific
-    individual), and use this account for the sponsoring. After being added to
-    the list of collaborators, the bot account can create a private fork of the
-    private GitHub repository, and grant access to all members of the
-    organizations.
-
-You can cancel your sponsorship anytime.[^3]
-
-[^3]:
     If you cancel your sponsorship, GitHub schedules a cancellation request
     which will become effective at the end of the billing cycle. This means
     that even though you cancel your sponsorship, you will keep your access to
-    the PRO repository as long as your cancellation isn't effective. All charges are
-    processed by GitHub through Stripe. As we don't receive any information
-    regarding your payment, and GitHub doesn't offer refunds, sponsorships are
-    non-refundable.
+    the vectorbt PRO repository as long as your cancellation isn't effective. 
+    All charges are processed by GitHub through Stripe. As we don't receive any 
+    information regarding your payment, and GitHub doesn't offer refunds, 
+    sponsorships are non-refundable.

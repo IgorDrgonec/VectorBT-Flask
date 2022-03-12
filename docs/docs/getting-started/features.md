@@ -740,6 +740,40 @@ dtype: float64
 
 ![](/assets/images/features_benchmark.svg)
 
+### Multiple time frames
+
+- [x] The [look-ahead bias](https://www.investopedia.com/terms/l/lookaheadbias.asp) is an ongoing 
+threat when working with array data, especially on multiple time frames. In vectorbt PRO, there is 
+an entire collection of functions for resampling and analyzing data in a safe way. 
+
+```pycon title="Plot a heatmap of EMA on multiple time frames"
+>>> h1_data = vbt.BinanceData.fetch(
+...     'BTCUSDT', 
+...     start="2020-01-01", 
+...     end="2020-06-01", 
+...     timeframe="1h")
+
+>>> h4_data = h1_data.resample("4h")  # (1)!
+>>> d1_data = h1_data.resample("1d")
+
+>>> h1_ma = vbt.MA.run(h1_data.get("Open"), 10).ma
+>>> h4_ma = vbt.MA.run(h4_data.get("Open"), 10).ma
+>>> d1_ma = vbt.MA.run(d1_data.get("Open"), 10).ma
+
+>>> h4_ma = h4_ma.vbt.latest_at_index(h1_data.wrapper.index)  # (2)!
+>>> d1_ma = d1_ma.vbt.latest_at_index(h1_data.wrapper.index)
+
+>>> mas = pd.concat((h1_ma, h4_ma, d1_ma), axis=1, keys=["1h", "4h", "1d"])
+>>> mas.iloc[:, ::-1].vbt.ts_heatmap()
+```
+
+1. Downsample the entire data instance
+2. Bring downsampled arrays back to the original time frame
+
+[=100% "Period 8/8"]{: .candystripe}
+
+![](/assets/images/features_mtf_heatmap.svg)
+
 ## And many more...
 
 - [x] This is just the tip of the iceberg: vectorbt PRO deploys a new project structure, modular settings, time and memory profiling tools, rich templating macros, an upgraded formatting engine, dynamic type checking, new efficient data structures, and more.

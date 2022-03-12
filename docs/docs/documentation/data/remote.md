@@ -339,5 +339,5 @@ Open time
 
 We could have loaded both datasets using [pandas.read_csv](https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html)
 itself, but wrapping them with [CSVData](/api/data/custom/#vectorbtpro.data.custom.CSVData) allows us
-to take advantage of the vectorbt's powerful data classes, for example, to update the remote datasets 
-whenever new data points arrive - a true :gem:
+to take advantage of the vectorbt's powerful [Data](/api/data/base/#vectorbtpro.data.base.Data) class, 
+for example, to update the remote datasets whenever new data points arrive - a true :gem:

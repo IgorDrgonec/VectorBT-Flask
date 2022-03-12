@@ -89,8 +89,6 @@ extra:
       link: https://www.linkedin.com/in/polakowo
     - icon: fontawesome/brands/github
       link: https://github.com/polakowo
-    - icon: fontawesome/brands/discord
-      link: https://discord.gg/63jZZzCwzp
   consent:
     title: Cookie consent
     description: >-
@@ -119,6 +117,7 @@ nav:
       - Streaming: examples/superfast-supertrend/streaming.md
       - Multithreading: examples/superfast-supertrend/multithreading.md
       - Pipelines: examples/superfast-supertrend/pipelines.md
+    - MTF analysis: examples/mtf-analysis.md
     - To be continued...: examples/to-be-continued.md
   - Documentation:
     - Fundamentals: documentation/fundamentals.md
