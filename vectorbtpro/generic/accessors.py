@@ -225,6 +225,7 @@ from vectorbtpro.base.accessors import BaseAccessor, BaseDFAccessor, BaseSRAcces
 from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
+from vectorbtpro.base.indexes import repeat_index
 from vectorbtpro.generic import nb
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic.decorators import attach_nb_methods, attach_transform_methods
@@ -242,6 +243,7 @@ from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config, Readonly
 from vectorbtpro.utils.decorators import class_or_instancemethod
 from vectorbtpro.utils.mapping import apply_mapping, to_mapping
 from vectorbtpro.utils.template import deep_substitute
+from vectorbtpro.utils.datetime_ import freq_to_timedelta64, try_to_datetime_index
 
 try:  # pragma: no cover
     import bottleneck as bn
@@ -1283,15 +1285,9 @@ class GenericAccessor(BaseAccessor, Analyzable):
             return resampled_obj
 
         if not isinstance(rule, Resampler):
-            if not isinstance(rule, PandasResampler):
-                resample_kwargs = merge_dicts(
-                    dict(closed='left', label='left'),
-                    resample_kwargs,
-                )
-                rule = pd.Series(index=wrapper.index, dtype=object).resample(rule, **resolve_dict(resample_kwargs))
-            rule = Resampler.from_pd_resampler(wrapper.index, rule)
+            rule = wrapper.create_resampler(rule, resample_kwargs=resample_kwargs, return_pd_resampler=False)
         return cls_or_self.resample_to_index(
-            rule.to_index,
+            rule,
             reduce_func_nb,
             *args,
             template_context=template_context,
@@ -1868,14 +1864,22 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
     def latest_at_index(
         self,
-        target_index: tp.IndexLike,
+        target_index: tp.Union[Resampler, tp.IndexLike],
+        source_freq: tp.Union[None, bool, tp.FrequencyLike] = None,
+        target_freq: tp.Union[None, bool, tp.FrequencyLike] = None,
         nan_value: tp.Optional[tp.Scalar] = None,
         ffill: bool = True,
+        source_rbound: tp.Union[bool, str, tp.IndexLike] = False,
+        target_rbound: tp.Union[bool, str, tp.IndexLike] = False,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
-    ):
+        silence_warnings: bool = False,
+    ) -> tp.MaybeSeriesFrame:
         """See `vectorbtpro.generic.nb.resample.latest_at_index_nb`.
+
+        `target_index` can be either an instance of `vectorbtpro.base.resampling.base.Resampler`,
+        or any index-like object.
 
         Gives the same results as `df.resample(closed='right', label='right').last().ffill()`
         when applied on the target index of the resampler.
@@ -1883,7 +1887,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         !!! warning
             Do not use this method when upsampling information that belongs somewhere in-between
             two dates, such as the high, low, and close price at '2020-01-01' - it will be interpreted
-            as happening exactly at '2020-01-01T00:00:00'. Use shifting to account for this.
+            as happening exactly at '2020-01-01T00:00:00'. Use `GenericAccessor.resample_closing`.
 
         Usage:
             * Downsampling:
@@ -1921,32 +1925,122 @@ class GenericAccessor(BaseAccessor, Analyzable):
             Freq: H, Length: 97, dtype: float64
             ```
         """
-        if not checks.is_index(target_index):
-            target_index = pd.Index(target_index)
+        target_index_str = isinstance(target_index, str)
+        if not isinstance(target_index, Resampler):
+            resampler = Resampler(
+                self.wrapper.index,
+                target_index,
+                source_freq=source_freq,
+                target_freq=target_freq,
+            )
+        else:
+            resampler = target_index
+        if isinstance(source_rbound, bool):
+            use_source_rbound = source_rbound
+        else:
+            use_source_rbound = False
+            if isinstance(source_rbound, str):
+                if source_rbound == "pandas":
+                    resampler = resampler.replace(source_index=resampler.source_rbound_index)
+                else:
+                    raise ValueError(f"Invalid option '{source_rbound}' for source_rbound")
+            else:
+                resampler = resampler.replace(source_index=source_rbound)
+        if isinstance(target_rbound, bool):
+            use_target_rbound = target_rbound
+            target_index = resampler.target_index
+        else:
+            use_target_rbound = False
+            target_index = resampler.target_index
+            if isinstance(target_rbound, str):
+                if target_rbound == "pandas":
+                    resampler = resampler.replace(target_index=resampler.target_rbound_index)
+                else:
+                    raise ValueError(f"Invalid option '{target_rbound}' for target_rbound")
+            else:
+                resampler = resampler.replace(target_index=target_rbound)
+
+        if not use_source_rbound:
+            source_freq = None
+        else:
+            source_freq = resampler.source_freq
+            if source_freq is not None and not isinstance(source_freq, (int, float)):
+                source_freq = freq_to_timedelta64(source_freq)
+            if source_freq is None:
+                if not silence_warnings:
+                    warnings.warn("Using right bound of source index without frequency. Set source_freq.", stacklevel=2)
+        if not use_target_rbound:
+            target_freq = None
+        else:
+            target_freq = resampler.target_freq
+            if target_freq is not None and not isinstance(target_freq, (int, float)):
+                target_freq = freq_to_timedelta64(target_freq)
+            if target_freq is None:
+                if not silence_warnings:
+                    warnings.warn("Using right bound of target index without frequency. Set target_freq.", stacklevel=2)
         if nan_value is None:
             if self.mapping is not None:
                 nan_value = -1
             else:
                 nan_value = np.nan
+
         func = jit_reg.resolve_option(nb.latest_at_index_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         out = func(
             self.to_2d_array(),
-            self.wrapper.index.values,
-            target_index.values,
+            resampler.source_index.values,
+            resampler.target_index.values,
+            source_freq=source_freq,
+            target_freq=target_freq,
+            source_rbound=use_source_rbound,
+            target_rbound=use_target_rbound,
             nan_value=nan_value,
             ffill=ffill,
         )
-        return self.wrapper.wrap(out, group_by=False, index=target_index, **resolve_dict(wrap_kwargs))
+        wrap_kwargs = merge_dicts(dict(index=target_index), wrap_kwargs)
+        out = self.wrapper.wrap(out, group_by=False, **wrap_kwargs)
+        if target_index_str:
+            return out.iloc[0]
+        return out
+
+    def resample_opening(
+        self,
+        rule: tp.Union[Resampler, tp.PandasResampler],
+        resample_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.MaybeSeriesFrame:
+        """`GenericAccessor.latest_at_index` but creating a resampler and using the left bound
+        of the source and target index.
+
+        !!! note
+            The timestamps in the source and target index should denote the open time."""
+        if not isinstance(rule, Resampler):
+            rule = self.wrapper.create_resampler(rule, resample_kwargs=resample_kwargs, return_pd_resampler=False)
+        return self.latest_at_index(rule, source_rbound=False, target_rbound=False, **kwargs)
+
+    def resample_closing(
+        self,
+        rule: tp.Union[Resampler, tp.PandasResampler],
+        resample_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.MaybeSeriesFrame:
+        """`GenericAccessor.latest_at_index` but creating a resampler and using the right bound
+        of the source and target index.
+
+        !!! note
+            The timestamps in the source and target  index should denote the open time."""
+        if not isinstance(rule, Resampler):
+            rule = self.wrapper.create_resampler(rule, resample_kwargs=resample_kwargs, return_pd_resampler=False)
+        return self.latest_at_index(rule, source_rbound=True, target_rbound=True, **kwargs)
 
     @class_or_instancemethod
     def resample_to_index(
         cls_or_self,
-        target_index: tp.IndexLike,
+        target_index: tp.Union[Resampler, tp.IndexLike],
         reduce_func_nb: tp.Union[tp.ReduceFunc, tp.RangeReduceMetaFunc],
         *args,
         before: bool = False,
-        reduce_one: bool = False,
+        reduce_one: bool = True,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
         template_context: tp.Optional[tp.Mapping] = None,
@@ -2045,8 +2139,6 @@ class GenericAccessor(BaseAccessor, Analyzable):
             Freq: D, dtype: float64
             ```
         """
-        if not checks.is_index(target_index):
-            target_index = pd.Index(target_index)
         if broadcast_named_args is None:
             broadcast_named_args = {}
         if broadcast_kwargs is None:
@@ -2072,13 +2164,25 @@ class GenericAccessor(BaseAccessor, Analyzable):
             else:
                 checks.assert_not_none(wrapper)
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
+            target_index = deep_substitute(target_index, template_context, sub_id="target_index")
+        else:
+            if wrapper is None:
+                wrapper = cls_or_self.wrapper
+
+        if not isinstance(target_index, Resampler):
+            resampler = Resampler(wrapper.index, target_index)
+        else:
+            resampler = target_index
+
+        if isinstance(cls_or_self, type):
+            template_context = merge_dicts(dict(resampler=resampler), template_context)
             args = deep_substitute(args, template_context, sub_id="args")
             func = jit_reg.resolve_option(nb.resample_to_index_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             out = func(
                 wrapper.shape_2d[1],
-                wrapper.index.values,
-                target_index.values,
+                resampler.source_index.values,
+                resampler.target_index.values,
                 before,
                 reduce_func_nb,
                 *args,
@@ -2088,17 +2192,188 @@ class GenericAccessor(BaseAccessor, Analyzable):
             func = ch_reg.resolve_option(func, chunked)
             out = func(
                 cls_or_self.to_2d_array(),
-                cls_or_self.wrapper.index.values,
-                target_index.values,
+                resampler.source_index.values,
+                resampler.target_index.values,
                 before,
                 reduce_one,
                 reduce_func_nb,
                 *args,
             )
+
+        wrap_kwargs = merge_dicts(dict(index=resampler.target_index), wrap_kwargs)
+        return wrapper.wrap(out, group_by=False, **wrap_kwargs)
+
+    @class_or_instancemethod
+    def resample_between_bounds(
+        cls_or_self,
+        target_lbound_index: tp.IndexLike,
+        target_rbound_index: tp.IndexLike,
+        reduce_func_nb: tp.Union[tp.ReduceFunc, tp.RangeReduceMetaFunc],
+        *args,
+        closed_lbound: bool = True,
+        closed_rbound: bool = False,
+        reduce_one: bool = True,
+        broadcast_named_args: tp.KwargsLike = None,
+        broadcast_kwargs: tp.KwargsLike = None,
+        template_context: tp.Optional[tp.Mapping] = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_with_lbound: tp.Optional[bool] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """See `vectorbtpro.generic.nb.resample.resample_between_bounds_nb`.
+
+        For details on the meta version, see `vectorbtpro.generic.nb.resample.resample_between_bounds_meta_nb`.
+
+        Usage:
+            * Using regular function:
+
+            ```pycon
+            >>> h_index = pd.date_range('2020-01-01', '2020-01-05', freq='1h')
+            >>> d_index = pd.date_range('2020-01-01', '2020-01-05', freq='1d')
+
+            >>> h_sr = pd.Series(range(len(h_index)), index=h_index)
+            >>> h_sr.vbt.resample_between_bounds(d_index, d_index.shift(), njit(lambda x: x.mean()))
+            2020-01-01    11.5
+            2020-01-02    35.5
+            2020-01-03    59.5
+            2020-01-04    83.5
+            2020-01-05    96.0
+            Freq: D, dtype: float64
+            ```
+
+            * Using meta function:
+
+            ```pycon
+            >>> mean_ratio_meta_nb = njit(lambda from_i, to_i, col, a, b: \\
+            ...     np.mean(a[from_i:to_i][col]) / np.mean(b[from_i:to_i][col]))
+
+            >>> vbt.pd_acc.resample_between_bounds(
+            ...     d_index,
+            ...     d_index.shift(),
+            ...     mean_ratio_meta_nb,
+            ...     h_sr.vbt.to_2d_array() - 1,
+            ...     h_sr.vbt.to_2d_array() + 1,
+            ...     wrapper=h_sr.vbt.wrapper
+            ... )
+            2020-01-01   -1.000000
+            2020-01-02    0.920000
+            2020-01-03    0.959184
+            2020-01-04    0.972603
+            2020-01-05    0.979381
+            Freq: D, dtype: float64
+            ```
+
+            * Using templates and broadcasting:
+
+            ```pycon
+            >>> vbt.pd_acc.resample_between_bounds(
+            ...     d_index,
+            ...     d_index.shift(),
+            ...     mean_ratio_meta_nb,
+            ...     vbt.Rep('a'),
+            ...     vbt.Rep('b'),
+            ...     broadcast_named_args=dict(
+            ...         a=h_sr - 1,
+            ...         b=h_sr + 1
+            ...     )
+            ... )
+            2020-01-01   -1.000000
+            2020-01-02    0.920000
+            2020-01-03    0.959184
+            2020-01-04    0.972603
+            2020-01-05    0.979381
+            Freq: D, dtype: float64
+            ```
+        """
+        if broadcast_named_args is None:
+            broadcast_named_args = {}
+        if broadcast_kwargs is None:
+            broadcast_kwargs = {}
+        if template_context is None:
+            template_context = {}
+
+        if isinstance(cls_or_self, type):
+            if len(broadcast_named_args) > 0:
+                broadcast_kwargs = merge_dicts(dict(to_pd=False, post_func=reshaping.to_2d_array), broadcast_kwargs)
+                if wrapper is not None:
+                    broadcast_named_args = reshaping.broadcast(
+                        broadcast_named_args,
+                        to_shape=wrapper.shape_2d,
+                        **broadcast_kwargs,
+                    )
+                else:
+                    broadcast_named_args, wrapper = reshaping.broadcast(
+                        broadcast_named_args,
+                        return_wrapper=True,
+                        **broadcast_kwargs,
+                    )
+            else:
+                checks.assert_not_none(wrapper)
+            template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
+            target_lbound_index = deep_substitute(target_lbound_index, template_context, sub_id="target_lbound_index")
+            target_rbound_index = deep_substitute(target_rbound_index, template_context, sub_id="target_rbound_index")
+        else:
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
 
-        return wrapper.wrap(out, group_by=False, index=target_index, **resolve_dict(wrap_kwargs))
+        target_lbound_index = try_to_datetime_index(target_lbound_index)
+        target_rbound_index = try_to_datetime_index(target_rbound_index)
+        if len(target_lbound_index) == 1 and len(target_rbound_index) > 1:
+            target_lbound_index = repeat_index(target_lbound_index, len(target_rbound_index))
+            if wrap_with_lbound is None:
+                wrap_with_lbound = False
+        elif len(target_lbound_index) > 1 and len(target_rbound_index) == 1:
+            target_rbound_index = repeat_index(target_rbound_index, len(target_lbound_index))
+            if wrap_with_lbound is None:
+                wrap_with_lbound = True
+        checks.assert_len_equal(target_rbound_index, target_lbound_index)
+        if isinstance(cls_or_self, type):
+            template_context = merge_dicts(
+                dict(target_lbound_index=target_lbound_index, target_rbound_index=target_rbound_index),
+                template_context,
+            )
+            args = deep_substitute(args, template_context, sub_id="args")
+            func = jit_reg.resolve_option(nb.resample_between_bounds_meta_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
+            out = func(
+                wrapper.shape_2d[1],
+                wrapper.index.values,
+                target_lbound_index.values,
+                target_rbound_index.values,
+                closed_lbound,
+                closed_rbound,
+                reduce_func_nb,
+                *args,
+            )
+        else:
+            func = jit_reg.resolve_option(nb.resample_between_bounds_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
+            out = func(
+                cls_or_self.to_2d_array(),
+                wrapper.index.values,
+                target_lbound_index.values,
+                target_rbound_index.values,
+                closed_lbound,
+                closed_rbound,
+                reduce_one,
+                reduce_func_nb,
+                *args,
+            )
+
+        if wrap_with_lbound is None:
+            if closed_lbound:
+                wrap_with_lbound = True
+            elif closed_rbound:
+                wrap_with_lbound = False
+            else:
+                wrap_with_lbound = True
+        if wrap_with_lbound:
+            wrap_kwargs = merge_dicts(dict(index=target_lbound_index), wrap_kwargs)
+        else:
+            wrap_kwargs = merge_dicts(dict(index=target_rbound_index), wrap_kwargs)
+        return wrapper.wrap(out, group_by=False, **wrap_kwargs)
 
     # ############# Describing ############# #
 

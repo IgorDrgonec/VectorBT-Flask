@@ -1339,7 +1339,7 @@ class TestAccessors:
         )
         with pytest.raises(Exception):
             df.vbt.resample_apply(
-                vbt.Resampler.from_pd_resampler(df.index, df.resample(test_freq)),
+                vbt.Resampler.from_pd_resampler(df.resample(test_freq)),
                 mean_nb,
                 use_groupby_apply=True,
             )
@@ -1348,7 +1348,7 @@ class TestAccessors:
             df.vbt.resample_apply(test_freq, mean_nb),
         )
         pd.testing.assert_frame_equal(
-            df.vbt.resample_apply(vbt.Resampler.from_pd_resampler(df.index, df.resample(test_freq)), mean_nb),
+            df.vbt.resample_apply(vbt.Resampler.from_pd_resampler(df.resample(test_freq)), mean_nb),
             df.vbt.resample_apply(test_freq, mean_nb),
         )
         pd.testing.assert_frame_equal(
@@ -1452,6 +1452,208 @@ class TestAccessors:
         np.testing.assert_array_equal(
             df.vbt.latest_at_index(target_index, ffill=False, nan_value=-1).values,
             df.resample(test_freq, closed="right", label="right").last().fillna(-1).values,
+        )
+        np.testing.assert_array_equal(
+            df.vbt.latest_at_index(target_index, jitted=dict(parallel=True)).values,
+            df.vbt.latest_at_index(target_index, jitted=dict(parallel=False)).values,
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.latest_at_index(target_index, chunked=True),
+            df.vbt.latest_at_index(target_index, chunked=False),
+        )
+
+    def test_latest_at_index_bounds(self):
+        source_index = np.array([1, 2, 3])
+        target_index = np.array([0.5, 1, 1.5, 2.5, 3.0, 3.5])
+        sr = pd.Series(np.arange(len(source_index)), index=source_index)
+        np.testing.assert_array_equal(
+            sr.vbt.latest_at_index(
+                target_index,
+                nan_value=-1,
+                source_rbound=True,
+                target_rbound=True,
+            ).values,
+            np.array([-1, -1, 0, 1, 1, 2]),
+        )
+        source_index = np.array([1, 2, 3])
+        target_index = np.array([1.5, 2, 2.5])
+        sr = pd.Series(np.arange(len(source_index)), index=source_index)
+        np.testing.assert_array_equal(
+            sr.vbt.latest_at_index(
+                target_index,
+                nan_value=-1,
+                source_rbound=True,
+                target_rbound=True,
+            ).values,
+            np.array([0, 0, 2]),
+        )
+        source_index = np.array([0.5, 1, 1.5, 2.5, 3.0, 3.5])
+        target_index = np.array([1, 2, 3])
+        sr = pd.Series(np.arange(len(source_index)), index=source_index)
+        np.testing.assert_array_equal(
+            sr.vbt.latest_at_index(
+                target_index,
+                nan_value=-1,
+                source_rbound=True,
+                target_rbound=True,
+            ).values,
+            np.array([1, 3, 5]),
+        )
+        source_index = np.array([1.5, 2, 2.5])
+        target_index = np.array([1, 2, 3])
+        sr = pd.Series(np.arange(len(source_index)), index=source_index)
+        np.testing.assert_array_equal(
+            sr.vbt.latest_at_index(
+                target_index,
+                nan_value=-1,
+                source_rbound=True,
+                target_rbound=True,
+            ).values,
+            np.array([0, 1, 2]),
+        )
+        source_index = np.array([1, 2, 3])
+        target_index = np.array([0.5, 1, 1.5, 2.5, 3.0, 3.5])
+        sr = pd.Series(np.arange(len(source_index)), index=source_index)
+        np.testing.assert_array_equal(
+            sr.vbt.latest_at_index(
+                target_index,
+                nan_value=-1,
+                source_rbound=True,
+                target_rbound=False,
+            ).values,
+            np.array([-1, -1, -1, 0, 1, 1]),
+        )
+        source_index = np.array([1, 2, 3])
+        target_index = np.array([1.5, 2, 2.5])
+        sr = pd.Series(np.arange(len(source_index)), index=source_index)
+        np.testing.assert_array_equal(
+            sr.vbt.latest_at_index(
+                target_index,
+                nan_value=-1,
+                source_rbound=True,
+                target_rbound=False,
+            ).values,
+            np.array([-1, 0, 0]),
+        )
+        source_index = np.array([0.5, 1, 1.5, 2.5, 3.0, 3.5])
+        target_index = np.array([1, 2, 3])
+        sr = pd.Series(np.arange(len(source_index)), index=source_index)
+        np.testing.assert_array_equal(
+            sr.vbt.latest_at_index(
+                target_index,
+                nan_value=-1,
+                source_rbound=True,
+                target_rbound=False,
+            ).values,
+            np.array([0, 1, 3]),
+        )
+        source_index = np.array([1.5, 2, 2.5])
+        target_index = np.array([1, 2, 3])
+        sr = pd.Series(np.arange(len(source_index)), index=source_index)
+        np.testing.assert_array_equal(
+            sr.vbt.latest_at_index(
+                target_index,
+                nan_value=-1,
+                source_rbound=True,
+                target_rbound=False,
+            ).values,
+            np.array([-1, 0, 1]),
+        )
+        source_index = np.array([1, 2, 3])
+        target_index = np.array([0.5, 1, 1.5, 2.5, 3.0, 3.5])
+        sr = pd.Series(np.arange(len(source_index)), index=source_index)
+        np.testing.assert_array_equal(
+            sr.vbt.latest_at_index(
+                target_index,
+                nan_value=-1,
+                source_rbound=False,
+                target_rbound=True,
+            ).values,
+            np.array([-1, 0, 1, 1, 2, 2]),
+        )
+        source_index = np.array([1, 2, 3])
+        target_index = np.array([1.5, 2, 2.5])
+        sr = pd.Series(np.arange(len(source_index)), index=source_index)
+        np.testing.assert_array_equal(
+            sr.vbt.latest_at_index(
+                target_index,
+                nan_value=-1,
+                source_rbound=False,
+                target_rbound=True,
+            ).values,
+            np.array([0, 1, 2]),
+        )
+        source_index = np.array([0.5, 1, 1.5, 2.5, 3.0, 3.5])
+        target_index = np.array([1, 2, 3])
+        sr = pd.Series(np.arange(len(source_index)), index=source_index)
+        np.testing.assert_array_equal(
+            sr.vbt.latest_at_index(
+                target_index,
+                nan_value=-1,
+                source_rbound=False,
+                target_rbound=True,
+            ).values,
+            np.array([2, 3, 5]),
+        )
+        source_index = np.array([1.5, 2, 2.5])
+        target_index = np.array([1, 2, 3])
+        sr = pd.Series(np.arange(len(source_index)), index=source_index)
+        np.testing.assert_array_equal(
+            sr.vbt.latest_at_index(
+                target_index,
+                nan_value=-1,
+                source_rbound=False,
+                target_rbound=True,
+            ).values,
+            np.array([0, 2, 2]),
+        )
+        source_index = np.array([1, 2, 3])
+        target_index = np.array([0.5, 1, 1.5, 2.5, 3.0, 3.5])
+        sr = pd.Series(np.arange(len(source_index)), index=source_index)
+        np.testing.assert_array_equal(
+            sr.vbt.latest_at_index(
+                target_index,
+                nan_value=-1,
+                source_rbound=False,
+                target_rbound=False,
+            ).values,
+            np.array([-1, 0, 0, 1, 2, 2]),
+        )
+        source_index = np.array([1, 2, 3])
+        target_index = np.array([1.5, 2, 2.5])
+        sr = pd.Series(np.arange(len(source_index)), index=source_index)
+        np.testing.assert_array_equal(
+            sr.vbt.latest_at_index(
+                target_index,
+                nan_value=-1,
+                source_rbound=False,
+                target_rbound=False,
+            ).values,
+            np.array([0, 1, 1]),
+        )
+        source_index = np.array([0.5, 1, 1.5, 2.5, 3.0, 3.5])
+        target_index = np.array([1, 2, 3])
+        sr = pd.Series(np.arange(len(source_index)), index=source_index)
+        np.testing.assert_array_equal(
+            sr.vbt.latest_at_index(
+                target_index,
+                nan_value=-1,
+                source_rbound=False,
+                target_rbound=False,
+            ).values,
+            np.array([1, 2, 4]),
+        )
+        source_index = np.array([1.5, 2, 2.5])
+        target_index = np.array([1, 2, 3])
+        sr = pd.Series(np.arange(len(source_index)), index=source_index)
+        np.testing.assert_array_equal(
+            sr.vbt.latest_at_index(
+                target_index,
+                nan_value=-1,
+                source_rbound=False,
+                target_rbound=False,
+            ).values,
+            np.array([-1, 1, 2]),
         )
 
     @pytest.mark.parametrize(
@@ -1560,6 +1762,178 @@ class TestAccessors:
                 index=pd.DatetimeIndex(["2018-01-01", "2018-01-03", "2018-01-05"], dtype="datetime64[ns]", freq="2D"),
                 columns=df.columns,
             ),
+        )
+
+    @pytest.mark.parametrize(
+        "test_freq",
+        ["1h", "3d", "7d"],
+    )
+    def test_resample_between_bounds(self, test_freq):
+        @njit
+        def mean_nb(x):
+            return np.nanmean(x)
+
+        @njit
+        def mean_meta_nb(from_i, to_i, col, x):
+            return np.nanmean(x[from_i:to_i, col])
+
+        target_lbound_index = df.resample(test_freq).asfreq().index
+        target_rbound_index = target_lbound_index.shift()
+
+        pd.testing.assert_series_equal(
+            df["a"].vbt.resample_between_bounds(target_lbound_index, target_rbound_index, mean_nb),
+            df["a"].resample(test_freq).apply(lambda x: mean_nb(x.values)),
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.resample_between_bounds(target_lbound_index, target_rbound_index, mean_nb),
+            df.resample(test_freq).apply(lambda x: mean_nb(x.values)),
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.resample_between_bounds(
+                target_lbound_index, target_rbound_index, mean_nb, closed_lbound=False, closed_rbound=True
+            ),
+            df.vbt.resample_between_bounds(
+                target_lbound_index + pd.Timedelta(nanoseconds=1),
+                target_rbound_index + pd.Timedelta(nanoseconds=1),
+                mean_nb,
+                wrap_kwargs=dict(index=target_rbound_index),
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.resample_between_bounds(
+                target_lbound_index, target_rbound_index, mean_nb, closed_lbound=False, closed_rbound=False
+            ),
+            df.vbt.resample_between_bounds(
+                target_lbound_index + pd.Timedelta(nanoseconds=1),
+                target_rbound_index - pd.Timedelta(nanoseconds=1),
+                mean_nb,
+                wrap_kwargs=dict(index=target_lbound_index),
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.resample_between_bounds(
+                target_lbound_index, target_rbound_index, mean_nb, closed_lbound=True, closed_rbound=True
+            ),
+            df.vbt.resample_between_bounds(
+                target_lbound_index,
+                target_rbound_index + pd.Timedelta(nanoseconds=1),
+                mean_nb,
+                wrap_kwargs=dict(index=target_lbound_index),
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.resample_between_bounds(
+                target_lbound_index, target_rbound_index, mean_nb, jitted=dict(parallel=True)
+            ),
+            df.vbt.resample_between_bounds(
+                target_lbound_index, target_rbound_index, mean_nb, jitted=dict(parallel=False)
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.resample_between_bounds(target_lbound_index, target_rbound_index, mean_nb, chunked=True),
+            df.vbt.resample_between_bounds(target_lbound_index, target_rbound_index, mean_nb, chunked=False),
+        )
+        pd.testing.assert_frame_equal(
+            pd.DataFrame.vbt.resample_between_bounds(
+                target_lbound_index,
+                target_rbound_index,
+                mean_meta_nb,
+                df.vbt.to_2d_array(),
+                wrapper=df.vbt.wrapper,
+            ),
+            df.vbt.resample_between_bounds(target_lbound_index, target_rbound_index, mean_nb),
+        )
+        pd.testing.assert_frame_equal(
+            pd.DataFrame.vbt.resample_between_bounds(
+                target_lbound_index,
+                target_rbound_index,
+                mean_meta_nb,
+                df.vbt.to_2d_array(),
+                wrapper=df.vbt.wrapper,
+                jitted=dict(parallel=True),
+            ),
+            pd.DataFrame.vbt.resample_between_bounds(
+                target_lbound_index,
+                target_rbound_index,
+                mean_meta_nb,
+                df.vbt.to_2d_array(),
+                wrapper=df.vbt.wrapper,
+                jitted=dict(parallel=False),
+            ),
+        )
+        chunked = dict(
+            arg_take_spec=dict(
+                args=vbt.ArgsTaker(
+                    vbt.ArraySlicer(axis=1),
+                )
+            )
+        )
+        pd.testing.assert_frame_equal(
+            pd.DataFrame.vbt.resample_between_bounds(
+                target_lbound_index,
+                target_rbound_index,
+                mean_meta_nb,
+                df.vbt.to_2d_array(),
+                wrapper=df.vbt.wrapper,
+                chunked=chunked,
+            ),
+            pd.DataFrame.vbt.resample_between_bounds(
+                target_lbound_index,
+                target_rbound_index,
+                mean_meta_nb,
+                df.vbt.to_2d_array(),
+                wrapper=df.vbt.wrapper,
+                chunked=False,
+            ),
+        )
+
+        @njit
+        def mean_diff_meta_nb(from_i, to_i, col, x, y):
+            return np.nanmean(x[from_i:to_i, col]) / np.nanmean(y[from_i:to_i, col])
+
+        pd.testing.assert_frame_equal(
+            pd.DataFrame.vbt.resample_between_bounds(
+                df.resample("2d").asfreq().index,
+                df.resample("2d").asfreq().index.shift(),
+                mean_diff_meta_nb,
+                vbt.RepEval("to_2d_array(x)"),
+                vbt.RepEval("to_2d_array(y)"),
+                broadcast_named_args=dict(
+                    x=pd.Series([1, 2, 3, 4, 5], index=df.index),
+                    y=pd.DataFrame([[1, 2, 3]], columns=df.columns),
+                ),
+                template_context=dict(to_2d_array=vbt.base.reshaping.to_2d_array),
+            ),
+            pd.DataFrame(
+                [[1.5, 0.75, 0.5], [3.5, 1.75, 1.1666666666666667], [5.0, 2.5, 1.6666666666666667]],
+                index=pd.DatetimeIndex(["2018-01-01", "2018-01-03", "2018-01-05"], dtype="datetime64[ns]", freq="2D"),
+                columns=df.columns,
+            ),
+        )
+
+    def test_resample_between_bounds_rolling(self):
+        @njit
+        def mean_nb(x):
+            if len(x) < 2:
+                return np.nan
+            return np.mean(x)
+
+        pd.testing.assert_frame_equal(
+            df.vbt.resample_between_bounds(
+                pd.DatetimeIndex([
+                    df.index[0],
+                    df.index[0],
+                    df.index[1],
+                    df.index[2],
+                    df.index[3],
+                ]),
+                df.index,
+                mean_nb,
+                closed_lbound=True,
+                closed_rbound=True,
+                wrap_kwargs=dict(index=df.index),
+            ),
+            df.vbt.rolling_apply(2, mean_nb),
         )
 
     def test_apply_and_reduce(self):

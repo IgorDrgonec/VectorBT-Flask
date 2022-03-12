@@ -62,35 +62,35 @@ def date_range_nb(
 
 
 @register_jitted(cache=True)
-def map_to_index_nb(
-    from_index: tp.Array1d,
-    to_index: tp.Array1d,
+def map_index_nb(
+    source_index: tp.Array1d,
+    target_index: tp.Array1d,
     before: bool = False,
     raise_missing: bool = True,
 ) -> tp.Array1d:
-    """Get index of each in `from_index` in `to_index`.
+    """Get index of each in `source_index` in `target_index`.
 
     If `before` is True, applied on elements that come before and including that index.
     Otherwise, applied on elements that come after and including that index.
 
     If `raise_missing` is True, will throw an error if an index cannot be mapped.
     Otherwise, the element for that index becomes -1."""
-    out = np.empty(len(from_index), dtype=np.int_)
+    out = np.empty(len(source_index), dtype=np.int_)
     from_j = 0
-    for i in range(len(from_index)):
-        if i > 0 and from_index[i] <= from_index[i - 1]:
+    for i in range(len(source_index)):
+        if i > 0 and source_index[i] <= source_index[i - 1]:
             raise ValueError("Array index must be strictly increasing")
         found = False
-        for j in range(from_j, len(to_index)):
-            if j > 0 and to_index[j] <= to_index[j - 1]:
+        for j in range(from_j, len(target_index)):
+            if j > 0 and target_index[j] <= target_index[j - 1]:
                 raise ValueError("Target index must be strictly increasing")
-            if before and from_index[i] <= to_index[j]:
-                if j == 0 or to_index[j - 1] < from_index[i]:
+            if before and source_index[i] <= target_index[j]:
+                if j == 0 or target_index[j - 1] < source_index[i]:
                     out[i] = from_j = j
                     found = True
                     break
-            if not before and to_index[j] <= from_index[i]:
-                if j == len(to_index) - 1 or from_index[i] < to_index[j + 1]:
+            if not before and target_index[j] <= source_index[i]:
+                if j == len(target_index) - 1 or source_index[i] < target_index[j + 1]:
                     out[i] = from_j = j
                     found = True
                     break
@@ -103,23 +103,23 @@ def map_to_index_nb(
 
 @register_jitted(cache=True)
 def index_difference_nb(
-    from_index: tp.Array1d,
-    to_index: tp.Array1d,
+    source_index: tp.Array1d,
+    target_index: tp.Array1d,
 ) -> tp.Array1d:
-    """Get elements in `from_index` not present in `to_index`."""
-    out = np.empty(len(from_index), dtype=np.int_)
+    """Get elements in `source_index` not present in `target_index`."""
+    out = np.empty(len(source_index), dtype=np.int_)
     from_j = 0
     k = 0
-    for i in range(len(from_index)):
-        if i > 0 and from_index[i] <= from_index[i - 1]:
+    for i in range(len(source_index)):
+        if i > 0 and source_index[i] <= source_index[i - 1]:
             raise ValueError("Array index must be strictly increasing")
         found = False
-        for j in range(from_j, len(to_index)):
-            if j > 0 and to_index[j] <= to_index[j - 1]:
+        for j in range(from_j, len(target_index)):
+            if j > 0 and target_index[j] <= target_index[j - 1]:
                 raise ValueError("Target index must be strictly increasing")
-            if from_index[i] < to_index[j]:
+            if source_index[i] < target_index[j]:
                 break
-            if from_index[i] == to_index[j]:
+            if source_index[i] == target_index[j]:
                 from_j = j
                 found = True
                 break

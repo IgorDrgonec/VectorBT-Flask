@@ -16,7 +16,7 @@ from vectorbtpro.base.indexing import IndexingError, PandasIndexer
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import AttrResolverMixin, AttrResolverMixinT
 from vectorbtpro.utils.config import Configured, merge_dicts, resolve_dict
-from vectorbtpro.utils.datetime_ import freq_to_timedelta, PandasDatetimeIndex
+from vectorbtpro.utils.datetime_ import infer_index_freq, freq_to_timedelta
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.decorators import class_or_instancemethod
 
@@ -368,14 +368,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         freq = self._freq
         if freq is None:
             freq = wrapping_cfg["freq"]
-        if freq is not None:
-            return freq_to_timedelta(freq)
-        if isinstance(self.index, PandasDatetimeIndex):
-            if self.index.freq is not None:
-                return freq_to_timedelta(self.index.freq)
-            if self.index.inferred_freq is not None:
-                return freq_to_timedelta(self.index.inferred_freq)
-        return freq
+        return infer_index_freq(self.index, freq=freq)
 
     @property
     def period(self) -> int:
@@ -699,7 +692,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                 rule = pd.Series(index=self.index, dtype=object).resample(rule, **resolve_dict(resample_kwargs))
             if return_pd_resampler:
                 return rule
-            rule = Resampler.from_pd_resampler(self.index, rule)
+            rule = Resampler.from_pd_resampler(rule)
         if return_pd_resampler:
             raise TypeError("Cannot convert Resampler to Pandas Resampler")
         return rule
@@ -714,9 +707,9 @@ class ArrayWrapper(Configured, PandasIndexer):
         if isinstance(resampler, Resampler):
             _resampler = resampler
         else:
-            _resampler = Resampler.from_pd_resampler(self.index, resampler)
-        new_index = _resampler.to_index
-        new_freq = freq_to_timedelta(_resampler.to_freq)
+            _resampler = Resampler.from_pd_resampler(resampler)
+        new_index = _resampler.target_index
+        new_freq = freq_to_timedelta(_resampler.target_freq)
         new_wrapper = self.replace(index=new_index, freq=new_freq)
         return resampler, new_wrapper
 

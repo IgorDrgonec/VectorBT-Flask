@@ -596,11 +596,11 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
         if isinstance(resampler, Resampler):
             _resampler = resampler
         else:
-            _resampler = Resampler.from_pd_resampler(self.wrapper.index, resampler)
+            _resampler = Resampler.from_pd_resampler(resampler)
         new_records_arr = self.records_arr.copy()
         for field_name in self.values.dtype.names:
             if self.get_field_mapping(field_name) == "index":
-                index_map = _resampler.map_to_index()
+                index_map = _resampler.map_index(return_index=False)
                 new_records_arr[field_name] = index_map[new_records_arr[field_name]]
         return new_records_arr
 

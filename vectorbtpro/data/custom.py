@@ -83,7 +83,7 @@ __all__ = [
 
 
 class SyntheticData(Data):
-    """Subclass of `Data` for synthetically generated data.
+    """Subclass of `vectorbtpro.data.base.Data` for synthetically generated data.
 
     Exposes an abstract class method `SyntheticData.generate_symbol`.
     Everything else is taken care of."""
@@ -281,7 +281,7 @@ LocalDataT = tp.TypeVar("LocalDataT", bound="LocalData")
 
 
 class LocalData(Data):
-    """Subclass of `Data` for local data."""
+    """Subclass of `vectorbtpro.data.base.Data` for local data."""
 
     @classmethod
     def match_path(
@@ -422,7 +422,7 @@ CSVDataT = tp.TypeVar("CSVDataT", bound="CSVData")
 
 
 class CSVData(LocalData):
-    """Subclass of `Data` for data that can be fetched and updated using `pd.read_csv`."""
+    """Subclass of `vectorbtpro.data.base.Data` for data that can be fetched and updated using `pd.read_csv`."""
 
     @classmethod
     def fetch_symbol(
@@ -546,7 +546,7 @@ HDFDataT = tp.TypeVar("HDFDataT", bound="HDFData")
 
 
 class HDFData(LocalData):
-    """Subclass of `Data` for data that can be fetched and updated using `pd.read_hdf`."""
+    """Subclass of `vectorbtpro.data.base.Data` for data that can be fetched and updated using `pd.read_hdf`."""
 
     @classmethod
     def split_hdf_path(
@@ -699,7 +699,7 @@ class HDFData(LocalData):
 
 
 class RemoteData(Data):
-    """Subclass of `Data` for remote data.
+    """Subclass of `vectorbtpro.data.base.Data` for remote data.
 
     Remote data usually has arguments such as `start`, `end`, and `timeframe`.
 
@@ -713,7 +713,7 @@ class RemoteData(Data):
 
 
 class YFData(RemoteData):  # pragma: no cover
-    """Subclass of `Data` for `yfinance`.
+    """Subclass of `vectorbtpro.data.base.Data` for `yfinance`.
 
     See https://github.com/ranaroussi/yfinance."""
 
@@ -799,7 +799,7 @@ BinanceDataT = tp.TypeVar("BinanceDataT", bound="BinanceData")
 
 
 class BinanceData(RemoteData):  # pragma: no cover
-    """Subclass of `Data` for `python-binance`.
+    """Subclass of `vectorbtpro.data.base.Data` for `python-binance`.
 
     See https://github.com/sammchardy/python-binance."""
 
@@ -1033,7 +1033,7 @@ class BinanceData(RemoteData):  # pragma: no cover
 
 
 class CCXTData(RemoteData):  # pragma: no cover
-    """Subclass of `Data` for `ccxt`.
+    """Subclass of `vectorbtpro.data.base.Data` for `ccxt`.
 
     See https://github.com/ccxt/ccxt."""
 
@@ -1250,7 +1250,7 @@ AlpacaDataT = tp.TypeVar("AlpacaDataT", bound="AlpacaData")
 
 
 class AlpacaData(RemoteData):  # pragma: no cover
-    """Subclass of `Data` for `alpaca-trade-api`.
+    """Subclass of `vectorbtpro.data.base.Data` for `alpaca-trade-api`.
 
     See https://github.com/alpacahq/alpaca-trade-api-python.
 
@@ -1458,7 +1458,7 @@ PolygonDataT = tp.TypeVar("PolygonDataT", bound="PolygonData")
 
 
 class PolygonData(RemoteData):  # pragma: no cover
-    """Subclass of `Data` for `polygon-api-client`.
+    """Subclass of `vectorbtpro.data.base.Data` for `polygon-api-client`.
 
     See https://github.com/polygon-io/client-python."""
 
@@ -1778,7 +1778,7 @@ AlphaVantageDataT = tp.TypeVar("AlphaVantageDataT", bound="AlphaVantageData")
 
 
 class AlphaVantageData(RemoteData):  # pragma: no cover
-    """Subclass of `Data` for `alpha_vantage`.
+    """Subclass of `vectorbtpro.data.base.Data` for `alpha_vantage`.
 
     Instead of using https://github.com/RomelTorres/alpha_vantage package, which is stale and has
     many issues, this class parses the API documentation with `AlphaVantageData.parse_api_meta` using
@@ -2138,7 +2138,7 @@ NDLDataT = tp.TypeVar("NDLDataT", bound="NDLData")
 
 
 class NDLData(RemoteData):  # pragma: no cover
-    """Subclass of `Data` for `nasdaqdatalink`.
+    """Subclass of `vectorbtpro.data.base.Data` for `nasdaqdatalink`.
 
     See https://github.com/Nasdaq/data-link-python."""
 

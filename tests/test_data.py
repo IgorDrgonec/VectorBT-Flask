@@ -1481,7 +1481,7 @@ class TestData:
             single_symbol=True,
         )
         ohlcv_data.column_config["Other"] = dict(
-            resample_func=lambda obj, resampler: obj.vbt.resample_apply(resampler, vbt.nb.mean_reduce_nb)
+            resample_func=lambda self, obj, resampler: obj.vbt.resample_apply(resampler, vbt.nb.mean_reduce_nb)
         )
         pd.testing.assert_frame_equal(
             ohlcv_data.resample(test_freq).get(),

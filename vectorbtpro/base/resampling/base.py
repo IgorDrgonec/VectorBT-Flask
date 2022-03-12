@@ -6,8 +6,10 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import Configured
-from vectorbtpro.utils.datetime_ import freq_to_timedelta
+from vectorbtpro.utils.datetime_ import try_to_datetime_index, infer_index_freq
+from vectorbtpro.utils.decorators import cached_property
 from vectorbtpro.base.resampling import nb
 from vectorbtpro.registries.jit_registry import jit_reg
 
@@ -16,144 +18,171 @@ ResamplerT = tp.TypeVar("ResamplerT", bound="Resampler")
 
 
 class Resampler(Configured):
-    """Class that exposes methods to resample index."""
+    """Class that exposes methods to resample index.
+
+    Args:
+        source_index (index_like): Index being resampled.
+        target_index (index_like): Index resulted from resampling.
+        source_freq (frequency_like or bool): Frequency or date offset of the source index.
+
+            Set to False to force-set the frequency to None.
+        target_freq (frequency_like or bool): Frequency or date offset of the target index.
+
+            Set to False to force-set the frequency to None."""
 
     def __init__(
         self,
-        from_index: tp.IndexLike,
-        to_index: tp.IndexLike,
-        from_freq: tp.Optional[tp.FrequencyLike] = None,
-        to_freq: tp.Optional[tp.FrequencyLike] = None,
+        source_index: tp.IndexLike,
+        target_index: tp.IndexLike,
+        source_freq: tp.Union[None, bool, tp.FrequencyLike] = None,
+        target_freq: tp.Union[None, bool, tp.FrequencyLike] = None,
     ) -> None:
-        if not isinstance(from_index, pd.DatetimeIndex):
-            from_index = pd.DatetimeIndex(from_index)
-        if not isinstance(to_index, pd.DatetimeIndex):
-            to_index = pd.DatetimeIndex(to_index)
-        if from_freq is not None and not isinstance(from_freq, (pd.Timedelta, pd.DateOffset)):
-            from_freq = freq_to_timedelta(from_freq)
-        if to_freq is not None and not isinstance(to_freq, (pd.Timedelta, pd.DateOffset)):
-            to_freq = freq_to_timedelta(to_freq)
+        source_index = try_to_datetime_index(source_index)
+        target_index = try_to_datetime_index(target_index)
+        infer_source_freq = True
+        if isinstance(source_freq, bool):
+            if not source_freq:
+                infer_source_freq = False
+            source_freq = None
+        infer_target_freq = True
+        if isinstance(target_freq, bool):
+            if not target_freq:
+                infer_target_freq = False
+            target_freq = None
+        if infer_source_freq:
+            source_freq = infer_index_freq(source_index, freq=source_freq, allow_date_offset=True, allow_numeric=True)
+        if infer_target_freq:
+            target_freq = infer_index_freq(target_index, freq=target_freq, allow_date_offset=True, allow_numeric=True)
 
-        self._from_index = from_index
-        self._to_index = to_index
-        self._from_freq = from_freq
-        self._to_freq = to_freq
+        self._source_index = source_index
+        self._target_index = target_index
+        self._source_freq = source_freq
+        self._target_freq = target_freq
 
         Configured.__init__(
             self,
-            from_index=from_index,
-            to_index=to_index,
-            from_freq=from_freq,
-            to_freq=to_freq,
+            source_index=source_index,
+            target_index=target_index,
+            source_freq=source_freq,
+            target_freq=target_freq,
         )
 
     @classmethod
     def from_pd_resampler(
         cls: tp.Type[ResamplerT],
-        from_index: tp.IndexLike,
         pd_resampler: tp.PandasResampler,
-        from_freq: tp.Optional[tp.FrequencyLike] = None,
+        source_freq: tp.Optional[tp.FrequencyLike] = None,
     ) -> ResamplerT:
         """Build `Resampler` from
         [pandas.core.resample.Resampler](https://pandas.pydata.org/docs/reference/resampling.html).
         """
-        to_index = pd_resampler.count().index
+        target_index = pd_resampler.count().index
         return cls(
-            from_index=from_index,
-            to_index=to_index,
-            from_freq=from_freq,
-            to_freq=None,
+            source_index=pd_resampler.obj.index,
+            target_index=target_index,
+            source_freq=source_freq,
+            target_freq=None,
         )
 
     @classmethod
     def from_pd_resample(
         cls: tp.Type[ResamplerT],
-        from_index: tp.IndexLike,
+        source_index: tp.IndexLike,
         *args,
-        from_freq: tp.Optional[tp.FrequencyLike] = None,
+        source_freq: tp.Optional[tp.FrequencyLike] = None,
         **kwargs,
     ) -> ResamplerT:
         """Build `Resampler` from
         [pandas.DataFrame.resample](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.resample.html).
         """
-        if not isinstance(from_index, pd.DatetimeIndex):
-            from_index = pd.DatetimeIndex(from_index)
-        pd_resampler = pd.Series(index=from_index, dtype=object).resample(*args, **kwargs)
-        return cls.from_pd_resampler(from_index, pd_resampler, from_freq=from_freq)
+        pd_resampler = pd.Series(index=source_index, dtype=object).resample(*args, **kwargs)
+        return cls.from_pd_resampler(pd_resampler, source_freq=source_freq)
 
     @classmethod
     def from_pd_date_range(
         cls: tp.Type[ResamplerT],
-        from_index: tp.IndexLike,
+        source_index: tp.IndexLike,
         *args,
-        from_freq: tp.Optional[tp.FrequencyLike] = None,
+        source_freq: tp.Optional[tp.FrequencyLike] = None,
         **kwargs,
     ) -> ResamplerT:
         """Build `Resampler` from
         [pandas.date_range](https://pandas.pydata.org/docs/reference/api/pandas.date_range.html).
         """
-        to_index = pd.date_range(*args, **kwargs)
+        target_index = pd.date_range(*args, **kwargs)
         return cls(
-            from_index=from_index,
-            to_index=to_index,
-            from_freq=from_freq,
-            to_freq=None,
+            source_index=source_index,
+            target_index=target_index,
+            source_freq=source_freq,
+            target_freq=None,
         )
 
     @property
-    def from_index(self) -> tp.PandasDatetimeIndex:
-        """Source index."""
-        return self._from_index
+    def source_index(self) -> tp.Index:
+        """Index being resampled."""
+        return self._source_index
 
     @property
-    def to_index(self) -> tp.PandasDatetimeIndex:
-        """Target index."""
-        return self._to_index
+    def target_index(self) -> tp.Index:
+        """Index resulted from resampling."""
+        return self._target_index
 
     @property
-    def from_freq(self) -> tp.Optional[tp.PandasFrequency]:
-        """Source frequency or date offset."""
-        if self._from_freq is None:
-            if self.from_index.freq is not None:
-                return freq_to_timedelta(self.from_index.freq)
-            if self.from_index.inferred_freq is not None:
-                return freq_to_timedelta(self.from_index.inferred_freq)
-        return self._from_freq
+    def source_freq(self) -> tp.AnyFrequency:
+        """Frequency or date offset of the source index."""
+        return self._source_freq
 
     @property
-    def to_freq(self) -> tp.Optional[tp.PandasFrequency]:
-        """Target frequency or date offset."""
-        if self._to_freq is None:
-            if self.to_index.freq is not None:
-                return freq_to_timedelta(self.to_index.freq)
-            if self.to_index.inferred_freq is not None:
-                return freq_to_timedelta(self.to_index.inferred_freq)
-        return self._to_freq
+    def target_freq(self) -> tp.AnyFrequency:
+        """Frequency or date offset of the target index."""
+        return self._target_freq
 
-    def map_to_index(
+    @classmethod
+    def get_rbound_index(cls, index: pd.Index, freq: tp.AnyFrequency = None) -> tp.Index:
+        """Get the right bound of a datetime index.
+
+        If `freq` is None, calculates the rightmost bound."""
+        index = try_to_datetime_index(index)
+        checks.assert_instance_of(index, pd.DatetimeIndex)
+        if freq is not None:
+            return index.shift(1, freq=freq) - pd.Timedelta(1, "ns")
+        max_ts = pd.Timestamp.max.tz_localize(index.tzinfo)
+        return (index[1:] - pd.Timedelta(1, "ns")).append(pd.Index([max_ts]))
+
+    @cached_property
+    def source_rbound_index(self) -> tp.Index:
+        """Get the right bound of the source datetime index."""
+        return self.get_rbound_index(self.source_index, freq=self.source_freq)
+
+    @cached_property
+    def target_rbound_index(self) -> tp.Index:
+        """Get the right bound of the target datetime index."""
+        return self.get_rbound_index(self.target_index, freq=self.target_freq)
+
+    def map_index(
         self,
         before: bool = False,
         raise_missing: bool = True,
         return_index: bool = True,
         jitted: tp.JittedOption = None,
     ) -> tp.Union[tp.Array1d, tp.Index]:
-        """See `vectorbtpro.base.resampling.nb.map_to_index_nb`."""
-        func = jit_reg.resolve_option(nb.map_to_index_nb, jitted)
+        """See `vectorbtpro.base.resampling.nb.map_index_nb`."""
+        func = jit_reg.resolve_option(nb.map_index_nb, jitted)
         mapped_arr = func(
-            self.from_index.values,
-            self.to_index.values,
+            self.source_index.values,
+            self.target_index.values,
             before=before,
             raise_missing=raise_missing,
         )
         if return_index:
             nan_mask = mapped_arr == -1
             if nan_mask.any():
-                mapped_index = self.from_index.to_series().copy()
+                mapped_index = self.source_index.to_series().copy()
                 mapped_index[nan_mask] = np.nan
-                mapped_index[~nan_mask] = self.to_index[mapped_arr]
+                mapped_index[~nan_mask] = self.target_index[mapped_arr]
                 mapped_index = pd.Index(mapped_index)
             else:
-                mapped_index = self.to_index[mapped_arr]
+                mapped_index = self.target_index[mapped_arr]
             return mapped_index
         return mapped_arr
 
@@ -166,9 +195,9 @@ class Resampler(Configured):
         """See `vectorbtpro.base.resampling.nb.index_difference_nb`."""
         func = jit_reg.resolve_option(nb.index_difference_nb, jitted)
         if reverse:
-            mapped_arr = func(self.to_index.values, self.from_index.values)
+            mapped_arr = func(self.target_index.values, self.source_index.values)
         else:
-            mapped_arr = func(self.from_index.values, self.to_index.values)
+            mapped_arr = func(self.source_index.values, self.target_index.values)
         if return_index:
-            return self.to_index[mapped_arr]
+            return self.target_index[mapped_arr]
         return mapped_arr

@@ -113,6 +113,7 @@ TimezoneLike = Union[None, str, float, timedelta, tzinfo]
 DatetimeLike = Union[str, float, pd.Timestamp, np.datetime64, datetime]
 PandasFrequency = Union[pd.Timedelta, pd.DateOffset]
 PandasDatetimeIndex = Union[pd.DatetimeIndex, pd.PeriodIndex]
+AnyFrequency = Union[None, int, float, pd.Timedelta, pd.DateOffset]
 
 
 class SupportsTZInfo(Protocol):

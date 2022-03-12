@@ -91,6 +91,10 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         """
         return self._column_config
 
+    def use_column_config_of(self, cls: tp.Type[DataT]) -> None:
+        """Copy column config from another `Data` class."""
+        self._column_config = cls.column_config.copy()
+
     def __init__(
         self,
         wrapper: ArrayWrapper,

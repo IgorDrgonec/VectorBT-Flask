@@ -7,6 +7,7 @@ from datetime import datetime, timezone, timedelta, tzinfo, time
 import dateparser
 import numpy as np
 import pandas as pd
+from pandas.tseries.frequencies import to_offset
 import pytz
 import re
 
@@ -16,19 +17,85 @@ from vectorbtpro import _typing as tp
 PandasDatetimeIndex = (pd.DatetimeIndex, pd.PeriodIndex)
 
 
-def freq_to_timedelta(arg: tp.FrequencyLike) -> pd.Timedelta:
-    """`pd.to_timedelta` that uses unit abbreviation with number."""
-    if isinstance(arg, str):
-        arg = "".join(arg.strip().split())
-        match = re.match(r"^(\d*)([m]?)$", arg)
+def freq_to_timedelta(freq: tp.FrequencyLike) -> pd.Timedelta:
+    """Convert a frequency-like object to `pd.Timedelta`."""
+    if isinstance(freq, pd.Timedelta):
+        return freq
+    if isinstance(freq, str):
+        freq = "".join(freq.strip().split())
+        match = re.match(r"^(\d*)([m]?)$", freq)
         if match:
-            arg = match.group(1) + match.group(2)
-        if re.match(r"^\d*[MyY]?$", arg):
+            freq = match.group(1) + match.group(2)
+        if re.match(r"^\d*[MyY]?$", freq):
             raise ValueError("Units 'M', 'Y' and 'y' do not represent unambiguous timedelta values")
-    if isinstance(arg, str) and not arg[0].isdigit():
+    if isinstance(freq, str) and not freq[0].isdigit():
         # Otherwise "ValueError: unit abbreviation w/o a number"
-        return pd.Timedelta(1, unit=arg)
-    return pd.Timedelta(arg)
+        return pd.Timedelta(1, unit=freq)
+    return pd.Timedelta(freq)
+
+
+def freq_to_timedelta64(freq: tp.FrequencyLike) -> np.timedelta64:
+    """Convert a frequency-like object to `np.timedelta64`."""
+    if isinstance(freq, np.timedelta64):
+        return freq
+    if not isinstance(freq, (pd.DateOffset, pd.Timedelta)):
+        freq = freq_to_timedelta(freq)
+    if isinstance(freq, pd.DateOffset):
+        freq = pd.Timedelta(freq)
+    return freq.to_timedelta64()
+
+
+def try_to_datetime_index(index: tp.IndexLike, **kwargs) -> tp.Index:
+    """Try converting an index to a datetime index."""
+    if not isinstance(index, pd.Index):
+        if isinstance(index, str):
+            try:
+                index = pd.to_datetime(index)
+                index = [index]
+            except Exception as e:
+                pass
+        try:
+            index = pd.Index(index)
+        except Exception as e:
+            index = pd.Index([index])
+    if isinstance(index, pd.DatetimeIndex):
+        return index
+    if index.dtype == object:
+        try:
+            return pd.to_datetime(index, **kwargs)
+        except Exception as e:
+            pass
+    return index
+
+
+def infer_index_freq(
+    index: pd.Index,
+    freq: tp.Optional[tp.FrequencyLike] = None,
+    allow_date_offset: bool = False,
+    allow_numeric: bool = False,
+    detect_via_diff: bool = False,
+) -> tp.Union[None, float, tp.PandasFrequency]:
+    """Infer frequency of a datetime index if `freq` is None, otherwise convert `freq`."""
+    if freq is None and isinstance(index, pd.DatetimeIndex):
+        if index.freqstr is not None:
+            freq = freq_to_timedelta(index.freqstr)
+        elif index.freq is not None:
+            freq = index.freq
+        elif len(index) >= 3:
+            freq = pd.infer_freq(index)
+            if freq is not None:
+                freq = to_offset(freq)
+    if freq is None:
+        if detect_via_diff:
+            return (index[1:] - index[:-1]).min()
+        return None
+    if isinstance(freq, pd.Timedelta):
+        return freq
+    if isinstance(freq, pd.DateOffset) and allow_date_offset:
+        return freq
+    if isinstance(freq, (int, float)) and allow_numeric:
+        return freq
+    return freq_to_timedelta(freq)
 
 
 def get_utc_tz() -> timezone:
