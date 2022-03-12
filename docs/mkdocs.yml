@@ -149,6 +149,10 @@ nav:
         - nb: api/base/grouping/nb.md
       - indexes: api/base/indexes.md
       - indexing: api/base/indexing.md
+      - resampling:
+          - api/base/resampling/index.md
+          - base: api/base/resampling/base.md
+          - nb: api/base/resampling/nb.md
       - reshaping: api/base/reshaping.md
       - wrapping: api/base/wrapping.md
     - data:
@@ -170,6 +174,7 @@ nav:
         - apply_reduce: api/generic/nb/apply_reduce.md
         - base: api/generic/nb/base.md
         - records: api/generic/nb/records.md
+        - resample: api/generic/nb/resample.md
         - rolling: api/generic/nb/rolling.md
       - plots_builder: api/generic/plots_builder.md
       - plotting: api/generic/plotting.md

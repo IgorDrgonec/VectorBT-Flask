@@ -706,7 +706,9 @@ class ArrayWrapper(Configured, PandasIndexer):
         *args,
         **kwargs,
     ) -> tp.Tuple[tp.Union[Resampler, tp.PandasResampler], ArrayWrapperT]:
-        """Perform resampling on `ArrayWrapper` and also return metadata."""
+        """Perform resampling on `ArrayWrapper` and also return metadata.
+
+        `*args` and `**kwargs` are passed to `ArrayWrapper.create_resampler`."""
         resampler = self.create_resampler(*args, **kwargs)
         if isinstance(resampler, Resampler):
             _resampler = resampler
@@ -718,7 +720,9 @@ class ArrayWrapper(Configured, PandasIndexer):
         return resampler, new_wrapper
 
     def resample(self: ArrayWrapperT, *args, **kwargs) -> ArrayWrapperT:
-        """Perform resampling on `ArrayWrapper`."""
+        """Perform resampling on `ArrayWrapper`.
+
+        Uses `ArrayWrapper.resample_meta`."""
         return self.resample_meta(*args, **kwargs)[1]
 
 
@@ -747,7 +751,10 @@ class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
         return self.replace(wrapper=new_wrapper)
 
     def resample(self: WrappingT, *args, **kwargs) -> WrappingT:
-        """Perform resampling on `Wrapping`."""
+        """Perform resampling on `Wrapping`.
+
+        When overriding, make sure to create a resampler by passing `*args` and `**kwargs`
+        to `ArrayWrapper.create_resampler`."""
         raise NotImplementedError
 
     @property
