@@ -1619,6 +1619,8 @@ You can also replace templates across all subplots by using the global template 
 ![](/assets/images/portfolio_plot_path.svg)
 """
 
+import string
+import inspect
 import warnings
 from collections import namedtuple
 
@@ -1647,6 +1649,7 @@ from vectorbtpro.returns.accessors import ReturnsAccessor
 from vectorbtpro.signals.generators import RANDNX, RPROBNX
 from vectorbtpro.utils import checks
 from vectorbtpro.utils import chunking as ch
+from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig
 from vectorbtpro.utils.decorators import custom_property, cached_property, class_or_instancemethod
@@ -8835,7 +8838,24 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     def subplots(self) -> Config:
         return self._subplots
 
+    # ############# Docs ############# #
 
+    @classmethod
+    def build_in_output_config_doc(cls, source_cls: tp.Optional[type] = None) -> str:
+        """Build in-output config documentation."""
+        if source_cls is None:
+            source_cls = Portfolio
+        return string.Template(inspect.cleandoc(get_dict_attr(source_cls, "in_output_config").__doc__)).substitute(
+            {"in_output_config": cls.in_output_config.prettify(), "cls_name": cls.__name__},
+        )
+
+    @classmethod
+    def override_in_output_config_doc(cls, __pdoc__: dict, source_cls: tp.Optional[type] = None) -> None:
+        """Call this method on each subclass that overrides `Data.in_output_config`."""
+        __pdoc__[cls.__name__ + ".in_output_config"] = cls.build_in_output_config_doc(source_cls=source_cls)
+
+
+Portfolio.override_in_output_config_doc(__pdoc__)
 Portfolio.override_metrics_doc(__pdoc__)
 Portfolio.override_subplots_doc(__pdoc__)
 

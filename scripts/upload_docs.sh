@@ -10,9 +10,6 @@ echo "${C}Updating pdoc_to_md...${NC}"
 pip uninstall -y pdoc_to_md
 pip install -U git+https://github.com/polakowo/pdoc-to-md.git
 
-echo "${C}Updating mkdocs...${NC}"
-pip install -U git+https://github.com/squidfunk/mkdocs-material-insiders.git
-
 echo "${C}Generating API...${NC}"
 python generate_api.py
 

@@ -79,6 +79,8 @@ __all__ = [
     "NDLData",
 ]
 
+__pdoc__ = {}
+
 # ############# Synthetic ############# #
 
 
@@ -734,6 +736,10 @@ class YFData(RemoteData):  # pragma: no cover
         }
     )
 
+    @property
+    def column_config(self) -> Config:
+        return self._column_config
+
     @classmethod
     def fetch_symbol(
         cls,
@@ -795,6 +801,8 @@ class YFData(RemoteData):  # pragma: no cover
         return yf.Ticker(symbol).history(period=period, start=start, end=end, interval=timeframe, **history_kwargs)
 
 
+YFData.override_column_config_doc(__pdoc__)
+
 BinanceDataT = tp.TypeVar("BinanceDataT", bound="BinanceData")
 
 
@@ -840,6 +848,10 @@ class BinanceData(RemoteData):  # pragma: no cover
             ),
         }
     )
+
+    @property
+    def column_config(self) -> Config:
+        return self._column_config
 
     @classmethod
     def fetch(
@@ -1030,6 +1042,9 @@ class BinanceData(RemoteData):  # pragma: no cover
         del df["Ignore"]
 
         return df
+
+
+BinanceData.override_column_config_doc(__pdoc__)
 
 
 class CCXTData(RemoteData):  # pragma: no cover
@@ -1271,6 +1286,10 @@ class AlpacaData(RemoteData):  # pragma: no cover
         }
     )
 
+    @property
+    def column_config(self) -> Config:
+        return self._column_config
+
     @classmethod
     def fetch(
         cls: tp.Type[AlpacaDataT],
@@ -1454,6 +1473,8 @@ class AlpacaData(RemoteData):  # pragma: no cover
         return df
 
 
+AlpacaData.override_column_config_doc(__pdoc__)
+
 PolygonDataT = tp.TypeVar("PolygonDataT", bound="PolygonData")
 
 
@@ -1473,6 +1494,10 @@ class PolygonData(RemoteData):  # pragma: no cover
             ),
         }
     )
+
+    @property
+    def column_config(self) -> Config:
+        return self._column_config
 
     @classmethod
     def fetch(
@@ -1773,6 +1798,8 @@ class PolygonData(RemoteData):  # pragma: no cover
 
         return df
 
+
+PolygonData.override_column_config_doc(__pdoc__)
 
 AlphaVantageDataT = tp.TypeVar("AlphaVantageDataT", bound="AlphaVantageData")
 
