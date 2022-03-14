@@ -1,5 +1,7 @@
 ---
 title: Features
+hide:
+  - navigation
 ---
 
 # Features :zap:

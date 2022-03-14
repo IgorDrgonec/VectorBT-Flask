@@ -27,6 +27,7 @@ theme:
     - search.suggest
     - search.share
     - content.code.annotate
+    - toc.follow
   palette:
     scheme: slate
     accent: amber
@@ -107,9 +108,9 @@ nav:
   - Home: index.md
   - Getting started:
     - getting-started/index.md
-    - Features: getting-started/features.md
     - Installation: getting-started/installation.md
     - Release notes: getting-started/release-notes.md
+  - Features: features.md
   - Examples:
     - Basic RSI strategy: examples/basic-rsi-strategy.md
     - SuperFast SuperTrend:
