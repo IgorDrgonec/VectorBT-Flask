@@ -250,7 +250,7 @@ class ReturnsAccessor(GenericAccessor):
     def get_ann_factor(
         year_freq: tp.Optional[tp.FrequencyLike] = None,
         freq: tp.Optional[tp.FrequencyLike] = None,
-    ) -> float:
+    ) -> tp.Optional[float]:
         """Get the annualization factor from the year and data frequency."""
         from vectorbtpro._settings import settings
 
@@ -260,7 +260,9 @@ class ReturnsAccessor(GenericAccessor):
         if year_freq is None:
             year_freq = returns_cfg["year_freq"]
         if freq is None:
-            freq = wrapping_cfg["wrapping_cfg"]
+            freq = wrapping_cfg["freq"]
+        if year_freq is None or freq is None:
+            return None
 
         return freq_to_timedelta(year_freq) / freq_to_timedelta(freq)
 

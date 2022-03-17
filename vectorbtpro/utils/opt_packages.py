@@ -33,6 +33,7 @@ opt_package_config = ReadonlyConfig(
         polygon=dict(name="Polygon API Client", link="https://github.com/polygon-io/client-python"),
         bs4=dict(name="Beautiful Soup", link="https://www.crummy.com/software/BeautifulSoup/bs4/doc/"),
         nasdaqdatalink=dict(name="Nasdaq Data Link", link="https://github.com/Nasdaq/data-link-python"),
+        pypfopt=dict(name="PyPortfolioOpt", link="https://github.com/robertmartin8/PyPortfolioOpt"),
     )
 )
 """_"""
