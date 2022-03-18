@@ -362,16 +362,16 @@ class TestResampler:
         assert resampler.source_freq == source_index.freq
         assert resampler.target_freq == target_index.freq
 
-    def test_downsample_map_index(self):
+    def test_downsample_map_to_target_index(self):
         source_index = pd.date_range("2020-01-05", "2020-01-15", freq="1d")
         target_index = pd.date_range("2020-01-01", "2020-02-01", freq="7d")
         resampler = vbt.Resampler(source_index, target_index)
         np.testing.assert_array_equal(
-            resampler.map_index(return_index=False),
+            resampler.map_to_target_index(return_index=False),
             np.array([0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2]),
         )
         np.testing.assert_array_equal(
-            resampler.map_index(return_index=True),
+            resampler.map_to_target_index(return_index=True),
             pd.DatetimeIndex(
                 [
                     "2020-01-01",
@@ -394,13 +394,13 @@ class TestResampler:
         target_index = pd.date_range("2020-01-06", "2020-02-01", freq="7d")
         resampler = vbt.Resampler(source_index, target_index)
         with pytest.raises(Exception):
-            resampler.map_index(return_index=False)
+            resampler.map_to_target_index(return_index=False)
         np.testing.assert_array_equal(
-            resampler.map_index(return_index=False, raise_missing=False),
+            resampler.map_to_target_index(return_index=False, raise_missing=False),
             np.array([-1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1]),
         )
         np.testing.assert_array_equal(
-            resampler.map_index(return_index=True, raise_missing=False),
+            resampler.map_to_target_index(return_index=True, raise_missing=False),
             pd.DatetimeIndex(
                 [
                     pd.NaT,
@@ -423,11 +423,11 @@ class TestResampler:
         target_index = pd.date_range("2020-01-01", "2020-02-01", freq="7d")
         resampler = vbt.Resampler(source_index, target_index)
         np.testing.assert_array_equal(
-            resampler.map_index(return_index=False, before=True),
+            resampler.map_to_target_index(return_index=False, before=True),
             np.array([1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2]),
         )
         np.testing.assert_array_equal(
-            resampler.map_index(return_index=True, before=True),
+            resampler.map_to_target_index(return_index=True, before=True),
             pd.DatetimeIndex(
                 [
                     "2020-01-08",
@@ -450,13 +450,13 @@ class TestResampler:
         target_index = pd.date_range("2020-01-01", "2020-01-14", freq="7d")
         resampler = vbt.Resampler(source_index, target_index)
         with pytest.raises(Exception):
-            resampler.map_index(return_index=False, before=True)
+            resampler.map_to_target_index(return_index=False, before=True)
         np.testing.assert_array_equal(
-            resampler.map_index(return_index=False, raise_missing=False, before=True),
+            resampler.map_to_target_index(return_index=False, raise_missing=False, before=True),
             np.array([1, 1, 1, 1, -1, -1, -1, -1, -1, -1, -1]),
         )
         np.testing.assert_array_equal(
-            resampler.map_index(return_index=True, raise_missing=False, before=True),
+            resampler.map_to_target_index(return_index=True, raise_missing=False, before=True),
             pd.DatetimeIndex(
                 [
                     "2020-01-08",
@@ -476,16 +476,16 @@ class TestResampler:
             ),
         )
 
-    def test_upsample_map_index(self):
+    def test_upsample_map_to_target_index(self):
         source_index = pd.date_range("2020-01-05", "2020-01-15", freq="1d")
         target_index = pd.date_range("2020-01-01", "2020-02-01", freq="10h")
         resampler = vbt.Resampler(source_index, target_index)
         np.testing.assert_array_equal(
-            resampler.map_index(return_index=False),
+            resampler.map_to_target_index(return_index=False),
             np.array([9, 12, 14, 16, 19, 21, 24, 26, 28, 31, 33]),
         )
         np.testing.assert_array_equal(
-            resampler.map_index(return_index=True),
+            resampler.map_to_target_index(return_index=True),
             pd.DatetimeIndex(
                 [
                     "2020-01-04 18:00:00",
@@ -508,13 +508,13 @@ class TestResampler:
         target_index = pd.date_range("2020-01-06", "2020-02-01", freq="10h")
         resampler = vbt.Resampler(source_index, target_index)
         with pytest.raises(Exception):
-            resampler.map_index(return_index=False)
+            resampler.map_to_target_index(return_index=False)
         np.testing.assert_array_equal(
-            resampler.map_index(return_index=False, raise_missing=False),
+            resampler.map_to_target_index(return_index=False, raise_missing=False),
             np.array([-1, 0, 2, 4, 7, 9, 12, 14, 16, 19, 21]),
         )
         np.testing.assert_array_equal(
-            resampler.map_index(return_index=True, raise_missing=False),
+            resampler.map_to_target_index(return_index=True, raise_missing=False),
             pd.DatetimeIndex(
                 [
                     pd.NaT,
@@ -537,11 +537,11 @@ class TestResampler:
         target_index = pd.date_range("2020-01-01", "2020-02-01", freq="10h")
         resampler = vbt.Resampler(source_index, target_index)
         np.testing.assert_array_equal(
-            resampler.map_index(return_index=False, before=True),
+            resampler.map_to_target_index(return_index=False, before=True),
             np.array([10, 12, 15, 17, 20, 22, 24, 27, 29, 32, 34]),
         )
         np.testing.assert_array_equal(
-            resampler.map_index(return_index=True, before=True),
+            resampler.map_to_target_index(return_index=True, before=True),
             pd.DatetimeIndex(
                 [
                     "2020-01-05 04:00:00",
@@ -564,13 +564,13 @@ class TestResampler:
         target_index = pd.date_range("2020-01-01", "2020-01-14", freq="10h")
         resampler = vbt.Resampler(source_index, target_index)
         with pytest.raises(Exception):
-            resampler.map_index(return_index=False, before=True)
+            resampler.map_to_target_index(return_index=False, before=True)
         np.testing.assert_array_equal(
-            resampler.map_index(return_index=False, raise_missing=False, before=True),
+            resampler.map_to_target_index(return_index=False, raise_missing=False, before=True),
             np.array([10, 12, 15, 17, 20, 22, 24, 27, 29, -1, -1]),
         )
         np.testing.assert_array_equal(
-            resampler.map_index(return_index=True, raise_missing=False, before=True),
+            resampler.map_to_target_index(return_index=True, raise_missing=False, before=True),
             pd.DatetimeIndex(
                 [
                     "2020-01-05 04:00:00",

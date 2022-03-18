@@ -224,6 +224,7 @@ from vectorbtpro.base import indexes, reshaping
 from vectorbtpro.base.accessors import BaseAccessor, BaseDFAccessor, BaseSRAccessor
 from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.base.resampling.base import Resampler
+from vectorbtpro.base.resampling import nb as resampling_nb
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.base.indexes import repeat_index
 from vectorbtpro.generic import nb
@@ -1874,20 +1875,15 @@ class GenericAccessor(BaseAccessor, Analyzable):
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
-        silence_warnings: bool = False,
+        silence_warnings: tp.Optional[bool] = None,
     ) -> tp.MaybeSeriesFrame:
-        """See `vectorbtpro.generic.nb.resample.latest_at_index_nb`.
+        """See `vectorbtpro.base.resampling.nb.latest_at_index_nb`.
 
         `target_index` can be either an instance of `vectorbtpro.base.resampling.base.Resampler`,
         or any index-like object.
 
         Gives the same results as `df.resample(closed='right', label='right').last().ffill()`
         when applied on the target index of the resampler.
-
-        !!! warning
-            Do not use this method when upsampling information that belongs somewhere in-between
-            two dates, such as the high, low, and close price at '2020-01-01' - it will be interpreted
-            as happening exactly at '2020-01-01T00:00:00'. Use `GenericAccessor.resample_closing`.
 
         Usage:
             * Downsampling:
@@ -1925,6 +1921,13 @@ class GenericAccessor(BaseAccessor, Analyzable):
             Freq: H, Length: 97, dtype: float64
             ```
         """
+        from vectorbtpro._settings import settings
+
+        resampling_cfg = settings["resampling"]
+
+        if silence_warnings is None:
+            silence_warnings = resampling_cfg["silence_warnings"]
+
         target_index_str = isinstance(target_index, str)
         if not isinstance(target_index, Resampler):
             resampler = Resampler(
@@ -1932,6 +1935,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 target_index,
                 source_freq=source_freq,
                 target_freq=target_freq,
+                silence_warnings=silence_warnings,
             )
         else:
             resampler = target_index
@@ -1964,8 +1968,12 @@ class GenericAccessor(BaseAccessor, Analyzable):
             source_freq = None
         else:
             source_freq = resampler.source_freq
-            if source_freq is not None and not isinstance(source_freq, (int, float)):
-                source_freq = freq_to_timedelta64(source_freq)
+            if source_freq is not None:
+                if not isinstance(source_freq, (int, float)):
+                    try:
+                        source_freq = freq_to_timedelta64(source_freq)
+                    except ValueError as e:
+                        source_freq = None
             if source_freq is None:
                 if not silence_warnings:
                     warnings.warn("Using right bound of source index without frequency. Set source_freq.", stacklevel=2)
@@ -1973,8 +1981,12 @@ class GenericAccessor(BaseAccessor, Analyzable):
             target_freq = None
         else:
             target_freq = resampler.target_freq
-            if target_freq is not None and not isinstance(target_freq, (int, float)):
-                target_freq = freq_to_timedelta64(target_freq)
+            if target_freq is not None:
+                if not isinstance(target_freq, (int, float)):
+                    try:
+                        target_freq = freq_to_timedelta64(target_freq)
+                    except ValueError as e:
+                        target_freq = None
             if target_freq is None:
                 if not silence_warnings:
                     warnings.warn("Using right bound of target index without frequency. Set target_freq.", stacklevel=2)
@@ -1984,7 +1996,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             else:
                 nan_value = np.nan
 
-        func = jit_reg.resolve_option(nb.latest_at_index_nb, jitted)
+        func = jit_reg.resolve_option(resampling_nb.latest_at_index_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         out = func(
             self.to_2d_array(),
@@ -2016,7 +2028,12 @@ class GenericAccessor(BaseAccessor, Analyzable):
             The timestamps in the source and target index should denote the open time."""
         if not isinstance(rule, Resampler):
             rule = self.wrapper.create_resampler(rule, resample_kwargs=resample_kwargs, return_pd_resampler=False)
-        return self.latest_at_index(rule, source_rbound=False, target_rbound=False, **kwargs)
+        return self.latest_at_index(
+            rule,
+            source_rbound=False,
+            target_rbound=False,
+            **kwargs,
+        )
 
     def resample_closing(
         self,
@@ -2031,7 +2048,12 @@ class GenericAccessor(BaseAccessor, Analyzable):
             The timestamps in the source and target  index should denote the open time."""
         if not isinstance(rule, Resampler):
             rule = self.wrapper.create_resampler(rule, resample_kwargs=resample_kwargs, return_pd_resampler=False)
-        return self.latest_at_index(rule, source_rbound=True, target_rbound=True, **kwargs)
+        return self.latest_at_index(
+            rule,
+            source_rbound=True,
+            target_rbound=True,
+            **kwargs,
+        )
 
     @class_or_instancemethod
     def resample_to_index(
@@ -2039,8 +2061,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
         target_index: tp.Union[Resampler, tp.IndexLike],
         reduce_func_nb: tp.Union[tp.ReduceFunc, tp.RangeReduceMetaFunc],
         *args,
+        target_freq: tp.Union[None, bool, tp.FrequencyLike] = None,
         before: bool = False,
-        reduce_one: bool = True,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
         template_context: tp.Optional[tp.Mapping] = None,
@@ -2048,10 +2070,14 @@ class GenericAccessor(BaseAccessor, Analyzable):
         chunked: tp.ChunkedOption = None,
         wrapper: tp.Optional[ArrayWrapper] = None,
         wrap_kwargs: tp.KwargsLike = None,
+        silence_warnings: tp.Optional[bool] = None,
     ) -> tp.SeriesFrame:
-        """See `vectorbtpro.generic.nb.resample.resample_to_index_nb`.
+        """Resample solely based on target index.
 
-        For details on the meta version, see `vectorbtpro.generic.nb.resample.resample_to_index_meta_nb`.
+        Applies `vectorbtpro.generic.nb.apply_reduce.reduce_index_ranges_nb` on index ranges
+        from `vectorbtpro.base.resampler.nb.map_index_to_source_ranges_nb`.
+
+        For details on the meta version, see `vectorbtpro.generic.nb.apply_reduce.reduce_index_ranges_meta_nb`.
 
         Usage:
             * Downsampling:
@@ -2170,32 +2196,39 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 wrapper = cls_or_self.wrapper
 
         if not isinstance(target_index, Resampler):
-            resampler = Resampler(wrapper.index, target_index)
+            resampler = Resampler(
+                wrapper.index,
+                target_index,
+                target_freq=target_freq,
+                silence_warnings=silence_warnings,
+            )
         else:
             resampler = target_index
+            if target_freq is not None:
+                resampler = resampler.replace(target_freq=target_freq)
+        index_ranges = resampler.map_index_to_source_ranges(
+            before=before,
+            jitted=jitted,
+            silence_warnings=silence_warnings,
+        )
 
         if isinstance(cls_or_self, type):
-            template_context = merge_dicts(dict(resampler=resampler), template_context)
+            template_context = merge_dicts(dict(resampler=resampler, index_ranges=index_ranges), template_context)
             args = deep_substitute(args, template_context, sub_id="args")
-            func = jit_reg.resolve_option(nb.resample_to_index_meta_nb, jitted)
+            func = jit_reg.resolve_option(nb.reduce_index_ranges_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             out = func(
                 wrapper.shape_2d[1],
-                resampler.source_index.values,
-                resampler.target_index.values,
-                before,
+                index_ranges,
                 reduce_func_nb,
                 *args,
             )
         else:
-            func = jit_reg.resolve_option(nb.resample_to_index_nb, jitted)
+            func = jit_reg.resolve_option(nb.reduce_index_ranges_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             out = func(
                 cls_or_self.to_2d_array(),
-                resampler.source_index.values,
-                resampler.target_index.values,
-                before,
-                reduce_one,
+                index_ranges,
                 reduce_func_nb,
                 *args,
             )
@@ -2212,7 +2245,6 @@ class GenericAccessor(BaseAccessor, Analyzable):
         *args,
         closed_lbound: bool = True,
         closed_rbound: bool = False,
-        reduce_one: bool = True,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
         template_context: tp.Optional[tp.Mapping] = None,
@@ -2222,9 +2254,12 @@ class GenericAccessor(BaseAccessor, Analyzable):
         wrap_with_lbound: tp.Optional[bool] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """See `vectorbtpro.generic.nb.resample.resample_between_bounds_nb`.
+        """Resample between target index bounds.
 
-        For details on the meta version, see `vectorbtpro.generic.nb.resample.resample_between_bounds_meta_nb`.
+        Applies `vectorbtpro.generic.nb.apply_reduce.reduce_index_ranges_nb` on index ranges
+        from `vectorbtpro.base.resampler.nb.map_bounds_to_source_ranges_nb`.
+
+        For details on the meta version, see `vectorbtpro.generic.nb.apply_reduce.reduce_index_ranges_meta_nb`.
 
         Usage:
             * Using regular function:
@@ -2329,35 +2364,39 @@ class GenericAccessor(BaseAccessor, Analyzable):
             if wrap_with_lbound is None:
                 wrap_with_lbound = True
         checks.assert_len_equal(target_rbound_index, target_lbound_index)
+        func = jit_reg.resolve_option(resampling_nb.map_bounds_to_source_ranges_nb, jitted)
+        index_ranges = func(
+            wrapper.index.values,
+            target_lbound_index.values,
+            target_rbound_index.values,
+            closed_lbound=closed_lbound,
+            closed_rbound=closed_rbound,
+        )
+
         if isinstance(cls_or_self, type):
             template_context = merge_dicts(
-                dict(target_lbound_index=target_lbound_index, target_rbound_index=target_rbound_index),
+                dict(
+                    target_lbound_index=target_lbound_index,
+                    target_rbound_index=target_rbound_index,
+                    index_ranges=index_ranges,
+                ),
                 template_context,
             )
             args = deep_substitute(args, template_context, sub_id="args")
-            func = jit_reg.resolve_option(nb.resample_between_bounds_meta_nb, jitted)
+            func = jit_reg.resolve_option(nb.reduce_index_ranges_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             out = func(
                 wrapper.shape_2d[1],
-                wrapper.index.values,
-                target_lbound_index.values,
-                target_rbound_index.values,
-                closed_lbound,
-                closed_rbound,
+                index_ranges,
                 reduce_func_nb,
                 *args,
             )
         else:
-            func = jit_reg.resolve_option(nb.resample_between_bounds_nb, jitted)
+            func = jit_reg.resolve_option(nb.reduce_index_ranges_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             out = func(
                 cls_or_self.to_2d_array(),
-                wrapper.index.values,
-                target_lbound_index.values,
-                target_rbound_index.values,
-                closed_lbound,
-                closed_rbound,
-                reduce_one,
+                index_ranges,
                 reduce_func_nb,
                 *args,
             )

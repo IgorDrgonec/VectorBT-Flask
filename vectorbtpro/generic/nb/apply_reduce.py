@@ -333,6 +333,89 @@ def groupby_reduce_meta_nb(
 
 
 @register_jitted
+def reduce_index_ranges_1d_nb(
+    arr: tp.Array1d,
+    index_ranges: tp.Array2d,
+    reduce_func_nb: tp.ReduceFunc,
+    *args,
+) -> tp.Array1d:
+    """Reduce each index range.
+
+    `reduce_func_nb` must accept the array and `*args`. Must return a single value."""
+    out = np.empty(index_ranges.shape[0], dtype=np.float_)
+
+    for k in range(len(index_ranges)):
+        from_i = index_ranges[k, 0]
+        to_i = index_ranges[k, 1]
+        if from_i == -1 or to_i == -1:
+            out[k] = np.nan
+        else:
+            out[k] = reduce_func_nb(arr[from_i:to_i], *args)
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="arr", axis=1),
+    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), index_ranges=None, reduce_func_nb=None, args=ch.ArgsTaker()),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(tags={"can_parallel"})
+def reduce_index_ranges_nb(
+    arr: tp.Array2d,
+    index_ranges: tp.Array2d,
+    reduce_func_nb: tp.ReduceFunc,
+    *args,
+) -> tp.Array2d:
+    """2-dim version of `reduce_index_ranges_1d_nb`."""
+    out = np.empty((index_ranges.shape[0], arr.shape[1]), dtype=np.float_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = reduce_index_ranges_1d_nb(arr[:, col], index_ranges, reduce_func_nb, *args)
+    return out
+
+
+@register_jitted
+def reduce_index_ranges_1d_meta_nb(
+    col: int,
+    index_ranges: tp.Array2d,
+    reduce_func_nb: tp.RangeReduceMetaFunc,
+    *args,
+) -> tp.Array1d:
+    """Meta version of `reduce_index_ranges_1d_nb`.
+
+    `reduce_func_nb` must accept the start row index, the end row index, the column,
+    and `*args`. Must return a single value."""
+    out = np.empty(index_ranges.shape[0], dtype=np.float_)
+
+    for k in range(len(index_ranges)):
+        from_i = index_ranges[k, 0]
+        to_i = index_ranges[k, 1]
+        if from_i == -1 or to_i == -1:
+            out[k] = np.nan
+        else:
+            out[k] = reduce_func_nb(from_i, to_i, col, *args)
+    return out
+
+
+@register_chunkable(
+    size=ch.ArgSizer(arg_query="n_cols"),
+    arg_take_spec=dict(n_cols=ch.CountAdapter(), index_ranges=None, reduce_func_nb=None, args=ch.ArgsTaker()),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(tags={"can_parallel"})
+def reduce_index_ranges_meta_nb(
+    n_cols: int,
+    index_ranges: tp.Array2d,
+    reduce_func_nb: tp.RangeReduceMetaFunc,
+    *args,
+) -> tp.Array2d:
+    """2-dim version of `reduce_index_ranges_1d_meta_nb`."""
+    out = np.empty((index_ranges.shape[0], n_cols), dtype=np.float_)
+    for col in prange(n_cols):
+        out[:, col] = reduce_index_ranges_1d_meta_nb(col, index_ranges, reduce_func_nb, *args)
+    return out
+
+
+@register_jitted
 def apply_and_reduce_1d_nb(
     arr: tp.Array1d,
     apply_func_nb: tp.ApplyFunc,

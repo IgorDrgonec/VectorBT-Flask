@@ -585,7 +585,7 @@ class MappedArray(Analyzable):
         else:
             _resampler = Resampler.from_pd_resampler(resampler)
         if self.idx_arr is not None:
-            index_map = _resampler.map_index(return_index=False)
+            index_map = _resampler.map_to_target_index(return_index=False)
             new_idx_arr = index_map[self.idx_arr]
         else:
             new_idx_arr = None

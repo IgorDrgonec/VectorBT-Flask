@@ -384,6 +384,21 @@ ${config_doc}
 
 _settings["wrapping"] = wrapping
 
+resampling = ChildDict(
+    silence_warnings=False,
+)
+"""_"""
+
+__pdoc__["resampling"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.base.resampling`.
+
+```python
+${config_doc}
+```"""
+)
+
+_settings["resampling"] = resampling
+
 datetime = ChildDict(
     naive_tz=get_local_tz(),
     to_py_timezone=True,
@@ -1146,6 +1161,34 @@ ${config_doc}
 )
 
 _settings["portfolio"] = portfolio
+
+pfopt = Config(
+    target="max_sharpe",
+    target_is_convex=True,
+    weights_sum_to_one=True,
+    target_constraints=None,
+    target_solver="SLSQP",
+    target_initial_guess=None,
+    objectives=None,
+    constraints=None,
+    sector_mapper=None,
+    sector_lower=None,
+    sector_upper=None,
+    discrete_allocation=False,
+    allocation_method="lp_portfolio",
+    silence_warnings=False,
+)
+"""_"""
+
+__pdoc__["pfopt"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.portfolio.pfopt`.
+
+```python
+${config_doc}
+```"""
+)
+
+_settings["pfopt"] = pfopt
 
 messaging = ChildDict(
     telegram=Config(
