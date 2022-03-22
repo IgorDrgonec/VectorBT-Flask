@@ -2363,14 +2363,14 @@ class GenericAccessor(BaseAccessor, Analyzable):
             target_rbound_index = repeat_index(target_rbound_index, len(target_lbound_index))
             if wrap_with_lbound is None:
                 wrap_with_lbound = True
-        checks.assert_len_equal(target_rbound_index, target_lbound_index)
-        func = jit_reg.resolve_option(resampling_nb.map_bounds_to_source_ranges_nb, jitted)
-        index_ranges = func(
-            wrapper.index.values,
-            target_lbound_index.values,
-            target_rbound_index.values,
+        index_ranges = Resampler.map_bounds_to_source_ranges(
+            source_index=wrapper.index.values,
+            target_lbound_index=target_lbound_index.values,
+            target_rbound_index=target_rbound_index.values,
             closed_lbound=closed_lbound,
             closed_rbound=closed_rbound,
+            skipna=False,
+            jitted=jitted,
         )
 
         if isinstance(cls_or_self, type):

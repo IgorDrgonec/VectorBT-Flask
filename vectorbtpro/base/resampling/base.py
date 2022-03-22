@@ -11,7 +11,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import Configured
 from vectorbtpro.utils.datetime_ import freq_to_timedelta64, try_to_datetime_index, infer_index_freq
-from vectorbtpro.utils.decorators import cached_property
+from vectorbtpro.utils.decorators import cached_property, class_or_instancemethod
 from vectorbtpro.base.resampling import nb
 from vectorbtpro.base.indexes import repeat_index
 from vectorbtpro.registries.jit_registry import jit_reg
@@ -298,12 +298,15 @@ class Resampler(Configured):
             before=before,
         )
 
+    @class_or_instancemethod
     def map_bounds_to_source_ranges(
-        self,
+        cls_or_self,
+        source_index: tp.Optional[tp.IndexLike] = None,
         target_lbound_index: tp.Optional[tp.IndexLike] = None,
         target_rbound_index: tp.Optional[tp.IndexLike] = None,
         closed_lbound: bool = True,
         closed_rbound: bool = False,
+        skipna: bool = False,
         jitted: tp.JittedOption = None,
     ) -> tp.Array2d:
         """See `vectorbtpro.base.resampling.nb.map_bounds_to_source_ranges_nb`.
@@ -314,32 +317,37 @@ class Resampler(Configured):
         Also, both allow providing a single datetime string and will automatically broadcast
         to the `Resampler.target_index`."""
 
-        if target_lbound_index is None and target_rbound_index is None:
-            raise ValueError("Either target_lbound_index or target_rbound_index must be set")
-
-        if target_lbound_index is not None:
-            if isinstance(target_lbound_index, str) and target_lbound_index.lower() == "pandas":
-                target_lbound_index = self.target_lbound_index
-            else:
-                target_lbound_index = try_to_datetime_index(target_lbound_index)
-            target_rbound_index = self.target_index
-        if target_rbound_index is not None:
-            target_lbound_index = self.target_index
-            if isinstance(target_rbound_index, str) and target_rbound_index.lower() == "pandas":
-                target_rbound_index = self.target_rbound_index
-            else:
-                target_rbound_index = try_to_datetime_index(target_rbound_index)
-        if len(target_lbound_index) == 1 and len(target_rbound_index) > 1:
-            target_lbound_index = repeat_index(target_lbound_index, len(target_rbound_index))
-        elif len(target_lbound_index) > 1 and len(target_rbound_index) == 1:
-            target_rbound_index = repeat_index(target_rbound_index, len(target_lbound_index))
+        if not isinstance(cls_or_self, type):
+            if target_lbound_index is None and target_rbound_index is None:
+                raise ValueError("Either target_lbound_index or target_rbound_index must be set")
+            if target_lbound_index is not None:
+                if isinstance(target_lbound_index, str) and target_lbound_index.lower() == "pandas":
+                    target_lbound_index = cls_or_self.target_lbound_index
+                else:
+                    target_lbound_index = try_to_datetime_index(target_lbound_index)
+                target_rbound_index = cls_or_self.target_index
+            if target_rbound_index is not None:
+                target_lbound_index = cls_or_self.target_index
+                if isinstance(target_rbound_index, str) and target_rbound_index.lower() == "pandas":
+                    target_rbound_index = cls_or_self.target_rbound_index
+                else:
+                    target_rbound_index = try_to_datetime_index(target_rbound_index)
+            if len(target_lbound_index) == 1 and len(target_rbound_index) > 1:
+                target_lbound_index = repeat_index(target_lbound_index, len(target_rbound_index))
+            elif len(target_lbound_index) > 1 and len(target_rbound_index) == 1:
+                target_rbound_index = repeat_index(target_rbound_index, len(target_lbound_index))
+        else:
+            source_index = try_to_datetime_index(source_index)
+            target_lbound_index = try_to_datetime_index(target_lbound_index)
+            target_rbound_index = try_to_datetime_index(target_rbound_index)
 
         checks.assert_len_equal(target_rbound_index, target_lbound_index)
         func = jit_reg.resolve_option(nb.map_bounds_to_source_ranges_nb, jitted)
         return func(
-            self.source_index.values,
+            source_index.values,
             target_lbound_index.values,
             target_rbound_index.values,
             closed_lbound=closed_lbound,
             closed_rbound=closed_rbound,
+            skipna=skipna,
         )
