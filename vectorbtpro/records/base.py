@@ -583,7 +583,10 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
             group_select=self.group_select,
             **kwargs,
         )
-        new_records_arr = self.get_by_col_idxs(col_idxs)
+        if self.get_field_setting("col", "group_indexing", False):
+            new_records_arr = self.get_by_col_idxs(group_idxs)
+        else:
+            new_records_arr = self.get_by_col_idxs(col_idxs)
         return new_wrapper, new_records_arr, group_idxs, col_idxs
 
     def indexing_func(self: RecordsT, *args, **kwargs) -> RecordsT:

@@ -520,6 +520,7 @@ class MappedArray(Analyzable):
             idx_arr=idx_arr,
             mapping=mapping,
             col_mapper=col_mapper,
+            jitted=jitted,
             **kwargs,
         )
 
@@ -764,6 +765,8 @@ class MappedArray(Analyzable):
                 mapping = self.wrapper.index
             elif mapping.lower() == "columns":
                 mapping = self.wrapper.columns
+            elif mapping.lower() == "groups":
+                mapping = self.wrapper.get_columns()
             mapping = to_mapping(mapping)
         return mapping
 

@@ -54,6 +54,8 @@ __all__ = [
     "order_dt",
     "trade_dt",
     "log_dt",
+    "alloc_range_dt",
+    "alloc_point_dt",
 ]
 
 __pdoc__ = {}
@@ -2059,20 +2061,20 @@ class SignalContext(tp.NamedTuple):
     flex_2d: bool
 
 
-__pdoc__["AdjustSLContext"] = "A named tuple representing the context for generation of signals."
+__pdoc__["SignalContext"] = "A named tuple representing the context for generation of signals."
 __pdoc__[
-    "AdjustSLContext.i"
+    "SignalContext.i"
 ] = """Index of the current row.
 
 Has range `[0, target_shape[0])`."""
 __pdoc__[
-    "AdjustSLContext.col"
+    "SignalContext.col"
 ] = """Current column.
 
 Has range `[0, target_shape[1])` and is always within `[from_col, to_col)`."""
-__pdoc__["AdjustSLContext.position_now"] = "Latest position."
-__pdoc__["AdjustSLContext.val_price_now"] = "Latest valuation price."
-__pdoc__["AdjustSLContext.flex_2d"] = "See `vectorbtpro.base.indexing.flex_select_auto_nb`."
+__pdoc__["SignalContext.position_now"] = "Latest position."
+__pdoc__["SignalContext.val_price_now"] = "Latest valuation price."
+__pdoc__["SignalContext.flex_2d"] = "See `vectorbtpro.base.indexing.flex_select_auto_nb`."
 
 
 # ############# In-outputs ############# #
@@ -2210,5 +2212,46 @@ __pdoc__[
 
 ```python
 {prettify(log_dt)}
+```
+"""
+
+alloc_range_dt = np.dtype(
+    [
+        ("id", np.int_),
+        ("col", np.int_),
+        ("start_idx", np.int_),
+        ("end_idx", np.int_),
+        ("alloc_idx", np.int_),
+        ("status", np.int_),
+    ],
+    align=True,
+)
+"""_"""
+
+__pdoc__[
+    "alloc_range_dt"
+] = f"""`np.dtype` of allocation range records.
+
+```python
+{prettify(alloc_range_dt)}
+```
+"""
+
+alloc_point_dt = np.dtype(
+    [
+        ("id", np.int_),
+        ("col", np.int_),
+        ("alloc_idx", np.int_),
+    ],
+    align=True,
+)
+"""_"""
+
+__pdoc__[
+    "alloc_point_dt"
+] = f"""`np.dtype` of allocation point records.
+
+```python
+{prettify(alloc_point_dt)}
 ```
 """

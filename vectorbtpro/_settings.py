@@ -92,6 +92,7 @@ import pkgutil
 
 import numpy as np
 
+from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import ChildDict, Config, FrozenConfig
 from vectorbtpro.utils.datetime_ import get_local_tz, get_utc_tz
 from vectorbtpro.utils.execution import SequenceEngine, DaskEngine, RayEngine
@@ -1177,6 +1178,21 @@ pfopt = Config(
     discrete_allocation=False,
     allocation_method="lp_portfolio",
     silence_warnings=False,
+    ignore_opt_errors=False,
+    stats=Config(
+        filters=dict(
+            alloc_ranges=dict(
+                filter_func=lambda self, metric_settings: checks.is_instance_of(self.alloc_records, "AllocRanges"),
+            )
+        )
+    ),
+    plots=Config(
+        filters=dict(
+            alloc_ranges=dict(
+                filter_func=lambda self, metric_settings: checks.is_instance_of(self.alloc_records, "AllocRanges"),
+            )
+        )
+    ),
 )
 """_"""
 

@@ -23,6 +23,7 @@ plotly>=4.12.0:             plot, base
 ipywidgets>=7.0.0:          plot, base
 quantstats>=0.0.37:         stats, base
 PyPortfolioOpt>=1.5.1:      stats, base
+universal-portfolios        stats
 python-telegram-bot>=13.4:  notify
 dill:                       io, base
 pytest:                     test

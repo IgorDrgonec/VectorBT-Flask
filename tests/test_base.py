@@ -1460,6 +1460,126 @@ class TestArrayWrapper:
             np.array([[0, 17]])
         )
 
+    def test_get_index_points(self):
+        index = pd.date_range("2020-01-01", "2020-01-03", freq="3h", tz="+0400")
+        wrapper = vbt.ArrayWrapper.from_obj(pd.Series(np.arange(len(index)), index=index))
+        np.testing.assert_array_equal(
+            wrapper.get_index_points(every=2),
+            np.array([0, 2, 4, 6, 8, 10, 12, 14, 16])
+        )
+        np.testing.assert_array_equal(
+            wrapper.get_index_points(every=2, start=5, end=10),
+            np.array([5, 7, 9])
+        )
+
+        np.testing.assert_array_equal(
+            wrapper.get_index_points(every="5h"),
+            np.array([0, 2, 4, 5, 7, 9, 10, 12, 14, 15])
+        )
+        np.testing.assert_array_equal(
+            wrapper.get_index_points(every="5h", start=5),
+            np.array([5, 7, 9, 10, 12, 14, 15])
+        )
+        np.testing.assert_array_equal(
+            wrapper.get_index_points(every="5h", start=5, end=12),
+            np.array([5, 7, 9, 10, 12])
+        )
+        np.testing.assert_array_equal(
+            wrapper.get_index_points(every="5h", start=wrapper.index[5]),
+            np.array([5, 7, 9, 10, 12, 14, 15])
+        )
+        np.testing.assert_array_equal(
+            wrapper.get_index_points(every="5h", start=wrapper.index[5], end=wrapper.index[12]),
+            np.array([5, 7, 9, 10, 12])
+        )
+        np.testing.assert_array_equal(
+            wrapper.get_index_points(every="5h", start="2020-01-01 15:00:00"),
+            np.array([5, 7, 9, 10, 12, 14, 15])
+        )
+        np.testing.assert_array_equal(
+            wrapper.get_index_points(every="5h", start="2020-01-01 15:00:00", end="2020-01-02 12:00:00"),
+            np.array([5, 7, 9, 10, 12])
+        )
+
+        np.testing.assert_array_equal(
+            wrapper.get_index_points(),
+            np.array([0])
+        )
+        np.testing.assert_array_equal(
+            wrapper.get_index_points(start=5),
+            np.array([5])
+        )
+        np.testing.assert_array_equal(
+            wrapper.get_index_points(start=wrapper.index[0]),
+            np.array([0])
+        )
+
+        np.testing.assert_array_equal(
+            wrapper.get_index_points(
+                start=wrapper.index[5],
+                end=wrapper.index[10],
+                kind="labels",
+            ),
+            np.array([5])
+        )
+        np.testing.assert_array_equal(
+            wrapper.get_index_points(
+                start=wrapper.index[5] + pd.Timedelta(nanoseconds=1),
+                end=wrapper.index[10],
+                kind="labels",
+            ),
+            np.array([6])
+        )
+        np.testing.assert_array_equal(
+            wrapper.get_index_points(
+                start=wrapper.index[5] - pd.Timedelta(nanoseconds=1),
+                end=wrapper.index[10],
+                kind="labels",
+            ),
+            np.array([5])
+        )
+        np.testing.assert_array_equal(
+            wrapper.get_index_points(
+                start=wrapper.index[5],
+                end=wrapper.index[10] - pd.Timedelta(nanoseconds=1),
+                kind="labels",
+            ),
+            np.array([5])
+        )
+        np.testing.assert_array_equal(
+            wrapper.get_index_points(
+                start=wrapper.index[5],
+                end=wrapper.index[10] + pd.Timedelta(nanoseconds=1),
+                kind="labels",
+            ),
+            np.array([5])
+        )
+
+        np.testing.assert_array_equal(
+            wrapper.get_index_points(on=[5, 10]),
+            np.array([5, 10])
+        )
+        np.testing.assert_array_equal(
+            wrapper.get_index_points(on=[wrapper.index[5], wrapper.index[10]]),
+            np.array([5, 10])
+        )
+        np.testing.assert_array_equal(
+            wrapper.get_index_points(on=[wrapper.index[5], wrapper.index[10]], start=wrapper.index[7]),
+            np.array([10])
+        )
+        np.testing.assert_array_equal(
+            wrapper.get_index_points(on=[wrapper.index[5], wrapper.index[10]], end=wrapper.index[7]),
+            np.array([5])
+        )
+        np.testing.assert_array_equal(
+            wrapper.get_index_points(on=[wrapper.index[5], wrapper.index[10]], end=wrapper.index[10]),
+            np.array([5, 10])
+        )
+        np.testing.assert_array_equal(
+            wrapper.get_index_points(on=[wrapper.index[5], wrapper.index[10]], end=10),
+            np.array([5])
+        )
+
 
 sr2_wrapping = wrapping.Wrapping(sr2_wrapper)
 df4_wrapping = wrapping.Wrapping(df4_wrapper)

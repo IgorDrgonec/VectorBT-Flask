@@ -224,7 +224,6 @@ from vectorbtpro.base import indexes, reshaping
 from vectorbtpro.base.accessors import BaseAccessor, BaseDFAccessor, BaseSRAccessor
 from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.base.resampling.base import Resampler
-from vectorbtpro.base.resampling import nb as resampling_nb
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.base.indexes import repeat_index
 from vectorbtpro.generic import nb
@@ -394,6 +393,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 mapping = self.wrapper.index
             elif mapping.lower() == "columns":
                 mapping = self.wrapper.columns
+            elif mapping.lower() == "groups":
+                mapping = self.wrapper.get_columns()
             mapping = to_mapping(mapping)
         return mapping
 
@@ -1877,7 +1878,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         wrap_kwargs: tp.KwargsLike = None,
         silence_warnings: tp.Optional[bool] = None,
     ) -> tp.MaybeSeriesFrame:
-        """See `vectorbtpro.base.resampling.nb.latest_at_index_nb`.
+        """See `vectorbtpro.generic.nb.base.latest_at_index_nb`.
 
         `target_index` can be either an instance of `vectorbtpro.base.resampling.base.Resampler`,
         or any index-like object.
@@ -1996,7 +1997,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             else:
                 nan_value = np.nan
 
-        func = jit_reg.resolve_option(resampling_nb.latest_at_index_nb, jitted)
+        func = jit_reg.resolve_option(nb.latest_at_index_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         out = func(
             self.to_2d_array(),

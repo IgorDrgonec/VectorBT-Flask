@@ -1642,6 +1642,7 @@ from vectorbtpro.portfolio.enums import *
 from vectorbtpro.portfolio.logs import Logs
 from vectorbtpro.portfolio.orders import Orders
 from vectorbtpro.portfolio.trades import Trades, EntryTrades, ExitTrades, Positions
+from vectorbtpro.portfolio.pfopt.base import PortfolioOptimizer
 from vectorbtpro.records import nb as records_nb
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
@@ -4852,6 +4853,90 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             raise ValueError("At least n or entry_prob and exit_prob must be provided")
 
         return cls.from_signals(close, entries, exits, seed=seed, **kwargs)
+
+    @classmethod
+    def from_optimizer(
+        cls: tp.Type[PortfolioT],
+        optimizer: PortfolioOptimizer,
+        close: tp.ArrayLike,
+        dropna: tp.Optional[str] = None,
+        fill_value: tp.Scalar = np.nan,
+        size_type: tp.Optional[tp.ArrayLike] = None,
+        direction: tp.Optional[tp.ArrayLike] = None,
+        cash_sharing: tp.Optional[bool] = True,
+        call_seq: tp.Optional[tp.ArrayLike] = "auto",
+        group_by: tp.GroupByLike = None,
+        silence_warnings: bool = False,
+        **kwargs,
+    ) -> PortfolioT:
+        """Build portfolio from an optimizer of type `vectorbtpro.portfolio.pfopt.base.PortfolioOptimizer`.
+
+        Uses `Portfolio.from_orders` as the base simulation method.
+
+        If any allocation is bigger than 1, the whole array is considered to contain discrete
+        allocations and 'amount' as size type is used, otherwise 'targetpercent'. Also, if there
+        are any negative values, direction is automatically set to 'both', otherwise to 'longonly'.
+        The cash sharing is set to True, the call sequence is set to 'auto', and the grouper is set
+        to the grouper of the optimizer.
+
+        Usage:
+            ```pycon
+            >>> close = pd.DataFrame({
+            ...     "MSFT": [1, 2, 3, 4, 5],
+            ...     "GOOG": [5, 4, 3, 2, 1],
+            ...     "AAPL": [1, 2, 3, 2, 1]
+            ... }, index=pd.date_range(start="2020-01-01", periods=5))
+
+            >>> pf_opt = vbt.PortfolioOptimizer.from_random(
+            ...     close.vbt.wrapper,
+            ...     every="2D",
+            ...     seed=42
+            ... )
+            >>> pf_opt.fill_allocations()
+            alloc_group                         group
+                             MSFT      GOOG      AAPL
+            2020-01-01   0.182059  0.462129  0.355812
+            2020-01-02        NaN       NaN       NaN
+            2020-01-03   0.657381  0.171323  0.171296
+            2020-01-04        NaN       NaN       NaN
+            2020-01-05   0.038078  0.567845  0.394077
+
+            >>> pf = vbt.Portfolio.from_optimizer(pf_opt, close)
+            >>> pf.get_asset_value(group_by=False).vbt / pf.value
+            alloc_group                         group
+                             MSFT      GOOG      AAPL
+            2020-01-01   0.182059  0.462129  0.355812  << rebalanced
+            2020-01-02   0.251907  0.255771  0.492322
+            2020-01-03   0.657381  0.171323  0.171296  << rebalanced
+            2020-01-04   0.793277  0.103369  0.103353
+            2020-01-05   0.038078  0.567845  0.394077  << rebalanced
+            ```
+        """
+        size = optimizer.fill_allocations(dropna=dropna, fill_value=fill_value)
+        if size_type is None:
+            if (np.abs(size.values) > 1).any():
+                if not silence_warnings:
+                    warnings.warn("Some allocations are greater than 1. Using SizeType.Amount.", stacklevel=2)
+                size_type = "amount"
+            else:
+                size_type = "targetpercent"
+        if direction is None:
+            if (size.values < 0).any():
+                direction = "both"
+            else:
+                direction = "longonly"
+        if group_by is None:
+            group_by = optimizer.wrapper.grouper.group_by.name
+        return cls.from_orders(
+            close,
+            size=size,
+            size_type=size_type,
+            direction=direction,
+            cash_sharing=cash_sharing,
+            call_seq=call_seq,
+            group_by=group_by,
+            **kwargs,
+        )
 
     @classmethod
     def from_order_func(

@@ -877,19 +877,7 @@ class ArrayWrapper(Configured, PandasIndexer):
             array([[ 2,  8],
                    [ 8, 15]])
             ```
-
-            * Provide `kind` to manually differentiate between indices, labels, and bounds:
-
-            ```pycon
-            >>> # Generate ranges between labels
-            >>> data.wrapper.get_index_ranges(
-            ...     start=data.wrapper.index[0],
-            ...     end=data.wrapper.index[10],
-            ...     kind="labels"
-            ... )
-            array([[ 0, 10]])
-            ```
-            """
+        """
         if start is not None and isinstance(start, str):
             try:
                 start = pd.Timestamp(start, tz=self.index.tzinfo)
@@ -1023,24 +1011,35 @@ class ArrayWrapper(Configured, PandasIndexer):
                 jitted=jitted,
             )
         elif kind.lower() == "labels":
-            index_ranges = np.empty((len(start), 2), dtype=np.int_)
-            for i in range(len(start)):
-                if closed_start:
-                    new_start = self.index.get_indexer([start[i]], method="bfill")[0]
-                else:
+            if isinstance(start, pd.DatetimeIndex):
+                if start.tzinfo is None and self.index.tzinfo is not None:
+                    start = start.tz_localize(self.index.tzinfo)
+                elif start.tzinfo is not None and self.index.tzinfo is not None:
+                    start = start.tz_convert(self.index.tzinfo)
+            if isinstance(end, pd.DatetimeIndex):
+                if end.tzinfo is None and self.index.tzinfo is not None:
+                    end = end.tz_localize(self.index.tzinfo)
+                elif end.tzinfo is not None and self.index.tzinfo is not None:
+                    end = end.tz_convert(self.index.tzinfo)
+            if closed_start:
+                new_start = self.index.get_indexer(start, method="bfill")
+            else:
+                new_start = np.empty(len(start), dtype=np.int_)
+                for i in range(len(start)):
                     if start[i] in self.index:
-                        new_start = self.index.get_loc(start[i]) + 1
+                        new_start[i] = self.index.get_loc(start[i]) + 1
                     else:
-                        new_start = self.index.get_indexer([start[i]], method="bfill")[0]
-                if closed_end:
+                        new_start[i] = self.index.get_indexer([start[i]], method="bfill")[0]
+            if closed_end:
+                new_end = np.empty(len(end), dtype=np.int_)
+                for i in range(len(end)):
                     if end[i] in self.index:
-                        new_end = self.index.get_loc(end[i]) + 1
+                        new_end[i] = self.index.get_loc(end[i]) + 1
                     else:
-                        new_end = self.index.get_indexer([end[i]], method="bfill")[0]
-                else:
-                    new_end = self.index.get_indexer([end[i]], method="bfill")[0]
-                index_ranges[i, 0] = new_start
-                index_ranges[i, 1] = new_end
+                        new_end[i] = self.index.get_indexer([end[i]], method="bfill")[0]
+            else:
+                new_end = self.index.get_indexer(end, method="bfill")
+            index_ranges = np.column_stack((new_start, new_end))
         else:
             if not closed_start:
                 start += 1
@@ -1051,6 +1050,183 @@ class ArrayWrapper(Configured, PandasIndexer):
             index_ranges = np.column_stack((start, end))
 
         return index_ranges
+
+    def get_index_points(
+        self,
+        every: tp.Optional[tp.FrequencyLike] = None,
+        normalize_every: bool = False,
+        start: tp.Optional[tp.Union[int, tp.DatetimeLike]] = None,
+        end: tp.Optional[tp.Union[int, tp.DatetimeLike]] = None,
+        on: tp.Optional[tp.Union[int, tp.DatetimeLike, tp.IndexLike]] = None,
+        kind: tp.Optional[str] = None,
+    ) -> tp.Array1d:
+        """Translate indices or labels into index points.
+
+        !!! note
+            `start` and `end` are both inclusive if provided as dates or used in `pd.date_range`.
+            Otherwise, only `start` is inclusive.
+
+        Usage:
+            * Provide nothing to generate at the beginning:
+
+            ```pycon
+            >>> import vectorbtpro as vbt
+
+            >>> data = vbt.YFData.fetch("BTC-USD", start="2020-01-01", end="2020-02-01")
+
+            >>> data.wrapper.get_index_points()
+            array([0])
+            ```
+
+            * Provide `every` as an integer frequency to generate index points using NumPy:
+
+            ```pycon
+            >>> # Generate a point every five rows
+            >>> data.wrapper.get_index_points(every=5)
+            array([ 0,  5, 10, 15, 20, 25, 30])
+
+            >>> # Generate a point every five rows starting at 6th row
+            >>> data.wrapper.get_index_points(every=5, start=5)
+            array([ 5, 10, 15, 20, 25, 30])
+
+            >>> # Generate a point every five rows from 6th to 16th row
+            >>> data.wrapper.get_index_points(every=5, start=5, end=15)
+            array([ 5, 10])
+            ```
+
+            * Provide `every` as a time delta frequency to generate index points using Pandas:
+
+            ```pycon
+            >>> # Generate a point every week
+            >>> data.wrapper.get_index_points(every="W")
+            array([ 5, 12, 19, 26])
+
+            >>> # Generate a point every week, starting at 11th row
+            >>> data.wrapper.get_index_points(every="W", start=10)
+            array([12, 19, 26])
+
+            >>> # Generate a point every week, starting at 2020-01-10
+            >>> data.wrapper.get_index_points(every="W", start="2020-01-10")
+            array([12, 19, 26])
+            ```
+
+            * Instead of using `every`, provide indices explicitly:
+
+            ```pycon
+            >>> # Generate one point
+            >>> data.wrapper.get_index_points(on="2020-01-07")
+            array([7])
+
+            >>> # Generate multiple points
+            >>> data.wrapper.get_index_points(on=["2020-01-07", "2020-01-14"])
+            array([ 7, 14])
+            ```
+        """
+        if on is not None and isinstance(on, str):
+            try:
+                on = pd.Timestamp(on, tz=self.index.tzinfo)
+            except Exception as e:
+                on = dateparser.parse(on)
+                if self.index.tzinfo is not None:
+                    on = on.replace(tzinfo=self.index.tzinfo)
+        if start is not None and isinstance(start, str):
+            try:
+                start = pd.Timestamp(start, tz=self.index.tzinfo)
+            except Exception as e:
+                start = dateparser.parse(start)
+                if self.index.tzinfo is not None:
+                    start = start.replace(tzinfo=self.index.tzinfo)
+        if end is not None and isinstance(end, str):
+            try:
+                end = pd.Timestamp(end, tz=self.index.tzinfo)
+            except Exception as e:
+                end = dateparser.parse(end)
+                if self.index.tzinfo is not None:
+                    end = end.replace(tzinfo=self.index.tzinfo)
+
+        start_used = False
+        end_used = False
+        if every is not None:
+            start_used = True
+            end_used = True
+            if isinstance(every, int):
+                if start is None:
+                    start = 0
+                if end is None:
+                    end = len(self.index)
+                on = np.arange(start, end, every)
+                kind = "indices"
+            else:
+                if start is None:
+                    start = 0
+                if isinstance(start, int):
+                    start_date = self.index[start]
+                else:
+                    start_date = start
+                if end is None:
+                    end = len(self.index) - 1
+                if isinstance(end, int):
+                    end_date = self.index[end]
+                else:
+                    end_date = end
+                on = pd.date_range(
+                    start_date,
+                    end_date,
+                    freq=every,
+                    tz=self.index.tzinfo,
+                    normalize=normalize_every,
+                )
+                kind = "labels"
+
+        if kind is None:
+            if on is None:
+                if start is not None:
+                    if isinstance(start, int):
+                        kind = 'indices'
+                    else:
+                        kind = 'labels'
+                else:
+                    kind = 'indices'
+            else:
+                on = try_to_datetime_index(on)
+                if on.is_integer() and not self.index.is_integer():
+                    kind = "indices"
+                else:
+                    kind = "labels"
+        checks.assert_in(kind, ("indices", "labels"))
+        if on is None:
+            if start is not None:
+                on = start
+                start_used = True
+            else:
+                if kind.lower() in ("labels",):
+                    on = self.index[0]
+                else:
+                    on = 0
+        on = try_to_datetime_index(on)
+
+        if kind.lower() == "labels":
+            if isinstance(on, pd.DatetimeIndex):
+                if on.tzinfo is None and self.index.tzinfo is not None:
+                    on = on.tz_localize(self.index.tzinfo)
+                elif on.tzinfo is not None and self.index.tzinfo is not None:
+                    on = on.tz_convert(self.index.tzinfo)
+            index_points = self.index.get_indexer(on, method="bfill")
+        else:
+            index_points = np.asarray(on)
+
+        if start is not None and not start_used:
+            if not isinstance(start, int):
+                start = self.index.get_indexer([start], method="bfill")[0]
+            index_points = index_points[index_points >= start]
+        if end is not None and not end_used:
+            if not isinstance(end, int):
+                end = self.index.get_indexer([end], method="bfill")[0]
+                index_points = index_points[index_points <= end]
+            else:
+                index_points = index_points[index_points < end]
+
+        return index_points
 
 
 WrappingT = tp.TypeVar("WrappingT", bound="Wrapping")
