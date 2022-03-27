@@ -50,7 +50,7 @@ def teardown_module():
 ts = pd.DataFrame(
     {"a": [1.0, 2.0, 3.0, 4.0, 5.0], "b": [5.0, 4.0, 3.0, 2.0, 1.0], "c": [1.0, 2.0, 3.0, 2.0, 1.0]},
     index=pd.DatetimeIndex(
-        [datetime(2018, 1, 1), datetime(2018, 1, 2), datetime(2018, 1, 3), datetime(2018, 1, 4), datetime(2018, 1, 5)],
+        [datetime(2020, 1, 1), datetime(2020, 1, 2), datetime(2020, 1, 3), datetime(2020, 1, 4), datetime(2020, 1, 5)],
     ),
 )
 
@@ -2026,8 +2026,8 @@ class TestFactory:
             obj.out_stats(),
             pd.Series(
                 [
-                    pd.Timestamp("2018-01-01 00:00:00"),
-                    pd.Timestamp("2018-01-05 00:00:00"),
+                    pd.Timestamp("2020-01-01 00:00:00"),
+                    pd.Timestamp("2020-01-05 00:00:00"),
                     pd.Timedelta("5 days 00:00:00"),
                     5.0,
                     2.6,
@@ -2090,13 +2090,13 @@ class TestFactory:
             obj.out_stats(),
             pd.Series(
                 [
-                    pd.Timestamp("2018-01-01 00:00:00"),
-                    pd.Timestamp("2018-01-05 00:00:00"),
+                    pd.Timestamp("2020-01-01 00:00:00"),
+                    pd.Timestamp("2020-01-05 00:00:00"),
                     pd.Timedelta("5 days 00:00:00"),
                     2.3333333333333335,
                     46.666666666666664,
-                    pd.Timestamp("2018-01-02 08:00:00"),
-                    pd.Timestamp("2018-01-03 16:00:00"),
+                    pd.Timestamp("2020-01-02 08:00:00"),
+                    pd.Timestamp("2020-01-03 16:00:00"),
                     0.0,
                     pd.Timedelta("1 days 00:00:00"),
                     pd.Timedelta("1 days 00:00:00"),
@@ -2262,6 +2262,7 @@ class TestFactory:
             "apply_func",
             "build_metrics_doc",
             "build_subplots_doc",
+            "cache_func",
             "cls_dir",
             "column_only_select",
             "config",
@@ -2629,11 +2630,11 @@ class TestFactory:
 
         I = vbt.IndicatorFactory.from_expr("@res_talib_sma", sma_timeperiod=2)
         assert I.input_names == ("close",)
-        assert I.param_names == ("sma_timeperiod",)
+        assert I.param_names == ("sma_timeperiod", "sma_timeframe")
         pd.testing.assert_frame_equal(I.run(ts).out, vbt.IF.from_talib("SMA", timeperiod=2).run(ts).real)
         I = vbt.IndicatorFactory.from_expr("@res_talib_sma * @res_talib_ema", sma_timeperiod=2, ema_timeperiod=3)
         assert I.input_names == ("close",)
-        assert I.param_names == ("sma_timeperiod", "ema_timeperiod")
+        assert I.param_names == ("sma_timeperiod", "sma_timeframe", "ema_timeperiod", "ema_timeframe")
         pd.testing.assert_frame_equal(
             I.run(ts).out,
             vbt.IF.from_talib("SMA", timeperiod=2).run(ts).real * vbt.IF.from_talib("EMA", timeperiod=3).run(ts).real,
@@ -2644,7 +2645,7 @@ class TestFactory:
             sma_kwargs=dict(return_raw=False),
         )
         assert I.input_names == ("close",)
-        assert I.param_names == ("sma_timeperiod",)
+        assert I.param_names == ("sma_timeperiod", "sma_timeframe")
         pd.testing.assert_frame_equal(I.run(ts).out, vbt.IF.from_talib("SMA", timeperiod=2).run(ts).real.cumsum())
 
         with pytest.raises(Exception):
@@ -2734,6 +2735,24 @@ class TestFactory:
                     columns=ts.columns,
                 ),
             )
+            # multiple timeframes
+            pd.testing.assert_frame_equal(
+                SMA.run(ts, vbt.Default(2), skipna=True, timeframe=["1d", "2d"]).real,
+                pd.DataFrame(
+                    [
+                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
+                        [1.5, 4.5, 1.5, np.nan, np.nan, np.nan],
+                        [2.5, 3.5, 2.5, np.nan, np.nan, np.nan],
+                        [3.5, 2.5, 2.5, 3.0, 3.0, 2.0],
+                        [4.5, 1.5, 1.5, 3.0, 3.0, 2.0],
+                    ],
+                    index=ts.index,
+                    columns=pd.MultiIndex.from_tuples(
+                        [("1d", "a"), ("1d", "b"), ("1d", "c"), ("2d", "a"), ("2d", "b"), ("2d", "c")],
+                        names=["sma_timeframe", None],
+                    ),
+                ),
+            )
 
     def test_get_pandas_ta_indicators(self):
         if pandas_ta_available:
@@ -2817,13 +2836,13 @@ close_ts = pd.Series(
     [1, 2, 3, 4, 3, 2, 1],
     index=pd.DatetimeIndex(
         [
-            datetime(2018, 1, 1),
-            datetime(2018, 1, 2),
-            datetime(2018, 1, 3),
-            datetime(2018, 1, 4),
-            datetime(2018, 1, 5),
-            datetime(2018, 1, 6),
-            datetime(2018, 1, 7),
+            datetime(2020, 1, 1),
+            datetime(2020, 1, 2),
+            datetime(2020, 1, 3),
+            datetime(2020, 1, 4),
+            datetime(2020, 1, 5),
+            datetime(2020, 1, 6),
+            datetime(2020, 1, 7),
         ]
     ),
 )

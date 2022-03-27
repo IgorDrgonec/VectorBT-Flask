@@ -65,9 +65,10 @@ from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.formatting import prettify
 from vectorbtpro.utils.mapping import to_mapping, apply_mapping
 from vectorbtpro.utils.params import to_typed_list, broadcast_params, create_param_product, params_to_list
-from vectorbtpro.utils.parsing import get_expr_var_names, get_func_arg_names
+from vectorbtpro.utils.parsing import get_expr_var_names, get_func_arg_names, get_func_kwargs
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.template import has_templates, deep_substitute
+from vectorbtpro.utils.datetime_ import freq_to_timedelta64, infer_index_freq
 
 try:
     from ta.utils import IndicatorMixin as IndicatorMixinT
@@ -2133,6 +2134,7 @@ Other keyword arguments are passed to `{0}.run`.
         Indicator = self.Indicator
 
         setattr(Indicator, "apply_func", apply_func)
+        setattr(Indicator, "cache_func", cache_func)
 
         module_name = self.module_name
         input_names = self.input_names
@@ -2426,7 +2428,7 @@ Other keyword arguments are passed to `{0}.run`.
                 **_kwargs,
                 n_outputs=num_ret_outputs,
                 jitted_loop=jitted_loop,
-                execute_kwargs=execute_kwargs
+                execute_kwargs=execute_kwargs,
             )
 
         return self.with_custom_func(custom_func, pass_packed=True, **kwargs)
@@ -2523,7 +2525,7 @@ Other keyword arguments are passed to `{0}.run`.
                 input_names.append(in_names)
         class_name = info["name"]
         class_docstring = "{}, {}".format(info["display_name"], info["group"])
-        param_names = list(info["parameters"].keys())
+        param_names = list(info["parameters"].keys()) + ["timeframe"]
         output_names = info["output_names"]
         output_flags = info["output_flags"]
 
@@ -2531,24 +2533,88 @@ Other keyword arguments are passed to `{0}.run`.
             input_tuple: tp.Tuple[tp.Array1d, ...],
             in_output_tuple: tp.Tuple[tp.Array1d, ...],
             param_tuple: tp.Tuple[tp.Param, ...],
+            timeframe: tp.Optional[tp.FrequencyLike] = None,
+            wrapper: tp.Optional[ArrayWrapper] = None,
             skipna: bool = False,
+            silence_warnings: bool = False,
             **_kwargs,
         ) -> tp.Union[tp.Array1d, tp.Tuple[tp.Array1d]]:
             """1-dim apply function wrapping a TA-Lib function.
 
             Set `skipna` to True to run the TA-Lib function on non-NA values only."""
+            if len(param_tuple) == len(param_names):
+                if timeframe is not None:
+                    raise ValueError("Time frame is set both as a parameter and as a keyword argument")
+                timeframe = param_tuple[-1]
+                param_tuple = param_tuple[:-1]
+            elif len(param_tuple) > len(param_names):
+                raise ValueError("Provided more parameters than registered")
+
+            new_index = None
+            if timeframe is not None:
+                if wrapper is None:
+                    raise ValueError("Resampling requires a wrapper")
+                if wrapper.freq is None:
+                    if not silence_warnings:
+                        warnings.warn(
+                            "Couldn't parse the frequency of index. Set freq in broadcast_kwargs or globally.",
+                            stacklevel=2,
+                        )
+                new_input_tuple = ()
+                for i, input in enumerate(input_tuple):
+                    if input_names[i] == "open":
+                        new_input = pd.Series(input, index=wrapper.index).resample(timeframe).first()
+                    elif input_names[i] == "high":
+                        new_input = pd.Series(input, index=wrapper.index).resample(timeframe).max()
+                    elif input_names[i] == "low":
+                        new_input = pd.Series(input, index=wrapper.index).resample(timeframe).min()
+                    elif input_names[i] == "close":
+                        new_input = pd.Series(input, index=wrapper.index).resample(timeframe).last()
+                    elif input_names[i] == "volume":
+                        new_input = pd.Series(input, index=wrapper.index).resample(timeframe).sum()
+                    else:
+                        raise ValueError(f"Can't resample '{input_names[i]}'")
+                    new_index = new_input.index
+                    new_input_tuple += (new_input.values,)
+                input_tuple = new_input_tuple
+
             if skipna:
                 nan_mask = build_nan_mask(*input_tuple)
                 input_tuple = squeeze_nan(*input_tuple, nan_mask=nan_mask)
             else:
                 nan_mask = None
-            input_tuple = tuple([arr.astype(np.double) for arr in input_tuple])
-            output = talib_func(*input_tuple, *param_tuple, **_kwargs)
-            if isinstance(output, tuple):
-                return unsqueeze_nan(*output, nan_mask=nan_mask)
-            return unsqueeze_nan(output, nan_mask=nan_mask)[0]
 
-        kwargs = merge_dicts({k: Default(v) for k, v in info["parameters"].items()}, kwargs)
+            input_tuple = tuple([arr.astype(np.double) for arr in input_tuple])
+            outputs = talib_func(*input_tuple, *param_tuple, **_kwargs)
+            one_output = not isinstance(outputs, tuple)
+            if one_output:
+                outputs = unsqueeze_nan(outputs, nan_mask=nan_mask)
+            else:
+                outputs = unsqueeze_nan(*outputs, nan_mask=nan_mask)
+            if timeframe is not None:
+                new_outputs = ()
+                for output in outputs:
+                    source_freq = infer_index_freq(new_index, allow_date_offset=False, allow_numeric=False)
+                    source_freq = freq_to_timedelta64(source_freq) if source_freq is not None else None
+                    target_freq = freq_to_timedelta64(wrapper.freq) if wrapper.freq is not None else None
+                    new_output = generic_nb.latest_at_index_1d_nb(
+                        output,
+                        new_index.values,
+                        wrapper.index.values,
+                        source_freq=source_freq,
+                        target_freq=target_freq,
+                        source_rbound=True,
+                        target_rbound=True,
+                        nan_value=np.nan,
+                        ffill=True,
+                    )
+                    new_outputs += (new_output,)
+                outputs = new_outputs
+            if one_output:
+                return outputs[0]
+            return outputs
+
+        kwargs = merge_dicts({k: Default(v) for k, v in info["parameters"].items()}, dict(timeframe=None), kwargs)
         TALibIndicator = cls(
             **merge_dicts(
                 dict(
@@ -2562,7 +2628,7 @@ Other keyword arguments are passed to `{0}.run`.
                 ),
                 factory_kwargs,
             )
-        ).with_apply_func(apply_func_1d, pass_packed=True, takes_1d=True, **kwargs)
+        ).with_apply_func(apply_func_1d, pass_packed=True, takes_1d=True, pass_wrapper=True, **kwargs)
 
         def plot(
             self,
@@ -3410,7 +3476,6 @@ Args:
             )
             use_pd_eval = settings.pop("use_pd_eval", use_pd_eval)
             pd_eval_kwargs = merge_dicts(settings.pop("pd_eval_kwargs", None), pd_eval_kwargs)
-            kwargs = merge_dicts(settings, kwargs)
 
             # Resolve defaults
             if use_pd_eval is None:
@@ -3424,6 +3489,8 @@ Args:
             found_magnet_inputs = []
             found_magnet_in_outputs = []
             found_magnet_params = []
+            found_defaults = {}
+            remove_defaults = set()
 
             # Parse annotated variables
             if parse_annotations:
@@ -3501,6 +3568,24 @@ Args:
                             magnet_in_outputs=[I.short_name + "_" + name for name in I.in_output_names],
                             magnet_params=[I.short_name + "_" + name for name in I.param_names],
                         )
+                        run_kwargs = get_func_kwargs(I.run)
+
+                        def _add_defaults(names, prefix=None):
+                            for k in names:
+                                if prefix is None:
+                                    k_prefixed = k
+                                else:
+                                    k_prefixed = prefix + "_" + k
+                                if k in run_kwargs:
+                                    if k_prefixed in found_defaults:
+                                        if found_defaults[k_prefixed] is not run_kwargs[k]:
+                                            remove_defaults.add(k_prefixed)
+                                    else:
+                                        found_defaults[k_prefixed] = run_kwargs[k]
+
+                        _add_defaults(I.input_names)
+                        _add_defaults(I.in_output_names, I.short_name)
+                        _add_defaults(I.param_names, I.short_name)
 
                 expr = expr.replace("@in_", "__in_")
                 expr = expr.replace("@inout_", "__inout_")
@@ -3575,6 +3660,24 @@ Args:
             )
             _find_magnets("magnet_params", parsed_factory_kwargs["param_names"], magnet_params, found_magnet_params)
 
+            # Prepare defaults
+            for k in remove_defaults:
+                found_defaults.pop(k, None)
+
+            def _sort_names(names_name):
+                new_names = []
+                for k in parsed_factory_kwargs[names_name]:
+                    if k not in found_defaults:
+                        new_names.append(k)
+                for k in parsed_factory_kwargs[names_name]:
+                    if k in found_defaults:
+                        new_names.append(k)
+                parsed_factory_kwargs[names_name] = new_names
+
+            _sort_names("input_names")
+            _sort_names("in_output_names")
+            _sort_names("param_names")
+
             # Parse the number of outputs
             if len(parsed_factory_kwargs["output_names"]) == 0:
                 n_open_brackets = 0
@@ -3595,6 +3698,7 @@ Args:
                         parsed_factory_kwargs["output_names"] = ["out%d" % (i + 1) for i in range(n_outputs)]
 
             factory = cls_or_self(**merge_dicts(parsed_factory_kwargs, factory_kwargs))
+            kwargs = merge_dicts(settings, found_defaults, kwargs)
         else:
             func_mapping = merge_dicts(expr_func_config, func_mapping)
             res_func_mapping = merge_dicts(expr_res_func_config, res_func_mapping)
@@ -3649,27 +3753,28 @@ Args:
                     talib_func_name = var_name[8:].upper()
                     talib_ind = cls_or_self.from_talib(talib_func_name)
 
-                    def _talib_func(*_args, _talib_ind: tp.Callable = talib_ind, **_kwargs) -> tp.Any:
+                    def _talib_func(*__args, _talib_ind=talib_ind, wrapper=_kwargs["wrapper"], **__kwargs) -> tp.Any:
                         inputs = {}
                         other_args = []
                         input_names = _talib_ind.input_names
-                        for k in range(len(_args)):
+                        for k in range(len(__args)):
                             if k < len(input_names) and len(inputs) < len(input_names):
-                                inputs[input_names[k]] = _args[k]
+                                inputs[input_names[k]] = __args[k]
                             else:
-                                other_args.append(_args[k])
+                                other_args.append(__args[k])
                         if len(inputs) < len(input_names):
-                            for k in _kwargs:
+                            for k in __kwargs:
                                 if k in input_names:
-                                    inputs[k] = _kwargs.pop(k)
+                                    inputs[k] = __kwargs.pop(k)
 
                         bc_inputs = tuple(np.broadcast_arrays(*inputs.values()))
                         if bc_inputs[0].ndim == 1:
-                            return _talib_ind.apply_func(bc_inputs, (), other_args, **_kwargs)
+                            return _talib_ind.apply_func(bc_inputs, (), other_args, wrapper=wrapper, **__kwargs)
                         outputs = []
                         for col in range(bc_inputs[0].shape[1]):
                             col_inputs = [input[:, col] for input in bc_inputs]
-                            outputs.append(_talib_ind.apply_func(col_inputs, (), other_args, **_kwargs))
+                            output = _talib_ind.apply_func(col_inputs, (), other_args, wrapper=wrapper, **__kwargs)
+                            outputs.append(output)
                         if isinstance(outputs[0], tuple):  # multiple outputs
                             outputs = list(zip(*outputs))
                             return list(map(column_stack, outputs))
