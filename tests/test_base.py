@@ -3613,6 +3613,165 @@ class TestAccessors:
             pd.DataFrame([1, 2, 3], index=["a", "b", "c"]),
         )
 
+    def test_set(self):
+        ts_index = pd.date_range("2020-01-01", "2020-01-05")
+        df = pd.DataFrame(0, index=ts_index, columns=["a", "b", "c"])
+        sr = pd.Series(0, index=ts_index)
+
+        target_sr = sr.copy()
+        target_sr.iloc[::2] = 100
+        pd.testing.assert_series_equal(sr.vbt.set(100, every=2), target_sr)
+        target_df = df.copy()
+        target_df.iloc[::2] = 100
+        pd.testing.assert_frame_equal(df.vbt.set(100, every=2), target_df)
+        target_df = df.copy()
+        target_df.iloc[::2, 1] = 100
+        pd.testing.assert_frame_equal(df.vbt.set(100, columns="b", every=2), target_df)
+        target_df = df.copy()
+        target_df.iloc[::2, [1, 2]] = 100
+        pd.testing.assert_frame_equal(df.vbt.set(100, columns=["b", "c"], every=2), target_df)
+
+        target_sr = sr.copy()
+        target_sr.iloc[0] = 100
+        target_sr.iloc[2] = 200
+        target_sr.iloc[4] = 300
+        pd.testing.assert_series_equal(sr.vbt.set([100, 200, 300], every=2), target_sr)
+        target_df = df.copy()
+        target_df.iloc[0] = 100
+        target_df.iloc[2] = 200
+        target_df.iloc[4] = 300
+        pd.testing.assert_frame_equal(df.vbt.set([100, 200, 300], every=2), target_df)
+        target_df = df.copy()
+        target_df.iloc[0, 1] = 100
+        target_df.iloc[2, 1] = 200
+        target_df.iloc[4, 1] = 300
+        pd.testing.assert_frame_equal(df.vbt.set([100, 200, 300], columns="b", every=2), target_df)
+        target_df = df.copy()
+        target_df.iloc[0, [1, 2]] = 100
+        target_df.iloc[2, [1, 2]] = 200
+        target_df.iloc[4, [1, 2]] = 300
+        pd.testing.assert_frame_equal(df.vbt.set([100, 200, 300], columns=["b", "c"], every=2), target_df)
+
+        target_sr = sr.copy()
+        target_sr.iloc[0] = 100
+        target_sr.iloc[2] = 200
+        target_sr.iloc[4] = 300
+        pd.testing.assert_series_equal(
+            sr.vbt.set(lambda i: [100, 200, 300][i], vbt.Rep("i"), every=2),
+            target_sr,
+        )
+        target_df = df.copy()
+        target_df.iloc[0] = 100
+        target_df.iloc[2] = 200
+        target_df.iloc[4] = 300
+        pd.testing.assert_frame_equal(
+            df.vbt.set(lambda i: [100, 200, 300][i], vbt.Rep("i"), every=2),
+            target_df,
+        )
+        target_df = df.copy()
+        target_df.iloc[0, 1] = 100
+        target_df.iloc[2, 1] = 200
+        target_df.iloc[4, 1] = 300
+        pd.testing.assert_frame_equal(
+            df.vbt.set(lambda i: [100, 200, 300][i], vbt.Rep("i"), columns="b", every=2),
+            target_df,
+        )
+        target_df = df.copy()
+        target_df.iloc[0, [1, 2]] = 100
+        target_df.iloc[2, [1, 2]] = 200
+        target_df.iloc[4, [1, 2]] = 300
+        pd.testing.assert_frame_equal(
+            df.vbt.set(lambda i: [100, 200, 300][i], vbt.Rep("i"), columns=["b", "c"], every=2),
+            target_df,
+        )
+
+    def test_set_between(self):
+        ts_index = pd.date_range("2020-01-01", "2020-01-05")
+        df = pd.DataFrame(0, index=ts_index, columns=["a", "b", "c"])
+        sr = pd.Series(0, index=ts_index)
+
+        target_sr = sr.copy()
+        target_sr.iloc[::2] = 100
+        pd.testing.assert_series_equal(sr.vbt.set_between(100, start=[0, 2, 4], end=[1, 3, 5]), target_sr)
+        target_df = df.copy()
+        target_df.iloc[::2] = 100
+        pd.testing.assert_frame_equal(df.vbt.set_between(100, start=[0, 2, 4], end=[1, 3, 5]), target_df)
+        target_df = df.copy()
+        target_df.iloc[::2, 1] = 100
+        pd.testing.assert_frame_equal(
+            df.vbt.set_between(100, columns="b", start=[0, 2, 4], end=[1, 3, 5]),
+            target_df,
+        )
+        target_df = df.copy()
+        target_df.iloc[::2, [1, 2]] = 100
+        pd.testing.assert_frame_equal(
+            df.vbt.set_between(100, columns=["b", "c"], start=[0, 2, 4], end=[1, 3, 5]),
+            target_df,
+        )
+
+        target_sr = sr.copy()
+        target_sr.iloc[0] = 100
+        target_sr.iloc[2] = 200
+        target_sr.iloc[4] = 300
+        pd.testing.assert_series_equal(sr.vbt.set_between([100, 200, 300], start=[0, 2, 4], end=[1, 3, 5]), target_sr)
+        target_df = df.copy()
+        target_df.iloc[0] = 100
+        target_df.iloc[2] = 200
+        target_df.iloc[4] = 300
+        pd.testing.assert_frame_equal(df.vbt.set_between([100, 200, 300], start=[0, 2, 4], end=[1, 3, 5]), target_df)
+        target_df = df.copy()
+        target_df.iloc[0, 1] = 100
+        target_df.iloc[2, 1] = 200
+        target_df.iloc[4, 1] = 300
+        pd.testing.assert_frame_equal(
+            df.vbt.set_between([100, 200, 300], columns="b", start=[0, 2, 4], end=[1, 3, 5]),
+            target_df,
+        )
+        target_df = df.copy()
+        target_df.iloc[0, [1, 2]] = 100
+        target_df.iloc[2, [1, 2]] = 200
+        target_df.iloc[4, [1, 2]] = 300
+        pd.testing.assert_frame_equal(
+            df.vbt.set_between([100, 200, 300], columns=["b", "c"], start=[0, 2, 4], end=[1, 3, 5]),
+            target_df,
+        )
+
+        target_sr = sr.copy()
+        target_sr.iloc[0] = 100
+        target_sr.iloc[2] = 200
+        target_sr.iloc[4] = 300
+        pd.testing.assert_series_equal(
+            sr.vbt.set_between(lambda i: [100, 200, 300][i], vbt.Rep("i"), start=[0, 2, 4], end=[1, 3, 5]),
+            target_sr,
+        )
+        target_df = df.copy()
+        target_df.iloc[0] = 100
+        target_df.iloc[2] = 200
+        target_df.iloc[4] = 300
+        pd.testing.assert_frame_equal(
+            df.vbt.set_between(lambda i: [100, 200, 300][i], vbt.Rep("i"), start=[0, 2, 4], end=[1, 3, 5]),
+            target_df,
+        )
+        target_df = df.copy()
+        target_df.iloc[0, 1] = 100
+        target_df.iloc[2, 1] = 200
+        target_df.iloc[4, 1] = 300
+        pd.testing.assert_frame_equal(
+            df.vbt.set_between(lambda i: [100, 200, 300][i], vbt.Rep("i"), columns="b", start=[0, 2, 4], end=[1, 3, 5]),
+            target_df,
+        )
+        target_df = df.copy()
+        target_df.iloc[0, [1, 2]] = 100
+        target_df.iloc[2, [1, 2]] = 200
+        target_df.iloc[4, [1, 2]] = 300
+        pd.testing.assert_frame_equal(
+            df.vbt.set_between(
+                lambda i: [100, 200, 300][i], vbt.Rep("i"),
+                columns=["b", "c"], start=[0, 2, 4], end=[1, 3, 5],
+            ),
+            target_df,
+        )
+
     def test_to_array(self):
         np.testing.assert_array_equal(sr2.vbt.to_1d_array(), sr2.values)
         np.testing.assert_array_equal(sr2.vbt.to_2d_array(), sr2.to_frame().values)

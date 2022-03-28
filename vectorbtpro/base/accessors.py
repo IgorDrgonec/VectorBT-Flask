@@ -4,6 +4,7 @@
 
 import numpy as np
 import pandas as pd
+from pandas.api.types import is_scalar
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import combining, reshaping, indexes
@@ -383,6 +384,126 @@ class BaseAccessor(Wrapping):
         if axis == 1:
             return self.obj.iloc[:, indexer]
         return self.obj.iloc[indexer]
+
+    # ############# Setting ############# #
+
+    def set(
+        self,
+        value_or_func: tp.Union[tp.MaybeArray, tp.Callable],
+        *args,
+        columns: tp.Optional[tp.MaybeSequence[tp.Hashable]] = None,
+        template_context: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
+        """Set value at each index point using `vectorbtpro.base.wrapping.ArrayWrapper.get_index_points`.
+
+        If `value_or_func` is a function, selects all keyword arguments that were not passed
+        to the `get_index_points` method, substitutes any templates, and passes everything to the function.
+        As context uses `kwargs`, `template_context`, and various variables such as `i` (iteration index),
+        `index_point` (absolute position in the index), `wrapper`, and `obj`."""
+        obj = self.obj.copy()
+        index_points = self.wrapper.get_index_points(**kwargs)
+
+        if callable(value_or_func):
+            arg_names = get_func_arg_names(self.wrapper.get_index_points)
+            func_kwargs = {k: v for k, v in kwargs.items() if k not in arg_names}
+            template_context = merge_dicts(kwargs, template_context)
+        else:
+            func_kwargs = None
+        if callable(value_or_func):
+            for i in range(len(index_points)):
+                _template_context = merge_dicts(
+                    dict(
+                        i=i,
+                        index_point=index_points[i],
+                        index_points=index_points,
+                        wrapper=self.wrapper,
+                        obj=self.obj,
+                        columns=columns,
+                        args=args,
+                        kwargs=kwargs,
+                    ),
+                    template_context,
+                )
+                _func_args = deep_substitute(args, _template_context, sub_id="func_args")
+                _func_kwargs = deep_substitute(func_kwargs, _template_context, sub_id="func_kwargs")
+                v = value_or_func(*_func_args, **_func_kwargs)
+                if self.is_series() or columns is None:
+                    obj.iloc[index_points[i]] = v
+                elif is_scalar(columns):
+                    obj.iloc[index_points[i], obj.columns.get_indexer([columns])[0]] = v
+                else:
+                    obj.iloc[index_points[i], obj.columns.get_indexer(columns)] = v
+        elif checks.is_sequence(value_or_func) and not is_scalar(value_or_func):
+            if self.is_series():
+                obj.iloc[index_points] = reshaping.to_1d_array(value_or_func)
+            elif columns is None:
+                obj.iloc[index_points] = reshaping.to_2d_array(value_or_func)
+            elif is_scalar(columns):
+                obj.iloc[index_points, obj.columns.get_indexer([columns])[0]] = reshaping.to_1d_array(value_or_func)
+            else:
+                obj.iloc[index_points, obj.columns.get_indexer(columns)] = reshaping.to_2d_array(value_or_func)
+        else:
+            if self.is_series() or columns is None:
+                obj.iloc[index_points] = value_or_func
+            elif is_scalar(columns):
+                obj.iloc[index_points, obj.columns.get_indexer([columns])[0]] = value_or_func
+            else:
+                obj.iloc[index_points, obj.columns.get_indexer(columns)] = value_or_func
+        return obj
+
+    def set_between(
+        self,
+        value_or_func: tp.Union[tp.MaybeArray, tp.Callable],
+        *args,
+        columns: tp.Optional[tp.MaybeSequence[tp.Hashable]] = None,
+        template_context: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
+        """Set value at each index range using `vectorbtpro.base.wrapping.ArrayWrapper.get_index_ranges`.
+
+        If `value_or_func` is a function, selects all keyword arguments that were not passed
+        to the `get_index_points` method, substitutes any templates, and passes everything to the function.
+        As context uses `kwargs`, `template_context`, and various variables such as `i` (iteration index),
+        `index_slice` (absolute slice of the index), `wrapper`, and `obj`."""
+        obj = self.obj.copy()
+        index_ranges = self.wrapper.get_index_ranges(**kwargs)
+
+        if callable(value_or_func):
+            arg_names = get_func_arg_names(self.wrapper.get_index_points)
+            func_kwargs = {k: v for k, v in kwargs.items() if k not in arg_names}
+            template_context = merge_dicts(kwargs, template_context)
+        else:
+            func_kwargs = None
+        for i in range(len(index_ranges)):
+            if callable(value_or_func):
+                _template_context = merge_dicts(
+                    dict(
+                        i=i,
+                        index_slice=slice(index_ranges[i, 0], index_ranges[i, 1]),
+                        index_ranges=index_ranges,
+                        wrapper=self.wrapper,
+                        obj=self.obj,
+                        columns=columns,
+                        args=args,
+                        kwargs=kwargs,
+                    ),
+                    template_context,
+                )
+                _func_args = deep_substitute(args, _template_context, sub_id="func_args")
+                _func_kwargs = deep_substitute(func_kwargs, _template_context, sub_id="func_kwargs")
+                v = value_or_func(*_func_args, **_func_kwargs)
+            elif checks.is_sequence(value_or_func) and not isinstance(value_or_func, str):
+                v = value_or_func[i]
+            else:
+                v = value_or_func
+            if self.is_series() or columns is None:
+                obj.iloc[index_ranges[i, 0]: index_ranges[i, 1]] = v
+            elif is_scalar(columns):
+                obj.iloc[index_ranges[i, 0]: index_ranges[i, 1], obj.columns.get_indexer([columns])[0]] = v
+            else:
+                obj.iloc[index_ranges[i, 0]: index_ranges[i, 1], obj.columns.get_indexer(columns)] = v
+        return obj
 
     # ############# Reshaping ############# #
 
