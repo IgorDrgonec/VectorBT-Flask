@@ -66,8 +66,10 @@ def select_pypfopt_func_kwargs(
 ) -> tp.Kwargs:
     """Select keyword arguments belonging to `pypfopt_func`."""
     if isinstance(kwargs, pypfopt_func_dict):
-        if pypfopt_func in kwargs or pypfopt_func.__name__ in kwargs:
+        if pypfopt_func in kwargs:
             _kwargs = kwargs[pypfopt_func]
+        elif pypfopt_func.__name__ in kwargs:
+            _kwargs = kwargs[pypfopt_func.__name__]
         elif "_default" in kwargs:
             _kwargs = kwargs["_default"]
         else:
@@ -76,8 +78,10 @@ def select_pypfopt_func_kwargs(
         _kwargs = {}
         for k, v in kwargs.items():
             if isinstance(v, pypfopt_func_dict):
-                if pypfopt_func in v or pypfopt_func.__name__ in v:
+                if pypfopt_func in v:
                     _kwargs[k] = v[pypfopt_func]
+                elif pypfopt_func.__name__ in v:
+                    _kwargs[k] = v[pypfopt_func.__name__]
                 elif "_default" in v:
                     _kwargs[k] = v["_default"]
             else:
@@ -531,7 +535,7 @@ def pypfopt_optimize(
 
     Any function is resolved using `resolve_pypfopt_func_call`.
 
-    For defaults, see `vectorbtpro._settings.pfopt`.
+    For defaults, see `pypfopt` under `vectorbtpro._settings.pfopt`.
 
     Usage:
         * Using mean historical returns, Ledoit-Wolf covariance matrix with constant variance,
@@ -640,10 +644,10 @@ def pypfopt_optimize(
 
     from vectorbtpro._settings import settings
 
-    pfopt_cfg = dict(settings["pfopt"])
+    pypfopt_cfg = dict(settings["pfopt"]["pypfopt"])
 
     def _resolve_setting(k, v):
-        setting = pfopt_cfg.pop(k)
+        setting = pypfopt_cfg.pop(k)
         if v is None:
             return setting
         return v
@@ -663,7 +667,7 @@ def pypfopt_optimize(
     allocation_method = _resolve_setting("allocation_method", allocation_method)
     silence_warnings = _resolve_setting("silence_warnings", silence_warnings)
     ignore_opt_errors = _resolve_setting("ignore_opt_errors", ignore_opt_errors)
-    kwargs = merge_dicts(pfopt_cfg, kwargs)
+    kwargs = merge_dicts(pypfopt_cfg, kwargs)
 
     if "cache" not in kwargs:
         kwargs["cache"] = {}
@@ -735,6 +739,9 @@ def pypfopt_optimize(
         if not silence_warnings:
             warnings.warn(f"Some arguments were not used: {unused_arg_names}", stacklevel=2)
 
+    if not discrete_allocation:
+        weights = {k: 1 if v >= 1 else v for k, v in weights.items()}
+
     return weights
 
 
@@ -750,8 +757,8 @@ class pfopt_group_dict(dict):
 
 
 def find_pfopt_groups(
-    args: tp.Union[tp.Args, pypfopt_func_dict],
-    kwargs: tp.Union[tp.Kwargs, pypfopt_func_dict],
+    args: tp.Union[tp.Args, pfopt_group_dict],
+    kwargs: tp.Union[tp.Kwargs, pfopt_group_dict],
     sort_groups: bool = False,
 ) -> tp.List[tp.Hashable]:
     """Find all groups in arguments."""
@@ -783,8 +790,8 @@ def find_pfopt_groups(
 
 def select_pfopt_group_args(
     group: tp.Hashable,
-    args: tp.Union[tp.Args, pypfopt_func_dict],
-    kwargs: tp.Union[tp.Kwargs, pypfopt_func_dict],
+    args: tp.Union[tp.Args, pfopt_group_dict],
+    kwargs: tp.Union[tp.Kwargs, pfopt_group_dict],
 ) -> tp.Tuple[tp.Args, tp.Kwargs]:
     """Select arguments and keyword arguments belonging to `group`.
 
@@ -866,16 +873,587 @@ class PortfolioOptimizer(Analyzable):
         new_allocations = to_2d_array(self._allocations)[new_indices]
         return self.replace(wrapper=new_wrapper, alloc_records=new_alloc_records, allocations=new_allocations)
 
-    def resample(self: PortfolioOptimizerT, *args, bfill_ts: bool = False, **kwargs) -> PortfolioOptimizerT:
+    def resample(self: PortfolioOptimizerT, *args, **kwargs) -> PortfolioOptimizerT:
         """Perform resampling on `PortfolioOptimizer`."""
         new_wrapper = self._wrapper.resample(*args, **kwargs)
-        new_alloc_records = self._alloc_records.resample(*args, bfill_ts=bfill_ts, **kwargs)
+        new_alloc_records = self._alloc_records.resample(*args, **kwargs)
         return self.replace(
             wrapper=new_wrapper,
             alloc_records=new_alloc_records,
         )
 
     # ############# Class methods ############# #
+
+    @classmethod
+    def from_allocate_func(
+        cls: tp.Type[PortfolioOptimizerT],
+        wrapper: ArrayWrapper,
+        allocate_func: tp.Union[tp.Callable, pfopt_group_dict],
+        *args,
+        jitted_loop: tp.Union[bool, pfopt_group_dict] = False,
+        every: tp.Union[None, tp.FrequencyLike, pfopt_group_dict] = None,
+        normalize_every: tp.Union[bool, pfopt_group_dict] = False,
+        start: tp.Union[None, int, tp.DatetimeLike, pfopt_group_dict] = None,
+        end: tp.Union[None, int, tp.DatetimeLike, pfopt_group_dict] = None,
+        exact_start: tp.Union[bool, pfopt_group_dict] = False,
+        on: tp.Union[None, int, tp.DatetimeLike, tp.IndexLike, pfopt_group_dict] = None,
+        add_delta: tp.Union[None, tp.FrequencyLike, pfopt_group_dict] = None,
+        kind: tp.Union[None, str, pfopt_group_dict] = None,
+        skip_minus_one: tp.Union[bool, pfopt_group_dict] = True,
+        jitted: tp.Union[tp.JittedOption, pfopt_group_dict] = None,
+        chunked: tp.Union[tp.ChunkedOption, pfopt_group_dict] = None,
+        index_points: tp.Union[None, tp.MaybeSequence[int], pfopt_group_dict] = None,
+        groups: tp.Optional[tp.Sequence[tp.Hashable]] = None,
+        template_context: tp.Union[None, tp.Kwargs, pfopt_group_dict] = None,
+        execute_kwargs: tp.Union[None, tp.Kwargs, pfopt_group_dict] = None,
+        sort_groups: bool = False,
+        wrapper_kwargs: tp.KwargsLike = None,
+        show_progress: tp.Optional[bool] = None,
+        pbar_kwargs: tp.KwargsLike = None,
+        forward_args: tp.Optional[tp.Sequence[str]] = None,
+        forward_kwargs: tp.Optional[tp.Sequence[str]] = None,
+        pre_group_func: tp.Optional[tp.Callable] = None,
+        **kwargs,
+    ) -> PortfolioOptimizerT:
+        """Generate allocations from an allocation function.
+
+        Generates date points and allocates at those points.
+
+        Similar to `PortfolioOptimizer.from_optimize_func`, but generates points using
+        `vectorbtpro.base.wrapping.ArrayWrapper.get_index_points` and makes each point available
+        as `index_point` in the context.
+
+        If `jitted_loop` is True, see `vectorbtpro.portfolio.pfopt.nb.allocate_meta_nb`.
+
+        Also, in contrast to `PortfolioOptimizer.from_optimize_func`, creates records of type
+        `vectorbtpro.portfolio.pfopt.records.AllocPoints`.
+
+        Usage:
+            * Allocate uniformly:
+
+            ```pycon
+            >>> import vectorbtpro as vbt
+            >>> import numpy as np
+
+            >>> data = vbt.YFData.fetch(
+            ...     ["MSFT", "AMZN", "AAPL"],
+            ...     start="2010-01-01",
+            ...     end="2020-01-01"
+            ... )
+            >>> close = data.get("Close")
+
+            >>> def uniform_allocate_func(n_cols):
+            ...     return np.full(n_cols, 1 / n_cols)
+
+            >>> pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
+            ...     close.vbt.wrapper,
+            ...     uniform_allocate_func,
+            ...     close.shape[1]
+            ... )
+            >>> pf_opt.allocations
+            symbol                                     MSFT      AMZN      AAPL
+            alloc_group Date
+            group       2009-12-31 00:00:00+00:00  0.333333  0.333333  0.333333
+            ```
+
+            * Allocate randomly every first date of the year:
+
+            ```pycon
+            >>> def random_allocate_func(n_cols):
+            ...     weights = np.random.uniform(size=n_cols)
+            ...     return weights / weights.sum()
+
+            >>> pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+            ...     close.vbt.wrapper,
+            ...     random_allocate_func,
+            ...     close.shape[1],
+            ...     every="AS-JAN"
+            ... )
+            >>> pf_opt.allocations
+            symbol                                     MSFT      AMZN      AAPL
+            alloc_group Date
+            group       2011-01-03 00:00:00+00:00  0.152594  0.203128  0.644279
+                        2012-01-03 00:00:00+00:00  0.707249  0.087783  0.204968
+                        2013-01-02 00:00:00+00:00  0.327492  0.434563  0.237946
+                        2014-01-02 00:00:00+00:00  0.237210  0.245863  0.516927
+                        2015-01-02 00:00:00+00:00  0.339189  0.126962  0.533850
+                        2016-01-04 00:00:00+00:00  0.140094  0.473617  0.386289
+                        2017-01-03 00:00:00+00:00  0.476338  0.294500  0.229162
+                        2018-01-02 00:00:00+00:00  0.195077  0.393477  0.411445
+                        2019-01-02 00:00:00+00:00  0.297255  0.536558  0.166186
+            ```
+
+            * Specify index points manually:
+
+            ```pycon
+            >>> pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
+            ...     close.vbt.wrapper,
+            ...     random_allocate_func,
+            ...     close.shape[1],
+            ...     index_points=[0, 30, 60]
+            ... )
+            >>> pf_opt.allocations
+            symbol                                     MSFT      AMZN      AAPL
+            alloc_group Date
+            group       2009-12-31 00:00:00+00:00  0.336081  0.313966  0.349953
+                        2010-02-16 00:00:00+00:00  0.500909  0.282295  0.216796
+                        2010-03-30 00:00:00+00:00  0.241952  0.556282  0.201767
+            ```
+
+            * Specify allocations manually:
+
+            ```pycon
+            >>> def manual_allocate_func(weights):
+            ...     return weights
+
+            >>> pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
+            ...     close.vbt.wrapper,
+            ...     manual_allocate_func,
+            ...     vbt.RepEval("weights[i]", context=dict(weights=[
+            ...         [1, 0, 0],
+            ...         [0, 1, 0],
+            ...         [0, 0, 1]
+            ...     ])),
+            ...     index_points=[0, 30, 60]
+            ... )
+            >>> pf_opt.allocations
+            symbol                                 MSFT  AMZN  AAPL
+            alloc_group Date
+            group       2009-12-31 00:00:00+00:00     1     0     0
+                        2010-02-16 00:00:00+00:00     0     1     0
+                        2010-03-30 00:00:00+00:00     0     0     1
+            ```
+
+            * Use Numba-compiled loop:
+
+            ```pycon
+            >>> from numba import njit
+
+            >>> @njit
+            ... def random_allocate_func_nb(i, idx, n_cols):
+            ...     weights = np.random.uniform(0, 1, n_cols)
+            ...     return weights / weights.sum()
+
+            >>> pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
+            ...     close.vbt.wrapper,
+            ...     random_allocate_func_nb,
+            ...     close.shape[1],
+            ...     index_points=[0, 30, 60],
+            ...     jitted_loop=True
+            ... )
+            >>> pf_opt.allocations
+            symbol                                     MSFT      AMZN      AAPL
+            alloc_group Date
+            group       2009-12-31 00:00:00+00:00  0.442137  0.233593  0.324270
+                        2010-02-16 00:00:00+00:00  0.379956  0.309599  0.310445
+                        2010-03-30 00:00:00+00:00  0.386918  0.228373  0.384709
+            ```
+
+            !!! hint
+                There is no big reason of using the Numba-compiled loop, apart from when having
+                to rebalance many thousands of times. Usually, using a regular Python loop
+                and a Numba-compiled allocation function suffice.
+        """
+        if pbar_kwargs is None:
+            pbar_kwargs = {}
+
+        groupable_kwargs = {
+            "allocate_func": allocate_func,
+            "jitted_loop": jitted_loop,
+            "every": every,
+            "normalize_every": normalize_every,
+            "start": start,
+            "end": end,
+            "exact_start": exact_start,
+            "on": on,
+            "add_delta": add_delta,
+            "kind": kind,
+            "skip_minus_one": skip_minus_one,
+            "jitted": jitted,
+            "chunked": chunked,
+            "index_points": index_points,
+            "template_context": template_context,
+            "execute_kwargs": execute_kwargs,
+            "forward_args": forward_args,
+            "forward_kwargs": forward_kwargs,
+            **kwargs,
+        }
+        if groups is None:
+            groups = find_pfopt_groups(args, groupable_kwargs, sort_groups=sort_groups)
+        if len(groups) == 0:
+            groups = ["group"]
+            single_group = True
+        else:
+            single_group = False
+
+        alloc_points = []
+        allocations = []
+        if show_progress is None:
+            show_progress = len(groups) > 1
+            show_progress_none = True
+        else:
+            show_progress_none = False
+        with get_pbar(total=len(groups), show_progress=show_progress, **pbar_kwargs) as pbar:
+            for g, group in enumerate(groups):
+                pbar.set_description(str(group))
+
+                _args, _kwargs = select_pfopt_group_args(group, args, groupable_kwargs)
+                if pre_group_func is not None:
+                    _args, _kwargs = pre_group_func(group, *_args, **_kwargs)
+                _allocate_func = _kwargs.pop("allocate_func")
+                _jitted_loop = _kwargs.pop("jitted_loop", False)
+                _every = _kwargs.pop("every", None)
+                _normalize_every = _kwargs.pop("normalize_every", False)
+                _start = _kwargs.pop("start", None)
+                _end = _kwargs.pop("end", None)
+                _exact_start = _kwargs.pop("exact_start", False)
+                _on = _kwargs.pop("on", None)
+                _add_delta = _kwargs.pop("add_delta", None)
+                _kind = _kwargs.pop("kind", None)
+                _skip_minus_one = _kwargs.pop("skip_minus_one", True)
+                _jitted = _kwargs.pop("jitted", None)
+                _chunked = _kwargs.pop("chunked", None)
+                _index_points = _kwargs.pop("index_points", None)
+                _template_context = _kwargs.pop("template_context", None)
+                _execute_kwargs = _kwargs.pop("execute_kwargs", None)
+                _forward_args = _kwargs.pop("forward_args", None)
+                _forward_kwargs = _kwargs.pop("forward_kwargs", None)
+
+                _template_context = merge_dicts(
+                    dict(
+                        groups=groups,
+                        group=group,
+                        group_idx=g,
+                        wrapper=wrapper,
+                        allocate_func=_allocate_func,
+                        jitted_loop=_jitted_loop,
+                        every=_every,
+                        normalize_every=_normalize_every,
+                        start=_start,
+                        end=_end,
+                        exact_start=_exact_start,
+                        on=_on,
+                        add_delta=_add_delta,
+                        kind=_kind,
+                        skip_minus_one=_skip_minus_one,
+                        jitted=_jitted,
+                        chunked=_chunked,
+                        index_points=_index_points,
+                        args=_args,
+                        kwargs=_kwargs,
+                        execute_kwargs=_execute_kwargs,
+                        forward_args=_forward_args,
+                        forward_kwargs=_forward_kwargs,
+                    ),
+                    _template_context,
+                )
+
+                if _index_points is None:
+                    get_index_points_kwargs = deep_substitute(
+                        dict(
+                            every=_every,
+                            normalize_every=_normalize_every,
+                            start=_start,
+                            end=_end,
+                            exact_start=_exact_start,
+                            on=_on,
+                            add_delta=_add_delta,
+                            kind=_kind,
+                            skip_minus_one=_skip_minus_one,
+                        ),
+                        _template_context,
+                        sub_id="get_index_points_kwargs",
+                        strict=True,
+                    )
+                    _index_points = wrapper.get_index_points(**get_index_points_kwargs)
+                    _template_context = merge_dicts(
+                        _template_context,
+                        get_index_points_kwargs,
+                        dict(index_points=_index_points),
+                    )
+                else:
+                    _index_points = deep_substitute(
+                        _index_points,
+                        _template_context,
+                        sub_id="index_points",
+                        strict=True,
+                    )
+                    _index_points = to_1d_array(_index_points)
+                    _template_context = merge_dicts(_template_context, dict(index_points=_index_points))
+
+                if _forward_args is None:
+                    _forward_args = []
+                for k in _forward_args:
+                    _args += (_template_context[k],)
+                if _forward_kwargs is None:
+                    _forward_kwargs = []
+                for k in _forward_kwargs:
+                    _kwargs[k] = _template_context[k]
+
+                if jitted_loop:
+                    _allocate_func = deep_substitute(
+                        _allocate_func,
+                        _template_context,
+                        sub_id="allocate_func",
+                        strict=True,
+                    )
+                    _args = deep_substitute(_args, _template_context, sub_id="args")
+                    _kwargs = deep_substitute(_kwargs, _template_context, sub_id="kwargs")
+                    func = jit_reg.resolve_option(nb.allocate_meta_nb, jitted)
+                    func = ch_reg.resolve_option(func, chunked)
+                    _allocations = func(len(wrapper.columns), _index_points, _allocate_func, *_args, **_kwargs)
+                else:
+                    funcs_args = []
+                    for i in range(len(_index_points)):
+                        __template_context = merge_dicts(dict(i=i, index_point=_index_points[i]), _template_context)
+                        __allocate_func = deep_substitute(
+                            _allocate_func,
+                            __template_context,
+                            sub_id="allocate_func",
+                            strict=True,
+                        )
+                        __args = deep_substitute(_args, __template_context, sub_id="args")
+                        __kwargs = deep_substitute(_kwargs, __template_context, sub_id="kwargs")
+                        funcs_args.append((__allocate_func, __args, __kwargs))
+
+                    _execute_kwargs = merge_dicts(
+                        dict(
+                            show_progress=len(funcs_args) > 1 if show_progress_none else show_progress,
+                            pbar_kwargs=pbar_kwargs,
+                        ),
+                        _execute_kwargs,
+                    )
+                    results = execute(funcs_args, **_execute_kwargs)
+                    _allocations = pd.DataFrame(results, columns=wrapper.columns)
+                    if isinstance(_allocations.columns, pd.RangeIndex):
+                        _allocations = _allocations.values
+                    else:
+                        _allocations = _allocations[list(wrapper.columns)].values
+
+                notna_mask = ~np.isnan(_allocations).all(axis=1)
+                _allocations = _allocations[notna_mask]
+                _index_points = _index_points[notna_mask]
+
+                _alloc_points = np.empty(len(_allocations), alloc_point_dt)
+                _alloc_points["id"] = np.arange(len(_allocations))
+                _alloc_points["col"] = g
+                _alloc_points["alloc_idx"] = _index_points
+                alloc_points.append(_alloc_points)
+                allocations.append(_allocations)
+
+                pbar.update(1)
+
+        if isinstance(groups, pd.Index):
+            group_index = groups
+        else:
+            group_index = pd.Index(groups, name="alloc_group")
+        if group_index.has_duplicates:
+            raise ValueError("Groups cannot have duplicates")
+        if group_index.name is None:
+            raise ValueError("Group index must have a name")
+        new_columns = combine_indexes((group_index, wrapper.columns))
+        wrapper_kwargs = merge_dicts(
+            dict(
+                index=wrapper.index,
+                columns=new_columns,
+                ndim=2,
+                freq=wrapper.freq,
+                column_only_select=True,
+                group_select=True,
+                grouped_ndim=1 if single_group else 2,
+                group_by=group_index.name,
+                allow_enable=False,
+                allow_disable=True,
+                allow_modify=False,
+            ),
+            wrapper_kwargs,
+        )
+        new_wrapper = ArrayWrapper(**wrapper_kwargs)
+        alloc_points = AllocPoints(
+            ArrayWrapper(
+                index=wrapper.index,
+                columns=group_index,
+                ndim=1 if single_group else 2,
+                freq=wrapper.freq,
+                column_only_select=True,
+            ),
+            np.concatenate(alloc_points),
+        )
+        allocations = np.row_stack(allocations)
+        return cls(new_wrapper, alloc_points, allocations)
+
+    @classmethod
+    def from_allocations(
+        cls: tp.Type[PortfolioOptimizerT],
+        wrapper: ArrayWrapper,
+        allocations: tp.ArrayLike,
+        **kwargs,
+    ) -> PortfolioOptimizerT:
+        """Pick allocations from an array.
+
+        Uses `PortfolioOptimizer.from_allocate_func`.
+
+        If `allocations` is a NumPy array, uses `vectorbtpro.portfolio.pfopt.nb.pick_idx_allocate_func_nb`
+        and a Numba-compiled loop. Otherwise, uses a regular Python function to pick each allocation
+        (which can be a dict, Series, etc.).
+
+        If `allocations` is a DataFrame, additionally uses its index as labels."""
+        if isinstance(allocations, pd.DataFrame):
+            kwargs = merge_dicts(
+                dict(on=allocations.index, kind="labels"),
+                kwargs,
+            )
+            allocations = allocations.values
+        if isinstance(allocations, np.ndarray):
+
+            def _resolve_allocations(index_points):
+                if len(index_points) != len(allocations):
+                    raise ValueError(f"Allocation array must have {len(index_points)} rows")
+                return to_2d_array(allocations, expand_axis=0)
+
+            return cls.from_allocate_func(
+                wrapper,
+                nb.pick_idx_allocate_func_nb,
+                RepFunc(_resolve_allocations),
+                jitted_loop=True,
+                **kwargs,
+            )
+
+        def _pick_allocate_func(index_points, i):
+            if len(index_points) != len(allocations):
+                raise ValueError(f"Allocation array must have {len(index_points)} rows")
+            return allocations[i]
+
+        return cls.from_allocate_func(wrapper, _pick_allocate_func, Rep("index_points"), Rep("i"), **kwargs)
+
+    @classmethod
+    def from_filled_allocations(
+        cls: tp.Type[PortfolioOptimizerT],
+        allocations: tp.AnyArray2d,
+        notna_only: bool = True,
+        unique_only: bool = True,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        **kwargs,
+    ) -> PortfolioOptimizerT:
+        """Pick allocations from an already filled array.
+
+        Uses `PortfolioOptimizer.from_allocate_func`.
+
+        Uses `vectorbtpro.portfolio.pfopt.nb.pick_point_allocate_func_nb` and a Numba-compiled loop.
+
+        Extracts allocation points using `vectorbtpro.portfolio.pfopt.nb.get_alloc_points_nb`."""
+        if wrapper is None:
+            if checks.is_frame(allocations):
+                wrapper = ArrayWrapper.from_obj(allocations)
+            else:
+                raise TypeError("Must provide a wrapper if allocations is not a DataFrame")
+        allocations = to_2d_array(allocations, expand_axis=0)
+        if allocations.shape != wrapper.shape_2d:
+            raise ValueError("Allocation array must have the same shape as wrapper")
+        on = nb.get_alloc_points_nb(allocations, notna_only=notna_only, unique_only=unique_only)
+        kwargs = merge_dicts(dict(on=on), kwargs)
+        return cls.from_allocate_func(
+            wrapper,
+            nb.pick_point_allocate_func_nb,
+            allocations,
+            jitted_loop=True,
+            **kwargs,
+        )
+
+    @classmethod
+    def from_uniform(cls: tp.Type[PortfolioOptimizerT], wrapper: ArrayWrapper, **kwargs) -> PortfolioOptimizerT:
+        """Generate uniform allocations.
+
+        Uses `PortfolioOptimizer.from_allocate_func`."""
+
+        def _uniform_allocate_func():
+            return np.full(wrapper.shape_2d[1], 1 / wrapper.shape_2d[1])
+
+        return cls.from_allocate_func(wrapper, _uniform_allocate_func, **kwargs)
+
+    @classmethod
+    def from_random(
+        cls: tp.Type[PortfolioOptimizerT],
+        wrapper: ArrayWrapper,
+        seed: tp.Optional[int] = None,
+        **kwargs,
+    ) -> PortfolioOptimizerT:
+        """Generate random allocations.
+
+        Uses `PortfolioOptimizer.from_allocate_func`.
+
+        Uses `vectorbtpro.portfolio.pfopt.nb.random_allocate_func_nb` and a Numba-compiled loop."""
+        if seed is not None:
+            set_seed_nb(seed)
+        return cls.from_allocate_func(
+            wrapper,
+            nb.random_allocate_func_nb,
+            wrapper.shape_2d[1],
+            jitted_loop=True,
+            **kwargs,
+        )
+
+    @classmethod
+    def from_universal_algo(
+        cls: tp.Type[PortfolioOptimizerT],
+        algo: tp.Union[str, tp.Type[AlgoT], AlgoT, AlgoResultT],
+        S: tp.Optional[tp.AnyArray2d] = None,
+        n_jobs: int = 1,
+        log_progress: bool = False,
+        notna_only: bool = True,
+        unique_only: bool = True,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        **kwargs,
+    ) -> PortfolioOptimizerT:
+        """Generate allocations using [Universal Portfolios](https://github.com/Marigold/universal-portfolios).
+
+        `S` can be any price, while `algo` must be either an attribute of the package, subclass of
+        `universal.algo.Algo`, instance of `universal.algo.Algo`, or instance of `universal.result.AlgoResult`.
+
+        Extracts allocation points using `vectorbtpro.portfolio.pfopt.nb.get_alloc_points_nb`."""
+        from vectorbtpro.utils.opt_packages import assert_can_import
+
+        assert_can_import("universal")
+        from universal.algo import Algo
+        from universal.result import AlgoResult
+
+        if wrapper is None:
+            if S is None or not checks.is_frame(S):
+                raise TypeError("Must provide a wrapper if allocations is not a DataFrame")
+            else:
+                wrapper = ArrayWrapper.from_obj(S)
+
+        def _pre_group_func(group, *_args, _algo=algo, **_kwargs):
+            if isinstance(_algo, str):
+                import universal.algos
+
+                _algo = getattr(universal.algos, _algo)
+            if isinstance(_algo, type) and issubclass(_algo, Algo):
+                reserved_arg_names = get_func_arg_names(cls.from_allocate_func)
+                algo_keys = set(_kwargs.keys()).difference(reserved_arg_names)
+                algo_kwargs = {}
+                for k in algo_keys:
+                    algo_kwargs[k] = _kwargs.pop(k)
+                _algo = _algo(**algo_kwargs)
+            if isinstance(_algo, Algo):
+                if S is None:
+                    raise ValueError("Must provide S")
+                _algo = _algo.run(S, n_jobs=n_jobs, log_progress=log_progress)
+            if isinstance(_algo, AlgoResult):
+                weights = _algo.weights[wrapper.columns].values
+            else:
+                raise TypeError(f"Algo {_algo} not supported")
+            if "on" not in kwargs:
+                _kwargs["on"] = nb.get_alloc_points_nb(weights, notna_only=notna_only, unique_only=unique_only)
+            return (weights,), _kwargs
+
+        return cls.from_allocate_func(
+            wrapper,
+            nb.pick_point_allocate_func_nb,
+            jitted_loop=True,
+            pre_group_func=_pre_group_func,
+            **kwargs,
+        )
 
     @classmethod
     def from_optimize_func(
@@ -889,10 +1467,14 @@ class PortfolioOptimizer(Analyzable):
         lookback_period: tp.Union[None, tp.FrequencyLike, pfopt_group_dict] = None,
         start: tp.Union[None, int, tp.DatetimeLike, tp.IndexLike, pfopt_group_dict] = None,
         end: tp.Union[None, int, tp.DatetimeLike, tp.IndexLike, pfopt_group_dict] = None,
+        exact_start: tp.Union[bool, pfopt_group_dict] = False,
+        fixed_start: tp.Union[bool, pfopt_group_dict] = False,
         closed_start: tp.Union[bool, pfopt_group_dict] = True,
         closed_end: tp.Union[bool, pfopt_group_dict] = False,
+        add_start_delta: tp.Union[None, tp.FrequencyLike, pfopt_group_dict] = None,
+        add_end_delta: tp.Union[None, tp.FrequencyLike, pfopt_group_dict] = None,
         kind: tp.Union[None, str, pfopt_group_dict] = None,
-        bounds_skipna: tp.Union[bool, pfopt_group_dict] = True,
+        skip_minus_one: tp.Union[bool, pfopt_group_dict] = True,
         jitted: tp.Union[tp.JittedOption, pfopt_group_dict] = None,
         chunked: tp.Union[tp.ChunkedOption, pfopt_group_dict] = None,
         index_ranges: tp.Union[None, tp.MaybeSequence[tp.MaybeSequence[int]], pfopt_group_dict] = None,
@@ -907,6 +1489,7 @@ class PortfolioOptimizer(Analyzable):
         pbar_kwargs: tp.KwargsLike = None,
         forward_args: tp.Optional[tp.Sequence[str]] = None,
         forward_kwargs: tp.Optional[tp.Sequence[str]] = None,
+        pre_group_func: tp.Optional[tp.Callable] = None,
         **kwargs,
     ) -> PortfolioOptimizerT:
         """Generate allocations from an optimization function.
@@ -916,9 +1499,12 @@ class PortfolioOptimizer(Analyzable):
 
         This is a parametrized method that allows testing multiple combinations on most arguments.
         First, it uses `find_pfopt_groups` to check whether any of the arguments is wrapped
-        with `pfopt_group_dict` and extracts the keys of all groups that were found. After that,
-        it iterates over each group (= parameter combination), and selects all arguments and
-        keyword arguments that correspond to that group using `select_pfopt_group_args`.
+        with `pfopt_group_dict` and extracts the keys of all groups that were found. It then
+        additionally processes the arguments using `pre_group_func`, if provided (must take
+        `group`, `*args`, and `**kwargs`, and return new `args` and `kwargs`).
+
+        After that, it iterates over each group (= parameter combination), and selects all arguments
+        and keyword arguments that correspond to that group using `select_pfopt_group_args`.
 
         It then resolves the date ranges, either using the ready-to-use `index_ranges` or
         by passing all the arguments ranging from `every` to `jitted` to
@@ -1127,8 +1713,6 @@ class PortfolioOptimizer(Analyzable):
         """
         if pbar_kwargs is None:
             pbar_kwargs = {}
-        if isinstance(wrapper.columns, pd.MultiIndex):
-            raise ValueError("Columns must represent only assets and cannot be multi-index")
 
         groupable_kwargs = {
             "optimize_func": optimize_func,
@@ -1138,10 +1722,14 @@ class PortfolioOptimizer(Analyzable):
             "lookback_period": lookback_period,
             "start": start,
             "end": end,
+            "exact_start": exact_start,
+            "fixed_start": fixed_start,
             "closed_start": closed_start,
             "closed_end": closed_end,
+            "add_start_delta": add_start_delta,
+            "add_end_delta": add_end_delta,
             "kind": kind,
-            "bounds_skipna": bounds_skipna,
+            "skip_minus_one": skip_minus_one,
             "jitted": jitted,
             "chunked": chunked,
             "index_ranges": index_ranges,
@@ -1173,6 +1761,8 @@ class PortfolioOptimizer(Analyzable):
                 pbar.set_description(str(group))
 
                 _args, _kwargs = select_pfopt_group_args(group, args, groupable_kwargs)
+                if pre_group_func is not None:
+                    _args, _kwargs = pre_group_func(group, *_args, **_kwargs)
                 _optimize_func = _kwargs.pop("optimize_func")
                 _jitted_loop = _kwargs.pop("jitted_loop", False)
                 _every = _kwargs.pop("every", None)
@@ -1180,10 +1770,14 @@ class PortfolioOptimizer(Analyzable):
                 _lookback_period = _kwargs.pop("lookback_period", None)
                 _start = _kwargs.pop("start", None)
                 _end = _kwargs.pop("end", None)
+                _exact_start = _kwargs.pop("exact_start", False)
+                _fixed_start = _kwargs.pop("fixed_start", False)
                 _closed_start = _kwargs.pop("closed_start", True)
                 _closed_end = _kwargs.pop("closed_end", False)
+                _add_start_delta = _kwargs.pop("add_start_delta", None)
+                _add_end_delta = _kwargs.pop("add_end_delta", None)
                 _kind = _kwargs.pop("kind", None)
-                _bounds_skipna = _kwargs.pop("bounds_skipna", True)
+                _skip_minus_one = _kwargs.pop("skip_minus_one", True)
                 _jitted = _kwargs.pop("jitted", None)
                 _chunked = _kwargs.pop("chunked", None)
                 _index_ranges = _kwargs.pop("index_ranges", None)
@@ -1207,10 +1801,14 @@ class PortfolioOptimizer(Analyzable):
                         lookback_period=_lookback_period,
                         start=_start,
                         end=_end,
+                        exact_start=_exact_start,
+                        fixed_start=_fixed_start,
                         closed_start=_closed_start,
                         closed_end=_closed_end,
+                        add_start_delta=_add_start_delta,
+                        add_end_delta=_add_end_delta,
                         kind=_kind,
-                        bounds_skipna=_bounds_skipna,
+                        skip_minus_one=_skip_minus_one,
                         jitted=_jitted,
                         chunked=_chunked,
                         index_ranges=_index_ranges,
@@ -1232,10 +1830,14 @@ class PortfolioOptimizer(Analyzable):
                             lookback_period=_lookback_period,
                             start=_start,
                             end=_end,
+                            exact_start=_exact_start,
+                            fixed_start=_fixed_start,
                             closed_start=_closed_start,
                             closed_end=_closed_end,
+                            add_start_delta=_add_start_delta,
+                            add_end_delta=_add_end_delta,
                             kind=_kind,
-                            skipna=_bounds_skipna,
+                            skip_minus_one=_skip_minus_one,
                             jitted=_jitted,
                         ),
                         _template_context,
@@ -1317,11 +1919,15 @@ class PortfolioOptimizer(Analyzable):
                     else:
                         _allocations = _allocations[list(wrapper.columns)].values
 
-                _alloc_ranges = np.empty(len(_allocations), alloc_range_dt)
+                notna_mask = ~np.isnan(_allocations).all(axis=1)
+                _allocations = _allocations[notna_mask]
+                _index_ranges = _index_ranges[notna_mask]
                 if _index_loc is None:
                     alloc_idx = _index_ranges[:, 1] - 1 + _alloc_wait
                 else:
-                    alloc_idx = _index_loc
+                    alloc_idx = _index_loc[notna_mask]
+
+                _alloc_ranges = np.empty(len(_allocations), alloc_range_dt)
                 _alloc_ranges["id"] = np.arange(len(_allocations))
                 _alloc_ranges["col"] = g
                 _alloc_ranges["start_idx"] = _index_ranges[:, 0]
@@ -1392,569 +1998,6 @@ class PortfolioOptimizer(Analyzable):
                 raise TypeError("Must provide a wrapper if price and returns are not set")
         return cls.from_optimize_func(wrapper, pypfopt_optimize, **kwargs)
 
-    @classmethod
-    def from_allocate_func(
-        cls: tp.Type[PortfolioOptimizerT],
-        wrapper: ArrayWrapper,
-        allocate_func: tp.Union[tp.Callable, pfopt_group_dict],
-        *args,
-        jitted_loop: tp.Union[bool, pfopt_group_dict] = False,
-        every: tp.Union[None, tp.FrequencyLike, pfopt_group_dict] = None,
-        normalize_every: tp.Union[bool, pfopt_group_dict] = False,
-        start: tp.Union[None, int, tp.DatetimeLike, pfopt_group_dict] = None,
-        end: tp.Union[None, int, tp.DatetimeLike, pfopt_group_dict] = None,
-        on: tp.Union[None, int, tp.DatetimeLike, tp.IndexLike, pfopt_group_dict] = None,
-        kind: tp.Union[None, str, pfopt_group_dict] = None,
-        jitted: tp.Union[tp.JittedOption, pfopt_group_dict] = None,
-        chunked: tp.Union[tp.ChunkedOption, pfopt_group_dict] = None,
-        index_points: tp.Union[None, tp.MaybeSequence[int], pfopt_group_dict] = None,
-        groups: tp.Optional[tp.Sequence[tp.Hashable]] = None,
-        template_context: tp.Union[None, tp.Kwargs, pfopt_group_dict] = None,
-        execute_kwargs: tp.Union[None, tp.Kwargs, pfopt_group_dict] = None,
-        sort_groups: bool = False,
-        wrapper_kwargs: tp.KwargsLike = None,
-        show_progress: tp.Optional[bool] = None,
-        pbar_kwargs: tp.KwargsLike = None,
-        forward_args: tp.Optional[tp.Sequence[str]] = None,
-        forward_kwargs: tp.Optional[tp.Sequence[str]] = None,
-        **kwargs,
-    ) -> PortfolioOptimizerT:
-        """Generate allocations from an allocation function.
-
-        Generates date points and allocates at those points.
-
-        Similar to `PortfolioOptimizer.from_optimize_func`, but generates points using
-        `vectorbtpro.base.wrapping.ArrayWrapper.get_index_points` and makes each point available
-        as `index_point` in the context.
-
-        If `jitted_loop` is True, see `vectorbtpro.portfolio.pfopt.nb.allocate_meta_nb`.
-
-        Also, in contrast to `PortfolioOptimizer.from_optimize_func`, creates records of type
-        `vectorbtpro.portfolio.pfopt.records.AllocPoints`.
-
-        Usage:
-            * Allocate uniformly:
-
-            ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import numpy as np
-
-            >>> data = vbt.YFData.fetch(
-            ...     ["MSFT", "AMZN", "AAPL"],
-            ...     start="2010-01-01",
-            ...     end="2020-01-01"
-            ... )
-            >>> close = data.get("Close")
-
-            >>> def uniform_allocate_func(n_cols):
-            ...     return np.full(n_cols, 1 / n_cols)
-
-            >>> pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
-            ...     close.vbt.wrapper,
-            ...     uniform_allocate_func,
-            ...     close.shape[1]
-            ... )
-            >>> pf_opt.allocations
-            symbol                                     MSFT      AMZN      AAPL
-            alloc_group Date
-            group       2009-12-31 00:00:00+00:00  0.333333  0.333333  0.333333
-            ```
-
-            * Allocate randomly every first date of the year:
-
-            ```pycon
-            >>> def random_allocate_func(n_cols):
-            ...     weights = np.random.uniform(size=n_cols)
-            ...     return weights / weights.sum()
-
-            >>> pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
-            ...     close.vbt.wrapper,
-            ...     random_allocate_func,
-            ...     close.shape[1],
-            ...     every="AS-JAN"
-            ... )
-            >>> pf_opt.allocations
-            symbol                                     MSFT      AMZN      AAPL
-            alloc_group Date
-            group       2011-01-03 00:00:00+00:00  0.152594  0.203128  0.644279
-                        2012-01-03 00:00:00+00:00  0.707249  0.087783  0.204968
-                        2013-01-02 00:00:00+00:00  0.327492  0.434563  0.237946
-                        2014-01-02 00:00:00+00:00  0.237210  0.245863  0.516927
-                        2015-01-02 00:00:00+00:00  0.339189  0.126962  0.533850
-                        2016-01-04 00:00:00+00:00  0.140094  0.473617  0.386289
-                        2017-01-03 00:00:00+00:00  0.476338  0.294500  0.229162
-                        2018-01-02 00:00:00+00:00  0.195077  0.393477  0.411445
-                        2019-01-02 00:00:00+00:00  0.297255  0.536558  0.166186
-            ```
-
-            * Specify index points manually:
-
-            ```pycon
-            >>> pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
-            ...     close.vbt.wrapper,
-            ...     random_allocate_func,
-            ...     close.shape[1],
-            ...     index_points=[0, 30, 60]
-            ... )
-            >>> pf_opt.allocations
-            symbol                                     MSFT      AMZN      AAPL
-            alloc_group Date
-            group       2009-12-31 00:00:00+00:00  0.336081  0.313966  0.349953
-                        2010-02-16 00:00:00+00:00  0.500909  0.282295  0.216796
-                        2010-03-30 00:00:00+00:00  0.241952  0.556282  0.201767
-            ```
-
-            * Specify allocations manually:
-
-            ```pycon
-            >>> def manual_allocate_func(weights):
-            ...     return weights
-
-            >>> pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
-            ...     close.vbt.wrapper,
-            ...     manual_allocate_func,
-            ...     vbt.RepEval("weights[i]", context=dict(weights=[
-            ...         [1, 0, 0],
-            ...         [0, 1, 0],
-            ...         [0, 0, 1]
-            ...     ])),
-            ...     index_points=[0, 30, 60]
-            ... )
-            >>> pf_opt.allocations
-            symbol                                 MSFT  AMZN  AAPL
-            alloc_group Date
-            group       2009-12-31 00:00:00+00:00     1     0     0
-                        2010-02-16 00:00:00+00:00     0     1     0
-                        2010-03-30 00:00:00+00:00     0     0     1
-            ```
-
-            * Use Numba-compiled loop:
-
-            ```pycon
-            >>> from numba import njit
-
-            >>> @njit
-            ... def random_allocate_func_nb(i, idx, n_cols):
-            ...     weights = np.random.uniform(0, 1, n_cols)
-            ...     return weights / weights.sum()
-
-            >>> pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
-            ...     close.vbt.wrapper,
-            ...     random_allocate_func_nb,
-            ...     close.shape[1],
-            ...     index_points=[0, 30, 60],
-            ...     jitted_loop=True
-            ... )
-            >>> pf_opt.allocations
-            symbol                                     MSFT      AMZN      AAPL
-            alloc_group Date
-            group       2009-12-31 00:00:00+00:00  0.442137  0.233593  0.324270
-                        2010-02-16 00:00:00+00:00  0.379956  0.309599  0.310445
-                        2010-03-30 00:00:00+00:00  0.386918  0.228373  0.384709
-            ```
-
-            !!! hint
-                There is no big reason of using the Numba-compiled loop, apart from when having
-                to rebalance many thousands of times. Usually, using a regular Python loop
-                and a Numba-compiled allocation function suffice.
-        """
-        if pbar_kwargs is None:
-            pbar_kwargs = {}
-        if isinstance(wrapper.columns, pd.MultiIndex):
-            raise ValueError("Columns must represent only assets and cannot be multi-index")
-
-        groupable_kwargs = {
-            "allocate_func": allocate_func,
-            "jitted_loop": jitted_loop,
-            "every": every,
-            "normalize_every": normalize_every,
-            "start": start,
-            "end": end,
-            "on": on,
-            "kind": kind,
-            "jitted": jitted,
-            "chunked": chunked,
-            "index_points": index_points,
-            "template_context": template_context,
-            "execute_kwargs": execute_kwargs,
-            "forward_args": forward_args,
-            "forward_kwargs": forward_kwargs,
-            **kwargs,
-        }
-        if groups is None:
-            groups = find_pfopt_groups(args, groupable_kwargs, sort_groups=sort_groups)
-        if len(groups) == 0:
-            groups = ["group"]
-            single_group = True
-        else:
-            single_group = False
-
-        alloc_points = []
-        allocations = []
-        if show_progress is None:
-            show_progress = len(groups) > 1
-            show_progress_none = True
-        else:
-            show_progress_none = False
-        with get_pbar(total=len(groups), show_progress=show_progress, **pbar_kwargs) as pbar:
-            for g, group in enumerate(groups):
-                pbar.set_description(str(group))
-
-                _args, _kwargs = select_pfopt_group_args(group, args, groupable_kwargs)
-                _allocate_func = _kwargs.pop("allocate_func")
-                _jitted_loop = _kwargs.pop("jitted_loop", False)
-                _every = _kwargs.pop("every", None)
-                _normalize_every = _kwargs.pop("normalize_every", False)
-                _start = _kwargs.pop("start", None)
-                _end = _kwargs.pop("end", None)
-                _on = _kwargs.pop("on", None)
-                _kind = _kwargs.pop("kind", None)
-                _jitted = _kwargs.pop("jitted", None)
-                _chunked = _kwargs.pop("chunked", None)
-                _index_points = _kwargs.pop("index_points", None)
-                _template_context = _kwargs.pop("template_context", None)
-                _execute_kwargs = _kwargs.pop("execute_kwargs", None)
-                _forward_args = _kwargs.pop("forward_args", None)
-                _forward_kwargs = _kwargs.pop("forward_kwargs", None)
-
-                _template_context = merge_dicts(
-                    dict(
-                        groups=groups,
-                        group=group,
-                        group_idx=g,
-                        wrapper=wrapper,
-                        allocate_func=_allocate_func,
-                        jitted_loop=_jitted_loop,
-                        every=_every,
-                        normalize_every=_normalize_every,
-                        start=_start,
-                        end=_end,
-                        on=_on,
-                        jitted=_jitted,
-                        chunked=_chunked,
-                        index_points=_index_points,
-                        args=_args,
-                        kwargs=_kwargs,
-                        execute_kwargs=_execute_kwargs,
-                        forward_args=_forward_args,
-                        forward_kwargs=_forward_kwargs,
-                    ),
-                    _template_context,
-                )
-
-                if _index_points is None:
-                    get_index_points_kwargs = deep_substitute(
-                        dict(
-                            every=_every,
-                            normalize_every=_normalize_every,
-                            start=_start,
-                            end=_end,
-                            on=_on,
-                            kind=_kind,
-                        ),
-                        _template_context,
-                        sub_id="get_index_points_kwargs",
-                        strict=True,
-                    )
-                    _index_points = wrapper.get_index_points(**get_index_points_kwargs)
-                    _template_context = merge_dicts(
-                        _template_context,
-                        get_index_points_kwargs,
-                        dict(index_points=_index_points),
-                    )
-                else:
-                    _index_points = deep_substitute(
-                        _index_points,
-                        _template_context,
-                        sub_id="index_points",
-                        strict=True,
-                    )
-                    _index_points = to_1d_array(_index_points)
-                    _template_context = merge_dicts(_template_context, dict(index_points=_index_points))
-
-                if _forward_args is None:
-                    _forward_args = []
-                for k in _forward_args:
-                    _args += (_template_context[k],)
-                if _forward_kwargs is None:
-                    _forward_kwargs = []
-                for k in _forward_kwargs:
-                    _kwargs[k] = _template_context[k]
-
-                if jitted_loop:
-                    _allocate_func = deep_substitute(
-                        _allocate_func,
-                        _template_context,
-                        sub_id="allocate_func",
-                        strict=True,
-                    )
-                    _args = deep_substitute(_args, _template_context, sub_id="args")
-                    _kwargs = deep_substitute(_kwargs, _template_context, sub_id="kwargs")
-                    func = jit_reg.resolve_option(nb.allocate_meta_nb, jitted)
-                    func = ch_reg.resolve_option(func, chunked)
-                    _allocations = func(len(wrapper.columns), _index_points, _allocate_func, *_args, **_kwargs)
-                else:
-                    funcs_args = []
-                    for i in range(len(_index_points)):
-                        __template_context = merge_dicts(dict(i=i, index_point=_index_points[i]), _template_context)
-                        __allocate_func = deep_substitute(
-                            _allocate_func,
-                            __template_context,
-                            sub_id="allocate_func",
-                            strict=True,
-                        )
-                        __args = deep_substitute(_args, __template_context, sub_id="args")
-                        __kwargs = deep_substitute(_kwargs, __template_context, sub_id="kwargs")
-                        funcs_args.append((__allocate_func, __args, __kwargs))
-
-                    _execute_kwargs = merge_dicts(
-                        dict(
-                            show_progress=len(funcs_args) > 1 if show_progress_none else show_progress,
-                            pbar_kwargs=pbar_kwargs,
-                        ),
-                        _execute_kwargs,
-                    )
-                    results = execute(funcs_args, **_execute_kwargs)
-                    _allocations = pd.DataFrame(results, columns=wrapper.columns)
-                    if isinstance(_allocations.columns, pd.RangeIndex):
-                        _allocations = _allocations.values
-                    else:
-                        _allocations = _allocations[list(wrapper.columns)].values
-
-                _alloc_points = np.empty(len(_allocations), alloc_point_dt)
-                _alloc_points["id"] = np.arange(len(_allocations))
-                _alloc_points["col"] = g
-                _alloc_points["alloc_idx"] = _index_points
-                alloc_points.append(_alloc_points)
-                allocations.append(_allocations)
-
-                pbar.update(1)
-
-        if isinstance(groups, pd.Index):
-            group_index = groups
-        else:
-            group_index = pd.Index(groups, name="alloc_group")
-        if group_index.has_duplicates:
-            raise ValueError("Groups cannot have duplicates")
-        if group_index.name is None:
-            raise ValueError("Group index must have a name")
-        new_columns = combine_indexes((group_index, wrapper.columns))
-        wrapper_kwargs = merge_dicts(
-            dict(
-                index=wrapper.index,
-                columns=new_columns,
-                ndim=2,
-                freq=wrapper.freq,
-                column_only_select=True,
-                group_select=True,
-                grouped_ndim=1 if single_group else 2,
-                group_by=group_index.name,
-                allow_enable=False,
-                allow_disable=True,
-                allow_modify=False,
-            ),
-            wrapper_kwargs,
-        )
-        new_wrapper = ArrayWrapper(**wrapper_kwargs)
-        alloc_points = AllocPoints(
-            ArrayWrapper(
-                index=wrapper.index,
-                columns=group_index,
-                ndim=1 if single_group else 2,
-                freq=wrapper.freq,
-                column_only_select=True,
-            ),
-            np.concatenate(alloc_points),
-        )
-        allocations = np.row_stack(allocations)
-        return cls(new_wrapper, alloc_points, allocations)
-
-    @classmethod
-    def from_allocations(
-        cls: tp.Type[PortfolioOptimizerT],
-        wrapper: ArrayWrapper,
-        allocations: tp.ArrayLike,
-        **kwargs,
-    ) -> PortfolioOptimizerT:
-        """Pick allocations from an array.
-
-        Uses `PortfolioOptimizer.from_allocate_func`.
-
-        If `allocations` is a NumPy array, uses `vectorbtpro.portfolio.pfopt.nb.pick_idx_allocate_func_nb`
-        and a Numba-compiled loop. Otherwise, uses a regular Python function to pick each allocation
-        (which can be a dict, Series, etc.).
-
-        If `allocations` is a DataFrame, additionally uses its index as labels."""
-        if isinstance(allocations, pd.DataFrame):
-            kwargs = merge_dicts(
-                dict(on=allocations.index, kind="labels"),
-                kwargs,
-            )
-            allocations = allocations.values
-        if isinstance(allocations, np.ndarray):
-
-            def _resolve_allocations(index_points):
-                if len(index_points) != len(allocations):
-                    raise ValueError(f"Allocation array must have {len(index_points)} rows")
-                return to_2d_array(allocations, expand_axis=0)
-
-            return cls.from_allocate_func(
-                wrapper,
-                nb.pick_idx_allocate_func_nb,
-                RepFunc(_resolve_allocations),
-                jitted_loop=True,
-                **kwargs,
-            )
-
-        def _pick_allocate_func(index_points, i):
-            if len(index_points) != len(allocations):
-                raise ValueError(f"Allocation array must have {len(index_points)} rows")
-            return allocations[i]
-
-        return cls.from_allocate_func(wrapper, _pick_allocate_func, Rep("index_points"), Rep("i"), **kwargs)
-
-    @classmethod
-    def from_filled_allocations(
-        cls: tp.Type[PortfolioOptimizerT],
-        allocations: tp.AnyArray2d,
-        nonzero_only: bool = True,
-        unique_only: bool = True,
-        wrapper: tp.Optional[ArrayWrapper] = None,
-        **kwargs,
-    ) -> PortfolioOptimizerT:
-        """Pick allocations from an already filled array.
-
-        Uses `PortfolioOptimizer.from_allocate_func`.
-
-        Uses `vectorbtpro.portfolio.pfopt.nb.pick_point_allocate_func_nb` and a Numba-compiled loop.
-
-        Extracts allocation points using `vectorbtpro.portfolio.pfopt.nb.get_alloc_points_nb`."""
-        if wrapper is None:
-            if checks.is_frame(allocations):
-                wrapper = ArrayWrapper.from_obj(allocations)
-            else:
-                raise TypeError("Must provide a wrapper if allocations is not a DataFrame")
-        allocations = to_2d_array(allocations, expand_axis=0)
-        if allocations.shape != wrapper.shape_2d:
-            raise ValueError("Allocation array must have the same shape as wrapper")
-        on = nb.get_alloc_points_nb(allocations, nonzero_only=nonzero_only, unique_only=unique_only)
-        kwargs = merge_dicts(dict(on=on), kwargs)
-        return cls.from_allocate_func(
-            wrapper,
-            nb.pick_point_allocate_func_nb,
-            allocations,
-            jitted_loop=True,
-            **kwargs,
-        )
-
-    @classmethod
-    def from_uniform(cls: tp.Type[PortfolioOptimizerT], wrapper: ArrayWrapper, **kwargs) -> PortfolioOptimizerT:
-        """Generate uniform allocations.
-
-        Uses `PortfolioOptimizer.from_allocate_func`."""
-
-        def _uniform_allocate_func():
-            return np.full(wrapper.shape_2d[1], 1 / wrapper.shape_2d[1])
-
-        return cls.from_allocate_func(wrapper, _uniform_allocate_func, **kwargs)
-
-    @classmethod
-    def from_random(
-        cls: tp.Type[PortfolioOptimizerT],
-        wrapper: ArrayWrapper,
-        seed: tp.Optional[int] = None,
-        **kwargs,
-    ) -> PortfolioOptimizerT:
-        """Generate random allocations.
-
-        Uses `PortfolioOptimizer.from_allocate_func`.
-
-        Uses `vectorbtpro.portfolio.pfopt.nb.random_allocate_func_nb` and a Numba-compiled loop."""
-        if seed is not None:
-            set_seed_nb(seed)
-        return cls.from_allocate_func(
-            wrapper,
-            nb.random_allocate_func_nb,
-            wrapper.shape_2d[1],
-            jitted_loop=True,
-            **kwargs,
-        )
-
-    @classmethod
-    def from_universal_algo(
-        cls: tp.Type[PortfolioOptimizerT],
-        algo: tp.Union[str, tp.Type[AlgoT], AlgoT, AlgoResultT],
-        S: tp.Optional[tp.AnyArray2d] = None,
-        n_jobs: int = 1,
-        log_progress: bool = False,
-        nonzero_only: bool = True,
-        unique_only: bool = True,
-        wrapper: tp.Optional[ArrayWrapper] = None,
-        **kwargs,
-    ) -> PortfolioOptimizerT:
-        """Generate allocations using [Universal Portfolios](https://github.com/Marigold/universal-portfolios).
-
-        `S` can be any price, while `algo` must be either an attribute of the package, subclass of
-        `universal.algo.Algo`, instance of `universal.algo.Algo`, or instance of `universal.result.AlgoResult`.
-
-        Extracts allocation points using `vectorbtpro.portfolio.pfopt.nb.get_alloc_points_nb`."""
-        from vectorbtpro.utils.opt_packages import assert_can_import
-
-        assert_can_import("universal")
-        from universal.algo import Algo
-        from universal.result import AlgoResult
-
-        if wrapper is None:
-            if S is None or not checks.is_frame(S):
-                raise TypeError("Must provide a wrapper if allocations is not a DataFrame")
-            else:
-                wrapper = ArrayWrapper.from_obj(S)
-
-        group_weights = {}
-
-        if isinstance(algo, str):
-            import universal.algos
-
-            algo = getattr(universal.algos, algo)
-        if isinstance(algo, type) and issubclass(algo, Algo):
-            algo_arg_names = get_func_arg_names(algo)
-            algo_kwargs = {}
-            for k in algo_arg_names:
-                if k in kwargs:
-                    algo_kwargs[k] = kwargs.pop(k)
-            algo = algo(**algo_kwargs)
-
-        def _resolve_algo_result(group, kwargs, _algo=algo):
-            _kwargs = dict(kwargs)
-            for k in list(kwargs.keys()):
-                kwargs.pop(k)  # otherwise gets passed to Numba function
-            nonlocal group_weights
-            if group in group_weights:
-                return group_weights[group]
-            if isinstance(_algo, Algo):
-                if S is None:
-                    raise ValueError("Must provide S")
-                _algo = _algo.run(S, n_jobs=n_jobs, log_progress=log_progress)
-            if isinstance(_algo, AlgoResult):
-                group_weights[group] = _algo.weights[wrapper.columns].values
-                return group_weights[group]
-            raise TypeError(f"Algo {_algo} not supported")
-
-        def _resolve_index_points(group, kwargs):
-            weights = _resolve_algo_result(group, kwargs)
-            return nb.get_alloc_points_nb(weights, nonzero_only=nonzero_only, unique_only=unique_only)
-
-        allocations = RepFunc(_resolve_algo_result)
-        on = RepFunc(_resolve_index_points)
-        kwargs = merge_dicts(dict(on=on), kwargs)
-        return cls.from_allocate_func(
-            wrapper,
-            nb.pick_point_allocate_func_nb,
-            allocations,
-            jitted_loop=True,
-            **kwargs,
-        )
-
     # ############# Properties ############# #
 
     @property
@@ -1963,7 +2006,7 @@ class PortfolioOptimizer(Analyzable):
         or points of type `vectorbtpro.portfolio.pfopt.records.AllocPoints`."""
         return self._alloc_records
 
-    def get_allocations(self, squeeze_groups: bool = False) -> tp.Frame:
+    def get_allocations(self, squeeze_groups: bool = True) -> tp.Frame:
         """Get a DataFrame with allocation groups concatenated along the index axis."""
         idx_arr = self.alloc_records.get_field_arr("idx")
         group_arr = self.alloc_records.col_arr
@@ -1990,7 +2033,7 @@ class PortfolioOptimizer(Analyzable):
         dropna: tp.Optional[str] = None,
         fill_value: tp.Scalar = np.nan,
         wrap_kwargs: tp.KwargsLike = None,
-        squeeze_groups: bool = False,
+        squeeze_groups: bool = True,
     ) -> tp.Frame:
         """Fill an empty DataFrame with allocations.
 
@@ -2049,25 +2092,21 @@ class PortfolioOptimizer(Analyzable):
                 agg_func=None,
                 tags="wrapper",
             ),
+            total_records=dict(title="Total Records", calc_func="alloc_records.count", tags="alloc_records"),
             coverage=dict(
                 title="Coverage",
-                calc_func="alloc_records.coverage",
+                calc_func="alloc_records.get_coverage",
                 overlapping=False,
-                normalize=False,
-                apply_to_timedelta=True,
                 check_alloc_ranges=True,
                 tags=["alloc_ranges", "coverage"],
             ),
             overlap_coverage=dict(
                 title="Overlap Coverage",
-                calc_func="alloc_records.coverage",
+                calc_func="alloc_records.get_coverage",
                 overlapping=True,
-                normalize=False,
-                apply_to_timedelta=True,
                 check_alloc_ranges=True,
                 tags=["alloc_ranges", "coverage"],
             ),
-            total_records=dict(title="Total Records", calc_func="alloc_records.count", tags="alloc_records"),
             mean_allocation=dict(
                 title="Mean Allocation",
                 calc_func=lambda allocations: to_dict(
@@ -2090,7 +2129,7 @@ class PortfolioOptimizer(Analyzable):
         self,
         column: tp.Optional[tp.Label] = None,
         dropna: tp.Optional[str] = "head",
-        plot_rb_dates: tp.Optional[bool] = False,
+        plot_rb_dates: tp.Optional[bool] = None,
         trace_kwargs: tp.KwargsLikeSequence = None,
         add_shape_kwargs: tp.KwargsLike = None,
         add_trace_kwargs: tp.KwargsLike = None,
@@ -2138,7 +2177,7 @@ class PortfolioOptimizer(Analyzable):
         import plotly.express as px
 
         self_group = self.select_col(column=column)
-        filled_alloc_df = self_group.fill_allocations(dropna=dropna).ffill()
+        filled_alloc_df = self_group.fill_allocations(squeeze_groups=False, dropna=dropna).ffill()
         columns = self_group.wrapper.columns.unique(level=1)
         if len(columns) <= len(px.colors.qualitative.D3):
             colors = px.colors.qualitative.D3
@@ -2150,7 +2189,6 @@ class PortfolioOptimizer(Analyzable):
                 merge_dicts(
                     dict(
                         stackgroup="one",
-                        groupnorm="percent",
                         line=dict(width=0),
                         fillcolor=adjust_opacity(colors[c % len(colors)], 0.8),
                     ),
@@ -2165,7 +2203,7 @@ class PortfolioOptimizer(Analyzable):
         )
 
         if plot_rb_dates is None or (isinstance(plot_rb_dates, bool) and plot_rb_dates):
-            rb_dates = self_group.allocations.index.get_level_values(level=1)
+            rb_dates = self_group.get_allocations(squeeze_groups=False).index.get_level_values(level=1)
             if plot_rb_dates is None:
                 plot_rb_dates = len(rb_dates) <= 20
             if plot_rb_dates:

@@ -15,12 +15,12 @@ from vectorbtpro.utils import chunking as ch
 @register_jitted(cache=True)
 def get_alloc_points_nb(
     filled_allocations: tp.Array2d,
-    nonzero_only: bool = True,
+    notna_only: bool = True,
     unique_only: bool = True,
 ) -> tp.Array1d:
     """Get allocation points from filled allocations.
 
-    Set `nonzero_only` to False to not register a new allocation when all points are 0 or NaN.
+    Set `notna_only` to False to not register a new allocation when all points are NaN.
     Set `unique_only` to False to not register a new allocation when it's the same as the last one."""
     out = np.empty(len(filled_allocations), dtype=np.int_)
     k = 0
@@ -32,7 +32,7 @@ def get_alloc_points_nb(
                 all_zeros = False
             if k == 0 or (k > 0 and filled_allocations[i, col] != filled_allocations[out[k - 1], col]):
                 all_unique = False
-        if nonzero_only and all_zeros:
+        if notna_only and all_zeros:
             continue
         if unique_only and all_unique:
             continue
@@ -55,7 +55,7 @@ def get_alloc_points_nb(
 def optimize_meta_nb(
     n_cols: int,
     index_ranges: tp.Array2d,
-    reduce_func_nb: tp.Callable,
+    optimize_func_nb: tp.Callable,
     *args,
 ) -> tp.Array2d:
     """Optimize by reducing each index range.
@@ -64,7 +64,7 @@ def optimize_meta_nb(
     Must return a 1-dim array with the same size as `n_cols`."""
     out = np.empty((index_ranges.shape[0], n_cols), dtype=np.float_)
     for i in prange(len(index_ranges)):
-        out[i] = reduce_func_nb(i, index_ranges[i][0], index_ranges[i][1], *args)
+        out[i] = optimize_func_nb(i, index_ranges[i][0], index_ranges[i][1], *args)
     return out
 
 
@@ -73,7 +73,7 @@ def optimize_meta_nb(
     arg_take_spec=dict(
         n_cols=None,
         index_points=ch.ArraySlicer(axis=0),
-        map_func_nb=None,
+        allocate_func_nb=None,
         args=ch.ArgsTaker(),
     ),
     merge_func=base_ch.row_stack,
@@ -82,7 +82,7 @@ def optimize_meta_nb(
 def allocate_meta_nb(
     n_cols: int,
     index_points: tp.Array1d,
-    map_func_nb: tp.Callable,
+    allocate_func_nb: tp.Callable,
     *args,
 ) -> tp.Array2d:
     """Allocate by mapping each index point.
@@ -91,7 +91,7 @@ def allocate_meta_nb(
     Must return a 1-dim array with the same size as `n_cols`."""
     out = np.empty((index_points.shape[0], n_cols), dtype=np.float_)
     for i in prange(len(index_points)):
-        out[i] = map_func_nb(i, index_points[i], *args)
+        out[i] = allocate_func_nb(i, index_points[i], *args)
     return out
 
 

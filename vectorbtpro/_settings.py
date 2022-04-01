@@ -1163,22 +1163,24 @@ ${config_doc}
 
 _settings["portfolio"] = portfolio
 
-pfopt = Config(
-    target="max_sharpe",
-    target_is_convex=True,
-    weights_sum_to_one=True,
-    target_constraints=None,
-    target_solver="SLSQP",
-    target_initial_guess=None,
-    objectives=None,
-    constraints=None,
-    sector_mapper=None,
-    sector_lower=None,
-    sector_upper=None,
-    discrete_allocation=False,
-    allocation_method="lp_portfolio",
-    silence_warnings=False,
-    ignore_opt_errors=False,
+pfopt = ChildDict(
+    pypfopt=Config(
+        target="max_sharpe",
+        target_is_convex=True,
+        weights_sum_to_one=True,
+        target_constraints=None,
+        target_solver="SLSQP",
+        target_initial_guess=None,
+        objectives=None,
+        constraints=None,
+        sector_mapper=None,
+        sector_lower=None,
+        sector_upper=None,
+        discrete_allocation=False,
+        allocation_method="lp_portfolio",
+        silence_warnings=False,
+        ignore_opt_errors=False,
+    ),
     stats=Config(
         filters=dict(
             alloc_ranges=dict(

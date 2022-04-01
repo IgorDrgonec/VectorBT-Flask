@@ -684,7 +684,7 @@ class Drawdowns(Ranges):
     def plot(
         self,
         column: tp.Optional[tp.Label] = None,
-        top_n: int = 5,
+        top_n: tp.Optional[int] = 5,
         plot_zones: bool = True,
         ts_trace_kwargs: tp.KwargsLike = None,
         peak_trace_kwargs: tp.KwargsLike = None,

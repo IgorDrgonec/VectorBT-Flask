@@ -1250,7 +1250,7 @@ class TestArrayWrapper:
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(every=4, lookback_period=1, closed_end=True),
-            np.array([[0, 2], [4, 6], [8, 10], [12, 14], [16, 17]])
+            np.array([[0, 2], [4, 6], [8, 10], [12, 14]])
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(every=2, start=5, end=10, lookback_period=1),
@@ -1278,6 +1278,10 @@ class TestArrayWrapper:
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(every="5h", closed_start=True, closed_end=True),
             np.array([[0, 2], [2, 4], [4, 6], [5, 7], [7, 9], [9, 11], [10, 12], [12, 14], [14, 16]])
+        )
+        np.testing.assert_array_equal(
+            wrapper.get_index_ranges(every="5h", add_start_delta="1h", add_end_delta="1h"),
+            np.array([[1, 2], [2, 4], [4, 6], [6, 7], [7, 9], [9, 11], [11, 12], [12, 14], [14, 16]])
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(every="5h", start=5),
@@ -1447,18 +1451,6 @@ class TestArrayWrapper:
             ),
             np.array([[5, 11]])
         )
-        np.testing.assert_array_equal(
-            wrapper.get_index_ranges(start=-1, end=-1),
-            np.array([[-1, -1]])
-        )
-        np.testing.assert_array_equal(
-            wrapper.get_index_ranges(start=-1),
-            np.array([[0, 17]])
-        )
-        np.testing.assert_array_equal(
-            wrapper.get_index_ranges(end=100),
-            np.array([[0, 17]])
-        )
 
     def test_get_index_points(self):
         index = pd.date_range("2020-01-01", "2020-01-03", freq="3h", tz="+0400")
@@ -1475,6 +1467,10 @@ class TestArrayWrapper:
         np.testing.assert_array_equal(
             wrapper.get_index_points(every="5h"),
             np.array([0, 2, 4, 5, 7, 9, 10, 12, 14, 15])
+        )
+        np.testing.assert_array_equal(
+            wrapper.get_index_points(every="5h", add_delta="1h"),
+            np.array([1, 2, 4, 6, 7, 9, 11, 12, 14, 16])
         )
         np.testing.assert_array_equal(
             wrapper.get_index_points(every="5h", start=5),

@@ -74,9 +74,9 @@ Moreover, all generic accessors have a property `ranges` and a method `get_range
 Start                             0
 End                               5
 Period              6 days 00:00:00
-Coverage            4 days 00:00:00
-Overlap Coverage    0 days 00:00:00
 Total Records                     2
+Coverage                   0.666667
+Overlap Coverage                0.0
 Duration: Min       2 days 00:00:00
 Duration: Median    2 days 00:00:00
 Duration: Max       2 days 00:00:00
@@ -92,9 +92,9 @@ Name: a, dtype: object
 Start                                       0
 End                                         5
 Period                        6 days 00:00:00
-Coverage                      5 days 00:00:00
-Overlap Coverage              2 days 00:00:00
 Total Records                               5
+Coverage                             0.416667
+Overlap Coverage                          0.4
 Duration: Min                 1 days 00:00:00
 Duration: Median              1 days 00:00:00
 Duration: Max                 2 days 00:00:00
@@ -404,23 +404,19 @@ class Ranges(Records):
                 agg_func=None,
                 tags="wrapper",
             ),
+            total_records=dict(title="Total Records", calc_func="count", tags="records"),
             coverage=dict(
                 title="Coverage",
                 calc_func="coverage",
                 overlapping=False,
-                normalize=False,
-                apply_to_timedelta=True,
                 tags=["ranges", "coverage"],
             ),
             overlap_coverage=dict(
                 title="Overlap Coverage",
                 calc_func="coverage",
                 overlapping=True,
-                normalize=False,
-                apply_to_timedelta=True,
                 tags=["ranges", "coverage"],
             ),
-            total_records=dict(title="Total Records", calc_func="count", tags="records"),
             duration=dict(
                 title="Duration",
                 calc_func="duration.describe",
@@ -446,7 +442,7 @@ class Ranges(Records):
     def plot(
         self,
         column: tp.Optional[tp.Label] = None,
-        top_n: int = 5,
+        top_n: tp.Optional[int] = None,
         plot_zones: bool = True,
         ts_trace_kwargs: tp.KwargsLike = None,
         start_trace_kwargs: tp.KwargsLike = None,

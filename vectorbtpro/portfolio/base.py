@@ -4879,6 +4879,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         The cash sharing is set to True, the call sequence is set to 'auto', and the grouper is set
         to the grouper of the optimizer.
 
+        If filled allocations have a different count than there are elements in `close`,
+        uses `vectorbtpro.generic.accessors.GenericAccessor.latest_at_index` to align the size
+        array to the index in `close`.
+
         Usage:
             ```pycon
             >>> close = pd.DataFrame({
@@ -4912,7 +4916,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             2020-01-05   0.038078  0.567845  0.394077  << rebalanced
             ```
         """
-        size = optimizer.fill_allocations(dropna=dropna, fill_value=fill_value)
+        size = optimizer.fill_allocations(squeeze_groups=False, dropna=dropna, fill_value=fill_value)
         if size_type is None:
             if (np.abs(size.values) > 1).any():
                 if not silence_warnings:

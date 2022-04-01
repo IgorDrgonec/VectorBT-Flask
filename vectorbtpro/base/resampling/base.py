@@ -306,7 +306,7 @@ class Resampler(Configured):
         target_rbound_index: tp.Optional[tp.IndexLike] = None,
         closed_lbound: bool = True,
         closed_rbound: bool = False,
-        skipna: bool = False,
+        skip_minus_one: bool = False,
         jitted: tp.JittedOption = None,
     ) -> tp.Array2d:
         """See `vectorbtpro.base.resampling.nb.map_bounds_to_source_ranges_nb`.
@@ -349,5 +349,5 @@ class Resampler(Configured):
             target_rbound_index.values,
             closed_lbound=closed_lbound,
             closed_rbound=closed_rbound,
-            skipna=skipna,
+            skip_minus_one=skip_minus_one,
         )

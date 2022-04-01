@@ -850,6 +850,14 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
     # ############# Getting ############# #
 
+    def get_symbol_wrapper(self, level_name: str = "symbol", **kwargs) -> ArrayWrapper:
+        """Get wrapper where columns are symbols."""
+        return self.wrapper.replace(
+            columns=pd.Index(self.symbols, name=level_name),
+            grouper=None,
+            **kwargs,
+        )
+
     def concat(self, symbols: tp.Optional[tp.Symbols] = None, level_name: str = "symbol") -> dict:
         """Return a dict of Series/DataFrames with symbols as columns, keyed by column name."""
         if symbols is None:

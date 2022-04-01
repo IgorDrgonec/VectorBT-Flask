@@ -968,6 +968,32 @@ class TestPortfolioOptimizer:
             pf_opt.alloc_records.values,
             np.array([(0, 0, 0, 2, 2, 1), (1, 0, 2, 4, 4, 1)], dtype=alloc_range_dt),
         )
+        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+            prices.vbt.wrapper,
+            njit(lambda i, from_idx, to_idx, prices: vbt.nb.nansum_nb(prices[from_idx:to_idx])),
+            vbt.RepEval("prices.values", context=dict(prices=prices)),
+            every="2D",
+            jitted_loop=True,
+            chunked=dict(arg_take_spec=dict(args=vbt.ArgsTaker(None))),
+        )
+        assert isinstance(pf_opt.alloc_records, vbt.AllocRanges)
+        assert_records_close(
+            pf_opt.alloc_records.values,
+            np.array([(0, 0, 0, 2, 2, 1), (1, 0, 2, 4, 4, 1)], dtype=alloc_range_dt),
+        )
+        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+            prices.vbt.wrapper,
+            njit(lambda i, from_idx, to_idx, prices: vbt.nb.nansum_nb(prices[from_idx:to_idx])),
+            vbt.RepEval("prices.values", context=dict(prices=prices)),
+            every="2D",
+            jitted_loop=True,
+            jitted=dict(parallel=True),
+        )
+        assert isinstance(pf_opt.alloc_records, vbt.AllocRanges)
+        assert_records_close(
+            pf_opt.alloc_records.values,
+            np.array([(0, 0, 0, 2, 2, 1), (1, 0, 2, 4, 4, 1)], dtype=alloc_range_dt),
+        )
         np.testing.assert_array_equal(
             pf_opt._allocations,
             get_allocations(pf_opt),
@@ -1260,6 +1286,40 @@ class TestPortfolioOptimizer:
         )
         pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
             prices.vbt.wrapper,
+            njit(lambda i, idx, prices: prices[idx]),
+            vbt.RepEval("prices.values", context=dict(prices=prices)),
+            every="2D",
+            jitted_loop=True,
+            chunked=dict(arg_take_spec=dict(args=vbt.ArgsTaker(None))),
+        )
+        assert isinstance(pf_opt.alloc_records, vbt.AllocPoints)
+        assert_records_close(
+            pf_opt.alloc_records.values,
+            np.array([(0, 0, 0), (1, 0, 2), (2, 0, 4)], dtype=alloc_point_dt),
+        )
+        np.testing.assert_array_equal(
+            pf_opt._allocations,
+            get_allocations(pf_opt),
+        )
+        pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
+            prices.vbt.wrapper,
+            njit(lambda i, idx, prices: prices[idx]),
+            vbt.RepEval("prices.values", context=dict(prices=prices)),
+            every="2D",
+            jitted_loop=True,
+            jitted=dict(parallel=True),
+        )
+        assert isinstance(pf_opt.alloc_records, vbt.AllocPoints)
+        assert_records_close(
+            pf_opt.alloc_records.values,
+            np.array([(0, 0, 0), (1, 0, 2), (2, 0, 4)], dtype=alloc_point_dt),
+        )
+        np.testing.assert_array_equal(
+            pf_opt._allocations,
+            get_allocations(pf_opt),
+        )
+        pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
+            prices.vbt.wrapper,
             vbt.Rep("allocate_func"),
             vbt.RepEval("prices.values", context=dict(prices=prices)),
             every="2D",
@@ -1411,7 +1471,7 @@ class TestPortfolioOptimizer:
         )
         pf_opt = vbt.PortfolioOptimizer.from_filled_allocations(
             filled_allocations,
-            nonzero_only=False,
+            notna_only=False,
             unique_only=False,
         )
         assert_records_close(
@@ -1477,7 +1537,7 @@ class TestPortfolioOptimizer:
             pf_opt = vbt.PortfolioOptimizer.from_universal_algo(
                 "CRP",
                 prices,
-                nonzero_only=False,
+                notna_only=False,
                 unique_only=False
             )
             assert_records_close(
@@ -1565,7 +1625,7 @@ class TestPortfolioOptimizer:
             0.29633387919266296,
         ]]
         pd.testing.assert_frame_equal(
-            pf_opt.get_allocations(),
+            pf_opt.get_allocations(squeeze_groups=False),
             pd.DataFrame(
                 target_arr,
                 index=pd.MultiIndex.from_arrays([
@@ -1595,7 +1655,7 @@ class TestPortfolioOptimizer:
             [0.10567348701744264, 0.17529742718559654, 0.302352663027335, 0.2488768479913802, 0.1677995747782457]
         ])
         pd.testing.assert_frame_equal(
-            pf_opt.get_allocations(),
+            pf_opt.get_allocations(squeeze_groups=False),
             pd.DataFrame(
                 target_arr,
                 index=pd.MultiIndex.from_arrays([
@@ -1623,7 +1683,7 @@ class TestPortfolioOptimizer:
             index_loc=4,
         )
         pd.testing.assert_frame_equal(
-            pf_opt.get_allocations(),
+            pf_opt.get_allocations(squeeze_groups=False),
             pd.DataFrame(
                 prices.sum().values[None],
                 index=pd.MultiIndex.from_arrays([
@@ -1671,7 +1731,7 @@ class TestPortfolioOptimizer:
         )
         target_df.iloc[[1, 3]] = target_arr
         pd.testing.assert_frame_equal(
-            pf_opt.fill_allocations(),
+            pf_opt.fill_allocations(squeeze_groups=False),
             target_df,
         )
         target_df = pd.DataFrame(
@@ -1706,7 +1766,7 @@ class TestPortfolioOptimizer:
         target_df.iloc[[1, 3], 0:5] = target_arr[0:2]
         target_df.iloc[[2, 4], 5:10] = target_arr[2:4]
         pd.testing.assert_frame_equal(
-            pf_opt.fill_allocations(),
+            pf_opt.fill_allocations(squeeze_groups=False),
             target_df
         )
         pd.testing.assert_frame_equal(
@@ -1729,7 +1789,7 @@ class TestPortfolioOptimizer:
         )
         target_df.iloc[[4]] = prices.sum().values
         pd.testing.assert_frame_equal(
-            pf_opt.fill_allocations(),
+            pf_opt.fill_allocations(squeeze_groups=False),
             target_df,
         )
         target_df = pd.DataFrame(
@@ -1813,9 +1873,9 @@ class TestPortfolioOptimizer:
             'Start',
             'End',
             'Period',
+            'Total Records',
             'Coverage',
             'Overlap Coverage',
-            'Total Records',
             'Mean Allocation: XOM',
             'Mean Allocation: RRC',
             'Mean Allocation: BBY',
@@ -1829,9 +1889,9 @@ class TestPortfolioOptimizer:
                     pd.Timestamp('2020-01-01 00:00:00', freq='D'),
                     pd.Timestamp('2020-01-05 00:00:00', freq='D'),
                     pd.Timedelta('5 days 00:00:00'),
-                    pd.Timedelta('0 days 09:36:00'),
-                    pd.Timedelta('0 days 09:36:00'),
                     1.0,
+                    0.4,
+                    0.0,
                     108.68882550000001,
                     103.4886705,
                     66.15678550000001,
@@ -1849,9 +1909,9 @@ class TestPortfolioOptimizer:
                     pd.Timestamp('2020-01-01 00:00:00', freq='D'),
                     pd.Timestamp('2020-01-05 00:00:00', freq='D'),
                     pd.Timedelta('5 days 00:00:00'),
-                    pd.Timedelta('0 days 09:36:00'),
-                    pd.Timedelta('0 days 09:36:00'),
                     1,
+                    0.4,
+                    0.0,
                     108.348701,
                     103.293606,
                     65.873542,
