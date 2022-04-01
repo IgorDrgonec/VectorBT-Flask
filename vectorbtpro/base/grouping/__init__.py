@@ -2,7 +2,7 @@
 
 """Modules with classes and utilities for grouping."""
 
-from vectorbtpro.base.grouping.base import Grouper
+from vectorbtpro.base.grouping.base import Grouper, ExceptLevel
 from vectorbtpro.utils.module_ import create__all__
 
 __all__ = create__all__(__name__)

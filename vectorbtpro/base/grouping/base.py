@@ -7,6 +7,8 @@ the number of groups, the start indices of groups, and other information useful 
 operations that utilize grouping. It also allows to dynamically enable/disable/modify groups
 and checks whether a certain operation is permitted."""
 
+import attr
+
 import numpy as np
 import pandas as pd
 from pandas.core.groupby import GroupBy as PandasGroupBy
@@ -24,6 +26,14 @@ from vectorbtpro.base.grouping import nb
 GroupByT = tp.Union[None, bool, tp.Index]
 
 
+@attr.s(frozen=True)
+class ExceptLevel:
+    """Class for grouping except one or more levels."""
+
+    level: tp.MaybeLevelSequence = attr.ib()
+    """Level position or name."""
+
+
 def group_by_to_index(index: tp.Index, group_by: tp.GroupByLike) -> GroupByT:
     """Convert mapper `group_by` to `pd.Index`.
 
@@ -33,6 +43,20 @@ def group_by_to_index(index: tp.Index, group_by: tp.GroupByLike) -> GroupByT:
         return group_by
     if group_by is True:
         group_by = pd.Index(["group"] * len(index))  # one group
+    elif isinstance(group_by, ExceptLevel):
+        except_levels = group_by.level
+        if isinstance(except_levels, (int, str)):
+            except_levels = [except_levels]
+        new_group_by = []
+        for i, name in enumerate(index.names):
+            if i not in except_levels and name not in except_levels:
+                new_group_by.append(name)
+        if len(new_group_by) == 0:
+            group_by = pd.Index(["group"] * len(index))
+        else:
+            if len(new_group_by) == 1:
+                new_group_by = new_group_by[0]
+            group_by = indexes.select_levels(index, new_group_by)
     elif isinstance(group_by, (int, str)):
         group_by = indexes.select_levels(index, group_by)
     elif checks.is_sequence(group_by):
