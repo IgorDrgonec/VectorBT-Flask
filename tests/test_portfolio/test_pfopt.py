@@ -489,14 +489,14 @@ class TestPyPortfolioOpt:
             assert pfopt.pypfopt_optimize(prices=prices) == ef.clean_weights()
             ef = pypfopt.efficient_frontier.EfficientFrontier(
                 pypfopt.expected_returns.ema_historical_return(prices=prices),
-                pypfopt.risk_models.sample_cov(prices=prices),
+                pypfopt.risk_models.CovarianceShrinkage(prices=prices).ledoit_wolf(shrinkage_target="single_factor"),
             )
             ef.max_sharpe()
             assert (
                 pfopt.pypfopt_optimize(
                     prices=prices,
                     expected_returns="ema_historical_return",
-                    cov_matrix="sample_cov",
+                    cov_matrix="ledoit_wolf_single_factor",
                 )
                 == ef.clean_weights()
             )

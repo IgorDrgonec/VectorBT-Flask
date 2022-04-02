@@ -669,10 +669,10 @@ def process_order_nb(
     state: ProcessOrderState,
     update_value: bool,
     order: Order,
-    order_records: tp.RecordArray2d,
-    last_oidx: tp.Array1d,
-    log_records: tp.RecordArray2d,
-    last_lidx: tp.Array1d,
+    order_records: tp.Optional[tp.RecordArray2d] = None,
+    last_oidx: tp.Optional[tp.Array1d] = None,
+    log_records: tp.Optional[tp.RecordArray2d] = None,
+    last_lidx: tp.Optional[tp.Array1d] = None,
 ) -> tp.Tuple[OrderResult, ProcessOrderState]:
     """Process an order by executing it, saving relevant information to the logs, and returning a new state."""
 
@@ -700,13 +700,6 @@ def process_order_nb(
         new_val_price = state.val_price
         new_value = state.value
 
-    if is_filled and order_records.shape[0] > 0:
-        # Fill order record
-        if last_oidx[col] >= order_records.shape[0] - 1:
-            raise IndexError("order_records index out of range. Set a higher max_orders.")
-        fill_order_record_nb(order_records, last_oidx[col] + 1, col, i, order_result)
-        last_oidx[col] += 1
-
     # Create new state
     new_state = ProcessOrderState(
         cash=exec_state.cash,
@@ -717,24 +710,33 @@ def process_order_nb(
         value=new_value,
     )
 
-    if order.log and log_records.shape[0] > 0:
-        # Fill log record
-        if last_lidx[col] >= log_records.shape[0] - 1:
-            raise IndexError("log_records index out of range. Set a higher max_logs.")
-        fill_log_record_nb(
-            log_records,
-            last_lidx[col] + 1,
-            group,
-            col,
-            i,
-            price_area,
-            state,
-            order,
-            new_state,
-            order_result,
-            last_oidx[col] if is_filled else -1,
-        )
-        last_lidx[col] += 1
+    if order_records is not None and last_oidx is not None:
+        if is_filled and order_records.shape[0] > 0:
+            # Fill order record
+            if last_oidx[col] >= order_records.shape[0] - 1:
+                raise IndexError("order_records index out of range. Set a higher max_orders.")
+            fill_order_record_nb(order_records, last_oidx[col] + 1, col, i, order_result)
+            last_oidx[col] += 1
+
+    if log_records is not None and last_lidx is not None:
+        if order.log and log_records.shape[0] > 0:
+            # Fill log record
+            if last_lidx[col] >= log_records.shape[0] - 1:
+                raise IndexError("log_records index out of range. Set a higher max_logs.")
+            fill_log_record_nb(
+                log_records,
+                last_lidx[col] + 1,
+                group,
+                col,
+                i,
+                price_area,
+                state,
+                order,
+                new_state,
+                order_result,
+                last_oidx[col] if is_filled else -1,
+            )
+            last_lidx[col] += 1
 
     return order_result, new_state
 

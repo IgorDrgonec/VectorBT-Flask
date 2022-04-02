@@ -4897,7 +4897,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ...     seed=42
             ... )
             >>> pf_opt.fill_allocations()
-            alloc_group                         group
                              MSFT      GOOG      AAPL
             2020-01-01   0.182059  0.462129  0.355812
             2020-01-02        NaN       NaN       NaN
