@@ -3601,7 +3601,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
                 !!! note
                     `SizeType.Percent` does not support position reversal. Switch to a single
-                    direction or use `vectorbtpro.portfolio.enums.OppositeEntryMode.Close` to close the position first.
+                    direction or use `OppositeEntryMode.Close` to close the position first.
 
                 See warning in `Portfolio.from_orders`.
             price (array_like of float): See `Portfolio.from_orders`.
@@ -4668,7 +4668,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         * 'from_signals': Based on `Portfolio.from_signals`. Faster than the second method and allows
             using the native broadcasting mechanism of the underlying class method, but has less
-            sizers available (e.g., there is no support for `vectorbtpro.portfolio.enums.SizeType.TargetPercent`).
+            sizers available (e.g., there is no support for `SizeType.TargetPercent`).
         * 'from_orders': Based on `Portfolio.from_orders`. Allows using all implemented sizers,
             but requires conversion of `close` to pandas prior to broadcasting and must broadcast `size`
             to `close` to set all elements after the first timestamp to `np.nan`.

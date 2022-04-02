@@ -2076,7 +2076,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         """Resample solely based on target index.
 
         Applies `vectorbtpro.generic.nb.apply_reduce.reduce_index_ranges_nb` on index ranges
-        from `vectorbtpro.base.resampler.nb.map_index_to_source_ranges_nb`.
+        from `vectorbtpro.base.resampling.nb.map_index_to_source_ranges_nb`.
 
         For details on the meta version, see `vectorbtpro.generic.nb.apply_reduce.reduce_index_ranges_meta_nb`.
 
@@ -2258,7 +2258,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         """Resample between target index bounds.
 
         Applies `vectorbtpro.generic.nb.apply_reduce.reduce_index_ranges_nb` on index ranges
-        from `vectorbtpro.base.resampler.nb.map_bounds_to_source_ranges_nb`.
+        from `vectorbtpro.base.resampling.nb.map_bounds_to_source_ranges_nb`.
 
         For details on the meta version, see `vectorbtpro.generic.nb.apply_reduce.reduce_index_ranges_meta_nb`.
 
