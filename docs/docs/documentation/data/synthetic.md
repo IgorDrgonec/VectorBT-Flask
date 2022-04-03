@@ -10,7 +10,7 @@ price and return data address the financial small data problem and have numerous
 new investment strategies and feeding data-hungry ML models. They also help us to detect behavior and 
 outlier discrepancies between real and mimicked markets. For example, if our model performs well on a 
 subset of real-world data, we can check it against synthetic data to find out whether we introduced
-a look-ahead bias or any other Achilles' heel to our model without knowing it.
+the look-ahead bias or any other Achilles' heel to our model without knowing it.
 
 To assist us in generating synthetic data, vectorbt implements the class 
 [SyntheticData](/api/data/custom/#vectorbtpro.data.custom.SyntheticData), which takes the start date,

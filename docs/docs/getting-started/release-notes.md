@@ -6,6 +6,39 @@ title: Release notes
 
 All notable changes in reverse chronological order.
 
+## Version 1.2.0 (2 Apr, 2022)
+
+- Integrated [PyPortfolioOpt](https://pyportfolioopt.readthedocs.io/en/latest/): implemented
+the function [pypfopt_optimize](/api/portfolio/pfopt/base/#vectorbtpro.portfolio.pfopt.base.pypfopt_optimize)
+and an infrastructure around it to run arbitrary optimization models from PyPortfolioOpt with a single function call.
+- Split generation and reduction of resampling metadata. The generation part now resides in
+[resampling.nb](/api/base/resampling/nb/), while the reduction part takes place in 
+[generic.nb.apply_reduce](/api/generic/nb/apply_reduce/).
+- Implemented wrapper methods for generation of index points ([ArrayWrapper.get_index_points](/api/base/wrapping/#vectorbtpro.base.wrapping.ArrayWrapper.get_index_points)) 
+and index ranges ([ArrayWrapper.get_index_ranges](/api/base/wrapping/#vectorbtpro.base.wrapping.ArrayWrapper.get_index_ranges)) 
+from human-readable queries. This helps tremendously in rebalancing.
+- Implemented the [PortfolioOptimizer](/api/portfolio/pfopt/base/#vectorbtpro.portfolio.pfopt.base.PortfolioOptimizer) class,
+which is capable of portfolio optimization at regular and irregular intervals, storing the generated allocation data
+in a compressed format, and analyzing and plotting it. Supports the following input modes:
+    1. Custom allocation function ([PortfolioOptimizer.from_allocate_func](/api/portfolio/pfopt/base/#vectorbtpro.portfolio.pfopt.base.PortfolioOptimizer.from_allocate_func))
+    2. Custom optimization function ([PortfolioOptimizer.from_optimize_func](/api/portfolio/pfopt/base/#vectorbtpro.portfolio.pfopt.base.PortfolioOptimizer.from_optimize_func))
+    3. Custom allocations ([PortfolioOptimizer.from_allocations](/api/portfolio/pfopt/base/#vectorbtpro.portfolio.pfopt.base.PortfolioOptimizer.from_allocations))
+    4. Custom filled allocations ([PortfolioOptimizer.from_filled_allocations](/api/portfolio/pfopt/base/#vectorbtpro.portfolio.pfopt.base.PortfolioOptimizer.from_filled_allocations))
+    5. Random allocation ([PortfolioOptimizer.from_random](/api/portfolio/pfopt/base/#vectorbtpro.portfolio.pfopt.base.PortfolioOptimizer.from_random))
+    6. Uniform allocation ([PortfolioOptimizer.from_uniform](/api/portfolio/pfopt/base/#vectorbtpro.portfolio.pfopt.base.PortfolioOptimizer.from_uniform))
+    7. PyPortfolioOpt ([PortfolioOptimizer.from_pypfopt](/api/portfolio/pfopt/base/#vectorbtpro.portfolio.pfopt.base.PortfolioOptimizer.from_pypfopt))
+    8. Universal Portfolios ([PortfolioOptimizer.from_universal_algo](/api/portfolio/pfopt/base/#vectorbtpro.portfolio.pfopt.base.PortfolioOptimizer.from_universal_algo))
+- Added time frames as a parameter to TA-Lib indicators. This will downsample the input data 
+(such as the close price), run the indicator, and upsample it back to the original time frame.
+Multiple time frame combinations are supported out of the box.
+- Implemented convenience methods [BaseAccessor.set](/api/base/accessors/#vectorbtpro.base.accessors.BaseAccessor.set) 
+and [BaseAccessor.set_between](/api/base/accessors/#vectorbtpro.base.accessors.BaseAccessor.set_between) 
+for setting data based on index points and ranges respectively
+- Added an attribute class [ExceptLevel](/api/base/grouping/#vectorbtpro.base.grouping.base.ExceptLevel)
+that can be used to specify the level by which **not** to group in `group_by`. This is handy
+when there are many levels and there is a need to group by all levels except assets, for example.
+- Wrote [Portfolio optimization](/tutorials/portfolio-optimization) :notebook_with_decorative_cover:
+
 ## Version 1.1.2 (12 Mar, 2022)
 
 - Added option `skipna` to run a TA-Lib indicator on non-NA values only (TA-Lib hates NaN)
@@ -18,7 +51,7 @@ which acts as a mapper between the source and target index for best flexibility.
 from Pandas. Also, implemented a range of helper functions for
     1. Generating a datetime index from frequency (NB)
     2. Getting the right bound of a datetime index
-    3. Mapping one datetime index to another (NB, [Resampler.map_index](/api/base/resampling/base/#vectorbtpro.base.resampling.base.Resampler.map_index))
+    3. Mapping one datetime index to another (NB, [Resampler.map_to_target_index](/api/base/resampling/base/#vectorbtpro.base.resampling.base.Resampler.map_to_target_index))
     4. Getting datetime index difference (NB, [Resampler.index_difference](/api/base/resampling/base/#vectorbtpro.base.resampling.base.Resampler.index_difference))
 - Implemented an interface for resampling complex vectorbt objects in form of an abstract method
 [Wrapping.resample](/api/base/wrapping/#vectorbtpro.base.wrapping.Wrapping.resample). Also, defined
@@ -44,6 +77,7 @@ of P&L and other metrics more precise and flexible.
 and [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_signals)
 - Distributed generic Numba-compiled functions across multiple files
 - Enabled passing additional keyword arguments to `get_klines` in [BinanceData](/api/data/custom/#vectorbtpro.data.custom.BinanceData)
+- Wrote [MTF analysis](/tutorials/mtf-analysis) :notebook_with_decorative_cover:
 
 ## Version 1.1.1 (25 Feb, 2022)
 
@@ -161,7 +195,7 @@ and [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Por
 by passing the `fill_returns=True` flag
 - Fixed [save_animation](/api/utils/image_/#vectorbtpro.utils.image_.save_animation), which previously
 produced one less iteration
-- Wrote [SuperFast SuperTrend](/examples/superfast-supertrend) :notebook_with_decorative_cover:
+- Wrote [SuperFast SuperTrend](/tutorials/superfast-supertrend) :notebook_with_decorative_cover:
 
 ## Version 1.0.9 (2 Feb, 2022)
 
@@ -222,7 +256,7 @@ Most logic now resides in the sub-package [grouping](/api/base/grouping/). Also,
 (apart from the portfolio-related ones) do not require strict group ordering anymore.
 - Added chunking specification for labeling functions
 - Fixed [Config.prettify](/api/utils/config/#vectorbtpro.utils.config.Config.prettify) for non-string keys
-- Wrote [Basic RSI strategy](/examples/basic-rsi-strategy) :notebook_with_decorative_cover:
+- Wrote [Basic RSI strategy](/tutorials/basic-rsi-strategy) :notebook_with_decorative_cover:
 
 ## Version 1.0.7 (16 Jan, 2021)
 

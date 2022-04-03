@@ -27,6 +27,7 @@ theme:
     - search.suggest
     - search.share
     - content.code.annotate
+    - content.tabs.link
     - toc.follow
   palette:
     scheme: slate
@@ -65,6 +66,8 @@ markdown_extensions:
         - name: mermaid
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
   - pymdownx.progressbar
   - pymdownx.magiclink:
       repo_url_shorthand: true
@@ -111,15 +114,22 @@ nav:
     - Installation: getting-started/installation.md
     - Release notes: getting-started/release-notes.md
   - Features: features.md
-  - Examples:
-    - Basic RSI strategy: examples/basic-rsi-strategy.md
+  - Tutorials:
+    - Basic RSI strategy: tutorials/basic-rsi-strategy.md
     - SuperFast SuperTrend:
-      - examples/superfast-supertrend/index.md
-      - Streaming: examples/superfast-supertrend/streaming.md
-      - Multithreading: examples/superfast-supertrend/multithreading.md
-      - Pipelines: examples/superfast-supertrend/pipelines.md
-    - MTF analysis: examples/mtf-analysis.md
-    - To be continued...: examples/to-be-continued.md
+      - tutorials/superfast-supertrend/index.md
+      - Streaming: tutorials/superfast-supertrend/streaming.md
+      - Multithreading: tutorials/superfast-supertrend/multithreading.md
+      - Pipelines: tutorials/superfast-supertrend/pipelines.md
+    - MTF analysis:
+      - tutorials/mtf-analysis/index.md
+      - Alignment: tutorials/mtf-analysis/alignment.md
+      - Aggregation: tutorials/mtf-analysis/aggregation.md
+    - Portfolio optimization:
+      - tutorials/portfolio-optimization/index.md
+      - Integrations: tutorials/portfolio-optimization/integrations.md
+      - Dynamic: tutorials/portfolio-optimization/dynamic.md
+    - To be continued...: tutorials/to-be-continued.md
   - Documentation:
     - Fundamentals: documentation/fundamentals.md
     - Building blocks: documentation/building-blocks.md
@@ -175,7 +185,6 @@ nav:
         - apply_reduce: api/generic/nb/apply_reduce.md
         - base: api/generic/nb/base.md
         - records: api/generic/nb/records.md
-        - resample: api/generic/nb/resample.md
         - rolling: api/generic/nb/rolling.md
       - plots_builder: api/generic/plots_builder.md
       - plotting: api/generic/plotting.md
@@ -218,6 +227,11 @@ nav:
         - from_signals: api/portfolio/nb/from_signals.md
         - records: api/portfolio/nb/records.md
       - orders: api/portfolio/orders.md
+      - pfopt:
+        - api/portfolio/pfopt/index.md
+        - base: api/portfolio/pfopt/base.md
+        - nb: api/portfolio/pfopt/nb.md
+        - records: api/portfolio/pfopt/records.md
       - trades: api/portfolio/trades.md
     - px:
       - api/px/index.md

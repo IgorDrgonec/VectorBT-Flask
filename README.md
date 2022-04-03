@@ -22,7 +22,7 @@ vectorbt PRO is the ultimate engine for backtesting, algorithmic trading, and re
 
 ## Getting Started
 
-Visit [Getting Started](https://vectorbt.pro/getting-started/) and follow the installation guide. Also make sure to join our [Discord server](https://discord.gg/63jZZzCwzp)!
+Visit [Getting Started](https://vectorbt.pro/getting-started/) and follow the installation guide. Also make sure to join our [Discord server](https://discord.gg/eQ9sVr5vb9)!
 
 ## Terms
 

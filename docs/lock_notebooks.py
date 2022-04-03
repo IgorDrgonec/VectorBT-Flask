@@ -11,6 +11,7 @@ locked_notebooks = {
     Path("../notebooks/BasicRSI.ipynb"): "Basic RSI strategy",
     Path("../notebooks/SuperTrend.ipynb"): "SuperFast SuperTrend",
     Path("../notebooks/MTFAnalysis.ipynb"): "MTF analysis",
+    Path("../notebooks/PortfolioOptimization.ipynb"): "Portfolio optimization",
 }
 
 

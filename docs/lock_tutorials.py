@@ -7,11 +7,16 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from argparse import ArgumentParser
 
-locked_pages = {
-    Path("examples/superfast-supertrend/streaming-locked"): "SuperFast SuperTrend - Streaming",
-    Path("examples/superfast-supertrend/multithreading-locked"): "SuperFast SuperTrend - Multithreading",
-    Path("examples/superfast-supertrend/pipelines-locked"): "SuperFast SuperTrend - Pipelines",
-    Path("examples/mtf-analysis-locked"): "MTF analysis",
+locked_tutorials = {
+    Path("tutorials/superfast-supertrend/streaming-locked"): "SuperFast SuperTrend - Streaming",
+    Path("tutorials/superfast-supertrend/multithreading-locked"): "SuperFast SuperTrend - Multithreading",
+    Path("tutorials/superfast-supertrend/pipelines-locked"): "SuperFast SuperTrend - Pipelines",
+    Path("tutorials/mtf-analysis/index-locked"): "MTF analysis",
+    Path("tutorials/mtf-analysis/alignment-locked"): "MTF analysis - Alignment",
+    Path("tutorials/mtf-analysis/aggregation-locked"): "MTF analysis - Aggregation",
+    Path("tutorials/portfolio-optimization/index-locked"): "Portfolio optimization",
+    Path("tutorials/portfolio-optimization/integrations-locked"): "Portfolio optimization - Integrations",
+    Path("tutorials/portfolio-optimization/dynamic-locked"): "Portfolio optimization - Dynamic",
 }
 
 
@@ -31,15 +36,15 @@ args = parser.parse_args()
 if __name__ == "__main__":
     if args.renew:
         while True:
-            locked_uuid = {page_path: generate_uuid() for page_path in locked_pages}
-            if len(set(locked_uuid.values())) == len(locked_pages):
+            locked_uuid = {page_path: generate_uuid() for page_path in locked_tutorials}
+            if len(set(locked_uuid.values())) == len(locked_tutorials):
                 break
     else:
         locked_uuid = {}
-        with open("../locked-pages.md", "r") as f:
+        with open("../locked-tutorials.md", "r") as f:
             lines = f.read().split("\n")
         for line in lines:
-            for page_path in locked_pages:
+            for page_path in locked_tutorials:
                 if str(page_path) in line:
                     locked_uuid[page_path] = line[-37:-1]
                     break
@@ -47,7 +52,7 @@ if __name__ == "__main__":
     tree = ET.parse("./site/sitemap.xml")
     root = tree.getroot()
     ET.register_namespace("", namespace(root))
-    for page_path in locked_pages:
+    for page_path in locked_tutorials:
         for child in list(root):
             for subchild in list(child):
                 if str(page_path) in subchild.text:
@@ -69,7 +74,7 @@ if __name__ == "__main__":
     for p in list(glob.iglob("./site/**/*-locked", recursive=True)):
         p_path = Path(p)
         found_path = False
-        for page_path in locked_pages:
+        for page_path in locked_tutorials:
             if "./site/" + str(page_path) == p:
                 new_path = p.replace(str(page_path), f"{page_path}-{locked_uuid[page_path]}")
                 with open(p_path / "index.html", "r") as f:
@@ -86,9 +91,9 @@ if __name__ == "__main__":
 
     if args.renew:
         links = []
-        for page_path, page_title in locked_pages.items():
+        for page_path, page_title in locked_tutorials.items():
             links.append(
                 "* [{}](https://vectorbt.pro/{}-{})".format(page_title, str(page_path), locked_uuid[page_path])
             )
-        with open("../locked-pages.md", "w") as f:
+        with open("../locked-tutorials.md", "w") as f:
             f.write("\n".join(links))

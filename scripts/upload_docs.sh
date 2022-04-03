@@ -16,8 +16,8 @@ python generate_api.py
 echo "${C}Building static files...${NC}"
 mkdocs build --clean
 
-echo "${C}Locking pages...${NC}"
-python lock_pages.py
+echo "${C}Locking tutorials...${NC}"
+python lock_tutorials.py
 
 echo "${C}Pushing static files to GitHub...${NC}"
 python mkdocs_cli.py gh-deploy --force

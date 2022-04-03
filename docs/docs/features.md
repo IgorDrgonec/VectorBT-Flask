@@ -6,13 +6,15 @@ hide:
 
 # Features :zap:
 
-On top of the [features](https://vectorbt.dev/getting-started/features/) offered by the community version of vectorbt, vectorbt PRO implements the following major enhancements:
+On top of the [features](https://vectorbt.dev/getting-started/features/) offered by the community 
+version of vectorbt, vectorbt PRO implements the following major enhancements:
 
 ## Performance
 
 ### Parallelization with Numba
 
-- [x] Most Numba-compiled functions were rewritten to process columns in parallel, which can be enabled by a single command.
+- [x] Most Numba-compiled functions were rewritten to process columns in parallel, which can be 
+enabled by a single command.
 
 ```pycon title="Benchmark the rolling mean without and with parallelization"
 >>> import vectorbtpro as vbt
@@ -38,7 +40,11 @@ On top of the [features](https://vectorbt.dev/getting-started/features/) offered
 
 ### Chunking
 
-- [x] Innovative chunking mechanism that takes a specification of how arguments should be chunked, automatically splits them, passes each chunk to the function, and merges back the results. This way, you can run any function in a distributed manner! Additionally, vectorbt PRO implements a central registry and provides the chunking specification for all arguments of most Numba-compiled functions. Chunking can be enabled by a single command. No more out-of-memory errors! :tada:
+- [x] Innovative chunking mechanism that takes a specification of how arguments should be chunked, 
+automatically splits them, passes each chunk to the function, and merges back the results. This way, 
+you can run any function in a distributed manner! Additionally, vectorbt PRO implements a central 
+registry and provides the chunking specification for all arguments of most Numba-compiled functions. 
+Chunking can be enabled by a single command. No more out-of-memory errors! :tada:
 
 ```pycon title="Split hyperparameters into chunks and backtest them"
 >>> price = vbt.YFData.fetch(['BTC-USD', 'ETH-USD']).get('Close')
@@ -79,7 +85,10 @@ Name: total_return, dtype: float64
 
 ### Multithreading
 
-- [x] Integration of the [Dask](https://dask.org/) backend for running multiple chunks across multiple threads. Best suited for accelerating functions that release GIL, such as Numba and C functions. Cuts down execution time on Apple M1 by 3-4x, and even more depending on the number of cores. Dask + Numba = :muscle:
+- [x] Integration of the [Dask](https://dask.org/) backend for running multiple chunks across 
+multiple threads. Best suited for accelerating functions that release GIL, such as Numba and C 
+functions. Cuts down execution time on Apple M1 by 3-4x, and even more depending on the number 
+of cores. Dask + Numba = :muscle:
 
 ```pycon title="Benchmark 10 million orders without and with multithreading"
 >>> big_size = np.full((10000, 1000), 0)
@@ -93,7 +102,10 @@ Name: total_return, dtype: float64
 
 ### Multiprocessing
 
-- [x] Integration of the [Ray](https://www.ray.io/) backend for running multiple chunks across multiple processes. Best suited for accelerating functions that do not release GIL, such as regular Python functions. Ever wanted to test billions of hyperparameter combinations in a matter of minutes? This is now possible by scaling functions and entire applications up in the cloud using the Ray cluster. :eyes:
+- [x] Integration of the [Ray](https://www.ray.io/) backend for running multiple chunks across 
+multiple processes. Best suited for accelerating functions that do not release GIL, such as regular 
+Python functions. Ever wanted to test billions of hyperparameter combinations in a matter of minutes? 
+This is now possible by scaling functions and entire applications up in the cloud using the Ray cluster. :eyes:
 
 ```pycon title="Benchmark sorting a matrix without and with multiprocessing"
 >>> @vbt.chunked(
@@ -125,7 +137,11 @@ Wall time: 4.32 s
 
 ### Jitting
 
-- [x] Jitting means just-in-time compiling. In the vectorbt PRO universe though, jitting simply means accelerating. Although Numba remains the primary jitter, vectorbt PRO now enables implementation of custom jitter classes, such as that for vectorized NumPy and even [JAX](https://github.com/google/jax) with GPU support. Every jitted function is registered globally so you can switch between different implementations using a single command.
+- [x] Jitting means just-in-time compiling. In the vectorbt PRO universe though, jitting simply 
+means accelerating. Although Numba remains the primary jitter, vectorbt PRO now enables implementation 
+of custom jitter classes, such as that for vectorized NumPy and even [JAX](https://github.com/google/jax) 
+with GPU support. Every jitted function is registered globally so you can switch between different 
+implementations using a single command.
 
 ```pycon title="Run different implementations of cumulative sum"
 >>> df = pd.DataFrame({
@@ -167,7 +183,9 @@ Wall time: 4.32 s
 
 ### Caching
 
-- [x] Caching was reimplemented from the ground up and now it's being managed by a central registry. This allows for tracking useful statistics of all cacheable parts of vectorbt, such as to display the total cached size in MB. Full control and transparency.
+- [x] Caching was reimplemented from the ground up and now it's being managed by a central registry. 
+This allows for tracking useful statistics of all cacheable parts of vectorbt, such as to display the 
+total cached size in MB. Full control and transparency.
 
 ```pycon title="Display caching statistics of a portfolio"
 >>> price = vbt.YFData.fetch('BTC-USD').get('Close')
@@ -216,7 +234,8 @@ portfolio:0.trades                  0       1    70.5 kB
 
 ### Smart broadcasting
 
-- [x] Broadcasting mechanism was completely refactored and now supports parameters. Build a product of multiple hyperparameter combinations with a single line of code :magic_wand:
+- [x] Broadcasting mechanism was completely refactored and now supports parameters. Build a product 
+of multiple hyperparameter combinations with a single line of code :magic_wand:
 
 ```pycon title="Backtest the Golden Cross with different stop configurations"
 >>> price = vbt.YFData.fetch('BTC-USD').get('Close')
@@ -245,7 +264,10 @@ Name: sharpe_ratio, dtype: float64
 
 ### Meta methods
 
-- [x] Many methods such as rolling apply are now available in two flavors: regular (instance methods) and meta (class methods). Regular methods are bound to a single array and do not have to take metadata anymore, while meta methods are not bound to any array and act as micro-pipelines with their own broadcasting and templating logic.
+- [x] Many methods such as rolling apply are now available in two flavors: regular (instance methods) 
+and meta (class methods). Regular methods are bound to a single array and do not have to take metadata 
+anymore, while meta methods are not bound to any array and act as micro-pipelines with their own 
+broadcasting and templating logic.
 
 ```pycon title="Compute the rolling z-score"
 >>> @njit
@@ -326,7 +348,10 @@ dtype: float64
 
 ### Flexible portfolio attributes
 
-- [x] Portfolio attributes can now be partly or even entirely computed from user-defined arrays. This allows great control of post-simulation analysis, for example, to override some simulation data, to test hyperparameters without having to re-simulate the entire portfolio, or to avoid repeated reconstruction when caching is disabled.
+- [x] Portfolio attributes can now be partly or even entirely computed from user-defined arrays. 
+This allows great control of post-simulation analysis, for example, to override some simulation data, 
+to test hyperparameters without having to re-simulate the entire portfolio, or to avoid repeated 
+reconstruction when caching is disabled.
 
 ```pycon title="Compute returns from custom data"
 >>> price = pd.Series([1, 2, 3, 4, 5])
@@ -376,7 +401,8 @@ dtype: float64
 
 ### Local data
 
-- [x] Added data classes that specialize in loading data from local files, such as CSV and HDF5. Also, any data can be effortlessly saved locally.
+- [x] Added data classes that specialize in loading data from local files, such as CSV and HDF5. 
+Also, any data can be effortlessly saved locally.
 
 ```pycon title="Generate random data, save separately, and load all at once"
 >>> rand_data1 = vbt.RandomData.fetch('R1', start='2020-01-01', end='2020-01-05')
@@ -458,7 +484,7 @@ Date
 >>> vbt.talib('MACD').run(data.get('Close')).plot()
 ```
 
-![](/assets/images/features_talib.svg)
+![](/assets/images/features/talib.svg)
 
 ### Expressions
 
@@ -486,7 +512,7 @@ Designing indicators has never been easier!
 
 1. No more manually passing `input_names`, `param_names`, and other information
 
-![](/assets/images/features_macd.svg)
+![](/assets/images/features/macd.svg)
 
 ### WorldQuant Alphas
 
@@ -584,11 +610,13 @@ Date
 3. Final number of shares in the portfolio
 4. Reinvest dividends at the next bar
 
-![](/assets/images/features_dividends.svg)
+![](/assets/images/features/dividends.svg)
 
 ### Default order function
 
-- [x] There is a new order function that behaves just like [Portfolio.from_orders](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_orders). No more boilerplate code for backtesting regular order data with custom callbacks!
+- [x] There is a new order function that behaves just like 
+[Portfolio.from_orders](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_orders). 
+No more boilerplate code for backtesting regular order data with custom callbacks!
 
 ```pycon title="Track exposure during simulation"
 >>> @njit
@@ -617,7 +645,10 @@ dtype: float64
 
 ### In-outputs
 
-- [x] Portfolio can now take and return any user-defined arrays filled during the simulation, such as signals. In-output arrays can broadcast together with regular arrays. Additionally, vectorbt PRO will (semi-) automatically figure out how to correctly wrap and index the array, for example, whenever you select a column in the entire portfolio.
+- [x] Portfolio can now take and return any user-defined arrays filled during the simulation, 
+such as signals. In-output arrays can broadcast together with regular arrays. Additionally, 
+vectorbt PRO will (semi-) automatically figure out how to correctly wrap and index the array, 
+for example, whenever you select a column in the entire portfolio.
 
 ```pycon title="Track debt during simulation"
 >>> @njit
@@ -678,11 +709,44 @@ Name: b, dtype: float64
 3. The same holds for reduced NumPy arrays
 4. Portfolio instance also knows how to properly select a column/group in a custom NumPy array
 
+### Portfolio optimization
+
+- [x] There is a full-blown class for portfolio optimization that accepts a custom optimization function, 
+and even integrates with [PyPortfolioOpt](https://pyportfolioopt.readthedocs.io/en/latest/) 
+and [Universal Portfolios](https://github.com/Marigold/universal-portfolios).
+
+```pycon title="Optimize portfolio using Hierarchical Risk Parity on a monthly basis"
+>>> close = vbt.BinanceData.fetch(
+...     ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'],
+...     start="2020-01-01",
+...     end="2022-01-01",
+...     missing_index="drop"
+... ).get('Close')
+
+>>> pf_opt = vbt.PortfolioOptimizer.from_pypfopt(
+...     close.vbt.wrapper,
+...     optimizer="hrp",
+...     target="optimize",
+...     prices=vbt.RepEval(
+...         "close.iloc[index_slice]", 
+...         context=dict(close=close)
+...     ), 
+...     every="MS"
+... )
+>>> pf_opt.plot()
+```
+
+[=100% "Allocation 15/15"]{: .candystripe}
+
+![](/assets/images/features/hrp.svg)
+
 ## Analysis
 
 ### Shortcut properties
 
-- [x] [In-output arrays](#in-outputs) can be used to override regular portfolio attributes. Portfolio will automatically pick the pre-computed array and perform all future calculations using this array, without wasting time on its reconstruction.
+- [x] [In-output arrays](#in-outputs) can be used to override regular portfolio attributes. Portfolio 
+will automatically pick the pre-computed array and perform all future calculations using this array, 
+without wasting time on its reconstruction.
 
 ```pycon title="Modify returns from within simulation"
 >>> @njit
@@ -740,13 +804,14 @@ dtype: float64
 
 [=100% "Data 2/2"]{: .candystripe}
 
-![](/assets/images/features_benchmark.svg)
+![](/assets/images/features/benchmark.svg)
 
 ### Multiple time frames
 
 - [x] The [look-ahead bias](https://www.investopedia.com/terms/l/lookaheadbias.asp) is an ongoing 
 threat when working with array data, especially on multiple time frames. In vectorbt PRO, there is 
-an entire collection of functions for resampling and analyzing data in a safe way. 
+an entire collection of functions for resampling and analyzing data in a safe way. Additionally,
+there is a time frame parameter in each TA-Lib indicator!
 
 ```pycon title="Plot a heatmap of EMA on multiple time frames"
 >>> h1_data = vbt.BinanceData.fetch(
@@ -755,18 +820,16 @@ an entire collection of functions for resampling and analyzing data in a safe wa
 ...     end="2020-06-01", 
 ...     timeframe="1h")
 
->>> h4_data = h1_data.resample("4h")  # (1)!
->>> d1_data = h1_data.resample("1d")
+>>> mtf_sma = vbt.talib("SMA").run(
+...     h1_data.get("Close"), 
+...     timeperiod=10, 
+...     timeframe=["1h", "4h", "1d"], 
+...     skipna=True, 
+...     broadcast_kwargs=dict(
+...         wrapper_kwargs=dict(freq="1h")
+...     ))
 
->>> h1_ma = vbt.MA.run(h1_data.get("Open"), 10).ma
->>> h4_ma = vbt.MA.run(h4_data.get("Open"), 10).ma
->>> d1_ma = vbt.MA.run(d1_data.get("Open"), 10).ma
-
->>> h4_ma = h4_ma.vbt.latest_at_index(h1_data.wrapper.index)  # (2)!
->>> d1_ma = d1_ma.vbt.latest_at_index(h1_data.wrapper.index)
-
->>> mas = pd.concat((h1_ma, h4_ma, d1_ma), axis=1, keys=["1h", "4h", "1d"])
->>> mas.iloc[:, ::-1].vbt.ts_heatmap()
+>>> mtf_sma.real.iloc[:, ::-1].vbt.ts_heatmap()
 ```
 
 1. Downsample the entire data instance
@@ -774,11 +837,13 @@ an entire collection of functions for resampling and analyzing data in a safe wa
 
 [=100% "Period 8/8"]{: .candystripe}
 
-![](/assets/images/features_mtf_heatmap.svg)
+![](/assets/images/features/mtf_heatmap.svg)
 
 ## And many more...
 
-- [x] This is just the tip of the iceberg: vectorbt PRO deploys a new project structure, modular settings, time and memory profiling tools, rich templating macros, an upgraded formatting engine, dynamic type checking, new efficient data structures, and more.
+- [x] This is just the tip of the iceberg: vectorbt PRO deploys a new project structure, modular 
+settings, time and memory profiling tools, rich templating macros, an upgraded formatting engine, 
+dynamic type checking, new efficient data structures, and more.
 - [ ] Expect more killer features to be added on a weekly basis! :heart:{ .heart }
 
 

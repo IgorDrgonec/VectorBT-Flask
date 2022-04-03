@@ -14,7 +14,7 @@ indicator parsers to a powerful expression parser.
     construct and pass any information to the indicator factory using `vbt.IF(...)` - 
     the method already does it for us!
 
-### TA-Lib
+## TA-Lib
 
 [IndicatorFactory.from_talib](/api/indicators/factory/#vectorbtpro.indicators.factory.IndicatorFactory.from_talib) 
 can parse [TA-Lib](https://github.com/mrjbq7/ta-lib) indicators. Whenever we pass the name of an indicator,
@@ -56,7 +56,112 @@ Or, using a shortcut:
 vectorbtpro.indicators.factory.talib.RSI
 ```
 
-#### Plotting
+### Skipping NaN
+
+TA-Lib indicators are usually very unhappy when they encounter missing data. For instance, 
+a single NaN in a time series can propagate this NaN to all data points that follow:
+
+```pycon
+>>> import numpy as np
+
+>>> price = vbt.RandomData.fetch(
+...     start='2020-01-01', 
+...     end='2020-06-01', 
+...     freq='1H',
+...     seed=42
+... ).get()
+>>> price_na = price.copy()
+>>> price_na.iloc[2] = np.nan  # (1)!
+
+>>> SMA = vbt.talib("SMA")
+>>> sma = SMA.run(price_na, timeperiod=10)
+>>> sma.real
+2019-12-31 22:00:00+00:00   NaN
+2019-12-31 23:00:00+00:00   NaN
+2020-01-01 00:00:00+00:00   NaN
+2020-01-01 01:00:00+00:00   NaN
+2020-01-01 02:00:00+00:00   NaN
+...                         ...
+2020-05-31 18:00:00+00:00   NaN
+2020-05-31 19:00:00+00:00   NaN
+2020-05-31 20:00:00+00:00   NaN
+2020-05-31 21:00:00+00:00   NaN
+2020-05-31 22:00:00+00:00   NaN
+Freq: H, Name: 10, Length: 3649, dtype: float64
+```
+
+1. Make a single value missing
+
+To address this, we can tell the indicator factory to run the indicator on non-NA values only
+and then place the output values at their original positions:
+
+```pycon
+>>> sma = SMA.run(price_na, timeperiod=10, skipna=True)
+>>> sma.real
+2019-12-31 22:00:00+00:00           NaN
+2019-12-31 23:00:00+00:00           NaN
+2020-01-01 00:00:00+00:00           NaN
+2020-01-01 01:00:00+00:00           NaN
+2020-01-01 02:00:00+00:00           NaN
+...                                 ...
+2020-05-31 18:00:00+00:00    213.169260
+2020-05-31 19:00:00+00:00    212.477181
+2020-05-31 20:00:00+00:00    211.911416
+2020-05-31 21:00:00+00:00    211.310849
+2020-05-31 22:00:00+00:00    210.899923
+Freq: H, Name: 10, Length: 3649, dtype: float64
+```
+
+!!! hint
+    Another option would be to forward fill NaN values before running an indicator, but this
+    would skew the results, thus make use of this option whenever this is really appropriate.
+
+### Resampling
+
+Another feature implemented by the indicator factory is the support for parametrized time frames!
+
+This works the following way: 
+
+1. Using the wrapper, input arrays are downsampled to the target time frame
+2. Indicator is run on downsampled input arrays
+3. Output arrays are upsampled back to the original time frame
+
+This way, multiple time frames can be packed into a single two-dimensional array:
+
+```pycon
+>>> sma = SMA.run(
+...     price_na, 
+...     timeperiod=10, 
+...     skipna=True, 
+...     timeframe=["1h", "4h", "1d"]
+... )
+>>> sma.real
+sma_timeperiod                                             10
+sma_timeframe                      1h          4h          1d
+2019-12-31 22:00:00+00:00         NaN         NaN         NaN
+2019-12-31 23:00:00+00:00         NaN         NaN         NaN
+2020-01-01 00:00:00+00:00         NaN         NaN         NaN
+2020-01-01 01:00:00+00:00         NaN         NaN         NaN
+2020-01-01 02:00:00+00:00         NaN         NaN         NaN
+...                               ...         ...         ...
+2020-05-31 18:00:00+00:00  213.169260  215.561805  206.104351
+2020-05-31 19:00:00+00:00  212.477181  214.422456  206.104351
+2020-05-31 20:00:00+00:00  211.911416  214.422456  206.104351
+2020-05-31 21:00:00+00:00  211.310849  214.422456  206.104351
+2020-05-31 22:00:00+00:00  210.899923  214.422456  206.104351
+
+[3649 rows x 3 columns]
+```
+
+!!! note
+    When some timestamps are missing, vectorbt may have difficulties parsing the frequency
+    of the source index. To provide the frequency explicitly, pass 
+    `broadcast_kwargs=dict(wrapper_kwargs=dict(freq="1h"))`, for example.
+    Without the source frequency, vectorbt will upsample the downsampled arrays 
+    between each two timestamps in the source index instead of relying on its frequency,
+    which may be undesired.
+
+### Plotting
 
 Additionally, we can plot each indicator. This is achieved fully programmatically by parsing the indicator's 
 output flags. Let's take `STOCH` as an example:
@@ -66,14 +171,7 @@ output flags. Let's take `STOCH` as an example:
 >>> STOCH.output_flags
 OrderedDict([('slowk', ['Dashed Line']), ('slowd', ['Dashed Line'])])
 
->>> price = vbt.RandomData.fetch(
-...     'Price', 
-...     start='2020-01-01', 
-...     end='2020-06-01', 
-...     freq='1H',
-...     seed=42
-... )
->>> ohlc = price.get().resample('1d').ohlc()
+>>> ohlc = price.resample('1d').ohlc()
 >>> stoch = STOCH.run(ohlc['high'], ohlc['low'], ohlc['close'])
 >>> stoch.plot()
 ```
@@ -139,7 +237,7 @@ of 20 and an overbought limit of 80:
 
 ![](/assets/images/indicators_stoch_subplots.svg)
 
-### Pandas TA
+## Pandas TA
 
 [IndicatorFactory.from_pandas_ta](/api/indicators/factory/#vectorbtpro.indicators.factory.IndicatorFactory.from_pandas_ta) 
 can parse [Pandas TA](https://github.com/twopirllc/pandas-ta) indicators. Since Pandas TA indicators have
@@ -184,7 +282,7 @@ Or, using a shortcut:
 vectorbtpro.indicators.factory.pandas_ta.RSI
 ```
 
-### TA
+## TA
 
 [IndicatorFactory.from_ta](/api/indicators/factory/#vectorbtpro.indicators.factory.IndicatorFactory.from_ta) 
 can parse [TA](https://github.com/bukosabino/ta) indicators. Similarly to Pandas TA, TA indicators
@@ -224,7 +322,7 @@ Or, using a shortcut:
 vectorbtpro.indicators.factory.ta.RSIIndicator
 ```
 
-### Expressions
+## Expressions
 
 Expressions are a brand-new way to define indicators of any complexity using regular strings.
 The main advantage of expressions over custom and apply functions is that vectorbt can easily 
@@ -237,7 +335,7 @@ when we want to have a full control over the indicator's specification, and on a
 case when we want the entire specification to be parsed for us. Let's try both approaches
 while building an ATR indicator!
 
-#### Instance method
+### Instance method
 
 Here's a semi-automated implementation using the instance method:
 
@@ -276,7 +374,7 @@ Freq: D, Length: 153, dtype: float64
 The expression `expr` is just a regular Python code without any extensions that gets evaluated using 
 the Python's `eval` command. All function names are resolved by the parser prior to the evaluation.
 
-#### Class method
+### Class method
 
 And here's a fully-automated implementation using the class method and annotations:
 
@@ -352,7 +450,7 @@ modules via `np`, `pd`, and `vbt` respectively:
 ... """
 ```
 
-#### TA-Lib
+### TA-Lib
 
 Another automation touches TA-Lib indicators: vectorbt will replace any variable annotated
 with `@talib` with an actual TA-Lib indicator function that can work on both one-dimensional and 
@@ -370,7 +468,7 @@ two-dimensional data!
 ... """
 ```
 
-#### Context
+### Context
 
 So, how can we define our own functions and rules? Any additional keyword argument passed to
 [IndicatorFactory.from_expr](/api/indicators/factory/#vectorbtpro.indicators.factory.IndicatorFactory.from_expr)
@@ -471,7 +569,7 @@ before the evaluation and only once, which would effectively cache it. For this,
 
 Notice how `shifted_close` doesn't have parentheses anymore - it has become an array.
 
-#### Settings
+### Settings
 
 But that's not all. How about overriding any information passed to 
 [IndicatorFactory.from_expr](/api/indicators/factory/#vectorbtpro.indicators.factory.IndicatorFactory.from_expr)
@@ -504,7 +602,7 @@ Let's rewrite the [instance method](#instance-method) example solely using an ex
 >>> ATR = vbt.IF.from_expr(expr)
 ```
 
-#### Stacking
+### Stacking
 
 Remember that we can use arbitrary Python code inside our expressions, even other indicators. 
 To simplify the usage of indicators, there is a convenient annotation `@res`, which takes 
@@ -583,7 +681,7 @@ indicator instance instead:
 1. If we printed `vbt.format_func(vbt.talib('ATR').run)`, we would see that any additional keyword argument
 is passed as `**kwargs`, so we can specify `atr_kwargs` to target those variable arguments
 
-#### One-liners
+### One-liners
 
 There is nothing more satisfying than being able to define an indicator in one line :drooling_face:
 
@@ -628,7 +726,7 @@ Here's a single-line expression for basic SuperTrend bands with multiple outputs
 
 ![](/assets/images/indicators_supertrend.svg)
 
-#### Using Pandas
+### Using Pandas
 
 Like many other factory methods, [IndicatorFactory.from_expr](/api/indicators/factory/#vectorbtpro.indicators.factory.IndicatorFactory.from_expr)
 passes inputs and in-outputs as two-dimensional NumPy arrays. We can enable the `keep_pd` flag to work 
@@ -691,7 +789,7 @@ switches to [NumExpr](https://github.com/pydata/numexpr) by default:
 Freq: D, Length: 153, dtype: float64
 ```
 
-#### Debugging
+### Debugging
 
 To see the expression after parsing all the annotations, set `return_clean_expr` to True:
 
@@ -741,7 +839,7 @@ tr:  (153,)
 atr:  (153,)
 ```
 
-### WorldQuant's Alphas
+## WorldQuant's Alphas
 
 [IndicatorFactory.from_wqa101](/api/indicators/factory/#vectorbtpro.indicators.factory.IndicatorFactory.from_wqa101)
 uses the expression parser to parse and execute [101 Formulaic Alphas](https://arxiv.org/pdf/1601.00991.pdf).

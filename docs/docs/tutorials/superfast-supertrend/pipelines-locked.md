@@ -1125,6 +1125,8 @@ We just created our own simulator optimized for one particular task, and as you 
 its speed is something unreal! :exploding_head:
 
 ```pycon
+>>> chunked_raw_pipeline_nb = nb_chunked(raw_pipeline_nb)
+
 >>> %%timeit
 >>> chunked_raw_pipeline_nb(
 ...     high.values, 
@@ -1330,7 +1332,7 @@ to the GIF file:
 
 [=100% "Heatmap 100/100"]{: .candystripe}
 
-![](/assets/images/examples_raw_pipeline.gif){: style="width:650px"}
+![](/assets/images/tutorials/raw_pipeline.gif){: style="width:650px"}
 
 Everything bluer than yellow beats the market. Just don't pick any value at the bottom :wink:
 

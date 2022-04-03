@@ -51,10 +51,10 @@ algorithmic trading accessible to everyone. Join us!
 <div class="feature-row">
   <div class="feature-column" data-aos="fade-up">
     <span class="icon">
-      <span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m21.71 20.29-1.42 1.42a1 1 0 0 1-1.41 0L7 9.85A3.81 3.81 0 0 1 6 10a4 4 0 0 1-3.78-5.3l2.54 2.54.53-.53 1.42-1.42.53-.53L4.7 2.22A4 4 0 0 1 10 6a3.81 3.81 0 0 1-.15 1l11.86 11.88a1 1 0 0 1 0 1.41M2.29 18.88a1 1 0 0 0 0 1.41l1.42 1.42a1 1 0 0 0 1.41 0l5.47-5.46-2.83-2.83M20 2l-4 2v2l-2.17 2.17 2 2L18 8h2l2-4z"></path></svg></span>
+      <span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><path d="M492.7 42.75c25 24.99 25 65.55 0 90.55l-56.4 56.4-114-113.98 56.4-56.4c25-24.998 65.6-24.998 90.6 0l23.4 23.43zM44.89 353.2 299.7 98.34l114 113.96-254.9 254.8c-6.7 6.7-15 11.6-24.2 14.3L30.59 511.1c-8.38 2.4-17.4 0-23.56-7-6.163-5.3-8.5-14.3-6.106-22.7l29.726-104c2.61-9.2 7.51-17.5 14.24-24.2zM249.4 103.4l-146 146L16 161.9c-18.745-18.7-18.745-49.1 0-67.84L94.06 16C112.8-2.745 143.2-2.745 161.9 16l19.8 19.76c-.3.29-.7.6-1 .93l-64 64.01c-6.3 6.2-6.3 16.4 0 22.6 6.2 6.3 16.4 6.3 22.6 0l64-63.99c.3-.32-.2-.66.9-1.01l45.2 45.1zm204.3 204.4c-.3.2-.7.6-1 .9l-64 64c-6.3 6.2-6.3 16.4 0 22.6 6.2 6.3 16.4 6.3 22.6 0l64-64c.3-1.2-.2-.7.9-1l19.8 19.8c18.7 18.7 18.7 49.1 0 67.8L417.9 496c-18.7 18.7-49.1 18.7-67.8 0l-87.5-87.4 146-146 45.1 45.2z"/></svg></span>
     </span>
-    <b>Technical support</b>
-    <p>Receive dedicated and responsive technical support from the developers of the engine.</p>
+    <b>Tutorials</b>
+    <p>Get access to a range of exclusive articles and tutorials covering many aspects and best practices of using the library.</p>
   </div>
   <div class="feature-column" data-aos="fade-up">
     <span class="icon">
@@ -75,7 +75,8 @@ vectorbt PRO is a private fork of vectorbt, hosted as a private GitHub repositor
 All new features are developed as part of this fork, which means that they are immediately 
 and exclusively available to all eligible sponsors, as they are made collaborators of this repository.
 
-Sponsorships start as low as [__$25 a month or $500 one time__](#how-to-become-a-sponsor).[^1]
+Sponsorships for first 100 contributors start as low as [__$25 a month or $500 one time__](#how-to-become-a-sponsor).[^1]
+One-time payments can also be made in :material-bitcoin: and :material-ethereum: - please [contact me](emailto:olegpolakow@gmail.com).
 
 !!! info
     With each new milestone, the price will steadily increase to match that of competitors. By subscribing now, 
@@ -83,7 +84,7 @@ Sponsorships start as low as [__$25 a month or $500 one time__](#how-to-become-a
 
 [^1]:
     This rate applies to individuals only. To grant access for an organization, please 
-    [contact us](emailto:olegpolakow@gmail.com).
+    [contact me](emailto:olegpolakow@gmail.com).
 
 ## What sponsorships achieve
 

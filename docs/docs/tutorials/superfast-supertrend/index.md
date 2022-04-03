@@ -1,6 +1,5 @@
 ---
 title: SuperFast SuperTrend
-description: How to design, implement, and backtest the fastest SuperTrend indicator in Python
 ---
 
 # SuperFast SuperTrend
@@ -339,7 +338,7 @@ A graph is worth 1,000 words. Let's plot the first month of data (January 2020):
 
 1. Using [GenericAccessor.plot](/api/generic/accessors/#vectorbtpro.generic.accessors.GenericAccessor.plot)
 
-![](/assets/images/examples_supertrend_pandas.svg)
+![](/assets/images/tutorials/supertrend_pandas.svg)
 
 We've generated and visualized the SuperTrend values, but what about performance? 
 Can we already make our overfitting machine with thousands of parameter combinations rolling?
@@ -782,7 +781,7 @@ date range and symbol but slightly change the color palette:
 ... ).show_svg()
 ```
 
-![](/assets/images/examples_supertrend_indicator.svg)
+![](/assets/images/tutorials/supertrend_indicator.svg)
 
 Beautiful!
 
@@ -917,7 +916,7 @@ the column as a regular tuple:
 >>> st.loc[date_range, (19, 4, 'ETHUSDT')].plot()
 ```
 
-![](/assets/images/examples_supertrend_optimization.svg)
+![](/assets/images/tutorials/supertrend_optimization.svg)
 
 When stacking a huge number of columns, make sure that you are not running out of RAM.
 You can print the size of any pickleable object in vectorbt using the 
@@ -969,7 +968,7 @@ Since we have an additional column level that contains symbols, we'll make it a 
 ... )
 ```
 
-![](/assets/images/examples_supertrend_heatmap.gif){: style="width:650px"}
+![](/assets/images/tutorials/supertrend_heatmap.gif){: style="width:650px"}
 
 We now have a nice overview of any parameter regions that performed well during 
 the backtesting period, yay! :partying_face:

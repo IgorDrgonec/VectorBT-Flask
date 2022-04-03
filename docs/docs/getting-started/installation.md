@@ -55,7 +55,7 @@ Uninstall the community version if installed:
 pip uninstall vectorbt
 ```
 
-Install the base PRO version:
+Install the base PRO version (with recommended dependencies):
 
 ```sh
 # if you're using Git/HTTPS authentication
@@ -76,19 +76,13 @@ pip install -U "vectorbtpro[base] @ git+ssh://github.com/polakowo/vectorbt.pro.g
     pip install -U "vectorbtpro[base] @ git+https://${GH_TOKEN}@github.com/polakowo/vectorbt.pro.git"
     ```
 
-Full version (with all optional dependencies):
-
-```sh
-pip install -U "vectorbtpro[full] @ git+https://github.com/polakowo/vectorbt.pro.git"
-```
-
 Lightweight version (with only required dependencies):
 
 ```sh
 pip install -U git+https://github.com/polakowo/vectorbt.pro.git
 ```
 
-For more details, see [extra-requirements.txt](https://github.com/polakowo/vectorbt.pro/blob/main/extra-requirements.txt).
+For other optional dependencies, see [extra-requirements.txt](https://github.com/polakowo/vectorbt.pro/blob/main/extra-requirements.txt).
 
 ### Google Colab
 
@@ -104,7 +98,7 @@ Set your token using `%env`:
 Install vectorbt PRO:
 
 ```plaintext
-!pip install -U "vectorbtpro[full] @ git+https://${GH_TOKEN}@github.com/polakowo/vectorbt.pro.git"
+!pip install -U "vectorbtpro[base] @ git+https://${GH_TOKEN}@github.com/polakowo/vectorbt.pro.git"
 ```
 
 Restart the runtime, and you're all set!
