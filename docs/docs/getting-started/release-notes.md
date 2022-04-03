@@ -6,7 +6,7 @@ title: Release notes
 
 All notable changes in reverse chronological order.
 
-## Version 1.2.0 (2 Apr, 2022)
+## Version 1.2.0 (3 Apr, 2022)
 
 - Integrated [PyPortfolioOpt](https://pyportfolioopt.readthedocs.io/en/latest/): implemented
 the function [pypfopt_optimize](/api/portfolio/pfopt/base/#vectorbtpro.portfolio.pfopt.base.pypfopt_optimize)

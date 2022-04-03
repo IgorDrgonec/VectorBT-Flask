@@ -218,7 +218,7 @@ of 20 and an overbought limit of 80:
 ...     shared_xaxes=True,  # (1)!
 ...     vertical_spacing=0.05)
 >>> ohlc.vbt.ohlcv.plot(
-...     ohlc_add_trace_kwargs=dict(row=1, col=1),  # (2)!
+...     add_trace_kwargs=dict(row=1, col=1),  # (2)!
 ...     fig=fig,
 ...     xaxis=dict(rangeslider_visible=False))  # (3)!
 >>> stoch.plot(

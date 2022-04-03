@@ -75,7 +75,7 @@ vectorbt PRO is a private fork of vectorbt, hosted as a private GitHub repositor
 All new features are developed as part of this fork, which means that they are immediately 
 and exclusively available to all eligible sponsors, as they are made collaborators of this repository.
 
-Sponsorships for first 100 contributors start as low as [__$25 a month or $500 one time__](#how-to-become-a-sponsor).[^1]
+Sponsorships for the first 100 contributors start as low as [__$25 a month or $500 one time__](#how-to-become-a-sponsor).[^1]
 One-time payments can also be made in :material-bitcoin: and :material-ethereum: - please [contact me](emailto:olegpolakow@gmail.com).
 
 !!! info
