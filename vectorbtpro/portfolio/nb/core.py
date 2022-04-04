@@ -160,7 +160,7 @@ def buy_nb(
             final_req_cash = cash_limit
 
     # Check size of zero
-    if is_close_nb(adj_size, 0):
+    if is_close_nb(final_size, 0):
         return exec_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.SizeZero)
 
     # Check against minimum size
