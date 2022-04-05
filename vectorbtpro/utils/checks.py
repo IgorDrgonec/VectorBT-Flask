@@ -96,10 +96,11 @@ def is_numba_func(arg: tp.Any) -> bool:
         return True
     if "NUMBA_DISABLE_JIT" in os.environ:
         if not is_numba_enabled():
-            if not numba_cfg["check_func_suffix"]:
-                return True
-            if arg.__name__.endswith("_nb"):
-                return True
+            if numba_cfg["check_func_suffix"]:
+                if arg.__name__.endswith("_nb"):
+                    return True
+                return False
+            return False
     return isinstance(arg, CPUDispatcher)
 
 
