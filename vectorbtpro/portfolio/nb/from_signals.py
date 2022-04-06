@@ -925,7 +925,7 @@ def simulate_from_signal_func_nb(
                         low=flex_select_auto_nb(low, i, col, flex_2d),
                         close=flex_select_auto_nb(close, i, col, flex_2d),
                     )
-                    state = ProcessOrderState(
+                    exec_state = ExecState(
                         cash=cash_now,
                         position=position_now,
                         debt=debt_now,
@@ -933,11 +933,11 @@ def simulate_from_signal_func_nb(
                         val_price=val_price_now,
                         value=value_now,
                     )
-                    order_result, new_state = process_order_nb(
+                    order_result, new_exec_state = process_order_nb(
                         group=group,
                         col=col,
                         i=i,
-                        state=state,
+                        exec_state=exec_state,
                         order=order,
                         price_area=price_area,
                         update_value=update_value,
@@ -947,13 +947,13 @@ def simulate_from_signal_func_nb(
                         log_counts=log_counts,
                     )
 
-                    # Update state
-                    cash_now = new_state.cash
-                    position_now = new_state.position
-                    debt_now = new_state.debt
-                    free_cash_now = new_state.free_cash
-                    val_price_now = new_state.val_price
-                    value_now = new_state.value
+                    # Update execution state
+                    cash_now = new_exec_state.cash
+                    position_now = new_exec_state.position
+                    debt_now = new_exec_state.debt
+                    free_cash_now = new_exec_state.free_cash
+                    val_price_now = new_exec_state.val_price
+                    value_now = new_exec_state.value
 
                     if use_stops:
                         # Update stop price
@@ -982,7 +982,7 @@ def simulate_from_signal_func_nb(
                                 _sl_trail = flex_select_auto_nb(sl_trail, i, col, flex_2d)
                                 _tp_stop = flex_select_auto_nb(tp_stop, i, col, flex_2d)
 
-                                if state.position == 0 or np.sign(position_now) != np.sign(state.position):
+                                if exec_state.position == 0 or np.sign(position_now) != np.sign(exec_state.position):
                                     # Position opened/reversed -> set stops
                                     sl_curr_i[col] = sl_init_i[col] = i
                                     sl_curr_price[col] = sl_init_price[col] = new_init_price
@@ -991,7 +991,7 @@ def simulate_from_signal_func_nb(
                                     tp_init_i[col] = i
                                     tp_init_price[col] = new_init_price
                                     tp_curr_stop[col] = _tp_stop
-                                elif abs(position_now) > abs(state.position):
+                                elif abs(position_now) > abs(exec_state.position):
                                     # Position increased -> keep/override stops
                                     if should_update_stop_nb(_sl_stop, _upon_stop_update):
                                         sl_curr_i[col] = sl_init_i[col] = i

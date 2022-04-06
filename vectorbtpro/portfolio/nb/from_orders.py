@@ -280,7 +280,7 @@ def simulate_from_orders_nb(
                     low=flex_select_auto_nb(low, i, col, flex_2d),
                     close=flex_select_auto_nb(close, i, col, flex_2d),
                 )
-                state = ProcessOrderState(
+                exec_state = ExecState(
                     cash=cash_now,
                     position=position_now,
                     debt=debt_now,
@@ -288,11 +288,11 @@ def simulate_from_orders_nb(
                     val_price=val_price_now,
                     value=value_now,
                 )
-                order_result, new_state = process_order_nb(
+                order_result, new_exec_state = process_order_nb(
                     group=group,
                     col=col,
                     i=i,
-                    state=state,
+                    exec_state=exec_state,
                     order=order,
                     price_area=price_area,
                     update_value=update_value,
@@ -302,13 +302,13 @@ def simulate_from_orders_nb(
                     log_counts=log_counts,
                 )
 
-                # Update state
-                cash_now = new_state.cash
-                position_now = new_state.position
-                debt_now = new_state.debt
-                free_cash_now = new_state.free_cash
-                val_price_now = new_state.val_price
-                value_now = new_state.value
+                # Update execution state
+                cash_now = new_exec_state.cash
+                position_now = new_exec_state.position
+                debt_now = new_exec_state.debt
+                free_cash_now = new_exec_state.free_cash
+                val_price_now = new_exec_state.val_price
+                value_now = new_exec_state.value
 
                 # Now becomes last
                 last_position[col] = position_now

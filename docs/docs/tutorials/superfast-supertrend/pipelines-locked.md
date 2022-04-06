@@ -963,7 +963,7 @@ Numba-compiled for-loops. In this case, you can directly use the vectorbt's core
 order execution:
 
 ```pycon
->>> from vectorbtpro.portfolio.enums import ProcessOrderState, PriceArea
+>>> from vectorbtpro.portfolio.enums import ExecState, PriceArea
 
 >>> @njit(nogil=True)
 ... def raw_pipeline_nb(high, low, close, 
@@ -1047,7 +1047,7 @@ order execution:
 ...                 val_price = close[i, col]
 ...                 value = cash + position * val_price
 ...                 if not np.isnan(size):
-...                     order_state = ProcessOrderState(  # (9)!
+...                     exec_state = ExecState(  # (9)!
 ...                         cash=cash,
 ...                         position=position,
 ...                         debt=debt,
@@ -1066,9 +1066,9 @@ order execution:
 ...                         direction=Direction.LongOnly,
 ...                         fees=0.001
 ...                     )
-...                     new_order_state, _ = pf_nb.execute_order_nb(  # (12)!
-...                         order_state, order, price_area)
-...                     cash, position, debt, free_cash = new_order_state
+...                     new_exec_state, _ = pf_nb.execute_order_nb(  # (12)!
+...                         exec_state, order, price_area)
+...                     cash, position, debt, free_cash = new_exec_state
 ... 
 ...                 value = cash + position * val_price
 ...                 return_ = ret_nb.get_return_nb(prev_value, value)  # (13)!
@@ -1108,14 +1108,14 @@ order execution:
 transform the signal into an order size
 8. Build and execute an order, and update the return at the end of this time step
 9. Pack the current state of the environment into an instance of 
-[ProcessOrderState](/api/portfolio/enums/#vectorbtpro.portfolio.enums.ProcessOrderState)
+[ExecState](/api/portfolio/enums/#vectorbtpro.portfolio.enums.ExecState)
 10. Pack the current price bounds into an instance of 
 [PriceArea](/api/portfolio/enums/#vectorbtpro.portfolio.enums.PriceArea)
 11. Get an instance of type [Order](/api/portfolio/enums/#vectorbtpro.portfolio.enums.Order) 
 using [order_nb](/api/portfolio/nb/core/#vectorbtpro.portfolio.nb.core.order_nb)
 12. Execute the order using [execute_order_nb](/api/portfolio/nb/core/#vectorbtpro.portfolio.nb.core.execute_order_nb),
 which returns the updated state of the backtesting environment of type 
-[ExecuteOrderState](/api/portfolio/enums/#vectorbtpro.portfolio.enums.ExecuteOrderState) 
+[AccountState](/api/portfolio/enums/#vectorbtpro.portfolio.enums.AccountState) 
 and the order result of type [OrderResult](/api/portfolio/enums/#vectorbtpro.portfolio.enums.OrderResult)
 13. Return is the percentage change between the previous value and the current value
 14. Calculate the Sharpe ratio based on the updated return

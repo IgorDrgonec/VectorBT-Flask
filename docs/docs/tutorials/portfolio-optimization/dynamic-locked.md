@@ -557,7 +557,7 @@ Here's our raw Numba-compiled pipeline (optimization function agnostic):
 
 ```pycon
 >>> from vectorbtpro.portfolio.enums import (
-...     ProcessOrderState, 
+...     ExecState, 
 ...     PriceArea, 
 ...     order_dt
 ... )
@@ -637,7 +637,7 @@ Here's our raw Numba-compiled pipeline (optimization function agnostic):
 ...                 close=flex_select_auto_nb(close, i, col, True),
 ...             )
 ...             val_price_now = flex_select_auto_nb(val_price, i, col, True)
-...             state = ProcessOrderState(
+...             exec_state = ExecState(
 ...                 cash=cash_now,
 ...                 position=last_position[col],
 ...                 debt=last_debt[col],
@@ -645,22 +645,22 @@ Here's our raw Numba-compiled pipeline (optimization function agnostic):
 ...                 val_price=val_price_now,
 ...                 value=value_now,
 ...             )
-...             order_result, new_state = pf_nb.process_order_nb(
+...             order_result, new_exec_state = pf_nb.process_order_nb(
 ...                 group=group,
 ...                 col=col,
 ...                 i=i,
-...                 state=state,
+...                 exec_state=exec_state,
 ...                 order=order,
 ...                 price_area=price_area,
 ...                 order_records=order_records,
 ...                 order_counts=order_counts
 ...             )
 ... 
-...             cash_now = new_state.cash
-...             free_cash_now = new_state.free_cash
-...             value_now = new_state.value
-...             last_position[col] = new_state.position
-...             last_debt[col] = new_state.debt
+...             cash_now = new_exec_state.cash
+...             free_cash_now = new_exec_state.free_cash
+...             value_now = new_exec_state.value
+...             last_position[col] = new_exec_state.position
+...             last_debt[col] = new_exec_state.debt
 ... 
 ...     # (16)!
 ...     if order_records.shape[0] > 0:

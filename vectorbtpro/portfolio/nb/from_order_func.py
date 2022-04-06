@@ -151,9 +151,9 @@ def sort_call_seq_nb(
 
 
 @register_jitted
-def try_order_nb(ctx: OrderContext, order: Order) -> tp.Tuple[ExecuteOrderState, OrderResult]:
+def try_order_nb(ctx: OrderContext, order: Order) -> tp.Tuple[AccountState, OrderResult]:
     """Execute an order without persistence."""
-    state = ProcessOrderState(
+    exec_state = ExecState(
         cash=ctx.cash_now,
         position=ctx.position_now,
         debt=ctx.debt_now,
@@ -167,7 +167,7 @@ def try_order_nb(ctx: OrderContext, order: Order) -> tp.Tuple[ExecuteOrderState,
         low=flex_select_auto_nb(ctx.low, ctx.i, ctx.col, ctx.flex_2d),
         close=flex_select_auto_nb(ctx.close, ctx.i, ctx.col, ctx.flex_2d),
     )
-    return execute_order_nb(state=state, order=order, price_area=price_area)
+    return execute_order_nb(exec_state=exec_state, order=order, price_area=price_area)
 
 
 @register_jitted
@@ -1077,7 +1077,7 @@ def simulate_nb(
                         low=flex_select_auto_nb(low, i, col, flex_2d),
                         close=flex_select_auto_nb(close, i, col, flex_2d),
                     )
-                    state = ProcessOrderState(
+                    exec_state = ExecState(
                         cash=cash_now,
                         position=position_now,
                         debt=debt_now,
@@ -1085,11 +1085,11 @@ def simulate_nb(
                         val_price=val_price_now,
                         value=value_now,
                     )
-                    order_result, new_state = process_order_nb(
+                    order_result, new_exec_state = process_order_nb(
                         group=group,
                         col=col,
                         i=i,
-                        state=state,
+                        exec_state=exec_state,
                         order=order,
                         price_area=price_area,
                         update_value=update_value,
@@ -1099,15 +1099,15 @@ def simulate_nb(
                         log_counts=log_counts,
                     )
 
-                    # Update state
-                    cash_now = new_state.cash
-                    position_now = new_state.position
-                    debt_now = new_state.debt
-                    free_cash_now = new_state.free_cash
+                    # Update execution state
+                    cash_now = new_exec_state.cash
+                    position_now = new_exec_state.position
+                    debt_now = new_exec_state.debt
+                    free_cash_now = new_exec_state.free_cash
 
                     if track_value:
-                        val_price_now = new_state.val_price
-                        value_now = new_state.value
+                        val_price_now = new_exec_state.val_price
+                        value_now = new_exec_state.value
                         if cash_sharing:
                             return_now = returns_nb_.get_return_nb(
                                 prev_close_value[group],
@@ -1138,7 +1138,7 @@ def simulate_nb(
 
                     # Update position record
                     if fill_pos_record:
-                        update_pos_record_nb(pos_record_now, i, col, state.position, position_now, order_result)
+                        update_pos_record_nb(pos_record_now, i, col, exec_state.position, position_now, order_result)
 
                     # Post-order callback
                     post_order_ctx = PostOrderContext(
@@ -1185,12 +1185,12 @@ def simulate_nb(
                         call_seq_now=call_seq_now,
                         col=col,
                         call_idx=k,
-                        cash_before=state.cash,
-                        position_before=state.position,
-                        debt_before=state.debt,
-                        free_cash_before=state.free_cash,
-                        val_price_before=state.val_price,
-                        value_before=state.value,
+                        cash_before=exec_state.cash,
+                        position_before=exec_state.position,
+                        debt_before=exec_state.debt,
+                        free_cash_before=exec_state.free_cash,
+                        val_price_before=exec_state.val_price,
+                        value_before=exec_state.value,
                         order_result=order_result,
                         cash_now=cash_now,
                         position_now=position_now,
@@ -1934,7 +1934,7 @@ def simulate_row_wise_nb(
                         low=flex_select_auto_nb(low, i, col, flex_2d),
                         close=flex_select_auto_nb(close, i, col, flex_2d),
                     )
-                    state = ProcessOrderState(
+                    exec_state = ExecState(
                         cash=cash_now,
                         position=position_now,
                         debt=debt_now,
@@ -1942,11 +1942,11 @@ def simulate_row_wise_nb(
                         val_price=val_price_now,
                         value=value_now,
                     )
-                    order_result, new_state = process_order_nb(
+                    order_result, new_exec_state = process_order_nb(
                         group=group,
                         col=col,
                         i=i,
-                        state=state,
+                        exec_state=exec_state,
                         order=order,
                         price_area=price_area,
                         update_value=update_value,
@@ -1956,15 +1956,15 @@ def simulate_row_wise_nb(
                         log_counts=log_counts,
                     )
 
-                    # Update state
-                    cash_now = new_state.cash
-                    position_now = new_state.position
-                    debt_now = new_state.debt
-                    free_cash_now = new_state.free_cash
+                    # Update execution state
+                    cash_now = new_exec_state.cash
+                    position_now = new_exec_state.position
+                    debt_now = new_exec_state.debt
+                    free_cash_now = new_exec_state.free_cash
 
                     if track_value:
-                        val_price_now = new_state.val_price
-                        value_now = new_state.value
+                        val_price_now = new_exec_state.val_price
+                        value_now = new_exec_state.value
                         if cash_sharing:
                             return_now = returns_nb_.get_return_nb(
                                 prev_close_value[group],
@@ -1995,7 +1995,7 @@ def simulate_row_wise_nb(
 
                     # Update position record
                     if fill_pos_record:
-                        update_pos_record_nb(pos_record_now, i, col, state.position, position_now, order_result)
+                        update_pos_record_nb(pos_record_now, i, col, exec_state.position, position_now, order_result)
 
                     # Post-order callback
                     post_order_ctx = PostOrderContext(
@@ -2042,12 +2042,12 @@ def simulate_row_wise_nb(
                         call_seq_now=call_seq_now,
                         col=col,
                         call_idx=k,
-                        cash_before=state.cash,
-                        position_before=state.position,
-                        debt_before=state.debt,
-                        free_cash_before=state.free_cash,
-                        val_price_before=state.val_price,
-                        value_before=state.value,
+                        cash_before=exec_state.cash,
+                        position_before=exec_state.position,
+                        debt_before=exec_state.debt,
+                        free_cash_before=exec_state.free_cash,
+                        val_price_before=exec_state.val_price,
+                        value_before=exec_state.value,
                         order_result=order_result,
                         cash_now=cash_now,
                         position_now=position_now,
@@ -2933,7 +2933,7 @@ def flex_simulate_nb(
                         low=flex_select_auto_nb(low, i, col, flex_2d),
                         close=flex_select_auto_nb(close, i, col, flex_2d),
                     )
-                    state = ProcessOrderState(
+                    exec_state = ExecState(
                         cash=cash_now,
                         position=position_now,
                         debt=debt_now,
@@ -2941,11 +2941,11 @@ def flex_simulate_nb(
                         val_price=val_price_now,
                         value=value_now,
                     )
-                    order_result, new_state = process_order_nb(
+                    order_result, new_exec_state = process_order_nb(
                         group=group,
                         col=col,
                         i=i,
-                        state=state,
+                        exec_state=exec_state,
                         order=order,
                         price_area=price_area,
                         update_value=update_value,
@@ -2955,15 +2955,15 @@ def flex_simulate_nb(
                         log_counts=log_counts,
                     )
 
-                    # Update state
-                    cash_now = new_state.cash
-                    position_now = new_state.position
-                    debt_now = new_state.debt
-                    free_cash_now = new_state.free_cash
+                    # Update execution state
+                    cash_now = new_exec_state.cash
+                    position_now = new_exec_state.position
+                    debt_now = new_exec_state.debt
+                    free_cash_now = new_exec_state.free_cash
 
                     if track_value:
-                        val_price_now = new_state.val_price
-                        value_now = new_state.value
+                        val_price_now = new_exec_state.val_price
+                        value_now = new_exec_state.value
                         if cash_sharing:
                             return_now = returns_nb_.get_return_nb(
                                 prev_close_value[group],
@@ -3000,7 +3000,7 @@ def flex_simulate_nb(
 
                     # Update position record
                     if fill_pos_record:
-                        update_pos_record_nb(pos_record_now, i, col, state.position, position_now, order_result)
+                        update_pos_record_nb(pos_record_now, i, col, exec_state.position, position_now, order_result)
 
                     # Post-order callback
                     post_order_ctx = PostOrderContext(
@@ -3047,12 +3047,12 @@ def flex_simulate_nb(
                         call_seq_now=None,
                         col=col,
                         call_idx=call_idx,
-                        cash_before=state.cash,
-                        position_before=state.position,
-                        debt_before=state.debt,
-                        free_cash_before=state.free_cash,
-                        val_price_before=state.val_price,
-                        value_before=state.value,
+                        cash_before=exec_state.cash,
+                        position_before=exec_state.position,
+                        debt_before=exec_state.debt,
+                        free_cash_before=exec_state.free_cash,
+                        val_price_before=exec_state.val_price,
+                        value_before=exec_state.value,
                         order_result=order_result,
                         cash_now=cash_now,
                         position_now=position_now,
@@ -3704,7 +3704,7 @@ def flex_simulate_row_wise_nb(
                         low=flex_select_auto_nb(low, i, col, flex_2d),
                         close=flex_select_auto_nb(close, i, col, flex_2d),
                     )
-                    state = ProcessOrderState(
+                    exec_state = ExecState(
                         cash=cash_now,
                         position=position_now,
                         debt=debt_now,
@@ -3712,11 +3712,11 @@ def flex_simulate_row_wise_nb(
                         val_price=val_price_now,
                         value=value_now,
                     )
-                    order_result, new_state = process_order_nb(
+                    order_result, new_exec_state = process_order_nb(
                         group=group,
                         col=col,
                         i=i,
-                        state=state,
+                        exec_state=exec_state,
                         order=order,
                         price_area=price_area,
                         update_value=update_value,
@@ -3726,15 +3726,15 @@ def flex_simulate_row_wise_nb(
                         log_counts=log_counts,
                     )
 
-                    # Update state
-                    cash_now = new_state.cash
-                    position_now = new_state.position
-                    debt_now = new_state.debt
-                    free_cash_now = new_state.free_cash
+                    # Update execution state
+                    cash_now = new_exec_state.cash
+                    position_now = new_exec_state.position
+                    debt_now = new_exec_state.debt
+                    free_cash_now = new_exec_state.free_cash
 
                     if track_value:
-                        val_price_now = new_state.val_price
-                        value_now = new_state.value
+                        val_price_now = new_exec_state.val_price
+                        value_now = new_exec_state.value
                         if cash_sharing:
                             return_now = returns_nb_.get_return_nb(
                                 prev_close_value[group],
@@ -3771,7 +3771,7 @@ def flex_simulate_row_wise_nb(
 
                     # Update position record
                     if fill_pos_record:
-                        update_pos_record_nb(pos_record_now, i, col, state.position, position_now, order_result)
+                        update_pos_record_nb(pos_record_now, i, col, exec_state.position, position_now, order_result)
 
                     # Post-order callback
                     post_order_ctx = PostOrderContext(
@@ -3818,12 +3818,12 @@ def flex_simulate_row_wise_nb(
                         call_seq_now=None,
                         col=col,
                         call_idx=call_idx,
-                        cash_before=state.cash,
-                        position_before=state.position,
-                        debt_before=state.debt,
-                        free_cash_before=state.free_cash,
-                        val_price_before=state.val_price,
-                        value_before=state.value,
+                        cash_before=exec_state.cash,
+                        position_before=exec_state.position,
+                        debt_before=exec_state.debt,
+                        free_cash_before=exec_state.free_cash,
+                        val_price_before=exec_state.val_price,
+                        value_before=exec_state.value,
                         order_result=order_result,
                         cash_now=cash_now,
                         position_now=position_now,

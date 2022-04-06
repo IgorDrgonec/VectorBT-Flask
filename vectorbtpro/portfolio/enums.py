@@ -34,8 +34,8 @@ __all__ = [
     "TradesType",
     "PriceArea",
     "NoPriceArea",
-    "ProcessOrderState",
-    "ExecuteOrderState",
+    "AccountState",
+    "ExecState",
     "SimulationOutput",
     "SimulationContext",
     "GroupContext",
@@ -709,7 +709,21 @@ NoPriceArea = PriceArea(open=np.nan, high=np.nan, low=np.nan, close=np.nan)
 __pdoc__["NoPriceArea"] = "No price area."
 
 
-class ProcessOrderState(tp.NamedTuple):
+class AccountState(tp.NamedTuple):
+    cash: float
+    position: float
+    debt: float
+    free_cash: float
+
+
+__pdoc__["AccountState"] = "State of the account."
+__pdoc__["AccountState.cash"] = "Cash in the current column (or group with cash sharing)."
+__pdoc__["AccountState.position"] = "Position in the current column."
+__pdoc__["AccountState.debt"] = "Debt from shorting in the current column."
+__pdoc__["AccountState.free_cash"] = "Free cash in the current column (or group with cash sharing)."
+
+
+class ExecState(tp.NamedTuple):
     cash: float
     position: float
     debt: float
@@ -718,27 +732,13 @@ class ProcessOrderState(tp.NamedTuple):
     value: float
 
 
-__pdoc__["ProcessOrderState"] = "State before or after order processing."
-__pdoc__["ProcessOrderState.cash"] = "Cash in the current column (or group with cash sharing)."
-__pdoc__["ProcessOrderState.position"] = "Position in the current column."
-__pdoc__["ProcessOrderState.debt"] = "Debt from shorting in the current column."
-__pdoc__["ProcessOrderState.free_cash"] = "Free cash in the current column (or group with cash sharing)."
-__pdoc__["ProcessOrderState.val_price"] = "Valuation price in the current column."
-__pdoc__["ProcessOrderState.value"] = "Value in the current column (or group with cash sharing)."
-
-
-class ExecuteOrderState(tp.NamedTuple):
-    cash: float
-    position: float
-    debt: float
-    free_cash: float
-
-
-__pdoc__["ExecuteOrderState"] = "State after order execution."
-__pdoc__["ExecuteOrderState.cash"] = "See `ProcessOrderState.cash`."
-__pdoc__["ExecuteOrderState.position"] = "See `ProcessOrderState.position`."
-__pdoc__["ExecuteOrderState.debt"] = "See `ProcessOrderState.debt`."
-__pdoc__["ExecuteOrderState.free_cash"] = "See `ProcessOrderState.free_cash`."
+__pdoc__["ExecState"] = "State before or after order execution."
+__pdoc__["ExecState.cash"] = "See `AccountState.cash`."
+__pdoc__["ExecState.position"] = "See `AccountState.position`."
+__pdoc__["ExecState.debt"] = "See `AccountState.debt`."
+__pdoc__["ExecState.free_cash"] = "See `AccountState.free_cash`."
+__pdoc__["ExecState.val_price"] = "Valuation price in the current column."
+__pdoc__["ExecState.value"] = "Value in the current column (or group with cash sharing)."
 
 
 class SimulationOutput(tp.NamedTuple):
