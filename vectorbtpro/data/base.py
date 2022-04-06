@@ -854,6 +854,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         """Get wrapper where columns are symbols."""
         return self.wrapper.replace(
             columns=pd.Index(self.symbols, name=level_name),
+            ndim=1 if self.single_symbol else 2,
             grouper=None,
             **kwargs,
         )
