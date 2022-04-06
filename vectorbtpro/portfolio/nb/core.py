@@ -30,17 +30,17 @@ def check_adj_price_nb(
         return adj_price
     if adj_price > price_area.high:
         if price_area_vio_mode == PriceAreaVioMode.Error:
-            raise ValueError("Adjusted order price goes above the highest price")
+            raise ValueError("Adjusted order price is above the highest price")
         elif price_area_vio_mode == PriceAreaVioMode.Cap:
             adj_price = price_area.high
     if adj_price < price_area.low:
         if price_area_vio_mode == PriceAreaVioMode.Error:
-            raise ValueError("Adjusted order price goes below than the lowest price")
+            raise ValueError("Adjusted order price is below than the lowest price")
         elif price_area_vio_mode == PriceAreaVioMode.Cap:
             adj_price = price_area.low
     if is_closing_price and adj_price != price_area.close:
         if price_area_vio_mode == PriceAreaVioMode.Error:
-            raise ValueError("Adjusted order price goes beyond the closing price")
+            raise ValueError("Adjusted order price is beyond the closing price")
         elif price_area_vio_mode == PriceAreaVioMode.Cap:
             adj_price = price_area.close
     return adj_price
@@ -522,6 +522,9 @@ def execute_order_nb(
         if np.random.uniform(0, 1) < order.reject_prob:
             return exec_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.RandomEvent)
 
+    if order_result.status == OrderStatus.Rejected and order.raise_reject:
+        raise_rejected_order_nb(order_result)
+
     return new_exec_state, order_result
 
 
@@ -665,24 +668,19 @@ def process_order_nb(
     group: int,
     col: int,
     i: int,
-    price_area: PriceArea,
     state: ProcessOrderState,
-    update_value: bool,
     order: Order,
+    price_area: PriceArea = NoPriceArea,
+    update_value: bool = False,
     order_records: tp.Optional[tp.RecordArray2d] = None,
-    last_oidx: tp.Optional[tp.Array1d] = None,
+    order_counts: tp.Optional[tp.Array1d] = None,
     log_records: tp.Optional[tp.RecordArray2d] = None,
-    last_lidx: tp.Optional[tp.Array1d] = None,
+    log_counts: tp.Optional[tp.Array1d] = None,
 ) -> tp.Tuple[OrderResult, ProcessOrderState]:
     """Process an order by executing it, saving relevant information to the logs, and returning a new state."""
 
     # Execute the order
     exec_state, order_result = execute_order_nb(state=state, order=order, price_area=price_area)
-
-    # Raise if order rejected
-    is_rejected = order_result.status == OrderStatus.Rejected
-    if is_rejected and order.raise_reject:
-        raise_rejected_order_nb(order_result)
 
     # Update valuation price and value
     is_filled = order_result.status == OrderStatus.Filled
@@ -710,22 +708,22 @@ def process_order_nb(
         value=new_value,
     )
 
-    if order_records is not None and last_oidx is not None:
+    if order_records is not None and order_counts is not None:
         if is_filled and order_records.shape[0] > 0:
             # Fill order record
-            if last_oidx[col] >= order_records.shape[0] - 1:
+            if order_counts[col] >= order_records.shape[0]:
                 raise IndexError("order_records index out of range. Set a higher max_orders.")
-            fill_order_record_nb(order_records, last_oidx[col] + 1, col, i, order_result)
-            last_oidx[col] += 1
+            fill_order_record_nb(order_records, order_counts[col], col, i, order_result)
+            order_counts[col] += 1
 
-    if log_records is not None and last_lidx is not None:
+    if log_records is not None and log_counts is not None:
         if order.log and log_records.shape[0] > 0:
             # Fill log record
-            if last_lidx[col] >= log_records.shape[0] - 1:
+            if log_counts[col] >= log_records.shape[0]:
                 raise IndexError("log_records index out of range. Set a higher max_logs.")
             fill_log_record_nb(
                 log_records,
-                last_lidx[col] + 1,
+                log_counts[col],
                 group,
                 col,
                 i,
@@ -734,9 +732,9 @@ def process_order_nb(
                 order,
                 new_state,
                 order_result,
-                last_oidx[col] if is_filled else -1,
+                order_counts[col] - 1 if is_filled else -1,
             )
-            last_lidx[col] += 1
+            log_counts[col] += 1
 
     return order_result, new_state
 
@@ -998,20 +996,20 @@ def prepare_last_pos_record_nb(
 @register_jitted
 def prepare_simout_nb(
     order_records: tp.RecordArray2d,
-    last_oidx: tp.Array1d,
+    order_counts: tp.Array1d,
     log_records: tp.RecordArray2d,
-    last_lidx: tp.Array1d,
+    log_counts: tp.Array1d,
     cash_earnings: tp.Array2d,
     call_seq: tp.Optional[tp.Array2d] = None,
     in_outputs: tp.Optional[tp.NamedTuple] = None,
 ) -> SimulationOutput:
     """Prepare simulation output."""
     if order_records.shape[0] > 0:
-        order_records_repart = generic_nb.repartition_nb(order_records, last_oidx + 1)
+        order_records_repart = generic_nb.repartition_nb(order_records, order_counts)
     else:
         order_records_repart = order_records.flatten()
     if log_records.shape[0] > 0:
-        log_records_repart = generic_nb.repartition_nb(log_records, last_lidx + 1)
+        log_records_repart = generic_nb.repartition_nb(log_records, log_counts)
     else:
         log_records_repart = log_records.flatten()
     return SimulationOutput(

@@ -27,6 +27,7 @@ __all__ = [
     "PriceAreaVioMode",
     "OrderStatus",
     "OrderStatusInfo",
+    "status_info_desc",
     "OrderSide",
     "TradeDirection",
     "TradeStatus",
@@ -789,8 +790,8 @@ class SimulationContext(tp.NamedTuple):
     last_val_price: tp.Array1d
     last_value: tp.Array1d
     last_return: tp.Array1d
-    last_oidx: tp.Array1d
-    last_lidx: tp.Array1d
+    order_counts: tp.Array1d
+    log_counts: tp.Array1d
     last_pos_record: tp.RecordArray
 
 
@@ -1069,8 +1070,8 @@ but usually it matches the number of rows, meaning there is maximal one order re
 `max_orders` can be chosen lower if not every `order_func_nb` leads to a filled order, to save memory.
 It can also be chosen higher if more than one order per element is expected.
 
-You can use `SimulationContext.last_oidx` to get the index of the latest filled order of each column.
-To get all order records filled up to this point in a column, do `order_records[:last_oidx[col] + 1, col]`.
+You can use `SimulationContext.order_counts` to get the number of filled orders in each column.
+To get all order records filled up to this point in a column, do `order_records[:order_counts[col], col]`.
 
 Example:
     Before filling, each order record looks like this:
@@ -1089,7 +1090,7 @@ __pdoc__[
     "SimulationContext.log_records"
 ] = """Log records per column.
 
-Similar to `SimulationContext.order_records` but of type `log_dt` and index `SimulationContext.last_lidx`."""
+Similar to `SimulationContext.order_records` but of type `log_dt` and count `SimulationContext.log_counts`."""
 __pdoc__[
     "SimulationContext.in_outputs"
 ] = """Named tuple with in-output objects.
@@ -1183,7 +1184,7 @@ __pdoc__[
 ] = """Latest value per column (or per group with cash sharing).
 
 Calculated by multiplying valuation price by the current position.
-The value of each column in a group with cash sharing is summed to get the value of the entire group.
+The value in each column in a group with cash sharing is summed to get the value of the entire group.
 
 Gets updated right before `pre_segment_func_nb`. Then, gets updated right after `pre_segment_func_nb`.
 If `SimulationContext.update_value`, gets also updated right after `order_func_nb` using 
@@ -1207,31 +1208,31 @@ Gets updated each time `SimulationContext.last_value` is updated.
     Changing this array may produce results inconsistent with those of `vectorbtpro.portfolio.base.Portfolio`.
 """
 __pdoc__[
-    "SimulationContext.last_oidx"
-] = """Index of the latest order record of each column.
+    "SimulationContext.order_counts"
+] = """Number of filled order records in each column.
 
 Points to `SimulationContext.order_records` and has shape `(target_shape[1],)`.
 
 Example:
-    `last_oidx` of `np.array([1, 100, -1])` means the latest filled order is `order_records[1, 0]` for the
-    first column, `order_records[100, 1]` for the second column, and no orders have been filled yet
-    for the third column (`order_records[0, 2]` is empty).
+    `order_counts` of `np.array([2, 100, 0])` means the latest filled order is `order_records[1, 0]` in the
+    first column, `order_records[99, 1]` in the second column, and no orders have been filled yet
+    in the third column (`order_records[0, 2]` is empty).
     
     !!! note
         Changing this array may produce results inconsistent with those of `vectorbtpro.portfolio.base.Portfolio`.
 """
 __pdoc__[
-    "SimulationContext.last_lidx"
-] = """Index of the latest log record of each column.
+    "SimulationContext.log_counts"
+] = """Number of filled log records in each column.
 
-Similar to `SimulationContext.last_oidx` but for log records.
+Similar to `SimulationContext.log_counts` but for log records.
 
 !!! note
     Changing this array may produce results inconsistent with those of `vectorbtpro.portfolio.base.Portfolio`.
 """
 __pdoc__[
     "SimulationContext.last_pos_record"
-] = """Latest position record of each column.
+] = """Latest position record in each column.
 
 It's a 1-dimensional array with records of type `trade_dt`.
 
@@ -1332,8 +1333,8 @@ class GroupContext(tp.NamedTuple):
     last_val_price: tp.Array1d
     last_value: tp.Array1d
     last_return: tp.Array1d
-    last_oidx: tp.Array1d
-    last_lidx: tp.Array1d
+    order_counts: tp.Array1d
+    log_counts: tp.Array1d
     last_pos_record: tp.RecordArray
     group: int
     group_len: int
@@ -1428,8 +1429,8 @@ class RowContext(tp.NamedTuple):
     last_val_price: tp.Array1d
     last_value: tp.Array1d
     last_return: tp.Array1d
-    last_oidx: tp.Array1d
-    last_lidx: tp.Array1d
+    order_counts: tp.Array1d
+    log_counts: tp.Array1d
     last_pos_record: tp.RecordArray
     i: int
 
@@ -1488,8 +1489,8 @@ class SegmentContext(tp.NamedTuple):
     last_val_price: tp.Array1d
     last_value: tp.Array1d
     last_return: tp.Array1d
-    last_oidx: tp.Array1d
-    last_lidx: tp.Array1d
+    order_counts: tp.Array1d
+    log_counts: tp.Array1d
     last_pos_record: tp.RecordArray
     group: int
     group_len: int
@@ -1567,8 +1568,8 @@ class OrderContext(tp.NamedTuple):
     last_val_price: tp.Array1d
     last_value: tp.Array1d
     last_return: tp.Array1d
-    last_oidx: tp.Array1d
-    last_lidx: tp.Array1d
+    order_counts: tp.Array1d
+    log_counts: tp.Array1d
     last_pos_record: tp.RecordArray
     group: int
     group_len: int
@@ -1660,8 +1661,8 @@ class PostOrderContext(tp.NamedTuple):
     last_val_price: tp.Array1d
     last_value: tp.Array1d
     last_return: tp.Array1d
-    last_oidx: tp.Array1d
-    last_lidx: tp.Array1d
+    order_counts: tp.Array1d
+    log_counts: tp.Array1d
     last_pos_record: tp.RecordArray
     group: int
     group_len: int
@@ -1773,8 +1774,8 @@ class FlexOrderContext(tp.NamedTuple):
     last_val_price: tp.Array1d
     last_value: tp.Array1d
     last_return: tp.Array1d
-    last_oidx: tp.Array1d
-    last_lidx: tp.Array1d
+    order_counts: tp.Array1d
+    log_counts: tp.Array1d
     last_pos_record: tp.RecordArray
     group: int
     group_len: int

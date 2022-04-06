@@ -1713,8 +1713,8 @@ class TestFromOrderFunc:
         np.testing.assert_array_equal(c.last_return, np.array([0.05597598409235705, 0.028482598060884715]))
         np.testing.assert_array_equal(c.last_debt, np.array([0.0, 0.0, 0.0]))
         np.testing.assert_array_equal(c.last_free_cash, np.array([59.39700000000002, 79.69850000000001]))
-        np.testing.assert_array_equal(c.last_oidx, np.array([4, 4, 4]))
-        np.testing.assert_array_equal(c.last_lidx, np.array([4, 4, 4]))
+        np.testing.assert_array_equal(c.order_counts, np.array([5, 5, 5]))
+        np.testing.assert_array_equal(c.log_counts, np.array([5, 5, 5]))
 
     @pytest.mark.parametrize("test_row_wise", [False, True])
     @pytest.mark.parametrize("test_flexible", [False, True])

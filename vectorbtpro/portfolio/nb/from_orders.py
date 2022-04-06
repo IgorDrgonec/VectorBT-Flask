@@ -153,8 +153,8 @@ def simulate_from_orders_nb(
     temp_order_value = np.empty(target_shape[1], dtype=np.float_)
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
-    last_oidx = np.full(target_shape[1], -1, dtype=np.int_)
-    last_lidx = np.full(target_shape[1], -1, dtype=np.int_)
+    order_counts = np.full(target_shape[1], 0, dtype=np.int_)
+    log_counts = np.full(target_shape[1], 0, dtype=np.int_)
     track_cash_earnings = np.any(cash_earnings) or np.any(cash_dividends)
     if track_cash_earnings:
         cash_earnings_out = np.full(target_shape, 0.0, dtype=np.float_)
@@ -292,14 +292,14 @@ def simulate_from_orders_nb(
                     group=group,
                     col=col,
                     i=i,
-                    price_area=price_area,
                     state=state,
-                    update_value=update_value,
                     order=order,
+                    price_area=price_area,
+                    update_value=update_value,
                     order_records=order_records,
-                    last_oidx=last_oidx,
+                    order_counts=order_counts,
                     log_records=log_records,
-                    last_lidx=last_lidx,
+                    log_counts=log_counts,
                 )
 
                 # Update state
@@ -359,9 +359,9 @@ def simulate_from_orders_nb(
 
     return prepare_simout_nb(
         order_records=order_records,
-        last_oidx=last_oidx,
+        order_counts=order_counts,
         log_records=log_records,
-        last_lidx=last_lidx,
+        log_counts=log_counts,
         cash_earnings=cash_earnings_out,
         call_seq=call_seq,
         in_outputs=in_outputs,

@@ -577,7 +577,7 @@ Here's our raw Numba-compiled pipeline (optimization function agnostic):
 ...     group=0
 ... ):
 ...     order_records = np.empty(close.shape, dtype=order_dt)  # (2)!
-...     last_oidx = np.full(close.shape[1], -1, dtype=np.int_)
+...     order_counts = np.full(close.shape[1], 0, dtype=np.int_)
 ...     
 ...     order_value = np.empty(close.shape[1], dtype=np.float_)  # (3)!
 ...     call_seq = np.empty(close.shape[1], dtype=np.int_)
@@ -649,12 +649,11 @@ Here's our raw Numba-compiled pipeline (optimization function agnostic):
 ...                 group=group,
 ...                 col=col,
 ...                 i=i,
-...                 price_area=price_area,
 ...                 state=state,
-...                 update_value=False,
 ...                 order=order,
+...                 price_area=price_area,
 ...                 order_records=order_records,
-...                 last_oidx=last_oidx
+...                 order_counts=order_counts
 ...             )
 ... 
 ...             cash_now = new_state.cash
@@ -665,7 +664,7 @@ Here's our raw Numba-compiled pipeline (optimization function agnostic):
 ... 
 ...     # (16)!
 ...     if order_records.shape[0] > 0:
-...         return generic_nb.repartition_nb(order_records, last_oidx + 1)
+...         return generic_nb.repartition_nb(order_records, order_counts)
 ...     return order_records.flatten()
 ```
 

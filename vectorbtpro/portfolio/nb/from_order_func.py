@@ -759,8 +759,8 @@ def simulate_nb(
     last_free_cash = last_cash.copy()
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
-    last_oidx = np.full(target_shape[1], -1, dtype=np.int_)
-    last_lidx = np.full(target_shape[1], -1, dtype=np.int_)
+    order_counts = np.full(target_shape[1], 0, dtype=np.int)
+    log_counts = np.full(target_shape[1], 0, dtype=np.int)
 
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
@@ -799,8 +799,8 @@ def simulate_nb(
         last_val_price=last_val_price,
         last_value=last_value,
         last_return=last_return,
-        last_oidx=last_oidx,
-        last_lidx=last_lidx,
+        order_counts=order_counts,
+        log_counts=log_counts,
         last_pos_record=last_pos_record,
     )
     pre_sim_out = pre_sim_func_nb(pre_sim_ctx, *pre_sim_args)
@@ -844,8 +844,8 @@ def simulate_nb(
             last_val_price=last_val_price,
             last_value=last_value,
             last_return=last_return,
-            last_oidx=last_oidx,
-            last_lidx=last_lidx,
+            order_counts=order_counts,
+            log_counts=log_counts,
             last_pos_record=last_pos_record,
             group=group,
             group_len=group_len,
@@ -924,8 +924,8 @@ def simulate_nb(
                     last_val_price=last_val_price,
                     last_value=last_value,
                     last_return=last_return,
-                    last_oidx=last_oidx,
-                    last_lidx=last_lidx,
+                    order_counts=order_counts,
+                    log_counts=log_counts,
                     last_pos_record=last_pos_record,
                     group=group,
                     group_len=group_len,
@@ -1040,8 +1040,8 @@ def simulate_nb(
                         last_val_price=last_val_price,
                         last_value=last_value,
                         last_return=last_return,
-                        last_oidx=last_oidx,
-                        last_lidx=last_lidx,
+                        order_counts=order_counts,
+                        log_counts=log_counts,
                         last_pos_record=last_pos_record,
                         group=group,
                         group_len=group_len,
@@ -1089,14 +1089,14 @@ def simulate_nb(
                         group=group,
                         col=col,
                         i=i,
-                        price_area=price_area,
                         state=state,
-                        update_value=update_value,
                         order=order,
+                        price_area=price_area,
+                        update_value=update_value,
                         order_records=order_records,
-                        last_oidx=last_oidx,
+                        order_counts=order_counts,
                         log_records=log_records,
-                        last_lidx=last_lidx,
+                        log_counts=log_counts,
                     )
 
                     # Update state
@@ -1174,8 +1174,8 @@ def simulate_nb(
                         last_val_price=last_val_price,
                         last_value=last_value,
                         last_return=last_return,
-                        last_oidx=last_oidx,
-                        last_lidx=last_lidx,
+                        order_counts=order_counts,
+                        log_counts=log_counts,
                         last_pos_record=last_pos_record,
                         group=group,
                         group_len=group_len,
@@ -1288,8 +1288,8 @@ def simulate_nb(
                     last_val_price=last_val_price,
                     last_value=last_value,
                     last_return=last_return,
-                    last_oidx=last_oidx,
-                    last_lidx=last_lidx,
+                    order_counts=order_counts,
+                    log_counts=log_counts,
                     last_pos_record=last_pos_record,
                     group=group,
                     group_len=group_len,
@@ -1334,8 +1334,8 @@ def simulate_nb(
             last_val_price=last_val_price,
             last_value=last_value,
             last_return=last_return,
-            last_oidx=last_oidx,
-            last_lidx=last_lidx,
+            order_counts=order_counts,
+            log_counts=log_counts,
             last_pos_record=last_pos_record,
             group=group,
             group_len=group_len,
@@ -1378,17 +1378,17 @@ def simulate_nb(
         last_val_price=last_val_price,
         last_value=last_value,
         last_return=last_return,
-        last_oidx=last_oidx,
-        last_lidx=last_lidx,
+        order_counts=order_counts,
+        log_counts=log_counts,
         last_pos_record=last_pos_record,
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
     return prepare_simout_nb(
         order_records=order_records,
-        last_oidx=last_oidx,
+        order_counts=order_counts,
         log_records=log_records,
-        last_lidx=last_lidx,
+        log_counts=log_counts,
         cash_earnings=cash_earnings,
         call_seq=call_seq,
         in_outputs=in_outputs,
@@ -1619,8 +1619,8 @@ def simulate_row_wise_nb(
     last_free_cash = last_cash.copy()
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
-    last_oidx = np.full(target_shape[1], -1, dtype=np.int_)
-    last_lidx = np.full(target_shape[1], -1, dtype=np.int_)
+    order_counts = np.full(target_shape[1], 0, dtype=np.int)
+    log_counts = np.full(target_shape[1], 0, dtype=np.int)
 
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
@@ -1659,8 +1659,8 @@ def simulate_row_wise_nb(
         last_val_price=last_val_price,
         last_value=last_value,
         last_return=last_return,
-        last_oidx=last_oidx,
-        last_lidx=last_lidx,
+        order_counts=order_counts,
+        log_counts=log_counts,
         last_pos_record=last_pos_record,
     )
     pre_sim_out = pre_sim_func_nb(pre_sim_ctx, *pre_sim_args)
@@ -1701,8 +1701,8 @@ def simulate_row_wise_nb(
             last_val_price=last_val_price,
             last_value=last_value,
             last_return=last_return,
-            last_oidx=last_oidx,
-            last_lidx=last_lidx,
+            order_counts=order_counts,
+            log_counts=log_counts,
             last_pos_record=last_pos_record,
             i=i,
         )
@@ -1781,8 +1781,8 @@ def simulate_row_wise_nb(
                     last_val_price=last_val_price,
                     last_value=last_value,
                     last_return=last_return,
-                    last_oidx=last_oidx,
-                    last_lidx=last_lidx,
+                    order_counts=order_counts,
+                    log_counts=log_counts,
                     last_pos_record=last_pos_record,
                     group=group,
                     group_len=group_len,
@@ -1897,8 +1897,8 @@ def simulate_row_wise_nb(
                         last_val_price=last_val_price,
                         last_value=last_value,
                         last_return=last_return,
-                        last_oidx=last_oidx,
-                        last_lidx=last_lidx,
+                        order_counts=order_counts,
+                        log_counts=log_counts,
                         last_pos_record=last_pos_record,
                         group=group,
                         group_len=group_len,
@@ -1946,14 +1946,14 @@ def simulate_row_wise_nb(
                         group=group,
                         col=col,
                         i=i,
-                        price_area=price_area,
                         state=state,
-                        update_value=update_value,
                         order=order,
+                        price_area=price_area,
+                        update_value=update_value,
                         order_records=order_records,
-                        last_oidx=last_oidx,
+                        order_counts=order_counts,
                         log_records=log_records,
-                        last_lidx=last_lidx,
+                        log_counts=log_counts,
                     )
 
                     # Update state
@@ -2031,8 +2031,8 @@ def simulate_row_wise_nb(
                         last_val_price=last_val_price,
                         last_value=last_value,
                         last_return=last_return,
-                        last_oidx=last_oidx,
-                        last_lidx=last_lidx,
+                        order_counts=order_counts,
+                        log_counts=log_counts,
                         last_pos_record=last_pos_record,
                         group=group,
                         group_len=group_len,
@@ -2145,8 +2145,8 @@ def simulate_row_wise_nb(
                     last_val_price=last_val_price,
                     last_value=last_value,
                     last_return=last_return,
-                    last_oidx=last_oidx,
-                    last_lidx=last_lidx,
+                    order_counts=order_counts,
+                    log_counts=log_counts,
                     last_pos_record=last_pos_record,
                     group=group,
                     group_len=group_len,
@@ -2191,8 +2191,8 @@ def simulate_row_wise_nb(
             last_val_price=last_val_price,
             last_value=last_value,
             last_return=last_return,
-            last_oidx=last_oidx,
-            last_lidx=last_lidx,
+            order_counts=order_counts,
+            log_counts=log_counts,
             last_pos_record=last_pos_record,
             i=i,
         )
@@ -2232,17 +2232,17 @@ def simulate_row_wise_nb(
         last_val_price=last_val_price,
         last_value=last_value,
         last_return=last_return,
-        last_oidx=last_oidx,
-        last_lidx=last_lidx,
+        order_counts=order_counts,
+        log_counts=log_counts,
         last_pos_record=last_pos_record,
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
     return prepare_simout_nb(
         order_records=order_records,
-        last_oidx=last_oidx,
+        order_counts=order_counts,
         log_records=log_records,
-        last_lidx=last_lidx,
+        log_counts=log_counts,
         cash_earnings=cash_earnings,
         call_seq=call_seq,
         in_outputs=in_outputs,
@@ -2622,8 +2622,8 @@ def flex_simulate_nb(
     last_free_cash = last_cash.copy()
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
-    last_oidx = np.full(target_shape[1], -1, dtype=np.int_)
-    last_lidx = np.full(target_shape[1], -1, dtype=np.int_)
+    order_counts = np.full(target_shape[1], 0, dtype=np.int)
+    log_counts = np.full(target_shape[1], 0, dtype=np.int)
 
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
@@ -2662,8 +2662,8 @@ def flex_simulate_nb(
         last_val_price=last_val_price,
         last_value=last_value,
         last_return=last_return,
-        last_oidx=last_oidx,
-        last_lidx=last_lidx,
+        order_counts=order_counts,
+        log_counts=log_counts,
         last_pos_record=last_pos_record,
     )
     pre_sim_out = pre_sim_func_nb(pre_sim_ctx, *pre_sim_args)
@@ -2707,8 +2707,8 @@ def flex_simulate_nb(
             last_val_price=last_val_price,
             last_value=last_value,
             last_return=last_return,
-            last_oidx=last_oidx,
-            last_lidx=last_lidx,
+            order_counts=order_counts,
+            log_counts=log_counts,
             last_pos_record=last_pos_record,
             group=group,
             group_len=group_len,
@@ -2786,8 +2786,8 @@ def flex_simulate_nb(
                     last_val_price=last_val_price,
                     last_value=last_value,
                     last_return=last_return,
-                    last_oidx=last_oidx,
-                    last_lidx=last_lidx,
+                    order_counts=order_counts,
+                    log_counts=log_counts,
                     last_pos_record=last_pos_record,
                     group=group,
                     group_len=group_len,
@@ -2883,8 +2883,8 @@ def flex_simulate_nb(
                         last_val_price=last_val_price,
                         last_value=last_value,
                         last_return=last_return,
-                        last_oidx=last_oidx,
-                        last_lidx=last_lidx,
+                        order_counts=order_counts,
+                        log_counts=log_counts,
                         last_pos_record=last_pos_record,
                         group=group,
                         group_len=group_len,
@@ -2945,14 +2945,14 @@ def flex_simulate_nb(
                         group=group,
                         col=col,
                         i=i,
-                        price_area=price_area,
                         state=state,
-                        update_value=update_value,
                         order=order,
+                        price_area=price_area,
+                        update_value=update_value,
                         order_records=order_records,
-                        last_oidx=last_oidx,
+                        order_counts=order_counts,
                         log_records=log_records,
-                        last_lidx=last_lidx,
+                        log_counts=log_counts,
                     )
 
                     # Update state
@@ -3036,8 +3036,8 @@ def flex_simulate_nb(
                         last_val_price=last_val_price,
                         last_value=last_value,
                         last_return=last_return,
-                        last_oidx=last_oidx,
-                        last_lidx=last_lidx,
+                        order_counts=order_counts,
+                        log_counts=log_counts,
                         last_pos_record=last_pos_record,
                         group=group,
                         group_len=group_len,
@@ -3150,8 +3150,8 @@ def flex_simulate_nb(
                     last_val_price=last_val_price,
                     last_value=last_value,
                     last_return=last_return,
-                    last_oidx=last_oidx,
-                    last_lidx=last_lidx,
+                    order_counts=order_counts,
+                    log_counts=log_counts,
                     last_pos_record=last_pos_record,
                     group=group,
                     group_len=group_len,
@@ -3196,8 +3196,8 @@ def flex_simulate_nb(
             last_val_price=last_val_price,
             last_value=last_value,
             last_return=last_return,
-            last_oidx=last_oidx,
-            last_lidx=last_lidx,
+            order_counts=order_counts,
+            log_counts=log_counts,
             last_pos_record=last_pos_record,
             group=group,
             group_len=group_len,
@@ -3240,17 +3240,17 @@ def flex_simulate_nb(
         last_val_price=last_val_price,
         last_value=last_value,
         last_return=last_return,
-        last_oidx=last_oidx,
-        last_lidx=last_lidx,
+        order_counts=order_counts,
+        log_counts=log_counts,
         last_pos_record=last_pos_record,
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
     return prepare_simout_nb(
         order_records=order_records,
-        last_oidx=last_oidx,
+        order_counts=order_counts,
         log_records=log_records,
-        last_lidx=last_lidx,
+        log_counts=log_counts,
         cash_earnings=cash_earnings,
         call_seq=None,
         in_outputs=in_outputs,
@@ -3396,8 +3396,8 @@ def flex_simulate_row_wise_nb(
     last_free_cash = last_cash.copy()
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
-    last_oidx = np.full(target_shape[1], -1, dtype=np.int_)
-    last_lidx = np.full(target_shape[1], -1, dtype=np.int_)
+    order_counts = np.full(target_shape[1], 0, dtype=np.int)
+    log_counts = np.full(target_shape[1], 0, dtype=np.int)
 
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
@@ -3436,8 +3436,8 @@ def flex_simulate_row_wise_nb(
         last_val_price=last_val_price,
         last_value=last_value,
         last_return=last_return,
-        last_oidx=last_oidx,
-        last_lidx=last_lidx,
+        order_counts=order_counts,
+        log_counts=log_counts,
         last_pos_record=last_pos_record,
     )
     pre_sim_out = pre_sim_func_nb(pre_sim_ctx, *pre_sim_args)
@@ -3478,8 +3478,8 @@ def flex_simulate_row_wise_nb(
             last_val_price=last_val_price,
             last_value=last_value,
             last_return=last_return,
-            last_oidx=last_oidx,
-            last_lidx=last_lidx,
+            order_counts=order_counts,
+            log_counts=log_counts,
             last_pos_record=last_pos_record,
             i=i,
         )
@@ -3557,8 +3557,8 @@ def flex_simulate_row_wise_nb(
                     last_val_price=last_val_price,
                     last_value=last_value,
                     last_return=last_return,
-                    last_oidx=last_oidx,
-                    last_lidx=last_lidx,
+                    order_counts=order_counts,
+                    log_counts=log_counts,
                     last_pos_record=last_pos_record,
                     group=group,
                     group_len=group_len,
@@ -3654,8 +3654,8 @@ def flex_simulate_row_wise_nb(
                         last_val_price=last_val_price,
                         last_value=last_value,
                         last_return=last_return,
-                        last_oidx=last_oidx,
-                        last_lidx=last_lidx,
+                        order_counts=order_counts,
+                        log_counts=log_counts,
                         last_pos_record=last_pos_record,
                         group=group,
                         group_len=group_len,
@@ -3716,14 +3716,14 @@ def flex_simulate_row_wise_nb(
                         group=group,
                         col=col,
                         i=i,
-                        price_area=price_area,
                         state=state,
-                        update_value=update_value,
                         order=order,
+                        price_area=price_area,
+                        update_value=update_value,
                         order_records=order_records,
-                        last_oidx=last_oidx,
+                        order_counts=order_counts,
                         log_records=log_records,
-                        last_lidx=last_lidx,
+                        log_counts=log_counts,
                     )
 
                     # Update state
@@ -3807,8 +3807,8 @@ def flex_simulate_row_wise_nb(
                         last_val_price=last_val_price,
                         last_value=last_value,
                         last_return=last_return,
-                        last_oidx=last_oidx,
-                        last_lidx=last_lidx,
+                        order_counts=order_counts,
+                        log_counts=log_counts,
                         last_pos_record=last_pos_record,
                         group=group,
                         group_len=group_len,
@@ -3921,8 +3921,8 @@ def flex_simulate_row_wise_nb(
                     last_val_price=last_val_price,
                     last_value=last_value,
                     last_return=last_return,
-                    last_oidx=last_oidx,
-                    last_lidx=last_lidx,
+                    order_counts=order_counts,
+                    log_counts=log_counts,
                     last_pos_record=last_pos_record,
                     group=group,
                     group_len=group_len,
@@ -3967,8 +3967,8 @@ def flex_simulate_row_wise_nb(
             last_val_price=last_val_price,
             last_value=last_value,
             last_return=last_return,
-            last_oidx=last_oidx,
-            last_lidx=last_lidx,
+            order_counts=order_counts,
+            log_counts=log_counts,
             last_pos_record=last_pos_record,
             i=i,
         )
@@ -4008,17 +4008,17 @@ def flex_simulate_row_wise_nb(
         last_val_price=last_val_price,
         last_value=last_value,
         last_return=last_return,
-        last_oidx=last_oidx,
-        last_lidx=last_lidx,
+        order_counts=order_counts,
+        log_counts=log_counts,
         last_pos_record=last_pos_record,
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
     return prepare_simout_nb(
         order_records=order_records,
-        last_oidx=last_oidx,
+        order_counts=order_counts,
         log_records=log_records,
-        last_lidx=last_lidx,
+        log_counts=log_counts,
         cash_earnings=cash_earnings,
         call_seq=None,
         in_outputs=in_outputs,
