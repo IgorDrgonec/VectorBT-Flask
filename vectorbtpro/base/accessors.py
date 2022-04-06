@@ -391,17 +391,21 @@ class BaseAccessor(Wrapping):
         self,
         value_or_func: tp.Union[tp.MaybeArray, tp.Callable],
         *args,
+        inplace: bool = False,
         columns: tp.Optional[tp.MaybeSequence[tp.Hashable]] = None,
         template_context: tp.KwargsLike = None,
         **kwargs,
-    ) -> tp.SeriesFrame:
+    ) -> tp.Optional[tp.SeriesFrame]:
         """Set value at each index point using `vectorbtpro.base.wrapping.ArrayWrapper.get_index_points`.
 
         If `value_or_func` is a function, selects all keyword arguments that were not passed
         to the `get_index_points` method, substitutes any templates, and passes everything to the function.
         As context uses `kwargs`, `template_context`, and various variables such as `i` (iteration index),
         `index_point` (absolute position in the index), `wrapper`, and `obj`."""
-        obj = self.obj.copy()
+        if inplace:
+            obj = self.obj
+        else:
+            obj = self.obj.copy()
         index_points = self.wrapper.get_index_points(**kwargs)
 
         if callable(value_or_func):
@@ -450,23 +454,29 @@ class BaseAccessor(Wrapping):
                 obj.iloc[index_points, obj.columns.get_indexer([columns])[0]] = value_or_func
             else:
                 obj.iloc[index_points, obj.columns.get_indexer(columns)] = value_or_func
+        if inplace:
+            return None
         return obj
 
     def set_between(
         self,
         value_or_func: tp.Union[tp.MaybeArray, tp.Callable],
         *args,
+        inplace: bool = False,
         columns: tp.Optional[tp.MaybeSequence[tp.Hashable]] = None,
         template_context: tp.KwargsLike = None,
         **kwargs,
-    ) -> tp.SeriesFrame:
+    ) -> tp.Optional[tp.SeriesFrame]:
         """Set value at each index range using `vectorbtpro.base.wrapping.ArrayWrapper.get_index_ranges`.
 
         If `value_or_func` is a function, selects all keyword arguments that were not passed
         to the `get_index_points` method, substitutes any templates, and passes everything to the function.
         As context uses `kwargs`, `template_context`, and various variables such as `i` (iteration index),
         `index_slice` (absolute slice of the index), `wrapper`, and `obj`."""
-        obj = self.obj.copy()
+        if inplace:
+            obj = self.obj
+        else:
+            obj = self.obj.copy()
         index_ranges = self.wrapper.get_index_ranges(**kwargs)
 
         if callable(value_or_func):
@@ -503,6 +513,8 @@ class BaseAccessor(Wrapping):
                 obj.iloc[index_ranges[i, 0]: index_ranges[i, 1], obj.columns.get_indexer([columns])[0]] = v
             else:
                 obj.iloc[index_ranges[i, 0]: index_ranges[i, 1], obj.columns.get_indexer(columns)] = v
+        if inplace:
+            return None
         return obj
 
     # ############# Reshaping ############# #
