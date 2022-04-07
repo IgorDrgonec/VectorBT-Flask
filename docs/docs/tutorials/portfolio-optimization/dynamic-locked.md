@@ -645,7 +645,7 @@ Here's our raw Numba-compiled pipeline (optimization function agnostic):
 ...                 val_price=val_price_now,
 ...                 value=value_now,
 ...             )
-...             order_result, new_exec_state = pf_nb.process_order_nb(
+...             new_exec_state, order_result = pf_nb.process_order_nb(
 ...                 group=group,
 ...                 col=col,
 ...                 i=i,
@@ -663,9 +663,7 @@ Here's our raw Numba-compiled pipeline (optimization function agnostic):
 ...             last_debt[col] = new_exec_state.debt
 ... 
 ...     # (16)!
-...     if order_records.shape[0] > 0:
-...         return generic_nb.repartition_nb(order_records, order_counts)
-...     return order_records.flatten()
+...     return generic_nb.repartition_nb(order_records, order_counts)
 ```
 
 1. Any array-like object can be provided as a constant, or per timestamp, asset, or element.

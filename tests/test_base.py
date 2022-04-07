@@ -3278,6 +3278,36 @@ class TestIndexing:
                         bc_arg.ndim == 2,
                     )
 
+    def test_flex_select_nb(self):
+        arr_0d = np.asarray(0)
+        arr_1d = np.asarray([1, 2, 3])
+        arr_2d = np.asarray([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+
+        assert indexing.flex_select_auto_nb(arr_0d, 0, 0) == arr_0d.item()
+        assert indexing.flex_select_auto_nb(arr_0d, 1, 0) == arr_0d.item()
+        assert indexing.flex_select_auto_nb(arr_0d, 0, 1) == arr_0d.item()
+        assert indexing.flex_select_auto_nb(arr_1d, 0, 0, flex_2d=False) == arr_1d[0]
+        assert indexing.flex_select_auto_nb(arr_1d, 1, 0, flex_2d=False) == arr_1d[1]
+        assert indexing.flex_select_auto_nb(arr_1d, 0, 1, flex_2d=False) == arr_1d[0]
+        assert indexing.flex_select_auto_nb(arr_1d, 100, 0, flex_2d=False) == arr_1d[100 % arr_1d.shape[0]]
+        with pytest.raises(Exception):
+            indexing.flex_select_auto_nb(arr_1d, 100, 0, flex_2d=False, rotate_rows=False)
+        assert indexing.flex_select_auto_nb(arr_1d, 0, 0, flex_2d=True) == arr_1d[0]
+        assert indexing.flex_select_auto_nb(arr_1d, 1, 0, flex_2d=True) == arr_1d[0]
+        assert indexing.flex_select_auto_nb(arr_1d, 0, 1, flex_2d=True) == arr_1d[1]
+        assert indexing.flex_select_auto_nb(arr_1d, 0, 100, flex_2d=True) == arr_1d[100 % arr_1d.shape[0]]
+        with pytest.raises(Exception):
+            indexing.flex_select_auto_nb(arr_1d, 0, 100, flex_2d=True, rotate_columns=False)
+        assert indexing.flex_select_auto_nb(arr_2d, 0, 0) == arr_2d[0, 0]
+        assert indexing.flex_select_auto_nb(arr_2d, 1, 0) == arr_2d[1, 0]
+        assert indexing.flex_select_auto_nb(arr_2d, 0, 1) == arr_2d[0, 1]
+        assert indexing.flex_select_auto_nb(arr_2d, 100, 0) == arr_2d[100 % arr_2d.shape[0], 0]
+        with pytest.raises(Exception):
+            indexing.flex_select_auto_nb(arr_2d, 100, 0, rotate_rows=False)
+        assert indexing.flex_select_auto_nb(arr_2d, 0, 100) == arr_2d[0, 100 % arr_2d.shape[1]]
+        with pytest.raises(Exception):
+            indexing.flex_select_auto_nb(arr_2d, 0, 100, rotate_columns=False)
+
 
 # ############# combining.py ############# #
 

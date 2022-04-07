@@ -5,6 +5,7 @@
 import numpy as np
 import pandas as pd
 
+from vectorbtpro._settings import settings
 from vectorbtpro import _typing as tp
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import checks
@@ -351,8 +352,21 @@ def flex_choose_i_and_col_nb(a: tp.Array, flex_2d: bool = True) -> tp.Tuple[int,
     return i, col
 
 
+_rotate_rows = settings["indexing"]["rotate_rows"]
+_rotate_columns = settings["indexing"]["rotate_columns"]
+
+
 @register_jitted(cache=True)
-def flex_select_nb(a: tp.Array, i: int, col: int, flex_i: int, flex_col: int, flex_2d: bool = True) -> tp.Any:
+def flex_select_nb(
+    a: tp.Array,
+    i: int,
+    col: int,
+    flex_i: int,
+    flex_col: int,
+    flex_2d: bool = True,
+    rotate_rows: bool = _rotate_rows,
+    rotate_columns: bool = _rotate_columns,
+) -> tp.Any:
     """Select element of `a` as if it has been broadcast."""
     if flex_i == -1:
         flex_i = i
@@ -362,13 +376,30 @@ def flex_select_nb(a: tp.Array, i: int, col: int, flex_i: int, flex_col: int, fl
         return a.item()
     if a.ndim == 1:
         if flex_2d:
-            return a[int(flex_col) % a.shape[0]]
-        return a[flex_i % a.shape[0]]
-    return a[flex_i % a.shape[0], int(flex_col) % a.shape[1]]
+            if rotate_columns:
+                return a[int(flex_col) % a.shape[0]]
+            return a[int(flex_col)]
+        if rotate_rows:
+            return a[int(flex_i) % a.shape[0]]
+        return a[int(flex_i)]
+    if rotate_rows and rotate_columns:
+        return a[int(flex_i) % a.shape[0], int(flex_col) % a.shape[1]]
+    if rotate_rows:
+        return a[int(flex_i) % a.shape[0], int(flex_col)]
+    if rotate_columns:
+        return a[int(flex_i), int(flex_col) % a.shape[1]]
+    return a[int(flex_i), int(flex_col)]
 
 
 @register_jitted(cache=True)
-def flex_select_auto_nb(a: tp.Array, i: int, col: int, flex_2d: bool = True) -> tp.Any:
+def flex_select_auto_nb(
+    a: tp.Array,
+    i: int = 0,
+    col: int = 0,
+    flex_2d: bool = True,
+    rotate_rows: bool = _rotate_rows,
+    rotate_columns: bool = _rotate_columns,
+) -> tp.Any:
     """Combines `flex_choose_i_and_col_nb` and `flex_select_nb`."""
     flex_i, flex_col = flex_choose_i_and_col_nb(a, flex_2d)
-    return flex_select_nb(a, i, col, flex_i, flex_col, flex_2d)
+    return flex_select_nb(a, i, col, flex_i, flex_col, flex_2d, rotate_rows, rotate_columns)

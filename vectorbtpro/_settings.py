@@ -73,7 +73,7 @@ False
 
 Bonus: You can do the same with any sub-config inside `settings`!
 
-Some settings (such as Numba-related ones) are applied on import, so changing them during the runtime
+Some settings (such as Numba-related ones) are applied only on import, so changing them during the runtime
 will have no effect. In this case, change the settings, save them to the disk, and create an environment
 variable that holds the path to the file - vectorbt will load it before any other module.
 
@@ -123,7 +123,7 @@ __pdoc__["caching"] = Sub(
 !!! hint
     Apply setting `register_lazily` on startup to register all unbound cacheables.
     
-    Setting `use_cached_accessors` is applied only once.
+    Setting `use_cached_accessors` is applied only on import.
 
 ```python
 ${config_doc}
@@ -166,7 +166,7 @@ __pdoc__["jitting"] = Sub(
 `vectorbtpro.utils.jitting`.
 
 !!! note
-    Options (with `_options` suffix) are applied only once. 
+    Options (with `_options` suffix) are applied only on import. 
     
     Keyword arguments (with `_kwargs` suffix) are applied right away.
 
@@ -206,7 +206,7 @@ __pdoc__["math"] = Sub(
     """Sub-config with settings applied across `vectorbtpro.utils.math_`.
 
 !!! note
-    All math settings are applied only once.
+    All math settings are applied only on import.
 
 ```python
 ${config_doc}
@@ -279,7 +279,7 @@ __pdoc__["chunking"] = Sub(
 and `vectorbtpro.utils.chunking`.
 
 !!! note
-    Options (with `_options` suffix) and setting `disable_machinery` are applied only once.
+    Options (with `_options` suffix) and setting `disable_machinery` are applied only on import.
 
 ```python
 ${config_doc}
@@ -366,6 +366,25 @@ ${config_doc}
 )
 
 _settings["broadcasting"] = broadcasting
+
+indexing = ChildDict(
+    rotate_rows=False,
+    rotate_columns=False,
+)
+"""_"""
+
+__pdoc__["indexing"] = Sub(
+    """Sub-config with settings applied to indexing functions across `vectorbtpro.base`.
+    
+!!! note
+    Options `rotate_rows` and `rotate_columns` are applied only on import. 
+
+```python
+${config_doc}
+```"""
+)
+
+_settings["indexing"] = indexing
 
 wrapping = ChildDict(
     column_only_select=False,

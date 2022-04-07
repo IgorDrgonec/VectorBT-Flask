@@ -288,7 +288,7 @@ def simulate_from_orders_nb(
                     val_price=val_price_now,
                     value=value_now,
                 )
-                order_result, new_exec_state = process_order_nb(
+                new_exec_state, order_result = process_order_nb(
                     group=group,
                     col=col,
                     i=i,

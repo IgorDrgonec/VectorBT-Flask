@@ -702,7 +702,7 @@ def process_order_nb(
     order_counts: tp.Optional[tp.Array1d] = None,
     log_records: tp.Optional[tp.RecordArray2d] = None,
     log_counts: tp.Optional[tp.Array1d] = None,
-) -> tp.Tuple[OrderResult, ExecState]:
+) -> tp.Tuple[ExecState, OrderResult]:
     """Process an order by executing it, saving relevant information to the logs, and returning a new state."""
 
     # Execute the order
@@ -738,11 +738,11 @@ def process_order_nb(
                 order,
                 new_exec_state,
                 order_result,
-                order_counts[col] - 1 if is_filled else -1,
+                order_counts[col] - 1 if order_counts is not None and is_filled else -1,
             )
             log_counts[col] += 1
 
-    return order_result, new_exec_state
+    return new_exec_state, order_result
 
 
 @register_jitted(cache=True)
@@ -1010,17 +1010,11 @@ def prepare_simout_nb(
     in_outputs: tp.Optional[tp.NamedTuple] = None,
 ) -> SimulationOutput:
     """Prepare simulation output."""
-    if order_records.shape[0] > 0:
-        order_records_repart = generic_nb.repartition_nb(order_records, order_counts)
-    else:
-        order_records_repart = order_records.flatten()
-    if log_records.shape[0] > 0:
-        log_records_repart = generic_nb.repartition_nb(log_records, log_counts)
-    else:
-        log_records_repart = log_records.flatten()
+    order_records_flat = generic_nb.repartition_nb(order_records, order_counts)
+    log_records_flat = generic_nb.repartition_nb(log_records, log_counts)
     return SimulationOutput(
-        order_records=order_records_repart,
-        log_records=log_records_repart,
+        order_records=order_records_flat,
+        log_records=log_records_flat,
         cash_earnings=cash_earnings,
         call_seq=call_seq,
         in_outputs=in_outputs,

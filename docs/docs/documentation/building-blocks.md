@@ -496,7 +496,7 @@ Remember how vectorbt specializes at taking a Pandas object, extracting its NumP
 processing the array, and converting the results back into a Pandas format? 
 The last part is done by the class [ArrayWrapper](/api/base/wrapping/#vectorbtpro.base.wrapping.ArrayWrapper), 
 which captures all the necessary metadata, such as the index, columns, and number of dimensions, 
-and exposes methods such as  [ArrayWrapper.wrap](/api/base/wrapping/#vectorbtpro.base.wrapping.ArrayWrapper.wrap) 
+and exposes methods such as [ArrayWrapper.wrap](/api/base/wrapping/#vectorbtpro.base.wrapping.ArrayWrapper.wrap) 
 to convert a NumPy object back into a Pandas format. 
 
 Class [ArrayWrapper](/api/base/wrapping/#vectorbtpro.base.wrapping.ArrayWrapper) combines many concepts we 
@@ -605,7 +605,7 @@ to manage an arbitrary number of shape-compatible array-like objects. Instead of
 Pandas objects, it takes an array wrapper, and all other objects and arrays in any format (preferably NumPy), 
 and wraps them using this wrapper. Additionally, any [Wrapping](/api/base/wrapping/#vectorbtpro.base.wrapping.Wrapping) 
 subclass can utilize its wrapper to perform Pandas indexing on any kind of objects, including NumPy 
-arrays, becausem[ArrayWrapper](/api/base/wrapping/#vectorbtpro.base.wrapping.ArrayWrapper) can translate 
+arrays, because [ArrayWrapper](/api/base/wrapping/#vectorbtpro.base.wrapping.ArrayWrapper) can translate 
 a Pandas indexing operation into universal row, column, and group indices. 
 
 Coming back to our `CorrStats` class. There are two issues with the current implementation:

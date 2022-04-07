@@ -1085,7 +1085,7 @@ def simulate_nb(
                         val_price=val_price_now,
                         value=value_now,
                     )
-                    order_result, new_exec_state = process_order_nb(
+                    new_exec_state, order_result = process_order_nb(
                         group=group,
                         col=col,
                         i=i,
@@ -1942,7 +1942,7 @@ def simulate_row_wise_nb(
                         val_price=val_price_now,
                         value=value_now,
                     )
-                    order_result, new_exec_state = process_order_nb(
+                    new_exec_state, order_result = process_order_nb(
                         group=group,
                         col=col,
                         i=i,
@@ -2941,7 +2941,7 @@ def flex_simulate_nb(
                         val_price=val_price_now,
                         value=value_now,
                     )
-                    order_result, new_exec_state = process_order_nb(
+                    new_exec_state, order_result = process_order_nb(
                         group=group,
                         col=col,
                         i=i,
@@ -3712,7 +3712,7 @@ def flex_simulate_row_wise_nb(
                         val_price=val_price_now,
                         value=value_now,
                     )
-                    order_result, new_exec_state = process_order_nb(
+                    new_exec_state, order_result = process_order_nb(
                         group=group,
                         col=col,
                         i=i,

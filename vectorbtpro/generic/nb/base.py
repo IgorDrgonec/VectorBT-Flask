@@ -980,6 +980,8 @@ def value_counts_per_row_nb(codes: tp.Array2d, n_uniques: int) -> tp.Array2d:
 @register_jitted(cache=True)
 def repartition_nb(arr: tp.Array2d, counts: tp.Array1d) -> tp.Array1d:
     """Repartition a 2-dimensional array into a 1-dimensional by removing empty elements."""
+    if arr.shape[0] == 0:
+        return arr.flatten()
     out = np.empty(np.sum(counts), dtype=arr.dtype)
     j = 0
     for col in range(counts.shape[0]):
