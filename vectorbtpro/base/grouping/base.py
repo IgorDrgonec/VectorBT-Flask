@@ -116,7 +116,7 @@ class Grouper(Configured):
     All properties are read-only to enable caching.
 
     !!! note
-        Columns must build groups that are coherent and sorted for using `get_group_lens_nb`.
+        Columns must form monolithic groups for using `get_group_lens_nb`.
 
     !!! note
         This class is meant to be immutable. To change any attribute, use `Grouper.replace`."""
@@ -309,7 +309,7 @@ class Grouper(Configured):
 
     @cached_method(whitelist=True)
     def is_sorted(self, group_by: tp.GroupByLike = None, **kwargs) -> bool:
-        """Return whether groups are coherent and sorted."""
+        """Return whether groups are monolithic, sorted."""
         group_by = self.resolve_group_by(group_by=group_by, **kwargs)
         groups = self.get_groups(group_by=group_by)
         return is_sorted(groups)
@@ -321,7 +321,7 @@ class Grouper(Configured):
         if group_by is None or group_by is False:  # no grouping
             return np.full(len(self.index), 1)
         if not self.is_sorted(group_by=group_by):
-            raise ValueError("group_by must lead to groups that are coherent and sorted")
+            raise ValueError("group_by must form monolithic, sorted groups")
         groups = self.get_groups(group_by=group_by)
         func = jit_reg.resolve_option(nb.get_group_lens_nb, jitted)
         return func(groups)

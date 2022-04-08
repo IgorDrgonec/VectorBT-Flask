@@ -1214,165 +1214,136 @@ class TestArrayWrapper:
         wrapper = vbt.ArrayWrapper.from_obj(pd.Series(np.arange(len(index)), index=index))
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(every=2, closed_start=False, closed_end=False),
-            np.array([[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12], [13, 14], [15, 16]])
+            np.array([[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12], [13, 14], [15, 16]]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(every=2, closed_start=True, closed_end=False),
-            np.array([[0, 2], [2, 4], [4, 6], [6, 8], [8, 10], [10, 12], [12, 14], [14, 16]])
+            np.array([[0, 2], [2, 4], [4, 6], [6, 8], [8, 10], [10, 12], [12, 14], [14, 16]]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(every=2, closed_start=False, closed_end=True),
-            np.array([[1, 3], [3, 5], [5, 7], [7, 9], [9, 11], [11, 13], [13, 15], [15, 17]])
+            np.array([[1, 3], [3, 5], [5, 7], [7, 9], [9, 11], [11, 13], [13, 15], [15, 17]]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(every=2, closed_start=True, closed_end=True),
-            np.array([[0, 3], [2, 5], [4, 7], [6, 9], [8, 11], [10, 13], [12, 15], [14, 17]])
+            np.array([[0, 3], [2, 5], [4, 7], [6, 9], [8, 11], [10, 13], [12, 15], [14, 17]]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(every=2, start=5, end=10, closed_start=False, closed_end=False),
-            np.array([[6, 7], [8, 9]])
+            np.array([[6, 7], [8, 9]]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(every=2, start=5, end=10, closed_start=True, closed_end=False),
-            np.array([[5, 7], [7, 9]])
+            np.array([[5, 7], [7, 9]]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(every=2, start=5, end=10, closed_start=False, closed_end=True),
-            np.array([[6, 8], [8, 10]])
+            np.array([[6, 8], [8, 10]]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(every=2, start=5, end=10, closed_start=True, closed_end=True),
-            np.array([[5, 8], [7, 10]])
+            np.array([[5, 8], [7, 10]]),
         )
         np.testing.assert_array_equal(
-            wrapper.get_index_ranges(every=4, lookback_period=1),
-            np.array([[0, 1], [4, 5], [8, 9], [12, 13], [16, 17]])
+            wrapper.get_index_ranges(every=4, lookback_period=1), np.array([[0, 1], [4, 5], [8, 9], [12, 13], [16, 17]])
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(every=4, lookback_period=1, closed_end=True),
-            np.array([[0, 2], [4, 6], [8, 10], [12, 14]])
+            np.array([[0, 2], [4, 6], [8, 10], [12, 14]]),
         )
         np.testing.assert_array_equal(
-            wrapper.get_index_ranges(every=2, start=5, end=10, lookback_period=1),
-            np.array([[5, 6], [7, 8], [9, 10]])
+            wrapper.get_index_ranges(every=2, start=5, end=10, lookback_period=1), np.array([[5, 6], [7, 8], [9, 10]])
         )
         np.testing.assert_array_equal(
-            wrapper.get_index_ranges(every=2, start=5, end=10, fixed_start=True),
-            np.array([[5, 7], [5, 9]])
+            wrapper.get_index_ranges(every=2, start=5, end=10, fixed_start=True), np.array([[5, 7], [5, 9]])
         )
         with pytest.raises(Exception):
             wrapper.get_index_ranges(every=2, start=5, end=10, fixed_start=True, lookback_period=1)
 
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(every="5h", closed_start=False, closed_end=False),
-            np.array([[1, 2], [2, 4], [4, 5], [6, 7], [7, 9], [9, 10], [11, 12], [12, 14], [14, 15]])
+            np.array([[1, 2], [2, 4], [4, 5], [6, 7], [7, 9], [9, 10], [11, 12], [12, 14], [14, 15]]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(every="5h", closed_start=True, closed_end=False),
-            np.array([[0, 2], [2, 4], [4, 5], [5, 7], [7, 9], [9, 10], [10, 12], [12, 14], [14, 15]])
+            np.array([[0, 2], [2, 4], [4, 5], [5, 7], [7, 9], [9, 10], [10, 12], [12, 14], [14, 15]]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(every="5h", closed_start=False, closed_end=True),
-            np.array([[1, 2], [2, 4], [4, 6], [6, 7], [7, 9], [9, 11], [11, 12], [12, 14], [14, 16]])
+            np.array([[1, 2], [2, 4], [4, 6], [6, 7], [7, 9], [9, 11], [11, 12], [12, 14], [14, 16]]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(every="5h", closed_start=True, closed_end=True),
-            np.array([[0, 2], [2, 4], [4, 6], [5, 7], [7, 9], [9, 11], [10, 12], [12, 14], [14, 16]])
+            np.array([[0, 2], [2, 4], [4, 6], [5, 7], [7, 9], [9, 11], [10, 12], [12, 14], [14, 16]]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(every="5h", add_start_delta="1h", add_end_delta="1h"),
-            np.array([[1, 2], [2, 4], [4, 6], [6, 7], [7, 9], [9, 11], [11, 12], [12, 14], [14, 16]])
+            np.array([[1, 2], [2, 4], [4, 6], [6, 7], [7, 9], [9, 11], [11, 12], [12, 14], [14, 16]]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(every="5h", start=5),
-            np.array([[5, 7], [7, 9], [9, 10], [10, 12], [12, 14], [14, 15]])
+            np.array([[5, 7], [7, 9], [9, 10], [10, 12], [12, 14], [14, 15]]),
         )
         np.testing.assert_array_equal(
-            wrapper.get_index_ranges(every="5h", start=5, end=12),
-            np.array([[5, 7], [7, 9], [9, 10], [10, 12]])
+            wrapper.get_index_ranges(every="5h", start=5, end=12), np.array([[5, 7], [7, 9], [9, 10], [10, 12]])
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(every="5h", start=wrapper.index[5]),
-            np.array([[5, 7], [7, 9], [9, 10], [10, 12], [12, 14], [14, 15]])
+            np.array([[5, 7], [7, 9], [9, 10], [10, 12], [12, 14], [14, 15]]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(every="5h", start=wrapper.index[5], end=wrapper.index[12]),
-            np.array([[5, 7], [7, 9], [9, 10], [10, 12]])
+            np.array([[5, 7], [7, 9], [9, 10], [10, 12]]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(every="5h", start="2020-01-01 15:00:00"),
-            np.array([[5, 7], [7, 9], [9, 10], [10, 12], [12, 14], [14, 15]])
+            np.array([[5, 7], [7, 9], [9, 10], [10, 12], [12, 14], [14, 15]]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(every="5h", start="2020-01-01 15:00:00", end="2020-01-02 12:00:00"),
-            np.array([[5, 7], [7, 9], [9, 10], [10, 12]])
+            np.array([[5, 7], [7, 9], [9, 10], [10, 12]]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(every="5h", start="2020-01-01 15:00:00", fixed_start=True),
-            np.array([[5, 7], [5, 9], [5, 10], [5, 12], [5, 14], [5, 15]])
+            np.array([[5, 7], [5, 9], [5, 10], [5, 12], [5, 14], [5, 15]]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(every="5h", lookback_period="12h"),
-            np.array([[0, 4], [2, 6], [4, 8], [5, 9], [7, 11], [9, 13], [10, 14], [12, 16]])
+            np.array([[0, 4], [2, 6], [4, 8], [5, 9], [7, 11], [9, 13], [10, 14], [12, 16]]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(every="5h", lookback_period=4),
-            np.array([[0, 4], [2, 6], [4, 8], [5, 9], [7, 11], [9, 13], [10, 14], [12, 16]])
+            np.array([[0, 4], [2, 6], [4, 8], [5, 9], [7, 11], [9, 13], [10, 14], [12, 16]]),
         )
 
+        np.testing.assert_array_equal(wrapper.get_index_ranges(), np.array([[0, 17]]))
+        np.testing.assert_array_equal(wrapper.get_index_ranges(start=5), np.array([[5, 17]]))
+        np.testing.assert_array_equal(wrapper.get_index_ranges(end=10), np.array([[0, 10]]))
+        np.testing.assert_array_equal(wrapper.get_index_ranges(start=5, end=10), np.array([[5, 10]]))
         np.testing.assert_array_equal(
-            wrapper.get_index_ranges(),
-            np.array([[0, 17]])
+            wrapper.get_index_ranges(start=wrapper.index[0], end=wrapper.index[10]), np.array([[0, 10]])
         )
-        np.testing.assert_array_equal(
-            wrapper.get_index_ranges(start=5),
-            np.array([[5, 17]])
-        )
-        np.testing.assert_array_equal(
-            wrapper.get_index_ranges(end=10),
-            np.array([[0, 10]])
-        )
-        np.testing.assert_array_equal(
-            wrapper.get_index_ranges(start=5, end=10),
-            np.array([[5, 10]])
-        )
-        np.testing.assert_array_equal(
-            wrapper.get_index_ranges(start=wrapper.index[0], end=wrapper.index[10]),
-            np.array([[0, 10]])
-        )
-        np.testing.assert_array_equal(
-            wrapper.get_index_ranges(start=5, end=[10, 15]),
-            np.array([[5, 10], [5, 15]])
-        )
-        np.testing.assert_array_equal(
-            wrapper.get_index_ranges(start=[5, 7], end=10),
-            np.array([[5, 10], [7, 10]])
-        )
+        np.testing.assert_array_equal(wrapper.get_index_ranges(start=5, end=[10, 15]), np.array([[5, 10], [5, 15]]))
+        np.testing.assert_array_equal(wrapper.get_index_ranges(start=[5, 7], end=10), np.array([[5, 10], [7, 10]]))
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(start=wrapper.index[5], end=[wrapper.index[10], wrapper.index[15]]),
-            np.array([[5, 10], [5, 15]])
+            np.array([[5, 10], [5, 15]]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(start=[wrapper.index[5], wrapper.index[7]], end=wrapper.index[10]),
-            np.array([[5, 10], [7, 10]])
+            np.array([[5, 10], [7, 10]]),
         )
         with pytest.raises(Exception):
             wrapper.get_index_ranges(start=0, end=wrapper.index[10])
         np.testing.assert_array_equal(
-            wrapper.get_index_ranges(start=wrapper.index[0], end=wrapper.index[10], kind="labels"),
-            np.array([[0, 10]])
+            wrapper.get_index_ranges(start=wrapper.index[0], end=wrapper.index[10], kind="labels"), np.array([[0, 10]])
+        )
+        np.testing.assert_array_equal(wrapper.get_index_ranges(end=10, lookback_period=3), np.array([[7, 10]]))
+        np.testing.assert_array_equal(
+            wrapper.get_index_ranges(end=wrapper.index[10], lookback_period=3), np.array([[7, 10]])
         )
         np.testing.assert_array_equal(
-            wrapper.get_index_ranges(end=10, lookback_period=3),
-            np.array([[7, 10]])
-        )
-        np.testing.assert_array_equal(
-            wrapper.get_index_ranges(end=wrapper.index[10], lookback_period=3),
-            np.array([[7, 10]])
-        )
-        np.testing.assert_array_equal(
-            wrapper.get_index_ranges(end=wrapper.index[10], lookback_period="9h"),
-            np.array([[7, 10]])
+            wrapper.get_index_ranges(end=wrapper.index[10], lookback_period="9h"), np.array([[7, 10]])
         )
 
         np.testing.assert_array_equal(
@@ -1381,7 +1352,7 @@ class TestArrayWrapper:
                 end=wrapper.index[10],
                 kind="labels",
             ),
-            np.array([[5, 10]])
+            np.array([[5, 10]]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(
@@ -1389,7 +1360,7 @@ class TestArrayWrapper:
                 end=wrapper.index[10],
                 kind="labels",
             ),
-            np.array([[6, 10]])
+            np.array([[6, 10]]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(
@@ -1397,7 +1368,7 @@ class TestArrayWrapper:
                 end=wrapper.index[10],
                 kind="labels",
             ),
-            np.array([[5, 10]])
+            np.array([[5, 10]]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(
@@ -1405,7 +1376,7 @@ class TestArrayWrapper:
                 end=wrapper.index[10] - pd.Timedelta(nanoseconds=1),
                 kind="labels",
             ),
-            np.array([[5, 10]])
+            np.array([[5, 10]]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(
@@ -1413,7 +1384,7 @@ class TestArrayWrapper:
                 end=wrapper.index[10] + pd.Timedelta(nanoseconds=1),
                 kind="labels",
             ),
-            np.array([[5, 11]])
+            np.array([[5, 11]]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(
@@ -1422,7 +1393,7 @@ class TestArrayWrapper:
                 kind="labels",
                 closed_start=False,
             ),
-            np.array([[6, 10]])
+            np.array([[6, 10]]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(
@@ -1431,7 +1402,7 @@ class TestArrayWrapper:
                 kind="labels",
                 closed_start=False,
             ),
-            np.array([[6, 10]])
+            np.array([[6, 10]]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(
@@ -1440,7 +1411,7 @@ class TestArrayWrapper:
                 kind="labels",
                 closed_end=True,
             ),
-            np.array([[5, 11]])
+            np.array([[5, 11]]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_ranges(
@@ -1449,66 +1420,45 @@ class TestArrayWrapper:
                 kind="labels",
                 closed_end=True,
             ),
-            np.array([[5, 11]])
+            np.array([[5, 11]]),
         )
 
     def test_get_index_points(self):
         index = pd.date_range("2020-01-01", "2020-01-03", freq="3h", tz="+0400")
         wrapper = vbt.ArrayWrapper.from_obj(pd.Series(np.arange(len(index)), index=index))
-        np.testing.assert_array_equal(
-            wrapper.get_index_points(every=2),
-            np.array([0, 2, 4, 6, 8, 10, 12, 14, 16])
-        )
-        np.testing.assert_array_equal(
-            wrapper.get_index_points(every=2, start=5, end=10),
-            np.array([5, 7, 9])
-        )
+        np.testing.assert_array_equal(wrapper.get_index_points(every=2), np.array([0, 2, 4, 6, 8, 10, 12, 14, 16]))
+        np.testing.assert_array_equal(wrapper.get_index_points(every=2, start=5, end=10), np.array([5, 7, 9]))
 
         np.testing.assert_array_equal(
-            wrapper.get_index_points(every="5h"),
-            np.array([0, 2, 4, 5, 7, 9, 10, 12, 14, 15])
+            wrapper.get_index_points(every="5h"), np.array([0, 2, 4, 5, 7, 9, 10, 12, 14, 15])
         )
         np.testing.assert_array_equal(
-            wrapper.get_index_points(every="5h", add_delta="1h"),
-            np.array([1, 2, 4, 6, 7, 9, 11, 12, 14, 16])
+            wrapper.get_index_points(every="5h", add_delta="1h"), np.array([1, 2, 4, 6, 7, 9, 11, 12, 14, 16])
         )
         np.testing.assert_array_equal(
-            wrapper.get_index_points(every="5h", start=5),
-            np.array([5, 7, 9, 10, 12, 14, 15])
+            wrapper.get_index_points(every="5h", start=5), np.array([5, 7, 9, 10, 12, 14, 15])
         )
         np.testing.assert_array_equal(
-            wrapper.get_index_points(every="5h", start=5, end=12),
-            np.array([5, 7, 9, 10, 12])
+            wrapper.get_index_points(every="5h", start=5, end=12), np.array([5, 7, 9, 10, 12])
         )
         np.testing.assert_array_equal(
-            wrapper.get_index_points(every="5h", start=wrapper.index[5]),
-            np.array([5, 7, 9, 10, 12, 14, 15])
+            wrapper.get_index_points(every="5h", start=wrapper.index[5]), np.array([5, 7, 9, 10, 12, 14, 15])
         )
         np.testing.assert_array_equal(
             wrapper.get_index_points(every="5h", start=wrapper.index[5], end=wrapper.index[12]),
-            np.array([5, 7, 9, 10, 12])
+            np.array([5, 7, 9, 10, 12]),
         )
         np.testing.assert_array_equal(
-            wrapper.get_index_points(every="5h", start="2020-01-01 15:00:00"),
-            np.array([5, 7, 9, 10, 12, 14, 15])
+            wrapper.get_index_points(every="5h", start="2020-01-01 15:00:00"), np.array([5, 7, 9, 10, 12, 14, 15])
         )
         np.testing.assert_array_equal(
             wrapper.get_index_points(every="5h", start="2020-01-01 15:00:00", end="2020-01-02 12:00:00"),
-            np.array([5, 7, 9, 10, 12])
+            np.array([5, 7, 9, 10, 12]),
         )
 
-        np.testing.assert_array_equal(
-            wrapper.get_index_points(),
-            np.array([0])
-        )
-        np.testing.assert_array_equal(
-            wrapper.get_index_points(start=5),
-            np.array([5])
-        )
-        np.testing.assert_array_equal(
-            wrapper.get_index_points(start=wrapper.index[0]),
-            np.array([0])
-        )
+        np.testing.assert_array_equal(wrapper.get_index_points(), np.array([0]))
+        np.testing.assert_array_equal(wrapper.get_index_points(start=5), np.array([5]))
+        np.testing.assert_array_equal(wrapper.get_index_points(start=wrapper.index[0]), np.array([0]))
 
         np.testing.assert_array_equal(
             wrapper.get_index_points(
@@ -1516,7 +1466,7 @@ class TestArrayWrapper:
                 end=wrapper.index[10],
                 kind="labels",
             ),
-            np.array([5])
+            np.array([5]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_points(
@@ -1524,7 +1474,7 @@ class TestArrayWrapper:
                 end=wrapper.index[10],
                 kind="labels",
             ),
-            np.array([6])
+            np.array([6]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_points(
@@ -1532,7 +1482,7 @@ class TestArrayWrapper:
                 end=wrapper.index[10],
                 kind="labels",
             ),
-            np.array([5])
+            np.array([5]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_points(
@@ -1540,7 +1490,7 @@ class TestArrayWrapper:
                 end=wrapper.index[10] - pd.Timedelta(nanoseconds=1),
                 kind="labels",
             ),
-            np.array([5])
+            np.array([5]),
         )
         np.testing.assert_array_equal(
             wrapper.get_index_points(
@@ -1548,32 +1498,24 @@ class TestArrayWrapper:
                 end=wrapper.index[10] + pd.Timedelta(nanoseconds=1),
                 kind="labels",
             ),
-            np.array([5])
+            np.array([5]),
         )
 
+        np.testing.assert_array_equal(wrapper.get_index_points(on=[5, 10]), np.array([5, 10]))
         np.testing.assert_array_equal(
-            wrapper.get_index_points(on=[5, 10]),
-            np.array([5, 10])
+            wrapper.get_index_points(on=[wrapper.index[5], wrapper.index[10]]), np.array([5, 10])
         )
         np.testing.assert_array_equal(
-            wrapper.get_index_points(on=[wrapper.index[5], wrapper.index[10]]),
-            np.array([5, 10])
+            wrapper.get_index_points(on=[wrapper.index[5], wrapper.index[10]], start=wrapper.index[7]), np.array([10])
         )
         np.testing.assert_array_equal(
-            wrapper.get_index_points(on=[wrapper.index[5], wrapper.index[10]], start=wrapper.index[7]),
-            np.array([10])
+            wrapper.get_index_points(on=[wrapper.index[5], wrapper.index[10]], end=wrapper.index[7]), np.array([5])
         )
         np.testing.assert_array_equal(
-            wrapper.get_index_points(on=[wrapper.index[5], wrapper.index[10]], end=wrapper.index[7]),
-            np.array([5])
+            wrapper.get_index_points(on=[wrapper.index[5], wrapper.index[10]], end=wrapper.index[10]), np.array([5, 10])
         )
         np.testing.assert_array_equal(
-            wrapper.get_index_points(on=[wrapper.index[5], wrapper.index[10]], end=wrapper.index[10]),
-            np.array([5, 10])
-        )
-        np.testing.assert_array_equal(
-            wrapper.get_index_points(on=[wrapper.index[5], wrapper.index[10]], end=10),
-            np.array([5])
+            wrapper.get_index_points(on=[wrapper.index[5], wrapper.index[10]], end=10), np.array([5])
         )
 
 
@@ -3289,24 +3231,30 @@ class TestIndexing:
         assert indexing.flex_select_auto_nb(arr_1d, 0, 0, flex_2d=False) == arr_1d[0]
         assert indexing.flex_select_auto_nb(arr_1d, 1, 0, flex_2d=False) == arr_1d[1]
         assert indexing.flex_select_auto_nb(arr_1d, 0, 1, flex_2d=False) == arr_1d[0]
-        assert indexing.flex_select_auto_nb(arr_1d, 100, 0, flex_2d=False) == arr_1d[100 % arr_1d.shape[0]]
+        assert (
+            indexing.flex_select_auto_nb(arr_1d, 100, 0, flex_2d=False, rotate_rows=True)
+            == arr_1d[100 % arr_1d.shape[0]]
+        )
         with pytest.raises(Exception):
             indexing.flex_select_auto_nb(arr_1d, 100, 0, flex_2d=False, rotate_rows=False)
         assert indexing.flex_select_auto_nb(arr_1d, 0, 0, flex_2d=True) == arr_1d[0]
         assert indexing.flex_select_auto_nb(arr_1d, 1, 0, flex_2d=True) == arr_1d[0]
         assert indexing.flex_select_auto_nb(arr_1d, 0, 1, flex_2d=True) == arr_1d[1]
-        assert indexing.flex_select_auto_nb(arr_1d, 0, 100, flex_2d=True) == arr_1d[100 % arr_1d.shape[0]]
+        assert (
+            indexing.flex_select_auto_nb(arr_1d, 0, 100, flex_2d=True, rotate_cols=True)
+            == arr_1d[100 % arr_1d.shape[0]]
+        )
         with pytest.raises(Exception):
-            indexing.flex_select_auto_nb(arr_1d, 0, 100, flex_2d=True, rotate_columns=False)
+            indexing.flex_select_auto_nb(arr_1d, 0, 100, flex_2d=True, rotate_cols=False)
         assert indexing.flex_select_auto_nb(arr_2d, 0, 0) == arr_2d[0, 0]
         assert indexing.flex_select_auto_nb(arr_2d, 1, 0) == arr_2d[1, 0]
         assert indexing.flex_select_auto_nb(arr_2d, 0, 1) == arr_2d[0, 1]
-        assert indexing.flex_select_auto_nb(arr_2d, 100, 0) == arr_2d[100 % arr_2d.shape[0], 0]
+        assert indexing.flex_select_auto_nb(arr_2d, 100, 0, rotate_rows=True) == arr_2d[100 % arr_2d.shape[0], 0]
         with pytest.raises(Exception):
             indexing.flex_select_auto_nb(arr_2d, 100, 0, rotate_rows=False)
-        assert indexing.flex_select_auto_nb(arr_2d, 0, 100) == arr_2d[0, 100 % arr_2d.shape[1]]
+        assert indexing.flex_select_auto_nb(arr_2d, 0, 100, rotate_cols=True) == arr_2d[0, 100 % arr_2d.shape[1]]
         with pytest.raises(Exception):
-            indexing.flex_select_auto_nb(arr_2d, 0, 100, rotate_columns=False)
+            indexing.flex_select_auto_nb(arr_2d, 0, 100, rotate_cols=False)
 
 
 # ############# combining.py ############# #
@@ -3792,8 +3740,11 @@ class TestAccessors:
         target_df.iloc[4, [1, 2]] = 300
         pd.testing.assert_frame_equal(
             df.vbt.set_between(
-                lambda i: [100, 200, 300][i], vbt.Rep("i"),
-                columns=["b", "c"], start=[0, 2, 4], end=[1, 3, 5],
+                lambda i: [100, 200, 300][i],
+                vbt.Rep("i"),
+                columns=["b", "c"],
+                start=[0, 2, 4],
+                end=[1, 3, 5],
             ),
             target_df,
         )

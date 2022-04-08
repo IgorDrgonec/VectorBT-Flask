@@ -65,7 +65,7 @@ def get_group_lens_nb(groups: tp.Array1d) -> tp.GroupLens:
     """Return the count per group.
 
     !!! note
-        Groups must be coherent and sorted. For unsorted groups, use `get_group_map_nb`."""
+        Columns must form monolithic, sorted groups. For unsorted groups, use `get_group_map_nb`."""
     result = np.empty(groups.shape[0], dtype=np.int_)
     j = 0
     last_group = -1
@@ -73,7 +73,7 @@ def get_group_lens_nb(groups: tp.Array1d) -> tp.GroupLens:
     for i in range(groups.shape[0]):
         cur_group = groups[i]
         if cur_group < last_group:
-            raise ValueError("Groups must be coherent and sorted")
+            raise ValueError("Columns must form monolithic, sorted groups")
         if cur_group != last_group:
             if last_group != -1:
                 # Process previous group

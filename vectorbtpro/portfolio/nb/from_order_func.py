@@ -116,15 +116,19 @@ def sort_call_seq_out_nb(
         else:
             cash_now = ctx.last_cash[col]
             free_cash_now = ctx.last_free_cash[col]
+        exec_state = ExecState(
+            cash=cash_now,
+            position=ctx.last_position[col],
+            debt=ctx.last_debt[col],
+            free_cash=free_cash_now,
+            val_price=ctx.last_val_price[col],
+            value=group_value_now,
+        )
         order_value_out[k] = approx_order_value_nb(
+            exec_state,
             _size,
             _size_type,
             _direction,
-            cash_now,
-            ctx.last_position[col],
-            free_cash_now,
-            ctx.last_val_price[col],
-            group_value_now,
         )
     # Sort by order value
     insert_argsort_nb(order_value_out, call_seq_out)

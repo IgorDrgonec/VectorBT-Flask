@@ -369,7 +369,7 @@ _settings["broadcasting"] = broadcasting
 
 indexing = ChildDict(
     rotate_rows=False,
-    rotate_columns=False,
+    rotate_cols=False,
 )
 """_"""
 
@@ -377,7 +377,7 @@ __pdoc__["indexing"] = Sub(
     """Sub-config with settings applied to indexing functions across `vectorbtpro.base`.
     
 !!! note
-    Options `rotate_rows` and `rotate_columns` are applied only on import. 
+    Options `rotate_rows` and `rotate_cols` are applied only on import. 
 
 ```python
 ${config_doc}

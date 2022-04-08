@@ -222,15 +222,19 @@ def simulate_from_orders_nb(
                     # Same as sort_by_order_value_ctx_nb but with flexible indexing
                     for k in range(group_len):
                         col = from_col + k
+                        exec_state = ExecState(
+                            cash=cash_now,
+                            position=last_position[col],
+                            debt=last_debt[col],
+                            free_cash=free_cash_now,
+                            val_price=last_val_price[col],
+                            value=value_now,
+                        )
                         temp_order_value[k] = approx_order_value_nb(
+                            exec_state,
                             flex_select_auto_nb(size, i, col, flex_2d),
                             flex_select_auto_nb(size_type, i, col, flex_2d),
                             flex_select_auto_nb(direction, i, col, flex_2d),
-                            cash_now,
-                            last_position[col],
-                            free_cash_now,
-                            last_val_price[col],
-                            value_now,
                         )
 
                     # Sort by order value

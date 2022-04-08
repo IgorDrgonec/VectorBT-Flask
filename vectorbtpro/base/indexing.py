@@ -353,7 +353,7 @@ def flex_choose_i_and_col_nb(a: tp.Array, flex_2d: bool = True) -> tp.Tuple[int,
 
 
 _rotate_rows = settings["indexing"]["rotate_rows"]
-_rotate_columns = settings["indexing"]["rotate_columns"]
+_rotate_cols = settings["indexing"]["rotate_cols"]
 
 
 @register_jitted(cache=True)
@@ -365,7 +365,7 @@ def flex_select_nb(
     flex_col: int,
     flex_2d: bool = True,
     rotate_rows: bool = _rotate_rows,
-    rotate_columns: bool = _rotate_columns,
+    rotate_cols: bool = _rotate_cols,
 ) -> tp.Any:
     """Select element of `a` as if it has been broadcast."""
     if flex_i == -1:
@@ -376,17 +376,17 @@ def flex_select_nb(
         return a.item()
     if a.ndim == 1:
         if flex_2d:
-            if rotate_columns:
+            if rotate_cols:
                 return a[int(flex_col) % a.shape[0]]
             return a[int(flex_col)]
         if rotate_rows:
             return a[int(flex_i) % a.shape[0]]
         return a[int(flex_i)]
-    if rotate_rows and rotate_columns:
+    if rotate_rows and rotate_cols:
         return a[int(flex_i) % a.shape[0], int(flex_col) % a.shape[1]]
     if rotate_rows:
         return a[int(flex_i) % a.shape[0], int(flex_col)]
-    if rotate_columns:
+    if rotate_cols:
         return a[int(flex_i), int(flex_col) % a.shape[1]]
     return a[int(flex_i), int(flex_col)]
 
@@ -398,8 +398,8 @@ def flex_select_auto_nb(
     col: int = 0,
     flex_2d: bool = True,
     rotate_rows: bool = _rotate_rows,
-    rotate_columns: bool = _rotate_columns,
+    rotate_cols: bool = _rotate_cols,
 ) -> tp.Any:
     """Combines `flex_choose_i_and_col_nb` and `flex_select_nb`."""
     flex_i, flex_col = flex_choose_i_and_col_nb(a, flex_2d)
-    return flex_select_nb(a, i, col, flex_i, flex_col, flex_2d, rotate_rows, rotate_columns)
+    return flex_select_nb(a, i, col, flex_i, flex_col, flex_2d, rotate_rows, rotate_cols)

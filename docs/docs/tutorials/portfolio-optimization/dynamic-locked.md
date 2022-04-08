@@ -604,15 +604,19 @@ Here's our raw Numba-compiled pipeline (optimization function agnostic):
 ...         
 ...         for col in range(close.shape[1]):
 ...             val_price_now = flex_select_auto_nb(val_price, i, col, True)
+...             exec_state = ExecState(
+...                 cash=cash_now,
+...                 position=last_position[col],
+...                 debt=last_debt[col],
+...                 free_cash=free_cash_now,
+...                 val_price=val_price_now,
+...                 value=value_now,
+...             )
 ...             order_value[col] = pf_nb.approx_order_value_nb(  # (9)!
+...                 exec_state,
 ...                 size[col],
 ...                 SizeType.TargetPercent,
 ...                 Direction.Both,
-...                 cash_now,
-...                 last_position[col],
-...                 free_cash_now,
-...                 val_price_now,
-...                 value_now,
 ...             )
 ...             call_seq[col] = col  # (10)!
 ... 

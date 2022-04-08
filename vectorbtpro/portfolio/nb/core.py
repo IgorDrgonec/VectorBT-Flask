@@ -865,36 +865,32 @@ def get_group_value_nb(
 
 @register_jitted(cache=True)
 def approx_order_value_nb(
+    exec_state: ExecState,
     size: float,
     size_type: int,
     direction: int,
-    cash_now: float,
-    position_now: float,
-    free_cash_now: float,
-    val_price_now: float,
-    value_now: float,
 ) -> float:
-    """Approximate value of an order."""
+    """Approximate the value of an order."""
     if direction == Direction.ShortOnly:
         size *= -1
-    asset_value_now = position_now * val_price_now
+    asset_value_now = exec_state.position * exec_state.val_price
     if size_type == SizeType.Amount:
-        return size * val_price_now
+        return size * exec_state.val_price
     if size_type == SizeType.Value:
         return size
     if size_type == SizeType.Percent:
         if size >= 0:
-            return size * cash_now
+            return size * exec_state.cash
         else:
             if direction == Direction.LongOnly:
                 return size * asset_value_now
-            return size * (2 * max(asset_value_now, 0) + max(free_cash_now, 0))
+            return size * (2 * max(asset_value_now, 0) + max(exec_state.free_cash, 0))
     if size_type == SizeType.TargetAmount:
-        return size * val_price_now - asset_value_now
+        return size * exec_state.val_price - asset_value_now
     if size_type == SizeType.TargetValue:
         return size - asset_value_now
     if size_type == SizeType.TargetPercent:
-        return size * value_now - asset_value_now
+        return size * exec_state.value - asset_value_now
     return np.nan
 
 
