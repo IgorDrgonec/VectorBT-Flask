@@ -3,12 +3,12 @@ from collections import namedtuple
 from datetime import datetime
 from itertools import product
 
-import numpy as np
-import pandas as pd
 import pytest
 from numba import njit
 
 import vectorbtpro as vbt
+
+from tests.utils import *
 
 ta_available = True
 try:
@@ -105,11 +105,11 @@ class TestFactory:
                 names=["custom_p", None],
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_custom_func(custom_func, var_args=True, per_column=False).run(ts, [0, 1], 10, b=100).out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_custom_func(custom_func_nb, var_args=True, per_column=False).run(ts, [0, 1], 10, 100).out,
             target,
         )
@@ -126,11 +126,11 @@ class TestFactory:
             index=ts.index,
             columns=pd.MultiIndex.from_tuples([(0, "a"), (1, "b"), (2, "c")], names=["custom_p", None]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_custom_func(custom_func, var_args=True).run(ts, [0, 1, 2], 10, b=100, per_column=True).out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_custom_func(custom_func_nb, var_args=True).run(ts, [0, 1, 2], 10, 100, per_column=True).out,
             target,
         )
@@ -139,11 +139,11 @@ class TestFactory:
             index=ts.index,
             columns=pd.Index([0, 1], dtype="int64", name="custom_p"),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_custom_func(custom_func, var_args=True, per_column=False).run(ts["a"], [0, 1], 10, b=100).out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_custom_func(custom_func_nb, var_args=True, per_column=False).run(ts["a"], [0, 1], 10, 100).out,
             target,
         )
@@ -152,28 +152,28 @@ class TestFactory:
             index=ts.index,
             columns=pd.MultiIndex.from_tuples([(0, "a")], names=["custom_p", None]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_custom_func(custom_func, var_args=True).run(ts[["a"]], 0, 10, b=100, per_column=True).out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_custom_func(custom_func_nb, var_args=True).run(ts[["a"]], 0, 10, 100, per_column=True).out,
             target,
         )
         target = pd.Series(np.array([110.0, 110.0, 110.0, 110.0, 110.0]), index=ts.index, name=(0, "a"))
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             F.with_custom_func(custom_func, var_args=True, per_column=False).run(ts["a"], 0, 10, b=100).out,
             target,
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             F.with_custom_func(custom_func_nb, var_args=True, per_column=False).run(ts["a"], 0, 10, 100).out,
             target,
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             F.with_custom_func(custom_func, var_args=True).run(ts["a"], 0, 10, b=100, per_column=True).out,
             target,
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             F.with_custom_func(custom_func_nb, var_args=True).run(ts["a"], 0, 10, 100, per_column=True).out,
             target,
         )
@@ -204,11 +204,11 @@ class TestFactory:
                 names=["custom_p", None],
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, var_args=True).run(ts, [0, 1], 10, b=100).out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, var_args=True).run(ts, [0, 1], 10, 100).out,
             target,
         )
@@ -225,11 +225,11 @@ class TestFactory:
             index=ts.index,
             columns=pd.MultiIndex.from_tuples([(0, "a"), (1, "b"), (2, "c")], names=["custom_p", None]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, var_args=True).run(ts, [0, 1, 2], 10, b=100, per_column=True).out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, var_args=True).run(ts, [0, 1, 2], 10, 100, per_column=True).out,
             target,
         )
@@ -238,11 +238,11 @@ class TestFactory:
             index=ts.index,
             columns=pd.Index([0, 1], dtype="int64", name="custom_p"),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, var_args=True).run(ts["a"], [0, 1], 10, b=100).out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, jitted_loop=True, var_args=True).run(ts["a"], [0, 1], 10, 100).out,
             target,
         )
@@ -251,28 +251,28 @@ class TestFactory:
             index=ts.index,
             columns=pd.MultiIndex.from_tuples([(0, "a")], names=["custom_p", None]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, var_args=True).run(ts[["a"]], 0, 10, b=100, per_column=True).out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, var_args=True).run(ts[["a"]], 0, 10, 100, per_column=True).out,
             target,
         )
         target = pd.Series(np.array([110.0, 110.0, 110.0, 110.0, 110.0]), index=ts.index, name=(0, "a"))
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             F.with_apply_func(apply_func, var_args=True).run(ts["a"], 0, 10, b=100).out,
             target,
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             F.with_apply_func(apply_func_nb, jitted_loop=True, var_args=True).run(ts["a"], 0, 10, 100).out,
             target,
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             F.with_apply_func(apply_func, var_args=True).run(ts["a"], 0, 10, b=100, per_column=True).out,
             target,
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             F.with_apply_func(apply_func_nb, jitted_loop=True, var_args=True)
             .run(ts["a"], 0, 10, 100, per_column=True)
             .out,
@@ -301,7 +301,7 @@ class TestFactory:
                 names=["custom_p", None],
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, var_args=True)
             .run(ts, [0, 1], vbt.RepEval("10"), b=vbt.Rep("b"), template_context=dict(b=100))
             .out,
@@ -326,8 +326,8 @@ class TestFactory:
                 names=["custom_p", None],
             ),
         )
-        pd.testing.assert_frame_equal(F.with_apply_func(apply_func).run([0, 1]).out, target)
-        pd.testing.assert_frame_equal(F.with_apply_func(apply_func_nb, jitted_loop=True).run([0, 1]).out, target)
+        assert_frame_equal(F.with_apply_func(apply_func).run([0, 1]).out, target)
+        assert_frame_equal(F.with_apply_func(apply_func_nb, jitted_loop=True).run([0, 1]).out, target)
         with pytest.raises(Exception):
             F.with_apply_func(apply_func).run([0, 1], per_column=True)
 
@@ -342,8 +342,8 @@ class TestFactory:
             return np.full(input_shape, p)
 
         target = pd.Series(np.array([0, 0, 0, 0, 0]), index=pd.RangeIndex(start=0, stop=5, step=1))
-        pd.testing.assert_series_equal(F.with_apply_func(apply_func, require_input_shape=True).run(5, 0).out, target)
-        pd.testing.assert_series_equal(
+        assert_series_equal(F.with_apply_func(apply_func, require_input_shape=True).run(5, 0).out, target)
+        assert_series_equal(
             F.with_apply_func(apply_func_nb, jitted_loop=True, require_input_shape=True).run(5, 0).out,
             target,
         )
@@ -352,11 +352,11 @@ class TestFactory:
             index=pd.RangeIndex(start=0, stop=5, step=1),
             columns=pd.Index([0, 1], dtype="int64", name="custom_p"),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, require_input_shape=True).run(5, [0, 1]).out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, jitted_loop=True, require_input_shape=True).run(5, [0, 1]).out,
             target,
         )
@@ -370,13 +370,13 @@ class TestFactory:
                 names=["custom_p", None],
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, require_input_shape=True)
             .run((5, 3), [0, 1], input_index=ts.index, input_columns=ts.columns)
             .out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, jitted_loop=True, require_input_shape=True)
             .run((5, 3), [0, 1], input_index=ts.index, input_columns=ts.columns)
             .out,
@@ -387,13 +387,13 @@ class TestFactory:
             index=ts.index,
             columns=pd.MultiIndex.from_tuples([(0, "a"), (1, "b"), (2, "c")], names=["custom_p", None]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, require_input_shape=True)
             .run((5, 3), [0, 1, 2], input_index=ts.index, input_columns=ts.columns, per_column=True)
             .out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, jitted_loop=True, require_input_shape=True)
             .run((5, 3), [0, 1, 2], input_index=ts.index, input_columns=ts.columns, per_column=True)
             .out,
@@ -426,8 +426,8 @@ class TestFactory:
                 names=["custom_p", None],
             ),
         )
-        pd.testing.assert_frame_equal(F.with_apply_func(apply_func).run(ts, ts, [0, 1]).out, target)
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(F.with_apply_func(apply_func).run(ts, ts, [0, 1]).out, target)
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, jitted_loop=True).run(ts, ts, [0, 1]).out,
             target,
         )
@@ -436,8 +436,8 @@ class TestFactory:
             index=ts.index,
             columns=pd.MultiIndex.from_tuples([(0, "a"), (1, "b"), (2, "c")], names=["custom_p", None]),
         )
-        pd.testing.assert_frame_equal(F.with_apply_func(apply_func).run(ts, ts, [0, 1, 2], per_column=True).out, target)
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(F.with_apply_func(apply_func).run(ts, ts, [0, 1, 2], per_column=True).out, target)
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, jitted_loop=True).run(ts, ts, [0, 1, 2], per_column=True).out,
             target,
         )
@@ -461,40 +461,40 @@ class TestFactory:
             in_out2[::2] = ts1[::2] * ts2[::2] * (p1 + p2)
             return ts1 * p1, ts2 * p2
 
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, takes_1d=True).run(ts, 0, [1, 2], 3, in_out1=4.0, in_out2=5.0).out1,
             F.with_apply_func(apply_func, takes_1d=False).run(ts, 0, [1, 2], 3, in_out1=4.0, in_out2=5.0).out1,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, takes_1d=True).run(ts, 0, [1, 2], 3, in_out1=4.0, in_out2=5.0).out2,
             F.with_apply_func(apply_func, takes_1d=False).run(ts, 0, [1, 2], 3, in_out1=4.0, in_out2=5.0).out2,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, takes_1d=True).run(ts, 0, [1, 2], 3, in_out1=4.0, in_out2=5.0).in_out1,
             F.with_apply_func(apply_func, takes_1d=False).run(ts, 0, [1, 2], 3, in_out1=4.0, in_out2=5.0).in_out1,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, takes_1d=True).run(ts, 0, [1, 2], 3, in_out1=4.0, in_out2=5.0).in_out2,
             F.with_apply_func(apply_func, takes_1d=False).run(ts, 0, [1, 2], 3, in_out1=4.0, in_out2=5.0).in_out2,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, takes_1d=True).run(ts, 0, [1, 2], 3, in_out1=4.0, in_out2=5.0).out1,
             F.with_apply_func(apply_func_nb, takes_1d=False).run(ts, 0, [1, 2], 3, in_out1=4.0, in_out2=5.0).out1,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, takes_1d=True).run(ts, 0, [1, 2], 3, in_out1=4.0, in_out2=5.0).out2,
             F.with_apply_func(apply_func_nb, takes_1d=False).run(ts, 0, [1, 2], 3, in_out1=4.0, in_out2=5.0).out2,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, takes_1d=True).run(ts, 0, [1, 2], 3, in_out1=4.0, in_out2=5.0).in_out1,
             F.with_apply_func(apply_func_nb, takes_1d=False).run(ts, 0, [1, 2], 3, in_out1=4.0, in_out2=5.0).in_out1,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, takes_1d=True).run(ts, 0, [1, 2], 3, in_out1=4.0, in_out2=5.0).in_out2,
             F.with_apply_func(apply_func_nb, takes_1d=False).run(ts, 0, [1, 2], 3, in_out1=4.0, in_out2=5.0).in_out2,
         )
 
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, takes_1d=True)
             .run(ts, 0, [1, 2, 3], 3, in_out1=4.0, in_out2=5.0, per_column=True)
             .out1,
@@ -502,7 +502,7 @@ class TestFactory:
             .run(ts, 0, [1, 2, 3], 3, in_out1=4.0, in_out2=5.0, per_column=True)
             .out1,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, takes_1d=True)
             .run(ts, 0, [1, 2, 3], 3, in_out1=4.0, in_out2=5.0, per_column=True)
             .out2,
@@ -510,7 +510,7 @@ class TestFactory:
             .run(ts, 0, [1, 2, 3], 3, in_out1=4.0, in_out2=5.0, per_column=True)
             .out2,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, takes_1d=True)
             .run(ts, 0, [1, 2, 3], 3, in_out1=4.0, in_out2=5.0, per_column=True)
             .in_out1,
@@ -518,7 +518,7 @@ class TestFactory:
             .run(ts, 0, [1, 2, 3], 3, in_out1=4.0, in_out2=5.0, per_column=True)
             .in_out1,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, takes_1d=True)
             .run(ts, 0, [1, 2, 3], 3, in_out1=4.0, in_out2=5.0, per_column=True)
             .in_out2,
@@ -526,7 +526,7 @@ class TestFactory:
             .run(ts, 0, [1, 2, 3], 3, in_out1=4.0, in_out2=5.0, per_column=True)
             .in_out2,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, takes_1d=True)
             .run(ts, 0, [1, 2, 3], 3, in_out1=4.0, in_out2=5.0, per_column=True)
             .out1,
@@ -534,7 +534,7 @@ class TestFactory:
             .run(ts, 0, [1, 2, 3], 3, in_out1=4.0, in_out2=5.0, per_column=True)
             .out1,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, takes_1d=True)
             .run(ts, 0, [1, 2, 3], 3, in_out1=4.0, in_out2=5.0, per_column=True)
             .out2,
@@ -542,7 +542,7 @@ class TestFactory:
             .run(ts, 0, [1, 2, 3], 3, in_out1=4.0, in_out2=5.0, per_column=True)
             .out2,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, takes_1d=True)
             .run(ts, 0, [1, 2, 3], 3, in_out1=4.0, in_out2=5.0, per_column=True)
             .in_out1,
@@ -550,7 +550,7 @@ class TestFactory:
             .run(ts, 0, [1, 2, 3], 3, in_out1=4.0, in_out2=5.0, per_column=True)
             .in_out1,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, takes_1d=True)
             .run(ts, 0, [1, 2, 3], 3, in_out1=4.0, in_out2=5.0, per_column=True)
             .in_out2,
@@ -564,7 +564,7 @@ class TestFactory:
             in_out2.iloc[::2] = ts1[::2] * ts2[::2] * (p1 + p2)
             return ts1 * p1, ts2 * p2
 
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, takes_1d=True, keep_pd=True)
             .run(ts, 0, [1, 2], 3, in_out1=4.0, in_out2=5.0)
             .out1,
@@ -572,7 +572,7 @@ class TestFactory:
             .run(ts, 0, [1, 2], 3, in_out1=4.0, in_out2=5.0)
             .out1,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, takes_1d=True, keep_pd=True)
             .run(ts, 0, [1, 2], 3, in_out1=4.0, in_out2=5.0)
             .out2,
@@ -580,7 +580,7 @@ class TestFactory:
             .run(ts, 0, [1, 2], 3, in_out1=4.0, in_out2=5.0)
             .out2,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, takes_1d=True, keep_pd=True)
             .run(ts, 0, [1, 2], 3, in_out1=4.0, in_out2=5.0)
             .in_out1,
@@ -588,7 +588,7 @@ class TestFactory:
             .run(ts, 0, [1, 2], 3, in_out1=4.0, in_out2=5.0)
             .in_out1,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, takes_1d=True, keep_pd=True)
             .run(ts, 0, [1, 2], 3, in_out1=4.0, in_out2=5.0)
             .in_out2,
@@ -597,7 +597,7 @@ class TestFactory:
             .in_out2,
         )
 
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, takes_1d=True, keep_pd=True)
             .run(ts, 0, [1, 2, 3], 3, in_out1=4.0, in_out2=5.0, per_column=True)
             .out1,
@@ -605,7 +605,7 @@ class TestFactory:
             .run(ts, 0, [1, 2, 3], 3, in_out1=4.0, in_out2=5.0, per_column=True)
             .out1,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, takes_1d=True, keep_pd=True)
             .run(ts, 0, [1, 2, 3], 3, in_out1=4.0, in_out2=5.0, per_column=True)
             .out2,
@@ -613,7 +613,7 @@ class TestFactory:
             .run(ts, 0, [1, 2, 3], 3, in_out1=4.0, in_out2=5.0, per_column=True)
             .out2,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, takes_1d=True, keep_pd=True)
             .run(ts, 0, [1, 2, 3], 3, in_out1=4.0, in_out2=5.0, per_column=True)
             .in_out1,
@@ -621,7 +621,7 @@ class TestFactory:
             .run(ts, 0, [1, 2, 3], 3, in_out1=4.0, in_out2=5.0, per_column=True)
             .in_out1,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, takes_1d=True, keep_pd=True)
             .run(ts, 0, [1, 2, 3], 3, in_out1=4.0, in_out2=5.0, per_column=True)
             .in_out2,
@@ -640,8 +640,8 @@ class TestFactory:
         def apply_func_nb(ts):
             return ts * 2
 
-        pd.testing.assert_frame_equal(F.with_apply_func(apply_func).run(ts).out, ts * 2)
-        pd.testing.assert_frame_equal(F.with_apply_func(apply_func_nb, jitted_loop=True).run(ts).out, ts * 2)
+        assert_frame_equal(F.with_apply_func(apply_func).run(ts).out, ts * 2)
+        assert_frame_equal(F.with_apply_func(apply_func_nb, jitted_loop=True).run(ts).out, ts * 2)
 
     def test_no_inputs_and_params(self):
         F = vbt.IndicatorFactory(output_names=["out"])
@@ -653,8 +653,8 @@ class TestFactory:
         def apply_func_nb():
             return np.full((3, 3), 1)
 
-        pd.testing.assert_frame_equal(F.with_apply_func(apply_func).run().out, pd.DataFrame(np.full((3, 3), 1)))
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(F.with_apply_func(apply_func).run().out, pd.DataFrame(np.full((3, 3), 1)))
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, jitted_loop=True).run().out,
             pd.DataFrame(np.full((3, 3), 1)),
         )
@@ -687,8 +687,8 @@ class TestFactory:
                 names=["custom_p1", "custom_p2", None],
             ),
         )
-        pd.testing.assert_frame_equal(F.with_apply_func(apply_func).run(ts, np.asarray([0, 1]), 2).out, target)
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(F.with_apply_func(apply_func).run(ts, np.asarray([0, 1]), 2).out, target)
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, jitted_loop=True).run(ts, np.asarray([0, 1]), 2).out,
             target,
         )
@@ -700,19 +700,19 @@ class TestFactory:
                 names=["custom_p1", "custom_p2", None],
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func).run(ts, np.asarray([0, 1, 2]), 2, per_column=True).out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, jitted_loop=True).run(ts, np.asarray([0, 1, 2]), 2, per_column=True).out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func).run(ts, np.asarray([0, 1, 2]), [2], per_column=True).out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func).run(ts, np.asarray([0, 1, 2]), np.array([2]), per_column=True).out,
             target,
         )
@@ -743,13 +743,13 @@ class TestFactory:
                 names=["custom_p", None],
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func)
             .run(ts, np.asarray([0, 1, 2]), param_settings={"p": {"is_array_like": True}})
             .out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, jitted_loop=True)
             .run(ts, np.asarray([0, 1, 2]), param_settings={"p": {"is_array_like": True}})
             .out,
@@ -767,7 +767,7 @@ class TestFactory:
                 names=["custom_p", None],
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func)
             .run(
                 ts,
@@ -777,7 +777,7 @@ class TestFactory:
             .out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, jitted_loop=True)
             .run(
                 ts,
@@ -807,13 +807,13 @@ class TestFactory:
                 names=["custom_p", None],
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func2)
             .run(ts, np.asarray([0, 1, 2, 3, 4]), param_settings={"p": {"is_array_like": True, "bc_to_input": 0}})
             .out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func2_nb)
             .run(ts, np.asarray([0, 1, 2, 3, 4]), param_settings={"p": {"is_array_like": True, "bc_to_input": 0}})
             .out,
@@ -839,11 +839,11 @@ class TestFactory:
                 names=["custom_p", None],
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func3).run(ts, (0, 1), param_settings={"p": {"is_tuple": True}}).out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func3_nb).run(ts, (0, 1), param_settings={"p": {"is_tuple": True}}).out,
             target,
         )
@@ -887,11 +887,11 @@ class TestFactory:
                 names=["custom_p1", "custom_p2", None],
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func).run(ts, [0, 1], [2, 3], param_product=True).out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, jitted_loop=True).run(ts, [0, 1], [2, 3], param_product=True).out,
             target,
         )
@@ -910,33 +910,33 @@ class TestFactory:
             return ts1 * ts2 * (p1 + p2)
 
         # default inputs
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, ts2=0).run(ts, [1, 2], 3).out,
             F.with_apply_func(apply_func).run(ts, 0, [1, 2], 3).out,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, ts2=vbt.Ref("ts1")).run(ts, [1, 2], 3).out,
             F.with_apply_func(apply_func).run(ts, ts, [1, 2], 3).out,
         )
         # default params
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, p2=0, hide_default=False).run(ts, ts, [1, 2]).out,
             F.with_apply_func(apply_func, hide_default=False).run(ts, ts, [1, 2], 0).out,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, p2=vbt.Ref("p1"), hide_default=False).run(ts, ts, [1, 2]).out,
             F.with_apply_func(apply_func, hide_default=False).run(ts, ts, [1, 2], [1, 2]).out,
         )
         with pytest.raises(Exception):
-            pd.testing.assert_frame_equal(
+            assert_frame_equal(
                 F.with_apply_func(apply_func, in_out1=1, in_out2=2).run(ts, ts, [1, 2], 3).in_out1,
                 F.with_apply_func(apply_func, in_out1=1, in_out2=2).run(ts, ts, [1, 2], 3).in_out2,
             )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, in_out1=1, in_out2=vbt.Ref("in_out1")).run(ts, ts, [1, 2], 3).in_out2,
             F.with_apply_func(apply_func, in_out1=1, in_out2=1).run(ts, ts, [1, 2], 3).in_out2,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, in_out1=1, in_out2=vbt.Ref("ts1")).run(ts, ts, [1, 2], 3).in_out2,
             F.with_apply_func(apply_func, in_out1=1, in_out2=ts).run(ts, ts, [1, 2], 3).in_out2,
         )
@@ -993,13 +993,13 @@ class TestFactory:
                 names=["custom_p", None],
             ),
         )
-        pd.testing.assert_frame_equal(F.with_apply_func(apply_func).run(ts, [0, 1]).o1, target)
-        pd.testing.assert_frame_equal(F.with_apply_func(apply_func_nb, jitted_loop=True).run(ts, [0, 1]).o1, target)
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(F.with_apply_func(apply_func).run(ts, [0, 1]).o1, target)
+        assert_frame_equal(F.with_apply_func(apply_func_nb, jitted_loop=True).run(ts, [0, 1]).o1, target)
+        assert_frame_equal(
             F.with_apply_func(apply_func).run(ts.vbt.tile(2), [0, 0, 0, 1, 1, 1], per_column=True).o1,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, jitted_loop=True)
             .run(ts.vbt.tile(2), [0, 0, 0, 1, 1, 1], per_column=True)
             .o1,
@@ -1018,13 +1018,13 @@ class TestFactory:
             index=target.index,
             columns=target.columns,
         )
-        pd.testing.assert_frame_equal(F.with_apply_func(apply_func).run(ts, [0, 1]).o2, target)
-        pd.testing.assert_frame_equal(F.with_apply_func(apply_func_nb, jitted_loop=True).run(ts, [0, 1]).o2, target)
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(F.with_apply_func(apply_func).run(ts, [0, 1]).o2, target)
+        assert_frame_equal(F.with_apply_func(apply_func_nb, jitted_loop=True).run(ts, [0, 1]).o2, target)
+        assert_frame_equal(
             F.with_apply_func(apply_func).run(ts.vbt.tile(2), [0, 0, 0, 1, 1, 1], per_column=True).o2,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, jitted_loop=True)
             .run(ts.vbt.tile(2), [0, 0, 0, 1, 1, 1], per_column=True)
             .o2,
@@ -1071,21 +1071,21 @@ class TestFactory:
             ._in_out.dtype
             == np.int_
         )
-        pd.testing.assert_frame_equal(F.with_apply_func(apply_func, in_out=-1).run(ts, [0, 1]).in_out, target)
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(F.with_apply_func(apply_func, in_out=-1).run(ts, [0, 1]).in_out, target)
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, jitted_loop=True, in_out=-1).run(ts, [0, 1]).in_out,
             target,
         )
-        pd.testing.assert_frame_equal(F.with_apply_func(apply_func).run(ts, [0, 1], in_out=-1).in_out, target)
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(F.with_apply_func(apply_func).run(ts, [0, 1], in_out=-1).in_out, target)
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, jitted_loop=True).run(ts, [0, 1], in_out=-1).in_out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func).run(ts, [0, 1], in_out=np.full(ts.shape, -1, dtype=int)).in_out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, jitted_loop=True)
             .run(ts, [0, 1], in_out=np.full(ts.shape, -1, dtype=int))
             .in_out,
@@ -1096,21 +1096,21 @@ class TestFactory:
             index=ts.index,
             columns=pd.MultiIndex.from_tuples([(0, "a"), (1, "b"), (2, "c")], names=["custom_p", None]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func).run(ts, [0, 1, 2], in_out=-1, per_column=True).in_out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, jitted_loop=True).run(ts, [0, 1, 2], in_out=-1, per_column=True).in_out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func)
             .run(ts, [0, 1, 2], in_out=np.full(ts.shape, -1, dtype=int), per_column=True)
             .in_out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, jitted_loop=True)
             .run(ts, [0, 1, 2], in_out=np.full(ts.shape, -1, dtype=int), per_column=True)
             .in_out,
@@ -1137,13 +1137,13 @@ class TestFactory:
                 names=["custom_p", None],
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, in_output_settings=dict(in_out=dict(dtype=np.int_)))
             .run([0, 1], input_shape=ts.shape, input_index=ts.index, input_columns=ts.columns)
             .in_out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, jitted_loop=True, in_output_settings=dict(in_out=dict(dtype=np.int_)))
             .run([0, 1], input_shape=ts.shape, input_index=ts.index, input_columns=ts.columns)
             .in_out,
@@ -1160,8 +1160,8 @@ class TestFactory:
         def apply_func_nb(ts, kw):
             return ts * kw
 
-        pd.testing.assert_frame_equal(F.with_apply_func(apply_func, kwargs_as_args=["kw"]).run(ts, kw=2).out, ts * 2)
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(F.with_apply_func(apply_func, kwargs_as_args=["kw"]).run(ts, kw=2).out, ts * 2)
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, jitted_loop=True, kwargs_as_args=["kw"]).run(ts, kw=2).out,
             ts * 2,
         )
@@ -1248,8 +1248,8 @@ class TestFactory:
                 names=["custom_p", None],
             ),
         )
-        pd.testing.assert_frame_equal(F.with_apply_func(apply_func, cache_func=cache_func).run(ts, [0, 1]).out, target)
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(F.with_apply_func(apply_func, cache_func=cache_func).run(ts, [0, 1]).out, target)
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, cache_func=cache_func_nb).run(ts, [0, 1]).out,
             target,
         )
@@ -1279,8 +1279,8 @@ class TestFactory:
         np.testing.assert_array_equal(cache[0], target1)
         np.testing.assert_array_equal(cache[1], target2)
         # use_cache
-        pd.testing.assert_frame_equal(F.with_apply_func(apply_func).run(ts, [0, 1], use_cache=cache).out, target)
-        pd.testing.assert_frame_equal(F.with_apply_func(apply_func_nb).run(ts, [0, 1], use_cache=cache).out, target)
+        assert_frame_equal(F.with_apply_func(apply_func).run(ts, [0, 1], use_cache=cache).out, target)
+        assert_frame_equal(F.with_apply_func(apply_func_nb).run(ts, [0, 1], use_cache=cache).out, target)
 
         # per_column
         target = pd.DataFrame(
@@ -1296,13 +1296,13 @@ class TestFactory:
             index=ts.index,
             columns=pd.MultiIndex.from_tuples([(0, "a"), (1, "b"), (2, "c")], names=["custom_p", None]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, cache_func=cache_func, cache_pass_per_column=True)
             .run(ts, [0, 1, 2], per_column=True)
             .out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, cache_func=cache_func_nb, cache_pass_per_column=True)
             .run(ts, [0, 1, 2], per_column=True)
             .out,
@@ -1349,7 +1349,7 @@ class TestFactory:
         assert F.with_apply_func(apply_func, var_args=True).run(ts, [0, 1], 10, b=100, return_raw=True)[3] == []
         assert F.with_apply_func(apply_func_nb, var_args=True).run(ts, [0, 1], 10, 100, return_raw=True)[3] == []
         raw_results = F.with_apply_func(apply_func, var_args=True).run(ts, [0, 1, 2], 10, b=100, return_raw=True)
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, var_args=True).run(ts, [0, 1], 10, b=100, use_raw=raw_results).out,
             F.with_apply_func(apply_func_nb, var_args=True).run(ts, [0, 1], 10, 100).out,
         )
@@ -1413,7 +1413,7 @@ class TestFactory:
         assert F.with_apply_func(apply_func, var_args=True).run(ts, [0, 1, 2], 10, b=100, return_raw=True)[3] == []
         assert F.with_apply_func(apply_func_nb, var_args=True).run(ts, [0, 1, 2], 10, 100, return_raw=True)[3] == []
         raw_results = F.with_apply_func(apply_func, var_args=True).run(ts, [0, 1, 2], 10, b=100, return_raw=True)
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, var_args=True).run(ts, [0, 0, 0], 10, b=100, use_raw=raw_results).out,
             F.with_apply_func(apply_func_nb, var_args=True).run(ts, [0, 0, 0], 10, 100).out,
         )
@@ -1428,17 +1428,17 @@ class TestFactory:
                 for __in_out in _in_out:
                     assert __in_out.ndim == 2
                 if test_keep_pd:
-                    pd.testing.assert_frame_equal(_ts, ts[["a"]].vbt.wrapper.wrap(_ts.values))
+                    assert_frame_equal(_ts, ts[["a"]].vbt.wrapper.wrap(_ts.values))
                     for __in_out in _in_out:
-                        pd.testing.assert_frame_equal(__in_out, ts[["a"]].vbt.wrapper.wrap(__in_out.values))
+                        assert_frame_equal(__in_out, ts[["a"]].vbt.wrapper.wrap(__in_out.values))
             else:
                 assert _ts.ndim == 1
                 for __in_out in _in_out:
                     assert __in_out.ndim == 1
                 if test_keep_pd:
-                    pd.testing.assert_series_equal(_ts, ts["a"].vbt.wrapper.wrap(_ts.values))
+                    assert_series_equal(_ts, ts["a"].vbt.wrapper.wrap(_ts.values))
                     for __in_out in _in_out:
-                        pd.testing.assert_series_equal(__in_out, ts["a"].vbt.wrapper.wrap(__in_out.values))
+                        assert_series_equal(__in_out, ts["a"].vbt.wrapper.wrap(__in_out.values))
             return _ts
 
         def apply_func(_ts, _in_out):
@@ -1446,14 +1446,14 @@ class TestFactory:
                 assert _ts.ndim == 2
                 assert _in_out.ndim == 2
                 if test_keep_pd:
-                    pd.testing.assert_frame_equal(_ts, ts[["a"]].vbt.wrapper.wrap(_ts.values))
-                    pd.testing.assert_frame_equal(_in_out, ts[["a"]].vbt.wrapper.wrap(_in_out.values))
+                    assert_frame_equal(_ts, ts[["a"]].vbt.wrapper.wrap(_ts.values))
+                    assert_frame_equal(_in_out, ts[["a"]].vbt.wrapper.wrap(_in_out.values))
             else:
                 assert _ts.ndim == 1
                 assert _in_out.ndim == 1
                 if test_keep_pd:
-                    pd.testing.assert_series_equal(_ts, ts["a"].vbt.wrapper.wrap(_ts.values))
-                    pd.testing.assert_series_equal(_in_out, ts["a"].vbt.wrapper.wrap(_in_out.values))
+                    assert_series_equal(_ts, ts["a"].vbt.wrapper.wrap(_ts.values))
+                    assert_series_equal(_in_out, ts["a"].vbt.wrapper.wrap(_in_out.values))
             return _ts
 
         F.with_custom_func(custom_func, to_2d=test_to_2d, keep_pd=test_keep_pd, var_args=True).run(ts["a"])
@@ -1465,17 +1465,17 @@ class TestFactory:
                 for __in_out in _in_out:
                     assert __in_out.ndim == 2
                 if test_keep_pd:
-                    pd.testing.assert_frame_equal(_ts, ts.iloc[:, [col]].vbt.wrapper.wrap(_ts.values))
+                    assert_frame_equal(_ts, ts.iloc[:, [col]].vbt.wrapper.wrap(_ts.values))
                     for __in_out in _in_out:
-                        pd.testing.assert_frame_equal(__in_out, ts.iloc[:, [col]].vbt.wrapper.wrap(__in_out.values))
+                        assert_frame_equal(__in_out, ts.iloc[:, [col]].vbt.wrapper.wrap(__in_out.values))
             else:
                 assert _ts.ndim == 1
                 for __in_out in _in_out:
                     assert __in_out.ndim == 1
                 if test_keep_pd:
-                    pd.testing.assert_series_equal(_ts, ts.iloc[:, col].vbt.wrapper.wrap(_ts.values))
+                    assert_series_equal(_ts, ts.iloc[:, col].vbt.wrapper.wrap(_ts.values))
                     for __in_out in _in_out:
-                        pd.testing.assert_series_equal(__in_out, ts.iloc[:, col].vbt.wrapper.wrap(__in_out.values))
+                        assert_series_equal(__in_out, ts.iloc[:, col].vbt.wrapper.wrap(__in_out.values))
             return _ts
 
         def apply_func(col, _ts, _in_out):
@@ -1483,14 +1483,14 @@ class TestFactory:
                 assert _ts.ndim == 2
                 assert _in_out.ndim == 2
                 if test_keep_pd:
-                    pd.testing.assert_frame_equal(_ts, ts.iloc[:, [col]].vbt.wrapper.wrap(_ts.values))
-                    pd.testing.assert_frame_equal(_in_out, ts.iloc[:, [col]].vbt.wrapper.wrap(_in_out.values))
+                    assert_frame_equal(_ts, ts.iloc[:, [col]].vbt.wrapper.wrap(_ts.values))
+                    assert_frame_equal(_in_out, ts.iloc[:, [col]].vbt.wrapper.wrap(_in_out.values))
             else:
                 assert _ts.ndim == 1
                 assert _in_out.ndim == 1
                 if test_keep_pd:
-                    pd.testing.assert_series_equal(_ts, ts.iloc[:, col].vbt.wrapper.wrap(_ts.values))
-                    pd.testing.assert_series_equal(_in_out, ts.iloc[:, col].vbt.wrapper.wrap(_in_out.values))
+                    assert_series_equal(_ts, ts.iloc[:, col].vbt.wrapper.wrap(_ts.values))
+                    assert_series_equal(_in_out, ts.iloc[:, col].vbt.wrapper.wrap(_in_out.values))
             return _ts
 
     def test_pass_packed(self):
@@ -1508,13 +1508,13 @@ class TestFactory:
             index=ts.index,
             columns=pd.MultiIndex.from_tuples([(2, "a"), (2, "b"), (2, "c")], names=["custom_p", None]),
         )
-        pd.testing.assert_frame_equal(F.with_custom_func(custom_func, pass_packed=True).run(ts, 2).out, target)
-        pd.testing.assert_frame_equal(F.with_custom_func(custom_func_nb, pass_packed=True).run(ts, 2).out, target)
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(F.with_custom_func(custom_func, pass_packed=True).run(ts, 2).out, target)
+        assert_frame_equal(F.with_custom_func(custom_func_nb, pass_packed=True).run(ts, 2).out, target)
+        assert_frame_equal(
             F.with_custom_func(custom_func, pass_packed=True).run(ts, 2, per_column=True).out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_custom_func(custom_func_nb, pass_packed=True).run(ts, 2, per_column=True).out,
             target,
         )
@@ -1531,13 +1531,13 @@ class TestFactory:
             index=ts.index,
             columns=pd.MultiIndex.from_tuples([(2, "a"), (2, "b"), (2, "c")], names=["custom_p", None]),
         )
-        pd.testing.assert_frame_equal(F.with_apply_func(apply_func, pass_packed=True).run(ts, 2).out, target)
-        pd.testing.assert_frame_equal(F.with_apply_func(apply_func_nb, pass_packed=True).run(ts, 2).out, target)
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(F.with_apply_func(apply_func, pass_packed=True).run(ts, 2).out, target)
+        assert_frame_equal(F.with_apply_func(apply_func_nb, pass_packed=True).run(ts, 2).out, target)
+        assert_frame_equal(
             F.with_apply_func(apply_func, pass_packed=True).run(ts, 2, per_column=True).out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, pass_packed=True).run(ts, 2, per_column=True).out,
             target,
         )
@@ -1557,19 +1557,19 @@ class TestFactory:
             index=ts.index,
             columns=pd.MultiIndex.from_tuples([(2, "a"), (2, "b"), (2, "c")], names=["custom_p", None]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, pass_packed=False, select_params=False).run(ts, 2).out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, pass_packed=False, select_params=False).run(ts, 2).out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, pass_packed=False, select_params=False).run(ts, 2, per_column=True).out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, pass_packed=False, select_params=False).run(ts, 2, per_column=True).out,
             target,
         )
@@ -1586,19 +1586,19 @@ class TestFactory:
             index=ts.index,
             columns=pd.MultiIndex.from_tuples([(2, "a"), (2, "b"), (2, "c")], names=["custom_p", None]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, pass_packed=True, select_params=False).run(ts, 2).out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, pass_packed=True, select_params=False).run(ts, 2).out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func, pass_packed=True, select_params=False).run(ts, 2, per_column=True).out,
             target,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func_nb, pass_packed=True, select_params=False).run(ts, 2, per_column=True).out,
             target,
         )
@@ -1624,7 +1624,7 @@ class TestFactory:
         def apply_func(ts, p1, p2):
             return ts * (p1 + p2)
 
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             F.with_apply_func(apply_func).run(ts["a"], 2, 3, run_unique=True).out,
             F.with_apply_func(apply_func).run(ts["a"], 2, 3, run_unique=False).out,
         )
@@ -1633,19 +1633,19 @@ class TestFactory:
         assert raw[1] == [(2, 3)]
         assert raw[2] == 1
         assert raw[3] == []
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func).run(ts["a"], [2, 2, 2], [3, 3, 3], run_unique=True).out,
             F.with_apply_func(apply_func).run(ts["a"], [2, 2, 2], [3, 3, 3], run_unique=False).out,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func).run(ts, 2, 3, run_unique=True).out,
             F.with_apply_func(apply_func).run(ts, 2, 3, run_unique=False).out,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func).run(ts, [2, 2, 2], [3, 3, 3], run_unique=True).out,
             F.with_apply_func(apply_func).run(ts, [2, 2, 2], [3, 3, 3], run_unique=False).out,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             F.with_apply_func(apply_func).run(ts, [2, 3, 4], [4, 3, 2], run_unique=True).out,
             F.with_apply_func(apply_func).run(ts, [2, 3, 4], [4, 3, 2], run_unique=False).out,
         )
@@ -1680,10 +1680,10 @@ class TestFactory:
             r=2,
             run_unique=True,
         )
-        pd.testing.assert_frame_equal(ind1.out, ind1_1.out)
-        pd.testing.assert_frame_equal(ind2.out, ind2_1.out)
-        pd.testing.assert_frame_equal(ind1.out, ind1_2.out)
-        pd.testing.assert_frame_equal(ind2.out, ind2_2.out)
+        assert_frame_equal(ind1.out, ind1_1.out)
+        assert_frame_equal(ind2.out, ind2_1.out)
+        assert_frame_equal(ind1.out, ind1_2.out)
+        assert_frame_equal(ind2.out, ind2_2.out)
         # itertools.product
         ind3 = F.with_apply_func(lambda ts, p1, p2: ts * p1 * p2).run(
             ts,
@@ -1713,25 +1713,25 @@ class TestFactory:
             comb_func=product,
             run_unique=True,
         )
-        pd.testing.assert_frame_equal(ind3.out, ind3_1.out)
-        pd.testing.assert_frame_equal(ind4.out, ind4_1.out)
-        pd.testing.assert_frame_equal(ind3.out, ind3_2.out)
-        pd.testing.assert_frame_equal(ind4.out, ind4_2.out)
+        assert_frame_equal(ind3.out, ind3_1.out)
+        assert_frame_equal(ind4.out, ind4_1.out)
+        assert_frame_equal(ind3.out, ind3_2.out)
+        assert_frame_equal(ind4.out, ind4_2.out)
 
     def test_wrapper(self):
         F = vbt.IndicatorFactory(input_names=["ts"], param_names=["p1", "p2"], output_names=["out"])
 
         obj = F.with_apply_func(lambda ts, p1, p2: ts * p1 * p2).run(ts["a"], 0, 1)
         assert obj.wrapper.ndim == 1
-        pd.testing.assert_index_equal(obj.wrapper.index, ts.index)
-        pd.testing.assert_index_equal(
+        assert_index_equal(obj.wrapper.index, ts.index)
+        assert_index_equal(
             obj.wrapper.columns,
             pd.MultiIndex.from_tuples([(0, 1, "a")], names=["custom_p1", "custom_p2", None]),
         )
         obj = F.with_apply_func(lambda ts, p1, p2: ts * p1 * p2).run(ts["a"], [0, 1], 2)
         assert obj.wrapper.ndim == 2
-        pd.testing.assert_index_equal(obj.wrapper.index, ts.index)
-        pd.testing.assert_index_equal(
+        assert_index_equal(obj.wrapper.index, ts.index)
+        assert_index_equal(
             obj.wrapper.columns,
             pd.MultiIndex.from_tuples(
                 [
@@ -1743,15 +1743,15 @@ class TestFactory:
         )
         obj = F.with_apply_func(lambda ts, p1, p2: ts * p1 * p2).run(ts, 0, 1)
         assert obj.wrapper.ndim == 2
-        pd.testing.assert_index_equal(obj.wrapper.index, ts.index)
-        pd.testing.assert_index_equal(
+        assert_index_equal(obj.wrapper.index, ts.index)
+        assert_index_equal(
             obj.wrapper.columns,
             pd.MultiIndex.from_tuples([(0, 1, "a"), (0, 1, "b"), (0, 1, "c")], names=["custom_p1", "custom_p2", None]),
         )
         obj = F.with_apply_func(lambda ts, p1, p2: ts * p1 * p2).run(ts, [1, 2], 3)
         assert obj.wrapper.ndim == 2
-        pd.testing.assert_index_equal(obj.wrapper.index, ts.index)
-        pd.testing.assert_index_equal(
+        assert_index_equal(obj.wrapper.index, ts.index)
+        assert_index_equal(
             obj.wrapper.columns,
             pd.MultiIndex.from_tuples(
                 [(1, 3, "a"), (1, 3, "b"), (1, 3, "c"), (2, 3, "a"), (2, 3, "b"), (2, 3, "c")],
@@ -1760,22 +1760,22 @@ class TestFactory:
         )
         obj = F.with_apply_func(lambda ts, p1, p2: ts * p1 * p2).run(ts["a"], 0, 1, per_column=True)
         assert obj.wrapper.ndim == 1
-        pd.testing.assert_index_equal(obj.wrapper.index, ts.index)
-        pd.testing.assert_index_equal(
+        assert_index_equal(obj.wrapper.index, ts.index)
+        assert_index_equal(
             obj.wrapper.columns,
             pd.MultiIndex.from_tuples([(0, 1, "a")], names=["custom_p1", "custom_p2", None]),
         )
         obj = F.with_apply_func(lambda ts, p1, p2: ts * p1 * p2).run(ts[["a"]], 0, 1, per_column=True)
         assert obj.wrapper.ndim == 2
-        pd.testing.assert_index_equal(obj.wrapper.index, ts.index)
-        pd.testing.assert_index_equal(
+        assert_index_equal(obj.wrapper.index, ts.index)
+        assert_index_equal(
             obj.wrapper.columns,
             pd.MultiIndex.from_tuples([(0, 1, "a")], names=["custom_p1", "custom_p2", None]),
         )
         obj = F.with_apply_func(lambda ts, p1, p2: ts * p1 * p2).run(ts, 0, 1, per_column=True)
         assert obj.wrapper.ndim == 2
-        pd.testing.assert_index_equal(obj.wrapper.index, ts.index)
-        pd.testing.assert_index_equal(
+        assert_index_equal(obj.wrapper.index, ts.index)
+        assert_index_equal(
             obj.wrapper.columns,
             pd.MultiIndex.from_tuples([(0, 1, "a"), (0, 1, "b"), (0, 1, "c")], names=["custom_p1", "custom_p2", None]),
         )
@@ -1798,8 +1798,8 @@ class TestFactory:
 
         obj = test_config(F, (5,), 0, 1)
         assert obj.wrapper.ndim == 1
-        pd.testing.assert_index_equal(obj.wrapper.index, pd.RangeIndex(start=0, stop=5, step=1))
-        pd.testing.assert_index_equal(
+        assert_index_equal(obj.wrapper.index, pd.RangeIndex(start=0, stop=5, step=1))
+        assert_index_equal(
             obj.wrapper.columns,
             pd.MultiIndex.from_tuples(
                 [
@@ -1810,15 +1810,15 @@ class TestFactory:
         )
         obj = test_config(F, (5,), [0, 1], 2)
         assert obj.wrapper.ndim == 2
-        pd.testing.assert_index_equal(obj.wrapper.index, pd.RangeIndex(start=0, stop=5, step=1))
-        pd.testing.assert_index_equal(
+        assert_index_equal(obj.wrapper.index, pd.RangeIndex(start=0, stop=5, step=1))
+        assert_index_equal(
             obj.wrapper.columns,
             pd.MultiIndex.from_tuples([(0, 2), (1, 2)], names=["custom_p1", "custom_p2"]),
         )
         obj = test_config(F, (5, 3), [0, 1], 2)
         assert obj.wrapper.ndim == 2
-        pd.testing.assert_index_equal(obj.wrapper.index, pd.RangeIndex(start=0, stop=5, step=1))
-        pd.testing.assert_index_equal(
+        assert_index_equal(obj.wrapper.index, pd.RangeIndex(start=0, stop=5, step=1))
+        assert_index_equal(
             obj.wrapper.columns,
             pd.MultiIndex.from_tuples(
                 [(0, 2, 0), (0, 2, 1), (0, 2, 2), (1, 2, 0), (1, 2, 1), (1, 2, 2)],
@@ -1827,8 +1827,8 @@ class TestFactory:
         )
         obj = test_config(F, ts.shape, [0, 1], 2, input_index=ts.index, input_columns=ts.columns)
         assert obj.wrapper.ndim == ts.ndim
-        pd.testing.assert_index_equal(obj.wrapper.index, ts.index)
-        pd.testing.assert_index_equal(
+        assert_index_equal(obj.wrapper.index, ts.index)
+        assert_index_equal(
             obj.wrapper.columns,
             pd.MultiIndex.from_tuples(
                 [(0, 2, "a"), (0, 2, "b"), (0, 2, "c"), (1, 2, "a"), (1, 2, "b"), (1, 2, "c")],
@@ -1897,25 +1897,25 @@ class TestFactory:
             .run(ts, ts + 1, [1, 2], 3)
         )
 
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             getattr(obj.iloc[np.arange(3), np.arange(3)], test_attr),
             getattr(obj, test_attr).iloc[np.arange(3), np.arange(3)],
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             getattr(obj.loc[:, (1, 3, "a")], test_attr),
             getattr(obj, test_attr).loc[:, (1, 3, "a")],
         )
-        pd.testing.assert_frame_equal(getattr(obj.loc[:, (1, 3)], test_attr), getattr(obj, test_attr).loc[:, (1, 3)])
-        pd.testing.assert_frame_equal(getattr(obj[(1, 3)], test_attr), getattr(obj, test_attr)[(1, 3)])
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(getattr(obj.loc[:, (1, 3)], test_attr), getattr(obj, test_attr).loc[:, (1, 3)])
+        assert_frame_equal(getattr(obj[(1, 3)], test_attr), getattr(obj, test_attr)[(1, 3)])
+        assert_frame_equal(
             getattr(obj.xs(1, axis=1, level=0), test_attr),
             getattr(obj, test_attr).xs(1, axis=1, level=0),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             getattr(obj.p1_loc[2], test_attr),
             getattr(obj, test_attr).xs(2, level="custom_p1", axis=1),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             getattr(obj.p1_loc[1:2], test_attr),
             pd.concat(
                 (
@@ -1925,7 +1925,7 @@ class TestFactory:
                 axis=1,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             getattr(obj.p1_loc[[1, 1, 1]], test_attr),
             pd.concat(
                 (
@@ -1936,11 +1936,11 @@ class TestFactory:
                 axis=1,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             getattr(obj.tuple_loc[(1, 3)], test_attr),
             getattr(obj, test_attr).xs((1, 3), level=("custom_p1", "custom_p2"), axis=1),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             getattr(obj.tuple_loc[(1, 3):(2, 3)], test_attr),
             pd.concat(
                 (
@@ -1950,7 +1950,7 @@ class TestFactory:
                 axis=1,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             getattr(obj.tuple_loc[[(1, 3), (1, 3), (1, 3)]], test_attr),
             pd.concat(
                 (
@@ -1969,7 +1969,7 @@ class TestFactory:
             .run(ts, 1)
         )
 
-        pd.testing.assert_frame_equal(obj.out_above(2), obj.out > 2)
+        assert_frame_equal(obj.out_above(2), obj.out > 2)
         target = pd.DataFrame(
             np.array(
                 [
@@ -1993,13 +1993,13 @@ class TestFactory:
                 names=["custom_out_above", "custom_p", None],
             ),
         )
-        pd.testing.assert_frame_equal(obj.out_above([2, 3]), target)
+        assert_frame_equal(obj.out_above([2, 3]), target)
         columns = target.columns.rename("my_above", 0)
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             obj.out_above([2, 3], level_name="my_above"),
             pd.DataFrame(target.values, index=target.index, columns=columns),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             obj.out_crossed_above(2),
             pd.DataFrame(
                 np.array(
@@ -2022,7 +2022,7 @@ class TestFactory:
                 ),
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             obj.out_stats(),
             pd.Series(
                 [
@@ -2056,7 +2056,7 @@ class TestFactory:
             .run(ts, 2)
         )
 
-        pd.testing.assert_frame_equal(obj.out_and(True), obj.out)
+        assert_frame_equal(obj.out_and(True), obj.out)
         target = pd.DataFrame(
             np.array(
                 [
@@ -2080,13 +2080,13 @@ class TestFactory:
                 names=["custom_out_and", "custom_p", None],
             ),
         )
-        pd.testing.assert_frame_equal(obj.out_and([False, True]), target)
+        assert_frame_equal(obj.out_and([False, True]), target)
         columns = target.columns.rename("my_and", 0)
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             obj.out_and([False, True], level_name="my_and"),
             pd.DataFrame(target.values, index=target.index, columns=columns),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             obj.out_stats(),
             pd.Series(
                 [
@@ -2152,8 +2152,8 @@ class TestFactory:
             .run()
         )
 
-        pd.testing.assert_frame_equal(obj.out_readable, pd.DataFrame([["Hello", "World"], ["World", None]]))
-        pd.testing.assert_series_equal(
+        assert_frame_equal(obj.out_readable, pd.DataFrame([["Hello", "World"], ["World", None]]))
+        assert_series_equal(
             obj.out_stats(),
             pd.Series(
                 [0.0, 1.0, 2.0, 0.5, 0.5, 1.0],
@@ -2179,7 +2179,7 @@ class TestFactory:
         ).with_apply_func(apply_func_nb)
 
         myind = MyInd.run(ts)
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             myind.stats(),
             pd.Series([9535.0], index=["sum_diff"], name="agg_stats", dtype=object),
         )
@@ -2349,13 +2349,13 @@ class TestFactory:
         assert I.short_name == "rollmean"
         assert I.input_names == ("ts",)
         assert I.param_names == ("window",)
-        pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
+        assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
         I = vbt.IndicatorFactory.from_expr("RollMean:rolling_mean(@in_ts, @p_window)", window=2)
         assert I.__name__ == "RollMean"
         assert I.short_name == "rollmean"
         assert I.input_names == ("ts",)
         assert I.param_names == ("window",)
-        pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
+        assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
         I = vbt.IndicatorFactory.from_expr(
             """
         RollMean:
@@ -2367,29 +2367,29 @@ class TestFactory:
         assert I.short_name == "rollmean"
         assert I.input_names == ("ts",)
         assert I.param_names == ("window",)
-        pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
+        assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
         I = vbt.IndicatorFactory.from_expr("RollMean[rm]: rolling_mean(@in_ts, @p_window)", window=2)
         assert I.__name__ == "RollMean"
         assert I.short_name == "rm"
         assert I.input_names == ("ts",)
         assert I.param_names == ("window",)
-        pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
+        assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
 
         I = vbt.IndicatorFactory.from_expr("rolling_mean(@in_ts, @p_window)", window=2)
         assert I.input_names == ("ts",)
         assert I.param_names == ("window",)
-        pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
+        assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
         I = vbt.IndicatorFactory.from_expr("rolling_mean(@in_ts, window)")
         assert I.input_names == ("ts",)
         assert I.param_names == ()
-        pd.testing.assert_frame_equal(I.run(ts, window=2).out, ts.vbt.rolling_mean(2))
+        assert_frame_equal(I.run(ts, window=2).out, ts.vbt.rolling_mean(2))
         I = vbt.IndicatorFactory.from_expr(
             "rolling_mean(@in_ts, window)",
             func_mapping=dict(rolling_mean=dict(func=vbt.nb.rolling_min_nb)),
         )
         assert I.input_names == ("ts",)
         assert I.param_names == ()
-        pd.testing.assert_frame_equal(I.run(ts, window=2).out, ts.vbt.rolling_min(2))
+        assert_frame_equal(I.run(ts, window=2).out, ts.vbt.rolling_min(2))
         I = vbt.IndicatorFactory.from_expr(
             "hello",
             magnet_inputs=["ts"],
@@ -2397,7 +2397,7 @@ class TestFactory:
         )
         assert I.input_names == ("ts",)
         assert I.param_names == ()
-        pd.testing.assert_frame_equal(I.run(ts).out, ts)
+        assert_frame_equal(I.run(ts).out, ts)
         np.random.seed(42)
         I = vbt.IndicatorFactory.from_expr(
             "ts * rand, ts * rand",
@@ -2407,27 +2407,27 @@ class TestFactory:
         assert I.input_names == ("ts",)
         assert I.param_names == ()
         ind = I.run(ts)
-        pd.testing.assert_frame_equal(ind.out1, ind.out2)
+        assert_frame_equal(ind.out1, ind.out2)
         I = vbt.IndicatorFactory.from_expr("rolling_mean_nb(@in_ts, @p_window)", window=2)
         assert I.input_names == ("ts",)
         assert I.param_names == ("window",)
-        pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
+        assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
         I = vbt.IndicatorFactory.from_expr("(rolling_mean(@in_ts, @p_window))", window=2)
         assert I.input_names == ("ts",)
         assert I.param_names == ("window",)
-        pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
+        assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
         I = vbt.IndicatorFactory.from_expr("(rolling_mean(@in_ts, @p_window) - 1) * (3 - 1)", window=2)
         assert I.input_names == ("ts",)
         assert I.param_names == ("window",)
-        pd.testing.assert_frame_equal(I.run(ts).out, (ts.vbt.rolling_mean(2) - 1) * (3 - 1))
+        assert_frame_equal(I.run(ts).out, (ts.vbt.rolling_mean(2) - 1) * (3 - 1))
         I = vbt.IndicatorFactory.from_expr("(rolling_mean(@in_ts, @p_window),)", window=2)
         assert I.input_names == ("ts",)
         assert I.param_names == ("window",)
-        pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
+        assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
         I = vbt.IndicatorFactory.from_expr("rolling_mean(@in_ts, @p_window),", window=2)
         assert I.input_names == ("ts",)
         assert I.param_names == ("window",)
-        pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
+        assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
         I = vbt.IndicatorFactory.from_expr(
             "rolling_mean(@in_ts1, @p_window1),rolling_mean(@in_ts2, @p_window2)",
             window1=2,
@@ -2435,24 +2435,24 @@ class TestFactory:
         )
         assert I.input_names == ("ts1", "ts2")
         assert I.param_names == ("window1", "window2")
-        pd.testing.assert_frame_equal(I.run(ts, ts * 2).out1, ts.vbt.rolling_mean(2))
-        pd.testing.assert_frame_equal(I.run(ts, ts * 2).out2, (ts * 2).vbt.rolling_mean(3))
+        assert_frame_equal(I.run(ts, ts * 2).out1, ts.vbt.rolling_mean(2))
+        assert_frame_equal(I.run(ts, ts * 2).out2, (ts * 2).vbt.rolling_mean(3))
         I = vbt.IndicatorFactory.from_expr("ts_mean(@in_ts, @p_window)", window=2)
         assert I.input_names == ("ts",)
         assert I.param_names == ("window",)
-        pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
+        assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
         I = vbt.IndicatorFactory.from_expr("returns")
         assert I.input_names == ("close",)
         assert I.param_names == ()
-        pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.to_returns())
+        assert_frame_equal(I.run(ts).out, ts.vbt.to_returns())
         I = vbt.IndicatorFactory.from_expr("random_func(@in_ts)", random_func=lambda x: x)
         assert I.input_names == ("ts",)
         assert I.param_names == ()
-        pd.testing.assert_frame_equal(I.run(ts).out, ts)
+        assert_frame_equal(I.run(ts).out, ts)
         I = vbt.IndicatorFactory.from_expr("vbt.nb.rolling_mean_nb(@in_ts, @p_window)", window=2)
         assert I.input_names == ("ts",)
         assert I.param_names == ("window",)
-        pd.testing.assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
+        assert_frame_equal(I.run(ts).out, ts.vbt.rolling_mean(2))
         I = vbt.IndicatorFactory.from_expr(
             "random_func()",
             random_func=lambda context: context["close"],
@@ -2460,27 +2460,27 @@ class TestFactory:
         )
         assert I.input_names == ("close",)
         assert I.param_names == ()
-        pd.testing.assert_frame_equal(I.run(ts).out, ts)
+        assert_frame_equal(I.run(ts).out, ts)
         I = vbt.IndicatorFactory.from_expr("(close + low + high + open + volume) / 5")
         assert I.input_names == ("open", "high", "low", "close", "volume")
         assert I.param_names == ()
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             I.run(ts, ts * 2, ts * 3, ts * 4, ts * 5).out,
             (ts + ts * 2 + ts * 3 + ts * 4 + ts * 5) / 5,
         )
         I = vbt.IndicatorFactory.from_expr("@in_ts1 + @in_ts2", use_pd_eval=True)
         assert I.input_names == ("ts1", "ts2")
         assert I.param_names == ()
-        pd.testing.assert_frame_equal(I.run(ts, ts * 2).out, ts + ts * 2)
+        assert_frame_equal(I.run(ts, ts * 2).out, ts + ts * 2)
 
         I = vbt.IndicatorFactory.from_expr("@out_o:rolling_mean(@in_ts, @p_window)", window=2)
         assert I.input_names == ("ts",)
         assert I.param_names == ("window",)
-        pd.testing.assert_frame_equal(I.run(ts).o, ts.vbt.rolling_mean(2))
+        assert_frame_equal(I.run(ts).o, ts.vbt.rolling_mean(2))
         I = vbt.IndicatorFactory.from_expr("@out_o :rolling_mean(@in_ts, @p_window)", window=2)
         assert I.input_names == ("ts",)
         assert I.param_names == ("window",)
-        pd.testing.assert_frame_equal(I.run(ts).o, ts.vbt.rolling_mean(2))
+        assert_frame_equal(I.run(ts).o, ts.vbt.rolling_mean(2))
         I = vbt.IndicatorFactory.from_expr(
             "@out_o1:rolling_mean(@in_ts1, @p_window1),@out_o2:rolling_mean(@in_ts2, @p_window2)",
             window1=2,
@@ -2488,8 +2488,8 @@ class TestFactory:
         )
         assert I.input_names == ("ts1", "ts2")
         assert I.param_names == ("window1", "window2")
-        pd.testing.assert_frame_equal(I.run(ts, ts * 2).o1, ts.vbt.rolling_mean(2))
-        pd.testing.assert_frame_equal(I.run(ts, ts * 2).o2, (ts * 2).vbt.rolling_mean(3))
+        assert_frame_equal(I.run(ts, ts * 2).o1, ts.vbt.rolling_mean(2))
+        assert_frame_equal(I.run(ts, ts * 2).o2, (ts * 2).vbt.rolling_mean(3))
         I = vbt.IndicatorFactory.from_expr(
             """
         @out_o1 = rolling_mean(@in_ts1, @p_window1)
@@ -2501,8 +2501,8 @@ class TestFactory:
         )
         assert I.input_names == ("ts1", "ts2")
         assert I.param_names == ("window1", "window2")
-        pd.testing.assert_frame_equal(I.run(ts, ts * 2).o1, ts.vbt.rolling_mean(2))
-        pd.testing.assert_frame_equal(I.run(ts, ts * 2).o2, (ts * 2).vbt.rolling_mean(3))
+        assert_frame_equal(I.run(ts, ts * 2).o1, ts.vbt.rolling_mean(2))
+        assert_frame_equal(I.run(ts, ts * 2).o2, (ts * 2).vbt.rolling_mean(3))
         I = vbt.IndicatorFactory.from_expr(
             """
         o1 = rolling_mean(@in_ts1, @p_window1)
@@ -2514,24 +2514,24 @@ class TestFactory:
         )
         assert I.input_names == ("ts1", "ts2")
         assert I.param_names == ("window1", "window2")
-        pd.testing.assert_frame_equal(I.run(ts, ts * 2).o1, ts.vbt.rolling_mean(2))
-        pd.testing.assert_frame_equal(I.run(ts, ts * 2).o2, (ts * 2).vbt.rolling_mean(3))
+        assert_frame_equal(I.run(ts, ts * 2).o1, ts.vbt.rolling_mean(2))
+        assert_frame_equal(I.run(ts, ts * 2).o2, (ts * 2).vbt.rolling_mean(3))
 
         I = vbt.IndicatorFactory.from_expr("@talib_sma(@in_ts, @p_window)", window=2)
         assert I.input_names == ("ts",)
         assert I.param_names == ("window",)
-        pd.testing.assert_frame_equal(I.run(ts).out, vbt.IF.from_talib("SMA", timeperiod=2).run(ts).real)
+        assert_frame_equal(I.run(ts).out, vbt.IF.from_talib("SMA", timeperiod=2).run(ts).real)
         I = vbt.IndicatorFactory.from_expr("@talib_sma(@in_ts, @p_window, skipna=True)", window=2)
         assert I.input_names == ("ts",)
         assert I.param_names == ("window",)
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             I.run(pd.Series([np.nan, 1, np.nan, 2, np.nan, 3])).out,
             vbt.IF.from_talib("SMA", timeperiod=2, skipna=True).run(pd.Series([np.nan, 1, np.nan, 2, np.nan, 3])).real,
         )
         I = vbt.IndicatorFactory.from_expr("@talib_sma(@in_ts, @p_window)", window=2)
         assert I.input_names == ("ts",)
         assert I.param_names == ("window",)
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             I.run(ts["a"], to_2d=False).out,
             vbt.IF.from_talib("SMA", timeperiod=2).run(ts["a"]).real,
         )
@@ -2543,7 +2543,7 @@ class TestFactory:
         )
         assert I.input_names == ("ts",)
         assert I.param_names == ("fastperiod", "slowperiod", "signalperiod")
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             I.run(ts).out,
             vbt.IF.from_talib("MACD", fastperiod=2, slowperiod=3, signalperiod=4).run(ts).macdsignal,
         )
@@ -2555,7 +2555,7 @@ class TestFactory:
         )
         assert I.input_names == ("ts",)
         assert I.param_names == ("fastperiod", "slowperiod", "signalperiod")
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             I.run(ts["a"], to_2d=False).out,
             vbt.IF.from_talib("MACD", fastperiod=2, slowperiod=3, signalperiod=4).run(ts["a"]).macdsignal,
         )
@@ -2578,8 +2578,8 @@ class TestFactory:
         )
         assert I.input_names == ("ts1", "ts2")
         assert I.param_names == ("window1", "window2")
-        pd.testing.assert_frame_equal(I.run(ts, ts * 2).o3, ts.vbt.rolling_mean(2))
-        pd.testing.assert_frame_equal(I.run(ts, ts * 2).o4, (ts * 2).vbt.rolling_mean(3))
+        assert_frame_equal(I.run(ts, ts * 2).o3, ts.vbt.rolling_mean(2))
+        assert_frame_equal(I.run(ts, ts * 2).o4, (ts * 2).vbt.rolling_mean(3))
         I = vbt.IndicatorFactory.from_expr(
             """
         @settings({
@@ -2599,8 +2599,8 @@ class TestFactory:
         )
         assert I.input_names == ("ts1", "ts2")
         assert I.param_names == ("window1", "window2")
-        pd.testing.assert_frame_equal(I.run(ts, ts * 2).o1, ts.vbt.rolling_mean(2))
-        pd.testing.assert_frame_equal(I.run(ts, ts * 2).o2, (ts * 2).vbt.rolling_mean(3))
+        assert_frame_equal(I.run(ts, ts * 2).o1, ts.vbt.rolling_mean(2))
+        assert_frame_equal(I.run(ts, ts * 2).o2, (ts * 2).vbt.rolling_mean(3))
         I = vbt.IndicatorFactory.from_expr(
             """
         @settings({
@@ -2625,17 +2625,17 @@ class TestFactory:
         )
         assert I.input_names == ("ts1", "ts2")
         assert I.param_names == ("window1", "window2")
-        pd.testing.assert_frame_equal(I.run(ts, ts * 2).o1, ts.vbt.rolling_mean(2))
-        pd.testing.assert_frame_equal(I.run(ts, ts * 2).o2, (ts * 2).vbt.rolling_mean(4))
+        assert_frame_equal(I.run(ts, ts * 2).o1, ts.vbt.rolling_mean(2))
+        assert_frame_equal(I.run(ts, ts * 2).o2, (ts * 2).vbt.rolling_mean(4))
 
         I = vbt.IndicatorFactory.from_expr("@res_talib_sma", sma_timeperiod=2)
         assert I.input_names == ("close",)
         assert I.param_names == ("sma_timeperiod", "sma_timeframe")
-        pd.testing.assert_frame_equal(I.run(ts).out, vbt.IF.from_talib("SMA", timeperiod=2).run(ts).real)
+        assert_frame_equal(I.run(ts).out, vbt.IF.from_talib("SMA", timeperiod=2).run(ts).real)
         I = vbt.IndicatorFactory.from_expr("@res_talib_sma * @res_talib_ema", sma_timeperiod=2, ema_timeperiod=3)
         assert I.input_names == ("close",)
         assert I.param_names == ("sma_timeperiod", "sma_timeframe", "ema_timeperiod", "ema_timeframe")
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             I.run(ts).out,
             vbt.IF.from_talib("SMA", timeperiod=2).run(ts).real * vbt.IF.from_talib("EMA", timeperiod=3).run(ts).real,
         )
@@ -2646,7 +2646,7 @@ class TestFactory:
         )
         assert I.input_names == ("close",)
         assert I.param_names == ("sma_timeperiod", "sma_timeframe")
-        pd.testing.assert_frame_equal(I.run(ts).out, vbt.IF.from_talib("SMA", timeperiod=2).run(ts).real.cumsum())
+        assert_frame_equal(I.run(ts).out, vbt.IF.from_talib("SMA", timeperiod=2).run(ts).real.cumsum())
 
         with pytest.raises(Exception):
             vbt.IndicatorFactory.from_expr("rolling_mean(@in_ts, @p_window)", parse_annotations=False)
@@ -2676,12 +2676,12 @@ class TestFactory:
     def test_from_talib(self):
         if talib_available:
             SMA = vbt.talib("SMA")
-            pd.testing.assert_frame_equal(SMA.run(ts, vbt.Default(2)).real, ts.rolling(2).mean())
-            pd.testing.assert_series_equal(
+            assert_frame_equal(SMA.run(ts, vbt.Default(2)).real, ts.rolling(2).mean())
+            assert_series_equal(
                 SMA.run(pd.Series([1, np.nan, 2, np.nan]), vbt.Default(2)).real,
                 pd.Series([1, np.nan, 2, np.nan]).rolling(2).mean(),
             )
-            pd.testing.assert_series_equal(
+            assert_series_equal(
                 SMA.run(pd.Series([1, np.nan, 2, np.nan, 3]), vbt.Default(2), skipna=True).real,
                 pd.Series([np.nan, np.nan, 1.5, np.nan, 2.5]),
             )
@@ -2697,9 +2697,9 @@ class TestFactory:
                 ),
             )
             BBANDS = vbt.talib("BBANDS")
-            pd.testing.assert_frame_equal(BBANDS.run(ts, timeperiod=2, nbdevup=2, nbdevdn=2).upperband, target)
-            pd.testing.assert_frame_equal(BBANDS.run(ts, timeperiod=2, nbdevup=2, nbdevdn=2).middleband, target - 1)
-            pd.testing.assert_frame_equal(BBANDS.run(ts, timeperiod=2, nbdevup=2, nbdevdn=2).lowerband, target - 2)
+            assert_frame_equal(BBANDS.run(ts, timeperiod=2, nbdevup=2, nbdevdn=2).upperband, target)
+            assert_frame_equal(BBANDS.run(ts, timeperiod=2, nbdevup=2, nbdevdn=2).middleband, target - 1)
+            assert_frame_equal(BBANDS.run(ts, timeperiod=2, nbdevup=2, nbdevdn=2).lowerband, target - 2)
             target = pd.DataFrame(
                 np.array(
                     [
@@ -2717,15 +2717,15 @@ class TestFactory:
                 ),
             )
             BBANDS = vbt.talib("BBANDS")
-            pd.testing.assert_frame_equal(BBANDS.run(ts, timeperiod=[2, 2], nbdevup=2, nbdevdn=2).upperband, target)
-            pd.testing.assert_frame_equal(
+            assert_frame_equal(BBANDS.run(ts, timeperiod=[2, 2], nbdevup=2, nbdevdn=2).upperband, target)
+            assert_frame_equal(
                 BBANDS.run(ts, timeperiod=[2, 2], nbdevup=2, nbdevdn=2).middleband,
                 target - 1,
             )
-            pd.testing.assert_frame_equal(BBANDS.run(ts, timeperiod=[2, 2], nbdevup=2, nbdevdn=2).lowerband, target - 2)
+            assert_frame_equal(BBANDS.run(ts, timeperiod=[2, 2], nbdevup=2, nbdevdn=2).lowerband, target - 2)
             # without params
             OBV = vbt.talib("OBV")
-            pd.testing.assert_frame_equal(
+            assert_frame_equal(
                 OBV.run(ts, ts * 2).real,
                 pd.DataFrame(
                     np.array(
@@ -2736,7 +2736,7 @@ class TestFactory:
                 ),
             )
             # multiple timeframes
-            pd.testing.assert_frame_equal(
+            assert_frame_equal(
                 SMA.run(ts, vbt.Default(2), skipna=True, timeframe=["1d", "2d"]).real,
                 pd.DataFrame(
                     [
@@ -2760,7 +2760,7 @@ class TestFactory:
 
     def test_from_pandas_ta(self):
         if pandas_ta_available:
-            pd.testing.assert_frame_equal(
+            assert_frame_equal(
                 vbt.pandas_ta("SMA").run(ts, 2).sma,
                 pd.DataFrame(
                     ts.rolling(2).mean().values,
@@ -2768,7 +2768,7 @@ class TestFactory:
                     columns=pd.MultiIndex.from_tuples([(2, "a"), (2, "b"), (2, "c")], names=["sma_length", None]),
                 ),
             )
-            pd.testing.assert_frame_equal(
+            assert_frame_equal(
                 vbt.pandas_ta("SMA").run(ts["a"], [2, 3, 4]).sma,
                 pd.DataFrame(
                     np.column_stack(
@@ -2789,7 +2789,7 @@ class TestFactory:
 
     def test_from_ta(self):
         if ta_available:
-            pd.testing.assert_frame_equal(
+            assert_frame_equal(
                 vbt.ta("SMAIndicator").run(ts, 2).sma_indicator,
                 pd.DataFrame(
                     ts.rolling(2).mean().values,
@@ -2800,7 +2800,7 @@ class TestFactory:
                     ),
                 ),
             )
-            pd.testing.assert_frame_equal(
+            assert_frame_equal(
                 vbt.ta("SMAIndicator").run(ts["a"], [2, 3, 4]).sma_indicator,
                 pd.DataFrame(
                     np.column_stack(
@@ -2825,9 +2825,9 @@ class TestFactory:
                 ),
             )
             BollingerBands = vbt.ta("BollingerBands")
-            pd.testing.assert_frame_equal(BollingerBands.run(ts, window=2, window_dev=2).bollinger_hband, target)
-            pd.testing.assert_frame_equal(BollingerBands.run(ts, window=2, window_dev=2).bollinger_mavg, target - 1)
-            pd.testing.assert_frame_equal(BollingerBands.run(ts, window=2, window_dev=2).bollinger_lband, target - 2)
+            assert_frame_equal(BollingerBands.run(ts, window=2, window_dev=2).bollinger_hband, target)
+            assert_frame_equal(BollingerBands.run(ts, window=2, window_dev=2).bollinger_mavg, target - 1)
+            assert_frame_equal(BollingerBands.run(ts, window=2, window_dev=2).bollinger_lband, target - 2)
 
 
 # ############# custom.py ############# #
@@ -2853,7 +2853,7 @@ volume_ts = pd.Series([4, 3, 2, 1, 2, 3, 4], index=close_ts.index)
 
 class TestBasic:
     def test_MA(self):
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.MA.run(close_ts, window=(2, 3), ewm=(False, True), param_product=True).ma,
             pd.DataFrame(
                 np.array(
@@ -2874,13 +2874,13 @@ class TestBasic:
                 ),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.MA.run(close_ts.vbt.tile(4), window=(2, 3), ewm=(False, True), param_product=True, per_column=True).ma,
             vbt.MA.run(close_ts, window=(2, 3), ewm=(False, True), param_product=True, per_column=False).ma,
         )
 
     def test_MSTD(self):
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.MSTD.run(close_ts, window=(2, 3), ewm=(False, True), param_product=True).mstd,
             pd.DataFrame(
                 np.array(
@@ -2901,7 +2901,7 @@ class TestBasic:
                 ),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.MSTD.run(
                 close_ts.vbt.tile(4),
                 window=(2, 3),
@@ -2927,7 +2927,7 @@ class TestBasic:
             names=["bb_window", "bb_ewm", "bb_alpha"],
         )
         bbands = vbt.BBANDS.run(close_ts, window=(2, 3), alpha=(2.0, 3.0), ewm=(False, True), param_product=True)
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             bbands.middle,
             pd.DataFrame(
                 np.array(
@@ -2945,7 +2945,7 @@ class TestBasic:
                 columns=columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             bbands.upper,
             pd.DataFrame(
                 np.array(
@@ -2963,7 +2963,7 @@ class TestBasic:
                 columns=columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             bbands.lower,
             pd.DataFrame(
                 np.array(
@@ -2981,7 +2981,7 @@ class TestBasic:
                 columns=columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             bbands.percent_b,
             pd.DataFrame(
                 np.array(
@@ -2999,7 +2999,7 @@ class TestBasic:
                 columns=columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             bbands.bandwidth,
             pd.DataFrame(
                 np.array(
@@ -3026,7 +3026,7 @@ class TestBasic:
                 columns=columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.BBANDS.run(
                 close_ts.vbt.tile(8),
                 window=(2, 3),
@@ -3037,7 +3037,7 @@ class TestBasic:
             ).middle,
             bbands.middle,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.BBANDS.run(
                 close_ts.vbt.tile(8),
                 window=(2, 3),
@@ -3048,7 +3048,7 @@ class TestBasic:
             ).upper,
             bbands.upper,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.BBANDS.run(
                 close_ts.vbt.tile(8),
                 window=(2, 3),
@@ -3059,7 +3059,7 @@ class TestBasic:
             ).lower,
             bbands.lower,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.BBANDS.run(
                 close_ts.vbt.tile(8),
                 window=(2, 3),
@@ -3070,7 +3070,7 @@ class TestBasic:
             ).percent_b,
             bbands.percent_b,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.BBANDS.run(
                 close_ts.vbt.tile(8),
                 window=(2, 3),
@@ -3083,7 +3083,7 @@ class TestBasic:
         )
 
     def test_RSI(self):
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.RSI.run(close_ts, window=(2, 3), ewm=(False, True), param_product=True).rsi,
             pd.DataFrame(
                 np.array(
@@ -3104,7 +3104,7 @@ class TestBasic:
                 ),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.RSI.run(
                 close_ts.vbt.tile(4),
                 window=(2, 3),
@@ -3138,7 +3138,7 @@ class TestBasic:
             d_ewm=(False, True),
             param_product=True,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             stoch.percent_k,
             pd.DataFrame(
                 np.array(
@@ -3192,7 +3192,7 @@ class TestBasic:
                 columns=columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             stoch.percent_d,
             pd.DataFrame(
                 np.array(
@@ -3237,7 +3237,7 @@ class TestBasic:
                 columns=columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.STOCH.run(
                 high_ts.vbt.tile(8),
                 low_ts.vbt.tile(8),
@@ -3250,7 +3250,7 @@ class TestBasic:
             ).percent_k,
             stoch.percent_k,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.STOCH.run(
                 high_ts.vbt.tile(8),
                 low_ts.vbt.tile(8),
@@ -3312,7 +3312,7 @@ class TestBasic:
             signal_ewm=(False, True),
             param_product=True,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             macd.macd,
             pd.DataFrame(
                 np.array(
@@ -3561,7 +3561,7 @@ class TestBasic:
                 columns=columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             macd.signal,
             pd.DataFrame(
                 np.array(
@@ -3810,7 +3810,7 @@ class TestBasic:
                 columns=columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             macd.hist,
             pd.DataFrame(
                 np.array(
@@ -4059,7 +4059,7 @@ class TestBasic:
                 columns=columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.MACD.run(
                 close_ts.vbt.tile(32),
                 fast_window=(2, 3),
@@ -4072,7 +4072,7 @@ class TestBasic:
             ).macd,
             macd.macd,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.MACD.run(
                 close_ts.vbt.tile(32),
                 fast_window=(2, 3),
@@ -4085,7 +4085,7 @@ class TestBasic:
             ).signal,
             macd.signal,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.MACD.run(
                 close_ts.vbt.tile(32),
                 fast_window=(2, 3),
@@ -4105,7 +4105,7 @@ class TestBasic:
             names=["atr_window", "atr_ewm"],
         )
         atr = vbt.ATR.run(high_ts, low_ts, close_ts, window=(2, 3), ewm=(False, True), param_product=True)
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             atr.tr,
             pd.DataFrame(
                 np.array(
@@ -4123,7 +4123,7 @@ class TestBasic:
                 columns=columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             atr.atr,
             pd.DataFrame(
                 np.array(
@@ -4141,7 +4141,7 @@ class TestBasic:
                 columns=columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.ATR.run(
                 high_ts.vbt.tile(4),
                 low_ts.vbt.tile(4),
@@ -4153,7 +4153,7 @@ class TestBasic:
             ).tr,
             atr.tr,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.ATR.run(
                 high_ts.vbt.tile(4),
                 low_ts.vbt.tile(4),
@@ -4167,7 +4167,7 @@ class TestBasic:
         )
 
     def test_OBV(self):
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             vbt.OBV.run(close_ts, volume_ts).obv,
             pd.Series(np.array([4, 7, 9, 10, 8, 5, 1]), index=close_ts.index, name=close_ts.name),
         )

@@ -1,15 +1,14 @@
 import os
 from datetime import datetime
 
-import numpy as np
-import pandas as pd
 import pytest
 from numba import njit
 
 import vectorbtpro as vbt
-from tests.utils import assert_records_close
 from vectorbtpro.portfolio import nb
 from vectorbtpro.portfolio.enums import *
+
+from tests.utils import *
 
 seed = 42
 
@@ -94,11 +93,11 @@ class TestFromSignals:
             np.array([(0, 0, 0, 100.0, 1.0, 0.0, 1), (1, 0, 3, 50.0, 4.0, 0.0, 0)], dtype=order_dt),
         )
         pf = _from_signals_both()
-        pd.testing.assert_index_equal(
+        assert_index_equal(
             pf.wrapper.index,
             pd.DatetimeIndex(["2020-01-01", "2020-01-02", "2020-01-03", "2020-01-04", "2020-01-05"]),
         )
-        pd.testing.assert_index_equal(pf.wrapper.columns, pd.Index([0], dtype="int64"))
+        assert_index_equal(pf.wrapper.columns, pd.Index([0], dtype="int64"))
         assert pf.wrapper.ndim == 1
         assert pf.wrapper.freq == day_dt
         assert pf.wrapper.grouper.group_by is None
@@ -154,11 +153,11 @@ class TestFromSignals:
             ),
         )
         pf = _from_signals_both(close=price_wide)
-        pd.testing.assert_index_equal(
+        assert_index_equal(
             pf.wrapper.index,
             pd.DatetimeIndex(["2020-01-01", "2020-01-02", "2020-01-03", "2020-01-04", "2020-01-05"]),
         )
-        pd.testing.assert_index_equal(pf.wrapper.columns, pd.Index(["a", "b", "c"], dtype="object"))
+        assert_index_equal(pf.wrapper.columns, pd.Index(["a", "b", "c"], dtype="object"))
         assert pf.wrapper.ndim == 2
         assert pf.wrapper.freq == day_dt
         assert pf.wrapper.grouper.group_by is None
@@ -1524,8 +1523,8 @@ class TestFromSignals:
                 dtype=order_dt,
             ),
         )
-        pd.testing.assert_index_equal(pf.wrapper.grouper.group_by, pd.Index([0, 0, 1], dtype="int64"))
-        pd.testing.assert_series_equal(
+        assert_index_equal(pf.wrapper.grouper.group_by, pd.Index([0, 0, 1], dtype="int64"))
+        assert_series_equal(
             pf.init_cash,
             pd.Series([200.0, 100.0], index=pd.Index([0, 1], dtype="int64")).rename("init_cash"),
         )
@@ -1545,8 +1544,8 @@ class TestFromSignals:
                 dtype=order_dt,
             ),
         )
-        pd.testing.assert_index_equal(pf.wrapper.grouper.group_by, pd.Index([0, 0, 1], dtype="int64"))
-        pd.testing.assert_series_equal(
+        assert_index_equal(pf.wrapper.grouper.group_by, pd.Index([0, 0, 1], dtype="int64"))
+        assert_series_equal(
             pf.init_cash,
             pd.Series([100.0, 100.0], index=pd.Index([0, 1], dtype="int64")).rename("init_cash"),
         )
@@ -3016,7 +3015,7 @@ class TestFromSignals:
 
     def test_cash_earnings(self):
         pf = vbt.Portfolio.from_signals(1, cash_earnings=[0, 1, 2, 3], accumulate=True)
-        pd.testing.assert_series_equal(pf.cash_earnings, pd.Series([0.0, 1.0, 2.0, 3.0]))
+        assert_series_equal(pf.cash_earnings, pd.Series([0.0, 1.0, 2.0, 3.0]))
         assert_records_close(
             pf.order_records,
             np.array(
@@ -3027,7 +3026,7 @@ class TestFromSignals:
 
     def test_cash_dividends(self):
         pf = vbt.Portfolio.from_signals(1, size=np.inf, cash_dividends=[0, 1, 2, 3], accumulate=True)
-        pd.testing.assert_series_equal(pf.cash_earnings, pd.Series([0.0, 100.0, 400.0, 1800.0]))
+        assert_series_equal(pf.cash_earnings, pd.Series([0.0, 100.0, 400.0, 1800.0]))
         assert_records_close(
             pf.order_records,
             np.array(
@@ -3039,7 +3038,7 @@ class TestFromSignals:
     @pytest.mark.parametrize("test_group_by", [False, np.array([0, 0, 1])])
     @pytest.mark.parametrize("test_cash_sharing", [False, True])
     def test_fill_returns(self, test_group_by, test_cash_sharing):
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             from_signals_both(
                 close=price_wide,
                 fill_returns=True,
@@ -3053,7 +3052,7 @@ class TestFromSignals:
                 cash_sharing=test_cash_sharing,
             ).returns,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             from_signals_longonly(
                 close=price_wide,
                 fill_returns=True,
@@ -3067,7 +3066,7 @@ class TestFromSignals:
                 cash_sharing=test_cash_sharing,
             ).returns,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             from_signals_shortonly(
                 close=price_wide,
                 fill_returns=True,
@@ -3124,8 +3123,8 @@ class TestFromRandomSignals:
                 [False, False, True, False, True],
             ).order_records,
         )
-        pd.testing.assert_index_equal(result.wrapper.index, price.vbt.wrapper.index)
-        pd.testing.assert_index_equal(result.wrapper.columns, price.vbt.wrapper.columns)
+        assert_index_equal(result.wrapper.index, price.vbt.wrapper.index)
+        assert_index_equal(result.wrapper.columns, price.vbt.wrapper.columns)
         result = vbt.Portfolio.from_random_signals(price, n=[1, 2], seed=seed)
         assert_records_close(
             result.order_records,
@@ -3135,7 +3134,7 @@ class TestFromRandomSignals:
                 [[False, False], [False, False], [False, True], [False, False], [True, True]],
             ).order_records,
         )
-        pd.testing.assert_index_equal(
+        assert_index_equal(
             result.wrapper.index,
             pd.DatetimeIndex(
                 ["2020-01-01", "2020-01-02", "2020-01-03", "2020-01-04", "2020-01-05"],
@@ -3143,7 +3142,7 @@ class TestFromRandomSignals:
                 freq=None,
             ),
         )
-        pd.testing.assert_index_equal(result.wrapper.columns, pd.Index([1, 2], dtype="int64", name="randnx_n"))
+        assert_index_equal(result.wrapper.columns, pd.Index([1, 2], dtype="int64", name="randnx_n"))
 
     def test_from_random_prob(self):
         result = vbt.Portfolio.from_random_signals(price, prob=0.5, seed=seed)
@@ -3155,8 +3154,8 @@ class TestFromRandomSignals:
                 [False, False, False, False, True],
             ).order_records,
         )
-        pd.testing.assert_index_equal(result.wrapper.index, price.vbt.wrapper.index)
-        pd.testing.assert_index_equal(result.wrapper.columns, price.vbt.wrapper.columns)
+        assert_index_equal(result.wrapper.index, price.vbt.wrapper.index)
+        assert_index_equal(result.wrapper.columns, price.vbt.wrapper.columns)
         result = vbt.Portfolio.from_random_signals(price, prob=[0.25, 0.5], seed=seed)
         assert_records_close(
             result.order_records,
@@ -3166,7 +3165,7 @@ class TestFromRandomSignals:
                 [[False, False], [False, True], [False, False], [False, False], [False, False]],
             ).order_records,
         )
-        pd.testing.assert_index_equal(
+        assert_index_equal(
             result.wrapper.index,
             pd.DatetimeIndex(
                 ["2020-01-01", "2020-01-02", "2020-01-03", "2020-01-04", "2020-01-05"],
@@ -3174,7 +3173,7 @@ class TestFromRandomSignals:
                 freq=None,
             ),
         )
-        pd.testing.assert_index_equal(
+        assert_index_equal(
             result.wrapper.columns,
             pd.MultiIndex.from_tuples([(0.25, 0.25), (0.5, 0.5)], names=["rprobnx_entry_prob", "rprobnx_exit_prob"]),
         )

@@ -7,15 +7,12 @@ from datetime import datetime as _datetime, timedelta as _timedelta, time as _ti
 from functools import wraps
 from itertools import product, combinations
 
-import numpy as np
-import pandas as pd
 import pytest
 import pytz
 from numba import njit
 from numba.core.registry import CPUDispatcher
 
 import vectorbtpro as vbt
-from tests.utils import chunk_meta_equal
 from vectorbtpro.utils import (
     checks,
     config,
@@ -36,6 +33,8 @@ from vectorbtpro.utils import (
     chunking,
     jitting,
 )
+
+from tests.utils import *
 
 dask_available = True
 try:
@@ -1717,24 +1716,24 @@ class TestEnum:
         np.testing.assert_array_equal(enum_.map_enum_fields(np.array([["attr1", "attr2"]]), Enum), np.array([[0, 1]]))
         with pytest.raises(Exception):
             enum_.map_enum_fields(np.array([["attr1", 1]]), Enum)
-        pd.testing.assert_series_equal(enum_.map_enum_fields(pd.Series([]), Enum), pd.Series([]))
+        assert_series_equal(enum_.map_enum_fields(pd.Series([]), Enum), pd.Series([]))
         with pytest.raises(Exception):
             enum_.map_enum_fields(pd.Series([0.0, 1.0]), Enum)
         with pytest.raises(Exception):
             enum_.map_enum_fields(pd.Series([False, True]), Enum)
-        pd.testing.assert_series_equal(enum_.map_enum_fields(pd.Series([0, 1]), Enum), pd.Series([0, 1]))
-        pd.testing.assert_series_equal(enum_.map_enum_fields(pd.Series(["attr1", "attr2"]), Enum), pd.Series([0, 1]))
+        assert_series_equal(enum_.map_enum_fields(pd.Series([0, 1]), Enum), pd.Series([0, 1]))
+        assert_series_equal(enum_.map_enum_fields(pd.Series(["attr1", "attr2"]), Enum), pd.Series([0, 1]))
         with pytest.raises(Exception):
             enum_.map_enum_fields(pd.Series(["attr1", 0]), Enum)
-        pd.testing.assert_frame_equal(enum_.map_enum_fields(pd.DataFrame([]), Enum), pd.DataFrame([]))
+        assert_frame_equal(enum_.map_enum_fields(pd.DataFrame([]), Enum), pd.DataFrame([]))
         with pytest.raises(Exception):
             enum_.map_enum_fields(pd.DataFrame([[0.0, 1.0]]), Enum)
-        pd.testing.assert_frame_equal(enum_.map_enum_fields(pd.DataFrame([[0, 1]]), Enum), pd.DataFrame([[0, 1]]))
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(enum_.map_enum_fields(pd.DataFrame([[0, 1]]), Enum), pd.DataFrame([[0, 1]]))
+        assert_frame_equal(
             enum_.map_enum_fields(pd.DataFrame([["attr1", "attr2"]]), Enum),
             pd.DataFrame([[0, 1]]),
         )
-        pd.testing.assert_frame_equal(enum_.map_enum_fields(pd.DataFrame([[0, "attr2"]]), Enum), pd.DataFrame([[0, 1]]))
+        assert_frame_equal(enum_.map_enum_fields(pd.DataFrame([[0, "attr2"]]), Enum), pd.DataFrame([[0, 1]]))
 
     def test_map_enum_values(self):
         assert enum_.map_enum_values(0, Enum) == "Attr1"
@@ -1754,32 +1753,32 @@ class TestEnum:
             np.array([["Attr1", "Attr2"]]),
         )
         np.testing.assert_array_equal(enum_.map_enum_values(np.array([[0, "Attr2"]]), Enum), np.array([["0", "Attr2"]]))
-        pd.testing.assert_series_equal(enum_.map_enum_values(pd.Series([]), Enum), pd.Series([]))
-        pd.testing.assert_series_equal(
+        assert_series_equal(enum_.map_enum_values(pd.Series([]), Enum), pd.Series([]))
+        assert_series_equal(
             enum_.map_enum_values(pd.Series([0.0, 1.0]), Enum),
             pd.Series(["Attr1", "Attr2"]),
         )
-        pd.testing.assert_series_equal(enum_.map_enum_values(pd.Series([0, 1]), Enum), pd.Series(["Attr1", "Attr2"]))
-        pd.testing.assert_series_equal(
+        assert_series_equal(enum_.map_enum_values(pd.Series([0, 1]), Enum), pd.Series(["Attr1", "Attr2"]))
+        assert_series_equal(
             enum_.map_enum_values(pd.Series(["Attr1", "Attr2"]), Enum),
             pd.Series(["Attr1", "Attr2"]),
         )
         with pytest.raises(Exception):
             enum_.map_enum_values(pd.Series([0, "Attr2"]), Enum)
-        pd.testing.assert_frame_equal(enum_.map_enum_values(pd.DataFrame([]), Enum), pd.DataFrame([]))
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(enum_.map_enum_values(pd.DataFrame([]), Enum), pd.DataFrame([]))
+        assert_frame_equal(
             enum_.map_enum_values(pd.DataFrame([[0.0, 1.0]]), Enum),
             pd.DataFrame([["Attr1", "Attr2"]]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             enum_.map_enum_values(pd.DataFrame([[0, 1]]), Enum),
             pd.DataFrame([["Attr1", "Attr2"]]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             enum_.map_enum_values(pd.DataFrame([["Attr1", "Attr2"]]), Enum),
             pd.DataFrame([["Attr1", "Attr2"]]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             enum_.map_enum_values(pd.DataFrame([[0, "Attr2"]]), Enum),
             pd.DataFrame([["Attr1", "Attr2"]]),
         )
@@ -2709,7 +2708,7 @@ class TestChunking:
         with pytest.raises(Exception):
             chunking.ArraySelector(axis=2).apply(a, chunking.ChunkMeta("", 0, 0, 1, None))
         assert chunking.ArraySelector(axis=0).apply(sr, chunking.ChunkMeta("", 0, 0, 1, None)) == sr.iloc[0]
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             chunking.ArraySelector(axis=1).apply(df, chunking.ChunkMeta("", 0, 0, 1, None)),
             df.iloc[:, 0],
         )
@@ -2729,11 +2728,11 @@ class TestChunking:
             chunking.ArraySlicer(axis=0).apply(a, chunking.ChunkMeta("", 0, None, None, np.array([2])))
         with pytest.raises(Exception):
             chunking.ArraySlicer(axis=2).apply(a, chunking.ChunkMeta("", 0, 0, 1, None))
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             chunking.ArraySlicer(axis=0).apply(sr, chunking.ChunkMeta("", 0, 0, 1, None)),
             sr.iloc[[0]],
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             chunking.ArraySlicer(axis=1).apply(df, chunking.ChunkMeta("", 0, 0, 1, None)),
             df.iloc[:, [0]],
         )

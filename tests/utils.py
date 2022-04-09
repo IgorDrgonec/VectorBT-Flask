@@ -1,9 +1,10 @@
 import hashlib
 
 import numpy as np
+import pandas as pd
 
 # non-randomized hash function
-hash = lambda s: int(hashlib.sha512(s.encode("utf-8")).hexdigest()[:16], 16)
+nonrand_hash = lambda s: int(hashlib.sha512(s.encode("utf-8")).hexdigest()[:16], 16)
 
 
 def isclose(a, b, rel_tol=1e-06, abs_tol=0.0):
@@ -20,9 +21,21 @@ def isclose(a, b, rel_tol=1e-06, abs_tol=0.0):
     return abs(a - b) <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
 
 
+def assert_index_equal(x, y):
+    pd.testing.assert_index_equal(x, y, rtol=1e-06, atol=0)
+
+
+def assert_series_equal(x, y):
+    pd.testing.assert_series_equal(x, y, rtol=1e-06, atol=0)
+
+
+def assert_frame_equal(x, y):
+    pd.testing.assert_frame_equal(x, y, rtol=1e-06, atol=0)
+
+
 def assert_records_close(x, y):
     for field in x.dtype.names:
-        np.testing.assert_allclose(x[field], y[field], rtol=1e-06)
+        np.testing.assert_allclose(x[field], y[field], rtol=1e-06, atol=0)
 
 
 def chunk_meta_equal(x, y):

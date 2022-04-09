@@ -11,9 +11,10 @@ from numba import njit, typeof
 from numba.typed import List
 
 import vectorbtpro as vbt
-from tests.utils import assert_records_close
 from vectorbtpro.portfolio import nb
 from vectorbtpro.portfolio.enums import *
+
+from tests.utils import *
 
 seed = 42
 
@@ -127,11 +128,11 @@ class TestFromOrderFunc:
                 dtype=order_dt,
             ),
         )
-        pd.testing.assert_index_equal(
+        assert_index_equal(
             pf.wrapper.index,
             pd.DatetimeIndex(["2020-01-01", "2020-01-02", "2020-01-03", "2020-01-04", "2020-01-05"]),
         )
-        pd.testing.assert_index_equal(pf.wrapper.columns, pd.Index([0], dtype="int64"))
+        assert_index_equal(pf.wrapper.columns, pd.Index([0], dtype="int64"))
         assert pf.wrapper.ndim == 1
         assert pf.wrapper.freq == day_dt
         assert pf.wrapper.grouper.group_by is None
@@ -168,11 +169,11 @@ class TestFromOrderFunc:
                 dtype=order_dt,
             ),
         )
-        pd.testing.assert_index_equal(
+        assert_index_equal(
             pf.wrapper.index,
             pd.DatetimeIndex(["2020-01-01", "2020-01-02", "2020-01-03", "2020-01-04", "2020-01-05"]),
         )
-        pd.testing.assert_index_equal(pf.wrapper.columns, pd.Index(["a", "b", "c"], dtype="object"))
+        assert_index_equal(pf.wrapper.columns, pd.Index(["a", "b", "c"], dtype="object"))
         assert pf.wrapper.ndim == 2
         assert pf.wrapper.freq == day_dt
         assert pf.wrapper.grouper.group_by is None
@@ -316,8 +317,8 @@ class TestFromOrderFunc:
                 dtype=order_dt,
             ),
         )
-        pd.testing.assert_index_equal(pf.wrapper.grouper.group_by, pd.Index([0, 0, 1], dtype="int64"))
-        pd.testing.assert_series_equal(
+        assert_index_equal(pf.wrapper.grouper.group_by, pd.Index([0, 0, 1], dtype="int64"))
+        assert_series_equal(
             pf.init_cash,
             pd.Series([200.0, 100.0], index=pd.Index([0, 1], dtype="int64")).rename("init_cash"),
         )
@@ -354,8 +355,8 @@ class TestFromOrderFunc:
                 dtype=order_dt,
             ),
         )
-        pd.testing.assert_index_equal(pf.wrapper.grouper.group_by, pd.Index([0, 0, 1], dtype="int64"))
-        pd.testing.assert_series_equal(
+        assert_index_equal(pf.wrapper.grouper.group_by, pd.Index([0, 0, 1], dtype="int64"))
+        assert_series_equal(
             pf.init_cash,
             pd.Series([100.0, 100.0], index=pd.Index([0, 1], dtype="int64")).rename("init_cash"),
         )
@@ -508,7 +509,7 @@ class TestFromOrderFunc:
             pf.call_seq.values,
             np.array([[0, 1, 2], [2, 1, 0], [0, 2, 1], [1, 0, 2], [2, 1, 0]]),
         )
-        pd.testing.assert_frame_equal(pf.get_asset_value(group_by=False), target_hold_value)
+        assert_frame_equal(pf.get_asset_value(group_by=False), target_hold_value)
 
     @pytest.mark.parametrize("test_row_wise", [False, True])
     @pytest.mark.parametrize("test_flexible", [False, True])
@@ -2000,7 +2001,7 @@ class TestFromOrderFunc:
             row_wise=test_row_wise,
             flexible=test_flexible,
         )
-        pd.testing.assert_series_equal(pf.cash_earnings, pd.Series([0, 1, 2, 3]))
+        assert_series_equal(pf.cash_earnings, pd.Series([0, 1, 2, 3]))
         assert_records_close(
             pf.order_records,
             np.array(
@@ -3065,8 +3066,8 @@ class TestFromOrderFunc:
             chunked=False,
         )
         if test_row_wise:
-            pd.testing.assert_series_equal(pf.total_profit, pf2.total_profit)
-            pd.testing.assert_series_equal(pf.total_profit, pf2.total_profit)
+            assert_series_equal(pf.total_profit, pf2.total_profit)
+            assert_series_equal(pf.total_profit, pf2.total_profit)
         else:
             assert_records_close(pf.order_records, pf2.order_records)
             assert_records_close(pf.log_records, pf2.log_records)
@@ -3093,8 +3094,8 @@ class TestFromOrderFunc:
             chunked=False,
         )
         if test_row_wise:
-            pd.testing.assert_series_equal(pf.total_profit, pf2.total_profit)
-            pd.testing.assert_series_equal(pf.total_profit, pf2.total_profit)
+            assert_series_equal(pf.total_profit, pf2.total_profit)
+            assert_series_equal(pf.total_profit, pf2.total_profit)
         else:
             assert_records_close(pf.order_records, pf2.order_records)
             assert_records_close(pf.log_records, pf2.log_records)
@@ -3218,7 +3219,7 @@ class TestFromDefOrderFunc:
             {"a": [0.0, 70.0, 30.0, 0.0, 70.0], "b": [30.0, 0.0, 70.0, 30.0, 30.0], "c": [70.0, 30.0, 0.0, 70.0, 0.0]},
             index=price.index,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.Portfolio.from_def_order_func(
                 close=1.0,
                 size=target_hold_value,
@@ -3229,7 +3230,7 @@ class TestFromDefOrderFunc:
             ).get_asset_value(group_by=False),
             target_hold_value,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.Portfolio.from_def_order_func(
                 close=1.0,
                 size=target_hold_value / 100,

@@ -1,6 +1,6 @@
-import numpy as np
-
 import vectorbtpro as vbt
+
+from tests.utils import *
 
 
 # ############# Global ############# #

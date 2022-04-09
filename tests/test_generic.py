@@ -1,14 +1,14 @@
 import os
 from datetime import datetime
 
-import numpy as np
-import pandas as pd
 import pytest
 from numba import njit
 from sklearn.model_selection import TimeSeriesSplit
 
 import vectorbtpro as vbt
 from vectorbtpro.generic import nb
+
+from tests.utils import *
 
 seed = 42
 
@@ -104,7 +104,7 @@ class TestAccessors:
         )
 
     def test_shuffle(self):
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.shuffle(seed=seed),
             pd.Series(np.array([2.0, np.nan, 3.0, 1.0, 4.0]), index=df["a"].index, name=df["a"].name),
         )
@@ -112,7 +112,7 @@ class TestAccessors:
             df["a"].vbt.shuffle(seed=seed).values,
             nb.shuffle_1d_nb(df["a"].values, seed=seed),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.shuffle(seed=seed),
             pd.DataFrame(
                 np.array(
@@ -128,118 +128,118 @@ class TestAccessors:
         [-1, 0.0, np.nan],
     )
     def test_fillna(self, test_value):
-        pd.testing.assert_series_equal(df["a"].vbt.fillna(test_value), df["a"].fillna(test_value))
-        pd.testing.assert_frame_equal(df.vbt.fillna(test_value), df.fillna(test_value))
-        pd.testing.assert_series_equal(pd.Series([1, 2, 3]).vbt.fillna(-1), pd.Series([1, 2, 3]))
-        pd.testing.assert_series_equal(
+        assert_series_equal(df["a"].vbt.fillna(test_value), df["a"].fillna(test_value))
+        assert_frame_equal(df.vbt.fillna(test_value), df.fillna(test_value))
+        assert_series_equal(pd.Series([1, 2, 3]).vbt.fillna(-1), pd.Series([1, 2, 3]))
+        assert_series_equal(
             pd.Series([False, True, False]).vbt.fillna(False),
             pd.Series([False, True, False]),
         )
-        pd.testing.assert_frame_equal(df.vbt.fillna(test_value, chunked=True), df.vbt.fillna(test_value, chunked=False))
+        assert_frame_equal(df.vbt.fillna(test_value, chunked=True), df.vbt.fillna(test_value, chunked=False))
 
     @pytest.mark.parametrize(
         "test_n",
         [1, 2, 3, 4, 5],
     )
     def test_bshift(self, test_n):
-        pd.testing.assert_series_equal(df["a"].vbt.bshift(test_n), df["a"].shift(-test_n))
+        assert_series_equal(df["a"].vbt.bshift(test_n), df["a"].shift(-test_n))
         np.testing.assert_array_equal(df["a"].vbt.bshift(test_n).values, nb.bshift_1d_nb(df["a"].values, test_n))
-        pd.testing.assert_frame_equal(df.vbt.bshift(test_n), df.shift(-test_n))
-        pd.testing.assert_series_equal(pd.Series([1, 2, 3]).vbt.bshift(1, fill_value=-1), pd.Series([2, 3, -1]))
-        pd.testing.assert_series_equal(
+        assert_frame_equal(df.vbt.bshift(test_n), df.shift(-test_n))
+        assert_series_equal(pd.Series([1, 2, 3]).vbt.bshift(1, fill_value=-1), pd.Series([2, 3, -1]))
+        assert_series_equal(
             pd.Series([True, True, True]).vbt.bshift(1, fill_value=False),
             pd.Series([True, True, False]),
         )
-        pd.testing.assert_frame_equal(df.vbt.bshift(test_n, chunked=True), df.vbt.bshift(test_n, chunked=False))
+        assert_frame_equal(df.vbt.bshift(test_n, chunked=True), df.vbt.bshift(test_n, chunked=False))
 
     @pytest.mark.parametrize(
         "test_n",
         [1, 2, 3, 4, 5],
     )
     def test_fshift(self, test_n):
-        pd.testing.assert_series_equal(df["a"].vbt.fshift(test_n), df["a"].shift(test_n))
+        assert_series_equal(df["a"].vbt.fshift(test_n), df["a"].shift(test_n))
         np.testing.assert_array_equal(df["a"].vbt.fshift(test_n).values, nb.fshift_1d_nb(df["a"].values, test_n))
-        pd.testing.assert_frame_equal(df.vbt.fshift(test_n), df.shift(test_n))
-        pd.testing.assert_series_equal(pd.Series([1, 2, 3]).vbt.fshift(1, fill_value=-1), pd.Series([-1, 1, 2]))
-        pd.testing.assert_series_equal(
+        assert_frame_equal(df.vbt.fshift(test_n), df.shift(test_n))
+        assert_series_equal(pd.Series([1, 2, 3]).vbt.fshift(1, fill_value=-1), pd.Series([-1, 1, 2]))
+        assert_series_equal(
             pd.Series([True, True, True]).vbt.fshift(1, fill_value=False),
             pd.Series([False, True, True]),
         )
-        pd.testing.assert_frame_equal(df.vbt.fshift(test_n, chunked=True), df.vbt.fshift(test_n, chunked=False))
+        assert_frame_equal(df.vbt.fshift(test_n, chunked=True), df.vbt.fshift(test_n, chunked=False))
 
     def test_diff(self):
-        pd.testing.assert_series_equal(df["a"].vbt.diff(), df["a"].diff())
+        assert_series_equal(df["a"].vbt.diff(), df["a"].diff())
         np.testing.assert_array_equal(df["a"].vbt.diff().values, nb.diff_1d_nb(df["a"].values))
-        pd.testing.assert_frame_equal(df.vbt.diff(), df.diff())
-        pd.testing.assert_frame_equal(df.vbt.diff(jitted=dict(parallel=True)), df.vbt.diff(jitted=dict(parallel=False)))
-        pd.testing.assert_frame_equal(df.vbt.diff(chunked=True), df.vbt.diff(chunked=False))
+        assert_frame_equal(df.vbt.diff(), df.diff())
+        assert_frame_equal(df.vbt.diff(jitted=dict(parallel=True)), df.vbt.diff(jitted=dict(parallel=False)))
+        assert_frame_equal(df.vbt.diff(chunked=True), df.vbt.diff(chunked=False))
 
     def test_pct_change(self):
-        pd.testing.assert_series_equal(df["a"].vbt.pct_change(), df["a"].pct_change(fill_method=None))
+        assert_series_equal(df["a"].vbt.pct_change(), df["a"].pct_change(fill_method=None))
         np.testing.assert_array_equal(df["a"].vbt.pct_change().values, nb.pct_change_1d_nb(df["a"].values))
-        pd.testing.assert_frame_equal(df.vbt.pct_change(), df.pct_change(fill_method=None))
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(df.vbt.pct_change(), df.pct_change(fill_method=None))
+        assert_frame_equal(
             df.vbt.pct_change(jitted=dict(parallel=True)),
             df.vbt.pct_change(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(df.vbt.pct_change(chunked=True), df.vbt.pct_change(chunked=False))
+        assert_frame_equal(df.vbt.pct_change(chunked=True), df.vbt.pct_change(chunked=False))
 
     def test_bfill(self):
-        pd.testing.assert_series_equal(df["b"].vbt.bfill(), df["b"].bfill())
-        pd.testing.assert_frame_equal(df.vbt.bfill(), df.bfill())
-        pd.testing.assert_frame_equal(df.vbt.bfill(chunked=True), df.vbt.bfill(chunked=False))
+        assert_series_equal(df["b"].vbt.bfill(), df["b"].bfill())
+        assert_frame_equal(df.vbt.bfill(), df.bfill())
+        assert_frame_equal(df.vbt.bfill(chunked=True), df.vbt.bfill(chunked=False))
 
     def test_ffill(self):
-        pd.testing.assert_series_equal(df["a"].vbt.ffill(), df["a"].ffill())
-        pd.testing.assert_frame_equal(df.vbt.ffill(), df.ffill())
-        pd.testing.assert_frame_equal(df.vbt.ffill(chunked=True), df.vbt.ffill(chunked=False))
+        assert_series_equal(df["a"].vbt.ffill(), df["a"].ffill())
+        assert_frame_equal(df.vbt.ffill(), df.ffill())
+        assert_frame_equal(df.vbt.ffill(chunked=True), df.vbt.ffill(chunked=False))
 
     def test_product(self):
         assert df["a"].vbt.product() == df["a"].product()
-        pd.testing.assert_series_equal(df.vbt.product(), df.product().rename("product"))
-        pd.testing.assert_series_equal(
+        assert_series_equal(df.vbt.product(), df.product().rename("product"))
+        assert_series_equal(
             df.vbt.product(jitted=dict(parallel=True)),
             df.vbt.product(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(df.vbt.product(chunked=True), df.vbt.product(chunked=False))
+        assert_series_equal(df.vbt.product(chunked=True), df.vbt.product(chunked=False))
 
     def test_cumsum(self):
-        pd.testing.assert_series_equal(df["a"].vbt.cumsum(), df["a"].cumsum().ffill().fillna(0))
-        pd.testing.assert_frame_equal(df.vbt.cumsum(), df.cumsum().ffill().fillna(0))
-        pd.testing.assert_frame_equal(
+        assert_series_equal(df["a"].vbt.cumsum(), df["a"].cumsum().ffill().fillna(0))
+        assert_frame_equal(df.vbt.cumsum(), df.cumsum().ffill().fillna(0))
+        assert_frame_equal(
             df.vbt.cumsum(jitted=dict(parallel=True)),
             df.vbt.cumsum(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(df.vbt.cumsum(chunked=True), df.vbt.cumsum(chunked=False))
+        assert_frame_equal(df.vbt.cumsum(chunked=True), df.vbt.cumsum(chunked=False))
 
     def test_cumprod(self):
-        pd.testing.assert_series_equal(df["a"].vbt.cumprod(), df["a"].cumprod().ffill().fillna(1))
-        pd.testing.assert_frame_equal(df.vbt.cumprod(), df.cumprod().ffill().fillna(1))
-        pd.testing.assert_frame_equal(
+        assert_series_equal(df["a"].vbt.cumprod(), df["a"].cumprod().ffill().fillna(1))
+        assert_frame_equal(df.vbt.cumprod(), df.cumprod().ffill().fillna(1))
+        assert_frame_equal(
             df.vbt.cumprod(jitted=dict(parallel=True)),
             df.vbt.cumprod(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(df.vbt.cumprod(chunked=True), df.vbt.cumprod(chunked=False))
+        assert_frame_equal(df.vbt.cumprod(chunked=True), df.vbt.cumprod(chunked=False))
 
     @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
     @pytest.mark.parametrize("test_minp", [1, None])
     def test_rolling_sum(self, test_window, test_minp):
         if test_minp is None:
             test_minp = test_window
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.rolling_sum(test_window, minp=test_minp),
             df["a"].rolling(test_window, min_periods=test_minp).sum(),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_sum(test_window, minp=test_minp),
             df.rolling(test_window, min_periods=test_minp).sum(),
         )
-        pd.testing.assert_frame_equal(df.vbt.rolling_sum(test_window), df.rolling(test_window).sum())
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(df.vbt.rolling_sum(test_window), df.rolling(test_window).sum())
+        assert_frame_equal(
             df.vbt.rolling_sum(test_window, minp=test_minp, jitted=dict(parallel=True)),
             df.vbt.rolling_sum(test_window, minp=test_minp, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_sum(test_window, minp=test_minp, chunked=True),
             df.vbt.rolling_sum(test_window, minp=test_minp, chunked=False),
         )
@@ -249,20 +249,20 @@ class TestAccessors:
     def test_rolling_prod(self, test_window, test_minp):
         if test_minp is None:
             test_minp = test_window
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.rolling_prod(test_window, minp=test_minp),
             df["a"].rolling(test_window, min_periods=test_minp).apply(np.prod),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_prod(test_window, minp=test_minp),
             df.rolling(test_window, min_periods=test_minp).apply(np.prod),
         )
-        pd.testing.assert_frame_equal(df.vbt.rolling_prod(test_window), df.rolling(test_window).apply(np.prod))
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(df.vbt.rolling_prod(test_window), df.rolling(test_window).apply(np.prod))
+        assert_frame_equal(
             df.vbt.rolling_prod(test_window, minp=test_minp, jitted=dict(parallel=True)),
             df.vbt.rolling_prod(test_window, minp=test_minp, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_prod(test_window, minp=test_minp, chunked=True),
             df.vbt.rolling_prod(test_window, minp=test_minp, chunked=False),
         )
@@ -272,37 +272,37 @@ class TestAccessors:
     def test_rolling_mean(self, test_window, test_minp):
         if test_minp is None:
             test_minp = test_window
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.rolling_mean(test_window, minp=test_minp),
             df["a"].rolling(test_window, min_periods=test_minp).mean(),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_mean(test_window, minp=test_minp),
             df.rolling(test_window, min_periods=test_minp).mean(),
         )
-        pd.testing.assert_frame_equal(df.vbt.rolling_mean(test_window), df.rolling(test_window).mean())
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(df.vbt.rolling_mean(test_window), df.rolling(test_window).mean())
+        assert_frame_equal(
             df.vbt.rolling_mean(test_window, minp=test_minp, jitted=dict(parallel=True)),
             df.vbt.rolling_mean(test_window, minp=test_minp, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_mean(test_window, minp=test_minp, chunked=True),
             df.vbt.rolling_mean(test_window, minp=test_minp, chunked=False),
         )
 
     @pytest.mark.parametrize("test_minp", [1, 3])
     def test_expanding_mean(self, test_minp):
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.expanding_mean(minp=test_minp),
             df["a"].expanding(min_periods=test_minp).mean(),
         )
-        pd.testing.assert_frame_equal(df.vbt.expanding_mean(minp=test_minp), df.expanding(min_periods=test_minp).mean())
-        pd.testing.assert_frame_equal(df.vbt.expanding_mean(), df.expanding().mean())
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(df.vbt.expanding_mean(minp=test_minp), df.expanding(min_periods=test_minp).mean())
+        assert_frame_equal(df.vbt.expanding_mean(), df.expanding().mean())
+        assert_frame_equal(
             df.vbt.expanding_mean(minp=test_minp, jitted=dict(parallel=True)),
             df.vbt.expanding_mean(minp=test_minp, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.expanding_mean(minp=test_minp, chunked=True),
             df.vbt.expanding_mean(minp=test_minp, chunked=False),
         )
@@ -313,20 +313,20 @@ class TestAccessors:
     def test_rolling_std(self, test_window, test_minp, test_ddof):
         if test_minp is None:
             test_minp = test_window
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.rolling_std(test_window, minp=test_minp, ddof=test_ddof),
             df["a"].rolling(test_window, min_periods=test_minp).std(ddof=test_ddof),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_std(test_window, minp=test_minp, ddof=test_ddof),
             df.rolling(test_window, min_periods=test_minp).std(ddof=test_ddof),
         )
-        pd.testing.assert_frame_equal(df.vbt.rolling_std(test_window), df.rolling(test_window).std())
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(df.vbt.rolling_std(test_window), df.rolling(test_window).std())
+        assert_frame_equal(
             df.vbt.rolling_std(test_window, minp=test_minp, ddof=test_ddof, jitted=dict(parallel=True)),
             df.vbt.rolling_std(test_window, minp=test_minp, ddof=test_ddof, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_std(test_window, minp=test_minp, ddof=test_ddof, chunked=True),
             df.vbt.rolling_std(test_window, minp=test_minp, ddof=test_ddof, chunked=False),
         )
@@ -334,20 +334,20 @@ class TestAccessors:
     @pytest.mark.parametrize("test_minp", [1, 3])
     @pytest.mark.parametrize("test_ddof", [0, 1])
     def test_expanding_std(self, test_minp, test_ddof):
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.expanding_std(minp=test_minp, ddof=test_ddof),
             df["a"].expanding(min_periods=test_minp).std(ddof=test_ddof),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.expanding_std(minp=test_minp, ddof=test_ddof),
             df.expanding(min_periods=test_minp).std(ddof=test_ddof),
         )
-        pd.testing.assert_frame_equal(df.vbt.expanding_std(), df.expanding().std())
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(df.vbt.expanding_std(), df.expanding().std())
+        assert_frame_equal(
             df.vbt.expanding_std(minp=test_minp, ddof=test_ddof, jitted=dict(parallel=True)),
             df.vbt.expanding_std(minp=test_minp, ddof=test_ddof, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.expanding_std(minp=test_minp, ddof=test_ddof, chunked=True),
             df.vbt.expanding_std(minp=test_minp, ddof=test_ddof, chunked=False),
         )
@@ -363,20 +363,20 @@ class TestAccessors:
             weights = np.arange(len(sr)) + 1
             return np.sum(sr * weights) / np.sum(weights)
 
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.wm_mean(test_window, minp=test_minp),
             df["a"].rolling(window=test_window, min_periods=test_minp).apply(wma),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.wm_mean(test_window, minp=test_minp),
             df.rolling(window=test_window, min_periods=test_minp).apply(wma),
         )
-        pd.testing.assert_frame_equal(df.vbt.wm_mean(test_window), df.rolling(window=test_window).apply(wma))
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(df.vbt.wm_mean(test_window), df.rolling(window=test_window).apply(wma))
+        assert_frame_equal(
             df.vbt.wm_mean(test_window, minp=test_minp, jitted=dict(parallel=True)),
             df.vbt.wm_mean(test_window, minp=test_minp, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.wm_mean(test_window, minp=test_minp, chunked=True),
             df.vbt.wm_mean(test_window, minp=test_minp, chunked=False),
         )
@@ -387,20 +387,20 @@ class TestAccessors:
     def test_ewm_mean(self, test_window, test_minp, test_adjust):
         if test_minp is None:
             test_minp = test_window
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.ewm_mean(test_window, minp=test_minp, adjust=test_adjust),
             df["a"].ewm(span=test_window, min_periods=test_minp, adjust=test_adjust).mean(),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.ewm_mean(test_window, minp=test_minp, adjust=test_adjust),
             df.ewm(span=test_window, min_periods=test_minp, adjust=test_adjust).mean(),
         )
-        pd.testing.assert_frame_equal(df.vbt.ewm_mean(test_window), df.ewm(span=test_window).mean())
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(df.vbt.ewm_mean(test_window), df.ewm(span=test_window).mean())
+        assert_frame_equal(
             df.vbt.ewm_mean(test_window, minp=test_minp, adjust=test_adjust, jitted=dict(parallel=True)),
             df.vbt.ewm_mean(test_window, minp=test_minp, adjust=test_adjust, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.ewm_mean(test_window, minp=test_minp, adjust=test_adjust, chunked=True),
             df.vbt.ewm_mean(test_window, minp=test_minp, adjust=test_adjust, chunked=False),
         )
@@ -411,20 +411,20 @@ class TestAccessors:
     def test_ewm_std(self, test_window, test_minp, test_adjust):
         if test_minp is None:
             test_minp = test_window
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.ewm_std(test_window, minp=test_minp, adjust=test_adjust),
             df["a"].ewm(span=test_window, min_periods=test_minp, adjust=test_adjust).std(),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.ewm_std(test_window, minp=test_minp, adjust=test_adjust),
             df.ewm(span=test_window, min_periods=test_minp, adjust=test_adjust).std(),
         )
-        pd.testing.assert_frame_equal(df.vbt.ewm_std(test_window), df.ewm(span=test_window).std())
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(df.vbt.ewm_std(test_window), df.ewm(span=test_window).std())
+        assert_frame_equal(
             df.vbt.ewm_std(test_window, minp=test_minp, adjust=test_adjust, jitted=dict(parallel=True)),
             df.vbt.ewm_std(test_window, minp=test_minp, adjust=test_adjust, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.ewm_std(test_window, minp=test_minp, adjust=test_adjust, chunked=True),
             df.vbt.ewm_std(test_window, minp=test_minp, adjust=test_adjust, chunked=False),
         )
@@ -434,20 +434,20 @@ class TestAccessors:
     def test_wwm_mean(self, test_window, test_minp):
         if test_minp is None:
             test_minp = test_window
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.wwm_mean(test_window, minp=test_minp),
             df["a"].ewm(alpha=1 / test_window, min_periods=test_minp, adjust=False).mean(),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.wwm_mean(test_window, minp=test_minp),
             df.ewm(alpha=1 / test_window, min_periods=test_minp, adjust=False).mean(),
         )
-        pd.testing.assert_frame_equal(df.vbt.wwm_mean(test_window), df.ewm(alpha=1 / test_window, adjust=False).mean())
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(df.vbt.wwm_mean(test_window), df.ewm(alpha=1 / test_window, adjust=False).mean())
+        assert_frame_equal(
             df.vbt.wwm_mean(test_window, minp=test_minp, jitted=dict(parallel=True)),
             df.vbt.wwm_mean(test_window, minp=test_minp, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.wwm_mean(test_window, minp=test_minp, chunked=True),
             df.vbt.wwm_mean(test_window, minp=test_minp, chunked=False),
         )
@@ -457,20 +457,20 @@ class TestAccessors:
     def test_wwm_std(self, test_window, test_minp):
         if test_minp is None:
             test_minp = test_window
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.wwm_std(test_window, minp=test_minp),
             df["a"].ewm(alpha=1 / test_window, min_periods=test_minp, adjust=False).std(),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.wwm_std(test_window, minp=test_minp),
             df.ewm(alpha=1 / test_window, min_periods=test_minp, adjust=False).std(),
         )
-        pd.testing.assert_frame_equal(df.vbt.wwm_std(test_window), df.ewm(alpha=1 / test_window, adjust=False).std())
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(df.vbt.wwm_std(test_window), df.ewm(alpha=1 / test_window, adjust=False).std())
+        assert_frame_equal(
             df.vbt.wwm_std(test_window, minp=test_minp, jitted=dict(parallel=True)),
             df.vbt.wwm_std(test_window, minp=test_minp, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.wwm_std(test_window, minp=test_minp, chunked=True),
             df.vbt.wwm_std(test_window, minp=test_minp, chunked=False),
         )
@@ -482,23 +482,23 @@ class TestAccessors:
         if test_minp is None:
             test_minp = test_window
         df2 = df[["b", "c", "a"]].rename(columns={"b": "a", "c": "b", "a": "c"})
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.rolling_cov(df2["a"], test_window, minp=test_minp, ddof=test_ddof),
             df["a"].rolling(test_window, min_periods=test_minp).cov(df2["a"], ddof=test_ddof),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_cov(df2, test_window, minp=test_minp, ddof=test_ddof),
             df.rolling(test_window, min_periods=test_minp).cov(df2, ddof=test_ddof),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_cov(df2, test_window, ddof=test_ddof),
             df.rolling(test_window).cov(df2, ddof=test_ddof),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_cov(df2, test_window, minp=test_minp, ddof=test_ddof, jitted=dict(parallel=True)),
             df.vbt.rolling_cov(df2, test_window, minp=test_minp, ddof=test_ddof, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_cov(df2, test_window, minp=test_minp, ddof=test_ddof, chunked=True),
             df.vbt.rolling_cov(df2, test_window, minp=test_minp, ddof=test_ddof, chunked=False),
         )
@@ -507,23 +507,23 @@ class TestAccessors:
     @pytest.mark.parametrize("test_ddof", [0, 1])
     def test_expanding_cov(self, test_minp, test_ddof):
         df2 = df[["b", "c", "a"]].rename(columns={"b": "a", "c": "b", "a": "c"})
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.expanding_cov(df2["a"], minp=test_minp, ddof=test_ddof),
             df["a"].expanding(min_periods=test_minp).cov(df2["a"], ddof=test_ddof),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.expanding_cov(df2, minp=test_minp, ddof=test_ddof),
             df.expanding(min_periods=test_minp).cov(df2, ddof=test_ddof),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.expanding_cov(df2, ddof=test_ddof),
             df.expanding().cov(df2, ddof=test_ddof),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.expanding_cov(df2, minp=test_minp, ddof=test_ddof, jitted=dict(parallel=True)),
             df.vbt.expanding_cov(df2, minp=test_minp, ddof=test_ddof, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.expanding_cov(df2, minp=test_minp, ddof=test_ddof, chunked=True),
             df.vbt.expanding_cov(df2, minp=test_minp, ddof=test_ddof, chunked=False),
         )
@@ -534,20 +534,20 @@ class TestAccessors:
         if test_minp is None:
             test_minp = test_window
         df2 = df[["b", "c", "a"]].rename(columns={"b": "a", "c": "b", "a": "c"})
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.rolling_corr(df2["a"], test_window, minp=test_minp),
             df["a"].rolling(test_window, min_periods=test_minp).corr(df2["a"]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_corr(df2, test_window, minp=test_minp),
             df.rolling(test_window, min_periods=test_minp).corr(df2),
         )
-        pd.testing.assert_frame_equal(df.vbt.rolling_corr(df2, test_window), df.rolling(test_window).corr(df2))
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(df.vbt.rolling_corr(df2, test_window), df.rolling(test_window).corr(df2))
+        assert_frame_equal(
             df.vbt.rolling_corr(df2, test_window, minp=test_minp, jitted=dict(parallel=True)),
             df.vbt.rolling_corr(df2, test_window, minp=test_minp, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_corr(df2, test_window, minp=test_minp, chunked=True),
             df.vbt.rolling_corr(df2, test_window, minp=test_minp, chunked=False),
         )
@@ -555,20 +555,20 @@ class TestAccessors:
     @pytest.mark.parametrize("test_minp", [1, 3])
     def test_expanding_corr(self, test_minp):
         df2 = df[["b", "c", "a"]].rename(columns={"b": "a", "c": "b", "a": "c"})
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.expanding_corr(df2["a"], minp=test_minp),
             df["a"].expanding(min_periods=test_minp).corr(df2["a"]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.expanding_corr(df2, minp=test_minp),
             df.expanding(min_periods=test_minp).corr(df2),
         )
-        pd.testing.assert_frame_equal(df.vbt.expanding_corr(df2), df.expanding().corr(df2))
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(df.vbt.expanding_corr(df2), df.expanding().corr(df2))
+        assert_frame_equal(
             df.vbt.expanding_corr(df2, minp=test_minp, jitted=dict(parallel=True)),
             df.vbt.expanding_corr(df2, minp=test_minp, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.expanding_corr(df2, minp=test_minp, chunked=True),
             df.vbt.expanding_corr(df2, minp=test_minp, chunked=False),
         )
@@ -579,23 +579,23 @@ class TestAccessors:
     def test_rolling_rank(self, test_window, test_minp, test_pct):
         if test_minp is None:
             test_minp = test_window
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.rolling_rank(test_window, minp=test_minp, pct=test_pct),
             df["a"].rolling(test_window, min_periods=test_minp).apply(lambda sr: sr.rank(pct=test_pct).iloc[-1]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_rank(test_window, minp=test_minp, pct=test_pct),
             df.rolling(test_window, min_periods=test_minp).apply(lambda sr: sr.rank(pct=test_pct).iloc[-1]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_rank(test_window, pct=test_pct),
             df.rolling(test_window).apply(lambda sr: sr.rank(pct=test_pct).iloc[-1]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_rank(test_window, minp=test_minp, pct=test_pct, jitted=dict(parallel=True)),
             df.vbt.rolling_rank(test_window, minp=test_minp, pct=test_pct, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_rank(test_window, minp=test_minp, pct=test_pct, chunked=True),
             df.vbt.rolling_rank(test_window, minp=test_minp, pct=test_pct, chunked=False),
         )
@@ -603,23 +603,23 @@ class TestAccessors:
     @pytest.mark.parametrize("test_minp", [1, 3])
     @pytest.mark.parametrize("test_pct", [False, True])
     def test_expanding_rank(self, test_minp, test_pct):
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.expanding_rank(minp=test_minp, pct=test_pct),
             df["a"].expanding(min_periods=test_minp).apply(lambda sr: sr.rank(pct=test_pct).iloc[-1]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.expanding_rank(minp=test_minp, pct=test_pct),
             df.expanding(min_periods=test_minp).apply(lambda sr: sr.rank(pct=test_pct).iloc[-1]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.expanding_rank(pct=test_pct),
             df.expanding().apply(lambda sr: sr.rank(pct=test_pct).iloc[-1]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.expanding_rank(minp=test_minp, pct=test_pct, jitted=dict(parallel=True)),
             df.vbt.expanding_rank(minp=test_minp, pct=test_pct, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.expanding_rank(minp=test_minp, pct=test_pct, chunked=True),
             df.vbt.expanding_rank(minp=test_minp, pct=test_pct, chunked=False),
         )
@@ -629,37 +629,37 @@ class TestAccessors:
     def test_rolling_min(self, test_window, test_minp):
         if test_minp is None:
             test_minp = test_window
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.rolling_min(test_window, minp=test_minp),
             df["a"].rolling(test_window, min_periods=test_minp).min(),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_min(test_window, minp=test_minp),
             df.rolling(test_window, min_periods=test_minp).min(),
         )
-        pd.testing.assert_frame_equal(df.vbt.rolling_min(test_window), df.rolling(test_window).min())
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(df.vbt.rolling_min(test_window), df.rolling(test_window).min())
+        assert_frame_equal(
             df.vbt.rolling_min(test_window, minp=test_minp, jitted=dict(parallel=True)),
             df.vbt.rolling_min(test_window, minp=test_minp, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_min(test_window, minp=test_minp, chunked=True),
             df.vbt.rolling_min(test_window, minp=test_minp, chunked=False),
         )
 
     @pytest.mark.parametrize("test_minp", [1, 3])
     def test_expanding_min(self, test_minp):
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.expanding_min(minp=test_minp),
             df["a"].expanding(min_periods=test_minp).min(),
         )
-        pd.testing.assert_frame_equal(df.vbt.expanding_min(minp=test_minp), df.expanding(min_periods=test_minp).min())
-        pd.testing.assert_frame_equal(df.vbt.expanding_min(), df.expanding().min())
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(df.vbt.expanding_min(minp=test_minp), df.expanding(min_periods=test_minp).min())
+        assert_frame_equal(df.vbt.expanding_min(), df.expanding().min())
+        assert_frame_equal(
             df.vbt.expanding_min(minp=test_minp, jitted=dict(parallel=True)),
             df.vbt.expanding_min(minp=test_minp, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.expanding_min(minp=test_minp, chunked=True),
             df.vbt.expanding_min(minp=test_minp, chunked=False),
         )
@@ -669,37 +669,37 @@ class TestAccessors:
     def test_rolling_max(self, test_window, test_minp):
         if test_minp is None:
             test_minp = test_window
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.rolling_max(test_window, minp=test_minp),
             df["a"].rolling(test_window, min_periods=test_minp).max(),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_max(test_window, minp=test_minp),
             df.rolling(test_window, min_periods=test_minp).max(),
         )
-        pd.testing.assert_frame_equal(df.vbt.rolling_max(test_window), df.rolling(test_window).max())
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(df.vbt.rolling_max(test_window), df.rolling(test_window).max())
+        assert_frame_equal(
             df.vbt.rolling_max(test_window, minp=test_minp, jitted=dict(parallel=True)),
             df.vbt.rolling_max(test_window, minp=test_minp, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_max(test_window, minp=test_minp, chunked=True),
             df.vbt.rolling_max(test_window, minp=test_minp, chunked=False),
         )
 
     @pytest.mark.parametrize("test_minp", [1, 3])
     def test_expanding_max(self, test_minp):
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.expanding_max(minp=test_minp),
             df["a"].expanding(min_periods=test_minp).max(),
         )
-        pd.testing.assert_frame_equal(df.vbt.expanding_max(minp=test_minp), df.expanding(min_periods=test_minp).max())
-        pd.testing.assert_frame_equal(df.vbt.expanding_max(), df.expanding().max())
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(df.vbt.expanding_max(minp=test_minp), df.expanding(min_periods=test_minp).max())
+        assert_frame_equal(df.vbt.expanding_max(), df.expanding().max())
+        assert_frame_equal(
             df.vbt.expanding_max(minp=test_minp, jitted=dict(parallel=True)),
             df.vbt.expanding_max(minp=test_minp, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.expanding_max(minp=test_minp, chunked=True),
             df.vbt.expanding_max(minp=test_minp, chunked=False),
         )
@@ -709,46 +709,46 @@ class TestAccessors:
     def test_rolling_idxmin(self, test_window, test_minp):
         if test_minp is None:
             test_minp = test_window
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.rolling_idxmin(test_window, minp=test_minp, local=True),
             df["a"].rolling(test_window, min_periods=test_minp).apply(np.argmin).fillna(-1).astype(np.int_),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_idxmin(test_window, minp=test_minp, local=True),
             df.rolling(test_window, min_periods=test_minp).apply(np.argmin).fillna(-1).astype(np.int_),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_idxmin(test_window, local=True),
             df.rolling(test_window).apply(np.argmin).fillna(-1).astype(np.int_),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_idxmin(test_window, minp=test_minp, jitted=dict(parallel=True)),
             df.vbt.rolling_idxmin(test_window, minp=test_minp, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_idxmin(test_window, minp=test_minp, chunked=True),
             df.vbt.rolling_idxmin(test_window, minp=test_minp, chunked=False),
         )
 
     @pytest.mark.parametrize("test_minp", [1, 3])
     def test_expanding_idxmin(self, test_minp):
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.expanding_idxmin(minp=test_minp, local=True),
             df["a"].expanding(min_periods=test_minp).apply(np.argmin).fillna(-1).astype(np.int_),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.expanding_idxmin(minp=test_minp, local=True),
             df.expanding(min_periods=test_minp).apply(np.argmin).fillna(-1).astype(np.int_),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.expanding_idxmin(local=True),
             df.expanding().apply(np.argmin).fillna(-1).astype(np.int_),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.expanding_idxmin(minp=test_minp, jitted=dict(parallel=True)),
             df.vbt.expanding_idxmin(minp=test_minp, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.expanding_idxmin(minp=test_minp, chunked=True),
             df.vbt.expanding_idxmin(minp=test_minp, chunked=False),
         )
@@ -758,46 +758,46 @@ class TestAccessors:
     def test_rolling_idxmax(self, test_window, test_minp):
         if test_minp is None:
             test_minp = test_window
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.rolling_idxmax(test_window, minp=test_minp, local=True),
             df["a"].rolling(test_window, min_periods=test_minp).apply(np.argmax).fillna(-1).astype(np.int_),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_idxmax(test_window, minp=test_minp, local=True),
             df.rolling(test_window, min_periods=test_minp).apply(np.argmax).fillna(-1).astype(np.int_),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_idxmax(test_window, local=True),
             df.rolling(test_window).apply(np.argmax).fillna(-1).astype(np.int_),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_idxmax(test_window, minp=test_minp, jitted=dict(parallel=True)),
             df.vbt.rolling_idxmax(test_window, minp=test_minp, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_idxmax(test_window, minp=test_minp, chunked=True),
             df.vbt.rolling_idxmax(test_window, minp=test_minp, chunked=False),
         )
 
     @pytest.mark.parametrize("test_minp", [1, 3])
     def test_expanding_idxmax(self, test_minp):
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.expanding_idxmax(minp=test_minp, local=True),
             df["a"].expanding(min_periods=test_minp).apply(np.argmax).fillna(-1).astype(np.int_),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.expanding_idxmax(minp=test_minp, local=True),
             df.expanding(min_periods=test_minp).apply(np.argmax).fillna(-1).astype(np.int_),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.expanding_idxmax(local=True),
             df.expanding().apply(np.argmax).fillna(-1).astype(np.int_),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.expanding_idxmax(minp=test_minp, jitted=dict(parallel=True)),
             df.vbt.expanding_idxmax(minp=test_minp, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.expanding_idxmax(minp=test_minp, chunked=True),
             df.vbt.expanding_idxmax(minp=test_minp, chunked=False),
         )
@@ -811,19 +811,19 @@ class TestAccessors:
         def mult_meta_nb(i, col, x, y):
             return x[i, col] * y
 
-        pd.testing.assert_series_equal(df["a"].vbt.map(mult_nb, 2), df["a"].map(lambda x: x * 2))
-        pd.testing.assert_frame_equal(df.vbt.map(mult_nb, 2), df.applymap(lambda x: x * 2))
-        pd.testing.assert_frame_equal(
+        assert_series_equal(df["a"].vbt.map(mult_nb, 2), df["a"].map(lambda x: x * 2))
+        assert_frame_equal(df.vbt.map(mult_nb, 2), df.applymap(lambda x: x * 2))
+        assert_frame_equal(
             df.vbt.map(mult_nb, 2, jitted=dict(parallel=True)),
             df.vbt.map(mult_nb, 2, jitted=dict(parallel=False)),
         )
         chunked = dict(arg_take_spec=dict(args=vbt.ArgsTaker(None)))
-        pd.testing.assert_frame_equal(df.vbt.map(mult_nb, 2, chunked=chunked), df.vbt.map(mult_nb, 2, chunked=False))
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(df.vbt.map(mult_nb, 2, chunked=chunked), df.vbt.map(mult_nb, 2, chunked=False))
+        assert_frame_equal(
             pd.DataFrame.vbt.map(mult_meta_nb, df.vbt.to_2d_array(), 2, wrapper=df.vbt.wrapper),
             df.vbt.map(mult_nb, 2),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.map(
                 mult_meta_nb,
                 df.vbt.to_2d_array(),
@@ -840,7 +840,7 @@ class TestAccessors:
             ),
         )
         chunked = dict(arg_take_spec=dict(args=vbt.ArgsTaker(vbt.ArraySlicer(axis=1), None)))
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.map(mult_meta_nb, df.vbt.to_2d_array(), 2, wrapper=df.vbt.wrapper, chunked=chunked),
             pd.DataFrame.vbt.map(mult_meta_nb, df.vbt.to_2d_array(), 2, wrapper=df.vbt.wrapper, chunked=False),
         )
@@ -849,7 +849,7 @@ class TestAccessors:
         def mult_meta2_nb(i, col, x, y):
             return x[i, col] * y[i, col]
 
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.map(
                 mult_meta2_nb,
                 vbt.RepEval("to_2d_array(x)"),
@@ -880,36 +880,36 @@ class TestAccessors:
         def row_pow_meta_nb(i, x, y):
             return x[i, :] ** y
 
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.apply_along_axis(pow_nb, 2, axis=0),
             df.apply(pow_nb, args=(2,), axis=0, raw=True),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.apply_along_axis(pow_nb, 2, axis=0, jitted=dict(parallel=True)),
             df.vbt.apply_along_axis(pow_nb, 2, axis=0, jitted=dict(parallel=False)),
         )
         chunked = dict(arg_take_spec=dict(args=vbt.ArgsTaker(None)))
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.apply_along_axis(pow_nb, 2, axis=0, chunked=chunked),
             df.vbt.apply_along_axis(pow_nb, 2, axis=0, chunked=False),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.apply_along_axis(pow_nb, 2, axis=1),
             df.apply(pow_nb, args=(2,), axis=1, raw=True),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.apply_along_axis(pow_nb, 2, axis=1, jitted=dict(parallel=True)),
             df.vbt.apply_along_axis(pow_nb, 2, axis=1, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.apply_along_axis(pow_nb, 2, axis=1, chunked=chunked),
             df.vbt.apply_along_axis(pow_nb, 2, axis=1, chunked=False),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.apply_along_axis(row_pow_meta_nb, df.vbt.to_2d_array(), 2, axis=0, wrapper=df.vbt.wrapper),
             df.vbt.apply_along_axis(pow_nb, 2, axis=0),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.apply_along_axis(
                 row_pow_meta_nb,
                 df.vbt.to_2d_array(),
@@ -928,7 +928,7 @@ class TestAccessors:
             ),
         )
         chunked = dict(arg_take_spec=dict(args=vbt.ArgsTaker(vbt.ArraySlicer(axis=0), None)))
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.apply_along_axis(
                 row_pow_meta_nb,
                 df.vbt.to_2d_array(),
@@ -946,11 +946,11 @@ class TestAccessors:
                 chunked=False,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.apply_along_axis(pow_meta_nb, df.vbt.to_2d_array(), 2, axis=1, wrapper=df.vbt.wrapper),
             df.vbt.apply_along_axis(pow_nb, 2, axis=1),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.apply_along_axis(
                 pow_meta_nb,
                 df.vbt.to_2d_array(),
@@ -969,7 +969,7 @@ class TestAccessors:
             ),
         )
         chunked = dict(arg_take_spec=dict(args=vbt.ArgsTaker(vbt.ArraySlicer(axis=1), None)))
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.apply_along_axis(
                 pow_meta_nb,
                 df.vbt.to_2d_array(),
@@ -992,7 +992,7 @@ class TestAccessors:
         def pow_meta2_nb(col, x, y):
             return x[:, col] ** y[:, col]
 
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.apply_along_axis(
                 pow_meta2_nb,
                 vbt.RepEval("to_2d_array(x)"),
@@ -1023,25 +1023,25 @@ class TestAccessors:
 
         if test_minp is None:
             test_minp = test_window
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.rolling_apply(test_window, mean_nb, minp=test_minp),
             df["a"].rolling(test_window, min_periods=test_minp).apply(mean_nb, raw=True),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_apply(test_window, mean_nb, minp=test_minp),
             df.rolling(test_window, min_periods=test_minp).apply(mean_nb, raw=True),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_apply(test_window, mean_nb, minp=test_minp, jitted=dict(parallel=True)),
             df.vbt.rolling_apply(test_window, mean_nb, minp=test_minp, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.rolling_apply(test_window, mean_nb, minp=test_minp, chunked=True),
             df.vbt.rolling_apply(test_window, mean_nb, minp=test_minp, chunked=False),
         )
         result = df.vbt.rolling_apply(test_window, mean_nb, minp=1)
         result.iloc[: test_minp - 1] = np.nan
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.rolling_apply(
                 test_window,
                 mean_meta_nb,
@@ -1051,7 +1051,7 @@ class TestAccessors:
             ),
             result,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.rolling_apply(
                 test_window,
                 mean_meta_nb,
@@ -1076,7 +1076,7 @@ class TestAccessors:
                 )
             )
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.rolling_apply(
                 test_window,
                 mean_meta_nb,
@@ -1099,7 +1099,7 @@ class TestAccessors:
         def mean_diff_meta_nb(from_i, to_i, col, x, y):
             return np.nanmean(x[from_i:to_i, col]) / np.nanmean(y[from_i:to_i, col])
 
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.rolling_apply(
                 3,
                 mean_diff_meta_nb,
@@ -1134,25 +1134,25 @@ class TestAccessors:
         def mean_meta_nb(from_i, to_i, col, x):
             return np.nanmean(x[from_i:to_i, col])
 
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.expanding_apply(mean_nb, minp=test_minp),
             df["a"].expanding(min_periods=test_minp).apply(mean_nb, raw=True),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.expanding_apply(mean_nb, minp=test_minp),
             df.expanding(min_periods=test_minp).apply(mean_nb, raw=True),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.expanding_apply(mean_nb, minp=test_minp, jitted=dict(parallel=True)),
             df.vbt.expanding_apply(mean_nb, minp=test_minp, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.expanding_apply(mean_nb, minp=test_minp, chunked=True),
             df.vbt.expanding_apply(mean_nb, minp=test_minp, chunked=False),
         )
         result = df.vbt.expanding_apply(mean_nb, minp=1)
         result.iloc[: test_minp - 1] = np.nan
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.expanding_apply(
                 mean_meta_nb,
                 df.vbt.to_2d_array(),
@@ -1161,7 +1161,7 @@ class TestAccessors:
             ),
             result,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.expanding_apply(
                 mean_meta_nb,
                 df.vbt.to_2d_array(),
@@ -1184,7 +1184,7 @@ class TestAccessors:
                 )
             )
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.expanding_apply(
                 mean_meta_nb,
                 df.vbt.to_2d_array(),
@@ -1210,37 +1210,37 @@ class TestAccessors:
         def mean_meta_nb(idxs, group, col, x):
             return np.nanmean(x[idxs, col])
 
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb),
             df["a"].groupby(np.asarray([1, 1, 2, 2, 3])).apply(lambda x: mean_nb(x.values)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb),
             df.groupby(np.asarray([1, 1, 2, 2, 3])).agg(
                 {"a": lambda x: mean_nb(x.values), "b": lambda x: mean_nb(x.values), "c": lambda x: mean_nb(x.values)},
             ),  # any clean way to do column-wise grouping in pandas?
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb, use_groupby=True),
             df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb, use_groupby=False),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.groupby_apply(df.groupby(np.asarray([1, 1, 2, 2, 3])), mean_nb),
             df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.groupby_apply(vbt.Grouper(df.index, np.asarray([1, 1, 2, 2, 3])), mean_nb),
             df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb, jitted=dict(parallel=True)),
             df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb, chunked=True),
             df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb, chunked=False),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.groupby_apply(
                 np.asarray([1, 1, 2, 2, 3]),
                 mean_meta_nb,
@@ -1249,7 +1249,7 @@ class TestAccessors:
             ),
             df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.groupby_apply(
                 np.asarray([1, 1, 2, 2, 3]),
                 mean_meta_nb,
@@ -1272,7 +1272,7 @@ class TestAccessors:
                 )
             )
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.groupby_apply(
                 np.asarray([1, 1, 2, 2, 3]),
                 mean_meta_nb,
@@ -1293,7 +1293,7 @@ class TestAccessors:
         def mean_diff_meta_nb(idxs, group, col, x, y):
             return np.nanmean(x[idxs, col]) / np.nanmean(y[idxs, col])
 
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.groupby_apply(
                 vbt.RepEval("group_by_evenly_nb(wrapper.shape[0], 2)"),
                 mean_diff_meta_nb,
@@ -1321,19 +1321,19 @@ class TestAccessors:
         def mean_meta_nb(from_i, to_i, col, x):
             return np.nanmean(x[from_i:to_i, col])
 
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.resample_apply(test_freq, mean_nb),
             df["a"].resample(test_freq).apply(lambda x: mean_nb(x.values)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.resample_apply(test_freq, mean_nb),
             df.resample(test_freq).apply(lambda x: mean_nb(x.values)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.resample_apply(test_freq, mean_nb, use_groupby_apply=True),
             df.vbt.resample_apply(test_freq, mean_nb, use_groupby_apply=False),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.resample_apply(df.resample(test_freq), mean_nb, use_groupby_apply=True),
             df.vbt.resample_apply(test_freq, mean_nb, use_groupby_apply=False),
         )
@@ -1343,23 +1343,23 @@ class TestAccessors:
                 mean_nb,
                 use_groupby_apply=True,
             )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.resample_apply(df.resample(test_freq), mean_nb),
             df.vbt.resample_apply(test_freq, mean_nb),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.resample_apply(vbt.Resampler.from_pd_resampler(df.resample(test_freq)), mean_nb),
             df.vbt.resample_apply(test_freq, mean_nb),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.resample_apply(test_freq, mean_nb, jitted=dict(parallel=True)),
             df.vbt.resample_apply(test_freq, mean_nb, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.resample_apply(test_freq, mean_nb, chunked=True),
             df.vbt.resample_apply(test_freq, mean_nb, chunked=False),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.resample_apply(
                 test_freq,
                 mean_meta_nb,
@@ -1368,7 +1368,7 @@ class TestAccessors:
             ),
             df.vbt.resample_apply(test_freq, mean_nb),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.resample_apply(
                 test_freq,
                 mean_meta_nb,
@@ -1391,7 +1391,7 @@ class TestAccessors:
                 )
             )
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.resample_apply(
                 test_freq,
                 mean_meta_nb,
@@ -1412,7 +1412,7 @@ class TestAccessors:
         def mean_diff_meta_nb(from_i, to_i, col, x, y):
             return np.nanmean(x[from_i:to_i, col]) / np.nanmean(y[from_i:to_i, col])
 
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.resample_apply(
                 "2d",
                 mean_diff_meta_nb,
@@ -1457,7 +1457,7 @@ class TestAccessors:
             df.vbt.latest_at_index(target_index, jitted=dict(parallel=True)).values,
             df.vbt.latest_at_index(target_index, jitted=dict(parallel=False)).values,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.latest_at_index(target_index, chunked=True),
             df.vbt.latest_at_index(target_index, chunked=False),
         )
@@ -1672,27 +1672,27 @@ class TestAccessors:
         target_index = df.resample(test_freq).asfreq().index
         target_index_before = df.resample(test_freq, closed="right", label="right").asfreq().index
 
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.resample_to_index(target_index, mean_nb),
             df["a"].resample(test_freq).apply(lambda x: mean_nb(x.values)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.resample_to_index(target_index, mean_nb),
             df.resample(test_freq).apply(lambda x: mean_nb(x.values)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.resample_to_index(target_index_before, mean_nb, before=True),
             df.resample(test_freq, closed="right", label="right").apply(lambda x: mean_nb(x.values)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.resample_to_index(target_index, mean_nb, jitted=dict(parallel=True)),
             df.vbt.resample_to_index(target_index, mean_nb, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.resample_to_index(target_index, mean_nb, chunked=True),
             df.vbt.resample_to_index(target_index, mean_nb, chunked=False),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.resample_to_index(
                 target_index,
                 mean_meta_nb,
@@ -1701,7 +1701,7 @@ class TestAccessors:
             ),
             df.vbt.resample_to_index(target_index, mean_nb),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.resample_to_index(
                 target_index,
                 mean_meta_nb,
@@ -1724,7 +1724,7 @@ class TestAccessors:
                 )
             )
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.resample_to_index(
                 target_index,
                 mean_meta_nb,
@@ -1745,7 +1745,7 @@ class TestAccessors:
         def mean_diff_meta_nb(from_i, to_i, col, x, y):
             return np.nanmean(x[from_i:to_i, col]) / np.nanmean(y[from_i:to_i, col])
 
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.resample_to_index(
                 df.resample("2d").asfreq().index,
                 mean_diff_meta_nb,
@@ -1780,15 +1780,15 @@ class TestAccessors:
         target_lbound_index = df.resample(test_freq).asfreq().index
         target_rbound_index = target_lbound_index.shift()
 
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.resample_between_bounds(target_lbound_index, target_rbound_index, mean_nb),
             df["a"].resample(test_freq).apply(lambda x: mean_nb(x.values)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.resample_between_bounds(target_lbound_index, target_rbound_index, mean_nb),
             df.resample(test_freq).apply(lambda x: mean_nb(x.values)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.resample_between_bounds(
                 target_lbound_index, target_rbound_index, mean_nb, closed_lbound=False, closed_rbound=True
             ),
@@ -1799,7 +1799,7 @@ class TestAccessors:
                 wrap_kwargs=dict(index=target_rbound_index),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.resample_between_bounds(
                 target_lbound_index, target_rbound_index, mean_nb, closed_lbound=False, closed_rbound=False
             ),
@@ -1810,7 +1810,7 @@ class TestAccessors:
                 wrap_kwargs=dict(index=target_lbound_index),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.resample_between_bounds(
                 target_lbound_index, target_rbound_index, mean_nb, closed_lbound=True, closed_rbound=True
             ),
@@ -1821,7 +1821,7 @@ class TestAccessors:
                 wrap_kwargs=dict(index=target_lbound_index),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.resample_between_bounds(
                 target_lbound_index, target_rbound_index, mean_nb, jitted=dict(parallel=True)
             ),
@@ -1829,11 +1829,11 @@ class TestAccessors:
                 target_lbound_index, target_rbound_index, mean_nb, jitted=dict(parallel=False)
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.resample_between_bounds(target_lbound_index, target_rbound_index, mean_nb, chunked=True),
             df.vbt.resample_between_bounds(target_lbound_index, target_rbound_index, mean_nb, chunked=False),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.resample_between_bounds(
                 target_lbound_index,
                 target_rbound_index,
@@ -1843,7 +1843,7 @@ class TestAccessors:
             ),
             df.vbt.resample_between_bounds(target_lbound_index, target_rbound_index, mean_nb),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.resample_between_bounds(
                 target_lbound_index,
                 target_rbound_index,
@@ -1868,7 +1868,7 @@ class TestAccessors:
                 )
             )
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.resample_between_bounds(
                 target_lbound_index,
                 target_rbound_index,
@@ -1891,7 +1891,7 @@ class TestAccessors:
         def mean_diff_meta_nb(from_i, to_i, col, x, y):
             return np.nanmean(x[from_i:to_i, col]) / np.nanmean(y[from_i:to_i, col])
 
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.resample_between_bounds(
                 df.resample("2d").asfreq().index,
                 df.resample("2d").asfreq().index.shift(),
@@ -1918,7 +1918,7 @@ class TestAccessors:
                 return np.nan
             return np.mean(x)
 
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.resample_between_bounds(
                 pd.DatetimeIndex([
                     df.index[0],
@@ -1957,11 +1957,11 @@ class TestAccessors:
             df["a"].vbt.apply_and_reduce(every_nth_nb, sum_nb, apply_args=(2,), reduce_args=(3,))
             == df["a"].iloc[::2].sum() + 3
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df.vbt.apply_and_reduce(every_nth_nb, sum_nb, apply_args=(2,), reduce_args=(3,)),
             df.iloc[::2].sum().rename("apply_and_reduce") + 3,
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df.vbt.apply_and_reduce(
                 every_nth_nb,
                 sum_nb,
@@ -1987,11 +1987,11 @@ class TestAccessors:
                 ),
             )
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df.vbt.apply_and_reduce(every_nth_nb, sum_nb, apply_args=(2,), reduce_args=(3,), chunked=chunked),
             df.vbt.apply_and_reduce(every_nth_nb, sum_nb, apply_args=(2,), reduce_args=(3,), chunked=False),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             pd.DataFrame.vbt.apply_and_reduce(
                 every_nth_meta_nb,
                 sum_meta_nb,
@@ -2004,7 +2004,7 @@ class TestAccessors:
             ),
             df.vbt.apply_and_reduce(every_nth_nb, sum_nb, apply_args=(2,), reduce_args=(3,)),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             pd.DataFrame.vbt.apply_and_reduce(
                 every_nth_meta_nb,
                 sum_meta_nb,
@@ -2036,7 +2036,7 @@ class TestAccessors:
                 ),
             )
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             pd.DataFrame.vbt.apply_and_reduce(
                 every_nth_meta_nb,
                 sum_meta_nb,
@@ -2069,7 +2069,7 @@ class TestAccessors:
         def sum_meta2_nb(col, a):
             return np.nansum(a)
 
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             pd.DataFrame.vbt.apply_and_reduce(
                 every_2nd_sum_meta_nb,
                 sum_meta2_nb,
@@ -2097,17 +2097,17 @@ class TestAccessors:
             return np.nansum(a[:, group_idxs])
 
         assert df["a"].vbt.reduce(sum_nb) == df["a"].sum()
-        pd.testing.assert_series_equal(df.vbt.reduce(sum_nb), df.sum().rename("reduce"))
-        pd.testing.assert_series_equal(
+        assert_series_equal(df.vbt.reduce(sum_nb), df.sum().rename("reduce"))
+        assert_series_equal(
             df.vbt.reduce(sum_nb, jitted=dict(parallel=True)),
             df.vbt.reduce(sum_nb, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(df.vbt.reduce(sum_nb, chunked=True), df.vbt.reduce(sum_nb, chunked=False))
-        pd.testing.assert_series_equal(
+        assert_series_equal(df.vbt.reduce(sum_nb, chunked=True), df.vbt.reduce(sum_nb, chunked=False))
+        assert_series_equal(
             pd.DataFrame.vbt.reduce(sum_meta_nb, df.vbt.to_2d_array(), wrapper=df.vbt.wrapper),
             df.vbt.reduce(sum_nb),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             pd.DataFrame.vbt.reduce(
                 sum_meta_nb,
                 df.vbt.to_2d_array(),
@@ -2128,23 +2128,23 @@ class TestAccessors:
                 )
             )
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             pd.DataFrame.vbt.reduce(sum_meta_nb, df.vbt.to_2d_array(), wrapper=df.vbt.wrapper, chunked=count_chunked),
             pd.DataFrame.vbt.reduce(sum_meta_nb, df.vbt.to_2d_array(), wrapper=df.vbt.wrapper, chunked=False),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df.vbt.reduce(sum_nb, group_by=group_by),
             pd.Series([20.0, 6.0], index=["g1", "g2"]).rename("reduce"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df.vbt.reduce(sum_nb, group_by=group_by, flatten=True, order="C"),
             df.vbt.reduce(sum_nb, group_by=group_by),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df.vbt.reduce(sum_nb, group_by=group_by, flatten=True, order="F"),
             df.vbt.reduce(sum_nb, group_by=group_by),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             pd.DataFrame.vbt.reduce(
                 sum_grouped_meta_nb,
                 df.vbt.to_2d_array(),
@@ -2153,7 +2153,7 @@ class TestAccessors:
             ),
             df.vbt.reduce(sum_nb, group_by=group_by),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             pd.DataFrame.vbt.reduce(
                 sum_grouped_meta_nb,
                 df.vbt.to_2d_array(),
@@ -2176,7 +2176,7 @@ class TestAccessors:
                 )
             )
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             pd.DataFrame.vbt.reduce(
                 sum_grouped_meta_nb,
                 df.vbt.to_2d_array(),
@@ -2197,7 +2197,7 @@ class TestAccessors:
         def sum_meta2_nb(col, a, b):
             return np.nansum(a[:, col]) + np.nansum(b[:, col])
 
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             pd.DataFrame.vbt.reduce(
                 sum_meta2_nb,
                 vbt.RepEval("to_2d_array(a)"),
@@ -2215,7 +2215,7 @@ class TestAccessors:
         def sum_grouped_meta2_nb(group_idxs, group, a, b):
             return np.nansum(a[:, group_idxs]) + np.nansum(b[:, group_idxs])
 
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             pd.DataFrame.vbt.reduce(
                 sum_grouped_meta2_nb,
                 vbt.RepEval("to_2d_array(a)"),
@@ -2250,20 +2250,20 @@ class TestAccessors:
             return np.argmax(a) // len(group_idxs)
 
         assert df["a"].vbt.reduce(argmax_nb, returns_idx=True) == df["a"].idxmax()
-        pd.testing.assert_series_equal(df.vbt.reduce(argmax_nb, returns_idx=True), df.idxmax().rename("reduce"))
-        pd.testing.assert_series_equal(
+        assert_series_equal(df.vbt.reduce(argmax_nb, returns_idx=True), df.idxmax().rename("reduce"))
+        assert_series_equal(
             df.vbt.reduce(argmax_nb, returns_idx=True, jitted=dict(parallel=True)),
             df.vbt.reduce(argmax_nb, returns_idx=True, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df.vbt.reduce(argmax_nb, returns_idx=True, chunked=True),
             df.vbt.reduce(argmax_nb, returns_idx=True, chunked=False),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             pd.DataFrame.vbt.reduce(argmax_meta_nb, df.vbt.to_2d_array(), returns_idx=True, wrapper=df.vbt.wrapper),
             df.vbt.reduce(argmax_nb, returns_idx=True),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             pd.DataFrame.vbt.reduce(
                 argmax_meta_nb,
                 df.vbt.to_2d_array(),
@@ -2286,7 +2286,7 @@ class TestAccessors:
                 )
             )
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             pd.DataFrame.vbt.reduce(
                 argmax_meta_nb,
                 df.vbt.to_2d_array(),
@@ -2302,15 +2302,15 @@ class TestAccessors:
                 chunked=False,
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df.vbt.reduce(argmax_nb, returns_idx=True, group_by=group_by, flatten=True, order="C"),
             pd.Series(["2018-01-02", "2018-01-02"], dtype="datetime64[ns]", index=["g1", "g2"]).rename("reduce"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df.vbt.reduce(argmax_nb, returns_idx=True, group_by=group_by, flatten=True, order="F"),
             pd.Series(["2018-01-04", "2018-01-02"], dtype="datetime64[ns]", index=["g1", "g2"]).rename("reduce"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             pd.DataFrame.vbt.reduce(
                 argmax_grouped_meta_nb,
                 df.vbt.to_2d_array(),
@@ -2320,7 +2320,7 @@ class TestAccessors:
             ),
             df.vbt.reduce(argmax_nb, group_by=group_by, returns_idx=True, flatten=True),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             pd.DataFrame.vbt.reduce(
                 argmax_grouped_meta_nb,
                 df.vbt.to_2d_array(),
@@ -2347,7 +2347,7 @@ class TestAccessors:
                 )
             )
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             pd.DataFrame.vbt.reduce(
                 argmax_grouped_meta_nb,
                 df.vbt.to_2d_array(),
@@ -2390,23 +2390,23 @@ class TestAccessors:
             out[1] = np.nanmax(a[:, group_idxs])
             return out
 
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.reduce(min_and_max_nb, returns_array=True, wrap_kwargs=dict(name_or_index=["min", "max"])),
             pd.Series([np.nanmin(df["a"]), np.nanmax(df["a"])], index=["min", "max"], name="a"),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.reduce(min_and_max_nb, returns_array=True, wrap_kwargs=dict(name_or_index=["min", "max"])),
             df.apply(lambda x: pd.Series(np.asarray([np.nanmin(x), np.nanmax(x)]), index=["min", "max"]), axis=0),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.reduce(min_and_max_nb, returns_array=True, jitted=dict(parallel=True)),
             df.vbt.reduce(min_and_max_nb, returns_array=True, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.reduce(min_and_max_nb, returns_array=True, chunked=True),
             df.vbt.reduce(min_and_max_nb, returns_array=True, chunked=False),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.reduce(
                 min_and_max_meta_nb,
                 df.vbt.to_2d_array(),
@@ -2415,7 +2415,7 @@ class TestAccessors:
             ),
             df.vbt.reduce(min_and_max_nb, returns_array=True),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.reduce(
                 min_and_max_meta_nb,
                 df.vbt.to_2d_array(),
@@ -2438,7 +2438,7 @@ class TestAccessors:
                 )
             )
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.reduce(
                 min_and_max_meta_nb,
                 df.vbt.to_2d_array(),
@@ -2454,7 +2454,7 @@ class TestAccessors:
                 chunked=False,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.reduce(
                 min_and_max_nb,
                 returns_array=True,
@@ -2463,15 +2463,15 @@ class TestAccessors:
             ),
             pd.DataFrame([[1.0, 1.0], [4.0, 2.0]], index=["min", "max"], columns=["g1", "g2"]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.reduce(min_and_max_nb, returns_array=True, group_by=group_by, flatten=True, order="C"),
             df.vbt.reduce(min_and_max_nb, returns_array=True, group_by=group_by),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.reduce(min_and_max_nb, returns_array=True, group_by=group_by, flatten=True, order="F"),
             df.vbt.reduce(min_and_max_nb, returns_array=True, group_by=group_by),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.reduce(
                 min_and_max_grouped_meta_nb,
                 df.vbt.to_2d_array(),
@@ -2481,7 +2481,7 @@ class TestAccessors:
             ),
             df.vbt.reduce(min_and_max_nb, returns_array=True, group_by=group_by),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.reduce(
                 min_and_max_grouped_meta_nb,
                 df.vbt.to_2d_array(),
@@ -2506,7 +2506,7 @@ class TestAccessors:
                 )
             )
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.reduce(
                 min_and_max_grouped_meta_nb,
                 df.vbt.to_2d_array(),
@@ -2562,7 +2562,7 @@ class TestAccessors:
             out[1] = np.argmax(_a)
             return out // len(group_idxs)
 
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.reduce(
                 argmin_and_argmax_nb,
                 returns_idx=True,
@@ -2571,7 +2571,7 @@ class TestAccessors:
             ),
             pd.Series([df["a"].idxmin(), df["a"].idxmax()], index=["idxmin", "idxmax"], name="a"),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.reduce(
                 argmin_and_argmax_nb,
                 returns_idx=True,
@@ -2580,15 +2580,15 @@ class TestAccessors:
             ),
             df.apply(lambda x: pd.Series(np.asarray([x.idxmin(), x.idxmax()]), index=["idxmin", "idxmax"]), axis=0),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.reduce(argmin_and_argmax_nb, returns_idx=True, returns_array=True, jitted=dict(parallel=True)),
             df.vbt.reduce(argmin_and_argmax_nb, returns_idx=True, returns_array=True, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.reduce(argmin_and_argmax_nb, returns_idx=True, returns_array=True, chunked=True),
             df.vbt.reduce(argmin_and_argmax_nb, returns_idx=True, returns_array=True, chunked=False),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.reduce(
                 argmin_and_argmax_meta_nb,
                 df.vbt.to_2d_array(),
@@ -2598,7 +2598,7 @@ class TestAccessors:
             ),
             df.vbt.reduce(argmin_and_argmax_nb, returns_idx=True, returns_array=True),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.reduce(
                 argmin_and_argmax_meta_nb,
                 df.vbt.to_2d_array(),
@@ -2623,7 +2623,7 @@ class TestAccessors:
                 )
             )
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.reduce(
                 argmin_and_argmax_meta_nb,
                 df.vbt.to_2d_array(),
@@ -2641,7 +2641,7 @@ class TestAccessors:
                 chunked=False,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.reduce(
                 argmin_and_argmax_nb,
                 returns_idx=True,
@@ -2658,7 +2658,7 @@ class TestAccessors:
                 columns=["g1", "g2"],
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.reduce(
                 argmin_and_argmax_nb,
                 returns_idx=True,
@@ -2675,7 +2675,7 @@ class TestAccessors:
                 columns=["g1", "g2"],
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.reduce(
                 argmin_and_argmax_grouped_meta_nb,
                 df.vbt.to_2d_array(),
@@ -2686,7 +2686,7 @@ class TestAccessors:
             ),
             df.vbt.reduce(argmin_and_argmax_nb, returns_idx=True, returns_array=True, group_by=group_by, flatten=True),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.reduce(
                 argmin_and_argmax_grouped_meta_nb,
                 df.vbt.to_2d_array(),
@@ -2713,7 +2713,7 @@ class TestAccessors:
                 )
             )
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.reduce(
                 argmin_and_argmax_grouped_meta_nb,
                 df.vbt.to_2d_array(),
@@ -2743,7 +2743,7 @@ class TestAccessors:
         def mean_grouped_meta_nb(i, group_idxs, group, a):
             return np.nanmean(a[i][group_idxs])
 
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.squeeze_grouped(mean_nb, group_by=group_by),
             pd.DataFrame(
                 [[1.0, 1.0], [3.0, 2.0], [3.0, np.nan], [3.0, 2.0], [1.0, 1.0]],
@@ -2751,15 +2751,15 @@ class TestAccessors:
                 columns=["g1", "g2"],
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.squeeze_grouped(mean_nb, group_by=group_by, jitted=dict(parallel=True)),
             df.vbt.squeeze_grouped(mean_nb, group_by=group_by, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.squeeze_grouped(mean_nb, group_by=group_by, chunked=True),
             df.vbt.squeeze_grouped(mean_nb, group_by=group_by, chunked=False),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.squeeze_grouped(
                 mean_grouped_meta_nb,
                 df.vbt.to_2d_array(),
@@ -2768,7 +2768,7 @@ class TestAccessors:
             ),
             df.vbt.squeeze_grouped(mean_nb, group_by=group_by),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.squeeze_grouped(
                 mean_grouped_meta_nb,
                 df.vbt.to_2d_array(),
@@ -2791,7 +2791,7 @@ class TestAccessors:
                 )
             )
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.squeeze_grouped(
                 mean_grouped_meta_nb,
                 df.vbt.to_2d_array(),
@@ -2812,7 +2812,7 @@ class TestAccessors:
         def sum_grouped_meta_nb(i, group_idxs, group, a, b):
             return np.nansum(a[i][group_idxs]) + np.nansum(b[i][group_idxs])
 
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.squeeze_grouped(
                 sum_grouped_meta_nb,
                 vbt.RepEval("to_2d_array(a)"),
@@ -2828,7 +2828,7 @@ class TestAccessors:
         )
 
     def test_flatten_grouped(self):
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.flatten_grouped(group_by=group_by, order="C"),
             pd.DataFrame(
                 [
@@ -2847,7 +2847,7 @@ class TestAccessors:
                 columns=["g1", "g2"],
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.flatten_grouped(group_by=group_by, order="F"),
             pd.DataFrame(
                 [
@@ -2866,11 +2866,11 @@ class TestAccessors:
                 columns=["g1", "g2"],
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             pd.DataFrame([[False, True], [False, True]]).vbt.flatten_grouped(group_by=True, order="C"),
             pd.Series([False, True, False, True], name="group"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             pd.DataFrame([[False, True], [False, True]]).vbt.flatten_grouped(group_by=True, order="F"),
             pd.Series([False, False, True, True], name="group"),
         )
@@ -2890,41 +2890,41 @@ class TestAccessors:
     def test_funcs(self, test_name, test_func):
         # numeric
         assert test_func(df["a"].vbt) == test_func(df["a"])
-        pd.testing.assert_series_equal(test_func(df.vbt), test_func(df).rename(test_name))
-        pd.testing.assert_series_equal(
+        assert_series_equal(test_func(df.vbt), test_func(df).rename(test_name))
+        assert_series_equal(
             test_func(df.vbt, group_by=group_by),
             pd.Series([test_func(df[["a", "b"]].stack()), test_func(df["c"])], index=["g1", "g2"]).rename(test_name),
         )
-        pd.testing.assert_series_equal(test_func(df.vbt, use_jitted=True), test_func(df.vbt, use_jitted=False))
-        pd.testing.assert_series_equal(
+        assert_series_equal(test_func(df.vbt, use_jitted=True), test_func(df.vbt, use_jitted=False))
+        assert_series_equal(
             test_func(df.vbt, use_jitted=True, jitted=dict(parallel=True)),
             test_func(df.vbt, use_jitted=True, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             test_func(df.vbt, use_jitted=True, chunked=True),
             test_func(df.vbt, use_jitted=True, chunked=False),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             test_func(df.vbt, wrap_kwargs=dict(to_timedelta=True)),
             test_func(df).rename(test_name) * day_dt,
         )
         # boolean
         bool_ts = df == df
         assert test_func(bool_ts["a"].vbt) == test_func(bool_ts["a"])
-        pd.testing.assert_series_equal(test_func(bool_ts.vbt), test_func(bool_ts).rename(test_name))
+        assert_series_equal(test_func(bool_ts.vbt), test_func(bool_ts).rename(test_name))
 
     def test_corr(self):
         df2 = df[["b", "c", "a"]].rename(columns={"b": "a", "c": "b", "a": "c"})
         assert df["a"].vbt.corr(df2["a"]) == df["a"].corr(df2["a"])
-        pd.testing.assert_series_equal(df.vbt.corr(df2), df.corrwith(df2).rename("corr"))
-        pd.testing.assert_series_equal(
+        assert_series_equal(df.vbt.corr(df2), df.corrwith(df2).rename("corr"))
+        assert_series_equal(
             df.vbt.corr(df2, jitted=dict(parallel=True)),
             df.vbt.corr(df2, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(df.vbt.corr(df2, chunked=True), df.vbt.corr(df2, chunked=False))
+        assert_series_equal(df.vbt.corr(df2, chunked=True), df.vbt.corr(df2, chunked=False))
         flatten1 = pd.Series(df[["a", "b"]].values.flatten())
         flatten2 = pd.Series(df2[["a", "b"]].values.flatten())
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df.vbt.corr(df2, group_by=group_by),
             pd.Series([flatten1.vbt.corr(flatten2), df["c"].vbt.corr(df2["c"])], index=["g1", "g2"]).rename("corr"),
         )
@@ -2933,7 +2933,7 @@ class TestAccessors:
     def test_cov(self, test_ddof):
         df2 = df[["b", "c", "a"]].rename(columns={"b": "a", "c": "b", "a": "c"})
         assert df["a"].vbt.cov(df2["a"], ddof=test_ddof) == df["a"].cov(df2["a"], ddof=test_ddof)
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df.vbt.cov(df2, ddof=test_ddof),
             pd.Series(
                 [
@@ -2945,17 +2945,17 @@ class TestAccessors:
                 name="cov",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df.vbt.cov(df2, ddof=test_ddof, jitted=dict(parallel=True)),
             df.vbt.cov(df2, ddof=test_ddof, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df.vbt.cov(df2, ddof=test_ddof, chunked=True),
             df.vbt.cov(df2, ddof=test_ddof, chunked=False),
         )
         flatten1 = pd.Series(df[["a", "b"]].values.flatten())
         flatten2 = pd.Series(df2[["a", "b"]].values.flatten())
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df.vbt.cov(df2, ddof=test_ddof, group_by=group_by),
             pd.Series(
                 [flatten1.vbt.cov(flatten2, ddof=test_ddof), df["c"].vbt.cov(df2["c"], ddof=test_ddof)],
@@ -2965,11 +2965,11 @@ class TestAccessors:
 
     @pytest.mark.parametrize("test_pct", [False, True])
     def test_rank(self, test_pct):
-        pd.testing.assert_series_equal(df["a"].vbt.rank(pct=test_pct), df["a"].rank(pct=test_pct))
-        pd.testing.assert_frame_equal(df.vbt.rank(pct=test_pct), df.rank(pct=test_pct))
-        pd.testing.assert_frame_equal(df.vbt.rank(), df.rank())
-        pd.testing.assert_frame_equal(df.vbt.rank(jitted=dict(parallel=True)), df.vbt.rank(jitted=dict(parallel=False)))
-        pd.testing.assert_frame_equal(df.vbt.rank(chunked=True), df.vbt.rank(chunked=False))
+        assert_series_equal(df["a"].vbt.rank(pct=test_pct), df["a"].rank(pct=test_pct))
+        assert_frame_equal(df.vbt.rank(pct=test_pct), df.rank(pct=test_pct))
+        assert_frame_equal(df.vbt.rank(), df.rank())
+        assert_frame_equal(df.vbt.rank(jitted=dict(parallel=True)), df.vbt.rank(jitted=dict(parallel=False)))
+        assert_frame_equal(df.vbt.rank(chunked=True), df.vbt.rank(chunked=False))
 
     @pytest.mark.parametrize(
         "test_name,test_func",
@@ -2977,9 +2977,9 @@ class TestAccessors:
     )
     def test_arg_funcs(self, test_name, test_func):
         assert test_func(df["a"].vbt) == test_func(df["a"])
-        pd.testing.assert_series_equal(test_func(df.vbt), test_func(df).rename(test_name))
-        pd.testing.assert_series_equal(test_func(df.vbt, chunked=True), test_func(df.vbt, chunked=False))
-        pd.testing.assert_series_equal(
+        assert_series_equal(test_func(df.vbt), test_func(df).rename(test_name))
+        assert_series_equal(test_func(df.vbt, chunked=True), test_func(df.vbt, chunked=False))
+        assert_series_equal(
             test_func(df.vbt, group_by=group_by),
             pd.Series(
                 [test_func(df[["a", "b"]].stack())[0], test_func(df["c"])],
@@ -2989,12 +2989,12 @@ class TestAccessors:
         )
 
     def test_describe(self):
-        pd.testing.assert_series_equal(df["a"].vbt.describe(), df["a"].describe())
-        pd.testing.assert_frame_equal(df.vbt.describe(percentiles=None), df.describe(percentiles=None))
-        pd.testing.assert_frame_equal(df.vbt.describe(percentiles=[]), df.describe(percentiles=[]))
+        assert_series_equal(df["a"].vbt.describe(), df["a"].describe())
+        assert_frame_equal(df.vbt.describe(percentiles=None), df.describe(percentiles=None))
+        assert_frame_equal(df.vbt.describe(percentiles=[]), df.describe(percentiles=[]))
         test_against = df.describe(percentiles=np.arange(0, 1, 0.1))
-        pd.testing.assert_frame_equal(df.vbt.describe(percentiles=np.arange(0, 1, 0.1)), test_against)
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(df.vbt.describe(percentiles=np.arange(0, 1, 0.1)), test_against)
+        assert_frame_equal(
             df.vbt.describe(percentiles=np.arange(0, 1, 0.1), group_by=group_by),
             pd.DataFrame(
                 {
@@ -3004,22 +3004,22 @@ class TestAccessors:
                 index=test_against.index,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.describe(jitted=dict(parallel=True)),
             df.vbt.describe(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(df.vbt.describe(chunked=True), df.vbt.describe(chunked=False))
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(df.vbt.describe(chunked=True), df.vbt.describe(chunked=False))
+        assert_frame_equal(
             df.vbt.describe(group_by=group_by, jitted=dict(parallel=True)),
             df.vbt.describe(group_by=group_by, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.describe(group_by=group_by, chunked=True),
             df.vbt.describe(group_by=group_by, chunked=False),
         )
 
     def test_value_counts(self):
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.value_counts(),
             pd.Series(
                 np.array([1, 1, 1, 1, 1]),
@@ -3028,7 +3028,7 @@ class TestAccessors:
             ),
         )
         mapping = {1.0: "one", 2.0: "two", 3.0: "three", 4.0: "four"}
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["a"].vbt.value_counts(mapping=mapping),
             pd.Series(
                 np.array([1, 1, 1, 1, 1]),
@@ -3036,7 +3036,7 @@ class TestAccessors:
                 name="a",
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.value_counts(),
             pd.DataFrame(
                 np.array([[1, 1, 2], [1, 1, 2], [1, 1, 0], [1, 1, 0], [1, 1, 1]]),
@@ -3044,12 +3044,12 @@ class TestAccessors:
                 columns=df.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.value_counts(jitted=dict(parallel=True)),
             df.vbt.value_counts(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(df.vbt.value_counts(chunked=True), df.vbt.value_counts(chunked=False))
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(df.vbt.value_counts(chunked=True), df.vbt.value_counts(chunked=False))
+        assert_frame_equal(
             df.vbt.value_counts(axis=0),
             pd.DataFrame(
                 np.array([[2, 0, 0, 0, 2], [0, 2, 0, 2, 0], [0, 0, 2, 0, 0], [0, 1, 0, 1, 0], [1, 0, 1, 0, 1]]),
@@ -3057,15 +3057,15 @@ class TestAccessors:
                 columns=df.index,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.value_counts(axis=0, jitted=dict(parallel=True)),
             df.vbt.value_counts(axis=0, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.value_counts(axis=0, chunked=True),
             df.vbt.value_counts(axis=0, chunked=False),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df.vbt.value_counts(axis=-1),
             pd.Series(
                 np.array([4, 4, 2, 2, 3]),
@@ -3073,11 +3073,11 @@ class TestAccessors:
                 name="value_counts",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df.vbt.value_counts(axis=-1, jitted=dict(parallel=True)),
             df.vbt.value_counts(axis=-1, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.value_counts(group_by=group_by),
             pd.DataFrame(
                 np.array([[2, 2], [2, 2], [2, 0], [2, 0], [2, 1]]),
@@ -3085,7 +3085,7 @@ class TestAccessors:
                 columns=pd.Index(["g1", "g2"], dtype="object"),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.value_counts(sort_uniques=False),
             pd.DataFrame(
                 np.array([[1, 1, 2], [1, 1, 2], [1, 1, 0], [1, 1, 0], [1, 1, 1]]),
@@ -3093,7 +3093,7 @@ class TestAccessors:
                 columns=df.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.value_counts(sort=True),
             pd.DataFrame(
                 np.array([[1, 1, 2], [1, 1, 2], [1, 1, 1], [1, 1, 0], [1, 1, 0]]),
@@ -3101,7 +3101,7 @@ class TestAccessors:
                 columns=df.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.value_counts(sort=True, ascending=True),
             pd.DataFrame(
                 np.array([[1, 1, 0], [1, 1, 0], [1, 1, 1], [1, 1, 2], [1, 1, 2]]),
@@ -3109,7 +3109,7 @@ class TestAccessors:
                 columns=df.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.value_counts(sort=True, normalize=True),
             pd.DataFrame(
                 np.array(
@@ -3125,7 +3125,7 @@ class TestAccessors:
                 columns=df.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.value_counts(sort=True, normalize=True, dropna=True),
             pd.DataFrame(
                 np.array(
@@ -3142,7 +3142,7 @@ class TestAccessors:
         )
 
     def test_demean(self):
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.demean(group_by=group_by),
             pd.DataFrame(
                 {
@@ -3153,20 +3153,20 @@ class TestAccessors:
                 index=df.index,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.demean(jitted=dict(parallel=True)),
             df.vbt.demean(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(df.vbt.demean(chunked=True), df.vbt.demean(chunked=False))
+        assert_frame_equal(df.vbt.demean(chunked=True), df.vbt.demean(chunked=False))
 
     def test_drawdown(self):
-        pd.testing.assert_series_equal(df["a"].vbt.drawdown(), df["a"] / df["a"].expanding().max() - 1)
-        pd.testing.assert_frame_equal(df.vbt.drawdown(), df / df.expanding().max() - 1)
-        pd.testing.assert_frame_equal(
+        assert_series_equal(df["a"].vbt.drawdown(), df["a"] / df["a"].expanding().max() - 1)
+        assert_frame_equal(df.vbt.drawdown(), df / df.expanding().max() - 1)
+        assert_frame_equal(
             df.vbt.drawdown(jitted=dict(parallel=True)),
             df.vbt.drawdown(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(df.vbt.drawdown(chunked=True), df.vbt.drawdown(chunked=False))
+        assert_frame_equal(df.vbt.drawdown(chunked=True), df.vbt.drawdown(chunked=False))
 
     def test_drawdowns(self):
         assert type(df["a"].vbt.drawdowns) is vbt.Drawdowns
@@ -3195,13 +3195,13 @@ class TestAccessors:
         )
 
     def test_zscore(self):
-        pd.testing.assert_series_equal(df["a"].vbt.zscore(), (df["a"] - df["a"].mean()) / df["a"].std(ddof=0))
-        pd.testing.assert_frame_equal(df.vbt.zscore(), (df - df.mean()) / df.std(ddof=0))
+        assert_series_equal(df["a"].vbt.zscore(), (df["a"] - df["a"].mean()) / df["a"].std(ddof=0))
+        assert_frame_equal(df.vbt.zscore(), (df - df.mean()) / df.std(ddof=0))
 
     def test_split(self):
         splitter = TimeSeriesSplit(n_splits=2)
         (train_df, train_indexes), (test_df, test_indexes) = df["a"].vbt.split(splitter)
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             train_df,
             pd.DataFrame(
                 np.array([[1.0, 1.0], [2.0, 2.0], [3.0, 3.0], [np.nan, 4.0]]),
@@ -3224,8 +3224,8 @@ class TestAccessors:
             ),
         ]
         for i in range(len(target)):
-            pd.testing.assert_index_equal(train_indexes[i], target[i])
-        pd.testing.assert_frame_equal(
+            assert_index_equal(train_indexes[i], target[i])
+        assert_frame_equal(
             test_df,
             pd.DataFrame(
                 np.array([[4.0, np.nan]]),
@@ -3238,9 +3238,9 @@ class TestAccessors:
             pd.DatetimeIndex(["2018-01-05"], dtype="datetime64[ns]", name="split_1", freq=None),
         ]
         for i in range(len(target)):
-            pd.testing.assert_index_equal(test_indexes[i], target[i])
+            assert_index_equal(test_indexes[i], target[i])
         (train_df, train_indexes), (test_df, test_indexes) = df.vbt.split(splitter)
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             train_df,
             pd.DataFrame(
                 np.array(
@@ -3273,8 +3273,8 @@ class TestAccessors:
             ),
         ]
         for i in range(len(target)):
-            pd.testing.assert_index_equal(train_indexes[i], target[i])
-        pd.testing.assert_frame_equal(
+            assert_index_equal(train_indexes[i], target[i])
+        assert_frame_equal(
             test_df,
             pd.DataFrame(
                 np.array([[4.0, 2.0, 2.0, np.nan, 1.0, 1.0]]),
@@ -3290,10 +3290,10 @@ class TestAccessors:
             pd.DatetimeIndex(["2018-01-05"], dtype="datetime64[ns]", name="split_1", freq=None),
         ]
         for i in range(len(target)):
-            pd.testing.assert_index_equal(test_indexes[i], target[i])
+            assert_index_equal(test_indexes[i], target[i])
 
     def test_range_split(self):
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df["a"].vbt.range_split(n=2)[0],
             pd.DataFrame(
                 np.array([[1.0, 4.0], [2.0, np.nan]]),
@@ -3306,8 +3306,8 @@ class TestAccessors:
             pd.DatetimeIndex(["2018-01-04", "2018-01-05"], dtype="datetime64[ns]", name="split_1", freq=None),
         ]
         for i in range(len(target)):
-            pd.testing.assert_index_equal(df["a"].vbt.range_split(n=2)[1][i], target[i])
-        pd.testing.assert_frame_equal(
+            assert_index_equal(df["a"].vbt.range_split(n=2)[1][i], target[i])
+        assert_frame_equal(
             df["a"].vbt.range_split(range_len=2)[0],
             pd.DataFrame(
                 np.array([[1.0, 2.0, 3.0, 4.0], [2.0, 3.0, 4.0, np.nan]]),
@@ -3322,8 +3322,8 @@ class TestAccessors:
             pd.DatetimeIndex(["2018-01-04", "2018-01-05"], dtype="datetime64[ns]", name="split_3", freq=None),
         ]
         for i in range(len(target)):
-            pd.testing.assert_index_equal(df["a"].vbt.range_split(range_len=2)[1][i], target[i])
-        pd.testing.assert_frame_equal(
+            assert_index_equal(df["a"].vbt.range_split(range_len=2)[1][i], target[i])
+        assert_frame_equal(
             df["a"].vbt.range_split(range_len=2, n=3)[0],
             pd.DataFrame(
                 np.array([[1.0, 3.0, 4.0], [2.0, 4.0, np.nan]]),
@@ -3337,8 +3337,8 @@ class TestAccessors:
             pd.DatetimeIndex(["2018-01-04", "2018-01-05"], dtype="datetime64[ns]", name="split_2", freq=None),
         ]
         for i in range(len(target)):
-            pd.testing.assert_index_equal(df["a"].vbt.range_split(range_len=2, n=3)[1][i], target[i])
-        pd.testing.assert_frame_equal(
+            assert_index_equal(df["a"].vbt.range_split(range_len=2, n=3)[1][i], target[i])
+        assert_frame_equal(
             df["a"].vbt.range_split(range_len=3, n=2)[0],
             pd.DataFrame(
                 np.array([[1.0, 3.0], [2.0, 4.0], [3.0, np.nan]]),
@@ -3361,8 +3361,8 @@ class TestAccessors:
             ),
         ]
         for i in range(len(target)):
-            pd.testing.assert_index_equal(df["a"].vbt.range_split(range_len=3, n=2)[1][i], target[i])
-        pd.testing.assert_frame_equal(
+            assert_index_equal(df["a"].vbt.range_split(range_len=3, n=2)[1][i], target[i])
+        assert_frame_equal(
             df.vbt.range_split(n=2)[0],
             pd.DataFrame(
                 np.array([[1.0, np.nan, 1.0, 4.0, 2.0, 2.0], [2.0, 4.0, 2.0, np.nan, 1.0, 1.0]]),
@@ -3380,8 +3380,8 @@ class TestAccessors:
             pd.DatetimeIndex(["2018-01-04", "2018-01-05"], dtype="datetime64[ns]", name="split_1", freq=None),
         ]
         for i in range(len(target)):
-            pd.testing.assert_index_equal(df.vbt.range_split(n=2)[1][i], target[i])
-        pd.testing.assert_frame_equal(
+            assert_index_equal(df.vbt.range_split(n=2)[1][i], target[i])
+        assert_frame_equal(
             df.vbt.range_split(start_idxs=[0, 1], end_idxs=[2, 3])[0],
             pd.DataFrame(
                 np.array(
@@ -3415,8 +3415,8 @@ class TestAccessors:
             ),
         ]
         for i in range(len(target)):
-            pd.testing.assert_index_equal(df.vbt.range_split(start_idxs=[0, 1], end_idxs=[2, 3])[1][i], target[i])
-        pd.testing.assert_frame_equal(
+            assert_index_equal(df.vbt.range_split(start_idxs=[0, 1], end_idxs=[2, 3])[1][i], target[i])
+        assert_frame_equal(
             df.vbt.range_split(start_idxs=df.index[[0, 1]], end_idxs=df.index[[2, 3]])[0],
             pd.DataFrame(
                 np.array(
@@ -3450,11 +3450,11 @@ class TestAccessors:
             ),
         ]
         for i in range(len(target)):
-            pd.testing.assert_index_equal(
+            assert_index_equal(
                 df.vbt.range_split(start_idxs=df.index[[0, 1]], end_idxs=df.index[[2, 3]])[1][i],
                 target[i],
             )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.range_split(start_idxs=df.index[[0]], end_idxs=df.index[[2, 3]])[0],
             pd.DataFrame(
                 np.array(
@@ -3489,7 +3489,7 @@ class TestAccessors:
             ),
         ]
         for i in range(len(target)):
-            pd.testing.assert_index_equal(
+            assert_index_equal(
                 df.vbt.range_split(start_idxs=df.index[[0]], end_idxs=df.index[[2, 3]])[1][i],
                 target[i],
             )
@@ -3510,7 +3510,7 @@ class TestAccessors:
             set_lens=(1, 1),
             left_to_right=False,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df1,
             pd.DataFrame(
                 np.array([[1.0, 2.0], [2.0, 3.0]]),
@@ -3523,8 +3523,8 @@ class TestAccessors:
             pd.DatetimeIndex(["2018-01-02", "2018-01-03"], dtype="datetime64[ns]", name="split_1", freq=None),
         ]
         for i in range(len(target)):
-            pd.testing.assert_index_equal(indexes1[i], target[i])
-        pd.testing.assert_frame_equal(
+            assert_index_equal(indexes1[i], target[i])
+        assert_frame_equal(
             df2,
             pd.DataFrame(
                 np.array([[3.0, 4.0]]),
@@ -3537,8 +3537,8 @@ class TestAccessors:
             pd.DatetimeIndex(["2018-01-04"], dtype="datetime64[ns]", name="split_1", freq=None),
         ]
         for i in range(len(target)):
-            pd.testing.assert_index_equal(indexes2[i], target[i])
-        pd.testing.assert_frame_equal(
+            assert_index_equal(indexes2[i], target[i])
+        assert_frame_equal(
             df3,
             pd.DataFrame(
                 np.array([[4.0, np.nan]]),
@@ -3551,13 +3551,13 @@ class TestAccessors:
             pd.DatetimeIndex(["2018-01-05"], dtype="datetime64[ns]", name="split_1", freq=None),
         ]
         for i in range(len(target)):
-            pd.testing.assert_index_equal(indexes3[i], target[i])
+            assert_index_equal(indexes3[i], target[i])
         (df1, indexes1), (df2, indexes2), (df3, indexes3) = df["a"].vbt.rolling_split(
             window_len=4,
             set_lens=(1, 1),
             left_to_right=True,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df1,
             pd.DataFrame(
                 np.array([[1.0, 2.0]]),
@@ -3570,8 +3570,8 @@ class TestAccessors:
             pd.DatetimeIndex(["2018-01-02"], dtype="datetime64[ns]", name="split_1", freq=None),
         ]
         for i in range(len(target)):
-            pd.testing.assert_index_equal(indexes1[i], target[i])
-        pd.testing.assert_frame_equal(
+            assert_index_equal(indexes1[i], target[i])
+        assert_frame_equal(
             df2,
             pd.DataFrame(
                 np.array([[2.0, 3.0]]),
@@ -3584,8 +3584,8 @@ class TestAccessors:
             pd.DatetimeIndex(["2018-01-03"], dtype="datetime64[ns]", name="split_1", freq=None),
         ]
         for i in range(len(target)):
-            pd.testing.assert_index_equal(indexes2[i], target[i])
-        pd.testing.assert_frame_equal(
+            assert_index_equal(indexes2[i], target[i])
+        assert_frame_equal(
             df3,
             pd.DataFrame(
                 np.array([[3.0, 4.0], [4.0, np.nan]]),
@@ -3598,13 +3598,13 @@ class TestAccessors:
             pd.DatetimeIndex(["2018-01-04", "2018-01-05"], dtype="datetime64[ns]", name="split_1", freq=None),
         ]
         for i in range(len(target)):
-            pd.testing.assert_index_equal(indexes3[i], target[i])
+            assert_index_equal(indexes3[i], target[i])
         (df1, indexes1), (df2, indexes2), (df3, indexes3) = df["a"].vbt.rolling_split(
             window_len=4,
             set_lens=(0.25, 0.25),
             left_to_right=[False, True],
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df1,
             pd.DataFrame(
                 np.array([[1.0, 2.0], [2.0, np.nan]]),
@@ -3617,8 +3617,8 @@ class TestAccessors:
             pd.DatetimeIndex(["2018-01-02"], dtype="datetime64[ns]", name="split_1", freq=None),
         ]
         for i in range(len(target)):
-            pd.testing.assert_index_equal(indexes1[i], target[i])
-        pd.testing.assert_frame_equal(
+            assert_index_equal(indexes1[i], target[i])
+        assert_frame_equal(
             df2,
             pd.DataFrame(
                 np.array([[3.0, 3.0]]),
@@ -3631,8 +3631,8 @@ class TestAccessors:
             pd.DatetimeIndex(["2018-01-03"], dtype="datetime64[ns]", name="split_1", freq=None),
         ]
         for i in range(len(target)):
-            pd.testing.assert_index_equal(indexes2[i], target[i])
-        pd.testing.assert_frame_equal(
+            assert_index_equal(indexes2[i], target[i])
+        assert_frame_equal(
             df3,
             pd.DataFrame(
                 np.array([[4.0, 4.0], [np.nan, np.nan]]),
@@ -3645,9 +3645,9 @@ class TestAccessors:
             pd.DatetimeIndex(["2018-01-04", "2018-01-05"], dtype="datetime64[ns]", name="split_1", freq=None),
         ]
         for i in range(len(target)):
-            pd.testing.assert_index_equal(indexes3[i], target[i])
+            assert_index_equal(indexes3[i], target[i])
         df1, indexes1 = df["a"].vbt.rolling_split(window_len=2, n=2)
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df1,
             pd.DataFrame(
                 np.array([[1.0, 4.0], [2.0, np.nan]]),
@@ -3660,7 +3660,7 @@ class TestAccessors:
             pd.DatetimeIndex(["2018-01-04", "2018-01-05"], dtype="datetime64[ns]", name="split_1", freq=None),
         ]
         df1, indexes1 = df["a"].vbt.rolling_split(window_len=0.4, n=2)
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df1,
             pd.DataFrame(
                 np.array([[1.0, 4.0], [2.0, np.nan]]),
@@ -3673,7 +3673,7 @@ class TestAccessors:
             pd.DatetimeIndex(["2018-01-04", "2018-01-05"], dtype="datetime64[ns]", name="split_1", freq=None),
         ]
         for i in range(len(target)):
-            pd.testing.assert_index_equal(indexes1[i], target[i])
+            assert_index_equal(indexes1[i], target[i])
         with pytest.raises(Exception):
             df.vbt.rolling_split()
         with pytest.raises(Exception):
@@ -3691,7 +3691,7 @@ class TestAccessors:
             set_lens=(1, 1),
             left_to_right=False,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df1,
             pd.DataFrame(
                 np.array([[1.0, 1.0], [2.0, 2.0], [np.nan, 3.0]]),
@@ -3709,8 +3709,8 @@ class TestAccessors:
             ),
         ]
         for i in range(len(target)):
-            pd.testing.assert_index_equal(indexes1[i], target[i])
-        pd.testing.assert_frame_equal(
+            assert_index_equal(indexes1[i], target[i])
+        assert_frame_equal(
             df2,
             pd.DataFrame(
                 np.array([[3.0, 4.0]]),
@@ -3723,8 +3723,8 @@ class TestAccessors:
             pd.DatetimeIndex(["2018-01-04"], dtype="datetime64[ns]", name="split_1", freq=None),
         ]
         for i in range(len(target)):
-            pd.testing.assert_index_equal(indexes2[i], target[i])
-        pd.testing.assert_frame_equal(
+            assert_index_equal(indexes2[i], target[i])
+        assert_frame_equal(
             df3,
             pd.DataFrame(
                 np.array([[4.0, np.nan]]),
@@ -3737,9 +3737,9 @@ class TestAccessors:
             pd.DatetimeIndex(["2018-01-05"], dtype="datetime64[ns]", name="split_1", freq=None),
         ]
         for i in range(len(target)):
-            pd.testing.assert_index_equal(indexes3[i], target[i])
+            assert_index_equal(indexes3[i], target[i])
         df1, indexes1 = df["a"].vbt.expanding_split(n=2, min_len=2)
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df1,
             pd.DataFrame(
                 np.array([[1.0, 1.0], [2.0, 2.0], [np.nan, 3.0], [np.nan, 4.0], [np.nan, np.nan]]),
@@ -3757,7 +3757,7 @@ class TestAccessors:
             ),
         ]
         for i in range(len(target)):
-            pd.testing.assert_index_equal(indexes1[i], target[i])
+            assert_index_equal(indexes1[i], target[i])
         with pytest.raises(Exception):
             df.vbt.expanding_split(n=2, min_len=10)
         with pytest.raises(Exception):
@@ -3766,46 +3766,46 @@ class TestAccessors:
     def test_crossed_above(self):
         sr1 = pd.Series([np.nan, 3, 2, 1, 2, 3, 4])
         sr2 = pd.Series([1, 2, 3, 4, 3, 2, 1])
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             sr1.vbt.crossed_above(sr2),
             pd.Series([False, False, False, False, False, True, False]),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             sr1.vbt.crossed_above(sr2, wait=1),
             pd.Series([False, False, False, False, False, False, True]),
         )
         sr3 = pd.Series([1, 2, 3, np.nan, 5, 1, 5])
         sr4 = pd.Series([3, 2, 1, 1, 1, 5, 1])
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             sr3.vbt.crossed_above(sr4),
             pd.Series([False, False, True, False, False, False, True]),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             sr3.vbt.crossed_above(sr4, wait=1),
             pd.Series([False, False, False, False, False, False, False]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.crossed_above(df.iloc[:, ::-1], jitted=dict(parallel=True)),
             df.vbt.crossed_above(df.iloc[:, ::-1], jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.crossed_above(df.iloc[:, ::-1], chunked=True),
             df.vbt.crossed_above(df.iloc[:, ::-1], chunked=False),
         )
         sr5 = pd.Series([1, 2, 1, 2, 1])
         sr6 = pd.Series([2, 1, 2, 1, 2])
-        pd.testing.assert_series_equal(sr5.vbt.crossed_above(sr6), pd.Series([False, True, False, True, False]))
-        pd.testing.assert_series_equal(
+        assert_series_equal(sr5.vbt.crossed_above(sr6), pd.Series([False, True, False, True, False]))
+        assert_series_equal(
             sr5.vbt.crossed_above(sr6, wait=1),
             pd.Series([False, False, False, False, False]),
         )
         sr7 = pd.Series([1, 1, 2, 2, 1, 1, 2, 2, 1, 1])
         sr8 = pd.Series([2, 2, 1, 1, 2, 2, 1, 1, 2, 2])
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             sr7.vbt.crossed_above(sr8),
             pd.Series([False, False, True, False, False, False, True, False, False, False]),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             sr7.vbt.crossed_above(sr8, wait=1),
             pd.Series([False, False, False, True, False, False, False, True, False, False]),
         )
@@ -3813,46 +3813,46 @@ class TestAccessors:
     def test_crossed_below(self):
         sr1 = pd.Series([np.nan, 3, 2, 1, 2, 3, 4])
         sr2 = pd.Series([1, 2, 3, 4, 3, 2, 1])
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             sr1.vbt.crossed_below(sr2),
             pd.Series([False, False, True, False, False, False, False]),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             sr1.vbt.crossed_below(sr2, wait=1),
             pd.Series([False, False, False, True, False, False, False]),
         )
         sr3 = pd.Series([1, 2, 3, np.nan, 5, 1, 5])
         sr4 = pd.Series([3, 2, 1, 1, 1, 5, 1])
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             sr3.vbt.crossed_above(sr4),
             pd.Series([False, False, True, False, False, False, True]),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             sr3.vbt.crossed_above(sr4, wait=1),
             pd.Series([False, False, False, False, False, False, False]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.crossed_below(df.iloc[:, ::-1], jitted=dict(parallel=True)),
             df.vbt.crossed_below(df.iloc[:, ::-1], jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             df.vbt.crossed_below(df.iloc[:, ::-1], chunked=True),
             df.vbt.crossed_below(df.iloc[:, ::-1], chunked=False),
         )
         sr5 = pd.Series([1, 2, 1, 2, 1])
         sr6 = pd.Series([2, 1, 2, 1, 2])
-        pd.testing.assert_series_equal(sr5.vbt.crossed_below(sr6), pd.Series([False, False, True, False, True]))
-        pd.testing.assert_series_equal(
+        assert_series_equal(sr5.vbt.crossed_below(sr6), pd.Series([False, False, True, False, True]))
+        assert_series_equal(
             sr5.vbt.crossed_below(sr6, wait=1),
             pd.Series([False, False, False, False, False]),
         )
         sr7 = pd.Series([1, 1, 2, 2, 1, 1, 2, 2, 1, 1])
         sr8 = pd.Series([2, 2, 1, 1, 2, 2, 1, 1, 2, 2])
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             sr7.vbt.crossed_below(sr8),
             pd.Series([False, False, False, False, True, False, False, False, True, False]),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             sr7.vbt.crossed_below(sr8, wait=1),
             pd.Series([False, False, False, False, False, True, False, False, False, True]),
         )
@@ -3862,7 +3862,7 @@ class TestAccessors:
             ["Start", "End", "Period", "Count", "Mean", "Std", "Min", "Median", "Max", "Min Index", "Max Index"],
             dtype="object",
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df.vbt.stats(),
             pd.Series(
                 [
@@ -3880,7 +3880,7 @@ class TestAccessors:
                 name="agg_stats",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df.vbt.stats(column="a"),
             pd.Series(
                 [
@@ -3900,7 +3900,7 @@ class TestAccessors:
                 name="a",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df.vbt.stats(column="g1", group_by=group_by),
             pd.Series(
                 [
@@ -3920,20 +3920,20 @@ class TestAccessors:
                 name="g1",
             ),
         )
-        pd.testing.assert_series_equal(df["c"].vbt.stats(), df.vbt.stats(column="c"))
-        pd.testing.assert_series_equal(df["c"].vbt.stats(), df.vbt.stats(column="c", group_by=False))
-        pd.testing.assert_series_equal(
+        assert_series_equal(df["c"].vbt.stats(), df.vbt.stats(column="c"))
+        assert_series_equal(df["c"].vbt.stats(), df.vbt.stats(column="c", group_by=False))
+        assert_series_equal(
             df.vbt(group_by=group_by)["g2"].stats(),
             df.vbt(group_by=group_by).stats(column="g2"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df.vbt(group_by=group_by)["g2"].stats(),
             df.vbt.stats(column="g2", group_by=group_by),
         )
         stats_df = df.vbt.stats(agg_func=None)
         assert stats_df.shape == (3, 11)
-        pd.testing.assert_index_equal(stats_df.index, df.vbt.wrapper.columns)
-        pd.testing.assert_index_equal(stats_df.columns, stats_index)
+        assert_index_equal(stats_df.index, df.vbt.wrapper.columns)
+        assert_index_equal(stats_df.columns, stats_index)
 
     def test_mapping_stats(self):
         mapping = {x: "test_" + str(x) for x in pd.unique(df.values.flatten())}
@@ -3950,7 +3950,7 @@ class TestAccessors:
             ],
             dtype="object",
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df.vbt(mapping=mapping).stats(),
             pd.Series(
                 [
@@ -3967,7 +3967,7 @@ class TestAccessors:
                 name="agg_stats",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df.vbt(mapping=mapping).stats(column="a"),
             pd.Series(
                 [
@@ -3984,7 +3984,7 @@ class TestAccessors:
                 name="a",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df.vbt(mapping=mapping).stats(column="g1", group_by=group_by),
             pd.Series(
                 [
@@ -4001,24 +4001,24 @@ class TestAccessors:
                 name="g1",
             ),
         )
-        pd.testing.assert_series_equal(df.vbt(mapping=mapping).stats(), df.vbt.stats(settings=dict(mapping=mapping)))
-        pd.testing.assert_series_equal(
+        assert_series_equal(df.vbt(mapping=mapping).stats(), df.vbt.stats(settings=dict(mapping=mapping)))
+        assert_series_equal(
             df["c"].vbt(mapping=mapping).stats(settings=dict(incl_all_keys=True)),
             df.vbt(mapping=mapping).stats(column="c"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df["c"].vbt(mapping=mapping).stats(settings=dict(incl_all_keys=True)),
             df.vbt(mapping=mapping).stats(column="c", group_by=False),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df.vbt(mapping=mapping, group_by=group_by)["g2"].stats(settings=dict(incl_all_keys=True)),
             df.vbt(mapping=mapping, group_by=group_by).stats(column="g2"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             df.vbt(mapping=mapping, group_by=group_by)["g2"].stats(settings=dict(incl_all_keys=True)),
             df.vbt(mapping=mapping).stats(column="g2", group_by=group_by),
         )
         stats_df = df.vbt(mapping=mapping).stats(agg_func=None)
         assert stats_df.shape == (3, 8)
-        pd.testing.assert_index_equal(stats_df.index, df.vbt.wrapper.columns)
-        pd.testing.assert_index_equal(stats_df.columns, stats_index)
+        assert_index_equal(stats_df.index, df.vbt.wrapper.columns)
+        assert_index_equal(stats_df.columns, stats_index)

@@ -1,6 +1,5 @@
 import os
 
-import numpy as np
 import pytest
 
 import vectorbtpro as vbt
@@ -8,6 +7,8 @@ from vectorbtpro.portfolio import nb
 from vectorbtpro.portfolio.call_seq import build_call_seq, build_call_seq_nb
 from vectorbtpro.portfolio.enums import *
 from vectorbtpro.utils.random_ import set_seed
+
+from tests.utils import *
 
 seed = 42
 

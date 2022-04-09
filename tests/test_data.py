@@ -1,14 +1,14 @@
 import os
 from datetime import datetime, timedelta, timezone
 
-import numpy as np
-import pandas as pd
 import pytest
 import pytz
 
 import vectorbtpro as vbt
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.datetime_ import to_timezone
+
+from tests.utils import *
 
 seed = 42
 
@@ -110,11 +110,11 @@ class TestData:
         assert MyData.load(tmp_path / "data") == data
 
     def test_fetch(self):
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch(0, shape=(5,), return_arr=True).data[0],
             pd.Series(["0_0", "0_1", "0_2", "0_3", "0_4"]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(0, shape=(5, 3), return_arr=True).data[0],
             pd.DataFrame(
                 [
@@ -137,15 +137,15 @@ class TestData:
             freq="D",
             tz=timezone.utc,
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch(0, shape=(5,)).data[0],
             pd.Series(["0_0", "0_1", "0_2", "0_3", "0_4"], index=index),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch(0, shape=(5,), columns="feat0").data[0],
             pd.Series(["0_0", "0_1", "0_2", "0_3", "0_4"], index=index, name="feat0"),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(0, shape=(5, 3)).data[0],
             pd.DataFrame(
                 [
@@ -158,7 +158,7 @@ class TestData:
                 index=index,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(0, shape=(5, 3), columns=["feat0", "feat1", "feat2"]).data[0],
             pd.DataFrame(
                 [
@@ -172,15 +172,15 @@ class TestData:
                 columns=pd.Index(["feat0", "feat1", "feat2"], dtype="object"),
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch([0, 1], shape=(5,)).data[0],
             pd.Series(["0_0", "0_1", "0_2", "0_3", "0_4"], index=index),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch([0, 1], shape=(5,)).data[1],
             pd.Series(["1_0", "1_1", "1_2", "1_3", "1_4"], index=index),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch([0, 1], shape=(5, 3)).data[0],
             pd.DataFrame(
                 [
@@ -193,7 +193,7 @@ class TestData:
                 index=index,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch([0, 1], shape=(5, 3)).data[1],
             pd.DataFrame(
                 [
@@ -217,29 +217,29 @@ class TestData:
             freq="D",
             tz=pytz.utc,
         ).tz_convert(to_timezone("Europe/Berlin"))
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch(0, shape=(5,), tz_localize="UTC", tz_convert="Europe/Berlin").data[0],
             pd.Series(["0_0", "0_1", "0_2", "0_3", "0_4"], index=index2),
         )
         index_mask = vbt.symbol_dict({0: [False, True, True, True, True], 1: [True, True, True, True, False]})
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="nan").data[0],
             pd.Series([np.nan, "0_1", "0_2", "0_3", "0_4"], index=index),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="nan").data[1],
             pd.Series(["1_0", "1_1", "1_2", "1_3", np.nan], index=index),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="drop").data[0],
             pd.Series(["0_1", "0_2", "0_3"], index=index[1:4]),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="drop").data[1],
             pd.Series(["1_1", "1_2", "1_3"], index=index[1:4]),
         )
         column_mask = vbt.symbol_dict({0: [False, True, True], 1: [True, True, False]})
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(
                 [0, 1],
                 shape=(5, 3),
@@ -259,7 +259,7 @@ class TestData:
                 index=index,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(
                 [0, 1],
                 shape=(5, 3),
@@ -279,7 +279,7 @@ class TestData:
                 index=index,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(
                 [0, 1],
                 shape=(5, 3),
@@ -294,7 +294,7 @@ class TestData:
                 columns=pd.Index([1], dtype="int64"),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(
                 [0, 1],
                 shape=(5, 3),
@@ -310,7 +310,7 @@ class TestData:
             ),
         )
         assert len(MyData.fetch([0, 1], shape=(5, 3), return_none=vbt.symbol_dict({0: True, 1: False})).symbols) == 1
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch([0, 1], shape=(5, 3), return_none=vbt.symbol_dict({0: True, 1: False})).data[1],
             pd.DataFrame(
                 [
@@ -324,7 +324,7 @@ class TestData:
             ),
         )
         assert len(MyData.fetch([0, 1], shape=(5, 3), return_empty=vbt.symbol_dict({0: True, 1: False})).symbols) == 1
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch([0, 1], shape=(5, 3), return_empty=vbt.symbol_dict({0: True, 1: False})).data[1],
             pd.DataFrame(
                 [
@@ -345,7 +345,7 @@ class TestData:
             )
             == 1
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(
                 [0, 1], shape=(5, 3), raise_error=vbt.symbol_dict({0: True, 1: False}), skip_on_error=True
             ).data[1],
@@ -408,23 +408,23 @@ class TestData:
             MyData.fetch([0, 1], shape=(5, 3), raise_error=True, skip_on_error=True)
 
     def test_update(self):
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch(0, shape=(5,), return_arr=True).update().data[0],
             pd.Series(["0_0", "0_1", "0_2", "0_3", "0_0_u"]),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch(0, shape=(5,), return_arr=True).update(concat=False).data[0],
             pd.Series(["0_0_u"], index=pd.Index([4], dtype="int64")),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch(0, shape=(5,), return_arr=True).update(n=2).data[0],
             pd.Series(["0_0", "0_1", "0_2", "0_3", "0_0_u", "0_1_u"]),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch(0, shape=(5,), return_arr=True).update(n=2, concat=False).data[0],
             pd.Series(["0_0_u", "0_1_u"], index=pd.Index([4, 5], dtype="int64")),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(0, shape=(5, 3), return_arr=True).update().data[0],
             pd.DataFrame(
                 [
@@ -436,7 +436,7 @@ class TestData:
                 ]
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(0, shape=(5, 3), return_arr=True).update(concat=False).data[0],
             pd.DataFrame(
                 [
@@ -445,7 +445,7 @@ class TestData:
                 index=pd.Index([4], dtype="int64"),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(0, shape=(5, 3), return_arr=True).update(n=2).data[0],
             pd.DataFrame(
                 [
@@ -458,7 +458,7 @@ class TestData:
                 ]
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(0, shape=(5, 3), return_arr=True).update(n=2, concat=False).data[0],
             pd.DataFrame(
                 [
@@ -479,11 +479,11 @@ class TestData:
             freq="D",
             tz=timezone.utc,
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch(0, shape=(5,)).update().data[0],
             pd.Series(["0_0", "0_1", "0_2", "0_3", "0_0_u"], index=index),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch(0, shape=(5,)).update(concat=False).data[0],
             pd.Series(["0_0_u"], index=index[[-1]]),
         )
@@ -499,11 +499,11 @@ class TestData:
             freq="D",
             tz=timezone.utc,
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch(0, shape=(5,)).update(n=2).data[0],
             pd.Series(["0_0", "0_1", "0_2", "0_3", "0_0_u", "0_1_u"], index=updated_index),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch(0, shape=(5,)).update(n=2, concat=False).data[0],
             pd.Series(
                 ["0_0_u", "0_1_u"],
@@ -523,11 +523,11 @@ class TestData:
             freq="D",
             tz=pytz.utc,
         ).tz_convert(to_timezone("Europe/Berlin"))
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch(0, shape=(5,), tz_localize="UTC", tz_convert="Europe/Berlin").update(tz_localize=None).data[0],
             pd.Series(["0_0", "0_1", "0_2", "0_3", "0_0_u"], index=index2),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch(0, shape=(5,), tz_localize="UTC", tz_convert="Europe/Berlin")
             .update(tz_localize=None, concat=False)
             .data[0],
@@ -535,38 +535,38 @@ class TestData:
         )
         index_mask = vbt.symbol_dict({0: [False, True, True, True, True], 1: [True, True, True, True, False]})
         update_index_mask = vbt.symbol_dict({0: [True], 1: [False]})
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="nan")
             .update(index_mask=update_index_mask)
             .data[0],
             pd.Series([np.nan, "0_1", "0_2", "0_3", "0_0_u"], index=index),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="nan")
             .update(index_mask=update_index_mask)
             .data[1],
             pd.Series(["1_0", "1_1", "1_2", "1_3", np.nan], index=index),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="nan")
             .update(index_mask=update_index_mask, concat=False)
             .data[0],
             pd.Series(["0_0_u"], index=index[[-1]], dtype=object),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="nan")
             .update(index_mask=update_index_mask, concat=False)
             .data[1],
             pd.Series([np.nan], index=index[[-1]], dtype=object),
         )
         update_index_mask2 = vbt.symbol_dict({0: [True, False, False], 1: [True, False, True]})
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="nan")
             .update(n=3, index_mask=update_index_mask2)
             .data[0],
             pd.Series([np.nan, "0_1", "0_2", "0_3", "0_0_u", np.nan], index=updated_index),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="nan")
             .update(n=3, index_mask=update_index_mask2)
             .data[1],
@@ -582,13 +582,13 @@ class TestData:
                 index=updated_index,
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="nan")
             .update(n=3, index_mask=update_index_mask2, concat=False)
             .data[0],
             pd.Series(["0_3", "0_0_u", np.nan], index=updated_index[-3:]),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="nan")
             .update(n=3, index_mask=update_index_mask2, concat=False)
             .data[1],
@@ -601,43 +601,43 @@ class TestData:
                 index=updated_index[-3:],
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="drop")
             .update(index_mask=update_index_mask)
             .data[0],
             pd.Series(["0_1", "0_2", "0_3"], index=index[1:4]),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="drop")
             .update(index_mask=update_index_mask)
             .data[1],
             pd.Series(["1_1", "1_2", "1_3"], index=index[1:4]),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="drop")
             .update(index_mask=update_index_mask, concat=False)
             .data[0],
             pd.Series([], index=pd.DatetimeIndex([], dtype="datetime64[ns, UTC]", freq=None), dtype=object),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="drop")
             .update(index_mask=update_index_mask, concat=False)
             .data[1],
             pd.Series([], index=pd.DatetimeIndex([], dtype="datetime64[ns, UTC]", freq=None), dtype=object),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="drop")
             .update(n=3, index_mask=update_index_mask2)
             .data[0],
             pd.Series(["0_1", "0_2", "0_3"], index=index[1:4]),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="drop")
             .update(n=3, index_mask=update_index_mask2)
             .data[1],
             pd.Series(["1_1", "1_2", "1_0_u"], index=index[1:4]),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="drop")
             .update(n=3, index_mask=update_index_mask2, concat=False)
             .data[0],
@@ -645,7 +645,7 @@ class TestData:
                 ["0_3"], index=pd.DatetimeIndex(["2020-01-04 00:00:00+00:00"], dtype="datetime64[ns, UTC]", freq=None)
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch([0, 1], shape=(5,), index_mask=index_mask, missing_index="drop")
             .update(n=3, index_mask=update_index_mask2, concat=False)
             .data[1],
@@ -654,7 +654,7 @@ class TestData:
             ),
         )
         column_mask = vbt.symbol_dict({0: [False, True, True], 1: [True, True, False]})
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(
                 [0, 1],
                 shape=(5, 3),
@@ -676,7 +676,7 @@ class TestData:
                 index=index,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(
                 [0, 1],
                 shape=(5, 3),
@@ -698,7 +698,7 @@ class TestData:
                 index=index,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(
                 [0, 1],
                 shape=(5, 3),
@@ -716,7 +716,7 @@ class TestData:
                 index=pd.DatetimeIndex(["2020-01-05 00:00:00+00:00"], dtype="datetime64[ns, UTC]", freq=None),
             ).astype({0: float, 1: object, 2: object}),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(
                 [0, 1],
                 shape=(5, 3),
@@ -734,7 +734,7 @@ class TestData:
                 index=pd.DatetimeIndex(["2020-01-05 00:00:00+00:00"], dtype="datetime64[ns, UTC]", freq=None),
             ).astype({0: object, 1: object, 2: float}),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(
                 [0, 1],
                 shape=(5, 3),
@@ -757,7 +757,7 @@ class TestData:
                 index=updated_index,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(
                 [0, 1],
                 shape=(5, 3),
@@ -780,7 +780,7 @@ class TestData:
                 index=updated_index,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(
                 [0, 1],
                 shape=(5, 3),
@@ -800,7 +800,7 @@ class TestData:
                 index=updated_index[3:],
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(
                 [0, 1],
                 shape=(5, 3),
@@ -820,7 +820,7 @@ class TestData:
                 index=updated_index[3:],
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(
                 [0, 1],
                 shape=(5, 3),
@@ -837,7 +837,7 @@ class TestData:
                 columns=pd.Index([1], dtype="int64"),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(
                 [0, 1],
                 shape=(5, 3),
@@ -854,7 +854,7 @@ class TestData:
                 columns=pd.Index([1], dtype="int64"),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(
                 [0, 1],
                 shape=(5, 3),
@@ -871,7 +871,7 @@ class TestData:
                 columns=pd.Index([1], dtype="int64"),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(
                 [0, 1],
                 shape=(5, 3),
@@ -888,7 +888,7 @@ class TestData:
                 columns=pd.Index([1], dtype="int64"),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(
                 [0, 1],
                 shape=(5, 3),
@@ -905,7 +905,7 @@ class TestData:
                 columns=pd.Index([1], dtype="int64"),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(
                 [0, 1],
                 shape=(5, 3),
@@ -922,7 +922,7 @@ class TestData:
                 columns=pd.Index([1], dtype="int64"),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(
                 [0, 1],
                 shape=(5, 3),
@@ -939,7 +939,7 @@ class TestData:
                 columns=pd.Index([1], dtype="int64"),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(
                 [0, 1],
                 shape=(5, 3),
@@ -983,7 +983,7 @@ class TestData:
             0: updated_index[4],
             1: updated_index[5],
         }
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch([0, 1], shape=(5, 3)).update(n=2, return_none=vbt.symbol_dict({0: True, 1: False})).data[0],
             pd.DataFrame(
                 [
@@ -997,7 +997,7 @@ class TestData:
                 index=updated_index,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch([0, 1], shape=(5, 3)).update(n=2, return_none=vbt.symbol_dict({0: True, 1: False})).data[1],
             pd.DataFrame(
                 [
@@ -1011,7 +1011,7 @@ class TestData:
                 index=updated_index,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch([0, 1], shape=(5, 3))
             .update(n=2, return_none=vbt.symbol_dict({0: True, 1: False}), concat=False)
             .data[0],
@@ -1022,7 +1022,7 @@ class TestData:
                 ),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch([0, 1], shape=(5, 3))
             .update(n=2, return_none=vbt.symbol_dict({0: True, 1: False}), concat=False)
             .data[1],
@@ -1033,7 +1033,7 @@ class TestData:
                 ),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch([0, 1], shape=(5, 3)).update(n=2, return_empty=vbt.symbol_dict({0: True, 1: False})).data[0],
             pd.DataFrame(
                 [
@@ -1047,7 +1047,7 @@ class TestData:
                 index=updated_index,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch([0, 1], shape=(5, 3)).update(n=2, return_empty=vbt.symbol_dict({0: True, 1: False})).data[1],
             pd.DataFrame(
                 [
@@ -1061,7 +1061,7 @@ class TestData:
                 index=updated_index,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch([0, 1], shape=(5, 3))
             .update(n=2, raise_error=vbt.symbol_dict({0: True, 1: False}), skip_on_error=True)
             .data[0],
@@ -1077,7 +1077,7 @@ class TestData:
                 index=updated_index,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch([0, 1], shape=(5, 3))
             .update(n=2, raise_error=vbt.symbol_dict({0: True, 1: False}), skip_on_error=True)
             .data[1],
@@ -1093,7 +1093,7 @@ class TestData:
                 index=updated_index,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch([0, 1], shape=(5, 3)).update(n=2, raise_error=True, skip_on_error=True).data[0],
             pd.DataFrame(
                 [
@@ -1106,7 +1106,7 @@ class TestData:
                 index=index,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch([0, 1], shape=(5, 3)).update(n=2, raise_error=True, skip_on_error=True).data[1],
             pd.DataFrame(
                 [
@@ -1132,11 +1132,11 @@ class TestData:
             freq="D",
             tz=timezone.utc,
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch(0, shape=(5,), columns="feat0").concat()["feat0"],
             pd.Series(["0_0", "0_1", "0_2", "0_3", "0_4"], index=index, name=0),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch([0, 1], shape=(5,), columns="feat0").concat()["feat0"],
             pd.DataFrame(
                 [["0_0", "1_0"], ["0_1", "1_1"], ["0_2", "1_2"], ["0_3", "1_3"], ["0_4", "1_4"]],
@@ -1144,19 +1144,19 @@ class TestData:
                 columns=pd.Index([0, 1], dtype="int64", name="symbol"),
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch(0, shape=(5, 3), columns=["feat0", "feat1", "feat2"]).concat()["feat0"],
             pd.Series(["0_0_0", "0_0_1", "0_0_2", "0_0_3", "0_0_4"], index=index, name=0),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch(0, shape=(5, 3), columns=["feat0", "feat1", "feat2"]).concat()["feat1"],
             pd.Series(["0_1_0", "0_1_1", "0_1_2", "0_1_3", "0_1_4"], index=index, name=0),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch(0, shape=(5, 3), columns=["feat0", "feat1", "feat2"]).concat()["feat2"],
             pd.Series(["0_2_0", "0_2_1", "0_2_2", "0_2_3", "0_2_4"], index=index, name=0),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"]).concat()["feat0"],
             pd.DataFrame(
                 [["0_0_0", "1_0_0"], ["0_0_1", "1_0_1"], ["0_0_2", "1_0_2"], ["0_0_3", "1_0_3"], ["0_0_4", "1_0_4"]],
@@ -1164,7 +1164,7 @@ class TestData:
                 columns=pd.Index([0, 1], dtype="int64", name="symbol"),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"]).concat()["feat1"],
             pd.DataFrame(
                 [["0_1_0", "1_1_0"], ["0_1_1", "1_1_1"], ["0_1_2", "1_1_2"], ["0_1_3", "1_1_3"], ["0_1_4", "1_1_4"]],
@@ -1172,7 +1172,7 @@ class TestData:
                 columns=pd.Index([0, 1], dtype="int64", name="symbol"),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"]).concat()["feat2"],
             pd.DataFrame(
                 [["0_2_0", "1_2_0"], ["0_2_1", "1_2_1"], ["0_2_2", "1_2_2"], ["0_2_3", "1_2_3"], ["0_2_4", "1_2_4"]],
@@ -1193,11 +1193,11 @@ class TestData:
             freq="D",
             tz=timezone.utc,
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch(0, shape=(5,), columns="feat0").get(),
             pd.Series(["0_0", "0_1", "0_2", "0_3", "0_4"], index=index, name="feat0"),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch(0, shape=(5, 3), columns=["feat0", "feat1", "feat2"]).get(),
             pd.DataFrame(
                 [
@@ -1211,11 +1211,11 @@ class TestData:
                 columns=pd.Index(["feat0", "feat1", "feat2"], dtype="object"),
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch(0, shape=(5, 3), columns=["feat0", "feat1", "feat2"]).get("feat0"),
             pd.Series(["0_0_0", "0_0_1", "0_0_2", "0_0_3", "0_0_4"], index=index, name="feat0"),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch([0, 1], shape=(5,), columns="feat0").get(),
             pd.DataFrame(
                 [["0_0", "1_0"], ["0_1", "1_1"], ["0_2", "1_2"], ["0_3", "1_3"], ["0_4", "1_4"]],
@@ -1223,7 +1223,7 @@ class TestData:
                 columns=pd.Index([0, 1], dtype="int64", name="symbol"),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"]).get("feat0"),
             pd.DataFrame(
                 [["0_0_0", "1_0_0"], ["0_0_1", "1_0_1"], ["0_0_2", "1_0_2"], ["0_0_3", "1_0_3"], ["0_0_4", "1_0_4"]],
@@ -1231,7 +1231,7 @@ class TestData:
                 columns=pd.Index([0, 1], dtype="int64", name="symbol"),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"]).get(["feat0", "feat1"])[0],
             pd.DataFrame(
                 [["0_0_0", "1_0_0"], ["0_0_1", "1_0_1"], ["0_0_2", "1_0_2"], ["0_0_3", "1_0_3"], ["0_0_4", "1_0_4"]],
@@ -1239,7 +1239,7 @@ class TestData:
                 columns=pd.Index([0, 1], dtype="int64", name="symbol"),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"]).get()[0],
             pd.DataFrame(
                 [["0_0_0", "1_0_0"], ["0_0_1", "1_0_1"], ["0_0_2", "1_0_2"], ["0_0_3", "1_0_3"], ["0_0_4", "1_0_4"]],
@@ -1247,19 +1247,19 @@ class TestData:
                 columns=pd.Index([0, 1], dtype="int64", name="symbol"),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"]).get(symbols=0),
             MyData.fetch(0, shape=(5, 3), columns=["feat0", "feat1", "feat2"]).get(),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"]).get(symbols=[0])[0],
             MyData.fetch([0], shape=(5, 3), columns=["feat0", "feat1", "feat2"]).get()[0],
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"]).get("feat0", symbols=0),
             MyData.fetch(0, shape=(5, 3), columns=["feat0", "feat1", "feat2"]).get("feat0"),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"]).get(["feat0"], symbols=0),
             MyData.fetch(0, shape=(5, 3), columns=["feat0", "feat1", "feat2"]).get(["feat0"]),
         )
@@ -1293,7 +1293,7 @@ class TestData:
         def _load_and_check_symbol(s, path, **kwargs):
             df = pd.read_csv(path, parse_dates=True, index_col=0, **kwargs).squeeze("columns")
             df.index.freq = df.index.inferred_freq
-            pd.testing.assert_frame_equal(df, data.data[s])
+            assert_frame_equal(df, data.data[s])
 
         data.to_csv(tmp_path)
         _load_and_check_symbol("S1", tmp_path / "S1.csv")
@@ -1328,7 +1328,7 @@ class TestData:
                 key = s
             df = pd.read_hdf(path, key, **kwargs)
             df.index.freq = df.index.inferred_freq
-            pd.testing.assert_frame_equal(df, data.data[s])
+            assert_frame_equal(df, data.data[s])
 
         data.to_hdf(tmp_path)
         _load_and_check_symbol("S1", tmp_path / "MyData.h5")
@@ -1401,7 +1401,7 @@ class TestData:
             ],
             dtype="object",
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             data.stats(),
             pd.Series(
                 [
@@ -1418,7 +1418,7 @@ class TestData:
                 name="agg_stats",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             data.stats(column="feat0"),
             pd.Series(
                 [
@@ -1435,7 +1435,7 @@ class TestData:
                 name="feat0",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             data.stats(group_by=True),
             pd.Series(
                 [
@@ -1452,15 +1452,15 @@ class TestData:
                 name="group",
             ),
         )
-        pd.testing.assert_series_equal(data["feat0"].stats(), data.stats(column="feat0"))
-        pd.testing.assert_series_equal(
+        assert_series_equal(data["feat0"].stats(), data.stats(column="feat0"))
+        assert_series_equal(
             data.replace(wrapper=data.wrapper.replace(group_by=True)).stats(),
             data.stats(group_by=True),
         )
         stats_df = data.stats(agg_func=None)
         assert stats_df.shape == (3, 8)
-        pd.testing.assert_index_equal(stats_df.index, data.wrapper.columns)
-        pd.testing.assert_index_equal(stats_df.columns, stats_index)
+        assert_index_equal(stats_df.index, data.wrapper.columns)
+        assert_index_equal(stats_df.columns, stats_index)
 
     @pytest.mark.parametrize("test_freq", ["1h", "10h", "3d"])
     def test_resample(self, test_freq):
@@ -1483,7 +1483,7 @@ class TestData:
         ohlcv_data.column_config["Other"] = dict(
             resample_func=lambda self, obj, resampler: obj.vbt.resample_apply(resampler, vbt.nb.mean_reduce_nb)
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ohlcv_data.resample(test_freq).get(),
             pd.concat((
                 ohlcv_data.get(["Open", "High", "Low", "Close", "Volume"]).vbt.ohlcv.resample(test_freq).obj,
@@ -1500,42 +1500,42 @@ class TestCustom:
         sr = pd.Series(np.arange(10))
         sr.to_csv(tmp_path / "temp.csv")
         csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv")
-        pd.testing.assert_series_equal(csv_data.get(), sr)
+        assert_series_equal(csv_data.get(), sr)
         csv_data = vbt.CSVData.fetch("TEMP", paths=tmp_path / "temp.csv")
         assert csv_data.symbols[0] == "TEMP"
-        pd.testing.assert_series_equal(csv_data.get(), sr)
+        assert_series_equal(csv_data.get(), sr)
         csv_data = vbt.CSVData.fetch("TEMP", paths=[tmp_path / "temp.csv"])
         assert csv_data.symbols[0] == "TEMP"
-        pd.testing.assert_series_equal(csv_data.get(), sr)
+        assert_series_equal(csv_data.get(), sr)
         csv_data = vbt.CSVData.fetch(["TEMP"], paths=tmp_path / "temp.csv")
         assert csv_data.symbols[0] == "TEMP"
-        pd.testing.assert_series_equal(csv_data.get()["TEMP"], sr.rename("TEMP"))
+        assert_series_equal(csv_data.get()["TEMP"], sr.rename("TEMP"))
         csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv", start_row=2, end_row=3)
-        pd.testing.assert_series_equal(csv_data.get(), sr.iloc[2:4])
+        assert_series_equal(csv_data.get(), sr.iloc[2:4])
         df = pd.DataFrame(np.arange(20).reshape((10, 2)))
         df.columns = pd.Index(["0", "1"], dtype="object")
         df.to_csv(tmp_path / "temp.csv")
         csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv", iterator=True)
-        pd.testing.assert_frame_equal(csv_data.get(), df)
+        assert_frame_equal(csv_data.get(), df)
         csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv", chunksize=1)
-        pd.testing.assert_frame_equal(csv_data.get(), df)
+        assert_frame_equal(csv_data.get(), df)
         csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv", chunksize=1, chunk_func=lambda x: list(x)[-1])
-        pd.testing.assert_frame_equal(csv_data.get(), df.iloc[[-1]])
+        assert_frame_equal(csv_data.get(), df.iloc[[-1]])
         df = pd.DataFrame(np.arange(20).reshape((10, 2)))
         df.columns = pd.MultiIndex.from_tuples([("1", "2"), ("3", "4")], names=["a", "b"])
         df.to_csv(tmp_path / "temp.csv")
         csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv", header=[0, 1], start_row=0, end_row=1)
-        pd.testing.assert_frame_equal(csv_data.get(), df.iloc[:2])
+        assert_frame_equal(csv_data.get(), df.iloc[:2])
         assert csv_data.returned_kwargs["temp"] == {"last_row": 1}
         csv_data = csv_data.update()
-        pd.testing.assert_frame_equal(csv_data.get(), df.iloc[:2])
+        assert_frame_equal(csv_data.get(), df.iloc[:2])
         assert csv_data.returned_kwargs["temp"] == {"last_row": 1}
         csv_data = csv_data.update(end_row=2)
         csv_data.get()
-        pd.testing.assert_frame_equal(csv_data.get(), df.iloc[:3])
+        assert_frame_equal(csv_data.get(), df.iloc[:3])
         assert csv_data.returned_kwargs["temp"] == {"last_row": 2}
         csv_data = csv_data.update(end_row=None)
-        pd.testing.assert_frame_equal(csv_data.get(), df)
+        assert_frame_equal(csv_data.get(), df)
         assert csv_data.returned_kwargs["temp"] == {"last_row": 9}
 
         data1 = MyData.fetch(shape=(5,))
@@ -1547,26 +1547,26 @@ class TestCustom:
         data2.get().to_csv(tmp_path / "data2.csv")
         data3.get().to_csv(tmp_path / "data3.csv")
         csv_data = vbt.CSVData.fetch(tmp_path / "data*.csv")
-        pd.testing.assert_frame_equal(csv_data.get(), result_data.get())
+        assert_frame_equal(csv_data.get(), result_data.get())
         (tmp_path / "data").mkdir(exist_ok=True)
         data1.get().to_csv(tmp_path / "data/data1.csv")
         data2.get().to_csv(tmp_path / "data/data2.csv")
         data3.get().to_csv(tmp_path / "data/data3.csv")
         csv_data = vbt.CSVData.fetch(tmp_path / "data")
-        pd.testing.assert_frame_equal(csv_data.get(), result_data.get())
+        assert_frame_equal(csv_data.get(), result_data.get())
         csv_data = vbt.CSVData.fetch(
             [tmp_path / "data/data1.csv", tmp_path / "data/data2.csv", tmp_path / "data/data3.csv"],
         )
-        pd.testing.assert_frame_equal(csv_data.get(), result_data.get())
+        assert_frame_equal(csv_data.get(), result_data.get())
         csv_data = vbt.CSVData.fetch(
             paths=[tmp_path / "data/data1.csv", tmp_path / "data/data2.csv", tmp_path / "data/data3.csv"],
         )
-        pd.testing.assert_frame_equal(csv_data.get(), result_data.get())
+        assert_frame_equal(csv_data.get(), result_data.get())
         csv_data = vbt.CSVData.fetch(
             symbols=["DATA1", "DATA2", "DATA3"],
             paths=[tmp_path / "data/data1.csv", tmp_path / "data/data2.csv", tmp_path / "data/data3.csv"],
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             csv_data.get(),
             result_data.get().rename(columns={"data1": "DATA1", "data2": "DATA2", "data3": "DATA3"}),
         )
@@ -1579,7 +1579,7 @@ class TestCustom:
                 }
             )
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             csv_data.get(),
             result_data.get().rename(columns={"data1": "DATA1", "data2": "DATA2", "data3": "DATA3"}),
         )
@@ -1598,42 +1598,42 @@ class TestCustom:
         sr = pd.Series(np.arange(10))
         sr.to_hdf(tmp_path / "temp.h5", "s")
         hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "s")
-        pd.testing.assert_series_equal(hdf_data.get(), sr)
+        assert_series_equal(hdf_data.get(), sr)
         hdf_data = vbt.HDFData.fetch("S", paths=tmp_path / "temp.h5" / "s")
         assert hdf_data.symbols[0] == "S"
-        pd.testing.assert_series_equal(hdf_data.get(), sr)
+        assert_series_equal(hdf_data.get(), sr)
         hdf_data = vbt.HDFData.fetch("S", paths=[tmp_path / "temp.h5" / "s"])
         assert hdf_data.symbols[0] == "S"
-        pd.testing.assert_series_equal(hdf_data.get(), sr)
+        assert_series_equal(hdf_data.get(), sr)
         hdf_data = vbt.HDFData.fetch(["S"], paths=tmp_path / "temp.h5" / "s")
         assert hdf_data.symbols[0] == "S"
-        pd.testing.assert_series_equal(hdf_data.get()["S"], sr.rename("S"))
+        assert_series_equal(hdf_data.get()["S"], sr.rename("S"))
         hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "s", start_row=2, end_row=3)
-        pd.testing.assert_series_equal(hdf_data.get(), sr.iloc[2:4])
+        assert_series_equal(hdf_data.get(), sr.iloc[2:4])
         df = pd.DataFrame(np.arange(20).reshape((10, 2)))
         df.columns = pd.Index(["0", "1"], dtype="object")
         df.to_hdf(tmp_path / "temp.h5", "df", format="table")
         hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "df", iterator=True)
-        pd.testing.assert_frame_equal(hdf_data.get(), df)
+        assert_frame_equal(hdf_data.get(), df)
         hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "df", chunksize=1)
-        pd.testing.assert_frame_equal(hdf_data.get(), df)
+        assert_frame_equal(hdf_data.get(), df)
         hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "df", chunksize=1, chunk_func=lambda x: list(x)[-1])
-        pd.testing.assert_frame_equal(hdf_data.get(), df.iloc[[-1]])
+        assert_frame_equal(hdf_data.get(), df.iloc[[-1]])
         df = pd.DataFrame(np.arange(20).reshape((10, 2)))
         df.columns = pd.MultiIndex.from_tuples([("1", "2"), ("3", "4")], names=["a", "b"])
         df.to_hdf(tmp_path / "temp.h5", "df")
         hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "df", header=[0, 1], start_row=0, end_row=1)
-        pd.testing.assert_frame_equal(hdf_data.get(), df.iloc[:2])
+        assert_frame_equal(hdf_data.get(), df.iloc[:2])
         assert hdf_data.returned_kwargs["df"] == {"last_row": 1}
         hdf_data = hdf_data.update()
-        pd.testing.assert_frame_equal(hdf_data.get(), df.iloc[:2])
+        assert_frame_equal(hdf_data.get(), df.iloc[:2])
         assert hdf_data.returned_kwargs["df"] == {"last_row": 1}
         hdf_data = hdf_data.update(end_row=2)
         hdf_data.get()
-        pd.testing.assert_frame_equal(hdf_data.get(), df.iloc[:3])
+        assert_frame_equal(hdf_data.get(), df.iloc[:3])
         assert hdf_data.returned_kwargs["df"] == {"last_row": 2}
         hdf_data = hdf_data.update(end_row=None)
-        pd.testing.assert_frame_equal(hdf_data.get(), df)
+        assert_frame_equal(hdf_data.get(), df)
         assert hdf_data.returned_kwargs["df"] == {"last_row": 9}
 
         data1 = MyData.fetch(shape=(5,))
@@ -1645,26 +1645,26 @@ class TestCustom:
         data2.get().to_hdf(tmp_path / "data2.h5", "data2")
         data3.get().to_hdf(tmp_path / "data3.h5", "data3")
         hdf_data = vbt.HDFData.fetch(tmp_path / "data*.h5")
-        pd.testing.assert_frame_equal(hdf_data.get(), result_data.get())
+        assert_frame_equal(hdf_data.get(), result_data.get())
         (tmp_path / "data").mkdir(exist_ok=True)
         data1.get().to_hdf(tmp_path / "data/data1.h5", "data1")
         data2.get().to_hdf(tmp_path / "data/data2.h5", "data2")
         data3.get().to_hdf(tmp_path / "data/data3.h5", "data3")
         hdf_data = vbt.HDFData.fetch(tmp_path / "data")
-        pd.testing.assert_frame_equal(hdf_data.get(), result_data.get())
+        assert_frame_equal(hdf_data.get(), result_data.get())
         hdf_data = vbt.HDFData.fetch(
             [tmp_path / "data/data1.h5", tmp_path / "data/data2.h5", tmp_path / "data/data3.h5"],
         )
-        pd.testing.assert_frame_equal(hdf_data.get(), result_data.get())
+        assert_frame_equal(hdf_data.get(), result_data.get())
         hdf_data = vbt.HDFData.fetch(
             paths=[tmp_path / "data/data1.h5", tmp_path / "data/data2.h5", tmp_path / "data/data3.h5"],
         )
-        pd.testing.assert_frame_equal(hdf_data.get(), result_data.get())
+        assert_frame_equal(hdf_data.get(), result_data.get())
         hdf_data = vbt.HDFData.fetch(
             symbols=["DATA1", "DATA2", "DATA3"],
             paths=[tmp_path / "data/data1.h5", tmp_path / "data/data2.h5", tmp_path / "data/data3.h5"],
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             hdf_data.get(),
             result_data.get().rename(columns={"data1": "DATA1", "data2": "DATA2", "data3": "DATA3"}),
         )
@@ -1677,7 +1677,7 @@ class TestCustom:
                 }
             )
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             hdf_data.get(),
             result_data.get().rename(columns={"data1": "DATA1", "data2": "DATA2", "data3": "DATA3"}),
         )
@@ -1696,17 +1696,17 @@ class TestCustom:
         data2.get().to_hdf(tmp_path / "data/data.h5", "data2")
         data3.get().to_hdf(tmp_path / "data/data.h5", "data3")
         hdf_data = vbt.HDFData.fetch(tmp_path / "data/data.h5")
-        pd.testing.assert_frame_equal(hdf_data.get(), result_data.get())
+        assert_frame_equal(hdf_data.get(), result_data.get())
         data1.get().to_hdf(tmp_path / "data/data.h5", "data1")
         data2.get().to_hdf(tmp_path / "data/data.h5", "data2")
         data3.get().to_hdf(tmp_path / "data/data.h5", "data3")
         hdf_data = vbt.HDFData.fetch(tmp_path / "data")
-        pd.testing.assert_frame_equal(hdf_data.get(), result_data.get())
+        assert_frame_equal(hdf_data.get(), result_data.get())
         data1.get().to_hdf(tmp_path / "data/data.h5", "/folder/data1")
         data2.get().to_hdf(tmp_path / "data/data.h5", "/folder/data2")
         data3.get().to_hdf(tmp_path / "data/data.h5", "/folder/data3")
         hdf_data = vbt.HDFData.fetch(tmp_path / "data/data.h5/folder")
-        pd.testing.assert_frame_equal(hdf_data.get(), result_data.get())
+        assert_frame_equal(hdf_data.get(), result_data.get())
         hdf_data = vbt.HDFData.fetch(
             symbols=["DATA1", "DATA2", "DATA3"],
             paths=[
@@ -1715,7 +1715,7 @@ class TestCustom:
                 tmp_path / "data/data.h5/folder/data3",
             ],
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             hdf_data.get(),
             result_data.get().rename(columns={"data1": "DATA1", "data2": "DATA2", "data3": "DATA3"}),
         )
@@ -1733,7 +1733,7 @@ class TestCustom:
         data2.get().to_hdf(tmp_path / "data/data.h5", "/data2/folder/data2")
         data3.get().to_hdf(tmp_path / "data/data.h5", "/data3/folder/data3")
         hdf_data = vbt.HDFData.fetch(tmp_path / "data/data.h5/data*/folder/*")
-        pd.testing.assert_frame_equal(hdf_data.get(), result_data.get())
+        assert_frame_equal(hdf_data.get(), result_data.get())
 
         if (tmp_path / "data/data.h5").exists():
             (tmp_path / "data/data.h5").unlink()
@@ -1741,13 +1741,13 @@ class TestCustom:
         data2.get().to_hdf(tmp_path / "data/data.h5", "/data2/folder/data2")
         data3.get().to_hdf(tmp_path / "data/data.h5", "/data3/folder/data3")
         hdf_data = vbt.HDFData.fetch(tmp_path / "**/data.h5/data*/folder/*")
-        pd.testing.assert_frame_equal(hdf_data.get(), result_data.get())
+        assert_frame_equal(hdf_data.get(), result_data.get())
 
         with pytest.raises(Exception):
             vbt.HDFData.fetch(tmp_path / "data/data.h5/folder/data4")
 
     def test_random_data(self):
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             vbt.RandomData.fetch(start="2021-01-01 UTC", end="2021-01-05 UTC", seed=42).get(),
             pd.Series(
                 [100.49671415301123, 100.35776307348756, 101.00776880200878, 102.54614727815496, 102.3060320136544],
@@ -1764,7 +1764,7 @@ class TestCustom:
                 ),
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             vbt.RandomData.fetch(start="2021-01-01 UTC", end="2021-01-05 UTC", symmetric=True, seed=42).get(),
             pd.Series(
                 [100.49671415301123, 100.35795492796039, 101.00796189910105, 102.54634331617359, 102.30678851828695],
@@ -1781,7 +1781,7 @@ class TestCustom:
                 ),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.RandomData.fetch(num_paths=2, start="2021-01-01 UTC", end="2021-01-05 UTC", seed=42).get(),
             pd.DataFrame(
                 [
@@ -1805,7 +1805,7 @@ class TestCustom:
                 columns=pd.Index([0, 1], name="path"),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.RandomData.fetch([0, 1], start="2021-01-01 UTC", end="2021-01-05 UTC", seed=42).get(),
             pd.DataFrame(
                 [
@@ -1829,7 +1829,7 @@ class TestCustom:
                 columns=pd.Index([0, 1], name="symbol"),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.RandomData.fetch(
                 start="2021-01-01 UTC",
                 end="2021-01-05 UTC",
@@ -1857,7 +1857,7 @@ class TestCustom:
         )
 
     def test_gbm_data(self):
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             vbt.GBMData.fetch(start="2021-01-01 UTC", end="2021-01-05 UTC", seed=42).get(),
             pd.Series(
                 [100.49292505095792, 100.34905764408163, 100.99606643427086, 102.54091282498935, 102.29597577584751],
@@ -1874,7 +1874,7 @@ class TestCustom:
                 ),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.GBMData.fetch(num_paths=2, start="2021-01-01 UTC", end="2021-01-05 UTC", seed=42).get(),
             pd.DataFrame(
                 [
@@ -1898,7 +1898,7 @@ class TestCustom:
                 columns=pd.Index([0, 1], name="path"),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.GBMData.fetch([0, 1], start="2021-01-01 UTC", end="2021-01-05 UTC", seed=42).get(),
             pd.DataFrame(
                 [
@@ -1922,7 +1922,7 @@ class TestCustom:
                 columns=pd.Index([0, 1], name="symbol"),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.GBMData.fetch(
                 start="2021-01-01 UTC",
                 end="2021-01-05 UTC",
@@ -2001,8 +2001,8 @@ class TestCSVDataSaver:
         saved_result0.index.freq = "D"
         saved_result1 = pd.concat((data.data[1].iloc[:-1], updated_data.data[1]), axis=0)
         saved_result1.index.freq = "D"
-        pd.testing.assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["0"], saved_result0)
-        pd.testing.assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["1"], saved_result1)
+        assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["0"], saved_result0)
+        assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["1"], saved_result1)
 
         new_data = saver.data
         new_saver = vbt.CSVDataSaver(
@@ -2023,8 +2023,8 @@ class TestCSVDataSaver:
             (data.data[1].iloc[:-1], new_data.data[1].iloc[:-1], new_updated_data.data[1]), axis=0
         )
         new_saved_result1.index.freq = "D"
-        pd.testing.assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["0"], new_saved_result0)
-        pd.testing.assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["1"], new_saved_result1)
+        assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["0"], new_saved_result0)
+        assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["1"], new_saved_result1)
 
     def test_update_every(self, tmp_path):
         data = MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
@@ -2048,8 +2048,8 @@ class TestCSVDataSaver:
         saver.update_every(call_count=call_count)
         for i in range(5):
             data = data.update()
-        pd.testing.assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["0"], data.data[0])
-        pd.testing.assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["1"], data.data[1])
+        assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["0"], data.data[0])
+        assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["1"], data.data[1])
 
 
 class TestHDFDataSaver:
@@ -2071,8 +2071,8 @@ class TestHDFDataSaver:
         saved_result0.index.freq = "D"
         saved_result1 = pd.concat((data.data[1].iloc[:-1], updated_data.data[1]), axis=0)
         saved_result1.index.freq = "D"
-        pd.testing.assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["0"], saved_result0)
-        pd.testing.assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["1"], saved_result1)
+        assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["0"], saved_result0)
+        assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["1"], saved_result1)
 
         new_data = saver.data
         new_saver = vbt.HDFDataSaver(
@@ -2094,8 +2094,8 @@ class TestHDFDataSaver:
             (data.data[1].iloc[:-1], new_data.data[1].iloc[:-1], new_updated_data.data[1]), axis=0
         )
         new_saved_result1.index.freq = "D"
-        pd.testing.assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["0"], new_saved_result0)
-        pd.testing.assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["1"], new_saved_result1)
+        assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["0"], new_saved_result0)
+        assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["1"], new_saved_result1)
 
     def test_update_every(self, tmp_path):
         data = MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
@@ -2120,5 +2120,5 @@ class TestHDFDataSaver:
         saver.update_every(call_count=call_count)
         for i in range(5):
             data = data.update()
-        pd.testing.assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["0"], data.data[0])
-        pd.testing.assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["1"], data.data[1])
+        assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["0"], data.data[0])
+        assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["1"], data.data[1])

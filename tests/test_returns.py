@@ -1,12 +1,11 @@
 import os
 from datetime import datetime
 
-import numpy as np
-import pandas as pd
 import pytest
 
 import vectorbtpro as vbt
-from tests.utils import isclose
+
+from tests.utils import *
 
 qs_available = True
 try:
@@ -68,8 +67,8 @@ class TestAccessors:
         assert ret_acc["a"].total() == ret_acc["a"].total()
 
     def test_bm_returns(self):
-        pd.testing.assert_frame_equal(bm_returns, ret_acc.bm_returns)
-        pd.testing.assert_series_equal(bm_returns["a"], ret_acc["a"].bm_returns)
+        assert_frame_equal(bm_returns, ret_acc.bm_returns)
+        assert_series_equal(bm_returns["a"], ret_acc["a"].bm_returns)
 
     def test_freq(self):
         assert ret_acc.wrapper.freq == day_dt
@@ -87,13 +86,13 @@ class TestAccessors:
             assert pd.Series([1, 2, 3]).vbt.returns(freq=None).ann_factor
 
     def test_from_value(self):
-        pd.testing.assert_series_equal(pd.Series.vbt.returns.from_value(ts["a"]).obj, ts["a"].pct_change().fillna(0.0))
-        pd.testing.assert_frame_equal(pd.DataFrame.vbt.returns.from_value(ts).obj, ts.pct_change().fillna(0.0))
-        pd.testing.assert_frame_equal(
+        assert_series_equal(pd.Series.vbt.returns.from_value(ts["a"]).obj, ts["a"].pct_change().fillna(0.0))
+        assert_frame_equal(pd.DataFrame.vbt.returns.from_value(ts).obj, ts.pct_change().fillna(0.0))
+        assert_frame_equal(
             pd.DataFrame.vbt.returns.from_value(ts, jitted=dict(parallel=True)).obj,
             pd.DataFrame.vbt.returns.from_value(ts, jitted=dict(parallel=False)).obj,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pd.DataFrame.vbt.returns.from_value(ts, chunked=True).obj,
             pd.DataFrame.vbt.returns.from_value(ts, chunked=False).obj,
         )
@@ -113,7 +112,7 @@ class TestAccessors:
                 ]
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_12h["a"].vbt.returns.daily(),
             pd.Series(
                 np.array([0.21, 0.21, 0.1]),
@@ -121,7 +120,7 @@ class TestAccessors:
                 name=ret_12h["a"].name,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_12h.vbt.returns.daily(),
             pd.DataFrame(
                 np.array([[0.21, -0.19, -0.01], [0.21, -0.19, -0.01], [0.1, -0.1, 0.1]]),
@@ -129,14 +128,14 @@ class TestAccessors:
                 columns=ret_12h.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_12h.vbt.returns.daily(jitted=dict(parallel=True)),
             ret_12h.vbt.returns.daily(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(ret_12h.vbt.returns.daily(chunked=True), ret_12h.vbt.returns.daily(chunked=False))
+        assert_frame_equal(ret_12h.vbt.returns.daily(chunked=True), ret_12h.vbt.returns.daily(chunked=False))
 
     def test_annual(self):
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc["a"].annual(),
             pd.Series(
                 np.array([0.03960396039603964]),
@@ -144,7 +143,7 @@ class TestAccessors:
                 name=rets["a"].name,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.annual(),
             pd.DataFrame(
                 np.array([[0.03960396039603964, -0.03809523809523796, 0.0]]),
@@ -152,14 +151,14 @@ class TestAccessors:
                 columns=rets.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.annual(jitted=dict(parallel=True)),
             ret_acc.annual(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(ret_acc.annual(chunked=True), ret_acc.annual(chunked=False))
+        assert_frame_equal(ret_acc.annual(chunked=True), ret_acc.annual(chunked=False))
 
     def test_cumulative(self):
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc["a"].cumulative(),
             pd.Series(
                 [0.0, 0.00990099009900991, 0.01980198019801982, 0.02970297029702973, 0.03960396039603964],
@@ -167,7 +166,7 @@ class TestAccessors:
                 name="a",
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.cumulative(),
             pd.DataFrame(
                 [
@@ -181,24 +180,24 @@ class TestAccessors:
                 columns=rets.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.cumulative(jitted=dict(parallel=True)),
             ret_acc.cumulative(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(ret_acc.cumulative(chunked=True), ret_acc.cumulative(chunked=False))
+        assert_frame_equal(ret_acc.cumulative(chunked=True), ret_acc.cumulative(chunked=False))
 
     def test_total(self):
         assert isclose(ret_acc["a"].total(), 0.03960396039603964)
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.total(),
             pd.Series([0.03960396039603964, -0.03809523809523796, 0.0], index=rets.columns, name="total_return"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.total(jitted=dict(parallel=True)),
             ret_acc.total(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(ret_acc.total(chunked=True), ret_acc.total(chunked=False))
-        pd.testing.assert_frame_equal(
+        assert_series_equal(ret_acc.total(chunked=True), ret_acc.total(chunked=False))
+        assert_frame_equal(
             ret_acc.rolling_total(),
             pd.DataFrame(
                 [
@@ -212,24 +211,24 @@ class TestAccessors:
                 columns=rets.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_total(jitted=dict(parallel=True)),
             ret_acc.rolling_total(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(ret_acc.rolling_total(chunked=True), ret_acc.rolling_total(chunked=False))
+        assert_frame_equal(ret_acc.rolling_total(chunked=True), ret_acc.rolling_total(chunked=False))
 
     def test_annualized(self):
         assert isclose(ret_acc["a"].annualized(), 16.03564361105591)
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.annualized(),
             pd.Series([16.03564361105591, -0.94129954683068, 0.0], index=rets.columns, name="annualized_return"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.annualized(jitted=dict(parallel=True)),
             ret_acc.annualized(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(ret_acc.annualized(chunked=True), ret_acc.annualized(chunked=False))
-        pd.testing.assert_frame_equal(
+        assert_series_equal(ret_acc.annualized(chunked=True), ret_acc.annualized(chunked=False))
+        assert_frame_equal(
             ret_acc.rolling_annualized(),
             pd.DataFrame(
                 [
@@ -243,18 +242,18 @@ class TestAccessors:
                 columns=rets.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_annualized(jitted=dict(parallel=True)),
             ret_acc.rolling_annualized(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_annualized(chunked=True),
             ret_acc.rolling_annualized(chunked=False),
         )
 
     def test_annualized_volatility(self):
         assert isclose(ret_acc["a"].annualized_volatility(), 0.0023481420320083587)
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.annualized_volatility(),
             pd.Series(
                 [0.0023481420320083587, 0.002302976178562684, 0.21629262958084472],
@@ -262,15 +261,15 @@ class TestAccessors:
                 name="annualized_volatility",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.annualized_volatility(jitted=dict(parallel=True)),
             ret_acc.annualized_volatility(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.annualized_volatility(chunked=True),
             ret_acc.annualized_volatility(chunked=False),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_annualized_volatility(),
             pd.DataFrame(
                 [
@@ -284,27 +283,27 @@ class TestAccessors:
                 columns=rets.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_annualized_volatility(jitted=dict(parallel=True)),
             ret_acc.rolling_annualized_volatility(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_annualized_volatility(chunked=True),
             ret_acc.rolling_annualized_volatility(chunked=False),
         )
 
     def test_calmar_ratio(self):
         assert isclose(ret_acc["a"].calmar_ratio(), np.nan)
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.calmar_ratio(),
             pd.Series([np.nan, -24.709113104305438, 0.0], index=rets.columns, name="calmar_ratio"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.calmar_ratio(jitted=dict(parallel=True)),
             ret_acc.calmar_ratio(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(ret_acc.calmar_ratio(chunked=True), ret_acc.calmar_ratio(chunked=False))
-        pd.testing.assert_frame_equal(
+        assert_series_equal(ret_acc.calmar_ratio(chunked=True), ret_acc.calmar_ratio(chunked=False))
+        assert_frame_equal(
             ret_acc.rolling_calmar_ratio(),
             pd.DataFrame(
                 [
@@ -318,27 +317,27 @@ class TestAccessors:
                 columns=rets.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_calmar_ratio(jitted=dict(parallel=True)),
             ret_acc.rolling_calmar_ratio(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_calmar_ratio(chunked=True),
             ret_acc.rolling_calmar_ratio(chunked=False),
         )
 
     def test_omega_ratio(self):
         assert isclose(ret_acc["a"].omega_ratio(), np.inf)
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.omega_ratio(),
             pd.Series([np.inf, 0.0, 0.8183910222656902], index=rets.columns, name="omega_ratio"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.omega_ratio(jitted=dict(parallel=True)),
             ret_acc.omega_ratio(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(ret_acc.omega_ratio(chunked=True), ret_acc.omega_ratio(chunked=False))
-        pd.testing.assert_frame_equal(
+        assert_series_equal(ret_acc.omega_ratio(chunked=True), ret_acc.omega_ratio(chunked=False))
+        assert_frame_equal(
             ret_acc.rolling_omega_ratio(),
             pd.DataFrame(
                 [
@@ -352,18 +351,18 @@ class TestAccessors:
                 columns=rets.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_omega_ratio(jitted=dict(parallel=True)),
             ret_acc.rolling_omega_ratio(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_omega_ratio(chunked=True),
             ret_acc.rolling_omega_ratio(chunked=False),
         )
 
     def test_sharpe_ratio(self):
         assert isclose(ret_acc["a"].sharpe_ratio(), 1361.2461777659016)
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.sharpe_ratio(),
             pd.Series(
                 [1361.2461777659016, -1689.979112534647, -1.6064208208840622],
@@ -371,12 +370,12 @@ class TestAccessors:
                 name="sharpe_ratio",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.sharpe_ratio(jitted=dict(parallel=True)),
             ret_acc.sharpe_ratio(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(ret_acc.sharpe_ratio(chunked=True), ret_acc.sharpe_ratio(chunked=False))
-        pd.testing.assert_frame_equal(
+        assert_series_equal(ret_acc.sharpe_ratio(chunked=True), ret_acc.sharpe_ratio(chunked=False))
+        assert_frame_equal(
             ret_acc.rolling_sharpe_ratio(),
             pd.DataFrame(
                 [
@@ -390,28 +389,28 @@ class TestAccessors:
                 columns=rets.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_sharpe_ratio(jitted=dict(parallel=True)),
             ret_acc.rolling_sharpe_ratio(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_sharpe_ratio(chunked=True),
             ret_acc.rolling_sharpe_ratio(chunked=False),
         )
 
     def test_deflated_sharpe_ratio(self):
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.deflated_sharpe_ratio(),
             pd.Series([np.nan, np.nan, 0.0], index=rets.columns, name="deflated_sharpe_ratio"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.deflated_sharpe_ratio(),
             pd.Series([np.nan, np.nan, 0.0], index=rets.columns, name="deflated_sharpe_ratio"),
         )
 
     def test_downside_risk(self):
         assert isclose(ret_acc["a"].downside_risk(), 0.0050638301522095246)
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.downside_risk(),
             pd.Series(
                 [0.0050638301522095246, 0.3756656824931905, 0.2669023399120462],
@@ -419,12 +418,12 @@ class TestAccessors:
                 name="downside_risk",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.downside_risk(jitted=dict(parallel=True)),
             ret_acc.downside_risk(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(ret_acc.downside_risk(chunked=True), ret_acc.downside_risk(chunked=False))
-        pd.testing.assert_frame_equal(
+        assert_series_equal(ret_acc.downside_risk(chunked=True), ret_acc.downside_risk(chunked=False))
+        assert_frame_equal(
             ret_acc.rolling_downside_risk(),
             pd.DataFrame(
                 [
@@ -438,18 +437,18 @@ class TestAccessors:
                 columns=rets.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_downside_risk(jitted=dict(parallel=True)),
             ret_acc.rolling_downside_risk(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_downside_risk(chunked=True),
             ret_acc.rolling_downside_risk(chunked=False),
         )
 
     def test_sortino_ratio(self):
         assert isclose(ret_acc["a"].sortino_ratio(), -17.496762611302145)
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.sortino_ratio(),
             pd.Series(
                 [-17.496762611302145, -19.104703923989362, -13.609685792786445],
@@ -457,12 +456,12 @@ class TestAccessors:
                 name="sortino_ratio",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.sortino_ratio(jitted=dict(parallel=True)),
             ret_acc.sortino_ratio(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(ret_acc.sortino_ratio(chunked=True), ret_acc.sortino_ratio(chunked=False))
-        pd.testing.assert_frame_equal(
+        assert_series_equal(ret_acc.sortino_ratio(chunked=True), ret_acc.sortino_ratio(chunked=False))
+        assert_frame_equal(
             ret_acc.rolling_sortino_ratio(),
             pd.DataFrame(
                 [
@@ -476,18 +475,18 @@ class TestAccessors:
                 columns=rets.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_sortino_ratio(jitted=dict(parallel=True)),
             ret_acc.rolling_sortino_ratio(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_sortino_ratio(chunked=True),
             ret_acc.rolling_sortino_ratio(chunked=False),
         )
 
     def test_information_ratio(self):
         assert isclose(ret_acc["a"].information_ratio(), 0.8660254018606264)
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.information_ratio(),
             pd.Series(
                 [0.8660254018606264, -6123.473107502151, 0.8660253864635988],
@@ -495,15 +494,15 @@ class TestAccessors:
                 name="information_ratio",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.information_ratio(jitted=dict(parallel=True)),
             ret_acc.information_ratio(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.information_ratio(chunked=True),
             ret_acc.information_ratio(chunked=False),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_information_ratio(),
             pd.DataFrame(
                 [
@@ -517,27 +516,27 @@ class TestAccessors:
                 columns=rets.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_information_ratio(jitted=dict(parallel=True)),
             ret_acc.rolling_information_ratio(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_information_ratio(chunked=True),
             ret_acc.rolling_information_ratio(chunked=False),
         )
 
     def test_beta(self):
         assert isclose(ret_acc["a"].beta(), 0.00973323097108315)
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.beta(),
             pd.Series([0.00973323097108315, 0.9806173576309167, 84.20285394440484], index=rets.columns, name="beta"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.beta(jitted=dict(parallel=True)),
             ret_acc.beta(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(ret_acc.beta(chunked=True), ret_acc.beta(chunked=False))
-        pd.testing.assert_frame_equal(
+        assert_series_equal(ret_acc.beta(chunked=True), ret_acc.beta(chunked=False))
+        assert_frame_equal(
             ret_acc.rolling_beta(),
             pd.DataFrame(
                 [
@@ -551,15 +550,15 @@ class TestAccessors:
                 columns=rets.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_beta(jitted=dict(parallel=True)),
             ret_acc.rolling_beta(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(ret_acc.rolling_beta(chunked=True), ret_acc.rolling_beta(chunked=False))
+        assert_frame_equal(ret_acc.rolling_beta(chunked=True), ret_acc.rolling_beta(chunked=False))
 
     def test_alpha(self):
         assert isclose(ret_acc["a"].alpha(), 23.18752973476371)
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.alpha(),
             pd.Series(
                 [23.18752973476371, -0.9991707078650568, 3.063517449349351e101],
@@ -567,12 +566,12 @@ class TestAccessors:
                 name="alpha",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.alpha(jitted=dict(parallel=True)),
             ret_acc.alpha(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(ret_acc.alpha(chunked=True), ret_acc.alpha(chunked=False))
-        pd.testing.assert_frame_equal(
+        assert_series_equal(ret_acc.alpha(chunked=True), ret_acc.alpha(chunked=False))
+        assert_frame_equal(
             ret_acc.rolling_alpha(),
             pd.DataFrame(
                 [
@@ -586,15 +585,15 @@ class TestAccessors:
                 columns=rets.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_alpha(jitted=dict(parallel=True)),
             ret_acc.rolling_alpha(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(ret_acc.rolling_alpha(chunked=True), ret_acc.rolling_alpha(chunked=False))
+        assert_frame_equal(ret_acc.rolling_alpha(chunked=True), ret_acc.rolling_alpha(chunked=False))
 
     def test_tail_ratio(self):
         assert isclose(ret_acc["a"].tail_ratio(), 1.0266935164903142)
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.tail_ratio(),
             pd.Series(
                 [1.0266935164903142, 0.9742484787939328, 1.0098865501523446],
@@ -602,12 +601,12 @@ class TestAccessors:
                 name="tail_ratio",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.tail_ratio(jitted=dict(parallel=True)),
             ret_acc.tail_ratio(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(ret_acc.tail_ratio(chunked=True), ret_acc.tail_ratio(chunked=False))
-        pd.testing.assert_frame_equal(
+        assert_series_equal(ret_acc.tail_ratio(chunked=True), ret_acc.tail_ratio(chunked=False))
+        assert_frame_equal(
             ret_acc.rolling_tail_ratio(),
             pd.DataFrame(
                 [
@@ -621,18 +620,18 @@ class TestAccessors:
                 columns=rets.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_tail_ratio(jitted=dict(parallel=True)),
             ret_acc.rolling_tail_ratio(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_tail_ratio(chunked=True),
             ret_acc.rolling_tail_ratio(chunked=False),
         )
 
     def test_value_at_risk(self):
         assert isclose(ret_acc["a"].value_at_risk(), 0.009629387602688543)
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.value_at_risk(),
             pd.Series(
                 [0.009629387602688543, -0.009789644012944954, -0.009789644012944954],
@@ -640,12 +639,12 @@ class TestAccessors:
                 name="value_at_risk",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.value_at_risk(jitted=dict(parallel=True)),
             ret_acc.value_at_risk(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(ret_acc.value_at_risk(chunked=True), ret_acc.value_at_risk(chunked=False))
-        pd.testing.assert_frame_equal(
+        assert_series_equal(ret_acc.value_at_risk(chunked=True), ret_acc.value_at_risk(chunked=False))
+        assert_frame_equal(
             ret_acc.rolling_value_at_risk(),
             pd.DataFrame(
                 [
@@ -659,18 +658,18 @@ class TestAccessors:
                 columns=rets.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_value_at_risk(jitted=dict(parallel=True)),
             ret_acc.rolling_value_at_risk(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_value_at_risk(chunked=True),
             ret_acc.rolling_value_at_risk(chunked=False),
         )
 
     def test_cond_value_at_risk(self):
         assert isclose(ret_acc["a"].cond_value_at_risk(), 0.009615384615384581)
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.cond_value_at_risk(),
             pd.Series(
                 [0.009615384615384581, -0.009803921568627416, -0.009803921568627416],
@@ -678,15 +677,15 @@ class TestAccessors:
                 name="cond_value_at_risk",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.cond_value_at_risk(jitted=dict(parallel=True)),
             ret_acc.cond_value_at_risk(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.cond_value_at_risk(chunked=True),
             ret_acc.cond_value_at_risk(chunked=False),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_cond_value_at_risk(),
             pd.DataFrame(
                 [
@@ -700,27 +699,27 @@ class TestAccessors:
                 columns=rets.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_cond_value_at_risk(jitted=dict(parallel=True)),
             ret_acc.rolling_cond_value_at_risk(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_cond_value_at_risk(chunked=True),
             ret_acc.rolling_cond_value_at_risk(chunked=False),
         )
 
     def test_capture(self):
         assert isclose(ret_acc["a"].capture(), np.inf)
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.capture(),
             pd.Series([np.inf, -0.05870045316931919, -0.0], index=rets.columns, name="capture"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.capture(jitted=dict(parallel=True)),
             ret_acc.capture(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(ret_acc.capture(chunked=True), ret_acc.capture(chunked=False))
-        pd.testing.assert_frame_equal(
+        assert_series_equal(ret_acc.capture(chunked=True), ret_acc.capture(chunked=False))
+        assert_frame_equal(
             ret_acc.rolling_capture(),
             pd.DataFrame(
                 [
@@ -734,24 +733,24 @@ class TestAccessors:
                 columns=rets.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_capture(jitted=dict(parallel=True)),
             ret_acc.rolling_capture(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(ret_acc.rolling_capture(chunked=True), ret_acc.rolling_capture(chunked=False))
+        assert_frame_equal(ret_acc.rolling_capture(chunked=True), ret_acc.rolling_capture(chunked=False))
 
     def test_up_capture(self):
         assert isclose(ret_acc["a"].up_capture(), 5.035323109391956)
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.up_capture(),
             pd.Series([5.035323109391956, np.nan, np.nan], index=rets.columns, name="up_capture"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.up_capture(jitted=dict(parallel=True)),
             ret_acc.up_capture(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(ret_acc.up_capture(chunked=True), ret_acc.up_capture(chunked=False))
-        pd.testing.assert_frame_equal(
+        assert_series_equal(ret_acc.up_capture(chunked=True), ret_acc.up_capture(chunked=False))
+        assert_frame_equal(
             ret_acc.rolling_up_capture(),
             pd.DataFrame(
                 [
@@ -765,27 +764,27 @@ class TestAccessors:
                 columns=rets.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_up_capture(jitted=dict(parallel=True)),
             ret_acc.rolling_up_capture(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_up_capture(chunked=True),
             ret_acc.rolling_up_capture(chunked=False),
         )
 
     def test_down_capture(self):
         assert isclose(ret_acc["a"].down_capture(), np.nan)
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.down_capture(),
             pd.Series([np.nan, np.nan, 0.8084889429645409], index=rets.columns, name="down_capture"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.down_capture(jitted=dict(parallel=True)),
             ret_acc.down_capture(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(ret_acc.down_capture(chunked=True), ret_acc.down_capture(chunked=False))
-        pd.testing.assert_frame_equal(
+        assert_series_equal(ret_acc.down_capture(chunked=True), ret_acc.down_capture(chunked=False))
+        assert_frame_equal(
             ret_acc.rolling_down_capture(),
             pd.DataFrame(
                 [
@@ -799,21 +798,21 @@ class TestAccessors:
                 columns=rets.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_down_capture(jitted=dict(parallel=True)),
             ret_acc.rolling_down_capture(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_down_capture(chunked=True),
             ret_acc.rolling_down_capture(chunked=False),
         )
 
     def test_drawdown(self):
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc["a"].drawdown(),
             pd.Series(np.array([0.0, 0.0, 0.0, 0.0, 0.0]), index=rets["a"].index, name=rets["a"].name),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.drawdown(),
             pd.DataFrame(
                 np.array(
@@ -833,21 +832,21 @@ class TestAccessors:
                 columns=rets.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.drawdown(jitted=dict(parallel=True)),
             ret_acc.drawdown(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(ret_acc.drawdown(chunked=True), ret_acc.drawdown(chunked=False))
+        assert_frame_equal(ret_acc.drawdown(chunked=True), ret_acc.drawdown(chunked=False))
 
     def test_max_drawdown(self):
         assert isclose(ret_acc["a"].max_drawdown(), ret_acc["a"].drawdowns.get_max_drawdown(fill_value=0.0))
-        pd.testing.assert_series_equal(ret_acc.max_drawdown(), ret_acc.drawdowns.get_max_drawdown(fill_value=0.0))
-        pd.testing.assert_series_equal(
+        assert_series_equal(ret_acc.max_drawdown(), ret_acc.drawdowns.get_max_drawdown(fill_value=0.0))
+        assert_series_equal(
             ret_acc.max_drawdown(jitted=dict(parallel=True)),
             ret_acc.max_drawdown(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(ret_acc.max_drawdown(chunked=True), ret_acc.max_drawdown(chunked=False))
-        pd.testing.assert_frame_equal(
+        assert_series_equal(ret_acc.max_drawdown(chunked=True), ret_acc.max_drawdown(chunked=False))
+        assert_frame_equal(
             ret_acc.rolling_max_drawdown(),
             pd.DataFrame(
                 [
@@ -861,11 +860,11 @@ class TestAccessors:
                 columns=rets.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_max_drawdown(jitted=dict(parallel=True)),
             ret_acc.rolling_max_drawdown(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ret_acc.rolling_max_drawdown(chunked=True),
             ret_acc.rolling_max_drawdown(chunked=False),
         )
@@ -876,7 +875,7 @@ class TestAccessors:
         assert ret_acc["a"].drawdowns.wrapper.ndim == rets["a"].ndim
         assert ret_acc.drawdowns.wrapper.ndim == rets.ndim
         assert isclose(ret_acc["a"].drawdowns.get_max_drawdown(fill_value=0.0), ret_acc["a"].max_drawdown())
-        pd.testing.assert_series_equal(ret_acc.drawdowns.get_max_drawdown(fill_value=0.0), ret_acc.max_drawdown())
+        assert_series_equal(ret_acc.drawdowns.get_max_drawdown(fill_value=0.0), ret_acc.max_drawdown())
 
     def test_stats(self):
         stats_index = pd.Index(
@@ -904,7 +903,7 @@ class TestAccessors:
             ],
             dtype="object",
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.stats(),
             pd.Series(
                 [
@@ -933,7 +932,7 @@ class TestAccessors:
                 name="agg_stats",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.stats(column="a"),
             pd.Series(
                 [
@@ -962,7 +961,7 @@ class TestAccessors:
                 name="a",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.stats(column="a", settings=dict(freq="10 days", year_freq="200 days")),
             pd.Series(
                 [
@@ -991,7 +990,7 @@ class TestAccessors:
                 name="a",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.stats(column="a", settings=dict(bm_returns=None)),
             pd.Series(
                 [
@@ -1038,34 +1037,34 @@ class TestAccessors:
                 name="a",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.stats(column="a", settings=dict()),
             ret_acc().stats(column="a"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ret_acc.stats(column="a", settings=dict(bm_returns=None)),
             ret_acc(bm_returns=None).stats(column="a"),
         )
-        pd.testing.assert_series_equal(ret_acc["c"].stats(), ret_acc.stats(column="c"))
-        pd.testing.assert_series_equal(ret_acc["c"].stats(), ret_acc.stats(column="c", group_by=False))
-        pd.testing.assert_series_equal(ret_acc(freq="10d").stats(), ret_acc.stats(settings=dict(freq="10d")))
-        pd.testing.assert_series_equal(
+        assert_series_equal(ret_acc["c"].stats(), ret_acc.stats(column="c"))
+        assert_series_equal(ret_acc["c"].stats(), ret_acc.stats(column="c", group_by=False))
+        assert_series_equal(ret_acc(freq="10d").stats(), ret_acc.stats(settings=dict(freq="10d")))
+        assert_series_equal(
             ret_acc(freq="d", year_freq="400d").stats(),
             ret_acc.stats(settings=dict(freq="d", year_freq="400d")),
         )
         stats_df = ret_acc.stats(agg_func=None)
         assert stats_df.shape == (3, 20)
-        pd.testing.assert_index_equal(stats_df.index, ret_acc.wrapper.columns)
-        pd.testing.assert_index_equal(stats_df.columns, stats_index)
+        assert_index_equal(stats_df.index, ret_acc.wrapper.columns)
+        assert_index_equal(stats_df.columns, stats_index)
 
     def test_qs(self):
         if qs_available:
-            pd.testing.assert_series_equal(ret_acc.qs.sharpe(), qs.stats.sharpe(rets.dropna(), periods=365, rf=0.001))
-            pd.testing.assert_series_equal(
+            assert_series_equal(ret_acc.qs.sharpe(), qs.stats.sharpe(rets.dropna(), periods=365, rf=0.001))
+            assert_series_equal(
                 ret_acc(freq="h", year_freq="252d").qs.sharpe(),
                 qs.stats.sharpe(rets.dropna(), periods=252 * 24, rf=0.001),
             )
-            pd.testing.assert_series_equal(
+            assert_series_equal(
                 ret_acc(freq="h", year_freq="252d").qs.sharpe(periods=252, periods_per_year=252, rf=0),
                 qs.stats.sharpe(rets.dropna()),
             )
@@ -1073,7 +1072,7 @@ class TestAccessors:
 
     @pytest.mark.parametrize("test_freq", ["1h", "10h", "3d"])
     def test_resample(self, test_freq):
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ts.vbt.to_returns().vbt.returns.resample(test_freq).obj,
             (1 + ts.vbt.to_returns()).resample(test_freq).apply(lambda x: x.prod() - 1),
         )

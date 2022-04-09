@@ -1,13 +1,13 @@
 import gc
 import weakref
 
-import numpy as np
-import pandas as pd
 import pytest
 
 import vectorbtpro as vbt
 from vectorbtpro.registries.ca_registry import ca_reg, CAQuery, CARunSetup, CARunResult
 from vectorbtpro.utils.caching import Cacheable
+
+from tests.utils import *
 
 
 # ############# Global ############# #
@@ -962,7 +962,7 @@ class TestCacheableRegistry:
             "last_update_time",
         ]
         status_overview = query_delegator.get_status_overview(readable=False, short_str=False)
-        pd.testing.assert_index_equal(status_overview.columns, pd.Index(columns))
+        assert_index_equal(status_overview.columns, pd.Index(columns))
         np.testing.assert_array_equal(status_overview.index.values, np.array([str(class_setup1)]))
         np.testing.assert_array_equal(status_overview["hash"].values, np.array([hash(class_setup1)]))
         np.testing.assert_array_equal(status_overview["use_cache"].values, np.array([class_setup1.use_cache]))
@@ -1008,19 +1008,19 @@ class TestCacheableRegistry:
         )
 
         status_overview = query_delegator.get_status_overview()
-        pd.testing.assert_index_equal(status_overview.columns, pd.Index(columns))
+        assert_index_equal(status_overview.columns, pd.Index(columns))
         status_overview = query_delegator.get_status_overview(include=columns)
-        pd.testing.assert_index_equal(status_overview.columns, pd.Index(columns))
+        assert_index_equal(status_overview.columns, pd.Index(columns))
         status_overview = query_delegator.get_status_overview(include=columns[0])
-        pd.testing.assert_index_equal(status_overview.columns, pd.Index([columns[0]]))
+        assert_index_equal(status_overview.columns, pd.Index([columns[0]]))
         status_overview = query_delegator.get_status_overview(include=[columns[0]])
-        pd.testing.assert_index_equal(status_overview.columns, pd.Index([columns[0]]))
+        assert_index_equal(status_overview.columns, pd.Index([columns[0]]))
         status_overview = query_delegator.get_status_overview(exclude=columns)
         assert status_overview is None
         status_overview = query_delegator.get_status_overview(exclude=columns[0])
-        pd.testing.assert_index_equal(status_overview.columns, pd.Index(columns[1:]))
+        assert_index_equal(status_overview.columns, pd.Index(columns[1:]))
         status_overview = query_delegator.get_status_overview(exclude=[columns[0]])
-        pd.testing.assert_index_equal(status_overview.columns, pd.Index(columns[1:]))
+        assert_index_equal(status_overview.columns, pd.Index(columns[1:]))
 
     def test_disable_machinery(self):
         vbt.settings["caching"]["disable_machinery"] = True

@@ -2,10 +2,9 @@ import os
 from datetime import datetime
 import pytest
 
-import numpy as np
-import pandas as pd
-
 import vectorbtpro as vbt
+
+from tests.utils import *
 
 ohlcv_ts = pd.DataFrame(
     {
@@ -41,7 +40,7 @@ def teardown_module():
 
 class TestAccessors:
     def test_vwap(self):
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ohlcv_ts.vbt.ohlcv.vwap(),
             (
                 (ohlcv_ts["volume"] * (ohlcv_ts["high"] + ohlcv_ts["low"]) / 2).cumsum() / ohlcv_ts["volume"].cumsum()
@@ -55,11 +54,11 @@ class TestAccessors:
         high.columns = result.columns
         low.columns = result.columns
         volume.columns = result.columns
-        pd.testing.assert_frame_equal(pd.DataFrame.vbt.ohlcv.vwap(high=high, low=low, volume=volume), result)
+        assert_frame_equal(pd.DataFrame.vbt.ohlcv.vwap(high=high, low=low, volume=volume), result)
 
     @pytest.mark.parametrize("test_freq", ["1h", "10h", "3d"])
     def test_resample(self, test_freq):
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ohlcv_ts.vbt.ohlcv.resample(test_freq).obj,
             ohlcv_ts.resample(test_freq).agg({
                 "open": lambda x: float(x[0] if len(x) > 0 else np.nan),

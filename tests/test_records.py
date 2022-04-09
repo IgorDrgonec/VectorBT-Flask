@@ -1,16 +1,15 @@
 import os
 from datetime import datetime
 
-import numpy as np
-import pandas as pd
 import pytest
 from numba import njit
 
 import vectorbtpro as vbt
-from tests.utils import assert_records_close
 from vectorbtpro.generic.enums import range_dt, drawdown_dt
 from vectorbtpro.portfolio.enums import order_dt, trade_dt, log_dt
 from vectorbtpro.records.base import Records
+
+from tests.utils import *
 
 day_dt = np.timedelta64(86400000000000)
 
@@ -215,11 +214,11 @@ class TestMappedArray:
         assert mapped_array2.has_conflicts()
 
     def test_coverage_map(self):
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array.coverage_map(),
             pd.DataFrame([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0]], index=wrapper.index, columns=wrapper.columns),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array.coverage_map(group_by=group_by),
             pd.DataFrame([[2, 1], [2, 1], [2, 1]], index=wrapper.index, columns=pd.Index(["g1", "g2"], dtype="object")),
         )
@@ -230,16 +229,16 @@ class TestMappedArray:
             index=wrapper.index,
             columns=wrapper.columns,
         )
-        pd.testing.assert_series_equal(mapped_array["a"].to_pd(), target["a"])
-        pd.testing.assert_frame_equal(mapped_array.to_pd(), target)
-        pd.testing.assert_frame_equal(mapped_array.to_pd(fill_value=0.0), target.fillna(0.0))
+        assert_series_equal(mapped_array["a"].to_pd(), target["a"])
+        assert_frame_equal(mapped_array.to_pd(), target)
+        assert_frame_equal(mapped_array.to_pd(fill_value=0.0), target.fillna(0.0))
         mapped_array2 = vbt.MappedArray(
             wrapper,
             records_arr["some_field1"].tolist() + [1],
             records_arr["col"].tolist() + [2],
             idx_arr=records_arr["idx"].tolist() + [2],
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array2.to_pd(),
             pd.DataFrame(
                 np.array([[10.0, 13.0, 12.0, np.nan], [11.0, 14.0, 11.0, np.nan], [12.0, 13.0, 1.0, np.nan]]),
@@ -247,7 +246,7 @@ class TestMappedArray:
                 columns=wrapper.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array2.to_pd(group_by=group_by),
             pd.DataFrame(
                 np.array([[13.0, 12.0], [14.0, 11.0], [13.0, 1.0]]),
@@ -255,7 +254,7 @@ class TestMappedArray:
                 columns=pd.Index(["g1", "g2"], dtype="object"),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array2.to_pd(repeat_index=True),
             pd.DataFrame(
                 np.array(
@@ -270,7 +269,7 @@ class TestMappedArray:
                 columns=wrapper.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array2.to_pd(repeat_index=True, group_by=group_by),
             pd.DataFrame(
                 np.array([[10.0, 12.0], [13.0, np.nan], [11.0, 11.0], [14.0, np.nan], [12.0, 10.0], [13.0, 1.0]]),
@@ -278,25 +277,25 @@ class TestMappedArray:
                 columns=pd.Index(["g1", "g2"], dtype="object"),
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array["a"].to_pd(ignore_index=True),
             pd.Series(np.array([10.0, 11.0, 12.0]), name="a"),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array.to_pd(ignore_index=True),
             pd.DataFrame(
                 np.array([[10.0, 13.0, 12.0, np.nan], [11.0, 14.0, 11.0, np.nan], [12.0, 13.0, 10.0, np.nan]]),
                 columns=wrapper.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array.to_pd(fill_value=0, ignore_index=True),
             pd.DataFrame(
                 np.array([[10.0, 13.0, 12.0, 0.0], [11.0, 14.0, 11.0, 0.0], [12.0, 13.0, 10.0, 0.0]]),
                 columns=wrapper.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array_grouped.to_pd(ignore_index=True),
             pd.DataFrame(
                 np.array(
@@ -468,53 +467,53 @@ class TestMappedArray:
             return np.mean(records[ridxs])
 
         assert mapped_array["a"].reduce(mean_reduce_nb) == 11.0
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array.reduce(mean_reduce_nb),
             pd.Series(np.array([11.0, 13.333333333333334, 11.0, np.nan]), index=wrapper.columns).rename("reduce"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array.reduce(mean_reduce_nb, fill_value=0.0),
             pd.Series(np.array([11.0, 13.333333333333334, 11.0, 0.0]), index=wrapper.columns).rename("reduce"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array.reduce(mean_reduce_nb, fill_value=0.0, wrap_kwargs=dict(dtype=np.int_)),
             pd.Series(np.array([11.0, 13.333333333333334, 11.0, 0.0]), index=wrapper.columns).rename("reduce"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array.reduce(mean_reduce_nb, wrap_kwargs=dict(to_timedelta=True)),
             pd.Series(np.array([11.0, 13.333333333333334, 11.0, np.nan]), index=wrapper.columns).rename("reduce")
             * day_dt,
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array_grouped.reduce(mean_reduce_nb),
             pd.Series([12.166666666666666, 11.0], index=pd.Index(["g1", "g2"], dtype="object")).rename("reduce"),
         )
         assert mapped_array_grouped["g1"].reduce(mean_reduce_nb) == 12.166666666666666
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array_grouped[["g1"]].reduce(mean_reduce_nb),
             pd.Series([12.166666666666666], index=pd.Index(["g1"], dtype="object")).rename("reduce"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array.reduce(mean_reduce_nb),
             mapped_array_grouped.reduce(mean_reduce_nb, group_by=False),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array.reduce(mean_reduce_nb, group_by=group_by),
             mapped_array_grouped.reduce(mean_reduce_nb),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array.reduce(mean_reduce_nb, jitted=dict(parallel=True)),
             mapped_array.reduce(mean_reduce_nb, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array.reduce(mean_reduce_nb, chunked=True),
             mapped_array.reduce(mean_reduce_nb, chunked=False),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             type(mapped_array).reduce(mean_reduce_meta_nb, mapped_array.values, col_mapper=mapped_array.col_mapper),
             mapped_array.reduce(mean_reduce_nb),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             type(mapped_array).reduce(
                 mean_reduce_meta_nb,
                 mapped_array.values,
@@ -535,7 +534,7 @@ class TestMappedArray:
                 )
             )
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             type(mapped_array).reduce(
                 mean_reduce_meta_nb,
                 mapped_array.values,
@@ -560,27 +559,27 @@ class TestMappedArray:
             return np.argmin(records[ridxs])
 
         assert mapped_array["a"].reduce(argmin_reduce_nb, returns_idx=True) == "x"
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array.reduce(argmin_reduce_nb, returns_idx=True),
             pd.Series(np.array(["x", "x", "z", np.nan], dtype=object), index=wrapper.columns).rename("reduce"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array.reduce(argmin_reduce_nb, returns_idx=True, to_index=False),
             pd.Series(np.array([0, 0, 2, -1], dtype=int), index=wrapper.columns).rename("reduce"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array_grouped.reduce(argmin_reduce_nb, returns_idx=True, to_index=False),
             pd.Series(np.array([0, 2], dtype=int), index=pd.Index(["g1", "g2"], dtype="object")).rename("reduce"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array.reduce(argmin_reduce_nb, returns_idx=True, jitted=dict(parallel=True)),
             mapped_array.reduce(argmin_reduce_nb, returns_idx=True, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array.reduce(argmin_reduce_nb, returns_idx=True, chunked=True),
             mapped_array.reduce(argmin_reduce_nb, returns_idx=True, chunked=False),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             type(mapped_array).reduce(
                 argmin_reduce_meta_nb,
                 mapped_array.values,
@@ -590,7 +589,7 @@ class TestMappedArray:
             ),
             mapped_array.reduce(argmin_reduce_nb, returns_idx=True),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             type(mapped_array).reduce(
                 argmin_reduce_meta_nb,
                 mapped_array.values,
@@ -615,7 +614,7 @@ class TestMappedArray:
                 )
             )
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             type(mapped_array).reduce(
                 argmin_reduce_meta_nb,
                 mapped_array.values,
@@ -643,7 +642,7 @@ class TestMappedArray:
         def min_max_reduce_meta_nb(ridxs, col, records):
             return np.array([np.min(records[ridxs]), np.max(records[ridxs])])
 
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array["a"].reduce(
                 min_max_reduce_nb,
                 returns_array=True,
@@ -651,7 +650,7 @@ class TestMappedArray:
             ),
             pd.Series([10.0, 12.0], index=pd.Index(["min", "max"], dtype="object"), name="a"),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array.reduce(min_max_reduce_nb, returns_array=True, wrap_kwargs=dict(name_or_index=["min", "max"])),
             pd.DataFrame(
                 np.array([[10.0, 13.0, 10.0, np.nan], [12.0, 14.0, 12.0, np.nan]]),
@@ -659,44 +658,44 @@ class TestMappedArray:
                 columns=wrapper.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array.reduce(min_max_reduce_nb, returns_array=True, fill_value=0.0),
             pd.DataFrame(np.array([[10.0, 13.0, 10.0, 0.0], [12.0, 14.0, 12.0, 0.0]]), columns=wrapper.columns),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array.reduce(min_max_reduce_nb, returns_array=True, wrap_kwargs=dict(to_timedelta=True)),
             pd.DataFrame(np.array([[10.0, 13.0, 10.0, np.nan], [12.0, 14.0, 12.0, np.nan]]), columns=wrapper.columns)
             * day_dt,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array_grouped.reduce(min_max_reduce_nb, returns_array=True),
             pd.DataFrame(np.array([[10.0, 10.0], [14.0, 12.0]]), columns=pd.Index(["g1", "g2"], dtype="object")),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array.reduce(min_max_reduce_nb, returns_array=True),
             mapped_array_grouped.reduce(min_max_reduce_nb, returns_array=True, group_by=False),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array.reduce(min_max_reduce_nb, returns_array=True, group_by=group_by),
             mapped_array_grouped.reduce(min_max_reduce_nb, returns_array=True),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array_grouped["g1"].reduce(min_max_reduce_nb, returns_array=True),
             pd.Series([10.0, 14.0], name="g1"),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array_grouped[["g1"]].reduce(min_max_reduce_nb, returns_array=True),
             pd.DataFrame([[10.0], [14.0]], columns=pd.Index(["g1"], dtype="object")),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array.reduce(min_max_reduce_nb, returns_array=True, jitted=dict(parallel=True)),
             mapped_array.reduce(min_max_reduce_nb, returns_array=True, jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array.reduce(min_max_reduce_nb, returns_array=True, chunked=True),
             mapped_array.reduce(min_max_reduce_nb, returns_array=True, chunked=False),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             type(mapped_array).reduce(
                 min_max_reduce_meta_nb,
                 mapped_array.values,
@@ -705,7 +704,7 @@ class TestMappedArray:
             ),
             mapped_array.reduce(min_max_reduce_nb, returns_array=True),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             type(mapped_array).reduce(
                 min_max_reduce_meta_nb,
                 mapped_array.values,
@@ -728,7 +727,7 @@ class TestMappedArray:
                 )
             )
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             type(mapped_array).reduce(
                 min_max_reduce_meta_nb,
                 mapped_array.values,
@@ -754,7 +753,7 @@ class TestMappedArray:
         def idxmin_idxmax_reduce_meta_nb(ridxs, col, records):
             return np.array([np.argmin(records[ridxs]), np.argmax(records[ridxs])])
 
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array["a"].reduce(
                 idxmin_idxmax_reduce_nb,
                 returns_array=True,
@@ -763,7 +762,7 @@ class TestMappedArray:
             ),
             pd.Series(np.array(["x", "z"], dtype=object), index=pd.Index(["min", "max"], dtype="object"), name="a"),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array.reduce(
                 idxmin_idxmax_reduce_nb,
                 returns_array=True,
@@ -775,15 +774,15 @@ class TestMappedArray:
                 index=pd.Index(["min", "max"], dtype="object"),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array.reduce(idxmin_idxmax_reduce_nb, returns_array=True, returns_idx=True, to_index=False),
             pd.DataFrame(np.array([[0, 0, 2, -1], [2, 1, 0, -1]]), columns=wrapper.columns),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array_grouped.reduce(idxmin_idxmax_reduce_nb, returns_array=True, returns_idx=True, to_index=False),
             pd.DataFrame(np.array([[0, 2], [1, 0]]), columns=pd.Index(["g1", "g2"], dtype="object")),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array.reduce(
                 idxmin_idxmax_reduce_nb,
                 returns_array=True,
@@ -797,11 +796,11 @@ class TestMappedArray:
                 jitted=dict(parallel=False),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array.reduce(idxmin_idxmax_reduce_nb, returns_array=True, returns_idx=True, chunked=True),
             mapped_array.reduce(idxmin_idxmax_reduce_nb, returns_array=True, returns_idx=True, chunked=False),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             type(mapped_array).reduce(
                 idxmin_idxmax_reduce_meta_nb,
                 mapped_array.values,
@@ -812,7 +811,7 @@ class TestMappedArray:
             ),
             mapped_array.reduce(idxmin_idxmax_reduce_nb, returns_array=True, returns_idx=True),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             type(mapped_array).reduce(
                 idxmin_idxmax_reduce_meta_nb,
                 mapped_array.values,
@@ -839,7 +838,7 @@ class TestMappedArray:
                 )
             )
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             type(mapped_array).reduce(
                 idxmin_idxmax_reduce_meta_nb,
                 mapped_array.values,
@@ -862,36 +861,36 @@ class TestMappedArray:
 
     def test_nth(self):
         assert mapped_array["a"].nth(0) == 10.0
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array.nth(0),
             pd.Series(np.array([10.0, 13.0, 12.0, np.nan]), index=wrapper.columns).rename("nth"),
         )
         assert mapped_array["a"].nth(-1) == 12.0
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array.nth(-1),
             pd.Series(np.array([12.0, 13.0, 10.0, np.nan]), index=wrapper.columns).rename("nth"),
         )
         with pytest.raises(Exception):
             mapped_array.nth(10)
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array_grouped.nth(0),
             pd.Series(np.array([10.0, 12.0]), index=pd.Index(["g1", "g2"], dtype="object")).rename("nth"),
         )
 
     def test_nth_index(self):
         assert mapped_array["a"].nth(0) == 10.0
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array.nth_index(0),
             pd.Series(np.array(["x", "x", "x", np.nan], dtype="object"), index=wrapper.columns).rename("nth_index"),
         )
         assert mapped_array["a"].nth(-1) == 12.0
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array.nth_index(-1),
             pd.Series(np.array(["z", "z", "z", np.nan], dtype="object"), index=wrapper.columns).rename("nth_index"),
         )
         with pytest.raises(Exception):
             mapped_array.nth_index(10)
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array_grouped.nth_index(0),
             pd.Series(np.array(["x", "x"], dtype="object"), index=pd.Index(["g1", "g2"], dtype="object")).rename(
                 "nth_index"
@@ -900,65 +899,65 @@ class TestMappedArray:
 
     def test_min(self):
         assert mapped_array["a"].min() == mapped_array["a"].to_pd().min()
-        pd.testing.assert_series_equal(mapped_array.min(), mapped_array.to_pd().min().rename("min"))
-        pd.testing.assert_series_equal(
+        assert_series_equal(mapped_array.min(), mapped_array.to_pd().min().rename("min"))
+        assert_series_equal(
             mapped_array_grouped.min(),
             pd.Series([10.0, 10.0], index=pd.Index(["g1", "g2"], dtype="object")).rename("min"),
         )
 
     def test_max(self):
         assert mapped_array["a"].max() == mapped_array["a"].to_pd().max()
-        pd.testing.assert_series_equal(mapped_array.max(), mapped_array.to_pd().max().rename("max"))
-        pd.testing.assert_series_equal(
+        assert_series_equal(mapped_array.max(), mapped_array.to_pd().max().rename("max"))
+        assert_series_equal(
             mapped_array_grouped.max(),
             pd.Series([14.0, 12.0], index=pd.Index(["g1", "g2"], dtype="object")).rename("max"),
         )
 
     def test_mean(self):
         assert mapped_array["a"].mean() == mapped_array["a"].to_pd().mean()
-        pd.testing.assert_series_equal(mapped_array.mean(), mapped_array.to_pd().mean().rename("mean"))
-        pd.testing.assert_series_equal(
+        assert_series_equal(mapped_array.mean(), mapped_array.to_pd().mean().rename("mean"))
+        assert_series_equal(
             mapped_array_grouped.mean(),
             pd.Series([12.166667, 11.0], index=pd.Index(["g1", "g2"], dtype="object")).rename("mean"),
         )
 
     def test_median(self):
         assert mapped_array["a"].median() == mapped_array["a"].to_pd().median()
-        pd.testing.assert_series_equal(mapped_array.median(), mapped_array.to_pd().median().rename("median"))
-        pd.testing.assert_series_equal(
+        assert_series_equal(mapped_array.median(), mapped_array.to_pd().median().rename("median"))
+        assert_series_equal(
             mapped_array_grouped.median(),
             pd.Series([12.5, 11.0], index=pd.Index(["g1", "g2"], dtype="object")).rename("median"),
         )
 
     def test_std(self):
         assert mapped_array["a"].std() == mapped_array["a"].to_pd().std()
-        pd.testing.assert_series_equal(mapped_array.std(), mapped_array.to_pd().std().rename("std"))
-        pd.testing.assert_series_equal(mapped_array.std(ddof=0), mapped_array.to_pd().std(ddof=0).rename("std"))
-        pd.testing.assert_series_equal(
+        assert_series_equal(mapped_array.std(), mapped_array.to_pd().std().rename("std"))
+        assert_series_equal(mapped_array.std(ddof=0), mapped_array.to_pd().std(ddof=0).rename("std"))
+        assert_series_equal(
             mapped_array_grouped.std(),
             pd.Series([1.4719601443879746, 1.0], index=pd.Index(["g1", "g2"], dtype="object")).rename("std"),
         )
 
     def test_sum(self):
         assert mapped_array["a"].sum() == mapped_array["a"].to_pd().sum()
-        pd.testing.assert_series_equal(mapped_array.sum(), mapped_array.to_pd().sum().rename("sum"))
-        pd.testing.assert_series_equal(
+        assert_series_equal(mapped_array.sum(), mapped_array.to_pd().sum().rename("sum"))
+        assert_series_equal(
             mapped_array_grouped.sum(),
             pd.Series([73.0, 33.0], index=pd.Index(["g1", "g2"], dtype="object")).rename("sum"),
         )
 
     def test_count(self):
         assert mapped_array["a"].count() == mapped_array["a"].to_pd().count()
-        pd.testing.assert_series_equal(mapped_array.count(), mapped_array.to_pd().count().rename("count"))
-        pd.testing.assert_series_equal(
+        assert_series_equal(mapped_array.count(), mapped_array.to_pd().count().rename("count"))
+        assert_series_equal(
             mapped_array_grouped.count(),
             pd.Series([6, 3], index=pd.Index(["g1", "g2"], dtype="object")).rename("count"),
         )
 
     def test_idxmin(self):
         assert mapped_array["a"].idxmin() == mapped_array["a"].to_pd().idxmin()
-        pd.testing.assert_series_equal(mapped_array.idxmin(), mapped_array.to_pd().idxmin().rename("idxmin"))
-        pd.testing.assert_series_equal(
+        assert_series_equal(mapped_array.idxmin(), mapped_array.to_pd().idxmin().rename("idxmin"))
+        assert_series_equal(
             mapped_array_grouped.idxmin(),
             pd.Series(np.array(["x", "z"], dtype=object), index=pd.Index(["g1", "g2"], dtype="object")).rename(
                 "idxmin"
@@ -967,8 +966,8 @@ class TestMappedArray:
 
     def test_idxmax(self):
         assert mapped_array["a"].idxmax() == mapped_array["a"].to_pd().idxmax()
-        pd.testing.assert_series_equal(mapped_array.idxmax(), mapped_array.to_pd().idxmax().rename("idxmax"))
-        pd.testing.assert_series_equal(
+        assert_series_equal(mapped_array.idxmax(), mapped_array.to_pd().idxmax().rename("idxmax"))
+        assert_series_equal(
             mapped_array_grouped.idxmax(),
             pd.Series(np.array(["y", "x"], dtype=object), index=pd.Index(["g1", "g2"], dtype="object")).rename(
                 "idxmax"
@@ -976,20 +975,20 @@ class TestMappedArray:
         )
 
     def test_describe(self):
-        pd.testing.assert_series_equal(mapped_array["a"].describe(), mapped_array["a"].to_pd().describe())
-        pd.testing.assert_frame_equal(
+        assert_series_equal(mapped_array["a"].describe(), mapped_array["a"].to_pd().describe())
+        assert_frame_equal(
             mapped_array.describe(percentiles=None),
             mapped_array.to_pd().describe(percentiles=None),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array.describe(percentiles=[]),
             mapped_array.to_pd().describe(percentiles=[]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array.describe(percentiles=np.arange(0, 1, 0.1)),
             mapped_array.to_pd().describe(percentiles=np.arange(0, 1, 0.1)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array_grouped.describe(),
             pd.DataFrame(
                 np.array(
@@ -1010,11 +1009,11 @@ class TestMappedArray:
         )
 
     def test_value_counts(self):
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array["a"].value_counts(),
             pd.Series(np.array([1, 1, 1]), index=pd.Float64Index([10.0, 11.0, 12.0], dtype="float64"), name="a"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array["a"].value_counts(mapping=mapping),
             pd.Series(
                 np.array([1, 1, 1]),
@@ -1022,7 +1021,7 @@ class TestMappedArray:
                 name="a",
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array.value_counts(),
             pd.DataFrame(
                 np.array([[1, 0, 1, 0], [1, 0, 1, 0], [1, 0, 1, 0], [0, 2, 0, 0], [0, 1, 0, 0]]),
@@ -1030,12 +1029,12 @@ class TestMappedArray:
                 columns=wrapper.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array.value_counts(jitted=dict(parallel=True)),
             mapped_array.value_counts(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(mapped_array.value_counts(chunked=True), mapped_array.value_counts(chunked=False))
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(mapped_array.value_counts(chunked=True), mapped_array.value_counts(chunked=False))
+        assert_frame_equal(
             mapped_array.value_counts(axis=0),
             pd.DataFrame(
                 np.array([[1, 0, 1], [0, 2, 0], [1, 0, 1], [1, 0, 1], [0, 1, 0]]),
@@ -1043,7 +1042,7 @@ class TestMappedArray:
                 columns=wrapper.index,
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array.value_counts(axis=-1),
             pd.Series(
                 np.array([2, 2, 2, 2, 1]),
@@ -1051,7 +1050,7 @@ class TestMappedArray:
                 name="value_counts",
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array_grouped.value_counts(),
             pd.DataFrame(
                 np.array([[1, 1], [1, 1], [1, 1], [2, 0], [1, 0]]),
@@ -1060,7 +1059,7 @@ class TestMappedArray:
             ),
         )
         mapped_array2 = mapped_array.replace(mapped_arr=[4, 4, 3, 2, np.nan, 4, 3, 2, 1])
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array2.value_counts(sort_uniques=False),
             pd.DataFrame(
                 np.array([[2, 1, 0, 0], [1, 0, 1, 0], [0, 1, 1, 0], [0, 0, 1, 0], [0, 1, 0, 0]]),
@@ -1068,7 +1067,7 @@ class TestMappedArray:
                 columns=wrapper.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array2.value_counts(sort_uniques=True),
             pd.DataFrame(
                 np.array([[0, 0, 1, 0], [0, 1, 1, 0], [1, 0, 1, 0], [2, 1, 0, 0], [0, 1, 0, 0]]),
@@ -1076,7 +1075,7 @@ class TestMappedArray:
                 columns=wrapper.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array2.value_counts(sort=True),
             pd.DataFrame(
                 np.array([[2, 1, 0, 0], [0, 1, 1, 0], [1, 0, 1, 0], [0, 0, 1, 0], [0, 1, 0, 0]]),
@@ -1084,7 +1083,7 @@ class TestMappedArray:
                 columns=wrapper.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array2.value_counts(sort=True, ascending=True),
             pd.DataFrame(
                 np.array([[0, 0, 1, 0], [0, 1, 0, 0], [0, 1, 1, 0], [1, 0, 1, 0], [2, 1, 0, 0]]),
@@ -1092,7 +1091,7 @@ class TestMappedArray:
                 columns=wrapper.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array2.value_counts(sort=True, normalize=True),
             pd.DataFrame(
                 np.array(
@@ -1108,7 +1107,7 @@ class TestMappedArray:
                 columns=wrapper.columns,
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             mapped_array2.value_counts(sort=True, normalize=True, dropna=True),
             pd.DataFrame(
                 np.array(
@@ -1137,40 +1136,40 @@ class TestMappedArray:
             ma_grouped = mapped_array_grouped
         np.testing.assert_array_equal(ma["a"].id_arr, np.array([0, 1, 2]))
         np.testing.assert_array_equal(ma["a"].col_arr, np.array([0, 0, 0]))
-        pd.testing.assert_index_equal(ma["a"].wrapper.columns, pd.Index(["a"], dtype="object"))
+        assert_index_equal(ma["a"].wrapper.columns, pd.Index(["a"], dtype="object"))
         np.testing.assert_array_equal(ma["b"].id_arr, np.array([0, 1, 2]))
         np.testing.assert_array_equal(ma["b"].col_arr, np.array([0, 0, 0]))
-        pd.testing.assert_index_equal(ma["b"].wrapper.columns, pd.Index(["b"], dtype="object"))
+        assert_index_equal(ma["b"].wrapper.columns, pd.Index(["b"], dtype="object"))
         np.testing.assert_array_equal(ma[["a", "a"]].id_arr, np.array([0, 1, 2, 0, 1, 2]))
         np.testing.assert_array_equal(ma[["a", "a"]].col_arr, np.array([0, 0, 0, 1, 1, 1]))
-        pd.testing.assert_index_equal(ma[["a", "a"]].wrapper.columns, pd.Index(["a", "a"], dtype="object"))
+        assert_index_equal(ma[["a", "a"]].wrapper.columns, pd.Index(["a", "a"], dtype="object"))
         np.testing.assert_array_equal(ma[["a", "b"]].id_arr, np.array([0, 1, 2, 0, 1, 2]))
         np.testing.assert_array_equal(ma[["a", "b"]].col_arr, np.array([0, 0, 0, 1, 1, 1]))
-        pd.testing.assert_index_equal(ma[["a", "b"]].wrapper.columns, pd.Index(["a", "b"], dtype="object"))
+        assert_index_equal(ma[["a", "b"]].wrapper.columns, pd.Index(["a", "b"], dtype="object"))
         with pytest.raises(Exception):
             ma.iloc[::2, :]  # changing time not supported
-        pd.testing.assert_index_equal(ma_grouped["g1"].wrapper.columns, pd.Index(["a", "b"], dtype="object"))
+        assert_index_equal(ma_grouped["g1"].wrapper.columns, pd.Index(["a", "b"], dtype="object"))
         assert ma_grouped["g1"].wrapper.ndim == 2
         assert ma_grouped["g1"].wrapper.grouped_ndim == 1
-        pd.testing.assert_index_equal(ma_grouped["g1"].wrapper.grouper.group_by, pd.Index(["g1", "g1"], dtype="object"))
-        pd.testing.assert_index_equal(ma_grouped["g2"].wrapper.columns, pd.Index(["c", "d"], dtype="object"))
+        assert_index_equal(ma_grouped["g1"].wrapper.grouper.group_by, pd.Index(["g1", "g1"], dtype="object"))
+        assert_index_equal(ma_grouped["g2"].wrapper.columns, pd.Index(["c", "d"], dtype="object"))
         assert ma_grouped["g2"].wrapper.ndim == 2
         assert ma_grouped["g2"].wrapper.grouped_ndim == 1
-        pd.testing.assert_index_equal(ma_grouped["g2"].wrapper.grouper.group_by, pd.Index(["g2", "g2"], dtype="object"))
-        pd.testing.assert_index_equal(ma_grouped[["g1"]].wrapper.columns, pd.Index(["a", "b"], dtype="object"))
+        assert_index_equal(ma_grouped["g2"].wrapper.grouper.group_by, pd.Index(["g2", "g2"], dtype="object"))
+        assert_index_equal(ma_grouped[["g1"]].wrapper.columns, pd.Index(["a", "b"], dtype="object"))
         assert ma_grouped[["g1"]].wrapper.ndim == 2
         assert ma_grouped[["g1"]].wrapper.grouped_ndim == 2
-        pd.testing.assert_index_equal(
+        assert_index_equal(
             ma_grouped[["g1"]].wrapper.grouper.group_by,
             pd.Index(["g1", "g1"], dtype="object"),
         )
-        pd.testing.assert_index_equal(
+        assert_index_equal(
             ma_grouped[["g1", "g2"]].wrapper.columns,
             pd.Index(["a", "b", "c", "d"], dtype="object"),
         )
         assert ma_grouped[["g1", "g2"]].wrapper.ndim == 2
         assert ma_grouped[["g1", "g2"]].wrapper.grouped_ndim == 2
-        pd.testing.assert_index_equal(
+        assert_index_equal(
             ma_grouped[["g1", "g2"]].wrapper.grouper.group_by,
             pd.Index(["g1", "g1", "g2", "g2"], dtype="object"),
         )
@@ -1244,7 +1243,7 @@ class TestMappedArray:
             ["Start", "End", "Period", "Count", "Mean", "Std", "Min", "Median", "Max", "Min Index", "Max Index"],
             dtype="object",
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array.stats(),
             pd.Series(
                 [
@@ -1262,7 +1261,7 @@ class TestMappedArray:
                 name="agg_stats",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array.stats(column="a"),
             pd.Series(
                 ["x", "z", pd.Timedelta("3 days 00:00:00"), 3, 11.0, 1.0, 10.0, 11.0, 12.0, "x", "z"],
@@ -1270,7 +1269,7 @@ class TestMappedArray:
                 name="a",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mapped_array.stats(column="g1", group_by=group_by),
             pd.Series(
                 [
@@ -1290,17 +1289,17 @@ class TestMappedArray:
                 name="g1",
             ),
         )
-        pd.testing.assert_series_equal(mapped_array["c"].stats(), mapped_array.stats(column="c"))
-        pd.testing.assert_series_equal(mapped_array["c"].stats(), mapped_array.stats(column="c", group_by=False))
-        pd.testing.assert_series_equal(mapped_array_grouped["g2"].stats(), mapped_array_grouped.stats(column="g2"))
-        pd.testing.assert_series_equal(
+        assert_series_equal(mapped_array["c"].stats(), mapped_array.stats(column="c"))
+        assert_series_equal(mapped_array["c"].stats(), mapped_array.stats(column="c", group_by=False))
+        assert_series_equal(mapped_array_grouped["g2"].stats(), mapped_array_grouped.stats(column="g2"))
+        assert_series_equal(
             mapped_array_grouped["g2"].stats(),
             mapped_array.stats(column="g2", group_by=group_by),
         )
         stats_df = mapped_array.stats(agg_func=None)
         assert stats_df.shape == (4, 11)
-        pd.testing.assert_index_equal(stats_df.index, mapped_array.wrapper.columns)
-        pd.testing.assert_index_equal(stats_df.columns, stats_index)
+        assert_index_equal(stats_df.index, mapped_array.wrapper.columns)
+        assert_index_equal(stats_df.columns, stats_index)
 
     def test_stats_mapping(self):
         stats_index = pd.Index(
@@ -1317,7 +1316,7 @@ class TestMappedArray:
             ],
             dtype="object",
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mp_mapped_array.stats(),
             pd.Series(
                 ["x", "z", pd.Timedelta("3 days 00:00:00"), 2.25, 0.5, 0.5, 0.5, 0.5, 0.25],
@@ -1325,35 +1324,35 @@ class TestMappedArray:
                 name="agg_stats",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mp_mapped_array.stats(column="a"),
             pd.Series(["x", "z", pd.Timedelta("3 days 00:00:00"), 3, 1, 1, 1, 0, 0], index=stats_index, name="a"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mp_mapped_array.stats(column="g1", group_by=group_by),
             pd.Series(["x", "z", pd.Timedelta("3 days 00:00:00"), 6, 1, 1, 1, 2, 1], index=stats_index, name="g1"),
         )
-        pd.testing.assert_series_equal(mp_mapped_array.stats(), mapped_array.stats(settings=dict(mapping=mapping)))
-        pd.testing.assert_series_equal(
+        assert_series_equal(mp_mapped_array.stats(), mapped_array.stats(settings=dict(mapping=mapping)))
+        assert_series_equal(
             mp_mapped_array["c"].stats(settings=dict(incl_all_keys=True)),
             mp_mapped_array.stats(column="c"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mp_mapped_array["c"].stats(settings=dict(incl_all_keys=True)),
             mp_mapped_array.stats(column="c", group_by=False),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mp_mapped_array_grouped["g2"].stats(settings=dict(incl_all_keys=True)),
             mp_mapped_array_grouped.stats(column="g2"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             mp_mapped_array_grouped["g2"].stats(settings=dict(incl_all_keys=True)),
             mp_mapped_array.stats(column="g2", group_by=group_by),
         )
         stats_df = mp_mapped_array.stats(agg_func=None)
         assert stats_df.shape == (4, 9)
-        pd.testing.assert_index_equal(stats_df.index, mp_mapped_array.wrapper.columns)
-        pd.testing.assert_index_equal(stats_df.columns, stats_index)
+        assert_index_equal(stats_df.index, mp_mapped_array.wrapper.columns)
+        assert_index_equal(stats_df.columns, stats_index)
 
     def test_resample(self):
         dt_mapped_array = mapped_array.replace(
@@ -1413,14 +1412,14 @@ class TestRecords:
         assert "hello" not in Records.subplots
 
     def test_records(self):
-        pd.testing.assert_frame_equal(records.records, pd.DataFrame.from_records(records_arr))
+        assert_frame_equal(records.records, pd.DataFrame.from_records(records_arr))
 
     def test_recarray(self):
         np.testing.assert_array_equal(records["a"].recarray.some_field1, records["a"].values["some_field1"])
         np.testing.assert_array_equal(records.recarray.some_field1, records.values["some_field1"])
 
     def test_records_readable(self):
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             records.records_readable,
             pd.DataFrame(
                 [
@@ -1611,12 +1610,12 @@ class TestRecords:
 
     def test_count(self):
         assert records["a"].count() == 3
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             records.count(),
             pd.Series(np.array([3, 3, 3, 0]), index=wrapper.columns).rename("count"),
         )
         assert records_grouped["g1"].count() == 6
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             records_grouped.count(),
             pd.Series(np.array([6, 3]), index=pd.Index(["g1", "g2"], dtype="object")).rename("count"),
         )
@@ -1625,11 +1624,11 @@ class TestRecords:
         assert not records.has_conflicts()
 
     def test_coverage_map(self):
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             records.coverage_map(),
             pd.DataFrame([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0]], index=wrapper.index, columns=wrapper.columns),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             records.coverage_map(group_by=group_by),
             pd.DataFrame([[2, 1], [2, 1], [2, 1]], index=wrapper.index, columns=pd.Index(["g1", "g2"], dtype="object")),
         )
@@ -1649,8 +1648,8 @@ class TestRecords:
             r["a"].values,
             np.array([(0, 0, 0, 10.0, 21.0), (1, 0, 1, 11.0, 20.0), (2, 0, 2, 12.0, 19.0)], dtype=example_dt),
         )
-        pd.testing.assert_index_equal(r["a"].wrapper.columns, pd.Index(["a"], dtype="object"))
-        pd.testing.assert_index_equal(r["b"].wrapper.columns, pd.Index(["b"], dtype="object"))
+        assert_index_equal(r["a"].wrapper.columns, pd.Index(["a"], dtype="object"))
+        assert_index_equal(r["b"].wrapper.columns, pd.Index(["b"], dtype="object"))
         assert_records_close(
             r[["a", "a"]].values,
             np.array(
@@ -1665,7 +1664,7 @@ class TestRecords:
                 dtype=example_dt,
             ),
         )
-        pd.testing.assert_index_equal(r[["a", "a"]].wrapper.columns, pd.Index(["a", "a"], dtype="object"))
+        assert_index_equal(r[["a", "a"]].wrapper.columns, pd.Index(["a", "a"], dtype="object"))
         assert_records_close(
             r[["a", "b"]].values,
             np.array(
@@ -1680,31 +1679,31 @@ class TestRecords:
                 dtype=example_dt,
             ),
         )
-        pd.testing.assert_index_equal(r[["a", "b"]].wrapper.columns, pd.Index(["a", "b"], dtype="object"))
+        assert_index_equal(r[["a", "b"]].wrapper.columns, pd.Index(["a", "b"], dtype="object"))
         with pytest.raises(Exception):
             r.iloc[::2, :]  # changing time not supported
-        pd.testing.assert_index_equal(r_grouped["g1"].wrapper.columns, pd.Index(["a", "b"], dtype="object"))
+        assert_index_equal(r_grouped["g1"].wrapper.columns, pd.Index(["a", "b"], dtype="object"))
         assert r_grouped["g1"].wrapper.ndim == 2
         assert r_grouped["g1"].wrapper.grouped_ndim == 1
-        pd.testing.assert_index_equal(r_grouped["g1"].wrapper.grouper.group_by, pd.Index(["g1", "g1"], dtype="object"))
-        pd.testing.assert_index_equal(r_grouped["g2"].wrapper.columns, pd.Index(["c", "d"], dtype="object"))
+        assert_index_equal(r_grouped["g1"].wrapper.grouper.group_by, pd.Index(["g1", "g1"], dtype="object"))
+        assert_index_equal(r_grouped["g2"].wrapper.columns, pd.Index(["c", "d"], dtype="object"))
         assert r_grouped["g2"].wrapper.ndim == 2
         assert r_grouped["g2"].wrapper.grouped_ndim == 1
-        pd.testing.assert_index_equal(r_grouped["g2"].wrapper.grouper.group_by, pd.Index(["g2", "g2"], dtype="object"))
-        pd.testing.assert_index_equal(r_grouped[["g1"]].wrapper.columns, pd.Index(["a", "b"], dtype="object"))
+        assert_index_equal(r_grouped["g2"].wrapper.grouper.group_by, pd.Index(["g2", "g2"], dtype="object"))
+        assert_index_equal(r_grouped[["g1"]].wrapper.columns, pd.Index(["a", "b"], dtype="object"))
         assert r_grouped[["g1"]].wrapper.ndim == 2
         assert r_grouped[["g1"]].wrapper.grouped_ndim == 2
-        pd.testing.assert_index_equal(
+        assert_index_equal(
             r_grouped[["g1"]].wrapper.grouper.group_by,
             pd.Index(["g1", "g1"], dtype="object"),
         )
-        pd.testing.assert_index_equal(
+        assert_index_equal(
             r_grouped[["g1", "g2"]].wrapper.columns,
             pd.Index(["a", "b", "c", "d"], dtype="object"),
         )
         assert r_grouped[["g1", "g2"]].wrapper.ndim == 2
         assert r_grouped[["g1", "g2"]].wrapper.grouped_ndim == 2
-        pd.testing.assert_index_equal(
+        assert_index_equal(
             r_grouped[["g1", "g2"]].wrapper.grouper.group_by,
             pd.Index(["g1", "g1", "g2", "g2"], dtype="object"),
         )
@@ -1738,26 +1737,26 @@ class TestRecords:
 
     def test_stats(self):
         stats_index = pd.Index(["Start", "End", "Period", "Count"], dtype="object")
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             records.stats(),
             pd.Series(["x", "z", pd.Timedelta("3 days 00:00:00"), 2.25], index=stats_index, name="agg_stats"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             records.stats(column="a"),
             pd.Series(["x", "z", pd.Timedelta("3 days 00:00:00"), 3], index=stats_index, name="a"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             records.stats(column="g1", group_by=group_by),
             pd.Series(["x", "z", pd.Timedelta("3 days 00:00:00"), 6], index=stats_index, name="g1"),
         )
-        pd.testing.assert_series_equal(records["c"].stats(), records.stats(column="c"))
-        pd.testing.assert_series_equal(records["c"].stats(), records.stats(column="c", group_by=False))
-        pd.testing.assert_series_equal(records_grouped["g2"].stats(), records_grouped.stats(column="g2"))
-        pd.testing.assert_series_equal(records_grouped["g2"].stats(), records.stats(column="g2", group_by=group_by))
+        assert_series_equal(records["c"].stats(), records.stats(column="c"))
+        assert_series_equal(records["c"].stats(), records.stats(column="c", group_by=False))
+        assert_series_equal(records_grouped["g2"].stats(), records_grouped.stats(column="g2"))
+        assert_series_equal(records_grouped["g2"].stats(), records.stats(column="g2", group_by=group_by))
         stats_df = records.stats(agg_func=None)
         assert stats_df.shape == (4, 4)
-        pd.testing.assert_index_equal(stats_df.index, records.wrapper.columns)
-        pd.testing.assert_index_equal(stats_df.columns, stats_index)
+        assert_index_equal(stats_df.index, records.wrapper.columns)
+        assert_index_equal(stats_df.columns, stats_index)
 
     def test_resample(self):
         dt_records = records.replace(
@@ -1809,7 +1808,7 @@ class TestRanges:
             ),
         )
         assert ranges.wrapper.freq == day_dt
-        pd.testing.assert_index_equal(ranges_grouped.wrapper.grouper.group_by, group_by)
+        assert_index_equal(ranges_grouped.wrapper.grouper.group_by, group_by)
         assert_records_close(
             vbt.Ranges.from_ts(ts, jitted=dict(parallel=True)).values,
             vbt.Ranges.from_ts(ts, jitted=dict(parallel=False)).values,
@@ -1853,9 +1852,9 @@ class TestRanges:
         )
 
     def test_mask(self):
-        pd.testing.assert_series_equal(ranges["a"].mask, ts["a"] != -1)
-        pd.testing.assert_frame_equal(ranges.mask, ts != -1)
-        pd.testing.assert_frame_equal(
+        assert_series_equal(ranges["a"].mask, ts["a"] != -1)
+        assert_frame_equal(ranges.mask, ts != -1)
+        assert_frame_equal(
             ranges_grouped.mask,
             pd.DataFrame(
                 [[True, True], [False, True], [True, True], [True, False], [True, False], [True, False]],
@@ -1863,11 +1862,11 @@ class TestRanges:
                 columns=pd.Index(["g1", "g2"], dtype="object"),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ranges.get_mask(jitted=dict(parallel=True)),
             ranges.get_mask(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_frame_equal(ranges.get_mask(chunked=True), ranges.get_mask(chunked=False))
+        assert_frame_equal(ranges.get_mask(chunked=True), ranges.get_mask(chunked=False))
 
     def test_duration(self):
         np.testing.assert_array_equal(ranges["a"].duration.values, np.array([1, 1, 1]))
@@ -1883,85 +1882,85 @@ class TestRanges:
 
     def test_avg_duration(self):
         assert ranges["a"].avg_duration == pd.Timedelta("1 days 00:00:00")
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ranges.avg_duration,
             pd.Series(
                 np.array([86400000000000, 259200000000000, 259200000000000, "NaT"], dtype="timedelta64[ns]"),
                 index=wrapper.columns,
             ).rename("avg_duration"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ranges_grouped.avg_duration,
             pd.Series(
                 np.array([129600000000000, 259200000000000], dtype="timedelta64[ns]"),
                 index=pd.Index(["g1", "g2"], dtype="object"),
             ).rename("avg_duration"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ranges.get_avg_duration(jitted=dict(parallel=True)),
             ranges.get_avg_duration(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(ranges.get_avg_duration(chunked=True), ranges.get_avg_duration(chunked=False))
+        assert_series_equal(ranges.get_avg_duration(chunked=True), ranges.get_avg_duration(chunked=False))
 
     def test_max_duration(self):
         assert ranges["a"].max_duration == pd.Timedelta("1 days 00:00:00")
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ranges.max_duration,
             pd.Series(
                 np.array([86400000000000, 259200000000000, 259200000000000, "NaT"], dtype="timedelta64[ns]"),
                 index=wrapper.columns,
             ).rename("max_duration"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ranges_grouped.max_duration,
             pd.Series(
                 np.array([259200000000000, 259200000000000], dtype="timedelta64[ns]"),
                 index=pd.Index(["g1", "g2"], dtype="object"),
             ).rename("max_duration"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ranges.get_max_duration(jitted=dict(parallel=True)),
             ranges.get_max_duration(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(ranges.get_max_duration(chunked=True), ranges.get_max_duration(chunked=False))
+        assert_series_equal(ranges.get_max_duration(chunked=True), ranges.get_max_duration(chunked=False))
 
     def test_coverage(self):
         assert ranges["a"].coverage == 0.5
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ranges.coverage,
             pd.Series(np.array([0.5, 0.5, 0.5, np.nan]), index=ts2.columns).rename("coverage"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ranges.coverage,
             ranges.replace(records_arr=np.repeat(ranges.values, 2)).coverage,
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ranges.replace(records_arr=np.repeat(ranges.values, 2)).get_coverage(overlapping=True),
             pd.Series(np.array([1.0, 1.0, 1.0, np.nan]), index=ts2.columns).rename("coverage"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ranges.get_coverage(normalize=False),
             pd.Series(np.array([3.0, 3.0, 3.0, np.nan]), index=ts2.columns).rename("coverage"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ranges.replace(records_arr=np.repeat(ranges.values, 2)).get_coverage(overlapping=True, normalize=False),
             pd.Series(np.array([3.0, 3.0, 3.0, np.nan]), index=ts2.columns).rename("coverage"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ranges_grouped.coverage,
             pd.Series(np.array([0.4166666666666667, 0.25]), index=pd.Index(["g1", "g2"], dtype="object")).rename(
                 "coverage"
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ranges_grouped.coverage,
             ranges_grouped.replace(records_arr=np.repeat(ranges_grouped.values, 2)).coverage,
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ranges.get_coverage(jitted=dict(parallel=True)),
             ranges.get_coverage(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(ranges.get_coverage(chunked=True), ranges.get_coverage(chunked=False))
+        assert_series_equal(ranges.get_coverage(chunked=True), ranges.get_coverage(chunked=False))
 
     def test_stats(self):
         stats_index = pd.Index(
@@ -1980,7 +1979,7 @@ class TestRanges:
             ],
             dtype="object",
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ranges.stats(),
             pd.Series(
                 [
@@ -2000,7 +1999,7 @@ class TestRanges:
                 name="agg_stats",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ranges.stats(column="a"),
             pd.Series(
                 [
@@ -2020,7 +2019,7 @@ class TestRanges:
                 name="a",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             ranges.stats(column="g1", group_by=group_by),
             pd.Series(
                 [
@@ -2040,14 +2039,14 @@ class TestRanges:
                 name="g1",
             ),
         )
-        pd.testing.assert_series_equal(ranges["c"].stats(), ranges.stats(column="c"))
-        pd.testing.assert_series_equal(ranges["c"].stats(), ranges.stats(column="c", group_by=False))
-        pd.testing.assert_series_equal(ranges_grouped["g2"].stats(), ranges_grouped.stats(column="g2"))
-        pd.testing.assert_series_equal(ranges_grouped["g2"].stats(), ranges.stats(column="g2", group_by=group_by))
+        assert_series_equal(ranges["c"].stats(), ranges.stats(column="c"))
+        assert_series_equal(ranges["c"].stats(), ranges.stats(column="c", group_by=False))
+        assert_series_equal(ranges_grouped["g2"].stats(), ranges_grouped.stats(column="g2"))
+        assert_series_equal(ranges_grouped["g2"].stats(), ranges.stats(column="g2", group_by=group_by))
         stats_df = ranges.stats(agg_func=None)
         assert stats_df.shape == (4, 11)
-        pd.testing.assert_index_equal(stats_df.index, ranges.wrapper.columns)
-        pd.testing.assert_index_equal(stats_df.columns, stats_index)
+        assert_index_equal(stats_df.index, ranges.wrapper.columns)
+        assert_index_equal(stats_df.columns, stats_index)
 
     def test_resample(self):
         np.testing.assert_array_equal(
@@ -2074,15 +2073,15 @@ class TestRanges:
             ranges.resample("3d").end_idx.values,
             np.array([0, 1, 1, 1, 1]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ranges.resample("1h").ts,
             ranges.ts.resample("1h").last().ffill().bfill().astype(np.float_),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ranges.resample("10h").ts,
             ranges.ts.resample("10h").last().ffill().bfill().astype(np.float_),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             ranges.resample("3d").ts,
             ranges.ts.resample("3d").last().ffill().bfill().astype(np.float_),
         )
@@ -2113,9 +2112,9 @@ class TestDrawdowns:
             np.testing.assert_array_equal(getattr(drawdowns, name).values, drawdowns.values[name])
 
     def test_ts(self):
-        pd.testing.assert_frame_equal(drawdowns.ts, ts2)
-        pd.testing.assert_series_equal(drawdowns["a"].ts, ts2["a"])
-        pd.testing.assert_frame_equal(drawdowns_grouped["g1"].ts, ts2[["a", "b"]])
+        assert_frame_equal(drawdowns.ts, ts2)
+        assert_series_equal(drawdowns["a"].ts, ts2["a"])
+        assert_frame_equal(drawdowns_grouped["g1"].ts, ts2[["a", "b"]])
         assert drawdowns.replace(ts=None)["a"].ts is None
 
     def test_from_ts(self):
@@ -2134,7 +2133,7 @@ class TestDrawdowns:
             ),
         )
         assert drawdowns.wrapper.freq == day_dt
-        pd.testing.assert_index_equal(drawdowns_grouped.wrapper.grouper.group_by, group_by)
+        assert_index_equal(drawdowns_grouped.wrapper.grouper.group_by, group_by)
         assert_records_close(
             vbt.Drawdowns.from_ts(ts2, jitted=dict(parallel=True)).values,
             vbt.Drawdowns.from_ts(ts2, jitted=dict(parallel=False)).values,
@@ -2219,7 +2218,7 @@ class TestDrawdowns:
             drawdowns.drawdown.values,
             np.array([-0.5, -0.66666667, -0.75, -0.5, -0.66666667, -0.66666667]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             drawdowns.drawdown.to_pd(),
             pd.DataFrame(
                 np.array(
@@ -2247,47 +2246,47 @@ class TestDrawdowns:
 
     def test_avg_drawdown(self):
         assert drawdowns["a"].avg_drawdown == -0.6388888888888888
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.avg_drawdown,
             pd.Series(np.array([-0.63888889, -0.58333333, -0.66666667, np.nan]), index=wrapper.columns).rename(
                 "avg_drawdown"
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns_grouped.avg_drawdown,
             pd.Series(
                 np.array([-0.6166666666666666, -0.6666666666666666]),
                 index=pd.Index(["g1", "g2"], dtype="object"),
             ).rename("avg_drawdown"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.get_avg_drawdown(jitted=dict(parallel=True)),
             drawdowns.get_avg_drawdown(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.get_avg_drawdown(chunked=True),
             drawdowns.get_avg_drawdown(chunked=False),
         )
 
     def test_max_drawdown(self):
         assert drawdowns["a"].max_drawdown == -0.75
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.max_drawdown,
             pd.Series(np.array([-0.75, -0.66666667, -0.66666667, np.nan]), index=wrapper.columns).rename(
                 "max_drawdown"
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns_grouped.max_drawdown,
             pd.Series(np.array([-0.75, -0.6666666666666666]), index=pd.Index(["g1", "g2"], dtype="object")).rename(
                 "max_drawdown"
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.get_max_drawdown(jitted=dict(parallel=True)),
             drawdowns.get_max_drawdown(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.get_max_drawdown(chunked=True),
             drawdowns.get_max_drawdown(chunked=False),
         )
@@ -2295,7 +2294,7 @@ class TestDrawdowns:
     def test_recovery_return(self):
         np.testing.assert_array_almost_equal(drawdowns["a"].recovery_return.values, np.array([2.0, 3.0, 0.0]))
         np.testing.assert_array_almost_equal(drawdowns.recovery_return.values, np.array([2.0, 3.0, 0.0, 2.0, 3.0, 1.0]))
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             drawdowns.recovery_return.to_pd(),
             pd.DataFrame(
                 np.array(
@@ -2323,40 +2322,40 @@ class TestDrawdowns:
 
     def test_avg_recovery_return(self):
         assert drawdowns["a"].avg_recovery_return == 1.6666666666666667
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.avg_recovery_return,
             pd.Series(np.array([1.6666666666666667, 2.5, 1.0, np.nan]), index=wrapper.columns).rename(
                 "avg_recovery_return"
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns_grouped.avg_recovery_return,
             pd.Series(np.array([2.0, 1.0]), index=pd.Index(["g1", "g2"], dtype="object")).rename("avg_recovery_return"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.get_avg_recovery_return(jitted=dict(parallel=True)),
             drawdowns.get_avg_recovery_return(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.get_avg_recovery_return(chunked=True),
             drawdowns.get_avg_recovery_return(chunked=False),
         )
 
     def test_max_recovery_return(self):
         assert drawdowns["a"].max_recovery_return == 3.0
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.max_recovery_return,
             pd.Series(np.array([3.0, 3.0, 1.0, np.nan]), index=wrapper.columns).rename("max_recovery_return"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns_grouped.max_recovery_return,
             pd.Series(np.array([3.0, 1.0]), index=pd.Index(["g1", "g2"], dtype="object")).rename("max_recovery_return"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.get_max_recovery_return(jitted=dict(parallel=True)),
             drawdowns.get_max_recovery_return(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.get_max_recovery_return(chunked=True),
             drawdowns.get_max_recovery_return(chunked=False),
         )
@@ -2367,14 +2366,14 @@ class TestDrawdowns:
 
     def test_avg_duration(self):
         assert drawdowns["a"].avg_duration == pd.Timedelta("1 days 00:00:00")
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.avg_duration,
             pd.Series(
                 np.array([86400000000000, 86400000000000, 259200000000000, "NaT"], dtype="timedelta64[ns]"),
                 index=wrapper.columns,
             ).rename("avg_duration"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns_grouped.avg_duration,
             pd.Series(
                 np.array([86400000000000, 259200000000000], dtype="timedelta64[ns]"),
@@ -2384,36 +2383,36 @@ class TestDrawdowns:
 
     def test_get_mask_duration(self):
         assert drawdowns["a"].max_duration == pd.Timedelta("1 days 00:00:00")
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.max_duration,
             pd.Series(
                 np.array([86400000000000, 86400000000000, 259200000000000, "NaT"], dtype="timedelta64[ns]"),
                 index=wrapper.columns,
             ).rename("max_duration"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns_grouped.max_duration,
             pd.Series(
                 np.array([86400000000000, 259200000000000], dtype="timedelta64[ns]"),
                 index=pd.Index(["g1", "g2"], dtype="object"),
             ).rename("max_duration"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.get_max_duration(jitted=dict(parallel=True)),
             drawdowns.get_max_duration(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.get_max_duration(chunked=True),
             drawdowns.get_max_duration(chunked=False),
         )
 
     def test_coverage(self):
         assert drawdowns["a"].coverage == 0.5
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.coverage,
             pd.Series(np.array([0.5, 0.3333333333333333, 0.5, np.nan]), index=ts2.columns).rename("coverage"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns_grouped.coverage,
             pd.Series(np.array([0.4166666666666667, 0.25]), index=pd.Index(["g1", "g2"], dtype="object")).rename(
                 "coverage"
@@ -2490,7 +2489,7 @@ class TestDrawdowns:
 
     def test_active_drawdown(self):
         assert drawdowns["a"].active_drawdown == -0.75
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.active_drawdown,
             pd.Series(np.array([-0.75, np.nan, -0.3333333333333333, np.nan]), index=wrapper.columns).rename(
                 "active_drawdown"
@@ -2498,18 +2497,18 @@ class TestDrawdowns:
         )
         with pytest.raises(Exception):
             drawdowns_grouped.active_drawdown
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.get_active_drawdown(jitted=dict(parallel=True)),
             drawdowns.get_active_drawdown(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.get_active_drawdown(chunked=True),
             drawdowns.get_active_drawdown(chunked=False),
         )
 
     def test_active_duration(self):
         assert drawdowns["a"].active_duration == np.timedelta64(86400000000000)
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.active_duration,
             pd.Series(
                 np.array([86400000000000, "NaT", 259200000000000, "NaT"], dtype="timedelta64[ns]"),
@@ -2518,52 +2517,52 @@ class TestDrawdowns:
         )
         with pytest.raises(Exception):
             drawdowns_grouped.active_duration
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.get_active_duration(jitted=dict(parallel=True)),
             drawdowns.get_active_duration(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.get_active_duration(chunked=True),
             drawdowns.get_active_duration(chunked=False),
         )
 
     def test_active_recovery(self):
         assert drawdowns["a"].active_recovery == 0.0
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.active_recovery,
             pd.Series(np.array([0.0, np.nan, 0.5, np.nan]), index=wrapper.columns).rename("active_recovery"),
         )
         with pytest.raises(Exception):
             drawdowns_grouped.active_recovery
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.get_active_recovery(jitted=dict(parallel=True)),
             drawdowns.get_active_recovery(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.get_active_recovery(chunked=True),
             drawdowns.get_active_recovery(chunked=False),
         )
 
     def test_active_recovery_return(self):
         assert drawdowns["a"].active_recovery_return == 0.0
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.active_recovery_return,
             pd.Series(np.array([0.0, np.nan, 1.0, np.nan]), index=wrapper.columns).rename("active_recovery_return"),
         )
         with pytest.raises(Exception):
             drawdowns_grouped.active_recovery_return
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.get_active_recovery_return(jitted=dict(parallel=True)),
             drawdowns.get_active_recovery_return(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.get_active_recovery_return(chunked=True),
             drawdowns.get_active_recovery_return(chunked=False),
         )
 
     def test_active_recovery_duration(self):
         assert drawdowns["a"].active_recovery_duration == pd.Timedelta("0 days 00:00:00")
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.active_recovery_duration,
             pd.Series(
                 np.array([0, "NaT", 86400000000000, "NaT"], dtype="timedelta64[ns]"),
@@ -2572,11 +2571,11 @@ class TestDrawdowns:
         )
         with pytest.raises(Exception):
             drawdowns_grouped.active_recovery_duration
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.get_active_recovery_duration(jitted=dict(parallel=True)),
             drawdowns.get_active_recovery_duration(jitted=dict(parallel=False)),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.get_active_recovery_duration(chunked=True),
             drawdowns.get_active_recovery_duration(chunked=False),
         )
@@ -2608,7 +2607,7 @@ class TestDrawdowns:
             ],
             dtype="object",
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.stats(),
             pd.Series(
                 [
@@ -2638,7 +2637,7 @@ class TestDrawdowns:
                 name="agg_stats",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.stats(settings=dict(incl_active=True)),
             pd.Series(
                 [
@@ -2668,7 +2667,7 @@ class TestDrawdowns:
                 name="agg_stats",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.stats(column="a"),
             pd.Series(
                 [
@@ -2698,7 +2697,7 @@ class TestDrawdowns:
                 name="a",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             drawdowns.stats(column="g1", group_by=group_by),
             pd.Series(
                 [
@@ -2743,14 +2742,14 @@ class TestDrawdowns:
                 name="g1",
             ),
         )
-        pd.testing.assert_series_equal(drawdowns["c"].stats(), drawdowns.stats(column="c"))
-        pd.testing.assert_series_equal(drawdowns["c"].stats(), drawdowns.stats(column="c", group_by=False))
-        pd.testing.assert_series_equal(drawdowns_grouped["g2"].stats(), drawdowns_grouped.stats(column="g2"))
-        pd.testing.assert_series_equal(drawdowns_grouped["g2"].stats(), drawdowns.stats(column="g2", group_by=group_by))
+        assert_series_equal(drawdowns["c"].stats(), drawdowns.stats(column="c"))
+        assert_series_equal(drawdowns["c"].stats(), drawdowns.stats(column="c", group_by=False))
+        assert_series_equal(drawdowns_grouped["g2"].stats(), drawdowns_grouped.stats(column="g2"))
+        assert_series_equal(drawdowns_grouped["g2"].stats(), drawdowns.stats(column="g2", group_by=group_by))
         stats_df = drawdowns.stats(agg_func=None)
         assert stats_df.shape == (4, 21)
-        pd.testing.assert_index_equal(stats_df.index, drawdowns.wrapper.columns)
-        pd.testing.assert_index_equal(stats_df.columns, stats_index)
+        assert_index_equal(stats_df.index, drawdowns.wrapper.columns)
+        assert_index_equal(stats_df.columns, stats_index)
 
     def test_resample(self):
         np.testing.assert_array_equal(
@@ -2777,15 +2776,15 @@ class TestDrawdowns:
             drawdowns.resample("3d").end_idx.values,
             np.array([0, 1, 1, 1, 1, 1]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             drawdowns.resample("1h").ts,
             drawdowns.ts.resample("1h").last().ffill().bfill().astype(np.float_),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             drawdowns.resample("10h").ts,
             drawdowns.ts.resample("10h").last().ffill().bfill().astype(np.float_),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             drawdowns.resample("3d").ts,
             drawdowns.ts.resample("3d").last().ffill().bfill().astype(np.float_),
         )
@@ -2821,9 +2820,9 @@ class TestOrders:
             np.testing.assert_array_equal(getattr(orders, name).values, orders.values[name])
 
     def test_close(self):
-        pd.testing.assert_frame_equal(orders.close, close)
-        pd.testing.assert_series_equal(orders["a"].close, close["a"])
-        pd.testing.assert_frame_equal(orders_grouped["g1"].close, close[["a", "b"]])
+        assert_frame_equal(orders.close, close)
+        assert_series_equal(orders["a"].close, close["a"])
+        assert_frame_equal(orders_grouped["g1"].close, close[["a", "b"]])
         assert orders.replace(close=None)["a"].close is None
 
     def test_records_readable(self):
@@ -3094,7 +3093,7 @@ class TestOrders:
             ],
             dtype="object",
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             orders.stats(),
             pd.Series(
                 [
@@ -3122,7 +3121,7 @@ class TestOrders:
                 name="agg_stats",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             orders.stats(column="a"),
             pd.Series(
                 [
@@ -3150,7 +3149,7 @@ class TestOrders:
                 name="a",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             orders.stats(column="g1", group_by=group_by),
             pd.Series(
                 [
@@ -3178,14 +3177,14 @@ class TestOrders:
                 name="g1",
             ),
         )
-        pd.testing.assert_series_equal(orders["c"].stats(), orders.stats(column="c"))
-        pd.testing.assert_series_equal(orders["c"].stats(), orders.stats(column="c", group_by=False))
-        pd.testing.assert_series_equal(orders_grouped["g2"].stats(), orders_grouped.stats(column="g2"))
-        pd.testing.assert_series_equal(orders_grouped["g2"].stats(), orders.stats(column="g2", group_by=group_by))
+        assert_series_equal(orders["c"].stats(), orders.stats(column="c"))
+        assert_series_equal(orders["c"].stats(), orders.stats(column="c", group_by=False))
+        assert_series_equal(orders_grouped["g2"].stats(), orders_grouped.stats(column="g2"))
+        assert_series_equal(orders_grouped["g2"].stats(), orders.stats(column="g2", group_by=group_by))
         stats_df = orders.stats(agg_func=None)
         assert stats_df.shape == (4, 19)
-        pd.testing.assert_index_equal(stats_df.index, orders.wrapper.columns)
-        pd.testing.assert_index_equal(stats_df.columns, stats_index)
+        assert_index_equal(stats_df.index, orders.wrapper.columns)
+        assert_index_equal(stats_df.columns, stats_index)
 
     def test_resample(self):
         np.testing.assert_array_equal(
@@ -3200,15 +3199,15 @@ class TestOrders:
             orders.resample("3d").idx_arr,
             np.array([0, 0, 0, 1, 1, 2, 2, 0, 0, 0, 1, 1, 2, 2, 0, 0, 0, 1, 1, 2, 2]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             orders.resample("1h").close,
             orders.close.resample("1h").last().ffill().bfill().astype(np.float_),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             orders.resample("10h").close,
             orders.close.resample("10h").last().ffill().bfill().astype(np.float_),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             orders.resample("3d").close,
             orders.close.resample("3d").last().ffill().bfill().astype(np.float_),
         )
@@ -3229,9 +3228,9 @@ class TestExitTrades:
                 np.testing.assert_array_equal(getattr(exit_trades, name).values, exit_trades.values[name])
 
     def test_close(self):
-        pd.testing.assert_frame_equal(exit_trades.close, close)
-        pd.testing.assert_series_equal(exit_trades["a"].close, close["a"])
-        pd.testing.assert_frame_equal(exit_trades_grouped["g1"].close, close[["a", "b"]])
+        assert_frame_equal(exit_trades.close, close)
+        assert_series_equal(exit_trades["a"].close, close["a"])
+        assert_frame_equal(exit_trades_grouped["g1"].close, close[["a", "b"]])
         assert exit_trades.replace(close=None)["a"].close is None
 
     def test_records_arr(self):
@@ -3558,22 +3557,22 @@ class TestExitTrades:
 
     def test_win_rate(self):
         assert exit_trades["a"].win_rate == 0.75
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             exit_trades.win_rate,
             pd.Series(np.array([0.75, 0.0, 0.6, np.nan]), index=close.columns).rename("win_rate"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             exit_trades_grouped.win_rate,
             pd.Series(np.array([0.375, 0.6]), index=pd.Index(["g1", "g2"], dtype="object")).rename("win_rate"),
         )
 
     def test_profit_factor(self):
         assert exit_trades["a"].profit_factor == 18.9
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             exit_trades.profit_factor,
             pd.Series(np.array([18.9, 0.0, 2.45853659, np.nan]), index=ts2.columns).rename("profit_factor"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             exit_trades_grouped.profit_factor,
             pd.Series(np.array([0.81818182, 2.45853659]), index=pd.Index(["g1", "g2"], dtype="object")).rename(
                 "profit_factor"
@@ -3582,22 +3581,22 @@ class TestExitTrades:
 
     def test_expectancy(self):
         assert exit_trades["a"].expectancy == 0.716
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             exit_trades.expectancy,
             pd.Series(np.array([0.716, -0.884, 0.3588, np.nan]), index=ts2.columns).rename("expectancy"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             exit_trades_grouped.expectancy,
             pd.Series(np.array([-0.084, 0.3588]), index=pd.Index(["g1", "g2"], dtype="object")).rename("expectancy"),
         )
 
     def test_sqn(self):
         assert exit_trades["a"].sqn == 1.634155521947584
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             exit_trades.sqn,
             pd.Series(np.array([1.63415552, -2.13007307, 0.71660403, np.nan]), index=ts2.columns).rename("sqn"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             exit_trades_grouped.sqn,
             pd.Series(np.array([-0.20404671, 0.71660403]), index=pd.Index(["g1", "g2"], dtype="object")).rename("sqn"),
         )
@@ -3739,7 +3738,7 @@ class TestExitTrades:
             ],
             dtype="object",
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             exit_trades.stats(),
             pd.Series(
                 [
@@ -3773,7 +3772,7 @@ class TestExitTrades:
                 name="agg_stats",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             exit_trades.stats(settings=dict(incl_open=True)),
             pd.Series(
                 [
@@ -3807,7 +3806,7 @@ class TestExitTrades:
                 name="agg_stats",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             exit_trades.stats(column="a"),
             pd.Series(
                 [
@@ -3841,7 +3840,7 @@ class TestExitTrades:
                 name="a",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             exit_trades.stats(column="g1", group_by=group_by),
             pd.Series(
                 [
@@ -3875,7 +3874,7 @@ class TestExitTrades:
                 name="g1",
             ),
         )
-        pd.testing.assert_index_equal(
+        assert_index_equal(
             exit_trades.stats(tags="trades").index,
             pd.Index(
                 [
@@ -3902,17 +3901,17 @@ class TestExitTrades:
                 dtype="object",
             ),
         )
-        pd.testing.assert_series_equal(exit_trades["c"].stats(), exit_trades.stats(column="c"))
-        pd.testing.assert_series_equal(exit_trades["c"].stats(), exit_trades.stats(column="c", group_by=False))
-        pd.testing.assert_series_equal(exit_trades_grouped["g2"].stats(), exit_trades_grouped.stats(column="g2"))
-        pd.testing.assert_series_equal(
+        assert_series_equal(exit_trades["c"].stats(), exit_trades.stats(column="c"))
+        assert_series_equal(exit_trades["c"].stats(), exit_trades.stats(column="c", group_by=False))
+        assert_series_equal(exit_trades_grouped["g2"].stats(), exit_trades_grouped.stats(column="g2"))
+        assert_series_equal(
             exit_trades_grouped["g2"].stats(),
             exit_trades.stats(column="g2", group_by=group_by),
         )
         stats_df = exit_trades.stats(agg_func=None)
         assert stats_df.shape == (4, 25)
-        pd.testing.assert_index_equal(stats_df.index, exit_trades.wrapper.columns)
-        pd.testing.assert_index_equal(stats_df.columns, stats_index)
+        assert_index_equal(stats_df.index, exit_trades.wrapper.columns)
+        assert_index_equal(stats_df.columns, stats_index)
 
     def test_resample(self):
         np.testing.assert_array_equal(
@@ -3939,15 +3938,15 @@ class TestExitTrades:
             exit_trades.resample("3d").end_idx.values,
             np.array([0, 1, 2, 2, 0, 1, 2, 2, 0, 1, 2, 2, 2]),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             exit_trades.resample("1h").close,
             exit_trades.close.resample("1h").last().ffill().bfill().astype(np.float_),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             exit_trades.resample("10h").close,
             exit_trades.close.resample("10h").last().ffill().bfill().astype(np.float_),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             exit_trades.resample("3d").close,
             exit_trades.close.resample("3d").last().ffill().bfill().astype(np.float_),
         )
@@ -5733,7 +5732,7 @@ class TestLogs:
             ],
             dtype="object",
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             logs.stats(),
             pd.Series(
                 [
@@ -5751,7 +5750,7 @@ class TestLogs:
                 name="agg_stats",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             logs.stats(column="a"),
             pd.Series(
                 [
@@ -5769,7 +5768,7 @@ class TestLogs:
                 name="a",
             ),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             logs.stats(column="g1", group_by=group_by),
             pd.Series(
                 [
@@ -5787,22 +5786,22 @@ class TestLogs:
                 name="g1",
             ),
         )
-        pd.testing.assert_series_equal(logs["c"].stats(), logs.stats(column="c"))
-        pd.testing.assert_series_equal(logs["c"].stats(), logs.stats(column="c", group_by=False))
-        pd.testing.assert_series_equal(logs_grouped["g2"].stats(), logs_grouped.stats(column="g2"))
-        pd.testing.assert_series_equal(logs_grouped["g2"].stats(), logs.stats(column="g2", group_by=group_by))
+        assert_series_equal(logs["c"].stats(), logs.stats(column="c"))
+        assert_series_equal(logs["c"].stats(), logs.stats(column="c", group_by=False))
+        assert_series_equal(logs_grouped["g2"].stats(), logs_grouped.stats(column="g2"))
+        assert_series_equal(logs_grouped["g2"].stats(), logs.stats(column="g2", group_by=group_by))
         stats_df = logs.stats(agg_func=None)
         assert stats_df.shape == (4, 9)
-        pd.testing.assert_index_equal(stats_df.index, logs.wrapper.columns)
-        pd.testing.assert_index_equal(stats_df.columns, stats_index)
+        assert_index_equal(stats_df.index, logs.wrapper.columns)
+        assert_index_equal(stats_df.columns, stats_index)
 
     def test_count(self):
         assert logs["a"].count() == 8
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             logs.count(),
             pd.Series(np.array([8, 8, 8, 8]), index=pd.Index(["a", "b", "c", "d"], dtype="object")).rename("count"),
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             logs_grouped.count(),
             pd.Series(np.array([16, 16]), index=pd.Index(["g1", "g2"], dtype="object")).rename("count"),
         )

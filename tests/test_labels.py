@@ -1,10 +1,9 @@
 import os
 from datetime import datetime
 
-import numpy as np
-import pandas as pd
-
 import vectorbtpro as vbt
+
+from tests.utils import *
 
 close_ts = pd.DataFrame(
     {"a": [1, 2, 1, 2, 3, 2], "b": [3, 2, 3, 2, 1, 2]},
@@ -43,7 +42,7 @@ def teardown_module():
 
 class TestGenerators:
     def test_FMEAN(self):
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.FMEAN.run(close_ts, window=(2, 3), ewm=False).fmean,
             pd.DataFrame(
                 np.array(
@@ -68,7 +67,7 @@ class TestGenerators:
                 ),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.FMEAN.run(close_ts, window=(2, 3), ewm=True).fmean,
             pd.DataFrame(
                 np.array(
@@ -95,7 +94,7 @@ class TestGenerators:
         )
 
     def test_FSTD(self):
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.FSTD.run(close_ts, window=(2, 3), ewm=False).fstd,
             pd.DataFrame(
                 np.array(
@@ -120,7 +119,7 @@ class TestGenerators:
                 ),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.FSTD.run(close_ts, window=(2, 3), ewm=True).fstd,
             pd.DataFrame(
                 np.array(
@@ -147,7 +146,7 @@ class TestGenerators:
         )
 
     def test_FMIN(self):
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.FMIN.run(close_ts, window=(2, 3)).fmin,
             pd.DataFrame(
                 np.array(
@@ -174,7 +173,7 @@ class TestGenerators:
         )
 
     def test_FMAX(self):
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.FMAX.run(close_ts, window=(2, 3)).fmax,
             pd.DataFrame(
                 np.array(
@@ -201,7 +200,7 @@ class TestGenerators:
         )
 
     def test_FIXLB(self):
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.FIXLB.run(close_ts, n=(2, 3)).labels,
             pd.DataFrame(
                 np.array(
@@ -228,7 +227,7 @@ class TestGenerators:
         )
 
     def test_MEANLB(self):
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.MEANLB.run(close_ts, window=(2, 3), ewm=False).labels,
             pd.DataFrame(
                 np.array(
@@ -253,7 +252,7 @@ class TestGenerators:
                 ),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.MEANLB.run(close_ts, window=(2, 3), ewm=True).labels,
             pd.DataFrame(
                 np.array(
@@ -280,7 +279,7 @@ class TestGenerators:
         )
 
     def test_LEXLB(self):
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.LEXLB.run(close_ts, pos_th=pos_ths, neg_th=neg_ths).labels,
             pd.DataFrame(
                 np.array(
@@ -309,7 +308,7 @@ class TestGenerators:
         )
 
     def test_TRENDLB(self):
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.TRENDLB.run(close_ts, pos_th=pos_ths, neg_th=neg_ths, mode="Binary").labels,
             pd.DataFrame(
                 np.array(
@@ -336,7 +335,7 @@ class TestGenerators:
                 ),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.TRENDLB.run(close_ts, pos_th=pos_ths, neg_th=neg_ths, mode="BinaryCont").labels,
             pd.DataFrame(
                 np.array(
@@ -363,7 +362,7 @@ class TestGenerators:
                 ),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.TRENDLB.run(close_ts, pos_th=pos_ths, neg_th=neg_ths, mode="BinaryContSat").labels,
             pd.DataFrame(
                 np.array(
@@ -390,7 +389,7 @@ class TestGenerators:
                 ),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.TRENDLB.run(close_ts, pos_th=pos_ths, neg_th=neg_ths, mode="PctChange").labels,
             pd.DataFrame(
                 np.array(
@@ -417,7 +416,7 @@ class TestGenerators:
                 ),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.TRENDLB.run(close_ts, pos_th=pos_ths, neg_th=neg_ths, mode="PctChangeNorm").labels,
             pd.DataFrame(
                 np.array(
@@ -453,7 +452,7 @@ class TestGenerators:
         )
 
     def test_BOLB(self):
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.BOLB.run(close_ts, window=1, pos_th=pos_ths, neg_th=neg_ths).labels,
             pd.DataFrame(
                 np.array(
@@ -480,7 +479,7 @@ class TestGenerators:
                 ),
             ),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             vbt.BOLB.run(close_ts, window=2, pos_th=pos_ths, neg_th=neg_ths).labels,
             pd.DataFrame(
                 np.array(

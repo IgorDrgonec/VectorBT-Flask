@@ -6,6 +6,8 @@ import vectorbtpro as vbt
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import jitting
 
+from tests.utils import *
+
 
 # ############# Global ############# #
 

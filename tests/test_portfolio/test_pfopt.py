@@ -1,14 +1,13 @@
 import os
 import pytest
 
-import numpy as np
-import pandas as pd
 from numba import njit
 
 import vectorbtpro as vbt
 import vectorbtpro.portfolio.pfopt.base as pfopt
 from vectorbtpro.portfolio.enums import alloc_range_dt, alloc_point_dt
-from tests.utils import assert_records_close
+
+from tests.utils import *
 
 pypfopt_available = True
 try:
@@ -88,27 +87,27 @@ class TestPyPortfolioOpt:
         if pypfopt_available:
             import pypfopt.expected_returns
 
-            pd.testing.assert_series_equal(
+            assert_series_equal(
                 pfopt.resolve_pypfopt_expected_returns("mean_historical_return", prices=prices),
                 pypfopt.expected_returns.mean_historical_return(prices),
             )
-            pd.testing.assert_series_equal(
+            assert_series_equal(
                 pfopt.resolve_pypfopt_expected_returns("mean_historical_return", prices=prices, returns_data=False),
                 pypfopt.expected_returns.mean_historical_return(prices),
             )
-            pd.testing.assert_series_equal(
+            assert_series_equal(
                 pfopt.resolve_pypfopt_expected_returns("mean_historical_return", prices=returns, returns_data=True),
                 pypfopt.expected_returns.mean_historical_return(returns, returns_data=True),
             )
-            pd.testing.assert_series_equal(
+            assert_series_equal(
                 pfopt.resolve_pypfopt_expected_returns("mean_historical_return", returns=returns),
                 pypfopt.expected_returns.mean_historical_return(returns, returns_data=True),
             )
-            pd.testing.assert_series_equal(
+            assert_series_equal(
                 pfopt.resolve_pypfopt_expected_returns("mean_historical_return", prices=prices, returns=returns),
                 pypfopt.expected_returns.mean_historical_return(prices, returns_data=False),
             )
-            pd.testing.assert_series_equal(
+            assert_series_equal(
                 pfopt.resolve_pypfopt_expected_returns(
                     "mean_historical_return",
                     prices=prices,
@@ -118,7 +117,7 @@ class TestPyPortfolioOpt:
                 ),
                 pypfopt.expected_returns.mean_historical_return(prices, frequency=365, compounding=False),
             )
-            pd.testing.assert_series_equal(
+            assert_series_equal(
                 pfopt.resolve_pypfopt_expected_returns(
                     "ema_historical_return",
                     prices=prices,
@@ -129,7 +128,7 @@ class TestPyPortfolioOpt:
                 ),
                 pypfopt.expected_returns.ema_historical_return(prices, frequency=365, compounding=False, span=350),
             )
-            pd.testing.assert_series_equal(
+            assert_series_equal(
                 pfopt.resolve_pypfopt_expected_returns(
                     "capm_return",
                     prices=prices,
@@ -148,7 +147,7 @@ class TestPyPortfolioOpt:
                     compounding=False,
                 ),
             )
-            pd.testing.assert_series_equal(
+            assert_series_equal(
                 pfopt.resolve_pypfopt_expected_returns(
                     "bl_returns",
                     prices=prices,
@@ -160,7 +159,7 @@ class TestPyPortfolioOpt:
                     absolute_views=viewdict,
                 ).bl_returns(),
             )
-            pd.testing.assert_series_equal(
+            assert_series_equal(
                 pfopt.resolve_pypfopt_expected_returns(
                     lambda prices, absolute_views: pypfopt.black_litterman.BlackLittermanModel(
                         pypfopt.risk_models.CovarianceShrinkage(prices).ledoit_wolf(),
@@ -174,7 +173,7 @@ class TestPyPortfolioOpt:
                     absolute_views=viewdict,
                 ).bl_returns(),
             )
-            pd.testing.assert_series_equal(
+            assert_series_equal(
                 pfopt.resolve_pypfopt_expected_returns(
                     pypfopt.black_litterman.BlackLittermanModel(
                         pypfopt.risk_models.CovarianceShrinkage(prices).ledoit_wolf(),
@@ -1038,11 +1037,11 @@ class TestPortfolioOptimizer:
             lambda index_slice: prices.iloc[index_slice].sum(),
             vbt.Rep("index_slice")
         )
-        pd.testing.assert_index_equal(
+        assert_index_equal(
             pf_opt.wrapper.grouper.group_by,
             pd.Index(['group', 'group', 'group', 'group', 'group'], name="alloc_group"),
         )
-        pd.testing.assert_index_equal(
+        assert_index_equal(
             pf_opt.wrapper.columns,
             pd.MultiIndex.from_tuples([
                 ('group', 'XOM'),
@@ -1054,7 +1053,7 @@ class TestPortfolioOptimizer:
             ),
         )
         assert pf_opt.wrapper.grouped_ndim == 1
-        pd.testing.assert_index_equal(
+        assert_index_equal(
             pf_opt.alloc_records.wrapper.columns,
             pd.Index(["group"], name="alloc_group"),
         )
@@ -1065,11 +1064,11 @@ class TestPortfolioOptimizer:
             vbt.Rep("index_slice"),
             vbt.pfopt_group_dict({1: 1, 2: 2}),
         )
-        pd.testing.assert_index_equal(
+        assert_index_equal(
             pf_opt.wrapper.grouper.group_by,
             pd.Index([1, 1, 1, 1, 1, 2, 2, 2, 2, 2], name="alloc_group"),
         )
-        pd.testing.assert_index_equal(
+        assert_index_equal(
             pf_opt.wrapper.columns,
             pd.MultiIndex.from_tuples([
                 (1, 'XOM'),
@@ -1086,7 +1085,7 @@ class TestPortfolioOptimizer:
             ),
         )
         assert pf_opt.wrapper.grouped_ndim == 2
-        pd.testing.assert_index_equal(
+        assert_index_equal(
             pf_opt.alloc_records.wrapper.columns,
             pd.Index([1, 2], name="alloc_group"),
         )
@@ -1358,11 +1357,11 @@ class TestPortfolioOptimizer:
             lambda index_point: prices.iloc[index_point],
             vbt.Rep("index_point")
         )
-        pd.testing.assert_index_equal(
+        assert_index_equal(
             pf_opt.wrapper.grouper.group_by,
             pd.Index(['group', 'group', 'group', 'group', 'group'], name="alloc_group"),
         )
-        pd.testing.assert_index_equal(
+        assert_index_equal(
             pf_opt.wrapper.columns,
             pd.MultiIndex.from_tuples([
                 ('group', 'XOM'),
@@ -1374,7 +1373,7 @@ class TestPortfolioOptimizer:
             ),
         )
         assert pf_opt.wrapper.grouped_ndim == 1
-        pd.testing.assert_index_equal(
+        assert_index_equal(
             pf_opt.alloc_records.wrapper.columns,
             pd.Index(["group"], name="alloc_group"),
         )
@@ -1385,11 +1384,11 @@ class TestPortfolioOptimizer:
             vbt.Rep("index_point"),
             vbt.pfopt_group_dict({1: 1, 2: 2}),
         )
-        pd.testing.assert_index_equal(
+        assert_index_equal(
             pf_opt.wrapper.grouper.group_by,
             pd.Index([1, 1, 1, 1, 1, 2, 2, 2, 2, 2], name="alloc_group"),
         )
-        pd.testing.assert_index_equal(
+        assert_index_equal(
             pf_opt.wrapper.columns,
             pd.MultiIndex.from_tuples([
                 (1, 'XOM'),
@@ -1406,7 +1405,7 @@ class TestPortfolioOptimizer:
             ),
         )
         assert pf_opt.wrapper.grouped_ndim == 2
-        pd.testing.assert_index_equal(
+        assert_index_equal(
             pf_opt.alloc_records.wrapper.columns,
             pd.Index([1, 2], name="alloc_group"),
         )
@@ -1624,7 +1623,7 @@ class TestPortfolioOptimizer:
             0.2515713061862386,
             0.29633387919266296,
         ]]
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pf_opt.get_allocations(squeeze_groups=False),
             pd.DataFrame(
                 target_arr,
@@ -1635,7 +1634,7 @@ class TestPortfolioOptimizer:
                 columns=prices.columns,
             )
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pf_opt.get_allocations(squeeze_groups=True),
             pd.DataFrame(
                 target_arr,
@@ -1654,7 +1653,7 @@ class TestPortfolioOptimizer:
             [0.00928441856775223, 0.4374675865753444, 0.37546445396096845, 0.09577331138241256, 0.0820102295135221],
             [0.10567348701744264, 0.17529742718559654, 0.302352663027335, 0.2488768479913802, 0.1677995747782457]
         ])
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pf_opt.get_allocations(squeeze_groups=False),
             pd.DataFrame(
                 target_arr,
@@ -1665,7 +1664,7 @@ class TestPortfolioOptimizer:
                 columns=prices.columns,
             )
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pf_opt.get_allocations(squeeze_groups=True),
             pd.DataFrame(
                 target_arr,
@@ -1682,7 +1681,7 @@ class TestPortfolioOptimizer:
             vbt.Rep("index_slice"),
             index_loc=4,
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pf_opt.get_allocations(squeeze_groups=False),
             pd.DataFrame(
                 prices.sum().values[None],
@@ -1693,7 +1692,7 @@ class TestPortfolioOptimizer:
                 columns=prices.columns,
             )
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pf_opt.get_allocations(squeeze_groups=True),
             pd.DataFrame(
                 prices.sum().values[None],
@@ -1730,7 +1729,7 @@ class TestPortfolioOptimizer:
             ]),
         )
         target_df.iloc[[1, 3]] = target_arr
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pf_opt.fill_allocations(squeeze_groups=False),
             target_df,
         )
@@ -1740,7 +1739,7 @@ class TestPortfolioOptimizer:
             columns=prices.columns,
         )
         target_df.iloc[[1, 3]] = target_arr
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pf_opt.fill_allocations(squeeze_groups=True),
             target_df,
         )
@@ -1765,11 +1764,11 @@ class TestPortfolioOptimizer:
         )
         target_df.iloc[[1, 3], 0:5] = target_arr[0:2]
         target_df.iloc[[2, 4], 5:10] = target_arr[2:4]
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pf_opt.fill_allocations(squeeze_groups=False),
             target_df
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pf_opt.fill_allocations(squeeze_groups=True),
             target_df
         )
@@ -1788,7 +1787,7 @@ class TestPortfolioOptimizer:
             ]),
         )
         target_df.iloc[[4]] = prices.sum().values
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pf_opt.fill_allocations(squeeze_groups=False),
             target_df,
         )
@@ -1798,7 +1797,7 @@ class TestPortfolioOptimizer:
             columns=prices.columns,
         )
         target_df.iloc[[4]] = prices.sum().values
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             pf_opt.fill_allocations(squeeze_groups=True),
             target_df,
         )
@@ -1820,7 +1819,7 @@ class TestPortfolioOptimizer:
             'Mean Allocation: MA',
             'Mean Allocation: PFE',
         ], dtype='object')
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             pf_opt.stats(),
             pd.Series(
                 [
@@ -1838,7 +1837,7 @@ class TestPortfolioOptimizer:
                 name="agg_stats"
             )
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             pf_opt.stats(column="g1"),
             pd.Series(
                 [
@@ -1856,11 +1855,11 @@ class TestPortfolioOptimizer:
                 name="g1"
             )
         )
-        pd.testing.assert_series_equal(pf_opt["g1"].stats(), pf_opt.stats(column="g1"))
+        assert_series_equal(pf_opt["g1"].stats(), pf_opt.stats(column="g1"))
         stats_df = pf_opt.stats(agg_func=None)
         assert stats_df.shape == (2, 9)
-        pd.testing.assert_index_equal(stats_df.index, pf_opt.wrapper.get_columns())
-        pd.testing.assert_index_equal(stats_df.columns, stats_index)
+        assert_index_equal(stats_df.index, pf_opt.wrapper.get_columns())
+        assert_index_equal(stats_df.columns, stats_index)
 
     def test_ranges_stats(self):
         pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
@@ -1882,7 +1881,7 @@ class TestPortfolioOptimizer:
             'Mean Allocation: MA',
             'Mean Allocation: PFE',
         ], dtype='object')
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             pf_opt.stats(),
             pd.Series(
                 [
@@ -1902,7 +1901,7 @@ class TestPortfolioOptimizer:
                 name="agg_stats"
             )
         )
-        pd.testing.assert_series_equal(
+        assert_series_equal(
             pf_opt.stats(column="g1"),
             pd.Series(
                 [
@@ -1922,11 +1921,11 @@ class TestPortfolioOptimizer:
                 name="g1"
             )
         )
-        pd.testing.assert_series_equal(pf_opt["g1"].stats(), pf_opt.stats(column="g1"))
+        assert_series_equal(pf_opt["g1"].stats(), pf_opt.stats(column="g1"))
         stats_df = pf_opt.stats(agg_func=None)
         assert stats_df.shape == (2, 11)
-        pd.testing.assert_index_equal(stats_df.index, pf_opt.wrapper.get_columns())
-        pd.testing.assert_index_equal(stats_df.columns, stats_index)
+        assert_index_equal(stats_df.index, pf_opt.wrapper.get_columns())
+        assert_index_equal(stats_df.columns, stats_index)
 
     def test_plots(self):
         pf_opt = vbt.PortfolioOptimizer.from_random(
