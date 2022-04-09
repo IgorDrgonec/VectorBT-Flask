@@ -1764,6 +1764,23 @@ class TestCustom:
                 ),
             ),
         )
+        pd.testing.assert_series_equal(
+            vbt.RandomData.fetch(start="2021-01-01 UTC", end="2021-01-05 UTC", symmetric=True, seed=42).get(),
+            pd.Series(
+                [100.49671415301123, 100.35795492796039, 101.00796189910105, 102.54634331617359, 102.30678851828695],
+                index=pd.DatetimeIndex(
+                    [
+                        datetime(2021, 1, 1),
+                        datetime(2021, 1, 2),
+                        datetime(2021, 1, 3),
+                        datetime(2021, 1, 4),
+                        datetime(2021, 1, 5),
+                    ],
+                    dtype="datetime64[ns, UTC]",
+                    freq="D",
+                ),
+            ),
+        )
         pd.testing.assert_frame_equal(
             vbt.RandomData.fetch(num_paths=2, start="2021-01-01 UTC", end="2021-01-05 UTC", seed=42).get(),
             pd.DataFrame(
@@ -1810,6 +1827,32 @@ class TestCustom:
                     freq="D",
                 ),
                 columns=pd.Index([0, 1], name="symbol"),
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            vbt.RandomData.fetch(
+                start="2021-01-01 UTC",
+                end="2021-01-05 UTC",
+                to_ohlc=True,
+                ohlc_freq="2D",
+                seed=42,
+            ).get(),
+            pd.DataFrame(
+                [
+                    [100.49671415301123, 100.49671415301123, 100.35776307348756, 100.35776307348756],
+                    [101.00776880200878, 102.54614727815496, 101.00776880200878, 102.54614727815496],
+                    [102.3060320136544, 102.3060320136544, 102.3060320136544, 102.3060320136544],
+                ],
+                index=pd.DatetimeIndex(
+                    [
+                        datetime(2021, 1, 1),
+                        datetime(2021, 1, 3),
+                        datetime(2021, 1, 5),
+                    ],
+                    dtype="datetime64[ns, UTC]",
+                    freq="2D",
+                ),
+                columns=pd.Index(['Open', 'High', 'Low', 'Close'], dtype='object'),
             ),
         )
 
@@ -1877,6 +1920,32 @@ class TestCustom:
                     freq="D",
                 ),
                 columns=pd.Index([0, 1], name="symbol"),
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            vbt.GBMData.fetch(
+                start="2021-01-01 UTC",
+                end="2021-01-05 UTC",
+                to_ohlc=True,
+                ohlc_freq="2D",
+                seed=42,
+            ).get(),
+            pd.DataFrame(
+                [
+                    [100.49292505095792, 100.49292505095792, 100.34905764408163, 100.34905764408163],
+                    [100.99606643427086, 102.54091282498935, 100.99606643427086, 102.54091282498935],
+                    [102.29597577584751, 102.29597577584751, 102.29597577584751, 102.29597577584751],
+                ],
+                index=pd.DatetimeIndex(
+                    [
+                        datetime(2021, 1, 1),
+                        datetime(2021, 1, 3),
+                        datetime(2021, 1, 5),
+                    ],
+                    dtype="datetime64[ns, UTC]",
+                    freq="2D",
+                ),
+                columns=pd.Index(['Open', 'High', 'Low', 'Close'], dtype='object'),
             ),
         )
 

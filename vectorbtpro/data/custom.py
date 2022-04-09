@@ -152,6 +152,9 @@ class RandomData(SyntheticData):
         start_value: tp.Optional[float] = None,
         mean: tp.Optional[float] = None,
         std: tp.Optional[float] = None,
+        symmetric: tp.Optional[bool] = None,
+        to_ohlc: tp.Optional[int] = None,
+        ohlc_freq: tp.Optional[tp.FrequencyLike] = None,
         seed: tp.Optional[int] = None,
         jitted: tp.JittedOption = None,
     ) -> tp.SeriesFrame:
@@ -166,6 +169,11 @@ class RandomData(SyntheticData):
                 Does not appear as the first value in the output data.
             mean (float): Drift, or mean of the percentage change.
             std (float): Standard deviation of the percentage change.
+            symmetric (bool): Whether to diminish negative returns and make them symmetric to positive ones.
+            to_ohlc (bool) Whether to resample to OHLC.
+
+                Argument `num_paths` must be 1.
+            ohlc_freq (frequency_like): Resampling frequency.
             seed (int): Set seed to make output deterministic.
             jitted (any): See `vectorbtpro.utils.jitting.resolve_jitted_option`.
 
@@ -186,6 +194,14 @@ class RandomData(SyntheticData):
             mean = random_cfg["mean"]
         if std is None:
             std = random_cfg["std"]
+        if symmetric is None:
+            symmetric = random_cfg["symmetric"]
+        if to_ohlc is None:
+            to_ohlc = random_cfg["to_ohlc"]
+        if to_ohlc and num_paths > 1:
+            raise ValueError("Only one path can be resampled to OHLC")
+        if ohlc_freq is None:
+            ohlc_freq = random_cfg["ohlc_freq"]
         if seed is None:
             seed = random_cfg["seed"]
         if seed is not None:
@@ -194,18 +210,26 @@ class RandomData(SyntheticData):
             jitted = random_cfg["jitted"]
 
         func = jit_reg.resolve_option(nb.generate_random_data_nb, jitted)
-        out = func((len(index), num_paths), start_value, mean, std)
+        out = func((len(index), num_paths), start_value, mean, std, symmetric=symmetric)
 
         if out.shape[1] == 1:
-            return pd.Series(out[:, 0], index=index)
-        columns = pd.RangeIndex(stop=out.shape[1], name="path")
-        return pd.DataFrame(out, index=index, columns=columns)
+            out = pd.Series(out[:, 0], index=index)
+        else:
+            columns = pd.RangeIndex(stop=out.shape[1], name="path")
+            out = pd.DataFrame(out, index=index, columns=columns)
+        if to_ohlc:
+            out = out.resample(ohlc_freq).ohlc()
+            out = out.rename(columns={"open": "Open", "high": "High", "low": "Low", "close": "Close"})
+        return out
 
     def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
         fetch_kwargs["start"] = self.last_index[symbol]
         _ = fetch_kwargs.pop("start_value", None)
-        start_value = self.data[symbol].iloc[-2]
+        if "Open" in self.wrapper.columns:
+            start_value = self.data[symbol].iloc[-1, 0]
+        else:
+            start_value = self.data[symbol].iloc[-2]
         fetch_kwargs["seed"] = None
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         return self.fetch_symbol(symbol, start_value=start_value, **kwargs)
@@ -224,6 +248,8 @@ class GBMData(RandomData):
         mean: tp.Optional[float] = None,
         std: tp.Optional[float] = None,
         dt: tp.Optional[float] = None,
+        to_ohlc: tp.Optional[int] = None,
+        ohlc_freq: tp.Optional[tp.FrequencyLike] = None,
         seed: tp.Optional[int] = None,
         jitted: tp.JittedOption = None,
     ) -> tp.SeriesFrame:
@@ -239,6 +265,10 @@ class GBMData(RandomData):
             mean (float): Drift, or mean of the percentage change.
             std (float): Standard deviation of the percentage change.
             dt (float): Time change (one period of time).
+            to_ohlc (bool) Whether to resample to OHLC.
+
+                Argument `num_paths` must be 1.
+            ohlc_freq (frequency_like): Resampling frequency.
             seed (int): Set seed to make output deterministic.
             jitted (any): See `vectorbtpro.utils.jitting.resolve_jitted_option`.
 
@@ -261,6 +291,12 @@ class GBMData(RandomData):
             std = gbm_cfg["std"]
         if dt is None:
             dt = gbm_cfg["dt"]
+        if to_ohlc is None:
+            to_ohlc = gbm_cfg["to_ohlc"]
+        if to_ohlc and num_paths > 1:
+            raise ValueError("Only one path can be resampled to OHLC")
+        if ohlc_freq is None:
+            ohlc_freq = gbm_cfg["ohlc_freq"]
         if seed is None:
             seed = gbm_cfg["seed"]
         if seed is not None:
@@ -272,9 +308,14 @@ class GBMData(RandomData):
         out = func((len(index), num_paths), start_value, mean, std, dt)
 
         if out.shape[1] == 1:
-            return pd.Series(out[:, 0], index=index)
-        columns = pd.RangeIndex(stop=out.shape[1], name="path")
-        return pd.DataFrame(out, index=index, columns=columns)
+            out = pd.Series(out[:, 0], index=index)
+        else:
+            columns = pd.RangeIndex(stop=out.shape[1], name="path")
+            out = pd.DataFrame(out, index=index, columns=columns)
+        if to_ohlc:
+            out = out.resample(ohlc_freq).ohlc()
+            out = out.rename(columns={"open": "Open", "high": "High", "low": "Low", "close": "Close"})
+        return out
 
 
 # ############# Local ############# #

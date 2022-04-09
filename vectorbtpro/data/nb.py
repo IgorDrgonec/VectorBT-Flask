@@ -10,32 +10,67 @@ from numba import prange
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.registries.jit_registry import register_jitted
+from vectorbtpro.base.indexing import flex_select_auto_nb
 
 
 @register_jitted(cache=True, tags={"can_parallel"})
-def generate_random_data_nb(shape: tp.Shape, start_value: float, mean: float, std: float) -> tp.Array2d:
-    """Generate data using cumulative product of returns drawn from normal (Gaussian) distribution."""
+def generate_random_data_nb(
+    shape: tp.Shape,
+    start_value: tp.MaybeFlexArray = 100.0,
+    mean: tp.MaybeFlexArray = 0.0,
+    std: tp.MaybeFlexArray = 0.01,
+    symmetric: tp.MaybeFlexArray = False,
+) -> tp.Array2d:
+    """Generate data using cumulative product of returns drawn from normal (Gaussian) distribution.
+
+    Turn on `symmetric` to diminish negative returns and make them symmetric to positive ones.
+    Otherwise, the majority of generated paths will go downward.
+
+    Each argument can be provided per column thanks to flexible indexing."""
     out = np.empty(shape, dtype=np.float_)
+
     for col in prange(shape[1]):
+        _start_value = flex_select_auto_nb(np.asarray(start_value), col)
+        _mean = flex_select_auto_nb(np.asarray(mean), col)
+        _std = flex_select_auto_nb(np.asarray(std), col)
+        _symmetric = flex_select_auto_nb(np.asarray(symmetric), col)
+
         for i in range(shape[0]):
             if i == 0:
-                prev_value = start_value
+                prev_value = _start_value
             else:
                 prev_value = out[i - 1, col]
-            out[i, col] = prev_value * (1 + np.random.normal(mean, std))
+            return_ = np.random.normal(_mean, _std)
+            if _symmetric and return_ < 0:
+                return_ = -abs(return_) / (1 + abs(return_))
+            out[i, col] = prev_value * (1 + return_)
+
     return out
 
 
 @register_jitted(cache=True, tags={"can_parallel"})
-def generate_gbm_data_nb(shape: tp.Shape, start_value: float, mean: float, std: float, dt: float) -> tp.Array2d:
+def generate_gbm_data_nb(
+    shape: tp.Shape,
+    start_value: tp.MaybeFlexArray = 100.0,
+    mean: tp.MaybeFlexArray = 0.0,
+    std: tp.MaybeFlexArray = 0.01,
+    dt: tp.MaybeFlexArray = 1.0,
+) -> tp.Array2d:
     """Generate data using Geometric Brownian Motion (GBM)."""
     out = np.empty(shape, dtype=np.float_)
+
     for col in prange(shape[1]):
+        _start_value = flex_select_auto_nb(np.asarray(start_value), col)
+        _mean = flex_select_auto_nb(np.asarray(mean), col)
+        _std = flex_select_auto_nb(np.asarray(std), col)
+        _dt = flex_select_auto_nb(np.asarray(dt), col)
+
         for i in range(shape[0]):
             if i == 0:
-                prev_value = start_value
+                prev_value = _start_value
             else:
                 prev_value = out[i - 1, col]
             rand = np.random.standard_normal()
-            out[i, col] = prev_value * np.exp((mean - 0.5 * std**2) * dt + std * np.sqrt(dt) * rand)
+            out[i, col] = prev_value * np.exp((_mean - 0.5 * _std**2) * _dt + _std * np.sqrt(_dt) * rand)
+
     return out

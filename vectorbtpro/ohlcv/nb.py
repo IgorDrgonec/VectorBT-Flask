@@ -18,6 +18,30 @@ from vectorbtpro.utils import chunking as ch
 
 
 @register_jitted(cache=True)
+def ohlc_every_1d_nb(price: tp.Array1d, n: int) -> tp.Array2d:
+    """Aggregate every `n` price points into an OHLC point."""
+    out = np.empty((price.shape[0], 4), dtype=np.float_)
+    vmin = np.inf
+    vmax = -np.inf
+    j = -1
+    for i in range(price.shape[0]):
+        if price[i] < vmin:
+            vmin = price[i]
+        if price[i] > vmax:
+            vmax = price[i]
+        if i % n == 0:
+            j += 1
+            out[j, 0] = price[i]
+        if i % n == n - 1 or i == price.shape[0] - 1:
+            out[j, 1] = vmax
+            out[j, 2] = vmin
+            out[j, 3] = price[i]
+            vmin = np.inf
+            vmax = -np.inf
+    return out[:j + 1]
+
+
+@register_jitted(cache=True)
 def vwap_1d_nb(high: tp.Array1d, low: tp.Array1d, volume: tp.Array1d) -> tp.Array1d:
     """Compute the volume-weighted average price (VWAP)."""
     out = np.empty_like(volume, dtype=np.float_)

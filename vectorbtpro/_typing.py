@@ -97,6 +97,7 @@ AnyArray2d = Union[Array2d, Frame]
 ArrayLike = Union[Scalar, Sequence[Scalar], Sequence[Sequence[Any]], SupportsArray]
 IndexLike = Union[range, Sequence[Scalar], SupportsArray]
 FlexArray = Array
+MaybeFlexArray = Union[Scalar, FlexArray]
 
 # Labels
 Label = Hashable
