@@ -53,7 +53,7 @@ commands is also supported out of the box. This also means that more complex ord
 and SL orders must be implemented manually. In contrast to other backtesting frameworks where processing 
 is monolothic and functionality is written in an [object-oriented manner](https://en.wikipedia.org/wiki/Object-oriented_programming),
 Numba forces vectorbt to implement most of the functionality as a spaghetti of functions :spaghetti:
-(but don't worry - vectorbt has still been designed with the best software design patterns in mind!)
+(but don't worry - vectorbt was still designed with the best software design patterns in mind!)
 
 !!! info
     Even though Numba supports OOP by compiling Python classes with `@jitclass`, they are treated
@@ -240,7 +240,7 @@ Here, the status "Size is zero" means that by considering our cash balance and a
 size granularity, the (potentially) filled order size is zero, thus the order should be ignored.
 Ignored orders have no effect on the trading environment and are simply, well, *ignored*. But sometimes,
 when the user has specific requirements and vectorbt cannot execute them, the status will become "Rejected",
-indicating that the request could not be fulfilled and an error can be thrown if this was wanted.
+indicating that the request could not be fulfilled and an error can be thrown if wanted.
 
 For example, let's try to buy more than possible:
 
@@ -1056,7 +1056,7 @@ nan
 
 #### Size type conversion
 
-Our primitive commands accept only the size in the number of shares, thus we have to convert 
+Our primitive commands accept only a size in the number of shares, thus we have to convert 
 any size type defined in [SizeType](/api/portfolio/enums/#vectorbtpro.portfolio.enums.SizeType) 
 to `Amount`. Different size types require different information for conversion; for example, 
 `TargetAmount` requires to know the current position size, while `Value` also requires to know 
@@ -1299,21 +1299,20 @@ process like most backtesting frameworks force us to do :face_with_spiral_eyes:
 
 Order execution takes an order instruction and translates it into a buy or sell operation.
 The responsibility of the user is to do something with the returned order execution state and result;
-mostly, we want to post-process and append each successful order to some list for later analysis,
-and that's where order and log records come into play. Furthermore, we may want to update
-the current valuation price and portfolio value using the filled order price since it's the
-most up-to-date price at the execution time. All of this is ensured by 
+mostly, we want to post-process and append each successful order to some list for later analysis - 
+that's where order and log records come into play. Furthermore, we may want to raise an error if 
+an order has been rejected and a certain flag in the requirements is present. All of this is ensured by 
 [process_order_nb](/api/portfolio/nb/core/#vectorbtpro.portfolio.nb.core.process_order_nb).
 
 #### Order records
 
 Order records is a [structured](https://numpy.org/doc/stable/user/basics.rec.html) NumPy array
-of data type [order_dt](/api/portfolio/enums/#vectorbtpro.portfolio.enums.order_dt) containing 
+of the data type [order_dt](/api/portfolio/enums/#vectorbtpro.portfolio.enums.order_dt) containing 
 information on each successful order. Each order in this array is assumed to be completed,
 that is, you should view an order as a trade in the vectorbt's world. Since we're dealing with
 Numba, we cannot and should not use lists and other inefficient data structures for storing
 such complex information. Given that orders have fields with variable data types, the best 
-data structure is a record array, which is a regular NumPy array with a complex data type that 
+data structure is a record array, which is a regular NumPy array with a complex data type and that 
 behaves similarly to a Pandas DataFrame.
 
 Since any NumPy array is a non-appendable structure, we should initialize an empty array of 
@@ -1370,7 +1369,7 @@ at the 678th bar, and fill the first record in the array:
 2. Index of the current bar
 
 !!! note
-    When writing a field of a record, first select the field, and then the index.
+    When writing to an element of a record field, first select the field, and then the index.
 
 At the next bar, we'll reverse the position and fill the second record:
 
@@ -1402,7 +1401,7 @@ array([(0, 0, 678,  6.66666667, 15., 0., 0),
 ```
 
 But instead of setting each of these records manually, we can use 
-[process_order_nb](/api/portfolio/nb/core/#vectorbtpro.portfolio.nb.core.process_order_nb) to do it for us.
+[process_order_nb](/api/portfolio/nb/core/#vectorbtpro.portfolio.nb.core.process_order_nb) to do it for us!
 We just need to do one little adjustment: both the order records and the counter must be provided 
 per column since vectorbt primarily works on multi-columnar data. This means that the order 
 records array must become a two-dimensional array and the counter constant must become a one-dimensional array
@@ -1540,12 +1539,12 @@ the final order records array (= concatenate records of all columns into a one-d
 
 !!! info
     We are flattening (repartitioning) order records because most records are left unfilled,
-    thus unnecessarily taking memory. By flattening we're effectively compressing them
+    thus unnecessarily taking memory. By flattening, we're effectively compressing them
     without losing any information because each record already tracks the column it's supposed to be in.
 
-Our pipeline now expect all arrays to be two-dimensional. Let's test three value combinations
+Our pipeline now expects all arrays to be two-dimensional. Let's test three value combinations
 of the parameter `every`, which controls the re-allocation periodicity. For this, we need
-to expand all arrays to have the same number of columns as parameter combinations.
+to expand all arrays to have the same number of columns as the parameter combinations.
 
 ```pycon
 >>> import pandas as pd
@@ -1607,18 +1606,18 @@ to populate columns and append a new column level for our parameter combinations
 2. Change the corresponding column only
 
 This is exactly what [Portfolio](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio)
-requires as input - order records with a couple of other arrays can be used to reconstruct 
-the simulation state including the cash balance and position size at each time step. 
+requires as input: order records with a couple of other arrays can be used to reconstruct 
+the simulation state, including the cash balance and the position size at each time step. 
 We're slowly progressing towards post-analysis :slightly_smiling_face:
 
 ### Flexible indexing
 
-The issue of bringing all arrays to the same shape as we did above is that it unnecessarily takes memory:
+The issue of bringing all arrays to the same shape as we did above is that it unnecessarily consumes memory:
 even though the only array that has different data in each column is `target_pct`, we have
 almost tripled memory consumption by having to expand other arrays like `close`. Imagine 
 how expensive would it be having to align dozens of such array-like arguments :face_exhaling:
 
-Flexible indexing allows us to overcome the alignment step and to access each element of an array
+Flexible indexing allows us to overcome this alignment step and to access each element of an array
 solely based on its shape. For example, there is no need to tile `close` three times if each 
 row stays the same for each column - we can simply return the same row element irrespective of the column
 being queried. The same goes for a one-dimensional array with elements per column - return the same column
@@ -1651,7 +1650,7 @@ Let's demonstrate its use in different scenarios:
 4. Considers each value in `arr_1d` to be defined per column
 5. Considers each value in `arr_2d` to be defined per element
 
-Which yields the same result as if we had aligned the arrays prior to indexing:
+Which yields the same result as if we had aligned the arrays prior to indexing (= memory expensive):
 
 ```pycon
 >>> target_shape = (3, 3)
@@ -1715,8 +1714,10 @@ vectorbt ensures that all arrays can broadcast against other nicely anyway.
 
 Let's adapt the previous pipeline for flexible indexing. Since usually we don't know which one of 
 the passed arrays has the full shape, and sometimes there is no array with the full shape at all, 
-we need to introduce another argument - `target_shape` - to provide the full shape. We'll also 
-experiment with rotational indexing, which isn't supported by any of the preset simulation methods.
+we need to introduce another argument - `target_shape` - to provide the full shape for our loops to
+iterate over. We'll also experiment with rotational indexing, which isn't supported by any of the 
+preset simulation methods because the post-analysis phase requires the close price array to be of 
+the full shape.
 
 ```pycon
 >>> @njit
@@ -1819,7 +1820,7 @@ This also allows us to provide target percentages as a constant to re-allocate a
 1. Since we reduced the target percentage array to just a constant, our data 
 now holds the largest shape, thus use it for iteration
 
-This operation has generated the same number of orders as we have elements in data:
+This operation has generated the same number of orders as we have elements in the data:
 
 ```pycon
 >>> np.product(symbol_wrapper.shape_2d)
@@ -1872,13 +1873,13 @@ and should be backtested as a single whole. Very often, we use groups to share c
 multiple columns, but we can also use groups to bind columns on some logical level. During
 a simulation, it's our responsibility to make use of grouping. For example, even though
 [process_order_nb](/api/portfolio/nb/core/#vectorbtpro.portfolio.nb.core.process_order_nb) requires
-a group index, it uses it just for log records and nothing else. But after the simulation, 
+a group index, it uses it just for filling log records and nothing else. But after the simulation, 
 vectorbt has many tools at its disposal to enable us in aggregating and analyzing various 
 information per group, such as portfolio value.
 
 Groups can be constructed and provided in two ways: as group lengths and as a group map. 
-The former is marginally faster and requires columns to be split into monolithic groups, while 
-the latter allows the columns of a group to be distributed arbitrarily, and is generally
+The former is easier to handle, marginally faster, and requires the columns to be split into monolithic 
+groups, while the latter allows the columns of a group to be distributed arbitrarily, and is generally
 a more flexible option. Group lengths is the format primarily used by simulation methods (since
 asset columns, in contrast to parameter columns, are usually located next to each other),
 while group maps are predominantly used by generic functions specialized in pre- and post-analysis. 
@@ -1957,6 +1958,9 @@ work with any possible group distribution:
 (array([0, 2, 1, 3, 4]), array([2, 3]))
 ```
 
+In the second example, the first two (`2`) column indices in the first array belong to the first group,
+while the remaining three (`3`) column indices belong to the second group.
+
 Here's a template for working with a group map:
 
 ```pycon
@@ -1998,15 +2002,15 @@ we can use another array, such as with potential order values, to (arg-)sort the
 
 The sorting is done by the function [insert_argsort_nb](/api/utils/array_/#vectorbtpro.utils.array_.insert_argsort_nb),
 which takes an array with values to sort by and an array of indices, and sorts the indices in-place
-in the order the values appear in the first array using [insertion sort](https://en.wikipedia.org/wiki/Insertion_sort).
-This sorting algorithm is best suited for smaller arrays and does not require any additional memory space
-- perfect for groups with assets!
+using [insertion sort](https://en.wikipedia.org/wiki/Insertion_sort) in the order the values appear 
+in the first array. This sorting algorithm is best suited for smaller arrays and does not require any 
+additional memory space - perfect for groups with assets!
 
 Let's say we have three assets: one not in position, one in a short position, and one in a long position.
 We want to close all positions in the order such that assets that should be sold are processed first.
 Otherwise, we wouldn't have cash from exiting the long position to close out the short position.
 For this, we will first use [approx_order_value_nb](/api/portfolio/nb/core/#vectorbtpro.portfolio.nb.core.approx_order_value_nb)
-to approximate order value of each operation:
+to approximate the order value of each operation:
 
 ```pycon
 >>> position = np.array([0.0, -10.0, 10.0])
@@ -2072,9 +2076,9 @@ We can then modify the for-loop to iterate over the call sequence instead:
 2. When working with a group map
 
 !!! hint
-    A good practice is to keep a consistent naming of variables. Here, we're using `c`
-    to denote a column index within a group, `col` to denote a global column index,
-    and `k` to denote an index in the call sequence.
+    A good practice is to keep a consistent naming of variables. Here, we're using 
+    `k` to denote an index in the call sequence, `c` to denote a column index within a group, 
+    and `col` to denote a global column index.
 
 #### Pipeline/5
 
@@ -2082,7 +2086,7 @@ Let's upgrade our previous pipeline to rebalance groups of assets. To better ill
 important is sorting by order value when rebalancing multi-asset portfolios, we'll introduce another 
 argument `auto_call_seq` to switch between sorting and not sorting. We will use group lengths
 as the grouping format of choice because of its simplicity. Also note that now we have to keep
-a lot of position-related information in arrays rather than constants since it exists
+a lot of position-related information in arrays rather than constants since they exist
 in relation to columns rather than groups. In addition, as we already know how to fill order records,
 let's track the allocation at each bar instead.
 
@@ -2309,7 +2313,7 @@ And here's the same procedure but without sorting the call sequence array:
 ![](/assets/images/pipeline_5_wo_auto_call_seq.svg)
 
 As we see, some rebalancing steps couldn't be completed at all because long operations
-were executed before short operations, leaving them without required funds.
+were executed before short operations, leaving them without the required funds.
 
 The biggest advantage of this pipeline is in its flexibility: we can turn off grouping via `group_by=False` 
 to run the entire logic per column (each group will contain only one column). We can also test 
@@ -2371,18 +2375,18 @@ Each level must have the same length.
 ### Contexts
 
 Sometimes, there is a need to create a simulation method that takes a user-defined function and calls it 
-to make some trading decision. Such a UDF would require access to the simulation's state and other 
-information (such as the current position size and direction), which could quickly involve dozens 
+to make some trading decision. Such a UDF would require access to the simulation's state (such as the 
+current position size and direction) and other information, which could quickly involve dozens 
 of variables. Remember that we cannot do full-scale OOP in Numba, thus we have to pass data using
 primitive containers such as tuples. But usage of variable positional arguments or a regular tuple
-would be quite cumbersome for the user because accessing each field could only be done using an 
+would be quite cumbersome for the user because accessing each field can only be done using an 
 integer index or tuple unpacking. To ease this burden, we usually pass such information in form of 
 a named tuple, often referred to as a (simulation) "context".
 
 #### Pipeline/6
 
 Let's create a very basic pipeline that iterates over rows and columns, and, at each element, 
-calls a UDF to get an order, and executes it! 
+calls a UDF to get an order and execute it!
 
 First, we need to answer the following question: "What information would a UDF need?" 
 Mostly, we just include everything we have:
@@ -2407,7 +2411,7 @@ Mostly, we just include everything we have:
 2. Loop variables
 3. State information, either unpacked (marginally faster) or in form of named tuples (more convenient)
 
-And here's our pipeline that takes and calls a UDF to generate an order:
+And here's our pipeline that takes and calls an order function:
 
 ```pycon
 >>> @njit
@@ -2474,7 +2478,7 @@ And here's our pipeline that takes and calls a UDF to generate an order:
 1. Initialize the simulation context (= creates a named tuple)
 2. Call the UDF by first passing the context and then any user-defined arguments
 
-Let's write an order function that generates orders based on signals:
+Let's write our own order function that generates orders based on signals:
 
 ```pycon
 >>> @njit  # (1)!
@@ -2523,13 +2527,13 @@ functionality, neat! :boom:
 
 In terms of performance, Numba code is often a roller coaster :roller_coaster:
 
-Numba is a just-in-time compiler that analyzes and optimizes code, and finally uses the [LLVM compiler 
-library](https://github.com/numba/llvmlite) to generate a machine code version of a Python function 
-to be compiled. But sometimes, even if the function looks efficient on paper, Numba may
+Numba is a just-in-time (JIT) compiler that analyzes and optimizes code, and finally uses the 
+[LLVM compiler library](https://github.com/numba/llvmlite) to generate a machine code version of a 
+Python function to be compiled. But sometimes, even if the function looks efficient on paper, Numba may
 generate a suboptimal machine code because of some variables or their types not interacting optimally.
 In such a case, the code may still run very fast compared to a similar implementation with Python
-or even with another JIT compiler, but there is a lot of space for improvement that may be hard to discover,
-even for experienced users. There are even cases where switching the lines where variables are defined
+or even to another JIT compiler, but there is a lot of space for improvement that may be hard to discover,
+even for experienced users. There are even cases where switching the lines in which variables are defined
 suddenly and unexpectedly has a negative/positive effect on performance.
 
 Apart from [official tips](https://numba.pydata.org/numba-doc/latest/user/performance-tips.html), 
@@ -2537,7 +2541,7 @@ there are some of the best practices you should always keep in mind when designi
 Numba-compiled functions:
 
 1. Numba is perfectly happy with loops, and often even more happy than with vectorized operations.
-That's why 90% of vectorbt's functionality is written using loops.
+That's why 90% of vectorbt's functionality is enabled by loops.
 2. Numba hates repeated creation of new arrays and allocating (even small) chunks of memory in loops. 
 A much better idea is to create a bunch of bigger arrays prior to the iteration, and use them as a buffer
 for storing temporary information. Be aware that operations with NumPy that yield a new array, 
@@ -2572,7 +2576,8 @@ of its execution time and stability.
 !!! note
     Generation of sample data and preparation of other inputs must be done prior to benchmarking.
 
-Let's generate 1-minute random OHLC data for one year using [RandomOHLCData](/api/data/custom/#vectorbtpro.data.custom.RandomData):
+Let's generate 1-minute random OHLC data for one year using 
+[RandomOHLCData](/api/data/custom/#vectorbtpro.data.custom.RandomOHLCData):
 
 ```pycon
 >>> test_data = vbt.RandomOHLCData.fetch(
@@ -2596,8 +2601,8 @@ frequency for faster plotting.
 
 ![](/assets/images/simulation_random_ohlc_data.svg)
 
-Then, we to prepare all the data, which includes filling signals such that there is at least one 
-order at each bar (the worst-case scenario):
+Then, we need to prepare all the data, which includes filling signals such that there is at least one 
+order at each bar (our worst-case scenario for performance and memory):
 
 ```pycon
 >>> test_open = test_data.get("Open").values[:, None]  # (2)!
@@ -2644,7 +2649,7 @@ So, how is our simulator performing on this data?
 1. This magic command works only in a Jupyter environment and only if you place this command 
 at the beginning of the cell. If you're running the code as a script, use the `timeit` module.
 
-80 milliseconds to generate half a million orders (on Apple M1), not bad! :fire:
+80 milliseconds to generate half a million orders on Apple M1, not bad! :fire:
 
 To better illustrate how only a minor change can impact performance, we will create a new
 order function that also creates a zero-sized empty array:
@@ -2684,14 +2689,14 @@ And this is a very important lesson to learn: create arrays outside of loops and
 
 Because of path dependencies (= the current state depends on the previous one), we cannot parallelize 
 the loop that iterates over rows (= time). But here's the deal: since vectorbt allows us
-to define multi-columnar backtesting logic, we can parallelize the loop that iterates over 
+to define a multi-columnar backtesting logic, we can parallelize the loop that iterates over 
 columns or groups of columns, given that those columns or groups of columns are independent 
-of each other - all using Numba alone. This is one of the major reasons why vectorbt so much loves 
-two-dimensional data layouts, by the way.
+of each other - all using Numba alone. By the way, this is one of the primary reasons why vectorbt 
+loves two-dimensional data layouts so much.
 
 Automatic parallelization with Numba cannot be simpler: just replace `range` that you want to 
 parallelize with `numba.prange`, and instruct Numba to parallelize the function by passing 
-`parallel=True` to the `@njit` decorator. This will execute some code in the loop simultaneously 
+`parallel=True` to the `@njit` decorator. This will (try to) execute the code in the loop simultaneously 
 by multiple parallel threads. You can read more about automatic parallelization with Numba 
 [here](https://numba.pydata.org/numba-doc/latest/user/parallel.html) and about the
 available threading layers [here](https://numba.pydata.org/numba-doc/latest/user/threading-layer.html). 
@@ -2753,7 +2758,7 @@ Even if we had optimized the simulation pipeline for the best-possible performan
 step would take a huge chunk of that time savings away. However, the good news is that
 Numba doesn't have to re-compile the function the second time it's executed, given that we passed 
 the same argument **types** (not data!). This means that we need to wait only once if we want to test the 
-same function on many parameter combinations, in the same Python runtime. Sadly, if only one argument 
+same function on many parameter combinations, at the same Python runtime. Sadly, if only one argument 
 differs in type, or we've restarted the Python runtime, Numba has to compile again. 
 
 But luckily, Numba gives us a mechanism to avoid re-compilation even if we've restarted the runtime, 
@@ -2761,21 +2766,21 @@ called [caching](https://numba.pydata.org/numba-doc/latest/developer/caching.htm
 To enable caching, just pass `cache=True` to the `@njit` decorator.
 
 !!! important
-    Avoid turning on caching for functions that take complex, user-defined data as arguments, such as
+    Avoid turning on caching for functions that take complex, user-defined data, such as
     (named) tuples and other functions. This may lead to some hidden bugs and kernel crashes if the 
     data changes during the next runtime. Also make sure that your function doesn't use global variables.
     For example, the [fifth pipeline](#pipeline5) is perfectly cacheable, while the [sixth pipeline](#pipeline6)
-    is not cacheable, or could be if `order_func_nb` was cacheable as well.
+    is not cacheable, or maybe could be if `order_func_nb` was cacheable as well.
 
 #### AOT compilation
 
 Using [ahead-of-time compilation](https://numba.pydata.org/numba-doc/dev/user/pycc.html), we can compile
 a function only once and get no compilation overhead at runtime. Although this feature of Numba
-isn't widely used in vectorbt to make functions accept arguments as flexible as possible, we
-can make use of it in a case where we know the argument types in advance. Let's pre-compile our
+isn't widely used in vectorbt because it would restrict us from passing input data flexibly, we
+can make use of it in cases where we know the argument types in advance. Let's pre-compile our
 [fifth pipeline](#pipeline5)!
 
-For this, we have to specify the signature of the function explicitly. You can read more about it in the 
+For this, we have to specify the signature of a function explicitly. You can read more about it in the 
 [types](https://numba.pydata.org/numba-doc/dev/reference/types.html#numba-types) reference.
 
 ```pycon
@@ -2854,7 +2859,7 @@ One of the most important takeaways from this documentation piece is that implem
 simulator is as easy (or as difficult) as any other Numba-compiled function, and there is no point 
 in using the preset simulation methods such as 
 [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_signals)
-if you can get the same results, achieve a multifold performance gain, use rotational indexing and 
-caching, and do AOT compilation by designing your own pipeline from scratch. After all, it's just 
+if you can produce the same results, achieve a multifold performance gain, be able to use rotational 
+indexing, caching, and AOT compilation, by designing your own pipeline from scratch. After all, it's just 
 a bunch of loops that gradually move over the shape of a matrix, execute orders, update the state 
 of the simulation, and write some output data. Everything else is up to your imagination :mage:
