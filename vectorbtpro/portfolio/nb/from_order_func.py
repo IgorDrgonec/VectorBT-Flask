@@ -763,8 +763,8 @@ def simulate_nb(
     last_free_cash = last_cash.copy()
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
-    order_counts = np.full(target_shape[1], 0, dtype=np.int)
-    log_counts = np.full(target_shape[1], 0, dtype=np.int)
+    order_counts = np.full(target_shape[1], 0, dtype=np.int_)
+    log_counts = np.full(target_shape[1], 0, dtype=np.int_)
 
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
@@ -1623,8 +1623,8 @@ def simulate_row_wise_nb(
     last_free_cash = last_cash.copy()
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
-    order_counts = np.full(target_shape[1], 0, dtype=np.int)
-    log_counts = np.full(target_shape[1], 0, dtype=np.int)
+    order_counts = np.full(target_shape[1], 0, dtype=np.int_)
+    log_counts = np.full(target_shape[1], 0, dtype=np.int_)
 
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
@@ -2626,8 +2626,8 @@ def flex_simulate_nb(
     last_free_cash = last_cash.copy()
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
-    order_counts = np.full(target_shape[1], 0, dtype=np.int)
-    log_counts = np.full(target_shape[1], 0, dtype=np.int)
+    order_counts = np.full(target_shape[1], 0, dtype=np.int_)
+    log_counts = np.full(target_shape[1], 0, dtype=np.int_)
 
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
@@ -3400,8 +3400,8 @@ def flex_simulate_row_wise_nb(
     last_free_cash = last_cash.copy()
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
-    order_counts = np.full(target_shape[1], 0, dtype=np.int)
-    log_counts = np.full(target_shape[1], 0, dtype=np.int)
+    order_counts = np.full(target_shape[1], 0, dtype=np.int_)
+    log_counts = np.full(target_shape[1], 0, dtype=np.int_)
 
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens

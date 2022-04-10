@@ -144,7 +144,10 @@ def test_execute_order_nb():
         ExecState(100.0, 100.0, 0.0, 100.0, 10.0, np.nan),
         nb.order_nb(1, 10, size_type=SizeType.TargetPercent),
     )
-    assert account_state == ExecState(100.0, 100.0, 0.0, 100.0, 10.0, np.nan)
+    np.testing.assert_array_equal(
+        np.asarray(account_state),
+        np.asarray(ExecState(100.0, 100.0, 0.0, 100.0, 10.0, np.nan)),
+    )
     assert_same_tuple(
         order_result,
         OrderResult(size=np.nan, price=np.nan, fees=np.nan, side=-1, status=1, status_info=3),
@@ -172,7 +175,10 @@ def test_execute_order_nb():
         ExecState(100.0, 100.0, 0.0, 100.0, np.nan, 1100.0),
         nb.order_nb(10, 10, size_type=SizeType.Value),
     )
-    assert account_state == ExecState(100.0, 100.0, 0.0, 100.0, np.nan, 1100.0)
+    np.testing.assert_array_equal(
+        np.asarray(account_state),
+        np.asarray(ExecState(100.0, 100.0, 0.0, 100.0, np.nan, 1100.0)),
+    )
     with pytest.raises(Exception):
         nb.execute_order_nb(
             ExecState(100.0, 100.0, 0.0, 100.0, np.inf, 1100.0),
@@ -187,7 +193,10 @@ def test_execute_order_nb():
         ExecState(100.0, 100.0, 0.0, 100.0, np.nan, 1100.0),
         nb.order_nb(10, 10, size_type=SizeType.TargetValue),
     )
-    assert account_state == ExecState(100.0, 100.0, 0.0, 100.0, np.nan, 1100.0)
+    np.testing.assert_array_equal(
+        np.asarray(account_state),
+        np.asarray(ExecState(100.0, 100.0, 0.0, 100.0, np.nan, 1100.0)),
+    )
     assert_same_tuple(
         order_result,
         OrderResult(size=np.nan, price=np.nan, fees=np.nan, side=-1, status=1, status_info=2),
