@@ -201,7 +201,7 @@ Just for the sake of example, let's save the current timestamp:
 ## Alignment
 
 Like most classes that hold data, the class [Data](/api/data/base/#vectorbtpro.data.base.Data) 
-subclasses [Analyzable](/documentation/building-blocks/#analyzing), so we can perform Pandas indexing 
+subclasses [Analyzable](../building-blocks/#analyzing), so we can perform Pandas indexing 
 on the class instance itself to select rows and columns in all Pandas objects stored inside that instance.
 Doing a single Pandas indexing operation on multiple Pandas objects with different labels is impossible, so 
 what happens if we fetched symbol data from different date ranges or with different columns? Whenever 
@@ -219,7 +219,7 @@ of all objects based on some rule. By default, it builds the union of all indexe
 and sets the missing data points in any object to NaN.
 5. Calls [Data.align_columns](/api/data/base/#vectorbtpro.data.base.Data.align_columns) to align the column 
 labels of all objects based on some rule - a similar procedure to aligning indexes.
-6. Having the same index and columns across all objects, it builds a [wrapper](/documentation/building-blocks/#wrapping)
+6. Having the same index and columns across all objects, it builds a [wrapper](../building-blocks/#wrapping)
 7. Finally, it passes all information to the class constructor for instantiation
 
 Let's illustrate this workflow in practice:
@@ -963,8 +963,7 @@ Freq: MS, Name: Close, dtype: float64
 
 ## Analysis
 
-Each data class subclasses [Analyzable](/documentation/building-blocks/#analyzing), which makes
-it analyzable and indexable.
+Each data class subclasses [Analyzable](../building-blocks/#analyzing), which makes it analyzable and indexable.
 
 ### Indexing
 

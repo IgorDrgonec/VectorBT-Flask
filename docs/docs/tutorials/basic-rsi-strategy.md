@@ -514,10 +514,9 @@ We can observe entire regions of parameter combinations that yield positive resu
 
 ### Using columns
 
-As you might have read in [Fundamentals](/documentation/fundamentals), vectorbt loves processing
-multi-dimensional data. In particular, it's built around the idea that you can represent
-each asset, period, parameter combination, and a backtest in general, as a column
-in a two-dimensional array. 
+As you might have read in the documentation, vectorbt loves processing multi-dimensional data. 
+In particular, it's built around the idea that you can represent each asset, period, parameter 
+combination, and a backtest in general, as a column in a two-dimensional array.
 
 Instead of computing everything in a loop (which isn't too bad but usually executes magnitudes 
 slower than a vectorized solution) we can change our code to accept parameters as arrays. 
@@ -568,7 +567,7 @@ The next part are crossovers. In contrast to indicators, they are regular functi
 any array-like object, broadcast it to the `rsi` array, and search for crossovers.
 The broadcasting step is done using [broadcast](/api/base/reshaping/#vectorbtpro.base.reshaping.broadcast),
 which is a very powerful function for bringing multiple arrays to a single shape
-(read more in [Broadcasting](/documentation/fundamentals/#broadcasting)).
+(learn more about broadcasting in the documentation).
 
 In our case, we want to build a product of `lower_ths`, `upper_th_index`, and all columns in `rsi`.
 Since both `rsi_crossed_below` and `rsi_crossed_above` are two different functions,

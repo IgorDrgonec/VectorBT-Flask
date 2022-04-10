@@ -254,7 +254,7 @@ Or, manually:
 
 ## Indexing
 
-Each indicator class subclasses [Analyzable](/documentation/building-blocks/#analyzing), so we can perform
+Each indicator class subclasses [Analyzable](../../building-blocks/#analyzing), so we can perform
 Pandas indexing on the indicator instance to select rows and columns in all Pandas objects.
 Supported operations are `iloc`, `loc`, `xs`, and `__getitem__`. 
 
@@ -504,6 +504,6 @@ in case it wasn't provided
 2. We need to use [Config](/api/utils/config/#vectorbtpro.utils.config.Config) instead of `dict` when
 setting `metrics` and `subplots` manually
 3. Since both functions have become attributes of the class, we can specify them as strings
-to make use of vectorbt's [attribute resolution](/documentation/building-blocks/#attribute-resolution)
+to make use of vectorbt's [attribute resolution](../../building-blocks/#attribute-resolution)
 
 ![](/assets/images/indicators_plot_signals.svg)

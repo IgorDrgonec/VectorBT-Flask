@@ -690,7 +690,7 @@ been upgraded with broadcasting and multidimensionality. You can also see that p
 annotated with `@p`, while inputs and outputs weren't annotated at all - the factory knows exactly
 that `high` is the high price, while the latest line apparently returns 4 output objects.
 
-For more examples, see [Expressions](/documentation/indicators/parsers/#expressions).
+For more examples, see the documentation on expression parsing.
 
 ```pycon
 >>> SuperTrend = vbt.IF.from_expr(

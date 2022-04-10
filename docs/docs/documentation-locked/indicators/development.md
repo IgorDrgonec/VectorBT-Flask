@@ -453,7 +453,7 @@ to the point in time when this is actually needed.
 The implementation above is great but not the most optimized one since it iterates over the 
 input shape multiple times. As a bonus, let's rewrite our `apply_func` to be Numba-compiled: 
 it will iterate over columns and rows, select each parameter value 
-[flexibly](/documentation/fundamentals/#flexible-indexing) and entirely without broadcasting, 
+[flexibly](../../fundamentals/#flexible-indexing) and entirely without broadcasting, 
 and gradually fill the output array.
 
 ```pycon
@@ -504,11 +504,11 @@ Indicators can also be parameterless, such as [OBV](/api/indicators/custom/#vect
 [IndicatorFactory](/api/indicators/factory/#vectorbtpro.indicators.factory.IndicatorFactory) supports 
 passing none, one, or multiple inputs. If multiple inputs were passed, it tries to broadcast them into 
 a single shape with [broadcast](/api/base/reshaping/#vectorbtpro.base.reshaping.broadcast)
-(see [Broadcasting](/documentation/fundamentals/#broadcasting)).
+(see [Broadcasting](../../fundamentals/#broadcasting)).
 
 Remember that in vectorbt each column means a separate backtest. That's why in order to use
 multiple pieces of information, such as OHLCV, we need to provide them as separate Pandas 
-objects rather than a monolithic DataFrame (see [Multidimensionality](/documentation/fundamentals/#multidimensionality)).
+objects rather than a monolithic DataFrame (see [Multidimensionality](../../fundamentals/#multidimensionality)).
 
 Let's create a parameterless indicator that measures the position of the closing price relative 
 to the candle:
@@ -741,7 +741,7 @@ custom_group_by                tuple_0                True
 ```
 
 Instead of working on Pandas objects, we can instruct [run_pipeline](/api/indicators/factory/#vectorbtpro.indicators.factory.run_pipeline)
-to pass inputs as NumPy arrays along with a [wrapper](/documentation/building-blocks/#wrapping) 
+to pass inputs as NumPy arrays along with a [wrapper](../../building-blocks/#wrapping) 
 containing the Pandas metadata:
 
 ```pycon

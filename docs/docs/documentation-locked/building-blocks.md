@@ -1047,7 +1047,7 @@ Records are [structured arrays](https://numpy.org/doc/stable/user/basics.rec.htm
 a NumPy array that can hold different data types, just like a Pandas DataFrame. Records have one big 
 advantage over DataFrames though: they are well understood by Numba, thus we can generate and 
 use them efficiently. So, what's the catch? Records have no (index) labels and the API is very limited.
-We also [learned](/documentation/fundamentals/) that vectorbt doesn't like heterogenous data and 
+We also [learned](../fundamentals/) that vectorbt doesn't like heterogenous data and 
 prefers to work with multiple homogeneous arrays (remember how we need to split OHLC 
 into O, H, L, and C?). Nevertheless, they take a very important place in our ecosystem - 
 as containers for event data.

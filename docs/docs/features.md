@@ -832,9 +832,6 @@ there is a time frame parameter in each TA-Lib indicator!
 >>> mtf_sma.real.iloc[:, ::-1].vbt.ts_heatmap()
 ```
 
-1. Downsample the entire data instance
-2. Bring downsampled arrays back to the original time frame
-
 [=100% "Period 8/8"]{: .candystripe}
 
 ![](/assets/images/features/mtf_heatmap.svg)

@@ -213,7 +213,7 @@ Whenever we call the `run` method, it sets up and returns an instance of `MADiff
 and output data.
 
 You might ask: *"Why doesn't the factory create a function instead of a class? Having an indicator
-function would be more intuitive!"* If you read through [Building blocks](/documentation/building-blocks),
+function would be more intuitive!"* If you read through [Building blocks](../building-blocks),
 you would already be familiar with the class [Analyzable](/api/generic/analyzable/#vectorbtpro.generic.analyzable.Analyzable),
 which is the go-to class for analyzing data. The indicator class created by the factory is a subclass of 
 [Analyzable](/api/generic/analyzable/#vectorbtpro.generic.analyzable.Analyzable), so we not only 

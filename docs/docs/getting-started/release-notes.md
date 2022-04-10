@@ -156,7 +156,7 @@ has been renamed to `convert_children_`.
 [custom](/api/data/custom/) module to [_settings.data](/api/_settings/#vectorbtpro._settings.data) 
 to be able to set them globally
 - Minor fixes and enhancements across the project
-- Wrote [Data](/documentation/data) :notebook_with_decorative_cover:
+- Wrote documentation on data :notebook_with_decorative_cover:
 
 ## Version 1.0.10 (11 Feb, 2022)
 
@@ -227,7 +227,7 @@ in [Wrapping](/api/base/wrapping/#vectorbtpro.base.wrapping.Wrapping)
 - Updated plotting methods in [custom](/api/indicators/custom/)
 - [Data.get](/api/data/base/#vectorbtpro.data.base.Data.get) also accepts symbol(s)
 - Greatly optimized [Data.concat](/api/data/base/#vectorbtpro.data.base.Data.concat)
-- Wrote [Indicators](/documentation/indicators) :notebook_with_decorative_cover:
+- Wrote documentation on indicators :notebook_with_decorative_cover:
 
 ## Version 1.0.8 (25 Jan, 2022)
 
@@ -271,13 +271,13 @@ which combines [Wrapping](/api/base/wrapping/#vectorbtpro.base.wrapping.Wrapping
 is two-dimensional and has only one column
 - [Grouper](/api/base/grouping/#vectorbtpro.base.grouping.base.Grouper) can return a group map,
 which isn't tied to a strict group ordering and is easier to use outside of Numba
-- Wrote [Building blocks](/documentation/building-blocks) :notebook_with_decorative_cover:
+- Wrote documentation on building blocks :notebook_with_decorative_cover:
 
 ## Version 1.0.6 (9 Jan, 2022)
 
 - Benchmark can be disabled by passing `bm_close=False` to 
 [Portfolio](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio)
-- Wrote [Fundamentals](/documentation/fundamentals) :notebook_with_decorative_cover:
+- Wrote documentation on fundamentals :notebook_with_decorative_cover:
 
 ## Version 1.0.5 (8 Jan, 2022)
 
