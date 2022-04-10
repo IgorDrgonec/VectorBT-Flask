@@ -6,6 +6,25 @@ title: Release notes
 
 All notable changes in reverse chronological order.
 
+## Version 1.2.1 (10 Apr, 2022)
+
+- Fixed check for zero size in [buy_nb](/api/portfolio/nb/core/#vectorbtpro.portfolio.nb.core.buy_nb)
+- Fixed [is_numba_func](/api/utils/checks/#vectorbtpro.utils.checks.is_numba_func) when Numba is disabled globally
+- Use record counts (`order_counts` and `log_counts`) instead of last indices (`last_oidx` and `last_lidx`) 
+in simulation methods with order functions
+- Added `inplace` argument for [BaseAccessor.set](/api/base/accessors/#vectorbtpro.base.accessors.BaseAccessor.set) 
+and [BaseAccessor.set_between](/api/base/accessors/#vectorbtpro.base.accessors.BaseAccessor.set_between) 
+- Fixed `ndim` in [Data.get_symbol_wrapper](/api/data/base/#vectorbtpro.data.base.Data.get_symbol_wrapper)
+- Renamed `ExecuteOrderState` to [AccountState](/api/portfolio/enums/#vectorbtpro.portfolio.enums.AccountState) 
+and `ProcessOrderState` to [ExecState](/api/portfolio/enums/#vectorbtpro.portfolio.enums.ExecState) 
+- Rotational indexing is disabled by default and can be enabled globally using settings
+- Order approximation function takes an instance of `ExecState` instead of state variables
+- Created classes [RandomOHLCData](/api/data/custom/#vectorbtpro.data.custom.RandomData) and
+  [GBMOHLCData](/api/data/custom/#vectorbtpro.data.custom.GBMOHLCData) for generation of random OHLC data
+- Made numeric tests more precise by reducing tolerance values
+- Fixed documentation where argument `interval` was used instead of `timeframe`
+- Wrote documentation on [Portfolio simulation](/documentation/portfolio/) :notebook_with_decorative_cover:
+
 ## Version 1.2.0 (3 Apr, 2022)
 
 - Integrated [PyPortfolioOpt](https://pyportfolioopt.readthedocs.io/en/latest/): implemented
@@ -156,7 +175,7 @@ has been renamed to `convert_children_`.
 [custom](/api/data/custom/) module to [_settings.data](/api/_settings/#vectorbtpro._settings.data) 
 to be able to set them globally
 - Minor fixes and enhancements across the project
-- Wrote documentation on data :notebook_with_decorative_cover:
+- Wrote documentation on [Data](/documentation/data/) :notebook_with_decorative_cover:
 
 ## Version 1.0.10 (11 Feb, 2022)
 
@@ -227,7 +246,7 @@ in [Wrapping](/api/base/wrapping/#vectorbtpro.base.wrapping.Wrapping)
 - Updated plotting methods in [custom](/api/indicators/custom/)
 - [Data.get](/api/data/base/#vectorbtpro.data.base.Data.get) also accepts symbol(s)
 - Greatly optimized [Data.concat](/api/data/base/#vectorbtpro.data.base.Data.concat)
-- Wrote documentation on indicators :notebook_with_decorative_cover:
+- Wrote documentation on [Indicators](/documentation/indicators/) :notebook_with_decorative_cover:
 
 ## Version 1.0.8 (25 Jan, 2022)
 
@@ -271,13 +290,13 @@ which combines [Wrapping](/api/base/wrapping/#vectorbtpro.base.wrapping.Wrapping
 is two-dimensional and has only one column
 - [Grouper](/api/base/grouping/#vectorbtpro.base.grouping.base.Grouper) can return a group map,
 which isn't tied to a strict group ordering and is easier to use outside of Numba
-- Wrote documentation on building blocks :notebook_with_decorative_cover:
+- Wrote documentation on [Building blocks](/documentation/building-blocks/) :notebook_with_decorative_cover:
 
 ## Version 1.0.6 (9 Jan, 2022)
 
 - Benchmark can be disabled by passing `bm_close=False` to 
 [Portfolio](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio)
-- Wrote documentation on fundamentals :notebook_with_decorative_cover:
+- Wrote documentation on [Fundamentals](/documentation/fundamentals/) :notebook_with_decorative_cover:
 
 ## Version 1.0.5 (8 Jan, 2022)
 

@@ -2572,7 +2572,7 @@ of its execution time and stability.
 !!! note
     Generation of sample data and preparation of other inputs must be done prior to benchmarking.
 
-Let's generate 1-minute random OHLC data for one year:
+Let's generate 1-minute random OHLC data for one year using [RandomOHLCData](/api/data/custom/#vectorbtpro.data.custom.RandomData):
 
 ```pycon
 >>> test_data = vbt.RandomOHLCData.fetch(
