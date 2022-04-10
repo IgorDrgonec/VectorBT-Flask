@@ -34,7 +34,7 @@ ticker, every 10 seconds, for 5 minutes. First, we will pull the latest 10 minut
 ...     'BTCUSDT', 
 ...     start='10 minutes ago UTC', 
 ...     end='now UTC', 
-...     interval='1m'
+...     timeframe='1m'
 ... )
 
 >>> data.get('Close')
@@ -272,7 +272,7 @@ Let's pull 1-minute `BTCUSDT` data from Binance and write it to a CSV file, ever
 ...     'BTCUSDT', 
 ...     start='10 minutes ago UTC', 
 ...     end='now UTC', 
-...     interval='1m'
+...     timeframe='1m'
 ... )
 
 >>> csv_saver = vbt.CSVDataSaver(data)

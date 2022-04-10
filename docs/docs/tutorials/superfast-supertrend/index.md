@@ -42,7 +42,7 @@ Bitcoin and Ethereum data from Binance using the vectorbt's
 ...     ['BTCUSDT', 'ETHUSDT'], 
 ...     start='2020-01-01',
 ...     end='2022-01-01',
-...     interval='1h'
+...     timeframe='1h'
 ... )
 ```
 

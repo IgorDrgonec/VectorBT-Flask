@@ -458,10 +458,11 @@ data = ChildDict(
             mean=0.0,
             std=0.01,
             symmetric=False,
-            to_ohlc=False,
-            ohlc_freq=None,
             seed=None,
             jitted=None,
+        ),
+        random_ohlc=FrozenConfig(
+            ohlc_freq=None,
         ),
         gbm=FrozenConfig(
             num_paths=1,
@@ -469,10 +470,11 @@ data = ChildDict(
             mean=0.0,
             std=0.01,
             dt=1.0,
-            to_ohlc=False,
-            ohlc_freq=None,
             seed=None,
             jitted=None,
+        ),
+        gbm_ohlc=FrozenConfig(
+            ohlc_freq=None,
         ),
         # Local
         local=FrozenConfig(

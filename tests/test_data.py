@@ -1829,11 +1829,12 @@ class TestCustom:
                 columns=pd.Index([0, 1], name="symbol"),
             ),
         )
+
+    def test_random_ohlc_data(self):
         assert_frame_equal(
-            vbt.RandomData.fetch(
+            vbt.RandomOHLCData.fetch(
                 start="2021-01-01 UTC",
                 end="2021-01-05 UTC",
-                to_ohlc=True,
                 ohlc_freq="2D",
                 seed=42,
             ).get(),
@@ -1922,11 +1923,12 @@ class TestCustom:
                 columns=pd.Index([0, 1], name="symbol"),
             ),
         )
+
+    def test_gbm_ohlc_data(self):
         assert_frame_equal(
-            vbt.GBMData.fetch(
+            vbt.GBMOHLCData.fetch(
                 start="2021-01-01 UTC",
                 end="2021-01-05 UTC",
-                to_ohlc=True,
                 ohlc_freq="2D",
                 seed=42,
             ).get(),

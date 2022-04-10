@@ -1204,7 +1204,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         column: tp.Optional[tp.Label] = None,
         symbol: tp.Optional[tp.Symbol] = None,
         column_names: tp.KwargsLike = None,
-        plot_volume: bool = True,
+        plot_volume: tp.Optional[bool] = None,
         base: tp.Optional[float] = None,
         **kwargs,
     ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:  # pragma: no cover
