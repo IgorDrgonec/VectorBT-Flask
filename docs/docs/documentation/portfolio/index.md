@@ -191,7 +191,7 @@ OrderResult(
 )
 ```
 
-This has bought exactly 15 shares. Given the new account state, let's run the same transaction again:
+This has bought exactly 6 shares. Given the new account state, let's run the same transaction again:
 
 ```pycon
 >>> new_account_state2, order_result = pf_nb.buy_nb(
@@ -1028,23 +1028,23 @@ close price :writing_hand:
 ... )
 >>> new_exec_state, order_result = pf_nb.execute_order_nb(  # (1)!
 ...     exec_state=exec_state,
-...     order=pf_nb.order_nb(size=np.inf, price=np.inf),
-...     price_area=price_area
-... )
->>> order_result.price
-12.0
-
->>> new_exec_state, order_result = pf_nb.execute_order_nb(  # (2)!
-...     exec_state=exec_state,
 ...     order=pf_nb.order_nb(size=np.inf, price=-np.inf),
 ...     price_area=price_area
 ... )
 >>> order_result.price
 10.0
 
+>>> new_exec_state, order_result = pf_nb.execute_order_nb(  # (2)!
+...     exec_state=exec_state,
+...     order=pf_nb.order_nb(size=np.inf, price=np.inf),
+...     price_area=price_area
+... )
+>>> order_result.price
+12.0
+
 >>> new_exec_state, order_result = pf_nb.execute_order_nb(  # (3)!
 ...     exec_state=exec_state,
-...     order=pf_nb.order_nb(size=np.inf, price=-np.inf)
+...     order=pf_nb.order_nb(size=np.inf, price=np.inf)
 ... )
 >>> order_result.price
 nan
@@ -2771,6 +2771,16 @@ To enable caching, just pass `cache=True` to the `@njit` decorator.
     data changes during the next runtime. Also make sure that your function doesn't use global variables.
     For example, the [fifth pipeline](#pipeline5) is perfectly cacheable, while the [sixth pipeline](#pipeline6)
     is not cacheable, or maybe could be if `order_func_nb` was cacheable as well.
+
+Make sure to define any cached function inside a Python file rather than in a notebook cell since
+it must have a clear filepath such that it can be introspected by Numba. To invalidate the cache, 
+go to the directory where the function resides and remove the `__pycache__` directory. You can do 
+that by running `rm -rf __pycache__` from your terminal.
+
+!!! hint
+    A good practice is to invalidate the cache every time you change the code of a cached function
+    to avoid potential side effects. Also, disable caching for the entire time of developing
+    a function and turn it only on once the function has been fully implemented.
 
 #### AOT compilation
 
