@@ -2972,8 +2972,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 call next. Processing of `call_seq` goes always from left to right.
                 For example, `[2, 0, 1]` would first call column 'c', then 'a', and finally 'b'.
 
-                * Use `vectorbtpro.portfolio.enums.CallSeqType` to select a sequence type.
-                * Set to array to specify custom sequence. Will not broadcast.
+                Supported are multiple options:
+
+                * Set to None to generate the default call sequence on the fly. Will create a
+                    full array only if `attach_call_seq` is True.
+                * Use `vectorbtpro.portfolio.enums.CallSeqType` to create a full array of a specific type.
+                * Set to array to specify a custom call sequence.
 
                 If `CallSeqType.Auto` selected, rearranges calls dynamically based on order value.
                 Calculates value of all orders per row and group, and sorts them by this value.
@@ -3369,10 +3373,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             **require_kwargs,
         )
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
-        if checks.is_any_array(call_seq):
-            call_seq = require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
-        else:
-            call_seq = build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
+        if call_seq is None and attach_call_seq:
+            call_seq = CallSeqType.Default
+        if call_seq is not None:
+            if checks.is_any_array(call_seq):
+                call_seq = require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
+            else:
+                call_seq = build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
         if not np.any(log):
             max_logs = 0
 
@@ -3386,7 +3393,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         # Check data types
         checks.assert_subdtype(cs_group_lens, np.integer)
-        checks.assert_subdtype(call_seq, np.integer)
+        if call_seq is not None:
+            checks.assert_subdtype(call_seq, np.integer)
         checks.assert_subdtype(init_cash, np.number)
         checks.assert_subdtype(init_position, np.number)
         checks.assert_subdtype(init_price, np.number)
@@ -4441,10 +4449,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             **require_kwargs,
         )
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
-        if checks.is_any_array(call_seq):
-            call_seq = require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
-        else:
-            call_seq = build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
+        if call_seq is None and attach_call_seq:
+            call_seq = CallSeqType.Default
+        if call_seq is not None:
+            if checks.is_any_array(call_seq):
+                call_seq = require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
+            else:
+                call_seq = build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
         if not np.any(log):
             max_logs = 0
 
@@ -5637,10 +5648,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 **require_kwargs,
             )
         if not flexible:
-            if checks.is_any_array(call_seq):
-                call_seq = require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
-            else:
-                call_seq = build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
+            if call_seq is None and attach_call_seq:
+                call_seq = CallSeqType.Default
+            if call_seq is not None:
+                if checks.is_any_array(call_seq):
+                    call_seq = require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
+                else:
+                    call_seq = build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
 
         # Check data types
         checks.assert_subdtype(cs_group_lens, np.integer)

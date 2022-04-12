@@ -1141,7 +1141,7 @@ portfolio = ChildDict(
     ),
     template_context=Config(),
     keep_inout_raw=True,
-    call_seq="default",
+    call_seq=None,
     attach_call_seq=False,
     bm_close=None,
     # Portfolio

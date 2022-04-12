@@ -833,6 +833,7 @@ __pdoc__[
 Controls the sequence in which `order_func_nb` is executed within each segment.
 
 Has shape `SimulationContext.target_shape` and each value must exist in the range `[0, group_len)`.
+Can also be None if not provided.
 
 !!! note
     To use `sort_call_seq_nb`, must be generated using `CallSeqType.Default`.

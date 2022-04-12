@@ -416,7 +416,7 @@ AdjustTPFuncT = tp.Callable[[AdjustTPContext, tp.VarArg()], float]
 def simulate_from_signal_func_nb(
     target_shape: tp.Shape,
     group_lens: tp.Array1d,
-    call_seq: tp.Array2d,
+    call_seq: tp.Optional[tp.Array2d] = None,
     init_cash: tp.FlexArray = np.asarray(100.0),
     init_position: tp.FlexArray = np.asarray(0.0),
     init_price: tp.FlexArray = np.asarray(np.nan),
@@ -540,7 +540,6 @@ def simulate_from_signal_func_nb(
 
     last_val_price = np.full_like(last_position, np.nan)
     last_debt = np.full(target_shape[1], 0.0, dtype=np.float_)
-    temp_order_value = np.empty(target_shape[1], dtype=np.float_)
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
     order_counts = np.full(target_shape[1], 0, dtype=np.int_)
@@ -583,6 +582,9 @@ def simulate_from_signal_func_nb(
     slippage_arr = np.empty(target_shape[1], dtype=np.float_)
     direction_arr = np.empty(target_shape[1], dtype=np.int_)
 
+    temp_call_seq = np.empty(target_shape[1], dtype=np.int_)
+    temp_order_value = np.empty(target_shape[1], dtype=np.float_)
+
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
 
@@ -599,8 +601,8 @@ def simulate_from_signal_func_nb(
             cash_now += _cash_deposits
             free_cash_now += _cash_deposits
 
-            for k in range(group_len):
-                col = from_col + k
+            for c in range(group_len):
+                col = from_col + c
 
                 # Update valuation price using current open
                 _open = flex_select_auto_nb(open, i, col, flex_2d)
@@ -624,8 +626,8 @@ def simulate_from_signal_func_nb(
                     last_val_price[col] = _val_price
 
             # Get size and value of each order
-            for k in range(group_len):
-                col = from_col + k  # order doesn't matter
+            for c in range(group_len):
+                col = from_col + c  # order doesn't matter
 
                 position_now = last_position[col]
                 stop_price = np.nan
@@ -837,45 +839,52 @@ def simulate_from_signal_func_nb(
                 size_type_arr[col] = _size_type
                 direction_arr[col] = _direction
 
-                if cash_sharing:
+                if cash_sharing and auto_call_seq:
                     if np.isnan(_size):
-                        temp_order_value[k] = 0.0
+                        temp_order_value[c] = 0.0
                     else:
                         # Approximate order value
                         if _size_type == SizeType.Amount:
-                            temp_order_value[k] = _size * last_val_price[col]
+                            temp_order_value[c] = _size * last_val_price[col]
                         elif _size_type == SizeType.Value:
-                            temp_order_value[k] = _size
+                            temp_order_value[c] = _size
                         else:  # SizeType.Percent
                             if _size >= 0:
-                                temp_order_value[k] = _size * cash_now
+                                temp_order_value[c] = _size * cash_now
                             else:
                                 asset_value_now = last_position[col] * last_val_price[col]
                                 if _direction == Direction.LongOnly:
-                                    temp_order_value[k] = _size * asset_value_now
+                                    temp_order_value[c] = _size * asset_value_now
                                 else:
                                     max_exposure = 2 * max(asset_value_now, 0) + max(free_cash_now, 0)
-                                    temp_order_value[k] = _size * max_exposure
+                                    temp_order_value[c] = _size * max_exposure
 
             if cash_sharing:
                 # Dynamically sort by order value -> selling comes first to release funds early
+                if call_seq is None:
+                    for c in range(group_len):
+                        temp_call_seq[c] = c
+                    call_seq_now = temp_call_seq[:group_len]
+                else:
+                    call_seq_now = call_seq[i, from_col:to_col]
                 if auto_call_seq:
-                    insert_argsort_nb(temp_order_value[:group_len], call_seq[i, from_col:to_col])
+                    insert_argsort_nb(temp_order_value[:group_len], call_seq_now)
 
                 # Same as get_group_value_ctx_nb but with flexible indexing
                 value_now = cash_now
-                for k in range(group_len):
-                    col = from_col + k
+                for c in range(group_len):
+                    col = from_col + c
                     if last_position[col] != 0:
                         value_now += last_position[col] * last_val_price[col]
 
             for k in range(group_len):
-                col = from_col + k
                 if cash_sharing:
-                    col_i = call_seq[i, col]
-                    if col_i >= group_len:
+                    c = call_seq_now[k]
+                    if c >= group_len:
                         raise ValueError("Call index out of bounds of the group")
-                    col = from_col + col_i
+                else:
+                    c = k
+                col = from_col + c
 
                 # Get current values per column
                 position_now = last_position[col]

@@ -1709,6 +1709,9 @@ class TestFromOrders:
             pf.call_seq.values,
             np.array([[2, 0, 1], [1, 0, 2], [0, 2, 1], [2, 1, 0], [1, 0, 2]]),
         )
+        _ = from_orders_both(attach_call_seq=False, **kwargs)
+        _ = from_orders_longonly(attach_call_seq=False, **kwargs)
+        _ = from_orders_shortonly(attach_call_seq=False, **kwargs)
 
     def test_value(self):
         assert_records_close(

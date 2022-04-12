@@ -98,18 +98,18 @@ def sort_call_seq_out_nb(
 
     group_value_now = get_group_value_ctx_nb(ctx)
     group_len = ctx.to_col - ctx.from_col
-    for k in range(group_len):
-        if call_seq_out[k] != k:
+    for c in range(group_len):
+        if call_seq_out[c] != c:
             raise ValueError("call_seq_out must follow CallSeqType.Default")
-        col = ctx.from_col + k
+        col = ctx.from_col + c
         if ctx_select:
             _size = get_col_elem_nb(ctx, col, size)
             _size_type = get_col_elem_nb(ctx, col, size_type)
             _direction = get_col_elem_nb(ctx, col, direction)
         else:
-            _size = flex_select_auto_nb(size, k, 0, False)
-            _size_type = flex_select_auto_nb(size_type, k, 0, False)
-            _direction = flex_select_auto_nb(direction, k, 0, False)
+            _size = flex_select_auto_nb(size, c, 0, False)
+            _size_type = flex_select_auto_nb(size_type, c, 0, False)
+            _direction = flex_select_auto_nb(direction, c, 0, False)
         if ctx.cash_sharing:
             cash_now = ctx.last_cash[ctx.group]
             free_cash_now = ctx.last_free_cash[ctx.group]
@@ -124,7 +124,7 @@ def sort_call_seq_out_nb(
             val_price=ctx.last_val_price[col],
             value=group_value_now,
         )
-        order_value_out[k] = approx_order_value_nb(
+        order_value_out[c] = approx_order_value_nb(
             exec_state,
             _size,
             _size_type,
@@ -338,7 +338,7 @@ def simulate_nb(
     target_shape: tp.Shape,
     group_lens: tp.Array1d,
     cash_sharing: bool,
-    call_seq: tp.Array2d,
+    call_seq: tp.Optional[tp.Array2d] = None,
     init_cash: tp.FlexArray = np.asarray(100.0),
     init_position: tp.FlexArray = np.asarray(0.0),
     init_price: tp.FlexArray = np.asarray(np.nan),
@@ -766,6 +766,8 @@ def simulate_nb(
     order_counts = np.full(target_shape[1], 0, dtype=np.int_)
     log_counts = np.full(target_shape[1], 0, dtype=np.int_)
 
+    temp_call_seq = np.empty(target_shape[1], dtype=np.int_)
+
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
 
@@ -859,7 +861,12 @@ def simulate_nb(
         pre_group_out = pre_group_func_nb(pre_group_ctx, *pre_sim_out, *pre_group_args)
 
         for i in range(target_shape[0]):
-            call_seq_now = call_seq[i, from_col:to_col]
+            if call_seq is None:
+                for c in range(group_len):
+                    temp_call_seq[c] = c
+                call_seq_now = temp_call_seq[:group_len]
+            else:
+                call_seq_now = call_seq[i, from_col:to_col]
 
             if track_value:
                 # Update valuation price using current open
@@ -985,12 +992,14 @@ def simulate_nb(
 
             # Is this segment active?
             if is_segment_active:
-
                 for k in range(group_len):
-                    col_i = call_seq_now[k]
-                    if col_i >= group_len:
-                        raise ValueError("Call index out of bounds of the group")
-                    col = from_col + col_i
+                    if cash_sharing:
+                        c = call_seq_now[k]
+                        if c >= group_len:
+                            raise ValueError("Call index out of bounds of the group")
+                    else:
+                        c = k
+                    col = from_col + c
 
                     # Get current values
                     position_now = last_position[col]
@@ -1626,6 +1635,8 @@ def simulate_row_wise_nb(
     order_counts = np.full(target_shape[1], 0, dtype=np.int_)
     log_counts = np.full(target_shape[1], 0, dtype=np.int_)
 
+    temp_call_seq = np.empty(target_shape[1], dtype=np.int_)
+
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
 
@@ -1716,7 +1727,13 @@ def simulate_row_wise_nb(
             from_col = group_start_idxs[group]
             to_col = group_end_idxs[group]
             group_len = to_col - from_col
-            call_seq_now = call_seq[i, from_col:to_col]
+
+            if call_seq is None:
+                for c in range(group_len):
+                    temp_call_seq[c] = c
+                call_seq_now = temp_call_seq[:group_len]
+            else:
+                call_seq_now = call_seq[i, from_col:to_col]
 
             if track_value:
                 # Update valuation price using current open
@@ -1842,12 +1859,14 @@ def simulate_row_wise_nb(
 
             # Is this segment active?
             if is_segment_active:
-
                 for k in range(group_len):
-                    col_i = call_seq_now[k]
-                    if col_i >= group_len:
-                        raise ValueError("Call index out of bounds of the group")
-                    col = from_col + col_i
+                    if cash_sharing:
+                        c = call_seq_now[k]
+                        if c >= group_len:
+                            raise ValueError("Call index out of bounds of the group")
+                    else:
+                        c = k
+                    col = from_col + c
 
                     # Get current values
                     position_now = last_position[col]

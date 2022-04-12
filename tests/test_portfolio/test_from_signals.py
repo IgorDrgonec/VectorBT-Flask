@@ -1719,6 +1719,9 @@ class TestFromSignals:
             pf.call_seq.values,
             np.array([[0, 1, 2], [2, 0, 1], [1, 0, 2], [0, 1, 2], [2, 0, 1]]),
         )
+        _ = from_signals_both(attach_call_seq=False, **kwargs)
+        _ = from_signals_longonly(attach_call_seq=False, **kwargs)
+        _ = from_signals_shortonly(attach_call_seq=False, **kwargs)
 
     def test_sl_stop(self):
         entries = pd.Series([True, False, False, False, False], index=price.index)

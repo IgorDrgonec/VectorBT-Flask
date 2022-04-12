@@ -60,7 +60,7 @@ from vectorbtpro.utils.array_ import insert_argsort_nb
 def simulate_from_orders_nb(
     target_shape: tp.Shape,
     group_lens: tp.Array1d,
-    call_seq: tp.Array2d,
+    call_seq: tp.Optional[tp.Array2d] = None,
     init_cash: tp.FlexArray = np.asarray(100.0),
     init_position: tp.FlexArray = np.asarray(0.0),
     init_price: tp.FlexArray = np.asarray(np.nan),
@@ -150,7 +150,6 @@ def simulate_from_orders_nb(
 
     last_val_price = np.full_like(last_position, np.nan)
     last_debt = np.full(target_shape[1], 0.0, dtype=np.float_)
-    temp_order_value = np.empty(target_shape[1], dtype=np.float_)
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
     order_counts = np.full(target_shape[1], 0, dtype=np.int_)
@@ -166,6 +165,9 @@ def simulate_from_orders_nb(
     else:
         returns = np.empty((0, 0), dtype=np.float_)
     in_outputs = FSInOutputs(returns=returns)
+
+    temp_call_seq = np.empty(target_shape[1], dtype=np.int_)
+    temp_order_value = np.empty(target_shape[1], dtype=np.float_)
 
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
@@ -183,8 +185,8 @@ def simulate_from_orders_nb(
             cash_now += _cash_deposits
             free_cash_now += _cash_deposits
 
-            for k in range(group_len):
-                col = from_col + k
+            for c in range(group_len):
+                col = from_col + c
 
                 # Update valuation price using current open
                 _open = flex_select_auto_nb(open, i, col, flex_2d)
@@ -211,17 +213,23 @@ def simulate_from_orders_nb(
             if cash_sharing:
                 # Same as get_group_value_ctx_nb but with flexible indexing
                 value_now = cash_now
-                for k in range(group_len):
-                    col = from_col + k
+                for c in range(group_len):
+                    col = from_col + c
 
                     if last_position[col] != 0:
                         value_now += last_position[col] * last_val_price[col]
 
                 # Dynamically sort by order value -> selling comes first to release funds early
+                if call_seq is None:
+                    for c in range(group_len):
+                        temp_call_seq[c] = c
+                    call_seq_now = temp_call_seq[:group_len]
+                else:
+                    call_seq_now = call_seq[i, from_col:to_col]
                 if auto_call_seq:
                     # Same as sort_by_order_value_ctx_nb but with flexible indexing
-                    for k in range(group_len):
-                        col = from_col + k
+                    for c in range(group_len):
+                        col = from_col + c
                         exec_state = ExecState(
                             cash=cash_now,
                             position=last_position[col],
@@ -230,23 +238,26 @@ def simulate_from_orders_nb(
                             val_price=last_val_price[col],
                             value=value_now,
                         )
-                        temp_order_value[k] = approx_order_value_nb(
+                        temp_order_value[c] = approx_order_value_nb(
                             exec_state,
                             flex_select_auto_nb(size, i, col, flex_2d),
                             flex_select_auto_nb(size_type, i, col, flex_2d),
                             flex_select_auto_nb(direction, i, col, flex_2d),
                         )
+                        if call_seq[i, col] != c:
+                            raise ValueError("Call sequence must follow CallSeqType.Default")
 
                     # Sort by order value
-                    insert_argsort_nb(temp_order_value[:group_len], call_seq[i, from_col:to_col])
+                    insert_argsort_nb(temp_order_value[:group_len], call_seq_now)
 
             for k in range(group_len):
-                col = from_col + k
                 if cash_sharing:
-                    col_i = call_seq[i, col]
-                    if col_i >= group_len:
+                    c = call_seq_now[k]
+                    if c >= group_len:
                         raise ValueError("Call index out of bounds of the group")
-                    col = from_col + col_i
+                else:
+                    c = k
+                col = from_col + c
 
                 # Get current values per column
                 position_now = last_position[col]

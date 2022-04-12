@@ -511,6 +511,17 @@ class TestFromOrderFunc:
         )
         assert_frame_equal(pf.get_asset_value(group_by=False), target_hold_value)
 
+        _ = vbt.Portfolio.from_order_func(
+            price_wide,
+            order_func_nb,
+            np.asarray(np.inf),
+            group_by=np.array([0, 0, 1]),
+            cash_sharing=True,
+            row_wise=test_row_wise,
+            call_seq=None,
+            attach_call_seq=False,
+        )
+
     @pytest.mark.parametrize("test_row_wise", [False, True])
     @pytest.mark.parametrize("test_flexible", [False, True])
     def test_target_value(self, test_row_wise, test_flexible):
