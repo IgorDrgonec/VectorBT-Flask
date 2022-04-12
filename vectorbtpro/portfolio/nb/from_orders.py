@@ -244,7 +244,7 @@ def simulate_from_orders_nb(
                             flex_select_auto_nb(size_type, i, col, flex_2d),
                             flex_select_auto_nb(direction, i, col, flex_2d),
                         )
-                        if call_seq[i, col] != c:
+                        if call_seq_now[c] != c:
                             raise ValueError("Call sequence must follow CallSeqType.Default")
 
                     # Sort by order value

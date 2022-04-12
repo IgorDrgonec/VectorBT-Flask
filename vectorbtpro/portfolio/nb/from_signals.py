@@ -868,6 +868,9 @@ def simulate_from_signal_func_nb(
                 else:
                     call_seq_now = call_seq[i, from_col:to_col]
                 if auto_call_seq:
+                    for c in range(group_len):
+                        if call_seq_now[c] != c:
+                            raise ValueError("Call sequence must follow CallSeqType.Default")
                     insert_argsort_nb(temp_order_value[:group_len], call_seq_now)
 
                 # Same as get_group_value_ctx_nb but with flexible indexing
