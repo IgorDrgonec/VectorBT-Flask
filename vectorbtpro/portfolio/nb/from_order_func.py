@@ -374,7 +374,7 @@ def simulate_nb(
     track_value: bool = True,
     max_orders: tp.Optional[int] = None,
     max_logs: tp.Optional[int] = 0,
-    flex_2d: bool = True,
+    flex_2d: bool = False,
     in_outputs: tp.Optional[tp.NamedTuple] = None,
 ) -> SimulationOutput:
     """Fill order and log records by iterating over a shape and calling a range of user-defined functions.
@@ -1496,7 +1496,7 @@ def simulate_row_wise_nb(
     track_value: bool = True,
     max_orders: tp.Optional[int] = None,
     max_logs: tp.Optional[int] = 0,
-    flex_2d: bool = True,
+    flex_2d: bool = False,
     in_outputs: tp.Optional[tp.NamedTuple] = None,
 ) -> SimulationOutput:
     """Same as `simulate_nb`, but iterates in row-major order.
@@ -2432,7 +2432,7 @@ def flex_simulate_nb(
     track_value: bool = True,
     max_orders: tp.Optional[int] = None,
     max_logs: tp.Optional[int] = 0,
-    flex_2d: bool = True,
+    flex_2d: bool = False,
     in_outputs: tp.Optional[tp.NamedTuple] = None,
 ) -> SimulationOutput:
     """Same as `simulate_nb`, but with no predefined call sequence.
@@ -3366,7 +3366,7 @@ def flex_simulate_row_wise_nb(
     track_value: bool = True,
     max_orders: tp.Optional[int] = None,
     max_logs: tp.Optional[int] = 0,
-    flex_2d: bool = True,
+    flex_2d: bool = False,
     in_outputs: tp.Optional[tp.NamedTuple] = None,
 ) -> SimulationOutput:
     """Same as `flex_simulate_nb`, but iterates using row-major order, with the rows

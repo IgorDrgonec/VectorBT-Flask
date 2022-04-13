@@ -138,7 +138,7 @@ def get_symmetric_neg_th_nb(pos_th: tp.FlexArray) -> tp.FlexArray:
     merge_func=base_ch.column_stack,
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def local_extrema_nb(close: tp.Array2d, pos_th: tp.FlexArray, neg_th: tp.FlexArray, flex_2d: bool = True) -> tp.Array2d:
+def local_extrema_nb(close: tp.Array2d, pos_th: tp.FlexArray, neg_th: tp.FlexArray, flex_2d: bool = False) -> tp.Array2d:
     """Get array of local extrema denoted by 1 (peak) or -1 (trough), otherwise 0.
 
     Two adjacent peak and trough points should exceed the given threshold parameters.
@@ -266,7 +266,7 @@ def bn_cont_sat_trend_labels_nb(
     local_extrema: tp.Array2d,
     pos_th: tp.FlexArray,
     neg_th: tp.FlexArray,
-    flex_2d: bool = True,
+    flex_2d: bool = False,
 ) -> tp.Array2d:
     """Similar to `bn_cont_trend_labels_nb` but sets each close value to 0 or 1
     if the percentage change to the next extremum exceeds the threshold set for this range.
@@ -357,7 +357,7 @@ def trend_labels_nb(
     pos_th: tp.FlexArray,
     neg_th: tp.FlexArray,
     mode: int,
-    flex_2d: bool = True,
+    flex_2d: bool = False,
 ) -> tp.Array2d:
     """Apply a trend labeling function based on `TrendMode`."""
     local_extrema = local_extrema_nb(close, pos_th, neg_th, flex_2d)
@@ -393,7 +393,7 @@ def breakout_labels_nb(
     pos_th: tp.FlexArray,
     neg_th: tp.FlexArray,
     wait: int = 1,
-    flex_2d: bool = True,
+    flex_2d: bool = False,
 ) -> tp.Array2d:
     """For each value, return 1 if any value in the next period is greater than the
     positive threshold (in %), -1 if less than the negative threshold, and 0 otherwise.

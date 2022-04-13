@@ -320,7 +320,7 @@ def build_param_indexer(
 
 
 @register_jitted(cache=True)
-def flex_choose_i_and_col_nb(a: tp.Array, flex_2d: bool = True) -> tp.Tuple[int, int]:
+def flex_choose_i_and_col_nb(a: tp.Array, flex_2d: bool = False) -> tp.Tuple[int, int]:
     """Choose selection index and column based on the array's shape.
 
     Instead of expensive broadcasting, keep the original shape and do indexing in a smart way.
@@ -363,7 +363,7 @@ def flex_select_nb(
     col: int,
     flex_i: int,
     flex_col: int,
-    flex_2d: bool = True,
+    flex_2d: bool = False,
     rotate_rows: bool = _rotate_rows,
     rotate_cols: bool = _rotate_cols,
 ) -> tp.Any:
@@ -396,7 +396,7 @@ def flex_select_auto_nb(
     a: tp.Array,
     i: int = 0,
     col: int = 0,
-    flex_2d: bool = True,
+    flex_2d: bool = False,
     rotate_rows: bool = _rotate_rows,
     rotate_cols: bool = _rotate_cols,
 ) -> tp.Any:

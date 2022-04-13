@@ -94,7 +94,7 @@ def simulate_from_orders_nb(
     fill_returns: bool = False,
     max_orders: tp.Optional[int] = None,
     max_logs: tp.Optional[int] = 0,
-    flex_2d: bool = True,
+    flex_2d: bool = False,
 ) -> SimulationOutput:
     """Creates on order out of each element.
 
