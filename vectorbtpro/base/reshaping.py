@@ -1097,7 +1097,7 @@ def broadcast(
         to_shape = (to_shape,)
     if len(to_shape) == 0:
         to_shape = (1,)
-    shape_2d = to_shape if len(to_shape) > 1 else (*to_shape, 1)
+    to_shape_2d = to_shape if len(to_shape) > 1 else (*to_shape, 1)
 
     if is_pd:
         # Decide on index and columns
@@ -1232,7 +1232,7 @@ def broadcast(
             # Broadcast parameters
             obj = param_product[k]
             if _repeat_product:
-                obj = np.repeat(obj, shape_2d[1])
+                obj = np.repeat(obj, to_shape_2d[1])
             if not _keep_flex:
                 if _repeat_product:
                     obj = np.broadcast_to(obj, (to_shape[0], len(obj)))
@@ -1316,8 +1316,12 @@ def broadcast(
     else:
         return_objs = tuple(return_objs)
     if return_wrapper:
+        if n_params == 0:
+            new_shape = to_shape
+        else:
+            new_shape = (to_shape_2d[0], to_shape_2d[1] * n_params)
         wrapper = wrapping.ArrayWrapper.from_shape(
-            to_shape,
+            new_shape,
             index=new_index,
             columns=new_columns,
             **resolve_dict(wrapper_kwargs),
