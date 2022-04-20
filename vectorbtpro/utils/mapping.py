@@ -2,6 +2,8 @@
 
 """Mapping utilities."""
 
+import re
+
 import numpy as np
 import pandas as pd
 
@@ -44,6 +46,7 @@ def apply_mapping(
     reverse: bool = False,
     ignore_case: bool = True,
     ignore_underscores: bool = True,
+    ignore_invalid: bool = True,
     ignore_type: tp.Optional[tp.MaybeTuple[tp.DTypeLike]] = None,
     ignore_missing: bool = False,
     na_sentinel: tp.Any = None,
@@ -60,6 +63,7 @@ def apply_mapping(
         reverse (bool): See `reverse` in `to_mapping`.
         ignore_case (bool): Whether to ignore the case if the key is a string.
         ignore_underscores (bool): Whether to ignore underscores if the key is a string.
+        ignore_invalid (bool): Whether to remove any character that is not allowed in a Python variable.
         ignore_type (dtype_like or tuple): One or multiple types or data types to ignore.
         ignore_missing (bool): Whether to ignore missing values.
         na_sentinel (any): Value to mark “not found”.
@@ -67,14 +71,15 @@ def apply_mapping(
     if mapping_like is None:
         return obj
 
-    if ignore_case and ignore_underscores:
-        key_func = lambda x: x.lower().replace("_", "")
-    elif ignore_case:
-        key_func = lambda x: x.lower()
-    elif ignore_underscores:
-        key_func = lambda x: x.replace("_", "")
-    else:
-        key_func = lambda x: x
+    def key_func(x):
+        if ignore_case:
+            x = x.lower()
+        if ignore_underscores:
+            x = x.replace("_", "")
+        if ignore_invalid:
+            x = re.sub(r"\W+", "", x)
+        return x
+
     if not isinstance(ignore_type, tuple):
         ignore_type = (ignore_type,)
 
