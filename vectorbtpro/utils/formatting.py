@@ -233,7 +233,7 @@ def format_signature(
     return rendered
 
 
-def format_func(func: tp.Callable, **kwargs) -> str:
+def format_func(func: tp.Callable, incl_doc: bool = True, **kwargs) -> str:
     """Format a function."""
     if inspect.isclass(func):
         func_name = func.__name__ + ".__init__"
@@ -242,7 +242,7 @@ def format_func(func: tp.Callable, **kwargs) -> str:
         func_name = func.__self__.__name__ + "." + func.__name__
     else:
         func_name = func.__name__
-    if func.__doc__ is not None:
+    if incl_doc and func.__doc__ is not None:
         return "{}{}:\n{}".format(
             func_name,
             format_signature(inspect.signature(func), **kwargs),
