@@ -705,7 +705,7 @@ class JITRegistry:
         option: tp.JittedOption,
         **kwargs,
     ) -> tp.Union[tp.Hashable, tp.Callable]:
-        """Resolve `option` using `vectorbtpro.utils.jitting.resolve_jitted_kwargs` and call `JITRegistry.resolve`."""
+        """Resolve `option` using `vectorbtpro.utils.jitting.resolve_jitted_option` and call `JITRegistry.resolve`."""
         kwargs = resolve_jitted_kwargs(option=option, **kwargs)
         if kwargs is None:
             kwargs = dict(disable=True)

@@ -56,6 +56,7 @@ from vectorbtpro.utils.profiling import Timer, MemTracer
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.schedule_ import AsyncJob, AsyncScheduler, CancelledError, ScheduleManager
 from vectorbtpro.utils.template import Sub, Rep, RepEval, RepFunc, deep_substitute
+from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.module_ import create__all__
 
 __blacklist__ = []

@@ -356,7 +356,7 @@ AdjustTPFuncT = tp.Callable[[AdjustTPContext, tp.VarArg()], float]
         target_shape=ch.ShapeSlicer(axis=1, mapper=base_ch.group_lens_mapper),
         group_lens=ch.ArraySlicer(axis=0),
         call_seq=ch.ArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
-        init_cash=ch.ArraySlicer(axis=0),
+        init_cash=base_ch.FlexArraySlicer(axis=1, flex_2d=True),
         init_position=portfolio_ch.flex_1d_array_gl_slicer,
         init_price=portfolio_ch.flex_1d_array_gl_slicer,
         cash_deposits=base_ch.FlexArraySlicer(axis=1),
@@ -544,6 +544,11 @@ def simulate_from_signal_func_nb(
     last_return = np.full_like(last_cash, np.nan)
     order_counts = np.full(target_shape[1], 0, dtype=np.int_)
     log_counts = np.full(target_shape[1], 0, dtype=np.int_)
+    track_cash_deposits = np.any(cash_deposits)
+    if track_cash_deposits:
+        cash_deposits_out = np.full((target_shape[0], len(group_lens)), 0.0, dtype=np.float_)
+    else:
+        cash_deposits_out = np.full((1, 1), 0.0, dtype=np.float_)
     track_cash_earnings = np.any(cash_earnings) or np.any(cash_dividends)
     if track_cash_earnings:
         cash_earnings_out = np.full(target_shape, 0.0, dtype=np.float_)
@@ -598,8 +603,12 @@ def simulate_from_signal_func_nb(
         for i in range(target_shape[0]):
             # Add cash
             _cash_deposits = flex_select_auto_nb(cash_deposits, i, group, flex_2d)
+            if _cash_deposits < 0:
+                _cash_deposits = max(_cash_deposits, -cash_now)
             cash_now += _cash_deposits
             free_cash_now += _cash_deposits
+            if track_cash_deposits:
+                cash_deposits_out[i, group] += _cash_deposits
 
             for c in range(group_len):
                 col = from_col + c
@@ -1031,6 +1040,8 @@ def simulate_from_signal_func_nb(
                 _cash_earnings = flex_select_auto_nb(cash_earnings, i, col, flex_2d)
                 _cash_dividends = flex_select_auto_nb(cash_dividends, i, col, flex_2d)
                 _cash_earnings += _cash_dividends * last_position[col]
+                if _cash_earnings < 0:
+                    _cash_earnings = max(_cash_earnings, -cash_now)
                 cash_now += _cash_earnings
                 free_cash_now += _cash_earnings
                 if track_cash_earnings:
@@ -1067,6 +1078,7 @@ def simulate_from_signal_func_nb(
         order_counts=order_counts,
         log_records=log_records,
         log_counts=log_counts,
+        cash_deposits=cash_deposits_out,
         cash_earnings=cash_earnings_out,
         call_seq=call_seq,
         in_outputs=in_outputs,

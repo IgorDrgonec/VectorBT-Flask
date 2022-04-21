@@ -1095,6 +1095,7 @@ portfolio = ChildDict(
     allow_partial=True,
     raise_reject=False,
     log=False,
+    skipna=False,
     # Signals
     signal_direction="longonly",
     accumulate=False,

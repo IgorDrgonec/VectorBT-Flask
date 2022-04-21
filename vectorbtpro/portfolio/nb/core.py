@@ -1001,6 +1001,7 @@ def prepare_simout_nb(
     order_counts: tp.Array1d,
     log_records: tp.RecordArray2d,
     log_counts: tp.Array1d,
+    cash_deposits: tp.Array2d,
     cash_earnings: tp.Array2d,
     call_seq: tp.Optional[tp.Array2d] = None,
     in_outputs: tp.Optional[tp.NamedTuple] = None,
@@ -1011,6 +1012,7 @@ def prepare_simout_nb(
     return SimulationOutput(
         order_records=order_records_flat,
         log_records=log_records_flat,
+        cash_deposits=cash_deposits,
         cash_earnings=cash_earnings,
         call_seq=call_seq,
         in_outputs=in_outputs,

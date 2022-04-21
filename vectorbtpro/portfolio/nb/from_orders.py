@@ -19,7 +19,7 @@ from vectorbtpro.utils.array_ import insert_argsort_nb
         target_shape=ch.ShapeSlicer(axis=1, mapper=base_ch.group_lens_mapper),
         group_lens=ch.ArraySlicer(axis=0),
         call_seq=ch.ArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
-        init_cash=ch.ArraySlicer(axis=0),
+        init_cash=base_ch.FlexArraySlicer(axis=1, flex_2d=True),
         init_position=portfolio_ch.flex_1d_array_gl_slicer,
         init_price=portfolio_ch.flex_1d_array_gl_slicer,
         cash_deposits=base_ch.FlexArraySlicer(axis=1),
@@ -52,6 +52,7 @@ from vectorbtpro.utils.array_ import insert_argsort_nb
         fill_returns=None,
         max_orders=None,
         max_logs=None,
+        skipna=None,
         flex_2d=None,
     ),
     **portfolio_ch.merge_sim_outs_config
@@ -94,17 +95,15 @@ def simulate_from_orders_nb(
     fill_returns: bool = False,
     max_orders: tp.Optional[int] = None,
     max_logs: tp.Optional[int] = 0,
+    skipna: bool = False,
     flex_2d: bool = False,
 ) -> SimulationOutput:
     """Creates on order out of each element.
 
-    Iterates in the column-major order.
-    Utilizes flexible broadcasting.
+    Iterates in the column-major order. Utilizes flexible broadcasting.
 
     !!! note
         Should be only grouped if cash sharing is enabled.
-
-        If `auto_call_seq` is True, make sure that `call_seq` follows `CallSeqType.Default`.
 
         Single value must be passed as a 0-dim array (for example, by using `np.asarray(value)`).
 
@@ -149,18 +148,31 @@ def simulate_from_orders_nb(
     )
 
     last_val_price = np.full_like(last_position, np.nan)
+    if ffill_val_price and skipna:
+        raise ValueError("Cannot skip NaN and forward-fill valuation price simultaneously")
     last_debt = np.full(target_shape[1], 0.0, dtype=np.float_)
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
     order_counts = np.full(target_shape[1], 0, dtype=np.int_)
     log_counts = np.full(target_shape[1], 0, dtype=np.int_)
+    track_cash_deposits = np.any(cash_deposits)
+    if track_cash_deposits:
+        if skipna:
+            raise ValueError("Cannot skip NaN and track cash deposits simultaneously")
+        cash_deposits_out = np.full((target_shape[0], len(group_lens)), 0.0, dtype=np.float_)
+    else:
+        cash_deposits_out = np.full((1, 1), 0.0, dtype=np.float_)
     track_cash_earnings = np.any(cash_earnings) or np.any(cash_dividends)
     if track_cash_earnings:
+        if skipna:
+            raise ValueError("Cannot skip NaN and track cash earnings simultaneously")
         cash_earnings_out = np.full(target_shape, 0.0, dtype=np.float_)
     else:
         cash_earnings_out = np.full((1, 1), 0.0, dtype=np.float_)
 
     if fill_returns:
+        if skipna:
+            raise ValueError("Cannot skip NaN and fill returns simultaneously")
         returns = np.empty((target_shape[0], len(group_lens)), dtype=np.float_)
     else:
         returns = np.empty((0, 0), dtype=np.float_)
@@ -180,10 +192,24 @@ def simulate_from_orders_nb(
         free_cash_now = cash_now
 
         for i in range(target_shape[0]):
+            if skipna:
+                skip = True
+                for c in range(group_len):
+                    col = from_col + c
+                    if not np.isnan(flex_select_auto_nb(size, i, col, flex_2d)):
+                        skip = False
+                        break
+                if skip:
+                    continue
+
             # Add cash
             _cash_deposits = flex_select_auto_nb(cash_deposits, i, group, flex_2d)
+            if _cash_deposits < 0:
+                _cash_deposits = max(_cash_deposits, -cash_now)
             cash_now += _cash_deposits
             free_cash_now += _cash_deposits
+            if track_cash_deposits:
+                cash_deposits_out[i, group] += _cash_deposits
 
             for c in range(group_len):
                 col = from_col + c
@@ -341,6 +367,8 @@ def simulate_from_orders_nb(
                 _cash_earnings = flex_select_auto_nb(cash_earnings, i, col, flex_2d)
                 _cash_dividends = flex_select_auto_nb(cash_dividends, i, col, flex_2d)
                 _cash_earnings += _cash_dividends * last_position[col]
+                if _cash_earnings < 0:
+                    _cash_earnings = max(_cash_earnings, -cash_now)
                 cash_now += _cash_earnings
                 free_cash_now += _cash_earnings
                 if track_cash_earnings:
@@ -377,6 +405,7 @@ def simulate_from_orders_nb(
         order_counts=order_counts,
         log_records=log_records,
         log_counts=log_counts,
+        cash_deposits=cash_deposits_out,
         cash_earnings=cash_earnings_out,
         call_seq=call_seq,
         in_outputs=in_outputs,

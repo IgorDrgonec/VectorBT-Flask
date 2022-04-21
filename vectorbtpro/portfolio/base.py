@@ -403,7 +403,7 @@ Grouped portfolio is indexed by group:
 
     Indexing behavior depends solely upon `vectorbtpro.base.wrapping.ArrayWrapper`.
     For example, if `group_select` is enabled indexing will be performed on groups,
-    otherwise on single columns. You can pass wrapper arguments with `wrapper_kwargs`.
+    otherwise on single columns. You can pass wrapper arguments in `broadcast_kwargs`.
 
 ## Logging
 
@@ -2562,7 +2562,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             group_select=self.group_select,
             **kwargs,
         )
-        new_close = to_2d_array(self._close)[:, col_idxs]
+        new_close = to_2d_array(self._close)
+        if new_close.shape[1] > 1:
+            new_close = new_close[:, col_idxs]
         new_order_records = self.orders.get_by_col_idxs(col_idxs)
         new_log_records = self.logs.get_by_col_idxs(col_idxs)
         if isinstance(self._init_cash, int):
@@ -2834,12 +2836,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         fill_returns: tp.Optional[bool] = None,
         max_orders: tp.Optional[int] = None,
         max_logs: tp.Optional[int] = None,
+        skipna: tp.Optional[bool] = None,
         seed: tp.Optional[int] = None,
         group_by: tp.GroupByLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
-        wrapper_kwargs: tp.KwargsLike = None,
         freq: tp.Optional[tp.FrequencyLike] = None,
         bm_close: tp.Optional[tp.ArrayLike] = None,
         **kwargs,
@@ -3008,20 +3010,22 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
                 The array will be avaiable as `returns` in in-outputs.
             max_orders (int): The max number of order records expected to be filled at each column.
-                Defaults to the number of rows in the broadcasted shape.
+                Defaults to the maximum number of non-NaN values across all columns of the size array.
 
                 Set to a lower number if you run out of memory, and to 0 to not fill.
             max_logs (int): The max number of log records expected to be filled at each column.
-                Defaults to the number of rows in the broadcasted shape if any of the `log` is True,
-                otherwise to 0.
+                Defaults to the maximum number of True values across all columns of the log array.
 
                 Set to a lower number if you run out of memory, and to 0 to not fill.
+            skipna (bool): Whether to skip the rows where the size of all columns is NaN.
+
+                Cannot work together with cash deposits, cash earnings, filling returns, and
+                forward-filling the valuation price.
             seed (int): Seed to be set for both `call_seq` and at the beginning of the simulation.
             group_by (any): Group columns. See `vectorbtpro.base.grouping.base.Grouper`.
             broadcast_kwargs (dict): Keyword arguments passed to `vectorbtpro.base.reshaping.broadcast`.
             jitted (any): See `vectorbtpro.utils.jitting.resolve_jitted_option`.
             chunked (any): See `vectorbtpro.utils.chunking.resolve_chunked_option`.
-            wrapper_kwargs (dict): Keyword arguments passed to `vectorbtpro.base.wrapping.ArrayWrapper`.
             freq (any): Index frequency in case it cannot be parsed from `close`.
             bm_close (array_like): Latest benchmark price at each time step.
                 Will broadcast.
@@ -3283,8 +3287,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             call_seq = map_enum_fields(call_seq, CallSeqType)
         if isinstance(call_seq, int):
             if call_seq == CallSeqType.Auto:
-                call_seq = CallSeqType.Default
                 auto_call_seq = True
+                call_seq = None
         if attach_call_seq is None:
             attach_call_seq = portfolio_cfg["attach_call_seq"]
         if ffill_val_price is None:
@@ -3293,6 +3297,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             update_value = portfolio_cfg["update_value"]
         if fill_returns is None:
             fill_returns = portfolio_cfg["fill_returns"]
+        if skipna is None:
+            skipna = portfolio_cfg["skipna"]
         if seed is None:
             seed = portfolio_cfg["seed"]
         if seed is not None:
@@ -3303,10 +3309,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             freq = portfolio_cfg["freq"]
         broadcast_kwargs = merge_dicts(portfolio_cfg["broadcast_kwargs"], broadcast_kwargs)
         require_kwargs = broadcast_kwargs.get("require_kwargs", {})
-        if wrapper_kwargs is None:
-            wrapper_kwargs = {}
-        if not wrapper_kwargs.get("group_select", True) and cash_sharing:
-            raise ValueError("group_select cannot be disabled if cash_sharing=True")
         if bm_close is None:
             bm_close = portfolio_cfg["bm_close"]
 
@@ -3339,28 +3341,30 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         )
         if bm_close is not None and not isinstance(bm_close, bool):
             broadcastable_args["bm_close"] = bm_close
+        else:
+            broadcastable_args["bm_close"] = None
         broadcast_kwargs = merge_dicts(
-            dict(keep_flex=dict(close=False, bm_close=False, _default=True)),
+            dict(keep_flex=True),
             broadcast_kwargs,
         )
-        broadcasted_args = broadcast(broadcastable_args, **broadcast_kwargs)
+        broadcast_kwargs = merge_dicts(dict(
+            wrapper_kwargs=dict(
+                freq=freq,
+                group_by=group_by,
+            ),
+        ), broadcast_kwargs)
+        broadcasted_args, wrapper = broadcast(
+            broadcastable_args,
+            return_wrapper=True,
+            **broadcast_kwargs
+        )
+        if not wrapper.group_select and cash_sharing:
+            raise ValueError("group_select cannot be disabled if cash_sharing=True")
         cash_earnings = broadcasted_args.pop("cash_earnings")
         cash_dividends = broadcasted_args.pop("cash_dividends")
-        close = broadcasted_args["close"]
-        if not checks.is_pandas(close):
-            close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
-        if bm_close is not None and not isinstance(bm_close, bool):
-            bm_close = broadcasted_args["bm_close"]
-            if not checks.is_pandas(bm_close):
-                bm_close = pd.Series(bm_close) if bm_close.ndim == 1 else pd.DataFrame(bm_close)
-            broadcasted_args["bm_close"] = to_2d_array(bm_close)
-        else:
-            broadcasted_args["bm_close"] = None
-        flex_2d = close.ndim == 2
-        broadcasted_args["close"] = to_2d_array(close)
-        target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
+        flex_2d = wrapper.ndim == 2
+        target_shape_2d = (wrapper.shape[0], wrapper.shape_2d[1])
 
-        wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
         init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)
         init_position = np.require(np.broadcast_to(init_position, (target_shape_2d[1],)), dtype=np.float_)
@@ -3380,8 +3384,28 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 call_seq = require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
             else:
                 call_seq = build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
-        if not np.any(log):
-            max_logs = 0
+        if max_orders is None:
+            _size = broadcasted_args["size"]
+            if _size.size == 1:
+                max_orders = target_shape_2d[0] * int(not np.isnan(_size.item(0)))
+            else:
+                if _size.ndim == 1:
+                    _size = to_2d_array(_size, expand_axis=int(not flex_2d))
+                if _size.shape[0] == 1 and target_shape_2d[0] > 1:
+                    max_orders = target_shape_2d[0] * int(np.any(~np.isnan(_size)))
+                else:
+                    max_orders = int(np.max(np.sum(~np.isnan(_size), axis=0)))
+        if max_logs is None:
+            _log = broadcasted_args["log"]
+            if _log.size == 1:
+                max_logs = target_shape_2d[0] * int(_log.item(0))
+            else:
+                if _log.ndim == 1:
+                    _log = to_2d_array(_log, expand_axis=int(not flex_2d))
+                if _log.shape[0] == 1 and target_shape_2d[0] > 1:
+                    max_logs = target_shape_2d[0] * int(np.any(_log))
+                else:
+                    max_logs = int(np.max(np.sum(_log, axis=0)))
 
         # Convert strings to numbers
         broadcasted_args["size_type"] = map_enum_fields(broadcasted_args["size_type"], SizeType)
@@ -3426,7 +3450,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             checks.assert_subdtype(broadcasted_args["bm_close"], np.number)
 
         # Remove arguments
-        broadcasted_args.pop("bm_close", None)
+        bm_close = broadcasted_args.pop("bm_close", None)
 
         # Perform the simulation
         func = jit_reg.resolve_option(nb.simulate_from_orders_nb, jitted)
@@ -3448,20 +3472,21 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             fill_returns=fill_returns,
             max_orders=max_orders,
             max_logs=max_logs,
+            skipna=skipna,
             flex_2d=flex_2d,
         )
 
         # Create an instance
         return cls(
             wrapper,
-            close,
+            broadcasted_args["close"],
             sim_out.order_records,
             sim_out.log_records,
             cash_sharing,
             init_cash if init_cash_mode is None else init_cash_mode,
             init_position=init_position,
             init_price=init_price,
-            cash_deposits=cash_deposits,
+            cash_deposits=sim_out.cash_deposits,
             cash_earnings=sim_out.cash_earnings,
             call_seq=call_seq if attach_call_seq else None,
             in_outputs=sim_out.in_outputs,
@@ -3538,7 +3563,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         template_context: tp.Optional[tp.Mapping] = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
-        wrapper_kwargs: tp.KwargsLike = None,
         freq: tp.Optional[tp.FrequencyLike] = None,
         bm_close: tp.Optional[tp.ArrayLike] = None,
         **kwargs,
@@ -3739,7 +3763,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             template_context (mapping): Mapping to replace templates in arguments.
             jitted (any): See `Portfolio.from_orders`.
             chunked (any): See `Portfolio.from_orders`.
-            wrapper_kwargs (dict): See `Portfolio.from_orders`.
             freq (any): See `Portfolio.from_orders`.
             bm_close (array_like): See `Portfolio.from_orders`.
             **kwargs: Keyword arguments passed to the `Portfolio` constructor.
@@ -4333,8 +4356,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             call_seq = map_enum_fields(call_seq, CallSeqType)
         if isinstance(call_seq, int):
             if call_seq == CallSeqType.Auto:
-                call_seq = CallSeqType.Default
                 auto_call_seq = True
+                call_seq = None
         if attach_call_seq is None:
             attach_call_seq = portfolio_cfg["attach_call_seq"]
         if ffill_val_price is None:
@@ -4356,10 +4379,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         broadcast_kwargs = merge_dicts(portfolio_cfg["broadcast_kwargs"], broadcast_kwargs)
         require_kwargs = broadcast_kwargs.get("require_kwargs", {})
         template_context = merge_dicts(portfolio_cfg["template_context"], template_context)
-        if wrapper_kwargs is None:
-            wrapper_kwargs = {}
-        if not wrapper_kwargs.get("group_select", True) and cash_sharing:
-            raise ValueError("group_select cannot be disabled if cash_sharing=True")
         if bm_close is None:
             bm_close = portfolio_cfg["bm_close"]
 
@@ -4403,6 +4422,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         )
         if bm_close is not None and not isinstance(bm_close, bool):
             broadcastable_args["bm_close"] = bm_close
+        else:
+            broadcastable_args["bm_close"] = None
         if not signal_func_mode:
             if ls_mode:
                 broadcastable_args["entries"] = entries
@@ -4414,29 +4435,28 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 broadcastable_args["exits"] = exits
                 broadcastable_args["direction"] = direction
         broadcastable_args = {**broadcastable_args, **broadcast_named_args}
-        # Only close is broadcast, others can remain unchanged thanks to flexible indexing
         broadcast_kwargs = merge_dicts(
-            dict(keep_flex=dict(close=False, bm_close=False, _default=True)),
+            dict(keep_flex=True),
             broadcast_kwargs,
         )
-        broadcasted_args = broadcast(broadcastable_args, **broadcast_kwargs)
+        broadcast_kwargs = merge_dicts(dict(
+            wrapper_kwargs=dict(
+                freq=freq,
+                group_by=group_by,
+            ),
+        ), broadcast_kwargs)
+        broadcasted_args, wrapper = broadcast(
+            broadcastable_args,
+            return_wrapper=True,
+            **broadcast_kwargs
+        )
+        if not wrapper.group_select and cash_sharing:
+            raise ValueError("group_select cannot be disabled if cash_sharing=True")
         cash_earnings = broadcasted_args.pop("cash_earnings")
         cash_dividends = broadcasted_args.pop("cash_dividends")
-        close = broadcasted_args["close"]
-        if not checks.is_pandas(close):
-            close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
-        if bm_close is not None and not isinstance(bm_close, bool):
-            bm_close = broadcasted_args["bm_close"]
-            if not checks.is_pandas(bm_close):
-                bm_close = pd.Series(bm_close) if bm_close.ndim == 1 else pd.DataFrame(bm_close)
-            broadcasted_args["bm_close"] = to_2d_array(bm_close)
-        else:
-            broadcasted_args["bm_close"] = None
-        flex_2d = close.ndim == 2
-        broadcasted_args["close"] = to_2d_array(close)
-        target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
+        flex_2d = wrapper.ndim == 2
+        target_shape_2d = (wrapper.shape[0], wrapper.shape_2d[1])
 
-        wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
         init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)
         init_position = np.require(np.broadcast_to(init_position, (target_shape_2d[1],)), dtype=np.float_)
@@ -4456,8 +4476,17 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 call_seq = require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
             else:
                 call_seq = build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
-        if not np.any(log):
-            max_logs = 0
+        if max_logs is None:
+            _log = broadcasted_args["log"]
+            if _log.size == 1:
+                max_logs = target_shape_2d[0] * int(_log.item(0))
+            else:
+                if _log.ndim == 1:
+                    _log = to_2d_array(_log, expand_axis=int(not flex_2d))
+                if _log.shape[0] == 1 and target_shape_2d[0] > 1:
+                    max_logs = target_shape_2d[0] * int(np.any(_log))
+                else:
+                    max_logs = int(np.max(np.sum(_log, axis=0)))
 
         # Convert strings to numbers
         broadcasted_args["size_type"] = map_enum_fields(broadcasted_args["size_type"], SizeType)
@@ -4490,7 +4519,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         # Check data types
         checks.assert_subdtype(cs_group_lens, np.integer)
-        checks.assert_subdtype(call_seq, np.integer)
+        if call_seq is not None:
+            checks.assert_subdtype(call_seq, np.integer)
         checks.assert_subdtype(init_cash, np.number)
         checks.assert_subdtype(init_position, np.number)
         checks.assert_subdtype(init_price, np.number)
@@ -4613,7 +4643,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 )
         for k in broadcast_named_args:
             broadcasted_args.pop(k)
-        broadcasted_args.pop("bm_close", None)
+        bm_close = broadcasted_args.pop("bm_close", None)
 
         # Perform the simulation
         func = jit_reg.resolve_option(nb.simulate_from_signal_func_nb, jitted)
@@ -4648,14 +4678,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         # Create an instance
         return cls(
             wrapper,
-            close,
+            broadcasted_args["close"],
             sim_out.order_records,
             sim_out.log_records,
             cash_sharing,
             init_cash if init_cash_mode is None else init_cash_mode,
             init_position=init_position,
             init_price=init_price,
-            cash_deposits=cash_deposits,
+            cash_deposits=sim_out.cash_deposits,
             cash_earnings=sim_out.cash_earnings,
             call_seq=call_seq if attach_call_seq else None,
             in_outputs=sim_out.in_outputs,
@@ -5007,7 +5037,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         keep_inout_raw: tp.Optional[bool] = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
-        wrapper_kwargs: tp.KwargsLike = None,
         freq: tp.Optional[tp.FrequencyLike] = None,
         bm_close: tp.Optional[tp.ArrayLike] = None,
         **kwargs,
@@ -5164,7 +5193,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 !!! warning
                     Parallelization assumes that groups are independent and there is no data flowing between them.
             chunked (any): See `vectorbtpro.utils.chunking.resolve_chunked_option`.
-            wrapper_kwargs (dict): See `Portfolio.from_orders`.
             freq (any): See `Portfolio.from_orders`.
             bm_close (array_like): See `Portfolio.from_orders`.
             **kwargs: Keyword arguments passed to the `Portfolio` constructor.
@@ -5586,10 +5614,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             keep_inout_raw = portfolio_cfg["keep_inout_raw"]
         if template_context is None:
             template_context = {}
-        if wrapper_kwargs is None:
-            wrapper_kwargs = {}
-        if not wrapper_kwargs.get("group_select", True) and cash_sharing:
-            raise ValueError("group_select cannot be disabled if cash_sharing=True")
         if bm_close is None:
             bm_close = portfolio_cfg["bm_close"]
 
@@ -5597,29 +5621,30 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         broadcastable_args = dict(cash_earnings=cash_earnings, open=open, high=high, low=low, close=close)
         if bm_close is not None and not isinstance(bm_close, bool):
             broadcastable_args["bm_close"] = bm_close
+        else:
+            broadcastable_args["bm_close"] = None
         broadcastable_args = {**broadcastable_args, **broadcast_named_args}
-        # Only close is broadcast, others can remain unchanged thanks to flexible indexing
         broadcast_kwargs = merge_dicts(
-            dict(keep_flex=dict(close=False, bm_close=False, _default=True)),
+            dict(keep_flex=True),
             broadcast_kwargs,
         )
-        broadcasted_args = broadcast(broadcastable_args, **broadcast_kwargs)
+        broadcast_kwargs = merge_dicts(dict(
+            wrapper_kwargs=dict(
+                freq=freq,
+                group_by=group_by,
+            ),
+        ), broadcast_kwargs)
+        broadcasted_args, wrapper = broadcast(
+            broadcastable_args,
+            return_wrapper=True,
+            **broadcast_kwargs
+        )
+        if not wrapper.group_select and cash_sharing:
+            raise ValueError("group_select cannot be disabled if cash_sharing=True")
         cash_earnings = broadcasted_args.pop("cash_earnings")
-        close = broadcasted_args["close"]
-        if not checks.is_pandas(close):
-            close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
-        if bm_close is not None and not isinstance(bm_close, bool):
-            bm_close = broadcasted_args["bm_close"]
-            if not checks.is_pandas(bm_close):
-                bm_close = pd.Series(bm_close) if bm_close.ndim == 1 else pd.DataFrame(bm_close)
-            broadcasted_args["bm_close"] = to_2d_array(bm_close)
-        else:
-            broadcasted_args["bm_close"] = None
-        flex_2d = close.ndim == 2
-        broadcasted_args["close"] = to_2d_array(close)
-        target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
+        flex_2d = wrapper.ndim == 2
+        target_shape_2d = (wrapper.shape[0], wrapper.shape_2d[1])
 
-        wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
         init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)
         init_position = np.require(np.broadcast_to(init_position, (target_shape_2d[1],)), dtype=np.float_)
@@ -5921,16 +5946,18 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 )
 
         # Create an instance
+        if bm_close is not None and not isinstance(bm_close, bool):
+            bm_close = broadcasted_args["bm_close"]
         return cls(
             wrapper,
-            close,
+            broadcasted_args["close"],
             sim_out.order_records,
             sim_out.log_records,
             cash_sharing,
             init_cash if init_cash_mode is None else init_cash_mode,
             init_position=init_position,
             init_price=init_price,
-            cash_deposits=cash_deposits,
+            cash_deposits=sim_out.cash_deposits,
             cash_earnings=sim_out.cash_earnings,
             call_seq=call_seq if not flexible and attach_call_seq else None,
             in_outputs=sim_out.in_outputs,
@@ -6097,8 +6124,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             call_seq = map_enum_fields(call_seq, CallSeqType)
         if isinstance(call_seq, int):
             if call_seq == CallSeqType.Auto:
-                call_seq = CallSeqType.Default
                 auto_call_seq = True
+                call_seq = None
         if broadcast_named_args is None:
             broadcast_named_args = {}
         broadcast_named_args = {

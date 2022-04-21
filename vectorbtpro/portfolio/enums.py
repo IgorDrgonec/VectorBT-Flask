@@ -744,6 +744,7 @@ __pdoc__["ExecState.value"] = "Value in the current column (or group with cash s
 class SimulationOutput(tp.NamedTuple):
     order_records: tp.RecordArray2d
     log_records: tp.RecordArray2d
+    cash_deposits: tp.Array2d
     cash_earnings: tp.Array2d
     call_seq: tp.Optional[tp.Array2d]
     in_outputs: tp.Optional[tp.NamedTuple]
@@ -752,7 +753,8 @@ class SimulationOutput(tp.NamedTuple):
 __pdoc__["SimulationOutput"] = "A named tuple representing the output of a simulation."
 __pdoc__["SimulationOutput.order_records"] = "Order records (flattened)."
 __pdoc__["SimulationOutput.log_records"] = "Log records (flattened)."
-__pdoc__["SimulationOutput.cash_earnings"] = "Earnings added at each timestamp."
+__pdoc__["SimulationOutput.cash_deposits"] = "Cash deposited/withdrawn at each timestamp."
+__pdoc__["SimulationOutput.cash_earnings"] = "Cash earnings added/removed at each timestamp."
 __pdoc__["SimulationOutput.call_seq"] = "Call sequence."
 __pdoc__["SimulationOutput.in_outputs"] = "Named tuple with in-output objects."
 

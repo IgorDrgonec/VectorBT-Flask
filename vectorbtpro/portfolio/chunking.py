@@ -23,7 +23,7 @@ def get_init_cash_slicer(ann_args: tp.AnnArgs) -> ArraySlicer:
     """Get slicer for `init_cash` based on cash sharing."""
     cash_sharing = ann_args["cash_sharing"]["value"]
     if cash_sharing:
-        return FlexArraySlicer(axis=0, flex_2d=True)
+        return FlexArraySlicer(axis=1, flex_2d=True)
     return flex_1d_array_gl_slicer
 
 
@@ -83,6 +83,10 @@ def merge_sim_outs(
     log_records = merge_records(log_records, chunk_meta, ann_args=ann_args, mapper=mapper)
 
     target_shape = ann_args["target_shape"]["value"]
+    if results[0].cash_deposits.shape == target_shape:
+        cash_deposits = np.column_stack([r.cash_deposits for r in results])
+    else:
+        cash_deposits = results[0].cash_deposits
     if results[0].cash_earnings.shape == target_shape:
         cash_earnings = np.column_stack([r.cash_earnings for r in results])
     else:
@@ -98,6 +102,7 @@ def merge_sim_outs(
     return SimulationOutput(
         order_records=order_records,
         log_records=log_records,
+        cash_deposits=cash_deposits,
         cash_earnings=cash_earnings,
         call_seq=call_seq,
         in_outputs=in_outputs,
