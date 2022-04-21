@@ -3,7 +3,7 @@ title: Analysis
 icon: material/chart-timeline-variant-shimmer
 ---
 
-# Analysis
+# :material-chart-timeline-variant-shimmer: Analysis
 
 To analyze an indicator, we can use the indicator instance returned by the `run` method.
 

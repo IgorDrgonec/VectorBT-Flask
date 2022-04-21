@@ -3,7 +3,7 @@ title: Fundamentals
 icon: material/alphabetical-variant
 ---
 
-# Fundamentals
+# :material-alphabetical-variant: Fundamentals
 
 vectorbt was implemented to address common performance shortcomings of backtesting libraries. 
 It builds upon the idea that each instance of a trading strategy can be represented in a vectorized 

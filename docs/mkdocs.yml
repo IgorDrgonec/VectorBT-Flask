@@ -146,6 +146,7 @@ nav:
       - Parsers: documentation/indicators/parsers.md
     - Portfolio:
       - documentation/portfolio/index.md
+      - From orders: documentation/portfolio/from-orders.md
     - To be continued...: documentation/to-be-continued.md
   - API:
     - api/index.md

@@ -3,7 +3,7 @@ title: Remote
 icon: material/web
 ---
 
-# Remote
+# :material-web: Remote
 
 Data classes that subclass [RemoteData](/api/data/custom/#vectorbtpro.data.custom.RemoteData) specialize
 in pulling (mostly OHLCV) data from remote data sources. In contrast to the classes for locally stored data,

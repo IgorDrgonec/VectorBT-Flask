@@ -3,7 +3,7 @@ title: Building blocks
 icon: material/cube-outline
 ---
 
-# Building blocks
+# :material-cube-outline: Building blocks
 
 In what follows, we will look at sub-packages, modules, and especially classes that act as 
 building blocks for more advanced functionalities distributed across vectorbt, such as 

@@ -3,7 +3,7 @@ title: Data
 icon: material/database
 ---
 
-# Data
+# :material-database: Data
 
 vectorbt works on Pandas and NumPy arrays, but where those arrays are coming from? Getting the 
 financial data manually is a challenging task, especially when an exchange can return only one bunch 

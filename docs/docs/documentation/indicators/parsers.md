@@ -3,7 +3,7 @@ title: Parsers
 icon: material/code-tags
 ---
 
-# Parsers
+# :material-code-tags: Parsers
 
 [IndicatorFactory](/api/indicators/factory/#vectorbtpro.indicators.factory.IndicatorFactory) 
 deploys a collection of parsers to simplify creation of indicators, ranging from third-party

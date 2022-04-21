@@ -42,7 +42,7 @@ To install the TA-Lib in Google Colab, run the following:
 !./configure --prefix=/usr
 !make
 !make install
-!pip install Ta-Lib
+!pip install TA-Lib
 ```
 
 ## With pip

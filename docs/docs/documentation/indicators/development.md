@@ -3,7 +3,7 @@ title: Development
 icon: material/order-bool-descending-variant
 ---
 
-# Development
+# :material-order-bool-descending-variant: Development
 
 vectorbt implements a ton of functions and arguments for seamless development of indicators.
 All it takes is an indicator function and a specification of how to handle it.

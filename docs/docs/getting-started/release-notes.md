@@ -6,6 +6,41 @@ title: Release notes
 
 All notable changes in reverse chronological order.
 
+## Version 1.2.2 (21 Apr, 2022)
+
+- Made the call sequence array entirely optional. Prior to this change, the user had to create an array 
+of the same size as the target shape, which is pretty unnecessary and consumes lots of memory. Now, 
+setting `call_seq` to None or `auto` won't require a user-defined array anymore, and only the call 
+sequence for the current row is being kept in memory.
+- The close price in [Portfolio](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio)
+won't broadcast to the full shape anymore. Since all methods deploy flexible indexing, 
+there is no need to expand and materialize the close price. Instead, it keeps its original shape while 
+the broadcasting operation returns a wrapper that holds the target shape and other Pandas metadata. 
+This has one big advantage: lower memory footprint.
+- Disabled `flex_2d` everywhere for more consistency across the codebase. Passing one-dimensional
+arrays will treat them per-row by default.
+- Fixed the shape in the wrapper returned by [broadcast](/api/base/reshaping/#vectorbtpro.base.reshaping.broadcast)
+- When specifying enum fields such as "targetamount", the mapper will ignore all non-alphanumeric 
+characters by default, thus "Target Amount" can now be passed as well
+- Added the option `incl_doc` to show/hide the docstring of the function when using 
+[format_func](https://vectorbt.pro/api/utils/formatting/#vectorbtpro.utils.formatting.format_func)
+- [ArrayWrapper.wrap](/api/base/wrapping/#vectorbtpro.base.wrapping.ArrayWrapper.wrap)
+will broadcast the to-be-wrapped array using NumPy rules if its shape doesn't match the shape of the wrapper.
+This way, smaller arrays can expand to the target shape once this is really required - good for memory.
+- Added the option `indexer_method` to specify the indexer method in 
+[BaseAccessor.set](/api/base/accessors/#vectorbtpro.base.accessors.BaseAccessor.set) 
+and [BaseAccessor.set_between](/api/base/accessors/#vectorbtpro.base.accessors.BaseAccessor.set_between)
+to control which timestamp (previous or next?) should be used if there is no exact match
+- Cash deposits and cash earnings now respect the cash balance in 
+[Portfolio.from_orders](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_orders) 
+and [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_signals).
+But also, cash deposits now behave the same way as cash earnings: a full array will be created during
+the simulation if any element of the passed cash deposits is not zero; this array will be overridden 
+in-place at each row and group, and then returned as a part of the simulation output.
+- Added the option `skipna` in [Portfolio.from_orders](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_orders)
+for skipping rows where the size in all columns of a group is NaN
+- Wrote documentation on [From orders](/documentation/portfolio/from-orders/) :notebook_with_decorative_cover:
+
 ## Version 1.2.1 (10 Apr, 2022)
 
 - Fixed check for zero size in [buy_nb](/api/portfolio/nb/core/#vectorbtpro.portfolio.nb.core.buy_nb)

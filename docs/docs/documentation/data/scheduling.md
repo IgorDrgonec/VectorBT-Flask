@@ -3,7 +3,7 @@ title: Scheduling
 icon: material/timer-outline
 ---
 
-# Scheduling
+# :material-timer-outline: Scheduling
 
 Most data sources aren't sitting idle: they steadily generate new data. To keep up with new information,
 we can utilize a schedule manager (or even the simplest while-loop) to periodically run jobs related to 

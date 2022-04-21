@@ -3,7 +3,7 @@ title: Local
 icon: material/folder-open
 ---
 
-# Local
+# :material-folder-open: Local
 
 Repeatedly hitting remote API endpoints is costly, thus it's very important to cache data locally. 
 Luckily, vectorbt implements a range of ways for managing local data.

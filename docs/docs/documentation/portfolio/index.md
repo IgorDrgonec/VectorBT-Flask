@@ -3,7 +3,7 @@ title: Portfolio
 icon: material/chart-areaspline
 ---
 
-# Portfolio
+# :material-chart-areaspline: Portfolio
 
 Portfolio refers to any combination of financial assets held by a trader. In the world of vectorbt,
 "portfolio" is a multidimensional structure capable of simulating and tracking multiple independent but
@@ -45,7 +45,7 @@ know how to properly pre-process their input data and post-process the output da
 In the following parts, we'll discuss order execution and processing, and gradually implement
 a collection of simple pipelines to better illustrate various simulation concepts.
 
-### Primitive commands
+## Primitive commands
 
 Remember that vectorbt is an exceptionally raw backtester: it's primary commands are "buy" :green_circle: 
 and "sell" :red_circle: This means that any strategy that can be translated into a set of those 
@@ -72,7 +72,7 @@ same type. Furthermore, it returns an order result of type [OrderResult](/api/po
 which contains the filled size, price adjusted with slippage, transaction fee, order side, status
 information on whether the order succeeded or failed, and valuable information about why it failed.
 
-#### Buying
+### Buying
 
 Let's say we have $100 available and want to buy 1 share at the price of $15:
 
@@ -336,7 +336,7 @@ of type [PriceAreaVioMode](/api/portfolio/enums/#vectorbtpro.portfolio.enums.Pri
 ValueError: Adjusted order price is above the highest price
 ```
 
-#### Selling
+### Selling
 
 The function for selling takes the same arguments but uses them in the opposite direction.
 Let's remove 2 shares from a position of 10 shares:
@@ -378,7 +378,7 @@ The size in the order result remains positive but the side has changed from 0 to
 'Sell'
 ```
 
-#### Shorting
+### Shorting
 
 Shorting is a regular sell operation with [sell_nb](/api/portfolio/nb/core/#vectorbtpro.portfolio.nb.core.sell_nb),
 but with one exception: it now involves the debt and free cash balance. Whenever we short, we are borrowing
@@ -649,7 +649,7 @@ OrderResult(
 The free cash balance equals to the regular cash balance, and we are debt-free! Additionally,
 those three operations have brought us $66.67 in profit.
 
-#### Reversing
+### Reversing
 
 Positions in vectorbt can be reversed with a single order. Let's start with a position of 10 shares,
 reverse it to the maximum extent in the short direction, and then reverse it to the maximum extent again 
@@ -711,7 +711,7 @@ OrderResult(
 Both operations are symmetric in nature and cancel each other out by a repetitive call,
 thus ultimately we've arrived at our initial state of the account.
 
-#### Closing
+### Closing
 
 To close out a position and to avoid its reversal, we can either specify the exact size, 
 or the size of infinity and the current direction via the `direction` argument of type 
@@ -757,7 +757,7 @@ OrderResult(
     and [sell_nb](/api/portfolio/nb/core/#vectorbtpro.portfolio.nb.core.sell_nb) command guarantees 
     to execute the order in the long and short direction respectively.
 
-#### Pipeline/1
+### Pipeline/1
 
 Even by using just those two essential commands, we can already build our own backtesting pipeline
 of arbitrary complexity and flexibility. As said before, a simulation is just a loop that iterates 
@@ -824,7 +824,7 @@ We can validate the pipeline using one of the preset simulation methods:
 210.71073253390762
 ```
 
-### Order execution
+## Order execution
 
 Using the primitive commands is fun as long as we exactly know the direction of the order.
 But very often, we have to deal with more complex requirements such as target percentages,
@@ -843,7 +843,7 @@ information on the current valuation. The second input is a named tuple of type
 [Order](/api/portfolio/enums/#vectorbtpro.portfolio.enums.Order) representing an order. 
 The third argument is the price area, which we are also already familiar with.
 
-#### Order
+### Order
 
 An order in vectorbt is represented by a [named tuple](https://realpython.com/python-namedtuple/).
 Named tuples are alternatives to data classes in both the Python and Numba world; they are very 
@@ -983,7 +983,7 @@ Notice how the size and price arguments were automatically cast to floats.
     Use [order_nb](/api/portfolio/nb/core/#vectorbtpro.portfolio.nb.core.order_nb)
     instead of [Order](/api/portfolio/enums/#vectorbtpro.portfolio.enums.Order) whenever possible.
 
-#### Validation
+### Validation
 
 Having constructed the order, [execute_order_nb](/api/portfolio/nb/core/#vectorbtpro.portfolio.nb.core.execute_order_nb)
 will check the arguments of that order for correct data types and values. For example, let's
@@ -1005,7 +1005,7 @@ try passing a negative price:
 ValueError: order.price must be finite and 0 or greater
 ```
 
-#### Price resolution
+### Price resolution
 
 After validating the inputs, [execute_order_nb](/api/portfolio/nb/core/#vectorbtpro.portfolio.nb.core.execute_order_nb) 
 uses them to decide which command to run: buy or sell. But first, it has to do some preprocessing.
@@ -1054,7 +1054,7 @@ nan
 2. Price gets replaced by the close price (default)
 3. Price gets replaced by `np.nan` since the price area is not defined
 
-#### Size type conversion
+### Size type conversion
 
 Our primitive commands accept only a size in the number of shares, thus we have to convert 
 any size type defined in [SizeType](/api/portfolio/enums/#vectorbtpro.portfolio.enums.SizeType) 
@@ -1097,7 +1097,7 @@ Since we're not in the market, vectorbt used [buy_nb](/api/portfolio/nb/core/#ve
 to buy 3 shares. If we were in the market with 10 shares, it would have used
 [sell_nb](/api/portfolio/nb/core/#vectorbtpro.portfolio.nb.core.sell_nb) to sell 7 shares.
 
-#### Valuation
+### Valuation
 
 Speaking about the valuation price, it's the latest available price at the time of decision-making,
 or the price used to calculate the portfolio value. In many simulation methods, valuation 
@@ -1188,7 +1188,7 @@ would use the updated value and thus probably produce a different outcome.
     Use this feature only if you can control the order in which orders appear within a bar,
     and you have intra-bar data.
 
-#### Pipeline/2
+### Pipeline/2
 
 Let's create another simplified pipeline that orders given a target percentage array.
 In particular, we'll keep 50% of the portfolio value in shares, and rebalance monthly.
@@ -1295,7 +1295,7 @@ environment in any Python function, even inside objective functions of machine l
 There is no need to trigger the entire backtesting pipeline as a script or any other complex 
 process like most backtesting frameworks force us to do :face_with_spiral_eyes:
 
-### Order processing
+## Order processing
 
 Order execution takes an order instruction and translates it into a buy or sell operation.
 The responsibility of the user is to do something with the returned order execution state and result;
@@ -1304,7 +1304,7 @@ that's where order and log records come into play. Furthermore, we may want to r
 an order has been rejected and a certain flag in the requirements is present. All of this is ensured by 
 [process_order_nb](/api/portfolio/nb/core/#vectorbtpro.portfolio.nb.core.process_order_nb).
 
-#### Order records
+### Order records
 
 Order records is a [structured](https://numpy.org/doc/stable/user/basics.rec.html) NumPy array
 of the data type [order_dt](/api/portfolio/enums/#vectorbtpro.portfolio.enums.order_dt) containing 
@@ -1439,7 +1439,7 @@ array([2])
 
 Such filled order records will become the backbone of the post-analysis phase.
 
-#### Log records
+### Log records
 
 Log records have the data type [log_dt](/api/portfolio/enums/#vectorbtpro.portfolio.enums.log_dt)
 and are similar to order records, but with a few key differences: they are filled irrespective 
@@ -1477,7 +1477,7 @@ array([[(0, 0, 0, 678, ..., 0, 0, -1, -1)],
 !!! note
     Logging costs performance and memory. Use only when really needed.
 
-#### Pipeline/3
+### Pipeline/3
 
 Let's extend the [last pipeline](#pipeline2) to independently process an arbitrary number of columns, 
 and gradually fill order records. This way, we can backtest multiple parameter combinations
@@ -1610,7 +1610,7 @@ requires as input: order records with a couple of other arrays can be used to re
 the simulation state, including the cash balance and the position size at each time step. 
 We're slowly progressing towards post-analysis :slightly_smiling_face:
 
-### Flexible indexing
+## Flexible indexing
 
 The issue of bringing all arrays to the same shape as we did above is that it unnecessarily consumes memory:
 even though the only array that has different data in each column is `target_pct`, we have
@@ -1687,7 +1687,7 @@ and also consumes no additional memory:
 6
 ```
 
-#### Rotational indexing
+### Rotational indexing
 
 But what happens if the index is out of bounds? Let's say we iterate over 6 columns but 
 an array has data only for 3. In such a case, vectorbt can rotate the index and return
@@ -1702,7 +1702,7 @@ the first element in the array for the fourth column, the second element for the
 ```
 
 1. Resolves to index 3 % 3 == 0 and element 1
-2. Resolves to index 4 % 2 == 1 and element 2
+2. Resolves to index 4 % 3 == 1 and element 2
 
 If you think that this is crazy, and you would rather have an error shown: rotational indexing
 is very useful when it comes to testing multiple assets and parameter combinations. Without it (default), 
@@ -1710,7 +1710,7 @@ we would need to tile the asset DataFrame by the number of parameter combination
 we could have just passed the data without tiling and thus wasting memory. But also, in many places, 
 vectorbt ensures that all arrays can broadcast against other nicely anyway.
 
-#### Pipeline/4
+### Pipeline/4
 
 Let's adapt the previous pipeline for flexible indexing. Since usually we don't know which one of 
 the passed arrays has the full shape, and sometimes there is no array with the full shape at all, 
@@ -1864,7 +1864,7 @@ without having to tile or change them in any way:
 Without rotation, we would have got an _"IndexError: index out of bounds"_ error as the 
 number of columns in the target shape is bigger than that in the price arrays.
 
-### Grouping
+## Grouping
 
 Using groups, we can put multiple columns to the same backtesting basket :basket:
 
@@ -1886,7 +1886,7 @@ while group maps are predominantly used by generic functions specialized in pre-
 Both formats can be easily generated by a 
 [Grouper](/api/base/grouping/base/#vectorbtpro.base.grouping.base.Grouper) instance.
 
-#### Group lengths
+### Group lengths
 
 Let's create a custom column index with 5 assets, and put them into 2 groups. Since group lengths
 work on monolithic groups only, assets in each group must be next to each other:
@@ -1940,7 +1940,7 @@ Now, how do we define logic per group? Here's a template:
 5. Iterate over all columns in the group
 6. Define here your logic per column in the group
 
-#### Group map
+### Group map
 
 Group map is a tuple of two arrays:
 
@@ -1986,7 +1986,7 @@ Here's a template for working with a group map:
 4. Iterate over all column indices in the group
 5. Define here your logic per column in the group
 
-#### Call sequence
+### Call sequence
 
 When sharing capital between two or more assets, we sometimes want to process one column before the others.
 This makes most sense, for example, in cases where we need to exit positions before opening new ones
@@ -2080,7 +2080,7 @@ We can then modify the for-loop to iterate over the call sequence instead:
     `k` to denote an index in the call sequence, `c` to denote a column index within a group, 
     and `col` to denote a global column index.
 
-#### Pipeline/5
+### Pipeline/5
 
 Let's upgrade our previous pipeline to rebalance groups of assets. To better illustrate how
 important is sorting by order value when rebalancing multi-asset portfolios, we'll introduce another 
@@ -2372,7 +2372,7 @@ Each level must have the same length.
 2. Create a new (grouped) wrapper with the new column hierarchy
 3. Fill the target percentage array using the new wrapper
 
-### Contexts
+## Contexts
 
 Sometimes, there is a need to create a simulation method that takes a user-defined function and calls it 
 to make some trading decision. Such a UDF would require access to the simulation's state (such as the 
@@ -2383,7 +2383,7 @@ would be quite cumbersome for the user because accessing each field can only be 
 integer index or tuple unpacking. To ease this burden, we usually pass such information in form of 
 a named tuple, often referred to as a (simulation) "context".
 
-#### Pipeline/6
+### Pipeline/6
 
 Let's create a very basic pipeline that iterates over rows and columns, and, at each element, 
 calls a UDF to get an order and execute it!
@@ -2523,7 +2523,7 @@ to two dimensions, easily using [to_2d_array](/api/base/reshaping/#vectorbtpro.b
 We just created our own shallow [Portfolio.from_order_func](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_order_func)
 functionality, neat! :boom:
 
-### Performance
+## Performance
 
 In terms of performance, Numba code is often a roller coaster :roller_coaster:
 
@@ -2565,7 +2565,7 @@ and use the loop variable to select the respective element
 !!! hint
     As a rule of thumb: the simpler is the code, the easier it becomes for Numba to analyze and optimize it.
 
-#### Benchmarking
+### Benchmarking
 
 To benchmark a simulator, we can use the [timeit](https://docs.python.org/3/library/timeit.html) module.
 If possible, create some sample data of a sufficient size, and prepare for the worst-case scenario
@@ -2685,7 +2685,7 @@ order function that also creates a zero-sized empty array:
 As we see, creating an empty array at each bar has slowed down the execution by more than 50%.
 And this is a very important lesson to learn: create arrays outside of loops and only once!
 
-#### Auto-parallelization
+### Auto-parallelization
 
 Because of path dependencies (= the current state depends on the previous one), we cannot parallelize 
 the loop that iterates over rows (= time). But here's the deal: since vectorbt allows us
@@ -2752,7 +2752,7 @@ without and with automatic parallelization:
 It's your turn: enable automatic parallelization of columns in the [sixth pipeline](#pipeline6) 
 and benchmark it! Just don't forget to reduce the number of rows and increase the number of columns.
 
-#### Caching
+### Caching
 
 Even if we had optimized the simulation pipeline for the best-possible performance, the actual compilation
 step would take a huge chunk of that time savings away. However, the good news is that
@@ -2782,7 +2782,7 @@ that by running `rm -rf __pycache__` from your terminal.
     to avoid potential side effects. Also, disable caching for the entire time of developing
     a function and turn it only on once the function has been fully implemented.
 
-#### AOT compilation
+### AOT compilation
 
 Using [ahead-of-time compilation](https://numba.pydata.org/numba-doc/dev/user/pycc.html), we can compile
 a function only once and get no compilation overhead at runtime. Although this feature of Numba
