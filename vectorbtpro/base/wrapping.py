@@ -554,13 +554,13 @@ class ArrayWrapper(Configured, PandasIndexer):
 
         def _wrap(arr, dtype):
             arr = np.asarray(arr)
-            checks.assert_ndim(arr, (1, 2))
             if fillna is not None:
                 arr[pd.isnull(arr)] = fillna
+            shape_2d = (arr.shape[0], arr.shape[1] if arr.ndim > 1 else 1)
+            target_shape_2d = (len(index), len(columns))
+            if shape_2d != target_shape_2d:
+                arr = np.broadcast_to(arr, target_shape_2d)
             arr = reshaping.soft_to_ndim(arr, self.ndim)
-            checks.assert_shape_equal(arr, index, axis=(0, 0))
-            if arr.ndim == 2:
-                checks.assert_shape_equal(arr, columns, axis=(1, 0))
             try:
                 if np.issubdtype(arr.dtype, np.floating) and np.issubdtype(dtype, np.integer):
                     if np.isnan(arr).any():
@@ -750,6 +750,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         on: tp.Optional[tp.Union[int, tp.DatetimeLike, tp.IndexLike]] = None,
         add_delta: tp.Optional[tp.FrequencyLike] = None,
         kind: tp.Optional[str] = None,
+        indexer_method: str = "bfill",
         skip_minus_one: bool = True,
     ) -> tp.Array1d:
         """Translate indices or labels into index points.
@@ -884,11 +885,11 @@ class ArrayWrapper(Configured, PandasIndexer):
             if on is None:
                 if start is not None:
                     if isinstance(start, int):
-                        kind = 'indices'
+                        kind = "indices"
                     else:
-                        kind = 'labels'
+                        kind = "labels"
                 else:
-                    kind = 'indices'
+                    kind = "indices"
             else:
                 on = try_to_datetime_index(on)
                 if on.is_integer() and not self.index.is_integer():
@@ -921,17 +922,17 @@ class ArrayWrapper(Configured, PandasIndexer):
                     on = on.tz_localize(self.index.tzinfo)
                 elif on.tzinfo is not None and self.index.tzinfo is not None:
                     on = on.tz_convert(self.index.tzinfo)
-            index_points = self.index.get_indexer(on, method="bfill")
+            index_points = self.index.get_indexer(on, method=indexer_method)
         else:
             index_points = np.asarray(on)
 
         if start is not None and not start_used:
             if not isinstance(start, int):
-                start = self.index.get_indexer([start], method="bfill")[0]
+                start = self.index.get_indexer([start], method=indexer_method)[0]
             index_points = index_points[index_points >= start]
         if end is not None and not end_used:
             if not isinstance(end, int):
-                end = self.index.get_indexer([end], method="bfill")[0]
+                end = self.index.get_indexer([end], method=indexer_method)[0]
                 index_points = index_points[index_points <= end]
             else:
                 index_points = index_points[index_points < end]
@@ -955,6 +956,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         add_start_delta: tp.Optional[tp.FrequencyLike] = None,
         add_end_delta: tp.Optional[tp.FrequencyLike] = None,
         kind: tp.Optional[str] = None,
+        indexer_method: str = "bfill",
         skip_minus_one: bool = True,
         jitted: tp.JittedOption = None,
     ) -> tp.Array2d:
@@ -1182,7 +1184,7 @@ class ArrayWrapper(Configured, PandasIndexer):
 
         if kind is None:
             if start is None and end is None:
-                kind = 'indices'
+                kind = "indices"
             else:
                 if start is not None:
                     start = try_to_datetime_index(start)
@@ -1259,23 +1261,23 @@ class ArrayWrapper(Configured, PandasIndexer):
                 elif end.tzinfo is not None and self.index.tzinfo is not None:
                     end = end.tz_convert(self.index.tzinfo)
             if closed_start:
-                new_start = self.index.get_indexer(start, method="bfill")
+                new_start = self.index.get_indexer(start, method=indexer_method)
             else:
                 new_start = np.empty(len(start), dtype=np.int_)
                 for i in range(len(start)):
                     if start[i] in self.index:
                         new_start[i] = self.index.get_loc(start[i]) + 1
                     else:
-                        new_start[i] = self.index.get_indexer([start[i]], method="bfill")[0]
+                        new_start[i] = self.index.get_indexer([start[i]], method=indexer_method)[0]
             if closed_end:
                 new_end = np.empty(len(end), dtype=np.int_)
                 for i in range(len(end)):
                     if end[i] in self.index:
                         new_end[i] = self.index.get_loc(end[i]) + 1
                     else:
-                        new_end[i] = self.index.get_indexer([end[i]], method="bfill")[0]
+                        new_end[i] = self.index.get_indexer([end[i]], method=indexer_method)[0]
             else:
-                new_end = self.index.get_indexer(end, method="bfill")
+                new_end = self.index.get_indexer(end, method=indexer_method)
             index_ranges = np.column_stack((new_start, new_end))
             if skip_minus_one:
                 index_ranges = index_ranges[(index_ranges != -1).all(axis=1)]
