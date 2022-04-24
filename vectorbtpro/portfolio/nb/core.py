@@ -439,10 +439,6 @@ def execute_order_nb(
         raise ValueError("order.size_type is invalid")
     if order.direction < 0 or order.direction >= len(Direction):
         raise ValueError("order.direction is invalid")
-    if order.direction == Direction.LongOnly and position < 0:
-        raise ValueError("exec_state.position is negative but order.direction is Direction.LongOnly")
-    if order.direction == Direction.ShortOnly and position > 0:
-        raise ValueError("exec_state.position is positive but order.direction is Direction.ShortOnly")
     if not np.isfinite(order.fees):
         raise ValueError("order.fees must be finite")
     if not np.isfinite(order.fixed_fees):
