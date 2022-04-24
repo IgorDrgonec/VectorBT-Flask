@@ -439,15 +439,17 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
 
         if plot_volume:
             marker_colors = np.empty(self.volume.shape, dtype=object)
-            marker_colors[(self.close.values - self.open.values) > 0] = plotting_cfg[
+            mask_greater = (self.close.values - self.open.values) > 0
+            mask_less = (self.close.values - self.open.values) < 0
+            marker_colors[mask_greater] = plotting_cfg[
                 "color_schema"
             ]["increasing"]
-            marker_colors[(self.close.values - self.open.values) == 0] = plotting_cfg[
-                "color_schema"
-            ]["gray"]
-            marker_colors[(self.close.values - self.open.values) < 0] = plotting_cfg[
+            marker_colors[mask_less] = plotting_cfg[
                 "color_schema"
             ]["decreasing"]
+            marker_colors[~(mask_greater | mask_less)] = plotting_cfg[
+                "color_schema"
+            ]["gray"]
             volume_bar = go.Bar(
                 x=self.wrapper.index,
                 y=self.volume,
