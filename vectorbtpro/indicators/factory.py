@@ -3680,9 +3680,11 @@ Args:
 
             # Parse the number of outputs
             if len(parsed_factory_kwargs["output_names"]) == 0:
+                lines = expr.split("\n")
+                last_line = _clean_expr(lines[-1])
                 n_open_brackets = 0
                 n_outputs = 1
-                for i, s in enumerate(expr):
+                for i, s in enumerate(last_line):
                     if s == "," and n_open_brackets == 0:
                         n_outputs += 1
                     elif s in "([{":
