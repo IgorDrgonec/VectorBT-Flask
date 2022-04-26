@@ -1112,7 +1112,7 @@ class BinanceData(RemoteData):  # pragma: no cover
         df["Volume"] = df["Volume"].astype(float)
         df["Close time"] = pd.to_datetime(df["Close time"], unit="ms", utc=True)
         df["Quote volume"] = df["Quote volume"].astype(float)
-        df["Number of trades"] = df["Number of trades"].astype(int)
+        df["Number of trades"] = df["Number of trades"].astype(int, errors='ignore')
         df["Taker base volume"] = df["Taker base volume"].astype(float)
         df["Taker quote volume"] = df["Taker quote volume"].astype(float)
         del df["Ignore"]
@@ -1542,7 +1542,7 @@ class AlpacaData(RemoteData):  # pragma: no cover
         if "Volume" in df.columns:
             df["Volume"] = df["Volume"].astype(float)
         if "Trade count" in df.columns:
-            df["Trade count"] = df["Trade count"].astype(int)
+            df["Trade count"] = df["Trade count"].astype(int, errors='ignore')
         if "VWAP" in df.columns:
             df["VWAP"] = df["VWAP"].astype(float)
 
@@ -1868,7 +1868,7 @@ class PolygonData(RemoteData):  # pragma: no cover
         if "Volume" in df.columns:
             df["Volume"] = df["Volume"].astype(float)
         if "Trade count" in df.columns:
-            df["Trade count"] = df["Trade count"].astype(int)
+            df["Trade count"] = df["Trade count"].astype(int, errors='ignore')
         if "VWAP" in df.columns:
             df["VWAP"] = df["VWAP"].astype(float)
 
