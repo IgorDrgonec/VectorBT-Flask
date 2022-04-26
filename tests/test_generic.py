@@ -1010,7 +1010,7 @@ class TestAccessors:
             ),
         )
 
-    @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
+    @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5, "12h", "1d", "3d", "10d"])
     @pytest.mark.parametrize("test_minp", [1, None])
     def test_rolling_apply(self, test_window, test_minp):
         @njit
@@ -1021,7 +1021,9 @@ class TestAccessors:
         def mean_meta_nb(from_i, to_i, col, x):
             return np.nanmean(x[from_i:to_i, col])
 
-        if test_minp is None:
+        if isinstance(test_window, str):
+            test_minp = 1
+        elif test_minp is None:
             test_minp = test_window
         assert_series_equal(
             df["a"].vbt.rolling_apply(test_window, mean_nb, minp=test_minp),

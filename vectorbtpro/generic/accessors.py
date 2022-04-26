@@ -869,7 +869,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
     @class_or_instancemethod
     def rolling_apply(
         cls_or_self,
-        window: tp.Optional[int],
+        window: tp.Optional[tp.FrequencyLike],
         reduce_func_nb: tp.Union[tp.ReduceFunc, tp.RangeReduceMetaFunc],
         *args,
         minp: tp.Optional[int] = None,
@@ -881,9 +881,12 @@ class GenericAccessor(BaseAccessor, Analyzable):
         wrapper: tp.Optional[ArrayWrapper] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """See `vectorbtpro.generic.nb.apply_reduce.rolling_reduce_nb`.
+        """See `vectorbtpro.generic.nb.apply_reduce.rolling_reduce_nb` for integer windows
+        and `vectorbtpro.generic.nb.apply_reduce.rolling_freq_reduce_nb` for frequency windows.
 
-        For details on the meta version, see `vectorbtpro.generic.nb.apply_reduce.rolling_reduce_meta_nb`.
+        For details on the meta version, see `vectorbtpro.generic.nb.apply_reduce.rolling_reduce_meta_nb`
+        for integer windows and `vectorbtpro.generic.nb.apply_reduce.rolling_reduce_freq_meta_nb` for
+        frequency windows.
 
         If `window` is None, it will become an expanding window.
 
@@ -968,33 +971,44 @@ class GenericAccessor(BaseAccessor, Analyzable):
                     )
             else:
                 checks.assert_not_none(wrapper)
-            if minp is None and window is None:
-                minp = 1
-            if window is None:
-                window = wrapper.shape[0]
-            if minp is None:
-                minp = window
+        else:
+            if wrapper is None:
+                wrapper = cls_or_self.wrapper
+
+        if window is not None:
+            if not isinstance(window, int):
+                window = freq_to_timedelta64(window)
+        if minp is None and window is None:
+            minp = 1
+        if window is None:
+            window = wrapper.shape[0]
+        if minp is None:
+            minp = window
+
+        if isinstance(cls_or_self, type):
             template_context = merge_dicts(
                 broadcast_named_args,
                 dict(wrapper=wrapper, window=window, minp=minp),
                 template_context,
             )
             args = deep_substitute(args, template_context, sub_id="args")
-            func = jit_reg.resolve_option(nb.rolling_reduce_meta_nb, jitted)
-            func = ch_reg.resolve_option(func, chunked)
-            out = func(wrapper.shape_2d, window, minp, reduce_func_nb, *args)
+            if isinstance(window, int):
+                func = jit_reg.resolve_option(nb.rolling_reduce_meta_nb, jitted)
+                func = ch_reg.resolve_option(func, chunked)
+                out = func(wrapper.shape_2d, window, minp, reduce_func_nb, *args)
+            else:
+                func = jit_reg.resolve_option(nb.rolling_freq_reduce_meta_nb, jitted)
+                func = ch_reg.resolve_option(func, chunked)
+                out = func(wrapper.shape_2d[1], wrapper.index.values, window, reduce_func_nb, *args)
         else:
-            if minp is None and window is None:
-                minp = 1
-            if window is None:
-                window = cls_or_self.wrapper.shape[0]
-            if minp is None:
-                minp = window
-            func = jit_reg.resolve_option(nb.rolling_reduce_nb, jitted)
-            func = ch_reg.resolve_option(func, chunked)
-            out = func(cls_or_self.to_2d_array(), window, minp, reduce_func_nb, *args)
-            if wrapper is None:
-                wrapper = cls_or_self.wrapper
+            if isinstance(window, int):
+                func = jit_reg.resolve_option(nb.rolling_reduce_nb, jitted)
+                func = ch_reg.resolve_option(func, chunked)
+                out = func(cls_or_self.to_2d_array(), window, minp, reduce_func_nb, *args)
+            else:
+                func = jit_reg.resolve_option(nb.rolling_freq_reduce_nb, jitted)
+                func = ch_reg.resolve_option(func, chunked)
+                out = func(wrapper.index.values, cls_or_self.to_2d_array(), window, reduce_func_nb, *args)
 
         return wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 

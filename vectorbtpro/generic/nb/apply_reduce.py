@@ -250,6 +250,96 @@ def rolling_reduce_meta_nb(
 
 
 @register_jitted
+def rolling_freq_reduce_1d_nb(
+    index: tp.Array1d,
+    arr: tp.Array1d,
+    freq: np.timedelta64,
+    reduce_func_nb: tp.ReduceFunc,
+    *args,
+) -> tp.Array1d:
+    """Provide rolling, frequency-based window calculations.
+
+    `reduce_func_nb` must accept the array and `*args`. Must return a single value."""
+    out = np.empty_like(arr, dtype=np.float_)
+    from_i = 0
+    for i in range(arr.shape[0]):
+        if index[from_i] <= index[i] - freq:
+            for j in range(from_i + 1, index.shape[0]):
+                if index[j] > index[i] - freq:
+                    from_i = j
+                    break
+        to_i = i + 1
+        window_a = arr[from_i:to_i]
+        out[i] = reduce_func_nb(window_a, *args)
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="arr", axis=1),
+    arg_take_spec=dict(index=None, arr=ch.ArraySlicer(axis=1), freq=None, reduce_func_nb=None, args=ch.ArgsTaker()),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(tags={"can_parallel"})
+def rolling_freq_reduce_nb(
+    index: tp.Array1d,
+    arr: tp.Array2d,
+    freq: np.timedelta64,
+    reduce_func_nb: tp.ReduceFunc,
+    *args,
+) -> tp.Array2d:
+    """2-dim version of `rolling_reduce_1d_nb`."""
+    out = np.empty_like(arr, dtype=np.float_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = rolling_freq_reduce_1d_nb(index, arr[:, col], freq, reduce_func_nb, *args)
+    return out
+
+
+@register_jitted
+def rolling_freq_reduce_1d_meta_nb(
+    col: int,
+    index: tp.Array1d,
+    freq: np.timedelta64,
+    reduce_func_nb: tp.RangeReduceMetaFunc,
+    *args,
+) -> tp.Array1d:
+    """Meta version of `rolling_freq_reduce_1d_nb`.
+
+    `reduce_func_nb` must accept the start row index, the end row index, the column, and `*args`.
+    Must return a single value."""
+    out = np.empty(index.shape[0], dtype=np.float_)
+    from_i = 0
+    for i in range(index.shape[0]):
+        if index[from_i] <= index[i] - freq:
+            for j in range(from_i + 1, index.shape[0]):
+                if index[j] > index[i] - freq:
+                    from_i = j
+                    break
+        to_i = i + 1
+        out[i] = reduce_func_nb(from_i, to_i, col, *args)
+    return out
+
+
+@register_chunkable(
+    size=ch.ArgSizer(arg_query="n_cols"),
+    arg_take_spec=dict(n_cols=ch.CountAdapter(), index=None, freq=None, reduce_func_nb=None, args=ch.ArgsTaker()),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(tags={"can_parallel"})
+def rolling_freq_reduce_meta_nb(
+    n_cols: int,
+    index: tp.Array1d,
+    freq: np.timedelta64,
+    reduce_func_nb: tp.RangeReduceMetaFunc,
+    *args,
+) -> tp.Array2d:
+    """2-dim version of `rolling_freq_reduce_1d_meta_nb`."""
+    out = np.empty((index.shape[0], n_cols), dtype=np.float_)
+    for col in prange(n_cols):
+        out[:, col] = rolling_freq_reduce_1d_meta_nb(col, index, freq, reduce_func_nb, *args)
+    return out
+
+
+@register_jitted
 def groupby_reduce_1d_nb(arr: tp.Array1d, group_map: tp.GroupMap, reduce_func_nb: tp.ReduceFunc, *args) -> tp.Array1d:
     """Provide group-by calculations.
 
