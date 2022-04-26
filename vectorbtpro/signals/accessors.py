@@ -1771,30 +1771,36 @@ class SignalsAccessor(GenericAccessor):
         )
 
     def first(self, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
-        """Select signals that satisfy the condition `pos_rank == 0`."""
+        """Select signals that satisfy the condition `pos_rank == 0`.
+
+        Uses `SignalsAccessor.pos_rank`."""
         pos_rank = self.pos_rank(**kwargs).values
         return self.wrapper.wrap(pos_rank == 0, group_by=False, **resolve_dict(wrap_kwargs))
 
     def nth(self, n: int, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
-        """Select signals that satisfy the condition `pos_rank == n`."""
+        """Select signals that satisfy the condition `pos_rank == n`.
+
+        Uses `SignalsAccessor.pos_rank`."""
         pos_rank = self.pos_rank(**kwargs).values
         return self.wrapper.wrap(pos_rank == n, group_by=False, **resolve_dict(wrap_kwargs))
 
     def from_nth(self, n: int, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
-        """Select signals that satisfy the condition `pos_rank >= n`."""
+        """Select signals that satisfy the condition `pos_rank >= n`.
+
+        Uses `SignalsAccessor.pos_rank`."""
         pos_rank = self.pos_rank(**kwargs).values
         return self.wrapper.wrap(pos_rank >= n, group_by=False, **resolve_dict(wrap_kwargs))
 
     def pos_rank_mapped(self, group_by: tp.GroupByLike = None, **kwargs) -> MappedArray:
         """Get a mapped array of signal position ranks.
 
-        See `SignalsAccessor.pos_rank`."""
+        Uses `SignalsAccessor.pos_rank`."""
         return self.pos_rank(as_mapped=True, group_by=group_by, **kwargs)
 
     def partition_pos_rank_mapped(self, group_by: tp.GroupByLike = None, **kwargs) -> MappedArray:
         """Get a mapped array of partition position ranks.
 
-        See `SignalsAccessor.partition_pos_rank`."""
+        Uses `SignalsAccessor.partition_pos_rank`."""
         return self.partition_pos_rank(as_mapped=True, group_by=group_by, **kwargs)
 
     # ############# Index ############# #
@@ -2137,21 +2143,32 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
         else:
             y = reshaping.to_pd_array(y)
 
-        return y[self.obj].vbt.scatterplot(
-            **merge_dicts(
-                dict(
-                    trace_kwargs=dict(
-                        marker=dict(
-                            symbol="circle",
-                            color=plotting_cfg["contrast_color_schema"]["blue"],
-                            size=7,
-                            line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["blue"])),
-                        )
-                    )
+        def_kwargs = dict(
+            trace_kwargs=dict(
+                marker=dict(
+                    symbol="circle",
+                    color=plotting_cfg["contrast_color_schema"]["blue"],
+                    size=7,
                 ),
-                kwargs,
+                name=self.wrapper.name,
             )
         )
+        kwargs = merge_dicts(def_kwargs, kwargs)
+        if "marker_color" in kwargs["trace_kwargs"]:
+            marker_color = kwargs["trace_kwargs"]["marker_color"]
+        else:
+            marker_color = kwargs["trace_kwargs"]["marker"]["color"]
+        kwargs = merge_dicts(
+            dict(
+                trace_kwargs=dict(
+                    marker=dict(
+                        line=dict(width=1, color=adjust_lightness(marker_color)),
+                    ),
+                ),
+            ),
+            kwargs,
+        )
+        return y[self.obj].vbt.scatterplot(**kwargs)
 
     def plot_as_entry_markers(
         self,
@@ -2174,9 +2191,8 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
                             symbol="triangle-up",
                             color=plotting_cfg["contrast_color_schema"]["green"],
                             size=8,
-                            line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["green"])),
                         ),
-                        name="Entry",
+                        name="Entries",
                     )
                 ),
                 kwargs,
@@ -2204,9 +2220,8 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
                             symbol="triangle-down",
                             color=plotting_cfg["contrast_color_schema"]["red"],
                             size=8,
-                            line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["red"])),
                         ),
-                        name="Exit",
+                        name="Exits",
                     )
                 ),
                 kwargs,
