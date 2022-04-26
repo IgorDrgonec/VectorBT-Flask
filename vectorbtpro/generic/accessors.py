@@ -303,6 +303,8 @@ nb_config = ReadonlyConfig(
         "rolling_max": dict(func=nb.rolling_max_nb),
         "expanding_min": dict(func=nb.expanding_min_nb),
         "expanding_max": dict(func=nb.expanding_max_nb),
+        "rolling_any": dict(func=nb.rolling_any_nb),
+        "rolling_all": dict(func=nb.rolling_all_nb),
         "product": dict(func=nb.nanprod_nb, is_reducing=True),
     }
 )
@@ -870,7 +872,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
     def rolling_apply(
         cls_or_self,
         window: tp.Optional[tp.FrequencyLike],
-        reduce_func_nb: tp.Union[tp.ReduceFunc, tp.RangeReduceMetaFunc],
+        reduce_func_nb: tp.Union[str, tp.ReduceFunc, tp.RangeReduceMetaFunc],
         *args,
         minp: tp.Optional[int] = None,
         broadcast_named_args: tp.KwargsLike = None,
@@ -900,6 +902,18 @@ class GenericAccessor(BaseAccessor, Analyzable):
                           a    b         c
             2020-01-01  NaN  NaN       NaN
             2020-01-02  NaN  NaN       NaN
+            2020-01-03  2.0  4.0  2.000000
+            2020-01-04  3.0  3.0  2.333333
+            2020-01-05  4.0  2.0  2.000000
+            ```
+
+            * Using a frequency-based window:
+
+            ```pycon
+            >>> df.vbt.rolling_apply("3d", mean_nb)
+                          a    b         c
+            2020-01-01  1.0  5.0  1.000000
+            2020-01-02  1.5  4.5  1.500000
             2020-01-03  2.0  4.0  2.000000
             2020-01-04  3.0  3.0  2.333333
             2020-01-05  4.0  2.0  2.000000
@@ -984,6 +998,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
             window = wrapper.shape[0]
         if minp is None:
             minp = window
+        if isinstance(reduce_func_nb, str):
+            reduce_func_nb = getattr(nb, reduce_func_nb + "_reduce_nb")
 
         if isinstance(cls_or_self, type):
             template_context = merge_dicts(

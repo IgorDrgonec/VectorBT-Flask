@@ -802,6 +802,46 @@ class TestAccessors:
             df.vbt.expanding_idxmax(minp=test_minp, chunked=False),
         )
 
+    @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
+    def test_rolling_any(self, test_window):
+        mask = (df == 2) | (df == 3)
+        assert_series_equal(
+            mask["a"].vbt.rolling_any(test_window),
+            mask["a"].rolling(test_window, min_periods=1).max().fillna(False).astype(np.bool_),
+        )
+        assert_frame_equal(
+            mask.vbt.rolling_any(test_window),
+            mask.rolling(test_window, min_periods=1).max().fillna(False).astype(np.bool_),
+        )
+        assert_frame_equal(
+            mask.vbt.rolling_any(test_window, jitted=dict(parallel=True)),
+            mask.vbt.rolling_any(test_window, jitted=dict(parallel=False)),
+        )
+        assert_frame_equal(
+            mask.vbt.rolling_any(test_window, chunked=True),
+            mask.vbt.rolling_any(test_window, chunked=False),
+        )
+
+    @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
+    def test_rolling_all(self, test_window):
+        mask = (df == 2) | (df == 3)
+        assert_series_equal(
+            mask["a"].vbt.rolling_all(test_window),
+            mask["a"].rolling(test_window, min_periods=1).min().fillna(False).astype(np.bool_),
+        )
+        assert_frame_equal(
+            mask.vbt.rolling_all(test_window),
+            mask.rolling(test_window, min_periods=1).min().fillna(False).astype(np.bool_),
+        )
+        assert_frame_equal(
+            mask.vbt.rolling_all(test_window, jitted=dict(parallel=True)),
+            mask.vbt.rolling_all(test_window, jitted=dict(parallel=False)),
+        )
+        assert_frame_equal(
+            mask.vbt.rolling_all(test_window, chunked=True),
+            mask.vbt.rolling_all(test_window, chunked=False),
+        )
+
     def test_map(self):
         @njit
         def mult_nb(x, y):

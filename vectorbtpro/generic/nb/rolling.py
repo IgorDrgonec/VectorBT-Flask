@@ -1301,3 +1301,63 @@ def expanding_max_nb(arr: tp.Array2d, minp: int = 1) -> tp.Array2d:
     for col in prange(arr.shape[1]):
         out[:, col] = expanding_max_1d_nb(arr[:, col], minp=minp)
     return out
+
+
+@register_jitted(cache=True)
+def rolling_any_1d_nb(arr: tp.Array1d, window: int) -> tp.Array1d:
+    """Compute rolling any."""
+    out = np.empty_like(arr, dtype=np.bool_)
+    last_true_i = -1
+    for i in range(arr.shape[0]):
+        if not np.isnan(arr[i]) and arr[i]:
+            last_true_i = i
+        from_i = max(0, i + 1 - window)
+        if last_true_i >= from_i:
+            out[i] = True
+        else:
+            out[i] = False
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="arr", axis=1),
+    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def rolling_any_nb(arr: tp.Array2d, window: int) -> tp.Array2d:
+    """2-dim version of `rolling_any_1d_nb`."""
+    out = np.empty_like(arr, dtype=np.bool_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = rolling_any_1d_nb(arr[:, col], window)
+    return out
+
+
+@register_jitted(cache=True)
+def rolling_all_1d_nb(arr: tp.Array1d, window: int) -> tp.Array1d:
+    """Compute rolling all."""
+    out = np.empty_like(arr, dtype=np.bool_)
+    last_false_i = -1
+    for i in range(arr.shape[0]):
+        if np.isnan(arr[i]) or not arr[i]:
+            last_false_i = i
+        from_i = max(0, i + 1 - window)
+        if last_false_i >= from_i:
+            out[i] = False
+        else:
+            out[i] = True
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="arr", axis=1),
+    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def rolling_all_nb(arr: tp.Array2d, window: int) -> tp.Array2d:
+    """2-dim version of `rolling_all_1d_nb`."""
+    out = np.empty_like(arr, dtype=np.bool_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = rolling_all_1d_nb(arr[:, col], window)
+    return out
