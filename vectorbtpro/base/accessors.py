@@ -16,6 +16,7 @@ from vectorbtpro.utils.decorators import class_or_instanceproperty, class_or_ins
 from vectorbtpro.utils.magic_decorators import attach_binary_magic_methods, attach_unary_magic_methods
 from vectorbtpro.utils.parsing import get_func_arg_names, get_expr_var_names, get_context_vars
 from vectorbtpro.utils.template import deep_substitute
+from vectorbtpro.utils.datetime_ import freq_to_timedelta
 
 BaseAccessorT = tp.TypeVar("BaseAccessorT", bound="BaseAccessor")
 
@@ -384,6 +385,21 @@ class BaseAccessor(Wrapping):
         if axis == 1:
             return self.obj.iloc[:, indexer]
         return self.obj.iloc[indexer]
+
+    # ############# Getting ############# #
+
+    def ago(self, delta: tp.FrequencyLike, **kwargs) -> tp.SeriesFrame:
+        """Get the value some periods behind each value.
+
+        Keyword arguments are passed to
+        [pandas.Index.get_indexer](https://pandas.pydata.org/docs/reference/api/pandas.Index.get_indexer.html)."""
+        if isinstance(delta, str):
+            delta = freq_to_timedelta(delta)
+        indices = self.wrapper.index.get_indexer(self.wrapper.index - delta, **kwargs)
+        new_obj = self.wrapper.fill()
+        found_mask = indices != -1
+        new_obj.iloc[np.flatnonzero(found_mask)] = self.obj.iloc[indices[found_mask]]
+        return new_obj
 
     # ############# Setting ############# #
 
