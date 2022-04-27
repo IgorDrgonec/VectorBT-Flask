@@ -586,6 +586,87 @@ Name: High, Length: 366, dtype: float64
 
 Good luck doing the same with Pandas.
 
+### Forward filling
+
+By default, when upsampling or downsampling, vectorbt will forward fill missing values by propagating
+the latest known value. This is usually desired when the final task is to compare the resampled
+time series to another time series of the same timeframe. But this may not hold well for some more sensitive
+time series types, such as signals: repeating the same signal over and over again may give a distorted 
+view of the original timeframe, especially when upsampling. To place each value only once, we can use 
+the argument `ffill`. For example, let's upsample a 5min mask with 3 entries to a 1min mask with 15 entries,
+without and with forward filling:
+
+```pycon
+>>> min5_index = pd.date_range(start="2020", freq="5T", periods=3)
+>>> min1_index = pd.date_range(start="2020", freq="1T", periods=15)
+>>> min5_mask = pd.Series(False, index=min5_index)
+>>> min5_mask.iloc[0] = True  # (1)!
+>>> min5_mask.iloc[2] = True
+
+>>> resampler = vbt.Resampler(min5_index, min1_index)
+>>> min1_mask = min5_mask.vbt.resample_closing(resampler)  # (2)!
+>>> min1_mask
+2020-01-01 00:00:00    NaN
+2020-01-01 00:01:00    NaN
+2020-01-01 00:02:00    NaN
+2020-01-01 00:03:00    NaN
+2020-01-01 00:04:00    1.0
+2020-01-01 00:05:00    1.0
+2020-01-01 00:06:00    1.0
+2020-01-01 00:07:00    1.0
+2020-01-01 00:08:00    1.0
+2020-01-01 00:09:00    0.0
+2020-01-01 00:10:00    0.0
+2020-01-01 00:11:00    0.0
+2020-01-01 00:12:00    0.0
+2020-01-01 00:13:00    0.0
+2020-01-01 00:14:00    1.0
+Freq: T, dtype: float64
+
+>>> min1_mask = min5_mask.vbt.resample_closing(resampler, ffill=False)  # (3)!
+>>> min1_mask
+2020-01-01 00:00:00    NaN
+2020-01-01 00:01:00    NaN
+2020-01-01 00:02:00    NaN
+2020-01-01 00:03:00    NaN
+2020-01-01 00:04:00    1.0
+2020-01-01 00:05:00    NaN
+2020-01-01 00:06:00    NaN
+2020-01-01 00:07:00    NaN
+2020-01-01 00:08:00    NaN
+2020-01-01 00:09:00    0.0
+2020-01-01 00:10:00    NaN
+2020-01-01 00:11:00    NaN
+2020-01-01 00:12:00    NaN
+2020-01-01 00:13:00    NaN
+2020-01-01 00:14:00    1.0
+Freq: T, dtype: float64
+
+>>> min1_mask = min1_mask.fillna(False).astype(bool)  # (4)!
+>>> min1_mask
+2020-01-01 00:00:00    False
+2020-01-01 00:01:00    False
+2020-01-01 00:02:00    False
+2020-01-01 00:03:00    False
+2020-01-01 00:04:00     True
+2020-01-01 00:05:00    False
+2020-01-01 00:06:00    False
+2020-01-01 00:07:00    False
+2020-01-01 00:08:00    False
+2020-01-01 00:09:00    False
+2020-01-01 00:10:00    False
+2020-01-01 00:11:00    False
+2020-01-01 00:12:00    False
+2020-01-01 00:13:00    False
+2020-01-01 00:14:00     True
+Freq: T, dtype: bool
+```
+
+1. Set the first value to `True`, the second to `False`, and the third to `True` again
+2. With forward filling
+3. Without forward filling
+4. Convert to a valid mask
+
 ## Indicators
 
 So, how do we use the resampling logic from above in constructing indicators that combine
