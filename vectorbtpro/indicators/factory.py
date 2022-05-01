@@ -173,11 +173,12 @@ def build_columns(
         level_name = None
         if level_names is not None:
             level_name = level_names[i]
+        _param_settings = resolve_dict(param_settings, i=i)
+        _per_column = _param_settings.get("per_column", False)
+        _post_index_func = _param_settings.get("post_index_func", None)
         if per_column:
             param_index = indexes.index_from_values(p_values, name=level_name)
         else:
-            _param_settings = resolve_dict(param_settings, i=i)
-            _per_column = _param_settings.get("per_column", False)
             if _per_column:
                 param_index = None
                 for p in p_values:
@@ -191,8 +192,10 @@ def build_columns(
                     # When using flexible column-wise parameters
                     param_index = indexes.repeat_index(param_index, len(input_columns), ignore_ranges=ignore_ranges)
             else:
-                param_index = indexes.index_from_values(param_list[i], name=level_name)
+                param_index = indexes.index_from_values(p_values, name=level_name)
                 param_index = indexes.repeat_index(param_index, len(input_columns), ignore_ranges=ignore_ranges)
+        if _post_index_func is not None:
+            param_index = _post_index_func(param_index)
         param_indexes.append(param_index)
         if i not in hide_levels and (level_names is None or level_names[i] not in hide_levels):
             shown_param_indexes.append(param_index)
@@ -318,6 +321,7 @@ def run_pipeline(
             * `broadcast_kwargs`: Keyword arguments passed to `vectorbtpro.base.reshaping.broadcast`.
             * `per_column`: Whether each parameter value can be split by columns such that it can
                 be better reflected in a multi-index. Does not affect broadcasting.
+            * `post_index_func`: Function to convert the final index level of the parameter. Defaults to None.
         run_unique (bool): Whether to run only on unique parameter combinations.
 
             Disable if two identical parameter combinations can lead to different results
@@ -416,7 +420,18 @@ def run_pipeline(
     if checks.is_mapping(param_settings):
         checks.assert_dict_valid(
             param_settings,
-            [param_names, ["dtype", "is_tuple", "is_array_like", "bc_to_input", "broadcast_kwargs", "per_column"]],
+            [
+                param_names,
+                [
+                    "dtype",
+                    "is_tuple",
+                    "is_array_like",
+                    "bc_to_input",
+                    "broadcast_kwargs",
+                    "per_column",
+                    "post_index_func",
+                ],
+            ],
         )
         param_settings = [param_settings.get(k, None) for k in param_names]
     if hide_levels is None:
