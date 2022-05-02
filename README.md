@@ -1,25 +1,3 @@
-<div align="center">
-	<br>
-    <a href="https://vectorbt.pro/" alt="https://vectorbt.pro/">
-        <img src="docs/docs/assets/logo/header.svg" />
-    </a>
-	<br>
-</div>
-<br>
-<p align="center">
-    <a href="setup.py" alt="Python Versions">
-        <img src="assets/badges/python_version.svg" />
-    </a>
-    <a href="LICENSE.md" alt="License">
-        <img src="assets/badges/license.svg" />
-    </a>
-    <a href="#" alt="Version">
-        <img src="assets/badges/version.svg" />
-    </a>
-</p>
-
-vectorbt PRO is the ultimate engine for backtesting, algorithmic trading, and research. It is a high-performance superset of the [vectorbt](https://github.com/polakowo/vectorbt) library, one of the world's most innovative open-source backtesting engines. vectorbt PRO extends the standard vectorbt library with new impressive features and useful enhancements.
-
 ## Getting Started
 
 Visit [Getting Started](https://vectorbt.pro/getting-started/) and follow the installation guide. Also make sure to join our [Discord server](https://discord.gg/eQ9sVr5vb9)!
