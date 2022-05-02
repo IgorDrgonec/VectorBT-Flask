@@ -8,6 +8,7 @@ They perform operations on index objects, such as stacking, combining, and clean
     "Index" in pandas context is referred to both index and columns."""
 
 from datetime import datetime, timedelta
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
@@ -49,6 +50,7 @@ def index_from_values(values: tp.Sequence, name: tp.Optional[str] = None) -> tp.
 
     Each in `values` will correspond to an element in the new index."""
     scalar_types = (int, float, complex, str, bool, datetime, timedelta, np.generic)
+    counts = defaultdict(int)
     value_names = []
     for i in range(len(values)):
         v = values[i]
@@ -59,14 +61,18 @@ def index_from_values(values: tp.Sequence, name: tp.Optional[str] = None) -> tp.
                 if np.isclose(v, v.item(0), equal_nan=True).all():
                     value_names.append(v.item(0))
                 else:
-                    value_names.append("array_%d" % i)
+                    value_names.append("array_%d" % counts["array"])
+                    counts["array"] += 1
             else:
                 if np.equal(v, v.item(0)).all():
                     value_names.append(v.item(0))
                 else:
-                    value_names.append("array_%d" % i)
+                    value_names.append("array_%d" % counts["array"])
+                    counts["array"] += 1
         else:
-            value_names.append("%s_%d" % (str(type(v).__name__), i))
+            type_name = str(type(v).__name__)
+            value_names.append("%s_%d" % (type_name, counts[type_name]))
+            counts[type_name] += 1
     return pd.Index(value_names, name=name)
 
 
