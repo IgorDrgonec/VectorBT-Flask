@@ -98,14 +98,13 @@ def buy_nb(
         # Apply percentage
         cash_limit = min(cash_limit, percent * cash_limit)
 
-    if direction == Direction.LongOnly or direction == Direction.Both:
-        if cash_limit == 0:
-            return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.NoCashLong)
-        if np.isinf(size) and np.isinf(cash_limit):
-            raise ValueError("Attempt to go in long direction infinitely")
-    else:
+    if direction == Direction.ShortOnly:
         if account_state.position == 0:
             return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.NoOpenPosition)
+    if cash_limit == 0:
+        return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.NoCashLong)
+    if np.isinf(size) and np.isinf(cash_limit):
+        raise ValueError("Attempt to go in long direction infinitely")
 
     # Get optimal order size
     if direction == Direction.ShortOnly:
@@ -270,12 +269,11 @@ def sell_nb(
 
         size_limit = max_size
 
-    if direction == Direction.ShortOnly or direction == Direction.Both:
-        if np.isinf(size_limit):
-            raise ValueError("Attempt to go in short direction infinitely")
-    else:
+    if direction == Direction.LongOnly:
         if account_state.position == 0:
             return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.NoOpenPosition)
+    if np.isinf(size_limit):
+        raise ValueError("Attempt to go in short direction infinitely")
 
     # Adjust granularity
     if not np.isnan(size_granularity):
