@@ -281,8 +281,10 @@ class SignalsAccessor(GenericAccessor):
 
             ```pycon
             >>> @njit
-            ... def place_func_nb(out, from_i, to_i, col):
-            ...     out[np.random.choice(len(out))] = True
+            ... def place_func_nb(c):
+            ...     i = np.random.choice(len(c.out))
+            ...     c.out[i] = True
+            ...     return i
 
             >>> vbt.pd_acc.signals.generate(
             ...     (5, 3),
@@ -332,8 +334,6 @@ class SignalsAccessor(GenericAccessor):
         exit_args: tp.ArgsLike = None,
         entry_wait: int = 1,
         exit_wait: int = 1,
-        max_one_entry: bool = True,
-        max_one_exit: bool = True,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
         template_context: tp.Optional[tp.Mapping] = None,
@@ -344,25 +344,19 @@ class SignalsAccessor(GenericAccessor):
     ) -> tp.Tuple[tp.SeriesFrame, tp.SeriesFrame]:
         """See `vectorbtpro.signals.nb.generate_enex_nb`.
 
-        !!! note
-            Make sure that both functions return one signal at most. Otherwise, set `max_one_entry` and/or
-            `max_one_exit` to False. In this case, the generator will search for the last signal and proceed
-            with placing opposite signals right after it. This makes generation slower.
-
         Usage:
             * Generate entry and exit signals one after another:
 
             ```pycon
             >>> @njit
-            ... def place_func_nb(out, from_i, to_i, col):
-            ...     out[0] = True
+            ... def place_func_nb(c):
+            ...     c.out[0] = True
+            ...     return 0
 
             >>> en, ex = vbt.pd_acc.signals.generate_both(
             ...     (5, 3),
             ...     entry_place_func_nb=place_func_nb,
             ...     exit_place_func_nb=place_func_nb,
-            ...     max_one_entry=True,
-            ...     max_one_exit=True,
             ...     wrap_kwargs=dict(
             ...         index=mask.index,
             ...         columns=mask.columns
@@ -388,12 +382,14 @@ class SignalsAccessor(GenericAccessor):
 
             ```pycon
             >>> @njit
-            ... def entry_place_func_nb(out, from_i, to_i, col, n):
-            ...     out[:n] = True
+            ... def entry_place_func_nb(c, n):
+            ...     c.out[:n] = True
+            ...     return n - 1
 
             >>> @njit
-            ... def exit_place_func_nb(out, from_i, to_i, col, n):
-            ...     out[:n] = True
+            ... def exit_place_func_nb(c, n):
+            ...     c.out[:n] = True
+            ...     return n - 1
 
             >>> en, ex = vbt.pd_acc.signals.generate_both(
             ...     (5, 3),
@@ -443,8 +439,6 @@ class SignalsAccessor(GenericAccessor):
                 shape_2d=shape_2d,
                 entry_wait=entry_wait,
                 exit_wait=exit_wait,
-                max_one_entry=max_one_entry,
-                max_one_exit=max_one_exit,
             ),
             template_context,
         )
@@ -456,8 +450,6 @@ class SignalsAccessor(GenericAccessor):
             shape_2d,
             entry_wait,
             exit_wait,
-            max_one_entry,
-            max_one_exit,
             entry_place_func_nb,
             entry_args,
             exit_place_func_nb,
@@ -490,8 +482,9 @@ class SignalsAccessor(GenericAccessor):
 
             ```pycon
             >>> @njit
-            ... def exit_place_func_nb(out, from_i, to_i, col):
-            ...     out[-1] = True
+            ... def exit_place_func_nb(c):
+            ...     c.out[-1] = True
+            ...     return len(c.out) - 1
 
             >>> mask.vbt.signals.generate_exits(exit_place_func_nb)
                             a      b      c
@@ -795,8 +788,6 @@ class SignalsAccessor(GenericAccessor):
                 exit_args=(exit_prob, exit_pick_first, flex_2d),
                 entry_wait=entry_wait,
                 exit_wait=exit_wait,
-                max_one_entry=entry_pick_first,
-                max_one_exit=exit_pick_first,
                 jitted=jitted,
                 chunked=chunked,
                 wrapper=wrapper,
@@ -899,14 +890,16 @@ class SignalsAccessor(GenericAccessor):
 
     def generate_stop_exits(
         self,
-        ts: tp.ArrayLike,
-        stop: tp.ArrayLike,
+        entry_ts: tp.ArrayLike,
+        ts: tp.ArrayLike = np.nan,
+        follow_ts: tp.ArrayLike = np.nan,
+        stop: tp.ArrayLike = np.nan,
         trailing: tp.ArrayLike = False,
+        out_dict: tp.Optional[tp.Dict[str, tp.ArrayLike]] = None,
         entry_wait: int = 1,
         exit_wait: int = 1,
         until_next: bool = True,
         skip_until_exit: bool = False,
-        pick_first: bool = True,
         chain: bool = False,
         broadcast_kwargs: tp.KwargsLike = None,
         jitted: tp.JittedOption = None,
@@ -920,8 +913,11 @@ class SignalsAccessor(GenericAccessor):
         If `chain` is True, uses `SignalsAccessor.generate_both`.
         Otherwise, uses `SignalsAccessor.generate_exits`.
 
-        Arguments `entries`, `ts` and `stop` will broadcast using `vectorbtpro.base.reshaping.broadcast`
-        and `broadcast_kwargs`.
+        Use `out_dict` as a dict to pass `stop_ts` array. You can also set `out_dict` to {}
+        to produce this array automatically and still have access to it.
+
+        All array-like arguments including stops and `out_dict` will broadcast using
+        `vectorbtpro.base.reshaping.broadcast` and `broadcast_kwargs`.
 
         !!! hint
             Default arguments will generate an exit signal strictly between two entry signals.
@@ -975,16 +971,39 @@ class SignalsAccessor(GenericAccessor):
         """
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
+        if wrap_kwargs is None:
+            wrap_kwargs = {}
         entries = self.obj
+        if out_dict is None:
+            out_dict_passed = False
+            out_dict = {}
+        else:
+            out_dict_passed = True
+        stop_ts = out_dict.get("stop_ts", np.nan if out_dict_passed else None)
 
-        broadcastable_args = dict(entries=entries, ts=ts, stop=stop, trailing=trailing)
+        broadcastable_args = dict(
+            entries=entries,
+            entry_ts=entry_ts,
+            ts=ts,
+            follow_ts=follow_ts,
+            stop=stop,
+            trailing=trailing,
+            stop_ts=stop_ts,
+        )
         broadcast_kwargs = merge_dicts(
-            dict(keep_flex=dict(entries=False, _default=True), require_kwargs=dict(requirements="W")),
+            dict(
+                keep_flex=dict(entries=False, stop_ts=False, _default=True),
+                require_kwargs=dict(requirements="W"),
+            ),
             broadcast_kwargs,
         )
         broadcasted_args = reshaping.broadcast(broadcastable_args, **broadcast_kwargs)
         entries = broadcasted_args["entries"]
         flex_2d = entries.ndim == 2
+        stop_ts = broadcasted_args["stop_ts"]
+        if stop_ts is None:
+            stop_ts = np.empty_like(entries, dtype=np.float_)
+        stop_ts = reshaping.to_2d_array(stop_ts)
 
         entries_arr = reshaping.to_2d_array(entries)
         wrapper = ArrayWrapper.from_obj(entries)
@@ -1001,29 +1020,30 @@ class SignalsAccessor(GenericAccessor):
                         base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
                         base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
                         base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        None,
-                        None,
+                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
+                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
+                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
                         None,
                     ),
                 ),
             )
+            out_dict["stop_ts"] = wrapper.wrap(stop_ts, group_by=False, **wrap_kwargs)
             return cls.generate_both(
                 entries.shape,
                 entry_place_func_nb=jit_reg.resolve_option(nb.first_place_nb, jitted),
                 entry_args=(entries_arr,),
                 exit_place_func_nb=jit_reg.resolve_option(nb.stop_place_nb, jitted),
                 exit_args=(
+                    broadcasted_args["entry_ts"],
                     broadcasted_args["ts"],
+                    broadcasted_args["follow_ts"],
+                    stop_ts,
                     broadcasted_args["stop"],
                     broadcasted_args["trailing"],
-                    exit_wait,
-                    pick_first,
                     flex_2d,
                 ),
                 entry_wait=entry_wait,
                 exit_wait=exit_wait,
-                max_one_entry=True,
-                max_one_exit=pick_first,
                 wrapper=wrapper,
                 jitted=jitted,
                 chunked=chunked,
@@ -1038,21 +1058,24 @@ class SignalsAccessor(GenericAccessor):
                         base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
                         base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
                         base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        None,
-                        None,
+                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
+                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
+                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
                         None,
                     )
                 ),
             )
             if skip_until_exit and until_next:
                 warnings.warn("skip_until_exit=True has only effect when until_next=False", stacklevel=2)
+            out_dict["stop_ts"] = wrapper.wrap(stop_ts, group_by=False, **wrap_kwargs)
             return entries.vbt.signals.generate_exits(
                 jit_reg.resolve_option(nb.stop_place_nb, jitted),
+                broadcasted_args["entry_ts"],
                 broadcasted_args["ts"],
+                broadcasted_args["follow_ts"],
+                stop_ts,
                 broadcasted_args["stop"],
                 broadcasted_args["trailing"],
-                exit_wait,
-                pick_first,
                 flex_2d,
                 wait=exit_wait,
                 until_next=until_next,
@@ -1065,21 +1088,23 @@ class SignalsAccessor(GenericAccessor):
 
     def generate_ohlc_stop_exits(
         self,
-        open: tp.ArrayLike,
+        entry_price: tp.ArrayLike,
+        open: tp.ArrayLike = np.nan,
         high: tp.ArrayLike = np.nan,
         low: tp.ArrayLike = np.nan,
         close: tp.ArrayLike = np.nan,
-        is_open_safe: bool = True,
-        out_dict: tp.Optional[tp.Dict[str, tp.ArrayLike]] = None,
         sl_stop: tp.ArrayLike = np.nan,
-        sl_trail: tp.ArrayLike = False,
+        tsl_stop: tp.ArrayLike = np.nan,
         tp_stop: tp.ArrayLike = np.nan,
+        ttp_th: tp.ArrayLike = np.nan,
+        ttp_stop: tp.ArrayLike = np.nan,
         reverse: tp.ArrayLike = False,
+        is_entry_open: bool = False,
+        out_dict: tp.Optional[tp.Dict[str, tp.ArrayLike]] = None,
         entry_wait: int = 1,
         exit_wait: int = 1,
         until_next: bool = True,
         skip_until_exit: bool = False,
-        pick_first: bool = True,
         chain: bool = False,
         broadcast_kwargs: tp.KwargsLike = None,
         jitted: tp.JittedOption = None,
@@ -1088,10 +1113,6 @@ class SignalsAccessor(GenericAccessor):
         **kwargs,
     ) -> tp.MaybeTuple[tp.SeriesFrame]:
         """Generate exits based on when the price hits (trailing) stop loss or take profit.
-
-        !!! hint
-            This function is meant for signal analysis. For backtesting, consider using
-            the stop logic integrated into `vectorbtpro.portfolio.base.Portfolio.from_signals`.
 
         Use `out_dict` as a dict to pass `stop_price` and `stop_type` arrays. You can also
         set `out_dict` to {} to produce these arrays automatically and still have access to them.
@@ -1104,10 +1125,6 @@ class SignalsAccessor(GenericAccessor):
         `vectorbtpro.base.reshaping.broadcast` and `broadcast_kwargs`.
 
         For arguments, see `vectorbtpro.signals.nb.ohlc_stop_place_nb`.
-
-        !!! note
-            `open` isn't necessarily open price, but can be any entry price (even previous close).
-            Stop price is calculated based solely on the entry price.
 
         !!! hint
             Default arguments will generate an exit signal strictly between two entry signals.
@@ -1131,14 +1148,15 @@ class SignalsAccessor(GenericAccessor):
             ... })
             >>> out_dict = {}
             >>> exits = mask.vbt.signals.generate_ohlc_stop_exits(
+            ...     price["open"],
             ...     price['open'],
             ...     price['high'],
             ...     price['low'],
             ...     price['close'],
-            ...     sl_stop=0.1,
-            ...     sl_trail=True,
+            ...     tsl_stop=0.1,
             ...     tp_stop=0.1,
-            ...     out_dict=out_dict
+            ...     is_entry_open=True,
+            ...     out_dict=out_dict,
             ... )
             >>> exits
                             a      b      c
@@ -1157,12 +1175,12 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05   NaN   NaN   NaN
 
             >>> out_dict['stop_type'].vbt(mapping=StopType).apply_mapping()
-                                 a           b          c
-            2020-01-01        None        None       None
-            2020-01-02  TakeProfit  TakeProfit       None
-            2020-01-03        None        None       None
-            2020-01-04        None   TrailStop  TrailStop
-            2020-01-05        None        None       None
+                           a     b     c
+            2020-01-01  None  None  None
+            2020-01-02    TP    TP  None
+            2020-01-03  None  None  None
+            2020-01-04  None   TSL   TSL
+            2020-01-05  None  None  None
             ```
 
             Notice how the first two entry signals in the third column have no exit signal -
@@ -1175,12 +1193,13 @@ class SignalsAccessor(GenericAccessor):
             >>> out_dict = {}
             >>> exits = mask.vbt.signals.generate_ohlc_stop_exits(
             ...     price['open'],
+            ...     price['open'],
             ...     price['high'],
             ...     price['low'],
             ...     price['close'],
-            ...     sl_stop=0.1,
-            ...     sl_trail=True,
+            ...     tsl_stop=0.1,
             ...     tp_stop=0.1,
+            ...     is_entry_open=True,
             ...     out_dict=out_dict,
             ...     until_next=False,
             ...     skip_until_exit=True
@@ -1202,12 +1221,12 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05   NaN   NaN   NaN
 
             >>> out_dict['stop_type'].vbt(mapping=StopType).apply_mapping()
-                                 a           b           c
-            2020-01-01        None        None        None
-            2020-01-02  TakeProfit  TakeProfit  TakeProfit
-            2020-01-03        None        None        None
-            2020-01-04        None   TrailStop   TrailStop
-            2020-01-05        None        None        None
+                           a     b     c
+            2020-01-01  None  None  None
+            2020-01-02    TP    TP    TP
+            2020-01-03  None  None  None
+            2020-01-04  None   TSL   TSL
+            2020-01-05  None  None  None
             ```
 
             Now, the first signal in the third column gets executed regardless of the entries that come next,
@@ -1220,12 +1239,13 @@ class SignalsAccessor(GenericAccessor):
             >>> out_dict = {}
             >>> new_entries, exits = mask.vbt.signals.generate_ohlc_stop_exits(
             ...     price['open'],
+            ...     price['open'],
             ...     price['high'],
             ...     price['low'],
             ...     price['close'],
-            ...     sl_stop=0.1,
-            ...     sl_trail=True,
+            ...     tsl_stop=0.1,
             ...     tp_stop=0.1,
+            ...     is_entry_open=True,
             ...     out_dict=out_dict,
             ...     chain=True
             ... )
@@ -1254,34 +1274,38 @@ class SignalsAccessor(GenericAccessor):
             ```pycon
             >>> exits = mask.vbt.signals.generate_ohlc_stop_exits(
             ...     price['open'],
+            ...     price['open'],
             ...     price['high'],
             ...     price['low'],
             ...     price['close'],
-            ...     sl_stop=pd.Index([0.1, 0.2]),
-            ...     sl_trail=pd.Index([False, True])
+            ...     sl_stop=pd.Index([False, 0.1]),
+            ...     tsl_stop=pd.Index([False, 0.1]),
+            ...     is_entry_open=True
             ... )
             >>> exits
-            sl_stop                                          0.1                       \\
-            sl_trail                  False                 True                False
+            sl_stop     False                                       0.1                \\
+            tsl_stop    False                  0.1                False
                             a      b      c      a      b      c      a      b      c
             2020-01-01  False  False  False  False  False  False  False  False  False
             2020-01-02  False  False  False  False  False  False  False  False  False
             2020-01-03  False  False  False  False  False  False  False  False  False
-            2020-01-04  False   True   True   True   True   True  False  False  False
-            2020-01-05   True  False  False  False  False  False  False  False   True
+            2020-01-04  False  False  False   True   True   True  False   True   True
+            2020-01-05  False  False  False  False  False  False   True  False  False
 
-            sl_stop                     0.2
-            sl_trail                   True
+            sl_stop
+            tsl_stop      0.1
                             a      b      c
             2020-01-01  False  False  False
             2020-01-02  False  False  False
             2020-01-03  False  False  False
-            2020-01-04   True  False  False
-            2020-01-05  False  False   True
+            2020-01-04   True   True   True
+            2020-01-05  False  False  False
             ```
         """
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
+        if wrap_kwargs is None:
+            wrap_kwargs = {}
         entries = self.obj
         if out_dict is None:
             out_dict_passed = False
@@ -1290,18 +1314,19 @@ class SignalsAccessor(GenericAccessor):
             out_dict_passed = True
         stop_price = out_dict.get("stop_price", np.nan if out_dict_passed else None)
         stop_type = out_dict.get("stop_type", -1 if out_dict_passed else None)
-        if wrap_kwargs is None:
-            wrap_kwargs = {}
 
         broadcastable_args = dict(
             entries=entries,
+            entry_price=entry_price,
             open=open,
             high=high,
             low=low,
             close=close,
             sl_stop=sl_stop,
-            sl_trail=sl_trail,
+            tsl_stop=tsl_stop,
             tp_stop=tp_stop,
+            ttp_th=ttp_th,
+            ttp_stop=ttp_stop,
             reverse=reverse,
             stop_price=stop_price,
             stop_type=stop_type,
@@ -1341,14 +1366,15 @@ class SignalsAccessor(GenericAccessor):
                         base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
                         base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
                         base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
+                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
                         ch.ArraySlicer(axis=1),
                         ch.ArraySlicer(axis=1),
                         base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
                         base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
                         base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
                         base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        None,
-                        None,
+                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
+                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
                         None,
                         None,
                     ),
@@ -1360,6 +1386,7 @@ class SignalsAccessor(GenericAccessor):
                 entry_args=(entries_arr,),
                 exit_place_func_nb=jit_reg.resolve_option(nb.ohlc_stop_place_nb, jitted),
                 exit_args=(
+                    broadcasted_args["entry_price"],
                     broadcasted_args["open"],
                     broadcasted_args["high"],
                     broadcasted_args["low"],
@@ -1367,18 +1394,16 @@ class SignalsAccessor(GenericAccessor):
                     stop_price,
                     stop_type,
                     broadcasted_args["sl_stop"],
-                    broadcasted_args["sl_trail"],
+                    broadcasted_args["tsl_stop"],
                     broadcasted_args["tp_stop"],
+                    broadcasted_args["ttp_th"],
+                    broadcasted_args["ttp_stop"],
                     broadcasted_args["reverse"],
-                    is_open_safe,
-                    exit_wait,
-                    pick_first,
+                    is_entry_open,
                     flex_2d,
                 ),
                 entry_wait=entry_wait,
                 exit_wait=exit_wait,
-                max_one_entry=True,
-                max_one_exit=pick_first,
                 wrapper=wrapper,
                 jitted=jitted,
                 chunked=chunked,
@@ -1399,14 +1424,15 @@ class SignalsAccessor(GenericAccessor):
                         base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
                         base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
                         base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
+                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
                         ch.ArraySlicer(axis=1),
                         ch.ArraySlicer(axis=1),
                         base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
                         base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
                         base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
                         base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        None,
-                        None,
+                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
+                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
                         None,
                         None,
                     )
@@ -1414,6 +1440,7 @@ class SignalsAccessor(GenericAccessor):
             )
             exits = entries.vbt.signals.generate_exits(
                 jit_reg.resolve_option(nb.ohlc_stop_place_nb, jitted),
+                broadcasted_args["entry_price"],
                 broadcasted_args["open"],
                 broadcasted_args["high"],
                 broadcasted_args["low"],
@@ -1421,12 +1448,12 @@ class SignalsAccessor(GenericAccessor):
                 stop_price,
                 stop_type,
                 broadcasted_args["sl_stop"],
-                broadcasted_args["sl_trail"],
+                broadcasted_args["tsl_stop"],
                 broadcasted_args["tp_stop"],
+                broadcasted_args["ttp_th"],
+                broadcasted_args["ttp_stop"],
                 broadcasted_args["reverse"],
-                is_open_safe,
-                exit_wait,
-                pick_first,
+                is_entry_open,
                 flex_2d,
                 wait=exit_wait,
                 until_next=until_next,
@@ -1598,6 +1625,7 @@ class SignalsAccessor(GenericAccessor):
         prepare_func: tp.Optional[tp.Callable] = None,
         reset_by: tp.Optional[tp.ArrayLike] = None,
         after_false: bool = False,
+        after_reset: bool = False,
         as_mapped: bool = False,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
@@ -1652,7 +1680,7 @@ class SignalsAccessor(GenericAccessor):
         args = deep_substitute(args, template_context, sub_id="args")
         func = jit_reg.resolve_option(nb.rank_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        rank = func(obj, reset_by, after_false, rank_func_nb, *temp_arrs, *args)
+        rank = func(obj, reset_by, after_false, after_reset, rank_func_nb, *temp_arrs, *args)
         rank_wrapped = wrapper.wrap(rank, group_by=False, **wrap_kwargs)
         if as_mapped:
             rank_wrapped = rank_wrapped.replace(-1, np.nan)
@@ -1777,6 +1805,10 @@ class SignalsAccessor(GenericAccessor):
         pos_rank = self.pos_rank(**kwargs).values
         return self.wrapper.wrap(pos_rank == 0, group_by=False, **resolve_dict(wrap_kwargs))
 
+    def first_after(self, reset_by: tp.ArrayLike, **kwargs) -> tp.SeriesFrame:
+        """Select the first signal after each signal in `reset_by`."""
+        return self.first(reset_by=reset_by, after_reset=True, **kwargs)
+
     def nth(self, n: int, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
         """Select signals that satisfy the condition `pos_rank == n`.
 
@@ -1784,12 +1816,20 @@ class SignalsAccessor(GenericAccessor):
         pos_rank = self.pos_rank(**kwargs).values
         return self.wrapper.wrap(pos_rank == n, group_by=False, **resolve_dict(wrap_kwargs))
 
+    def nth_after(self, reset_by: tp.ArrayLike, **kwargs) -> tp.SeriesFrame:
+        """Select the n-th signal after each signal in `reset_by`."""
+        return self.nth(reset_by=reset_by, after_reset=True, **kwargs)
+
     def from_nth(self, n: int, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
         """Select signals that satisfy the condition `pos_rank >= n`.
 
         Uses `SignalsAccessor.pos_rank`."""
         pos_rank = self.pos_rank(**kwargs).values
         return self.wrapper.wrap(pos_rank >= n, group_by=False, **resolve_dict(wrap_kwargs))
+
+    def from_nth_after(self, n: int, reset_by: tp.ArrayLike, **kwargs) -> tp.SeriesFrame:
+        """Select from the n-th signal after each signal in `reset_by`."""
+        return self.nth(n, reset_by=reset_by, after_reset=True, **kwargs)
 
     def pos_rank_mapped(self, group_by: tp.GroupByLike = None, **kwargs) -> MappedArray:
         """Get a mapped array of signal position ranks.

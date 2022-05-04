@@ -3,8 +3,10 @@
 """Custom signal generators built with the signal factory."""
 
 import numpy as np
+import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.base.reshaping import Ref
 from vectorbtpro.indicators.configs import flex_col_param_config, flex_elem_param_config
 from vectorbtpro.signals.enums import StopType
 from vectorbtpro.signals.factory import SignalFactory
@@ -15,7 +17,7 @@ from vectorbtpro.signals.nb import (
     ohlc_stop_place_nb,
     rand_place_nb,
 )
-from vectorbtpro.utils.config import ReadonlyConfig
+from vectorbtpro.utils.config import ReadonlyConfig, merge_dicts
 
 __all__ = [
     "RAND",
@@ -39,7 +41,7 @@ RAND = SignalFactory(
     short_name="rand",
     mode="entries",
     param_names=["n"],
-).from_place_func(
+).with_place_func(
     entry_place_func=rand_place_nb,
     entry_settings=dict(pass_params=["n"]),
     param_settings=dict(n=flex_col_param_config),
@@ -100,7 +102,7 @@ class _RAND(RAND):
 
 setattr(RAND, "__doc__", _RAND.__doc__)
 
-RANDX = SignalFactory(class_name="RANDX", module_name=__name__, short_name="randx", mode="exits").from_place_func(
+RANDX = SignalFactory(class_name="RANDX", module_name=__name__, short_name="randx", mode="exits").with_place_func(
     exit_place_func=rand_place_nb,
     exit_settings=dict(pass_kwargs=dict(n=np.asarray([1]))),
     seed=None,
@@ -208,7 +210,7 @@ RPROB = SignalFactory(
     short_name="rprob",
     mode="entries",
     param_names=["prob"],
-).from_place_func(
+).with_place_func(
     entry_place_func=rand_by_prob_place_nb,
     entry_settings=dict(pass_params=["prob"], pass_kwargs=["pick_first", "flex_2d"]),
     pass_flex_2d=True,
@@ -283,7 +285,7 @@ rprobx_func_config = ReadonlyConfig(
 )
 """Exit function config for `RPROBX`."""
 
-RPROBX = SignalFactory(**rprobx_config).from_place_func(**rprobx_func_config)
+RPROBX = SignalFactory(**rprobx_config).with_place_func(**rprobx_func_config)
 
 
 class _RPROBX(RPROBX):
@@ -300,7 +302,7 @@ setattr(RPROBX, "__doc__", _RPROBX.__doc__)
 
 RPROBCX = SignalFactory(
     **rprobx_config.merge_with(dict(class_name="RPROBCX", short_name="rprobcx", mode="chain")),
-).from_place_func(**rprobx_func_config)
+).with_place_func(**rprobx_func_config)
 
 
 class _RPROBCX(RPROBCX):
@@ -322,7 +324,7 @@ RPROBNX = SignalFactory(
     short_name="rprobnx",
     mode="both",
     param_names=["entry_prob", "exit_prob"],
-).from_place_func(
+).with_place_func(
     entry_place_func=rand_by_prob_place_nb,
     entry_settings=dict(pass_params=["entry_prob"], pass_kwargs=["pick_first", "flex_2d"]),
     exit_place_func=rand_by_prob_place_nb,
@@ -418,7 +420,8 @@ stx_config = ReadonlyConfig(
         module_name=__name__,
         short_name="stx",
         mode="exits",
-        input_names=["ts"],
+        input_names=["entry_ts", "ts", "follow_ts"],
+        in_output_names=["stop_ts"],
         param_names=["stop", "trailing"],
     )
 )
@@ -428,18 +431,22 @@ stx_func_config = ReadonlyConfig(
     dict(
         exit_place_func=stop_place_nb,
         exit_settings=dict(
-            pass_inputs=["ts"],
+            pass_inputs=["entry_ts", "ts", "follow_ts"],
+            pass_in_outputs=["stop_ts"],
             pass_params=["stop", "trailing"],
-            pass_kwargs=["wait", "pick_first", "flex_2d"],
+            pass_kwargs=["flex_2d"],
         ),
         pass_flex_2d=True,
         param_settings=dict(stop=flex_elem_param_config, trailing=flex_elem_param_config),
         trailing=False,
+        ts=np.nan,
+        follow_ts=np.nan,
+        stop_ts=np.nan,
     )
 )
 """Exit function config for `STX`."""
 
-STX = SignalFactory(**stx_config).from_place_func(**stx_func_config)
+STX = SignalFactory(**stx_config).with_place_func(**stx_func_config)
 
 
 class _STX(STX):
@@ -456,7 +463,7 @@ class _STX(STX):
 
 setattr(STX, "__doc__", _STX.__doc__)
 
-STCX = SignalFactory(**stx_config.merge_with(dict(class_name="STCX", short_name="stcx", mode="chain"))).from_place_func(
+STCX = SignalFactory(**stx_config.merge_with(dict(class_name="STCX", short_name="stcx", mode="chain"))).with_place_func(
     **stx_func_config
 )
 
@@ -482,9 +489,9 @@ ohlcstx_config = ReadonlyConfig(
         module_name=__name__,
         short_name="ohlcstx",
         mode="exits",
-        input_names=["open", "high", "low", "close"],
+        input_names=["entry_price", "open", "high", "low", "close"],
         in_output_names=["stop_price", "stop_type"],
-        param_names=["sl_stop", "sl_trail", "tp_stop", "reverse"],
+        param_names=["sl_stop", "tsl_stop", "tp_stop", "ttp_th", "ttp_stop", "reverse"],
         attr_settings=dict(stop_type=dict(dtype=StopType)),  # creates rand_type_readable
     )
 )
@@ -494,34 +501,39 @@ ohlcstx_func_config = ReadonlyConfig(
     dict(
         exit_place_func=ohlc_stop_place_nb,
         exit_settings=dict(
-            pass_inputs=["open", "high", "low", "close"],  # do not pass entries
+            pass_inputs=["entry_price", "open", "high", "low", "close"],  # do not pass entries
             pass_in_outputs=["stop_price", "stop_type"],
-            pass_params=["sl_stop", "sl_trail", "tp_stop", "reverse"],
-            pass_kwargs=["is_open_safe", "wait", "pick_first", "flex_2d"],
+            pass_params=["sl_stop", "tsl_stop", "tp_stop", "ttp_th", "ttp_stop", "reverse"],
+            pass_kwargs=["is_entry_open", "flex_2d"],
         ),
         pass_flex_2d=True,
         in_output_settings=dict(stop_price=dict(dtype=np.float_), stop_type=dict(dtype=np.int_)),
         param_settings=dict(
             sl_stop=flex_elem_param_config,
-            sl_trail=flex_elem_param_config,
+            tsl_stop=flex_elem_param_config,
             tp_stop=flex_elem_param_config,
+            ttp_th=flex_elem_param_config,
+            ttp_stop=flex_elem_param_config,
             reverse=flex_elem_param_config,
         ),
+        open=np.nan,
         high=np.nan,
         low=np.nan,
         close=np.nan,
         stop_price=np.nan,
         stop_type=-1,
         sl_stop=np.nan,
-        sl_trail=False,
+        tsl_stop=np.nan,
         tp_stop=np.nan,
+        ttp_th=np.nan,
+        ttp_stop=np.nan,
         reverse=False,
-        is_open_safe=True,
+        is_entry_open=False,
     )
 )
 """Exit function config for `OHLCSTX`."""
 
-OHLCSTX = SignalFactory(**ohlcstx_config).from_place_func(**ohlcstx_func_config)
+OHLCSTX = SignalFactory(**ohlcstx_config).with_place_func(**ohlcstx_func_config)
 
 
 def _bind_ohlcstx_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pragma: no cover
@@ -530,8 +542,9 @@ def _bind_ohlcstx_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pra
 
     def plot(
         self,
-        plot_type: tp.Union[None, str, tp.BaseTraceType] = None,
+        column: tp.Optional[tp.Label] = None,
         ohlc_kwargs: tp.KwargsLike = None,
+        entry_price_kwargs: tp.KwargsLike = None,
         entry_trace_kwargs: tp.KwargsLike = None,
         exit_trace_kwargs: tp.KwargsLike = None,
         add_trace_kwargs: tp.KwargsLike = None,
@@ -539,79 +552,52 @@ def _bind_ohlcstx_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pra
         _base_cls_plot: tp.Callable = base_cls_plot,
         **layout_kwargs
     ) -> tp.BaseFigure:  # pragma: no cover
-
-        from vectorbtpro.utils.opt_packages import assert_can_import
-
-        assert_can_import("plotly")
-        import plotly.graph_objects as go
-        from vectorbtpro.utils.figure import make_figure
-        from vectorbtpro._settings import settings
-
-        ohlcv_cfg = settings["ohlcv"]
-        plotting_cfg = settings["plotting"]
-
-        if self.wrapper.ndim > 1:
-            raise TypeError("Select a column first. Use indexing.")
+        self_col = self.select_col(column=column, group_by=False)
 
         if ohlc_kwargs is None:
             ohlc_kwargs = {}
+        if entry_price_kwargs is None:
+            entry_price_kwargs = {}
         if add_trace_kwargs is None:
             add_trace_kwargs = {}
 
-        if fig is None:
-            fig = make_figure()
-            fig.update_layout(
-                showlegend=True,
-                xaxis_rangeslider_visible=False,
-                xaxis_showgrid=True,
-                yaxis_showgrid=True,
-            )
-        fig.update_layout(**layout_kwargs)
-
-        if plot_type is None:
-            plot_type = ohlcv_cfg["plot_type"]
-        if isinstance(plot_type, str):
-            if plot_type.lower() == "ohlc":
-                plot_type = "OHLC"
-                plot_obj = go.Ohlc
-            elif plot_type.lower() == "candlestick":
-                plot_type = "Candlestick"
-                plot_obj = go.Candlestick
-            else:
-                raise ValueError("Plot type can be either 'OHLC' or 'Candlestick'")
+        open_any = not self_col.open.isnull().all()
+        high_any = not self_col.high.isnull().all()
+        low_any = not self_col.low.isnull().all()
+        close_any = not self_col.close.isnull().all()
+        if open_any and high_any and low_any and close_any:
+            ohlc_df = pd.concat((
+                self_col.open,
+                self_col.high,
+                self_col.low,
+                self_col.close
+            ), axis=1)
+            ohlc_df.columns = ["Open", "High", "Low", "Close"]
+            ohlc_kwargs = merge_dicts(layout_kwargs, dict(ohlc_trace_kwargs=dict(opacity=0.5)), ohlc_kwargs)
+            fig = ohlc_df.vbt.ohlcv.plot(fig=fig, **ohlc_kwargs)
         else:
-            plot_obj = plot_type
-        ohlc = plot_obj(
-            x=self.wrapper.index,
-            open=self.open,
-            high=self.high,
-            low=self.low,
-            close=self.close,
-            name=plot_type,
-            increasing=dict(line=dict(color=plotting_cfg["color_schema"]["increasing"])),
-            decreasing=dict(line=dict(color=plotting_cfg["color_schema"]["decreasing"])),
-        )
-        ohlc.update(**ohlc_kwargs)
-        fig.add_trace(ohlc, **add_trace_kwargs)
+            entry_price_kwargs = merge_dicts(layout_kwargs, entry_price_kwargs)
+            fig = self_col.entry_price.rename("Entry price").vbt.plot(fig=fig, **entry_price_kwargs)
 
         # Plot entry and exit markers
         _base_cls_plot(
-            self,
-            entry_y=self.open,
-            exit_y=self.stop_price,
-            exit_types=self.stop_type_readable,
+            self_col,
+            entry_y=self_col.entry_price,
+            exit_y=self_col.stop_price,
+            exit_types=self_col.stop_type_readable,
             entry_trace_kwargs=entry_trace_kwargs,
             exit_trace_kwargs=exit_trace_kwargs,
             add_trace_kwargs=add_trace_kwargs,
             fig=fig,
+            **layout_kwargs,
         )
         return fig
 
     plot.__doc__ = """Plot OHLC, `{0}.{1}` and `{0}.exits`.
     
     Args:
-        plot_type: Either 'OHLC', 'Candlestick' or Plotly trace.
-        ohlc_kwargs (dict): Keyword arguments passed to `plot_type`.
+        ohlc_kwargs (dict): Keyword arguments passed to 
+            `vectorbtpro.ohlcv.accessors.OHLCVDFAccessor.plot`.
         entry_trace_kwargs (dict): Keyword arguments passed to 
             `vectorbtpro.signals.accessors.SignalsSRAccessor.plot_as_entry_markers` for `{0}.{1}`.
         exit_trace_kwargs (dict): Keyword arguments passed to 
@@ -664,54 +650,69 @@ class _OHLCSTX(OHLCSTX):
         ... })
         >>> ohlcstx = vbt.OHLCSTX.run(
         ...     entries,
-        ...     price['open'], price['high'], price['low'], price['close'],
-        ...     sl_stop=[0.1, 0.1, np.nan],
-        ...     sl_trail=[False, True, False],
-        ...     tp_stop=[np.nan, np.nan, 0.1])
+        ...     price['open'],
+        ...     price['open'],
+        ...     price['high'],
+        ...     price['low'],
+        ...     price['close'],
+        ...     sl_stop=[0.1, np.nan, np.nan, np.nan],
+        ...     tsl_stop=[np.nan, 0.1, np.nan, np.nan],
+        ...     tp_stop=[np.nan, np.nan, 0.1, np.nan],
+        ...     ttp_th=[np.nan, np.nan, np.nan, 0.2],
+        ...     ttp_stop=[np.nan, np.nan, np.nan, 0.3],
+        ...     is_entry_open=True)
 
         >>> ohlcstx.entries
-        ohlcstx_sl_stop     0.1    0.1    NaN
-        ohlcstx_sl_trail  False   True  False
-        ohlcstx_tp_stop     NaN    NaN    0.1
-        0                  True   True   True
-        1                 False  False  False
-        2                 False  False  False
-        3                 False  False  False
-        4                 False  False  False
-        5                 False  False  False
+        ohlcstx_sl_stop     0.1    NaN    NaN    NaN
+        ohlcstx_tsl_stop    NaN    0.1    NaN    NaN
+        ohlcstx_tp_stop     NaN    NaN    0.1    NaN
+        ohlcstx_ttp_th      NaN    NaN    NaN    0.2
+        ohlcstx_ttp_stop    NaN    NaN    NaN    0.3
+        0                  True   True   True   True
+        1                 False  False  False  False
+        2                 False  False  False  False
+        3                 False  False  False  False
+        4                 False  False  False  False
+        5                 False  False  False  False
 
         >>> ohlcstx.exits
-        ohlcstx_sl_stop     0.1    0.1    NaN
-        ohlcstx_sl_trail  False   True  False
-        ohlcstx_tp_stop     NaN    NaN    0.1
-        0                 False  False  False
-        1                 False  False   True
-        2                 False  False  False
-        3                 False   True  False
-        4                  True  False  False
-        5                 False  False  False
+        ohlcstx_sl_stop     0.1    NaN    NaN    NaN
+        ohlcstx_tsl_stop    NaN    0.1    NaN    NaN
+        ohlcstx_tp_stop     NaN    NaN    0.1    NaN
+        ohlcstx_ttp_th      NaN    NaN    NaN    0.2
+        ohlcstx_ttp_stop    NaN    NaN    NaN    0.3
+        0                 False  False  False  False
+        1                 False  False   True  False
+        2                 False  False  False  False
+        3                 False   True  False  False
+        4                  True  False  False   True
+        5                 False  False  False  False
 
         >>> ohlcstx.stop_price
-        ohlcstx_sl_stop     0.1    0.1    NaN
-        ohlcstx_sl_trail  False   True  False
-        ohlcstx_tp_stop     NaN    NaN    0.1
-        0                   NaN    NaN    NaN
-        1                   NaN    NaN   11.0
-        2                   NaN    NaN    NaN
-        3                   NaN   11.7    NaN
-        4                   9.0    NaN    NaN
-        5                   NaN    NaN    NaN
+        ohlcstx_sl_stop   0.1   NaN   NaN  NaN
+        ohlcstx_tsl_stop  NaN   0.1   NaN  NaN
+        ohlcstx_tp_stop   NaN   NaN   0.1  NaN
+        ohlcstx_ttp_th    NaN   NaN   NaN  0.2
+        ohlcstx_ttp_stop  NaN   NaN   NaN  0.3
+        0                 NaN   NaN   NaN  NaN
+        1                 NaN   NaN  11.0  NaN
+        2                 NaN   NaN   NaN  NaN
+        3                 NaN  11.7   NaN  NaN
+        4                 9.0   NaN   NaN  9.1
+        5                 NaN   NaN   NaN  NaN
 
         >>> ohlcstx.stop_type_readable
-        ohlcstx_sl_stop        0.1        0.1         NaN
-        ohlcstx_sl_trail     False       True       False
-        ohlcstx_tp_stop        NaN        NaN         0.1
-        0                     None       None        None
-        1                     None       None  TakeProfit
-        2                     None       None        None
-        3                     None  TrailStop        None
-        4                 StopLoss       None        None
-        5                     None       None        None
+        ohlcstx_sl_stop    0.1   NaN   NaN   NaN
+        ohlcstx_tsl_stop   NaN   0.1   NaN   NaN
+        ohlcstx_tp_stop    NaN   NaN   0.1   NaN
+        ohlcstx_ttp_th     NaN   NaN   NaN   0.2
+        ohlcstx_ttp_stop   NaN   NaN   NaN   0.3
+        0                 None  None  None  None
+        1                 None  None    TP  None
+        2                 None  None  None  None
+        3                 None   TSL  None  None
+        4                   SL  None  None   TTP
+        5                 None  None  None  None
         ```
     """
 
@@ -723,7 +724,7 @@ setattr(OHLCSTX, "plot", _OHLCSTX.plot)
 
 OHLCSTCX = SignalFactory(
     **ohlcstx_config.merge_with(dict(class_name="OHLCSTCX", short_name="ohlcstcx", mode="chain")),
-).from_place_func(**ohlcstx_func_config)
+).with_place_func(**ohlcstx_func_config)
 
 
 class _OHLCSTCX(OHLCSTCX):

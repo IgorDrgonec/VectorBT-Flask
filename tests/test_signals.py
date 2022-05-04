@@ -15,7 +15,13 @@ seed = 42
 day_dt = np.timedelta64(86400000000000)
 
 mask = pd.DataFrame(
-    [[True, False, False], [False, True, False], [False, False, True], [True, False, False], [False, True, False]],
+    [
+        [True, False, False],
+        [False, True, False],
+        [False, False, True],
+        [True, False, False],
+        [False, True, False],
+    ],
     index=pd.Index(
         [datetime(2020, 1, 1), datetime(2020, 1, 2), datetime(2020, 1, 3), datetime(2020, 1, 4), datetime(2020, 1, 5)],
     ),
@@ -110,8 +116,9 @@ class TestAccessors:
 
     def test_generate(self):
         @njit
-        def place_func_nb(out, from_i, to_i, col, n):
-            out[-n] = True
+        def place_func_nb(c, n):
+            c.out[-n] = True
+            return len(c.out) - 1
 
         assert_series_equal(
             pd.Series.vbt.signals.generate(5, place_func_nb, 1, wrap_kwargs=dict(index=mask["a"].index, columns=["a"])),
@@ -151,8 +158,10 @@ class TestAccessors:
         )
 
         @njit
-        def place_func2_nb(out, from_i, to_i, col, temp):
-            out[temp[from_i, col]] = True
+        def place_func2_nb(c, temp):
+            i = temp[c.from_i, c.col]
+            c.out[i] = True
+            return i
 
         assert_series_equal(
             pd.Series.vbt.signals.generate(
@@ -167,19 +176,19 @@ class TestAccessors:
 
     def test_generate_both(self):
         @njit
-        def entry_place_func_nb(out, from_i, to_i, col):
-            out[0] = True
+        def entry_place_func_nb(c):
+            c.out[0] = True
+            return 0
 
         @njit
-        def exit_place_func_nb(out, from_i, to_i, col):
-            out[0] = True
+        def exit_place_func_nb(c):
+            c.out[0] = True
+            return 0
 
         en, ex = pd.Series.vbt.signals.generate_both(
             5,
             entry_place_func_nb=entry_place_func_nb,
             exit_place_func_nb=exit_place_func_nb,
-            max_one_entry=True,
-            max_one_exit=True,
             wrap_kwargs=dict(index=mask["a"].index, columns=["a"]),
         )
         assert_series_equal(
@@ -194,8 +203,6 @@ class TestAccessors:
             (5, 3),
             entry_place_func_nb=entry_place_func_nb,
             exit_place_func_nb=exit_place_func_nb,
-            max_one_entry=True,
-            max_one_exit=True,
             wrap_kwargs=dict(index=mask.index, columns=mask.columns),
         )
         assert_frame_equal(
@@ -236,8 +243,6 @@ class TestAccessors:
             exit_place_func_nb=exit_place_func_nb,
             entry_wait=1,
             exit_wait=0,
-            max_one_entry=True,
-            max_one_exit=True,
             wrap_kwargs=dict(index=mask["a"].index, columns=["a"]),
         )
         assert_series_equal(
@@ -254,8 +259,6 @@ class TestAccessors:
             exit_place_func_nb=exit_place_func_nb,
             entry_wait=0,
             exit_wait=1,
-            max_one_entry=True,
-            max_one_exit=True,
             wrap_kwargs=dict(index=mask["a"].index, columns=["a"]),
         )
         assert_series_equal(
@@ -268,23 +271,25 @@ class TestAccessors:
         )
 
         @njit
-        def entry_place_func2_nb(out, from_i, to_i, col):
-            out[0] = True
-            if from_i + 1 < to_i:
-                out[1] = True
+        def entry_place_func2_nb(c):
+            c.out[0] = True
+            if c.from_i + 1 < c.to_i:
+                c.out[1] = True
+                return 1
+            return 0
 
         @njit
-        def exit_place_func2_nb(out, from_i, to_i, col):
-            out[0] = True
-            if from_i + 1 < to_i:
-                out[1] = True
+        def exit_place_func2_nb(c):
+            c.out[0] = True
+            if c.from_i + 1 < c.to_i:
+                c.out[1] = True
+                return 1
+            return 0
 
         en, ex = pd.DataFrame.vbt.signals.generate_both(
             (5, 3),
             entry_place_func_nb=entry_place_func2_nb,
             exit_place_func_nb=exit_place_func2_nb,
-            max_one_entry=False,
-            max_one_exit=False,
             wrap_kwargs=dict(index=mask.index, columns=mask.columns),
         )
         assert_frame_equal(
@@ -324,16 +329,12 @@ class TestAccessors:
                 (5, 3),
                 entry_place_func_nb=entry_place_func2_nb,
                 exit_place_func_nb=exit_place_func2_nb,
-                max_one_entry=False,
-                max_one_exit=False,
                 chunked=True,
             )[0],
             pd.DataFrame.vbt.signals.generate_both(
                 (5, 3),
                 entry_place_func_nb=entry_place_func2_nb,
                 exit_place_func_nb=exit_place_func2_nb,
-                max_one_entry=False,
-                max_one_exit=False,
                 chunked=False,
             )[0],
         )
@@ -342,27 +343,27 @@ class TestAccessors:
                 (5, 3),
                 entry_place_func_nb=entry_place_func2_nb,
                 exit_place_func_nb=exit_place_func2_nb,
-                max_one_entry=False,
-                max_one_exit=False,
                 chunked=True,
             )[1],
             pd.DataFrame.vbt.signals.generate_both(
                 (5, 3),
                 entry_place_func_nb=entry_place_func2_nb,
                 exit_place_func_nb=exit_place_func2_nb,
-                max_one_entry=False,
-                max_one_exit=False,
                 chunked=False,
             )[1],
         )
 
         @njit
-        def entry_place_func3_nb(out, from_i, to_i, col, temp):
-            out[temp[from_i, col]] = True
+        def entry_place_func3_nb(c, temp):
+            i = temp[c.from_i, c.col]
+            c.out[i] = True
+            return i
 
         @njit
-        def exit_place_func3_nb(out, from_i, to_i, col, temp):
-            out[temp[from_i, col]] = True
+        def exit_place_func3_nb(c, temp):
+            i = temp[c.from_i, c.col]
+            c.out[i] = True
+            return i
 
         en, ex = pd.Series.vbt.signals.generate_both(
             5,
@@ -370,8 +371,6 @@ class TestAccessors:
             entry_args=(vbt.Rep("temp"),),
             exit_place_func_nb=exit_place_func3_nb,
             exit_args=(vbt.Rep("temp"),),
-            max_one_entry=True,
-            max_one_exit=True,
             broadcast_named_args=dict(temp=0),
             wrap_kwargs=dict(index=mask["a"].index, columns=["a"]),
         )
@@ -386,8 +385,9 @@ class TestAccessors:
 
     def test_generate_exits(self):
         @njit
-        def place_func_nb(out, from_i, to_i, col):
-            out[0] = True
+        def place_func_nb(c):
+            c.out[0] = True
+            return 0
 
         assert_series_equal(
             mask["a"].vbt.signals.generate_exits(place_func_nb),
@@ -427,8 +427,9 @@ class TestAccessors:
         )
 
         @njit
-        def place_func2_nb(out, from_i, to_i, col):
-            out[:] = True
+        def place_func2_nb(c):
+            c.out[:] = True
+            return len(c.out) - 1
 
         assert_frame_equal(
             mask.vbt.signals.generate_exits(place_func2_nb, until_next=False),
@@ -462,13 +463,15 @@ class TestAccessors:
         )
 
         @njit
-        def place_func3_nb(out, from_i, to_i, col, temp):
-            out[temp[from_i, col]] = True
+        def place_func3_nb(c, temp):
+            i = temp[c.from_i, c.col]
+            c.out[i] = True
+            return i
 
         assert_series_equal(
             mask["a"].vbt.signals.generate_exits(
                 place_func3_nb,
-                vbt.RepEval("temp[:, None]"),
+                vbt.RepEval("temp"),
                 broadcast_named_args=dict(temp=0),
             ),
             pd.Series(np.array([False, True, False, False, True]), index=mask["a"].index, name="a"),
@@ -1315,111 +1318,43 @@ class TestAccessors:
 
         # stop loss
         assert_series_equal(
-            e.vbt.signals.generate_stop_exits(t, -0.1),
+            e.vbt.signals.generate_stop_exits(t, stop=-0.1),
             pd.Series(np.array([False, False, False, False, False, True])),
         )
         assert_series_equal(
-            e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True),
+            e.vbt.signals.generate_stop_exits(t, stop=-0.1, trailing=True),
             pd.Series(np.array([False, False, False, True, False, False])),
-        )
-        assert_series_equal(
-            e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, pick_first=False),
-            pd.Series(np.array([False, False, False, True, True, True])),
-        )
-        assert_frame_equal(
-            e.vbt.signals.generate_stop_exits(t.vbt.tile(3), [np.nan, -0.5, -1.0], trailing=True, pick_first=False),
-            pd.DataFrame(
-                np.array(
-                    [
-                        [False, False, False],
-                        [False, False, False],
-                        [False, False, False],
-                        [False, False, False],
-                        [False, True, False],
-                        [False, True, False],
-                    ]
-                )
-            ),
-        )
-        assert_series_equal(
-            e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, exit_wait=3),
-            pd.Series(np.array([False, False, False, False, True, False])),
         )
         # take profit
         assert_series_equal(
-            e.vbt.signals.generate_stop_exits(4 - t, 0.1),
+            e.vbt.signals.generate_stop_exits(4 - t, stop=0.1),
             pd.Series(np.array([False, False, False, False, False, True])),
         )
         assert_series_equal(
-            e.vbt.signals.generate_stop_exits(4 - t, 0.1, trailing=True),
+            e.vbt.signals.generate_stop_exits(4 - t, stop=0.1, trailing=True),
             pd.Series(np.array([False, False, False, True, False, False])),
-        )
-        assert_series_equal(
-            e.vbt.signals.generate_stop_exits(4 - t, 0.1, trailing=True, pick_first=False),
-            pd.Series(np.array([False, False, False, True, True, True])),
-        )
-        assert_frame_equal(
-            e.vbt.signals.generate_stop_exits((4 - t).vbt.tile(3), [np.nan, 0.5, 1.0], trailing=True, pick_first=False),
-            pd.DataFrame(
-                np.array(
-                    [
-                        [False, False, False],
-                        [False, False, False],
-                        [False, False, False],
-                        [False, True, True],
-                        [False, True, True],
-                        [False, True, True],
-                    ]
-                )
-            ),
-        )
-        assert_series_equal(
-            e.vbt.signals.generate_stop_exits(4 - t, 0.1, trailing=True, exit_wait=3),
-            pd.Series(np.array([False, False, False, False, True, False])),
-        )
-        assert_frame_equal(
-            e.vbt.signals.generate_stop_exits(
-                t.vbt.tile(3),
-                [np.nan, -0.5, -1.0],
-                trailing=True,
-                pick_first=False,
-                chunked=True,
-            ),
-            e.vbt.signals.generate_stop_exits(
-                t.vbt.tile(3),
-                [np.nan, -0.5, -1.0],
-                trailing=True,
-                pick_first=False,
-                chunked=False,
-            ),
         )
         # chain
         e = pd.Series([True, True, True, True, True, True])
-        en, ex = e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, chain=True)
+        en, ex = e.vbt.signals.generate_stop_exits(t, stop=-0.1, trailing=True, chain=True)
         assert_series_equal(en, pd.Series(np.array([True, False, False, False, True, False])))
         assert_series_equal(ex, pd.Series(np.array([False, False, False, True, False, True])))
-        en, ex = e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, entry_wait=2, chain=True)
-        assert_series_equal(en, pd.Series(np.array([True, False, False, False, False, True])))
-        assert_series_equal(ex, pd.Series(np.array([False, False, False, True, False, False])))
-        en, ex = e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, exit_wait=2, chain=True)
-        assert_series_equal(en, pd.Series(np.array([True, False, False, False, True, False])))
-        assert_series_equal(ex, pd.Series(np.array([False, False, False, True, False, False])))
-        # until_next and pick_first
+        # until_next
         e2 = pd.Series([True, True, True, True, True, True])
         t2 = pd.Series([6, 5, 4, 3, 2, 1]).astype(np.float64)
-        ex = e2.vbt.signals.generate_stop_exits(t2, -0.1, until_next=False, pick_first=False)
+        ex = e2.vbt.signals.generate_stop_exits(t2, stop=-0.1, until_next=False)
         assert_series_equal(ex, pd.Series(np.array([False, True, True, True, True, True])))
         assert_frame_equal(
             e.vbt.signals.generate_stop_exits(
                 t.vbt.tile(3),
-                [np.nan, -0.5, -1.0],
+                stop=[np.nan, -0.5, -1.0],
                 trailing=True,
                 chain=True,
                 chunked=True,
             )[0],
             e.vbt.signals.generate_stop_exits(
                 t.vbt.tile(3),
-                [np.nan, -0.5, -1.0],
+                stop=[np.nan, -0.5, -1.0],
                 trailing=True,
                 chain=True,
                 chunked=False,
@@ -1428,14 +1363,14 @@ class TestAccessors:
         assert_frame_equal(
             e.vbt.signals.generate_stop_exits(
                 t.vbt.tile(3),
-                [np.nan, -0.5, -1.0],
+                stop=[np.nan, -0.5, -1.0],
                 trailing=True,
                 chain=True,
                 chunked=True,
             )[1],
             e.vbt.signals.generate_stop_exits(
                 t.vbt.tile(3),
-                [np.nan, -0.5, -1.0],
+                stop=[np.nan, -0.5, -1.0],
                 trailing=True,
                 chain=True,
                 chunked=False,
@@ -1449,27 +1384,27 @@ class TestAccessors:
             mask.vbt.signals.generate_ohlc_stop_exits(ts, tp_stop=-0.1)
 
         assert_frame_equal(
-            mask.vbt.signals.generate_stop_exits(ts, -0.1),
+            mask.vbt.signals.generate_stop_exits(ts, stop=-0.1),
             mask.vbt.signals.generate_ohlc_stop_exits(ts, sl_stop=0.1),
         )
         assert_frame_equal(
-            mask.vbt.signals.generate_stop_exits(ts, -0.1, trailing=True),
-            mask.vbt.signals.generate_ohlc_stop_exits(ts, sl_stop=0.1, sl_trail=True),
+            mask.vbt.signals.generate_stop_exits(ts, stop=-0.1, trailing=True),
+            mask.vbt.signals.generate_ohlc_stop_exits(ts, tsl_stop=0.1),
         )
         assert_frame_equal(
-            mask.vbt.signals.generate_stop_exits(ts, 0.1),
+            mask.vbt.signals.generate_stop_exits(ts, stop=0.1),
             mask.vbt.signals.generate_ohlc_stop_exits(ts, tp_stop=0.1),
         )
         assert_frame_equal(
-            mask.vbt.signals.generate_stop_exits(ts, 0.1),
+            mask.vbt.signals.generate_stop_exits(ts, stop=0.1),
             mask.vbt.signals.generate_ohlc_stop_exits(ts, sl_stop=0.1, reverse=True),
         )
         assert_frame_equal(
-            mask.vbt.signals.generate_stop_exits(ts, 0.1, trailing=True),
-            mask.vbt.signals.generate_ohlc_stop_exits(ts, sl_stop=0.1, sl_trail=True, reverse=True),
+            mask.vbt.signals.generate_stop_exits(ts, stop=0.1, trailing=True),
+            mask.vbt.signals.generate_ohlc_stop_exits(ts, tsl_stop=0.1, reverse=True),
         )
         assert_frame_equal(
-            mask.vbt.signals.generate_stop_exits(ts, -0.1),
+            mask.vbt.signals.generate_stop_exits(ts, stop=-0.1),
             mask.vbt.signals.generate_ohlc_stop_exits(ts, tp_stop=0.1, reverse=True),
         )
 
@@ -1477,10 +1412,12 @@ class TestAccessors:
             out_dict = {"stop_price": np.nan, "stop_type": -1}
             result = mask.vbt.signals.generate_ohlc_stop_exits(
                 price["open"],
+                price["open"],
                 price["high"],
                 price["low"],
                 price["close"],
                 out_dict=out_dict,
+                is_entry_open=True,
                 **kwargs,
             )
             if isinstance(result, tuple):
@@ -1571,7 +1508,7 @@ class TestAccessors:
                 columns=mask.columns,
             ),
         )
-        ex, stop_price, stop_type = _test_ohlc_stop_exits(sl_stop=0.1, sl_trail=True)
+        ex, stop_price, stop_type = _test_ohlc_stop_exits(tsl_stop=0.1)
         assert_frame_equal(
             ex,
             pd.DataFrame(
@@ -1596,8 +1533,8 @@ class TestAccessors:
                         [np.nan, np.nan, np.nan],
                         [np.nan, np.nan, np.nan],
                         [np.nan, np.nan, np.nan],
-                        [np.nan, 11.7, 10.8],
-                        [9.9, np.nan, np.nan],
+                        [np.nan, 11.7, 11.7],
+                        [10.8, np.nan, np.nan],
                     ]
                 ),
                 index=mask.index,
@@ -1653,7 +1590,7 @@ class TestAccessors:
                 columns=mask.columns,
             ),
         )
-        ex, stop_price, stop_type = _test_ohlc_stop_exits(sl_stop=0.1, sl_trail=True, tp_stop=0.1)
+        ex, stop_price, stop_type = _test_ohlc_stop_exits(tsl_stop=0.1, tp_stop=0.1)
         assert_frame_equal(
             ex,
             pd.DataFrame(
@@ -1678,8 +1615,8 @@ class TestAccessors:
                         [np.nan, np.nan, np.nan],
                         [11.0, np.nan, np.nan],
                         [np.nan, 12.1, np.nan],
-                        [np.nan, np.nan, 10.8],
-                        [9.9, np.nan, np.nan],
+                        [np.nan, np.nan, 11.7],
+                        [10.8, np.nan, np.nan],
                     ]
                 ),
                 index=mask.index,
@@ -1695,8 +1632,7 @@ class TestAccessors:
             ),
         )
         ex, stop_price, stop_type = _test_ohlc_stop_exits(
-            sl_stop=[np.nan, 0.1, 0.2],
-            sl_trail=True,
+            tsl_stop=[np.nan, 0.1, 0.2],
             tp_stop=[np.nan, 0.1, 0.2],
         )
         assert_frame_equal(
@@ -1707,8 +1643,8 @@ class TestAccessors:
                         [False, False, False],
                         [False, False, False],
                         [False, True, False],
-                        [False, False, False],
                         [False, False, True],
+                        [False, False, False],
                     ]
                 ),
                 index=mask.index,
@@ -1723,8 +1659,8 @@ class TestAccessors:
                         [np.nan, np.nan, np.nan],
                         [np.nan, np.nan, np.nan],
                         [np.nan, 12.1, np.nan],
+                        [np.nan, np.nan, 10.4],
                         [np.nan, np.nan, np.nan],
-                        [np.nan, np.nan, 9.6],
                     ]
                 ),
                 index=mask.index,
@@ -1734,36 +1670,24 @@ class TestAccessors:
         assert_frame_equal(
             stop_type,
             pd.DataFrame(
-                np.array([[-1, -1, -1], [-1, -1, -1], [-1, 2, -1], [-1, -1, -1], [-1, -1, 1]]),
+                np.array([[-1, -1, -1], [-1, -1, -1], [-1, 2, -1], [-1, -1, 1], [-1, -1, -1]]),
                 index=mask.index,
                 columns=mask.columns,
             ),
         )
         assert_frame_equal(
-            _test_ohlc_stop_exits(sl_stop=[np.nan, 0.1, 0.2], sl_trail=True, tp_stop=[np.nan, 0.1, 0.2], chunked=True)[
-                0
-            ],
-            _test_ohlc_stop_exits(sl_stop=[np.nan, 0.1, 0.2], sl_trail=True, tp_stop=[np.nan, 0.1, 0.2], chunked=False)[
-                0
-            ],
+            _test_ohlc_stop_exits(tsl_stop=[np.nan, 0.1, 0.2], tp_stop=[np.nan, 0.1, 0.2], chunked=True)[0],
+            _test_ohlc_stop_exits(tsl_stop=[np.nan, 0.1, 0.2], tp_stop=[np.nan, 0.1, 0.2], chunked=False)[0],
         )
         assert_frame_equal(
-            _test_ohlc_stop_exits(sl_stop=[np.nan, 0.1, 0.2], sl_trail=True, tp_stop=[np.nan, 0.1, 0.2], chunked=True)[
-                1
-            ],
-            _test_ohlc_stop_exits(sl_stop=[np.nan, 0.1, 0.2], sl_trail=True, tp_stop=[np.nan, 0.1, 0.2], chunked=False)[
-                1
-            ],
+            _test_ohlc_stop_exits(tsl_stop=[np.nan, 0.1, 0.2], tp_stop=[np.nan, 0.1, 0.2], chunked=True)[1],
+            _test_ohlc_stop_exits(tsl_stop=[np.nan, 0.1, 0.2], tp_stop=[np.nan, 0.1, 0.2], chunked=False)[1],
         )
         assert_frame_equal(
-            _test_ohlc_stop_exits(sl_stop=[np.nan, 0.1, 0.2], sl_trail=True, tp_stop=[np.nan, 0.1, 0.2], chunked=True)[
-                2
-            ],
-            _test_ohlc_stop_exits(sl_stop=[np.nan, 0.1, 0.2], sl_trail=True, tp_stop=[np.nan, 0.1, 0.2], chunked=False)[
-                2
-            ],
+            _test_ohlc_stop_exits(tsl_stop=[np.nan, 0.1, 0.2], tp_stop=[np.nan, 0.1, 0.2], chunked=True)[2],
+            _test_ohlc_stop_exits(tsl_stop=[np.nan, 0.1, 0.2], tp_stop=[np.nan, 0.1, 0.2], chunked=False)[2],
         )
-        ex, stop_price, stop_type = _test_ohlc_stop_exits(sl_stop=0.1, sl_trail=True, tp_stop=0.1, exit_wait=0)
+        ex, stop_price, stop_type = _test_ohlc_stop_exits(tsl_stop=0.1, tp_stop=0.1, exit_wait=0)
         assert_frame_equal(
             ex,
             pd.DataFrame(
@@ -1804,7 +1728,7 @@ class TestAccessors:
                 columns=mask.columns,
             ),
         )
-        (en, ex), stop_price, stop_type = _test_ohlc_stop_exits(sl_stop=0.1, sl_trail=True, tp_stop=0.1, chain=True)
+        (en, ex), stop_price, stop_type = _test_ohlc_stop_exits(tsl_stop=0.1, tp_stop=0.1, chain=True)
         assert_frame_equal(
             en,
             pd.DataFrame(
@@ -1845,8 +1769,8 @@ class TestAccessors:
                         [np.nan, np.nan, np.nan],
                         [11.0, np.nan, np.nan],
                         [np.nan, 12.1, np.nan],
-                        [np.nan, np.nan, 10.8],
-                        [9.9, np.nan, np.nan],
+                        [np.nan, np.nan, 11.7],
+                        [10.8, np.nan, np.nan],
                     ]
                 ),
                 index=mask.index,
@@ -1862,48 +1786,30 @@ class TestAccessors:
             ),
         )
         assert_frame_equal(
-            _test_ohlc_stop_exits(
-                sl_stop=[np.nan, 0.1, 0.2],
-                sl_trail=True,
-                chain=True,
-                tp_stop=[np.nan, 0.1, 0.2],
-                chunked=True,
-            )[0][0],
-            _test_ohlc_stop_exits(
-                sl_stop=[np.nan, 0.1, 0.2],
-                sl_trail=True,
-                chain=True,
-                tp_stop=[np.nan, 0.1, 0.2],
-                chunked=False,
-            )[0][0],
+            _test_ohlc_stop_exits(tsl_stop=[np.nan, 0.1, 0.2], chain=True, tp_stop=[np.nan, 0.1, 0.2], chunked=True,)[
+                0
+            ][0],
+            _test_ohlc_stop_exits(tsl_stop=[np.nan, 0.1, 0.2], chain=True, tp_stop=[np.nan, 0.1, 0.2], chunked=False,)[
+                0
+            ][0],
+        )
+        assert_frame_equal(
+            _test_ohlc_stop_exits(tsl_stop=[np.nan, 0.1, 0.2], chain=True, tp_stop=[np.nan, 0.1, 0.2], chunked=True,)[
+                0
+            ][0],
+            _test_ohlc_stop_exits(tsl_stop=[np.nan, 0.1, 0.2], chain=True, tp_stop=[np.nan, 0.1, 0.2], chunked=False,)[
+                0
+            ][0],
         )
         assert_frame_equal(
             _test_ohlc_stop_exits(
-                sl_stop=[np.nan, 0.1, 0.2],
-                sl_trail=True,
-                chain=True,
-                tp_stop=[np.nan, 0.1, 0.2],
-                chunked=True,
-            )[0][0],
-            _test_ohlc_stop_exits(
-                sl_stop=[np.nan, 0.1, 0.2],
-                sl_trail=True,
-                chain=True,
-                tp_stop=[np.nan, 0.1, 0.2],
-                chunked=False,
-            )[0][0],
-        )
-        assert_frame_equal(
-            _test_ohlc_stop_exits(
-                sl_stop=[np.nan, 0.1, 0.2],
-                sl_trail=True,
+                tsl_stop=[np.nan, 0.1, 0.2],
                 chain=True,
                 tp_stop=[np.nan, 0.1, 0.2],
                 chunked=True,
             )[1],
             _test_ohlc_stop_exits(
-                sl_stop=[np.nan, 0.1, 0.2],
-                sl_trail=True,
+                tsl_stop=[np.nan, 0.1, 0.2],
                 chain=True,
                 tp_stop=[np.nan, 0.1, 0.2],
                 chunked=False,
@@ -1911,15 +1817,13 @@ class TestAccessors:
         )
         assert_frame_equal(
             _test_ohlc_stop_exits(
-                sl_stop=[np.nan, 0.1, 0.2],
-                sl_trail=True,
+                tsl_stop=[np.nan, 0.1, 0.2],
                 chain=True,
                 tp_stop=[np.nan, 0.1, 0.2],
                 chunked=True,
             )[2],
             _test_ohlc_stop_exits(
-                sl_stop=[np.nan, 0.1, 0.2],
-                sl_trail=True,
+                tsl_stop=[np.nan, 0.1, 0.2],
                 chain=True,
                 tp_stop=[np.nan, 0.1, 0.2],
                 chunked=False,
@@ -2614,16 +2518,17 @@ class TestAccessors:
 class TestFactory:
     def test_entries(self):
         @njit
-        def place_nb(out, from_i, to_i, col, ts, in_out, n, arg, temp_idx_arr, kw):
-            in_out[from_i, col] = ts[from_i, col] * n + arg + kw
-            out[0] = True
+        def place_nb(c, ts, in_out, n, arg, temp_idx_arr, kw):
+            in_out[c.from_i, c.col] = ts[c.from_i, c.col] * n + arg + kw
+            c.out[0] = True
+            return 0
 
         MySignals = vbt.SignalFactory(
             mode="entries",
             input_names=["ts2"],
             in_output_names=["in_out2"],
             param_names=["n2"],
-        ).from_place_func(
+        ).with_place_func(
             entry_place_func=place_nb,
             entry_settings=dict(
                 pass_inputs=["ts2"],
@@ -2636,7 +2541,7 @@ class TestFactory:
             in_out2=np.nan,
             var_args=True,
         )
-        my_sig = MySignals.run((5,), np.arange(5), [1, 0], 100)
+        my_sig = MySignals.run(np.arange(5), [1, 0], 100)
         assert_frame_equal(
             my_sig.entries,
             pd.DataFrame(
@@ -2662,16 +2567,17 @@ class TestFactory:
 
     def test_exits(self):
         @njit
-        def place_nb(out, from_i, to_i, col, ts, in_out, n, arg, temp_idx_arr, kw):
-            in_out[from_i, col] = ts[from_i, col] * n + arg + kw
-            out[0] = True
+        def place_nb(c, ts, in_out, n, arg, temp_idx_arr, kw):
+            in_out[c.from_i, c.col] = ts[c.from_i, c.col] * n + arg + kw
+            c.out[0] = True
+            return 0
 
         MySignals = vbt.SignalFactory(
             mode="exits",
             input_names=["ts2"],
             in_output_names=["in_out2"],
             param_names=["n2"],
-        ).from_place_func(
+        ).with_place_func(
             exit_place_func=place_nb,
             exit_settings=dict(
                 pass_inputs=["ts2"],
@@ -2750,16 +2656,17 @@ class TestFactory:
 
     def test_chain(self):
         @njit
-        def place_nb(out, from_i, to_i, col, ts, in_out, n, arg, temp_idx_arr, kw):
-            in_out[from_i, col] = ts[from_i, col] * n + arg + kw
-            out[0] = True
+        def place_nb(c, ts, in_out, n, arg, temp_idx_arr, kw):
+            in_out[c.from_i, c.col] = ts[c.from_i, c.col] * n + arg + kw
+            c.out[0] = True
+            return 0
 
         MySignals = vbt.SignalFactory(
             mode="chain",
             input_names=["ts2"],
             in_output_names=["in_out2"],
             param_names=["n2"],
-        ).from_place_func(
+        ).with_place_func(
             exit_place_func=place_nb,
             exit_settings=dict(
                 pass_inputs=["ts2"],
@@ -2856,15 +2763,16 @@ class TestFactory:
             return arg0
 
         @njit
-        def place_nb(out, from_i, to_i, col, ts, in_out, n, arg, temp_idx_arr, kw, cache):
-            in_out[from_i, col] = ts[from_i, col] * n + arg + kw + cache
-            out[0] = True
+        def place_nb(c, ts, in_out, n, arg, temp_idx_arr, kw, cache):
+            in_out[c.from_i, c.col] = ts[c.from_i, c.col] * n + arg + kw + cache
+            c.out[0] = True
+            return 0
 
         MySignals = vbt.SignalFactory(
             input_names=["ts1", "ts2"],
             in_output_names=["in_out1", "in_out2"],
             param_names=["n1", "n2"],
-        ).from_place_func(
+        ).with_place_func(
             cache_func=cache_nb,
             cache_settings=dict(
                 pass_inputs=["ts1", "ts2"],
@@ -3371,6 +3279,22 @@ class TestGenerators:
                 columns=pd.MultiIndex.from_tuples([(0.1, "a"), (0.1, "b"), (0.1, "c")], names=["stx_stop", None]),
             ),
         )
+        assert_frame_equal(
+            stx.stop_ts,
+            pd.DataFrame(
+                np.array(
+                    [
+                        [np.nan, np.nan, np.nan],
+                        [1.1, np.nan, np.nan],
+                        [np.nan, 2.2, np.nan],
+                        [np.nan, np.nan, np.nan],
+                        [np.nan, np.nan, np.nan],
+                    ]
+                ),
+                index=mask.index,
+                columns=pd.MultiIndex.from_tuples([(0.1, "a"), (0.1, "b"), (0.1, "c")], names=["stx_stop", None]),
+            ),
+        )
         stx = vbt.STX.run(mask, ts, np.asarray([0.1, 0.1, -0.1, -0.1, -0.1])[:, None])
         assert_frame_equal(
             stx.exits,
@@ -3427,6 +3351,23 @@ class TestGenerators:
 
     def test_STCX(self):
         stcx = vbt.STCX.run(mask, ts, [0.1, 0.1, -0.1, -0.1], trailing=[False, True, False, True])
+        target_columns = pd.MultiIndex.from_tuples(
+            [
+                (0.1, False, "a"),
+                (0.1, False, "b"),
+                (0.1, False, "c"),
+                (0.1, True, "a"),
+                (0.1, True, "b"),
+                (0.1, True, "c"),
+                (-0.1, False, "a"),
+                (-0.1, False, "b"),
+                (-0.1, False, "c"),
+                (-0.1, True, "a"),
+                (-0.1, True, "b"),
+                (-0.1, True, "c"),
+            ],
+            names=["stcx_stop", "stcx_trailing", None],
+        )
         assert_frame_equal(
             stcx.new_entries,
             pd.DataFrame(
@@ -3440,23 +3381,36 @@ class TestGenerators:
                     ]
                 ),
                 index=mask.index,
-                columns=pd.MultiIndex.from_tuples(
+                columns=target_columns,
+            ),
+        )
+        assert_frame_equal(
+            stcx.stop_ts,
+            pd.DataFrame(
+                np.array(
                     [
-                        (0.1, False, "a"),
-                        (0.1, False, "b"),
-                        (0.1, False, "c"),
-                        (0.1, True, "a"),
-                        (0.1, True, "b"),
-                        (0.1, True, "c"),
-                        (-0.1, False, "a"),
-                        (-0.1, False, "b"),
-                        (-0.1, False, "c"),
-                        (-0.1, True, "a"),
-                        (-0.1, True, "b"),
-                        (-0.1, True, "c"),
-                    ],
-                    names=["stcx_stop", "stcx_trailing", None],
+                        [
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                        ],
+                        [1.1, np.nan, np.nan, 1.1, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
+                        [np.nan, 2.2, np.nan, np.nan, 2.2, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
+                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, 2.7, 2.7, 2.7, 2.7],
+                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, 1.8, np.nan, np.nan, np.nan, np.nan],
+                    ]
                 ),
+                index=mask.index,
+                columns=target_columns,
             ),
         )
         assert_frame_equal(
@@ -3472,28 +3426,21 @@ class TestGenerators:
                     ]
                 ),
                 index=mask.index,
-                columns=pd.MultiIndex.from_tuples(
-                    [
-                        (0.1, False, "a"),
-                        (0.1, False, "b"),
-                        (0.1, False, "c"),
-                        (0.1, True, "a"),
-                        (0.1, True, "b"),
-                        (0.1, True, "c"),
-                        (-0.1, False, "a"),
-                        (-0.1, False, "b"),
-                        (-0.1, False, "c"),
-                        (-0.1, True, "a"),
-                        (-0.1, True, "b"),
-                        (-0.1, True, "c"),
-                    ],
-                    names=["stcx_stop", "stcx_trailing", None],
-                ),
+                columns=target_columns,
             ),
         )
 
     def test_OHLCSTX(self):
-        ohlcstx = vbt.OHLCSTX.run(mask, price["open"], price["high"], price["low"], price["close"], sl_stop=0.1)
+        ohlcstx = vbt.OHLCSTX.run(
+            mask,
+            price["open"],
+            price["open"],
+            price["high"],
+            price["low"],
+            price["close"],
+            sl_stop=0.1,
+            is_entry_open=False,
+        )
         assert_frame_equal(
             ohlcstx.exits,
             pd.DataFrame(
@@ -3546,40 +3493,55 @@ class TestGenerators:
         ohlcstx = vbt.OHLCSTX.run(
             mask,
             price["open"],
+            price["open"],
             price["high"],
             price["low"],
             price["close"],
-            sl_stop=[0.1, 0.1, np.nan],
-            sl_trail=[False, True, False],
-            tp_stop=[np.nan, np.nan, 0.1],
+            sl_stop=[0.1, np.nan, np.nan, np.nan],
+            tsl_stop=[np.nan, 0.1, np.nan, np.nan],
+            tp_stop=[np.nan, np.nan, 0.1, np.nan],
+            ttp_th=[np.nan, np.nan, np.nan, 0.1],
+            ttp_stop=[np.nan, np.nan, np.nan, 0.05],
+            is_entry_open=False,
+        )
+        target_columns = pd.MultiIndex.from_tuples(
+            [
+                (0.1, np.nan, np.nan, np.nan, np.nan, "a"),
+                (0.1, np.nan, np.nan, np.nan, np.nan, "b"),
+                (0.1, np.nan, np.nan, np.nan, np.nan, "c"),
+                (np.nan, 0.1, np.nan, np.nan, np.nan, "a"),
+                (np.nan, 0.1, np.nan, np.nan, np.nan, "b"),
+                (np.nan, 0.1, np.nan, np.nan, np.nan, "c"),
+                (np.nan, np.nan, 0.1, np.nan, np.nan, "a"),
+                (np.nan, np.nan, 0.1, np.nan, np.nan, "b"),
+                (np.nan, np.nan, 0.1, np.nan, np.nan, "c"),
+                (np.nan, np.nan, np.nan, 0.1, 0.05, "a"),
+                (np.nan, np.nan, np.nan, 0.1, 0.05, "b"),
+                (np.nan, np.nan, np.nan, 0.1, 0.05, "c"),
+            ],
+            names=[
+                "ohlcstx_sl_stop",
+                "ohlcstx_tsl_stop",
+                "ohlcstx_tp_stop",
+                "ohlcstx_ttp_th",
+                "ohlcstx_ttp_stop",
+                None,
+            ],
         )
         assert_frame_equal(
             ohlcstx.exits,
             pd.DataFrame(
                 np.array(
                     [
-                        [False, False, False, False, False, False, False, False, False],
-                        [False, False, False, False, False, False, True, False, False],
-                        [False, False, False, False, False, False, False, True, False],
-                        [False, False, True, False, True, True, False, False, False],
-                        [True, False, False, True, False, False, False, False, False],
+                        [False, False, False, False, False, False, False, False, False, False, False, False],
+                        [False, False, False, False, False, False, True, False, False, False, False, False],
+                        [False, False, False, False, False, False, False, True, False, True, False, False],
+                        [False, False, True, False, True, True, False, False, False, False, True, False],
+                        [True, False, False, True, False, False, False, False, False, False, False, False],
                     ]
                 ),
                 index=mask.index,
-                columns=pd.MultiIndex.from_tuples(
-                    [
-                        (0.1, False, np.nan, "a"),
-                        (0.1, False, np.nan, "b"),
-                        (0.1, False, np.nan, "c"),
-                        (0.1, True, np.nan, "a"),
-                        (0.1, True, np.nan, "b"),
-                        (0.1, True, np.nan, "c"),
-                        (np.nan, False, 0.1, "a"),
-                        (np.nan, False, 0.1, "b"),
-                        (np.nan, False, 0.1, "c"),
-                    ],
-                    names=["ohlcstx_sl_stop", "ohlcstx_sl_trail", "ohlcstx_tp_stop", None],
-                ),
+                columns=target_columns,
             ),
         )
         assert_frame_equal(
@@ -3587,28 +3549,54 @@ class TestGenerators:
             pd.DataFrame(
                 np.array(
                     [
-                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, 11.0, np.nan, np.nan],
-                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, 12.1, np.nan],
-                        [np.nan, np.nan, 10.8, np.nan, 11.7, 10.8, np.nan, np.nan, np.nan],
-                        [9.9, np.nan, np.nan, 9.9, np.nan, np.nan, np.nan, np.nan, np.nan],
+                        [
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                        ],
+                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, 11.0, np.nan, np.nan, np.nan, np.nan, np.nan],
+                        [
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            12.100000000000001,
+                            np.nan,
+                            11.399999999999999,
+                            np.nan,
+                            np.nan,
+                        ],
+                        [
+                            np.nan,
+                            np.nan,
+                            10.8,
+                            np.nan,
+                            11.700000000000001,
+                            10.8,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            12.35,
+                            np.nan,
+                        ],
+                        [9.9, np.nan, np.nan, 9.9, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
                     ]
                 ),
                 index=mask.index,
-                columns=pd.MultiIndex.from_tuples(
-                    [
-                        (0.1, False, np.nan, "a"),
-                        (0.1, False, np.nan, "b"),
-                        (0.1, False, np.nan, "c"),
-                        (0.1, True, np.nan, "a"),
-                        (0.1, True, np.nan, "b"),
-                        (0.1, True, np.nan, "c"),
-                        (np.nan, False, 0.1, "a"),
-                        (np.nan, False, 0.1, "b"),
-                        (np.nan, False, 0.1, "c"),
-                    ],
-                    names=["ohlcstx_sl_stop", "ohlcstx_sl_trail", "ohlcstx_tp_stop", None],
-                ),
+                columns=target_columns,
             ),
         )
         assert_frame_equal(
@@ -3616,52 +3604,41 @@ class TestGenerators:
             pd.DataFrame(
                 np.array(
                     [
-                        [-1, -1, -1, -1, -1, -1, -1, -1, -1],
-                        [-1, -1, -1, -1, -1, -1, 2, -1, -1],
-                        [-1, -1, -1, -1, -1, -1, -1, 2, -1],
-                        [-1, -1, 0, -1, 1, 1, -1, -1, -1],
-                        [0, -1, -1, 1, -1, -1, -1, -1, -1],
+                        [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+                        [-1, -1, -1, -1, -1, -1, 2, -1, -1, -1, -1, -1],
+                        [-1, -1, -1, -1, -1, -1, -1, 2, -1, 3, -1, -1],
+                        [-1, -1, 0, -1, 1, 1, -1, -1, -1, -1, 3, -1],
+                        [0, -1, -1, 1, -1, -1, -1, -1, -1, -1, -1, -1],
                     ]
                 ),
                 index=mask.index,
-                columns=pd.MultiIndex.from_tuples(
-                    [
-                        (0.1, False, np.nan, "a"),
-                        (0.1, False, np.nan, "b"),
-                        (0.1, False, np.nan, "c"),
-                        (0.1, True, np.nan, "a"),
-                        (0.1, True, np.nan, "b"),
-                        (0.1, True, np.nan, "c"),
-                        (np.nan, False, 0.1, "a"),
-                        (np.nan, False, 0.1, "b"),
-                        (np.nan, False, 0.1, "c"),
-                    ],
-                    names=["ohlcstx_sl_stop", "ohlcstx_sl_trail", "ohlcstx_tp_stop", None],
-                ),
+                columns=target_columns,
             ),
         )
         np.testing.assert_array_equal(
             vbt.OHLCSTX.run(
                 mask,
                 price["open"],
+                price["open"],
                 price["high"],
                 price["low"],
                 price["close"],
                 sl_stop=[0.1, np.nan],
-                sl_trail=False,
                 tp_stop=[np.nan, 0.1],
                 reverse=False,
+                is_entry_open=False,
             ).exits.values,
             vbt.OHLCSTX.run(
                 mask,
+                price["open"],
                 price["open"],
                 price["high"],
                 price["low"],
                 price["close"],
                 sl_stop=[np.nan, 0.1],
-                sl_trail=False,
                 tp_stop=[0.1, np.nan],
                 reverse=True,
+                is_entry_open=False,
             ).exits.values,
         )
 
@@ -3669,40 +3646,55 @@ class TestGenerators:
         ohlcstcx = vbt.OHLCSTCX.run(
             mask,
             price["open"],
+            price["open"],
             price["high"],
             price["low"],
             price["close"],
-            sl_stop=[0.1, 0.1, np.nan],
-            sl_trail=[False, True, False],
-            tp_stop=[np.nan, np.nan, 0.1],
+            sl_stop=[0.1, np.nan, np.nan, np.nan],
+            tsl_stop=[np.nan, 0.1, np.nan, np.nan],
+            tp_stop=[np.nan, np.nan, 0.1, np.nan],
+            ttp_th=[np.nan, np.nan, np.nan, 0.1],
+            ttp_stop=[np.nan, np.nan, np.nan, 0.05],
+            is_entry_open=False,
+        )
+        target_columns = pd.MultiIndex.from_tuples(
+            [
+                (0.1, np.nan, np.nan, np.nan, np.nan, "a"),
+                (0.1, np.nan, np.nan, np.nan, np.nan, "b"),
+                (0.1, np.nan, np.nan, np.nan, np.nan, "c"),
+                (np.nan, 0.1, np.nan, np.nan, np.nan, "a"),
+                (np.nan, 0.1, np.nan, np.nan, np.nan, "b"),
+                (np.nan, 0.1, np.nan, np.nan, np.nan, "c"),
+                (np.nan, np.nan, 0.1, np.nan, np.nan, "a"),
+                (np.nan, np.nan, 0.1, np.nan, np.nan, "b"),
+                (np.nan, np.nan, 0.1, np.nan, np.nan, "c"),
+                (np.nan, np.nan, np.nan, 0.1, 0.05, "a"),
+                (np.nan, np.nan, np.nan, 0.1, 0.05, "b"),
+                (np.nan, np.nan, np.nan, 0.1, 0.05, "c"),
+            ],
+            names=[
+                "ohlcstcx_sl_stop",
+                "ohlcstcx_tsl_stop",
+                "ohlcstcx_tp_stop",
+                "ohlcstcx_ttp_th",
+                "ohlcstcx_ttp_stop",
+                None,
+            ],
         )
         assert_frame_equal(
             ohlcstcx.exits,
             pd.DataFrame(
                 np.array(
                     [
-                        [False, False, False, False, False, False, False, False, False],
-                        [False, False, False, False, False, False, True, False, False],
-                        [False, False, False, False, False, False, False, True, False],
-                        [False, False, True, True, True, True, False, False, False],
-                        [True, True, False, False, False, False, False, False, False],
+                        [False, False, False, False, False, False, False, False, False, False, False, False],
+                        [False, False, False, False, False, False, True, False, False, False, False, False],
+                        [False, False, False, False, False, False, False, True, False, True, False, False],
+                        [False, False, True, True, True, True, False, False, False, False, True, False],
+                        [True, True, False, False, False, False, False, False, False, False, False, False],
                     ]
                 ),
                 index=mask.index,
-                columns=pd.MultiIndex.from_tuples(
-                    [
-                        (0.1, False, np.nan, "a"),
-                        (0.1, False, np.nan, "b"),
-                        (0.1, False, np.nan, "c"),
-                        (0.1, True, np.nan, "a"),
-                        (0.1, True, np.nan, "b"),
-                        (0.1, True, np.nan, "c"),
-                        (np.nan, False, 0.1, "a"),
-                        (np.nan, False, 0.1, "b"),
-                        (np.nan, False, 0.1, "c"),
-                    ],
-                    names=["ohlcstcx_sl_stop", "ohlcstcx_sl_trail", "ohlcstcx_tp_stop", None],
-                ),
+                columns=target_columns,
             ),
         )
         assert_frame_equal(
@@ -3710,28 +3702,54 @@ class TestGenerators:
             pd.DataFrame(
                 np.array(
                     [
-                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, 11.0, np.nan, np.nan],
-                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, 12.1, np.nan],
-                        [np.nan, np.nan, 10.8, 11.7, 11.7, 10.8, np.nan, np.nan, np.nan],
-                        [9.0, 9.9, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
+                        [
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                        ],
+                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, 11.0, np.nan, np.nan, np.nan, np.nan, np.nan],
+                        [
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            12.100000000000001,
+                            np.nan,
+                            11.399999999999999,
+                            np.nan,
+                            np.nan,
+                        ],
+                        [
+                            np.nan,
+                            np.nan,
+                            10.8,
+                            11.700000000000001,
+                            11.700000000000001,
+                            10.8,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            np.nan,
+                            12.35,
+                            np.nan,
+                        ],
+                        [9.0, 9.9, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
                     ]
                 ),
                 index=mask.index,
-                columns=pd.MultiIndex.from_tuples(
-                    [
-                        (0.1, False, np.nan, "a"),
-                        (0.1, False, np.nan, "b"),
-                        (0.1, False, np.nan, "c"),
-                        (0.1, True, np.nan, "a"),
-                        (0.1, True, np.nan, "b"),
-                        (0.1, True, np.nan, "c"),
-                        (np.nan, False, 0.1, "a"),
-                        (np.nan, False, 0.1, "b"),
-                        (np.nan, False, 0.1, "c"),
-                    ],
-                    names=["ohlcstcx_sl_stop", "ohlcstcx_sl_trail", "ohlcstcx_tp_stop", None],
-                ),
+                columns=target_columns,
             ),
         )
         assert_frame_equal(
@@ -3739,27 +3757,14 @@ class TestGenerators:
             pd.DataFrame(
                 np.array(
                     [
-                        [-1, -1, -1, -1, -1, -1, -1, -1, -1],
-                        [-1, -1, -1, -1, -1, -1, 2, -1, -1],
-                        [-1, -1, -1, -1, -1, -1, -1, 2, -1],
-                        [-1, -1, 0, 1, 1, 1, -1, -1, -1],
-                        [0, 0, -1, -1, -1, -1, -1, -1, -1],
+                        [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+                        [-1, -1, -1, -1, -1, -1, 2, -1, -1, -1, -1, -1],
+                        [-1, -1, -1, -1, -1, -1, -1, 2, -1, 3, -1, -1],
+                        [-1, -1, 0, 1, 1, 1, -1, -1, -1, -1, 3, -1],
+                        [0, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
                     ]
                 ),
                 index=mask.index,
-                columns=pd.MultiIndex.from_tuples(
-                    [
-                        (0.1, False, np.nan, "a"),
-                        (0.1, False, np.nan, "b"),
-                        (0.1, False, np.nan, "c"),
-                        (0.1, True, np.nan, "a"),
-                        (0.1, True, np.nan, "b"),
-                        (0.1, True, np.nan, "c"),
-                        (np.nan, False, 0.1, "a"),
-                        (np.nan, False, 0.1, "b"),
-                        (np.nan, False, 0.1, "c"),
-                    ],
-                    names=["ohlcstcx_sl_stop", "ohlcstcx_sl_trail", "ohlcstcx_tp_stop", None],
-                ),
+                columns=target_columns,
             ),
         )

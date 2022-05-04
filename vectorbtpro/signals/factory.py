@@ -84,8 +84,9 @@ class SignalFactory(IndicatorFactory):
 
         def plot(
             _self,
-            entry_y: tp.Optional[tp.ArrayLike] = None,
-            exit_y: tp.Optional[tp.ArrayLike] = None,
+            column: tp.Optional[tp.Label] = None,
+            entry_y: tp.Union[None, str, tp.ArrayLike] = None,
+            exit_y: tp.Union[None, str, tp.ArrayLike] = None,
             entry_types: tp.Optional[tp.ArrayLike] = None,
             exit_types: tp.Optional[tp.ArrayLike] = None,
             entry_trace_kwargs: tp.KwargsLike = None,
@@ -93,18 +94,21 @@ class SignalFactory(IndicatorFactory):
             fig: tp.Optional[tp.BaseFigure] = None,
             **kwargs
         ) -> tp.BaseFigure:  # pragma: no cover
-            if _self.wrapper.ndim > 1:
-                raise TypeError("Select a column first. Use indexing.")
+            self_col = _self.select_col(column=column, group_by=False)
+            if entry_y is not None and isinstance(entry_y, str):
+                entry_y = getattr(self_col, entry_y)
+            if exit_y is not None and isinstance(exit_y, str):
+                exit_y = getattr(self_col, exit_y)
 
             if entry_trace_kwargs is None:
                 entry_trace_kwargs = {}
             if exit_trace_kwargs is None:
                 exit_trace_kwargs = {}
             entry_trace_kwargs = merge_dicts(
-                dict(name="New Entry" if mode == FactoryMode.Chain else "Entry"),
+                dict(name="New Entries" if mode == FactoryMode.Chain else "Entries"),
                 entry_trace_kwargs,
             )
-            exit_trace_kwargs = merge_dicts(dict(name="Exit"), exit_trace_kwargs)
+            exit_trace_kwargs = merge_dicts(dict(name="Exits"), exit_trace_kwargs)
             if entry_types is not None:
                 entry_types = np.asarray(entry_types)
                 entry_trace_kwargs = merge_dicts(
@@ -118,46 +122,46 @@ class SignalFactory(IndicatorFactory):
                     exit_trace_kwargs,
                 )
             if mode == FactoryMode.Entries:
-                fig = _self.entries.vbt.signals.plot_as_entry_markers(
+                fig = self_col.entries.vbt.signals.plot_as_entry_markers(
                     y=entry_y,
                     trace_kwargs=entry_trace_kwargs,
                     fig=fig,
                     **kwargs,
                 )
             elif mode == FactoryMode.Exits:
-                fig = _self.entries.vbt.signals.plot_as_entry_markers(
+                fig = self_col.entries.vbt.signals.plot_as_entry_markers(
                     y=entry_y,
                     trace_kwargs=entry_trace_kwargs,
                     fig=fig,
                     **kwargs,
                 )
-                fig = _self.exits.vbt.signals.plot_as_exit_markers(
+                fig = self_col.exits.vbt.signals.plot_as_exit_markers(
                     y=exit_y,
                     trace_kwargs=exit_trace_kwargs,
                     fig=fig,
                     **kwargs,
                 )
             elif mode == FactoryMode.Both:
-                fig = _self.entries.vbt.signals.plot_as_entry_markers(
+                fig = self_col.entries.vbt.signals.plot_as_entry_markers(
                     y=entry_y,
                     trace_kwargs=entry_trace_kwargs,
                     fig=fig,
                     **kwargs,
                 )
-                fig = _self.exits.vbt.signals.plot_as_exit_markers(
+                fig = self_col.exits.vbt.signals.plot_as_exit_markers(
                     y=exit_y,
                     trace_kwargs=exit_trace_kwargs,
                     fig=fig,
                     **kwargs,
                 )
             else:
-                fig = _self.new_entries.vbt.signals.plot_as_entry_markers(
+                fig = self_col.new_entries.vbt.signals.plot_as_entry_markers(
                     y=entry_y,
                     trace_kwargs=entry_trace_kwargs,
                     fig=fig,
                     **kwargs,
                 )
-                fig = _self.exits.vbt.signals.plot_as_exit_markers(
+                fig = self_col.exits.vbt.signals.plot_as_exit_markers(
                     y=exit_y,
                     trace_kwargs=exit_trace_kwargs,
                     fig=fig,
@@ -186,7 +190,7 @@ class SignalFactory(IndicatorFactory):
 
         setattr(self.Indicator, "plot", plot)
 
-    def from_place_func(
+    def with_place_func(
         self,
         entry_place_func: tp.Optional[tp.PlaceFunc] = None,
         exit_place_func: tp.Optional[tp.PlaceFunc] = None,
@@ -276,13 +280,10 @@ class SignalFactory(IndicatorFactory):
                     Default is False. Applied in `generate_ex_func` only.
                 * `pick_first`: Whether to stop as soon as the first exit signal is found.
                     Default is False with `FactoryMode.Entries`, otherwise is True.
-                * `max_one`: Whether the placement function returns only one signal at most.
-                    Default is True. Applied in `generate_enex_func` only. Make sure to enable `pick_first`
-                    if your placement function supports it.
                 * `temp_idx_arr`: Empty integer array used to temporarily store indices.
                     Default is an automatically generated array of shape `input_shape[0]`.
                     You can also pass `temp_idx_arr1`, `temp_idx_arr2`, etc. to generate multiple.
-                * `flex_2d`: See `vectorbtpro.base.indexing.flex_select_auto_nb`.
+                * `flex_2d`: Whether flexible 1-dim arrays are considered per column in 2-dim regime.
                     Default is provided by the pipeline if `pass_flex_2d` is True.
             pass_cache (bool): Whether to pass cache from `cache_func` to the placement function.
 
@@ -318,14 +319,16 @@ class SignalFactory(IndicatorFactory):
             >>> import numpy as np
 
             >>> @njit
-            ... def entry_place_func_nb(out, from_i, to_i, col):
-            ...     out[0] = True
+            ... def entry_place_func_nb(c):
+            ...     c.out[0] = True
+            ...     return 0
 
             >>> @njit
-            ... def exit_place_func_nb(out, from_i, to_i, col):
-            ...     out[0] = True
+            ... def exit_place_func_nb(c):
+            ...     c.out[0] = True
+            ...     return 0
 
-            >>> MySignals = vbt.SignalFactory().from_place_func(
+            >>> MySignals = vbt.SignalFactory().with_place_func(
             ...     entry_place_func=entry_place_func_nb,
             ...     exit_place_func=exit_place_func_nb,
             ...     entry_kwargs=dict(wait=1),
@@ -353,15 +356,17 @@ class SignalFactory(IndicatorFactory):
             >>> from vectorbtpro.signals.factory import SignalFactory
 
             >>> @njit
-            ... def wait_place_nb(out, from_i, to_i, col, n):
-            ...     if n < len(out):
-            ...         out[n] = True
+            ... def wait_place_nb(c, n):
+            ...     if n < len(c.out):
+            ...         c.out[n] = True
+            ...         return n
+            ...     return -1
 
             >>> # Build signal generator
             >>> MySignals = SignalFactory(
             ...     mode='chain',
             ...     param_names=['n']
-            ... ).from_place_func(
+            ... ).with_place_func(
             ...     exit_place_func=wait_place_nb,
             ...     exit_settings=dict(
             ...         pass_params=['n']
@@ -413,16 +418,17 @@ class SignalFactory(IndicatorFactory):
 
             >>> # Define exit placement function
             >>> @njit
-            ... def rand_exit_place_nb(out, from_i, to_i, col, rand_type, prob1, prob2, flex_2d):
-            ...     for i in range(len(out)):
+            ... def rand_exit_place_nb(c, rand_type, prob1, prob2, flex_2d):
+            ...     for out_i in range(len(c.out)):
             ...         if np.random.uniform(0, 1) < prob1:
-            ...             out[i] = True
-            ...             rand_type[from_i + i] = RandType.R1
-            ...             break
+            ...             c.out[out_i] = True
+            ...             rand_type[c.from_i + out_i] = RandType.R1
+            ...             return out_i
             ...         if np.random.uniform(0, 1) < prob2:
-            ...             out[i] = True
-            ...             rand_type[from_i + i] = RandType.R2
-            ...             break
+            ...             c.out[out_i] = True
+            ...             rand_type[c.from_i + out_i] = RandType.R2
+            ...             return out_i
+            ...     return -1
 
             >>> # Build signal generator
             >>> MySignals = SignalFactory(
@@ -432,7 +438,7 @@ class SignalFactory(IndicatorFactory):
             ...     attr_settings=dict(
             ...         rand_type=dict(dtype=RandType)  # creates rand_type_readable
             ...     )
-            ... ).from_place_func(
+            ... ).with_place_func(
             ...     exit_place_func=rand_exit_place_nb,
             ...     exit_settings=dict(
             ...         pass_in_outputs=['rand_type'],
@@ -479,6 +485,10 @@ class SignalFactory(IndicatorFactory):
             4
             ```
         """
+        Indicator = self.Indicator
+
+        setattr(Indicator, "entry_place_func", entry_place_func)
+        setattr(Indicator, "exit_place_func", exit_place_func)
 
         mode = self.mode
         input_names = self.input_names
@@ -486,7 +496,7 @@ class SignalFactory(IndicatorFactory):
         in_output_names = self.in_output_names
 
         if mode == FactoryMode.Entries:
-            require_input_shape = True
+            require_input_shape = len(input_names) == 0
             checks.assert_not_none(entry_place_func)
             if exit_place_func is not None:
                 raise ValueError("exit_place_func cannot be used with FactoryMode.Entries")
@@ -496,7 +506,7 @@ class SignalFactory(IndicatorFactory):
                 raise ValueError("entry_place_func cannot be used with FactoryMode.Exits")
             checks.assert_not_none(exit_place_func)
         elif mode == FactoryMode.Both:
-            require_input_shape = True
+            require_input_shape = len(input_names) == 0
             checks.assert_not_none(entry_place_func)
             checks.assert_not_none(exit_place_func)
         else:
@@ -612,8 +622,6 @@ class SignalFactory(IndicatorFactory):
             _0 += ", shape"
             _0 += ", entry_wait"
             _0 += ", exit_wait"
-            _0 += ", max_one_entry"
-            _0 += ", max_one_exit"
             if len(entry_input_names) > 0:
                 _0 += ", " + ", ".join(map(lambda x: "_entry_" + x, entry_input_names))
             if len(entry_in_output_names) > 0:
@@ -631,8 +639,6 @@ class SignalFactory(IndicatorFactory):
             _1 = "shape"
             _1 += ", entry_wait"
             _1 += ", exit_wait"
-            _1 += ", max_one_entry"
-            _1 += ", max_one_exit"
             _1 += ", entry_place_func"
             _1 += ", ("
             if len(entry_input_names) > 0:
@@ -663,6 +669,8 @@ class SignalFactory(IndicatorFactory):
             apply_func = scope["apply_func"]
             if jitted_loop:
                 apply_func = njit(apply_func)
+
+        setattr(Indicator, "apply_func", apply_func)
 
         def custom_func(
             input_list: tp.List[tp.AnyArray],
@@ -731,7 +739,6 @@ class SignalFactory(IndicatorFactory):
                 until_next=True,
                 skip_until_exit=False,
                 pick_first=mode != FactoryMode.Entries,
-                max_one=True,
                 flex_2d=flex_2d,
             )
             entry_kwargs = merge_dicts(kwargs_defaults, entry_kwargs)
@@ -739,8 +746,6 @@ class SignalFactory(IndicatorFactory):
             cache_kwargs = merge_dicts(kwargs_defaults, cache_kwargs)
             entry_wait = entry_kwargs["wait"]
             exit_wait = exit_kwargs["wait"]
-            max_one_entry = entry_kwargs["max_one"]
-            max_one_exit = exit_kwargs["max_one"]
             until_next = exit_kwargs["until_next"]
             skip_until_exit = exit_kwargs["skip_until_exit"]
 
@@ -891,8 +896,6 @@ class SignalFactory(IndicatorFactory):
                     input_shape,
                     entry_wait,
                     exit_wait,
-                    max_one_entry,
-                    max_one_exit,
                     *entry_input_list,
                     *_entry_in_output_list,
                     *_entry_param_list,

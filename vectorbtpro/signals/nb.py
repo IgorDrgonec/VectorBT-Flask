@@ -33,7 +33,7 @@ from vectorbtpro.generic.enums import range_dt, RangeStatus
 from vectorbtpro.records import chunking as records_ch
 from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.registries.jit_registry import register_jitted
-from vectorbtpro.signals.enums import StopType
+from vectorbtpro.signals.enums import *
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.array_ import uniform_summing_to_one_nb, rescale_float_to_int_nb, renormalize_nb
 from vectorbtpro.utils.template import Rep
@@ -44,7 +44,7 @@ from vectorbtpro.utils.template import Rep
 
 @register_chunkable(
     size=ch.ShapeSizer(arg_query="target_shape", axis=1),
-    arg_take_spec=dict(target_shape=ch.ShapeSlicer(axis=1), place_func_nb=None, args=ch.ArgsTaker()),
+    arg_take_spec=dict(target_shape=ch.ShapeSlicer(axis=1), wait=None, place_func_nb=None, args=ch.ArgsTaker()),
     merge_func=base_ch.column_stack,
 )
 @register_jitted(tags={"can_parallel"})
@@ -55,115 +55,28 @@ def generate_nb(target_shape: tp.Shape, place_func_nb: tp.PlaceFunc, *args) -> t
         target_shape (array): Target shape.
         place_func_nb (callable): Signal placement function.
 
-            `place_func_nb` must accept the boolean array for writing in place,
-            index of the start of the range `from_i`, index of the end of the range `to_i`,
-            index of the column `col`, and `*args`. Must return nothing.
-
-            !!! note
-                The first argument is always a 1-dimensional boolean array that contains only those
-                elements where signals can be placed. The range and column indices only describe which
-                range this array maps to.
+            `place_func_nb` must accept a context of type `vectorbtpro.signals.enums.GenEnContext`,
+            and return the index of the last signal.
         *args: Arguments passed to `place_func_nb`.
+
+    !!! note
+        The first argument is always a 1-dimensional boolean array that contains only those
+        elements where signals can be placed. The range and column indices only describe which
+        range this array maps to.
     """
     out = np.full(target_shape, False, dtype=np.bool_)
 
     for col in prange(target_shape[1]):
-        place_func_nb(out[:, col], 0, target_shape[0], col, *args)
+        c = GenEnContext(
+            target_shape=target_shape,
+            entries_out=out,
+            out=out[:, col],
+            from_i=0,
+            to_i=target_shape[0],
+            col=col,
+        )
+        place_func_nb(c, *args)
     return out
-
-
-@register_chunkable(
-    size=ch.ShapeSizer(arg_query="target_shape", axis=1),
-    arg_take_spec=dict(
-        target_shape=ch.ShapeSlicer(axis=1),
-        entry_wait=None,
-        exit_wait=None,
-        max_one_entry=None,
-        max_one_exit=None,
-        entry_place_func_nb=None,
-        entry_args=ch.ArgsTaker(),
-        exit_place_func_nb=None,
-        exit_args=ch.ArgsTaker(),
-    ),
-    merge_func=base_ch.column_stack,
-)
-@register_jitted
-def generate_enex_nb(
-    target_shape: tp.Shape,
-    entry_wait: int,
-    exit_wait: int,
-    max_one_entry: bool,
-    max_one_exit: bool,
-    entry_place_func_nb: tp.PlaceFunc,
-    entry_args: tp.Args,
-    exit_place_func_nb: tp.PlaceFunc,
-    exit_args: tp.Args,
-) -> tp.Tuple[tp.Array2d, tp.Array2d]:
-    """Pick entry signals using `entry_place_func_nb` and exit signals using
-    `exit_place_func_nb` one after another.
-
-    Args:
-        target_shape (array): Target shape.
-        entry_wait (int): Number of ticks to wait before placing entries.
-
-            !!! note
-                Setting `entry_wait` to 0 or False assumes that both entry and exit can be processed
-                within the same bar, and exit can be processed before entry.
-        exit_wait (int): Number of ticks to wait before placing exits.
-
-            !!! note
-                Setting `exit_wait` to 0 or False assumes that both entry and exit can be processed
-                within the same bar, and entry can be processed before exit.
-        max_one_entry (bool): Whether `entry_place_func_nb` returns only once signal at most.
-
-            Makes the execution a lot faster.
-        max_one_exit (bool): Whether `exit_place_func_nb` returns only once signal at most.
-
-            Makes the execution a lot faster.
-        entry_place_func_nb (callable): Entry place function.
-
-            See `place_func_nb` in `generate_nb`.
-        entry_args (tuple): Arguments unpacked and passed to `entry_place_func_nb`.
-        exit_place_func_nb (callable): Exit place function.
-
-            See `place_func_nb` in `generate_nb`.
-        exit_args (tuple): Arguments unpacked and passed to `exit_place_func_nb`.
-    """
-    entries = np.full(target_shape, False)
-    exits = np.full(target_shape, False)
-    if entry_wait == 0 and exit_wait == 0:
-        raise ValueError("entry_wait and exit_wait cannot be both 0")
-
-    def _place_signals(out, from_i, col, only_one, place_func_nb, args):
-        to_i = target_shape[0]
-        if to_i > from_i:
-            place_func_nb(out[from_i:to_i, col], from_i, to_i, col, *args)
-            last_i = -1
-            for j in range(from_i, to_i):
-                if out[j, col]:
-                    if only_one:
-                        return j
-                    last_i = j
-            return last_i
-        return -1
-
-    for col in range(target_shape[1]):
-        from_i = 0
-        entries_turn = True
-        first_signal = True
-        while from_i != -1:
-            if entries_turn:
-                if not first_signal:
-                    from_i += entry_wait
-                from_i = _place_signals(entries, from_i, col, max_one_entry, entry_place_func_nb, entry_args)
-                entries_turn = False
-            else:
-                from_i += exit_wait
-                from_i = _place_signals(exits, from_i, col, max_one_exit, exit_place_func_nb, exit_args)
-                entries_turn = True
-            first_signal = False
-
-    return entries, exits
 
 
 @register_chunkable(
@@ -207,7 +120,8 @@ def generate_ex_nb(
                 Setting it to True makes it impossible to tell which exit belongs to which entry.
         exit_place_func_nb (callable): Exit place function.
 
-            See `place_func_nb` in `generate_nb`.
+            `exit_place_func_nb` must accept a context of type `vectorbtpro.signals.enums.GenExContext`,
+            and return the index of the last signal.
         *args (callable): Arguments passed to `exit_place_func_nb`.
     """
     out = np.full_like(entries, False)
@@ -220,11 +134,20 @@ def generate_ex_nb(
             if not until_next:
                 to_i = entries.shape[0]
             if to_i > from_i:
-                exit_place_func_nb(out[from_i:to_i, col], from_i, to_i, col, *args)
-                if skip_until_exit:
-                    for j in range(from_i, to_i):
-                        if out[j, col]:
-                            last_exit_i = j
+                c = GenExContext(
+                    entries=out,
+                    until_next=until_next,
+                    skip_until_exit=skip_until_exit,
+                    exits_out=out,
+                    out=out[from_i:to_i, col],
+                    wait=wait,
+                    from_i=from_i,
+                    to_i=to_i,
+                    col=col,
+                )
+                _last_exit_i = exit_place_func_nb(c, *args)
+                if _last_exit_i != -1:
+                    last_exit_i = from_i + _last_exit_i
         return last_exit_i
 
     for col in prange(entries.shape[1]):
@@ -236,6 +159,117 @@ def generate_ex_nb(
                 from_i = i
         last_exit_i = _place_exits(from_i, entries.shape[0], col, last_exit_i)
     return out
+
+
+@register_chunkable(
+    size=ch.ShapeSizer(arg_query="target_shape", axis=1),
+    arg_take_spec=dict(
+        target_shape=ch.ShapeSlicer(axis=1),
+        entry_wait=None,
+        exit_wait=None,
+        entry_place_func_nb=None,
+        entry_args=ch.ArgsTaker(),
+        exit_place_func_nb=None,
+        exit_args=ch.ArgsTaker(),
+    ),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted
+def generate_enex_nb(
+    target_shape: tp.Shape,
+    entry_wait: int,
+    exit_wait: int,
+    entry_place_func_nb: tp.PlaceFunc,
+    entry_args: tp.Args,
+    exit_place_func_nb: tp.PlaceFunc,
+    exit_args: tp.Args,
+) -> tp.Tuple[tp.Array2d, tp.Array2d]:
+    """Pick entry signals using `entry_place_func_nb` and exit signals using
+    `exit_place_func_nb` one after another.
+
+    Args:
+        target_shape (array): Target shape.
+        entry_wait (int): Number of ticks to wait before placing entries.
+
+            !!! note
+                Setting `entry_wait` to 0 or False assumes that both entry and exit can be processed
+                within the same bar, and exit can be processed before entry.
+        exit_wait (int): Number of ticks to wait before placing exits.
+
+            !!! note
+                Setting `exit_wait` to 0 or False assumes that both entry and exit can be processed
+                within the same bar, and entry can be processed before exit.
+        entry_place_func_nb (callable): Entry place function.
+
+            `entry_place_func_nb` must accept a context of type `vectorbtpro.signals.enums.GenEnExContext`,
+            and return the index of the last signal.
+        entry_args (tuple): Arguments unpacked and passed to `entry_place_func_nb`.
+        exit_place_func_nb (callable): Exit place function.
+
+            `exit_place_func_nb` must accept a context of type `vectorbtpro.signals.enums.GenEnExContext`,
+            and return the index of the last signal.
+        exit_args (tuple): Arguments unpacked and passed to `exit_place_func_nb`.
+    """
+    entries = np.full(target_shape, False)
+    exits = np.full(target_shape, False)
+    if entry_wait == 0 and exit_wait == 0:
+        raise ValueError("entry_wait and exit_wait cannot be both 0")
+
+    def _place_signals(entries_turn, out, from_i, col, wait, place_func_nb, args):
+        to_i = target_shape[0]
+        if to_i > from_i:
+            c = GenEnExContext(
+                target_shape=target_shape,
+                entry_wait=entry_wait,
+                exit_wait=exit_wait,
+                entries_out=entries,
+                exits_out=exits,
+                entries_turn=entries_turn,
+                out=out[from_i:to_i, col],
+                wait=wait if from_i > 0 else 0,
+                from_i=from_i,
+                to_i=to_i,
+                col=col,
+            )
+            _last_i = place_func_nb(c, *args)
+            if _last_i == -1:
+                return -1
+            return from_i + _last_i
+        return -1
+
+    for col in range(target_shape[1]):
+        from_i = 0
+        entries_turn = True
+        first_signal = True
+        while from_i != -1:
+            if entries_turn:
+                if not first_signal:
+                    from_i += entry_wait
+                from_i = _place_signals(
+                    entries_turn,
+                    entries,
+                    from_i,
+                    col,
+                    entry_wait,
+                    entry_place_func_nb,
+                    entry_args,
+                )
+                entries_turn = False
+            else:
+                from_i += exit_wait
+                from_i = _place_signals(
+                    entries_turn,
+                    exits,
+                    from_i,
+                    col,
+                    exit_wait,
+                    exit_place_func_nb,
+                    exit_args,
+                )
+                entries_turn = True
+            first_signal = False
+
+    return entries, exits
 
 
 # ############# Filtering ############# #
@@ -285,37 +319,41 @@ def clean_enex_nb(entries: tp.Array2d, exits: tp.Array2d, entry_first: bool) -> 
 
 
 @register_jitted(cache=True)
-def rand_place_nb(out: tp.Array1d, from_i: int, to_i: int, col: int, n: tp.FlexArray) -> None:
+def rand_place_nb(c: tp.Union[GenEnContext, GenExContext, GenEnExContext], n: tp.FlexArray) -> int:
     """`place_func_nb` to randomly pick `n` values.
 
     `n` uses flexible indexing."""
-    size = min(to_i - from_i, flex_select_auto_nb(n, 0, col, True))
+    size = min(c.to_i - c.from_i, flex_select_auto_nb(n, 0, c.col, True))
     k = 0
+    last_i = -1
     while k < size:
-        i = np.random.choice(len(out))
-        if not out[i]:
-            out[i] = True
+        i = np.random.choice(len(c.out))
+        if not c.out[i]:
+            c.out[i] = True
             k += 1
+        if i > last_i:
+            last_i = i
+    return last_i
 
 
 @register_jitted(cache=True)
 def rand_by_prob_place_nb(
-    out: tp.Array1d,
-    from_i: int,
-    to_i: int,
-    col: int,
+    c: tp.Union[GenEnContext, GenExContext, GenEnExContext],
     prob: tp.FlexArray,
     pick_first: bool,
     flex_2d: bool,
-) -> None:
+) -> int:
     """`place_func_nb` to randomly place signals with probability `prob`.
 
     `prob` uses flexible indexing."""
-    for i in range(from_i, to_i):
-        if np.random.uniform(0, 1) < flex_select_auto_nb(prob, i, col, flex_2d):
-            out[i - from_i] = True
+    last_i = -1
+    for i in range(c.from_i, c.to_i):
+        if np.random.uniform(0, 1) < flex_select_auto_nb(prob, i, c.col, flex_2d):
+            c.out[i - c.from_i] = True
+            last_i = i - c.from_i
             if pick_first:
                 break
+    return last_i
 
 
 @register_chunkable(
@@ -439,58 +477,83 @@ def rand_enex_apply_nb(
 
 
 @register_jitted(cache=True)
-def first_place_nb(out: tp.Array1d, from_i: int, to_i: int, col: int, mask: tp.Array2d) -> None:
-    """`place_func_nb` that returns the index of the first signal in `mask`."""
-    for i in range(from_i, to_i):
-        if mask[i, col]:
-            out[i - from_i] = True
+def first_place_nb(c: tp.Union[GenEnContext, GenExContext, GenEnExContext], mask: tp.Array2d) -> int:
+    """`place_func_nb` that keeps only the first signal in `mask`."""
+    last_i = -1
+    for i in range(c.from_i, c.to_i):
+        if mask[i, c.col]:
+            c.out[i - c.from_i] = True
+            last_i = i - c.from_i
             break
+    return last_i
 
 
 @register_jitted(cache=True)
 def stop_place_nb(
-    out: tp.Array1d,
-    from_i: int,
-    to_i: int,
-    col: int,
+    c: tp.Union[GenExContext, GenEnExContext],
+    entry_ts: tp.FlexArray,
     ts: tp.FlexArray,
+    follow_ts: tp.FlexArray,
+    stop_ts_out: tp.Array2d,
     stop: tp.FlexArray,
-    trailing: tp.FlexArray,
-    wait: int,
-    pick_first: bool,
-    flex_2d: bool,
-) -> None:
-    """`place_func_nb` that returns the indices of the stop being hit.
+    trailing: tp.FlexArray = np.asarray(False),
+    flex_2d: bool = np.asarray(False),
+) -> int:
+    """`place_func_nb` that places an exit signal whenever a threshold is being hit.
+
+    !!! note
+        Waiting time cannot be higher than 1.
+
+        If waiting time is 0, `entry_ts` should be the first value in the bar.
+        If waiting time is 1, `entry_ts` should be the last value in the bar.
 
     Args:
-        out (array): Boolean array to write.
-        from_i (int): Index to start generation from (inclusive).
-        to_i (int): Index to run generation to (exclusive).
-        col (int): Current column.
-        ts (array of float): 2-dim time series array such as price.
-        stop (array of float): Stop value for stop loss.
+        c (GenExContext or GenEnExContext): Signal context.
+        entry_ts (array of float): Entry price.
 
-            Can be per frame, column, row, or element-wise. Must be at least a 0-dim array.
-            Set an element to `np.nan` to disable.
-        trailing (array of bool): Whether to use trailing stop.
+            Utilizes flexible indexing.
+        ts (array of float): Price to compare the stop value against.
 
-            Can be per frame, column, row, or element-wise. Must be at least a 0-dim array.
-            Set an element to False to disable.
-        wait (int): Number of ticks to wait before placing exits.
+            Utilizes flexible indexing. If NaN, defaults to `entry_ts`.
+        follow_ts (array of float): Following price.
 
-            Setting False or 0 may result in two signals at one bar.
+            Utilizes flexible indexing. If NaN, defaults to `ts`. Applied only if the stop is trailing.
+        stop_ts_out (array of float): Array where hit price of each exit will be stored.
 
-            !!! note
-                If `wait` is greater than 0, trailing stop won't update at bars that come before `from_i`.
-        pick_first (bool): Whether to stop as soon as the first exit signal is found.
-        flex_2d (bool): See `vectorbtpro.base.indexing.flex_select_auto_nb`."""
-    init_i = from_i - wait
-    init_ts = flex_select_auto_nb(ts, init_i, col, flex_2d)
-    init_stop = flex_select_auto_nb(stop, init_i, col, flex_2d)
-    init_trailing = flex_select_auto_nb(trailing, init_i, col, flex_2d)
-    max_high = min_low = init_ts
+            Must be of the full shape.
+        stop (array of float): Stop value.
 
-    for i in range(from_i, to_i):
+            Utilizes flexible indexing. Set an element to `np.nan` or `0` to disable it.
+        trailing (array of bool): Whether the stop is trailing.
+
+            Utilizes flexible indexing. Set an element to False to disable it.
+        flex_2d (bool): Whether flexible 1-dim arrays are considered per column in 2-dim regime."""
+    if c.wait > 1:
+        raise ValueError("Wait must be either 0 or 1")
+    init_i = c.from_i - c.wait
+    init_entry_ts = flex_select_auto_nb(entry_ts, init_i, c.col, flex_2d)
+    init_stop = flex_select_auto_nb(stop, init_i, c.col, flex_2d)
+    if init_stop == 0:
+        init_stop = np.nan
+    init_trailing = flex_select_auto_nb(trailing, init_i, c.col, flex_2d)
+    max_high = min_low = init_entry_ts
+
+    last_i = -1
+    for i in range(c.from_i, c.to_i):
+        curr_entry_ts = flex_select_auto_nb(entry_ts, i, c.col, flex_2d)
+        curr_ts = flex_select_auto_nb(ts, i, c.col, flex_2d)
+        curr_follow_ts = flex_select_auto_nb(follow_ts, i, c.col, flex_2d)
+        if np.isnan(curr_ts):
+            curr_ts = curr_entry_ts
+        if np.isnan(curr_follow_ts):
+            if not np.isnan(curr_entry_ts):
+                if init_stop >= 0:
+                    curr_follow_ts = min(curr_entry_ts, curr_ts)
+                else:
+                    curr_follow_ts = max(curr_entry_ts, curr_ts)
+            else:
+                curr_follow_ts = curr_ts
+
         if not np.isnan(init_stop):
             if init_trailing:
                 if init_stop >= 0:
@@ -500,122 +563,151 @@ def stop_place_nb(
                     # Trailing stop sell
                     curr_stop_price = max_high * (1 - abs(init_stop))
             else:
-                curr_stop_price = init_ts * (1 + init_stop)
+                curr_stop_price = init_entry_ts * (1 + init_stop)
 
         # Check if stop price is within bar
-        curr_ts = flex_select_auto_nb(ts, i, col, flex_2d)
         if not np.isnan(init_stop):
             if init_stop >= 0:
                 exit_signal = curr_ts >= curr_stop_price
             else:
                 exit_signal = curr_ts <= curr_stop_price
             if exit_signal:
-                out[i - from_i] = True
-                if pick_first:
-                    break
+                stop_ts_out[i, c.col] = curr_stop_price
+                c.out[i - c.from_i] = True
+                last_i = i - c.from_i
+                break
 
         # Keep track of lowest low and highest high if trailing
         if init_trailing:
-            if curr_ts < min_low:
-                min_low = curr_ts
-            elif curr_ts > max_high:
-                max_high = curr_ts
+            if curr_follow_ts < min_low:
+                min_low = curr_follow_ts
+            elif curr_follow_ts > max_high:
+                max_high = curr_follow_ts
+
+    return last_i
 
 
 @register_jitted(cache=True)
 def ohlc_stop_place_nb(
-    out: tp.Array1d,
-    from_i: int,
-    to_i: int,
-    col: int,
+    c: tp.Union[GenExContext, GenEnExContext],
+    entry_price: tp.FlexArray,
     open: tp.FlexArray,
     high: tp.FlexArray,
     low: tp.FlexArray,
     close: tp.FlexArray,
     stop_price_out: tp.Array2d,
     stop_type_out: tp.Array2d,
-    sl_stop: tp.FlexArray,
-    sl_trail: tp.FlexArray,
-    tp_stop: tp.FlexArray,
-    reverse: tp.FlexArray,
-    is_open_safe: bool,
-    wait: int,
-    pick_first: bool,
-    flex_2d: bool,
-) -> None:
-    """`place_func_nb` that returns the indices of the stop price being hit within OHLC.
+    sl_stop: tp.FlexArray = np.asarray(np.nan),
+    tsl_stop: tp.FlexArray = np.asarray(np.nan),
+    tp_stop: tp.FlexArray = np.asarray(np.nan),
+    ttp_th: tp.FlexArray = np.asarray(np.nan),
+    ttp_stop: tp.FlexArray = np.asarray(np.nan),
+    reverse: tp.FlexArray = np.asarray(False),
+    is_entry_open: bool = False,
+    flex_2d: bool = False,
+) -> int:
+    """`place_func_nb` that places an exit signal whenever a threshold is being hit using OHLC.
 
     Compared to `stop_place_nb`, takes into account the whole bar, can check for both
     (trailing) stop loss and take profit simultaneously, and tracks hit price and stop type.
 
     !!! note
-        We don't have intra-candle data. If there was a huge price fluctuation in both directions,
-        we can't determine whether SL was triggered before TP and vice versa. So some assumptions
-        need to be made:
-
-        1) if stop has been hit before open, stop price becomes current open,
-        2) trailing stop can only be based on previous close/high, and
-        3) we pessimistically assume that SL comes before TP.
+        Waiting time cannot be higher than 1.
 
     Args:
-        out (array): Boolean array to write.
-        col (int): Current column.
-        from_i (int): Index to start generation from (inclusive).
-        to_i (int): Index to run generation to (exclusive).
-        open (array of float): Entry price such as open or previous close.
+        c (GenExContext or GenEnExContext): Signal context.
+        entry_price (array of float): Entry price.
+
+            Utilizes flexible indexing.
+        open (array of float): Open price.
+
+            Utilizes flexible indexing. If Nan and `is_entry_open` is True, defaults to entry price.
         high (array of float): High price.
+
+            Utilizes flexible indexing. If NaN, gets calculated from open and close.
         low (array of float): Low price.
+
+            Utilizes flexible indexing. If NaN, gets calculated from open and close.
         close (array of float): Close price.
+
+            Utilizes flexible indexing. If Nan and `is_entry_open` is False, defaults to entry price.
         stop_price_out (array of float): Array where hit price of each exit will be stored.
+
+            Must be of the full shape.
         stop_type_out (array of int): Array where stop type of each exit will be stored.
 
-            0 for stop loss, 1 for take profit.
-        sl_stop (array of float): Percentage value for stop loss.
+            Must be of the full shape. 0 for stop loss, 1 for take profit.
+        sl_stop (array of float): Stop loss as a percentage.
 
-            Can be per frame, column, row, or element-wise. Must be at least a 0-dim array.
-            Set an element to `np.nan` to disable.
-        sl_trail (array of bool): Whether `sl_stop` is trailing.
+            Utilizes flexible indexing. Set an element to `np.nan` or `0` to disable.
+        tsl_stop (array of bool): Trailing stop loss as a percentage.
 
-            Can be per frame, column, row, or element-wise. Must be at least a 0-dim array.
-            Set an element to False to disable.
-        tp_stop (array of float): Percentage value for take profit.
+            Utilizes flexible indexing. Set an element to `np.nan` or `0` to disable.
+        tp_stop (array of float): Take profit as a percentage.
 
-            Can be per frame, column, row, or element-wise. Must be at least a 0-dim array.
-            Set an element to `np.nan` to disable.
+            Utilizes flexible indexing. Set an element to `np.nan` or `0` to disable.
+        ttp_th (array of float): Take profit threshold as a percentage for the trailing take profit.
+
+            Utilizes flexible indexing. Requires `ttp_stop`. Set an element to `np.nan` or `0` to disable.
+        ttp_stop (array of float): Trailing stop loss as a percentage for the trailing take profit.
+
+            Utilizes flexible indexing. Requires `ttp_th`. Set an element to `np.nan` or `0` to disable.
         reverse (array of float): Whether to do the opposite, i.e.: prices are followed downwards.
 
-            Can be per frame, column, row, or element-wise. Must be at least a 0-dim array.
-        is_open_safe (bool): Whether entry price comes right at or before open.
+            Utilizes flexible indexing.
+        is_entry_open (bool): Whether entry price comes right at or before open.
 
-            If True and wait is 0, can use high/low at entry bar. Otherwise uses only close.
-        wait (int): Number of ticks to wait before placing exits.
-
-            Setting False or 0 may result in entry and exit signal at one bar.
-
-            !!! note
-                If `wait` is greater than 0, even with `is_open_safe` set to True,
-                trailing stop won't update at bars that come before `from_i`.
-        pick_first (bool): Whether to stop as soon as the first exit signal is found.
-        flex_2d (bool): See `vectorbtpro.base.indexing.flex_select_auto_nb`.
+            If True, uses high and low of the entry bar. Otherwise, uses only close.
+        flex_2d (bool): Whether flexible 1-dim arrays are considered per column in 2-dim regime.
     """
-    init_i = from_i - wait
-    init_open = flex_select_auto_nb(open, init_i, col, flex_2d)
-    init_sl_stop = flex_select_auto_nb(sl_stop, init_i, col, flex_2d)
+    if c.wait > 1:
+        raise ValueError("Wait must be either 0 or 1")
+    init_i = c.from_i - c.wait
+    init_entry_price = flex_select_auto_nb(entry_price, init_i, c.col, flex_2d)
+    init_sl_stop = flex_select_auto_nb(sl_stop, init_i, c.col, flex_2d)
     if init_sl_stop < 0:
-        raise ValueError("Stop value must be nan, 0, or greater than 0")
-    init_sl_trail = flex_select_auto_nb(sl_trail, init_i, col, flex_2d)
-    init_tp_stop = flex_select_auto_nb(tp_stop, init_i, col, flex_2d)
+        raise ValueError("SL stop value must be nan, 0, or greater than 0")
+    if init_sl_stop == 0:
+        init_sl_stop = np.nan
+    init_tsl_stop = flex_select_auto_nb(tsl_stop, init_i, c.col, flex_2d)
+    if init_tsl_stop < 0:
+        raise ValueError("TSL stop value must be nan, 0, or greater than 0")
+    if init_tsl_stop == 0:
+        init_tsl_stop = np.nan
+    init_tp_stop = flex_select_auto_nb(tp_stop, init_i, c.col, flex_2d)
     if init_tp_stop < 0:
-        raise ValueError("Stop value must be nan, 0, or greater than 0")
-    init_reverse = flex_select_auto_nb(reverse, init_i, col, flex_2d)
-    max_p = min_p = init_open
+        raise ValueError("TP stop value must be nan, 0, or greater than 0")
+    if init_tp_stop == 0:
+        init_tp_stop = np.nan
+    init_ttp_th = flex_select_auto_nb(ttp_th, init_i, c.col, flex_2d)
+    if init_ttp_th < 0:
+        raise ValueError("TTP threshold value must be nan, 0, or greater than 0")
+    if init_ttp_th == 0:
+        init_ttp_th = np.nan
+    init_ttp_stop = flex_select_auto_nb(ttp_stop, init_i, c.col, flex_2d)
+    if init_ttp_stop < 0:
+        raise ValueError("TTP stop value must be nan, 0, or greater than 0")
+    if init_ttp_stop == 0:
+        init_ttp_stop = np.nan
+    if not np.isnan(init_ttp_th) and np.isnan(init_ttp_stop):
+        raise ValueError("TTP threshold requires a finite stop value")
+    if np.isnan(init_ttp_th) and not np.isnan(init_ttp_stop):
+        raise ValueError("TTP stop requires a finite threshold value")
+    init_reverse = flex_select_auto_nb(reverse, init_i, c.col, flex_2d)
+    last_high = last_low = init_entry_price
 
-    for i in range(from_i, to_i):
+    last_i = -1
+    for i in range(c.from_i - c.wait, c.to_i):
         # Resolve current bar
-        _open = flex_select_auto_nb(open, i, col, flex_2d)
-        _high = flex_select_auto_nb(high, i, col, flex_2d)
-        _low = flex_select_auto_nb(low, i, col, flex_2d)
-        _close = flex_select_auto_nb(close, i, col, flex_2d)
+        _entry_price = flex_select_auto_nb(entry_price, i, c.col, flex_2d)
+        _open = flex_select_auto_nb(open, i, c.col, flex_2d)
+        _high = flex_select_auto_nb(high, i, c.col, flex_2d)
+        _low = flex_select_auto_nb(low, i, c.col, flex_2d)
+        _close = flex_select_auto_nb(close, i, c.col, flex_2d)
+        if np.isnan(_open) and not np.isnan(_entry_price) and is_entry_open:
+            _open = _entry_price
+        if np.isnan(_close) and not np.isnan(_entry_price) and not is_entry_open:
+            _close = _entry_price
         if np.isnan(_high):
             if np.isnan(_open):
                 _high = _close
@@ -630,86 +722,128 @@ def ohlc_stop_place_nb(
                 _low = _open
             else:
                 _low = min(_open, _close)
-
-        # Calculate stop price
-        if not np.isnan(init_sl_stop):
-            if init_sl_trail:
-                if init_reverse:
-                    curr_sl_stop_price = min_p * (1 + init_sl_stop)
-                else:
-                    curr_sl_stop_price = max_p * (1 - init_sl_stop)
-            else:
-                if init_reverse:
-                    curr_sl_stop_price = init_open * (1 + init_sl_stop)
-                else:
-                    curr_sl_stop_price = init_open * (1 - init_sl_stop)
-        if not np.isnan(init_tp_stop):
-            if init_reverse:
-                curr_tp_stop_price = init_open * (1 - init_tp_stop)
-            else:
-                curr_tp_stop_price = init_open * (1 + init_tp_stop)
-
-        # Check if stop price is within bar
-        if i > init_i or is_open_safe:
-            # is_open_safe means open is either open or any other price before it
-            # so it's safe to use high/low at entry bar
+        if i > init_i or is_entry_open:
             curr_high = _high
             curr_low = _low
         else:
-            # Otherwise, we can only use close price at entry bar
             curr_high = curr_low = _close
 
-        exit_signal = False
-        if not np.isnan(init_sl_stop):
-            # SL/TSL hit?
-            stop_price = np.nan
-            if not init_reverse:
-                if _open <= curr_sl_stop_price:
-                    stop_price = _open
-                if curr_low <= curr_sl_stop_price:
-                    stop_price = curr_sl_stop_price
-            else:
-                if _open >= curr_sl_stop_price:
-                    stop_price = _open
-                if curr_high >= curr_sl_stop_price:
-                    stop_price = curr_sl_stop_price
-            if not np.isnan(stop_price):
-                stop_price_out[i, col] = stop_price
-                if init_sl_trail:
-                    stop_type_out[i, col] = StopType.TrailStop
+        if i >= c.from_i:
+            # Calculate stop prices
+            if not np.isnan(init_sl_stop):
+                if init_reverse:
+                    curr_sl_stop_price = init_entry_price * (1 + init_sl_stop)
                 else:
-                    stop_type_out[i, col] = StopType.StopLoss
-                exit_signal = True
+                    curr_sl_stop_price = init_entry_price * (1 - init_sl_stop)
+            if not np.isnan(init_tsl_stop):
+                if init_reverse:
+                    curr_tsl_stop_price = last_low * (1 + init_tsl_stop)
+                else:
+                    curr_tsl_stop_price = last_high * (1 - init_tsl_stop)
+            if not np.isnan(init_tp_stop):
+                if init_reverse:
+                    curr_tp_stop_price = init_entry_price * (1 - init_tp_stop)
+                else:
+                    curr_tp_stop_price = init_entry_price * (1 + init_tp_stop)
+            if not np.isnan(init_ttp_stop):
+                if init_reverse:
+                    if last_low <= init_entry_price * (1 - init_ttp_th):
+                        curr_ttp_stop_price = last_low * (1 + init_ttp_stop)
+                    else:
+                        curr_ttp_stop_price = np.nan
+                else:
+                    if last_high >= init_entry_price * (1 + init_ttp_th):
+                        curr_ttp_stop_price = last_high * (1 - init_ttp_stop)
+                    else:
+                        curr_ttp_stop_price = np.nan
 
-        if not exit_signal and not np.isnan(init_tp_stop):
-            # TP hit?
-            stop_price = np.nan
-            if not init_reverse:
-                if _open >= curr_tp_stop_price:
-                    stop_price = _open
-                if curr_high >= curr_tp_stop_price:
-                    stop_price = curr_tp_stop_price
-            else:
-                if _open <= curr_tp_stop_price:
-                    stop_price = _open
-                if curr_low <= curr_tp_stop_price:
-                    stop_price = curr_tp_stop_price
-            if not np.isnan(stop_price):
-                stop_price_out[i, col] = stop_price
-                stop_type_out[i, col] = StopType.TakeProfit
-                exit_signal = True
+            # Check if stop price is within bar
+            exit_signal = False
+            if not np.isnan(init_sl_stop):
+                # SL hit?
+                stop_price = np.nan
+                if not init_reverse:
+                    if _open <= curr_sl_stop_price:
+                        stop_price = _open
+                    if curr_low <= curr_sl_stop_price:
+                        stop_price = curr_sl_stop_price
+                else:
+                    if _open >= curr_sl_stop_price:
+                        stop_price = _open
+                    if curr_high >= curr_sl_stop_price:
+                        stop_price = curr_sl_stop_price
+                if not np.isnan(stop_price):
+                    stop_price_out[i, c.col] = stop_price
+                    stop_type_out[i, c.col] = StopType.SL
+                    exit_signal = True
 
-        if exit_signal:
-            out[i - from_i] = True
-            if pick_first:
+            if not exit_signal and not np.isnan(init_tsl_stop):
+                # TSL hit?
+                stop_price = np.nan
+                if not init_reverse:
+                    if _open <= curr_tsl_stop_price:
+                        stop_price = _open
+                    if curr_low <= curr_tsl_stop_price:
+                        stop_price = curr_tsl_stop_price
+                else:
+                    if _open >= curr_tsl_stop_price:
+                        stop_price = _open
+                    if curr_high >= curr_tsl_stop_price:
+                        stop_price = curr_tsl_stop_price
+                if not np.isnan(stop_price):
+                    stop_price_out[i, c.col] = stop_price
+                    stop_type_out[i, c.col] = StopType.TSL
+                    exit_signal = True
+
+            if not exit_signal and not np.isnan(init_ttp_stop):
+                # TTP hit?
+                stop_price = np.nan
+                if not init_reverse:
+                    if _open <= curr_ttp_stop_price:
+                        stop_price = _open
+                    if curr_low <= curr_ttp_stop_price:
+                        stop_price = curr_ttp_stop_price
+                else:
+                    if _open >= curr_ttp_stop_price:
+                        stop_price = _open
+                    if curr_high >= curr_ttp_stop_price:
+                        stop_price = curr_ttp_stop_price
+                if not np.isnan(stop_price):
+                    stop_price_out[i, c.col] = stop_price
+                    stop_type_out[i, c.col] = StopType.TTP
+                    exit_signal = True
+
+            if not exit_signal and not np.isnan(init_tp_stop):
+                # TP hit?
+                stop_price = np.nan
+                if not init_reverse:
+                    if _open >= curr_tp_stop_price:
+                        stop_price = _open
+                    if curr_high >= curr_tp_stop_price:
+                        stop_price = curr_tp_stop_price
+                else:
+                    if _open <= curr_tp_stop_price:
+                        stop_price = _open
+                    if curr_low <= curr_tp_stop_price:
+                        stop_price = curr_tp_stop_price
+                if not np.isnan(stop_price):
+                    stop_price_out[i, c.col] = stop_price
+                    stop_type_out[i, c.col] = StopType.TP
+                    exit_signal = True
+
+            if exit_signal:
+                c.out[i - c.from_i] = True
+                last_i = i - c.from_i
                 break
 
-        # Keep track of highest high if trailing
-        if init_sl_trail:
-            if curr_low < min_p:
-                min_p = curr_low
-            if curr_high > max_p:
-                max_p = curr_high
+        if i > init_i or is_entry_open:
+            # Keep track of the lowest low and the highest high
+            if curr_low < last_low:
+                last_low = curr_low
+            if curr_high > last_high:
+                last_high = curr_high
+
+    return last_i
 
 
 # ############# Ranges ############# #
@@ -894,6 +1028,7 @@ def rank_nb(
     mask: tp.Array2d,
     reset_by_mask: tp.Optional[tp.Array2d],
     after_false: bool,
+    after_reset: bool,
     rank_func_nb: tp.RankFunc,
     *args,
 ) -> tp.Array2d:
@@ -905,7 +1040,8 @@ def rank_nb(
     Must return -1 for no rank, otherwise 0 or greater.
 
     Setting `after_false` to True will disregard the first partition of True values
-    if there is no False value before them."""
+    if there is no False value before them. Setting `after_reset` to True will disregard
+    the first partition of True values coming before the first reset signal."""
     out = np.full(mask.shape, -1, dtype=np.int_)
 
     for col in prange(mask.shape[1]):
@@ -914,11 +1050,13 @@ def rank_nb(
         part_start_i = -1
         in_partition = False
         false_seen = not after_false
+        reset_seen = reset_by_mask is None
         for i in range(mask.shape[0]):
             if reset_by_mask is not None:
                 if reset_by_mask[i, col]:
                     reset_i = i
-            if mask[i, col] and not (after_false and not false_seen):
+                    reset_seen = True
+            if mask[i, col] and not (after_false and not false_seen) and not (after_reset and not reset_seen):
                 if not in_partition:
                     part_start_i = i
                 in_partition = True
