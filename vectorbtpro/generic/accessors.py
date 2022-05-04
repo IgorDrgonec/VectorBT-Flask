@@ -714,6 +714,9 @@ class GenericAccessor(BaseAccessor, Analyzable):
         if template_context is None:
             template_context = {}
 
+        if isinstance(map_func_nb, str):
+            map_func_nb = getattr(nb, map_func_nb + "_map_nb")
+
         if isinstance(cls_or_self, type):
             if len(broadcast_named_args) > 0:
                 broadcast_kwargs = merge_dicts(dict(to_pd=False, post_func=reshaping.to_2d_array), broadcast_kwargs)
@@ -828,6 +831,9 @@ class GenericAccessor(BaseAccessor, Analyzable):
             broadcast_kwargs = {}
         if template_context is None:
             template_context = {}
+
+        if isinstance(apply_func_nb, str):
+            apply_func_nb = getattr(nb, apply_func_nb + "_apply_nb")
 
         if isinstance(cls_or_self, type):
             if len(broadcast_named_args) > 0:
@@ -1123,6 +1129,9 @@ class GenericAccessor(BaseAccessor, Analyzable):
         if template_context is None:
             template_context = {}
 
+        if isinstance(reduce_func_nb, str):
+            reduce_func_nb = getattr(nb, reduce_func_nb + "_reduce_nb")
+
         if isinstance(cls_or_self, type):
             if len(broadcast_named_args) > 0:
                 broadcast_kwargs = merge_dicts(dict(to_pd=False, post_func=reshaping.to_2d_array), broadcast_kwargs)
@@ -1260,6 +1269,9 @@ class GenericAccessor(BaseAccessor, Analyzable):
             broadcast_kwargs = {}
         if template_context is None:
             template_context = {}
+
+        if isinstance(reduce_func_nb, str):
+            reduce_func_nb = getattr(nb, reduce_func_nb + "_reduce_nb")
 
         if isinstance(cls_or_self, type):
             if len(broadcast_named_args) > 0:
@@ -1410,6 +1422,10 @@ class GenericAccessor(BaseAccessor, Analyzable):
         if template_context is None:
             template_context = {}
 
+        if isinstance(apply_func_nb, str):
+            apply_func_nb = getattr(nb, apply_func_nb + "_apply_nb")
+        if isinstance(reduce_func_nb, str):
+            reduce_func_nb = getattr(nb, reduce_func_nb + "_reduce_nb")
         if apply_args is None:
             apply_args = ()
         if reduce_args is None:
@@ -1609,6 +1625,9 @@ class GenericAccessor(BaseAccessor, Analyzable):
         if template_context is None:
             template_context = {}
 
+        if isinstance(reduce_func_nb, str):
+            reduce_func_nb = getattr(nb, reduce_func_nb + "_reduce_nb")
+
         if isinstance(cls_or_self, type):
             if len(broadcast_named_args) > 0:
                 broadcast_kwargs = merge_dicts(dict(to_pd=False, post_func=reshaping.to_2d_array), broadcast_kwargs)
@@ -1784,6 +1803,9 @@ class GenericAccessor(BaseAccessor, Analyzable):
             broadcast_kwargs = {}
         if template_context is None:
             template_context = {}
+
+        if isinstance(squeeze_func_nb, str):
+            squeeze_func_nb = getattr(nb, squeeze_func_nb + "_reduce_nb")
 
         if isinstance(cls_or_self, type):
             if len(broadcast_named_args) > 0:
@@ -2203,6 +2225,9 @@ class GenericAccessor(BaseAccessor, Analyzable):
         if template_context is None:
             template_context = {}
 
+        if isinstance(reduce_func_nb, str):
+            reduce_func_nb = getattr(nb, reduce_func_nb + "_reduce_nb")
+
         if isinstance(cls_or_self, type):
             if len(broadcast_named_args) > 0:
                 broadcast_kwargs = merge_dicts(dict(to_pd=False, post_func=reshaping.to_2d_array), broadcast_kwargs)
@@ -2359,6 +2384,9 @@ class GenericAccessor(BaseAccessor, Analyzable):
             broadcast_kwargs = {}
         if template_context is None:
             template_context = {}
+
+        if isinstance(reduce_func_nb, str):
+            reduce_func_nb = getattr(nb, reduce_func_nb + "_reduce_nb")
 
         if isinstance(cls_or_self, type):
             if len(broadcast_named_args) > 0:
