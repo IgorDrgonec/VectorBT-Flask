@@ -793,7 +793,7 @@ class RemoteData(Data):
 class YFData(RemoteData):  # pragma: no cover
     """Subclass of `vectorbtpro.data.base.Data` for `yfinance`.
 
-    See https://github.com/ranaroussi/yfinance."""
+    See https://github.com/ranaroussi/yfinance"""
 
     _column_config: tp.ClassVar[Config] = HybridConfig(
         {
@@ -885,7 +885,7 @@ BinanceDataT = tp.TypeVar("BinanceDataT", bound="BinanceData")
 class BinanceData(RemoteData):  # pragma: no cover
     """Subclass of `vectorbtpro.data.base.Data` for `python-binance`.
 
-    See https://github.com/sammchardy/python-binance."""
+    See https://github.com/sammchardy/python-binance"""
 
     _column_config: tp.ClassVar[Config] = HybridConfig(
         {
@@ -1126,7 +1126,7 @@ BinanceData.override_column_config_doc(__pdoc__)
 class CCXTData(RemoteData):  # pragma: no cover
     """Subclass of `vectorbtpro.data.base.Data` for `ccxt`.
 
-    See https://github.com/ccxt/ccxt."""
+    See https://github.com/ccxt/ccxt"""
 
     @classmethod
     def fetch_symbol(
@@ -1343,9 +1343,9 @@ AlpacaDataT = tp.TypeVar("AlpacaDataT", bound="AlpacaData")
 class AlpacaData(RemoteData):  # pragma: no cover
     """Subclass of `vectorbtpro.data.base.Data` for `alpaca-trade-api`.
 
-    See https://github.com/alpacahq/alpaca-trade-api-python.
+    See https://github.com/alpacahq/alpaca-trade-api-python
 
-    Sign up for Alpaca API keys under https://app.alpaca.markets/signup.
+    Sign up for Alpaca API keys under https://app.alpaca.markets/signup
 
     Contributed to vectorbt by @haxdds. Licensed under Apache 2.0 with Commons Clause license.
     Adapted to vectorbtpro by @polakowo."""
@@ -1427,7 +1427,7 @@ class AlpacaData(RemoteData):  # pragma: no cover
             timeframe (str): Timeframe of data.
 
                 Must be integer multiple of 'm' (minute), 'h' (hour) or 'd' (day). i.e. '15m'.
-                See https://alpaca.markets/data.
+                See https://alpaca.markets/data
 
                 !!! note
                     Data from the latest 15 minutes is not available with a free data plan.
@@ -1557,7 +1557,7 @@ PolygonDataT = tp.TypeVar("PolygonDataT", bound="PolygonData")
 class PolygonData(RemoteData):  # pragma: no cover
     """Subclass of `vectorbtpro.data.base.Data` for `polygon-api-client`.
 
-    See https://github.com/polygon-io/client-python."""
+    See https://github.com/polygon-io/client-python"""
 
     _column_config: tp.ClassVar[Config] = HybridConfig(
         {
@@ -1899,7 +1899,7 @@ class AlphaVantageData(RemoteData):  # pragma: no cover
     @classmethod
     @lru_cache()
     def parse_api_meta(cls) -> dict:
-        """Parse API metadata from the documentation at https://www.alphavantage.co/documentation.
+        """Parse API metadata from the documentation at https://www.alphavantage.co/documentation
 
         Cached class method. To avoid re-parsing the same metadata in different runtimes, save it manually."""
         from vectorbtpro.utils.opt_packages import assert_can_import
@@ -2243,7 +2243,7 @@ NDLDataT = tp.TypeVar("NDLDataT", bound="NDLData")
 class NDLData(RemoteData):  # pragma: no cover
     """Subclass of `vectorbtpro.data.base.Data` for `nasdaqdatalink`.
 
-    See https://github.com/Nasdaq/data-link-python."""
+    See https://github.com/Nasdaq/data-link-python"""
 
     @classmethod
     def fetch_symbol(

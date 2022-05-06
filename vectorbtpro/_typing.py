@@ -2,7 +2,7 @@
 
 """General types used across vectorbtpro."""
 
-from datetime import datetime, timedelta, tzinfo
+from datetime import datetime, timedelta, tzinfo, time
 from pathlib import Path
 from typing import *
 
@@ -112,6 +112,7 @@ PandasFrequencyLike = Union[str, pd.Timedelta, timedelta, np.timedelta64, BaseOf
 PandasGroupByLike = Union[PandasGroupBy, PandasResampler, PandasFrequencyLike]
 TimezoneLike = Union[None, str, float, timedelta, tzinfo]
 DatetimeLike = Union[str, float, pd.Timestamp, np.datetime64, datetime]
+TimeLike = Union[str, time]
 PandasFrequency = Union[pd.Timedelta, pd.DateOffset]
 PandasDatetimeIndex = Union[pd.DatetimeIndex, pd.PeriodIndex]
 AnyFrequency = Union[None, int, float, pd.Timedelta, pd.DateOffset]
@@ -170,8 +171,8 @@ GroupByReduceMetaFunc = Callable[[GroupIdxs, int, int, VarArg()], Scalar]
 GroupSqueezeMetaFunc = Callable[[int, GroupIdxs, int, VarArg()], Scalar]
 
 # Signals
-PlaceFunc = Callable[[Array1d, int, int, int, VarArg()], None]
-RankFunc = Callable[[int, int, int, int, int, VarArg()], int]
+PlaceFunc = Callable[[NamedTuple, VarArg()], int]
+RankFunc = Callable[[NamedTuple, VarArg()], int]
 
 # Records
 RecordsMapFunc = Callable[[np.void, VarArg()], Scalar]

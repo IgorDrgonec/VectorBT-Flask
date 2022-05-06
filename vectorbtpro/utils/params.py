@@ -16,7 +16,7 @@ def to_typed_list(lst: list) -> List:
     """Cast Python list to typed list.
 
     Direct construction is flawed in Numba 0.52.0.
-    See https://github.com/numba/numba/issues/6651."""
+    See https://github.com/numba/numba/issues/6651"""
     nb_lst = List()
     for elem in lst:
         nb_lst.append(elem)

@@ -6,34 +6,14 @@ import numpy as np
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.registries.jit_registry import register_jitted
-
-ns_dt = np.timedelta64(1, "ns")
-"""Nanosecond."""
-
-us_dt = ns_dt * 1000
-"""Microsecond."""
-
-ms_dt = us_dt * 1000
-"""Millisecond."""
-
-s_dt = ms_dt * 1000
-"""Second."""
-
-m_dt = s_dt * 60
-"""Minute."""
-
-h_dt = m_dt * 60
-"""Hour."""
-
-d_dt = h_dt * 24
-"""Day."""
+from vectorbtpro.utils.datetime_nb import d_td
 
 
 @register_jitted(cache=True)
 def date_range_nb(
     start: np.datetime64,
     end: np.datetime64,
-    freq: np.timedelta64 = d_dt,
+    freq: np.timedelta64 = d_td,
     incl_left: bool = True,
     incl_right: bool = True,
 ) -> tp.Array1d:

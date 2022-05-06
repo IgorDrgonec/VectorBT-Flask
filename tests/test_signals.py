@@ -549,7 +549,7 @@ class TestAccessors:
             ),
         )
         assert_frame_equal(
-            entries.vbt.signals.clean(exits, entry_first=False)[0],
+            entries.vbt.signals.clean(exits, force_first=False)[0],
             pd.DataFrame(
                 np.array(
                     [
@@ -565,7 +565,39 @@ class TestAccessors:
             ),
         )
         assert_frame_equal(
-            entries.vbt.signals.clean(exits, entry_first=False)[1],
+            entries.vbt.signals.clean(exits, force_first=False)[1],
+            pd.DataFrame(
+                np.array(
+                    [
+                        [False, True, False],
+                        [False, False, False],
+                        [False, False, False],
+                        [False, False, False],
+                        [True, False, False],
+                    ]
+                ),
+                index=mask.index,
+                columns=mask.columns,
+            ),
+        )
+        assert_frame_equal(
+            entries.vbt.signals.clean(exits, reverse_order=True)[0],
+            pd.DataFrame(
+                np.array(
+                    [
+                        [False, False, False],
+                        [False, False, False],
+                        [False, False, False],
+                        [False, True, False],
+                        [False, False, False],
+                    ]
+                ),
+                index=mask.index,
+                columns=mask.columns,
+            ),
+        )
+        assert_frame_equal(
+            entries.vbt.signals.clean(exits, reverse_order=True)[1],
             pd.DataFrame(
                 np.array(
                     [
@@ -1945,6 +1977,154 @@ class TestAccessors:
             mask.vbt.signals.between_partition_ranges(chunked=False).values,
         )
 
+    def test_rank(self):
+        mask2 = pd.Series([True, True, False, True, True, False, True, True, True])
+        mask3 = pd.Series([False, False, False, False, True, False, False, True, False])
+
+        last_false_i = []
+        last_reset_i = []
+        all_sig_cnt = []
+        all_part_cnt = []
+        all_sig_in_part_cnt = []
+        nonres_sig_cnt = []
+        nonres_part_cnt = []
+        nonres_sig_in_part_cnt = []
+        sig_cnt = []
+        part_cnt = []
+        sig_in_part_cnt = []
+
+        def rank_func(c):
+            last_false_i.append(c.last_false_i)
+            last_reset_i.append(c.last_reset_i)
+            all_sig_cnt.append(c.all_sig_cnt)
+            all_part_cnt.append(c.all_part_cnt)
+            all_sig_in_part_cnt.append(c.all_sig_in_part_cnt)
+            nonres_sig_cnt.append(c.nonres_sig_cnt)
+            nonres_part_cnt.append(c.nonres_part_cnt)
+            nonres_sig_in_part_cnt.append(c.nonres_sig_in_part_cnt)
+            sig_cnt.append(c.sig_cnt)
+            part_cnt.append(c.part_cnt)
+            sig_in_part_cnt.append(c.sig_in_part_cnt)
+            return -1
+
+        mask2.vbt.signals.rank(rank_func, jitted=False)
+
+        assert last_false_i == [-1, -1, 2, 2, 5, 5, 5]
+        assert last_reset_i == [-1, -1, -1, -1, -1, -1, -1]
+        assert all_sig_cnt == [1, 2, 3, 4, 5, 6, 7]
+        assert all_part_cnt == [1, 1, 2, 2, 3, 3, 3]
+        assert all_sig_in_part_cnt == [1, 2, 1, 2, 1, 2, 3]
+        assert nonres_sig_cnt == [1, 2, 3, 4, 5, 6, 7]
+        assert nonres_part_cnt == [1, 1, 2, 2, 3, 3, 3]
+        assert nonres_sig_in_part_cnt == [1, 2, 1, 2, 1, 2, 3]
+        assert sig_cnt == [1, 2, 3, 4, 5, 6, 7]
+        assert part_cnt == [1, 1, 2, 2, 3, 3, 3]
+        assert sig_in_part_cnt == [1, 2, 1, 2, 1, 2, 3]
+
+        last_false_i = []
+        last_reset_i = []
+        all_sig_cnt = []
+        all_part_cnt = []
+        all_sig_in_part_cnt = []
+        nonres_sig_cnt = []
+        nonres_part_cnt = []
+        nonres_sig_in_part_cnt = []
+        sig_cnt = []
+        part_cnt = []
+        sig_in_part_cnt = []
+
+        mask2.vbt.signals.rank(rank_func, after_false=True, jitted=False)
+
+        assert last_false_i == [2, 2, 5, 5, 5]
+        assert last_reset_i == [-1, -1, -1, -1, -1]
+        assert all_sig_cnt == [3, 4, 5, 6, 7]
+        assert all_part_cnt == [2, 2, 3, 3, 3]
+        assert all_sig_in_part_cnt == [1, 2, 1, 2, 3]
+        assert nonres_sig_cnt == [1, 2, 3, 4, 5]
+        assert nonres_part_cnt == [1, 1, 2, 2, 2]
+        assert nonres_sig_in_part_cnt == [1, 2, 1, 2, 3]
+        assert sig_cnt == [1, 2, 3, 4, 5]
+        assert part_cnt == [1, 1, 2, 2, 2]
+        assert sig_in_part_cnt == [1, 2, 1, 2, 3]
+
+        last_false_i = []
+        last_reset_i = []
+        all_sig_cnt = []
+        all_part_cnt = []
+        all_sig_in_part_cnt = []
+        nonres_sig_cnt = []
+        nonres_part_cnt = []
+        nonres_sig_in_part_cnt = []
+        sig_cnt = []
+        part_cnt = []
+        sig_in_part_cnt = []
+
+        mask2.vbt.signals.rank(rank_func, reset_by=mask3, after_reset=False, reset_wait=0, jitted=False)
+
+        assert last_false_i == [-1, -1, 2, 2, 5, 5, 5]
+        assert last_reset_i == [-1, -1, -1, 4, 4, 7, 7]
+        assert all_sig_cnt == [1, 2, 3, 4, 5, 6, 7]
+        assert all_part_cnt == [1, 1, 2, 2, 3, 3, 3]
+        assert all_sig_in_part_cnt == [1, 2, 1, 2, 1, 2, 3]
+        assert nonres_sig_cnt == [1, 2, 3, 4, 5, 6, 7]
+        assert nonres_part_cnt == [1, 1, 2, 2, 3, 3, 3]
+        assert nonres_sig_in_part_cnt == [1, 2, 1, 2, 1, 2, 3]
+        assert sig_cnt == [1, 2, 3, 1, 2, 1, 2]
+        assert part_cnt == [1, 1, 2, 1, 2, 1, 1]
+        assert sig_in_part_cnt == [1, 2, 1, 1, 1, 1, 2]
+
+        last_false_i = []
+        last_reset_i = []
+        all_sig_cnt = []
+        all_part_cnt = []
+        all_sig_in_part_cnt = []
+        nonres_sig_cnt = []
+        nonres_part_cnt = []
+        nonres_sig_in_part_cnt = []
+        sig_cnt = []
+        part_cnt = []
+        sig_in_part_cnt = []
+
+        mask2.vbt.signals.rank(rank_func, reset_by=mask3, after_reset=True, reset_wait=0, jitted=False)
+
+        assert last_false_i == [2, 5, 5, 5]
+        assert last_reset_i == [4, 4, 7, 7]
+        assert all_sig_cnt == [4, 5, 6, 7]
+        assert all_part_cnt == [2, 3, 3, 3]
+        assert all_sig_in_part_cnt == [2, 1, 2, 3]
+        assert nonres_sig_cnt == [1, 2, 3, 4]
+        assert nonres_part_cnt == [1, 2, 2, 2]
+        assert nonres_sig_in_part_cnt == [1, 1, 2, 3]
+        assert sig_cnt == [1, 2, 1, 2]
+        assert part_cnt == [1, 2, 1, 1]
+        assert sig_in_part_cnt == [1, 1, 1, 2]
+
+        last_false_i = []
+        last_reset_i = []
+        all_sig_cnt = []
+        all_part_cnt = []
+        all_sig_in_part_cnt = []
+        nonres_sig_cnt = []
+        nonres_part_cnt = []
+        nonres_sig_in_part_cnt = []
+        sig_cnt = []
+        part_cnt = []
+        sig_in_part_cnt = []
+
+        mask2.vbt.signals.rank(rank_func, reset_by=mask3, after_reset=True, reset_wait=1, jitted=False)
+
+        assert last_false_i == [5, 5, 5]
+        assert last_reset_i == [4, 7, 7]
+        assert all_sig_cnt == [5, 6, 7]
+        assert all_part_cnt == [3, 3, 3]
+        assert all_sig_in_part_cnt == [1, 2, 3]
+        assert nonres_sig_cnt == [1, 2, 3]
+        assert nonres_part_cnt == [1, 1, 1]
+        assert nonres_sig_in_part_cnt == [1, 2, 3]
+        assert sig_cnt == [1, 2, 1]
+        assert part_cnt == [1, 1, 1]
+        assert sig_in_part_cnt == [1, 2, 1]
+
     def test_pos_rank(self):
         assert_series_equal(
             (~mask["a"]).vbt.signals.pos_rank(),
@@ -1975,7 +2155,7 @@ class TestAccessors:
             ),
         )
         assert_frame_equal(
-            (~mask).vbt.signals.pos_rank(reset_by=mask["a"], allow_gaps=True),
+            (~mask).vbt.signals.pos_rank(reset_by=mask["a"], reset_wait=0, allow_gaps=True),
             pd.DataFrame(
                 np.array([[-1, 0, 0], [0, -1, 1], [1, 1, -1], [-1, 0, 0], [0, -1, 1]]),
                 index=mask.index,
@@ -1983,7 +2163,7 @@ class TestAccessors:
             ),
         )
         assert_frame_equal(
-            (~mask).vbt.signals.pos_rank(reset_by=mask, allow_gaps=True),
+            (~mask).vbt.signals.pos_rank(reset_by=mask, reset_wait=0, allow_gaps=True),
             pd.DataFrame(
                 np.array([[-1, 0, 0], [0, -1, 1], [1, 0, -1], [-1, 1, 0], [0, -1, 1]]),
                 index=mask.index,
@@ -2021,7 +2201,7 @@ class TestAccessors:
             ),
         )
         assert_frame_equal(
-            (~mask).vbt.signals.partition_pos_rank(reset_by=mask["a"]),
+            (~mask).vbt.signals.partition_pos_rank(reset_by=mask["a"], reset_wait=0),
             pd.DataFrame(
                 np.array([[-1, 0, 0], [0, -1, 0], [0, 1, -1], [-1, 0, 0], [0, -1, 0]]),
                 index=mask.index,
@@ -2029,7 +2209,7 @@ class TestAccessors:
             ),
         )
         assert_frame_equal(
-            (~mask).vbt.signals.partition_pos_rank(reset_by=mask),
+            (~mask).vbt.signals.partition_pos_rank(reset_by=mask, reset_wait=0),
             pd.DataFrame(
                 np.array([[-1, 0, 0], [0, -1, 0], [0, 0, -1], [-1, 0, 0], [0, -1, 0]]),
                 index=mask.index,

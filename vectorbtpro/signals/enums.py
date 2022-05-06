@@ -7,7 +7,7 @@ Defines enums and other schemas for `vectorbtpro.signals`."""
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.formatting import prettify
 
-__all__ = ["StopType", "FactoryMode", "GenEnContext", "GenExContext", "GenEnExContext"]
+__all__ = ["StopType", "FactoryMode", "GenEnContext", "GenExContext", "GenEnExContext", "RankContext"]
 
 __pdoc__ = {}
 
@@ -153,4 +153,57 @@ __pdoc__["GenExContext.to_i"] = "End index of the segment (exclusive)."
 __pdoc__["GenExContext.col"] = "Column of the segment."
 
 
+class RankContext(tp.NamedTuple):
+    mask: tp.Array2d
+    reset_by_mask: tp.Optional[tp.Array2d]
+    after_false: bool
+    after_reset: bool
+    reset_wait: int
+    col: int
+    i: int
+    last_false_i: int
+    last_reset_i: int
+    all_sig_cnt: int
+    all_part_cnt: int
+    all_sig_in_part_cnt: int
+    nonres_sig_cnt: int
+    nonres_part_cnt: int
+    nonres_sig_in_part_cnt: int
+    sig_cnt: int
+    part_cnt: int
+    sig_in_part_cnt: int
 
+
+__pdoc__["RankContext"] = "Context of a ranker."
+__pdoc__["RankContext.mask"] = "Source mask."
+__pdoc__["RankContext.reset_by_mask"] = "Resetting mask."
+__pdoc__[
+    "RankContext.after_false"
+] = """Whether to disregard the first partition of True values if there is no False value before them."""
+__pdoc__[
+    "RankContext.after_reset"
+] = """Whether to disregard the first partition of True values coming before the first reset signal."""
+__pdoc__["RankContext.reset_wait"] = """Number of ticks to wait before resetting the current partition."""
+__pdoc__["RankContext.col"] = "Current column."
+__pdoc__["RankContext.i"] = "Current row."
+__pdoc__["RankContext.last_false_i"] = "Row of the last False value in the main mask."
+__pdoc__[
+    "RankContext.last_reset_i"
+] = """Row of the last True value in the resetting mask. 
+
+Doesn't take into account `reset_wait`."""
+__pdoc__["RankContext.all_sig_cnt"] = """Number of all signals encountered including this."""
+__pdoc__["RankContext.all_part_cnt"] = """Number of all partitions encountered including this."""
+__pdoc__[
+    "RankContext.all_sig_in_part_cnt"
+] = """Number of signals encountered in the current partition including this."""
+__pdoc__["RankContext.nonres_sig_cnt"] = """Number of non-resetting signals encountered including this."""
+__pdoc__["RankContext.nonres_part_cnt"] = """Number of non-resetting partitions encountered including this."""
+__pdoc__[
+    "RankContext.nonres_sig_in_part_cnt"
+] = """Number of signals encountered in the current non-resetting partition including this."""
+__pdoc__["RankContext.sig_cnt"] = """Number of valid and resetting signals encountered including this."""
+__pdoc__["RankContext.part_cnt"] = """Number of valid and resetting partitions encountered including this."""
+__pdoc__[
+    "RankContext.sig_in_part_cnt"
+] = """Number of signals encountered in the current valid and resetting partition including this."""

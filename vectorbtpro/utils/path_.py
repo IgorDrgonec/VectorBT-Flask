@@ -52,7 +52,7 @@ def tree(
 ) -> str:
     """Given a directory Path object print a visual tree structure.
 
-    Inspired by this answer: https://stackoverflow.com/a/59109706."""
+    Inspired by this answer: https://stackoverflow.com/a/59109706"""
     dir_path = Path(dir_path)
     files = 0
     directories = 0

@@ -35,7 +35,7 @@ def requests_retry_session(
 def text_to_giphy_url(text: str, api_key: tp.Optional[str] = None, weirdness: tp.Optional[int] = None) -> str:
     """Translate text to GIF.
 
-    See https://engineering.giphy.com/contextually-aware-search-giphy-gets-work-specific/."""
+    See https://engineering.giphy.com/contextually-aware-search-giphy-gets-work-specific/"""
     from vectorbtpro._settings import settings
 
     giphy_cfg = settings["messaging"]["giphy"]

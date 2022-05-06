@@ -73,16 +73,6 @@ def test_execute_order_nb():
             nb.order_nb(10, 10, direction=20),
         )
     with pytest.raises(Exception):
-        nb.execute_order_nb(
-            ExecState(100.0, -100.0, 0.0, 100.0, 10.0, 1100.0),
-            nb.order_nb(10, 10, direction=Direction.LongOnly),
-        )
-    with pytest.raises(Exception):
-        nb.execute_order_nb(
-            ExecState(100.0, 100.0, 0.0, 100.0, 10.0, 1100.0),
-            nb.order_nb(10, 10, direction=Direction.ShortOnly),
-        )
-    with pytest.raises(Exception):
         nb.execute_order_nb(ExecState(100.0, 100.0, 0.0, 100.0, 10.0, 1100.0), nb.order_nb(10, -10))
     with pytest.raises(Exception):
         nb.execute_order_nb(ExecState(100.0, 100.0, 0.0, 100.0, 10.0, 1100.0), nb.order_nb(10, 10, fees=np.inf))

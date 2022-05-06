@@ -331,8 +331,8 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
         self,
         plot_type: tp.Union[None, str, tp.BaseTraceType] = None,
         plot_volume: tp.Optional[bool] = None,
-        ohlc_kwargs: tp.KwargsLike = None,
-        volume_kwargs: tp.KwargsLike = None,
+        ohlc_trace_kwargs: tp.KwargsLike = None,
+        volume_trace_kwargs: tp.KwargsLike = None,
         add_trace_kwargs: tp.KwargsLike = None,
         volume_add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
@@ -345,8 +345,8 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
 
                 Pass None to use the default.
             plot_volume (bool): Whether to plot volume beneath.
-            ohlc_kwargs (dict): Keyword arguments passed to `plot_type`.
-            volume_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Bar`.
+            ohlc_trace_kwargs (dict): Keyword arguments passed to `plot_type`.
+            volume_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Bar`.
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace` for OHLC.
             volume_add_trace_kwargs (dict): Keyword arguments passed to `add_trace` for volume.
             fig (Figure or FigureWidget): Figure to add traces to.
@@ -373,10 +373,10 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
         plotting_cfg = settings["plotting"]
         ohlcv_cfg = settings["ohlcv"]
 
-        if ohlc_kwargs is None:
-            ohlc_kwargs = {}
-        if volume_kwargs is None:
-            volume_kwargs = {}
+        if ohlc_trace_kwargs is None:
+            ohlc_trace_kwargs = {}
+        if volume_trace_kwargs is None:
+            volume_trace_kwargs = {}
         if add_trace_kwargs is None:
             add_trace_kwargs = {}
         if volume_add_trace_kwargs is None:
@@ -434,7 +434,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             increasing=dict(line=dict(color=plotting_cfg["color_schema"]["increasing"])),
             decreasing=dict(line=dict(color=plotting_cfg["color_schema"]["decreasing"])),
         )
-        ohlc.update(**ohlc_kwargs)
+        ohlc.update(**ohlc_trace_kwargs)
         fig.add_trace(ohlc, **add_trace_kwargs)
 
         if plot_volume:
@@ -457,7 +457,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
                 opacity=0.5,
                 name="Volume",
             )
-            volume_bar.update(**volume_kwargs)
+            volume_bar.update(**volume_trace_kwargs)
             fig.add_trace(volume_bar, **volume_add_trace_kwargs)
 
         return fig

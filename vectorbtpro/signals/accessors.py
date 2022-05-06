@@ -526,13 +526,15 @@ class SignalsAccessor(GenericAccessor):
         exits = func(obj, wait, until_next, skip_until_exit, exit_place_func_nb, *args)
         return wrapper.wrap(exits, group_by=False, **resolve_dict(wrap_kwargs))
 
-    # ############# Filtering ############# #
+    # ############# Cleaning ############# #
 
     @class_or_instancemethod
     def clean(
         cls_or_self,
         *args,
-        entry_first: bool = True,
+        force_first: bool = True,
+        keep_conflicts: bool = False,
+        reverse_order: bool = False,
         broadcast_kwargs: tp.KwargsLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -540,8 +542,8 @@ class SignalsAccessor(GenericAccessor):
     ) -> tp.MaybeTuple[tp.SeriesFrame]:
         """Clean signals.
 
-        If one array passed, see `SignalsAccessor.first`.
-        If two arrays passed, entries and exits, see `vectorbtpro.signals.nb.clean_enex_nb`."""
+        If one array passed, see `SignalsAccessor.first`. If two arrays passed, entries and exits,
+        see `vectorbtpro.signals.nb.clean_enex_nb`."""
         if wrap_kwargs is None:
             wrap_kwargs = {}
         if not isinstance(cls_or_self, type):
@@ -554,15 +556,19 @@ class SignalsAccessor(GenericAccessor):
         if len(args) == 2:
             if broadcast_kwargs is None:
                 broadcast_kwargs = {}
-            broadcasted_args = reshaping.broadcast(dict(entries=args[0], exits=args[1]), **broadcast_kwargs)
-            entries = broadcasted_args["entries"]
-            exits = broadcasted_args["exits"]
+            broadcasted_args, wrapper = reshaping.broadcast(
+                dict(entries=args[0], exits=args[1]),
+                return_wrapper=True,
+                **broadcast_kwargs
+            )
+            entries = reshaping.to_2d_array(broadcasted_args["entries"])
+            exits = reshaping.to_2d_array(broadcasted_args["exits"])
             func = jit_reg.resolve_option(nb.clean_enex_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
-            entries_out, exits_out = func(reshaping.to_2d_array(entries), reshaping.to_2d_array(exits), entry_first)
+            entries_out, exits_out = func(entries, exits, force_first, keep_conflicts, reverse_order)
             return (
-                ArrayWrapper.from_obj(entries).wrap(entries_out, group_by=False, **wrap_kwargs),
-                ArrayWrapper.from_obj(exits).wrap(exits_out, group_by=False, **wrap_kwargs),
+                wrapper.wrap(entries_out, group_by=False, **wrap_kwargs),
+                wrapper.wrap(exits_out, group_by=False, **wrap_kwargs),
             )
         raise ValueError("Either one or two arrays must be passed")
 
@@ -1622,10 +1628,10 @@ class SignalsAccessor(GenericAccessor):
         self,
         rank_func_nb: tp.RankFunc,
         *args,
-        prepare_func: tp.Optional[tp.Callable] = None,
         reset_by: tp.Optional[tp.ArrayLike] = None,
         after_false: bool = False,
         after_reset: bool = False,
+        reset_wait: int = 1,
         as_mapped: bool = False,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
@@ -1638,9 +1644,6 @@ class SignalsAccessor(GenericAccessor):
         """See `vectorbtpro.signals.nb.rank_nb`.
 
         Will broadcast with `reset_by` using `vectorbtpro.base.reshaping.broadcast` and `broadcast_kwargs`.
-
-        Use `prepare_func` to prepare further arguments to be passed before `*args`, such as temporary arrays.
-        It must take both broadcasted arrays (`reset_by` can be None) and return a tuple.
 
         Set `as_mapped` to True to return an instance of `vectorbtpro.records.mapped_array.MappedArray`."""
         if broadcast_named_args is None:
@@ -1668,19 +1671,20 @@ class SignalsAccessor(GenericAccessor):
         obj = reshaping.to_2d_array(broadcast_named_args["obj"])
         if reset_by is not None:
             reset_by = reshaping.to_2d_array(broadcast_named_args["reset_by"])
-        if prepare_func is not None:
-            temp_arrs = prepare_func(obj, reset_by)
-        else:
-            temp_arrs = ()
         template_context = merge_dicts(
-            broadcast_named_args,
-            dict(after_false=after_false, temp_arrs=temp_arrs),
+            dict(
+                obj=obj,
+                reset_by=reset_by,
+                after_false=after_false,
+                after_reset=after_reset,
+                reset_wait=reset_wait,
+            ),
             template_context,
         )
         args = deep_substitute(args, template_context, sub_id="args")
         func = jit_reg.resolve_option(nb.rank_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        rank = func(obj, reset_by, after_false, after_reset, rank_func_nb, *temp_arrs, *args)
+        rank = func(obj, reset_by, after_false, after_reset, reset_wait, rank_func_nb, *args)
         rank_wrapped = wrapper.wrap(rank, group_by=False, **wrap_kwargs)
         if as_mapped:
             rank_wrapped = rank_wrapped.replace(-1, np.nan)
@@ -1735,19 +1739,34 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05 -1  0 -1
             ```
         """
-        prepare_func = lambda obj, reset_by: (np.full(obj.shape[1], -1, dtype=np.int_),)
         chunked = ch.specialize_chunked_option(
             chunked,
-            arg_take_spec=dict(args=ch.ArgsTaker(ch.ArraySlicer(axis=0), None)),
+            arg_take_spec=dict(
+                args=ch.ArgsTaker(
+                    None,
+                )
+            ),
         )
         return self.rank(
             jit_reg.resolve_option(nb.sig_pos_rank_nb, jitted),
             allow_gaps,
-            prepare_func=prepare_func,
             jitted=jitted,
             chunked=chunked,
             **kwargs,
         )
+
+    def pos_rank_after(
+        self,
+        reset_by: tp.ArrayLike,
+        after_reset: bool = True,
+        allow_gaps: bool = True,
+        **kwargs,
+    ) -> tp.Union[tp.SeriesFrame, MappedArray]:
+        """Get signal position ranks after each signal in `reset_by`.
+
+        !!! note
+            `allow_gaps` is enabled by default."""
+        return self.pos_rank(reset_by=reset_by, after_reset=after_reset, allow_gaps=allow_gaps, **kwargs)
 
     def partition_pos_rank(
         self,
@@ -1788,48 +1807,114 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05 -1  0 -1
             ```
         """
-        prepare_func = lambda obj, reset_by: (np.full(obj.shape[1], -1, dtype=np.int_),)
-        chunked = ch.specialize_chunked_option(chunked, arg_take_spec=dict(args=ch.ArgsTaker(ch.ArraySlicer(axis=0))))
         return self.rank(
             jit_reg.resolve_option(nb.part_pos_rank_nb, jitted),
-            prepare_func=prepare_func,
             jitted=jitted,
             chunked=chunked,
             **kwargs,
         )
 
-    def first(self, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
+    def partition_pos_rank_after(self, reset_by: tp.ArrayLike, **kwargs) -> tp.Union[tp.SeriesFrame, MappedArray]:
+        """Get partition position ranks after each signal in `reset_by`."""
+        return self.partition_pos_rank(reset_by=reset_by, after_reset=True, **kwargs)
+
+    def first(
+        self,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
         """Select signals that satisfy the condition `pos_rank == 0`.
 
         Uses `SignalsAccessor.pos_rank`."""
         pos_rank = self.pos_rank(**kwargs).values
         return self.wrapper.wrap(pos_rank == 0, group_by=False, **resolve_dict(wrap_kwargs))
 
-    def first_after(self, reset_by: tp.ArrayLike, **kwargs) -> tp.SeriesFrame:
-        """Select the first signal after each signal in `reset_by`."""
-        return self.first(reset_by=reset_by, after_reset=True, **kwargs)
+    def first_after(
+        self,
+        reset_by: tp.ArrayLike,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
+        """Select signals that satisfy the condition `pos_rank == 0`.
 
-    def nth(self, n: int, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
+        Uses `SignalsAccessor.pos_rank_after`."""
+        pos_rank = self.pos_rank_after(reset_by, **kwargs).values
+        return self.wrapper.wrap(pos_rank == 0, group_by=False, **resolve_dict(wrap_kwargs))
+
+    def nth(
+        self,
+        n: int,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
         """Select signals that satisfy the condition `pos_rank == n`.
 
         Uses `SignalsAccessor.pos_rank`."""
         pos_rank = self.pos_rank(**kwargs).values
         return self.wrapper.wrap(pos_rank == n, group_by=False, **resolve_dict(wrap_kwargs))
 
-    def nth_after(self, reset_by: tp.ArrayLike, **kwargs) -> tp.SeriesFrame:
-        """Select the n-th signal after each signal in `reset_by`."""
-        return self.nth(reset_by=reset_by, after_reset=True, **kwargs)
+    def nth_after(
+        self,
+        n: int,
+        reset_by: tp.ArrayLike,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
+        """Select signals that satisfy the condition `pos_rank == n`.
 
-    def from_nth(self, n: int, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
+        Uses `SignalsAccessor.pos_rank_after`."""
+        pos_rank = self.pos_rank_after(reset_by, **kwargs).values
+        return self.wrapper.wrap(pos_rank == n, group_by=False, **resolve_dict(wrap_kwargs))
+
+    def from_nth(
+        self,
+        n: int,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
         """Select signals that satisfy the condition `pos_rank >= n`.
 
         Uses `SignalsAccessor.pos_rank`."""
         pos_rank = self.pos_rank(**kwargs).values
         return self.wrapper.wrap(pos_rank >= n, group_by=False, **resolve_dict(wrap_kwargs))
 
-    def from_nth_after(self, n: int, reset_by: tp.ArrayLike, **kwargs) -> tp.SeriesFrame:
-        """Select from the n-th signal after each signal in `reset_by`."""
-        return self.nth(n, reset_by=reset_by, after_reset=True, **kwargs)
+    def from_nth_after(
+        self,
+        n: int,
+        reset_by: tp.ArrayLike,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
+        """Select signals that satisfy the condition `pos_rank >= n`.
+
+        Uses `SignalsAccessor.pos_rank_after`."""
+        pos_rank = self.pos_rank_after(reset_by, **kwargs).values
+        return self.wrapper.wrap(pos_rank >= n, group_by=False, **resolve_dict(wrap_kwargs))
+
+    def to_nth(
+        self,
+        n: int,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
+        """Select signals that satisfy the condition `pos_rank < n`.
+
+        Uses `SignalsAccessor.pos_rank`."""
+        pos_rank = self.pos_rank(**kwargs).values
+        return self.wrapper.wrap(pos_rank < n, group_by=False, **resolve_dict(wrap_kwargs))
+
+    def to_nth_after(
+        self,
+        n: int,
+        reset_by: tp.ArrayLike,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
+        """Select signals that satisfy the condition `pos_rank < n`.
+
+        Uses `SignalsAccessor.pos_rank_after`."""
+        pos_rank = self.pos_rank_after(reset_by, **kwargs).values
+        return self.wrapper.wrap(pos_rank < n, group_by=False, **resolve_dict(wrap_kwargs))
 
     def pos_rank_mapped(self, group_by: tp.GroupByLike = None, **kwargs) -> MappedArray:
         """Get a mapped array of signal position ranks.
@@ -2168,8 +2253,8 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
             ```pycon
             >>> ts = pd.Series([1, 2, 3, 2, 1], index=mask.index)
             >>> fig = ts.vbt.lineplot()
-            >>> mask['b'].vbt.signals.plot_as_entry_markers(y=ts, fig=fig)
-            >>> (~mask['b']).vbt.signals.plot_as_exit_markers(y=ts, fig=fig)
+            >>> mask['b'].vbt.signals.plot_as_entries(y=ts, fig=fig)
+            >>> (~mask['b']).vbt.signals.plot_as_exits(y=ts, fig=fig)
             ```
 
             ![](/assets/images/signals_plot_as_markers.svg)
@@ -2198,11 +2283,15 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
             marker_color = kwargs["trace_kwargs"]["marker_color"]
         else:
             marker_color = kwargs["trace_kwargs"]["marker"]["color"]
+        if isinstance(marker_color, str) and "rgba" not in marker_color:
+            line_color = adjust_lightness(marker_color)
+        else:
+            line_color = marker_color
         kwargs = merge_dicts(
             dict(
                 trace_kwargs=dict(
                     marker=dict(
-                        line=dict(width=1, color=adjust_lightness(marker_color)),
+                        line=dict(width=1, color=line_color),
                     ),
                 ),
             ),
@@ -2210,7 +2299,7 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
         )
         return y[self.obj].vbt.scatterplot(**kwargs)
 
-    def plot_as_entry_markers(
+    def plot_as_entries(
         self,
         y: tp.Optional[tp.ArrayLike] = None,
         **kwargs,
@@ -2239,7 +2328,7 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
             ),
         )
 
-    def plot_as_exit_markers(
+    def plot_as_exits(
         self,
         y: tp.Optional[tp.ArrayLike] = None,
         **kwargs,
@@ -2262,6 +2351,72 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
                             size=8,
                         ),
                         name="Exits",
+                    )
+                ),
+                kwargs,
+            ),
+        )
+
+    def plot_as_entry_marks(
+        self,
+        y: tp.Optional[tp.ArrayLike] = None,
+        **kwargs,
+    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:  # pragma: no cover
+        """Plot signals as marked entry markers.
+
+        See `SignalsSRAccessor.plot_as_markers`."""
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
+
+        return self.plot_as_markers(
+            y=y,
+            **merge_dicts(
+                dict(
+                    trace_kwargs=dict(
+                        marker=dict(
+                            symbol="circle",
+                            color="rgba(0, 0, 0, 0)",
+                            size=20,
+                            line=dict(
+                                color=plotting_cfg["contrast_color_schema"]["green"],
+                                width=2,
+                            )
+                        ),
+                        name="Entry marks",
+                    )
+                ),
+                kwargs,
+            ),
+        )
+
+    def plot_as_exit_marks(
+        self,
+        y: tp.Optional[tp.ArrayLike] = None,
+        **kwargs,
+    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:  # pragma: no cover
+        """Plot signals as marked exit markers.
+
+        See `SignalsSRAccessor.plot_as_markers`."""
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
+
+        return self.plot_as_markers(
+            y=y,
+            **merge_dicts(
+                dict(
+                    trace_kwargs=dict(
+                        marker=dict(
+                            symbol="circle",
+                            color="rgba(0, 0, 0, 0)",
+                            size=20,
+                            line=dict(
+                                color=plotting_cfg["contrast_color_schema"]["red"],
+                                width=2,
+                            )
+                        ),
+                        name="Exit marks",
                     )
                 ),
                 kwargs,

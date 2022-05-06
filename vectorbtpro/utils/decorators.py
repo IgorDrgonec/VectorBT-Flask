@@ -55,7 +55,7 @@ _NOT_FOUND = object()
 
 
 class cachedproperty:
-    """See https://docs.python.org/3/library/functools.html#functools.cached_property.
+    """See https://docs.python.org/3/library/functools.html#functools.cached_property
 
     In contrast to `cached_property`, persistent and cannot be disabled."""
 

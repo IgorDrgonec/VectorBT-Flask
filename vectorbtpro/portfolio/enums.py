@@ -2078,7 +2078,7 @@ __pdoc__[
 Has range `[0, target_shape[1])` and is always within `[from_col, to_col)`."""
 __pdoc__["SignalContext.position_now"] = "Latest position."
 __pdoc__["SignalContext.val_price_now"] = "Latest valuation price."
-__pdoc__["SignalContext.flex_2d"] = "See `vectorbtpro.base.indexing.flex_select_auto_nb`."
+__pdoc__["SignalContext.flex_2d"] = "Whether flexible 1-dim arrays are considered per column in 2-dim regime."
 
 
 # ############# In-outputs ############# #

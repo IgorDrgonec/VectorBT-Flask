@@ -122,46 +122,46 @@ class SignalFactory(IndicatorFactory):
                     exit_trace_kwargs,
                 )
             if mode == FactoryMode.Entries:
-                fig = self_col.entries.vbt.signals.plot_as_entry_markers(
+                fig = self_col.entries.vbt.signals.plot_as_entries(
                     y=entry_y,
                     trace_kwargs=entry_trace_kwargs,
                     fig=fig,
                     **kwargs,
                 )
             elif mode == FactoryMode.Exits:
-                fig = self_col.entries.vbt.signals.plot_as_entry_markers(
+                fig = self_col.entries.vbt.signals.plot_as_entries(
                     y=entry_y,
                     trace_kwargs=entry_trace_kwargs,
                     fig=fig,
                     **kwargs,
                 )
-                fig = self_col.exits.vbt.signals.plot_as_exit_markers(
+                fig = self_col.exits.vbt.signals.plot_as_exits(
                     y=exit_y,
                     trace_kwargs=exit_trace_kwargs,
                     fig=fig,
                     **kwargs,
                 )
             elif mode == FactoryMode.Both:
-                fig = self_col.entries.vbt.signals.plot_as_entry_markers(
+                fig = self_col.entries.vbt.signals.plot_as_entries(
                     y=entry_y,
                     trace_kwargs=entry_trace_kwargs,
                     fig=fig,
                     **kwargs,
                 )
-                fig = self_col.exits.vbt.signals.plot_as_exit_markers(
+                fig = self_col.exits.vbt.signals.plot_as_exits(
                     y=exit_y,
                     trace_kwargs=exit_trace_kwargs,
                     fig=fig,
                     **kwargs,
                 )
             else:
-                fig = self_col.new_entries.vbt.signals.plot_as_entry_markers(
+                fig = self_col.new_entries.vbt.signals.plot_as_entries(
                     y=entry_y,
                     trace_kwargs=entry_trace_kwargs,
                     fig=fig,
                     **kwargs,
                 )
-                fig = self_col.exits.vbt.signals.plot_as_exit_markers(
+                fig = self_col.exits.vbt.signals.plot_as_exits(
                     y=exit_y,
                     trace_kwargs=exit_trace_kwargs,
                     fig=fig,
@@ -178,9 +178,9 @@ class SignalFactory(IndicatorFactory):
             entry_types (array_like): Entry types in string format.
             exit_types (array_like): Exit types in string format.
             entry_trace_kwargs (dict): Keyword arguments passed to
-                `vectorbtpro.signals.accessors.SignalsSRAccessor.plot_as_entry_markers` for `{0}.{1}`.
+                `vectorbtpro.signals.accessors.SignalsSRAccessor.plot_as_entries` for `{0}.{1}`.
             exit_trace_kwargs (dict): Keyword arguments passed to 
-                `vectorbtpro.signals.accessors.SignalsSRAccessor.plot_as_exit_markers` for `{0}.exits`.
+                `vectorbtpro.signals.accessors.SignalsSRAccessor.plot_as_exits` for `{0}.exits`.
             fig (Figure or FigureWidget): Figure to add traces to.
             **kwargs: Keyword arguments passed to `vectorbtpro.signals.accessors.SignalsSRAccessor.plot_as_markers`.
         """.format(

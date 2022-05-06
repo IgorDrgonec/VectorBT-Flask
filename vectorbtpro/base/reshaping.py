@@ -117,6 +117,7 @@ def to_1d(arg: tp.ArrayLike, raw: bool = False) -> tp.AnyArray1d:
 
 
 to_1d_array = functools.partial(to_1d, raw=True)
+"""`to_1d` with `raw` enabled."""
 
 
 def to_2d(arg: tp.ArrayLike, raw: bool = False, expand_axis: int = 1) -> tp.AnyArray2d:
@@ -140,6 +141,13 @@ def to_2d(arg: tp.ArrayLike, raw: bool = False, expand_axis: int = 1) -> tp.AnyA
 
 
 to_2d_array = functools.partial(to_2d, raw=True)
+"""`to_2d` with `raw` enabled."""
+
+to_per_row_array = functools.partial(to_2d_array, expand_axis=1)
+"""`to_2d_array` with `expand_axis=1`."""
+
+to_per_col_array = functools.partial(to_2d_array, expand_axis=0)
+"""`to_2d_array` with `expand_axis=0`."""
 
 
 def to_dict(arg: tp.ArrayLike, orient: str = "dict") -> dict:

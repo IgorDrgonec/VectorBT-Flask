@@ -272,46 +272,86 @@ def generate_enex_nb(
     return entries, exits
 
 
-# ############# Filtering ############# #
+# ############# Cleaning ############# #
 
 
 @register_jitted(cache=True)
-def clean_enex_1d_nb(entries: tp.Array1d, exits: tp.Array1d, entry_first: bool) -> tp.Tuple[tp.Array1d, tp.Array1d]:
+def clean_enex_1d_nb(
+    entries: tp.Array1d,
+    exits: tp.Array1d,
+    force_first: bool = True,
+    keep_conflicts: bool = False,
+    reverse_order: bool = False,
+) -> tp.Tuple[tp.Array1d, tp.Array1d]:
     """Clean entry and exit arrays by picking the first signal out of each.
 
-    Entry signal must be picked first. If both signals are present, selects none."""
+    Set `force_first` to True to force placing the first entry/exit before the first exit/entry.
+    Set `keep_conflicts` to True to process signals at the same timestamp sequentially instead of removing them.
+    Set `reverse_order` to True to reverse the order of signals."""
     entries_out = np.full(entries.shape, False, dtype=np.bool_)
     exits_out = np.full(exits.shape, False, dtype=np.bool_)
+
+    def _process_entry(i, phase):
+        if ((not force_first or not reverse_order) and phase == -1) or phase == 1:
+            phase = 0
+            entries_out[i] = True
+        return phase
+
+    def _process_exit(i, phase):
+        if ((not force_first or reverse_order) and phase == -1) or phase == 0:
+            phase = 1
+            exits_out[i] = True
+        return phase
 
     phase = -1
     for i in range(entries.shape[0]):
         if entries[i] and exits[i]:
-            continue
-        if entries[i]:
-            if phase == -1 or phase == 0:
-                phase = 1
-                entries_out[i] = True
-        if exits[i]:
-            if (not entry_first and phase == -1) or phase == 1:
-                phase = 0
-                exits_out[i] = True
+            if keep_conflicts:
+                if not reverse_order:
+                    phase = _process_entry(i, phase)
+                    phase = _process_exit(i, phase)
+                else:
+                    phase = _process_exit(i, phase)
+                    phase = _process_entry(i, phase)
+        elif entries[i]:
+            phase = _process_entry(i, phase)
+        elif exits[i]:
+            phase = _process_exit(i, phase)
 
     return entries_out, exits_out
 
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="entries", axis=1),
-    arg_take_spec=dict(entries=ch.ArraySlicer(axis=1), exits=ch.ArraySlicer(axis=1), entry_first=None),
+    arg_take_spec=dict(
+        entries=ch.ArraySlicer(axis=1),
+        exits=ch.ArraySlicer(axis=1),
+        force_first=None,
+        keep_conflicts=None,
+        reverse_order=None,
+    ),
     merge_func=base_ch.column_stack,
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def clean_enex_nb(entries: tp.Array2d, exits: tp.Array2d, entry_first: bool) -> tp.Tuple[tp.Array2d, tp.Array2d]:
+def clean_enex_nb(
+    entries: tp.Array2d,
+    exits: tp.Array2d,
+    force_first: bool = True,
+    keep_conflicts: bool = False,
+    reverse_order: bool = False,
+) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """2-dim version of `clean_enex_1d_nb`."""
     entries_out = np.empty(entries.shape, dtype=np.bool_)
     exits_out = np.empty(exits.shape, dtype=np.bool_)
 
     for col in prange(entries.shape[1]):
-        entries_out[:, col], exits_out[:, col] = clean_enex_1d_nb(entries[:, col], exits[:, col], entry_first)
+        entries_out[:, col], exits_out[:, col] = clean_enex_1d_nb(
+            entries[:, col],
+            exits[:, col],
+            force_first=force_first,
+            keep_conflicts=keep_conflicts,
+            reverse_order=reverse_order,
+        )
     return entries_out, exits_out
 
 
@@ -1029,80 +1069,111 @@ def rank_nb(
     reset_by_mask: tp.Optional[tp.Array2d],
     after_false: bool,
     after_reset: bool,
+    reset_wait: int,
     rank_func_nb: tp.RankFunc,
     *args,
 ) -> tp.Array2d:
     """Rank each signal using `rank_func_nb`.
 
-    Applies `rank_func_nb` on each True value. Must accept the row index, the column index,
-    index of the last reset signal, index of the end of the previous partition,
-    index of the start of the current partition, and `*args`.
-    Must return -1 for no rank, otherwise 0 or greater.
+    Applies `rank_func_nb` on each True value. Must accept a context of type
+    `vectorbtpro.signals.enums.RankContext`. Must return -1 for no rank, otherwise 0 or greater.
 
     Setting `after_false` to True will disregard the first partition of True values
     if there is no False value before them. Setting `after_reset` to True will disregard
-    the first partition of True values coming before the first reset signal."""
+    the first partition of True values coming before the first reset signal. Setting `reset_wait`
+    to 0 will treat the signal at the same position as the reset signal as the first signal in
+    the next partition. Setting it to 1 will treat it as the last signal in the previous partition."""
     out = np.full(mask.shape, -1, dtype=np.int_)
 
     for col in prange(mask.shape[1]):
-        reset_i = 0
-        prev_part_end_i = -1
-        part_start_i = -1
         in_partition = False
         false_seen = not after_false
         reset_seen = reset_by_mask is None
+        last_false_i = -1
+        last_reset_i = -1
+        all_sig_cnt = 0
+        all_part_cnt = 0
+        all_sig_in_part_cnt = 0
+        nonres_sig_cnt = 0
+        nonres_part_cnt = 0
+        nonres_sig_in_part_cnt = 0
+        sig_cnt = 0
+        part_cnt = 0
+        sig_in_part_cnt = 0
+
         for i in range(mask.shape[0]):
-            if reset_by_mask is not None:
-                if reset_by_mask[i, col]:
-                    reset_i = i
-                    reset_seen = True
-            if mask[i, col] and not (after_false and not false_seen) and not (after_reset and not reset_seen):
-                if not in_partition:
-                    part_start_i = i
-                in_partition = True
-                out[i, col] = rank_func_nb(i, col, reset_i, prev_part_end_i, part_start_i, *args)
-            elif not mask[i, col]:
-                if in_partition:
-                    prev_part_end_i = i - 1
+            if reset_by_mask is not None and reset_by_mask[i, col]:
+                last_reset_i = i
+            if last_reset_i > -1 and i - last_reset_i == reset_wait:
+                reset_seen = True
+                sig_cnt = 0
+                part_cnt = 0
+                sig_in_part_cnt = 0
+            if mask[i, col]:
+                all_sig_cnt += 1
+                if i == 0 or not mask[i - 1, col]:
+                    all_part_cnt += 1
+                all_sig_in_part_cnt += 1
+                if not (after_false and not false_seen) and not (after_reset and not reset_seen):
+                    nonres_sig_cnt += 1
+                    sig_cnt += 1
+                    if not in_partition:
+                        nonres_part_cnt += 1
+                        part_cnt += 1
+                    elif last_reset_i > -1 and i - last_reset_i == reset_wait:
+                        part_cnt += 1
+                    nonres_sig_in_part_cnt += 1
+                    sig_in_part_cnt += 1
+                    in_partition = True
+                    c = RankContext(
+                        mask=mask,
+                        reset_by_mask=reset_by_mask,
+                        after_false=after_false,
+                        after_reset=after_reset,
+                        reset_wait=reset_wait,
+                        col=col,
+                        i=i,
+                        last_false_i=last_false_i,
+                        last_reset_i=last_reset_i,
+                        all_sig_cnt=all_sig_cnt,
+                        all_part_cnt=all_part_cnt,
+                        all_sig_in_part_cnt=all_sig_in_part_cnt,
+                        nonres_sig_cnt=nonres_sig_cnt,
+                        nonres_part_cnt=nonres_part_cnt,
+                        nonres_sig_in_part_cnt=nonres_sig_in_part_cnt,
+                        sig_cnt=sig_cnt,
+                        part_cnt=part_cnt,
+                        sig_in_part_cnt=sig_in_part_cnt,
+                    )
+                    out[i, col] = rank_func_nb(c, *args)
+            else:
+                all_sig_in_part_cnt = 0
+                nonres_sig_in_part_cnt = 0
+                sig_in_part_cnt = 0
+                last_false_i = i
                 in_partition = False
                 false_seen = True
+
     return out
 
 
 @register_jitted(cache=True)
-def sig_pos_rank_nb(
-    i: int,
-    col: int,
-    reset_i: int,
-    prev_part_end_i: int,
-    part_start_i: int,
-    sig_pos_temp: tp.Array1d,
-    allow_gaps: bool,
-) -> int:
-    """`rank_func_nb` that returns the rank of each signal by its position in the partition."""
-    if reset_i > prev_part_end_i and max(reset_i, part_start_i) == i:
-        sig_pos_temp[col] = -1
-    elif not allow_gaps and part_start_i == i:
-        sig_pos_temp[col] = -1
-    sig_pos_temp[col] += 1
-    return sig_pos_temp[col]
+def sig_pos_rank_nb(c: RankContext, allow_gaps: bool) -> int:
+    """`rank_func_nb` that returns the rank of each signal by its position in the partition
+    if `allow_gaps` is False, otherwise globally.
+
+    Resets at each reset signal."""
+    if allow_gaps:
+        return c.sig_cnt - 1
+    return c.sig_in_part_cnt - 1
 
 
 @register_jitted(cache=True)
-def part_pos_rank_nb(
-    i: int,
-    col: int,
-    reset_i: int,
-    prev_part_end_i: int,
-    part_start_i: int,
-    part_pos_temp: tp.Array1d,
-) -> int:
-    """`rank_func_nb` that returns the rank of each partition by its position in the series."""
-    if reset_i > prev_part_end_i and max(reset_i, part_start_i) == i:
-        part_pos_temp[col] = 0
-    elif part_start_i == i:
-        part_pos_temp[col] += 1
-    return part_pos_temp[col]
+def part_pos_rank_nb(c: RankContext) -> int:
+    """`rank_func_nb` that returns the rank of each partition by its position in the series.
+
+    Resets at each reset signal."""
+    return c.part_cnt - 1
 
 
 # ############# Index ############# #
