@@ -4,6 +4,7 @@
 
 import dateparser
 import warnings
+from datetime import time
 
 import numpy as np
 import pandas as pd
@@ -19,7 +20,7 @@ from vectorbtpro.base.indexes import repeat_index
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import AttrResolverMixin, AttrResolverMixinT
 from vectorbtpro.utils.config import Configured, merge_dicts, resolve_dict
-from vectorbtpro.utils.datetime_ import infer_index_freq, try_to_datetime_index
+from vectorbtpro.utils.datetime_ import infer_index_freq, try_to_datetime_index, time_to_timedelta
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.decorators import class_or_instancemethod
 
@@ -744,6 +745,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         self,
         every: tp.Optional[tp.FrequencyLike] = None,
         normalize_every: bool = False,
+        at_time: tp.Optional[tp.TimeLike] = None,
         start: tp.Optional[tp.Union[int, tp.DatetimeLike]] = None,
         end: tp.Optional[tp.Union[int, tp.DatetimeLike]] = None,
         exact_start: bool = False,
@@ -758,6 +760,10 @@ class ArrayWrapper(Configured, PandasIndexer):
         !!! note
             `start` and `end` are both inclusive if provided as dates or used in `pd.date_range`.
             Otherwise, only `start` is inclusive.
+
+            If `at_time` is not None, the resulting `on` index will be floored to a daily index
+            and `at_time` will be converted to a timedelta and added to `add_delta`.
+            Also, if `every` and `on` are both None, `every` will be set to "D".
 
         Usage:
             * Provide nothing to generate at the beginning:
@@ -847,6 +853,8 @@ class ArrayWrapper(Configured, PandasIndexer):
 
         start_used = False
         end_used = False
+        if at_time is not None and every is None and on is None:
+            every = "D"
         if every is not None:
             start_used = True
             end_used = True
@@ -908,6 +916,15 @@ class ArrayWrapper(Configured, PandasIndexer):
                     on = 0
         on = try_to_datetime_index(on)
 
+        if at_time is not None:
+            checks.assert_instance_of(on, pd.DatetimeIndex)
+            on = on.floor("D")
+            add_time_delta = time_to_timedelta(at_time)
+            if add_delta is None:
+                add_delta = add_time_delta
+            else:
+                add_delta += add_time_delta
+
         if add_delta is not None:
             if isinstance(add_delta, str):
                 try:
@@ -946,6 +963,9 @@ class ArrayWrapper(Configured, PandasIndexer):
         self,
         every: tp.Optional[tp.FrequencyLike] = None,
         normalize_every: bool = False,
+        split_every: bool = True,
+        start_time: tp.Optional[tp.TimeLike] = None,
+        end_time: tp.Optional[tp.TimeLike] = None,
         lookback_period: tp.Optional[tp.FrequencyLike] = None,
         start: tp.Optional[tp.Union[int, tp.DatetimeLike, tp.IndexLike]] = None,
         end: tp.Optional[tp.Union[int, tp.DatetimeLike, tp.IndexLike]] = None,
@@ -1120,7 +1140,24 @@ class ArrayWrapper(Configured, PandasIndexer):
         if exact_start and lookback_period is not None:
             raise ValueError("Cannot use exact_start and lookback_period together")
 
+        if start_time is not None or end_time is not None:
+            if every is None and start is None and end is None:
+                every = "D"
         if every is not None:
+            if not fixed_start:
+                if start_time is None and end_time is not None:
+                    start_time = time(0, 0, 0, 0)
+                    closed_start = True
+                if start_time is not None and end_time is None:
+                    end_time = time(0, 0, 0, 0)
+                    if add_end_delta is None:
+                        add_end_delta = pd.Timedelta(days=1)
+                    else:
+                        add_end_delta += pd.Timedelta(days=1)
+                    closed_end = False
+            if start_time is not None and end_time is not None and not fixed_start:
+                split_every = False
+
             if isinstance(every, int):
                 if start is None:
                     start = 0
@@ -1130,11 +1167,14 @@ class ArrayWrapper(Configured, PandasIndexer):
                     end -= 1
                 if lookback_period is None:
                     new_index = np.arange(start, end + 1, every)
-                    if fixed_start:
-                        start = np.full(len(new_index) - 1, new_index[0])
+                    if not split_every:
+                        start = end = new_index
                     else:
-                        start = new_index[:-1]
-                    end = new_index[1:]
+                        if fixed_start:
+                            start = np.full(len(new_index) - 1, new_index[0])
+                        else:
+                            start = new_index[:-1]
+                        end = new_index[1:]
                 else:
                     end = np.arange(start + lookback_period, end + 1, every)
                     start = end - lookback_period
@@ -1163,11 +1203,14 @@ class ArrayWrapper(Configured, PandasIndexer):
                     )
                     if exact_start and new_index[0] > start_date:
                         new_index = new_index.insert(0, start_date)
-                    if fixed_start:
-                        start = repeat_index(new_index[[0]], len(new_index) - 1)
+                    if not split_every:
+                        start = end = new_index
                     else:
-                        start = new_index[:-1]
-                    end = new_index[1:]
+                        if fixed_start:
+                            start = repeat_index(new_index[[0]], len(new_index) - 1)
+                        else:
+                            start = new_index[:-1]
+                        end = new_index[1:]
                 else:
                     if isinstance(lookback_period, int):
                         lookback_period *= self.any_freq
@@ -1223,6 +1266,23 @@ class ArrayWrapper(Configured, PandasIndexer):
         elif len(start) > 1 and len(end) == 1:
             end = repeat_index(end, len(start))
         checks.assert_len_equal(start, end)
+
+        if start_time is not None:
+            checks.assert_instance_of(start, pd.DatetimeIndex)
+            start = start.floor("D")
+            add_start_time_delta = time_to_timedelta(start_time)
+            if add_start_delta is None:
+                add_start_delta = add_start_time_delta
+            else:
+                add_start_delta += add_start_time_delta
+        if end_time is not None:
+            checks.assert_instance_of(end, pd.DatetimeIndex)
+            end = end.floor("D")
+            add_end_time_delta = time_to_timedelta(end_time)
+            if add_end_delta is None:
+                add_end_delta = add_end_time_delta
+            else:
+                add_end_delta += add_end_time_delta
 
         if add_start_delta is not None:
             if isinstance(add_start_delta, str):
@@ -1289,6 +1349,9 @@ class ArrayWrapper(Configured, PandasIndexer):
             index_ranges = np.column_stack((start, end))
             if skip_minus_one:
                 index_ranges = index_ranges[(index_ranges != -1).all(axis=1)]
+
+        if np.any(index_ranges[:, 0] >= index_ranges[:, 1]):
+            raise ValueError("Some start indices are higher than end indices")
 
         return index_ranges
 

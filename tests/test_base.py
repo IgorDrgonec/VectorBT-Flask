@@ -1315,6 +1315,14 @@ class TestArrayWrapper:
             wrapper.get_index_ranges(every="5h", lookback_period=4),
             np.array([[0, 4], [2, 6], [4, 8], [5, 9], [7, 11], [9, 13], [10, 14], [12, 16]]),
         )
+        np.testing.assert_array_equal(
+            wrapper.get_index_ranges(start_time="12:00"),
+            np.array([[4, 8], [12, 16]]),
+        )
+        np.testing.assert_array_equal(
+            wrapper.get_index_ranges(start_time="12:00", end_time="15:00"),
+            np.array([[4, 5], [12, 13]]),
+        )
 
         np.testing.assert_array_equal(wrapper.get_index_ranges(), np.array([[0, 17]]))
         np.testing.assert_array_equal(wrapper.get_index_ranges(start=5), np.array([[5, 17]]))
@@ -1455,6 +1463,9 @@ class TestArrayWrapper:
             wrapper.get_index_points(every="5h", start="2020-01-01 15:00:00", end="2020-01-02 12:00:00"),
             np.array([5, 7, 9, 10, 12]),
         )
+        np.testing.assert_array_equal(
+            wrapper.get_index_points(at_time="12:00"), np.array([4, 12])
+        )
 
         np.testing.assert_array_equal(wrapper.get_index_points(), np.array([0]))
         np.testing.assert_array_equal(wrapper.get_index_points(start=5), np.array([5]))
@@ -1502,6 +1513,9 @@ class TestArrayWrapper:
         )
 
         np.testing.assert_array_equal(wrapper.get_index_points(on=[5, 10]), np.array([5, 10]))
+        np.testing.assert_array_equal(wrapper.get_index_points(
+            on=wrapper.index[[5, 10]], at_time="12:00"), np.array([4, 12])
+        )
         np.testing.assert_array_equal(
             wrapper.get_index_points(on=[wrapper.index[5], wrapper.index[10]]), np.array([5, 10])
         )
@@ -1594,8 +1608,8 @@ class TestIndexFns:
             pass
 
         assert_index_equal(
-            indexes.index_from_values([A(), B(), C()], name="c"),
-            pd.Index(["A_0", "B_1", "C_2"], dtype="object", name="c"),
+            indexes.index_from_values([A(), B(), B(), C()], name="c"),
+            pd.Index(["A_0", "B_0", "B_1", "C_0"], dtype="object", name="c"),
         )
 
     def test_repeat_index(self):
