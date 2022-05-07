@@ -19,10 +19,10 @@ the simulation.
 
 [Portfolio.from_orders](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_orders)
 is the most basic method out of three: it doesn't take any UDFs, and allows us to provide every bit 
-of information on orders as separate, broadcastable arrays. Literally **each** element across all the 
+of information on orders as separate, broadcastable arrays. Literally __each__ element across all the 
 passed arrays will be converted into an instance of [Order](/api/portfolio/enums/#vectorbtpro.portfolio.enums.Order) 
 and processed as usual. Since the number of orders is limited by the number of elements in the passed arrays, 
-we can issue only one order per timestamp and asset.
+we can issue __and execute__ only one order per timestamp and asset.
 
 For example, passing `[0.1, -0.1, np.nan]` as the order size array and `[11, 10, 12]` as the order price 
 array will generate three orders at three subsequent timestamps:
@@ -123,7 +123,7 @@ Here's a basic helper function to pretty-print order records:
 1         1       0          1   0.1   10.0   0.0  Sell
 ```
 
-To apply any information on **every** element, provide a constant wrapped with a NumPy array:
+To apply any information on __every__ element, provide a constant wrapped with a NumPy array:
 
 ```pycon
 >>> sim_out = pf_nb.simulate_from_orders_nb(
@@ -910,7 +910,7 @@ To enable automatic parallelization:
 The same goes for chunking: each simulation function is registered as a chunkable function in 
 [ChunkableRegistry](/api/registries/ch_registry/#vectorbtpro.registries.ch_registry.ChunkableRegistry)
 and all arguments in [simulate_from_orders_nb](/api/portfolio/nb/from_orders/#vectorbtpro.portfolio.nb.from_orders.simulate_from_orders_nb)
-are perfectly chunkable across **groups** (not rows or columns!). But since Numba-compiled functions are meant 
+are perfectly chunkable across __groups__ (not rows or columns!). But since Numba-compiled functions are meant 
 to be used by other Numba-compiled functions and Numba can't take regular Python functions, they 
 haven't been decorated with the [chunked](/api/utils/chunking/#vectorbtpro.utils.chunking.chunked) 
 decorator just yet. To decorate, we need to explicitly tell the registry to do so:
@@ -1221,7 +1221,7 @@ size        short   nan  long
 But thanks to flexible indexing, we don't have to bring each argument to the full shape and materialize it. 
 That's why, to avoid high memory consumption, each simulation method also passes `keep_flex=True` to the 
 broadcaster to keep all arguments in their original form suitable for flexible indexing. For them, 
-the broadcaster will only check whether they **can broadcast** to the final shape. Since we not only
+the broadcaster will only check whether they __can broadcast__ to the final shape. Since we not only
 broadcast NumPy arrays but also Pandas objects as well, we need to return the wrapper resulting
 from the broadcasting operation, which will contain the final shape and Pandas metadata including 
 the index and columns:
@@ -1610,7 +1610,7 @@ pass the column level `symbol` as `group_by` because it will group by asset, tha
 the columns with `BTC-USD`, such as `(Open, BTC-USD)` and `(Close, BTC-USD)`, into one group and 
 the columns with `ETH-USD` into another. What we need though is to put `(Open, BTC-USD)` and `(Open, ETH-USD)`
 into one group and `(Close, BTC-USD)` and `(Close, ETH-USD)` into another; that is, we need to pass all the
-column levels **apart from symbols** as `group_by`, which can be done in multiple ways:
+column levels __apart from symbols__ as `group_by`, which can be done in multiple ways:
 
 ```pycon
 >>> pf = vbt.Portfolio.from_orders(
@@ -1711,7 +1711,7 @@ rebalancing. Let's create an equally-weighted portfolio that is being rebalanced
 
 1. Plot how much each asset contributes to the portfolio value
 
-![](/assets/images/call_seq_auto.svg)
+![](/assets/images/from_orders_call_seq.svg)
 
 !!! hint
     By the way, this is exactly the way 
@@ -1962,7 +1962,8 @@ Below, we do the same benchmark as above but now using Dask:
 ### Use cases
 
 This method is best suited for backtesting jobs where order information is known beforehand
-and there is no order that changes its parameters depending on changes in the simulation state. 
+and there is no order that changes its parameters depending on changes in the environment.
+That is, we cannot implement SL, TP, limit, or any other complex order type using this method.
 It's really just a smart way of representing multiple instances of 
 [Order](/api/portfolio/enums/#vectorbtpro.portfolio.enums.Order) in a vectorized and resource-cheap way - 
 imagine how difficult it would be to supply a list of named tuples instead of arrays! There
@@ -2106,7 +2107,7 @@ to resample the trade price
 12. Filled orders have the same information as our trades
 13. Plot the portfolio
 
-![](/assets/images/solbtc_pf_plot.svg)
+![](/assets/images/from_orders_pf_plot.svg)
 
 We can now change the `size`, `price`, and `fixed_fees` arrays to our liking and re-run the simulation to 
 see how the performance of our trading strategy has been affected :dna:

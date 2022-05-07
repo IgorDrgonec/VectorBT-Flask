@@ -594,7 +594,7 @@ time series to another time series of the same timeframe. But this may not hold 
 time series types, such as signals: repeating the same signal over and over again may give a distorted 
 view of the original timeframe, especially when upsampling. To place each value only once, we can use 
 the argument `ffill`. For example, let's upsample a 5min mask with 3 entries to a 1min mask with 15 entries,
-without and with forward filling:
+without and with forward filling. We'll assume that the 5min mask itself was generated using the close price:
 
 ```pycon
 >>> min5_index = pd.date_range(start="2020", freq="5T", periods=3)
@@ -748,9 +748,9 @@ Finally, as usually, compare the new time series to produce entries and exits:
 >>> def plot_date_range(date_range):
 ...     fig = h4_sma[date_range].rename("H4").vbt.plot()
 ...     d1_h4_sma[date_range].rename("D1_H4").vbt.plot(fig=fig)
-...     entries[date_range].rename("Entry").vbt.signals.plot_as_entry_markers(
+...     entries[date_range].rename("Entry").vbt.signals.plot_as_entries(
 ...         y=h4_sma[date_range], fig=fig)
-...     exits[date_range].rename("Exit").vbt.signals.plot_as_exit_markers(
+...     exits[date_range].rename("Exit").vbt.signals.plot_as_exits(
 ...         y=h4_sma[date_range], fig=fig)
 ...     return fig
 

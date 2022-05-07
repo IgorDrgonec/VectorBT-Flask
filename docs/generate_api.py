@@ -15,7 +15,7 @@ def get_icon(module):
     elif module.name == 'vectorbtpro.generic':
         icon = 'material/matrix'
     elif module.name == 'vectorbtpro.signals':
-        icon = 'material/ray-vertex'
+        icon = 'material/broadcast'
     elif module.name == 'vectorbtpro.labels':
         icon = 'material/label-multiple-outline'
     elif module.name == 'vectorbtpro._settings':

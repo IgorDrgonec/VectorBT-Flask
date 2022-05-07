@@ -107,3 +107,10 @@ You can cancel your sponsorship anytime.[^2]
     All charges are processed by GitHub through Stripe. As we don't receive any 
     information regarding your payment, and GitHub doesn't offer refunds, 
     sponsorships are non-refundable.
+
+## Paid sessions
+
+Have difficulties getting started or implementing your project? Contact chad@greyhoundanalytics.com - 
+he's offering professional help to organizations and individuals alike. You can also visit his YouTube 
+channel ([here](https://www.youtube.com/c/ChadThackray/videos)) and the company website 
+([here](https://greyhoundanalytics.com/)) to learn more about his work.

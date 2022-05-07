@@ -229,16 +229,16 @@ did everything right:
 ```pycon
 >>> def plot_rsi(rsi, entries, exits):
 ...     fig = rsi.plot()  # (1)!
-...     entries.vbt.signals.plot_as_entry_markers(rsi.rsi, fig=fig)  # (2)!
-...     exits.vbt.signals.plot_as_exit_markers(rsi.rsi, fig=fig)  # (3)!
+...     entries.vbt.signals.plot_as_entries(rsi.rsi, fig=fig)  # (2)!
+...     exits.vbt.signals.plot_as_exits(rsi.rsi, fig=fig)  # (3)!
 ...     return fig
 
 >>> plot_rsi(rsi, entries, exits)
 ```
 
 1. Using [RSI.plot](/api/indicators/custom/#vectorbtpro.indicators.custom.RSI.plot)
-2. Using [SignalsSRAccessor.plot_as_entry_markers](/api/signals/accessors/#vectorbtpro.signals.accessors.SignalsSRAccessor.plot_as_entry_markers)
-3. Using [SignalsSRAccessor.plot_as_exit_markers](/api/signals/accessors/#vectorbtpro.signals.accessors.SignalsSRAccessor.plot_as_exit_markers)
+2. Using [SignalsSRAccessor.plot_as_entries](/api/signals/accessors/#vectorbtpro.signals.accessors.SignalsSRAccessor.plot_as_entries)
+3. Using [SignalsSRAccessor.plot_as_exits](/api/signals/accessors/#vectorbtpro.signals.accessors.SignalsSRAccessor.plot_as_exits)
 
 ![](/assets/images/tutorials/rsi_rsi.svg)
 
