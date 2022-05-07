@@ -355,7 +355,7 @@ and the generated signals using [SignalsSRAccessor.plot_as_markers](/api/signals
 2. First plotting method returns a figure, which needs to be passed to each subsequent plotting method
 3. We're using `btc_low` as the Y-values at which to place the markers
 
-![](/assets/images/from_signals_crossovers.svg)
+![](/assets/images/signal_dev_crossovers.svg)
 
 !!! hint
     To wait for a confirmation, use [SignalsAccessor.nth](/api/signals/accessors/#vectorbtpro.signals.accessors.SignalsAccessor.nth)
@@ -956,7 +956,7 @@ and forward fill them.
 to map the mask values to their windows, and aggregate each window using the "any" operation
 6. Make both bounds inclusive to include every single timestamp in a month
 
-![](/assets/images/from_signals_ts_heatmap.svg)
+![](/assets/images/signal_dev_ts_heatmap.svg)
 
 We can observe how the signal for the bandwidth touching the 10% mark propagates through each month,
 and then the calculation gets reset and repeated.
@@ -1764,7 +1764,7 @@ using the attached `plot` method, which knows how to visualize each mode:
 >>> entry_generator.plot(column=(2, 0, "BTCUSDT"))
 ```
 
-![](/assets/images/from_signals_signal_factory.svg)
+![](/assets/images/signal_dev_signal_factory.svg)
 
 #### Exits
 
@@ -2115,7 +2115,7 @@ names by their broadcasted arrays
 10. Plot the OHLC price data, entries, and exits. 
 Make the OHLC graph more transparent to make the signals clearly visible.
 
-![](/assets/images/from_signals_both.svg)
+![](/assets/images/signal_dev_both.svg)
 
 To parametrize this logic, we need to use the mode `FactoryMode.Both`. And because our functions
 require input arrays that broadcast against the input shape, vectorbt won't ask us to provide the input shape 
@@ -2159,7 +2159,7 @@ but rather determine it from the input arrays automatically:
 ... )
 ```
 
-![](/assets/images/from_signals_both2.svg)
+![](/assets/images/signal_dev_both2.svg)
 
 #### Chain exits
 
@@ -2410,7 +2410,7 @@ the array to two dimensions such that each value corresponds to a row rather tha
 to hide the parameter.
 4. Plot the final distribution
 
-![](/assets/images/from_signals_rprob.svg)
+![](/assets/images/signal_dev_rprob.svg)
 
 To test multiple values, we can provide them as a list. Let's prove that the fixed probability
 of 50% yields the same number of signals on average as the one ranging from 0% to 100%
@@ -2534,7 +2534,7 @@ the first signal at the entry bar by making `wait` zero:
 ...     entry_y="entry_ts",  # (5)!
 ...     exit_y="stop_ts", 
 ...     fig=fig
-... ).show_svg()
+... )
 ```
 
 1. Indicators usually assume that we're interested in all optional arrays, so we don't need to 
@@ -2544,7 +2544,7 @@ pass anything. If you're not interested though, pass `stop_ts=None` to free up a
 4. Waiting time of zero should only be specified when the entry price is the open price!
 5. When plotting, we can provide `y` as an attribute of the indicator instance
 
-![](/assets/images/from_signals_stcx.svg)
+![](/assets/images/signal_dev_stcx.svg)
 
 !!! note
     Waiting time cannot be higher than 1. If waiting time is 0, `entry_ts` should be the first 
@@ -2590,7 +2590,7 @@ of 10% and 15% respectively:
 4. Entry price is the close price. Enable this flag if the entry price is the open price.
 5. The indicator instance plots the candlestick data automatically!
 
-![](/assets/images/from_signals_ohlcstcx.svg)
+![](/assets/images/signal_dev_ohlcstcx.svg)
 
 Keep in mind that we don't have intra-candle data. If there was a huge price fluctuation in 
 both directions, we wouldn't be able to determine whether SL was triggered before TP and vice versa. 
@@ -2660,7 +2660,7 @@ For example, let's run the same as above but specify the entry price only:
 >>> ohlcstcx.plot(column=("BTCUSDT"))
 ```
 
-![](/assets/images/from_signals_ohlcstcx2.svg)
+![](/assets/images/signal_dev_ohlcstcx2.svg)
 
 The same flexibility goes for parameters: similarly to the behavior of the probability parameter 
 in random signal generators, we can pass each parameter as an array, such as one element per row, 
@@ -2695,7 +2695,7 @@ Those will become our short entries.
 and a trailing stop loss (`ttp_stop`) that becomes enabled once the threshold has been crossed
 4. Short entry mask becomes our reversal mask
 
-![](/assets/images/from_signals_ohlcstcx3.svg)
+![](/assets/images/signal_dev_ohlcstcx3.svg)
 
 We can then split both final arrays into four direction-aware arrays for simulation:
 
@@ -2739,7 +2739,7 @@ long signals by inverting the short array and combining it with the new entry ar
 there are no other entries in-between, thus we can use [SignalsAccessor.first_after](/api/signals/accessors/#vectorbtpro.signals.accessors.SignalsAccessor.first_after)
 for this job
 
-![](/assets/images/from_signals_ohlcstcx4.svg)
+![](/assets/images/signal_dev_ohlcstcx4.svg)
 
 Seems like all trades are winning, thanks to a range-bound but still volatile market :four_leaf_clover:
 
@@ -3126,7 +3126,7 @@ Let's visualize the selected signals:
 ...     trace_kwargs=dict(name="New exits"))
 ```
 
-![](/assets/images/from_signals_cleaning.svg)
+![](/assets/images/signal_dev_cleaning.svg)
 
 !!! hint
     To allow having the first exit signal before the first entry signal, pass `after_reset=False`.
