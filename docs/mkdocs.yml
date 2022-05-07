@@ -278,6 +278,7 @@ nav:
       - colors: api/utils/colors.md
       - config: api/utils/config.md
       - datetime_: api/utils/datetime_.md
+      - datetime_nb: api/utils/datetime_nb.md
       - decorators: api/utils/decorators.md
       - enum_: api/utils/enum_.md
       - eval_: api/utils/eval_.md

@@ -893,7 +893,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         and `vectorbtpro.generic.nb.apply_reduce.rolling_freq_reduce_nb` for frequency windows.
 
         For details on the meta version, see `vectorbtpro.generic.nb.apply_reduce.rolling_reduce_meta_nb`
-        for integer windows and `vectorbtpro.generic.nb.apply_reduce.rolling_reduce_freq_meta_nb` for
+        for integer windows and `vectorbtpro.generic.nb.apply_reduce.rolling_freq_reduce_meta_nb` for
         frequency windows.
 
         If `window` is None, it will become an expanding window.
