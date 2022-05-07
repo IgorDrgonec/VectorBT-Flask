@@ -1085,7 +1085,36 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             _kwargs = self.select_symbol_kwargs(k, kwargs)
             v.to_hdf(path_or_buf=_path_or_buf, key=_key, **_kwargs)
 
-    # ############# Resampling ############# #
+    # ############# Transforming ############# #
+
+    def transform(self: DataT, transform_func: tp.Callable, *args, **kwargs) -> DataT:
+        """Transform data.
+
+        Concatenates all the data into a single DataFrame and calls `transform_func` on it.
+        Then, splits the data by symbol and builds a new `Data` instance."""
+        concat_data = pd.concat(self.data.values(), axis=1, keys=pd.Index(self.symbols, name="symbol"))
+        new_concat_data = transform_func(concat_data, *args, **kwargs)
+        new_wrapper = None
+        new_data = symbol_dict()
+        for k in self.symbols:
+            if isinstance(new_concat_data.columns, pd.MultiIndex):
+                new_v = new_concat_data.xs(k, axis=1, level="symbol")
+            else:
+                if len(self.wrapper.columns) == 1 and self.wrapper.columns[0] != 0:
+                    new_v = new_concat_data[k].rename(self.wrapper.columns[0])
+                else:
+                    new_v = new_concat_data[k].rename(None)
+            _new_wrapper = ArrayWrapper.from_obj(new_v)
+            if new_wrapper is None:
+                new_wrapper = _new_wrapper
+            else:
+                if not checks.is_index_equal(new_wrapper.columns, _new_wrapper.columns):
+                    raise ValueError("Transformed symbols must have the same columns")
+            new_data[k] = new_v
+        return self.replace(
+            wrapper=new_wrapper,
+            data=new_data,
+        )
 
     def resample(self: DataT, *args, **kwargs) -> DataT:
         """Perform resampling on `Data` based on `Data.column_config`.

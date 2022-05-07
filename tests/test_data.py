@@ -1462,6 +1462,26 @@ class TestData:
         assert_index_equal(stats_df.index, data.wrapper.columns)
         assert_index_equal(stats_df.columns, stats_index)
 
+    def test_transform(self):
+        data = MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
+        pd.testing.assert_frame_equal(
+            data.transform(lambda x: x.iloc[::2]).data[0],
+            data.data[0].iloc[::2]
+        )
+        pd.testing.assert_frame_equal(
+            data.transform(lambda x: x.iloc[::2]).data[1],
+            data.data[1].iloc[::2]
+        )
+        data = MyData.fetch([0, 1], shape=(5,))
+        pd.testing.assert_series_equal(
+            data.transform(lambda x: x.iloc[::2]).data[0],
+            data.data[0].iloc[::2]
+        )
+        pd.testing.assert_series_equal(
+            data.transform(lambda x: x.iloc[::2]).data[1],
+            data.data[1].iloc[::2]
+        )
+
     @pytest.mark.parametrize("test_freq", ["1h", "10h", "3d"])
     def test_resample(self, test_freq):
         ohlcv_data = vbt.Data.from_data(
