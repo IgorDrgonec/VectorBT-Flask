@@ -272,89 +272,6 @@ def generate_enex_nb(
     return entries, exits
 
 
-# ############# Cleaning ############# #
-
-
-@register_jitted(cache=True)
-def clean_enex_1d_nb(
-    entries: tp.Array1d,
-    exits: tp.Array1d,
-    force_first: bool = True,
-    keep_conflicts: bool = False,
-    reverse_order: bool = False,
-) -> tp.Tuple[tp.Array1d, tp.Array1d]:
-    """Clean entry and exit arrays by picking the first signal out of each.
-
-    Set `force_first` to True to force placing the first entry/exit before the first exit/entry.
-    Set `keep_conflicts` to True to process signals at the same timestamp sequentially instead of removing them.
-    Set `reverse_order` to True to reverse the order of signals."""
-    entries_out = np.full(entries.shape, False, dtype=np.bool_)
-    exits_out = np.full(exits.shape, False, dtype=np.bool_)
-
-    def _process_entry(i, phase):
-        if ((not force_first or not reverse_order) and phase == -1) or phase == 1:
-            phase = 0
-            entries_out[i] = True
-        return phase
-
-    def _process_exit(i, phase):
-        if ((not force_first or reverse_order) and phase == -1) or phase == 0:
-            phase = 1
-            exits_out[i] = True
-        return phase
-
-    phase = -1
-    for i in range(entries.shape[0]):
-        if entries[i] and exits[i]:
-            if keep_conflicts:
-                if not reverse_order:
-                    phase = _process_entry(i, phase)
-                    phase = _process_exit(i, phase)
-                else:
-                    phase = _process_exit(i, phase)
-                    phase = _process_entry(i, phase)
-        elif entries[i]:
-            phase = _process_entry(i, phase)
-        elif exits[i]:
-            phase = _process_exit(i, phase)
-
-    return entries_out, exits_out
-
-
-@register_chunkable(
-    size=ch.ArraySizer(arg_query="entries", axis=1),
-    arg_take_spec=dict(
-        entries=ch.ArraySlicer(axis=1),
-        exits=ch.ArraySlicer(axis=1),
-        force_first=None,
-        keep_conflicts=None,
-        reverse_order=None,
-    ),
-    merge_func=base_ch.column_stack,
-)
-@register_jitted(cache=True, tags={"can_parallel"})
-def clean_enex_nb(
-    entries: tp.Array2d,
-    exits: tp.Array2d,
-    force_first: bool = True,
-    keep_conflicts: bool = False,
-    reverse_order: bool = False,
-) -> tp.Tuple[tp.Array2d, tp.Array2d]:
-    """2-dim version of `clean_enex_1d_nb`."""
-    entries_out = np.empty(entries.shape, dtype=np.bool_)
-    exits_out = np.empty(exits.shape, dtype=np.bool_)
-
-    for col in prange(entries.shape[1]):
-        entries_out[:, col], exits_out[:, col] = clean_enex_1d_nb(
-            entries[:, col],
-            exits[:, col],
-            force_first=force_first,
-            keep_conflicts=keep_conflicts,
-            reverse_order=reverse_order,
-        )
-    return entries_out, exits_out
-
-
 # ############# Random signals ############# #
 
 
@@ -886,169 +803,6 @@ def ohlc_stop_place_nb(
     return last_i
 
 
-# ############# Ranges ############# #
-
-
-@register_chunkable(
-    size=ch.ArraySizer(arg_query="mask", axis=1),
-    arg_take_spec=dict(mask=ch.ArraySlicer(axis=1)),
-    merge_func=records_ch.merge_records,
-    merge_kwargs=dict(chunk_meta=Rep("chunk_meta")),
-)
-@register_jitted(cache=True, tags={"can_parallel"})
-def between_ranges_nb(mask: tp.Array2d) -> tp.RecordArray:
-    """Create a record of type `vectorbtpro.generic.enums.range_dt` for each range between two signals in `mask`."""
-    new_records = np.empty(mask.shape, dtype=range_dt)
-    counts = np.full(mask.shape[1], 0, dtype=np.int_)
-
-    for col in prange(mask.shape[1]):
-        from_i = -1
-        for i in range(mask.shape[0]):
-            if mask[i, col]:
-                if from_i > -1:
-                    to_i = i
-                    r = counts[col]
-                    new_records["id"][r, col] = r
-                    new_records["col"][r, col] = col
-                    new_records["start_idx"][r, col] = from_i
-                    new_records["end_idx"][r, col] = to_i
-                    new_records["status"][r, col] = RangeStatus.Closed
-                    counts[col] += 1
-                from_i = i
-
-    return generic_nb.repartition_nb(new_records, counts)
-
-
-@register_chunkable(
-    size=ch.ArraySizer(arg_query="mask", axis=1),
-    arg_take_spec=dict(mask=ch.ArraySlicer(axis=1), other_mask=ch.ArraySlicer(axis=1), from_other=None),
-    merge_func=records_ch.merge_records,
-    merge_kwargs=dict(chunk_meta=Rep("chunk_meta")),
-)
-@register_jitted(cache=True, tags={"can_parallel"})
-def between_two_ranges_nb(mask: tp.Array2d, other_mask: tp.Array2d, from_other: bool = False) -> tp.RecordArray:
-    """Create a record of type `vectorbtpro.generic.enums.range_dt` for each range between two
-    signals in `mask` and `other_mask`.
-
-    If `from_other` is False, returns ranges from each in `mask` to the succeeding in `other_mask`.
-    Otherwise, returns ranges from each in `other_mask` to the preceding in `mask`.
-
-    When `mask` and `other_mask` overlap (two signals at the same time), the distance between overlapping
-    signals is still considered and `from_i` would match `to_i`."""
-    new_records = np.empty(mask.shape, dtype=range_dt)
-    counts = np.full(mask.shape[1], 0, dtype=np.int_)
-
-    for col in prange(mask.shape[1]):
-        if from_other:
-            to_i = -1
-            for i in range(mask.shape[0] - 1, -1, -1):
-                if other_mask[i, col]:
-                    to_i = i
-                if mask[i, col]:
-                    from_i = i
-                    r = counts[col]
-                    new_records["id"][r, col] = r
-                    new_records["col"][r, col] = col
-                    new_records["start_idx"][r, col] = from_i
-                    new_records["end_idx"][r, col] = to_i
-                    new_records["status"][r, col] = RangeStatus.Closed
-                    counts[col] += 1
-        else:
-            from_i = -1
-            for i in range(mask.shape[0]):
-                if mask[i, col]:
-                    from_i = i
-                if other_mask[i, col]:
-                    to_i = i
-                    r = counts[col]
-                    new_records["id"][r, col] = r
-                    new_records["col"][r, col] = col
-                    new_records["start_idx"][r, col] = from_i
-                    new_records["end_idx"][r, col] = to_i
-                    new_records["status"][r, col] = RangeStatus.Closed
-                    counts[col] += 1
-
-    return generic_nb.repartition_nb(new_records, counts)
-
-
-@register_chunkable(
-    size=ch.ArraySizer(arg_query="mask", axis=1),
-    arg_take_spec=dict(mask=ch.ArraySlicer(axis=1)),
-    merge_func=records_ch.merge_records,
-    merge_kwargs=dict(chunk_meta=Rep("chunk_meta")),
-)
-@register_jitted(cache=True, tags={"can_parallel"})
-def partition_ranges_nb(mask: tp.Array2d) -> tp.RecordArray:
-    """Create a record of type `vectorbtpro.generic.enums.range_dt` for each partition of signals in `mask`."""
-    new_records = np.empty(mask.shape, dtype=range_dt)
-    counts = np.full(mask.shape[1], 0, dtype=np.int_)
-
-    for col in prange(mask.shape[1]):
-        is_partition = False
-        from_i = -1
-        for i in range(mask.shape[0]):
-            if mask[i, col]:
-                if not is_partition:
-                    from_i = i
-                is_partition = True
-            elif is_partition:
-                to_i = i
-                r = counts[col]
-                new_records["id"][r, col] = r
-                new_records["col"][r, col] = col
-                new_records["start_idx"][r, col] = from_i
-                new_records["end_idx"][r, col] = to_i
-                new_records["status"][r, col] = RangeStatus.Closed
-                counts[col] += 1
-                is_partition = False
-            if i == mask.shape[0] - 1:
-                if is_partition:
-                    to_i = mask.shape[0] - 1
-                    r = counts[col]
-                    new_records["id"][r, col] = r
-                    new_records["col"][r, col] = col
-                    new_records["start_idx"][r, col] = from_i
-                    new_records["end_idx"][r, col] = to_i
-                    new_records["status"][r, col] = RangeStatus.Open
-                    counts[col] += 1
-
-    return generic_nb.repartition_nb(new_records, counts)
-
-
-@register_chunkable(
-    size=ch.ArraySizer(arg_query="mask", axis=1),
-    arg_take_spec=dict(mask=ch.ArraySlicer(axis=1)),
-    merge_func=records_ch.merge_records,
-    merge_kwargs=dict(chunk_meta=Rep("chunk_meta")),
-)
-@register_jitted(cache=True, tags={"can_parallel"})
-def between_partition_ranges_nb(mask: tp.Array2d) -> tp.RecordArray:
-    """Create a record of type `vectorbtpro.generic.enums.range_dt` for each range between two partitions in `mask`."""
-    new_records = np.empty(mask.shape, dtype=range_dt)
-    counts = np.full(mask.shape[1], 0, dtype=np.int_)
-
-    for col in prange(mask.shape[1]):
-        is_partition = False
-        from_i = -1
-        for i in range(mask.shape[0]):
-            if mask[i, col]:
-                if not is_partition and from_i != -1:
-                    to_i = i
-                    r = counts[col]
-                    new_records["id"][r, col] = r
-                    new_records["col"][r, col] = col
-                    new_records["start_idx"][r, col] = from_i
-                    new_records["end_idx"][r, col] = to_i
-                    new_records["status"][r, col] = RangeStatus.Closed
-                    counts[col] += 1
-                is_partition = True
-                from_i = i
-            else:
-                is_partition = False
-
-    return generic_nb.repartition_nb(new_records, counts)
-
-
 # ############# Ranking ############# #
 
 
@@ -1174,6 +928,252 @@ def part_pos_rank_nb(c: RankContext) -> int:
 
     Resets at each reset signal."""
     return c.part_cnt - 1
+
+
+# ############# Cleaning ############# #
+
+
+@register_jitted(cache=True)
+def clean_enex_1d_nb(
+    entries: tp.Array1d,
+    exits: tp.Array1d,
+    force_first: bool = True,
+    keep_conflicts: bool = False,
+    reverse_order: bool = False,
+) -> tp.Tuple[tp.Array1d, tp.Array1d]:
+    """Clean entry and exit arrays by picking the first signal out of each.
+
+    Set `force_first` to True to force placing the first entry/exit before the first exit/entry.
+    Set `keep_conflicts` to True to process signals at the same timestamp sequentially instead of removing them.
+    Set `reverse_order` to True to reverse the order of signals."""
+    entries_out = np.full(entries.shape, False, dtype=np.bool_)
+    exits_out = np.full(exits.shape, False, dtype=np.bool_)
+
+    def _process_entry(i, phase):
+        if ((not force_first or not reverse_order) and phase == -1) or phase == 1:
+            phase = 0
+            entries_out[i] = True
+        return phase
+
+    def _process_exit(i, phase):
+        if ((not force_first or reverse_order) and phase == -1) or phase == 0:
+            phase = 1
+            exits_out[i] = True
+        return phase
+
+    phase = -1
+    for i in range(entries.shape[0]):
+        if entries[i] and exits[i]:
+            if keep_conflicts:
+                if not reverse_order:
+                    phase = _process_entry(i, phase)
+                    phase = _process_exit(i, phase)
+                else:
+                    phase = _process_exit(i, phase)
+                    phase = _process_entry(i, phase)
+        elif entries[i]:
+            phase = _process_entry(i, phase)
+        elif exits[i]:
+            phase = _process_exit(i, phase)
+
+    return entries_out, exits_out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="entries", axis=1),
+    arg_take_spec=dict(
+        entries=ch.ArraySlicer(axis=1),
+        exits=ch.ArraySlicer(axis=1),
+        force_first=None,
+        keep_conflicts=None,
+        reverse_order=None,
+    ),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def clean_enex_nb(
+    entries: tp.Array2d,
+    exits: tp.Array2d,
+    force_first: bool = True,
+    keep_conflicts: bool = False,
+    reverse_order: bool = False,
+) -> tp.Tuple[tp.Array2d, tp.Array2d]:
+    """2-dim version of `clean_enex_1d_nb`."""
+    entries_out = np.empty(entries.shape, dtype=np.bool_)
+    exits_out = np.empty(exits.shape, dtype=np.bool_)
+
+    for col in prange(entries.shape[1]):
+        entries_out[:, col], exits_out[:, col] = clean_enex_1d_nb(
+            entries[:, col],
+            exits[:, col],
+            force_first=force_first,
+            keep_conflicts=keep_conflicts,
+            reverse_order=reverse_order,
+        )
+    return entries_out, exits_out
+
+
+# ############# Ranges ############# #
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="mask", axis=1),
+    arg_take_spec=dict(mask=ch.ArraySlicer(axis=1)),
+    merge_func=records_ch.merge_records,
+    merge_kwargs=dict(chunk_meta=Rep("chunk_meta")),
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def between_ranges_nb(mask: tp.Array2d) -> tp.RecordArray:
+    """Create a record of type `vectorbtpro.generic.enums.range_dt` for each range between two signals in `mask`."""
+    new_records = np.empty(mask.shape, dtype=range_dt)
+    counts = np.full(mask.shape[1], 0, dtype=np.int_)
+
+    for col in prange(mask.shape[1]):
+        from_i = -1
+        for i in range(mask.shape[0]):
+            if mask[i, col]:
+                if from_i > -1:
+                    to_i = i
+                    r = counts[col]
+                    new_records["id"][r, col] = r
+                    new_records["col"][r, col] = col
+                    new_records["start_idx"][r, col] = from_i
+                    new_records["end_idx"][r, col] = to_i
+                    new_records["status"][r, col] = RangeStatus.Closed
+                    counts[col] += 1
+                from_i = i
+
+    return generic_nb.repartition_nb(new_records, counts)
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="mask", axis=1),
+    arg_take_spec=dict(mask=ch.ArraySlicer(axis=1), other_mask=ch.ArraySlicer(axis=1), from_other=None),
+    merge_func=records_ch.merge_records,
+    merge_kwargs=dict(chunk_meta=Rep("chunk_meta")),
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def between_two_ranges_nb(mask: tp.Array2d, other_mask: tp.Array2d, from_other: bool = False) -> tp.RecordArray:
+    """Create a record of type `vectorbtpro.generic.enums.range_dt` for each range between two
+    signals in `mask` and `other_mask`.
+
+    If `from_other` is False, returns ranges from each in `mask` to the succeeding in `other_mask`.
+    Otherwise, returns ranges from each in `other_mask` to the preceding in `mask`.
+
+    When `mask` and `other_mask` overlap (two signals at the same time), the distance between overlapping
+    signals is still considered and `from_i` would match `to_i`."""
+    new_records = np.empty(mask.shape, dtype=range_dt)
+    counts = np.full(mask.shape[1], 0, dtype=np.int_)
+
+    for col in prange(mask.shape[1]):
+        if from_other:
+            to_i = -1
+            for i in range(mask.shape[0] - 1, -1, -1):
+                if other_mask[i, col]:
+                    to_i = i
+                if mask[i, col] and to_i != -1:
+                    from_i = i
+                    r = counts[col]
+                    new_records["id"][r, col] = r
+                    new_records["col"][r, col] = col
+                    new_records["start_idx"][r, col] = from_i
+                    new_records["end_idx"][r, col] = to_i
+                    new_records["status"][r, col] = RangeStatus.Closed
+                    counts[col] += 1
+        else:
+            from_i = -1
+            for i in range(mask.shape[0]):
+                if mask[i, col]:
+                    from_i = i
+                if other_mask[i, col] and from_i != -1:
+                    to_i = i
+                    r = counts[col]
+                    new_records["id"][r, col] = r
+                    new_records["col"][r, col] = col
+                    new_records["start_idx"][r, col] = from_i
+                    new_records["end_idx"][r, col] = to_i
+                    new_records["status"][r, col] = RangeStatus.Closed
+                    counts[col] += 1
+
+    return generic_nb.repartition_nb(new_records, counts)
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="mask", axis=1),
+    arg_take_spec=dict(mask=ch.ArraySlicer(axis=1)),
+    merge_func=records_ch.merge_records,
+    merge_kwargs=dict(chunk_meta=Rep("chunk_meta")),
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def partition_ranges_nb(mask: tp.Array2d) -> tp.RecordArray:
+    """Create a record of type `vectorbtpro.generic.enums.range_dt` for each partition of signals in `mask`."""
+    new_records = np.empty(mask.shape, dtype=range_dt)
+    counts = np.full(mask.shape[1], 0, dtype=np.int_)
+
+    for col in prange(mask.shape[1]):
+        is_partition = False
+        from_i = -1
+        for i in range(mask.shape[0]):
+            if mask[i, col]:
+                if not is_partition:
+                    from_i = i
+                is_partition = True
+            elif is_partition:
+                to_i = i
+                r = counts[col]
+                new_records["id"][r, col] = r
+                new_records["col"][r, col] = col
+                new_records["start_idx"][r, col] = from_i
+                new_records["end_idx"][r, col] = to_i
+                new_records["status"][r, col] = RangeStatus.Closed
+                counts[col] += 1
+                is_partition = False
+            if i == mask.shape[0] - 1:
+                if is_partition:
+                    to_i = mask.shape[0] - 1
+                    r = counts[col]
+                    new_records["id"][r, col] = r
+                    new_records["col"][r, col] = col
+                    new_records["start_idx"][r, col] = from_i
+                    new_records["end_idx"][r, col] = to_i
+                    new_records["status"][r, col] = RangeStatus.Open
+                    counts[col] += 1
+
+    return generic_nb.repartition_nb(new_records, counts)
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="mask", axis=1),
+    arg_take_spec=dict(mask=ch.ArraySlicer(axis=1)),
+    merge_func=records_ch.merge_records,
+    merge_kwargs=dict(chunk_meta=Rep("chunk_meta")),
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def between_partition_ranges_nb(mask: tp.Array2d) -> tp.RecordArray:
+    """Create a record of type `vectorbtpro.generic.enums.range_dt` for each range between two partitions in `mask`."""
+    new_records = np.empty(mask.shape, dtype=range_dt)
+    counts = np.full(mask.shape[1], 0, dtype=np.int_)
+
+    for col in prange(mask.shape[1]):
+        is_partition = False
+        from_i = -1
+        for i in range(mask.shape[0]):
+            if mask[i, col]:
+                if not is_partition and from_i != -1:
+                    to_i = i
+                    r = counts[col]
+                    new_records["id"][r, col] = r
+                    new_records["col"][r, col] = col
+                    new_records["start_idx"][r, col] = from_i
+                    new_records["end_idx"][r, col] = to_i
+                    new_records["status"][r, col] = RangeStatus.Closed
+                    counts[col] += 1
+                is_partition = True
+                from_i = i
+            else:
+                is_partition = False
+
+    return generic_nb.repartition_nb(new_records, counts)
 
 
 # ############# Index ############# #

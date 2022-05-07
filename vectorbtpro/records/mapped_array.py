@@ -1286,11 +1286,14 @@ class MappedArray(Analyzable):
             wrap_kwargs=wrap_kwargs,
             **kwargs,
         )
-        if isinstance(out, pd.DataFrame):
-            out.loc["count"].fillna(0.0, inplace=True)
+        if wrap_kwargs.get("to_timedelta", False):
+            out.drop("count", axis=0, inplace=True)
         else:
-            if np.isnan(out.loc["count"]):
-                out.loc["count"] = 0.0
+            if isinstance(out, pd.DataFrame):
+                out.loc["count"].fillna(0.0, inplace=True)
+            else:
+                if np.isnan(out.loc["count"]):
+                    out.loc["count"] = 0.0
         return out
 
     @cached_method

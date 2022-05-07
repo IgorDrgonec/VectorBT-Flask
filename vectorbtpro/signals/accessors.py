@@ -557,9 +557,7 @@ class SignalsAccessor(GenericAccessor):
             if broadcast_kwargs is None:
                 broadcast_kwargs = {}
             broadcasted_args, wrapper = reshaping.broadcast(
-                dict(entries=args[0], exits=args[1]),
-                return_wrapper=True,
-                **broadcast_kwargs
+                dict(entries=args[0], exits=args[1]), return_wrapper=True, **broadcast_kwargs
             )
             entries = reshaping.to_2d_array(broadcasted_args["entries"])
             exits = reshaping.to_2d_array(broadcasted_args["exits"])
@@ -1473,155 +1471,6 @@ class SignalsAccessor(GenericAccessor):
             out_dict["stop_type"] = wrapper.wrap(stop_type, group_by=False, **wrap_kwargs)
             return exits
 
-    # ############# Ranges ############# #
-
-    def between_ranges(
-        self,
-        other: tp.Optional[tp.ArrayLike] = None,
-        from_other: bool = False,
-        broadcast_kwargs: tp.KwargsLike = None,
-        group_by: tp.GroupByLike = None,
-        attach_ts: bool = True,
-        attach_other: bool = False,
-        jitted: tp.JittedOption = None,
-        chunked: tp.ChunkedOption = None,
-        **kwargs,
-    ) -> Ranges:
-        """Wrap the result of `vectorbtpro.signals.nb.between_ranges_nb`
-        with `vectorbtpro.generic.ranges.Ranges`.
-
-        If `other` specified, see `vectorbtpro.signals.nb.between_two_ranges_nb`.
-        Both will broadcast using `vectorbtpro.base.reshaping.broadcast` and `broadcast_kwargs`.
-
-        Usage:
-            * One array:
-
-            ```pycon
-            >>> mask_sr = pd.Series([True, False, False, True, False, True, True])
-            >>> ranges = mask_sr.vbt.signals.between_ranges()
-            >>> ranges
-            <vectorbtpro.generic.ranges.Ranges at 0x7ff29ea7c7b8>
-
-            >>> ranges.records_readable
-               Range Id  Column  Start Timestamp  End Timestamp  Status
-            0         0       0                0              3  Closed
-            1         1       0                3              5  Closed
-            2         2       0                5              6  Closed
-
-            >>> ranges.duration.values
-            array([3, 2, 1])
-            ```
-
-            * Two arrays, traversing the signals of the first array:
-
-            ```pycon
-            >>> mask_sr = pd.Series([True, True, True, False, False])
-            >>> mask_sr2 = pd.Series([False, False, True, False, True])
-            >>> ranges = mask_sr.vbt.signals.between_ranges(other=mask_sr2)
-            >>> ranges
-            <vectorbtpro.generic.ranges.Ranges at 0x7ff29e3b80f0>
-
-            >>> ranges.records_readable
-               Range Id  Column  Start Timestamp  End Timestamp  Status
-            0         0       0                0              2  Closed
-            1         1       0                1              2  Closed
-            2         2       0                2              2  Closed
-
-            >>> ranges.duration.values
-            array([2, 1, 0])
-            ```
-
-            * Two arrays, traversing the signals of the second array:
-
-            ```pycon
-            >>> ranges = mask_sr.vbt.signals.between_ranges(other=mask_sr2, from_other=True)
-            >>> ranges
-            <vectorbtpro.generic.ranges.Ranges at 0x7ff29eccbd68>
-
-            >>> ranges.records_readable
-               Range Id  Column  Start Timestamp  End Timestamp  Status
-            0         0       0                2              2  Closed
-            1         1       0                2              4  Closed
-
-            >>> ranges.duration.values
-            array([0, 2])
-            ```
-        """
-        if broadcast_kwargs is None:
-            broadcast_kwargs = {}
-
-        if other is None:
-            # One input array
-            func = jit_reg.resolve_option(nb.between_ranges_nb, jitted)
-            func = ch_reg.resolve_option(func, chunked)
-            range_records = func(self.to_2d_array())
-            wrapper = self.wrapper
-            to_attach = self.obj
-        else:
-            # Two input arrays
-            broadcasted_args = reshaping.broadcast(dict(obj=self.obj, other=other), **broadcast_kwargs)
-            obj = broadcasted_args["obj"]
-            other = broadcasted_args["other"]
-            func = jit_reg.resolve_option(nb.between_two_ranges_nb, jitted)
-            func = ch_reg.resolve_option(func, chunked)
-            range_records = func(reshaping.to_2d_array(obj), reshaping.to_2d_array(other), from_other=from_other)
-            wrapper = ArrayWrapper.from_obj(obj)
-            to_attach = other if attach_other else obj
-        return Ranges(wrapper, range_records, ts=to_attach if attach_ts else None, **kwargs).regroup(group_by)
-
-    def partition_ranges(
-        self,
-        group_by: tp.GroupByLike = None,
-        attach_ts: bool = True,
-        jitted: tp.JittedOption = None,
-        chunked: tp.ChunkedOption = None,
-        **kwargs,
-    ) -> Ranges:
-        """Wrap the result of `vectorbtpro.signals.nb.partition_ranges_nb`
-        with `vectorbtpro.generic.ranges.Ranges`.
-
-        If `use_end_idxs` is True, uses the index of the last signal in each partition as `idx_arr`.
-        Otherwise, uses the index of the first signal.
-
-        Usage:
-            ```pycon
-            >>> mask_sr = pd.Series([True, True, True, False, True, True])
-            >>> mask_sr.vbt.signals.partition_ranges().records_readable
-               Range Id  Column  Start Timestamp  End Timestamp  Status
-            0         0       0                0              3  Closed
-            1         1       0                4              5    Open
-            ```
-        """
-        func = jit_reg.resolve_option(nb.partition_ranges_nb, jitted)
-        func = ch_reg.resolve_option(func, chunked)
-        range_records = func(self.to_2d_array())
-        return Ranges(self.wrapper, range_records, ts=self.obj if attach_ts else None, **kwargs).regroup(group_by)
-
-    def between_partition_ranges(
-        self,
-        group_by: tp.GroupByLike = None,
-        attach_ts: bool = True,
-        jitted: tp.JittedOption = None,
-        chunked: tp.ChunkedOption = None,
-        **kwargs,
-    ) -> Ranges:
-        """Wrap the result of `vectorbtpro.signals.nb.between_partition_ranges_nb`
-        with `vectorbtpro.generic.ranges.Ranges`.
-
-        Usage:
-            ```pycon
-            >>> mask_sr = pd.Series([True, False, False, True, False, True, True])
-            >>> mask_sr.vbt.signals.between_partition_ranges().records_readable
-               Range Id  Column  Start Timestamp  End Timestamp  Status
-            0         0       0                0              3  Closed
-            1         1       0                3              5  Closed
-             ```
-        """
-        func = jit_reg.resolve_option(nb.between_partition_ranges_nb, jitted)
-        func = ch_reg.resolve_option(func, chunked)
-        range_records = func(self.to_2d_array())
-        return Ranges(self.wrapper, range_records, ts=self.obj if attach_ts else None, **kwargs).regroup(group_by)
-
     # ############# Ranking ############# #
 
     def rank(
@@ -1928,6 +1777,155 @@ class SignalsAccessor(GenericAccessor):
         Uses `SignalsAccessor.partition_pos_rank`."""
         return self.partition_pos_rank(as_mapped=True, group_by=group_by, **kwargs)
 
+    # ############# Ranges ############# #
+
+    def between_ranges(
+        self,
+        other: tp.Optional[tp.ArrayLike] = None,
+        from_other: bool = False,
+        broadcast_kwargs: tp.KwargsLike = None,
+        group_by: tp.GroupByLike = None,
+        attach_ts: bool = True,
+        attach_other: bool = False,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        **kwargs,
+    ) -> Ranges:
+        """Wrap the result of `vectorbtpro.signals.nb.between_ranges_nb`
+        with `vectorbtpro.generic.ranges.Ranges`.
+
+        If `other` specified, see `vectorbtpro.signals.nb.between_two_ranges_nb`.
+        Both will broadcast using `vectorbtpro.base.reshaping.broadcast` and `broadcast_kwargs`.
+
+        Usage:
+            * One array:
+
+            ```pycon
+            >>> mask_sr = pd.Series([True, False, False, True, False, True, True])
+            >>> ranges = mask_sr.vbt.signals.between_ranges()
+            >>> ranges
+            <vectorbtpro.generic.ranges.Ranges at 0x7ff29ea7c7b8>
+
+            >>> ranges.records_readable
+               Range Id  Column  Start Timestamp  End Timestamp  Status
+            0         0       0                0              3  Closed
+            1         1       0                3              5  Closed
+            2         2       0                5              6  Closed
+
+            >>> ranges.duration.values
+            array([3, 2, 1])
+            ```
+
+            * Two arrays, traversing the signals of the first array:
+
+            ```pycon
+            >>> mask_sr = pd.Series([True, True, True, False, False])
+            >>> mask_sr2 = pd.Series([False, False, True, False, True])
+            >>> ranges = mask_sr.vbt.signals.between_ranges(other=mask_sr2)
+            >>> ranges
+            <vectorbtpro.generic.ranges.Ranges at 0x7ff29e3b80f0>
+
+            >>> ranges.records_readable
+               Range Id  Column  Start Timestamp  End Timestamp  Status
+            0         0       0                0              2  Closed
+            1         1       0                1              2  Closed
+            2         2       0                2              2  Closed
+
+            >>> ranges.duration.values
+            array([2, 1, 0])
+            ```
+
+            * Two arrays, traversing the signals of the second array:
+
+            ```pycon
+            >>> ranges = mask_sr.vbt.signals.between_ranges(other=mask_sr2, from_other=True)
+            >>> ranges
+            <vectorbtpro.generic.ranges.Ranges at 0x7ff29eccbd68>
+
+            >>> ranges.records_readable
+               Range Id  Column  Start Timestamp  End Timestamp  Status
+            0         0       0                2              2  Closed
+            1         1       0                2              4  Closed
+
+            >>> ranges.duration.values
+            array([0, 2])
+            ```
+        """
+        if broadcast_kwargs is None:
+            broadcast_kwargs = {}
+
+        if other is None:
+            # One input array
+            func = jit_reg.resolve_option(nb.between_ranges_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
+            range_records = func(self.to_2d_array())
+            wrapper = self.wrapper
+            to_attach = self.obj
+        else:
+            # Two input arrays
+            broadcasted_args = reshaping.broadcast(dict(obj=self.obj, other=other), **broadcast_kwargs)
+            obj = broadcasted_args["obj"]
+            other = broadcasted_args["other"]
+            func = jit_reg.resolve_option(nb.between_two_ranges_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
+            range_records = func(reshaping.to_2d_array(obj), reshaping.to_2d_array(other), from_other=from_other)
+            wrapper = ArrayWrapper.from_obj(obj)
+            to_attach = other if attach_other else obj
+        return Ranges(wrapper, range_records, ts=to_attach if attach_ts else None, **kwargs).regroup(group_by)
+
+    def partition_ranges(
+        self,
+        group_by: tp.GroupByLike = None,
+        attach_ts: bool = True,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        **kwargs,
+    ) -> Ranges:
+        """Wrap the result of `vectorbtpro.signals.nb.partition_ranges_nb`
+        with `vectorbtpro.generic.ranges.Ranges`.
+
+        If `use_end_idxs` is True, uses the index of the last signal in each partition as `idx_arr`.
+        Otherwise, uses the index of the first signal.
+
+        Usage:
+            ```pycon
+            >>> mask_sr = pd.Series([True, True, True, False, True, True])
+            >>> mask_sr.vbt.signals.partition_ranges().records_readable
+               Range Id  Column  Start Timestamp  End Timestamp  Status
+            0         0       0                0              3  Closed
+            1         1       0                4              5    Open
+            ```
+        """
+        func = jit_reg.resolve_option(nb.partition_ranges_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        range_records = func(self.to_2d_array())
+        return Ranges(self.wrapper, range_records, ts=self.obj if attach_ts else None, **kwargs).regroup(group_by)
+
+    def between_partition_ranges(
+        self,
+        group_by: tp.GroupByLike = None,
+        attach_ts: bool = True,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        **kwargs,
+    ) -> Ranges:
+        """Wrap the result of `vectorbtpro.signals.nb.between_partition_ranges_nb`
+        with `vectorbtpro.generic.ranges.Ranges`.
+
+        Usage:
+            ```pycon
+            >>> mask_sr = pd.Series([True, False, False, True, False, True, True])
+            >>> mask_sr.vbt.signals.between_partition_ranges().records_readable
+               Range Id  Column  Start Timestamp  End Timestamp  Status
+            0         0       0                0              3  Closed
+            1         1       0                3              5  Closed
+            ```
+        """
+        func = jit_reg.resolve_option(nb.between_partition_ranges_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        range_records = func(self.to_2d_array())
+        return Ranges(self.wrapper, range_records, ts=self.obj if attach_ts else None, **kwargs).regroup(group_by)
+
     # ############# Index ############# #
 
     def nth_index(
@@ -2138,9 +2136,8 @@ class SignalsAccessor(GenericAccessor):
                 calc_func="between_ranges.duration",
                 post_calc_func=lambda self, out, settings: {
                     "Min": out.min(),
+                    "Median": out.median(),
                     "Max": out.max(),
-                    "Mean": out.mean(),
-                    "Std": out.std(ddof=settings.get("ddof", 1)),
                 },
                 apply_to_timedelta=True,
                 tags=RepEval("['signals', 'distance', 'other'] if other is not None else ['signals', 'distance']"),
@@ -2161,9 +2158,8 @@ class SignalsAccessor(GenericAccessor):
                 calc_func="partition_ranges.duration",
                 post_calc_func=lambda self, out, settings: {
                     "Min": out.min(),
+                    "Median": out.median(),
                     "Max": out.max(),
-                    "Mean": out.mean(),
-                    "Std": out.std(ddof=settings.get("ddof", 1)),
                 },
                 apply_to_timedelta=True,
                 tags=["signals", "partitions", "distance"],
@@ -2173,9 +2169,8 @@ class SignalsAccessor(GenericAccessor):
                 calc_func="between_partition_ranges.duration",
                 post_calc_func=lambda self, out, settings: {
                     "Min": out.min(),
+                    "Median": out.median(),
                     "Max": out.max(),
-                    "Mean": out.mean(),
-                    "Std": out.std(ddof=settings.get("ddof", 1)),
                 },
                 apply_to_timedelta=True,
                 tags=["signals", "partitions", "distance"],
@@ -2381,7 +2376,7 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
                             line=dict(
                                 color=plotting_cfg["contrast_color_schema"]["green"],
                                 width=2,
-                            )
+                            ),
                         ),
                         name="Entry marks",
                     )
@@ -2414,7 +2409,7 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
                             line=dict(
                                 color=plotting_cfg["contrast_color_schema"]["red"],
                                 width=2,
-                            )
+                            ),
                         ),
                         name="Exit marks",
                     )
