@@ -24,6 +24,7 @@ theme:
     - navigation.indexes
     - navigation.tabs
     - navigation.instant
+    - navigation.top
     - search.suggest
     - search.share
     - content.code.annotate

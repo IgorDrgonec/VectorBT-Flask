@@ -6,6 +6,67 @@ title: Release notes
 
 All notable changes in reverse chronological order.
 
+## Version 1.2.3 (7 May, 2022)
+
+- Fixed marker color in [OHLCVDFAccessor.plot](/api/ohlcv/accessors/#vectorbtpro.ohlcv.accessors.OHLCVDFAccessor.plot)
+when one of the price points is NaN
+- Ordering in the long-only direction from a short position and short-only direction from a long position
+is now allowed
+- Fixed output parsing in [IndicatorFactory.from_expr](/api/indicators/factory/#vectorbtpro.indicators.factory.IndicatorFactory.from_expr)
+- Renamed `plot_as_entry_markers` to [SignalsSRAccessor.plot_as_entries](/api/signals/accessors/#vectorbtpro.signals.accessors.SignalsSRAccessor.plot_as_entries)
+and `plot_as_exit_markers` to [SignalsSRAccessor.plot_as_exits](/api/signals/accessors/#vectorbtpro.signals.accessors.SignalsSRAccessor.plot_as_exits).
+Created two more methods for marking entries ([SignalsSRAccessor.plot_as_entry_marks](/api/signals/accessors/#vectorbtpro.signals.accessors.SignalsSRAccessor.plot_as_entry_marks)) 
+and exits ([SignalsSRAccessor.plot_as_exit_marks](/api/signals/accessors/#vectorbtpro.signals.accessors.SignalsSRAccessor.plot_as_exit_marks)).
+- Rolling apply can now run on variable, frequency-based windows, such as `7d`
+- Implemented [BaseAccessor.ago](/api/base/accessors/#vectorbtpro.base.accessors.BaseAccessor.ago)
+for getting the values some periods ago
+- Implemented NB and SP rolling "any" ([GenericAccessor.rolling_any](/api/generic/accessors/#vectorbtpro.generic.accessors.GenericAccessor.rolling_any)) 
+and "all" ([GenericAccessor.rolling_all](/api/generic/accessors/#vectorbtpro.generic.accessors.GenericAccessor.rolling_all))
+- Updated the MTF tutorial with a section on forward filling
+- Indicator parameters can now be manually mapped to an index level using `post_index_func`
+specified in `param_settings`
+- Complex objects are now counted per type rather than based on their position in 
+[index_from_values](/api/base/indexes/#vectorbtpro.base.indexes.index_from_values)
+- Implemented an entire module [datetime_nb](/api/utils/datetime_nb/) with Numba-compiled
+functions for operations on (mostly integer-formatted) date and time
+- Added contexts [GenEnContext](/api/signals/enums/#vectorbtpro.signals.enums.GenEnContext), 
+[GenExContext](/api/signals/enums/#vectorbtpro.signals.enums.GenEnContext), and 
+[GenEnExContext](/api/signals/enums/#vectorbtpro.signals.enums.GenEnContext) to signal generation functions
+- Signal placement functions are now forced to return the local position of the last placed signal to make
+the generation (a lot) faster
+- Completely refactored [SignalsAccessor.generate_exits](/api/signals/accessors/#vectorbtpro.signals.accessors.SignalsAccessor.generate_exits)
+to accept the inputs `entry_ts` and `follow_ts`, and write the in-output `stop_ts_out`. This enables
+far more options in generating uni-directional stops.
+- Completely refactored [SignalsAccessor.generate_ohlc_exits](/api/signals/accessors/#vectorbtpro.signals.accessors.SignalsAccessor.generate_ohlc_exits)
+to separate the entry price (`entry_price`) from the open price (`open`), and to better represent
+and be able to simultaneously process 4 different stop types: SL, TSL, TP, and TTP (new).
+Also, updated the enum [StopType](/api/signals/enums/#vectorbtpro.signals.enums.StopType) according to the new stop types.
+- Refactored ranking. Added the argument `after_reset` to [SignalsAccessor.rank_nb](/api/signals/accessors/#vectorbtpro.signals.accessors.SignalsAccessor.rank_nb)
+to be able to remove any signal that comes before the first resetting signal. Added the argument
+`reset_wait` to postpone resetting the position by a number of ticks. Removed `prepare_func`
+in favor of templates. Also made the function contextualized by adding the context 
+[RankContext](/api/signals/enums/#vectorbtpro.signals.enums.RankContext) with lots of useful information.
+- Implemented after-reset versions for various signal selection functions, such as 
+[SignalsAccessor.first_after](/api/signals/accessors/#vectorbtpro.signals.accessors.SignalsAccessor.first_after)
+for [SignalsAccessor.first](/api/signals/accessors/#vectorbtpro.signals.accessors.SignalsAccessor.first).
+Also, implemented the method [SignalsAccessor.to_nth](/api/signals/accessors/#vectorbtpro.signals.accessors.SignalsAccessor.to_nth)
+to select the first `n` signals.
+- Accessor methods in [GenericAccessor](/api/generic/accessors/#vectorbtpro.generic.accessors.GenericAccessor)
+that accept a UDF now also accept the name of any UDF from [generic.nb](/api/generic/nb/)
+- Fixed casting the column "Trade count" to the integer data type in custom data classes
+- By enabling the `parse_index` flag in [settings.datetime](/api/_settings/#vectorbtpro._settings.datetime),
+any index with human-readable datetime strings passed to an array wrapper will be automatically
+parsed and converted to a Pandas index
+- Added time components to the methods [ArrayWrapper.get_index_points](/api/base/wrapping/#vectorbtpro.base.wrapping.ArrayWrapper.get_index_points)
+and [ArrayWrapper.get_index_ranges](/api/base/wrapping/#vectorbtpro.base.wrapping.ArrayWrapper.get_index_ranges).
+This, for example, allows signals to be placed and portfolios to be optimized during specific times of the day.
+- Reimplemented the method [SignalsAccessor.clean](/api/signals/accessors/#vectorbtpro.signals.accessors.SignalsAccessor.clean)
+to take the arguments `force_first`, `keep_conflicts`, and `reverse_order` for a better control of
+the cleaning process.
+- Implemented the method [Data.transform](/api/data/base/#vectorbtpro.data.base.Data.transform)
+to transform the underlying data with a UDF and replace the instance
+- Wrote [Signal development](/tutorials/signal-development) :notebook_with_decorative_cover:
+
 ## Version 1.2.2 (21 Apr, 2022)
 
 - Made the call sequence array entirely optional. Prior to this change, the user had to create an array 
@@ -23,7 +84,7 @@ arrays will treat them per-row by default.
 - When specifying enum fields such as "targetamount", the mapper will ignore all non-alphanumeric 
 characters by default, thus "Target Amount" can now be passed as well
 - Added the option `incl_doc` to show/hide the docstring of the function when using 
-[format_func](https://vectorbt.pro/api/utils/formatting/#vectorbtpro.utils.formatting.format_func)
+[format_func](/api/utils/formatting/#vectorbtpro.utils.formatting.format_func)
 - [ArrayWrapper.wrap](/api/base/wrapping/#vectorbtpro.base.wrapping.ArrayWrapper.wrap)
 will broadcast the to-be-wrapped array using NumPy rules if its shape doesn't match the shape of the wrapper.
 This way, smaller arrays can expand to the target shape once this is really required - good for memory.
@@ -199,7 +260,7 @@ displaying a variable number of metrics/subplots.
 - Symbols that return `None` or an empty array are skipped. When `raise_on_error` is True, any
 symbol raising an error is skipped as well.
 - Similar to the Python's `help` command, vectorbt now has a function 
-[format_func](https://vectorbt.pro/api/utils/formatting/#vectorbtpro.utils.formatting.format_func) that 
+[format_func](/api/utils/formatting/#vectorbtpro.utils.formatting.format_func) that 
 pretty-prints the arguments and docstring of any function. It's main advantage is the ability to skip 
 annotations, which sometimes reduce readability when exploring more complex vectorbt functions using `help`.
 - Settings have been refactored once again: it's now clearly visible which key can be accessed
