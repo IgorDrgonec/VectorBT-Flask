@@ -553,30 +553,29 @@ class ArrayWrapper(Configured, PandasIndexer):
         else:
             name = None
 
-        def _wrap(arr, dtype):
+        def _apply_dtype(obj):
+            if dtype is None:
+                return obj
+            return obj.astype(dtype, errors="ignore")
+
+        def _wrap(arr):
             arr = np.asarray(arr)
             if fillna is not None:
                 arr[pd.isnull(arr)] = fillna
-            shape_2d = (arr.shape[0], arr.shape[1] if arr.ndim > 1 else 1)
+            shape_2d = (arr.shape[0] if arr.ndim > 0 else 1, arr.shape[1] if arr.ndim > 1 else 1)
             target_shape_2d = (len(index), len(columns))
             if shape_2d != target_shape_2d:
                 arr = np.broadcast_to(arr, target_shape_2d)
             arr = reshaping.soft_to_ndim(arr, self.ndim)
-            try:
-                if np.issubdtype(arr.dtype, np.floating) and np.issubdtype(dtype, np.integer):
-                    if np.isnan(arr).any():
-                        dtype = np.float_
-            except TypeError as e:  # dtype may be native to pandas
-                pass
             if arr.ndim == 1:
-                return pd.Series(arr, index=index, name=name, dtype=dtype)
+                return _apply_dtype(pd.Series(arr, index=index, name=name))
             if arr.ndim == 2:
                 if arr.shape[1] == 1 and _self.ndim == 1:
-                    return pd.Series(arr[:, 0], index=index, name=name, dtype=dtype)
-                return pd.DataFrame(arr, index=index, columns=columns, dtype=dtype)
+                    return _apply_dtype(pd.Series(arr[:, 0], index=index, name=name))
+                return _apply_dtype(pd.DataFrame(arr, index=index, columns=columns))
             raise ValueError(f"{arr.ndim}-d input is not supported")
 
-        out = _wrap(arr, dtype)
+        out = _wrap(arr)
         if to_index:
             # Convert to index
             if checks.is_series(out):
@@ -628,6 +627,11 @@ class ArrayWrapper(Configured, PandasIndexer):
             if fillna is None:
                 fillna = -1
 
+        def _apply_dtype(obj):
+            if dtype is None:
+                return obj
+            return obj.astype(dtype, errors="ignore")
+
         def _wrap_reduced(arr):
             nonlocal name_or_index
 
@@ -636,21 +640,21 @@ class ArrayWrapper(Configured, PandasIndexer):
                 arr[pd.isnull(arr)] = fillna
             if arr.ndim == 0:
                 # Scalar per Series/DataFrame
-                return pd.Series(arr, dtype=dtype)[0]
+                return _apply_dtype(pd.Series(arr))[0]
             if arr.ndim == 1:
                 if _self.ndim == 1:
                     if arr.shape[0] == 1:
                         # Scalar per Series/DataFrame with one column
-                        return pd.Series(arr, dtype=dtype)[0]
+                        return _apply_dtype(pd.Series(arr))[0]
                     # Array per Series
                     sr_name = columns[0]
                     if sr_name == 0:  # was arr Series before
                         sr_name = None
                     if isinstance(name_or_index, str):
                         name_or_index = None
-                    return pd.Series(arr, index=name_or_index, name=sr_name, dtype=dtype)
+                    return _apply_dtype(pd.Series(arr, index=name_or_index, name=sr_name))
                 # Scalar per column in arr DataFrame
-                return pd.Series(arr, index=columns, name=name_or_index, dtype=dtype)
+                return _apply_dtype(pd.Series(arr, index=columns, name=name_or_index))
             if arr.ndim == 2:
                 if arr.shape[1] == 1 and _self.ndim == 1:
                     arr = reshaping.soft_to_ndim(arr, 1)
@@ -660,11 +664,11 @@ class ArrayWrapper(Configured, PandasIndexer):
                         sr_name = None
                     if isinstance(name_or_index, str):
                         name_or_index = None
-                    return pd.Series(arr, index=name_or_index, name=sr_name, dtype=dtype)
+                    return _apply_dtype(pd.Series(arr, index=name_or_index, name=sr_name))
                 # Array per column in DataFrame
                 if isinstance(name_or_index, str):
                     name_or_index = None
-                return pd.DataFrame(arr, index=name_or_index, columns=columns, dtype=dtype)
+                return _apply_dtype(pd.DataFrame(arr, index=name_or_index, columns=columns))
             raise ValueError(f"{arr.ndim}-d input is not supported")
 
         out = _wrap_reduced(arr)

@@ -477,7 +477,7 @@ class TestMappedArray:
         )
         assert_series_equal(
             mapped_array.reduce(mean_reduce_nb, fill_value=0.0, wrap_kwargs=dict(dtype=np.int_)),
-            pd.Series(np.array([11.0, 13.333333333333334, 11.0, 0.0]), index=wrapper.columns).rename("reduce"),
+            pd.Series(np.array([11, 13, 11, 0]), index=wrapper.columns).rename("reduce"),
         )
         assert_series_equal(
             mapped_array.reduce(mean_reduce_nb, wrap_kwargs=dict(to_timedelta=True)),
