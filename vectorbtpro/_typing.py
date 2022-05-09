@@ -127,7 +127,6 @@ PandasIndexingFunc = Callable[[SeriesFrame], MaybeSeriesFrame]
 
 # Grouping
 GroupByLike = Union[None, bool, MaybeLevelSequence, IndexLike]
-PandasGroupByLike = Union[Label, Labels, Callable, Mapping[Label, Any]]
 GroupIdxs = Array1d
 GroupLens = Array1d
 GroupMap = Tuple[GroupIdxs, GroupLens]

@@ -16,14 +16,14 @@ import string
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.reshaping import to_any_array, to_pd_array
+from vectorbtpro.base.reshaping import to_any_array, to_pd_array, to_2d_array
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
-from vectorbtpro.utils.datetime_ import is_tz_aware, to_timezone
+from vectorbtpro.utils.datetime_ import is_tz_aware, to_timezone, try_to_datetime_index
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.path_ import check_mkdir
 from vectorbtpro.utils.pbar import get_pbar
@@ -232,6 +232,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                     obj = obj.tz_localize(to_timezone(tz_localize))
             if tz_convert is not None:
                 obj = obj.tz_convert(to_timezone(tz_convert))
+        obj.index = try_to_datetime_index(obj.index)
         return obj
 
     @classmethod
@@ -250,9 +251,6 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         * 'raise': raise an error
 
         For defaults, see `vectorbtpro._settings.data`."""
-        if len(data) == 1:
-            return data
-
         from vectorbtpro._settings import settings
 
         data_cfg = settings["data"]
@@ -264,24 +262,25 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
         index = None
         for symbol, obj in data.items():
+            obj_index = obj.index.sort_values()
             if index is None:
-                index = obj.index
+                index = obj_index
             else:
-                if len(index.intersection(obj.index)) != len(index.union(obj.index)):
+                if not index.equals(obj_index):
                     if missing == "nan":
                         if not silence_warnings:
                             warnings.warn(
                                 "Symbols have mismatching index. Setting missing data points to NaN.",
                                 stacklevel=2,
                             )
-                        index = index.union(obj.index)
+                        index = index.union(obj_index)
                     elif missing == "drop":
                         if not silence_warnings:
                             warnings.warn(
                                 "Symbols have mismatching index. Dropping missing data points.",
                                 stacklevel=2,
                             )
-                        index = index.intersection(obj.index)
+                        index = index.intersection(obj_index)
                     elif missing == "raise":
                         raise ValueError("Symbols have mismatching index")
                     else:
@@ -323,24 +322,25 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                 obj = obj.to_frame()
             else:
                 multiple_columns = True
+            obj_columns = obj.columns
             if columns is None:
-                columns = obj.columns
+                columns = obj_columns
             else:
-                if len(columns.intersection(obj.columns)) != len(columns.union(obj.columns)):
+                if not columns.equals(obj_columns):
                     if missing == "nan":
                         if not silence_warnings:
                             warnings.warn(
                                 "Symbols have mismatching columns. Setting missing data points to NaN.",
                                 stacklevel=2,
                             )
-                        columns = columns.union(obj.columns)
+                        columns = columns.union(obj_columns)
                     elif missing == "drop":
                         if not silence_warnings:
                             warnings.warn(
                                 "Symbols have mismatching columns. Dropping missing data points.",
                                 stacklevel=2,
                             )
-                        columns = columns.intersection(obj.columns)
+                        columns = columns.intersection(obj_columns)
                     elif missing == "raise":
                         raise ValueError("Symbols have mismatching columns")
                     else:
@@ -1119,8 +1119,8 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
     def resample(self: DataT, *args, **kwargs) -> DataT:
         """Perform resampling on `Data` based on `Data.column_config`.
 
-        Columns `open`, `high`, `low`, `close`, and `volume` (case-insensitive) are recognized
-        and resampled automatically.
+        Columns "open", "high", "low", "close", "volume", "trade count", and "vwap" (case-insensitive)
+        are recognized and resampled automatically.
 
         Looks for `resample_func` of each column in `Data.column_config`. The function must
         accept the `Data` instance, object, and resampler."""
@@ -1140,25 +1140,43 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                 resample_func = self.column_config.get(c, {}).get("resample_func", None)
                 if resample_func is not None:
                     new_v.append(resample_func(self, obj, resampler))
-                elif isinstance(c, str) and c.lower() in ("open", "high", "low", "close", "volume", "trade count"):
-                    if c.lower() == "open":
-                        new_v.append(obj.vbt.resample_apply(resampler, generic_nb.nth_reduce_nb, 0))
-                    elif c.lower() == "high":
-                        new_v.append(obj.vbt.resample_apply(resampler, generic_nb.max_reduce_nb))
-                    elif c.lower() == "low":
-                        new_v.append(obj.vbt.resample_apply(resampler, generic_nb.min_reduce_nb))
-                    elif c.lower() == "close":
-                        new_v.append(obj.vbt.resample_apply(resampler, generic_nb.last_reduce_nb))
-                    elif c.lower() == "volume":
-                        new_v.append(obj.vbt.resample_apply(resampler, generic_nb.sum_reduce_nb))
-                    else:
-                        new_v.append(obj.vbt.resample_apply(
-                            resampler,
-                            generic_nb.sum_reduce_nb,
-                            wrap_kwargs=dict(dtype=int),
-                        ))
                 else:
-                    raise ValueError(f"Cannot resample column '{c}'. Specify resample_func in column_config.")
+                    if isinstance(c, str) and c.lower() == "open":
+                        new_v.append(obj.vbt.resample_apply(resampler, generic_nb.nth_reduce_nb, 0))
+                    elif isinstance(c, str) and c.lower() == "high":
+                        new_v.append(obj.vbt.resample_apply(resampler, generic_nb.max_reduce_nb))
+                    elif isinstance(c, str) and c.lower() == "low":
+                        new_v.append(obj.vbt.resample_apply(resampler, generic_nb.min_reduce_nb))
+                    elif isinstance(c, str) and c.lower() == "close":
+                        new_v.append(obj.vbt.resample_apply(resampler, generic_nb.last_reduce_nb))
+                    elif isinstance(c, str) and c.lower() == "volume":
+                        new_v.append(obj.vbt.resample_apply(resampler, generic_nb.sum_reduce_nb))
+                    elif isinstance(c, str) and c.lower() == "trade count":
+                        new_v.append(
+                            obj.vbt.resample_apply(
+                                resampler,
+                                generic_nb.sum_reduce_nb,
+                                wrap_kwargs=dict(dtype=int),
+                            )
+                        )
+                    elif isinstance(c, str) and c.lower() == "vwap":
+                        volume_obj = None
+                        for c2 in columns:
+                            if isinstance(c2, str) and c2.lower() == "volume":
+                                volume_obj = v[c2]
+                        if volume_obj is None:
+                            raise ValueError("Volume is required to resample VWAP")
+                        new_v.append(
+                            pd.DataFrame.vbt.resample_apply(
+                                resampler,
+                                generic_nb.wmean_range_reduce_meta_nb,
+                                to_2d_array(obj),
+                                to_2d_array(volume_obj),
+                                wrapper=self.wrapper[c],
+                            )
+                        )
+                    else:
+                        raise ValueError(f"Cannot resample column '{c}'. Specify resample_func in column_config.")
             if checks.is_series(v):
                 new_v = new_v[0]
             else:

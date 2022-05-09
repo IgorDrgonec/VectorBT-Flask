@@ -87,16 +87,20 @@ Name: agg_stats, dtype: object
 
 import numpy as np
 import pandas as pd
+from pandas.core.groupby import GroupBy as PandasGroupBy
+from pandas.core.resample import Resampler as PandasResampler
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.accessors import register_df_vbt_accessor
 from vectorbtpro.base.reshaping import to_2d_array
 from vectorbtpro.base.wrapping import ArrayWrapper
+from vectorbtpro.base.grouping import Grouper
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.accessors import GenericAccessor, GenericDFAccessor
 from vectorbtpro.ohlcv import nb
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
+from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.decorators import class_or_instancemethod
 
@@ -178,9 +182,12 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
     @class_or_instancemethod
     def vwap(
         cls_or_self,
+        by: tp.Union[Grouper, tp.PandasGroupByLike] = "D",
         high: tp.ArrayLike = None,
         low: tp.ArrayLike = None,
+        close: tp.ArrayLike = None,
         volume: tp.ArrayLike = None,
+        groupby_kwargs: tp.KwargsLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrapper: tp.Optional[ArrayWrapper] = None,
@@ -192,15 +199,30 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
                 high = cls_or_self.high
             if low is None:
                 low = cls_or_self.low
+            if close is None:
+                close = cls_or_self.close
             if volume is None:
                 volume = cls_or_self.volume
-        func = jit_reg.resolve_option(nb.vwap_nb, jitted)
-        func = ch_reg.resolve_option(func, chunked)
-        out = func(to_2d_array(high), to_2d_array(low), to_2d_array(volume))
+        checks.assert_not_none(high)
+        checks.assert_not_none(low)
+        checks.assert_not_none(close)
+        checks.assert_not_none(volume)
         if wrapper is None:
             wrapper = ArrayWrapper.from_obj(volume)
             if wrapper.ndim == 1 and not isinstance(cls_or_self, type):
                 wrapper = wrapper.replace(columns=["vwap"])
+
+        grouper = wrapper.create_index_grouper(by, **resolve_dict(groupby_kwargs))
+
+        func = jit_reg.resolve_option(nb.vwap_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        out = func(
+            to_2d_array(high),
+            to_2d_array(low),
+            to_2d_array(close),
+            to_2d_array(volume),
+            grouper.get_group_lens(),
+        )
         return wrapper.wrap(out, **resolve_dict(wrap_kwargs))
 
     # ############# Resampling ############# #
@@ -336,7 +358,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
         add_trace_kwargs: tp.KwargsLike = None,
         volume_add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
-        **layout_kwargs
+        **layout_kwargs,
     ) -> tp.BaseFigure:  # pragma: no cover
         """Plot OHLCV data.
 
@@ -441,15 +463,9 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             marker_colors = np.empty(self.volume.shape, dtype=object)
             mask_greater = (self.close.values - self.open.values) > 0
             mask_less = (self.close.values - self.open.values) < 0
-            marker_colors[mask_greater] = plotting_cfg[
-                "color_schema"
-            ]["increasing"]
-            marker_colors[mask_less] = plotting_cfg[
-                "color_schema"
-            ]["decreasing"]
-            marker_colors[~(mask_greater | mask_less)] = plotting_cfg[
-                "color_schema"
-            ]["gray"]
+            marker_colors[mask_greater] = plotting_cfg["color_schema"]["increasing"]
+            marker_colors[mask_less] = plotting_cfg["color_schema"]["decreasing"]
+            marker_colors[~(mask_greater | mask_less)] = plotting_cfg["color_schema"]["gray"]
             volume_bar = go.Bar(
                 x=self.wrapper.index,
                 y=self.volume,

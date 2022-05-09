@@ -1520,7 +1520,8 @@ class AlpacaData(RemoteData):  # pragma: no cover
             df["Volume"] = df["Volume"].astype(float)
         if "Trade count" in df.columns:
             df["Trade count"] = df["Trade count"].astype(int, errors='ignore')
-        del df["VWAP"]
+        if "VWAP" in df.columns:
+            df["VWAP"] = df["VWAP"].astype(float)
 
         return df
 
@@ -1829,7 +1830,8 @@ class PolygonData(RemoteData):  # pragma: no cover
             df["Volume"] = df["Volume"].astype(float)
         if "Trade count" in df.columns:
             df["Trade count"] = df["Trade count"].astype(int, errors='ignore')
-        del df["VWAP"]
+        if "VWAP" in df.columns:
+            df["VWAP"] = df["VWAP"].astype(float)
 
         return df
 

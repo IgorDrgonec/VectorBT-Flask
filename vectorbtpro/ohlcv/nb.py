@@ -38,31 +38,61 @@ def ohlc_every_1d_nb(price: tp.Array1d, n: int) -> tp.Array2d:
             out[j, 3] = price[i]
             vmin = np.inf
             vmax = -np.inf
-    return out[:j + 1]
+    return out[: j + 1]
 
 
 @register_jitted(cache=True)
-def vwap_1d_nb(high: tp.Array1d, low: tp.Array1d, volume: tp.Array1d) -> tp.Array1d:
+def vwap_1d_nb(
+    high: tp.Array1d,
+    low: tp.Array1d,
+    close: tp.Array1d,
+    volume: tp.Array1d,
+    group_lens: tp.GroupLens,
+) -> tp.Array1d:
     """Compute the volume-weighted average price (VWAP)."""
     out = np.empty_like(volume, dtype=np.float_)
-    nom_cumsum = 0
-    denum_cumsum = 0
-    for i in range(volume.shape[0]):
-        nom_cumsum += volume[i] * (high[i] + low[i]) / 2
-        denum_cumsum += volume[i]
-        out[i] = nom_cumsum / denum_cumsum
+
+    group_end_idxs = np.cumsum(group_lens)
+    group_start_idxs = group_end_idxs - group_lens
+    for group in range(len(group_lens)):
+        from_i = group_start_idxs[group]
+        to_i = group_end_idxs[group]
+        nom_cumsum = 0
+        denum_cumsum = 0
+        for i in range(from_i, to_i):
+            nom_cumsum += volume[i] * (high[i] + low[i] + close[i]) / 3
+            denum_cumsum += volume[i]
+            out[i] = nom_cumsum / denum_cumsum
     return out
 
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="high", axis=1),
-    arg_take_spec=dict(high=ch.ArraySlicer(axis=1), low=ch.ArraySlicer(axis=1), volume=ch.ArraySlicer(axis=1)),
+    arg_take_spec=dict(
+        high=ch.ArraySlicer(axis=1),
+        low=ch.ArraySlicer(axis=1),
+        close=ch.ArraySlicer(axis=1),
+        volume=ch.ArraySlicer(axis=1),
+        group_lens=None,
+    ),
     merge_func=base_ch.column_stack,
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def vwap_nb(high: tp.Array2d, low: tp.Array2d, volume: tp.Array2d) -> tp.Array2d:
+def vwap_nb(
+    high: tp.Array2d,
+    low: tp.Array2d,
+    close: tp.Array2d,
+    volume: tp.Array2d,
+    group_lens: tp.GroupLens,
+) -> tp.Array2d:
     """2-dim version of `vwap_1d_nb`."""
     out = np.empty_like(high, dtype=np.float_)
     for col in prange(high.shape[1]):
-        out[:, col] = vwap_1d_nb(high[:, col], low[:, col], volume[:, col])
+        out[:, col] = vwap_1d_nb(
+            high[:, col],
+            low[:, col],
+            close[:, col],
+            volume[:, col],
+            group_lens,
+        )
     return out

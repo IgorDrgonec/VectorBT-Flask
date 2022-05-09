@@ -1263,10 +1263,6 @@ class TestAccessors:
             ),  # any clean way to do column-wise grouping in pandas?
         )
         assert_frame_equal(
-            df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb, use_groupby=True),
-            df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb, use_groupby=False),
-        )
-        assert_frame_equal(
             df.vbt.groupby_apply(df.groupby(np.asarray([1, 1, 2, 2, 3])), mean_nb),
             df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb),
         )

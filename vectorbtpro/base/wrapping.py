@@ -9,6 +9,7 @@ from datetime import time
 import numpy as np
 import pandas as pd
 from pandas.tseries.frequencies import to_offset
+from pandas.core.groupby import GroupBy as PandasGroupBy
 from pandas.core.resample import Resampler as PandasResampler
 
 from vectorbtpro import _typing as tp
@@ -700,13 +701,36 @@ class ArrayWrapper(Configured, PandasIndexer):
         _self = self.resolve(group_by=group_by)
         return _self.wrap_reduced(np.full(_self.shape_2d[1], fill_value), **kwargs)
 
+    def create_index_grouper(self, by: tp.Union[Grouper, tp.PandasGroupByLike], **kwargs) -> Grouper:
+        """Create an index grouper of type `vectorbtpro.base.grouping.base.Grouper`."""
+        if isinstance(by, Grouper):
+            return by
+        if isinstance(by, (PandasGroupBy, PandasResampler)):
+            return Grouper.from_pd_group_by(by)
+        try:
+            return Grouper(index=self.index, group_by=by)
+        except Exception as e:
+            pass
+        if isinstance(self.index, pd.DatetimeIndex):
+            try:
+                return Grouper(index=self.index, group_by=self.index.to_period(by))
+            except Exception as e:
+                pass
+            try:
+                pd_group_by = pd.Series(index=self.index, dtype=object).resample(by, **kwargs)
+                return Grouper.from_pd_group_by(pd_group_by)
+            except Exception as e:
+                pass
+        pd_group_by = pd.Series(index=self.index, dtype=object).groupby(by, axis=0, **kwargs)
+        return Grouper.from_pd_group_by(pd_group_by)
+
     def create_resampler(
         self,
         rule: tp.Union[Resampler, tp.PandasResampler, tp.PandasFrequencyLike],
         resample_kwargs: tp.KwargsLike = None,
         return_pd_resampler: bool = False,
     ) -> tp.Union[Resampler, tp.PandasResampler]:
-        """Create resampler of type `vectorbtpro.base.resampling.base.Resampler`."""
+        """Create a resampler of type `vectorbtpro.base.resampling.base.Resampler`."""
         if not isinstance(rule, Resampler):
             if not isinstance(rule, PandasResampler):
                 resample_kwargs = merge_dicts(

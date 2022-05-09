@@ -203,7 +203,6 @@ from functools import partial
 
 import numpy as np
 import pandas as pd
-from pandas.core.groupby import GroupBy as PandasGroupBy
 from pandas.core.resample import Resampler as PandasResampler
 from scipy import stats
 from sklearn.exceptions import NotFittedError
@@ -1042,10 +1041,9 @@ class GenericAccessor(BaseAccessor, Analyzable):
     @class_or_instancemethod
     def groupby_apply(
         cls_or_self,
-        by: tp.Union[Grouper, tp.PandasGroupBy, tp.PandasResampler, tp.PandasGroupByLike],
+        by: tp.Union[Grouper, tp.PandasGroupByLike],
         reduce_func_nb: tp.Union[tp.ReduceFunc, tp.GroupByReduceMetaFunc],
         *args,
-        use_groupby: tp.Optional[bool] = None,
         groupby_kwargs: tp.KwargsLike = None,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
@@ -1063,7 +1061,6 @@ class GenericAccessor(BaseAccessor, Analyzable):
         `pandas.core.groupby.GroupBy`, `pandas.core.resample.Resampler`, or any other groupby-like
         object that can be accepted by `vectorbtpro.base.grouping.base.Grouper`, or if it fails,
         then by `pd.DataFrame.groupby` with `groupby_kwargs` passed as keyword arguments.
-        Set `use_groupby` to True to use exclusively `pandas.core.groupby.GroupBy`.
 
         Usage:
             * Using regular function:
@@ -1155,23 +1152,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
 
-        if isinstance(by, Grouper):
-            grouper = by
-        elif isinstance(by, (PandasGroupBy, PandasResampler)):
-            grouper = Grouper.from_pd_group_by(by)
-        else:
-            grouper = None
-            if use_groupby is None:
-                try:
-                    grouper = Grouper(index=wrapper.index, group_by=by)
-                except Exception as e:
-                    use_groupby = True
-            if grouper is None:
-                if use_groupby:
-                    pd_group_by = wrapper.dummy().groupby(by, axis=0, **resolve_dict(groupby_kwargs))
-                    grouper = Grouper.from_pd_group_by(pd_group_by)
-                else:
-                    grouper = Grouper(index=wrapper.index, group_by=by)
+        grouper = wrapper.create_index_grouper(by, **resolve_dict(groupby_kwargs))
 
         if isinstance(cls_or_self, type):
             group_map = grouper.get_group_map()
@@ -1305,7 +1286,6 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 rule,
                 reduce_func_nb,
                 *args,
-                use_groupby=False,
                 template_context=template_context,
                 wrapper=wrapper,
                 wrap_kwargs=wrap_kwargs,
@@ -2075,10 +2055,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         **kwargs,
     ) -> tp.MaybeSeriesFrame:
         """`GenericAccessor.latest_at_index` but creating a resampler and using the left bound
-        of the source and target index.
-
-        !!! note
-            The timestamps in the source and target index should denote the open time."""
+        of the source and target index."""
         if not isinstance(rule, Resampler):
             rule = self.wrapper.create_resampler(rule, resample_kwargs=resample_kwargs, return_pd_resampler=False)
         return self.latest_at_index(
@@ -2098,7 +2075,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         of the source and target index.
 
         !!! note
-            The timestamps in the source and target  index should denote the open time."""
+            The timestamps in the source and target index should denote the open time."""
         if not isinstance(rule, Resampler):
             rule = self.wrapper.create_resampler(rule, resample_kwargs=resample_kwargs, return_pd_resampler=False)
         return self.latest_at_index(

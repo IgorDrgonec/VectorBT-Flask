@@ -1139,3 +1139,16 @@ def cov_reduce_grouped_meta_nb(
 def corr_reduce_grouped_meta_nb(group_idxs: tp.GroupIdxs, group: int, arr1: tp.Array2d, arr2: tp.Array2d) -> float:
     """Get correlation coefficient (ignores NaNs)."""
     return nancorr_1d_nb(arr1[:, group_idxs].flatten(), arr2[:, group_idxs].flatten())
+
+
+@register_jitted(cache=True)
+def wmean_range_reduce_meta_nb(from_i: int, to_i: int, col: int, arr1: tp.Array2d, arr2: tp.Array2d) -> float:
+    """Get the weighted average."""
+    nom_cumsum = 0
+    denum_cumsum = 0
+    for i in range(from_i, to_i):
+        nom_cumsum += arr1[i, col] * arr2[i, col]
+        denum_cumsum += arr2[i, col]
+    if denum_cumsum == 0:
+        return np.nan
+    return nom_cumsum / denum_cumsum

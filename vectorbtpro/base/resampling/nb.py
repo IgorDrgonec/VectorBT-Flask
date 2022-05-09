@@ -44,7 +44,7 @@ def map_to_target_index_nb(
     before: bool = False,
     raise_missing: bool = True,
 ) -> tp.Array1d:
-    """Get index of each in `source_index` in `target_index`.
+    """Get the index of each from `source_index` in `target_index`.
 
     If `before` is True, applied on elements that come before and including that index.
     Otherwise, applied on elements that come after and including that index.
@@ -56,6 +56,7 @@ def map_to_target_index_nb(
     for i in range(len(source_index)):
         if i > 0 and source_index[i] <= source_index[i - 1]:
             raise ValueError("Array index must be strictly increasing")
+
         found = False
         for j in range(from_j, len(target_index)):
             if j > 0 and target_index[j] <= target_index[j - 1]:
@@ -80,6 +81,7 @@ def map_to_target_index_nb(
                     out[i] = from_j = j
                     found = True
                     break
+
         if not found:
             if raise_missing:
                 raise ValueError("Resampling failed: cannot map some indices")
@@ -92,7 +94,7 @@ def index_difference_nb(
     source_index: tp.Array1d,
     target_index: tp.Array1d,
 ) -> tp.Array1d:
-    """Get elements in `source_index` not present in `target_index`."""
+    """Get the elements in `source_index` not present in `target_index`."""
     out = np.empty(len(source_index), dtype=np.int_)
     from_j = 0
     k = 0
@@ -123,12 +125,12 @@ def map_index_to_source_ranges_nb(
     target_freq: tp.Optional[tp.Scalar] = None,
     before: bool = False,
 ) -> tp.Array2d:
-    """Get source bounds that correspond to each target index.
+    """Get the source bounds that correspond to each target index.
 
     If `target_freq` is not None, the right bound is limited by the frequency in `target_freq`.
     Otherwise, the right bound is the next index in `target_index`.
 
-    Returns a 2-dim array where the first column is the absolute start index (including) nad
+    Returns a 2-dim array where the first column is the absolute start index (including) and
     the second column is the absolute end index (excluding).
 
     If an element cannot be mapped, the start and end of the range becomes -1.
@@ -197,7 +199,7 @@ def map_bounds_to_source_ranges_nb(
     closed_rbound: bool = False,
     skip_minus_one: bool = False,
 ) -> tp.Array2d:
-    """Get source bounds that correspond to target bounds.
+    """Get the source bounds that correspond to the target bounds.
 
     Returns a 2-dim array where the first column is the absolute start index (including) nad
     the second column is the absolute end index (excluding).
