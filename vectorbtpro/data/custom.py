@@ -806,7 +806,7 @@ class YFData(RemoteData):  # pragma: no cover
             "Stock Splits": dict(
                 resample_func=lambda self, obj, resampler: obj.vbt.resample_apply(
                     resampler,
-                    generic_nb.sum_reduce_nb,
+                    generic_nb.nonzero_prod_reduce_nb,
                 )
             ),
         }

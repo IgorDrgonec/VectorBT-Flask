@@ -1042,43 +1042,61 @@ def all_reduce_nb(arr: tp.Array1d) -> bool:
 
 @register_jitted(cache=True)
 def min_reduce_nb(arr: tp.Array1d) -> float:
-    """Get min (ignores NaNs)."""
+    """Get min. Ignores NaN."""
     return np.nanmin(arr)
 
 
 @register_jitted(cache=True)
 def max_reduce_nb(arr: tp.Array1d) -> float:
-    """Get max (ignores NaNs)."""
+    """Get max. Ignores NaN."""
     return np.nanmax(arr)
 
 
 @register_jitted(cache=True)
 def mean_reduce_nb(arr: tp.Array1d) -> float:
-    """Get mean (ignores NaNs)."""
+    """Get mean. Ignores NaN."""
     return np.nanmean(arr)
 
 
 @register_jitted(cache=True)
 def median_reduce_nb(arr: tp.Array1d) -> float:
-    """Get median (ignores NaNs)."""
+    """Get median. Ignores NaN."""
     return np.nanmedian(arr)
 
 
 @register_jitted(cache=True)
 def std_reduce_nb(arr: tp.Array1d, ddof) -> float:
-    """Get std (ignores NaNs)."""
+    """Get std. Ignores NaN."""
     return nanstd_1d_nb(arr, ddof=ddof)
 
 
 @register_jitted(cache=True)
 def sum_reduce_nb(arr: tp.Array1d) -> float:
-    """Get sum (ignores NaNs)."""
+    """Get sum. Ignores NaN."""
     return np.nansum(arr)
 
 
 @register_jitted(cache=True)
+def prod_reduce_nb(arr: tp.Array1d) -> float:
+    """Get product. Ignores NaN."""
+    return np.nanprod(arr)
+
+
+@register_jitted(cache=True)
+def nonzero_prod_reduce_nb(arr: tp.Array1d) -> float:
+    """Get product. Ignores zero and NaN. Default value is zero."""
+    prod = 0.0
+    for i in range(len(arr)):
+        if not np.isnan(arr[i]) and arr[i] != 0:
+            if prod == 0:
+                prod = 1.0
+            prod *= arr[i]
+    return prod
+
+
+@register_jitted(cache=True)
 def count_reduce_nb(arr: tp.Array1d) -> int:
-    """Get count (ignores NaNs)."""
+    """Get count. Ignores NaN."""
     return np.sum(~np.isnan(arr))
 
 
@@ -1106,7 +1124,7 @@ def argmax_reduce_nb(arr: tp.Array1d) -> int:
 
 @register_jitted(cache=True)
 def describe_reduce_nb(arr: tp.Array1d, perc: tp.Array1d, ddof: int) -> tp.Array1d:
-    """Get descriptive statistics (ignores NaNs).
+    """Get descriptive statistics. Ignores NaN.
 
     Numba equivalent to `pd.Series(arr).describe(perc)`."""
     arr = arr[~np.isnan(arr)]
@@ -1131,13 +1149,13 @@ def cov_reduce_grouped_meta_nb(
     arr2: tp.Array2d,
     ddof: int,
 ) -> float:
-    """Get correlation coefficient (ignores NaNs)."""
+    """Get correlation coefficient. Ignores NaN."""
     return nancov_1d_nb(arr1[:, group_idxs].flatten(), arr2[:, group_idxs].flatten(), ddof=ddof)
 
 
 @register_jitted(cache=True)
 def corr_reduce_grouped_meta_nb(group_idxs: tp.GroupIdxs, group: int, arr1: tp.Array2d, arr2: tp.Array2d) -> float:
-    """Get correlation coefficient (ignores NaNs)."""
+    """Get correlation coefficient. Ignores NaN."""
     return nancorr_1d_nb(arr1[:, group_idxs].flatten(), arr2[:, group_idxs].flatten())
 
 
