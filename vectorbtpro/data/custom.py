@@ -664,13 +664,13 @@ class HDFData(LocalData):
                 sub_paths = [p for p in path.iterdir() if p.is_file()]
                 key_paths = [p for sub_path in sub_paths for p in cls.match_path(sub_path, sort_paths=False, **kwargs)]
             else:
-                with pd.HDFStore(str(path)) as store:
+                with pd.HDFStore(str(path), mode="r") as store:
                     keys = [k[1:] for k in store.keys()]
                 key_paths = [path / k for k in keys]
         else:
             try:
                 file_path, key = cls.split_hdf_path(path)
-                with pd.HDFStore(str(file_path)) as store:
+                with pd.HDFStore(str(file_path), mode="r") as store:
                     keys = [k[1:] for k in store.keys()]
                 if key is None:
                     key_paths = [file_path / k for k in keys]
@@ -890,7 +890,7 @@ class BinanceData(RemoteData):  # pragma: no cover
     _column_config: tp.ClassVar[Config] = HybridConfig(
         {
             "Close time": dict(
-                resample_func=lambda self, obj, resampler: obj.view(np.int_).vbt.resample_apply(
+                resample_func=lambda self, obj, resampler: obj.view(int).vbt.resample_apply(
                     resampler,
                     generic_nb.nth_reduce_nb,
                     -1,
@@ -901,13 +901,6 @@ class BinanceData(RemoteData):  # pragma: no cover
                 resample_func=lambda self, obj, resampler: obj.vbt.resample_apply(
                     resampler,
                     generic_nb.sum_reduce_nb,
-                )
-            ),
-            "Number of trades": dict(
-                resample_func=lambda self, obj, resampler: obj.vbt.resample_apply(
-                    resampler,
-                    generic_nb.sum_reduce_nb,
-                    wrap_kwargs=dict(dtype=np.int_),
                 )
             ),
             "Taker base volume": dict(
@@ -1097,7 +1090,7 @@ class BinanceData(RemoteData):  # pragma: no cover
                 "Volume",
                 "Close time",
                 "Quote volume",
-                "Number of trades",
+                "Trade count",
                 "Taker base volume",
                 "Taker quote volume",
                 "Ignore",
@@ -1112,7 +1105,7 @@ class BinanceData(RemoteData):  # pragma: no cover
         df["Volume"] = df["Volume"].astype(float)
         df["Close time"] = pd.to_datetime(df["Close time"], unit="ms", utc=True)
         df["Quote volume"] = df["Quote volume"].astype(float)
-        df["Number of trades"] = df["Number of trades"].astype(int, errors='ignore')
+        df["Trade count"] = df["Trade count"].astype(int, errors='ignore')
         df["Taker base volume"] = df["Taker base volume"].astype(float)
         df["Taker quote volume"] = df["Taker quote volume"].astype(float)
         del df["Ignore"]
@@ -1350,22 +1343,6 @@ class AlpacaData(RemoteData):  # pragma: no cover
     Contributed to vectorbt by @haxdds. Licensed under Apache 2.0 with Commons Clause license.
     Adapted to vectorbtpro by @polakowo."""
 
-    _column_config: tp.ClassVar[Config] = HybridConfig(
-        {
-            "Trade count": dict(
-                resample_func=lambda self, obj, resampler: obj.vbt.resample_apply(
-                    resampler,
-                    generic_nb.sum_reduce_nb,
-                    wrap_kwargs=dict(dtype=np.int_),
-                )
-            ),
-        }
-    )
-
-    @property
-    def column_config(self) -> Config:
-        return self._column_config
-
     @classmethod
     def fetch(
         cls: tp.Type[AlpacaDataT],
@@ -1543,8 +1520,7 @@ class AlpacaData(RemoteData):  # pragma: no cover
             df["Volume"] = df["Volume"].astype(float)
         if "Trade count" in df.columns:
             df["Trade count"] = df["Trade count"].astype(int, errors='ignore')
-        if "VWAP" in df.columns:
-            df["VWAP"] = df["VWAP"].astype(float)
+        del df["VWAP"]
 
         return df
 
@@ -1558,22 +1534,6 @@ class PolygonData(RemoteData):  # pragma: no cover
     """Subclass of `vectorbtpro.data.base.Data` for `polygon-api-client`.
 
     See https://github.com/polygon-io/client-python"""
-
-    _column_config: tp.ClassVar[Config] = HybridConfig(
-        {
-            "Trade count": dict(
-                resample_func=lambda self, obj, resampler: obj.vbt.resample_apply(
-                    resampler,
-                    generic_nb.sum_reduce_nb,
-                    wrap_kwargs=dict(dtype=np.int_),
-                )
-            ),
-        }
-    )
-
-    @property
-    def column_config(self) -> Config:
-        return self._column_config
 
     @classmethod
     def fetch(
@@ -1869,8 +1829,7 @@ class PolygonData(RemoteData):  # pragma: no cover
             df["Volume"] = df["Volume"].astype(float)
         if "Trade count" in df.columns:
             df["Trade count"] = df["Trade count"].astype(int, errors='ignore')
-        if "VWAP" in df.columns:
-            df["VWAP"] = df["VWAP"].astype(float)
+        del df["VWAP"]
 
         return df
 

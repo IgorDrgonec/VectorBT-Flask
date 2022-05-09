@@ -1140,7 +1140,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                 resample_func = self.column_config.get(c, {}).get("resample_func", None)
                 if resample_func is not None:
                     new_v.append(resample_func(self, obj, resampler))
-                elif isinstance(c, str) and c.lower() in ("open", "high", "low", "close", "volume"):
+                elif isinstance(c, str) and c.lower() in ("open", "high", "low", "close", "volume", "trade count"):
                     if c.lower() == "open":
                         new_v.append(obj.vbt.resample_apply(resampler, generic_nb.nth_reduce_nb, 0))
                     elif c.lower() == "high":
@@ -1149,8 +1149,14 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                         new_v.append(obj.vbt.resample_apply(resampler, generic_nb.min_reduce_nb))
                     elif c.lower() == "close":
                         new_v.append(obj.vbt.resample_apply(resampler, generic_nb.last_reduce_nb))
-                    else:
+                    elif c.lower() == "volume":
                         new_v.append(obj.vbt.resample_apply(resampler, generic_nb.sum_reduce_nb))
+                    else:
+                        new_v.append(obj.vbt.resample_apply(
+                            resampler,
+                            generic_nb.sum_reduce_nb,
+                            wrap_kwargs=dict(dtype=int),
+                        ))
                 else:
                     raise ValueError(f"Cannot resample column '{c}'. Specify resample_func in column_config.")
             if checks.is_series(v):
