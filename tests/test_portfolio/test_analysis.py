@@ -3744,6 +3744,18 @@ class TestPortfolio:
                 columns=price_na.columns,
             ),
         )
+        assert_frame_equal(
+            pf.get_returns(log_returns=True),
+            np.log(result + 1),
+        )
+        assert_frame_equal(
+            pf.get_returns(daily_returns=True),
+            pf.returns.resample("D").apply(lambda x: (x + 1).prod() - 1),
+        )
+        assert_frame_equal(
+            pf.get_returns(log_returns=True, daily_returns=True),
+            pf.get_returns(log_returns=True).resample("D").apply(lambda x: x.cumsum()).fillna(0),
+        )
         result = pd.DataFrame(
             np.array(
                 [
@@ -3815,6 +3827,18 @@ class TestPortfolio:
         assert_frame_equal(pf.asset_returns, result)
         assert_frame_equal(pf_grouped.get_asset_returns(group_by=False), result)
         assert_frame_equal(pf_shared.get_asset_returns(group_by=False), result)
+        assert_frame_equal(
+            pf.get_asset_returns(log_returns=True),
+            np.log(result + 1),
+        )
+        assert_frame_equal(
+            pf.get_asset_returns(daily_returns=True),
+            pf.asset_returns.resample("D").apply(lambda x: (x + 1).prod() - 1),
+        )
+        assert_frame_equal(
+            pf.get_asset_returns(log_returns=True, daily_returns=True),
+            pf.get_asset_returns(log_returns=True).resample("D").apply(lambda x: x.cumsum()).fillna(0),
+        )
         result = pd.DataFrame(
             np.array(
                 [
@@ -3992,6 +4016,18 @@ class TestPortfolio:
         assert_frame_equal(pf.market_returns, result)
         assert_frame_equal(pf_grouped.get_market_returns(group_by=False), result)
         assert_frame_equal(pf_shared.get_market_returns(group_by=False), result)
+        assert_frame_equal(
+            pf.get_market_returns(log_returns=True),
+            np.log(result + 1),
+        )
+        assert_frame_equal(
+            pf.get_market_returns(daily_returns=True),
+            pf.market_returns.resample("D").apply(lambda x: (x + 1).prod() - 1),
+        )
+        assert_frame_equal(
+            pf.get_market_returns(log_returns=True, daily_returns=True),
+            pf.get_market_returns(log_returns=True).resample("D").apply(lambda x: x.cumsum()).fillna(0),
+        )
         result = pd.DataFrame(
             np.array(
                 [
@@ -4655,6 +4691,85 @@ class TestPortfolio:
                         418742834.6664331,
                         3.602470352954977,
                         37.244793636996356,
+                    ]
+                ),
+                index=stats_index,
+                name="a",
+                dtype=object,
+            ),
+        )
+        assert_series_equal(
+            pf.stats(column="a", settings=dict(log_returns=True)),
+            pd.Series(
+                np.array(
+                    [
+                        pd.Timestamp('2020-01-01 00:00:00'),
+                        pd.Timestamp('2020-01-05 00:00:00'),
+                        pd.Timedelta('5 days 00:00:00'),
+                        100.0,
+                        202.62781999999999,
+                        0.3108019801980197,
+                        -67.1002954863757,
+                        2.467578242711193,
+                        0.48618000000000006,
+                        0.10277254148026709,
+                        pd.Timedelta('2 days 00:00:00'),
+                        3,
+                        2,
+                        1,
+                        -0.20049999999999982,
+                        100.0, 41.25431425976392,
+                        37.25295186194369,
+                        39.25363306085381,
+                        np.nan,
+                        pd.Timedelta('3 days 12:00:00'),
+                        pd.NaT,
+                        np.inf,
+                        0.4141600000000001,
+                        6.247748394546397,
+                        665.2843559613844,
+                        4.483949018487055,
+                        42.89733832278653
+                    ]
+                ),
+                index=stats_index,
+                name="a",
+                dtype=object,
+            ),
+        )
+        assert_series_equal(
+            pf.stats(column="a", settings=dict(daily_returns=True)),
+            pd.Series(
+                np.array(
+                    [
+                        pd.Timestamp("2020-01-01 00:00:00"),
+                        pd.Timestamp("2020-01-05 00:00:00"),
+                        pd.Timedelta("5 days 00:00:00"),
+                        100.0,
+                        202.62781999999999,
+                        0.3108019801980197,
+                        -60.00000000000001,
+                        2.467578242711193,
+                        0.48618000000000006,
+                        0.10277254148026709,
+                        pd.Timedelta("2 days 00:00:00"),
+                        3,
+                        2,
+                        1,
+                        -0.20049999999999982,
+                        100.0,
+                        41.25431425976392,
+                        37.25295186194369,
+                        39.25363306085381,
+                        np.nan,
+                        pd.Timedelta("3 days 12:00:00"),
+                        pd.NaT,
+                        np.inf,
+                        0.4141600000000001,
+                        6.258914490528395,
+                        665.2843559613844,
+                        4.506828421607624,
+                        43.179437771402675,
                     ]
                 ),
                 index=stats_index,

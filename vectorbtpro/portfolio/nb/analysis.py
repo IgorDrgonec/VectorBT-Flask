@@ -513,7 +513,7 @@ def init_position_value_nb(
         _init_position = float(flex_select_auto_nb(init_position, 0, col, True))
         _init_price = float(flex_select_auto_nb(init_price, 0, col, True))
         if _init_position == 0:
-            out[col] = 0.
+            out[col] = 0.0
         else:
             out[col] = _init_position * _init_price
     return out
@@ -686,6 +686,7 @@ def total_profit_grouped_nb(total_profit: tp.Array1d, group_lens: tp.Array1d) ->
         value=ch.ArraySlicer(axis=1),
         init_value=base_ch.FlexArraySlicer(axis=0),
         cash_deposits=base_ch.FlexArraySlicer(axis=1),
+        log_returns=None,
         flex_2d=None,
     ),
     merge_func=base_ch.column_stack,
@@ -695,6 +696,7 @@ def returns_nb(
     value: tp.Array2d,
     init_value: tp.FlexArray,
     cash_deposits: tp.FlexArray = np.asarray(0.0),
+    log_returns: bool = False,
     flex_2d: bool = False,
 ) -> tp.Array2d:
     """Get return series per column/group."""
@@ -704,21 +706,26 @@ def returns_nb(
         for i in range(value.shape[0]):
             output_value = value[i, col]
             adj_output_value = output_value - flex_select_auto_nb(cash_deposits, i, col, flex_2d)
-            out[i, col] = returns_nb_.get_return_nb(input_value, adj_output_value)
+            out[i, col] = returns_nb_.get_return_nb(input_value, adj_output_value, log_returns=log_returns)
             input_value = output_value
     return out
 
 
 @register_jitted(cache=True)
-def get_asset_return_nb(input_asset_value: float, output_asset_value: float, cash_flow: float) -> float:
+def get_asset_return_nb(
+    input_asset_value: float,
+    output_asset_value: float,
+    cash_flow: float,
+    log_returns: bool = False,
+) -> float:
     """Get asset return from the input and output asset value, and the cash flow."""
     if is_close_nb(input_asset_value, 0):
-        return returns_nb_.get_return_nb(-output_asset_value, cash_flow)
+        return returns_nb_.get_return_nb(-output_asset_value, cash_flow, log_returns=log_returns)
     if is_close_nb(output_asset_value, 0):
-        return returns_nb_.get_return_nb(input_asset_value, cash_flow)
+        return returns_nb_.get_return_nb(input_asset_value, cash_flow, log_returns=log_returns)
     if np.sign(input_asset_value) != np.sign(output_asset_value):
-        return returns_nb_.get_return_nb(input_asset_value - output_asset_value, cash_flow)
-    return returns_nb_.get_return_nb(input_asset_value, output_asset_value + cash_flow)
+        return returns_nb_.get_return_nb(input_asset_value - output_asset_value, cash_flow, log_returns=log_returns)
+    return returns_nb_.get_return_nb(input_asset_value, output_asset_value + cash_flow, log_returns=log_returns)
 
 
 @register_chunkable(
@@ -727,11 +734,17 @@ def get_asset_return_nb(input_asset_value: float, output_asset_value: float, cas
         init_position_value=ch.ArraySlicer(axis=0),
         asset_value=ch.ArraySlicer(axis=1),
         cash_flow=ch.ArraySlicer(axis=1),
+        log_returns=None,
     ),
     merge_func=base_ch.column_stack,
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def asset_returns_nb(init_position_value: tp.Array1d, asset_value: tp.Array2d, cash_flow: tp.Array2d) -> tp.Array2d:
+def asset_returns_nb(
+    init_position_value: tp.Array1d,
+    asset_value: tp.Array2d,
+    cash_flow: tp.Array2d,
+    log_returns: bool = False,
+) -> tp.Array2d:
     """Get asset return series per column/group."""
     out = np.empty_like(cash_flow)
     for col in prange(cash_flow.shape[1]):
@@ -742,7 +755,12 @@ def asset_returns_nb(init_position_value: tp.Array1d, asset_value: tp.Array2d, c
             else:
                 input_asset_value = asset_value[i - 1, col]
                 _cash_flow = cash_flow[i, col]
-            out[i, col] = get_asset_return_nb(input_asset_value, asset_value[i, col], _cash_flow)
+            out[i, col] = get_asset_return_nb(
+                input_asset_value,
+                asset_value[i, col],
+                _cash_flow,
+                log_returns=log_returns,
+            )
     return out
 
 

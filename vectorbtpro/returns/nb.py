@@ -5,18 +5,6 @@
 Provides an arsenal of Numba-compiled functions that are used by accessors and for measuring
 portfolio performance. These only accept NumPy arrays and other Numba-compatible types.
 
-```pycon
->>> import numpy as np
->>> import vectorbtpro as vbt
-
->>> price = np.array([1.1, 1.2, 1.3, 1.2, 1.1])
->>> returns = vbt.generic.nb.pct_change_1d_nb(price)
-
->>> # vectorbtpro.returns.nb.cum_returns_1d_nb
->>> vbt.returns.nb.cum_returns_1d_nb(returns, 0)
-array([0., 0.09090909, 0.18181818, 0.09090909, 0.])
-```
-
 !!! note
     vectorbt treats matrices as first-class citizens and expects input arrays to be
     2-dim, unless function has suffix `_1d` or is meant to be input to another function.
@@ -38,20 +26,24 @@ from vectorbtpro.utils.math_ import add_nb
 
 
 @register_jitted(cache=True)
-def get_return_nb(input_value: float, output_value: float) -> float:
+def get_return_nb(input_value: float, output_value: float, log_returns: bool = False) -> float:
     """Calculate return from input and output value."""
     if input_value == 0:
         if output_value == 0:
             return 0.0
         return np.inf * np.sign(output_value)
+    if log_returns and input_value > 0 and output_value > 0:
+        return add_nb(np.log(output_value), -np.log(input_value))
     return_value = add_nb(output_value, -input_value) / input_value
     if input_value < 0:
         return_value *= -1
+    if log_returns:
+        return np.log(return_value + 1)
     return return_value
 
 
 @register_jitted(cache=True)
-def returns_1d_nb(arr: tp.Array1d, init_value: float = np.nan) -> tp.Array1d:
+def returns_1d_nb(arr: tp.Array1d, init_value: float = np.nan, log_returns: bool = False) -> tp.Array1d:
     """Calculate returns."""
     out = np.empty(arr.shape, dtype=np.float_)
     if np.isnan(init_value) and arr.shape[0] > 0:
@@ -60,104 +52,140 @@ def returns_1d_nb(arr: tp.Array1d, init_value: float = np.nan) -> tp.Array1d:
         input_value = init_value
     for i in range(arr.shape[0]):
         output_value = arr[i]
-        out[i] = get_return_nb(input_value, output_value)
+        out[i] = get_return_nb(input_value, output_value, log_returns=log_returns)
         input_value = output_value
     return out
 
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
-    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), init_value=base_ch.FlexArraySlicer(axis=1, flex_2d=True)),
+    arg_take_spec=dict(
+        arr=ch.ArraySlicer(axis=1),
+        init_value=base_ch.FlexArraySlicer(axis=1, flex_2d=True),
+        log_returns=None,
+    ),
     merge_func=base_ch.column_stack,
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def returns_nb(arr: tp.Array2d, init_value: tp.FlexArray = np.asarray(np.nan)) -> tp.Array2d:
+def returns_nb(
+    arr: tp.Array2d,
+    init_value: tp.FlexArray = np.asarray(np.nan),
+    log_returns: bool = False,
+) -> tp.Array2d:
     """2-dim version of `returns_1d_nb`."""
     out = np.empty(arr.shape, dtype=np.float_)
     for col in prange(out.shape[1]):
         _init_value = flex_select_auto_nb(init_value, 0, col, True)
-        out[:, col] = returns_1d_nb(arr[:, col], init_value=_init_value)
+        out[:, col] = returns_1d_nb(arr[:, col], init_value=_init_value, log_returns=log_returns)
     return out
 
 
 @register_jitted(cache=True)
-def cum_returns_1d_nb(rets: tp.Array1d, start_value: float) -> tp.Array1d:
+def cum_returns_1d_nb(rets: tp.Array1d, start_value: float = 0.0, log_returns: bool = False) -> tp.Array1d:
     """Cumulative returns."""
     out = np.empty_like(rets, dtype=np.float_)
-    cumprod = 1
-    for i in range(rets.shape[0]):
-        if not np.isnan(rets[i]):
-            cumprod *= rets[i] + 1
-        out[i] = cumprod
-    if start_value == 0:
-        return out - 1.0
-    return out * start_value
+    if log_returns:
+        cumsum = 0
+        for i in range(rets.shape[0]):
+            if not np.isnan(rets[i]):
+                cumsum += rets[i]
+            if start_value == 0:
+                out[i] = cumsum
+            else:
+                out[i] = np.exp(cumsum) * start_value
+    else:
+        cumprod = 1
+        for i in range(rets.shape[0]):
+            if not np.isnan(rets[i]):
+                cumprod *= rets[i] + 1
+            if start_value == 0:
+                out[i] = cumprod - 1
+            else:
+                out[i] = cumprod * start_value
+    return out
 
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="rets", axis=1),
-    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), start_value=None),
+    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), start_value=None, log_returns=None),
     merge_func=base_ch.column_stack,
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def cum_returns_nb(rets: tp.Array2d, start_value: float) -> tp.Array2d:
+def cum_returns_nb(rets: tp.Array2d, start_value: float = 0.0, log_returns: bool = False) -> tp.Array2d:
     """2-dim version of `cum_returns_1d_nb`."""
     out = np.empty_like(rets, dtype=np.float_)
     for col in prange(rets.shape[1]):
-        out[:, col] = cum_returns_1d_nb(rets[:, col], start_value)
+        out[:, col] = cum_returns_1d_nb(rets[:, col], start_value=start_value, log_returns=log_returns)
     return out
 
 
 @register_jitted(cache=True)
-def cum_returns_final_1d_nb(rets: tp.Array1d, start_value: float = 0.0) -> float:
+def cum_returns_final_1d_nb(rets: tp.Array1d, start_value: float = 0.0, log_returns: bool = False) -> float:
     """Total return."""
-    out = np.nan
-    for i in range(rets.shape[0]):
-        if not np.isnan(rets[i]):
-            if np.isnan(out):
-                out = 1.0
-            out *= rets[i] + 1.0
-    if start_value == 0:
-        return out - 1.0
-    return out * start_value
+    if log_returns:
+        cumsum = 0
+        for i in range(rets.shape[0]):
+            if not np.isnan(rets[i]):
+                cumsum += rets[i]
+        if start_value == 0:
+            return cumsum
+        return np.exp(cumsum) * start_value
+    else:
+        cumprod = 1
+        for i in range(rets.shape[0]):
+            if not np.isnan(rets[i]):
+                cumprod *= rets[i] + 1
+        if start_value == 0:
+            return cumprod - 1
+        return cumprod * start_value
 
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="rets", axis=1),
-    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), start_value=None),
+    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), start_value=None, log_returns=None),
     merge_func=base_ch.concat,
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def cum_returns_final_nb(rets: tp.Array2d, start_value: float = 0.0) -> tp.Array1d:
+def cum_returns_final_nb(rets: tp.Array2d, start_value: float = 0.0, log_returns: bool = False) -> tp.Array1d:
     """2-dim version of `cum_returns_final_1d_nb`."""
     out = np.empty(rets.shape[1], dtype=np.float_)
     for col in prange(rets.shape[1]):
-        out[col] = cum_returns_final_1d_nb(rets[:, col], start_value)
+        out[col] = cum_returns_final_1d_nb(rets[:, col], start_value=start_value, log_returns=log_returns)
     return out
 
 
 @register_jitted(cache=True)
-def annualized_return_1d_nb(rets: tp.Array1d, ann_factor: float, period: tp.Optional[float] = None) -> float:
+def annualized_return_1d_nb(
+    rets: tp.Array1d,
+    ann_factor: float,
+    period: tp.Optional[float] = None,
+    log_returns: bool = False,
+) -> float:
     """Annualized total return.
 
     This is equivalent to the compound annual growth rate."""
     if period is None:
         period = rets.shape[0]
-    cum_return = cum_returns_final_1d_nb(rets, 1.0)
+    cum_return = cum_returns_final_1d_nb(rets, start_value=1.0, log_returns=log_returns)
     return cum_return ** (ann_factor / period) - 1
 
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="rets", axis=1),
-    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), ann_factor=None, period=None),
+    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), ann_factor=None, period=None, log_returns=None),
     merge_func=base_ch.concat,
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def annualized_return_nb(rets: tp.Array2d, ann_factor: float, period: tp.Optional[float] = None) -> tp.Array1d:
+def annualized_return_nb(
+    rets: tp.Array2d,
+    ann_factor: float,
+    period: tp.Optional[float] = None,
+    log_returns: bool = False,
+) -> tp.Array1d:
     """2-dim version of `annualized_return_1d_nb`."""
     out = np.empty(rets.shape[1], dtype=np.float_)
     for col in prange(rets.shape[1]):
-        out[col] = annualized_return_1d_nb(rets[:, col], ann_factor, period=period)
+        out[col] = annualized_return_1d_nb(rets[:, col], ann_factor, period=period, log_returns=log_returns)
     return out
 
 
@@ -182,7 +210,7 @@ def annualized_volatility_nb(rets: tp.Array2d, ann_factor: float, levy_alpha: fl
 
 
 @register_jitted(cache=True)
-def max_drawdown_1d_nb(rets: tp.Array1d) -> float:
+def max_drawdown_1d_nb(rets: tp.Array1d, log_returns: bool = False) -> float:
     """Total maximum drawdown (MDD)."""
     cum_ret = np.nan
     value_max = 1.0
@@ -191,7 +219,11 @@ def max_drawdown_1d_nb(rets: tp.Array1d) -> float:
         if not np.isnan(rets[i]):
             if np.isnan(cum_ret):
                 cum_ret = 1.0
-            cum_ret *= rets[i] + 1.0
+            if log_returns:
+                ret = np.exp(rets[i]) - 1
+            else:
+                ret = rets[i]
+            cum_ret *= ret + 1.0
         if cum_ret > value_max:
             value_max = cum_ret
         elif cum_ret < value_max:
@@ -205,25 +237,30 @@ def max_drawdown_1d_nb(rets: tp.Array1d) -> float:
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="rets", axis=1),
-    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1)),
+    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), log_returns=None),
     merge_func=base_ch.concat,
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def max_drawdown_nb(rets: tp.Array2d) -> tp.Array1d:
+def max_drawdown_nb(rets: tp.Array2d, log_returns: bool = False) -> tp.Array1d:
     """2-dim version of `max_drawdown_1d_nb`."""
     out = np.empty(rets.shape[1], dtype=np.float_)
     for col in prange(rets.shape[1]):
-        out[col] = max_drawdown_1d_nb(rets[:, col])
+        out[col] = max_drawdown_1d_nb(rets[:, col], log_returns=log_returns)
     return out
 
 
 @register_jitted(cache=True)
-def calmar_ratio_1d_nb(rets: tp.Array1d, ann_factor: float, period: tp.Optional[float] = None) -> float:
+def calmar_ratio_1d_nb(
+    rets: tp.Array1d,
+    ann_factor: float,
+    period: tp.Optional[float] = None,
+    log_returns: bool = False,
+) -> float:
     """Calmar ratio, or drawdown ratio, of a strategy."""
-    max_drawdown = max_drawdown_1d_nb(rets)
+    max_drawdown = max_drawdown_1d_nb(rets, log_returns=log_returns)
     if max_drawdown == 0:
         return np.nan
-    annualized_return = annualized_return_1d_nb(rets, ann_factor, period=period)
+    annualized_return = annualized_return_1d_nb(rets, ann_factor, period=period, log_returns=log_returns)
     if max_drawdown == 0:
         return np.inf
     return annualized_return / np.abs(max_drawdown)
@@ -231,15 +268,20 @@ def calmar_ratio_1d_nb(rets: tp.Array1d, ann_factor: float, period: tp.Optional[
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="rets", axis=1),
-    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), ann_factor=None, period=None),
+    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), ann_factor=None, period=None, log_returns=None),
     merge_func=base_ch.concat,
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def calmar_ratio_nb(rets: tp.Array2d, ann_factor: float, period: tp.Optional[float] = None) -> tp.Array1d:
+def calmar_ratio_nb(
+    rets: tp.Array2d,
+    ann_factor: float,
+    period: tp.Optional[float] = None,
+    log_returns: bool = False,
+) -> tp.Array1d:
     """2-dim version of `calmar_ratio_1d_nb`."""
     out = np.empty(rets.shape[1], dtype=np.float_)
     for col in prange(rets.shape[1]):
-        out[col] = calmar_ratio_1d_nb(rets[:, col], ann_factor, period=period)
+        out[col] = calmar_ratio_1d_nb(rets[:, col], ann_factor, period=period, log_returns=log_returns)
     return out
 
 
@@ -409,7 +451,7 @@ def beta_nb(rets: tp.Array2d, bm_returns: tp.Array2d, ddof: int = 0) -> tp.Array
     return out
 
 
-@register_jitted
+@register_jitted(cache=True)
 def beta_rollmeta_nb(
     from_i: int,
     to_i: int,
@@ -443,7 +485,7 @@ def alpha_nb(adj_rets: tp.Array2d, adj_bm_returns: tp.Array2d, ann_factor: float
     return out
 
 
-@register_jitted
+@register_jitted(cache=True)
 def alpha_rollmeta_nb(
     from_i: int,
     to_i: int,
@@ -549,10 +591,11 @@ def capture_1d_nb(
     bm_returns: tp.Array1d,
     ann_factor: float,
     period: tp.Optional[float] = None,
+    log_returns: bool = False,
 ) -> float:
     """Capture ratio."""
-    annualized_return1 = annualized_return_1d_nb(rets, ann_factor, period=period)
-    annualized_return2 = annualized_return_1d_nb(bm_returns, ann_factor, period=period)
+    annualized_return1 = annualized_return_1d_nb(rets, ann_factor, period=period, log_returns=log_returns)
+    annualized_return2 = annualized_return_1d_nb(bm_returns, ann_factor, period=period, log_returns=log_returns)
     if annualized_return2 == 0:
         return np.inf
     return annualized_return1 / annualized_return2
@@ -560,7 +603,13 @@ def capture_1d_nb(
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="rets", axis=1),
-    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), bm_returns=ch.ArraySlicer(axis=1), ann_factor=None, period=None),
+    arg_take_spec=dict(
+        rets=ch.ArraySlicer(axis=1),
+        bm_returns=ch.ArraySlicer(axis=1),
+        ann_factor=None,
+        period=None,
+        log_returns=None,
+    ),
     merge_func=base_ch.concat,
 )
 @register_jitted(cache=True, tags={"can_parallel"})
@@ -569,15 +618,16 @@ def capture_nb(
     bm_returns: tp.Array2d,
     ann_factor: float,
     period: tp.Optional[float] = None,
+    log_returns: bool = False,
 ) -> tp.Array1d:
     """2-dim version of `capture_1d_nb`."""
     out = np.empty(rets.shape[1], dtype=np.float_)
     for col in prange(rets.shape[1]):
-        out[col] = capture_1d_nb(rets[:, col], bm_returns[:, col], ann_factor, period=period)
+        out[col] = capture_1d_nb(rets[:, col], bm_returns[:, col], ann_factor, period=period, log_returns=log_returns)
     return out
 
 
-@register_jitted
+@register_jitted(cache=True)
 def capture_rollmeta_nb(
     from_i: int,
     to_i: int,
@@ -586,9 +636,16 @@ def capture_rollmeta_nb(
     bm_returns: tp.Array1d,
     ann_factor: float,
     period: tp.Optional[float] = None,
+    log_returns: bool = False,
 ) -> float:
     """Rolling apply meta function based on `capture_1d_nb`."""
-    return capture_1d_nb(rets[from_i:to_i, col], bm_returns[from_i:to_i, col], ann_factor, period=period)
+    return capture_1d_nb(
+        rets[from_i:to_i, col],
+        bm_returns[from_i:to_i, col],
+        ann_factor,
+        period=period,
+        log_returns=log_returns,
+    )
 
 
 @register_jitted(cache=True)
@@ -597,6 +654,7 @@ def up_capture_1d_nb(
     bm_returns: tp.Array1d,
     ann_factor: float,
     period: tp.Optional[float] = None,
+    log_returns: bool = False,
 ) -> float:
     """Capture ratio for periods when the benchmark return is positive."""
     if period is None:
@@ -607,10 +665,14 @@ def up_capture_1d_nb(
         ret_cnt = 0
         for i in range(a.shape[0]):
             if not np.isnan(a[i]):
+                if log_returns:
+                    _a = np.exp(a[i]) - 1
+                else:
+                    _a = a[i]
                 if np.isnan(ann_ret):
                     ann_ret = 1.0
-                if a[i] > 0:
-                    ann_ret *= a[i] + 1.0
+                if _a > 0:
+                    ann_ret *= _a + 1.0
                     ret_cnt += 1
         if ret_cnt == 0:
             return np.nan
@@ -625,7 +687,13 @@ def up_capture_1d_nb(
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="rets", axis=1),
-    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), bm_returns=ch.ArraySlicer(axis=1), ann_factor=None, period=None),
+    arg_take_spec=dict(
+        rets=ch.ArraySlicer(axis=1),
+        bm_returns=ch.ArraySlicer(axis=1),
+        ann_factor=None,
+        period=None,
+        log_returns=None,
+    ),
     merge_func=base_ch.concat,
 )
 @register_jitted(cache=True, tags={"can_parallel"})
@@ -634,15 +702,22 @@ def up_capture_nb(
     bm_returns: tp.Array2d,
     ann_factor: float,
     period: tp.Optional[float] = None,
+    log_returns: bool = False,
 ) -> tp.Array1d:
     """2-dim version of `up_capture_1d_nb`."""
     out = np.empty(rets.shape[1], dtype=np.float_)
     for col in prange(rets.shape[1]):
-        out[col] = up_capture_1d_nb(rets[:, col], bm_returns[:, col], ann_factor, period=period)
+        out[col] = up_capture_1d_nb(
+            rets[:, col],
+            bm_returns[:, col],
+            ann_factor,
+            period=period,
+            log_returns=log_returns,
+        )
     return out
 
 
-@register_jitted
+@register_jitted(cache=True)
 def up_capture_rollmeta_nb(
     from_i: int,
     to_i: int,
@@ -651,9 +726,16 @@ def up_capture_rollmeta_nb(
     bm_returns: tp.Array1d,
     ann_factor: float,
     period: tp.Optional[float] = None,
+    log_returns: bool = False,
 ) -> float:
     """Rolling apply meta function based on `up_capture_1d_nb`."""
-    return up_capture_1d_nb(rets[from_i:to_i, col], bm_returns[from_i:to_i, col], ann_factor, period=period)
+    return up_capture_1d_nb(
+        rets[from_i:to_i, col],
+        bm_returns[from_i:to_i, col],
+        ann_factor,
+        period=period,
+        log_returns=log_returns,
+    )
 
 
 @register_jitted(cache=True)
@@ -662,6 +744,7 @@ def down_capture_1d_nb(
     bm_returns: tp.Array1d,
     ann_factor: float,
     period: tp.Optional[float] = None,
+    log_returns: bool = False,
 ) -> float:
     """Capture ratio for periods when the benchmark return is negative."""
     if period is None:
@@ -672,10 +755,14 @@ def down_capture_1d_nb(
         ret_cnt = 0
         for i in range(a.shape[0]):
             if not np.isnan(a[i]):
+                if log_returns:
+                    _a = np.exp(a[i]) - 1
+                else:
+                    _a = a[i]
                 if np.isnan(ann_ret):
                     ann_ret = 1.0
-                if a[i] < 0:
-                    ann_ret *= a[i] + 1.0
+                if _a < 0:
+                    ann_ret *= _a + 1.0
                     ret_cnt += 1
         if ret_cnt == 0:
             return np.nan
@@ -690,7 +777,13 @@ def down_capture_1d_nb(
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="rets", axis=1),
-    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), bm_returns=ch.ArraySlicer(axis=1), ann_factor=None, period=None),
+    arg_take_spec=dict(
+        rets=ch.ArraySlicer(axis=1),
+        bm_returns=ch.ArraySlicer(axis=1),
+        ann_factor=None,
+        period=None,
+        log_returns=None,
+    ),
     merge_func=base_ch.concat,
 )
 @register_jitted(cache=True, tags={"can_parallel"})
@@ -699,15 +792,22 @@ def down_capture_nb(
     bm_returns: tp.Array2d,
     ann_factor: float,
     period: tp.Optional[float] = None,
+    log_returns: bool = False,
 ) -> tp.Array1d:
     """2-dim version of `down_capture_1d_nb`."""
     out = np.empty(rets.shape[1], dtype=np.float_)
     for col in prange(rets.shape[1]):
-        out[col] = down_capture_1d_nb(rets[:, col], bm_returns[:, col], ann_factor, period=period)
+        out[col] = down_capture_1d_nb(
+            rets[:, col],
+            bm_returns[:, col],
+            ann_factor,
+            period=period,
+            log_returns=log_returns,
+        )
     return out
 
 
-@register_jitted
+@register_jitted(cache=True)
 def down_capture_rollmeta_nb(
     from_i: int,
     to_i: int,
@@ -716,6 +816,13 @@ def down_capture_rollmeta_nb(
     bm_returns: tp.Array1d,
     ann_factor: float,
     period: tp.Optional[float] = None,
+    log_returns: bool = False,
 ) -> float:
     """Rolling apply meta function based on `down_capture_1d_nb`."""
-    return down_capture_1d_nb(rets[from_i:to_i, col], bm_returns[from_i:to_i, col], ann_factor, period=period)
+    return down_capture_1d_nb(
+        rets[from_i:to_i, col],
+        bm_returns[from_i:to_i, col],
+        ann_factor,
+        period=period,
+        log_returns=log_returns,
+    )

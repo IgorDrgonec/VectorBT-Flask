@@ -32,8 +32,10 @@ bm_ts = pd.DataFrame(
     index=ts.index,
 )
 bm_returns = bm_ts.pct_change()
+log_bm_returns = np.log(bm_returns + 1)
 
 ret_acc = rets.vbt.returns(bm_returns=bm_returns)
+log_ret_acc = np.log(rets + 1).vbt.returns(bm_returns=log_bm_returns, log_returns=True)
 
 
 # ############# Global ############# #
@@ -89,6 +91,10 @@ class TestAccessors:
         assert_series_equal(pd.Series.vbt.returns.from_value(ts["a"]).obj, ts["a"].pct_change().fillna(0.0))
         assert_frame_equal(pd.DataFrame.vbt.returns.from_value(ts).obj, ts.pct_change().fillna(0.0))
         assert_frame_equal(
+            pd.DataFrame.vbt.returns.from_value(ts, log_returns=True).obj,
+            np.log(ts.pct_change() + 1).fillna(0.0),
+        )
+        assert_frame_equal(
             pd.DataFrame.vbt.returns.from_value(ts, jitted=dict(parallel=True)).obj,
             pd.DataFrame.vbt.returns.from_value(ts, jitted=dict(parallel=False)).obj,
         )
@@ -129,6 +135,18 @@ class TestAccessors:
             ),
         )
         assert_frame_equal(
+            np.log(ret_12h + 1).vbt.returns(log_returns=True).daily(),
+            pd.DataFrame(
+                np.array([
+                    [0.19062035960864987, -0.21072103131565256, -0.010050335853501347],
+                    [0.19062035960864987, -0.21072103131565256, -0.010050335853501347],
+                    [0.09531017980432493, -0.10536051565782628, 0.09531017980432493],
+                ]),
+                index=pd.DatetimeIndex(["2020-01-01", "2020-01-02", "2020-01-03"], dtype="datetime64[ns]", freq="D"),
+                columns=ret_12h.columns,
+            ),
+        )
+        assert_frame_equal(
             ret_12h.vbt.returns.daily(jitted=dict(parallel=True)),
             ret_12h.vbt.returns.daily(jitted=dict(parallel=False)),
         )
@@ -147,6 +165,14 @@ class TestAccessors:
             ret_acc.annual(),
             pd.DataFrame(
                 np.array([[0.03960396039603964, -0.03809523809523796, 0.0]]),
+                index=pd.DatetimeIndex(["2020-01-01"], dtype="datetime64[ns]", freq="365D"),
+                columns=rets.columns,
+            ),
+        )
+        assert_frame_equal(
+            log_ret_acc.annual(),
+            pd.DataFrame(
+                np.array([[0.03883983331626386, -0.03883983331626381, 1.5612511283791264e-17]]),
                 index=pd.DatetimeIndex(["2020-01-01"], dtype="datetime64[ns]", freq="365D"),
                 columns=rets.columns,
             ),
@@ -181,6 +207,18 @@ class TestAccessors:
             ),
         )
         assert_frame_equal(
+            ret_acc.cumulative(start_value=2),
+            (ret_acc.cumulative() + 1) * 2,
+        )
+        assert_frame_equal(
+            log_ret_acc.cumulative(),
+            log_ret_acc.obj.cumsum().fillna(0.0),
+        )
+        assert_frame_equal(
+            log_ret_acc.cumulative(start_value=2),
+            np.exp(log_ret_acc.obj.cumsum().fillna(0.0)) * 2,
+        )
+        assert_frame_equal(
             ret_acc.cumulative(jitted=dict(parallel=True)),
             ret_acc.cumulative(jitted=dict(parallel=False)),
         )
@@ -190,7 +228,11 @@ class TestAccessors:
         assert isclose(ret_acc["a"].total(), 0.03960396039603964)
         assert_series_equal(
             ret_acc.total(),
-            pd.Series([0.03960396039603964, -0.03809523809523796, 0.0], index=rets.columns, name="total_return"),
+            ret_acc.cumulative().iloc[-1].rename("total_return"),
+        )
+        assert_series_equal(
+            log_ret_acc.total(),
+            log_ret_acc.cumulative().iloc[-1].rename("total_return"),
         )
         assert_series_equal(
             ret_acc.total(jitted=dict(parallel=True)),
@@ -224,6 +266,10 @@ class TestAccessors:
             pd.Series([16.03564361105591, -0.94129954683068, 0.0], index=rets.columns, name="annualized_return"),
         )
         assert_series_equal(
+            log_ret_acc.annualized(),
+            ret_acc.annualized(),
+        )
+        assert_series_equal(
             ret_acc.annualized(jitted=dict(parallel=True)),
             ret_acc.annualized(jitted=dict(parallel=False)),
         )
@@ -241,6 +287,10 @@ class TestAccessors:
                 index=rets.index,
                 columns=rets.columns,
             ),
+        )
+        assert_frame_equal(
+            log_ret_acc.rolling_annualized(),
+            ret_acc.rolling_annualized(),
         )
         assert_frame_equal(
             ret_acc.rolling_annualized(jitted=dict(parallel=True)),
@@ -299,6 +349,10 @@ class TestAccessors:
             pd.Series([np.nan, -24.709113104305438, 0.0], index=rets.columns, name="calmar_ratio"),
         )
         assert_series_equal(
+            log_ret_acc.calmar_ratio(),
+            ret_acc.calmar_ratio(),
+        )
+        assert_series_equal(
             ret_acc.calmar_ratio(jitted=dict(parallel=True)),
             ret_acc.calmar_ratio(jitted=dict(parallel=False)),
         )
@@ -316,6 +370,10 @@ class TestAccessors:
                 index=rets.index,
                 columns=rets.columns,
             ),
+        )
+        assert_frame_equal(
+            log_ret_acc.rolling_calmar_ratio(),
+            ret_acc.rolling_calmar_ratio(),
         )
         assert_frame_equal(
             ret_acc.rolling_calmar_ratio(jitted=dict(parallel=True)),
@@ -715,6 +773,10 @@ class TestAccessors:
             pd.Series([np.inf, -0.05870045316931919, -0.0], index=rets.columns, name="capture"),
         )
         assert_series_equal(
+            log_ret_acc.capture(),
+            ret_acc.capture(),
+        )
+        assert_series_equal(
             ret_acc.capture(jitted=dict(parallel=True)),
             ret_acc.capture(jitted=dict(parallel=False)),
         )
@@ -723,7 +785,7 @@ class TestAccessors:
             ret_acc.rolling_capture(),
             pd.DataFrame(
                 [
-                    [np.nan, np.nan, np.nan],
+                    [np.inf, np.inf, np.inf],
                     [1.0, -0.16388092468864593, -6.101991442261386],
                     [1.0, -0.09158688262758773, -10.918594140453699],
                     [9.232297917748712, -0.06905391446703253, -1.5685627136380502],
@@ -732,6 +794,10 @@ class TestAccessors:
                 index=rets.index,
                 columns=rets.columns,
             ),
+        )
+        assert_frame_equal(
+            log_ret_acc.rolling_capture(),
+            ret_acc.rolling_capture(),
         )
         assert_frame_equal(
             ret_acc.rolling_capture(jitted=dict(parallel=True)),
@@ -744,6 +810,10 @@ class TestAccessors:
         assert_series_equal(
             ret_acc.up_capture(),
             pd.Series([5.035323109391956, np.nan, np.nan], index=rets.columns, name="up_capture"),
+        )
+        assert_series_equal(
+            log_ret_acc.up_capture(),
+            ret_acc.up_capture(),
         )
         assert_series_equal(
             ret_acc.up_capture(jitted=dict(parallel=True)),
@@ -765,6 +835,10 @@ class TestAccessors:
             ),
         )
         assert_frame_equal(
+            log_ret_acc.rolling_up_capture(),
+            ret_acc.rolling_up_capture(),
+        )
+        assert_frame_equal(
             ret_acc.rolling_up_capture(jitted=dict(parallel=True)),
             ret_acc.rolling_up_capture(jitted=dict(parallel=False)),
         )
@@ -778,6 +852,10 @@ class TestAccessors:
         assert_series_equal(
             ret_acc.down_capture(),
             pd.Series([np.nan, np.nan, 0.8084889429645409], index=rets.columns, name="down_capture"),
+        )
+        assert_series_equal(
+            log_ret_acc.down_capture(),
+            ret_acc.down_capture(),
         )
         assert_series_equal(
             ret_acc.down_capture(jitted=dict(parallel=True)),
@@ -797,6 +875,10 @@ class TestAccessors:
                 index=rets.index,
                 columns=rets.columns,
             ),
+        )
+        assert_frame_equal(
+            log_ret_acc.rolling_down_capture(),
+            ret_acc.rolling_down_capture(),
         )
         assert_frame_equal(
             ret_acc.rolling_down_capture(jitted=dict(parallel=True)),
@@ -842,6 +924,10 @@ class TestAccessors:
         assert isclose(ret_acc["a"].max_drawdown(), ret_acc["a"].drawdowns.get_max_drawdown(fill_value=0.0))
         assert_series_equal(ret_acc.max_drawdown(), ret_acc.drawdowns.get_max_drawdown(fill_value=0.0))
         assert_series_equal(
+            log_ret_acc.max_drawdown(),
+            ret_acc.max_drawdown(),
+        )
+        assert_series_equal(
             ret_acc.max_drawdown(jitted=dict(parallel=True)),
             ret_acc.max_drawdown(jitted=dict(parallel=False)),
         )
@@ -859,6 +945,10 @@ class TestAccessors:
                 index=rets.index,
                 columns=rets.columns,
             ),
+        )
+        assert_frame_equal(
+            log_ret_acc.rolling_max_drawdown(),
+            ret_acc.rolling_max_drawdown(),
         )
         assert_frame_equal(
             ret_acc.rolling_max_drawdown(jitted=dict(parallel=True)),

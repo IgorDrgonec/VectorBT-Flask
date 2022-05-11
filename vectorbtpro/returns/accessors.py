@@ -151,6 +151,7 @@ class ReturnsAccessor(GenericAccessor):
     Args:
         obj (pd.Series or pd.DataFrame): Pandas object representing returns.
         bm_returns (array_like): Pandas object representing benchmark returns.
+        log_returns (bool): Whether returns and benchmark returns are provided as log returns.
         year_freq (any): Year frequency for annualization purposes.
         defaults (dict): Defaults that override `defaults` in `vectorbtpro._settings.returns`.
         **kwargs: Keyword arguments that are passed down to `vectorbtpro.generic.accessors.GenericAccessor`."""
@@ -159,15 +160,25 @@ class ReturnsAccessor(GenericAccessor):
         self,
         obj: tp.SeriesFrame,
         bm_returns: tp.Optional[tp.ArrayLike] = None,
+        log_returns: bool = False,
         year_freq: tp.Optional[tp.FrequencyLike] = None,
         defaults: tp.KwargsLike = None,
         **kwargs,
     ) -> None:
-        GenericAccessor.__init__(self, obj, bm_returns=bm_returns, year_freq=year_freq, defaults=defaults, **kwargs)
+        GenericAccessor.__init__(
+            self,
+            obj,
+            bm_returns=bm_returns,
+            log_returns=log_returns,
+            year_freq=year_freq,
+            defaults=defaults,
+            **kwargs,
+        )
 
         if bm_returns is not None:
             bm_returns = broadcast_to(bm_returns, obj)
         self._bm_returns = bm_returns
+        self._log_returns = log_returns
         self._year_freq = year_freq
         self._defaults = defaults
 
@@ -198,6 +209,7 @@ class ReturnsAccessor(GenericAccessor):
         cls: tp.Type[ReturnsAccessorT],
         value: tp.SeriesFrame,
         init_value: tp.MaybeSeries = np.nan,
+        log_returns: bool = False,
         broadcast_kwargs: tp.KwargsLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -216,7 +228,7 @@ class ReturnsAccessor(GenericAccessor):
 
         func = jit_reg.resolve_option(nb.returns_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        returns = func(value_2d, init_value)
+        returns = func(value_2d, init_value, log_returns=log_returns)
         returns = ArrayWrapper.from_obj(value).wrap(returns, **wrap_kwargs)
         return cls(returns, **kwargs)
 
@@ -231,6 +243,11 @@ class ReturnsAccessor(GenericAccessor):
         if bm_returns is None:
             bm_returns = returns_cfg["bm_returns"]
         return bm_returns
+
+    @property
+    def log_returns(self) -> bool:
+        """Whether returns and benchmark returns are provided as log returns."""
+        return self._log_returns
 
     @property
     def year_freq(self) -> tp.Optional[pd.Timedelta]:
@@ -289,23 +306,37 @@ class ReturnsAccessor(GenericAccessor):
 
         return merge_dicts(returns_defaults_cfg, self._defaults)
 
-    def daily(self, jitted: tp.JittedOption = None, **kwargs) -> tp.SeriesFrame:
+    def daily(self, jitted: tp.JittedOption = None, chunked: tp.ChunkedOption = None, **kwargs) -> tp.SeriesFrame:
         """Daily returns."""
         checks.assert_instance_of(self.wrapper.index, PandasDatetimeIndex)
 
-        if self.wrapper.freq == pd.Timedelta("1D"):
-            return self.obj
         func = jit_reg.resolve_option(nb.cum_returns_final_1d_nb, jitted)
-        return self.resample_apply("1D", func, jitted=jitted, **kwargs)
+        chunked = ch.specialize_chunked_option(chunked, arg_take_spec=dict(args=ch.ArgsTaker(None, None)))
+        return self.resample_apply(
+            "1D",
+            func,
+            0.0,
+            self.log_returns,
+            jitted=jitted,
+            chunked=chunked,
+            **kwargs,
+        )
 
-    def annual(self, jitted: tp.JittedOption = None, **kwargs) -> tp.SeriesFrame:
+    def annual(self, jitted: tp.JittedOption = None, chunked: tp.ChunkedOption = None, **kwargs) -> tp.SeriesFrame:
         """Annual returns."""
         checks.assert_instance_of(self.obj.index, PandasDatetimeIndex)
 
-        if self.wrapper.freq == self.year_freq:
-            return self.obj
         func = jit_reg.resolve_option(nb.cum_returns_final_1d_nb, jitted)
-        return self.resample_apply(self.year_freq, func, jitted=jitted, **kwargs)
+        chunked = ch.specialize_chunked_option(chunked, arg_take_spec=dict(args=ch.ArgsTaker(None, None)))
+        return self.resample_apply(
+            self.year_freq,
+            func,
+            0.0,
+            self.log_returns,
+            jitted=jitted,
+            chunked=chunked,
+            **kwargs,
+        )
 
     def cumulative(
         self,
@@ -319,7 +350,7 @@ class ReturnsAccessor(GenericAccessor):
             start_value = self.defaults["start_value"]
         func = jit_reg.resolve_option(nb.cum_returns_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        cumulative = func(self.to_2d_array(), start_value)
+        cumulative = func(self.to_2d_array(), start_value=start_value, log_returns=self.log_returns)
         wrap_kwargs = resolve_dict(wrap_kwargs)
         return self.wrapper.wrap(cumulative, group_by=False, **wrap_kwargs)
 
@@ -332,7 +363,7 @@ class ReturnsAccessor(GenericAccessor):
         """See `vectorbtpro.returns.nb.cum_returns_final_nb`."""
         func = jit_reg.resolve_option(nb.cum_returns_final_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        out = func(self.to_2d_array(), 0.0)
+        out = func(self.to_2d_array(), start_value=0.0, log_returns=self.log_returns)
         wrap_kwargs = merge_dicts(dict(name_or_index="total_return"), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
@@ -353,10 +384,19 @@ class ReturnsAccessor(GenericAccessor):
             arg_take_spec=dict(
                 args=ch.ArgsTaker(
                     None,
+                    None,
                 )
             ),
         )
-        return self.rolling_apply(window, nb.cum_returns_final_1d_nb, 0.0, minp=minp, chunked=chunked, **kwargs)
+        return self.rolling_apply(
+            window,
+            nb.cum_returns_final_1d_nb,
+            0.0,
+            self.log_returns,
+            minp=minp,
+            chunked=chunked,
+            **kwargs,
+        )
 
     def annualized(
         self,
@@ -367,7 +407,7 @@ class ReturnsAccessor(GenericAccessor):
         """See `vectorbtpro.returns.nb.annualized_return_nb`."""
         func = jit_reg.resolve_option(nb.annualized_return_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        out = func(self.to_2d_array(), self.ann_factor, period=self.wrapper.dt_period)
+        out = func(self.to_2d_array(), self.ann_factor, period=self.wrapper.dt_period, log_returns=self.log_returns)
         wrap_kwargs = merge_dicts(dict(name_or_index="annualized_return"), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
@@ -384,12 +424,13 @@ class ReturnsAccessor(GenericAccessor):
             window = self.defaults["window"]
         if minp is None:
             minp = self.defaults["minp"]
-        chunked = ch.specialize_chunked_option(chunked, arg_take_spec=dict(args=ch.ArgsTaker(None, None)))
+        chunked = ch.specialize_chunked_option(chunked, arg_take_spec=dict(args=ch.ArgsTaker(None, None, None)))
         return self.rolling_apply(
             window,
             jit_reg.resolve_option(nb.annualized_return_1d_nb, jitted),
             self.ann_factor,
             None,
+            self.log_returns,
             minp=minp,
             jitted=jitted,
             chunked=chunked,
@@ -456,7 +497,7 @@ class ReturnsAccessor(GenericAccessor):
         """See `vectorbtpro.returns.nb.calmar_ratio_nb`."""
         func = jit_reg.resolve_option(nb.calmar_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        out = func(self.to_2d_array(), self.ann_factor, period=self.wrapper.dt_period)
+        out = func(self.to_2d_array(), self.ann_factor, period=self.wrapper.dt_period, log_returns=self.log_returns)
         wrap_kwargs = merge_dicts(dict(name_or_index="calmar_ratio"), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
@@ -473,12 +514,13 @@ class ReturnsAccessor(GenericAccessor):
             window = self.defaults["window"]
         if minp is None:
             minp = self.defaults["minp"]
-        chunked = ch.specialize_chunked_option(chunked, arg_take_spec=dict(args=ch.ArgsTaker(None, None)))
+        chunked = ch.specialize_chunked_option(chunked, arg_take_spec=dict(args=ch.ArgsTaker(None, None, None)))
         return self.rolling_apply(
             window,
             jit_reg.resolve_option(nb.calmar_ratio_1d_nb, jitted),
             self.ann_factor,
             None,
+            self.log_returns,
             minp=minp,
             jitted=jitted,
             chunked=chunked,
@@ -1074,7 +1116,13 @@ class ReturnsAccessor(GenericAccessor):
         bm_returns = broadcast_to(bm_returns, self.obj)
         func = jit_reg.resolve_option(nb.capture_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        out = func(self.to_2d_array(), to_2d_array(bm_returns), self.ann_factor, period=self.wrapper.dt_period)
+        out = func(
+            self.to_2d_array(),
+            to_2d_array(bm_returns),
+            self.ann_factor,
+            period=self.wrapper.dt_period,
+            log_returns=self.log_returns,
+        )
         wrap_kwargs = merge_dicts(dict(name_or_index="capture"), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
@@ -1098,7 +1146,7 @@ class ReturnsAccessor(GenericAccessor):
         bm_returns = broadcast_to(bm_returns, self.obj)
         chunked = ch.specialize_chunked_option(
             chunked,
-            arg_take_spec=dict(args=ch.ArgsTaker(ch.ArraySlicer(axis=1), ch.ArraySlicer(axis=1), None, None)),
+            arg_take_spec=dict(args=ch.ArgsTaker(ch.ArraySlicer(axis=1), ch.ArraySlicer(axis=1), None, None, None)),
         )
         return type(self).rolling_apply(
             window,
@@ -1107,6 +1155,7 @@ class ReturnsAccessor(GenericAccessor):
             to_2d_array(bm_returns),
             self.ann_factor,
             None,
+            self.log_returns,
             minp=minp,
             wrapper=self.wrapper,
             jitted=jitted,
@@ -1128,7 +1177,13 @@ class ReturnsAccessor(GenericAccessor):
         bm_returns = broadcast_to(bm_returns, self.obj)
         func = jit_reg.resolve_option(nb.up_capture_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        out = func(self.to_2d_array(), to_2d_array(bm_returns), self.ann_factor, period=self.wrapper.dt_period)
+        out = func(
+            self.to_2d_array(),
+            to_2d_array(bm_returns),
+            self.ann_factor,
+            period=self.wrapper.dt_period,
+            log_returns=self.log_returns,
+        )
         wrap_kwargs = merge_dicts(dict(name_or_index="up_capture"), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
@@ -1152,7 +1207,7 @@ class ReturnsAccessor(GenericAccessor):
         bm_returns = broadcast_to(bm_returns, self.obj)
         chunked = ch.specialize_chunked_option(
             chunked,
-            arg_take_spec=dict(args=ch.ArgsTaker(ch.ArraySlicer(axis=1), ch.ArraySlicer(axis=1), None, None)),
+            arg_take_spec=dict(args=ch.ArgsTaker(ch.ArraySlicer(axis=1), ch.ArraySlicer(axis=1), None, None, None)),
         )
         return type(self).rolling_apply(
             window,
@@ -1161,6 +1216,7 @@ class ReturnsAccessor(GenericAccessor):
             to_2d_array(bm_returns),
             self.ann_factor,
             None,
+            self.log_returns,
             minp=minp,
             wrapper=self.wrapper,
             jitted=jitted,
@@ -1182,7 +1238,13 @@ class ReturnsAccessor(GenericAccessor):
         bm_returns = broadcast_to(bm_returns, self.obj)
         func = jit_reg.resolve_option(nb.down_capture_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        out = func(self.to_2d_array(), to_2d_array(bm_returns), self.ann_factor, period=self.wrapper.dt_period)
+        out = func(
+            self.to_2d_array(),
+            to_2d_array(bm_returns),
+            self.ann_factor,
+            period=self.wrapper.dt_period,
+            log_returns=self.log_returns,
+        )
         wrap_kwargs = merge_dicts(dict(name_or_index="down_capture"), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
@@ -1206,7 +1268,7 @@ class ReturnsAccessor(GenericAccessor):
         bm_returns = broadcast_to(bm_returns, self.obj)
         chunked = ch.specialize_chunked_option(
             chunked,
-            arg_take_spec=dict(args=ch.ArgsTaker(ch.ArraySlicer(axis=1), ch.ArraySlicer(axis=1), None, None)),
+            arg_take_spec=dict(args=ch.ArgsTaker(ch.ArraySlicer(axis=1), ch.ArraySlicer(axis=1), None, None, None)),
         )
         return type(self).rolling_apply(
             window,
@@ -1215,6 +1277,7 @@ class ReturnsAccessor(GenericAccessor):
             to_2d_array(bm_returns),
             self.ann_factor,
             None,
+            self.log_returns,
             minp=minp,
             wrapper=self.wrapper,
             jitted=jitted,
@@ -1246,7 +1309,7 @@ class ReturnsAccessor(GenericAccessor):
         Yields the same out as `max_drawdown` of `ReturnsAccessor.drawdowns`."""
         func = jit_reg.resolve_option(nb.max_drawdown_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        out = func(self.to_2d_array())
+        out = func(self.to_2d_array(), log_returns=self.log_returns)
         wrap_kwargs = merge_dicts(dict(name_or_index="max_drawdown"), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
@@ -1255,6 +1318,7 @@ class ReturnsAccessor(GenericAccessor):
         window: tp.Optional[int] = None,
         minp: tp.Optional[int] = None,
         jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
         **kwargs,
     ) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.max_drawdown`."""
@@ -1262,11 +1326,17 @@ class ReturnsAccessor(GenericAccessor):
             window = self.defaults["window"]
         if minp is None:
             minp = self.defaults["minp"]
+        chunked = ch.specialize_chunked_option(
+            chunked,
+            arg_take_spec=dict(args=ch.ArgsTaker(None)),
+        )
         return self.rolling_apply(
             window,
             jit_reg.resolve_option(nb.max_drawdown_1d_nb, jitted),
+            self.log_returns,
             minp=minp,
             jitted=jitted,
+            chunked=chunked,
             **kwargs,
         )
 
@@ -1351,11 +1421,11 @@ class ReturnsAccessor(GenericAccessor):
         resampler, new_wrapper = self.wrapper.resample_meta(*args, **kwargs)
         new_obj = self.resample_apply(resampler, nb.cum_returns_final_1d_nb)
         if fill_with_zero:
-            new_obj = new_obj.vbt.fillna(0.)
+            new_obj = new_obj.vbt.fillna(0.0)
         if self.bm_returns is not None:
             new_bm_returns = self.bm_returns.vbt.resample_apply(resampler, nb.cum_returns_final_1d_nb)
             if fill_with_zero:
-                new_bm_returns = new_bm_returns.vbt.fillna(0.)
+                new_bm_returns = new_bm_returns.vbt.fillna(0.0)
         else:
             new_bm_returns = None
         return self.replace(

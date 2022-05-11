@@ -33,6 +33,8 @@ def attach_returns_acc_methods(config: Config) -> tp.ClassWrapper:
                 bm_returns: tp.Optional[tp.ArrayLike] = None,
                 freq: tp.Optional[tp.FrequencyLike] = None,
                 year_freq: tp.Optional[tp.FrequencyLike] = None,
+                log_returns: bool = False,
+                daily_returns: bool = False,
                 use_asset_returns: bool = False,
                 jitted: tp.JittedOption = None,
                 _source_name: str = source_name,
@@ -43,6 +45,8 @@ def attach_returns_acc_methods(config: Config) -> tp.ClassWrapper:
                     bm_returns=bm_returns,
                     freq=freq,
                     year_freq=year_freq,
+                    log_returns=log_returns,
+                    daily_returns=daily_returns,
                     use_asset_returns=use_asset_returns,
                     jitted=jitted,
                 )
