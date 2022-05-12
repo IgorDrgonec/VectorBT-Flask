@@ -89,9 +89,10 @@ MA = IndicatorFactory(
     nb.ma_apply_nb,
     cache_func=nb.ma_cache_nb,
     cache_pass_per_column=True,
-    kwargs_as_args=["adjust"],
+    kwargs_as_args=["adjust", "minp"],
     ewm=False,
     adjust=False,
+    minp=None,
 )
 
 
@@ -176,10 +177,11 @@ MSTD = IndicatorFactory(
     nb.mstd_apply_nb,
     cache_func=nb.mstd_cache_nb,
     cache_pass_per_column=True,
-    kwargs_as_args=["adjust", "ddof"],
+    kwargs_as_args=["adjust", "ddof", "minp"],
     ewm=False,
     adjust=False,
     ddof=0,
+    minp=None,
 )
 
 
@@ -253,12 +255,13 @@ BBANDS = IndicatorFactory(
     nb.bb_apply_nb,
     cache_func=nb.bb_cache_nb,
     cache_pass_per_column=True,
-    kwargs_as_args=["adjust", "ddof"],
+    kwargs_as_args=["adjust", "ddof", "minp"],
     window=20,
     ewm=False,
     alpha=2,
     adjust=False,
     ddof=0,
+    minp=None,
 )
 
 
@@ -371,10 +374,11 @@ RSI = IndicatorFactory(
     nb.rsi_apply_nb,
     cache_func=nb.rsi_cache_nb,
     cache_pass_per_column=True,
-    kwargs_as_args=["adjust"],
+    kwargs_as_args=["adjust", "minp"],
     window=14,
     ewm=False,
     adjust=False,
+    minp=None,
 )
 
 
@@ -479,11 +483,12 @@ STOCH = IndicatorFactory(
     nb.stoch_apply_nb,
     cache_func=nb.stoch_cache_nb,
     cache_pass_per_column=True,
-    kwargs_as_args=["adjust"],
+    kwargs_as_args=["adjust", "minp"],
     k_window=14,
     d_window=3,
     d_ewm=False,
     adjust=False,
+    minp=None,
 )
 
 
@@ -604,13 +609,14 @@ MACD = IndicatorFactory(
     nb.macd_apply_nb,
     cache_func=nb.macd_cache_nb,
     cache_pass_per_column=True,
-    kwargs_as_args=["adjust"],
+    kwargs_as_args=["adjust", "minp"],
     fast_window=12,
     slow_window=26,
     signal_window=9,
     macd_ewm=False,
     signal_ewm=False,
     adjust=False,
+    minp=None,
 )
 
 
@@ -716,10 +722,11 @@ ATR = IndicatorFactory(
     nb.atr_apply_nb,
     cache_func=nb.atr_cache_nb,
     cache_pass_per_column=True,
-    kwargs_as_args=["adjust"],
+    kwargs_as_args=["adjust", "minp"],
     window=14,
     ewm=True,
     adjust=False,
+    minp=None,
 )
 
 

@@ -5,6 +5,7 @@
 import math
 
 import numpy as np
+import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.grouping import Grouper
@@ -141,7 +142,11 @@ def returns(context: tp.KwargsLike = None) -> tp.Array2d:
 
 def vwap(context: tp.KwargsLike = None) -> tp.Array2d:
     """VWAP."""
-    return vwap_nb(context["high"], context["low"], context["volume"])
+    if isinstance(context["wrapper"].index, pd.DatetimeIndex):
+        group_lens = context["wrapper"].create_index_grouper("D").get_group_lens()
+    else:
+        group_lens = np.array([context["wrapper"].shape[0]])
+    return vwap_nb(context["high"], context["low"], context["close"], context["volume"], group_lens)
 
 
 def cap(context: tp.KwargsLike = None) -> tp.Array2d:
@@ -191,7 +196,7 @@ Can be modified.
 expr_res_func_config = HybridConfig(
     dict(
         returns=dict(func=returns, magnet_inputs=["close"]),
-        vwap=dict(func=vwap, magnet_inputs=["high", "low", "volume"]),
+        vwap=dict(func=vwap, magnet_inputs=["high", "low", "close", "volume"]),
         cap=dict(func=cap, magnet_inputs=["close", "volume"]),
     )
 )

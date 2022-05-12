@@ -2646,17 +2646,18 @@ class TestFactory:
             vbt.IndicatorFactory.from_expr("rolling_mean(@in_ts, @p_window)", parse_annotations=False)
 
     def test_from_wqa101(self):
+        index = pd.date_range("2020", periods=100)
         columns = pd.MultiIndex.from_tuples(
             [("A", 0, 0, 0), ("B", 0, 0, 0)],
             names=["symbol", "sector", "subindustry", "industry"],
         )
         np.random.seed(42)
         data_dct = {
-            "open": pd.DataFrame(np.random.uniform(size=(100, 2)), columns=columns),
-            "high": pd.DataFrame(np.random.uniform(size=(100, 2)), columns=columns),
-            "low": pd.DataFrame(np.random.uniform(size=(100, 2)), columns=columns),
-            "close": pd.DataFrame(np.random.uniform(size=(100, 2)), columns=columns),
-            "volume": pd.DataFrame(np.random.uniform(size=(100, 2)), columns=columns),
+            "open": pd.DataFrame(np.random.uniform(size=(100, 2)), index=index, columns=columns),
+            "high": pd.DataFrame(np.random.uniform(size=(100, 2)), index=index, columns=columns),
+            "low": pd.DataFrame(np.random.uniform(size=(100, 2)), index=index, columns=columns),
+            "close": pd.DataFrame(np.random.uniform(size=(100, 2)), index=index, columns=columns),
+            "volume": pd.DataFrame(np.random.uniform(size=(100, 2)), index=index, columns=columns),
         }
         for i in range(1, 102):
             WQA = vbt.IndicatorFactory.from_wqa101(i)

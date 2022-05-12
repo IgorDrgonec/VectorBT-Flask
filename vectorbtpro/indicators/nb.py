@@ -20,19 +20,32 @@ from vectorbtpro.registries.jit_registry import register_jitted
 
 
 @register_jitted(cache=True)
-def ma_nb(a: tp.Array2d, window: int, ewm: bool, adjust: bool = False) -> tp.Array2d:
-    """Compute simple or exponential moving average (`ewm=True`)."""
+def ma_nb(
+    a: tp.Array2d,
+    window: int,
+    ewm: bool,
+    adjust: bool = False,
+    minp: tp.Optional[int] = None,
+) -> tp.Array2d:
+    """Compute simple (`ewm=False`) or exponential moving average (`ewm=True`)."""
     if ewm:
-        return generic_nb.ewm_mean_nb(a, window, minp=window, adjust=adjust)
-    return generic_nb.rolling_mean_nb(a, window, minp=window)
+        return generic_nb.ewm_mean_nb(a, window, adjust=adjust, minp=minp)
+    return generic_nb.rolling_mean_nb(a, window, minp=minp)
 
 
 @register_jitted(cache=True)
-def mstd_nb(a: tp.Array2d, window: int, ewm: int, adjust: bool = False, ddof: int = 0) -> tp.Array2d:
-    """Compute simple or exponential moving STD (`ewm=True`)."""
+def mstd_nb(
+    a: tp.Array2d,
+    window: int,
+    ewm: int,
+    adjust: bool = False,
+    ddof: int = 0,
+    minp: tp.Optional[int] = None,
+) -> tp.Array2d:
+    """Compute simple (`ewm=False`) or exponential moving STD (`ewm=True`)."""
     if ewm:
-        return generic_nb.ewm_std_nb(a, window, minp=window, adjust=adjust)
-    return generic_nb.rolling_std_nb(a, window, minp=window, ddof=ddof)
+        return generic_nb.ewm_std_nb(a, window, adjust=adjust, minp=minp)
+    return generic_nb.rolling_std_nb(a, window, ddof=ddof, minp=minp)
 
 
 @register_jitted(cache=True)
@@ -41,6 +54,7 @@ def ma_cache_nb(
     windows: tp.List[int],
     ewms: tp.List[bool],
     adjust: bool = False,
+    minp: tp.Optional[int] = None,
     per_column: bool = False,
 ) -> tp.Optional[tp.Dict[int, tp.Array2d]]:
     """Caching function for `vectorbtpro.indicators.custom.MA`."""
@@ -50,7 +64,7 @@ def ma_cache_nb(
     for i in range(len(windows)):
         h = hash((windows[i], ewms[i]))
         if h not in cache_dict:
-            cache_dict[h] = ma_nb(close, windows[i], ewms[i], adjust=adjust)
+            cache_dict[h] = ma_nb(close, windows[i], ewms[i], adjust=adjust, minp=minp)
     return cache_dict
 
 
@@ -60,13 +74,14 @@ def ma_apply_nb(
     window: int,
     ewm: bool,
     adjust: bool = False,
+    minp: tp.Optional[int] = None,
     cache_dict: tp.Optional[tp.Dict[int, tp.Array2d]] = None,
 ) -> tp.Array2d:
     """Apply function for `vectorbtpro.indicators.custom.MA`."""
     if cache_dict is not None:
         h = hash((window, ewm))
         return cache_dict[h]
-    return ma_nb(close, window, ewm, adjust=adjust)
+    return ma_nb(close, window, ewm, adjust=adjust, minp=minp)
 
 
 @register_jitted(cache=True)
@@ -76,6 +91,7 @@ def mstd_cache_nb(
     ewms: tp.List[bool],
     adjust: bool = False,
     ddof: int = 0,
+    minp: tp.Optional[int] = None,
     per_column: bool = False,
 ) -> tp.Optional[tp.Dict[int, tp.Array2d]]:
     """Caching function for `vectorbtpro.indicators.custom.MSTD`."""
@@ -85,7 +101,7 @@ def mstd_cache_nb(
     for i in range(len(windows)):
         h = hash((windows[i], ewms[i]))
         if h not in cache_dict:
-            cache_dict[h] = mstd_nb(close, windows[i], ewms[i], adjust=adjust, ddof=ddof)
+            cache_dict[h] = mstd_nb(close, windows[i], ewms[i], adjust=adjust, ddof=ddof, minp=minp)
     return cache_dict
 
 
@@ -96,13 +112,14 @@ def mstd_apply_nb(
     ewm: bool,
     adjust: bool = False,
     ddof: int = 0,
+    minp: tp.Optional[int] = None,
     cache_dict: tp.Optional[tp.Dict[int, tp.Array2d]] = None,
 ) -> tp.Array2d:
     """Apply function for `vectorbtpro.indicators.custom.MSTD`."""
     if cache_dict is not None:
         h = hash((window, ewm))
         return cache_dict[h]
-    return mstd_nb(close, window, ewm, adjust=adjust, ddof=ddof)
+    return mstd_nb(close, window, ewm, adjust=adjust, ddof=ddof, minp=minp)
 
 
 @register_jitted(cache=True)
@@ -113,13 +130,14 @@ def bb_cache_nb(
     alphas: tp.List[float],
     adjust: bool = False,
     ddof: int = 0,
+    minp: tp.Optional[int] = None,
     per_column: bool = False,
 ) -> tp.Tuple[tp.Optional[tp.Dict[int, tp.Array2d]], tp.Optional[tp.Dict[int, tp.Array2d]]]:
     """Caching function for `vectorbtpro.indicators.custom.BBANDS`."""
     if per_column:
         return None, None
-    ma_cache_dict = ma_cache_nb(close, windows, ewms, adjust)
-    mstd_cache_dict = mstd_cache_nb(close, windows, ewms, adjust, ddof)
+    ma_cache_dict = ma_cache_nb(close, windows, ewms, adjust=adjust, minp=minp)
+    mstd_cache_dict = mstd_cache_nb(close, windows, ewms, adjust=adjust, ddof=ddof, minp=minp)
     return ma_cache_dict, mstd_cache_dict
 
 
@@ -131,6 +149,7 @@ def bb_apply_nb(
     alpha: float,
     adjust: bool = False,
     ddof: int = 0,
+    minp: tp.Optional[int] = None,
     ma_cache_dict: tp.Optional[tp.Dict[int, tp.Array2d]] = None,
     mstd_cache_dict: tp.Optional[tp.Dict[int, tp.Array2d]] = None,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d, tp.Array2d]:
@@ -141,8 +160,8 @@ def bb_apply_nb(
         ma = np.copy(ma_cache_dict[h])
         mstd = np.copy(mstd_cache_dict[h])
     else:
-        ma = ma_nb(close, window, ewm, adjust=adjust)
-        mstd = mstd_nb(close, window, ewm, adjust=adjust, ddof=ddof)
+        ma = ma_nb(close, window, ewm, adjust=adjust, minp=minp)
+        mstd = mstd_nb(close, window, ewm, adjust=adjust, ddof=ddof, minp=minp)
     # # (MA + Kσ), MA, (MA - Kσ)
     return ma, ma + alpha * mstd, ma - alpha * mstd
 
@@ -163,6 +182,7 @@ def rsi_cache_nb(
     windows: tp.List[int],
     ewms: tp.List[bool],
     adjust: bool = False,
+    minp: tp.Optional[int] = None,
     per_column: bool = False,
 ) -> tp.Optional[tp.Dict[int, tp.Tuple[tp.Array2d, tp.Array2d]]]:
     """Caching function for `vectorbtpro.indicators.custom.RSI`."""
@@ -175,8 +195,8 @@ def rsi_cache_nb(
     for i in range(len(windows)):
         h = hash((windows[i], ewms[i]))
         if h not in cache_dict:
-            roll_up = ma_nb(up, windows[i], ewms[i], adjust=adjust)
-            roll_down = ma_nb(down, windows[i], ewms[i], adjust=adjust)
+            roll_up = ma_nb(up, windows[i], ewms[i], adjust=adjust, minp=minp)
+            roll_down = ma_nb(down, windows[i], ewms[i], adjust=adjust, minp=minp)
             cache_dict[h] = roll_up, roll_down
     return cache_dict
 
@@ -187,6 +207,7 @@ def rsi_apply_nb(
     window: int,
     ewm: bool,
     adjust: bool = False,
+    minp: tp.Optional[int] = None,
     cache_dict: tp.Optional[tp.Dict[int, tp.Tuple[tp.Array2d, tp.Array2d]]] = None,
 ) -> tp.Array2d:
     """Apply function for `vectorbtpro.indicators.custom.RSI`."""
@@ -195,8 +216,8 @@ def rsi_apply_nb(
         roll_up, roll_down = cache_dict[h]
     else:
         up, down = rsi_up_down_nb(close)
-        roll_up = ma_nb(up, window, ewm, adjust=adjust)
-        roll_down = ma_nb(down, window, ewm, adjust=adjust)
+        roll_up = ma_nb(up, window, ewm, adjust=adjust, minp=minp)
+        roll_down = ma_nb(down, window, ewm, adjust=adjust, minp=minp)
     rs = roll_up / roll_down
     return 100 - 100 / (1 + rs)
 
@@ -210,6 +231,7 @@ def stoch_cache_nb(
     d_windows: tp.List[int],
     d_ewms: tp.List[bool],
     adjust: bool = False,
+    minp: tp.Optional[int] = None,
     per_column: bool = False,
 ) -> tp.Optional[tp.Dict[int, tp.Tuple[tp.Array2d, tp.Array2d]]]:
     """Caching function for `vectorbtpro.indicators.custom.STOCH`."""
@@ -219,8 +241,8 @@ def stoch_cache_nb(
     for i in range(len(k_windows)):
         h = hash(k_windows[i])
         if h not in cache_dict:
-            roll_min = generic_nb.rolling_min_nb(low, k_windows[i])
-            roll_max = generic_nb.rolling_max_nb(high, k_windows[i])
+            roll_min = generic_nb.rolling_min_nb(low, k_windows[i], minp=minp)
+            roll_max = generic_nb.rolling_max_nb(high, k_windows[i], minp=minp)
             cache_dict[h] = roll_min, roll_max
     return cache_dict
 
@@ -234,6 +256,7 @@ def stoch_apply_nb(
     d_window: int,
     d_ewm: bool,
     adjust: bool = False,
+    minp: tp.Optional[int] = None,
     cache_dict: tp.Optional[tp.Dict[int, tp.Tuple[tp.Array2d, tp.Array2d]]] = None,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Apply function for `vectorbtpro.indicators.custom.STOCH`."""
@@ -241,10 +264,10 @@ def stoch_apply_nb(
         h = hash(k_window)
         roll_min, roll_max = cache_dict[h]
     else:
-        roll_min = generic_nb.rolling_min_nb(low, k_window)
-        roll_max = generic_nb.rolling_max_nb(high, k_window)
+        roll_min = generic_nb.rolling_min_nb(low, k_window, minp=minp)
+        roll_max = generic_nb.rolling_max_nb(high, k_window, minp=minp)
     percent_k = 100 * (close - roll_min) / (roll_max - roll_min)
-    percent_d = ma_nb(percent_k, d_window, d_ewm, adjust=adjust)
+    percent_d = ma_nb(percent_k, d_window, d_ewm, adjust=adjust, minp=minp)
     return percent_k, percent_d
 
 
@@ -257,6 +280,7 @@ def macd_cache_nb(
     macd_ewms: tp.List[bool],
     signal_ewms: tp.List[bool],
     adjust: bool = False,
+    minp: tp.Optional[int] = None,
     per_column: bool = False,
 ) -> tp.Optional[tp.Dict[int, tp.Array2d]]:
     """Caching function for `vectorbtpro.indicators.custom.MACD`."""
@@ -266,7 +290,7 @@ def macd_cache_nb(
     windows.extend(slow_windows)
     ewms = macd_ewms.copy()
     ewms.extend(macd_ewms)
-    return ma_cache_nb(close, windows, ewms, adjust)
+    return ma_cache_nb(close, windows, ewms, adjust=adjust, minp=minp)
 
 
 @register_jitted(cache=True)
@@ -278,6 +302,7 @@ def macd_apply_nb(
     macd_ewm: bool,
     signal_ewm: bool,
     adjust: bool = False,
+    minp: tp.Optional[int] = None,
     cache_dict: tp.Optional[tp.Dict[int, tp.Array2d]] = None,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Apply function for `vectorbtpro.indicators.custom.MACD`."""
@@ -287,24 +312,24 @@ def macd_apply_nb(
         fast_ma = cache_dict[fast_h]
         slow_ma = cache_dict[slow_h]
     else:
-        fast_ma = ma_nb(close, fast_window, macd_ewm, adjust=adjust)
-        slow_ma = ma_nb(close, slow_window, macd_ewm, adjust=adjust)
+        fast_ma = ma_nb(close, fast_window, macd_ewm, adjust=adjust, minp=minp)
+        slow_ma = ma_nb(close, slow_window, macd_ewm, adjust=adjust, minp=minp)
     macd_ts = fast_ma - slow_ma
-    signal_ts = ma_nb(macd_ts, signal_window, signal_ewm, adjust=adjust)
+    signal_ts = ma_nb(macd_ts, signal_window, signal_ewm, adjust=adjust, minp=minp)
     return macd_ts, signal_ts
 
 
 @register_jitted(cache=True)
 def true_range_nb(high: tp.Array2d, low: tp.Array2d, close: tp.Array2d) -> tp.Array2d:
     """Calculate true range."""
-    prev_close = generic_nb.fshift_nb(close, 1)
-    tr1 = high - low
-    tr2 = np.abs(high - prev_close)
-    tr3 = np.abs(low - prev_close)
-    tr = np.empty(prev_close.shape, dtype=np.float_)
-    for col in range(tr.shape[1]):
-        for i in range(tr.shape[0]):
-            tr[i, col] = max(tr1[i, col], tr2[i, col], tr3[i, col])
+    tr = np.empty(high.shape, dtype=np.float_)
+    for col in range(high.shape[1]):
+        for i in range(high.shape[0]):
+            prev_close = close[i - 1, col] if i > 0 else np.nan
+            tr1 = high[i, col] - low[i, col]
+            tr2 = abs(high[i, col] - prev_close)
+            tr3 = abs(low[i, col] - prev_close)
+            tr[i, col] = max(tr1, tr2, tr3)
     return tr
 
 
@@ -316,6 +341,7 @@ def atr_cache_nb(
     windows: tp.List[int],
     ewms: tp.List[bool],
     adjust: bool = False,
+    minp: tp.Optional[int] = None,
     per_column: bool = False,
 ) -> tp.Tuple[tp.Optional[tp.Array2d], tp.Optional[tp.Dict[int, tp.Array2d]]]:
     """Caching function for `vectorbtpro.indicators.custom.ATR`."""
@@ -328,7 +354,7 @@ def atr_cache_nb(
     for i in range(len(windows)):
         h = hash((windows[i], ewms[i]))
         if h not in cache_dict:
-            cache_dict[h] = ma_nb(tr, windows[i], ewms[i], adjust=adjust)
+            cache_dict[h] = ma_nb(tr, windows[i], ewms[i], adjust=adjust, minp=minp)
     return tr, cache_dict
 
 
@@ -340,6 +366,7 @@ def atr_apply_nb(
     window: int,
     ewm: bool,
     adjust: bool = False,
+    minp: tp.Optional[int] = None,
     tr: tp.Optional[tp.Array2d] = None,
     cache_dict: tp.Optional[tp.Dict[int, tp.Array2d]] = None,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
@@ -348,12 +375,22 @@ def atr_apply_nb(
         h = hash((window, ewm))
         return tr, cache_dict[h]
     tr = true_range_nb(high, low, close)
-    return tr, ma_nb(tr, window, ewm, adjust=adjust)
+    return tr, ma_nb(tr, window, ewm, adjust=adjust, minp=minp)
 
 
 @register_jitted(cache=True)
-def obv_custom_nb(close: tp.Array2d, volume_ts: tp.Array2d) -> tp.Array2d:
+def obv_custom_nb(close: tp.Array2d, volume: tp.Array2d) -> tp.Array2d:
     """Custom calculation function for `vectorbtpro.indicators.custom.OBV`."""
-    obv = generic_nb.set_by_mask_mult_nb(volume_ts, close < generic_nb.fshift_nb(close, 1), -volume_ts)
-    obv = generic_nb.nancumsum_nb(obv)
+    obv = np.empty_like(close)
+    cumsum = 0.0
+    for col in range(close.shape[1]):
+        for i in range(close.shape[0]):
+            prev_close = close[i - 1, col] if i > 0 else np.nan
+            if close[i, col] < prev_close:
+                value = -volume[i, col]
+            else:
+                value = volume[i, col]
+            if not np.isnan(value):
+                cumsum += value
+            obv[i, col] = cumsum
     return obv

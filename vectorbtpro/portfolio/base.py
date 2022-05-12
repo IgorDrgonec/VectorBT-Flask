@@ -3347,17 +3347,16 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             dict(keep_flex=True),
             broadcast_kwargs,
         )
-        broadcast_kwargs = merge_dicts(dict(
-            wrapper_kwargs=dict(
-                freq=freq,
-                group_by=group_by,
+        broadcast_kwargs = merge_dicts(
+            dict(
+                wrapper_kwargs=dict(
+                    freq=freq,
+                    group_by=group_by,
+                ),
             ),
-        ), broadcast_kwargs)
-        broadcasted_args, wrapper = broadcast(
-            broadcastable_args,
-            return_wrapper=True,
-            **broadcast_kwargs
+            broadcast_kwargs,
         )
+        broadcasted_args, wrapper = broadcast(broadcastable_args, return_wrapper=True, **broadcast_kwargs)
         if not wrapper.group_select and cash_sharing:
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
         cash_earnings = broadcasted_args.pop("cash_earnings")
@@ -4439,17 +4438,16 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             dict(keep_flex=True),
             broadcast_kwargs,
         )
-        broadcast_kwargs = merge_dicts(dict(
-            wrapper_kwargs=dict(
-                freq=freq,
-                group_by=group_by,
+        broadcast_kwargs = merge_dicts(
+            dict(
+                wrapper_kwargs=dict(
+                    freq=freq,
+                    group_by=group_by,
+                ),
             ),
-        ), broadcast_kwargs)
-        broadcasted_args, wrapper = broadcast(
-            broadcastable_args,
-            return_wrapper=True,
-            **broadcast_kwargs
+            broadcast_kwargs,
         )
+        broadcasted_args, wrapper = broadcast(broadcastable_args, return_wrapper=True, **broadcast_kwargs)
         if not wrapper.group_select and cash_sharing:
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
         cash_earnings = broadcasted_args.pop("cash_earnings")
@@ -5628,17 +5626,16 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             dict(keep_flex=True),
             broadcast_kwargs,
         )
-        broadcast_kwargs = merge_dicts(dict(
-            wrapper_kwargs=dict(
-                freq=freq,
-                group_by=group_by,
+        broadcast_kwargs = merge_dicts(
+            dict(
+                wrapper_kwargs=dict(
+                    freq=freq,
+                    group_by=group_by,
+                ),
             ),
-        ), broadcast_kwargs)
-        broadcasted_args, wrapper = broadcast(
-            broadcastable_args,
-            return_wrapper=True,
-            **broadcast_kwargs
+            broadcast_kwargs,
         )
+        broadcasted_args, wrapper = broadcast(broadcastable_args, return_wrapper=True, **broadcast_kwargs)
         if not wrapper.group_select and cash_sharing:
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
         cash_earnings = broadcasted_args.pop("cash_earnings")
@@ -7512,6 +7509,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         init_value: tp.Optional[tp.MaybeSeries] = None,
         cash_deposits: tp.Optional[tp.ArrayLike] = None,
         value: tp.Optional[tp.SeriesFrame] = None,
+        log_returns: bool = False,
+        daily_returns: bool = False,
         flex_2d: bool = False,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -7552,9 +7551,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             to_2d_array(value),
             to_1d_array(init_value),
             cash_deposits=to_2d_array(cash_deposits),
+            log_returns=log_returns,
             flex_2d=flex_2d,
         )
-        return wrapper.wrap(returns, group_by=group_by, **resolve_dict(wrap_kwargs))
+        returns = wrapper.wrap(returns, group_by=group_by, **resolve_dict(wrap_kwargs))
+        if daily_returns:
+            returns = returns.vbt.returns(log_returns=log_returns).daily(jitted=jitted)
+        return returns
 
     @class_or_instancemethod
     def get_asset_returns(
@@ -7563,6 +7566,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         init_position_value: tp.Optional[tp.MaybeSeries] = None,
         asset_value: tp.Optional[tp.SeriesFrame] = None,
         cash_flow: tp.Optional[tp.SeriesFrame] = None,
+        log_returns: bool = False,
+        daily_returns: bool = False,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrapper: tp.Optional[ArrayWrapper] = None,
@@ -7601,8 +7606,16 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         func = jit_reg.resolve_option(nb.asset_returns_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        asset_returns = func(to_1d_array(init_position_value), to_2d_array(asset_value), to_2d_array(cash_flow))
-        return wrapper.wrap(asset_returns, group_by=group_by, **resolve_dict(wrap_kwargs))
+        asset_returns = func(
+            to_1d_array(init_position_value),
+            to_2d_array(asset_value),
+            to_2d_array(cash_flow),
+            log_returns=log_returns,
+        )
+        asset_returns = wrapper.wrap(asset_returns, group_by=group_by, **resolve_dict(wrap_kwargs))
+        if daily_returns:
+            asset_returns = asset_returns.vbt.returns(log_returns=log_returns).daily(jitted=jitted)
+        return asset_returns
 
     @class_or_instancemethod
     def get_market_value(
@@ -7701,6 +7714,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         init_value: tp.Optional[tp.MaybeSeries] = None,
         cash_deposits: tp.Optional[tp.ArrayLike] = None,
         market_value: tp.Optional[tp.SeriesFrame] = None,
+        log_returns: bool = False,
+        daily_returns: bool = False,
         flex_2d: bool = False,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -7746,9 +7761,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             to_2d_array(market_value),
             to_1d_array(init_value),
             cash_deposits=to_2d_array(cash_deposits),
+            log_returns=log_returns,
             flex_2d=flex_2d,
         )
-        return wrapper.wrap(market_returns, group_by=group_by, **resolve_dict(wrap_kwargs))
+        market_returns = wrapper.wrap(market_returns, group_by=group_by, **resolve_dict(wrap_kwargs))
+        if daily_returns:
+            market_returns = market_returns.vbt.returns(log_returns=log_returns).daily(jitted=jitted)
+        return market_returns
 
     @class_or_instancemethod
     def get_bm_value(
@@ -7795,6 +7814,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         init_value: tp.Optional[tp.MaybeSeries] = None,
         cash_deposits: tp.Optional[tp.ArrayLike] = None,
         bm_value: tp.Optional[tp.SeriesFrame] = None,
+        log_returns: bool = False,
+        daily_returns: bool = False,
         flex_2d: bool = False,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -7813,6 +7834,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             init_value=init_value,
             cash_deposits=cash_deposits,
             market_value=bm_value,
+            log_returns=log_returns,
+            daily_returns=daily_returns,
             flex_2d=flex_2d,
             jitted=jitted,
             chunked=chunked,
@@ -7866,6 +7889,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         group_by: tp.GroupByLike = None,
         returns: tp.Optional[tp.SeriesFrame] = None,
         bm_returns: tp.Optional[tp.ArrayLike] = None,
+        log_returns: bool = False,
+        daily_returns: bool = False,
         freq: tp.Optional[tp.FrequencyLike] = None,
         year_freq: tp.Optional[tp.FrequencyLike] = None,
         use_asset_returns: bool = False,
@@ -7883,6 +7908,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 if use_asset_returns:
                     returns = cls_or_self.resolve_shortcut_attr(
                         "asset_returns",
+                        log_returns=log_returns,
+                        daily_returns=daily_returns,
                         group_by=group_by,
                         jitted=jitted,
                         chunked=chunked,
@@ -7890,6 +7917,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 else:
                     returns = cls_or_self.resolve_shortcut_attr(
                         "returns",
+                        log_returns=log_returns,
+                        daily_returns=daily_returns,
                         group_by=group_by,
                         jitted=jitted,
                         chunked=chunked,
@@ -7897,6 +7926,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if bm_returns is None or (isinstance(bm_returns, bool) and bm_returns):
                 bm_returns = cls_or_self.resolve_shortcut_attr(
                     "bm_returns",
+                    log_returns=log_returns,
+                    daily_returns=daily_returns,
                     group_by=group_by,
                     jitted=jitted,
                     chunked=chunked,
@@ -7908,7 +7939,16 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         else:
             checks.assert_not_none(returns)
 
-        return returns.vbt.returns(bm_returns=bm_returns, freq=freq, year_freq=year_freq, defaults=defaults, **kwargs)
+        if daily_returns:
+            freq = "D"
+        return returns.vbt.returns(
+            bm_returns=bm_returns,
+            log_returns=log_returns,
+            freq=freq,
+            year_freq=year_freq,
+            defaults=defaults,
+            **kwargs,
+        )
 
     @property
     def returns_acc(self) -> ReturnsAccessor:
@@ -7921,6 +7961,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         group_by: tp.GroupByLike = None,
         returns: tp.Optional[tp.SeriesFrame] = None,
         bm_returns: tp.Optional[tp.ArrayLike] = None,
+        log_returns: bool = False,
+        daily_returns: bool = False,
         freq: tp.Optional[tp.FrequencyLike] = None,
         year_freq: tp.Optional[tp.FrequencyLike] = None,
         use_asset_returns: bool = False,
@@ -7938,6 +7980,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             group_by=group_by,
             returns=returns,
             bm_returns=bm_returns,
+            log_returns=log_returns,
+            daily_returns=daily_returns,
             freq=freq,
             year_freq=year_freq,
             use_asset_returns=use_asset_returns,
@@ -8229,6 +8273,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         self,
         group_by: tp.GroupByLike = None,
         bm_returns: tp.Optional[tp.ArrayLike] = None,
+        log_returns: bool = False,
+        daily_returns: bool = False,
         freq: tp.Optional[tp.FrequencyLike] = None,
         year_freq: tp.Optional[tp.FrequencyLike] = None,
         use_asset_returns: bool = False,
@@ -8245,6 +8291,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         returns_acc = self.get_returns_acc(
             group_by=group_by,
             bm_returns=bm_returns,
+            log_returns=log_returns,
+            daily_returns=daily_returns,
             freq=freq,
             year_freq=year_freq,
             use_asset_returns=use_asset_returns,
@@ -8604,6 +8652,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         column: tp.Optional[tp.Label] = None,
         group_by: tp.GroupByLike = None,
         bm_returns: tp.Optional[tp.ArrayLike] = None,
+        log_returns: bool = False,
         use_asset_returns: bool = False,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -8619,16 +8668,37 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         plotting_cfg = settings["plotting"]
 
         if bm_returns is None or (isinstance(bm_returns, bool) and bm_returns):
-            bm_returns = self.resolve_shortcut_attr("bm_returns", group_by=group_by, jitted=jitted, chunked=chunked)
+            bm_returns = self.resolve_shortcut_attr(
+                "bm_returns",
+                log_returns=log_returns,
+                daily_returns=False,
+                group_by=group_by,
+                jitted=jitted,
+                chunked=chunked,
+            )
         elif isinstance(bm_returns, bool) and not bm_returns:
             bm_returns = None
         else:
             bm_returns = broadcast_to(bm_returns, self.obj)
         bm_returns = self.select_col_from_obj(bm_returns, column, wrapper=self.wrapper.regroup(group_by))
         if use_asset_returns:
-            returns = self.resolve_shortcut_attr("asset_returns", group_by=group_by, jitted=jitted, chunked=chunked)
+            returns = self.resolve_shortcut_attr(
+                "asset_returns",
+                log_returns=log_returns,
+                daily_returns=False,
+                group_by=group_by,
+                jitted=jitted,
+                chunked=chunked,
+            )
         else:
-            returns = self.resolve_shortcut_attr("returns", group_by=group_by, jitted=jitted, chunked=chunked)
+            returns = self.resolve_shortcut_attr(
+                "returns",
+                log_returns=log_returns,
+                daily_returns=False,
+                group_by=group_by,
+                jitted=jitted,
+                chunked=chunked,
+            )
         returns = self.select_col_from_obj(returns, column, wrapper=self.wrapper.regroup(group_by))
         kwargs = merge_dicts(
             dict(
@@ -8646,7 +8716,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ),
             kwargs,
         )
-        return returns.vbt.returns.plot_cumulative(**kwargs)
+        return returns.vbt.returns(log_returns=log_returns).plot_cumulative(**kwargs)
 
     def plot_drawdowns(
         self,
