@@ -5,6 +5,7 @@
 You can access all the indicators either by `vbt.*` or `vbt.indicators.*`.
 
 ```pycon
+>>> import numpy as np
 >>> import pandas as pd
 >>> import vectorbtpro as vbt
 
@@ -24,9 +25,6 @@ They also have plotting methods.
 Run for the examples below:
 
 ```pycon
->>> import vectorbtpro as vbt
->>> from datetime import datetime
-
 >>> start = '2019-03-01 UTC'  # crypto is in UTC
 >>> end = '2019-09-01 UTC'
 >>> cols = ['Open', 'High', 'Low', 'Close', 'Volume']
@@ -73,7 +71,7 @@ from vectorbtpro.indicators.factory import IndicatorFactory
 from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.config import merge_dicts
 
-__all__ = ["MA", "MSTD", "BBANDS", "RSI", "STOCH", "MACD", "ATR", "OBV"]
+__all__ = ["MA", "MSTD", "BBANDS", "RSI", "STOCH", "MACD", "ATR", "OBV", "LINREG"]
 
 # ############# MA ############# #
 
@@ -738,9 +736,6 @@ class _ATR(ATR):
     or large True Ranges.
 
     See [Average True Range - ATR](https://www.investopedia.com/terms/a/atr.asp).
-
-    !!! note
-        Uses Simple MA and Exponential MA as compared to Wilder.
     """
 
     def plot(
@@ -856,3 +851,96 @@ class _OBV(OBV):
 
 setattr(OBV, "__doc__", _OBV.__doc__)
 setattr(OBV, "plot", _OBV.plot)
+
+
+# ############# LINREG ############# #
+
+
+LINREG = IndicatorFactory(
+    class_name="LINREG",
+    module_name=__name__,
+    short_name="linreg",
+    input_names=["x", "y"],
+    param_names=["window"],
+    output_names=["slope", "intercept"],
+    lazy_outputs=dict(
+        pred=lambda self: self.wrapper.wrap(self.intercept.values + self.slope.values * self.x.values),
+        error=lambda self: self.wrapper.wrap(self.y.values - self.pred.values),
+        angle=lambda self: self.wrapper.wrap(np.arctan(self.slope.values) * 180 / np.pi),
+    ),
+).with_apply_func(
+    nb.linreg_apply_nb,
+    cache_func=nb.linreg_cache_nb,
+    cache_pass_per_column=True,
+    kwargs_as_args=["minp"],
+    window=14,
+    minp=None,
+)
+
+
+class _LINREG(LINREG):
+    """Linear Regression.
+
+    The indicator can be used to detect changes in the behavior of the stocks against the market or each other.
+
+    See [The Linear Regression of Time and Price](https://www.investopedia.com/articles/trading/09/linear-regression-time-price.asp).
+    """
+
+    def plot(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        plot_y: bool = True,
+        y_trace_kwargs: tp.KwargsLike = None,
+        pred_trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs
+    ) -> tp.BaseFigure:  # pragma: no cover
+        """Plot `LINREG.pred` against `LINREG.y`.
+
+        Args:
+            column (str): Name of the column to plot.
+            plot_y (bool): Whether to plot `LINREG.y`.
+            y_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `LINREG.y`.
+            pred_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `LINREG.pred`.
+            add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
+            fig (Figure or FigureWidget): Figure to add traces to.
+            **layout_kwargs: Keyword arguments passed to `fig.update_layout`.
+
+        Usage:
+            ```pycon
+            >>> vbt.LINREG.run(np.arange(len(ohlcv)), ohlcv['Close'], 10).plot()
+            ```
+
+            ![](/assets/images/LINREG.svg)
+        """
+        from vectorbtpro.utils.figure import make_figure
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
+
+        self_col = self.select_col(column=column)
+
+        if fig is None:
+            fig = make_figure()
+        fig.update_layout(**layout_kwargs)
+
+        if y_trace_kwargs is None:
+            y_trace_kwargs = {}
+        if pred_trace_kwargs is None:
+            pred_trace_kwargs = {}
+        y_trace_kwargs = merge_dicts(
+            dict(name="Y", line=dict(color=plotting_cfg["color_schema"]["blue"])),
+            y_trace_kwargs,
+        )
+        pred_trace_kwargs = merge_dicts(dict(name="Pred"), pred_trace_kwargs)
+
+        if plot_y:
+            fig = self_col.y.vbt.plot(trace_kwargs=y_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+        fig = self_col.pred.vbt.plot(trace_kwargs=pred_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+
+        return fig
+
+
+setattr(LINREG, "__doc__", _LINREG.__doc__)
+setattr(LINREG, "plot", _LINREG.plot)

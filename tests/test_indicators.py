@@ -4168,3 +4168,69 @@ class TestBasic:
         )
         with pytest.raises(Exception):
             vbt.OBV.run(close_ts, volume_ts, per_column=True)
+
+    def test_LINREG(self):
+        assert_frame_equal(
+            vbt.LINREG.run(np.arange(len(close_ts))[:, None], close_ts, window=(2, 3)).slope,
+            pd.DataFrame(
+                np.array(
+                    [
+                        [np.nan, np.nan],
+                        [1.0, np.nan],
+                        [1.0, 1.0],
+                        [1.0, 1.0],
+                        [-1.0, 0.0],
+                        [-1.0, -1.0],
+                        [-1.0, -1.0],
+                    ]
+                ),
+                index=close_ts.index,
+                columns=pd.Index([2, 3], name="linreg_window"),
+            ),
+        )
+        assert_frame_equal(
+            vbt.LINREG.run(np.arange(len(close_ts))[:, None], close_ts, window=(2, 3)).intercept,
+            pd.DataFrame(
+                np.array(
+                    [
+                        [np.nan, np.nan],
+                        [1.0, np.nan],
+                        [1.0, 1.0],
+                        [1.0, 1.0],
+                        [7.0, 3.3333333333333335],
+                        [7.0, 7.0],
+                        [7.0, 7.0],
+                    ]
+                ),
+                index=close_ts.index,
+                columns=pd.Index([2, 3], name="linreg_window"),
+            ),
+        )
+        assert_frame_equal(
+            vbt.LINREG.run(
+                np.arange(len(close_ts))[:, None],
+                close_ts.vbt.tile(2),
+                window=(2, 3),
+                per_column=True,
+            ).slope,
+            vbt.LINREG.run(
+                np.arange(len(close_ts))[:, None],
+                close_ts,
+                window=(2, 3),
+                per_column=False,
+            ).slope,
+        )
+        assert_frame_equal(
+            vbt.LINREG.run(
+                np.arange(len(close_ts))[:, None],
+                close_ts.vbt.tile(2),
+                window=(2, 3),
+                per_column=True,
+            ).intercept,
+            vbt.LINREG.run(
+                np.arange(len(close_ts))[:, None],
+                close_ts,
+                window=(2, 3),
+                per_column=False,
+            ).intercept,
+        )

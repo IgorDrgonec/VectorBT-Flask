@@ -394,3 +394,37 @@ def obv_custom_nb(close: tp.Array2d, volume: tp.Array2d) -> tp.Array2d:
                 cumsum += value
             obv[i, col] = cumsum
     return obv
+
+
+@register_jitted(cache=True)
+def linreg_cache_nb(
+    x: tp.Array2d,
+    y: tp.Array2d,
+    windows: tp.List[int],
+    minp: tp.Optional[int] = None,
+    per_column: bool = False,
+) -> tp.Optional[tp.Dict[int, tp.Tuple[tp.Array2d, tp.Array2d]]]:
+    """Caching function for `vectorbtpro.indicators.custom.LINREG`."""
+    if per_column:
+        return None
+    cache_dict = dict()
+    for i in range(len(windows)):
+        h = hash(windows[i])
+        if h not in cache_dict:
+            cache_dict[h] = generic_nb.rolling_linreg_nb(x, y, windows[i], minp=minp)
+    return cache_dict
+
+
+@register_jitted(cache=True)
+def linreg_apply_nb(
+    x: tp.Array2d,
+    y: tp.Array2d,
+    window: int,
+    minp: tp.Optional[int] = None,
+    cache_dict: tp.Optional[tp.Dict[int, tp.Tuple[tp.Array2d, tp.Array2d]]] = None,
+) -> tp.Tuple[tp.Array2d, tp.Array2d]:
+    """Apply function for `vectorbtpro.indicators.custom.LINREG`."""
+    if cache_dict is not None:
+        h = hash(window)
+        return cache_dict[h]
+    return generic_nb.rolling_linreg_nb(x, y, window, minp=minp)

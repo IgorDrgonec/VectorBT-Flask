@@ -1418,87 +1418,87 @@ class IndicatorFactory(Configured):
         self._Indicator = Indicator
 
     @property
-    def class_name(self):
+    def class_name(self) -> str:
         """Name for the created indicator class."""
         return self._class_name
 
     @property
-    def class_docstring(self):
+    def class_docstring(self) -> str:
         """Docstring for the created indicator class."""
         return self._class_docstring
 
     @property
-    def module_name(self):
+    def module_name(self) -> str:
         """Name of the module the class originates from."""
         return self._module_name
 
     @property
-    def short_name(self):
+    def short_name(self) -> str:
         """Short name of the indicator."""
         return self._short_name
 
     @property
-    def prepend_name(self):
+    def prepend_name(self) -> bool:
         """Whether to prepend `IndicatorFactory.short_name` to each parameter level."""
         return self._prepend_name
 
     @property
-    def input_names(self):
+    def input_names(self) -> tp.List[str]:
         """List with input names."""
         return self._input_names
 
     @property
-    def param_names(self):
+    def param_names(self) -> tp.List[str]:
         """List with parameter names."""
         return self._param_names
 
     @property
-    def in_output_names(self):
+    def in_output_names(self) -> tp.List[str]:
         """List with in-output names."""
         return self._in_output_names
 
     @property
-    def output_names(self):
+    def output_names(self) -> tp.List[str]:
         """List with output names."""
         return self._output_names
 
     @property
-    def output_flags(self):
+    def output_flags(self) -> tp.Kwargs:
         """Dictionary of in-place and regular output flags."""
         return self._output_flags
 
     @property
-    def lazy_outputs(self):
+    def lazy_outputs(self) -> tp.Kwargs:
         """Dictionary with user-defined functions that will become properties."""
         return self._lazy_outputs
 
     @property
-    def attr_settings(self):
+    def attr_settings(self) -> tp.Kwargs:
         """Dictionary with attribute settings."""
         return self._attr_settings
 
     @property
-    def metrics(self):
+    def metrics(self) -> Config:
         """Metrics supported by `vectorbtpro.generic.stats_builder.StatsBuilderMixin.stats`."""
         return self._metrics
 
     @property
-    def stats_defaults(self):
+    def stats_defaults(self) -> tp.Kwargs:
         """Defaults for `vectorbtpro.generic.stats_builder.StatsBuilderMixin.stats`."""
         return self._stats_defaults
 
     @property
-    def plots(self):
+    def subplots(self) -> Config:
         """Subplots supported by `vectorbtpro.generic.plots_builder.PlotsBuilderMixin.plots`."""
-        return self._plots
+        return self._subplots
 
     @property
-    def plots_defaults(self):
+    def plots_defaults(self) -> tp.Kwargs:
         """Defaults for `vectorbtpro.generic.plots_builder.PlotsBuilderMixin.plots`."""
         return self._plots_defaults
 
     @property
-    def Indicator(self):
+    def Indicator(self) -> type:
         """Built indicator class."""
         return self._Indicator
 
@@ -1819,6 +1819,8 @@ class IndicatorFactory(Configured):
             _1 += "\n* Parameters: " + ", ".join(map(lambda x: f"`{x}`", self.param_names))
         if len(self.output_names) > 0:
             _1 += "\n* Outputs: " + ", ".join(map(lambda x: f"`{x}`", self.output_names))
+        if len(self.lazy_outputs) > 0:
+            _1 += "\n* Lazy outputs: " + ", ".join(map(lambda x: f"`{x}`", list(self.lazy_outputs.keys())))
         run_docstring = """Run `{0}` indicator.
 {1}
 
@@ -1937,6 +1939,8 @@ Other keyword arguments are passed to `vectorbtpro.indicators.factory.run_pipeli
                 _1 += "\n* Parameters: " + ", ".join(map(lambda x: f"`{x}`", self.param_names))
             if len(self.output_names) > 0:
                 _1 += "\n* Outputs: " + ", ".join(map(lambda x: f"`{x}`", self.output_names))
+            if len(self.lazy_outputs) > 0:
+                _1 += "\n* Lazy outputs: " + ", ".join(map(lambda x: f"`{x}`", list(self.lazy_outputs.keys())))
             run_combs_docstring = """Create a combination of multiple `{0}` indicators using function `comb_func`.
 {1}
 
