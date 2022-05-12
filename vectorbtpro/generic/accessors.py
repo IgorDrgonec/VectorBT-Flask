@@ -612,6 +612,44 @@ class GenericAccessor(BaseAccessor, Analyzable):
         """Expanding version of `GenericAccessor.rolling_corr`."""
         return self.rolling_corr(other, None, minp=minp, **kwargs)
 
+    def rolling_linreg(
+        self,
+        other: tp.SeriesFrame,
+        window: tp.Optional[int],
+        minp: tp.Optional[int] = None,
+        broadcast_kwargs: tp.KwargsLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.Tuple[tp.SeriesFrame, tp.SeriesFrame]:
+        """See `vectorbtpro.generic.nb.rolling.rolling_linreg_nb`.
+
+        Returns two arrays: slope and intercept."""
+        self_obj, other_obj = reshaping.broadcast(self.obj, other, **resolve_dict(broadcast_kwargs))
+        if window is None:
+            window = self_obj.shape[0]
+        func = jit_reg.resolve_option(nb.rolling_linreg_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        slope_out, intercept_out = func(
+            reshaping.to_2d_array(self_obj),
+            reshaping.to_2d_array(other_obj),
+            window,
+            minp=minp,
+        )
+        return (
+            ArrayWrapper.from_obj(self_obj).wrap(slope_out, group_by=False, **resolve_dict(wrap_kwargs)),
+            ArrayWrapper.from_obj(self_obj).wrap(intercept_out, group_by=False, **resolve_dict(wrap_kwargs)),
+        )
+
+    def expanding_linreg(
+        self,
+        other: tp.SeriesFrame,
+        minp: tp.Optional[int] = 1,
+        **kwargs,
+    ) -> tp.Tuple[tp.SeriesFrame, tp.SeriesFrame]:
+        """Expanding version of `GenericAccessor.rolling_linreg`."""
+        return self.rolling_linreg(other, None, minp=minp, **kwargs)
+
     def rolling_rank(
         self,
         window: tp.Optional[int],

@@ -4,6 +4,7 @@ from datetime import datetime
 import pytest
 from numba import njit
 from sklearn.model_selection import TimeSeriesSplit
+from statsmodels.regression.rolling import RollingOLS
 
 import vectorbtpro as vbt
 from vectorbtpro.generic import nb
@@ -571,6 +572,114 @@ class TestAccessors:
         assert_frame_equal(
             df.vbt.expanding_corr(df2, minp=test_minp, chunked=True),
             df.vbt.expanding_corr(df2, minp=test_minp, chunked=False),
+        )
+
+    @pytest.mark.parametrize("test_window", [2, 3, 4, 5])
+    def test_rolling_linreg(self, test_window):
+        def sr_linreg(x, y):
+            intercept_slope = RollingOLS(
+                y,
+                np.column_stack((np.broadcast_to(1, x.shape), x)),
+                window=test_window,
+                min_nobs=test_window
+            ).fit().params
+            intercept = intercept_slope.iloc[:, 0].rename(x.name)
+            slope = intercept_slope.iloc[:, 1].rename(x.name)
+            return slope, intercept
+
+        df2 = df[["b", "c", "a"]].rename(columns={"b": "a", "c": "b", "a": "c"})
+        assert_series_equal(
+            df["a"].vbt.rolling_linreg(df2["a"], test_window)[0],
+            sr_linreg(df["a"], df2["a"])[0],
+        )
+        assert_series_equal(
+            df["a"].vbt.rolling_linreg(df2["a"], test_window)[1],
+            sr_linreg(df["a"], df2["a"])[1],
+        )
+        assert_frame_equal(
+            df.vbt.rolling_linreg(df2, test_window)[0],
+            pd.concat((
+                sr_linreg(df["a"], df2["a"])[0],
+                sr_linreg(df["b"], df2["b"])[0],
+                sr_linreg(df["c"], df2["c"])[0],
+            ), axis=1),
+        )
+        assert_frame_equal(
+            df.vbt.rolling_linreg(df2, test_window)[1],
+            pd.concat((
+                sr_linreg(df["a"], df2["a"])[1],
+                sr_linreg(df["b"], df2["b"])[1],
+                sr_linreg(df["c"], df2["c"])[1],
+            ), axis=1),
+        )
+        assert_frame_equal(
+            df.vbt.rolling_linreg(df2, test_window, jitted=dict(parallel=True))[0],
+            df.vbt.rolling_linreg(df2, test_window, jitted=dict(parallel=False))[0],
+        )
+        assert_frame_equal(
+            df.vbt.rolling_linreg(df2, test_window, jitted=dict(parallel=True))[1],
+            df.vbt.rolling_linreg(df2, test_window, jitted=dict(parallel=False))[1],
+        )
+        assert_frame_equal(
+            df.vbt.rolling_linreg(df2, test_window, chunked=True)[0],
+            df.vbt.rolling_linreg(df2, test_window, chunked=False)[0],
+        )
+        assert_frame_equal(
+            df.vbt.rolling_linreg(df2, test_window, chunked=True)[1],
+            df.vbt.rolling_linreg(df2, test_window, chunked=False)[1],
+        )
+
+    def test_expanding_linreg(self):
+        def sr_linreg(x, y):
+            intercept_slope = RollingOLS(
+                y,
+                np.column_stack((np.broadcast_to(1, x.shape), x)),
+                expanding=True
+            ).fit().params
+            intercept = intercept_slope.iloc[:, 0].rename(x.name)
+            slope = intercept_slope.iloc[:, 1].rename(x.name)
+            return slope, intercept
+
+        df2 = df[["b", "c", "a"]].rename(columns={"b": "a", "c": "b", "a": "c"})
+        assert_series_equal(
+            df["a"].vbt.expanding_linreg(df2["a"])[0],
+            sr_linreg(df["a"], df2["a"])[0],
+        )
+        assert_series_equal(
+            df["a"].vbt.expanding_linreg(df2["a"])[1],
+            sr_linreg(df["a"], df2["a"])[1],
+        )
+        assert_frame_equal(
+            df.vbt.expanding_linreg(df2)[0],
+            pd.concat((
+                sr_linreg(df["a"], df2["a"])[0],
+                sr_linreg(df["b"], df2["b"])[0],
+                sr_linreg(df["c"], df2["c"])[0],
+            ), axis=1),
+        )
+        assert_frame_equal(
+            df.vbt.expanding_linreg(df2)[1],
+            pd.concat((
+                sr_linreg(df["a"], df2["a"])[1],
+                sr_linreg(df["b"], df2["b"])[1],
+                sr_linreg(df["c"], df2["c"])[1],
+            ), axis=1),
+        )
+        assert_frame_equal(
+            df.vbt.expanding_linreg(df2, jitted=dict(parallel=True))[0],
+            df.vbt.expanding_linreg(df2, jitted=dict(parallel=False))[0],
+        )
+        assert_frame_equal(
+            df.vbt.expanding_linreg(df2, jitted=dict(parallel=True))[1],
+            df.vbt.expanding_linreg(df2, jitted=dict(parallel=False))[1],
+        )
+        assert_frame_equal(
+            df.vbt.expanding_linreg(df2, chunked=True)[0],
+            df.vbt.expanding_linreg(df2, chunked=False)[0],
+        )
+        assert_frame_equal(
+            df.vbt.expanding_linreg(df2, chunked=True)[1],
+            df.vbt.expanding_linreg(df2, chunked=False)[1],
         )
 
     @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])

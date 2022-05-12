@@ -32,6 +32,8 @@ __all__ = [
     "RollCovAOS",
     "RollCorrAIS",
     "RollCorrAOS",
+    "RollLinRegAIS",
+    "RollLinRegAOS",
 ]
 
 __pdoc__ = {}
@@ -422,3 +424,43 @@ __pdoc__[
     "RollCorrAOS"
 ] = """A named tuple representing an output state of 
 `vectorbtpro.generic.nb.rolling.rolling_corr_acc_nb`."""
+
+
+class RollLinRegAIS(tp.NamedTuple):
+    i: int
+    value1: float
+    value2: float
+    pre_window_value1: float
+    pre_window_value2: float
+    validcnt: int
+    cumsum1: float
+    cumsum2: float
+    cumsum_sq1: float
+    cumsum_prod: float
+    nancnt: int
+    window: int
+    minp: tp.Optional[int]
+
+
+__pdoc__[
+    "RollLinRegAIS"
+] = """A named tuple representing an input state of 
+`vectorbtpro.generic.nb.rolling.rolling_linreg_acc_nb`."""
+
+
+class RollLinRegAOS(tp.NamedTuple):
+    validcnt: int
+    cumsum1: float
+    cumsum2: float
+    cumsum_sq1: float
+    cumsum_prod: float
+    nancnt: int
+    window_len: int
+    slope_value: float
+    intercept_value: float
+
+
+__pdoc__[
+    "RollLinRegAOS"
+] = """A named tuple representing an output state of 
+`vectorbtpro.generic.nb.rolling.rolling_linreg_acc_nb`."""

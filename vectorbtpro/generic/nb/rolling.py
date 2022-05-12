@@ -1003,10 +1003,152 @@ def rolling_corr_nb(arr1: tp.Array2d, arr2: tp.Array2d, window: int, minp: tp.Op
 
 
 @register_jitted(cache=True)
-def rolling_rank_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int], pct: bool = False) -> tp.Array1d:
+def rolling_linreg_acc_nb(in_state: RollLinRegAIS) -> RollLinRegAOS:
+    """Accumulator of `rolling_linreg_1d_nb`.
+
+    Takes a state of type `vectorbtpro.generic.enums.RollLinRegAIS` and returns
+    a state of type `vectorbtpro.generic.enums.RollLinRegAOS`."""
+    i = in_state.i
+    value1 = in_state.value1
+    value2 = in_state.value2
+    pre_window_value1 = in_state.pre_window_value1
+    pre_window_value2 = in_state.pre_window_value2
+    validcnt = in_state.validcnt
+    cumsum1 = in_state.cumsum1
+    cumsum2 = in_state.cumsum2
+    cumsum_sq1 = in_state.cumsum_sq1
+    cumsum_prod = in_state.cumsum_prod
+    nancnt = in_state.nancnt
+    window = in_state.window
+    minp = in_state.minp
+
+    if np.isnan(value1) or np.isnan(value2):
+        nancnt = nancnt + 1
+    else:
+        validcnt = validcnt + 1
+        cumsum1 = cumsum1 + value1
+        cumsum2 = cumsum2 + value2
+        cumsum_sq1 = cumsum_sq1 + value1**2
+        cumsum_prod = cumsum_prod + value1 * value2
+    if i < window:
+        window_len = i + 1 - nancnt
+    else:
+        if np.isnan(pre_window_value1) or np.isnan(pre_window_value2):
+            nancnt = nancnt - 1
+        else:
+            validcnt = validcnt - 1
+            cumsum1 = cumsum1 - pre_window_value1
+            cumsum2 = cumsum2 - pre_window_value2
+            cumsum_sq1 = cumsum_sq1 - pre_window_value1**2
+            cumsum_prod = cumsum_prod - pre_window_value1 * pre_window_value2
+        window_len = window - nancnt
+    if window_len < minp:
+        slope_value = np.nan
+        intercept_value = np.nan
+    else:
+        slope_num = validcnt * cumsum_prod - cumsum1 * cumsum2
+        slope_denom = validcnt * cumsum_sq1 - cumsum1**2
+        if slope_denom != 0:
+            slope_value = slope_num / slope_denom
+        else:
+            slope_value = np.nan
+        intercept_num = cumsum2 - slope_value * cumsum1
+        intercept_denom = validcnt
+        if intercept_denom != 0:
+            intercept_value = intercept_num / intercept_denom
+        else:
+            intercept_value = np.nan
+
+    return RollLinRegAOS(
+        validcnt=validcnt,
+        cumsum1=cumsum1,
+        cumsum2=cumsum2,
+        cumsum_sq1=cumsum_sq1,
+        cumsum_prod=cumsum_prod,
+        nancnt=nancnt,
+        window_len=window_len,
+        slope_value=slope_value,
+        intercept_value=intercept_value,
+    )
+
+
+@register_jitted(cache=True)
+def rolling_linreg_1d_nb(
+    arr1: tp.Array1d,
+    arr2: tp.Array1d,
+    window: int,
+    minp: tp.Optional[int] = None,
+) -> tp.Tuple[tp.Array1d, tp.Array1d]:
+    """Compute rolling linear regression."""
+    if minp is None:
+        minp = window
+    if minp > window:
+        raise ValueError("minp must be <= window")
+    slope_out = np.empty_like(arr1, dtype=np.float_)
+    intercept_out = np.empty_like(arr1, dtype=np.float_)
+    validcnt = 0
+    cumsum1 = 0.0
+    cumsum2 = 0.0
+    cumsum_sq1 = 0.0
+    cumsum_prod = 0.0
+    nancnt = 0
+
+    for i in range(arr1.shape[0]):
+        in_state = RollLinRegAIS(
+            i=i,
+            value1=arr1[i],
+            value2=arr2[i],
+            pre_window_value1=arr1[i - window] if i - window >= 0 else np.nan,
+            pre_window_value2=arr2[i - window] if i - window >= 0 else np.nan,
+            validcnt=validcnt,
+            cumsum1=cumsum1,
+            cumsum2=cumsum2,
+            cumsum_sq1=cumsum_sq1,
+            cumsum_prod=cumsum_prod,
+            nancnt=nancnt,
+            window=window,
+            minp=minp,
+        )
+        out_state = rolling_linreg_acc_nb(in_state)
+        validcnt = out_state.validcnt
+        cumsum1 = out_state.cumsum1
+        cumsum2 = out_state.cumsum2
+        cumsum_sq1 = out_state.cumsum_sq1
+        cumsum_prod = out_state.cumsum_prod
+        nancnt = out_state.nancnt
+        slope_out[i] = out_state.slope_value
+        intercept_out[i] = out_state.intercept_value
+
+    return slope_out, intercept_out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="arr1", axis=1),
+    arg_take_spec=dict(arr1=ch.ArraySlicer(axis=1), arr2=ch.ArraySlicer(axis=1), window=None, minp=None),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def rolling_linreg_nb(
+    arr1: tp.Array2d,
+    arr2: tp.Array2d,
+    window: int,
+    minp: tp.Optional[int] = None,
+) -> tp.Tuple[tp.Array1d, tp.Array1d]:
+    """2-dim version of `rolling_linreg_1d_nb`."""
+    slope_out = np.empty_like(arr1, dtype=np.float_)
+    intercept_out = np.empty_like(arr1, dtype=np.float_)
+    for col in prange(arr1.shape[1]):
+        slope_out[:, col], intercept_out[:, col] = rolling_linreg_1d_nb(arr1[:, col], arr2[:, col], window, minp=minp)
+    return slope_out, intercept_out
+
+
+@register_jitted(cache=True)
+def rolling_rank_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None, pct: bool = False) -> tp.Array1d:
     """Rolling version of `rank_1d_nb`."""
     if minp is None:
         minp = window
+    if minp > window:
+        raise ValueError("minp must be <= window")
     out = np.empty_like(arr, dtype=np.float_)
     nancnt = 0
     for i in range(arr.shape[0]):
