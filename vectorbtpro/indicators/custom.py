@@ -63,6 +63,7 @@ Date
 ![](/assets/images/custom_price.svg)"""
 
 import numpy as np
+import scipy.stats as st
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.generic import nb as generic_nb
@@ -71,7 +72,7 @@ from vectorbtpro.indicators.factory import IndicatorFactory
 from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.config import merge_dicts
 
-__all__ = ["MA", "MSTD", "BBANDS", "RSI", "STOCH", "MACD", "ATR", "OBV", "LINREG"]
+__all__ = ["MA", "MSTD", "BBANDS", "RSI", "STOCH", "MACD", "ATR", "OBV", "OLS", "OLSS"]
 
 # ############# MA ############# #
 
@@ -853,13 +854,13 @@ setattr(OBV, "__doc__", _OBV.__doc__)
 setattr(OBV, "plot", _OBV.plot)
 
 
-# ############# LINREG ############# #
+# ############# OLS ############# #
 
 
-LINREG = IndicatorFactory(
-    class_name="LINREG",
+OLS = IndicatorFactory(
+    class_name="OLS",
     module_name=__name__,
-    short_name="linreg",
+    short_name="ols",
     input_names=["x", "y"],
     param_names=["window"],
     output_names=["slope", "intercept"],
@@ -869,8 +870,8 @@ LINREG = IndicatorFactory(
         angle=lambda self: self.wrapper.wrap(np.arctan(self.slope.values) * 180 / np.pi),
     ),
 ).with_apply_func(
-    nb.linreg_apply_nb,
-    cache_func=nb.linreg_cache_nb,
+    nb.ols_apply_nb,
+    cache_func=nb.ols_cache_nb,
     cache_pass_per_column=True,
     kwargs_as_args=["minp"],
     window=14,
@@ -878,8 +879,8 @@ LINREG = IndicatorFactory(
 )
 
 
-class _LINREG(LINREG):
-    """Linear Regression.
+class _OLS(OLS):
+    """Ordinary least squares (OLS).
 
     The indicator can be used to detect changes in the behavior of the stocks against the market or each other.
 
@@ -896,23 +897,23 @@ class _LINREG(LINREG):
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs
     ) -> tp.BaseFigure:  # pragma: no cover
-        """Plot `LINREG.pred` against `LINREG.y`.
+        """Plot `OLS.pred` against `OLS.y`.
 
         Args:
             column (str): Name of the column to plot.
-            plot_y (bool): Whether to plot `LINREG.y`.
-            y_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `LINREG.y`.
-            pred_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `LINREG.pred`.
+            plot_y (bool): Whether to plot `OLS.y`.
+            y_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `OLS.y`.
+            pred_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `OLS.pred`.
             add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments passed to `fig.update_layout`.
 
         Usage:
             ```pycon
-            >>> vbt.LINREG.run(np.arange(len(ohlcv)), ohlcv['Close'], 10).plot()
+            >>> vbt.OLS.run(np.arange(len(ohlcv)), ohlcv['Close'], 10).plot()
             ```
 
-            ![](/assets/images/LINREG.svg)
+            ![](/assets/images/OLS.svg)
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
@@ -942,5 +943,103 @@ class _LINREG(LINREG):
         return fig
 
 
-setattr(LINREG, "__doc__", _LINREG.__doc__)
-setattr(LINREG, "plot", _LINREG.plot)
+setattr(OLS, "__doc__", _OLS.__doc__)
+setattr(OLS, "plot", _OLS.plot)
+
+
+# ############# OLSS ############# #
+
+
+OLSS = IndicatorFactory(
+    class_name="OLSS",
+    module_name=__name__,
+    short_name="ols",
+    input_names=["x", "y"],
+    param_names=["window"],
+    output_names=["spread", "zscore"],
+).with_apply_func(
+    nb.ols_spread_apply_nb,
+    cache_func=nb.ols_spread_cache_nb,
+    cache_pass_per_column=True,
+    kwargs_as_args=["ddof", "minp"],
+    window=14,
+    ddof=0,
+    minp=None,
+)
+
+
+class _OLSS(OLSS):
+    """Spread of OLS."""
+
+    def plot(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        alpha: float = 0.05,
+        add_shape_kwargs: tp.KwargsLike = None,
+        zscore_trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs
+    ) -> tp.BaseFigure:  # pragma: no cover
+        """Plot `OLSS.zscore` with confidence intervals.
+
+        Args:
+            column (str): Name of the column to plot.
+            alpha (float): The alpha level for the confidence interval.
+
+                The default alpha = .05 returns a 95% confidence interval.
+            add_shape_kwargs (dict): Keyword arguments passed to `fig.add_shape`
+                when adding the range between both confidence intervals.
+            zscore_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `OLSS.zscore`.
+            add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
+            fig (Figure or FigureWidget): Figure to add traces to.
+            **layout_kwargs: Keyword arguments passed to `fig.update_layout`.
+
+        Usage:
+            ```pycon
+            >>> vbt.OLSS.run(np.arange(len(ohlcv)), ohlcv['Close'], 10).plot()
+            ```
+
+            ![](/assets/images/OLSS.svg)
+        """
+        from vectorbtpro.utils.figure import make_figure
+
+        self_col = self.select_col(column=column)
+
+        if fig is None:
+            fig = make_figure()
+        fig.update_layout(**layout_kwargs)
+
+        zscore_trace_kwargs = merge_dicts(dict(name="Z-Score"), zscore_trace_kwargs)
+        fig = self_col.zscore.vbt.plot(trace_kwargs=zscore_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+
+        # Fill void between limits
+        xaxis = getattr(fig.data[-1], "xaxis", None)
+        if xaxis is None:
+            xaxis = "x"
+        yaxis = getattr(fig.data[-1], "yaxis", None)
+        if yaxis is None:
+            yaxis = "y"
+        add_shape_kwargs = merge_dicts(
+            dict(
+                type="rect",
+                xref=xaxis,
+                yref=yaxis,
+                x0=self_col.wrapper.index[0],
+                y0=st.norm.ppf(1 - alpha / 2),
+                x1=self_col.wrapper.index[-1],
+                y1=st.norm.ppf(alpha / 2),
+                fillcolor="purple",
+                opacity=0.2,
+                layer="below",
+                line_width=0,
+            ),
+            add_shape_kwargs,
+        )
+        fig.add_shape(**add_shape_kwargs)
+
+        return fig
+
+
+setattr(OLSS, "__doc__", _OLSS.__doc__)
+setattr(OLSS, "plot", _OLSS.plot)

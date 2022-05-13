@@ -1003,11 +1003,11 @@ def rolling_corr_nb(arr1: tp.Array2d, arr2: tp.Array2d, window: int, minp: tp.Op
 
 
 @register_jitted(cache=True)
-def rolling_linreg_acc_nb(in_state: RollLinRegAIS) -> RollLinRegAOS:
-    """Accumulator of `rolling_linreg_1d_nb`.
+def rolling_ols_acc_nb(in_state: RollOLSAIS) -> RollOLSAOS:
+    """Accumulator of `rolling_ols_1d_nb`.
 
-    Takes a state of type `vectorbtpro.generic.enums.RollLinRegAIS` and returns
-    a state of type `vectorbtpro.generic.enums.RollLinRegAOS`."""
+    Takes a state of type `vectorbtpro.generic.enums.RollOLSAIS` and returns
+    a state of type `vectorbtpro.generic.enums.RollOLSAOS`."""
     i = in_state.i
     value1 = in_state.value1
     value2 = in_state.value2
@@ -1059,7 +1059,7 @@ def rolling_linreg_acc_nb(in_state: RollLinRegAIS) -> RollLinRegAOS:
         else:
             intercept_value = np.nan
 
-    return RollLinRegAOS(
+    return RollOLSAOS(
         validcnt=validcnt,
         cumsum1=cumsum1,
         cumsum2=cumsum2,
@@ -1073,7 +1073,7 @@ def rolling_linreg_acc_nb(in_state: RollLinRegAIS) -> RollLinRegAOS:
 
 
 @register_jitted(cache=True)
-def rolling_linreg_1d_nb(
+def rolling_ols_1d_nb(
     arr1: tp.Array1d,
     arr2: tp.Array1d,
     window: int,
@@ -1094,7 +1094,7 @@ def rolling_linreg_1d_nb(
     nancnt = 0
 
     for i in range(arr1.shape[0]):
-        in_state = RollLinRegAIS(
+        in_state = RollOLSAIS(
             i=i,
             value1=arr1[i],
             value2=arr2[i],
@@ -1109,7 +1109,7 @@ def rolling_linreg_1d_nb(
             window=window,
             minp=minp,
         )
-        out_state = rolling_linreg_acc_nb(in_state)
+        out_state = rolling_ols_acc_nb(in_state)
         validcnt = out_state.validcnt
         cumsum1 = out_state.cumsum1
         cumsum2 = out_state.cumsum2
@@ -1128,17 +1128,17 @@ def rolling_linreg_1d_nb(
     merge_func=base_ch.column_stack,
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def rolling_linreg_nb(
+def rolling_ols_nb(
     arr1: tp.Array2d,
     arr2: tp.Array2d,
     window: int,
     minp: tp.Optional[int] = None,
 ) -> tp.Tuple[tp.Array1d, tp.Array1d]:
-    """2-dim version of `rolling_linreg_1d_nb`."""
+    """2-dim version of `rolling_ols_1d_nb`."""
     slope_out = np.empty_like(arr1, dtype=np.float_)
     intercept_out = np.empty_like(arr1, dtype=np.float_)
     for col in prange(arr1.shape[1]):
-        slope_out[:, col], intercept_out[:, col] = rolling_linreg_1d_nb(arr1[:, col], arr2[:, col], window, minp=minp)
+        slope_out[:, col], intercept_out[:, col] = rolling_ols_1d_nb(arr1[:, col], arr2[:, col], window, minp=minp)
     return slope_out, intercept_out
 
 

@@ -4169,9 +4169,9 @@ class TestBasic:
         with pytest.raises(Exception):
             vbt.OBV.run(close_ts, volume_ts, per_column=True)
 
-    def test_LINREG(self):
+    def test_OLS(self):
         assert_frame_equal(
-            vbt.LINREG.run(np.arange(len(close_ts))[:, None], close_ts, window=(2, 3)).slope,
+            vbt.OLS.run(np.arange(len(close_ts))[:, None], close_ts, window=(2, 3)).slope,
             pd.DataFrame(
                 np.array(
                     [
@@ -4185,11 +4185,11 @@ class TestBasic:
                     ]
                 ),
                 index=close_ts.index,
-                columns=pd.Index([2, 3], name="linreg_window"),
+                columns=pd.Index([2, 3], name="ols_window"),
             ),
         )
         assert_frame_equal(
-            vbt.LINREG.run(np.arange(len(close_ts))[:, None], close_ts, window=(2, 3)).intercept,
+            vbt.OLS.run(np.arange(len(close_ts))[:, None], close_ts, window=(2, 3)).intercept,
             pd.DataFrame(
                 np.array(
                     [
@@ -4203,17 +4203,17 @@ class TestBasic:
                     ]
                 ),
                 index=close_ts.index,
-                columns=pd.Index([2, 3], name="linreg_window"),
+                columns=pd.Index([2, 3], name="ols_window"),
             ),
         )
         assert_frame_equal(
-            vbt.LINREG.run(
+            vbt.OLS.run(
                 np.arange(len(close_ts))[:, None],
                 close_ts.vbt.tile(2),
                 window=(2, 3),
                 per_column=True,
             ).slope,
-            vbt.LINREG.run(
+            vbt.OLS.run(
                 np.arange(len(close_ts))[:, None],
                 close_ts,
                 window=(2, 3),
@@ -4221,16 +4221,82 @@ class TestBasic:
             ).slope,
         )
         assert_frame_equal(
-            vbt.LINREG.run(
+            vbt.OLS.run(
                 np.arange(len(close_ts))[:, None],
                 close_ts.vbt.tile(2),
                 window=(2, 3),
                 per_column=True,
             ).intercept,
-            vbt.LINREG.run(
+            vbt.OLS.run(
                 np.arange(len(close_ts))[:, None],
                 close_ts,
                 window=(2, 3),
                 per_column=False,
             ).intercept,
+        )
+
+    def test_OLSS(self):
+        assert_frame_equal(
+            vbt.OLSS.run(np.arange(len(close_ts))[:, None], close_ts, window=(2, 3)).spread,
+            pd.DataFrame(
+                np.array(
+                    [
+                        [np.nan, np.nan],
+                        [0.0, np.nan],
+                        [0.0, 0.0],
+                        [0.0, 0.0],
+                        [0.0, -0.3333333333333335],
+                        [0.0, 0.0],
+                        [0.0, 0.0],
+                    ]
+                ),
+                index=close_ts.index,
+                columns=pd.Index([2, 3], name="ols_window"),
+            ),
+        )
+        assert_frame_equal(
+            vbt.OLSS.run(np.arange(len(close_ts))[:, None], close_ts, window=(2, 3)).zscore,
+            pd.DataFrame(
+                np.array(
+                    [
+                        [np.nan, np.nan],
+                        [np.nan, np.nan],
+                        [np.nan, np.nan],
+                        [np.nan, np.nan],
+                        [np.nan, -1.414213562373095],
+                        [np.nan, 0.7071067811865475],
+                        [np.nan, 0.7071067811865475],
+                    ]
+                ),
+                index=close_ts.index,
+                columns=pd.Index([2, 3], name="ols_window"),
+            ),
+        )
+        assert_frame_equal(
+            vbt.OLSS.run(
+                np.arange(len(close_ts))[:, None],
+                close_ts.vbt.tile(2),
+                window=(2, 3),
+                per_column=True,
+            ).spread,
+            vbt.OLSS.run(
+                np.arange(len(close_ts))[:, None],
+                close_ts,
+                window=(2, 3),
+                per_column=False,
+            ).spread,
+        )
+        assert_frame_equal(
+            vbt.OLSS.run(
+                np.arange(len(close_ts))[:, None],
+                close_ts.vbt.tile(2),
+                window=(2, 3),
+                per_column=True,
+            ).zscore,
+            vbt.OLSS.run(
+                np.arange(len(close_ts))[:, None],
+                close_ts,
+                window=(2, 3),
+                per_column=False,
+            ).zscore,
         )
