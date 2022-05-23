@@ -555,13 +555,14 @@ data = ChildDict(
         polygon=FrozenConfig(
             client=None,
             client_kwargs=dict(
-                auth_key=None,
+                api_key=None,
             ),
             start=0,
             end="now UTC",
             timeframe="1d",
             adjusted=True,
             limit=5000,
+            params=dict(),
             delay=500,
             retries=3,
             show_progress=True,

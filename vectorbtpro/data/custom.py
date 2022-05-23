@@ -1579,6 +1579,7 @@ class PolygonData(RemoteData):  # pragma: no cover
         timeframe: tp.Optional[str] = None,
         adjusted: tp.Optional[bool] = None,
         limit: tp.Optional[int] = None,
+        params: tp.KwargsLike = None,
         delay: tp.Optional[float] = None,
         retries: tp.Optional[int] = None,
         show_progress: tp.Optional[bool] = None,
@@ -1624,10 +1625,8 @@ class PolygonData(RemoteData):  # pragma: no cover
             limit (int): Limits the number of base aggregates queried to create the aggregate results.
 
                 Max 50000 and Default 5000.
+            params (dict): Any additional query params.
             delay (float): Time to sleep after each request (in milliseconds).
-
-                !!! note
-                    Use only if `enableRateLimit` is not set.
             retries (int): The number of retries on failure to fetch data.
             show_progress (bool): Whether to show the progress bar.
             pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`.
@@ -1657,6 +1656,7 @@ class PolygonData(RemoteData):  # pragma: no cover
             adjusted = polygon_cfg["adjusted"]
         if limit is None:
             limit = polygon_cfg["limit"]
+        params = merge_dicts(polygon_cfg["params"], params)
         if delay is None:
             delay = polygon_cfg["delay"]
         if retries is None:
@@ -1723,41 +1723,36 @@ class PolygonData(RemoteData):  # pragma: no cover
 
             return retry_method
 
+        def _postprocess(agg):
+            return dict(
+                o=agg.open,
+                h=agg.high,
+                l=agg.low,
+                c=agg.close,
+                v=agg.volume,
+                vw=agg.vwap,
+                t=agg.timestamp,
+                n=agg.transactions,
+            )
+
         @_retry
         def _fetch(_start_ts, _limit):
-            if symbol.startswith("C:"):
-                return client.forex_currencies_aggregates(
-                    ticker=symbol,
-                    multiplier=multiplier,
-                    timespan=timespan,
-                    from_=_start_ts,
-                    to=end_ts,
-                    adjusted=adjusted,
-                    limit=_limit,
-                )
-            if symbol.startswith("X:"):
-                return client.crypto_aggregates(
-                    ticker=symbol,
-                    multiplier=multiplier,
-                    timespan=timespan,
-                    from_=_start_ts,
-                    to=end_ts,
-                    adjusted=adjusted,
-                    limit=_limit,
-                )
-            return client.stocks_equities_aggregates(
+            return list(map(_postprocess, client.get_aggs(
                 ticker=symbol,
                 multiplier=multiplier,
                 timespan=timespan,
                 from_=_start_ts,
                 to=end_ts,
                 adjusted=adjusted,
+                sort="asc",
                 limit=_limit,
-            )
+                params=params,
+                raw=False,
+            )))
 
         # Establish the timestamps
         try:
-            first_data = _fetch(0, 1).results
+            first_data = _fetch(0, 1)
             first_valid_ts = first_data[0]["t"]
             next_start_ts = start_ts = max(start_ts, first_valid_ts)
         except Exception as e:
@@ -1773,7 +1768,7 @@ class PolygonData(RemoteData):  # pragma: no cover
                 pbar.set_description(_ts_to_str(start_ts))
                 while True:
                     # Fetch the klines for the next timeframe
-                    next_data = _fetch(next_start_ts, limit).results
+                    next_data = _fetch(next_start_ts, limit)
                     if len(data) > 0:
                         next_data = list(filter(lambda d: next_start_ts < d["t"] < end_ts, next_data))
                     else:
