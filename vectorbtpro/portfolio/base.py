@@ -1628,7 +1628,7 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, broadcast, broadcast_to, to_pd_array
+from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, broadcast, broadcast_to, to_pd_array, shape_to_2d
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.generic import nb as generic_nb
@@ -1903,6 +1903,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         init_position (array_like of float): Initial position.
 
             Can be provided in a format suitable for flexible indexing.
+        init_price (array_like of float): Initial position price.
+
+            Can be provided in a format suitable for flexible indexing.
         cash_deposits (array_like of float): Cash deposited/withdrawn at each timestamp.
 
             Can be provided in a format suitable for flexible indexing with `flex_2d=False`
@@ -1917,6 +1920,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             To substitute `Portfolio` attributes, provide already broadcasted and grouped objects.
             Also see `Portfolio.in_outputs_indexing_func` on how in-output objects are indexed.
         use_in_outputs (bool): Whether to return in-output objects when calling properties.
+        bm_close (array_like): Last benchmark asset price at each time step.
         fillna_close (bool): Whether to forward and backward fill NaN values in `close`.
 
             Applied after the simulation to avoid NaNs in asset value.
@@ -1937,14 +1941,682 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
     _writeable_attrs: tp.ClassVar[tp.Optional[tp.Set[str]]] = {"_in_output_config"}
 
+    @classmethod
+    def row_stack_objs(
+        cls: tp.Type[PortfolioT],
+        objs: tp.Sequence[tp.Any],
+        wrappers: tp.Sequence[ArrayWrapper],
+        grouping: str = "columns_or_groups",
+        obj_name: tp.Optional[str] = None,
+        obj_type: tp.Optional[str] = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        cash_sharing: bool = False,
+        row_stack_func: tp.Optional[tp.Callable] = None,
+        **kwargs,
+    ) -> tp.Any:
+        """Stack (two-dimensional) objects along rows.
+
+        `row_stack_func` must take the portfolio class, and all the arguments passed to this method.
+        If you don't need any of the arguments, make `row_stack_func` accept them as `**kwargs`.
+
+        If all the objects are None, boolean, or empty, returns the first one."""
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        all_none = True
+        for obj in objs:
+            if obj is None or isinstance(obj, bool) or (checks.is_np_array(obj) and obj.size == 0):
+                if not checks.is_deep_equal(obj, objs[0]):
+                    raise ValueError(f"Cannot unify scalar in-outputs with the name '{obj_name}'")
+            else:
+                all_none = False
+                break
+        if all_none:
+            return objs[0]
+
+        if row_stack_func is not None:
+            return row_stack_func(
+                cls,
+                objs,
+                wrappers,
+                grouping=grouping,
+                obj_name=obj_name,
+                obj_type=obj_type,
+                wrapper=wrapper,
+                **kwargs,
+            )
+
+        if grouping == "columns_or_groups":
+            obj_group_by = None
+        elif grouping == "columns":
+            obj_group_by = False
+        elif grouping == "groups":
+            obj_group_by = None
+        elif grouping == "cash_sharing":
+            obj_group_by = None if cash_sharing else False
+        else:
+            raise ValueError(f"Grouping '{grouping}' not supported")
+
+        if obj_type is None and checks.is_np_array(objs[0]):
+            n_cols = wrapper.get_shape_2d(group_by=obj_group_by)[1]
+            can_stack = (objs[0].ndim == 1 and n_cols == 1) or (objs[0].ndim == 2 and objs[0].shape[1] == n_cols)
+        elif obj_type is not None and obj_type == "array":
+            can_stack = True
+        else:
+            can_stack = False
+        if can_stack:
+            wrapped_objs = []
+            for i, obj in enumerate(objs):
+                wrapped_objs.append(wrappers[i].wrap(obj, group_by=obj_group_by))
+            return wrapper.row_stack_and_wrap(*wrapped_objs, group_by=obj_group_by).values
+        raise ValueError(f"Cannot figure out how to stack in-outputs with the name '{obj_name}' along rows")
+
+    @classmethod
+    def row_stack_in_outputs(
+        cls: tp.Type[PortfolioT],
+        *objs: tp.MaybeTuple[PortfolioT],
+        **kwargs,
+    ) -> tp.Optional[tp.NamedTuple]:
+        """Stack `Portfolio.in_outputs` along rows.
+
+        All in-output tuples must be either None or have the same fields.
+
+        If the field can be found in the attributes of this `Portfolio` instance, reads the
+        attribute's options to get requirements for the type and layout of the in-output object.
+
+        For each field in `Portfolio.in_outputs`, resolves the field's options by parsing its name with
+        `Portfolio.parse_field_options` and also looks for options in `Portfolio.in_output_config`.
+        Performs stacking on the in-output objects of the same field using `Portfolio.row_stack_objs`."""
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        all_none = True
+        for obj in objs:
+            if obj.in_outputs is not None:
+                all_none = False
+                break
+        if all_none:
+            return None
+        all_keys = set()
+        for obj in objs:
+            all_keys |= set(obj.in_outputs._asdict().keys())
+        for obj in objs:
+            if obj.in_outputs is None or len(all_keys.difference(set(obj.in_outputs._asdict().keys()))) > 0:
+                raise ValueError("Objects to be merged must have the same in-output fields")
+
+        cls_dir = set(dir(cls))
+        new_in_outputs = {}
+        for field in objs[0].in_outputs._asdict().keys():
+            field_options = merge_dicts(
+                cls.parse_field_options(field),
+                cls.in_output_config.get(field, None),
+            )
+            if field_options.get("field", field) in cls_dir:
+                prop = getattr(cls, field_options["field"])
+                prop_options = getattr(prop, "options", {})
+                obj_type = prop_options.get("obj_type", "array")
+                group_by_aware = prop_options.get("group_by_aware", True)
+            else:
+                obj_type = None
+                group_by_aware = True
+            _kwargs = merge_dicts(
+                dict(
+                    grouping=field_options.get("grouping", "columns_or_groups" if group_by_aware else "columns"),
+                    obj_name=field_options.get("field", field),
+                    obj_type=field_options.get("obj_type", obj_type),
+                    row_stack_func=field_options.get("row_stack_func", None),
+                ),
+                kwargs,
+            )
+            new_field_obj = cls.row_stack_objs(
+                [getattr(obj.in_outputs, field) for obj in objs],
+                [obj.wrapper for obj in objs],
+                **_kwargs,
+            )
+            new_in_outputs[field] = new_field_obj
+
+        return type(objs[0].in_outputs)(**new_in_outputs)
+
+    @classmethod
+    def row_stack(
+        cls: tp.Type[PortfolioT],
+        *objs: tp.MaybeTuple[PortfolioT],
+        group_by: tp.GroupByLike = None,
+        wrapper_kwargs: tp.KwargsLike = None,
+        combine_init_cash: bool = False,
+        combine_init_position: bool = False,
+        combine_init_price: bool = False,
+        **kwargs,
+    ) -> PortfolioT:
+        """Stack multiple `Portfolio` instances along rows.
+
+        Uses `vectorbtpro.base.wrapping.ArrayWrapper.row_stack` to stack the wrappers.
+
+        Cash sharing must be the same among all objects.
+
+        Close, benchmark close, cash deposits, cash earnings, call sequence, and other two-dimensional arrays
+        are stacked using `vectorbtpro.base.wrapping.ArrayWrapper.row_stack_and_wrap`. In-outputs
+        are stacked using `Portfolio.row_stack_in_outputs`. Records are stacked using
+        `vectorbtpro.records.base.Records.row_stack_records_arrs`.
+
+        If the initial cash of each object is one of the options in `vectorbtpro.portfolio.enums.InitCashMode`,
+        it will be retained for the resulting object. Once any of the objects has the initial cash listed
+        as an absolute amount or an array, the initial cash of the first object will be copied over to
+        the final object, while the initial cash of all other objects will be resolved and used
+        as cash deposits, unless they all are zero. Set `combine_init_cash` to True to simply sum all
+        initial cash arrays.
+
+        If only the first object has an initial position greater than zero, it will be copied over to
+        the final object. Otherwise, an error will be thrown, unless `combine_init_position` is enabled
+        to sum all initial position arrays. The same goes for the initial price, which becomes
+        a candidate for stacking only if any of the arrays are not NaN.
+
+        !!! note
+            When possible, avoid using initial position and price in objects to be stacked:
+            there is currently no way of injecting them in the correct order, while simply taking
+            the sum or weighted average may distort the reality since they weren't available
+            prior to the actual simulation."""
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        for obj in objs:
+            if not checks.is_instance_of(obj, Portfolio):
+                raise TypeError("Each object to be merged must be an instance of Portfolio")
+        if "wrapper" not in kwargs:
+            wrapper_kwargs = merge_dicts(dict(group_by=group_by), wrapper_kwargs)
+            kwargs["wrapper"] = ArrayWrapper.row_stack(*[obj.wrapper for obj in objs], **wrapper_kwargs)
+
+        for i in range(1, len(objs)):
+            if objs[i].cash_sharing != objs[0].cash_sharing:
+                raise ValueError("Objects to be merged must have the same 'cash_sharing'")
+        kwargs["cash_sharing"] = objs[0].cash_sharing
+        cs_group_by = None if kwargs["cash_sharing"] else False
+        cs_n_cols = kwargs["wrapper"].get_shape_2d(group_by=cs_group_by)[1]
+        n_cols = kwargs["wrapper"].shape_2d[1]
+
+        if "close" not in kwargs:
+            kwargs["close"] = kwargs["wrapper"].row_stack_and_wrap(
+                *[obj.close for obj in objs],
+                group_by=False,
+            )
+        if "order_records" not in kwargs:
+            kwargs["order_records"] = Orders.row_stack_records_arrs(*[obj.orders for obj in objs], **kwargs)
+        if "log_records" not in kwargs:
+            kwargs["log_records"] = Logs.row_stack_records_arrs(*[obj.logs for obj in objs], **kwargs)
+        if "init_cash" not in kwargs:
+            stack_init_cash_objs = False
+            for obj in objs:
+                if not isinstance(obj._init_cash, int) or obj._init_cash not in InitCashMode:
+                    stack_init_cash_objs = True
+                    break
+            if stack_init_cash_objs:
+                stack_init_cash_objs = False
+                init_cash_objs = []
+                for i, obj in enumerate(objs):
+                    init_cash_obj = obj.get_init_cash(group_by=cs_group_by)
+                    init_cash_obj = to_1d_array(init_cash_obj)
+                    init_cash_obj = np.broadcast_to(init_cash_obj, cs_n_cols)
+                    if i > 0 and (init_cash_obj != 0).any():
+                        stack_init_cash_objs = True
+                    init_cash_objs.append(init_cash_obj)
+                if stack_init_cash_objs:
+                    if not combine_init_cash:
+                        cash_deposits_objs = []
+                        for i, obj in enumerate(objs):
+                            cash_deposits_obj = obj.get_cash_deposits(group_by=cs_group_by)
+                            cash_deposits_obj = to_2d_array(cash_deposits_obj)
+                            cash_deposits_obj = np.broadcast_to(
+                                cash_deposits_obj,
+                                (cash_deposits_obj.shape[0], cs_n_cols),
+                            )
+                            cash_deposits_obj = cash_deposits_obj.copy()
+                            if i > 0:
+                                cash_deposits_obj[0] = init_cash_objs[i]
+                            cash_deposits_objs.append(cash_deposits_obj)
+                        kwargs["cash_deposits"] = np.row_stack(cash_deposits_objs)
+                        kwargs["init_cash"] = init_cash_objs[0]
+                    else:
+                        kwargs["init_cash"] = np.asarray(init_cash_objs).sum(axis=0)
+                else:
+                    kwargs["init_cash"] = init_cash_objs[0]
+        if "init_position" not in kwargs:
+            stack_init_position_objs = False
+            init_position_objs = []
+            for i, obj in enumerate(objs):
+                init_position_obj = obj.get_init_position()
+                init_position_obj = to_1d_array(init_position_obj)
+                init_position_obj = np.broadcast_to(init_position_obj, n_cols)
+                if i > 0 and (init_position_obj != 0).any():
+                    stack_init_position_objs = True
+                init_position_objs.append(init_position_obj)
+            if stack_init_position_objs:
+                if not combine_init_position:
+                    raise ValueError("Initial position cannot be stacked along rows")
+                kwargs["init_position"] = np.asarray(init_position_objs).sum(axis=0)
+            else:
+                kwargs["init_position"] = init_position_objs[0]
+        if "init_price" not in kwargs:
+            stack_init_price_objs = False
+            init_position_objs = []
+            init_price_objs = []
+            for i, obj in enumerate(objs):
+                init_position_obj = obj.get_init_position()
+                init_position_obj = to_1d_array(init_position_obj)
+                init_position_obj = np.broadcast_to(init_position_obj, n_cols)
+                init_price_obj = obj.get_init_price()
+                init_price_obj = to_1d_array(init_price_obj)
+                init_price_obj = np.broadcast_to(init_price_obj, n_cols)
+                if i > 0 and (init_position_obj != 0).any() and not np.isnan(init_price_obj).all():
+                    stack_init_price_objs = True
+                init_position_objs.append(init_position_obj)
+                init_price_objs.append(init_price_obj)
+            if stack_init_price_objs:
+                if not combine_init_price:
+                    raise ValueError("Initial price cannot be stacked along rows")
+                init_position_objs = np.asarray(init_position_objs)
+                init_price_objs = np.asarray(init_price_objs)
+                mask1 = (init_position_objs != 0).any(axis=1)
+                mask2 = (~np.isnan(init_price_objs)).any(axis=1)
+                mask = mask1 & mask2
+                init_position_objs = init_position_objs[mask]
+                init_price_objs = init_price_objs[mask]
+                nom = (init_position_objs * init_price_objs).sum(axis=0)
+                denum = init_position_objs.sum(axis=0)
+                kwargs["init_price"] = nom / denum
+            else:
+                kwargs["init_price"] = init_price_objs[0]
+        if "cash_deposits" not in kwargs:
+            stack_cash_deposits_objs = False
+            for obj in objs:
+                if obj._cash_deposits.size > 1 or obj._cash_deposits.item() != 0:
+                    stack_cash_deposits_objs = True
+                    break
+            if stack_cash_deposits_objs:
+                kwargs["cash_deposits"] = to_2d_array(
+                    kwargs["wrapper"].row_stack_and_wrap(
+                        *[obj.get_cash_deposits(group_by=cs_group_by) for obj in objs],
+                        group_by=cs_group_by,
+                    )
+                )
+            else:
+                kwargs["cash_deposits"] = np.array([[0.0]])
+        if "cash_earnings" not in kwargs:
+            stack_cash_earnings_objs = False
+            for obj in objs:
+                if obj._cash_earnings.size > 1 or obj._cash_earnings.item() != 0:
+                    stack_cash_earnings_objs = True
+                    break
+            if stack_cash_earnings_objs:
+                kwargs["cash_earnings"] = to_2d_array(
+                    kwargs["wrapper"].row_stack_and_wrap(
+                        *[obj.get_cash_earnings(group_by=False) for obj in objs],
+                        group_by=False,
+                    )
+                )
+            else:
+                kwargs["cash_earnings"] = np.array([[0.0]])
+        if "call_seq" not in kwargs:
+            stack_call_seq_objs = True
+            for obj in objs:
+                if obj.config["call_seq"] is None:
+                    stack_call_seq_objs = False
+                    break
+            if stack_call_seq_objs:
+                kwargs["call_seq"] = to_2d_array(
+                    kwargs["wrapper"].row_stack_and_wrap(
+                        *[obj.call_seq for obj in objs],
+                        group_by=False,
+                    )
+                )
+        if "bm_close" not in kwargs:
+            stack_bm_close_objs = True
+            for obj in objs:
+                if obj._bm_close is None or isinstance(obj._bm_close, bool):
+                    stack_bm_close_objs = False
+                    break
+            if stack_bm_close_objs:
+                kwargs["bm_close"] = to_2d_array(
+                    kwargs["wrapper"].row_stack_and_wrap(
+                        *[obj.bm_close for obj in objs],
+                        group_by=False,
+                    )
+                )
+        if "in_outputs" not in kwargs:
+            kwargs["in_outputs"] = cls.row_stack_in_outputs(*objs, **kwargs)
+
+        kwargs = cls.resolve_row_stack_kwargs(*objs, **kwargs)
+        kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
+        return cls(**kwargs)
+
+    @classmethod
+    def column_stack_objs(
+        cls: tp.Type[PortfolioT],
+        objs: tp.Sequence[tp.Any],
+        wrappers: tp.Sequence[ArrayWrapper],
+        grouping: str = "columns_or_groups",
+        obj_name: tp.Optional[str] = None,
+        obj_type: tp.Optional[str] = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        cash_sharing: bool = False,
+        column_stack_func: tp.Optional[tp.Callable] = None,
+        **kwargs,
+    ) -> tp.Any:
+        """Stack (one and two-dimensional) objects along column.
+
+        `column_stack_func` must take the portfolio class, and all the arguments passed to this method.
+        If you don't need any of the arguments, make `column_stack_func` accept them as `**kwargs`.
+
+        If all the objects are None, boolean, or empty, returns the first one."""
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        all_none = True
+        for obj in objs:
+            if obj is None or isinstance(obj, bool) or (checks.is_np_array(obj) and obj.size == 0):
+                if not checks.is_deep_equal(obj, objs[0]):
+                    raise ValueError(f"Cannot unify scalar in-outputs with the name '{obj_name}'")
+            else:
+                all_none = False
+                break
+        if all_none:
+            return objs[0]
+
+        if column_stack_func is not None:
+            return column_stack_func(
+                cls,
+                objs,
+                wrappers,
+                grouping=grouping,
+                obj_name=obj_name,
+                obj_type=obj_type,
+                wrapper=wrapper,
+                **kwargs,
+            )
+
+        if grouping == "columns_or_groups":
+            obj_group_by = None
+        elif grouping == "columns":
+            obj_group_by = False
+        elif grouping == "groups":
+            obj_group_by = None
+        elif grouping == "cash_sharing":
+            obj_group_by = None if cash_sharing else False
+        else:
+            raise ValueError(f"Grouping '{grouping}' not supported")
+
+        if obj_type is None and checks.is_np_array(obj):
+            n_cols = wrapper.get_shape_2d(group_by=obj_group_by)[1]
+            if shape_to_2d(objs[0].shape) == wrappers[0].get_shape_2d(group_by=obj_group_by):
+                can_stack = True
+                reduced = False
+            elif objs[0].shape == (wrappers[0].get_shape_2d(group_by=obj_group_by)[1],):
+                can_stack = True
+                reduced = True
+            else:
+                can_stack = False
+        elif obj_type is not None and obj_type == "array":
+            can_stack = True
+            reduced = False
+        elif obj_type is not None and obj_type == "red_array":
+            can_stack = True
+            reduced = True
+        else:
+            can_stack = False
+        if can_stack:
+            if reduced:
+                wrapped_objs = []
+                for i, obj in enumerate(objs):
+                    wrapped_objs.append(wrappers[i].wrap_reduced(obj, group_by=obj_group_by))
+                return wrapper.column_stack_and_wrap_reduced(*wrapped_objs, group_by=obj_group_by).values
+            wrapped_objs = []
+            for i, obj in enumerate(objs):
+                wrapped_objs.append(wrappers[i].wrap(obj, group_by=obj_group_by))
+            return wrapper.column_stack_and_wrap(*wrapped_objs, group_by=obj_group_by).values
+        raise ValueError(f"Cannot figure out how to stack in-outputs with the name '{obj_name}' along columns")
+
+    @classmethod
+    def column_stack_in_outputs(
+        cls: tp.Type[PortfolioT],
+        *objs: tp.MaybeTuple[PortfolioT],
+        **kwargs,
+    ) -> tp.Optional[tp.NamedTuple]:
+        """Stack `Portfolio.in_outputs` along columns.
+
+        All in-output tuples must be either None or have the same fields.
+
+        If the field can be found in the attributes of this `Portfolio` instance, reads the
+        attribute's options to get requirements for the type and layout of the in-output object.
+
+        For each field in `Portfolio.in_outputs`, resolves the field's options by parsing its name with
+        `Portfolio.parse_field_options` and also looks for options in `Portfolio.in_output_config`.
+        Performs stacking on the in-output objects of the same field using `Portfolio.column_stack_objs`."""
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        all_none = True
+        for obj in objs:
+            if obj.in_outputs is not None:
+                all_none = False
+                break
+        if all_none:
+            return None
+        all_keys = set()
+        for obj in objs:
+            all_keys |= set(obj.in_outputs._asdict().keys())
+        for obj in objs:
+            if obj.in_outputs is None or len(all_keys.difference(set(obj.in_outputs._asdict().keys()))) > 0:
+                raise ValueError("Objects to be merged must have the same in-output fields")
+
+        cls_dir = set(dir(cls))
+        new_in_outputs = {}
+        for field in objs[0].in_outputs._asdict().keys():
+            field_options = merge_dicts(
+                cls.parse_field_options(field),
+                cls.in_output_config.get(field, None),
+            )
+            if field_options.get("field", field) in cls_dir:
+                prop = getattr(cls, field_options["field"])
+                prop_options = getattr(prop, "options", {})
+                obj_type = prop_options.get("obj_type", "array")
+                group_by_aware = prop_options.get("group_by_aware", True)
+            else:
+                obj_type = None
+                group_by_aware = True
+            _kwargs = merge_dicts(
+                dict(
+                    grouping=field_options.get("grouping", "columns_or_groups" if group_by_aware else "columns"),
+                    obj_name=field_options.get("field", field),
+                    obj_type=field_options.get("obj_type", obj_type),
+                    column_stack_func=field_options.get("column_stack_func", None),
+                ),
+                kwargs,
+            )
+            new_field_obj = cls.column_stack_objs(
+                [getattr(obj.in_outputs, field) for obj in objs],
+                [obj.wrapper for obj in objs],
+                **_kwargs,
+            )
+            new_in_outputs[field] = new_field_obj
+
+        return type(objs[0].in_outputs)(**new_in_outputs)
+
+    @classmethod
+    def column_stack(
+        cls: tp.Type[PortfolioT],
+        *objs: tp.MaybeTuple[PortfolioT],
+        group_by: tp.GroupByLike = None,
+        wrapper_kwargs: tp.KwargsLike = None,
+        ffill_close: bool = False,
+        fbfill_close: bool = False,
+        **kwargs,
+    ) -> PortfolioT:
+        """Stack multiple `Portfolio` instances along columns.
+
+        Uses `vectorbtpro.base.wrapping.ArrayWrapper.column_stack` to stack the wrappers.
+
+        Cash sharing must be the same among all objects.
+
+        Two-dimensional arrays are stacked using
+        `vectorbtpro.base.wrapping.ArrayWrapper.column_stack_and_wrap`
+        while one-dimensional arrays are stacked using
+        `vectorbtpro.base.wrapping.ArrayWrapper.column_stack_and_wrap_reduced`.
+        In-outputs are stacked using `Portfolio.column_stack_in_outputs`. Records are stacked using
+        `vectorbtpro.records.base.Records.column_stack_records_arrs`."""
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        for obj in objs:
+            if not checks.is_instance_of(obj, Portfolio):
+                raise TypeError("Each object to be merged must be an instance of Portfolio")
+        if "wrapper" not in kwargs:
+            wrapper_kwargs = merge_dicts(dict(group_by=group_by), wrapper_kwargs)
+            kwargs["wrapper"] = ArrayWrapper.column_stack(
+                *[obj.wrapper for obj in objs],
+                **wrapper_kwargs,
+            )
+
+        for i in range(1, len(objs)):
+            if objs[i].cash_sharing != objs[0].cash_sharing:
+                raise ValueError("Objects to be merged must have the same 'cash_sharing'")
+        kwargs["cash_sharing"] = objs[0].cash_sharing
+        cs_group_by = None if kwargs["cash_sharing"] else False
+
+        if "close" not in kwargs:
+            new_close = kwargs["wrapper"].column_stack_and_wrap(
+                *[obj.close for obj in objs],
+                group_by=False,
+            )
+            if fbfill_close:
+                new_close = new_close.vbt.fbfill()
+            elif ffill_close:
+                new_close = new_close.vbt.ffill()
+            kwargs["close"] = new_close
+        if "order_records" not in kwargs:
+            kwargs["order_records"] = Orders.column_stack_records_arrs(*[obj.orders for obj in objs], **kwargs)
+        if "log_records" not in kwargs:
+            kwargs["log_records"] = Logs.column_stack_records_arrs(*[obj.logs for obj in objs], **kwargs)
+        if "init_cash" not in kwargs:
+            stack_init_cash_objs = False
+            for obj in objs:
+                if not isinstance(obj._init_cash, int) or obj._init_cash not in InitCashMode:
+                    stack_init_cash_objs = True
+                    break
+            if stack_init_cash_objs:
+                kwargs["init_cash"] = to_1d_array(
+                    kwargs["wrapper"].column_stack_and_wrap_reduced(
+                        *[obj.get_init_cash(group_by=cs_group_by) for obj in objs],
+                        group_by=cs_group_by,
+                    )
+                )
+        if "init_position" not in kwargs:
+            stack_init_position_objs = False
+            for obj in objs:
+                if (to_1d_array(obj.init_position) != 0).any():
+                    stack_init_position_objs = True
+                    break
+            if stack_init_position_objs:
+                kwargs["init_position"] = to_1d_array(
+                    kwargs["wrapper"].column_stack_and_wrap_reduced(
+                        *[obj.init_position for obj in objs],
+                        group_by=False,
+                    ),
+                )
+            else:
+                kwargs["init_position"] = np.array([0.0])
+        if "init_price" not in kwargs:
+            stack_init_price_objs = False
+            for obj in objs:
+                if not np.isnan(to_1d_array(obj.init_price)).all():
+                    stack_init_price_objs = True
+                    break
+            if stack_init_price_objs:
+                kwargs["init_price"] = to_1d_array(
+                    kwargs["wrapper"].column_stack_and_wrap_reduced(
+                        *[obj.init_price for obj in objs],
+                        group_by=False,
+                    ),
+                )
+            else:
+                kwargs["init_price"] = np.array([np.nan])
+        if "cash_deposits" not in kwargs:
+            stack_cash_deposits_objs = False
+            for obj in objs:
+                if obj._cash_deposits.size > 1 or obj._cash_deposits.item() != 0:
+                    stack_cash_deposits_objs = True
+                    break
+            if stack_cash_deposits_objs:
+                kwargs["cash_deposits"] = to_2d_array(
+                    kwargs["wrapper"].column_stack_and_wrap(
+                        *[obj.get_cash_deposits(group_by=cs_group_by) for obj in objs],
+                        group_by=cs_group_by,
+                        reindex_kwargs=dict(fill_value=0),
+                    )
+                )
+            else:
+                kwargs["cash_deposits"] = np.array([[0.0]])
+        if "cash_earnings" not in kwargs:
+            stack_cash_earnings_objs = False
+            for obj in objs:
+                if obj._cash_earnings.size > 1 or obj._cash_earnings.item() != 0:
+                    stack_cash_earnings_objs = True
+                    break
+            if stack_cash_earnings_objs:
+                kwargs["cash_earnings"] = to_2d_array(
+                    kwargs["wrapper"].column_stack_and_wrap(
+                        *[obj.get_cash_earnings(group_by=False) for obj in objs],
+                        group_by=False,
+                        reindex_kwargs=dict(fill_value=0),
+                    )
+                )
+            else:
+                kwargs["cash_earnings"] = np.array([[0.0]])
+        if "call_seq" not in kwargs:
+            stack_call_seq_objs = True
+            for obj in objs:
+                if obj.config["call_seq"] is None:
+                    stack_call_seq_objs = False
+                    break
+            if stack_call_seq_objs:
+                kwargs["call_seq"] = to_2d_array(
+                    kwargs["wrapper"].column_stack_and_wrap(
+                        *[obj.call_seq for obj in objs],
+                        group_by=False,
+                        reindex_kwargs=dict(fill_value=0),
+                    )
+                )
+        if "bm_close" not in kwargs:
+            stack_bm_close_objs = True
+            for obj in objs:
+                if obj._bm_close is None or isinstance(obj._bm_close, bool):
+                    stack_bm_close_objs = False
+                    break
+            if stack_bm_close_objs:
+                new_bm_close = to_2d_array(
+                    kwargs["wrapper"].column_stack_and_wrap(
+                        *[obj.bm_close for obj in objs],
+                        group_by=False,
+                    )
+                )
+                if fbfill_close:
+                    new_bm_close = new_bm_close.vbt.fbfill()
+                elif ffill_close:
+                    new_bm_close = new_bm_close.vbt.ffill()
+                kwargs["bm_close"] = new_bm_close
+        if "in_outputs" not in kwargs:
+            kwargs["in_outputs"] = cls.column_stack_in_outputs(*objs, **kwargs)
+
+        kwargs = cls.resolve_column_stack_kwargs(*objs, **kwargs)
+        kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
+        return cls(**kwargs)
+
     def __init__(
         self,
         wrapper: ArrayWrapper,
         close: tp.ArrayLike,
         order_records: tp.RecordArray,
-        log_records: tp.RecordArray,
-        cash_sharing: bool,
-        init_cash: tp.Union[int, tp.FlexArray],
+        log_records: tp.Optional[tp.RecordArray] = None,
+        cash_sharing: bool = False,
+        init_cash: tp.Union[int, tp.FlexArray] = InitCashMode.Auto,
         init_position: tp.FlexArray = np.asarray(0.0),
         init_price: tp.FlexArray = np.asarray(np.nan),
         cash_deposits: tp.FlexArray = np.asarray(0.0),
@@ -1962,6 +2634,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         portfolio_cfg = settings["portfolio"]
 
+        if log_records is None:
+            log_records = np.array([], dtype=log_dt)
         if use_in_outputs is None:
             use_in_outputs = portfolio_cfg["use_in_outputs"]
         if fillna_close is None:
@@ -2253,7 +2927,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                         return _wrap_2d_grouped(obj)
                     if obj_type == "red_array":
                         return _wrap_1d_grouped(obj)
-                    if obj.shape == wrapper.get_shape():
+                    if shape_to_2d(obj.shape) == wrapper.get_shape_2d():
                         return _wrap_2d_grouped(obj)
                     if obj.shape == (wrapper.get_shape_2d()[1],):
                         return _wrap_1d_grouped(obj)
@@ -2261,7 +2935,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     return _wrap_2d(obj)
                 if obj_type == "red_array":
                     return _wrap_1d(obj)
-                if obj.shape == wrapper.shape:
+                if shape_to_2d(obj.shape) == wrapper.shape_2d:
                     return _wrap_2d(obj)
                 if obj.shape == (wrapper.shape_2d[1],):
                     return _wrap_1d(obj)
@@ -2418,80 +3092,79 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             func = jit_reg.resolve_option(records_nb.record_col_map_select_nb, None)
             return func(obj, col_map, to_1d_array(col_idxs))
 
-        if obj_type is not None:
-            is_grouped = wrapper.grouper.is_grouped(group_by=group_by)
-            if obj_type == "records":
-                return _index_records(obj)
-            if grouping == "cash_sharing":
-                if obj_type == "array":
-                    if is_grouped and self.cash_sharing:
-                        return _index_2d_by_group(obj)
-                    return _index_2d_by_col(obj)
-                if obj_type == "red_array":
-                    if is_grouped and self.cash_sharing:
-                        return _index_1d_by_group(obj)
-                    return _index_1d_by_col(obj)
-                if obj.ndim == 2:
-                    if is_grouped and self.cash_sharing:
-                        return _index_2d_by_group(obj)
-                    return _index_2d_by_col(obj)
-                if obj.ndim == 1:
-                    if is_grouped and self.cash_sharing:
-                        return _index_1d_by_group(obj)
-                    return _index_1d_by_col(obj)
-            if grouping == "columns_or_groups":
-                if obj_type == "array":
-                    if is_grouped:
-                        return _index_2d_by_group(obj)
-                    return _index_2d_by_col(obj)
-                if obj_type == "red_array":
-                    if is_grouped:
-                        return _index_1d_by_group(obj)
-                    return _index_1d_by_col(obj)
-                if obj.ndim == 2:
-                    if is_grouped:
-                        return _index_2d_by_group(obj)
-                    return _index_2d_by_col(obj)
-                if obj.ndim == 1:
-                    if is_grouped:
-                        return _index_1d_by_group(obj)
-                    return _index_1d_by_col(obj)
-            if grouping == "groups":
-                if obj_type == "array":
+        is_grouped = wrapper.grouper.is_grouped(group_by=group_by)
+        if obj_type is not None and obj_type == "records":
+            return _index_records(obj)
+        if grouping == "cash_sharing":
+            if obj_type is not None and obj_type == "array":
+                if is_grouped and self.cash_sharing:
                     return _index_2d_by_group(obj)
-                if obj_type == "red_array":
+                return _index_2d_by_col(obj)
+            if obj_type is not None and obj_type == "red_array":
+                if is_grouped and self.cash_sharing:
                     return _index_1d_by_group(obj)
-                if obj.ndim == 2:
+                return _index_1d_by_col(obj)
+            if obj.ndim == 2:
+                if is_grouped and self.cash_sharing:
                     return _index_2d_by_group(obj)
-                if obj.ndim == 1:
+                return _index_2d_by_col(obj)
+            if obj.ndim == 1:
+                if is_grouped and self.cash_sharing:
                     return _index_1d_by_group(obj)
-            if grouping == "columns":
-                if obj_type == "array":
-                    return _index_2d_by_col(obj)
-                if obj_type == "red_array":
-                    return _index_1d_by_col(obj)
-                if obj.ndim == 2:
-                    return _index_2d_by_col(obj)
-                if obj.ndim == 1:
-                    return _index_1d_by_col(obj)
-            if checks.is_np_array(obj):
+                return _index_1d_by_col(obj)
+        if grouping == "columns_or_groups":
+            if obj_type is not None and obj_type == "array":
                 if is_grouped:
-                    if obj_type == "array":
-                        return _index_2d_by_group(obj)
-                    if obj_type == "red_array":
-                        return _index_1d_by_group(obj)
-                    if obj.shape == wrapper.get_shape():
-                        return _index_2d_by_group(obj)
-                    if obj.shape == (wrapper.get_shape_2d()[1],):
-                        return _index_1d_by_group(obj)
-                if obj_type == "array":
-                    return _index_2d_by_col(obj)
-                if obj_type == "red_array":
-                    return _index_1d_by_col(obj)
-                if obj.shape == wrapper.shape:
-                    return _index_2d_by_col(obj)
-                if obj.shape == (wrapper.shape_2d[1],):
-                    return _index_1d_by_col(obj)
+                    return _index_2d_by_group(obj)
+                return _index_2d_by_col(obj)
+            if obj_type is not None and obj_type == "red_array":
+                if is_grouped:
+                    return _index_1d_by_group(obj)
+                return _index_1d_by_col(obj)
+            if obj.ndim == 2:
+                if is_grouped:
+                    return _index_2d_by_group(obj)
+                return _index_2d_by_col(obj)
+            if obj.ndim == 1:
+                if is_grouped:
+                    return _index_1d_by_group(obj)
+                return _index_1d_by_col(obj)
+        if grouping == "groups":
+            if obj_type is not None and obj_type == "array":
+                return _index_2d_by_group(obj)
+            if obj_type is not None and obj_type == "red_array":
+                return _index_1d_by_group(obj)
+            if obj.ndim == 2:
+                return _index_2d_by_group(obj)
+            if obj.ndim == 1:
+                return _index_1d_by_group(obj)
+        if grouping == "columns":
+            if obj_type is not None and obj_type == "array":
+                return _index_2d_by_col(obj)
+            if obj_type is not None and obj_type == "red_array":
+                return _index_1d_by_col(obj)
+            if obj.ndim == 2:
+                return _index_2d_by_col(obj)
+            if obj.ndim == 1:
+                return _index_1d_by_col(obj)
+        if checks.is_np_array(obj):
+            if is_grouped:
+                if obj_type is not None and obj_type == "array":
+                    return _index_2d_by_group(obj)
+                if obj_type is not None and obj_type == "red_array":
+                    return _index_1d_by_group(obj)
+                if shape_to_2d(obj.shape) == wrapper.get_shape_2d():
+                    return _index_2d_by_group(obj)
+                if obj.shape == (wrapper.get_shape_2d()[1],):
+                    return _index_1d_by_group(obj)
+            if obj_type is not None and obj_type == "array":
+                return _index_2d_by_col(obj)
+            if obj_type is not None and obj_type == "red_array":
+                return _index_1d_by_col(obj)
+            if shape_to_2d(obj.shape) == wrapper.shape_2d:
+                return _index_2d_by_col(obj)
+            if obj.shape == (wrapper.shape_2d[1],):
+                return _index_1d_by_col(obj)
         if force_indexing:
             raise NotImplementedError(f"Cannot index object '{obj_name}'")
         if not silence_warnings:
@@ -2535,6 +3208,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             _kwargs = merge_dicts(
                 dict(
                     grouping=field_options.get("grouping", "columns_or_groups" if group_by_aware else "columns"),
+                    obj_name=field_options.get("field", field),
                     obj_type=field_options.get("obj_type", obj_type),
                     indexing_func=field_options.get("indexing_func", None),
                     force_indexing=field_options.get("force_indexing", False),
@@ -2546,7 +3220,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 obj,
                 group_idxs,
                 col_idxs,
-                field=field_options.get("field", field),
                 **_kwargs,
             )
             new_in_outputs[field] = new_obj
@@ -2657,17 +3330,16 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 **kwargs,
             )
 
-        if obj_type is not None:
-            if obj_type == "red_array":
-                return obj
-            if obj_type not in {"records"}:
-                is_grouped = wrapper.grouper.is_grouped(group_by=group_by)
-                if checks.is_np_array(obj):
-                    if is_grouped:
-                        if obj.shape == (wrapper.get_shape_2d()[1],):
-                            return obj
-                    if obj.shape == (wrapper.shape_2d[1],):
+        if obj_type is not None and obj_type == "red_array":
+            return obj
+        if obj_type is None or obj_type not in {"records"}:
+            is_grouped = wrapper.grouper.is_grouped(group_by=group_by)
+            if checks.is_np_array(obj):
+                if is_grouped:
+                    if obj.shape == (wrapper.get_shape_2d()[1],):
                         return obj
+                if obj.shape == (wrapper.shape_2d[1],):
+                    return obj
         if force_resampling:
             raise NotImplementedError(f"Cannot resample object '{obj_name}'")
         if not silence_warnings:
@@ -2707,6 +3379,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 obj_type = None
             _kwargs = merge_dicts(
                 dict(
+                    obj_name=field_options.get("field", field),
                     obj_type=field_options.get("obj_type", obj_type),
                     resample_func=field_options.get("resample_func", None),
                     force_resampling=field_options.get("force_resampling", False),
@@ -2717,7 +3390,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             new_obj = self.resample_obj(
                 obj,
                 resampler,
-                field=field_options.get("field", field),
                 **_kwargs,
             )
             new_in_outputs[field] = new_obj
@@ -2726,7 +3398,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     def resample(
         self: PortfolioT,
         *args,
-        bfill_close: bool = False,
+        ffill_close: bool = False,
+        fbfill_close: bool = False,
         in_output_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> PortfolioT:
@@ -2750,9 +3423,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             raise ValueError("Cannot resample call_seq")
         resampler, new_wrapper = self.wrapper.resample_meta(*args, **kwargs)
         new_close = self.close.vbt.resample_apply(resampler, generic_nb.last_reduce_nb)
-        if bfill_close:
+        if fbfill_close:
             new_close = new_close.vbt.fbfill()
-        else:
+        elif ffill_close:
             new_close = new_close.vbt.ffill()
         new_close = new_close.values
         new_order_records = self.orders.resample_records_arr(resampler)
@@ -2773,9 +3446,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             new_cash_earnings = self._cash_earnings
         if self._bm_close is not None and not isinstance(self._bm_close, bool):
             new_bm_close = self.bm_close.vbt.resample_apply(resampler, generic_nb.last_reduce_nb)
-            if bfill_close:
+            if fbfill_close:
                 new_bm_close = new_bm_close.vbt.fbfill()
-            else:
+            elif ffill_close:
                 new_bm_close = new_bm_close.vbt.ffill()
             new_bm_close = new_bm_close.values
         else:

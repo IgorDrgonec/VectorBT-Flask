@@ -412,6 +412,7 @@ Alternatively, we can override the `_field_config` class attribute.
 
 import inspect
 import string
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
@@ -493,7 +494,7 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
         dict(
             dtype=None,
             settings=dict(
-                id=dict(name="id", title="Id"),
+                id=dict(name="id", title="Id", mapping="ids"),
                 col=dict(name="col", title="Column", mapping="columns"),
                 idx=dict(name="idx", title="Timestamp", mapping="index"),
             ),
@@ -515,6 +516,172 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
         or overwrite the instance variable `${cls_name}._field_config`.
         """
         return self._field_config
+
+    @classmethod
+    def row_stack_records_arrs(cls, *objs: tp.MaybeTuple[tp.RecordArray], **kwargs):
+        """Stack multiple record arrays along rows."""
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        records_arrs = []
+        for col in range(kwargs["wrapper"].shape_2d[1]):
+            n_rows_sum = 0
+            from_id = defaultdict(int)
+            for i, obj in enumerate(objs):
+                col_idxs, col_lens = obj.col_mapper.col_map
+                if len(col_idxs) > 0:
+                    col_records = None
+                    set_columns = False
+                    if col > 0 and obj.wrapper.shape_2d[1] == 1:
+                        col_records = obj.records_arr[col_idxs]
+                        set_columns = True
+                    elif col_lens[col] > 0:
+                        col_end_idxs = np.cumsum(col_lens)
+                        col_start_idxs = col_end_idxs - col_lens
+                        col_records = obj.records_arr[col_idxs[col_start_idxs[col] : col_end_idxs[col]]]
+                    if col_records is not None:
+                        col_records = col_records.copy()
+                        for field in obj.values.dtype.names:
+                            field_mapping = cls.field_config.get("settings", {}).get(field, {}).get("mapping", None)
+                            if isinstance(field_mapping, str) and field_mapping == "columns" and set_columns:
+                                col_records[field][:] = col
+                            elif isinstance(field_mapping, str) and field_mapping == "index":
+                                col_records[field][:] += n_rows_sum
+                            elif isinstance(field_mapping, str) and field_mapping == "ids":
+                                col_records[field][:] += from_id[field]
+                                from_id[field] = col_records[field].max() + 1
+                        records_arrs.append(col_records)
+                n_rows_sum += obj.wrapper.shape_2d[0]
+        if len(records_arrs) == 0:
+            return np.array([], dtype=objs[0].values.dtype)
+        return np.concatenate(records_arrs)
+
+    @classmethod
+    def row_stack(
+        cls: tp.Type[RecordsT],
+        *objs: tp.MaybeTuple[RecordsT],
+        wrapper_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> RecordsT:
+        """Stack multiple `Records` instances along rows.
+
+        Uses `vectorbtpro.base.wrapping.ArrayWrapper.row_stack` to stack the wrappers
+        and `Records.row_stack_records_arrs` to stack the record arrays.
+
+        !!! note
+            Will produce a column-sorted array."""
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        for obj in objs:
+            if not checks.is_instance_of(obj, Records):
+                raise TypeError("Each object to be merged must be an instance of Records")
+        if "wrapper" not in kwargs:
+            if wrapper_kwargs is None:
+                wrapper_kwargs = {}
+            kwargs["wrapper"] = ArrayWrapper.row_stack(*[obj.wrapper for obj in objs], **wrapper_kwargs)
+
+        if "col_mapper" not in kwargs:
+            kwargs["col_mapper"] = ColumnMapper.row_stack(
+                *[obj.col_mapper for obj in objs],
+                wrapper=kwargs["wrapper"],
+            )
+        if "records_arr" not in kwargs:
+            kwargs["records_arr"] = cls.row_stack_records_arrs(*objs, **kwargs)
+
+        kwargs = cls.resolve_row_stack_kwargs(*objs, **kwargs)
+        kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
+        return cls(**kwargs)
+
+    @classmethod
+    def column_stack_records_arrs(
+        cls,
+        *objs: tp.MaybeTuple[tp.RecordArray],
+        get_indexer_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ):
+        """Stack multiple record arrays along columns."""
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        if get_indexer_kwargs is None:
+            get_indexer_kwargs = {}
+        records_arrs = []
+        col_sum = 0
+        for i, obj in enumerate(objs):
+            col_idxs, col_lens = obj.col_mapper.col_map
+            if len(col_idxs) > 0:
+                col_end_idxs = np.cumsum(col_lens)
+                col_start_idxs = col_end_idxs - col_lens
+                for obj_col in range(len(col_lens)):
+                    if col_lens[obj_col] > 0:
+                        col_records = obj.records_arr[col_idxs[col_start_idxs[obj_col] : col_end_idxs[obj_col]]]
+                        col_records = col_records.copy()
+                        for field in obj.values.dtype.names:
+                            field_mapping = cls.field_config.get("settings", {}).get(field, {}).get("mapping", None)
+                            if isinstance(field_mapping, str) and field_mapping == "columns":
+                                col_records[field][:] += col_sum
+                            elif isinstance(field_mapping, str) and field_mapping == "index":
+                                old_idxs = col_records[field]
+                                if not obj.wrapper.index.equals(kwargs["wrapper"].index):
+                                    new_idxs = kwargs["wrapper"].index.get_indexer(
+                                        obj.wrapper.index[old_idxs],
+                                        **get_indexer_kwargs,
+                                    )
+                                else:
+                                    new_idxs = old_idxs
+                                col_records[field][:] = new_idxs
+                        records_arrs.append(col_records)
+            col_sum += obj.wrapper.shape_2d[1]
+        if len(records_arrs) == 0:
+            return np.array([], dtype=objs[0].values.dtype)
+        return np.concatenate(records_arrs)
+
+    @classmethod
+    def column_stack(
+        cls: tp.Type[RecordsT],
+        *objs: tp.MaybeTuple[RecordsT],
+        wrapper_kwargs: tp.KwargsLike = None,
+        get_indexer_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> RecordsT:
+        """Stack multiple `Records` instances along columns.
+
+        Uses `vectorbtpro.base.wrapping.ArrayWrapper.column_stack` to stack the wrappers
+        and `Records.column_stack_records_arrs` to stack the record arrays.
+
+        `get_indexer_kwargs` are passed to
+        [pandas.Index.get_indexer](https://pandas.pydata.org/docs/reference/api/pandas.Index.get_indexer.html)
+        to translate old indices to new ones after the reindexing operation.
+
+        !!! note
+            Will produce a column-sorted array."""
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        for obj in objs:
+            if not checks.is_instance_of(obj, Records):
+                raise TypeError("Each object to be merged must be an instance of Records")
+        if "wrapper" not in kwargs:
+            if wrapper_kwargs is None:
+                wrapper_kwargs = {}
+            kwargs["wrapper"] = ArrayWrapper.column_stack(
+                *[obj.wrapper for obj in objs],
+                **wrapper_kwargs,
+            )
+
+        if "col_mapper" not in kwargs:
+            kwargs["col_mapper"] = ColumnMapper.column_stack(
+                *[obj.col_mapper for obj in objs],
+                wrapper=kwargs["wrapper"],
+                get_indexer_kwargs=get_indexer_kwargs,
+            )
+        if "records_arr" not in kwargs:
+            kwargs["records_arr"] = cls.column_stack_records_arrs(*objs, **kwargs)
+
+        kwargs = cls.resolve_column_stack_kwargs(*objs, get_indexer_kwargs=get_indexer_kwargs, **kwargs)
+        kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
+        return cls(**kwargs)
 
     def __init__(
         self,
@@ -602,7 +769,8 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
             _resampler = Resampler.from_pd_resampler(resampler)
         new_records_arr = self.records_arr.copy()
         for field_name in self.values.dtype.names:
-            if self.get_field_mapping(field_name) == "index":
+            field_mapping = self.get_field_mapping(field_name)
+            if isinstance(field_mapping, str) and field_mapping == "index":
                 index_map = _resampler.map_to_target_index(return_index=False)
                 new_records_arr[field_name] = index_map[new_records_arr[field_name]]
         return new_records_arr
@@ -704,7 +872,10 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
 
     def get_map_field(self, field: str, **kwargs) -> MappedArray:
         """Get the mapped array of the field. Uses `Records.field_config`."""
-        return self.map_field(self.get_field_name(field), mapping=self.get_field_mapping(field), **kwargs)
+        mapping = self.get_field_mapping(field)
+        if isinstance(mapping, str) and mapping == "ids":
+            mapping = None
+        return self.map_field(self.get_field_name(field), mapping=mapping, **kwargs)
 
     def get_apply_mapping_arr(self, field: str, **kwargs) -> tp.Array1d:
         """Get the mapped array on the field, with mapping applied. Uses `Records.field_config`."""

@@ -103,6 +103,117 @@ class MyData(vbt.Data):
 
 
 class TestData:
+    def test_row_stack(self):
+        data1 = MyData.fetch(
+            [0, 1],
+            shape=(4, 1),
+            columns=["feat0"],
+            start_date=pd.Timestamp("2020-01-01"),
+        )
+        data2 = MyData.fetch(
+            [0, 1],
+            shape=(6, 3),
+            columns=["feat0", "feat1", "feat2"],
+            start_date=pd.Timestamp("2020-01-05"),
+        )
+        new_data = MyData.row_stack((data1, data2))
+        pd.testing.assert_index_equal(new_data.wrapper.index, data1.wrapper.index.append(data2.wrapper.index))
+        pd.testing.assert_index_equal(new_data.wrapper.columns, data2.wrapper.columns)
+        pd.testing.assert_frame_equal(
+            new_data.data[0],
+            pd.DataFrame(
+                [
+                    ["0_0_0", "0_0_0", "0_0_0"],
+                    ["0_0_1", "0_0_1", "0_0_1"],
+                    ["0_0_2", "0_0_2", "0_0_2"],
+                    ["0_0_3", "0_0_3", "0_0_3"],
+                    ["0_0_0", "0_1_0", "0_2_0"],
+                    ["0_0_1", "0_1_1", "0_2_1"],
+                    ["0_0_2", "0_1_2", "0_2_2"],
+                    ["0_0_3", "0_1_3", "0_2_3"],
+                    ["0_0_4", "0_1_4", "0_2_4"],
+                    ["0_0_5", "0_1_5", "0_2_5"],
+                ],
+                index=new_data.wrapper.index,
+                columns=new_data.wrapper.columns,
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            new_data.data[1],
+            pd.DataFrame(
+                [
+                    ["1_0_0", "1_0_0", "1_0_0"],
+                    ["1_0_1", "1_0_1", "1_0_1"],
+                    ["1_0_2", "1_0_2", "1_0_2"],
+                    ["1_0_3", "1_0_3", "1_0_3"],
+                    ["1_0_0", "1_1_0", "1_2_0"],
+                    ["1_0_1", "1_1_1", "1_2_1"],
+                    ["1_0_2", "1_1_2", "1_2_2"],
+                    ["1_0_3", "1_1_3", "1_2_3"],
+                    ["1_0_4", "1_1_4", "1_2_4"],
+                    ["1_0_5", "1_1_5", "1_2_5"],
+                ],
+                index=new_data.wrapper.index,
+                columns=new_data.wrapper.columns,
+            ),
+        )
+        assert new_data.fetch_kwargs == data2.fetch_kwargs
+        assert new_data.returned_kwargs == data2.returned_kwargs
+        assert new_data.last_index == data2.last_index
+        with pytest.raises(Exception):
+            MyData.row_stack((data1.select([0]), data2))
+        with pytest.raises(Exception):
+            MyData.row_stack((data1, data2.select([0])))
+
+    def test_column_stack(self):
+        data1 = MyData.fetch(
+            [0, 1],
+            shape=(5, 1),
+            columns=["feat0"],
+        )
+        data2 = MyData.fetch(
+            [0, 1],
+            shape=(5, 3),
+            columns=["feat1", "feat2", "feat3"],
+        )
+        new_data = MyData.column_stack((data1, data2), fetch_kwargs={0: {}, 1: {}})
+        pd.testing.assert_index_equal(new_data.wrapper.index, data1.wrapper.index)
+        pd.testing.assert_index_equal(new_data.wrapper.columns, data1.wrapper.columns.append(data2.wrapper.columns))
+        pd.testing.assert_frame_equal(
+            new_data.data[0],
+            pd.DataFrame(
+                [
+                    ['0_0_0', '0_0_0', '0_1_0', '0_2_0'],
+                    ['0_0_1', '0_0_1', '0_1_1', '0_2_1'],
+                    ['0_0_2', '0_0_2', '0_1_2', '0_2_2'],
+                    ['0_0_3', '0_0_3', '0_1_3', '0_2_3'],
+                    ['0_0_4', '0_0_4', '0_1_4', '0_2_4'],
+                ],
+                index=new_data.wrapper.index,
+                columns=new_data.wrapper.columns,
+            ),
+        )
+        pd.testing.assert_frame_equal(
+            new_data.data[1],
+            pd.DataFrame(
+                [
+                    ['1_0_0', '1_0_0', '1_1_0', '1_2_0'],
+                    ['1_0_1', '1_0_1', '1_1_1', '1_2_1'],
+                    ['1_0_2', '1_0_2', '1_1_2', '1_2_2'],
+                    ['1_0_3', '1_0_3', '1_1_3', '1_2_3'],
+                    ['1_0_4', '1_0_4', '1_1_4', '1_2_4'],
+                ],
+                index=new_data.wrapper.index,
+                columns=new_data.wrapper.columns,
+            ),
+        )
+        with pytest.raises(Exception):
+            MyData.column_stack((data1, data2))
+        with pytest.raises(Exception):
+            MyData.column_stack((data1.select([0]), data2))
+        with pytest.raises(Exception):
+            MyData.column_stack((data1, data2.select([0])))
+
     def test_config(self, tmp_path):
         data = MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
         assert MyData.loads(data.dumps()) == data
@@ -1464,23 +1575,11 @@ class TestData:
 
     def test_transform(self):
         data = MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
-        pd.testing.assert_frame_equal(
-            data.transform(lambda x: x.iloc[::2]).data[0],
-            data.data[0].iloc[::2]
-        )
-        pd.testing.assert_frame_equal(
-            data.transform(lambda x: x.iloc[::2]).data[1],
-            data.data[1].iloc[::2]
-        )
+        pd.testing.assert_frame_equal(data.transform(lambda x: x.iloc[::2]).data[0], data.data[0].iloc[::2])
+        pd.testing.assert_frame_equal(data.transform(lambda x: x.iloc[::2]).data[1], data.data[1].iloc[::2])
         data = MyData.fetch([0, 1], shape=(5,))
-        pd.testing.assert_series_equal(
-            data.transform(lambda x: x.iloc[::2]).data[0],
-            data.data[0].iloc[::2]
-        )
-        pd.testing.assert_series_equal(
-            data.transform(lambda x: x.iloc[::2]).data[1],
-            data.data[1].iloc[::2]
-        )
+        pd.testing.assert_series_equal(data.transform(lambda x: x.iloc[::2]).data[0], data.data[0].iloc[::2])
+        pd.testing.assert_series_equal(data.transform(lambda x: x.iloc[::2]).data[1], data.data[1].iloc[::2])
 
     @pytest.mark.parametrize("test_freq", ["1h", "10h", "3d"])
     def test_resample(self, test_freq):
@@ -1505,10 +1604,13 @@ class TestData:
         )
         assert_frame_equal(
             ohlcv_data.resample(test_freq).get(),
-            pd.concat((
-                ohlcv_data.get(["Open", "High", "Low", "Close", "Volume"]).vbt.ohlcv.resample(test_freq).obj,
-                ohlcv_data.get(["Other"]).resample(test_freq).mean(),
-            ), axis=1)
+            pd.concat(
+                (
+                    ohlcv_data.get(["Open", "High", "Low", "Close", "Volume"]).vbt.ohlcv.resample(test_freq).obj,
+                    ohlcv_data.get(["Other"]).resample(test_freq).mean(),
+                ),
+                axis=1,
+            ),
         )
 
 
@@ -1873,7 +1975,7 @@ class TestCustom:
                     dtype="datetime64[ns, UTC]",
                     freq="2D",
                 ),
-                columns=pd.Index(['Open', 'High', 'Low', 'Close'], dtype='object'),
+                columns=pd.Index(["Open", "High", "Low", "Close"], dtype="object"),
             ),
         )
 
@@ -1967,7 +2069,7 @@ class TestCustom:
                     dtype="datetime64[ns, UTC]",
                     freq="2D",
                 ),
-                columns=pd.Index(['Open', 'High', 'Low', 'Close'], dtype='object'),
+                columns=pd.Index(["Open", "High", "Low", "Close"], dtype="object"),
             ),
         )
 

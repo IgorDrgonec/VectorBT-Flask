@@ -4,6 +4,7 @@
 
 In contrast to the `vectorbtpro.base` sub-package, focuses on the data itself."""
 
+from vectorbtpro.generic.accessors import GenericAccessor, GenericSRAccessor, GenericDFAccessor
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic.drawdowns import Drawdowns
 from vectorbtpro.generic.enums import *

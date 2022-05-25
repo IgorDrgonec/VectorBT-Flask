@@ -501,6 +501,7 @@ from vectorbtpro.records.decorators import attach_fields, override_field_config,
 from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
+from vectorbtpro.utils import checks
 from vectorbtpro.utils.array_ import min_rel_rescale, max_rel_rescale
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig
@@ -529,7 +530,7 @@ trades_field_config = ReadonlyConfig(
             "return": dict(title="Return"),
             "direction": dict(title="Direction", mapping=TradeDirection),
             "status": dict(title="Status", mapping=TradeStatus),
-            "parent_id": dict(title="Position Id"),
+            "parent_id": dict(title="Position Id", mapping="ids"),
         },
     )
 )
@@ -611,6 +612,72 @@ class Trades(Ranges):
         """Build `Trades` from records."""
         return cls(wrapper, records, close=close if attach_close else None, **kwargs)
 
+    @classmethod
+    def resolve_row_stack_kwargs(
+        cls: tp.Type[TradesT],
+        *objs: tp.MaybeTuple[TradesT],
+        **kwargs,
+    ) -> tp.Kwargs:
+        """Resolve keyword arguments for initializing `Trades` after stacking along rows."""
+        kwargs = Ranges.resolve_row_stack_kwargs(*objs, **kwargs)
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        for obj in objs:
+            if not checks.is_instance_of(obj, Trades):
+                raise TypeError("Each object to be merged must be an instance of Trades")
+        if "close" not in kwargs:
+            close_objs = []
+            stack_close_objs = True
+            for obj in objs:
+                if obj.config["close"] is not None:
+                    close_objs.append(obj.config["close"])
+                else:
+                    stack_close_objs = False
+                    break
+            if stack_close_objs:
+                kwargs["close"] = kwargs["wrapper"].row_stack_and_wrap(*close_objs, group_by=False)
+        return kwargs
+
+    @classmethod
+    def resolve_column_stack_kwargs(
+        cls: tp.Type[TradesT],
+        *objs: tp.MaybeTuple[TradesT],
+        reindex_kwargs: tp.KwargsLike = None,
+        ffill_close: bool = False,
+        fbfill_close: bool = False,
+        **kwargs,
+    ) -> tp.Kwargs:
+        """Resolve keyword arguments for initializing `Trades` after stacking along columns."""
+        kwargs = Ranges.resolve_column_stack_kwargs(*objs, reindex_kwargs=reindex_kwargs, **kwargs)
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        for obj in objs:
+            if not checks.is_instance_of(obj, Trades):
+                raise TypeError("Each object to be merged must be an instance of Trades")
+        if "close" not in kwargs:
+            close_objs = []
+            stack_close_objs = True
+            for obj in objs:
+                if obj.config["close"] is not None:
+                    close_objs.append(obj.config["close"])
+                else:
+                    stack_close_objs = False
+                    break
+            if stack_close_objs:
+                new_close = kwargs["wrapper"].column_stack_and_wrap(
+                    *close_objs,
+                    reindex_kwargs=reindex_kwargs,
+                    group_by=False,
+                )
+                if fbfill_close:
+                    new_close = new_close.vbt.fbfill()
+                elif ffill_close:
+                    new_close = new_close.vbt.ffill()
+                kwargs["close"] = new_close
+        return kwargs
+
     def __init__(
         self,
         wrapper: ArrayWrapper,
@@ -630,16 +697,22 @@ class Trades(Ranges):
             new_close = None
         return self.replace(wrapper=new_wrapper, records_arr=new_records_arr, close=new_close)
 
-    def resample(self: TradesT, *args, bfill_close: bool = False, **kwargs) -> TradesT:
+    def resample(
+        self: TradesT,
+        *args,
+        ffill_close: bool = False,
+        fbfill_close: bool = False,
+        **kwargs,
+    ) -> TradesT:
         """Perform resampling on `Trades`."""
         resampler, new_wrapper, new_records_arr = self.resample_meta(*args, **kwargs)
         if self.close is None:
             new_close = self.close
         else:
             new_close = self.close.vbt.resample_apply(resampler, generic_nb.last_reduce_nb)
-            if bfill_close:
+            if fbfill_close:
                 new_close = new_close.vbt.fbfill()
-            else:
+            elif ffill_close:
                 new_close = new_close.vbt.ffill()
         return self.replace(
             wrapper=new_wrapper,

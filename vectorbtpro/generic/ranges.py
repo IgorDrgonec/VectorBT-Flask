@@ -129,6 +129,7 @@ from vectorbtpro.records.decorators import override_field_config, attach_fields,
 from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
+from vectorbtpro.utils import checks
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig
 
@@ -217,6 +218,80 @@ class Ranges(Records):
         """Build `Trades` from records."""
         return cls(wrapper, records, ts=ts if attach_ts else None, **kwargs)
 
+    @classmethod
+    def resolve_row_stack_kwargs(
+        cls: tp.Type[RangesT],
+        *objs: tp.MaybeTuple[RangesT],
+        **kwargs,
+    ) -> tp.Kwargs:
+        """Resolve keyword arguments for initializing `Ranges` after stacking along rows."""
+        kwargs = Records.resolve_row_stack_kwargs(*objs, **kwargs)
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        for obj in objs:
+            if not checks.is_instance_of(obj, Ranges):
+                raise TypeError("Each object to be merged must be an instance of Ranges")
+        if "ts" not in kwargs:
+            ts_objs = []
+            stack_ts_objs = True
+            any_not_none = False
+            for obj in objs:
+                if obj.config["ts"] is not None:
+                    ts_objs.append(obj.config["ts"])
+                    any_not_none = True
+                else:
+                    stack_ts_objs = False
+            if stack_ts_objs:
+                kwargs["ts"] = kwargs["wrapper"].row_stack_and_wrap(*ts_objs, group_by=False)
+            else:
+                if any_not_none:
+                    raise ValueError("Some objects to be merged have 'ts' while others not")
+        return kwargs
+
+    @classmethod
+    def resolve_column_stack_kwargs(
+        cls: tp.Type[RangesT],
+        *objs: tp.MaybeTuple[RangesT],
+        reindex_kwargs: tp.KwargsLike = None,
+        ffill_ts: bool = False,
+        fbfill_ts: bool = False,
+        **kwargs,
+    ) -> tp.Kwargs:
+        """Resolve keyword arguments for initializing `Ranges` after stacking along columns."""
+        kwargs = Records.resolve_column_stack_kwargs(*objs, reindex_kwargs=reindex_kwargs, **kwargs)
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        for obj in objs:
+            if not checks.is_instance_of(obj, Ranges):
+                raise TypeError("Each object to be merged must be an instance of Ranges")
+        if "ts" not in kwargs:
+            ts_objs = []
+            stack_ts_objs = True
+            any_not_none = False
+            for obj in objs:
+                if obj.config["ts"] is not None:
+                    ts_objs.append(obj.config["ts"])
+                    any_not_none = True
+                else:
+                    stack_ts_objs = False
+            if stack_ts_objs:
+                new_ts = kwargs["wrapper"].column_stack_and_wrap(
+                    *ts_objs,
+                    reindex_kwargs=reindex_kwargs,
+                    group_by=False,
+                )
+                if fbfill_ts:
+                    new_ts = new_ts.vbt.fbfill()
+                elif ffill_ts:
+                    new_ts = new_ts.vbt.ffill()
+                kwargs["ts"] = new_ts
+            else:
+                if any_not_none:
+                    raise ValueError("Some objects to be merged have 'ts' while others not")
+        return kwargs
+
     def __init__(
         self,
         wrapper: ArrayWrapper,
@@ -236,16 +311,22 @@ class Ranges(Records):
             new_ts = None
         return self.replace(wrapper=new_wrapper, records_arr=new_records_arr, ts=new_ts)
 
-    def resample(self: RangesT, *args, bfill_ts: bool = False, **kwargs) -> RangesT:
+    def resample(
+        self: RangesT,
+        *args,
+        ffill_ts: bool = False,
+        fbfill_ts: bool = False,
+        **kwargs,
+    ) -> RangesT:
         """Perform resampling on `Ranges`."""
         resampler, new_wrapper, new_records_arr = self.resample_meta(*args, **kwargs)
         if self.ts is None:
             new_ts = self.ts
         else:
             new_ts = self.ts.vbt.resample_apply(resampler, nb.last_reduce_nb)
-            if bfill_ts:
+            if fbfill_ts:
                 new_ts = new_ts.vbt.fbfill()
-            else:
+            elif ffill_ts:
                 new_ts = new_ts.vbt.ffill()
         return self.replace(
             wrapper=new_wrapper,

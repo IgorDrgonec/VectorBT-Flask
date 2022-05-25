@@ -113,7 +113,7 @@ def tile_index(index: tp.IndexLike, n: int, ignore_ranges: tp.Optional[bool] = N
 
 
 def stack_indexes(
-    indexes: tp.Sequence[tp.IndexLike],
+    *indexes: tp.MaybeTuple[tp.IndexLike],
     drop_duplicates: tp.Optional[bool] = None,
     keep: tp.Optional[str] = None,
     drop_redundant: tp.Optional[bool] = None,
@@ -125,6 +125,10 @@ def stack_indexes(
     For details on `keep`, see `drop_duplicate_levels`.
 
     Set `drop_redundant` to True to use `drop_redundant_levels`."""
+    if len(indexes) == 1:
+        indexes = indexes[0]
+    indexes = list(indexes)
+
     from vectorbtpro._settings import settings
 
     broadcasting_cfg = settings["broadcasting"]
@@ -159,10 +163,14 @@ def stack_indexes(
     return new_index
 
 
-def combine_indexes(indexes: tp.Sequence[tp.IndexLike], ignore_ranges: tp.Optional[bool] = None, **kwargs) -> tp.Index:
+def combine_indexes(*indexes: tp.MaybeTuple[tp.IndexLike], ignore_ranges: tp.Optional[bool] = None, **kwargs) -> tp.Index:
     """Combine each index in `indexes` using Cartesian product.
 
     Keyword arguments will be passed to `stack_indexes`."""
+    if len(indexes) == 1:
+        indexes = indexes[0]
+    indexes = list(indexes)
+
     new_index = to_any_index(indexes[0])
     for i in range(1, len(indexes)):
         index1, index2 = new_index, to_any_index(indexes[i])
@@ -338,8 +346,12 @@ def align_index_to(index1: tp.Index, index2: tp.Index, jitted: tp.JittedOption =
     return pd.IndexSlice[func(unique1, unique2)]
 
 
-def align_indexes(indexes: tp.Sequence[tp.Index]) -> tp.List[tp.Index]:
+def align_indexes(*indexes: tp.MaybeTuple[tp.Index]) -> tp.List[tp.Index]:
     """Align multiple indexes to each other."""
+    if len(indexes) == 1:
+        indexes = indexes[0]
+    indexes = list(indexes)
+
     max_len = max(map(len, indexes))
     indices = []
     for i in range(len(indexes)):

@@ -95,6 +95,96 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         """Copy column config from another `Data` class."""
         self._column_config = cls.column_config.copy()
 
+    @classmethod
+    def row_stack(
+        cls: tp.Type[DataT],
+        *objs: tp.MaybeTuple[DataT],
+        wrapper_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> DataT:
+        """Stack multiple `Data` instances along rows.
+
+        Uses `vectorbtpro.base.wrapping.ArrayWrapper.row_stack` to stack the wrappers.
+
+        All objects to be merged must have the same symbols. Metadata such as the last index,
+        fetching and returned keyword arguments, are taken from the last object."""
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        for obj in objs:
+            if not checks.is_instance_of(obj, Data):
+                raise TypeError("Each object to be merged must be an instance of Records")
+        if "wrapper" not in kwargs:
+            if wrapper_kwargs is None:
+                wrapper_kwargs = {}
+            kwargs["wrapper"] = ArrayWrapper.row_stack(*[obj.wrapper for obj in objs], **wrapper_kwargs)
+
+        symbols = set()
+        for obj in objs:
+            symbols = symbols.union(set(obj.data.keys()))
+        for obj in objs:
+            if len(symbols.difference(set(obj.data.keys()))) > 0:
+                raise ValueError("Objects to be merged must have the same symbols")
+        if "data" not in kwargs:
+            new_data = symbol_dict()
+            for s in symbols:
+                new_data[s] = kwargs["wrapper"].row_stack_and_wrap(*[obj.data[s] for obj in objs], group_by=False)
+            kwargs["data"] = new_data
+        if "fetch_kwargs" not in kwargs:
+            kwargs["fetch_kwargs"] = objs[-1].fetch_kwargs
+        if "returned_kwargs" not in kwargs:
+            kwargs["returned_kwargs"] = objs[-1].returned_kwargs
+        if "last_index" not in kwargs:
+            kwargs["last_index"] = objs[-1].last_index
+
+        kwargs = cls.resolve_row_stack_kwargs(*objs, **kwargs)
+        kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
+        return cls(**kwargs)
+
+    @classmethod
+    def column_stack(
+        cls: tp.Type[DataT],
+        *objs: tp.MaybeTuple[DataT],
+        wrapper_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> DataT:
+        """Stack multiple `Data` instances along columns.
+
+        Uses `vectorbtpro.base.wrapping.ArrayWrapper.column_stack` to stack the wrappers.
+
+        All objects to be merged must have the same symbols and index. Metadata such as the last index,
+        fetching and returned keyword arguments, must be the same in all objects."""
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        for obj in objs:
+            if not checks.is_instance_of(obj, Data):
+                raise TypeError("Each object to be merged must be an instance of Records")
+        if "wrapper" not in kwargs:
+            if wrapper_kwargs is None:
+                wrapper_kwargs = {}
+            kwargs["wrapper"] = ArrayWrapper.column_stack(
+                *[obj.wrapper for obj in objs],
+                union_index=False,
+                **wrapper_kwargs,
+            )
+
+        symbols = set()
+        for obj in objs:
+            symbols = symbols.union(set(obj.data.keys()))
+        for obj in objs:
+            if len(symbols.difference(set(obj.data.keys()))) > 0:
+                raise ValueError("Objects to be merged must have the same symbols")
+        if "data" not in kwargs:
+            new_data = symbol_dict()
+            for s in symbols:
+                new_data[s] = kwargs["wrapper"].column_stack_and_wrap(*[obj.data[s] for obj in objs], group_by=False)
+            kwargs["data"] = new_data
+
+        kwargs = cls.resolve_column_stack_kwargs(*objs, **kwargs)
+        kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
+        return cls(**kwargs)
+
     def __init__(
         self,
         wrapper: ArrayWrapper,
@@ -148,8 +238,12 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
     def indexing_func(self: DataT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> DataT:
         """Perform indexing on `Data`."""
         new_wrapper = pd_indexing_func(self.wrapper)
-        new_data = {symbol: pd_indexing_func(obj) for symbol, obj in self.data.items()}
-        return self.replace(wrapper=new_wrapper, data=new_data)
+        new_data = {s: pd_indexing_func(obj) for s, obj in self.data.items()}
+        new_last_index = dict()
+        for s, obj in self.data.items():
+            if s in self.last_index:
+                new_last_index[s] = min([self.last_index[s], new_wrapper.index[-1]])
+        return self.replace(wrapper=new_wrapper, data=new_data, last_index=new_last_index)
 
     @property
     def data(self) -> symbol_dict:
@@ -958,13 +1052,14 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
     @classmethod
     def merge(
         cls: tp.Type[DataT],
-        *datas: "Data",
+        *datas: DataT,
         rename: tp.Optional[tp.Dict[tp.Hashable, tp.Hashable]] = None,
         **kwargs,
     ) -> DataT:
         """Merge multiple `Data` instances."""
-        if len(datas) < 2:
-            raise ValueError("Merging requires at least two Data instances")
+        if len(datas) == 1:
+            datas = datas[0]
+        datas = list(datas)
 
         data = symbol_dict()
         fetch_kwargs = symbol_dict()

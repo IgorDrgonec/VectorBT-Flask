@@ -14,6 +14,7 @@ from vectorbtpro.data import *
 from vectorbtpro.generic import *
 from vectorbtpro.indicators import *
 from vectorbtpro.signals import *
+from vectorbtpro.returns import *
 from vectorbtpro.records import *
 from vectorbtpro.portfolio import *
 from vectorbtpro.labels import *

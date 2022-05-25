@@ -2,6 +2,7 @@
 
 """Modules with base classes and utilities for pandas objects, such as broadcasting."""
 
+from vectorbtpro.base.accessors import BaseAccessor, BaseSRAccessor, BaseDFAccessor
 from vectorbtpro.base.chunking import (
     GroupLensSizer,
     GroupLensSlicer,

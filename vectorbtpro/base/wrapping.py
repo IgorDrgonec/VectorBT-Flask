@@ -17,7 +17,7 @@ from vectorbtpro.base import indexes, reshaping
 from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.indexing import IndexingError, PandasIndexer
-from vectorbtpro.base.indexes import repeat_index
+from vectorbtpro.base.indexes import repeat_index, stack_indexes
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import AttrResolverMixin, AttrResolverMixinT
 from vectorbtpro.utils.config import Configured, merge_dicts, resolve_dict
@@ -41,6 +41,461 @@ class ArrayWrapper(Configured, PandasIndexer):
         This class is meant to be immutable. To change any attribute, use `ArrayWrapper.replace`.
 
         Use methods that begin with `get_` to get group-aware results."""
+
+    @classmethod
+    def from_obj(cls: tp.Type[ArrayWrapperT], obj: tp.ArrayLike, *args, **kwargs) -> ArrayWrapperT:
+        """Derive metadata from an object."""
+        from vectorbtpro.base.reshaping import to_pd_array
+
+        pd_obj = to_pd_array(obj)
+        index = indexes.get_index(pd_obj, 0)
+        columns = indexes.get_index(pd_obj, 1)
+        ndim = pd_obj.ndim
+        kwargs.pop("index", None)
+        kwargs.pop("columns", None)
+        kwargs.pop("ndim", None)
+        return cls(index, columns, ndim, *args, **kwargs)
+
+    @classmethod
+    def from_shape(
+        cls: tp.Type[ArrayWrapperT],
+        shape: tp.ShapeLike,
+        index: tp.Optional[tp.IndexLike] = None,
+        columns: tp.Optional[tp.IndexLike] = None,
+        ndim: tp.Optional[int] = None,
+        *args,
+        **kwargs,
+    ) -> ArrayWrapperT:
+        """Derive metadata from shape."""
+        shape = reshaping.shape_to_tuple(shape)
+        if index is None:
+            index = pd.RangeIndex(stop=shape[0])
+        if columns is None:
+            columns = pd.RangeIndex(stop=shape[1] if len(shape) > 1 else 1)
+        if ndim is None:
+            ndim = len(shape)
+        return cls(index, columns, ndim, *args, **kwargs)
+
+    @staticmethod
+    def extract_init_kwargs(**kwargs) -> tp.Tuple[tp.Kwargs, tp.Kwargs]:
+        """Extract keyword arguments that can be passed to `ArrayWrapper` or `Grouper`."""
+        wrapper_arg_names = get_func_arg_names(ArrayWrapper.__init__)
+        grouper_arg_names = get_func_arg_names(Grouper.__init__)
+        init_kwargs = dict()
+        for k in list(kwargs.keys()):
+            if k in wrapper_arg_names or k in grouper_arg_names:
+                init_kwargs[k] = kwargs.pop(k)
+        return init_kwargs, kwargs
+
+    @classmethod
+    def resolve_stack_kwargs(cls, *wrappers: tp.MaybeTuple[ArrayWrapperT], **kwargs) -> tp.Kwargs:
+        """Resolve keyword arguments for initializing `ArrayWrapper` after stacking."""
+        if len(wrappers) == 1:
+            wrappers = wrappers[0]
+        wrappers = list(wrappers)
+
+        common_keys = set()
+        for wrapper in wrappers:
+            common_keys = common_keys.union(set(wrapper.config.keys()))
+            if "grouper" not in kwargs:
+                common_keys = common_keys.union(set(wrapper.grouper.config.keys()))
+        common_keys.remove("grouper")
+        init_wrapper = wrappers[0]
+        for i in range(1, len(wrappers)):
+            wrapper = wrappers[i]
+            for k in common_keys:
+                if k not in kwargs:
+                    same_k = True
+                    try:
+                        if k in wrapper.config:
+                            if not checks.is_deep_equal(init_wrapper.config[k], wrapper.config[k]):
+                                same_k = False
+                        elif "grouper" not in kwargs and k in wrapper.grouper.config:
+                            if not checks.is_deep_equal(init_wrapper.grouper.config[k], wrapper.grouper.config[k]):
+                                same_k = False
+                        else:
+                            same_k = False
+                    except KeyError as e:
+                        same_k = False
+                    if not same_k:
+                        raise ValueError(f"Objects to be merged must have compatible '{k}'. Pass to override.")
+        for k in common_keys:
+            if k not in kwargs:
+                if k in init_wrapper.config:
+                    kwargs[k] = init_wrapper.config[k]
+                elif "grouper" not in kwargs and k in init_wrapper.grouper.config:
+                    kwargs[k] = init_wrapper.grouper.config[k]
+                else:
+                    raise ValueError(f"Objects to be merged must have compatible '{k}'. Pass to override.")
+        return kwargs
+
+    @classmethod
+    def row_stack(
+        cls: tp.Type[ArrayWrapperT],
+        *wrappers: tp.MaybeTuple[ArrayWrapperT],
+        index: tp.Optional[tp.IndexLike] = None,
+        columns: tp.Optional[tp.IndexLike] = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+        group_by: tp.GroupByLike = None,
+        stack_columns: bool = True,
+        stack_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> ArrayWrapperT:
+        """Stack multiple `ArrayWrapper` instances along rows.
+
+        Indexes will be concatenated in the order instances appear in `wrappers`.
+        The merged index must have no duplicates or mixed data, and must be monotonically increasing.
+        A custom index can be provided via `index`.
+
+        Frequency must be the same across all indexes. A custom frequency can be provided via `freq`.
+
+        If column levels in some instances differ, they will be stacked upon each other.
+        Custom columns can be provided via `columns`.
+
+        If `group_by` is None, all instances must be either grouped or not, and they must
+        contain the same group values and labels.
+
+        All instances must contain the same keys and values in their configs and configs of their
+        grouper instances, apart from those arguments provided explicitly via `kwargs`."""
+        if len(wrappers) == 1:
+            wrappers = wrappers[0]
+        wrappers = list(wrappers)
+        for wrapper in wrappers:
+            if not checks.is_instance_of(wrapper, ArrayWrapper):
+                raise TypeError("Each object to be merged must be an instance of ArrayWrapper")
+
+        if index is None:
+            new_index = None
+            all_ranges = True
+            name = None
+            for wrapper in wrappers:
+                if not checks.is_default_index(wrapper.index, check_names=False) or (
+                    name is not None and wrapper.index != name
+                ):
+                    all_ranges = False
+                    break
+                if name is None:
+                    name = wrapper.index.name
+            if all_ranges:
+                new_index = pd.RangeIndex(stop=sum([len(wrapper.index) for wrapper in wrappers]), name=name)
+            else:
+                for wrapper in wrappers:
+                    if new_index is None:
+                        new_index = wrapper.index
+                    else:
+                        new_index = new_index.append(wrapper.index)
+            if new_index.has_duplicates:
+                raise ValueError("Merged index contains duplicates")
+            if not new_index.is_monotonic_increasing:
+                raise ValueError("Merged index must be monotonically increasing")
+            if "mixed" in new_index.inferred_type:
+                raise ValueError("Merged index holds data with mixed data types")
+            index = new_index
+        elif not isinstance(index, pd.Index):
+            index = pd.Index(index)
+        kwargs["index"] = index
+
+        if freq is None:
+            freq = infer_index_freq(index)
+            if freq is None:
+                new_freq = None
+                for wrapper in wrappers:
+                    if new_freq is None:
+                        new_freq = wrapper.freq
+                    else:
+                        if new_freq is not None and wrapper.freq is not None and new_freq != wrapper.freq:
+                            raise ValueError("Objects to be merged must have the same frequency")
+                freq = new_freq
+        kwargs["freq"] = freq
+
+        if columns is None:
+            new_columns = None
+            for wrapper in wrappers:
+                if new_columns is None:
+                    new_columns = wrapper.columns
+                else:
+                    if not checks.is_index_equal(new_columns, wrapper.columns, check_names=True):
+                        if not stack_columns:
+                            raise ValueError("Objects to be merged must have the same columns")
+                        new_columns = stack_indexes((new_columns, wrapper.columns), **resolve_dict(stack_kwargs))
+            columns = new_columns
+        elif not isinstance(columns, pd.Index):
+            columns = pd.Index(columns)
+        kwargs["columns"] = columns
+
+        if "grouper" in kwargs:
+            if not checks.is_index_equal(columns, kwargs["grouper"].index, check_names=True):
+                raise ValueError("Columns and grouper index must match")
+            if group_by is not None:
+                kwargs["group_by"] = group_by
+        else:
+            if group_by is None:
+                grouped = None
+                for wrapper in wrappers:
+                    wrapper_grouped = wrapper.grouper.is_grouped()
+                    if grouped is None:
+                        grouped = wrapper_grouped
+                    else:
+                        if grouped is not wrapper_grouped:
+                            raise ValueError("Objects to be merged must be either grouped or not")
+                if grouped:
+                    new_group_by = None
+                    for wrapper in wrappers:
+                        wrapper_groups, wrapper_grouped_index = wrapper.grouper.get_groups_and_index()
+                        wrapper_group_by = wrapper_grouped_index[wrapper_groups]
+                        if new_group_by is None:
+                            new_group_by = wrapper_group_by
+                        else:
+                            if not checks.is_index_equal(new_group_by, wrapper_group_by, check_names=True):
+                                raise ValueError("Objects to be merged must have the same groups")
+                    group_by = new_group_by
+                else:
+                    group_by = False
+            kwargs["group_by"] = group_by
+
+        if "ndim" not in kwargs:
+            ndim = None
+            for wrapper in wrappers:
+                if ndim is None or wrapper.ndim > 1:
+                    ndim = wrapper.ndim
+            kwargs["ndim"] = ndim
+
+        return cls(**ArrayWrapper.resolve_stack_kwargs(*wrappers, **kwargs))
+
+    @classmethod
+    def column_stack(
+        cls: tp.Type[ArrayWrapperT],
+        *wrappers: tp.MaybeTuple[ArrayWrapperT],
+        index: tp.Optional[tp.IndexLike] = None,
+        columns: tp.Optional[tp.IndexLike] = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+        group_by: tp.GroupByLike = None,
+        union_index: bool = True,
+        normalize_columns: tp.Optional[bool] = None,
+        normalize_groups: tp.Optional[bool] = None,
+        normalize_locally: bool = True,
+        keys: tp.Optional[tp.IndexLike] = None,
+        stack_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> ArrayWrapperT:
+        """Stack multiple `ArrayWrapper` instances along columns.
+
+        If indexes are the same in each wrapper index, will use that index. If indexes differ and
+        `union_index` is True, they will be merged into a single one by the set union operation.
+        Otherwise, an error will be raised. The merged index must have no duplicates or mixed data,
+        and must be monotonically increasing. A custom index can be provided via `index`.
+
+        Frequency must be the same across all indexes. A custom frequency can be provided via `freq`.
+
+        If columns level names are the same in each instance, will concatenate all columns.
+        If column level names differ and `normalize_columns` is True, will create a new column index
+        with the name `col_idx`. Otherwise, an error will be raised. If `normalize_locally` is True,
+        will index unique columns under their respective objects, otherwise globally.
+
+        If group level names differ and `normalize_groups` is True, applies the same approach as for columns.
+        Otherwise, an error will be raised (also when some instances are grouped and some are not).
+
+        If any of the instances has `column_only_select` being enabled, the final wrapper will also enable it.
+        If any of the instances has `group_select` or other grouping-related flags being disabled, the final
+        wrapper will also disable them.
+
+        All instances must contain the same keys and values in their configs and configs of their
+        grouper instances, apart from those arguments provided explicitly via `kwargs`."""
+        if len(wrappers) == 1:
+            wrappers = wrappers[0]
+        wrappers = list(wrappers)
+        for wrapper in wrappers:
+            if not checks.is_instance_of(wrapper, ArrayWrapper):
+                raise TypeError("Each object to be merged must be an instance of ArrayWrapper")
+        if keys is not None and not isinstance(keys, pd.Index):
+            keys = pd.Index(keys)
+
+        for wrapper in wrappers:
+            if wrapper.index.has_duplicates:
+                raise ValueError("Index of some objects to be merged contains duplicates")
+        if index is None:
+            new_index = None
+            for wrapper in wrappers:
+                if new_index is None:
+                    new_index = wrapper.index
+                else:
+                    if not checks.is_index_equal(new_index, wrapper.index, check_names=True):
+                        if not union_index:
+                            raise ValueError(
+                                "Objects to be merged must have the same index. "
+                                "Use index='union' to merge index as well."
+                            )
+                        else:
+                            new_index = new_index.union(wrapper.index)
+            if not new_index.is_monotonic_increasing:
+                raise ValueError("Merged index must be monotonically increasing")
+            if "mixed" in new_index.inferred_type:
+                raise ValueError("Merged index holds data with mixed data types")
+            index = new_index
+        elif not isinstance(index, pd.Index):
+            index = pd.Index(index)
+        kwargs["index"] = index
+
+        if freq is None:
+            freq = infer_index_freq(index)
+            if freq is None:
+                new_freq = None
+                for wrapper in wrappers:
+                    if new_freq is None:
+                        new_freq = wrapper.freq
+                    else:
+                        if new_freq is not None and wrapper.freq is not None and new_freq != wrapper.freq:
+                            raise ValueError("Objects to be merged must have the same frequency")
+                freq = new_freq
+        kwargs["freq"] = freq
+
+        if columns is None:
+            normalize = False
+            if normalize_columns is None or not normalize_columns:
+                new_columns = None
+                for wrapper in wrappers:
+                    wrapper_columns = wrapper.columns
+                    if new_columns is None:
+                        new_columns = wrapper_columns
+                    else:
+                        if new_columns.names != wrapper_columns.names:
+                            if normalize_columns is not None and not normalize_columns:
+                                raise ValueError(
+                                    "Objects to be merged must have the same column level names. "
+                                    "Use columns='normalize' to normalize columns."
+                                )
+                            normalize = True
+                            break
+                        new_columns = new_columns.append(wrapper_columns)
+            if normalize:
+                new_columns = None
+                if keys is not None and normalize_locally:
+                    for wrapper in wrappers:
+                        wrapper_columns = pd.RangeIndex(stop=len(wrapper.columns), name="col_idx")
+                        if new_columns is None:
+                            new_columns = wrapper_columns
+                        else:
+                            new_columns = new_columns.append(wrapper_columns)
+                else:
+                    total_column_count = sum([len(wrapper.columns) for wrapper in wrappers])
+                    new_columns = pd.RangeIndex(stop=total_column_count, name="col_idx")
+            elif keys is None:
+                if (new_columns == 0).all():
+                    new_columns = pd.RangeIndex(stop=len(new_columns))
+            if keys is not None:
+                top_columns = None
+                for i, wrapper in enumerate(wrappers):
+                    top_wrapper_columns = repeat_index(keys[[i]], len(wrapper.columns))
+                    if top_columns is None:
+                        top_columns = top_wrapper_columns
+                    else:
+                        top_columns = top_columns.append(top_wrapper_columns)
+                new_columns = stack_indexes((top_columns, new_columns), **resolve_dict(stack_kwargs))
+            columns = new_columns
+        elif not isinstance(columns, pd.Index):
+            columns = pd.Index(columns)
+        kwargs["columns"] = columns
+
+        if "grouper" in kwargs:
+            if not checks.is_index_equal(columns, kwargs["grouper"].index, check_names=True):
+                raise ValueError("Columns and grouper index must match")
+            if group_by is not None:
+                kwargs["group_by"] = group_by
+        else:
+            if group_by is None:
+                any_grouped = False
+                for wrapper in wrappers:
+                    if wrapper.grouper.is_grouped():
+                        any_grouped = True
+                        break
+                if any_grouped:
+                    normalize = False
+                    if normalize_groups is None or not normalize_groups:
+                        new_group_by = None
+                        for wrapper in wrappers:
+                            wrapper_groups, wrapper_grouped_index = wrapper.grouper.get_groups_and_index()
+                            wrapper_group_by = wrapper_grouped_index[wrapper_groups]
+                            if new_group_by is None:
+                                new_group_by = wrapper_group_by
+                            else:
+                                if len(new_group_by.intersection(wrapper_group_by)) > 0:
+                                    if normalize_groups is not None and not normalize_groups:
+                                        raise ValueError("Objects to be merged must must have compatible group labels")
+                                    normalize = True
+                                    break
+                                if new_group_by.names != wrapper_group_by.names:
+                                    if normalize_groups is not None and not normalize_groups:
+                                        raise ValueError("Objects to be merged must have the same group level names")
+                                    normalize = True
+                                    break
+                                new_group_by = new_group_by.append(wrapper_group_by)
+                    if normalize:
+                        new_group_by = None
+                        if keys is not None and normalize_locally:
+                            for i, wrapper in enumerate(wrappers):
+                                wrapper_group_by = pd.Index(wrapper.grouper.get_groups(), name="group_idx")
+                                if new_group_by is None:
+                                    new_group_by = wrapper_group_by
+                                else:
+                                    new_group_by = new_group_by.append(wrapper_group_by)
+                        else:
+                            cnt_sum = 0
+                            indices = []
+                            for i, wrapper in enumerate(wrappers):
+                                indices.append(wrapper.grouper.get_groups() + cnt_sum)
+                                cnt_sum += wrapper.grouper.get_group_count()
+                            new_group_by = pd.Index(np.concatenate(indices), name="group_idx")
+                    if keys is not None:
+                        top_group_by = None
+                        for i, wrapper in enumerate(wrappers):
+                            top_wrapper_group_by = repeat_index(keys[[i]], len(wrapper.columns))
+                            if top_group_by is None:
+                                top_group_by = top_wrapper_group_by
+                            else:
+                                top_group_by = top_group_by.append(top_wrapper_group_by)
+                        new_group_by = stack_indexes((top_group_by, new_group_by), **resolve_dict(stack_kwargs))
+                    group_by = new_group_by
+                else:
+                    group_by = False
+            kwargs["group_by"] = group_by
+
+        if "ndim" not in kwargs:
+            kwargs["ndim"] = 2
+        if "grouped_ndim" not in kwargs:
+            kwargs["grouped_ndim"] = None
+        if "column_only_select" not in kwargs:
+            column_only_select = None
+            for wrapper in wrappers:
+                if column_only_select is None or wrapper.column_only_select:
+                    column_only_select = wrapper.column_only_select
+            kwargs["column_only_select"] = column_only_select
+        if "group_select" not in kwargs:
+            group_select = None
+            for wrapper in wrappers:
+                if group_select is None or not wrapper.group_select:
+                    group_select = wrapper.group_select
+            kwargs["group_select"] = group_select
+        if "grouper" not in kwargs:
+            if "allow_enable" not in kwargs:
+                allow_enable = None
+                for wrapper in wrappers:
+                    if allow_enable is None or not wrapper.grouper.allow_enable:
+                        allow_enable = wrapper.grouper.allow_enable
+                kwargs["allow_enable"] = allow_enable
+            if "allow_disable" not in kwargs:
+                allow_disable = None
+                for wrapper in wrappers:
+                    if allow_disable is None or not wrapper.grouper.allow_disable:
+                        allow_disable = wrapper.grouper.allow_disable
+                kwargs["allow_disable"] = allow_disable
+            if "allow_modify" not in kwargs:
+                allow_modify = None
+                for wrapper in wrappers:
+                    if allow_modify is None or not wrapper.grouper.allow_modify:
+                        allow_modify = wrapper.grouper.allow_modify
+                kwargs["allow_modify"] = allow_modify
+
+        return cls(**ArrayWrapper.resolve_stack_kwargs(*wrappers, **kwargs))
 
     def __init__(
         self,
@@ -110,7 +565,7 @@ class ArrayWrapper(Configured, PandasIndexer):
 
         Set `column_only_select` to True to index the array wrapper as a Series of columns.
         This way, selection of index (axis 0) can be avoided. Set `group_select` to True
-        to select groups rather than columns. Takes effect only if grouping is enabled.
+        to allow selection of groups. Takes effect only if grouping is enabled.
 
         !!! note
             If `column_only_select` is True, make sure to index the array wrapper
@@ -270,40 +725,6 @@ class ArrayWrapper(Configured, PandasIndexer):
         """Perform indexing on `ArrayWrapper`"""
         return self.indexing_func_meta(*args, **kwargs)[0]
 
-    @classmethod
-    def from_obj(cls: tp.Type[ArrayWrapperT], obj: tp.ArrayLike, *args, **kwargs) -> ArrayWrapperT:
-        """Derive metadata from an object."""
-        from vectorbtpro.base.reshaping import to_pd_array
-
-        pd_obj = to_pd_array(obj)
-        index = indexes.get_index(pd_obj, 0)
-        columns = indexes.get_index(pd_obj, 1)
-        ndim = pd_obj.ndim
-        kwargs.pop("index", None)
-        kwargs.pop("columns", None)
-        kwargs.pop("ndim", None)
-        return cls(index, columns, ndim, *args, **kwargs)
-
-    @classmethod
-    def from_shape(
-        cls: tp.Type[ArrayWrapperT],
-        shape: tp.ShapeLike,
-        index: tp.Optional[tp.IndexLike] = None,
-        columns: tp.Optional[tp.IndexLike] = None,
-        ndim: tp.Optional[int] = None,
-        *args,
-        **kwargs,
-    ) -> ArrayWrapperT:
-        """Derive metadata from shape."""
-        shape = reshaping.shape_to_tuple(shape)
-        if index is None:
-            index = pd.RangeIndex(start=0, step=1, stop=shape[0])
-        if columns is None:
-            columns = pd.RangeIndex(start=0, step=1, stop=shape[1] if len(shape) > 1 else 1)
-        if ndim is None:
-            ndim = len(shape)
-        return cls(index, columns, ndim, *args, **kwargs)
-
     @property
     def index(self) -> tp.Index:
         """Index."""
@@ -458,7 +879,7 @@ class ArrayWrapper(Configured, PandasIndexer):
 
     @property
     def group_select(self) -> tp.Optional[bool]:
-        """Whether to perform indexing on groups."""
+        """Whether to allow indexing on groups."""
         from vectorbtpro._settings import settings
 
         wrapping_cfg = settings["wrapping"]
@@ -508,6 +929,74 @@ class ArrayWrapper(Configured, PandasIndexer):
                 group_by=None,
             )
         return _self  # important for keeping cache
+
+    def create_index_grouper(self, by: tp.Union[Grouper, tp.PandasGroupByLike], **kwargs) -> Grouper:
+        """Create an index grouper of type `vectorbtpro.base.grouping.base.Grouper`."""
+        if isinstance(by, Grouper):
+            return by
+        if isinstance(by, (PandasGroupBy, PandasResampler)):
+            return Grouper.from_pd_group_by(by)
+        try:
+            return Grouper(index=self.index, group_by=by)
+        except Exception as e:
+            pass
+        if isinstance(self.index, pd.DatetimeIndex):
+            try:
+                return Grouper(index=self.index, group_by=self.index.to_period(by))
+            except Exception as e:
+                pass
+            try:
+                pd_group_by = pd.Series(index=self.index, dtype=object).resample(by, **kwargs)
+                return Grouper.from_pd_group_by(pd_group_by)
+            except Exception as e:
+                pass
+        pd_group_by = pd.Series(index=self.index, dtype=object).groupby(by, axis=0, **kwargs)
+        return Grouper.from_pd_group_by(pd_group_by)
+
+    def create_resampler(
+        self,
+        rule: tp.Union[Resampler, tp.PandasResampler, tp.PandasFrequencyLike],
+        resample_kwargs: tp.KwargsLike = None,
+        return_pd_resampler: bool = False,
+    ) -> tp.Union[Resampler, tp.PandasResampler]:
+        """Create a resampler of type `vectorbtpro.base.resampling.base.Resampler`."""
+        if not isinstance(rule, Resampler):
+            if not isinstance(rule, PandasResampler):
+                resample_kwargs = merge_dicts(
+                    dict(closed="left", label="left"),
+                    resample_kwargs,
+                )
+                rule = pd.Series(index=self.index, dtype=object).resample(rule, **resolve_dict(resample_kwargs))
+            if return_pd_resampler:
+                return rule
+            rule = Resampler.from_pd_resampler(rule)
+        if return_pd_resampler:
+            raise TypeError("Cannot convert Resampler to Pandas Resampler")
+        return rule
+
+    def resample_meta(
+        self: ArrayWrapperT,
+        *args,
+        **kwargs,
+    ) -> tp.Tuple[tp.Union[Resampler, tp.PandasResampler], ArrayWrapperT]:
+        """Perform resampling on `ArrayWrapper` and also return metadata.
+
+        `*args` and `**kwargs` are passed to `ArrayWrapper.create_resampler`."""
+        resampler = self.create_resampler(*args, **kwargs)
+        if isinstance(resampler, Resampler):
+            _resampler = resampler
+        else:
+            _resampler = Resampler.from_pd_resampler(resampler)
+        new_index = _resampler.target_index
+        new_freq = infer_index_freq(new_index)
+        new_wrapper = self.replace(index=new_index, freq=new_freq)
+        return resampler, new_wrapper
+
+    def resample(self: ArrayWrapperT, *args, **kwargs) -> ArrayWrapperT:
+        """Perform resampling on `ArrayWrapper`.
+
+        Uses `ArrayWrapper.resample_meta`."""
+        return self.resample_meta(*args, **kwargs)[1]
 
     def wrap(
         self,
@@ -686,6 +1175,71 @@ class ArrayWrapper(Configured, PandasIndexer):
             out = self.to_timedelta(out, silence_warnings=silence_warnings)
         return out
 
+    def row_stack_and_wrap(self, *objs: tp.ArrayLike, group_by: tp.GroupByLike = None, **kwargs) -> tp.SeriesFrame:
+        """Stack objects along rows and wrap the final object."""
+        _self = self.resolve(group_by=group_by)
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        new_objs = []
+        for obj in objs:
+            obj = reshaping.to_2d_array(obj)
+            if obj.shape[1] != _self.shape_2d[1]:
+                if obj.shape[1] != 1:
+                    raise ValueError(f"Cannot broadcast {obj.shape[1]} to {_self.shape_2d[1]} columns")
+                obj = np.repeat(obj, _self.shape_2d[1], axis=1)
+            new_objs.append(obj)
+        stacked_obj = np.row_stack(new_objs)
+        return _self.wrap(stacked_obj, **kwargs)
+
+    def column_stack_and_wrap(
+        self,
+        *objs: tp.ArrayLike,
+        reindex_kwargs: tp.KwargsLike = None,
+        group_by: tp.GroupByLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
+        """Stack objects along columns and wrap the final object.
+
+        `reindex_kwargs` will be passed to
+        [pandas.DataFrame.reindex](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.reindex.html)."""
+        _self = self.resolve(group_by=group_by)
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        new_objs = []
+        for obj in objs:
+            if not obj.index.equals(_self.index):
+                was_bool = (isinstance(obj, pd.Series) and obj.dtype == "bool") or (
+                    isinstance(obj, pd.DataFrame) and (obj.dtypes == "bool").all()
+                )
+                obj = obj.reindex(_self.index, **resolve_dict(reindex_kwargs))
+                is_object = (isinstance(obj, pd.Series) and obj.dtype == "object") or (
+                    isinstance(obj, pd.DataFrame) and (obj.dtypes == "object").all()
+                )
+                if was_bool and is_object:
+                    obj = obj.astype(None)
+            new_objs.append(reshaping.to_2d_array(obj))
+        stacked_obj = np.column_stack(new_objs)
+        return _self.wrap(stacked_obj, **kwargs)
+
+    def column_stack_and_wrap_reduced(
+        self,
+        *objs: tp.ArrayLike,
+        group_by: tp.GroupByLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
+        """Stack reduced objects along columns and wrap the final object."""
+        _self = self.resolve(group_by=group_by)
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        new_objs = []
+        for obj in objs:
+            new_objs.append(reshaping.to_1d_array(obj))
+        stacked_obj = np.concatenate(new_objs)
+        return _self.wrap_reduced(stacked_obj, **kwargs)
+
     def dummy(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.SeriesFrame:
         """Create a dummy Series/DataFrame."""
         _self = self.resolve(group_by=group_by)
@@ -700,74 +1254,6 @@ class ArrayWrapper(Configured, PandasIndexer):
         """Fill a reduced Series/DataFrame."""
         _self = self.resolve(group_by=group_by)
         return _self.wrap_reduced(np.full(_self.shape_2d[1], fill_value), **kwargs)
-
-    def create_index_grouper(self, by: tp.Union[Grouper, tp.PandasGroupByLike], **kwargs) -> Grouper:
-        """Create an index grouper of type `vectorbtpro.base.grouping.base.Grouper`."""
-        if isinstance(by, Grouper):
-            return by
-        if isinstance(by, (PandasGroupBy, PandasResampler)):
-            return Grouper.from_pd_group_by(by)
-        try:
-            return Grouper(index=self.index, group_by=by)
-        except Exception as e:
-            pass
-        if isinstance(self.index, pd.DatetimeIndex):
-            try:
-                return Grouper(index=self.index, group_by=self.index.to_period(by))
-            except Exception as e:
-                pass
-            try:
-                pd_group_by = pd.Series(index=self.index, dtype=object).resample(by, **kwargs)
-                return Grouper.from_pd_group_by(pd_group_by)
-            except Exception as e:
-                pass
-        pd_group_by = pd.Series(index=self.index, dtype=object).groupby(by, axis=0, **kwargs)
-        return Grouper.from_pd_group_by(pd_group_by)
-
-    def create_resampler(
-        self,
-        rule: tp.Union[Resampler, tp.PandasResampler, tp.PandasFrequencyLike],
-        resample_kwargs: tp.KwargsLike = None,
-        return_pd_resampler: bool = False,
-    ) -> tp.Union[Resampler, tp.PandasResampler]:
-        """Create a resampler of type `vectorbtpro.base.resampling.base.Resampler`."""
-        if not isinstance(rule, Resampler):
-            if not isinstance(rule, PandasResampler):
-                resample_kwargs = merge_dicts(
-                    dict(closed="left", label="left"),
-                    resample_kwargs,
-                )
-                rule = pd.Series(index=self.index, dtype=object).resample(rule, **resolve_dict(resample_kwargs))
-            if return_pd_resampler:
-                return rule
-            rule = Resampler.from_pd_resampler(rule)
-        if return_pd_resampler:
-            raise TypeError("Cannot convert Resampler to Pandas Resampler")
-        return rule
-
-    def resample_meta(
-        self: ArrayWrapperT,
-        *args,
-        **kwargs,
-    ) -> tp.Tuple[tp.Union[Resampler, tp.PandasResampler], ArrayWrapperT]:
-        """Perform resampling on `ArrayWrapper` and also return metadata.
-
-        `*args` and `**kwargs` are passed to `ArrayWrapper.create_resampler`."""
-        resampler = self.create_resampler(*args, **kwargs)
-        if isinstance(resampler, Resampler):
-            _resampler = resampler
-        else:
-            _resampler = Resampler.from_pd_resampler(resampler)
-        new_index = _resampler.target_index
-        new_freq = infer_index_freq(new_index)
-        new_wrapper = self.replace(index=new_index, freq=new_freq)
-        return resampler, new_wrapper
-
-    def resample(self: ArrayWrapperT, *args, **kwargs) -> ArrayWrapperT:
-        """Perform resampling on `ArrayWrapper`.
-
-        Uses `ArrayWrapper.resample_meta`."""
-        return self.resample_meta(*args, **kwargs)[1]
 
     def get_index_points(
         self,
@@ -1389,6 +1875,66 @@ WrappingT = tp.TypeVar("WrappingT", bound="Wrapping")
 
 class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
     """Class that uses `ArrayWrapper` globally."""
+
+    @classmethod
+    def resolve_row_stack_kwargs(cls, *wrappings: tp.MaybeTuple[WrappingT], **kwargs) -> tp.Kwargs:
+        """Resolve keyword arguments for initializing `Wrapping` after stacking along rows."""
+        return kwargs
+
+    @classmethod
+    def resolve_column_stack_kwargs(cls, *wrappings: tp.MaybeTuple[WrappingT], **kwargs) -> tp.Kwargs:
+        """Resolve keyword arguments for initializing `Wrapping` after stacking along columns."""
+        return kwargs
+
+    @classmethod
+    def resolve_stack_kwargs(cls, *wrappings: tp.MaybeTuple[WrappingT], **kwargs) -> tp.Kwargs:
+        """Resolve keyword arguments for initializing `Wrapping` after stacking.
+
+        Should be called after `Wrapping.resolve_row_stack_kwargs` or `Wrapping.resolve_column_stack_kwargs`."""
+        if len(wrappings) == 1:
+            wrappings = wrappings[0]
+        wrappings = list(wrappings)
+
+        common_keys = set()
+        for wrapping in wrappings:
+            common_keys = common_keys.union(set(wrapping.config.keys()))
+        init_wrapping = wrappings[0]
+        for i in range(1, len(wrappings)):
+            wrapping = wrappings[i]
+            for k in common_keys:
+                if k not in kwargs:
+                    same_k = True
+                    try:
+                        if k in wrapping.config:
+                            if not checks.is_deep_equal(init_wrapping.config[k], wrapping.config[k]):
+                                same_k = False
+                        else:
+                            same_k = False
+                    except KeyError as e:
+                        same_k = False
+                    if not same_k:
+                        raise ValueError(f"Objects to be merged must have compatible '{k}'. Pass to override.")
+        for k in common_keys:
+            if k not in kwargs:
+                if k in init_wrapping.config:
+                    kwargs[k] = init_wrapping.config[k]
+                else:
+                    raise ValueError(f"Objects to be merged must have compatible '{k}'. Pass to override.")
+        return kwargs
+
+    @classmethod
+    def row_stack(cls: tp.Type[WrappingT], *args: tp.MaybeTuple[WrappingT], **kwargs) -> WrappingT:
+        """Stack multiple `Wrapping` instances along rows.
+
+        Should use `ArrayWrapper.row_stack`."""
+        raise NotImplementedError
+
+    @classmethod
+    def column_stack(cls: tp.Type[WrappingT], *args: tp.MaybeTuple[WrappingT], **kwargs) -> WrappingT:
+        """Stack multiple `Wrapping` instances along columns.
+
+        Should use `ArrayWrapper.column_stack`."""
+        raise NotImplementedError
 
     def __init__(self, wrapper: ArrayWrapper, **kwargs) -> None:
         checks.assert_instance_of(wrapper, ArrayWrapper)

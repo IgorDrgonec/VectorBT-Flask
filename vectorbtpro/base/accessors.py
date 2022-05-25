@@ -8,7 +8,6 @@ from pandas.api.types import is_scalar
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import combining, reshaping, indexes
-from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts, resolve_dict
@@ -149,19 +148,106 @@ class BaseAccessor(Wrapping):
         ```
     """
 
+    @classmethod
+    def resolve_row_stack_kwargs(
+        cls: tp.Type[BaseAccessorT],
+        *objs: tp.MaybeTuple[BaseAccessorT],
+        **kwargs,
+    ) -> tp.Kwargs:
+        """Resolve keyword arguments for initializing `BaseAccessor` after stacking along rows."""
+        wrapper_kwargs, kwargs = ArrayWrapper.extract_init_kwargs(**kwargs)
+        if "wrapper" in kwargs and kwargs["wrapper"] is not None:
+            wrapper = kwargs["wrapper"]
+            if len(wrapper_kwargs) > 0:
+                wrapper = wrapper.replace(**wrapper_kwargs)
+        else:
+            wrapper = ArrayWrapper.row_stack(*[obj.wrapper for obj in objs], **wrapper_kwargs)
+        kwargs["wrapper"] = wrapper
+        if "obj" not in kwargs:
+            kwargs["obj"] = wrapper.row_stack_and_wrap(*[obj.obj for obj in objs], group_by=False)
+        return kwargs
+
+    @classmethod
+    def resolve_column_stack_kwargs(
+        cls: tp.Type[BaseAccessorT],
+        *objs: tp.MaybeTuple[BaseAccessorT],
+        reindex_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.Kwargs:
+        """Resolve keyword arguments for initializing `BaseAccessor` after stacking along columns."""
+        wrapper_kwargs, kwargs = ArrayWrapper.extract_init_kwargs(**kwargs)
+        if "wrapper" in kwargs and kwargs["wrapper"] is not None:
+            wrapper = kwargs["wrapper"]
+            if len(wrapper_kwargs) > 0:
+                wrapper = wrapper.replace(**wrapper_kwargs)
+        else:
+            wrapper = ArrayWrapper.column_stack(*[obj.wrapper for obj in objs], **wrapper_kwargs)
+        kwargs["wrapper"] = wrapper
+        if "obj" not in kwargs:
+            kwargs["obj"] = wrapper.column_stack_and_wrap(
+                *[obj.obj for obj in objs],
+                reindex_kwargs=reindex_kwargs,
+                group_by=False,
+            )
+        return kwargs
+
+    @classmethod
+    def row_stack(
+        cls: tp.Type[BaseAccessorT],
+        *objs: tp.MaybeTuple[BaseAccessorT],
+        **kwargs,
+    ) -> BaseAccessorT:
+        """Stack multiple `BaseAccessor` instances along rows.
+
+        Uses `vectorbtpro.base.wrapping.ArrayWrapper.row_stack` to stack the wrappers."""
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        for obj in objs:
+            if not checks.is_instance_of(obj, BaseAccessor):
+                raise TypeError("Each object to be merged must be an instance of BaseAccessor")
+        kwargs = cls.resolve_row_stack_kwargs(*objs, **kwargs)
+        kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
+        if checks.is_series(kwargs["obj"]):
+            return cls.sr_accessor_cls(**kwargs)
+        return cls.df_accessor_cls(**kwargs)
+
+    @classmethod
+    def column_stack(
+        cls: tp.Type[BaseAccessorT],
+        *objs: tp.MaybeTuple[BaseAccessorT],
+        reindex_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> BaseAccessorT:
+        """Stack multiple `BaseAccessor` instances along columns.
+
+        Uses `vectorbtpro.base.wrapping.ArrayWrapper.column_stack` to stack the wrappers."""
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        for obj in objs:
+            if not checks.is_instance_of(obj, BaseAccessor):
+                raise TypeError("Each object to be merged must be an instance of BaseAccessor")
+        kwargs = cls.resolve_column_stack_kwargs(*objs, **kwargs)
+        kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
+        return cls.df_accessor_cls(**kwargs)
+
+    def indexing_func(self: BaseAccessorT, *args, **kwargs) -> BaseAccessorT:
+        """Perform indexing on `BaseAccessor`."""
+        new_wrapper, idx_idxs, _, col_idxs = self.wrapper.indexing_func_meta(*args, **kwargs)
+        new_obj = new_wrapper.wrap(self.to_2d_array()[idx_idxs, :][:, col_idxs], group_by=False)
+        if checks.is_series(new_obj):
+            return self.replace(cls_=self.sr_accessor_cls, obj=new_obj, wrapper=new_wrapper)
+        return self.replace(cls_=self.df_accessor_cls, obj=new_obj, wrapper=new_wrapper)
+
     def __init__(self, obj: tp.SeriesFrame, wrapper: tp.Optional[ArrayWrapper] = None, **kwargs) -> None:
         checks.assert_instance_of(obj, (pd.Series, pd.DataFrame))
 
-        wrapper_arg_names = get_func_arg_names(ArrayWrapper.__init__)
-        grouper_arg_names = get_func_arg_names(Grouper.__init__)
-        wrapping_kwargs = dict()
-        for k in list(kwargs.keys()):
-            if k in wrapper_arg_names or k in grouper_arg_names:
-                wrapping_kwargs[k] = kwargs.pop(k)
+        wrapper_kwargs, kwargs = ArrayWrapper.extract_init_kwargs(**kwargs)
         if wrapper is None:
-            wrapper = ArrayWrapper.from_obj(obj, **wrapping_kwargs)
-        elif len(wrapping_kwargs) > 0:
-            wrapper = wrapper.replace(**wrapping_kwargs)
+            wrapper = ArrayWrapper.from_obj(obj, **wrapper_kwargs)
+        elif len(wrapper_kwargs) > 0:
+            wrapper = wrapper.replace(**wrapper_kwargs)
 
         Wrapping.__init__(self, wrapper, obj=obj, **kwargs)
 
@@ -172,23 +258,15 @@ class BaseAccessor(Wrapping):
 
         return self.replace(**kwargs)
 
-    @property
-    def sr_accessor_cls(self) -> tp.Type["BaseSRAccessor"]:
+    @class_or_instanceproperty
+    def sr_accessor_cls(cls_or_self) -> tp.Type["BaseSRAccessor"]:
         """Accessor class for `pd.Series`."""
         return BaseSRAccessor
 
-    @property
-    def df_accessor_cls(self) -> tp.Type["BaseDFAccessor"]:
+    @class_or_instanceproperty
+    def df_accessor_cls(cls_or_self) -> tp.Type["BaseDFAccessor"]:
         """Accessor class for `pd.DataFrame`."""
         return BaseDFAccessor
-
-    def indexing_func(self: BaseAccessorT, *args, **kwargs) -> BaseAccessorT:
-        """Perform indexing on `BaseAccessor`."""
-        new_wrapper, idx_idxs, _, col_idxs = self.wrapper.indexing_func_meta(*args, **kwargs)
-        new_obj = new_wrapper.wrap(self.to_2d_array()[idx_idxs, :][:, col_idxs], group_by=False)
-        if checks.is_series(new_obj):
-            return self.replace(cls_=self.sr_accessor_cls, obj=new_obj, wrapper=new_wrapper)
-        return self.replace(cls_=self.df_accessor_cls, obj=new_obj, wrapper=new_wrapper)
 
     @property
     def obj(self):
@@ -524,11 +602,11 @@ class BaseAccessor(Wrapping):
             else:
                 v = value_or_func
             if self.is_series() or columns is None:
-                obj.iloc[index_ranges[i, 0]: index_ranges[i, 1]] = v
+                obj.iloc[index_ranges[i, 0] : index_ranges[i, 1]] = v
             elif is_scalar(columns):
-                obj.iloc[index_ranges[i, 0]: index_ranges[i, 1], obj.columns.get_indexer([columns])[0]] = v
+                obj.iloc[index_ranges[i, 0] : index_ranges[i, 1], obj.columns.get_indexer([columns])[0]] = v
             else:
-                obj.iloc[index_ranges[i, 0]: index_ranges[i, 1], obj.columns.get_indexer(columns)] = v
+                obj.iloc[index_ranges[i, 0] : index_ranges[i, 1], obj.columns.get_indexer(columns)] = v
         if inplace:
             return None
         return obj

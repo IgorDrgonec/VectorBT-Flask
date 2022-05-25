@@ -211,8 +211,12 @@ def tile(
         raise ValueError("Only axis 0 and 1 are supported")
 
 
-def column_stack(arrs: tp.Sequence[tp.AnyArray]) -> tp.Array2d:
+def column_stack(*arrs: tp.MaybeTuple[tp.AnyArray]) -> tp.Array2d:
     """Stack arrays along columns."""
+    if len(arrs) == 1:
+        arrs = arrs[0]
+    arrs = list(arrs)
+
     first_arr = arrs[0]
     if first_arr.ndim == 1 or (first_arr.ndim == 2 and first_arr.shape[1] == 1):
         return np.concatenate(arrs).reshape((len(arrs), len(first_arr))).T

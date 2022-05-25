@@ -239,7 +239,7 @@ from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config, ReadonlyConfig, HybridConfig
-from vectorbtpro.utils.decorators import class_or_instancemethod
+from vectorbtpro.utils.decorators import class_or_instancemethod, class_or_instanceproperty
 from vectorbtpro.utils.mapping import apply_mapping, to_mapping
 from vectorbtpro.utils.template import deep_substitute
 from vectorbtpro.utils.datetime_ import freq_to_timedelta64, try_to_datetime_index
@@ -362,13 +362,13 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         self._mapping = mapping
 
-    @property
-    def sr_accessor_cls(self) -> tp.Type["GenericSRAccessor"]:
+    @class_or_instanceproperty
+    def sr_accessor_cls(cls_or_self) -> tp.Type["GenericSRAccessor"]:
         """Accessor class for `pd.Series`."""
         return GenericSRAccessor
 
-    @property
-    def df_accessor_cls(self) -> tp.Type["GenericDFAccessor"]:
+    @class_or_instanceproperty
+    def df_accessor_cls(cls_or_self) -> tp.Type["GenericDFAccessor"]:
         """Accessor class for `pd.DataFrame`."""
         return GenericDFAccessor
 

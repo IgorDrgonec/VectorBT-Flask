@@ -170,8 +170,8 @@ class Resampler(Configured):
         checks.assert_instance_of(index, pd.DatetimeIndex)
         if freq is not None:
             return index.shift(-1, freq=freq) + pd.Timedelta(1, "ns")
-        max_ts = pd.Timestamp.min.tz_localize(index.tzinfo)
-        return (index[:-1] + pd.Timedelta(1, "ns")).insert(0, max_ts)
+        min_ts = pd.DatetimeIndex([pd.Timestamp.min.tz_localize(index.tzinfo)])
+        return (index[:-1] + pd.Timedelta(1, "ns")).append(min_ts)
 
     @classmethod
     def get_rbound_index(cls, index: pd.Index, freq: tp.AnyFrequency = None) -> tp.Index:
@@ -182,8 +182,8 @@ class Resampler(Configured):
         checks.assert_instance_of(index, pd.DatetimeIndex)
         if freq is not None:
             return index.shift(1, freq=freq) - pd.Timedelta(1, "ns")
-        max_ts = pd.Timestamp.max.tz_localize(index.tzinfo)
-        return (index[1:] - pd.Timedelta(1, "ns")).insert(len(index), max_ts)
+        max_ts = pd.DatetimeIndex([pd.Timestamp.max.tz_localize(index.tzinfo)])
+        return (index[1:] - pd.Timedelta(1, "ns")).append(max_ts)
 
     @cached_property
     def source_lbound_index(self) -> tp.Index:

@@ -59,17 +59,11 @@ def group_by_to_index(index: tp.Index, group_by: tp.GroupByLike) -> GroupByT:
             group_by = indexes.select_levels(index, new_group_by)
     elif isinstance(group_by, (int, str)):
         group_by = indexes.select_levels(index, group_by)
-    elif checks.is_sequence(group_by):
-        if (
-            len(group_by) != len(index)
-            and isinstance(group_by[0], (int, str))
-            and isinstance(index, pd.MultiIndex)
-            and len(group_by) <= len(index.names)
-        ):
-            try:
-                group_by = indexes.select_levels(index, group_by)
-            except (IndexError, KeyError):
-                pass
+    elif isinstance(group_by, (tuple, list)) and len(group_by) <= len(index.names):
+        try:
+            group_by = indexes.select_levels(index, group_by)
+        except (IndexError, KeyError):
+            pass
     if not isinstance(group_by, pd.Index):
         group_by = pd.Index(group_by)
     if len(group_by) != len(index):
@@ -157,7 +151,7 @@ class Grouper(Configured):
     @classmethod
     def from_pd_group_by(
         cls: tp.Type[GrouperT],
-        pd_group_by: tp.Union[PandasGroupBy, PandasResampler],
+        pd_group_by: tp.PandasGroupByLike,
         **kwargs,
     ) -> GrouperT:
         """Build a `Grouper` instance from a pandas `GroupBy` object.

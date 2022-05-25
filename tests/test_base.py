@@ -1,6 +1,7 @@
 import os
 from datetime import datetime
 
+import pandas as pd
 import pytest
 from numba import njit
 
@@ -621,6 +622,539 @@ df4_grouped_wrapper_co = df4_grouped_wrapper.replace(column_only_select=True, gr
 
 
 class TestArrayWrapper:
+    def test_row_stack(self):
+        assert vbt.ArrayWrapper.row_stack((
+            vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2),
+            vbt.ArrayWrapper(pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c"), 2),
+        )) == vbt.ArrayWrapper.row_stack(
+            vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2),
+            vbt.ArrayWrapper(pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c"), 2),
+        )
+        wrapper = vbt.ArrayWrapper.row_stack(
+            vbt.ArrayWrapper(pd.RangeIndex(start=0, stop=3), pd.Index(["a", "b"], name="c"), 2),
+            vbt.ArrayWrapper(pd.RangeIndex(start=3, stop=6), pd.Index(["a", "b"], name="c"), 2),
+        )
+        pd.testing.assert_index_equal(wrapper.index, pd.RangeIndex(start=0, stop=6, step=1))
+        wrapper = vbt.ArrayWrapper.row_stack(
+            vbt.ArrayWrapper(pd.RangeIndex(start=0, stop=3, name="i"), pd.Index(["a", "b"], name="c"), 2),
+            vbt.ArrayWrapper(pd.RangeIndex(start=3, stop=6, name="i"), pd.Index(["a", "b"], name="c"), 2),
+        )
+        pd.testing.assert_index_equal(wrapper.index, pd.RangeIndex(start=0, stop=6, step=1, name="i"))
+        wrapper = vbt.ArrayWrapper.row_stack(
+            vbt.ArrayWrapper(pd.RangeIndex(start=0, stop=3, name="i1"), pd.Index(["a", "b"], name="c"), 2),
+            vbt.ArrayWrapper(pd.RangeIndex(start=3, stop=6, name="i2"), pd.Index(["a", "b"], name="c"), 2),
+        )
+        pd.testing.assert_index_equal(wrapper.index, pd.Index([0, 1, 2, 3, 4, 5], dtype='int64'))
+        wrapper = vbt.ArrayWrapper.row_stack(
+            vbt.ArrayWrapper(pd.RangeIndex(start=0, stop=3), pd.Index(["a", "b"], name="c"), 2),
+            vbt.ArrayWrapper(pd.RangeIndex(start=4, stop=7), pd.Index(["a", "b"], name="c"), 2),
+        )
+        pd.testing.assert_index_equal(wrapper.index, pd.Index([0, 1, 2, 4, 5, 6], dtype='int64'))
+        wrapper = vbt.ArrayWrapper.row_stack(
+            vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2),
+            vbt.ArrayWrapper(pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c"), 2),
+        )
+        pd.testing.assert_index_equal(wrapper.index, pd.Index([0, 1, 2, 4, 5, 6]))
+        with pytest.raises(Exception):
+            vbt.ArrayWrapper.row_stack(
+                vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2),
+                vbt.ArrayWrapper(pd.Index([2, 3, 4]), pd.Index(["a", "b"], name="c"), 2),
+            )
+        with pytest.raises(Exception):
+            vbt.ArrayWrapper.row_stack(
+                vbt.ArrayWrapper(pd.Index([2, 1, 0]), pd.Index(["a", "b"], name="c"), 2),
+                vbt.ArrayWrapper(pd.Index([3, 4, 5]), pd.Index(["a", "b"], name="c"), 2),
+            )
+        with pytest.raises(Exception):
+            vbt.ArrayWrapper.row_stack(
+                vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2),
+                vbt.ArrayWrapper(pd.Index(["x", "y", "z"]), pd.Index(["a", "b"], name="c"), 2),
+            )
+        wrapper = vbt.ArrayWrapper.row_stack(
+            vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2),
+            vbt.ArrayWrapper(pd.Index(["x", "y", "z"]), pd.Index(["a", "b"], name="c"), 2),
+            index=np.arange(6),
+        )
+        pd.testing.assert_index_equal(wrapper.index, pd.Index(np.arange(6)))
+        index1 = pd.date_range("2020-01-01", "2020-01-05", inclusive="left")
+        index2 = pd.date_range("2020-01-05", "2020-01-10", inclusive="left")
+        wrapper = vbt.ArrayWrapper.row_stack(
+            vbt.ArrayWrapper(index1, pd.Index(["a", "b"], name="c"), 2),
+            vbt.ArrayWrapper(index2, pd.Index(["a", "b"], name="c"), 2),
+        )
+        pd.testing.assert_index_equal(wrapper.index, index1.append(index2))
+        assert wrapper.freq == pd.Timedelta(days=1)
+        index1 = pd.date_range("2020-01-01", "2020-01-05", inclusive="left")
+        index2 = pd.date_range("2020-01-05", "2020-01-06", inclusive="left")
+        index3 = pd.date_range("2020-01-07", "2020-01-10", inclusive="left")
+        wrapper = vbt.ArrayWrapper.row_stack(
+            vbt.ArrayWrapper(index1, pd.Index(["a", "b"], name="c"), 2),
+            vbt.ArrayWrapper(index2.append(index3), pd.Index(["a", "b"], name="c"), 2),
+        )
+        pd.testing.assert_index_equal(wrapper.index, index1.append(index2).append(index3))
+        assert wrapper.freq == pd.Timedelta(days=1)
+        with pytest.raises(Exception):
+            index1 = pd.date_range("2020-01-01", "2020-01-05", freq="1d", inclusive="left")
+            index2 = pd.date_range("2020-01-05", "2020-01-10", freq="1h", inclusive="left")
+            vbt.ArrayWrapper.row_stack(
+                vbt.ArrayWrapper(index1, pd.Index(["a", "b"], name="c"), 2),
+                vbt.ArrayWrapper(index2, pd.Index(["a", "b"], name="c"), 2),
+            )
+        index1 = pd.DatetimeIndex(["2020-01-01", "2020-01-03"])
+        index2 = pd.DatetimeIndex(["2020-01-06", "2020-01-10"])
+        wrapper = vbt.ArrayWrapper.row_stack(
+            vbt.ArrayWrapper(index1, pd.Index(["a", "b"], name="c"), 2),
+            vbt.ArrayWrapper(index2, pd.Index(["a", "b"], name="c"), 2),
+        )
+        pd.testing.assert_index_equal(wrapper.index, index1.append(index2))
+        assert wrapper.freq is None
+        wrapper = vbt.ArrayWrapper.row_stack(
+            vbt.ArrayWrapper(index1, pd.Index(["a", "b"], name="c"), 2),
+            vbt.ArrayWrapper(index2, pd.Index(["a", "b"], name="c"), 2),
+            freq="3d",
+        )
+        pd.testing.assert_index_equal(wrapper.index, index1.append(index2))
+        assert wrapper.freq == pd.Timedelta(days=3)
+        wrapper = vbt.ArrayWrapper.row_stack(
+            vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c1"), 2),
+            vbt.ArrayWrapper(
+                pd.Index([4, 5, 6]), pd.MultiIndex.from_tuples([("a", "a"), ("b", "b")], names=["c1", "c2"]), 2
+            ),
+        )
+        pd.testing.assert_index_equal(
+            wrapper.columns, pd.MultiIndex.from_tuples([("a", "a"), ("b", "b")], names=["c1", "c2"])
+        )
+        wrapper = vbt.ArrayWrapper.row_stack(
+            vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c1"), 2),
+            vbt.ArrayWrapper(
+                pd.Index([4, 5, 6]),
+                pd.MultiIndex.from_tuples([("a", "a"), ("b", "b")], names=["c1", "c2"]),
+                2,
+            ),
+            stack_kwargs=dict(drop_duplicates=False),
+        )
+        pd.testing.assert_index_equal(
+            wrapper.columns, pd.MultiIndex.from_tuples([("a", "a", "a"), ("b", "b", "b")], names=["c1", "c1", "c2"])
+        )
+        wrapper = vbt.ArrayWrapper.row_stack(
+            vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c1"), 2),
+            vbt.ArrayWrapper(pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c2"), 2),
+            columns=["a2", "b2"],
+        )
+        pd.testing.assert_index_equal(wrapper.columns, pd.Index(["a2", "b2"]))
+        wrapper = vbt.ArrayWrapper.row_stack(
+            vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c1"), 2),
+            vbt.ArrayWrapper(pd.Index([4, 5, 6]), pd.Index(["a2"], name="c2"), 2),
+        )
+        pd.testing.assert_index_equal(wrapper.index, pd.Index([0, 1, 2, 4, 5, 6]))
+        pd.testing.assert_index_equal(
+            wrapper.columns,
+            pd.MultiIndex.from_tuples([("a", "a2"), ("b", "a2")], names=["c1", "c2"]),
+        )
+        wrapper = vbt.ArrayWrapper.row_stack(
+            vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2, group_by=False),
+            vbt.ArrayWrapper(pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c"), 2, group_by=False),
+        )
+        wrapper_groups, wrapper_grouped_index = wrapper.grouper.get_groups_and_index()
+        pd.testing.assert_index_equal(
+            wrapper_grouped_index[wrapper_groups],
+            pd.Index(["a", "b"], name="c", dtype="object"),
+        )
+        wrapper = vbt.ArrayWrapper.row_stack(
+            vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2, group_by=True),
+            vbt.ArrayWrapper(pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c"), 2, group_by=True),
+        )
+        wrapper_groups, wrapper_grouped_index = wrapper.grouper.get_groups_and_index()
+        pd.testing.assert_index_equal(
+            wrapper_grouped_index[wrapper_groups],
+            pd.Index(["group", "group"], dtype="object"),
+        )
+        wrapper = vbt.ArrayWrapper.row_stack(
+            vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2, group_by=[0, 1]),
+            vbt.ArrayWrapper(pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c"), 2, group_by=[0, 1]),
+        )
+        wrapper_groups, wrapper_grouped_index = wrapper.grouper.get_groups_and_index()
+        pd.testing.assert_index_equal(
+            wrapper_grouped_index[wrapper_groups],
+            pd.Index([0, 1], dtype="int64"),
+        )
+        with pytest.raises(Exception):
+            vbt.ArrayWrapper.row_stack(
+                vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2, group_by=True),
+                vbt.ArrayWrapper(pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c"), 2, group_by=False),
+            )
+        with pytest.raises(Exception):
+            vbt.ArrayWrapper.row_stack(
+                vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2, group_by=[0, 1]),
+                vbt.ArrayWrapper(pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c"), 2, group_by=[1, 0]),
+            )
+        wrapper = vbt.ArrayWrapper.row_stack(
+            vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2, some_arg=2),
+            vbt.ArrayWrapper(pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c"), 2, some_arg=2),
+        )
+        assert wrapper.config["some_arg"] == 2
+        with pytest.raises(Exception):
+            vbt.ArrayWrapper.row_stack(
+                vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2, some_arg=2),
+                vbt.ArrayWrapper(pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c"), 2, some_arg=3),
+            )
+        with pytest.raises(Exception):
+            vbt.ArrayWrapper.row_stack(
+                vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2, some_arg=2),
+                vbt.ArrayWrapper(pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c"), 2),
+            )
+        with pytest.raises(Exception):
+            vbt.ArrayWrapper.row_stack(
+                vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2),
+                vbt.ArrayWrapper(pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c"), 2, some_arg=2),
+            )
+        with pytest.raises(Exception):
+            vbt.ArrayWrapper.row_stack(
+                vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2, column_only_select=True),
+                vbt.ArrayWrapper(pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c"), 2, column_only_select=False),
+            )
+        with pytest.raises(Exception):
+            vbt.ArrayWrapper.row_stack(
+                vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2, allow_enable=True),
+                vbt.ArrayWrapper(pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c"), 2, allow_enable=False),
+            )
+        wrapper = vbt.ArrayWrapper.row_stack(
+            vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2, allow_enable=True),
+            vbt.ArrayWrapper(pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c"), 2, allow_enable=False),
+            allow_enable=False,
+        )
+        assert not wrapper.grouper.allow_enable
+        columns = pd.Index(["a", "b"], name="c")
+        grouper = vbt.Grouper(columns, group_by=True)
+        wrapper = vbt.ArrayWrapper.row_stack(
+            vbt.ArrayWrapper(pd.Index([0, 1, 2]), columns, 2, grouper=grouper),
+            vbt.ArrayWrapper(pd.Index([4, 5, 6]), columns, 2, grouper=grouper),
+        )
+        assert wrapper.grouper == grouper
+        wrapper = vbt.ArrayWrapper.row_stack(
+            vbt.ArrayWrapper(pd.Index([0, 1, 2]), columns, 2, group_by=True, allow_enable=True),
+            vbt.ArrayWrapper(pd.Index([4, 5, 6]), columns, 2, group_by=False, allow_enable=False),
+            grouper=grouper
+        )
+        assert wrapper.grouper == grouper
+        wrapper = vbt.ArrayWrapper.row_stack(
+            vbt.ArrayWrapper(pd.Index([0, 1, 2]), columns, 2),
+            vbt.ArrayWrapper(pd.Index([4, 5, 6]), columns, 2),
+            grouper=grouper,
+            group_by=False,
+        )
+        assert not wrapper.grouper.is_grouped()
+
+    def test_column_stack(self):
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(pd.Index([0, 1, 2], name="i"), pd.Index(["a", "b"], name="c"), 2),
+            vbt.ArrayWrapper(pd.Index([0, 1, 2], name="i"), pd.Index(["c", "d"], name="c"), 2),
+        )
+        pd.testing.assert_index_equal(wrapper.index, pd.Index([0, 1, 2], name="i"))
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(pd.Index([0, 1, 2], name="i"), pd.Index(["a", "b"], name="c"), 2),
+            vbt.ArrayWrapper(pd.Index([1, 2, 3], name="i"), pd.Index(["c", "d"], name="c"), 2),
+        )
+        pd.testing.assert_index_equal(wrapper.index, pd.Index([0, 1, 2, 3], name="i"))
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(pd.Index([2, 1, 0], name="i"), pd.Index(["a", "b"], name="c"), 2),
+            vbt.ArrayWrapper(pd.Index([0, 1, 2], name="i"), pd.Index(["c", "d"], name="c"), 2),
+        )
+        pd.testing.assert_index_equal(wrapper.index, pd.Index([0, 1, 2], name="i"))
+        with pytest.raises(Exception):
+            vbt.ArrayWrapper.column_stack(
+                vbt.ArrayWrapper(pd.Index([0, 0, 1], name="i"), pd.Index(["a", "b"], name="c"), 2),
+                vbt.ArrayWrapper(pd.Index([0, 1, 2], name="i"), pd.Index(["c", "d"], name="c"), 2),
+            )
+        with pytest.raises(Exception):
+            vbt.ArrayWrapper.column_stack(
+                vbt.ArrayWrapper(pd.Index([2, 1, 0], name="i"), pd.Index(["a", "b"], name="c"), 2),
+                vbt.ArrayWrapper(pd.Index([2, 1, 0], name="i"), pd.Index(["c", "d"], name="c"), 2),
+            )
+        with pytest.raises(Exception):
+            vbt.ArrayWrapper.column_stack(
+                vbt.ArrayWrapper(pd.Index([0, 1, 2], name="i"), pd.Index(["a", "b"], name="c"), 2),
+                vbt.ArrayWrapper(pd.Index(["x", "y", "z"], name="i"), pd.Index(["c", "d"], name="c"), 2),
+            )
+        with pytest.raises(Exception):
+            vbt.ArrayWrapper.column_stack(
+                vbt.ArrayWrapper(pd.Index([0, 1, 2], name="i"), pd.Index(["a", "b"], name="c"), 2),
+                vbt.ArrayWrapper(pd.Index([1, 2, 3], name="i"), pd.Index(["c", "d"], name="c"), 2),
+                union_index=False,
+            )
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(pd.Index([0, 1, 2], name="i"), pd.Index(["a", "b"], name="c"), 2),
+            vbt.ArrayWrapper(pd.Index([5, 6, 7], name="i"), pd.Index(["c", "d"], name="c"), 2),
+            index=[0, 1, 2, 3, 4, 5],
+        )
+        pd.testing.assert_index_equal(wrapper.index, pd.Index([0, 1, 2, 3, 4, 5]))
+        index1 = pd.date_range("2020-01-01", "2020-01-05", inclusive="left")
+        index2 = pd.date_range("2020-01-05", "2020-01-10", inclusive="left")
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index1, pd.Index(["a", "b"], name="c"), 2),
+            vbt.ArrayWrapper(index2, pd.Index(["c", "d"], name="c"), 2),
+        )
+        pd.testing.assert_index_equal(wrapper.index, index1.append(index2))
+        assert wrapper.freq == pd.Timedelta(days=1)
+        index1 = pd.date_range("2020-01-01", "2020-01-05", inclusive="left")
+        index2 = pd.date_range("2020-01-05", "2020-01-06", inclusive="left")
+        index3 = pd.date_range("2020-01-07", "2020-01-10", inclusive="left")
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index1, pd.Index(["a", "b"], name="c"), 2),
+            vbt.ArrayWrapper(index2.append(index3), pd.Index(["c", "d"], name="c"), 2),
+        )
+        pd.testing.assert_index_equal(wrapper.index, index1.append(index2).append(index3))
+        assert wrapper.freq == pd.Timedelta(days=1)
+        with pytest.raises(Exception):
+            index1 = pd.date_range("2020-01-01", "2020-01-05", freq="1d", inclusive="left")
+            index2 = pd.date_range("2020-01-05", "2020-01-10", freq="1h", inclusive="left")
+            vbt.ArrayWrapper.column_stack(
+                vbt.ArrayWrapper(index1, pd.Index(["a", "b"], name="c"), 2),
+                vbt.ArrayWrapper(index2, pd.Index(["c", "d"], name="c"), 2),
+            )
+        index1 = pd.DatetimeIndex(["2020-01-01", "2020-01-03"])
+        index2 = pd.DatetimeIndex(["2020-01-06", "2020-01-10"])
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index1, pd.Index(["a", "b"], name="c"), 2),
+            vbt.ArrayWrapper(index2, pd.Index(["c", "d"], name="c"), 2),
+        )
+        pd.testing.assert_index_equal(wrapper.index, index1.append(index2))
+        assert wrapper.freq is None
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index1, pd.Index(["a", "b"], name="c"), 2),
+            vbt.ArrayWrapper(index2, pd.Index(["c", "d"], name="c"), 2),
+            freq="3d",
+        )
+        pd.testing.assert_index_equal(wrapper.index, index1.append(index2))
+        assert wrapper.freq == pd.Timedelta(days=3)
+        index = pd.Index([0, 1, 2], name="i")
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index, pd.Index(["a", "b"], name="c"), 2),
+            vbt.ArrayWrapper(index, pd.Index(["c", "d"], name="c"), 2),
+        )
+        pd.testing.assert_index_equal(wrapper.columns, pd.Index(["a", "b", "c", "d"], name="c"))
+        with pytest.raises(Exception):
+            vbt.ArrayWrapper.column_stack(
+                vbt.ArrayWrapper(index, pd.Index(["a", "b"], name="c1"), 2),
+                vbt.ArrayWrapper(index, pd.Index(["c", "d"], name="c2"), 2),
+                normalize_columns=False,
+            )
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index, pd.Index(["a", "b"], name="c1"), 2),
+            vbt.ArrayWrapper(index, pd.Index(["c", "d"], name="c2"), 2),
+        )
+        pd.testing.assert_index_equal(wrapper.columns, pd.Index([0, 1, 2, 3], name="col_idx"))
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index, pd.Index(["a", "b"], name="c"), 2),
+            vbt.ArrayWrapper(index, pd.Index(["c", "d"], name="c"), 2),
+            keys=["o1", "o2"],
+        )
+        pd.testing.assert_index_equal(
+            wrapper.columns,
+            pd.MultiIndex.from_tuples([("o1", "a"), ("o1", "b"), ("o2", "c"), ("o2", "d")], names=[None, "c"])
+        )
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index, pd.Index(["a", "b"], name="c1"), 2),
+            vbt.ArrayWrapper(index, pd.Index(["c", "d"], name="c2"), 2),
+            keys=pd.Index(["k1", "k2"], name="k"),
+        )
+        pd.testing.assert_index_equal(
+            wrapper.columns,
+            pd.MultiIndex.from_tuples([("k1", 0), ("k1", 1), ("k2", 0), ("k2", 1)], names=["k", "col_idx"])
+        )
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index, pd.Index(["a", "b"], name="c1"), 2),
+            vbt.ArrayWrapper(index, pd.Index(["c", "d"], name="c2"), 2),
+            keys=pd.Index(["k1", "k2"], name="k"),
+            normalize_locally=False,
+        )
+        pd.testing.assert_index_equal(
+            wrapper.columns,
+            pd.MultiIndex.from_tuples([("k1", 0), ("k1", 1), ("k2", 2), ("k2", 3)], names=["k", "col_idx"])
+        )
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index, pd.Index(["a", "b"], name="c1"), 2),
+            vbt.ArrayWrapper(index, pd.Index(["c", "d"], name="c2"), 2),
+            columns=["a2", "b2", "c2", "d2"],
+        )
+        pd.testing.assert_index_equal(wrapper.columns, pd.Index(["a2", "b2", "c2", "d2"]))
+        columns1 = pd.Index(["a", "b"], name="c")
+        columns2 = pd.Index(["c", "d"], name="c")
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index, columns1, 2, group_by=pd.Index([0, 1], name="g")),
+            vbt.ArrayWrapper(index, columns2, 2, group_by=pd.Index([2, 3], name="g")),
+            normalize_groups=False,
+        )
+        wrapper_groups, wrapper_grouped_index = wrapper.grouper.get_groups_and_index()
+        pd.testing.assert_index_equal(
+            wrapper_grouped_index[wrapper_groups],
+            pd.Index([0, 1, 2, 3], name="g", dtype="int64"),
+        )
+        with pytest.raises(Exception):
+            vbt.ArrayWrapper.column_stack(
+                vbt.ArrayWrapper(index, columns1, 2, group_by=pd.Index([0, 1], name="g")),
+                vbt.ArrayWrapper(index, columns2, 2, group_by=False),
+                normalize_groups=False,
+            )
+        with pytest.raises(Exception):
+            vbt.ArrayWrapper.column_stack(
+                vbt.ArrayWrapper(index, columns1, 2, group_by=pd.Index([0, 1], name="g")),
+                vbt.ArrayWrapper(index, columns2, 2, group_by=pd.Index([0, 1], name="g")),
+                normalize_groups=False,
+            )
+        with pytest.raises(Exception):
+            vbt.ArrayWrapper.column_stack(
+                vbt.ArrayWrapper(index, columns1, 2, group_by=pd.Index([0, 1], name="g1")),
+                vbt.ArrayWrapper(index, columns2, 2, group_by=pd.Index([2, 3], name="g2")),
+                normalize_groups=False,
+            )
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index, columns1, 2, group_by=pd.Index([0, 1], name="g")),
+            vbt.ArrayWrapper(index, columns2, 2, group_by=pd.Index([0, 1], name="g")),
+        )
+        wrapper_groups, wrapper_grouped_index = wrapper.grouper.get_groups_and_index()
+        pd.testing.assert_index_equal(
+            wrapper_grouped_index[wrapper_groups],
+            pd.Index([0, 1, 2, 3], name="group_idx", dtype="int64"),
+        )
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index, columns1, 2, group_by=True),
+            vbt.ArrayWrapper(index, columns2, 2, group_by=True),
+        )
+        wrapper_groups, wrapper_grouped_index = wrapper.grouper.get_groups_and_index()
+        pd.testing.assert_index_equal(
+            wrapper_grouped_index[wrapper_groups],
+            pd.Index([0, 0, 1, 1], name="group_idx", dtype="int64"),
+        )
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index, columns1, 2, group_by=True),
+            vbt.ArrayWrapper(index, columns2, 2, group_by=True),
+            keys=["o1", "o2"],
+        )
+        wrapper_groups, wrapper_grouped_index = wrapper.grouper.get_groups_and_index()
+        pd.testing.assert_index_equal(
+            wrapper_grouped_index[wrapper_groups],
+            pd.MultiIndex.from_tuples([("o1", 0), ("o1", 0), ("o2", 0), ("o2", 0)], names=(None, "group_idx")),
+        )
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index, columns1, 2, group_by=True),
+            vbt.ArrayWrapper(index, columns2, 2, group_by=False),
+            keys=["o1", "o2"],
+        )
+        wrapper_groups, wrapper_grouped_index = wrapper.grouper.get_groups_and_index()
+        pd.testing.assert_index_equal(
+            wrapper_grouped_index[wrapper_groups],
+            pd.MultiIndex.from_tuples([("o1", 0), ("o1", 0), ("o2", 0), ("o2", 1)], names=(None, "group_idx")),
+        )
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index, columns1, 2, group_by=True),
+            vbt.ArrayWrapper(index, columns2, 2, group_by=False),
+            keys=["o1", "o2"],
+            normalize_locally=False,
+        )
+        wrapper_groups, wrapper_grouped_index = wrapper.grouper.get_groups_and_index()
+        pd.testing.assert_index_equal(
+            wrapper_grouped_index[wrapper_groups],
+            pd.MultiIndex.from_tuples([("o1", 0), ("o1", 0), ("o2", 1), ("o2", 2)], names=(None, "group_idx")),
+        )
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index, columns1, 2, group_by=pd.Index([0, 1], name="g")),
+            vbt.ArrayWrapper(index, columns2, 2, group_by=pd.Index([2, 3], name="g")),
+            keys=["o1", "o2"],
+        )
+        wrapper_groups, wrapper_grouped_index = wrapper.grouper.get_groups_and_index()
+        pd.testing.assert_index_equal(
+            wrapper_grouped_index[wrapper_groups],
+            pd.MultiIndex.from_tuples([("o1", 0), ("o1", 1), ("o2", 2), ("o2", 3)], names=(None, "g")),
+        )
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index, columns1, 2, column_only_select=False),
+            vbt.ArrayWrapper(index, columns2, 2, column_only_select=False),
+        )
+        assert not wrapper.column_only_select
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index, columns1, 2, column_only_select=True),
+            vbt.ArrayWrapper(index, columns2, 2, column_only_select=False),
+        )
+        assert wrapper.column_only_select
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index, columns1, 2, group_select=True),
+            vbt.ArrayWrapper(index, columns2, 2, group_select=True),
+        )
+        assert wrapper.group_select
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index, columns1, 2, group_select=True),
+            vbt.ArrayWrapper(index, columns2, 2, group_select=False),
+        )
+        assert not wrapper.group_select
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index, columns1, 2, allow_enable=True),
+            vbt.ArrayWrapper(index, columns2, 2, allow_enable=True),
+        )
+        assert wrapper.grouper.allow_enable
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index, columns1, 2, allow_enable=True),
+            vbt.ArrayWrapper(index, columns2, 2, allow_enable=False),
+        )
+        assert not wrapper.grouper.allow_enable
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index, columns1, 2, allow_disable=True),
+            vbt.ArrayWrapper(index, columns2, 2, allow_disable=True),
+        )
+        assert wrapper.grouper.allow_disable
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index, columns1, 2, allow_disable=True),
+            vbt.ArrayWrapper(index, columns2, 2, allow_disable=False),
+        )
+        assert not wrapper.grouper.allow_disable
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index, columns1, 2, allow_modify=True),
+            vbt.ArrayWrapper(index, columns2, 2, allow_modify=True),
+        )
+        assert wrapper.grouper.allow_modify
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index, columns1, 2, allow_modify=True),
+            vbt.ArrayWrapper(index, columns2, 2, allow_modify=False),
+        )
+        assert not wrapper.grouper.allow_modify
+        columns = pd.Index(["a", "b", "c", "d"], name="c2")
+        grouper = vbt.Grouper(columns, group_by=True)
+        with pytest.raises(Exception):
+            vbt.ArrayWrapper.column_stack(
+                vbt.ArrayWrapper(index, columns1, 2),
+                vbt.ArrayWrapper(index, columns2, 2),
+                grouper=grouper,
+            )
+        columns = pd.Index(["a", "b", "c", "d"], name="c")
+        grouper = vbt.Grouper(columns, group_by=True)
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index, columns1, 2, allow_modify=False),
+            vbt.ArrayWrapper(index, columns2, 2, allow_modify=False),
+            grouper=grouper,
+        )
+        assert wrapper.grouper == grouper
+        assert wrapper.grouper.allow_modify
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index, columns1, 2, some_arg=2),
+            vbt.ArrayWrapper(index, columns2, 2, some_arg=2),
+        )
+        assert wrapper.config["some_arg"] == 2
+        with pytest.raises(Exception):
+            vbt.ArrayWrapper.column_stack(
+                vbt.ArrayWrapper(index, columns1, 2, some_arg=2),
+                vbt.ArrayWrapper(index, columns2, 2, some_arg=3),
+            )
+        with pytest.raises(Exception):
+            vbt.ArrayWrapper.column_stack(
+                vbt.ArrayWrapper(index, columns1, 2, some_arg=2),
+                vbt.ArrayWrapper(index, columns2, 2),
+            )
+        with pytest.raises(Exception):
+            vbt.ArrayWrapper.column_stack(
+                vbt.ArrayWrapper(index, columns1, 2),
+                vbt.ArrayWrapper(index, columns2, 2, some_arg=2),
+            )
+
     def test_config(self, tmp_path):
         assert vbt.ArrayWrapper.loads(sr2_wrapper.dumps()) == sr2_wrapper
         assert vbt.ArrayWrapper.loads(sr2_wrapper_co.dumps()) == sr2_wrapper_co
@@ -1463,9 +1997,7 @@ class TestArrayWrapper:
             wrapper.get_index_points(every="5h", start="2020-01-01 15:00:00", end="2020-01-02 12:00:00"),
             np.array([5, 7, 9, 10, 12]),
         )
-        np.testing.assert_array_equal(
-            wrapper.get_index_points(at_time="12:00"), np.array([4, 12])
-        )
+        np.testing.assert_array_equal(wrapper.get_index_points(at_time="12:00"), np.array([4, 12]))
 
         np.testing.assert_array_equal(wrapper.get_index_points(), np.array([0]))
         np.testing.assert_array_equal(wrapper.get_index_points(start=5), np.array([5]))
@@ -1513,8 +2045,8 @@ class TestArrayWrapper:
         )
 
         np.testing.assert_array_equal(wrapper.get_index_points(on=[5, 10]), np.array([5, 10]))
-        np.testing.assert_array_equal(wrapper.get_index_points(
-            on=wrapper.index[[5, 10]], at_time="12:00"), np.array([4, 12])
+        np.testing.assert_array_equal(
+            wrapper.get_index_points(on=wrapper.index[[5, 10]], at_time="12:00"), np.array([4, 12])
         )
         np.testing.assert_array_equal(
             wrapper.get_index_points(on=[wrapper.index[5], wrapper.index[10]]), np.array([5, 10])
@@ -3486,6 +4018,102 @@ class TestAccessors:
             df2.vbt.wrapper.wrap(df4.values, columns=df4.columns),
             pd.DataFrame(df4.values, index=df2.index, columns=df4.columns),
         )
+
+    def test_row_stack(self):
+        acc = vbt.BaseAccessor.row_stack(
+            pd.Series([0, 1, 2], index=pd.Index(["a", "b", "c"])).vbt,
+            pd.Series([3, 4, 5], index=pd.Index(["d", "e", "f"])).vbt,
+        )
+        target_obj = pd.DataFrame(
+            [0, 1, 2, 3, 4, 5],
+            index=pd.Index(["a", "b", "c", "d", "e", "f"]),
+        )
+        assert isinstance(acc, vbt.BaseSRAccessor)
+        pd.testing.assert_index_equal(
+            acc.wrapper.index,
+            target_obj.index,
+        )
+        assert acc.wrapper.name is None
+        assert target_obj.vbt.wrapper.ndim == target_obj.ndim
+        acc = vbt.BaseAccessor.row_stack(
+            pd.Series([0, 1, 2], name="sr").vbt,
+            pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c")).vbt,
+        )
+        target_obj = pd.DataFrame(
+            [[0, 0], [1, 1], [2, 2], [0, 1], [2, 3], [4, 5]],
+            index=pd.RangeIndex(start=0, stop=6, step=1),
+            columns=pd.Index(['a', 'b'], dtype='object', name='c'),
+        )
+        assert isinstance(acc, vbt.BaseDFAccessor)
+        pd.testing.assert_index_equal(
+            acc.wrapper.index,
+            target_obj.index,
+        )
+        pd.testing.assert_index_equal(
+            acc.wrapper.columns,
+            target_obj.columns,
+        )
+        assert target_obj.vbt.wrapper.ndim == target_obj.ndim
+        acc = vbt.BaseAccessor.row_stack(
+            pd.Series([0, 1, 2], name="sr").vbt(some_arg=2),
+            pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c")).vbt(some_arg=2),
+        )
+        assert acc.config["some_arg"] == 2
+        with pytest.raises(Exception):
+            vbt.BaseAccessor.row_stack(
+                pd.Series([0, 1, 2], name="sr").vbt(some_arg=2),
+                pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c")).vbt,
+            )
+        with pytest.raises(Exception):
+            vbt.BaseAccessor.row_stack(
+                pd.Series([0, 1, 2], name="sr").vbt,
+                pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c")).vbt(some_arg=2),
+            )
+        with pytest.raises(Exception):
+            vbt.BaseAccessor.row_stack(
+                pd.Series([0, 1, 2], name="sr").vbt(some_arg=2),
+                pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c")).vbt(some_arg=3),
+            )
+
+    def test_column_stack(self):
+        acc = vbt.BaseAccessor.column_stack(
+            pd.Series([0, 1, 2], name="sr").vbt,
+            pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c")).vbt,
+        )
+        target_obj = pd.DataFrame(
+            [[0, 0, 1], [1, 2, 3], [2, 4, 5]],
+            index=pd.RangeIndex(start=0, stop=3, step=1),
+            columns=pd.RangeIndex(start=0, stop=3, step=1, name='col_idx'),
+        )
+        assert isinstance(acc, vbt.BaseDFAccessor)
+        pd.testing.assert_index_equal(
+            acc.wrapper.index,
+            target_obj.index,
+        )
+        pd.testing.assert_index_equal(
+            acc.wrapper.columns,
+            target_obj.columns,
+        )
+        acc = vbt.BaseAccessor.column_stack(
+            pd.Series([0, 1, 2], name="sr").vbt(some_arg=2),
+            pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c")).vbt(some_arg=2),
+        )
+        assert acc.config["some_arg"] == 2
+        with pytest.raises(Exception):
+            vbt.BaseAccessor.column_stack(
+                pd.Series([0, 1, 2], name="sr").vbt(some_arg=2),
+                pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c")).vbt,
+            )
+        with pytest.raises(Exception):
+            vbt.BaseAccessor.column_stack(
+                pd.Series([0, 1, 2], name="sr").vbt,
+                pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c")).vbt(some_arg=2),
+            )
+        with pytest.raises(Exception):
+            vbt.BaseAccessor.column_stack(
+                pd.Series([0, 1, 2], name="sr").vbt(some_arg=2),
+                pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c")).vbt(some_arg=3),
+            )
 
     def test_empty(self):
         assert_series_equal(

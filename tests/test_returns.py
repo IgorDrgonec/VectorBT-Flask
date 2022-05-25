@@ -65,6 +65,40 @@ def teardown_module():
 
 
 class TestAccessors:
+    def test_row_stack(self):
+        rets2 = rets * 2
+        rets2.index += pd.Timedelta(days=len(rets2.index))
+        bm_returns2 = bm_returns * 2
+        bm_returns2.index += pd.Timedelta(days=len(bm_returns2.index))
+        ret_acc2 = ret_acc.replace(
+            wrapper=ret_acc.wrapper.replace(index=rets2.index),
+            obj=rets2,
+            bm_returns=bm_returns2,
+        )
+        acc = vbt.ReturnsAccessor.row_stack(ret_acc, ret_acc2)
+        assert isinstance(acc, vbt.ReturnsDFAccessor)
+        pd.testing.assert_frame_equal(acc.obj, pd.concat((rets, rets2)))
+        pd.testing.assert_frame_equal(acc.bm_returns, pd.concat((bm_returns, bm_returns2)))
+
+    def test_column_stack(self):
+        rets2 = rets * 2
+        bm_returns2 = bm_returns * 2
+        ret_acc2 = ret_acc.replace(
+            wrapper=ret_acc.wrapper.replace(index=rets2.index),
+            obj=rets2,
+            bm_returns=bm_returns2,
+        )
+        acc = vbt.ReturnsAccessor.column_stack(ret_acc, ret_acc2)
+        assert isinstance(acc, vbt.ReturnsDFAccessor)
+        pd.testing.assert_frame_equal(acc.obj, pd.concat((rets, rets2), axis=1))
+        pd.testing.assert_frame_equal(acc.bm_returns, pd.concat((bm_returns, bm_returns2), axis=1))
+        with pytest.raises(Exception):
+            vbt.ReturnsAccessor.column_stack(ret_acc, ret_acc2.replace(bm_returns=None))
+        with pytest.raises(Exception):
+            vbt.ReturnsAccessor.column_stack(ret_acc.replace(bm_returns=None), ret_acc2)
+        acc = vbt.ReturnsAccessor.column_stack(ret_acc.replace(bm_returns=None), ret_acc2.replace(bm_returns=None))
+        assert acc.bm_returns is None
+
     def test_indexing(self):
         assert ret_acc["a"].total() == ret_acc["a"].total()
 
@@ -137,11 +171,13 @@ class TestAccessors:
         assert_frame_equal(
             np.log(ret_12h + 1).vbt.returns(log_returns=True).daily(),
             pd.DataFrame(
-                np.array([
-                    [0.19062035960864987, -0.21072103131565256, -0.010050335853501347],
-                    [0.19062035960864987, -0.21072103131565256, -0.010050335853501347],
-                    [0.09531017980432493, -0.10536051565782628, 0.09531017980432493],
-                ]),
+                np.array(
+                    [
+                        [0.19062035960864987, -0.21072103131565256, -0.010050335853501347],
+                        [0.19062035960864987, -0.21072103131565256, -0.010050335853501347],
+                        [0.09531017980432493, -0.10536051565782628, 0.09531017980432493],
+                    ]
+                ),
                 index=pd.DatetimeIndex(["2020-01-01", "2020-01-02", "2020-01-03"], dtype="datetime64[ns]", freq="D"),
                 columns=ret_12h.columns,
             ),

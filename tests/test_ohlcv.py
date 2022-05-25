@@ -42,29 +42,41 @@ class TestAccessors:
     def test_vwap(self):
         assert_series_equal(
             ohlcv_ts.vbt.ohlcv.vwap(),
-            (
-                (ohlcv_ts["volume"] * (ohlcv_ts["high"] + ohlcv_ts["low"]) / 2).cumsum() / ohlcv_ts["volume"].cumsum()
-            ).rename("vwap"),
+            pd.Series(
+                [
+                    1.6666666666666667,
+                    2.6666666666666665,
+                    3.6666666666666665,
+                    4.666666666666667,
+                    5.666666666666667,
+                ],
+                index=ohlcv_ts.index,
+                name="vwap",
+            ),
         )
         result = pd.concat((ohlcv_ts.vbt.ohlcv.vwap(), ohlcv_ts.vbt.fshift(1).vbt.ohlcv.vwap()), axis=1)
         result.columns = ["a", "b"]
         high = pd.concat((ohlcv_ts["high"], ohlcv_ts["high"].vbt.fshift(1)), axis=1)
         low = pd.concat((ohlcv_ts["low"], ohlcv_ts["low"].vbt.fshift(1)), axis=1)
+        close = pd.concat((ohlcv_ts["close"], ohlcv_ts["close"].vbt.fshift(1)), axis=1)
         volume = pd.concat((ohlcv_ts["volume"], ohlcv_ts["volume"].vbt.fshift(1)), axis=1)
         high.columns = result.columns
         low.columns = result.columns
+        close.columns = result.columns
         volume.columns = result.columns
-        assert_frame_equal(pd.DataFrame.vbt.ohlcv.vwap(high=high, low=low, volume=volume), result)
+        assert_frame_equal(pd.DataFrame.vbt.ohlcv.vwap(high=high, low=low, close=close, volume=volume), result)
 
     @pytest.mark.parametrize("test_freq", ["1h", "10h", "3d"])
     def test_resample(self, test_freq):
         assert_frame_equal(
             ohlcv_ts.vbt.ohlcv.resample(test_freq).obj,
-            ohlcv_ts.resample(test_freq).agg({
-                "open": lambda x: float(x[0] if len(x) > 0 else np.nan),
-                "high": lambda x: float(x.max() if len(x) > 0 else np.nan),
-                "low": lambda x: float(x.min() if len(x) > 0 else np.nan),
-                "close": lambda x: float(x[-1] if len(x) > 0 else np.nan),
-                "volume": lambda x: float(x.sum() if len(x) > 0 else np.nan)
-            })
+            ohlcv_ts.resample(test_freq).agg(
+                {
+                    "open": lambda x: float(x[0] if len(x) > 0 else np.nan),
+                    "high": lambda x: float(x.max() if len(x) > 0 else np.nan),
+                    "low": lambda x: float(x.min() if len(x) > 0 else np.nan),
+                    "close": lambda x: float(x[-1] if len(x) > 0 else np.nan),
+                    "volume": lambda x: float(x.sum() if len(x) > 0 else np.nan),
+                }
+            ),
         )

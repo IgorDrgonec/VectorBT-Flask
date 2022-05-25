@@ -483,6 +483,174 @@ class MappedArray(Analyzable):
             Useful if any subclass wants to extend the config.
     """
 
+    @classmethod
+    def row_stack(
+        cls: tp.Type[MappedArrayT],
+        *objs: tp.MaybeTuple[MappedArrayT],
+        wrapper_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> MappedArrayT:
+        """Stack multiple `MappedArray` instances along rows.
+
+        Uses `vectorbtpro.base.wrapping.ArrayWrapper.row_stack` to stack the wrappers.
+
+        !!! note
+            Will produce a column-sorted array."""
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        for obj in objs:
+            if not checks.is_instance_of(obj, MappedArray):
+                raise TypeError("Each object to be merged must be an instance of MappedArray")
+        if "wrapper" not in kwargs:
+            if wrapper_kwargs is None:
+                wrapper_kwargs = {}
+            kwargs["wrapper"] = ArrayWrapper.row_stack(*[obj.wrapper for obj in objs], **wrapper_kwargs)
+
+        if "col_mapper" not in kwargs:
+            kwargs["col_mapper"] = ColumnMapper.row_stack(
+                *[obj.col_mapper for obj in objs],
+                wrapper=kwargs["wrapper"],
+            )
+        if "mapped_arr" not in kwargs:
+            mapped_arrs = []
+            for col in range(kwargs["wrapper"].shape_2d[1]):
+                for obj in objs:
+                    col_idxs, col_lens = obj.col_mapper.col_map
+                    if len(col_idxs) > 0:
+                        if col > 0 and obj.wrapper.shape_2d[1] == 1:
+                            mapped_arrs.append(obj.mapped_arr[col_idxs])
+                        elif col_lens[col] > 0:
+                            col_end_idxs = np.cumsum(col_lens)
+                            col_start_idxs = col_end_idxs - col_lens
+                            mapped_arrs.append(obj.mapped_arr[col_idxs[col_start_idxs[col] : col_end_idxs[col]]])
+            kwargs["mapped_arr"] = np.concatenate(mapped_arrs)
+        if "col_arr" not in kwargs:
+            kwargs["col_arr"] = kwargs["col_mapper"].col_arr
+        if "idx_arr" not in kwargs:
+            stack_idx_arrs = True
+            for obj in objs:
+                if obj.idx_arr is None:
+                    stack_idx_arrs = False
+                    break
+            if stack_idx_arrs:
+                idx_arrs = []
+                for col in range(kwargs["wrapper"].shape_2d[1]):
+                    n_rows_sum = 0
+                    for obj in objs:
+                        col_idxs, col_lens = obj.col_mapper.col_map
+                        if len(col_idxs) > 0:
+                            if col > 0 and obj.wrapper.shape_2d[1] == 1:
+                                idx_arrs.append(obj.idx_arr[col_idxs] + n_rows_sum)
+                            elif col_lens[col] > 0:
+                                col_end_idxs = np.cumsum(col_lens)
+                                col_start_idxs = col_end_idxs - col_lens
+                                col_idx_arr = obj.idx_arr[col_idxs[col_start_idxs[col] : col_end_idxs[col]]]
+                                idx_arrs.append(col_idx_arr + n_rows_sum)
+                        n_rows_sum += obj.wrapper.shape_2d[0]
+                kwargs["idx_arr"] = np.concatenate(idx_arrs)
+        if "id_arr" not in kwargs:
+            id_arrs = []
+            for col in range(kwargs["wrapper"].shape_2d[1]):
+                from_id = 0
+                for obj in objs:
+                    col_idxs, col_lens = obj.col_mapper.col_map
+                    if len(col_idxs) > 0:
+                        if col > 0 and obj.wrapper.shape_2d[1] == 1:
+                            id_arrs.append(obj.id_arr[col_idxs] + from_id)
+                        elif col_lens[col] > 0:
+                            col_end_idxs = np.cumsum(col_lens)
+                            col_start_idxs = col_end_idxs - col_lens
+                            id_arrs.append(obj.id_arr[col_idxs[col_start_idxs[col] : col_end_idxs[col]]] + from_id)
+                        if len(id_arrs) > 0 and len(id_arrs[-1]) > 0:
+                            from_id = id_arrs[-1].max() + 1
+            kwargs["id_arr"] = np.concatenate(id_arrs)
+
+        kwargs = cls.resolve_row_stack_kwargs(*objs, **kwargs)
+        kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
+        return cls(**kwargs)
+
+    @classmethod
+    def column_stack(
+        cls: tp.Type[MappedArrayT],
+        *objs: tp.MaybeTuple[MappedArrayT],
+        wrapper_kwargs: tp.KwargsLike = None,
+        get_indexer_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> MappedArrayT:
+        """Stack multiple `MappedArray` instances along columns.
+
+        Uses `vectorbtpro.base.wrapping.ArrayWrapper.column_stack` to stack the wrappers.
+
+        `get_indexer_kwargs` are passed to
+        [pandas.Index.get_indexer](https://pandas.pydata.org/docs/reference/api/pandas.Index.get_indexer.html)
+        to translate old indices to new ones after the reindexing operation.
+
+        !!! note
+            Will produce a column-sorted array."""
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        for obj in objs:
+            if not checks.is_instance_of(obj, MappedArray):
+                raise TypeError("Each object to be merged must be an instance of MappedArray")
+        if get_indexer_kwargs is None:
+            get_indexer_kwargs = {}
+        if "wrapper" not in kwargs:
+            if wrapper_kwargs is None:
+                wrapper_kwargs = {}
+            kwargs["wrapper"] = ArrayWrapper.column_stack(
+                *[obj.wrapper for obj in objs],
+                **wrapper_kwargs,
+            )
+
+        if "col_mapper" not in kwargs:
+            kwargs["col_mapper"] = ColumnMapper.column_stack(
+                *[obj.col_mapper for obj in objs],
+                wrapper=kwargs["wrapper"],
+            )
+        if "mapped_arr" not in kwargs:
+            mapped_arrs = []
+            for obj in objs:
+                col_idxs, col_lens = obj.col_mapper.col_map
+                if len(col_idxs) > 0:
+                    mapped_arrs.append(obj.mapped_arr[col_idxs])
+            kwargs["mapped_arr"] = np.concatenate(mapped_arrs)
+        if "col_arr" not in kwargs:
+            kwargs["col_arr"] = kwargs["col_mapper"].col_arr
+        if "idx_arr" not in kwargs:
+            stack_idx_arrs = True
+            for obj in objs:
+                if obj.idx_arr is None:
+                    stack_idx_arrs = False
+                    break
+            if stack_idx_arrs:
+                idx_arrs = []
+                for obj in objs:
+                    col_idxs, col_lens = obj.col_mapper.col_map
+                    if len(col_idxs) > 0:
+                        old_idxs = obj.idx_arr[col_idxs]
+                        if not obj.wrapper.index.equals(kwargs["wrapper"].index):
+                            new_idxs = kwargs["wrapper"].index.get_indexer(
+                                obj.wrapper.index[old_idxs],
+                                **get_indexer_kwargs,
+                            )
+                        else:
+                            new_idxs = old_idxs
+                        idx_arrs.append(new_idxs)
+                kwargs["idx_arr"] = np.concatenate(idx_arrs)
+        if "id_arr" not in kwargs:
+            id_arrs = []
+            for obj in objs:
+                col_idxs, col_lens = obj.col_mapper.col_map
+                if len(col_idxs) > 0:
+                    id_arrs.append(obj.id_arr[col_idxs])
+            kwargs["id_arr"] = np.concatenate(id_arrs)
+
+        kwargs = cls.resolve_column_stack_kwargs(*objs, **kwargs)
+        kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
+        return cls(**kwargs)
+
     def __init__(
         self,
         wrapper: ArrayWrapper,
@@ -492,7 +660,6 @@ class MappedArray(Analyzable):
         id_arr: tp.Optional[tp.ArrayLike] = None,
         mapping: tp.Optional[tp.MappingLike] = None,
         col_mapper: tp.Optional[ColumnMapper] = None,
-        jitted: tp.JittedOption = None,
         **kwargs,
     ) -> None:
 
@@ -502,14 +669,13 @@ class MappedArray(Analyzable):
         if idx_arr is not None:
             idx_arr = np.asarray(idx_arr)
             checks.assert_shape_equal(mapped_arr, idx_arr, axis=0)
+        if col_mapper is None:
+            col_mapper = ColumnMapper(wrapper, col_arr)
         if id_arr is None:
-            func = jit_reg.resolve_option(nb.generate_ids_nb, jitted)
-            id_arr = func(col_arr, wrapper.shape_2d[1])
+            id_arr = col_mapper.new_id_arr
         else:
             id_arr = np.asarray(id_arr)
             checks.assert_shape_equal(mapped_arr, id_arr, axis=0)
-        if col_mapper is None:
-            col_mapper = ColumnMapper(wrapper, col_arr)
 
         Analyzable.__init__(
             self,
@@ -520,7 +686,6 @@ class MappedArray(Analyzable):
             idx_arr=idx_arr,
             mapping=mapping,
             col_mapper=col_mapper,
-            jitted=jitted,
             **kwargs,
         )
 

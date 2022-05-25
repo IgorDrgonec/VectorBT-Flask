@@ -806,43 +806,145 @@ class IndicatorBase(Analyzable):
     _in_output_names: tp.ClassVar[tp.Tuple[str, ...]]
     _output_names: tp.ClassVar[tp.Tuple[str, ...]]
     _output_flags: tp.ClassVar[tp.Kwargs]
-
     _level_names: tp.Tuple[str, ...]
 
-    @classproperty
-    def short_name(cls_or_self) -> str:
-        """Name of the indicator."""
-        return cls_or_self._short_name
+    @classmethod
+    def _run(cls: tp.Type[IndicatorBaseT], *args, **kwargs) -> RunOutputT:
+        """Private run method."""
+        raise NotImplementedError
 
-    @classproperty
-    def input_names(cls_or_self) -> tp.Tuple[str, ...]:
-        """Names of the input arrays."""
-        return cls_or_self._input_names
+    @classmethod
+    def run(cls: tp.Type[IndicatorBaseT], *args, **kwargs) -> RunOutputT:
+        """Public run method."""
+        return cls._run(*args, **kwargs)
 
-    @classproperty
-    def param_names(cls_or_self) -> tp.Tuple[str, ...]:
-        """Names of the parameters."""
-        return cls_or_self._param_names
+    @classmethod
+    def _run_combs(cls: tp.Type[IndicatorBaseT], *args, **kwargs) -> RunCombsOutputT:
+        """Private run combinations method."""
+        raise NotImplementedError
 
-    @classproperty
-    def in_output_names(cls_or_self) -> tp.Tuple[str, ...]:
-        """Names of the in-place output arrays."""
-        return cls_or_self._in_output_names
+    @classmethod
+    def run_combs(cls: tp.Type[IndicatorBaseT], *args, **kwargs) -> RunCombsOutputT:
+        """Public run combinations method."""
+        return cls._run_combs(*args, **kwargs)
 
-    @classproperty
-    def output_names(cls_or_self) -> tp.Tuple[str, ...]:
-        """Names of the regular output arrays."""
-        return cls_or_self._output_names
+    @classmethod
+    def row_stack(
+        cls: tp.Type[IndicatorBaseT],
+        *objs: tp.MaybeTuple[IndicatorBaseT],
+        wrapper_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> IndicatorBaseT:
+        """Stack multiple `IndicatorBase` instances along rows.
 
-    @classproperty
-    def output_flags(cls_or_self) -> tp.Kwargs:
-        """Dictionary of output flags."""
-        return cls_or_self._output_flags
+        Uses `vectorbtpro.base.wrapping.ArrayWrapper.row_stack` to stack the wrappers.
 
-    @property
-    def level_names(self) -> tp.Tuple[str, ...]:
-        """Column level names corresponding to each parameter."""
-        return self._level_names
+        All objects to be merged must have the same columns x parameters."""
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        for obj in objs:
+            if not checks.is_instance_of(obj, IndicatorBase):
+                raise TypeError("Each object to be merged must be an instance of Records")
+        if "wrapper" not in kwargs:
+            if wrapper_kwargs is None:
+                wrapper_kwargs = {}
+            kwargs["wrapper"] = ArrayWrapper.row_stack(
+                *[obj.wrapper for obj in objs],
+                stack_columns=False,
+                **wrapper_kwargs
+            )
+
+        if "input_list" not in kwargs:
+            new_input_list = []
+            for input_name in cls.input_names:
+                new_input_list.append(np.row_stack([getattr(obj, f"_{input_name}") for obj in objs]))
+            kwargs["input_list"] = new_input_list
+        if "in_output_list" not in kwargs:
+            new_in_output_list = []
+            for in_output_name in cls.in_output_names:
+                new_in_output_list.append(np.row_stack([getattr(obj, f"_{in_output_name}") for obj in objs]))
+            kwargs["in_output_list"] = new_in_output_list
+        if "output_list" not in kwargs:
+            new_output_list = []
+            for output_name in cls.output_names:
+                new_output_list.append(np.row_stack([getattr(obj, f"_{output_name}") for obj in objs]))
+            kwargs["output_list"] = new_output_list
+
+        kwargs = cls.resolve_row_stack_kwargs(*objs, **kwargs)
+        kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
+        return cls(**kwargs)
+
+    @classmethod
+    def column_stack(
+        cls: tp.Type[IndicatorBaseT],
+        *objs: tp.MaybeTuple[IndicatorBaseT],
+        wrapper_kwargs: tp.KwargsLike = None,
+        reindex_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> IndicatorBaseT:
+        """Stack multiple `IndicatorBase` instances along columns x parameters.
+
+        Uses `vectorbtpro.base.wrapping.ArrayWrapper.column_stack` to stack the wrappers.
+
+        All objects to be merged must have the same index."""
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        for obj in objs:
+            if not checks.is_instance_of(obj, IndicatorBase):
+                raise TypeError("Each object to be merged must be an instance of Records")
+        if "wrapper" not in kwargs:
+            if wrapper_kwargs is None:
+                wrapper_kwargs = {}
+            kwargs["wrapper"] = ArrayWrapper.column_stack(
+                *[obj.wrapper for obj in objs],
+                union_index=False,
+                **wrapper_kwargs,
+            )
+
+        if "input_mapper" not in kwargs:
+            stack_input_mapper_objs = True
+            for obj in objs:
+                if getattr(obj, "_input_mapper", None) is None:
+                    stack_input_mapper_objs = False
+                    break
+            if stack_input_mapper_objs:
+                kwargs["input_mapper"] = np.concatenate([getattr(obj, "_input_mapper") for obj in objs])
+        if "in_output_list" not in kwargs:
+            new_in_output_list = []
+            for in_output_name in cls.in_output_names:
+                new_in_output_list.append(np.column_stack([getattr(obj, f"_{in_output_name}") for obj in objs]))
+            kwargs["in_output_list"] = new_in_output_list
+        if "output_list" not in kwargs:
+            new_output_list = []
+            for output_name in cls.output_names:
+                new_output_list.append(np.column_stack([getattr(obj, f"_{output_name}") for obj in objs]))
+            kwargs["output_list"] = new_output_list
+        if "param_list" not in kwargs:
+            new_param_list = []
+            for param_name in cls.param_names:
+                param_objs = []
+                for obj in objs:
+                    param_objs.extend(getattr(obj, f"_{param_name}_list"))
+                new_param_list.append(param_objs)
+            kwargs["param_list"] = new_param_list
+        if "mapper_list" not in kwargs:
+            new_mapper_list = []
+            for param_name in cls.param_names:
+                new_mapper = None
+                for obj in objs:
+                    obj_mapper = getattr(obj, f"_{param_name}_mapper")
+                    if new_mapper is None:
+                        new_mapper = obj_mapper
+                    else:
+                        new_mapper = new_mapper.append(obj_mapper)
+                new_mapper_list.append(new_mapper)
+            kwargs["mapper_list"] = new_mapper_list
+
+        kwargs = cls.resolve_column_stack_kwargs(*objs, **kwargs)
+        kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
+        return cls(**kwargs)
 
     def __init__(
         self,
@@ -941,25 +1043,40 @@ class IndicatorBase(Analyzable):
             mapper_list=mapper_list,
         )
 
-    @classmethod
-    def _run(cls: tp.Type[IndicatorBaseT], *args, **kwargs) -> RunOutputT:
-        """Private run method."""
-        raise NotImplementedError
+    @classproperty
+    def short_name(cls_or_self) -> str:
+        """Name of the indicator."""
+        return cls_or_self._short_name
 
-    @classmethod
-    def run(cls: tp.Type[IndicatorBaseT], *args, **kwargs) -> RunOutputT:
-        """Public run method."""
-        return cls._run(*args, **kwargs)
+    @classproperty
+    def input_names(cls_or_self) -> tp.Tuple[str, ...]:
+        """Names of the input arrays."""
+        return cls_or_self._input_names
 
-    @classmethod
-    def _run_combs(cls: tp.Type[IndicatorBaseT], *args, **kwargs) -> RunCombsOutputT:
-        """Private run combinations method."""
-        raise NotImplementedError
+    @classproperty
+    def param_names(cls_or_self) -> tp.Tuple[str, ...]:
+        """Names of the parameters."""
+        return cls_or_self._param_names
 
-    @classmethod
-    def run_combs(cls: tp.Type[IndicatorBaseT], *args, **kwargs) -> RunCombsOutputT:
-        """Public run combinations method."""
-        return cls._run_combs(*args, **kwargs)
+    @classproperty
+    def in_output_names(cls_or_self) -> tp.Tuple[str, ...]:
+        """Names of the in-place output arrays."""
+        return cls_or_self._in_output_names
+
+    @classproperty
+    def output_names(cls_or_self) -> tp.Tuple[str, ...]:
+        """Names of the regular output arrays."""
+        return cls_or_self._output_names
+
+    @classproperty
+    def output_flags(cls_or_self) -> tp.Kwargs:
+        """Dictionary of output flags."""
+        return cls_or_self._output_flags
+
+    @property
+    def level_names(self) -> tp.Tuple[str, ...]:
+        """Column level names corresponding to each parameter."""
+        return self._level_names
 
 
 class IndicatorFactory(Configured):

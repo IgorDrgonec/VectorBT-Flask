@@ -120,6 +120,7 @@ from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.portfolio.enums import order_dt, OrderSide
 from vectorbtpro.records.base import Records
 from vectorbtpro.records.decorators import attach_fields, override_field_config
+from vectorbtpro.utils import checks
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig
 
@@ -172,6 +173,72 @@ class Orders(Records):
     def field_config(self) -> Config:
         return self._field_config
 
+    @classmethod
+    def resolve_row_stack_kwargs(
+        cls: tp.Type[OrdersT],
+        *objs: tp.MaybeTuple[OrdersT],
+        **kwargs,
+    ) -> tp.Kwargs:
+        """Resolve keyword arguments for initializing `Orders` after stacking along rows."""
+        kwargs = Records.resolve_row_stack_kwargs(*objs, **kwargs)
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        for obj in objs:
+            if not checks.is_instance_of(obj, Orders):
+                raise TypeError("Each object to be merged must be an instance of Orders")
+        if "close" not in kwargs:
+            close_objs = []
+            stack_close_objs = True
+            for obj in objs:
+                if obj.config["close"] is not None:
+                    close_objs.append(obj.config["close"])
+                else:
+                    stack_close_objs = False
+                    break
+            if stack_close_objs:
+                kwargs["close"] = kwargs["wrapper"].row_stack_and_wrap(*close_objs, group_by=False)
+        return kwargs
+
+    @classmethod
+    def resolve_column_stack_kwargs(
+        cls: tp.Type[OrdersT],
+        *objs: tp.MaybeTuple[OrdersT],
+        reindex_kwargs: tp.KwargsLike = None,
+        ffill_close: bool = False,
+        fbfill_close: bool = False,
+        **kwargs,
+    ) -> tp.Kwargs:
+        """Resolve keyword arguments for initializing `Orders` after stacking along columns."""
+        kwargs = Records.resolve_column_stack_kwargs(*objs, reindex_kwargs=reindex_kwargs, **kwargs)
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        for obj in objs:
+            if not checks.is_instance_of(obj, Orders):
+                raise TypeError("Each object to be merged must be an instance of Orders")
+        if "close" not in kwargs:
+            close_objs = []
+            stack_close_objs = True
+            for obj in objs:
+                if obj.config["close"] is not None:
+                    close_objs.append(obj.config["close"])
+                else:
+                    stack_close_objs = False
+                    break
+            if stack_close_objs:
+                new_close = kwargs["wrapper"].column_stack_and_wrap(
+                    *close_objs,
+                    reindex_kwargs=reindex_kwargs,
+                    group_by=False,
+                )
+                if fbfill_close:
+                    new_close = new_close.vbt.fbfill()
+                elif ffill_close:
+                    new_close = new_close.vbt.ffill()
+                kwargs["close"] = new_close
+        return kwargs
+
     def __init__(
         self,
         wrapper: ArrayWrapper,
@@ -195,16 +262,22 @@ class Orders(Records):
             new_close = None
         return self.replace(wrapper=new_wrapper, records_arr=new_records_arr, close=new_close)
 
-    def resample(self: OrdersT, *args, bfill_close: bool = False, **kwargs) -> OrdersT:
+    def resample(
+        self: OrdersT,
+        *args,
+        ffill_close: bool = False,
+        fbfill_close: bool = False,
+        **kwargs,
+    ) -> OrdersT:
         """Perform resampling on `Orders`."""
         resampler, new_wrapper, new_records_arr = self.resample_meta(*args, **kwargs)
         if self.close is None:
             new_close = None
         else:
             new_close = self.close.vbt.resample_apply(resampler, generic_nb.last_reduce_nb)
-            if bfill_close:
+            if fbfill_close:
                 new_close = new_close.vbt.fbfill()
-            else:
+            elif ffill_close:
                 new_close = new_close.vbt.ffill()
         return self.replace(
             wrapper=new_wrapper,

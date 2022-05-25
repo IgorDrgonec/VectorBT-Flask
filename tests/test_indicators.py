@@ -56,6 +56,76 @@ ts = pd.DataFrame(
 
 
 class TestFactory:
+    def test_row_stack(self):
+        ts1 = ts.copy().iloc[:4]
+        ts2 = ts.copy()
+        ts2.index = pd.date_range("2020-01-05", "2020-01-09")
+        F = vbt.IndicatorFactory(
+            input_names=["ts"],
+            param_names=["p"],
+            in_output_names=["inout"],
+            output_names=["out"],
+        )
+
+        def apply_func(ts, inout, p):
+            inout[:] = p
+            return ts * p
+
+        I = F.with_apply_func(apply_func)
+        indicator1 = I.run(ts1, [0, 1])
+        indicator2 = I.run(ts2, [0, 1])
+        new_indicator = I.row_stack((indicator1, indicator2))
+        pd.testing.assert_frame_equal(
+            new_indicator.ts,
+            pd.concat((indicator1.ts, indicator2.ts), axis=0),
+        )
+        pd.testing.assert_frame_equal(
+            new_indicator.inout,
+            pd.concat((indicator1.inout, indicator2.inout), axis=0),
+        )
+        pd.testing.assert_frame_equal(
+            new_indicator.out,
+            pd.concat((indicator1.out, indicator2.out), axis=0),
+        )
+
+    def test_column_stack(self):
+        F = vbt.IndicatorFactory(
+            input_names=["ts"],
+            param_names=["p"],
+            in_output_names=["inout"],
+            output_names=["out"],
+        )
+
+        def apply_func(ts, inout, p):
+            inout[:] = p
+            return ts * p
+
+        I = F.with_apply_func(apply_func)
+        indicator1 = I.run(ts, 0)
+        indicator2 = I.run(ts, [1, 2])
+        new_indicator = I.column_stack((indicator1, indicator2))
+        np.testing.assert_array_equal(
+            new_indicator._input_mapper,
+            np.concatenate((indicator1._input_mapper, indicator2._input_mapper)),
+        )
+        pd.testing.assert_frame_equal(
+            new_indicator.ts,
+            pd.concat((indicator1.ts, indicator2.ts), axis=1),
+        )
+        pd.testing.assert_frame_equal(
+            new_indicator.inout,
+            pd.concat((indicator1.inout, indicator2.inout), axis=1),
+        )
+        pd.testing.assert_frame_equal(
+            new_indicator.out,
+            pd.concat((indicator1.out, indicator2.out), axis=1),
+        )
+        assert new_indicator.p_list == indicator1.p_list + indicator2.p_list
+        pd.testing.assert_index_equal(
+            new_indicator._p_mapper,
+            indicator1._p_mapper.append(indicator2._p_mapper),
+        )
+
     def test_config(self, tmp_path):
         F = vbt.IndicatorFactory(input_names=["ts"], param_names=["p"], output_names=["out"])
 
@@ -2259,6 +2329,7 @@ class TestFactory:
             "cache_func",
             "cls_dir",
             "column_only_select",
+            "column_stack",
             "config",
             "copy",
             "custom_func",
@@ -2311,8 +2382,12 @@ class TestFactory:
             "replace",
             "resample",
             "resolve_attr",
+            "resolve_column_stack_kwargs",
+            "resolve_row_stack_kwargs",
             "resolve_self",
             "resolve_shortcut_attr",
+            "resolve_stack_kwargs",
+            "row_stack",
             "run",
             "run_combs",
             "save",

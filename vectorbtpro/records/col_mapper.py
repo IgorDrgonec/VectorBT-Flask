@@ -2,12 +2,17 @@
 
 """Class for mapping column arrays."""
 
+from collections import defaultdict
+
+import numpy as np
+
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_1d_array
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.base.grouping import nb as grouping_nb
 from vectorbtpro.records import nb
 from vectorbtpro.registries.jit_registry import jit_reg
+from vectorbtpro.utils import checks
 from vectorbtpro.utils.decorators import cached_property, cached_method
 
 
@@ -18,6 +23,85 @@ IndexingMetaT = tp.Tuple[ArrayWrapper, tp.Array1d, tp.MaybeArray, tp.Array1d]
 class ColumnMapper(Wrapping):
     """Used by `vectorbtpro.records.base.Records` and `vectorbtpro.records.mapped_array.MappedArray`
     classes to make use of column and group metadata."""
+
+    @classmethod
+    def row_stack(
+        cls: tp.Type[ColumnMapperT],
+        *objs: tp.MaybeTuple[ColumnMapperT],
+        wrapper_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> ColumnMapperT:
+        """Stack multiple `ColumnMapper` instances along rows.
+
+        Uses `vectorbtpro.base.wrapping.ArrayWrapper.row_stack` to stack the wrappers.
+
+        !!! note
+            Will produce a column-sorted array."""
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        for obj in objs:
+            if not checks.is_instance_of(obj, ColumnMapper):
+                raise TypeError("Each object to be merged must be an instance of ColumnMapper")
+        if "wrapper" not in kwargs:
+            if wrapper_kwargs is None:
+                wrapper_kwargs = {}
+            kwargs["wrapper"] = ArrayWrapper.row_stack(*[obj.wrapper for obj in objs], **wrapper_kwargs)
+
+        if "col_arr" not in kwargs:
+            col_arrs = []
+            for col in range(kwargs["wrapper"].shape_2d[1]):
+                for obj in objs:
+                    col_idxs, col_lens = obj.col_map
+                    if len(col_idxs) > 0:
+                        if col > 0 and obj.wrapper.shape_2d[1] == 1:
+                            col_arrs.append(np.full(col_lens[0], col))
+                        elif col_lens[col] > 0:
+                            col_arrs.append(np.full(col_lens[col], col))
+            kwargs["col_arr"] = np.concatenate(col_arrs)
+        kwargs = cls.resolve_row_stack_kwargs(*objs, **kwargs)
+        kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
+        return cls(**kwargs)
+
+    @classmethod
+    def column_stack(
+        cls: tp.Type[ColumnMapperT],
+        *objs: tp.MaybeTuple[ColumnMapperT],
+        wrapper_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> ColumnMapperT:
+        """Stack multiple `ColumnMapper` instances along columns.
+
+        Uses `vectorbtpro.base.wrapping.ArrayWrapper.column_stack` to stack the wrappers.
+
+        !!! note
+            Will produce a column-sorted array."""
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        for obj in objs:
+            if not checks.is_instance_of(obj, ColumnMapper):
+                raise TypeError("Each object to be merged must be an instance of ColumnMapper")
+        if "wrapper" not in kwargs:
+            if wrapper_kwargs is None:
+                wrapper_kwargs = {}
+            kwargs["wrapper"] = ArrayWrapper.column_stack(
+                *[obj.wrapper for obj in objs],
+                **wrapper_kwargs,
+            )
+
+        if "col_arr" not in kwargs:
+            col_arrs = []
+            col_sum = 0
+            for obj in objs:
+                col_idxs, col_lens = obj.col_map
+                if len(col_idxs) > 0:
+                    col_arrs.append(obj.col_arr[col_idxs] + col_sum)
+                col_sum += obj.wrapper.shape_2d[1]
+            kwargs["col_arr"] = np.concatenate(col_arrs)
+        kwargs = cls.resolve_column_stack_kwargs(*objs, **kwargs)
+        kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
+        return cls(**kwargs)
 
     def __init__(self, wrapper: ArrayWrapper, col_arr: tp.Array1d, **kwargs) -> None:
         Wrapping.__init__(self, wrapper, col_arr=col_arr, **kwargs)
@@ -112,3 +196,21 @@ class ColumnMapper(Wrapping):
         """Check whether column array is sorted."""
         func = jit_reg.resolve_option(nb.is_col_sorted_nb, jitted)
         return func(self.col_arr)
+
+    @cached_property(whitelist=True)
+    def new_id_arr(self) -> tp.Array1d:
+        """Generate a new id array."""
+        func = jit_reg.resolve_option(nb.generate_ids_nb, None)
+        return func(self.col_arr, self.wrapper.shape_2d[1])
+
+    @cached_method(whitelist=True)
+    def get_new_id_arr(self, group_by: tp.GroupByLike = None) -> tp.Array1d:
+        """Generate a new group-aware id array."""
+        group_arr = self.wrapper.grouper.get_groups(group_by=group_by)
+        if group_arr is not None:
+            col_arr = group_arr[self.col_arr]
+        else:
+            col_arr = self.col_arr
+        columns = self.wrapper.get_columns(group_by=group_by)
+        func = jit_reg.resolve_option(nb.generate_ids_nb, None)
+        return func(col_arr, len(columns))

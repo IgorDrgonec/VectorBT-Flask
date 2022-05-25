@@ -141,7 +141,7 @@ logs_field_config = ReadonlyConfig(
             res_side=dict(title=("Result", "Side"), mapping=OrderSide),
             res_status=dict(title=("Result", "Status"), mapping=OrderStatus),
             res_status_info=dict(title=("Result", "Status Info"), mapping=OrderStatusInfo),
-            order_id=dict(title=("Result", "Order Id")),
+            order_id=dict(title=("Result", "Order Id"), mapping="ids"),
         ),
     )
 )

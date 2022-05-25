@@ -2,6 +2,7 @@
 
 """Modules for working with signals."""
 
+from vectorbtpro.signals.accessors import SignalsAccessor, SignalsSRAccessor, SignalsDFAccessor
 from vectorbtpro.signals.enums import *
 from vectorbtpro.signals.factory import SignalFactory
 from vectorbtpro.signals.generators import *

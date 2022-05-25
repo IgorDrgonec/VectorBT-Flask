@@ -136,6 +136,7 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, HybridConfig, Config
 from vectorbtpro.utils.datetime_ import freq_to_timedelta, PandasDatetimeIndex
+from vectorbtpro.utils.decorators import class_or_instanceproperty
 
 __pdoc__ = {}
 
@@ -155,54 +156,6 @@ class ReturnsAccessor(GenericAccessor):
         year_freq (any): Year frequency for annualization purposes.
         defaults (dict): Defaults that override `defaults` in `vectorbtpro._settings.returns`.
         **kwargs: Keyword arguments that are passed down to `vectorbtpro.generic.accessors.GenericAccessor`."""
-
-    def __init__(
-        self,
-        obj: tp.SeriesFrame,
-        bm_returns: tp.Optional[tp.ArrayLike] = None,
-        log_returns: bool = False,
-        year_freq: tp.Optional[tp.FrequencyLike] = None,
-        defaults: tp.KwargsLike = None,
-        **kwargs,
-    ) -> None:
-        GenericAccessor.__init__(
-            self,
-            obj,
-            bm_returns=bm_returns,
-            log_returns=log_returns,
-            year_freq=year_freq,
-            defaults=defaults,
-            **kwargs,
-        )
-
-        if bm_returns is not None:
-            bm_returns = broadcast_to(bm_returns, obj)
-        self._bm_returns = bm_returns
-        self._log_returns = log_returns
-        self._year_freq = year_freq
-        self._defaults = defaults
-
-    @property
-    def sr_accessor_cls(self) -> tp.Type["ReturnsSRAccessor"]:
-        """Accessor class for `pd.Series`."""
-        return ReturnsSRAccessor
-
-    @property
-    def df_accessor_cls(self) -> tp.Type["ReturnsDFAccessor"]:
-        """Accessor class for `pd.DataFrame`."""
-        return ReturnsDFAccessor
-
-    def indexing_func(self: ReturnsAccessorT, *args, **kwargs) -> ReturnsAccessorT:
-        """Perform indexing on `ReturnsAccessor`."""
-        new_wrapper, idx_idxs, _, col_idxs = self.wrapper.indexing_func_meta(*args, **kwargs)
-        new_obj = new_wrapper.wrap(self.to_2d_array()[idx_idxs, :][:, col_idxs], group_by=False)
-        if self.bm_returns is not None:
-            new_bm_returns = new_wrapper.wrap(to_2d_array(self.bm_returns)[idx_idxs, :][:, col_idxs], group_by=False)
-        else:
-            new_bm_returns = None
-        if checks.is_series(new_obj):
-            return self.replace(cls_=self.sr_accessor_cls, obj=new_obj, bm_returns=new_bm_returns, wrapper=new_wrapper)
-        return self.replace(cls_=self.df_accessor_cls, obj=new_obj, bm_returns=new_bm_returns, wrapper=new_wrapper)
 
     @classmethod
     def from_value(
@@ -231,6 +184,113 @@ class ReturnsAccessor(GenericAccessor):
         returns = func(value_2d, init_value, log_returns=log_returns)
         returns = ArrayWrapper.from_obj(value).wrap(returns, **wrap_kwargs)
         return cls(returns, **kwargs)
+
+    @classmethod
+    def resolve_row_stack_kwargs(
+        cls: tp.Type[ReturnsAccessorT],
+        *objs: tp.MaybeTuple[ReturnsAccessorT],
+        **kwargs,
+    ) -> tp.Kwargs:
+        """Resolve keyword arguments for initializing `ReturnsAccessor` after stacking along rows."""
+        kwargs = GenericAccessor.resolve_row_stack_kwargs(*objs, **kwargs)
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        for obj in objs:
+            if not checks.is_instance_of(obj, ReturnsAccessor):
+                raise TypeError("Each object to be merged must be an instance of ReturnsAccessor")
+        if "bm_returns" not in kwargs:
+            bm_returns = []
+            stack_bm_returns = True
+            for obj in objs:
+                if obj.config["bm_returns"] is not None:
+                    bm_returns.append(obj.config["bm_returns"])
+                else:
+                    stack_bm_returns = False
+                    break
+            if stack_bm_returns:
+                kwargs["bm_returns"] = kwargs["wrapper"].row_stack_and_wrap(*bm_returns, group_by=False)
+        return kwargs
+
+    @classmethod
+    def resolve_column_stack_kwargs(
+        cls: tp.Type[ReturnsAccessorT],
+        *objs: tp.MaybeTuple[ReturnsAccessorT],
+        reindex_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.Kwargs:
+        """Resolve keyword arguments for initializing `ReturnsAccessor` after stacking along columns."""
+        kwargs = GenericAccessor.resolve_column_stack_kwargs(*objs, reindex_kwargs=reindex_kwargs, **kwargs)
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        for obj in objs:
+            if not checks.is_instance_of(obj, ReturnsAccessor):
+                raise TypeError("Each object to be merged must be an instance of ReturnsAccessor")
+        if "bm_returns" not in kwargs:
+            bm_returns = []
+            stack_bm_returns = True
+            for obj in objs:
+                if obj.config["bm_returns"] is not None:
+                    bm_returns.append(obj.config["bm_returns"])
+                else:
+                    stack_bm_returns = False
+                    break
+            if stack_bm_returns:
+                kwargs["bm_returns"] = kwargs["wrapper"].column_stack_and_wrap(
+                    *bm_returns,
+                    reindex_kwargs=reindex_kwargs,
+                    group_by=False,
+                )
+        return kwargs
+
+    def __init__(
+        self,
+        obj: tp.SeriesFrame,
+        bm_returns: tp.Optional[tp.ArrayLike] = None,
+        log_returns: bool = False,
+        year_freq: tp.Optional[tp.FrequencyLike] = None,
+        defaults: tp.KwargsLike = None,
+        **kwargs,
+    ) -> None:
+        GenericAccessor.__init__(
+            self,
+            obj,
+            bm_returns=bm_returns,
+            log_returns=log_returns,
+            year_freq=year_freq,
+            defaults=defaults,
+            **kwargs,
+        )
+
+        if bm_returns is not None:
+            bm_returns = broadcast_to(bm_returns, obj)
+        self._bm_returns = bm_returns
+        self._log_returns = log_returns
+        self._year_freq = year_freq
+        self._defaults = defaults
+
+    @class_or_instanceproperty
+    def sr_accessor_cls(cls_or_self) -> tp.Type["ReturnsSRAccessor"]:
+        """Accessor class for `pd.Series`."""
+        return ReturnsSRAccessor
+
+    @class_or_instanceproperty
+    def df_accessor_cls(cls_or_self) -> tp.Type["ReturnsDFAccessor"]:
+        """Accessor class for `pd.DataFrame`."""
+        return ReturnsDFAccessor
+
+    def indexing_func(self: ReturnsAccessorT, *args, **kwargs) -> ReturnsAccessorT:
+        """Perform indexing on `ReturnsAccessor`."""
+        new_wrapper, idx_idxs, _, col_idxs = self.wrapper.indexing_func_meta(*args, **kwargs)
+        new_obj = new_wrapper.wrap(self.to_2d_array()[idx_idxs, :][:, col_idxs], group_by=False)
+        if self.bm_returns is not None:
+            new_bm_returns = new_wrapper.wrap(to_2d_array(self.bm_returns)[idx_idxs, :][:, col_idxs], group_by=False)
+        else:
+            new_bm_returns = None
+        if checks.is_series(new_obj):
+            return self.replace(cls_=self.sr_accessor_cls, obj=new_obj, bm_returns=new_bm_returns, wrapper=new_wrapper)
+        return self.replace(cls_=self.df_accessor_cls, obj=new_obj, bm_returns=new_bm_returns, wrapper=new_wrapper)
 
     @property
     def bm_returns(self) -> tp.Optional[tp.SeriesFrame]:

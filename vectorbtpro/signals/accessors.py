@@ -208,7 +208,7 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
-from vectorbtpro.utils.decorators import class_or_instancemethod
+from vectorbtpro.utils.decorators import class_or_instancemethod, class_or_instanceproperty
 from vectorbtpro.utils.random_ import set_seed_nb
 from vectorbtpro.utils.template import RepEval, deep_substitute
 
@@ -226,13 +226,13 @@ class SignalsAccessor(GenericAccessor):
 
         GenericAccessor.__init__(self, obj, **kwargs)
 
-    @property
-    def sr_accessor_cls(self) -> tp.Type["SignalsSRAccessor"]:
+    @class_or_instanceproperty
+    def sr_accessor_cls(cls_or_self) -> tp.Type["SignalsSRAccessor"]:
         """Accessor class for `pd.Series`."""
         return SignalsSRAccessor
 
-    @property
-    def df_accessor_cls(self) -> tp.Type["SignalsDFAccessor"]:
+    @class_or_instanceproperty
+    def df_accessor_cls(cls_or_self) -> tp.Type["SignalsDFAccessor"]:
         """Accessor class for `pd.DataFrame`."""
         return SignalsDFAccessor
 

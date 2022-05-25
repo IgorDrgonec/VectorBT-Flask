@@ -42,7 +42,7 @@ def split_ranges_into_sets(
             Can be passed per range.
 
     Usage:
-        * `set_lens=(0.5)`: 50% in training set, the rest in test set
+        * `set_lens=(0.5,)`: 50% in training set, the rest in test set
         * `set_lens=(0.5, 0.25)`: 50% in training set, 25% in validation set, the rest in test set
         * `set_lens=(50, 30)`: 50 in training set, 30 in validation set, the rest in test set
         * `set_lens=(50, 30)` and `left_to_right=False`: 30 in test set, 50 in validation set,
