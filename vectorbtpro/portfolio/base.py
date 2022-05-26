@@ -3530,7 +3530,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         See `vectorbtpro.portfolio.nb.from_orders.simulate_from_orders_nb`.
 
         Args:
-            close (array_like): Latest asset price at each time step.
+            close (array_like or Data): Latest asset price at each time step.
                 Will broadcast.
 
                 Used for calculating unrealized PnL and portfolio value.
@@ -3715,7 +3715,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         All broadcastable arguments will broadcast using `vectorbtpro.base.reshaping.broadcast`
         but keep original shape to utilize flexible indexing and to save memory.
 
-        For defaults, see `vectorbtpro._settings.portfolio`.
+        For defaults, see `vectorbtpro._settings.portfolio`. Those defaults are not used to fill
+        NaN values after reindexing: vectorbt uses its own sensible defaults, which are usually NaN
+        for floating arrays and default flags for integer arrays. Use `vectorbtpro.base.reshaping.BCO`
+        with `fill_value` to override.
 
         !!! note
             When `call_seq` is not `CallSeqType.Auto`, at each timestamp, processing of the assets in
@@ -4022,12 +4025,36 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             broadcastable_args["bm_close"] = bm_close
         else:
             broadcastable_args["bm_close"] = None
-        broadcast_kwargs = merge_dicts(
-            dict(keep_flex=True),
-            broadcast_kwargs,
-        )
+
         broadcast_kwargs = merge_dicts(
             dict(
+                keep_flex=True,
+                reindex_kwargs=dict(
+                    cash_earnings=dict(fill_value=0.0),
+                    cash_dividends=dict(fill_value=0.0),
+                    size=dict(fill_value=np.nan),
+                    price=dict(fill_value=np.nan),
+                    size_type=dict(fill_value=SizeType.Amount),
+                    direction=dict(fill_value=Direction.Both),
+                    fees=dict(fill_value=0.0),
+                    fixed_fees=dict(fill_value=0.0),
+                    slippage=dict(fill_value=0.0),
+                    min_size=dict(fill_value=0.0),
+                    max_size=dict(fill_value=np.inf),
+                    size_granularity=dict(fill_value=np.nan),
+                    reject_prob=dict(fill_value=0.0),
+                    price_area_vio_mode=dict(fill_value=PriceAreaVioMode.Ignore),
+                    lock_cash=dict(fill_value=False),
+                    allow_partial=dict(fill_value=True),
+                    raise_reject=dict(fill_value=False),
+                    log=dict(fill_value=False),
+                    val_price=dict(fill_value=np.nan),
+                    open=dict(fill_value=np.nan),
+                    high=dict(fill_value=np.nan),
+                    low=dict(fill_value=np.nan),
+                    close=dict(fill_value=np.nan),
+                    bm_close=dict(fill_value=np.nan),
+                ),
                 wrapper_kwargs=dict(
                     freq=freq,
                     group_by=group_by,
@@ -4052,6 +4079,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             to_shape=(target_shape_2d[0], len(cs_group_lens)),
             to_pd=False,
             keep_flex=True,
+            reindex_kwargs=dict(fill_value=0.0),
             **require_kwargs,
         )
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
@@ -4448,7 +4476,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         All broadcastable arguments will broadcast using `vectorbtpro.base.reshaping.broadcast`
         but keep original shape to utilize flexible indexing and to save memory.
 
-        For defaults, see `vectorbtpro._settings.portfolio`.
+        For defaults, see `vectorbtpro._settings.portfolio`. Those defaults are not used to fill
+        NaN values after reindexing: vectorbt uses its own sensible defaults, which are usually NaN
+        for floating arrays and default flags for integer arrays. Use `vectorbtpro.base.reshaping.BCO`
+        with `fill_value` to override.
 
         !!! note
             Stop signal has priority - it's executed before other signals within the same bar.
@@ -5114,11 +5145,51 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 broadcastable_args["direction"] = direction
         broadcastable_args = {**broadcastable_args, **broadcast_named_args}
         broadcast_kwargs = merge_dicts(
-            dict(keep_flex=True),
-            broadcast_kwargs,
-        )
-        broadcast_kwargs = merge_dicts(
             dict(
+                keep_flex=True,
+                reindex_kwargs=dict(
+                    cash_earnings=dict(fill_value=0.0),
+                    cash_dividends=dict(fill_value=0.0),
+                    size=dict(fill_value=np.nan),
+                    price=dict(fill_value=np.nan),
+                    size_type=dict(fill_value=SizeType.Amount),
+                    direction=dict(fill_value=Direction.Both),
+                    fees=dict(fill_value=0.0),
+                    fixed_fees=dict(fill_value=0.0),
+                    slippage=dict(fill_value=0.0),
+                    min_size=dict(fill_value=0.0),
+                    max_size=dict(fill_value=np.inf),
+                    size_granularity=dict(fill_value=np.nan),
+                    reject_prob=dict(fill_value=0.0),
+                    price_area_vio_mode=dict(fill_value=PriceAreaVioMode.Ignore),
+                    lock_cash=dict(fill_value=False),
+                    allow_partial=dict(fill_value=True),
+                    raise_reject=dict(fill_value=False),
+                    log=dict(fill_value=False),
+                    accumulate=dict(fill_value=False),
+                    upon_long_conflict=dict(fill_value=ConflictMode.Ignore),
+                    upon_short_conflict=dict(fill_value=ConflictMode.Ignore),
+                    upon_dir_conflict=dict(fill_value=DirectionConflictMode.Ignore),
+                    upon_opposite_entry=dict(fill_value=OppositeEntryMode.ReverseReduce),
+                    val_price=dict(fill_value=np.nan),
+                    open=dict(fill_value=np.nan),
+                    high=dict(fill_value=np.nan),
+                    low=dict(fill_value=np.nan),
+                    close=dict(fill_value=np.nan),
+                    bm_close=dict(fill_value=np.nan),
+                    sl_stop=dict(fill_value=np.nan),
+                    sl_trail=dict(fill_value=np.nan),
+                    tp_stop=dict(fill_value=np.nan),
+                    stop_entry_price=dict(fill_value=StopEntryPrice.Close),
+                    stop_exit_price=dict(fill_value=StopExitPrice.StopLimit),
+                    upon_stop_exit=dict(fill_value=StopExitMode.Close),
+                    upon_stop_update=dict(fill_value=StopUpdateMode.Override),
+                    signal_priority=dict(fill_value=SignalPriority.Stop),
+                    entries=dict(fill_value=False),
+                    exits=dict(fill_value=False),
+                    short_entries=dict(fill_value=False),
+                    short_exits=dict(fill_value=False),
+                ),
                 wrapper_kwargs=dict(
                     freq=freq,
                     group_by=group_by,
@@ -5143,6 +5214,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             to_shape=(target_shape_2d[0], len(cs_group_lens)),
             to_pd=False,
             keep_flex=True,
+            reindex_kwargs=dict(fill_value=0.0),
             **require_kwargs,
         )
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
@@ -5874,7 +5946,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             bm_close (array_like): See `Portfolio.from_orders`.
             **kwargs: Keyword arguments passed to the `Portfolio` constructor.
 
-        For defaults, see `vectorbtpro._settings.portfolio`.
+        For defaults, see `vectorbtpro._settings.portfolio`. Those defaults are not used to fill
+        NaN values after reindexing: vectorbt uses its own sensible defaults, which are usually NaN
+        for floating arrays and default flags for integer arrays. Use `vectorbtpro.base.reshaping.BCO`
+        with `fill_value` to override.
 
         !!! note
             All passed functions must be Numba-compiled if Numba is enabled.
@@ -6302,11 +6377,16 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             broadcastable_args["bm_close"] = None
         broadcastable_args = {**broadcastable_args, **broadcast_named_args}
         broadcast_kwargs = merge_dicts(
-            dict(keep_flex=True),
-            broadcast_kwargs,
-        )
-        broadcast_kwargs = merge_dicts(
             dict(
+                keep_flex=True,
+                reindex_kwargs=dict(
+                    cash_earnings=dict(fill_value=0.0),
+                    open=dict(fill_value=np.nan),
+                    high=dict(fill_value=np.nan),
+                    low=dict(fill_value=np.nan),
+                    close=dict(fill_value=np.nan),
+                    bm_close=dict(fill_value=np.nan),
+                ),
                 wrapper_kwargs=dict(
                     freq=freq,
                     group_by=group_by,
@@ -6330,6 +6410,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             to_shape=(target_shape_2d[0], len(cs_group_lens)),
             to_pd=False,
             keep_flex=keep_inout_raw,
+            reindex_kwargs=dict(fill_value=0.0),
             **require_kwargs,
         )
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
@@ -6667,6 +6748,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         call_seq: tp.Optional[tp.ArrayLike] = None,
         flexible: tp.Optional[bool] = None,
         broadcast_named_args: tp.KwargsLike = None,
+        broadcast_kwargs: tp.KwargsLike = None,
         chunked: tp.ChunkedOption = None,
         **kwargs,
     ) -> PortfolioT:
@@ -6804,8 +6886,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 call_seq = None
         if broadcast_named_args is None:
             broadcast_named_args = {}
-        broadcast_named_args = {
-            **dict(
+        broadcast_named_args = merge_dicts(
+            dict(
                 size=size,
                 size_type=size_type,
                 direction=direction,
@@ -6824,8 +6906,33 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 log=log,
                 val_price=val_price,
             ),
-            **broadcast_named_args,
-        }
+            broadcast_named_args,
+        )
+        broadcast_kwargs = merge_dicts(portfolio_cfg["broadcast_kwargs"], broadcast_kwargs)
+        broadcast_kwargs = merge_dicts(
+            dict(
+                reindex_kwargs=dict(
+                    size=dict(fill_value=np.nan),
+                    price=dict(fill_value=np.nan),
+                    size_type=dict(fill_value=SizeType.Amount),
+                    direction=dict(fill_value=Direction.Both),
+                    fees=dict(fill_value=0.0),
+                    fixed_fees=dict(fill_value=0.0),
+                    slippage=dict(fill_value=0.0),
+                    min_size=dict(fill_value=0.0),
+                    max_size=dict(fill_value=np.inf),
+                    size_granularity=dict(fill_value=np.nan),
+                    reject_prob=dict(fill_value=0.0),
+                    price_area_vio_mode=dict(fill_value=PriceAreaVioMode.Ignore),
+                    lock_cash=dict(fill_value=False),
+                    allow_partial=dict(fill_value=True),
+                    raise_reject=dict(fill_value=False),
+                    log=dict(fill_value=False),
+                    val_price=dict(val_price=np.nan),
+                )
+            ),
+            broadcast_kwargs,
+        )
 
         # Check data types
         checks.assert_subdtype(size, np.number)

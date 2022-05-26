@@ -184,13 +184,13 @@ class ArrayWrapper(Configured, PandasIndexer):
                     if new_index is None:
                         new_index = wrapper.index
                     else:
+                        if new_index.dtype != wrapper.index.dtype:
+                            raise ValueError("Indexes to be merged must have the same data type")
                         new_index = new_index.append(wrapper.index)
             if new_index.has_duplicates:
                 raise ValueError("Merged index contains duplicates")
             if not new_index.is_monotonic_increasing:
                 raise ValueError("Merged index must be monotonically increasing")
-            if "mixed" in new_index.inferred_type:
-                raise ValueError("Merged index holds data with mixed data types")
             index = new_index
         elif not isinstance(index, pd.Index):
             index = pd.Index(index)
@@ -215,7 +215,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                 if new_columns is None:
                     new_columns = wrapper.columns
                 else:
-                    if not checks.is_index_equal(new_columns, wrapper.columns, check_names=True):
+                    if not checks.is_index_equal(new_columns, wrapper.columns):
                         if not stack_columns:
                             raise ValueError("Objects to be merged must have the same columns")
                         new_columns = stack_indexes((new_columns, wrapper.columns), **resolve_dict(stack_kwargs))
@@ -225,7 +225,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         kwargs["columns"] = columns
 
         if "grouper" in kwargs:
-            if not checks.is_index_equal(columns, kwargs["grouper"].index, check_names=True):
+            if not checks.is_index_equal(columns, kwargs["grouper"].index):
                 raise ValueError("Columns and grouper index must match")
             if group_by is not None:
                 kwargs["group_by"] = group_by
@@ -247,7 +247,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                         if new_group_by is None:
                             new_group_by = wrapper_group_by
                         else:
-                            if not checks.is_index_equal(new_group_by, wrapper_group_by, check_names=True):
+                            if not checks.is_index_equal(new_group_by, wrapper_group_by):
                                 raise ValueError("Objects to be merged must have the same groups")
                     group_by = new_group_by
                 else:
@@ -320,18 +320,18 @@ class ArrayWrapper(Configured, PandasIndexer):
                 if new_index is None:
                     new_index = wrapper.index
                 else:
-                    if not checks.is_index_equal(new_index, wrapper.index, check_names=True):
+                    if not checks.is_index_equal(new_index, wrapper.index):
                         if not union_index:
                             raise ValueError(
                                 "Objects to be merged must have the same index. "
                                 "Use index='union' to merge index as well."
                             )
                         else:
+                            if new_index.dtype != wrapper.index.dtype:
+                                raise ValueError("Indexes to be merged must have the same data type")
                             new_index = new_index.union(wrapper.index)
             if not new_index.is_monotonic_increasing:
                 raise ValueError("Merged index must be monotonically increasing")
-            if "mixed" in new_index.inferred_type:
-                raise ValueError("Merged index holds data with mixed data types")
             index = new_index
         elif not isinstance(index, pd.Index):
             index = pd.Index(index)
@@ -398,7 +398,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         kwargs["columns"] = columns
 
         if "grouper" in kwargs:
-            if not checks.is_index_equal(columns, kwargs["grouper"].index, check_names=True):
+            if not checks.is_index_equal(columns, kwargs["grouper"].index):
                 raise ValueError("Columns and grouper index must match")
             if group_by is not None:
                 kwargs["group_by"] = group_by
@@ -1229,7 +1229,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         objs = list(objs)
         new_objs = []
         for obj in objs:
-            if not obj.index.equals(_self.index):
+            if not checks.is_index_equal(obj.index, _self.index, check_names=False):
                 was_bool = (isinstance(obj, pd.Series) and obj.dtype == "bool") or (
                     isinstance(obj, pd.DataFrame) and (obj.dtypes == "bool").all()
                 )

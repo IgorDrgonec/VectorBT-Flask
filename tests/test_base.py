@@ -626,10 +626,12 @@ df4_grouped_wrapper_conog = df4_grouped_wrapper.replace(column_only_select=True,
 
 class TestArrayWrapper:
     def test_row_stack(self):
-        assert vbt.ArrayWrapper.row_stack((
-            vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2),
-            vbt.ArrayWrapper(pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c"), 2),
-        )) == vbt.ArrayWrapper.row_stack(
+        assert vbt.ArrayWrapper.row_stack(
+            (
+                vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2),
+                vbt.ArrayWrapper(pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c"), 2),
+            )
+        ) == vbt.ArrayWrapper.row_stack(
             vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2),
             vbt.ArrayWrapper(pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c"), 2),
         )
@@ -647,12 +649,12 @@ class TestArrayWrapper:
             vbt.ArrayWrapper(pd.RangeIndex(start=0, stop=3, name="i1"), pd.Index(["a", "b"], name="c"), 2),
             vbt.ArrayWrapper(pd.RangeIndex(start=3, stop=6, name="i2"), pd.Index(["a", "b"], name="c"), 2),
         )
-        pd.testing.assert_index_equal(wrapper.index, pd.Index([0, 1, 2, 3, 4, 5], dtype='int64'))
+        pd.testing.assert_index_equal(wrapper.index, pd.Index([0, 1, 2, 3, 4, 5], dtype="int64"))
         wrapper = vbt.ArrayWrapper.row_stack(
             vbt.ArrayWrapper(pd.RangeIndex(start=0, stop=3), pd.Index(["a", "b"], name="c"), 2),
             vbt.ArrayWrapper(pd.RangeIndex(start=4, stop=7), pd.Index(["a", "b"], name="c"), 2),
         )
-        pd.testing.assert_index_equal(wrapper.index, pd.Index([0, 1, 2, 4, 5, 6], dtype='int64'))
+        pd.testing.assert_index_equal(wrapper.index, pd.Index([0, 1, 2, 4, 5, 6], dtype="int64"))
         wrapper = vbt.ArrayWrapper.row_stack(
             vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2),
             vbt.ArrayWrapper(pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c"), 2),
@@ -837,7 +839,7 @@ class TestArrayWrapper:
         wrapper = vbt.ArrayWrapper.row_stack(
             vbt.ArrayWrapper(pd.Index([0, 1, 2]), columns, 2, group_by=True, allow_enable=True),
             vbt.ArrayWrapper(pd.Index([4, 5, 6]), columns, 2, group_by=False, allow_enable=False),
-            grouper=grouper
+            grouper=grouper,
         )
         assert wrapper.grouper == grouper
         wrapper = vbt.ArrayWrapper.row_stack(
@@ -954,7 +956,7 @@ class TestArrayWrapper:
         )
         pd.testing.assert_index_equal(
             wrapper.columns,
-            pd.MultiIndex.from_tuples([("o1", "a"), ("o1", "b"), ("o2", "c"), ("o2", "d")], names=[None, "c"])
+            pd.MultiIndex.from_tuples([("o1", "a"), ("o1", "b"), ("o2", "c"), ("o2", "d")], names=[None, "c"]),
         )
         wrapper = vbt.ArrayWrapper.column_stack(
             vbt.ArrayWrapper(index, pd.Index(["a", "b"], name="c1"), 2),
@@ -963,7 +965,7 @@ class TestArrayWrapper:
         )
         pd.testing.assert_index_equal(
             wrapper.columns,
-            pd.MultiIndex.from_tuples([("k1", 0), ("k1", 1), ("k2", 0), ("k2", 1)], names=["k", "col_idx"])
+            pd.MultiIndex.from_tuples([("k1", 0), ("k1", 1), ("k2", 0), ("k2", 1)], names=["k", "col_idx"]),
         )
         wrapper = vbt.ArrayWrapper.column_stack(
             vbt.ArrayWrapper(index, pd.Index(["a", "b"], name="c1"), 2),
@@ -973,7 +975,7 @@ class TestArrayWrapper:
         )
         pd.testing.assert_index_equal(
             wrapper.columns,
-            pd.MultiIndex.from_tuples([("k1", 0), ("k1", 1), ("k2", 2), ("k2", 3)], names=["k", "col_idx"])
+            pd.MultiIndex.from_tuples([("k1", 0), ("k1", 1), ("k2", 2), ("k2", 3)], names=["k", "col_idx"]),
         )
         wrapper = vbt.ArrayWrapper.column_stack(
             vbt.ArrayWrapper(index, pd.Index(["a", "b"], name="c1"), 2),
@@ -2617,7 +2619,8 @@ class TestReshapeFns:
             columns_from="stack",
             drop_duplicates=True,
             drop_redundant=True,
-            ignore_sr_names=True
+            ignore_sr_names=True,
+            align_index=False,
         )
         for i in range(len(broadcasted)):
             assert_series_equal(
@@ -2645,7 +2648,8 @@ class TestReshapeFns:
             columns_from="stack",
             drop_duplicates=True,
             drop_redundant=True,
-            ignore_sr_names=True
+            ignore_sr_names=True,
+            align_index=False,
         )
         for i in range(len(broadcasted)):
             assert_frame_equal(
@@ -2675,6 +2679,7 @@ class TestReshapeFns:
             drop_duplicates=True,
             drop_redundant=True,
             ignore_sr_names=True,
+            align_index=False,
         )
         assert_frame_equal(
             broadcasted[0],
@@ -2701,7 +2706,8 @@ class TestReshapeFns:
             columns_from="keep",
             drop_duplicates=True,
             drop_redundant=True,
-            ignore_sr_names=True
+            ignore_sr_names=True,
+            align_index=False,
         )
         for i in range(4):
             assert_series_equal(
@@ -2730,7 +2736,8 @@ class TestReshapeFns:
             columns_from="keep",
             drop_duplicates=True,
             drop_redundant=True,
-            ignore_sr_names=True
+            ignore_sr_names=True,
+            align_index=False,
         )
         for i in range(7):
             assert_frame_equal(
@@ -2800,7 +2807,8 @@ class TestReshapeFns:
             columns_from=["name"],  # should translate to Series name
             drop_duplicates=True,
             drop_redundant=True,
-            ignore_sr_names=True
+            ignore_sr_names=True,
+            align_index=False,
         )
         for i in range(len(broadcasted)):
             assert_series_equal(broadcasted[i], pd.Series(broadcasted_arrs[i], index=multi_i, name="name"))
@@ -2810,7 +2818,8 @@ class TestReshapeFns:
             columns_from=[0],  # should translate to None
             drop_duplicates=True,
             drop_redundant=True,
-            ignore_sr_names=True
+            ignore_sr_names=True,
+            align_index=False,
         )
         for i in range(len(broadcasted)):
             assert_series_equal(broadcasted[i], pd.Series(broadcasted_arrs[i], index=multi_i, name=None))
@@ -2831,7 +2840,8 @@ class TestReshapeFns:
             columns_from=multi_c,
             drop_duplicates=True,
             drop_redundant=True,
-            ignore_sr_names=True
+            ignore_sr_names=True,
+            align_index=False,
         )
         for i in range(len(broadcasted)):
             assert_frame_equal(
@@ -2849,7 +2859,8 @@ class TestReshapeFns:
             columns_from=-1,  # should translate to Series name
             drop_duplicates=True,
             drop_redundant=True,
-            ignore_sr_names=True
+            ignore_sr_names=True,
+            align_index=False,
         )
         for i in range(len(broadcasted)):
             assert_series_equal(
@@ -2863,7 +2874,8 @@ class TestReshapeFns:
                 columns_from=0,
                 drop_duplicates=True,
                 drop_redundant=True,
-                ignore_sr_names=True
+                ignore_sr_names=True,
+                align_index=False,
             )
         # 2d
         to_broadcast_a = 0, a1, a2, a3, a4, a5
@@ -2882,7 +2894,8 @@ class TestReshapeFns:
             columns_from=-1,
             drop_duplicates=True,
             drop_redundant=True,
-            ignore_sr_names=True
+            ignore_sr_names=True,
+            align_index=False,
         )
         for i in range(len(broadcasted)):
             assert_frame_equal(
@@ -2900,7 +2913,7 @@ class TestReshapeFns:
                 columns_from="stack",
                 drop_duplicates=True,
                 drop_redundant=True,
-                ignore_sr_names=True
+                ignore_sr_names=True,
             )
         # 2d
         to_broadcast = df1, df2
@@ -2911,7 +2924,7 @@ class TestReshapeFns:
                 columns_from="strict",  # changing columns not allowed
                 drop_duplicates=True,
                 drop_redundant=True,
-                ignore_sr_names=True
+                ignore_sr_names=True,
             )
 
     def test_broadcast_dirty(self):
@@ -2924,7 +2937,7 @@ class TestReshapeFns:
             columns_from="stack",
             drop_duplicates=False,
             drop_redundant=False,
-            ignore_sr_names=False
+            ignore_sr_names=False,
         )
         for i in range(len(broadcasted)):
             assert_series_equal(
@@ -2951,7 +2964,7 @@ class TestReshapeFns:
             columns_from="stack",
             drop_duplicates=True,
             drop_redundant=True,
-            ignore_sr_names=True
+            ignore_sr_names=True,
         )
         for i in range(len(broadcasted)):
             assert_frame_equal(
@@ -2977,7 +2990,7 @@ class TestReshapeFns:
             columns_from="stack",
             drop_duplicates=True,
             drop_redundant=True,
-            ignore_sr_names=True
+            ignore_sr_names=True,
         )
         for i in range(len(broadcasted)):
             np.testing.assert_array_equal(broadcasted[i], broadcasted_arrs[i])
@@ -3116,40 +3129,124 @@ class TestReshapeFns:
     def test_broadcast_product(self):
         p = pd.Index([1, 2, 3], name="p")
 
-        _0, _a2, _sr2 = reshaping.broadcast(0, a2, sr2)
-        _0_p, _a2_p, _sr2_p, _p = reshaping.broadcast(0, a2, sr2, p)
+        _0, _a2, _sr2 = reshaping.broadcast(
+            0,
+            a2,
+            sr2,
+            align_index=False,
+        )
+        _0_p, _a2_p, _sr2_p, _p = reshaping.broadcast(
+            0,
+            a2,
+            sr2,
+            p,
+            align_index=False,
+        )
         assert_frame_equal(_0_p, _0.vbt.tile(len(p), keys=p))
         assert_frame_equal(_a2_p, _a2.vbt.tile(len(p), keys=p))
         assert_frame_equal(_sr2_p, _sr2.vbt.tile(len(p), keys=p))
         assert_frame_equal(_p, reshaping.broadcast_to(p.values, _sr2_p))
 
-        _0, _a2, _sr2, _df2 = reshaping.broadcast(0, a2, sr2, df2)
-        _0_p, _a2_p, _sr2_p, _df2_p, _p = reshaping.broadcast(0, a2, sr2, df2, p)
+        _0, _a2, _sr2, _df2 = reshaping.broadcast(
+            0,
+            a2,
+            sr2,
+            df2,
+            align_index=False,
+        )
+        _0_p, _a2_p, _sr2_p, _df2_p, _p = reshaping.broadcast(
+            0,
+            a2,
+            sr2,
+            df2,
+            p,
+            align_index=False,
+        )
         assert_frame_equal(_0_p, _0.vbt.tile(len(p), keys=p))
         assert_frame_equal(_a2_p, _a2.vbt.tile(len(p), keys=p))
         assert_frame_equal(_sr2_p, _sr2.vbt.tile(len(p), keys=p))
         assert_frame_equal(_df2_p, _df2.vbt.tile(len(p), keys=p))
         assert_frame_equal(_p, reshaping.broadcast_to(np.repeat(p.values, 3), _df2_p))
 
-        _0, _a2, _sr2 = reshaping.broadcast(0, a2, sr2, keep_flex=True)
-        _0_p, _a2_p, _sr2_p, _p = reshaping.broadcast(0, a2, sr2, p, keep_flex=True)
+        _0, _a2, _sr2 = reshaping.broadcast(
+            0,
+            a2,
+            sr2,
+            keep_flex=True,
+            align_index=False,
+        )
+        _0_p, _a2_p, _sr2_p, _p = reshaping.broadcast(
+            0,
+            a2,
+            sr2,
+            p,
+            keep_flex=True,
+            align_index=False,
+        )
         np.testing.assert_array_equal(_0_p, _0)
         np.testing.assert_array_equal(_a2_p, _a2[:, None])
         np.testing.assert_array_equal(_sr2_p, _sr2[:, None])
         np.testing.assert_array_equal(_p, p.values)
 
-        _0, _a2, _sr2, _df2 = reshaping.broadcast(0, a2, sr2, df2, keep_flex=True)
-        _0_p, _a2_p, _sr2_p, _df2_p, _p = reshaping.broadcast(0, a2, sr2, df2, p, keep_flex=True)
+        _0, _a2, _sr2, _df2 = reshaping.broadcast(
+            0,
+            a2,
+            sr2,
+            df2,
+            keep_flex=True,
+            align_index=False,
+        )
+        _0_p, _a2_p, _sr2_p, _df2_p, _p = reshaping.broadcast(
+            0,
+            a2,
+            sr2,
+            df2,
+            p,
+            keep_flex=True,
+            align_index=False,
+        )
         np.testing.assert_array_equal(_0_p, _0)
         np.testing.assert_array_equal(_a2_p, np.tile(_a2, 3))
         np.testing.assert_array_equal(_sr2_p, _sr2)
         np.testing.assert_array_equal(_sr2_p, _df2)
         np.testing.assert_array_equal(_p, np.repeat(p.values, 3))
 
-        _, _, _, _p1 = reshaping.broadcast(0, a2, sr2, p, repeat_product=False)
-        _, _, _, _, _p2 = reshaping.broadcast(0, a2, sr2, df2, p, repeat_product=False)
-        _, _, _, _p3 = reshaping.broadcast(0, a2, sr2, p, keep_flex=True, repeat_product=False)
-        _, _, _, _df2_p, _p4 = reshaping.broadcast(0, a2, sr2, df2, p, keep_flex=True, repeat_product=False)
+        _, _, _, _p1 = reshaping.broadcast(
+            0,
+            a2,
+            sr2,
+            p,
+            repeat_product=False,
+            align_index=False,
+        )
+        _, _, _, _, _p2 = reshaping.broadcast(
+            0,
+            a2,
+            sr2,
+            df2,
+            p,
+            repeat_product=False,
+            align_index=False,
+        )
+        _, _, _, _p3 = reshaping.broadcast(
+            0,
+            a2,
+            sr2,
+            p,
+            keep_flex=True,
+            repeat_product=False,
+            align_index=False,
+        )
+        _, _, _, _df2_p, _p4 = reshaping.broadcast(
+            0,
+            a2,
+            sr2,
+            df2,
+            p,
+            keep_flex=True,
+            repeat_product=False,
+            align_index=False,
+        )
 
         np.testing.assert_array_equal(_p1.values, _p2.values)
         np.testing.assert_array_equal(_p1.columns, _p2.columns)
@@ -3332,12 +3429,26 @@ class TestReshapeFns:
         assert_index_equal(wrapper.columns, pd.Index([1, 2, 3], dtype="int64", name="a2"))
 
     def test_broadcast_meta(self):
-        _0, _a2, _sr2, _df2 = reshaping.broadcast(0, a2, sr2, df2, keep_flex=True)
+        _0, _a2, _sr2, _df2 = reshaping.broadcast(
+            0,
+            a2,
+            sr2,
+            df2,
+            keep_flex=True,
+            align_index=False,
+        )
         assert _0 == 0
         np.testing.assert_array_equal(_a2, a2)
         np.testing.assert_array_equal(_sr2, sr2.values[:, None])
         np.testing.assert_array_equal(_df2, df2.values)
-        _0, _a2, _sr2, _df2 = reshaping.broadcast(0, a2, sr2, df2, keep_flex=[False, True, True, True])
+        _0, _a2, _sr2, _df2 = reshaping.broadcast(
+            0,
+            a2,
+            sr2,
+            df2,
+            keep_flex=[False, True, True, True],
+            align_index=False,
+        )
         test_shape = (3, 3)
         test_index = pd.MultiIndex.from_tuples([("x2", "x4"), ("y2", "y4"), ("z2", "z4")], names=["i2", "i4"])
         test_columns = pd.Index(["a4", "a4", "a4"], name="c4", dtype="object")
@@ -3348,40 +3459,45 @@ class TestReshapeFns:
         np.testing.assert_array_equal(_a2, a2)
         np.testing.assert_array_equal(_sr2, sr2.values[:, None])
         np.testing.assert_array_equal(_df2, df2.values)
-        _, wrapper = reshaping.broadcast(0, a2, sr2, df2, return_wrapper=True)
+        _, wrapper = reshaping.broadcast(
+            0,
+            a2,
+            sr2,
+            df2,
+            return_wrapper=True,
+            align_index=False,
+        )
         assert wrapper.shape == test_shape
         assert_index_equal(wrapper.index, test_index)
         assert_index_equal(wrapper.columns, test_columns)
 
     def test_broadcast_align(self):
-        index1 = pd.Index(["a", "b", "c"])
-        index2 = pd.MultiIndex.from_tuples([(0, "a"), (0, "b"), (0, "c"), (1, "a"), (1, "b"), (1, "c")])
-        index3 = pd.MultiIndex.from_tuples(
+        index1 = pd.date_range("2020-01-01", periods=3)
+        index2 = pd.date_range("2020-01-02", periods=3)
+        index3 = pd.date_range("2020-01-03", periods=3)
+        columns2 = pd.MultiIndex.from_tuples([(0, "a"), (0, "b"), (1, "a"), (1, "b")])
+        columns3 = pd.MultiIndex.from_tuples(
             [
                 (2, 0, "a"),
                 (2, 0, "b"),
-                (2, 0, "c"),
                 (2, 1, "a"),
                 (2, 1, "b"),
-                (2, 1, "c"),
                 (3, 0, "a"),
                 (3, 0, "b"),
-                (3, 0, "c"),
                 (3, 1, "a"),
                 (3, 1, "b"),
-                (3, 1, "c"),
             ]
         )
         sr1 = pd.Series(np.arange(len(index1)), index=index1)
         df2 = pd.DataFrame(
-            np.reshape(np.arange(len(index2) * len(index2)), (len(index2), len(index2))),
+            np.reshape(np.arange(len(index2) * len(columns2)), (len(index2), len(columns2))),
             index=index2,
-            columns=index2,
+            columns=columns2,
         )
         df3 = pd.DataFrame(
-            np.reshape(np.arange(len(index3) * len(index3)), (len(index3), len(index3))),
+            np.reshape(np.arange(len(index3) * len(columns3)), (len(index3), len(columns3))),
             index=index3,
-            columns=index3,
+            columns=columns3,
         )
         _df1, _df2, _df3 = reshaping.broadcast(sr1, df2, df3, align_index=True, align_columns=True)
         assert_frame_equal(
@@ -3389,22 +3505,15 @@ class TestReshapeFns:
             pd.DataFrame(
                 np.array(
                     [
-                        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                        [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
-                        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                        [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
-                        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                        [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
-                        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                        [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
+                        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                        [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+                        [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0],
+                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
+                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
                     ]
                 ),
-                index=index3,
-                columns=index3,
+                index=pd.date_range("2020-01-01", periods=5),
+                columns=columns3,
             ),
         )
         assert_frame_equal(
@@ -3412,25 +3521,44 @@ class TestReshapeFns:
             pd.DataFrame(
                 np.array(
                     [
-                        [0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5],
-                        [6, 7, 8, 9, 10, 11, 6, 7, 8, 9, 10, 11],
-                        [12, 13, 14, 15, 16, 17, 12, 13, 14, 15, 16, 17],
-                        [18, 19, 20, 21, 22, 23, 18, 19, 20, 21, 22, 23],
-                        [24, 25, 26, 27, 28, 29, 24, 25, 26, 27, 28, 29],
-                        [30, 31, 32, 33, 34, 35, 30, 31, 32, 33, 34, 35],
-                        [0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5],
-                        [6, 7, 8, 9, 10, 11, 6, 7, 8, 9, 10, 11],
-                        [12, 13, 14, 15, 16, 17, 12, 13, 14, 15, 16, 17],
-                        [18, 19, 20, 21, 22, 23, 18, 19, 20, 21, 22, 23],
-                        [24, 25, 26, 27, 28, 29, 24, 25, 26, 27, 28, 29],
-                        [30, 31, 32, 33, 34, 35, 30, 31, 32, 33, 34, 35],
+                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
+                        [0.0, 1.0, 2.0, 3.0, 0.0, 1.0, 2.0, 3.0],
+                        [4.0, 5.0, 6.0, 7.0, 4.0, 5.0, 6.0, 7.0],
+                        [8.0, 9.0, 10.0, 11.0, 8.0, 9.0, 10.0, 11.0],
+                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
                     ]
                 ),
-                index=index3,
-                columns=index3,
+                index=pd.date_range("2020-01-01", periods=5),
+                columns=columns3,
             ),
         )
-        assert_frame_equal(_df3, df3)
+        assert_frame_equal(
+            _df3,
+            pd.DataFrame(
+                np.array(
+                    [
+                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
+                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
+                        [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0],
+                        [8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0],
+                        [16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0],
+                    ]
+                ),
+                index=pd.date_range("2020-01-01", periods=5),
+                columns=columns3,
+            ),
+        )
+        _df12, _df22, _df32 = reshaping.broadcast(
+            sr1,
+            df2,
+            df3,
+            align_index=True,
+            align_columns=True,
+            reindex_kwargs=dict(fill_value=0),
+        )
+        assert_frame_equal(_df12, _df1.fillna(0).astype(int))
+        assert_frame_equal(_df22, _df2.fillna(0).astype(int))
+        assert_frame_equal(_df32, _df3.fillna(0).astype(int))
 
     def test_broadcast_to(self):
         np.testing.assert_array_equal(reshaping.broadcast_to(0, a5), np.broadcast_to(0, a5.shape))
@@ -3809,8 +3937,16 @@ class TestIndexing:
         [(0, a1, a2, sr_none, sr1, sr2), (0, a1, a2, a3, a4, a5, sr_none, sr1, sr2, df_none, df1, df2, df3, df4)],
     )
     def test_flex(self, test_inputs):
-        raw_args = reshaping.broadcast(*test_inputs, keep_flex=True)
-        bc_args = reshaping.broadcast(*test_inputs, keep_flex=False)
+        raw_args = reshaping.broadcast(
+            *test_inputs,
+            keep_flex=True,
+            align_index=False,
+        )
+        bc_args = reshaping.broadcast(
+            *test_inputs,
+            keep_flex=False,
+            align_index=False,
+        )
         for r in range(len(test_inputs)):
             raw_arg = raw_args[r]
             bc_arg = np.array(bc_args[r])
@@ -4103,7 +4239,7 @@ class TestAccessors:
         target_obj = pd.DataFrame(
             [[0, 0], [1, 1], [2, 2], [0, 1], [2, 3], [4, 5]],
             index=pd.RangeIndex(start=0, stop=6, step=1),
-            columns=pd.Index(['a', 'b'], dtype='object', name='c'),
+            columns=pd.Index(["a", "b"], dtype="object", name="c"),
         )
         assert isinstance(acc, vbt.BaseDFAccessor)
         pd.testing.assert_index_equal(
@@ -4144,7 +4280,7 @@ class TestAccessors:
         target_obj = pd.DataFrame(
             [[0, 0, 1], [1, 2, 3], [2, 4, 5]],
             index=pd.RangeIndex(start=0, stop=3, step=1),
-            columns=pd.RangeIndex(start=0, stop=3, step=1, name='col_idx'),
+            columns=pd.RangeIndex(start=0, stop=3, step=1, name="col_idx"),
         )
         assert isinstance(acc, vbt.BaseDFAccessor)
         pd.testing.assert_index_equal(
@@ -4553,7 +4689,7 @@ class TestAccessors:
             names=["c6", "c7", "c8"],
         )
         assert_frame_equal(
-            df4.vbt.broadcast_combs(df5)[0],
+            df4.vbt.broadcast_combs(df5, align_index=False)[0],
             pd.DataFrame(
                 [[1, 1, 1, 2, 2, 2, 3, 3, 3], [4, 4, 4, 5, 5, 5, 6, 6, 6], [7, 7, 7, 8, 8, 8, 9, 9, 9]],
                 index=new_index,
@@ -4561,7 +4697,7 @@ class TestAccessors:
             ),
         )
         assert_frame_equal(
-            df4.vbt.broadcast_combs(df5)[1],
+            df4.vbt.broadcast_combs(df5, align_index=False)[1],
             pd.DataFrame(
                 [[1, 2, 3, 1, 2, 3, 1, 2, 3], [4, 5, 6, 4, 5, 6, 4, 5, 6], [7, 8, 9, 7, 8, 9, 7, 8, 9]],
                 index=new_index,
@@ -4580,7 +4716,11 @@ class TestAccessors:
 
     def test_concat(self):
         assert_frame_equal(
-            pd.DataFrame.vbt.concat(pd.Series([1, 2, 3]), pd.Series([1, 2, 3])),
+            pd.DataFrame.vbt.concat(
+                pd.Series([1, 2, 3]),
+                pd.Series([1, 2, 3]),
+                broadcast_kwargs=dict(align_index=False),
+            ),
             pd.DataFrame({0: pd.Series([1, 2, 3]), 1: pd.Series([1, 2, 3])}),
         )
         target = pd.DataFrame(
@@ -4601,8 +4741,14 @@ class TestAccessors:
                 names=[None, "c6"],
             ),
         )
-        assert_frame_equal(pd.DataFrame.vbt.concat(sr2, 10, df4, keys=["a", "b", "c"]), target)
-        assert_frame_equal(sr2.vbt.concat(10, df4, keys=["a", "b", "c"]), target)
+        assert_frame_equal(
+            pd.DataFrame.vbt.concat(sr2, 10, df4, keys=["a", "b", "c"], broadcast_kwargs=dict(align_index=False)),
+            target,
+        )
+        assert_frame_equal(
+            sr2.vbt.concat(10, df4, keys=["a", "b", "c"], broadcast_kwargs=dict(align_index=False)),
+            target,
+        )
 
     def test_apply_and_concat(self):
         def apply_func(i, x, y, c, d=1):
@@ -4618,7 +4764,15 @@ class TestAccessors:
             columns=pd.Index(["a", "b", "c"], dtype="object"),
         )
         assert_frame_equal(
-            sr2.vbt.apply_and_concat(3, apply_func, np.array([1, 2, 3]), 10, d=100, keys=["a", "b", "c"]),
+            sr2.vbt.apply_and_concat(
+                3,
+                apply_func,
+                np.array([1, 2, 3]),
+                10,
+                d=100,
+                keys=["a", "b", "c"],
+                broadcast_kwargs=dict(align_index=False),
+            ),
             target,
         )
         assert_frame_equal(
@@ -4631,11 +4785,19 @@ class TestAccessors:
                 jitted_loop=True,
                 n_outputs=1,
                 keys=["a", "b", "c"],
+                broadcast_kwargs=dict(align_index=False),
             ),
             target,
         )
         assert_frame_equal(
-            sr2.vbt.apply_and_concat(3, apply_func, np.array([1, 2, 3]), 10, d=100),
+            sr2.vbt.apply_and_concat(
+                3,
+                apply_func,
+                np.array([1, 2, 3]),
+                10,
+                d=100,
+                broadcast_kwargs=dict(align_index=False),
+            ),
             pd.DataFrame(
                 target.values,
                 index=target.index,
@@ -4655,6 +4817,7 @@ class TestAccessors:
                 d=100,
                 keys=["a", "b", "c"],
                 to_2d=True,  # otherwise (3, 1) + (1, 3) = (3, 3) != (3, 1) -> error
+                broadcast_kwargs=dict(align_index=False),
             ),
             pd.DataFrame(
                 np.array([[112, 112, 112], [114, 114, 114], [116, 116, 116]]),
@@ -4668,7 +4831,15 @@ class TestAccessors:
             columns=pd.MultiIndex.from_tuples([("a", "a4"), ("b", "a4"), ("c", "a4")], names=[None, "c4"]),
         )
         assert_frame_equal(
-            df2.vbt.apply_and_concat(3, apply_func, np.array([1, 2, 3]), 10, d=100, keys=["a", "b", "c"]),
+            df2.vbt.apply_and_concat(
+                3,
+                apply_func,
+                np.array([1, 2, 3]),
+                10,
+                d=100,
+                keys=["a", "b", "c"],
+                broadcast_kwargs=dict(align_index=False),
+            ),
             target2,
         )
         assert_frame_equal(
@@ -4681,6 +4852,7 @@ class TestAccessors:
                 jitted_loop=True,
                 n_outputs=1,
                 keys=["a", "b", "c"],
+                broadcast_kwargs=dict(align_index=False),
             ),
             target2,
         )
@@ -4689,11 +4861,27 @@ class TestAccessors:
             return (x + y[i] + c + d, x + y[i] + c + d)
 
         assert_frame_equal(
-            df2.vbt.apply_and_concat(3, apply_func3, np.array([1, 2, 3]), 10, d=100, keys=["a", "b", "c"])[0],
+            df2.vbt.apply_and_concat(
+                3,
+                apply_func3,
+                np.array([1, 2, 3]),
+                10,
+                d=100,
+                keys=["a", "b", "c"],
+                broadcast_kwargs=dict(align_index=False),
+            )[0],
             target2,
         )
         assert_frame_equal(
-            df2.vbt.apply_and_concat(3, apply_func3, np.array([1, 2, 3]), 10, d=100, keys=["a", "b", "c"])[1],
+            df2.vbt.apply_and_concat(
+                3,
+                apply_func3,
+                np.array([1, 2, 3]),
+                10,
+                d=100,
+                keys=["a", "b", "c"],
+                broadcast_kwargs=dict(align_index=False),
+            )[1],
             target2,
         )
 
@@ -4708,6 +4896,7 @@ class TestAccessors:
                 vbt.RepEval("np.arange(ntimes)"),
                 broadcast_named_args=dict(y=df4),
                 template_context=dict(np=np),
+                broadcast_kwargs=dict(align_index=False),
             ),
             pd.DataFrame(
                 [[2, 3, 4, 3, 4, 5, 4, 5, 6], [6, 7, 8, 7, 8, 9, 8, 9, 10], [10, 11, 12, 11, 12, 13, 12, 13, 14]],
@@ -4728,7 +4917,13 @@ class TestAccessors:
             return x + y + a + b
 
         assert_series_equal(
-            sr2.vbt.combine(10, combine_func, 100, b=1000),
+            sr2.vbt.combine(
+                10,
+                combine_func,
+                100,
+                b=1000,
+                broadcast_kwargs=dict(align_index=False),
+            ),
             pd.Series(
                 np.array([1111, 1112, 1113]),
                 index=pd.Index(["x2", "y2", "z2"], dtype="object", name="i2"),
@@ -4736,7 +4931,13 @@ class TestAccessors:
             ),
         )
         assert_series_equal(
-            sr2.vbt.combine(10, combine_func, 100, 1000),
+            sr2.vbt.combine(
+                10,
+                combine_func,
+                100,
+                1000,
+                broadcast_kwargs=dict(align_index=False),
+            ),
             pd.Series(
                 np.array([1111, 1112, 1113]),
                 index=pd.Index(["x2", "y2", "z2"], dtype="object", name="i2"),
@@ -4749,7 +4950,12 @@ class TestAccessors:
             return x + y + np.array([[1], [2], [3]])
 
         assert_series_equal(
-            sr2.vbt.combine(10, combine_func2_nb, to_2d=True),
+            sr2.vbt.combine(
+                10,
+                combine_func2_nb,
+                to_2d=True,
+                broadcast_kwargs=dict(align_index=False),
+            ),
             pd.Series(np.array([12, 14, 16]), index=pd.Index(["x2", "y2", "z2"], dtype="object", name="i2"), name="a2"),
         )
 
@@ -4758,7 +4964,11 @@ class TestAccessors:
             return x + y
 
         assert_frame_equal(
-            df4.vbt.combine(sr2, combine_func3_nb),
+            df4.vbt.combine(
+                sr2,
+                combine_func3_nb,
+                broadcast_kwargs=dict(align_index=False),
+            ),
             pd.DataFrame(
                 np.array([[2, 3, 4], [6, 7, 8], [10, 11, 12]]),
                 index=pd.MultiIndex.from_tuples([("x6", "x2"), ("y6", "y2"), ("z6", "z2")], names=["i6", "i2"]),
@@ -4766,8 +4976,16 @@ class TestAccessors:
             ),
         )
         assert_frame_equal(
-            pd.DataFrame.vbt.combine([df4, sr2], combine_func3_nb),
-            df4.vbt.combine(sr2, combine_func3_nb),
+            pd.DataFrame.vbt.combine(
+                [df4, sr2],
+                combine_func3_nb,
+                broadcast_kwargs=dict(align_index=False),
+            ),
+            df4.vbt.combine(
+                sr2,
+                combine_func3_nb,
+                broadcast_kwargs=dict(align_index=False),
+            ),
         )
 
         target = pd.DataFrame(
@@ -4775,13 +4993,38 @@ class TestAccessors:
             index=pd.MultiIndex.from_tuples([("x2", "x6"), ("y2", "y6"), ("z2", "z6")], names=["i2", "i6"]),
             columns=pd.Index(["a6", "b6", "c6"], dtype="object", name="c6"),
         )
-        assert_frame_equal(sr2.vbt.combine([10, df4], combine_func, 10, b=100, concat=False), target)
         assert_frame_equal(
-            sr2.vbt.combine([10, df4], combine_func_nb, 10, 100, jitted_loop=True, concat=False),
+            sr2.vbt.combine(
+                [10, df4],
+                combine_func,
+                10,
+                b=100,
+                concat=False,
+                broadcast_kwargs=dict(align_index=False),
+            ),
             target,
         )
         assert_frame_equal(
-            df4.vbt.combine([10, sr2], combine_func, 10, b=100, concat=False),
+            sr2.vbt.combine(
+                [10, df4],
+                combine_func_nb,
+                10,
+                100,
+                jitted_loop=True,
+                concat=False,
+                broadcast_kwargs=dict(align_index=False),
+            ),
+            target,
+        )
+        assert_frame_equal(
+            df4.vbt.combine(
+                [10, sr2],
+                combine_func,
+                10,
+                b=100,
+                concat=False,
+                broadcast_kwargs=dict(align_index=False),
+            ),
             pd.DataFrame(
                 target.values,
                 index=pd.MultiIndex.from_tuples([("x6", "x2"), ("y6", "y2"), ("z6", "z2")], names=["i6", "i2"]),
@@ -4796,13 +5039,39 @@ class TestAccessors:
                 names=["combine_idx", "c6"],
             ),
         )
-        assert_frame_equal(sr2.vbt.combine([10, df4], combine_func, 10, b=100, concat=True), target2)
         assert_frame_equal(
-            sr2.vbt.combine([10, df4], combine_func_nb, 10, 100, jitted_loop=True, concat=True),
+            sr2.vbt.combine(
+                [10, df4],
+                combine_func,
+                10,
+                b=100,
+                concat=True,
+                broadcast_kwargs=dict(align_index=False),
+            ),
             target2,
         )
         assert_frame_equal(
-            sr2.vbt.combine([10, df4], lambda x, y, a, b=1: x + y + a + b, 10, b=100, concat=True, keys=["a", "b"]),
+            sr2.vbt.combine(
+                [10, df4],
+                combine_func_nb,
+                10,
+                100,
+                jitted_loop=True,
+                concat=True,
+                broadcast_kwargs=dict(align_index=False),
+            ),
+            target2,
+        )
+        assert_frame_equal(
+            sr2.vbt.combine(
+                [10, df4],
+                lambda x, y, a, b=1: x + y + a + b,
+                10,
+                b=100,
+                concat=True,
+                keys=["a", "b"],
+                broadcast_kwargs=dict(align_index=False),
+            ),
             pd.DataFrame(
                 target2.values,
                 index=target2.index,
@@ -4822,6 +5091,7 @@ class TestAccessors:
                 concat=True,
                 keys=["a", "b"],
                 broadcast_named_args=dict(y=df4),
+                broadcast_kwargs=dict(align_index=False),
             ),
             pd.DataFrame(
                 np.array(

@@ -338,7 +338,7 @@ ${config_doc}
 _settings["configured"] = configured
 
 broadcasting = ChildDict(
-    align_index=False,
+    align_index=True,
     align_columns=True,
     index_from="strict",
     columns_from="stack",

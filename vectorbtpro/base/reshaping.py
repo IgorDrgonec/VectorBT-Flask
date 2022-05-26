@@ -406,35 +406,59 @@ def wrap_broadcasted(
 
 
 def align_pd_arrays(
-    args: tp.Iterable[tp.ArrayLike],
+    args: tp.Iterable[tp.AnyArray],
     align_index: bool = True,
     align_columns: bool = True,
+    reindex_kwargs: tp.KwargsLikeSequence = None,
 ) -> tp.List[tp.ArrayLike]:
-    """Align Pandas arrays against common index and/or column levels using
-    `vectorbtpro.base.indexes.align_indexes`."""
+    """Align Pandas arrays against common index and/or column levels using reindexing
+    and `vectorbtpro.base.indexes.align_indexes` respectively."""
     args = list(args)
     if align_index:
-        index_to_align = []
+        indexes_to_align = []
         for i in range(len(args)):
-            if checks.is_pandas(args[i]) and len(args[i].index) > 1:
-                index_to_align.append(i)
-        if len(index_to_align) > 1:
-            indexes_ = [args[i].index for i in index_to_align]
-            if len(set(map(len, indexes_))) > 1:
-                index_indices = indexes.align_indexes(indexes_)
-                for i in index_to_align:
-                    args[i] = args[i].iloc[index_indices[index_to_align.index(i)]]
+            if checks.is_pandas(args[i]) and len(args[i].index) > 1 and not checks.is_default_index(args[i].index):
+                indexes_to_align.append(i)
+        if len(indexes_to_align) > 1:
+            new_index = None
+            index_changed = False
+            for i in indexes_to_align:
+                arg_index = args[i].index
+                if new_index is None:
+                    new_index = arg_index
+                else:
+                    if not checks.is_index_equal(new_index, arg_index):
+                        if new_index.dtype != arg_index.dtype:
+                            raise ValueError("Indexes to be aligned must have the same data type")
+                        new_index = new_index.union(arg_index)
+                        index_changed = True
+            if index_changed:
+                for i in indexes_to_align:
+                    if args[i].index.has_duplicates:
+                        raise ValueError(f"Index at position {i} contains duplicates")
+                    if not args[i].index.is_monotonic_increasing:
+                        raise ValueError(f"Index at position {i} is not monotonically increasing")
+                    _reindex_kwargs = resolve_dict(reindex_kwargs, i=i)
+                    was_bool = (isinstance(args[i], pd.Series) and args[i].dtype == "bool") or (
+                        isinstance(args[i], pd.DataFrame) and (args[i].dtypes == "bool").all()
+                    )
+                    args[i] = args[i].reindex(new_index, **_reindex_kwargs)
+                    is_object = (isinstance(args[i], pd.Series) and args[i].dtype == "object") or (
+                        isinstance(args[i], pd.DataFrame) and (args[i].dtypes == "object").all()
+                    )
+                    if was_bool and is_object:
+                        args[i] = args[i].astype(None)
     if align_columns:
-        cols_to_align = []
+        columns_to_align = []
         for i in range(len(args)):
-            if checks.is_frame(args[i]) and len(args[i].columns) > 1:
-                cols_to_align.append(i)
-        if len(cols_to_align) > 1:
-            indexes_ = [args[i].columns for i in cols_to_align]
+            if checks.is_frame(args[i]) and len(args[i].columns) > 1 and not checks.is_default_index(args[i].columns):
+                columns_to_align.append(i)
+        if len(columns_to_align) > 1:
+            indexes_ = [args[i].columns for i in columns_to_align]
             if len(set(map(len, indexes_))) > 1:
                 col_indices = indexes.align_indexes(indexes_)
-                for i in cols_to_align:
-                    args[i] = args[i].iloc[:, col_indices[cols_to_align.index(i)]]
+                for i in columns_to_align:
+                    args[i] = args[i].iloc[:, col_indices[columns_to_align.index(i)]]
     return args
 
 
@@ -463,6 +487,9 @@ class BCO:
 
     require_kwargs: tp.Optional[tp.Kwargs] = attr.ib(default=None)
     """Keyword arguments passed to `np.require`."""
+
+    reindex_kwargs: tp.Optional[tp.Kwargs] = attr.ib(default=None)
+    """Keyword arguments passed to `pd.DataFrame.reindex`."""
 
     index_to_product: tp.Optional[bool] = attr.ib(default=None)
     """Whether to set `BCO.product` to True if `BCO.value` is an index."""
@@ -553,6 +580,7 @@ def broadcast(
     min_one_dim: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
     post_func: tp.MaybeMappingSequence[tp.Optional[tp.Callable]] = None,
     require_kwargs: tp.MaybeMappingSequence[tp.Optional[tp.Kwargs]] = None,
+    reindex_kwargs: tp.MaybeMappingSequence[tp.Optional[tp.Kwargs]] = None,
     index_to_product: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
     product: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
     product_idx: tp.MaybeMappingSequence[tp.Optional[int]] = None,
@@ -581,7 +609,7 @@ def broadcast(
 
             Allows using `BCO` and `vectorbtpro.base.reshaping.Ref`.
         to_shape (tuple of int): Target shape. If set, will broadcast every object in `args` to `to_shape`.
-        align_index (bool): Whether to align index of Pandas objects using multi-index.
+        align_index (bool): Whether to align index of Pandas objects using union.
 
             Pass None to use the default.
         align_columns (bool): Whether to align columns of Pandas objects using multi-index.
@@ -606,6 +634,10 @@ def broadcast(
 
             This key will be merged with any argument-specific dict. If the mapping contains all keys in
             `np.require`, it will be applied on all objects.
+        reindex_kwargs (dict, sequence or mapping): See `BCO.reindex_kwargs`.
+
+            This key will be merged with any argument-specific dict. If the mapping contains all keys in
+            `pd.DataFrame.reindex`, it will be applied on all objects.
         index_to_product (bool, sequence or mapping): See `BCO.index_to_product`.
         product (bool, sequence or mapping): See `BCO.product`.
         product_idx (int, sequence or mapping): See `BCO.product_idx`.
@@ -925,6 +957,11 @@ def broadcast(
         require_arg_names = get_func_arg_names(np.require)
         if set(require_kwargs) <= set(require_arg_names):
             require_kwargs_per_obj = False
+    reindex_kwargs_per_obj = True
+    if reindex_kwargs is not None and checks.is_mapping(reindex_kwargs):
+        reindex_arg_names = get_func_arg_names(pd.DataFrame.reindex)
+        if set(reindex_kwargs) <= set(reindex_arg_names):
+            reindex_kwargs_per_obj = False
     if checks.is_mapping(args[0]):
         if len(args) > 1:
             raise ValueError("Only one argument is allowed when passing a mapping")
@@ -1000,6 +1037,20 @@ def broadcast(
             _require_kwargs = merge_dicts(require_kwargs[i], _require_kwargs)
         else:
             _require_kwargs = merge_dicts(require_kwargs, _require_kwargs)
+        if isinstance(obj, BCO) and obj.reindex_kwargs is not None:
+            _reindex_kwargs = obj.reindex_kwargs
+        else:
+            _reindex_kwargs = None
+        if checks.is_mapping(reindex_kwargs) and reindex_kwargs_per_obj:
+            _reindex_kwargs = merge_dicts(
+                reindex_kwargs.get("_default", None),
+                reindex_kwargs.get(k, None),
+                _reindex_kwargs,
+            )
+        elif checks.is_sequence(reindex_kwargs) and reindex_kwargs_per_obj:
+            _reindex_kwargs = merge_dicts(reindex_kwargs[i], _reindex_kwargs)
+        else:
+            _reindex_kwargs = merge_dicts(reindex_kwargs, _reindex_kwargs)
 
         _index_to_product = _resolve_arg(obj, "index_to_product", index_to_product, None)
         if _index_to_product is None:
@@ -1043,6 +1094,7 @@ def broadcast(
             min_one_dim=_min_one_dim,
             post_func=_post_func,
             require_kwargs=_require_kwargs,
+            reindex_kwargs=_reindex_kwargs,
             index_to_product=_index_to_product,
             product=_product,
             product_idx=_product_idx,
@@ -1056,6 +1108,7 @@ def broadcast(
     is_2d = False
 
     old_objs = []
+    obj_reindex_kwargs = []
     for k, bco_obj in bco_instances.items():
         if k in none_keys or k in product_keys:
             continue
@@ -1068,6 +1121,7 @@ def broadcast(
         if bco_obj.to_pd is not None and bco_obj.to_pd:
             is_pd = True
         old_objs.append(obj)
+        obj_reindex_kwargs.append(bco_obj.reindex_kwargs)
 
     if to_shape is not None:
         if isinstance(to_shape, int):
@@ -1082,7 +1136,12 @@ def broadcast(
         is_pd = to_pd or (return_wrapper and is_pd)
 
     # Align pandas arrays
-    old_objs = align_pd_arrays(old_objs, align_index=align_index, align_columns=align_columns)
+    old_objs = align_pd_arrays(
+        old_objs,
+        align_index=align_index,
+        align_columns=align_columns,
+        reindex_kwargs=obj_reindex_kwargs,
+    )
 
     # Convert all pd.Series objects to pd.DataFrame if we work on 2-dim data
     ready_objs = []
@@ -1453,7 +1512,7 @@ def broadcast_combs(
     *args: tp.ArrayLike,
     axis: int = 1,
     comb_func: tp.Callable = itertools.product,
-    broadcast_kwargs: tp.KwargsLike = None,
+    **broadcast_kwargs,
 ) -> tp.Any:
     """Align an axis of each array using a combinatoric function and broadcast their indexes.
 
