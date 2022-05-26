@@ -234,8 +234,8 @@ class BaseAccessor(Wrapping):
 
     def indexing_func(self: BaseAccessorT, *args, **kwargs) -> BaseAccessorT:
         """Perform indexing on `BaseAccessor`."""
-        new_wrapper, idx_idxs, _, col_idxs = self.wrapper.indexing_func_meta(*args, **kwargs)
-        new_obj = new_wrapper.wrap(self.to_2d_array()[idx_idxs, :][:, col_idxs], group_by=False)
+        new_wrapper, row_idxs, col_idxs, _ = self.wrapper.indexing_func_meta(*args, **kwargs)
+        new_obj = new_wrapper.wrap(self.to_2d_array()[row_idxs, :][:, col_idxs], group_by=False)
         if checks.is_series(new_obj):
             return self.replace(cls_=self.sr_accessor_cls, obj=new_obj, wrapper=new_wrapper)
         return self.replace(cls_=self.df_accessor_cls, obj=new_obj, wrapper=new_wrapper)

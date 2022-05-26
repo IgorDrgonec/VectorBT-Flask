@@ -3035,8 +3035,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     def index_obj(
         self,
         obj: tp.Any,
-        group_idxs: tp.MaybeArray,
-        col_idxs: tp.Array1d,
+        group_idxs: tp.MaybeIndexArray,
+        col_idxs: tp.MaybeIndexArray,
         obj_name: tp.Optional[str] = None,
         grouping: str = "columns_or_groups",
         obj_type: tp.Optional[str] = None,
@@ -3087,10 +3087,16 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             return to_2d_array(obj)[:, col_idxs]
 
         def _index_records(obj: tp.RecordArray) -> tp.RecordArray:
+            if isinstance(col_idxs, slice):
+                if col_idxs.start is None:
+                    return obj
+                col_idxs_arr = np.arange(col_idxs.start, col_idxs.stop, col_idxs.step)
+            else:
+                col_idxs_arr = col_idxs
             func = jit_reg.resolve_option(records_nb.col_map_nb, None)
             col_map = func(obj["col"], len(self.wrapper.columns))
             func = jit_reg.resolve_option(records_nb.record_col_map_select_nb, None)
-            return func(obj, col_map, to_1d_array(col_idxs))
+            return func(obj, col_map, to_1d_array(col_idxs_arr))
 
         is_grouped = wrapper.grouper.is_grouped(group_by=group_by)
         if obj_type is not None and obj_type == "records":
@@ -3176,8 +3182,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
     def in_outputs_indexing_func(
         self,
-        group_idxs: tp.MaybeArray,
-        col_idxs: tp.Array1d,
+        group_idxs: tp.MaybeIndexArray,
+        col_idxs: tp.MaybeIndexArray,
         **kwargs,
     ) -> tp.Optional[tp.NamedTuple]:
         """Perform indexing on `Portfolio.in_outputs`.
@@ -3229,7 +3235,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         """Perform indexing on `Portfolio`.
 
         In-outputs are indexed using `Portfolio.in_outputs_indexing_func`."""
-        new_wrapper, _, group_idxs, col_idxs = self.wrapper.indexing_func_meta(
+        new_wrapper, _, col_idxs, group_idxs = self.wrapper.indexing_func_meta(
             *args,
             column_only_select=self.column_only_select,
             group_select=self.group_select,

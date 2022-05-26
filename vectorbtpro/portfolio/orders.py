@@ -251,7 +251,7 @@ class Orders(Records):
 
     def indexing_func(self: OrdersT, *args, **kwargs) -> OrdersT:
         """Perform indexing on `Orders`."""
-        new_wrapper, new_records_arr, group_idxs, col_idxs = Records.indexing_func_meta(
+        new_wrapper, new_records_arr, col_idxs, group_idxs = Records.indexing_func_meta(
             self,
             *args,
             **kwargs,

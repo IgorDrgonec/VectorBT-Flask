@@ -1005,33 +1005,31 @@ class IndicatorBase(Analyzable):
 
     def indexing_func(self: IndicatorBaseT, *args, **kwargs) -> IndicatorBaseT:
         """Perform indexing on `IndicatorBase`."""
-        new_wrapper, idx_idxs, _, col_idxs = self.wrapper.indexing_func_meta(*args, **kwargs)
-        idx_idxs_arr = reshaping.to_1d_array(idx_idxs)
-        col_idxs_arr = reshaping.to_1d_array(col_idxs)
-        if np.array_equal(idx_idxs_arr, np.arange(self.wrapper.shape_2d[0])):
-            idx_idxs_arr = slice(None, None, None)
-        if np.array_equal(col_idxs_arr, np.arange(self.wrapper.shape_2d[1])):
-            col_idxs_arr = slice(None, None, None)
+        new_wrapper, row_idxs, col_idxs, _ = self.wrapper.indexing_func_meta(*args, **kwargs)
+        if not isinstance(row_idxs, slice):
+            row_idxs = reshaping.to_1d_array(row_idxs)
+        if not isinstance(col_idxs, slice):
+            col_idxs = reshaping.to_1d_array(col_idxs)
 
         input_mapper = getattr(self, "_input_mapper", None)
         if input_mapper is not None:
-            input_mapper = input_mapper[col_idxs_arr]
+            input_mapper = input_mapper[col_idxs]
         input_list = []
         for input_name in self.input_names:
-            input_list.append(getattr(self, f"_{input_name}")[idx_idxs_arr])
+            input_list.append(getattr(self, f"_{input_name}")[row_idxs])
         in_output_list = []
         for in_output_name in self.in_output_names:
-            in_output_list.append(getattr(self, f"_{in_output_name}")[idx_idxs_arr, :][:, col_idxs_arr])
+            in_output_list.append(getattr(self, f"_{in_output_name}")[row_idxs, :][:, col_idxs])
         output_list = []
         for output_name in self.output_names:
-            output_list.append(getattr(self, f"_{output_name}")[idx_idxs_arr, :][:, col_idxs_arr])
+            output_list.append(getattr(self, f"_{output_name}")[row_idxs, :][:, col_idxs])
         param_list = []
         for param_name in self.param_names:
             param_list.append(getattr(self, f"_{param_name}_list"))
         mapper_list = []
         for param_name in self.param_names:
             # Tuple mapper is a list because of its complex data type
-            mapper_list.append(getattr(self, f"_{param_name}_mapper")[col_idxs_arr])
+            mapper_list.append(getattr(self, f"_{param_name}_mapper")[col_idxs])
 
         return self.replace(
             wrapper=new_wrapper,

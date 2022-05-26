@@ -87,6 +87,7 @@ RecordArray = np.ndarray
 RecordArray2d = np.ndarray
 RecArray = np.recarray
 MaybeArray = Union[T, Array]
+MaybeIndexArray = Union[int, Array1d, slice]
 SeriesFrame = Union[Series, Frame]
 MaybeSeries = Union[T, Series]
 MaybeSeriesFrame = Union[T, Series, Frame]

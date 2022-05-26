@@ -218,9 +218,12 @@ def bshift_1d_nb(arr: tp.Array1d, n: int = 1, fill_value: tp.Scalar = np.nan) ->
     dtype = np.promote_types(a_dtype, fill_value_dtype)
 
     def _bshift_1d_nb(arr, n, fill_value):
-        out = np.empty_like(arr, dtype=dtype)
-        out[-n:] = fill_value
-        out[:-n] = arr[n:]
+        out = np.empty(arr.shape[0], dtype=dtype)
+        for i in range(out.shape[0]):
+            if i + n <= out.shape[0] - 1:
+                out[i] = arr[i + n]
+            else:
+                out[i] = fill_value
         return out
 
     if not nb_enabled:
@@ -279,9 +282,12 @@ def fshift_1d_nb(arr: tp.Array1d, n: int = 1, fill_value: tp.Scalar = np.nan) ->
     dtype = np.promote_types(a_dtype, fill_value_dtype)
 
     def _fshift_1d_nb(arr, n, fill_value):
-        out = np.empty_like(arr, dtype=dtype)
-        out[:n] = fill_value
-        out[n:] = arr[:-n]
+        out = np.empty(arr.shape[0], dtype=dtype)
+        for i in range(out.shape[0]):
+            if i - n >= 0:
+                out[i] = arr[i - n]
+            else:
+                out[i] = fill_value
         return out
 
     if not nb_enabled:
@@ -327,9 +333,12 @@ def diff_1d_nb(arr: tp.Array1d, n: int = 1) -> tp.Array1d:
     """Compute the 1-th discrete difference.
 
     Numba equivalent to `pd.Series(arr).diff()`."""
-    out = np.empty_like(arr, dtype=np.float_)
-    out[:n] = np.nan
-    out[n:] = arr[n:] - arr[:-n]
+    out = np.empty(arr.shape[0], dtype=np.float_)
+    for i in range(out.shape[0]):
+        if i - n >= 0:
+            out[i] = arr[i] - arr[i - n]
+        else:
+            out[i] = np.nan
     return out
 
 
@@ -352,9 +361,12 @@ def pct_change_1d_nb(arr: tp.Array1d, n: int = 1) -> tp.Array1d:
     """Compute the percentage change.
 
     Numba equivalent to `pd.Series(arr).pct_change()`."""
-    out = np.empty_like(arr, dtype=np.float_)
-    out[:n] = np.nan
-    out[n:] = arr[n:] / arr[:-n] - 1
+    out = np.empty(arr.shape[0], dtype=np.float_)
+    for i in range(out.shape[0]):
+        if i - n >= 0:
+            out[i] = (arr[i] - arr[i - n]) / arr[i - n]
+        else:
+            out[i] = np.nan
     return out
 
 

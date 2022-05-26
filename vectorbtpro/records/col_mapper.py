@@ -111,10 +111,18 @@ class ColumnMapper(Wrapping):
         # Cannot select rows
         self._column_only_select = True
 
-    def select_cols(self, col_idxs: tp.Array1d, jitted: tp.JittedOption = None) -> tp.Tuple[tp.Array1d, tp.Array1d]:
+    def select_cols(
+        self,
+        col_idxs: tp.MaybeIndexArray,
+        jitted: tp.JittedOption = None,
+    ) -> tp.Tuple[tp.Array1d, tp.Array1d]:
         """Select columns.
 
         Returns indices and new column array. Automatically decides whether to use column lengths or column map."""
+        if isinstance(col_idxs, slice):
+            if col_idxs.start is None:
+                return np.arange(len(self.col_arr)), self.col_arr
+            col_idxs = np.arange(col_idxs.start, col_idxs.stop, col_idxs.step)
         if self.is_sorted():
             func = jit_reg.resolve_option(grouping_nb.group_lens_select_nb, jitted)
             new_indices, new_col_arr = func(self.col_lens, to_1d_array(col_idxs))  # faster
@@ -125,14 +133,14 @@ class ColumnMapper(Wrapping):
 
     def indexing_func_meta(self, *args, **kwargs) -> IndexingMetaT:
         """Perform indexing on `ColumnMapper` and return metadata."""
-        new_wrapper, _, group_idxs, col_idxs = self.wrapper.indexing_func_meta(
+        new_wrapper, _, col_idxs, group_idxs = self.wrapper.indexing_func_meta(
             *args,
             column_only_select=self.column_only_select,
             group_select=self.group_select,
             **kwargs,
         )
         _, new_col_arr = self.select_cols(col_idxs)
-        return new_wrapper, new_col_arr, group_idxs, col_idxs
+        return new_wrapper, new_col_arr, col_idxs, group_idxs
 
     def indexing_func(self: ColumnMapperT, *args, **kwargs) -> ColumnMapperT:
         """Perform indexing on `ColumnMapper`."""

@@ -23,10 +23,11 @@ from vectorbtpro.utils.attr_ import AttrResolverMixin, AttrResolverMixinT
 from vectorbtpro.utils.config import Configured, merge_dicts, resolve_dict
 from vectorbtpro.utils.datetime_ import infer_index_freq, try_to_datetime_index, time_to_timedelta
 from vectorbtpro.utils.parsing import get_func_arg_names
-from vectorbtpro.utils.decorators import class_or_instancemethod
+from vectorbtpro.utils.decorators import class_or_instancemethod, cached_method
+from vectorbtpro.utils.array_ import is_range
 
 ArrayWrapperT = tp.TypeVar("ArrayWrapperT", bound="ArrayWrapper")
-IndexingMetaT = tp.Tuple[ArrayWrapperT, tp.MaybeArray, tp.MaybeArray, tp.Array1d]
+IndexingMetaT = tp.Tuple[ArrayWrapperT, tp.MaybeIndexArray, tp.MaybeIndexArray, tp.MaybeIndexArray]
 
 
 class ArrayWrapper(Configured, PandasIndexer):
@@ -557,15 +558,23 @@ class ArrayWrapper(Configured, PandasIndexer):
         columns: tp.Optional[tp.IndexLike] = None,
         column_only_select: tp.Optional[bool] = None,
         group_select: tp.Optional[bool] = None,
+        return_slices: bool = True,
+        return_none_slices: bool = True,
         group_by: tp.GroupByLike = None,
     ) -> IndexingMetaT:
         """Perform indexing on `ArrayWrapper` and also return metadata.
 
         Takes into account column grouping.
 
-        Set `column_only_select` to True to index the array wrapper as a Series of columns.
+        Set `column_only_select` to True to index the array wrapper as a Series of columns/groups.
         This way, selection of index (axis 0) can be avoided. Set `group_select` to True
-        to allow selection of groups. Takes effect only if grouping is enabled.
+        to allow selection of groups. Otherwise, indexing is performed on columns, even if grouping
+        is enabled. Takes effect only if grouping is enabled.
+
+        Returns the new array wrapper, row indices, column indices, and group indices.
+        If `return_slices` is True (default), indices will be returned as a slice if they were
+        identified as a range. If `return_none_slices` is True (default), indices will be returned as a slice
+        `(None, None, None)` if the axis hasn't been changed.
 
         !!! note
             If `column_only_select` is True, make sure to index the array wrapper
@@ -584,7 +593,7 @@ class ArrayWrapper(Configured, PandasIndexer):
             index = pd.Index(index)
         if columns is None:
             if group_select:
-                columns = _self.grouper.get_index()
+                columns = _self.get_columns()
             else:
                 columns = _self.columns
         if not isinstance(columns, pd.Index):
@@ -597,6 +606,13 @@ class ArrayWrapper(Configured, PandasIndexer):
             i_wrapper = ArrayWrapper(index, columns, _self.ndim)
         n_rows = len(index)
         n_cols = len(columns)
+
+        def _resolve_arr(arr: tp.MaybeArray, n: int) -> tp.Union[tp.MaybeArray, slice]:
+            if return_slices and checks.is_np_array(arr) and is_range(arr):
+                if return_none_slices and arr[0] == 0 and arr[-1] == n - 1:
+                    return slice(None, None, None)
+                return slice(arr[0], arr[-1] + 1, 1)
+            return arr
 
         if column_only_select:
             if i_wrapper.ndim == 1:
@@ -618,7 +634,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                 col_idxs = col_mapper
                 new_ndim = 1
             new_index = index
-            idx_idxs = np.arange(len(index))
+            row_idxs = np.arange(len(index))
         else:
             idx_mapper = pd_indexing_func(
                 i_wrapper.wrap(
@@ -630,14 +646,14 @@ class ArrayWrapper(Configured, PandasIndexer):
             if i_wrapper.ndim == 1:
                 if not checks.is_series(idx_mapper):
                     raise IndexingError("Selection of a scalar is not allowed")
-                idx_idxs = idx_mapper.values
+                row_idxs = idx_mapper.values
                 col_idxs = 0
             else:
                 col_mapper = pd_indexing_func(
                     i_wrapper.wrap(np.broadcast_to(np.arange(n_cols), (n_rows, n_cols)), index=index, columns=columns),
                 )
                 if checks.is_frame(idx_mapper):
-                    idx_idxs = idx_mapper.values[:, 0]
+                    row_idxs = idx_mapper.values[:, 0]
                     col_idxs = col_mapper.values[0]
                 elif checks.is_series(idx_mapper):
                     one_col = np.all(col_mapper.values == col_mapper.values.item(0))
@@ -647,20 +663,20 @@ class ArrayWrapper(Configured, PandasIndexer):
                         raise IndexingError("Must select at least two unique indices in one of both axes")
                     elif one_col:
                         # One column selected
-                        idx_idxs = idx_mapper.values
+                        row_idxs = idx_mapper.values
                         col_idxs = col_mapper.values[0]
                     elif one_idx:
                         # One index selected
-                        idx_idxs = idx_mapper.values[0]
+                        row_idxs = idx_mapper.values[0]
                         col_idxs = col_mapper.values
                     else:
                         raise IndexingError
                 else:
                     raise IndexingError("Selection of a scalar is not allowed")
             new_index = indexes.get_index(idx_mapper, 0)
-            if not isinstance(idx_idxs, np.ndarray):
+            if not isinstance(row_idxs, np.ndarray):
                 # One index selected
-                new_columns = index[[idx_idxs]]
+                new_columns = index[[row_idxs]]
             elif not isinstance(col_idxs, np.ndarray):
                 # One column selected
                 new_columns = columns[[col_idxs]]
@@ -670,18 +686,18 @@ class ArrayWrapper(Configured, PandasIndexer):
 
         if _self.grouper.is_grouped():
             # Grouping enabled
-            if np.asarray(idx_idxs).ndim == 0:
+            if np.asarray(row_idxs).ndim == 0:
                 raise IndexingError("Flipping index and columns is not allowed")
 
             if group_select:
                 # Selection based on groups
                 # Get indices of columns corresponding to selected groups
                 group_idxs = col_idxs
-                new_group_idxs, new_groups = _self.grouper.select_groups(group_idxs)
-                ungrouped_columns = _self.columns[new_group_idxs]
+                col_idxs, new_groups = _self.grouper.select_groups(group_idxs)
+                ungrouped_columns = _self.columns[col_idxs]
                 if new_ndim == 1 and len(ungrouped_columns) == 1:
                     ungrouped_ndim = 1
-                    new_group_idxs = new_group_idxs[0]
+                    col_idxs = col_idxs[0]
                 else:
                     ungrouped_ndim = 2
 
@@ -693,32 +709,32 @@ class ArrayWrapper(Configured, PandasIndexer):
                         grouped_ndim=new_ndim,
                         group_by=new_columns[new_groups],
                     ),
-                    idx_idxs,
-                    group_idxs,
-                    new_group_idxs,
+                    _resolve_arr(row_idxs, _self.shape[0]),
+                    _resolve_arr(col_idxs, _self.shape_2d[1]),
+                    _resolve_arr(group_idxs, _self.get_shape_2d()[1]),
                 )
 
             # Selection based on columns
-            col_idxs_arr = reshaping.to_1d_array(col_idxs)
+            group_idxs = _self.grouper.get_groups()[col_idxs]
             return (
                 _self.replace(
                     index=new_index,
                     columns=new_columns,
                     ndim=new_ndim,
                     grouped_ndim=None,
-                    group_by=_self.grouper.group_by[col_idxs_arr],
+                    group_by=_self.grouper.group_by[reshaping.to_1d_array(col_idxs)],
                 ),
-                idx_idxs,
-                col_idxs,
-                col_idxs,
+                _resolve_arr(row_idxs, _self.shape[0]),
+                _resolve_arr(col_idxs, _self.shape_2d[1]),
+                _resolve_arr(group_idxs, _self.get_shape_2d()[1]),
             )
 
         # Grouping disabled
         return (
             _self.replace(index=new_index, columns=new_columns, ndim=new_ndim, grouped_ndim=None, group_by=None),
-            idx_idxs,
-            col_idxs,
-            col_idxs,
+            _resolve_arr(row_idxs, _self.shape[0]),
+            _resolve_arr(col_idxs, _self.shape_2d[1]),
+            _resolve_arr(col_idxs, _self.shape_2d[1]),
         )
 
     def indexing_func(self: ArrayWrapperT, *args, **kwargs) -> ArrayWrapperT:
@@ -903,6 +919,7 @@ class ArrayWrapper(Configured, PandasIndexer):
             return self.ndim
         return self._grouped_ndim
 
+    @cached_method(whitelist=True)
     def regroup(self: ArrayWrapperT, group_by: tp.GroupByLike, **kwargs) -> ArrayWrapperT:
         """Regroup this object.
 
@@ -914,8 +931,11 @@ class ArrayWrapper(Configured, PandasIndexer):
                 if not self.grouper.is_group_count_changed(group_by=group_by):
                     grouped_ndim = self.grouped_ndim
             return self.replace(grouped_ndim=grouped_ndim, group_by=group_by, **kwargs)
+        if len(kwargs) > 0:
+            return self.replace(**kwargs)
         return self  # important for keeping cache
 
+    @cached_method(whitelist=True)
     def resolve(self: ArrayWrapperT, group_by: tp.GroupByLike = None, **kwargs) -> ArrayWrapperT:
         """Resolve this object.
 

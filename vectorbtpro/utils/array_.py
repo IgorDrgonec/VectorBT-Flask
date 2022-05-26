@@ -8,16 +8,30 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.registries.jit_registry import register_jitted
 
 
-def is_sorted(a: tp.Array1d) -> np.bool_:
+def is_sorted(arr: tp.Array1d) -> bool:
     """Checks if array is sorted."""
-    return np.all(a[:-1] <= a[1:])
+    return np.all(arr[:-1] <= arr[1:])
 
 
 @register_jitted(cache=True)
-def is_sorted_nb(a: tp.Array1d) -> bool:
+def is_sorted_nb(arr: tp.Array1d) -> bool:
     """Numba-compiled version of `is_sorted`."""
-    for i in range(a.size - 1):
-        if a[i + 1] < a[i]:
+    for i in range(arr.size - 1):
+        if arr[i + 1] < arr[i]:
+            return False
+    return True
+
+
+def is_range(arr: tp.Array1d) -> bool:
+    """Checks if array is arr range."""
+    return np.all(arr == np.arange(arr[0], arr[0] + len(arr)))
+
+
+@register_jitted(cache=True)
+def is_range_nb(arr: tp.Array1d) -> bool:
+    """Numba-compiled version of `is_range`."""
+    for i in range(arr.size):
+        if arr[i] != arr[0] + i:
             return False
     return True
 
@@ -73,34 +87,34 @@ def uniform_summing_to_one_nb(n: int) -> tp.Array1d:
 
 
 def renormalize(
-    a: tp.MaybeArray[float],
+    arr: tp.MaybeArray[float],
     from_range: tp.Tuple[float, float],
     to_range: tp.Tuple[float, float],
 ) -> tp.MaybeArray[float]:
-    """Renormalize `a` from one range to another."""
+    """Renormalize `arr` from one range to another."""
     from_delta = from_range[1] - from_range[0]
     to_delta = to_range[1] - to_range[0]
-    return (to_delta * (a - from_range[0]) / from_delta) + to_range[0]
+    return (to_delta * (arr - from_range[0]) / from_delta) + to_range[0]
 
 
 @register_jitted(cache=True)
 def renormalize_nb(
-    a: tp.MaybeArray[float],
+    arr: tp.MaybeArray[float],
     from_range: tp.Tuple[float, float],
     to_range: tp.Tuple[float, float],
 ) -> tp.MaybeArray[float]:
     """Numba-compiled version of `renormalize`."""
     from_delta = from_range[1] - from_range[0]
     to_delta = to_range[1] - to_range[0]
-    return (to_delta * (a - from_range[0]) / from_delta) + to_range[0]
+    return (to_delta * (arr - from_range[0]) / from_delta) + to_range[0]
 
 
-def min_rel_rescale(a: tp.Array, to_range: tp.Tuple[float, float]) -> tp.Array:
-    """Rescale elements in `a` relatively to minimum."""
-    a_min = np.min(a)
-    a_max = np.max(a)
+def min_rel_rescale(arr: tp.Array, to_range: tp.Tuple[float, float]) -> tp.Array:
+    """Rescale elements in `arr` relatively to minimum."""
+    a_min = np.min(arr)
+    a_max = np.max(arr)
     if a_max - a_min == 0:
-        return np.full(a.shape, to_range[0])
+        return np.full(arr.shape, to_range[0])
     from_range = (a_min, a_max)
 
     from_range_ratio = np.inf
@@ -110,15 +124,15 @@ def min_rel_rescale(a: tp.Array, to_range: tp.Tuple[float, float]) -> tp.Array:
     to_range_ratio = to_range[1] / to_range[0]
     if from_range_ratio < to_range_ratio:
         to_range = (to_range[0], to_range[0] * from_range_ratio)
-    return renormalize(a, from_range, to_range)
+    return renormalize(arr, from_range, to_range)
 
 
-def max_rel_rescale(a: tp.Array, to_range: tp.Tuple[float, float]) -> tp.Array:
-    """Rescale elements in `a` relatively to maximum."""
-    a_min = np.min(a)
-    a_max = np.max(a)
+def max_rel_rescale(arr: tp.Array, to_range: tp.Tuple[float, float]) -> tp.Array:
+    """Rescale elements in `arr` relatively to maximum."""
+    a_min = np.min(arr)
+    a_max = np.max(arr)
     if a_max - a_min == 0:
-        return np.full(a.shape, to_range[1])
+        return np.full(arr.shape, to_range[1])
     from_range = (a_min, a_max)
 
     from_range_ratio = np.inf
@@ -128,7 +142,7 @@ def max_rel_rescale(a: tp.Array, to_range: tp.Tuple[float, float]) -> tp.Array:
     to_range_ratio = to_range[1] / to_range[0]
     if from_range_ratio < to_range_ratio:
         to_range = (to_range[1] / from_range_ratio, to_range[1])
-    return renormalize(a, from_range, to_range)
+    return renormalize(arr, from_range, to_range)
 
 
 @register_jitted(cache=True)

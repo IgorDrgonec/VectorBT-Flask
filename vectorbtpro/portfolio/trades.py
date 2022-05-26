@@ -690,7 +690,7 @@ class Trades(Ranges):
 
     def indexing_func(self: TradesT, *args, **kwargs) -> TradesT:
         """Perform indexing on `Trades`."""
-        new_wrapper, new_records_arr, group_idxs, col_idxs = Ranges.indexing_func_meta(self, *args, **kwargs)
+        new_wrapper, new_records_arr, col_idxs, group_idxs = Ranges.indexing_func_meta(self, *args, **kwargs)
         if self.close is not None:
             new_close = to_2d_array(self.close)[:, col_idxs]
         else:

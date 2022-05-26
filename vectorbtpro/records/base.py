@@ -289,7 +289,7 @@ on a `Records` instance, which forwards indexing operation to each object with c
     to get the first column.
 
     Indexing behavior depends solely upon `vectorbtpro.base.wrapping.ArrayWrapper`.
-    For example, if `group_select` is enabled indexing will be performed on groups,
+    For example, if `group_select` is enabled indexing will be performed on groups when grouped,
     otherwise on single columns.
 
 ## Caching
@@ -728,12 +728,16 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
                     kwargs["col_mapper"] = None
         return Wrapping.replace(self, **kwargs)
 
-    def get_by_col_idxs(self, col_idxs: tp.Array1d, jitted: tp.JittedOption = None) -> tp.RecordArray:
+    def get_by_col_idxs(self, col_idxs: tp.MaybeIndexArray, jitted: tp.JittedOption = None) -> tp.RecordArray:
         """Get records corresponding to column indices.
 
         Returns new records array."""
         if len(self.values) == 0:
             return self.values
+        if isinstance(col_idxs, slice):
+            if col_idxs.start is None:
+                return self.values
+            col_idxs = np.arange(col_idxs.start, col_idxs.stop, col_idxs.step)
         if self.col_mapper.is_sorted():
             func = jit_reg.resolve_option(nb.record_col_lens_select_nb, jitted)
             new_records_arr = func(self.values, self.col_mapper.col_lens, to_1d_array(col_idxs))  # faster
@@ -744,7 +748,7 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
 
     def indexing_func_meta(self, *args, **kwargs) -> IndexingMetaT:
         """Perform indexing on `Records` and return metadata."""
-        new_wrapper, _, group_idxs, col_idxs = self.wrapper.indexing_func_meta(
+        new_wrapper, _, col_idxs, group_idxs = self.wrapper.indexing_func_meta(
             *args,
             column_only_select=self.column_only_select,
             group_select=self.group_select,
@@ -754,7 +758,7 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
             new_records_arr = self.get_by_col_idxs(group_idxs)
         else:
             new_records_arr = self.get_by_col_idxs(col_idxs)
-        return new_wrapper, new_records_arr, group_idxs, col_idxs
+        return new_wrapper, new_records_arr, col_idxs, group_idxs
 
     def indexing_func(self: RecordsT, *args, **kwargs) -> RecordsT:
         """Perform indexing on `Records`."""

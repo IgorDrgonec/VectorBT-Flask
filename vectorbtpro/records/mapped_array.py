@@ -714,7 +714,7 @@ class MappedArray(Analyzable):
 
     def indexing_func_meta(self, *args, **kwargs) -> IndexingMetaT:
         """Perform indexing on `MappedArray` and return metadata."""
-        new_wrapper, _, group_idxs, col_idxs = self.wrapper.indexing_func_meta(
+        new_wrapper, _, col_idxs, group_idxs = self.wrapper.indexing_func_meta(
             *args,
             column_only_select=self.column_only_select,
             group_select=self.group_select,
@@ -727,7 +727,7 @@ class MappedArray(Analyzable):
             new_idx_arr = self.idx_arr[new_indices]
         else:
             new_idx_arr = None
-        return new_wrapper, new_mapped_arr, new_col_arr, new_id_arr, new_idx_arr, group_idxs, col_idxs
+        return new_wrapper, new_mapped_arr, new_col_arr, new_id_arr, new_idx_arr, col_idxs, group_idxs
 
     def indexing_func(self: MappedArrayT, *args, **kwargs) -> MappedArrayT:
         """Perform indexing on `MappedArray`."""

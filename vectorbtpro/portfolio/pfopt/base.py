@@ -870,7 +870,7 @@ class PortfolioOptimizer(Analyzable):
         **kwargs,
     ) -> PortfolioOptimizerT:
         """Perform indexing on `PortfolioOptimizer`."""
-        new_wrapper, _, group_idxs, _ = self._wrapper.indexing_func_meta(pd_indexing_func, **kwargs)
+        new_wrapper, _, _, group_idxs = self._wrapper.indexing_func_meta(pd_indexing_func, **kwargs)
         new_alloc_records = self._alloc_records.indexing_func(pd_indexing_func, **kwargs)
         new_indices, _ = self._alloc_records.col_mapper.select_cols(group_idxs)
         new_allocations = to_2d_array(self._allocations)[new_indices]

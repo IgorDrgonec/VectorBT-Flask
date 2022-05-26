@@ -304,7 +304,7 @@ class Ranges(Records):
 
     def indexing_func(self: RangesT, *args, **kwargs) -> RangesT:
         """Perform indexing on `Ranges`."""
-        new_wrapper, new_records_arr, _, col_idxs = Records.indexing_func_meta(self, *args, **kwargs)
+        new_wrapper, new_records_arr, col_idxs, _ = Records.indexing_func_meta(self, *args, **kwargs)
         if self.ts is not None:
             new_ts = to_2d_array(self.ts)[:, col_idxs]
         else:

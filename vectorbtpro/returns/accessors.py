@@ -282,10 +282,10 @@ class ReturnsAccessor(GenericAccessor):
 
     def indexing_func(self: ReturnsAccessorT, *args, **kwargs) -> ReturnsAccessorT:
         """Perform indexing on `ReturnsAccessor`."""
-        new_wrapper, idx_idxs, _, col_idxs = self.wrapper.indexing_func_meta(*args, **kwargs)
-        new_obj = new_wrapper.wrap(self.to_2d_array()[idx_idxs, :][:, col_idxs], group_by=False)
+        new_wrapper, row_idxs, col_idxs, _ = self.wrapper.indexing_func_meta(*args, **kwargs)
+        new_obj = new_wrapper.wrap(self.to_2d_array()[row_idxs, :][:, col_idxs], group_by=False)
         if self.bm_returns is not None:
-            new_bm_returns = new_wrapper.wrap(to_2d_array(self.bm_returns)[idx_idxs, :][:, col_idxs], group_by=False)
+            new_bm_returns = new_wrapper.wrap(to_2d_array(self.bm_returns)[row_idxs, :][:, col_idxs], group_by=False)
         else:
             new_bm_returns = None
         if checks.is_series(new_obj):

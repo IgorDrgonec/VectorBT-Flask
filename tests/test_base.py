@@ -620,6 +620,9 @@ df4_grouped_wrapper = df4_wrapper.replace(group_by=np.array(["g1", "g1", "g2"]),
 sr2_grouped_wrapper_co = sr2_grouped_wrapper.replace(column_only_select=True, group_select=True)
 df4_grouped_wrapper_co = df4_grouped_wrapper.replace(column_only_select=True, group_select=True)
 
+sr2_grouped_wrapper_conog = sr2_grouped_wrapper.replace(column_only_select=True, group_select=False)
+df4_grouped_wrapper_conog = df4_grouped_wrapper.replace(column_only_select=True, group_select=False)
+
 
 class TestArrayWrapper:
     def test_row_stack(self):
@@ -1166,25 +1169,33 @@ class TestArrayWrapper:
     def test_indexing_func_meta(self):
         # not grouped
         a, b, c = sr2_wrapper.indexing_func_meta(lambda x: x.iloc[:2])[1:]
-        np.testing.assert_array_equal(a, np.array([0, 1]))
+        assert a == slice(0, 2, 1)
         assert b == 0
         assert c == 0
         a, b, c = df4_wrapper.indexing_func_meta(lambda x: x.iloc[0, :2])[1:]
         assert a == 0
-        np.testing.assert_array_equal(b, np.array([0, 1]))
-        np.testing.assert_array_equal(c, np.array([0, 1]))
+        assert b == slice(0, 2, 1)
+        assert c == slice(0, 2, 1)
         a, b, c = df4_wrapper.indexing_func_meta(lambda x: x.iloc[:2, 0])[1:]
-        np.testing.assert_array_equal(a, np.array([0, 1]))
+        assert a == slice(0, 2, 1)
         assert b == 0
         assert c == 0
         a, b, c = df4_wrapper.indexing_func_meta(lambda x: x.iloc[:2, [0]])[1:]
-        np.testing.assert_array_equal(a, np.array([0, 1]))
-        np.testing.assert_array_equal(b, np.array([0]))
-        np.testing.assert_array_equal(c, np.array([0]))
+        assert a == slice(0, 2, 1)
+        assert b == slice(0, 1, 1)
+        assert c == slice(0, 1, 1)
         a, b, c = df4_wrapper.indexing_func_meta(lambda x: x.iloc[:2, :2])[1:]
-        np.testing.assert_array_equal(a, np.array([0, 1]))
-        np.testing.assert_array_equal(b, np.array([0, 1]))
-        np.testing.assert_array_equal(c, np.array([0, 1]))
+        assert a == slice(0, 2, 1)
+        assert b == slice(0, 2, 1)
+        assert c == slice(0, 2, 1)
+        a, b, c = df4_wrapper.indexing_func_meta(lambda x: x.iloc[[0, 2], [0, 2]])[1:]
+        np.testing.assert_array_equal(a, np.array([0, 2]))
+        np.testing.assert_array_equal(b, np.array([0, 2]))
+        np.testing.assert_array_equal(c, np.array([0, 2]))
+        a, b, c = df4_wrapper.indexing_func_meta(lambda x: x.iloc[[0, 0], [0, 0]])[1:]
+        np.testing.assert_array_equal(a, np.array([0, 0]))
+        np.testing.assert_array_equal(b, np.array([0, 0]))
+        np.testing.assert_array_equal(c, np.array([0, 0]))
         with pytest.raises(Exception):
             df4_wrapper.indexing_func_meta(lambda x: x.iloc[0, 0])[1:]
         with pytest.raises(Exception):
@@ -1192,17 +1203,25 @@ class TestArrayWrapper:
 
         # not grouped, column only
         a, b, c = df4_wrapper_co.indexing_func_meta(lambda x: x.iloc[0])[1:]
-        np.testing.assert_array_equal(a, np.array([0, 1, 2]))
+        assert a == slice(None, None, None)
         assert b == 0
         assert c == 0
         a, b, c = df4_wrapper_co.indexing_func_meta(lambda x: x.iloc[[0]])[1:]
-        np.testing.assert_array_equal(a, np.array([0, 1, 2]))
-        np.testing.assert_array_equal(b, np.array([0]))
-        np.testing.assert_array_equal(c, np.array([0]))
+        assert a == slice(None, None, None)
+        assert b == slice(0, 1, 1)
+        assert c == slice(0, 1, 1)
         a, b, c = df4_wrapper_co.indexing_func_meta(lambda x: x.iloc[:2])[1:]
-        np.testing.assert_array_equal(a, np.array([0, 1, 2]))
-        np.testing.assert_array_equal(b, np.array([0, 1]))
-        np.testing.assert_array_equal(c, np.array([0, 1]))
+        assert a == slice(None, None, None)
+        assert b == slice(0, 2, 1)
+        assert c == slice(0, 2, 1)
+        a, b, c = df4_wrapper_co.indexing_func_meta(lambda x: x.iloc[[0, 2]])[1:]
+        assert a == slice(None, None, None)
+        np.testing.assert_array_equal(b, np.array([0, 2]))
+        np.testing.assert_array_equal(c, np.array([0, 2]))
+        a, b, c = df4_wrapper_co.indexing_func_meta(lambda x: x.iloc[[0, 0]])[1:]
+        assert a == slice(None, None, None)
+        np.testing.assert_array_equal(b, np.array([0, 0]))
+        np.testing.assert_array_equal(c, np.array([0, 0]))
         with pytest.raises(Exception):
             sr2_wrapper_co.indexing_func_meta(lambda x: x.iloc[:2])[1:]
         with pytest.raises(Exception):
@@ -1210,45 +1229,87 @@ class TestArrayWrapper:
 
         # grouped
         a, b, c = sr2_grouped_wrapper.indexing_func_meta(lambda x: x.iloc[:2])[1:]
-        np.testing.assert_array_equal(a, np.array([0, 1]))
+        assert a == slice(0, 2, 1)
         assert b == 0
         assert c == 0
         a, b, c = df4_grouped_wrapper.indexing_func_meta(lambda x: x.iloc[:2, 0])[1:]
-        np.testing.assert_array_equal(a, np.array([0, 1]))
-        assert b == 0
-        np.testing.assert_array_equal(c, np.array([0, 1]))
+        assert a == slice(0, 2, 1)
+        assert b == slice(0, 2, 1)
+        assert c == 0
         a, b, c = df4_grouped_wrapper.indexing_func_meta(lambda x: x.iloc[:2, 1])[1:]
-        np.testing.assert_array_equal(a, np.array([0, 1]))
-        assert b == 1
-        assert c == 2
+        assert a == slice(0, 2, 1)
+        assert b == 2
+        assert c == 1
         a, b, c = df4_grouped_wrapper.indexing_func_meta(lambda x: x.iloc[:2, [1]])[1:]
-        np.testing.assert_array_equal(a, np.array([0, 1]))
-        np.testing.assert_array_equal(b, np.array([1]))
-        np.testing.assert_array_equal(c, np.array([2]))
+        assert a == slice(0, 2, 1)
+        assert b == slice(2, 3, 1)
+        assert c == slice(1, 2, 1)
         a, b, c = df4_grouped_wrapper.indexing_func_meta(lambda x: x.iloc[:2, :2])[1:]
-        np.testing.assert_array_equal(a, np.array([0, 1]))
-        np.testing.assert_array_equal(b, np.array([0, 1]))
-        np.testing.assert_array_equal(c, np.array([0, 1, 2]))
+        assert a == slice(0, 2, 1)
+        assert b == slice(None, None, None)
+        assert c == slice(None, None, None)
+        a, b, c = df4_grouped_wrapper.indexing_func_meta(lambda x: x.iloc[[0, 2], [0, 1]])[1:]
+        np.testing.assert_array_equal(a, np.array([0, 2]))
+        assert b == slice(None, None, None)
+        assert c == slice(None, None, None)
+        a, b, c = df4_grouped_wrapper.indexing_func_meta(lambda x: x.iloc[[0, 0], [0, 0]])[1:]
+        np.testing.assert_array_equal(a, np.array([0, 0]))
+        np.testing.assert_array_equal(b, np.array([0, 1, 0, 1]))
+        np.testing.assert_array_equal(c, np.array([0, 0]))
         with pytest.raises(Exception):
             df4_grouped_wrapper.indexing_func_meta(lambda x: x.iloc[0, :2])[1:]
 
         # grouped, column only
         a, b, c = df4_grouped_wrapper_co.indexing_func_meta(lambda x: x.iloc[0])[1:]
-        np.testing.assert_array_equal(a, np.array([0, 1, 2]))
-        assert b == 0
-        np.testing.assert_array_equal(c, np.array([0, 1]))
+        assert a == slice(None, None, None)
+        assert b == slice(0, 2, 1)
+        assert c == 0
         a, b, c = df4_grouped_wrapper_co.indexing_func_meta(lambda x: x.iloc[1])[1:]
-        np.testing.assert_array_equal(a, np.array([0, 1, 2]))
-        assert b == 1
-        assert c == 2
+        assert a == slice(None, None, None)
+        assert b == 2
+        assert c == 1
         a, b, c = df4_grouped_wrapper_co.indexing_func_meta(lambda x: x.iloc[[1]])[1:]
-        np.testing.assert_array_equal(a, np.array([0, 1, 2]))
-        np.testing.assert_array_equal(b, np.array([1]))
-        np.testing.assert_array_equal(c, np.array([2]))
+        assert a == slice(None, None, None)
+        assert b == slice(2, 3, 1)
+        assert c == slice(1, 2, 1)
         a, b, c = df4_grouped_wrapper_co.indexing_func_meta(lambda x: x.iloc[:2])[1:]
-        np.testing.assert_array_equal(a, np.array([0, 1, 2]))
-        np.testing.assert_array_equal(b, np.array([0, 1]))
-        np.testing.assert_array_equal(c, np.array([0, 1, 2]))
+        assert a == slice(None, None, None)
+        assert b == slice(None, None, None)
+        assert c == slice(None, None, None)
+        a, b, c = df4_grouped_wrapper_co.indexing_func_meta(lambda x: x.iloc[[0, 1]])[1:]
+        assert a == slice(None, None, None)
+        assert b == slice(None, None, None)
+        assert c == slice(None, None, None)
+        a, b, c = df4_grouped_wrapper_co.indexing_func_meta(lambda x: x.iloc[[0, 0]])[1:]
+        assert a == slice(None, None, None)
+        np.testing.assert_array_equal(b, np.array([0, 1, 0, 1]))
+        np.testing.assert_array_equal(c, np.array([0, 0]))
+
+        # grouped, column only, no group select
+        a, b, c = df4_grouped_wrapper_conog.indexing_func_meta(lambda x: x.iloc[0])[1:]
+        assert a == slice(None, None, None)
+        assert b == 0
+        assert c == 0
+        a, b, c = df4_grouped_wrapper_conog.indexing_func_meta(lambda x: x.iloc[1])[1:]
+        assert a == slice(None, None, None)
+        assert b == 1
+        assert c == 0
+        a, b, c = df4_grouped_wrapper_conog.indexing_func_meta(lambda x: x.iloc[[1]])[1:]
+        assert a == slice(None, None, None)
+        assert b == slice(1, 2, 1)
+        assert c == slice(0, 1, 1)
+        a, b, c = df4_grouped_wrapper_conog.indexing_func_meta(lambda x: x.iloc[:2])[1:]
+        assert a == slice(None, None, None)
+        assert b == slice(0, 2, 1)
+        np.testing.assert_array_equal(c, np.array([0, 0]))
+        a, b, c = df4_grouped_wrapper_conog.indexing_func_meta(lambda x: x.iloc[[0, 1]])[1:]
+        assert a == slice(None, None, None)
+        assert b == slice(0, 2, 1)
+        np.testing.assert_array_equal(c, np.array([0, 0]))
+        a, b, c = df4_grouped_wrapper_conog.indexing_func_meta(lambda x: x.iloc[[0, 0]])[1:]
+        assert a == slice(None, None, None)
+        np.testing.assert_array_equal(b, np.array([0, 0]))
+        np.testing.assert_array_equal(c, np.array([0, 0]))
 
     def test_indexing(self):
         # not grouped
