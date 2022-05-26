@@ -304,12 +304,16 @@ class Ranges(Records):
 
     def indexing_func(self: RangesT, *args, **kwargs) -> RangesT:
         """Perform indexing on `Ranges`."""
-        new_wrapper, new_records_arr, col_idxs, _ = Records.indexing_func_meta(self, *args, **kwargs)
+        records_meta = Records.indexing_func_meta(self, *args, **kwargs)
         if self.ts is not None:
-            new_ts = to_2d_array(self.ts)[:, col_idxs]
+            new_ts = to_2d_array(self.ts)[:, records_meta["wrapper_meta"]["col_idxs"]]
         else:
             new_ts = None
-        return self.replace(wrapper=new_wrapper, records_arr=new_records_arr, ts=new_ts)
+        return self.replace(
+            wrapper=records_meta["wrapper_meta"]["new_wrapper"],
+            records_arr=records_meta["new_records_arr"],
+            ts=new_ts
+        )
 
     def resample(
         self: RangesT,

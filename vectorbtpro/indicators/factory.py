@@ -1005,7 +1005,9 @@ class IndicatorBase(Analyzable):
 
     def indexing_func(self: IndicatorBaseT, *args, **kwargs) -> IndicatorBaseT:
         """Perform indexing on `IndicatorBase`."""
-        new_wrapper, row_idxs, col_idxs, _ = self.wrapper.indexing_func_meta(*args, **kwargs)
+        wrapper_meta = self.wrapper.indexing_func_meta(*args, **kwargs)
+        row_idxs = wrapper_meta["row_idxs"]
+        col_idxs = wrapper_meta["col_idxs"]
         if not isinstance(row_idxs, slice):
             row_idxs = reshaping.to_1d_array(row_idxs)
         if not isinstance(col_idxs, slice):
@@ -1032,7 +1034,7 @@ class IndicatorBase(Analyzable):
             mapper_list.append(getattr(self, f"_{param_name}_mapper")[col_idxs])
 
         return self.replace(
-            wrapper=new_wrapper,
+            wrapper=wrapper_meta["new_wrapper"],
             input_list=input_list,
             input_mapper=input_mapper,
             in_output_list=in_output_list,

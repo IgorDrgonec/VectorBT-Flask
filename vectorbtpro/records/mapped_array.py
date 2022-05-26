@@ -430,9 +430,6 @@ from vectorbtpro.utils.magic_decorators import attach_binary_magic_methods, atta
 from vectorbtpro.utils.mapping import to_mapping, apply_mapping
 
 MappedArrayT = tp.TypeVar("MappedArrayT", bound="MappedArray")
-IndexingMetaT = tp.Tuple[
-    ArrayWrapper, tp.Array1d, tp.Array1d, tp.Array1d, tp.Optional[tp.Array1d], tp.MaybeArray, tp.Array1d
-]
 
 
 def combine_mapped_with_other(
@@ -712,35 +709,39 @@ class MappedArray(Analyzable):
                     kwargs["col_mapper"] = None
         return Wrapping.replace(self, **kwargs)
 
-    def indexing_func_meta(self, *args, **kwargs) -> IndexingMetaT:
-        """Perform indexing on `MappedArray` and return metadata."""
-        new_wrapper, _, col_idxs, group_idxs = self.wrapper.indexing_func_meta(
+    def indexing_func_meta(self, *args, **kwargs) -> dict:
+        """Perform indexing on `MappedArray` and also return metadata."""
+        wrapper_meta = self.wrapper.indexing_func_meta(
             *args,
             column_only_select=self.column_only_select,
             group_select=self.group_select,
             **kwargs,
         )
-        new_indices, new_col_arr = self.col_mapper.select_cols(col_idxs)
+        new_indices, new_col_arr = self.col_mapper.select_cols(wrapper_meta["col_idxs"])
         new_mapped_arr = self.values[new_indices]
-        new_id_arr = self.id_arr[new_indices]
         if self.idx_arr is not None:
             new_idx_arr = self.idx_arr[new_indices]
         else:
             new_idx_arr = None
-        return new_wrapper, new_mapped_arr, new_col_arr, new_id_arr, new_idx_arr, col_idxs, group_idxs
+        new_id_arr = self.id_arr[new_indices]
+        return dict(
+            wrapper_meta=wrapper_meta,
+            new_indices=new_indices,
+            new_mapped_arr=new_mapped_arr,
+            new_col_arr=new_col_arr,
+            new_idx_arr=new_idx_arr,
+            new_id_arr=new_id_arr,
+        )
 
     def indexing_func(self: MappedArrayT, *args, **kwargs) -> MappedArrayT:
         """Perform indexing on `MappedArray`."""
-        new_wrapper, new_mapped_arr, new_col_arr, new_id_arr, new_idx_arr, _, _ = self.indexing_func_meta(
-            *args,
-            **kwargs,
-        )
+        mapped_meta = self.indexing_func_meta(*args, **kwargs)
         return self.replace(
-            wrapper=new_wrapper,
-            mapped_arr=new_mapped_arr,
-            col_arr=new_col_arr,
-            id_arr=new_id_arr,
-            idx_arr=new_idx_arr,
+            wrapper=mapped_meta["wrapper_meta"]["new_wrapper"],
+            mapped_arr=mapped_meta["new_mapped_arr"],
+            col_arr=mapped_meta["new_col_arr"],
+            id_arr=mapped_meta["new_id_arr"],
+            idx_arr=mapped_meta["new_idx_arr"],
         )
 
     def resample_meta(self: MappedArrayT, *args, **kwargs) -> tp.Tuple[tp.PandasResampler, ArrayWrapper, tp.Array1d]:

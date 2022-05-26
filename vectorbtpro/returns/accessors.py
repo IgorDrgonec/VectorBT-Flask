@@ -282,15 +282,31 @@ class ReturnsAccessor(GenericAccessor):
 
     def indexing_func(self: ReturnsAccessorT, *args, **kwargs) -> ReturnsAccessorT:
         """Perform indexing on `ReturnsAccessor`."""
-        new_wrapper, row_idxs, col_idxs, _ = self.wrapper.indexing_func_meta(*args, **kwargs)
-        new_obj = new_wrapper.wrap(self.to_2d_array()[row_idxs, :][:, col_idxs], group_by=False)
+        wrapper_meta = self.wrapper.indexing_func_meta(*args, **kwargs)
+        new_obj = wrapper_meta["new_wrapper"].wrap(
+            self.to_2d_array()[wrapper_meta["row_idxs"], :][:, wrapper_meta["col_idxs"]],
+            group_by=False,
+        )
         if self.bm_returns is not None:
-            new_bm_returns = new_wrapper.wrap(to_2d_array(self.bm_returns)[row_idxs, :][:, col_idxs], group_by=False)
+            new_bm_returns = wrapper_meta["new_wrapper"].wrap(
+                to_2d_array(self.bm_returns)[wrapper_meta["row_idxs"], :][:, wrapper_meta["col_idxs"]],
+                group_by=False,
+            )
         else:
             new_bm_returns = None
         if checks.is_series(new_obj):
-            return self.replace(cls_=self.sr_accessor_cls, obj=new_obj, bm_returns=new_bm_returns, wrapper=new_wrapper)
-        return self.replace(cls_=self.df_accessor_cls, obj=new_obj, bm_returns=new_bm_returns, wrapper=new_wrapper)
+            return self.replace(
+                cls_=self.sr_accessor_cls,
+                obj=new_obj,
+                bm_returns=new_bm_returns,
+                wrapper=wrapper_meta["new_wrapper"],
+            )
+        return self.replace(
+            cls_=self.df_accessor_cls,
+            obj=new_obj,
+            bm_returns=new_bm_returns,
+            wrapper=wrapper_meta["new_wrapper"],
+        )
 
     @property
     def bm_returns(self) -> tp.Optional[tp.SeriesFrame]:

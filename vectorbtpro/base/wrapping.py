@@ -27,7 +27,6 @@ from vectorbtpro.utils.decorators import class_or_instancemethod, cached_method
 from vectorbtpro.utils.array_ import is_range
 
 ArrayWrapperT = tp.TypeVar("ArrayWrapperT", bound="ArrayWrapper")
-IndexingMetaT = tp.Tuple[ArrayWrapperT, tp.MaybeIndexArray, tp.MaybeIndexArray, tp.MaybeIndexArray]
 
 
 class ArrayWrapper(Configured, PandasIndexer):
@@ -561,7 +560,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         return_slices: bool = True,
         return_none_slices: bool = True,
         group_by: tp.GroupByLike = None,
-    ) -> IndexingMetaT:
+    ) -> dict:
         """Perform indexing on `ArrayWrapper` and also return metadata.
 
         Takes into account column grouping.
@@ -611,7 +610,7 @@ class ArrayWrapper(Configured, PandasIndexer):
             if return_slices and checks.is_np_array(arr) and is_range(arr):
                 if return_none_slices and arr[0] == 0 and arr[-1] == n - 1:
                     return slice(None, None, None)
-                return slice(arr[0], arr[-1] + 1, 1)
+                return slice(arr[0], arr[-1] + 1, None)
             return arr
 
         if column_only_select:
@@ -701,45 +700,51 @@ class ArrayWrapper(Configured, PandasIndexer):
                 else:
                     ungrouped_ndim = 2
 
-                return (
-                    _self.replace(
+                return dict(
+                    new_wrapper=_self.replace(
                         index=new_index,
                         columns=ungrouped_columns,
                         ndim=ungrouped_ndim,
                         grouped_ndim=new_ndim,
                         group_by=new_columns[new_groups],
                     ),
-                    _resolve_arr(row_idxs, _self.shape[0]),
-                    _resolve_arr(col_idxs, _self.shape_2d[1]),
-                    _resolve_arr(group_idxs, _self.get_shape_2d()[1]),
+                    row_idxs=_resolve_arr(row_idxs, _self.shape[0]),
+                    col_idxs=_resolve_arr(col_idxs, _self.shape_2d[1]),
+                    group_idxs=_resolve_arr(group_idxs, _self.get_shape_2d()[1]),
                 )
 
             # Selection based on columns
             group_idxs = _self.grouper.get_groups()[col_idxs]
-            return (
-                _self.replace(
+            return dict(
+                new_wrapper=_self.replace(
                     index=new_index,
                     columns=new_columns,
                     ndim=new_ndim,
                     grouped_ndim=None,
                     group_by=_self.grouper.group_by[reshaping.to_1d_array(col_idxs)],
                 ),
-                _resolve_arr(row_idxs, _self.shape[0]),
-                _resolve_arr(col_idxs, _self.shape_2d[1]),
-                _resolve_arr(group_idxs, _self.get_shape_2d()[1]),
+                row_idxs=_resolve_arr(row_idxs, _self.shape[0]),
+                col_idxs=_resolve_arr(col_idxs, _self.shape_2d[1]),
+                group_idxs=_resolve_arr(group_idxs, _self.get_shape_2d()[1]),
             )
 
         # Grouping disabled
-        return (
-            _self.replace(index=new_index, columns=new_columns, ndim=new_ndim, grouped_ndim=None, group_by=None),
-            _resolve_arr(row_idxs, _self.shape[0]),
-            _resolve_arr(col_idxs, _self.shape_2d[1]),
-            _resolve_arr(col_idxs, _self.shape_2d[1]),
+        return dict(
+            new_wrapper=_self.replace(
+                index=new_index,
+                columns=new_columns,
+                ndim=new_ndim,
+                grouped_ndim=None,
+                group_by=None,
+            ),
+            row_idxs=_resolve_arr(row_idxs, _self.shape[0]),
+            col_idxs=_resolve_arr(col_idxs, _self.shape_2d[1]),
+            group_idxs=_resolve_arr(col_idxs, _self.shape_2d[1]),
         )
 
     def indexing_func(self: ArrayWrapperT, *args, **kwargs) -> ArrayWrapperT:
         """Perform indexing on `ArrayWrapper`"""
-        return self.indexing_func_meta(*args, **kwargs)[0]
+        return self.indexing_func_meta(*args, **kwargs)["new_wrapper"]
 
     @property
     def index(self) -> tp.Index:

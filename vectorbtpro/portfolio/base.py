@@ -3088,9 +3088,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         def _index_records(obj: tp.RecordArray) -> tp.RecordArray:
             if isinstance(col_idxs, slice):
-                if col_idxs.start is None:
+                if col_idxs.start is None and col_idxs.stop is None:
                     return obj
-                col_idxs_arr = np.arange(col_idxs.start, col_idxs.stop, col_idxs.step)
+                col_idxs_arr = np.arange(col_idxs.start, col_idxs.stop)
             else:
                 col_idxs_arr = col_idxs
             func = jit_reg.resolve_option(records_nb.col_map_nb, None)
@@ -3235,7 +3235,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         """Perform indexing on `Portfolio`.
 
         In-outputs are indexed using `Portfolio.in_outputs_indexing_func`."""
-        new_wrapper, _, col_idxs, group_idxs = self.wrapper.indexing_func_meta(
+        wrapper_meta = self.wrapper.indexing_func_meta(
             *args,
             column_only_select=self.column_only_select,
             group_select=self.group_select,
@@ -3243,47 +3243,51 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         )
         new_close = to_2d_array(self._close)
         if new_close.shape[1] > 1:
-            new_close = new_close[:, col_idxs]
-        new_order_records = self.orders.get_by_col_idxs(col_idxs)
-        new_log_records = self.logs.get_by_col_idxs(col_idxs)
+            new_close = new_close[:, wrapper_meta["col_idxs"]]
+        new_order_records = self.orders.get_by_col_idxs(wrapper_meta["col_idxs"])
+        new_log_records = self.logs.get_by_col_idxs(wrapper_meta["col_idxs"])
         if isinstance(self._init_cash, int):
             new_init_cash = self._init_cash
         else:
             new_init_cash = to_1d_array(self._init_cash)
             if new_init_cash.shape[0] > 1:
                 if self.cash_sharing:
-                    new_init_cash = new_init_cash[group_idxs]
+                    new_init_cash = new_init_cash[wrapper_meta["group_idxs"]]
                 else:
-                    new_init_cash = new_init_cash[col_idxs]
+                    new_init_cash = new_init_cash[wrapper_meta["col_idxs"]]
         new_init_position = to_1d_array(self._init_position)
         if new_init_position.shape[0] > 1:
-            new_init_position = new_init_position[col_idxs]
+            new_init_position = new_init_position[wrapper_meta["col_idxs"]]
         new_init_price = to_1d_array(self._init_price)
         if new_init_price.shape[0] > 1:
-            new_init_price = new_init_price[col_idxs]
+            new_init_price = new_init_price[wrapper_meta["col_idxs"]]
         new_cash_deposits = to_2d_array(self._cash_deposits)
         if new_cash_deposits.shape[1] > 1:
             if self.cash_sharing:
-                new_cash_deposits = new_cash_deposits[:, group_idxs]
+                new_cash_deposits = new_cash_deposits[:, wrapper_meta["group_idxs"]]
             else:
-                new_cash_deposits = new_cash_deposits[:, col_idxs]
+                new_cash_deposits = new_cash_deposits[:, wrapper_meta["col_idxs"]]
         new_cash_earnings = to_2d_array(self._cash_earnings)
         if new_cash_earnings.shape[1] > 1:
-            new_cash_earnings = new_cash_earnings[:, col_idxs]
+            new_cash_earnings = new_cash_earnings[:, wrapper_meta["col_idxs"]]
         if self._call_seq is not None:
             call_seq = to_2d_array(self._call_seq)
-            new_call_seq = call_seq[:, col_idxs]
+            new_call_seq = call_seq[:, wrapper_meta["col_idxs"]]
         else:
             new_call_seq = None
         if self._bm_close is not None and not isinstance(self._bm_close, bool):
             bm_close = to_2d_array(self._bm_close)
-            new_bm_close = bm_close[:, col_idxs]
+            new_bm_close = bm_close[:, wrapper_meta["col_idxs"]]
         else:
             new_bm_close = self._bm_close
-        new_in_outputs = self.in_outputs_indexing_func(group_idxs, col_idxs, **resolve_dict(in_output_kwargs))
+        new_in_outputs = self.in_outputs_indexing_func(
+            wrapper_meta["group_idxs"],
+            wrapper_meta["col_idxs"],
+            **resolve_dict(in_output_kwargs),
+        )
 
         return self.replace(
-            wrapper=new_wrapper,
+            wrapper=wrapper_meta["new_wrapper"],
             close=new_close,
             order_records=new_order_records,
             log_records=new_log_records,

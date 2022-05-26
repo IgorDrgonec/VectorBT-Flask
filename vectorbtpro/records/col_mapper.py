@@ -17,7 +17,6 @@ from vectorbtpro.utils.decorators import cached_property, cached_method
 
 
 ColumnMapperT = tp.TypeVar("ColumnMapperT", bound="ColumnMapper")
-IndexingMetaT = tp.Tuple[ArrayWrapper, tp.Array1d, tp.MaybeArray, tp.Array1d]
 
 
 class ColumnMapper(Wrapping):
@@ -120,9 +119,9 @@ class ColumnMapper(Wrapping):
 
         Returns indices and new column array. Automatically decides whether to use column lengths or column map."""
         if isinstance(col_idxs, slice):
-            if col_idxs.start is None:
+            if col_idxs.start is None and col_idxs.stop is None:
                 return np.arange(len(self.col_arr)), self.col_arr
-            col_idxs = np.arange(col_idxs.start, col_idxs.stop, col_idxs.step)
+            col_idxs = np.arange(col_idxs.start, col_idxs.stop)
         if self.is_sorted():
             func = jit_reg.resolve_option(grouping_nb.group_lens_select_nb, jitted)
             new_indices, new_col_arr = func(self.col_lens, to_1d_array(col_idxs))  # faster
@@ -131,21 +130,28 @@ class ColumnMapper(Wrapping):
             new_indices, new_col_arr = func(self.col_map, to_1d_array(col_idxs))  # more flexible
         return new_indices, new_col_arr
 
-    def indexing_func_meta(self, *args, **kwargs) -> IndexingMetaT:
-        """Perform indexing on `ColumnMapper` and return metadata."""
-        new_wrapper, _, col_idxs, group_idxs = self.wrapper.indexing_func_meta(
+    def indexing_func_meta(self, *args, **kwargs) -> dict:
+        """Perform indexing on `ColumnMapper` and also return metadata."""
+        wrapper_meta = self.wrapper.indexing_func_meta(
             *args,
             column_only_select=self.column_only_select,
             group_select=self.group_select,
             **kwargs,
         )
-        _, new_col_arr = self.select_cols(col_idxs)
-        return new_wrapper, new_col_arr, col_idxs, group_idxs
+        new_indices, new_col_arr = self.select_cols(wrapper_meta["col_idxs"])
+        return dict(
+            wrapper_meta=wrapper_meta,
+            new_indices=new_indices,
+            new_col_arr=new_col_arr,
+        )
 
     def indexing_func(self: ColumnMapperT, *args, **kwargs) -> ColumnMapperT:
         """Perform indexing on `ColumnMapper`."""
-        new_wrapper, new_col_arr, _, _ = self.indexing_func_meta(*args, **kwargs)
-        return self.replace(wrapper=new_wrapper, col_arr=new_col_arr)
+        col_mapper_meta = self.indexing_func_meta(*args, **kwargs)
+        return self.replace(
+            wrapper=col_mapper_meta["wrapper_meta"]["new_wrapper"],
+            col_arr=col_mapper_meta["new_col_arr"],
+        )
 
     @property
     def col_arr(self) -> tp.Array1d:

@@ -690,12 +690,16 @@ class Trades(Ranges):
 
     def indexing_func(self: TradesT, *args, **kwargs) -> TradesT:
         """Perform indexing on `Trades`."""
-        new_wrapper, new_records_arr, col_idxs, group_idxs = Ranges.indexing_func_meta(self, *args, **kwargs)
+        ranges_meta = Ranges.indexing_func_meta(self, *args, **kwargs)
         if self.close is not None:
-            new_close = to_2d_array(self.close)[:, col_idxs]
+            new_close = to_2d_array(self.close)[:, ranges_meta["wrapper_meta"]["col_idxs"]]
         else:
             new_close = None
-        return self.replace(wrapper=new_wrapper, records_arr=new_records_arr, close=new_close)
+        return self.replace(
+            wrapper=ranges_meta["wrapper_meta"]["new_wrapper"],
+            records_arr=ranges_meta["new_records_arr"],
+            close=new_close
+        )
 
     def resample(
         self: TradesT,

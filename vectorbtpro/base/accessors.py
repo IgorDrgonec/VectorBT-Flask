@@ -234,11 +234,14 @@ class BaseAccessor(Wrapping):
 
     def indexing_func(self: BaseAccessorT, *args, **kwargs) -> BaseAccessorT:
         """Perform indexing on `BaseAccessor`."""
-        new_wrapper, row_idxs, col_idxs, _ = self.wrapper.indexing_func_meta(*args, **kwargs)
-        new_obj = new_wrapper.wrap(self.to_2d_array()[row_idxs, :][:, col_idxs], group_by=False)
+        wrapper_meta = self.wrapper.indexing_func_meta(*args, **kwargs)
+        new_obj = wrapper_meta["new_wrapper"].wrap(
+            self.to_2d_array()[wrapper_meta["row_idxs"], :][:, wrapper_meta["col_idxs"]],
+            group_by=False,
+        )
         if checks.is_series(new_obj):
-            return self.replace(cls_=self.sr_accessor_cls, obj=new_obj, wrapper=new_wrapper)
-        return self.replace(cls_=self.df_accessor_cls, obj=new_obj, wrapper=new_wrapper)
+            return self.replace(cls_=self.sr_accessor_cls, obj=new_obj, wrapper=wrapper_meta["new_wrapper"])
+        return self.replace(cls_=self.df_accessor_cls, obj=new_obj, wrapper=wrapper_meta["new_wrapper"])
 
     def __init__(self, obj: tp.SeriesFrame, wrapper: tp.Optional[ArrayWrapper] = None, **kwargs) -> None:
         checks.assert_instance_of(obj, (pd.Series, pd.DataFrame))

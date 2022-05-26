@@ -251,16 +251,19 @@ class Orders(Records):
 
     def indexing_func(self: OrdersT, *args, **kwargs) -> OrdersT:
         """Perform indexing on `Orders`."""
-        new_wrapper, new_records_arr, col_idxs, group_idxs = Records.indexing_func_meta(
-            self,
-            *args,
-            **kwargs,
-        )
+        records_meta = Records.indexing_func_meta(self, *args, **kwargs)
         if self.close is not None:
-            new_close = new_wrapper.wrap(to_2d_array(self.close)[:, col_idxs], group_by=False)
+            new_close = records_meta["wrapper_meta"]["new_wrapper"].wrap(
+                to_2d_array(self.close)[:, records_meta["wrapper_meta"]["col_idxs"]],
+                group_by=False,
+            )
         else:
             new_close = None
-        return self.replace(wrapper=new_wrapper, records_arr=new_records_arr, close=new_close)
+        return self.replace(
+            wrapper=records_meta["wrapper_meta"]["new_wrapper"],
+            records_arr=records_meta["new_records_arr"],
+            close=new_close
+        )
 
     def resample(
         self: OrdersT,

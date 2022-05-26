@@ -435,7 +435,6 @@ from vectorbtpro.utils.decorators import cached_method, class_or_instancemethod
 __pdoc__ = {}
 
 RecordsT = tp.TypeVar("RecordsT", bound="Records")
-IndexingMetaT = tp.Tuple[ArrayWrapper, tp.RecordArray, tp.MaybeArray, tp.Array1d]
 
 
 class MetaFields(type):
@@ -735,9 +734,9 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
         if len(self.values) == 0:
             return self.values
         if isinstance(col_idxs, slice):
-            if col_idxs.start is None:
+            if col_idxs.start is None and col_idxs.stop is None:
                 return self.values
-            col_idxs = np.arange(col_idxs.start, col_idxs.stop, col_idxs.step)
+            col_idxs = np.arange(col_idxs.start, col_idxs.stop)
         if self.col_mapper.is_sorted():
             func = jit_reg.resolve_option(nb.record_col_lens_select_nb, jitted)
             new_records_arr = func(self.values, self.col_mapper.col_lens, to_1d_array(col_idxs))  # faster
@@ -746,24 +745,30 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
             new_records_arr = func(self.values, self.col_mapper.col_map, to_1d_array(col_idxs))  # more flexible
         return new_records_arr
 
-    def indexing_func_meta(self, *args, **kwargs) -> IndexingMetaT:
-        """Perform indexing on `Records` and return metadata."""
-        new_wrapper, _, col_idxs, group_idxs = self.wrapper.indexing_func_meta(
+    def indexing_func_meta(self, *args, **kwargs) -> dict:
+        """Perform indexing on `Records` and also return metadata."""
+        wrapper_meta = self.wrapper.indexing_func_meta(
             *args,
             column_only_select=self.column_only_select,
             group_select=self.group_select,
             **kwargs,
         )
         if self.get_field_setting("col", "group_indexing", False):
-            new_records_arr = self.get_by_col_idxs(group_idxs)
+            new_records_arr = self.get_by_col_idxs(wrapper_meta["group_idxs"])
         else:
-            new_records_arr = self.get_by_col_idxs(col_idxs)
-        return new_wrapper, new_records_arr, col_idxs, group_idxs
+            new_records_arr = self.get_by_col_idxs(wrapper_meta["col_idxs"])
+        return dict(
+            wrapper_meta=wrapper_meta,
+            new_records_arr=new_records_arr,
+        )
 
     def indexing_func(self: RecordsT, *args, **kwargs) -> RecordsT:
         """Perform indexing on `Records`."""
-        new_wrapper, new_records_arr, _, _ = self.indexing_func_meta(*args, **kwargs)
-        return self.replace(wrapper=new_wrapper, records_arr=new_records_arr)
+        records_meta = self.indexing_func_meta(*args, **kwargs)
+        return self.replace(
+            wrapper=records_meta["wrapper_meta"]["new_wrapper"],
+            records_arr=records_meta["new_records_arr"]
+        )
 
     def resample_records_arr(self, resampler: tp.Union[Resampler, tp.PandasResampler]) -> tp.RecordArray:
         """Perform resampling on the record array."""
