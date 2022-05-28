@@ -896,18 +896,19 @@ class Volume(Configured, TraceUpdater):
         # Non-numeric data types are not supported by go.Volume, so use ticktext
         # Note: Currently plotly displays the entire tick array, in future versions it will be more sensible
         more_layout = dict()
+        more_layout[scene_name] = dict()
         if not np.issubdtype(x_labels.dtype, np.number):
             x_ticktext = x_labels
             x_labels = np.arange(x_len)
-            more_layout[scene_name] = dict(xaxis=dict(ticktext=x_ticktext, tickvals=x_labels, tickmode="array"))
+            more_layout[scene_name]["xaxis"] = dict(ticktext=x_ticktext, tickvals=x_labels, tickmode="array")
         if not np.issubdtype(y_labels.dtype, np.number):
             y_ticktext = y_labels
             y_labels = np.arange(y_len)
-            more_layout[scene_name] = dict(yaxis=dict(ticktext=y_ticktext, tickvals=y_labels, tickmode="array"))
+            more_layout[scene_name]["yaxis"] = dict(ticktext=y_ticktext, tickvals=y_labels, tickmode="array")
         if not np.issubdtype(z_labels.dtype, np.number):
             z_ticktext = z_labels
             z_labels = np.arange(z_len)
-            more_layout[scene_name] = dict(zaxis=dict(ticktext=z_ticktext, tickvals=z_labels, tickmode="array"))
+            more_layout[scene_name]["zaxis"] = dict(ticktext=z_ticktext, tickvals=z_labels, tickmode="array")
         fig.update_layout(**more_layout)
         fig.update_layout(**layout_kwargs)
 
