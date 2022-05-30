@@ -270,7 +270,7 @@ class Resampler(Configured):
         before: bool = False,
         jitted: tp.JittedOption = None,
         silence_warnings: tp.Optional[bool] = None,
-    ) -> tp.Array2d:
+    ) -> tp.Tuple[tp.Array1d, tp.Array1d]:
         """See `vectorbtpro.base.resampling.nb.map_index_to_source_ranges_nb`.
 
         If `Resampler.target_freq` is a date offset, sets is to None and gives a warning.
@@ -308,7 +308,7 @@ class Resampler(Configured):
         closed_rbound: bool = False,
         skip_minus_one: bool = False,
         jitted: tp.JittedOption = None,
-    ) -> tp.Array2d:
+    ) -> tp.Tuple[tp.Array1d, tp.Array1d]:
         """See `vectorbtpro.base.resampling.nb.map_bounds_to_source_ranges_nb`.
 
         Either `target_lbound_index` or `target_rbound_index` must be set.

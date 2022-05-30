@@ -267,11 +267,15 @@ def test_execute_order_nb():
         order_result,
         OrderResult(size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=8),
     )
-    with pytest.raises(Exception):
-        nb.execute_order_nb(
-            ExecState(np.inf, 100.0, 0.0, np.inf, 10.0, 1100.0),
-            nb.order_nb(-np.inf, 10, direction=Direction.ShortOnly),
-        )
+    account_state, order_result = nb.execute_order_nb(
+        ExecState(np.inf, -100.0, 0.0, np.inf, 10.0, 1100.0),
+        nb.order_nb(-np.inf, 10, direction=Direction.ShortOnly),
+    )
+    assert account_state == ExecState(np.inf, 0.0, 0.0, np.inf, 10.0, 1100.0)
+    assert_same_tuple(
+        order_result,
+        OrderResult(size=100.0, price=10.0, fees=0.0, side=0, status=0, status_info=-1),
+    )
     with pytest.raises(Exception):
         nb.execute_order_nb(
             ExecState(np.inf, 100.0, 0.0, np.inf, 10.0, 1100.0),

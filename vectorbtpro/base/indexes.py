@@ -219,8 +219,6 @@ def rename_levels(index: tp.Index, name_dict: tp.Dict[str, tp.Any], strict: bool
 
 def select_levels(index: tp.Index, level_names: tp.MaybeLevelSequence) -> tp.Index:
     """Build a new index by selecting one or multiple `level_names` from `index`."""
-    checks.assert_instance_of(index, pd.MultiIndex)
-
     if isinstance(level_names, (int, str)):
         return index.get_level_values(level_names)
     levels = [index.get_level_values(level_name) for level_name in level_names]

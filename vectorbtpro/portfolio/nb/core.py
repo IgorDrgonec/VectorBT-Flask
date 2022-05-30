@@ -103,14 +103,14 @@ def buy_nb(
             return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.NoOpenPosition)
     if cash_limit == 0:
         return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.NoCashLong)
-    if np.isinf(size) and np.isinf(cash_limit):
-        raise ValueError("Attempt to go in long direction infinitely")
 
     # Get optimal order size
     if direction == Direction.ShortOnly:
         adj_size = min(-account_state.position, size)
     else:
         adj_size = size
+    if np.isinf(adj_size) and np.isinf(cash_limit):
+        raise ValueError("Attempt to go in long direction infinitely")
 
     if adj_size > max_size:
         if not allow_partial:

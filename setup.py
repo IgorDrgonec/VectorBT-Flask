@@ -58,7 +58,7 @@ setup(
         "python-dateutil",
         "dateparser",
         "imageio",
-        "pytz",
+        'backports.zoneinfo; python_version < "3.9"',
         'typing_extensions; python_version < "3.8"',
         "mypy_extensions",
         "humanize",

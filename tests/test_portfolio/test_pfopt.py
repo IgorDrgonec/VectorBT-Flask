@@ -925,7 +925,7 @@ class TestPortfolioOptimizer:
         )
         pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
-            lambda i, index_ranges: prices.iloc[index_ranges[i, 0]:index_ranges[i, 1]].sum(),
+            lambda i, index_ranges: prices.iloc[index_ranges[0][i]:index_ranges[1][i]].sum(),
             vbt.Rep("i"),
             every="2D",
             forward_args=["index_ranges"],
@@ -941,7 +941,7 @@ class TestPortfolioOptimizer:
         )
         pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
-            lambda i, index_ranges: prices.iloc[index_ranges[i, 0]:index_ranges[i, 1]].sum(),
+            lambda i, index_ranges: prices.iloc[index_ranges[0][i]:index_ranges[1][i]].sum(),
             vbt.Rep("i"),
             every="2D",
             forward_kwargs=["index_ranges"],

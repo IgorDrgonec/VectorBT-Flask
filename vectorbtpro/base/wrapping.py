@@ -2,13 +2,10 @@
 
 """Classes for wrapping NumPy arrays into Series/DataFrames."""
 
-import dateparser
 import warnings
-from datetime import time
 
 import numpy as np
 import pandas as pd
-from pandas.tseries.frequencies import to_offset
 from pandas.core.groupby import GroupBy as PandasGroupBy
 from pandas.core.resample import Resampler as PandasResampler
 
@@ -16,15 +13,24 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base import indexes, reshaping
 from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.base.resampling.base import Resampler
-from vectorbtpro.base.indexing import IndexingError, PandasIndexer
+from vectorbtpro.base.indexing import (
+    IndexingError,
+    PandasIndexer,
+    get_index_points,
+    get_index_ranges,
+    index_dict,
+    hslice,
+    get_indices,
+)
 from vectorbtpro.base.indexes import repeat_index, stack_indexes
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import AttrResolverMixin, AttrResolverMixinT
 from vectorbtpro.utils.config import Configured, merge_dicts, resolve_dict
-from vectorbtpro.utils.datetime_ import infer_index_freq, try_to_datetime_index, time_to_timedelta
+from vectorbtpro.utils.datetime_ import infer_index_freq, try_to_datetime_index
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.decorators import class_or_instancemethod, cached_method
 from vectorbtpro.utils.array_ import is_range
+from vectorbtpro.utils.template import CustomTemplate
 
 ArrayWrapperT = tp.TypeVar("ArrayWrapperT", bound="ArrayWrapper")
 
@@ -501,7 +507,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         self,
         index: tp.IndexLike,
         columns: tp.IndexLike,
-        ndim: int,
+        ndim: tp.Optional[int] = None,
         freq: tp.Optional[tp.FrequencyLike] = None,
         column_only_select: tp.Optional[bool] = None,
         group_select: tp.Optional[bool] = None,
@@ -512,10 +518,14 @@ class ArrayWrapper(Configured, PandasIndexer):
 
         checks.assert_not_none(index)
         checks.assert_not_none(columns)
-        checks.assert_not_none(ndim)
         index = try_to_datetime_index(index)
         if not isinstance(columns, pd.Index):
             columns = pd.Index(columns)
+        if ndim is None:
+            if len(columns) == 1 and not isinstance(columns, pd.MultiIndex):
+                ndim = 1
+            else:
+                ndim = 2
 
         grouper_arg_names = get_func_arg_names(Grouper.__init__)
         grouper_kwargs = dict()
@@ -1280,29 +1290,8 @@ class ArrayWrapper(Configured, PandasIndexer):
         _self = self.resolve(group_by=group_by)
         return _self.wrap_reduced(np.full(_self.shape_2d[1], fill_value), **kwargs)
 
-    def get_index_points(
-        self,
-        every: tp.Optional[tp.FrequencyLike] = None,
-        normalize_every: bool = False,
-        at_time: tp.Optional[tp.TimeLike] = None,
-        start: tp.Optional[tp.Union[int, tp.DatetimeLike]] = None,
-        end: tp.Optional[tp.Union[int, tp.DatetimeLike]] = None,
-        exact_start: bool = False,
-        on: tp.Optional[tp.Union[int, tp.DatetimeLike, tp.IndexLike]] = None,
-        add_delta: tp.Optional[tp.FrequencyLike] = None,
-        kind: tp.Optional[str] = None,
-        indexer_method: str = "bfill",
-        skip_minus_one: bool = True,
-    ) -> tp.Array1d:
-        """Translate indices or labels into index points.
-
-        !!! note
-            `start` and `end` are both inclusive if provided as dates or used in `pd.date_range`.
-            Otherwise, only `start` is inclusive.
-
-            If `at_time` is not None, the resulting `on` index will be floored to a daily index
-            and `at_time` will be converted to a timedelta and added to `add_delta`.
-            Also, if `every` and `on` are both None, `every` will be set to "D".
+    def get_index_points(self, *args, **kwargs) -> tp.Array1d:
+        """See `vectorbtpro.base.indexing.get_index_points`.
 
         Usage:
             * Provide nothing to generate at the beginning:
@@ -1368,168 +1357,21 @@ class ArrayWrapper(Configured, PandasIndexer):
             array([ 7, 14])
             ```
         """
-        if on is not None and isinstance(on, str):
-            try:
-                on = pd.Timestamp(on, tz=self.index.tzinfo)
-            except Exception as e:
-                on = dateparser.parse(on)
-                if self.index.tzinfo is not None:
-                    on = on.replace(tzinfo=self.index.tzinfo)
-        if start is not None and isinstance(start, str):
-            try:
-                start = pd.Timestamp(start, tz=self.index.tzinfo)
-            except Exception as e:
-                start = dateparser.parse(start)
-                if self.index.tzinfo is not None:
-                    start = start.replace(tzinfo=self.index.tzinfo)
-        if end is not None and isinstance(end, str):
-            try:
-                end = pd.Timestamp(end, tz=self.index.tzinfo)
-            except Exception as e:
-                end = dateparser.parse(end)
-                if self.index.tzinfo is not None:
-                    end = end.replace(tzinfo=self.index.tzinfo)
+        return get_index_points(self.index, *args, **kwargs)
 
-        start_used = False
-        end_used = False
-        if at_time is not None and every is None and on is None:
-            every = "D"
-        if every is not None:
-            start_used = True
-            end_used = True
-            if isinstance(every, int):
-                if start is None:
-                    start = 0
-                if end is None:
-                    end = len(self.index)
-                on = np.arange(start, end, every)
-                kind = "indices"
-            else:
-                if start is None:
-                    start = 0
-                if isinstance(start, int):
-                    start_date = self.index[start]
-                else:
-                    start_date = start
-                if end is None:
-                    end = len(self.index) - 1
-                if isinstance(end, int):
-                    end_date = self.index[end]
-                else:
-                    end_date = end
-                on = pd.date_range(
-                    start_date,
-                    end_date,
-                    freq=every,
-                    tz=self.index.tzinfo,
-                    normalize=normalize_every,
-                )
-                if exact_start and on[0] > start_date:
-                    on = on.insert(0, start_date)
-                kind = "labels"
-
-        if kind is None:
-            if on is None:
-                if start is not None:
-                    if isinstance(start, int):
-                        kind = "indices"
-                    else:
-                        kind = "labels"
-                else:
-                    kind = "indices"
-            else:
-                on = try_to_datetime_index(on)
-                if on.is_integer() and not self.index.is_integer():
-                    kind = "indices"
-                else:
-                    kind = "labels"
-        checks.assert_in(kind, ("indices", "labels"))
-        if on is None:
-            if start is not None:
-                on = start
-                start_used = True
-            else:
-                if kind.lower() in ("labels",):
-                    on = self.index[0]
-                else:
-                    on = 0
-        on = try_to_datetime_index(on)
-
-        if at_time is not None:
-            checks.assert_instance_of(on, pd.DatetimeIndex)
-            on = on.floor("D")
-            add_time_delta = time_to_timedelta(at_time)
-            if add_delta is None:
-                add_delta = add_time_delta
-            else:
-                add_delta += add_time_delta
-
-        if add_delta is not None:
-            if isinstance(add_delta, str):
-                try:
-                    add_delta = to_offset(add_delta)
-                except Exception as e:
-                    add_delta = to_offset(pd.Timedelta(add_delta))
-            on += add_delta
-
-        if kind.lower() == "labels":
-            if isinstance(on, pd.DatetimeIndex):
-                if on.tzinfo is None and self.index.tzinfo is not None:
-                    on = on.tz_localize(self.index.tzinfo)
-                elif on.tzinfo is not None and self.index.tzinfo is not None:
-                    on = on.tz_convert(self.index.tzinfo)
-            index_points = self.index.get_indexer(on, method=indexer_method)
-        else:
-            index_points = np.asarray(on)
-
-        if start is not None and not start_used:
-            if not isinstance(start, int):
-                start = self.index.get_indexer([start], method=indexer_method)[0]
-            index_points = index_points[index_points >= start]
-        if end is not None and not end_used:
-            if not isinstance(end, int):
-                end = self.index.get_indexer([end], method=indexer_method)[0]
-                index_points = index_points[index_points <= end]
-            else:
-                index_points = index_points[index_points < end]
-
-        if skip_minus_one:
-            index_points = index_points[index_points != -1]
-
-        return index_points
-
-    def get_index_ranges(
-        self,
-        every: tp.Optional[tp.FrequencyLike] = None,
-        normalize_every: bool = False,
-        split_every: bool = True,
-        start_time: tp.Optional[tp.TimeLike] = None,
-        end_time: tp.Optional[tp.TimeLike] = None,
-        lookback_period: tp.Optional[tp.FrequencyLike] = None,
-        start: tp.Optional[tp.Union[int, tp.DatetimeLike, tp.IndexLike]] = None,
-        end: tp.Optional[tp.Union[int, tp.DatetimeLike, tp.IndexLike]] = None,
-        exact_start: bool = False,
-        fixed_start: bool = False,
-        closed_start: bool = True,
-        closed_end: bool = False,
-        add_start_delta: tp.Optional[tp.FrequencyLike] = None,
-        add_end_delta: tp.Optional[tp.FrequencyLike] = None,
-        kind: tp.Optional[str] = None,
-        indexer_method: str = "bfill",
-        skip_minus_one: bool = True,
-        jitted: tp.JittedOption = None,
-    ) -> tp.Array2d:
-        """Translate indices, labels, or bounds into index ranges.
+    def get_index_ranges(self, *args, **kwargs) -> tp.Tuple[tp.Array1d, tp.Array1d]:
+        """See `vectorbtpro.base.indexing.get_index_ranges`.
 
         Usage:
             * Provide nothing to generate one largest index range:
 
             ```pycon
             >>> import vectorbtpro as vbt
+            >>> import numpy as np
 
             >>> data = vbt.YFData.fetch("BTC-USD", start="2020-01-01", end="2020-02-01")
 
-            >>> data.wrapper.get_index_ranges()
+            >>> np.column_stack(data.wrapper.get_index_ranges())
             array([[ 0, 32]])
             ```
 
@@ -1537,7 +1379,7 @@ class ArrayWrapper(Configured, PandasIndexer):
 
             ```pycon
             >>> # Generate a range every five rows
-            >>> data.wrapper.get_index_ranges(every=5)
+            >>> np.column_stack(data.wrapper.get_index_ranges(every=5))
             array([[ 0,  5],
                    [ 5, 10],
                    [10, 15],
@@ -1546,7 +1388,10 @@ class ArrayWrapper(Configured, PandasIndexer):
                    [25, 30]])
 
             >>> # Generate a range every five rows, starting at 6th row
-            >>> data.wrapper.get_index_ranges(every=5, start=5)
+            >>> np.column_stack(data.wrapper.get_index_ranges(
+            ...     every=5,
+            ...     start=5
+            ... ))
             array([[ 5, 10],
                    [10, 15],
                    [15, 20],
@@ -1554,7 +1399,11 @@ class ArrayWrapper(Configured, PandasIndexer):
                    [25, 30]])
 
             >>> # Generate a range every five rows from 6th to 16th row
-            >>> data.wrapper.get_index_ranges(every=5, start=5, end=15)
+            >>> np.column_stack(data.wrapper.get_index_ranges(
+            ...     every=5,
+            ...     start=5,
+            ...     end=15
+            ... ))
             array([[ 5, 10],
                    [10, 15]])
             ```
@@ -1563,35 +1412,52 @@ class ArrayWrapper(Configured, PandasIndexer):
 
             ```pycon
             >>> # Generate a range every week
-            >>> data.wrapper.get_index_ranges(every="W")
+            >>> np.column_stack(data.wrapper.get_index_ranges(every="W"))
             array([[ 5, 12],
                    [12, 19],
                    [19, 26]])
 
             >>> # Generate a range every second day of the week
-            >>> data.wrapper.get_index_ranges(every="W", add_start_delta="2d")
+            >>> np.column_stack(data.wrapper.get_index_ranges(
+            ...     every="W",
+            ...     add_start_delta="2d"
+            ... ))
             array([[ 7, 12],
                    [14, 19],
                    [21, 26]])
 
             >>> # Generate a range every week, starting at 11th row
-            >>> data.wrapper.get_index_ranges(every="W", start=10)
+            >>> np.column_stack(data.wrapper.get_index_ranges(
+            ...     every="W",
+            ...     start=10
+            ... ))
             array([[12, 19],
                    [19, 26]])
 
             >>> # Generate a range every week, starting exactly at 11th row
-            >>> data.wrapper.get_index_ranges(every="W", start=10, exact_start=True)
+            >>> np.column_stack(data.wrapper.get_index_ranges(
+            ...     every="W",
+            ...     start=10,
+            ...     exact_start=True
+            ... ))
             array([[10, 12],
                    [12, 19],
                    [19, 26]])
 
             >>> # Generate a range every week, starting at 2020-01-10
-            >>> data.wrapper.get_index_ranges(every="W", start="2020-01-10")
+            >>> np.column_stack(data.wrapper.get_index_ranges(
+            ...     every="W",
+            ...     start="2020-01-10"
+            ... ))
             array([[12, 19],
                    [19, 26]])
 
             >>> # Generate a range every week, each starting at 2020-01-10
-            >>> data.wrapper.get_index_ranges(every="W", start="2020-01-10", fixed_start=True)
+            >>> np.column_stack(data.wrapper.get_index_ranges(
+            ...     every="W",
+            ...     start="2020-01-10",
+            ...     fixed_start=True
+            ... ))
             array([[12, 19],
                    [12, 26]])
             ```
@@ -1600,14 +1466,20 @@ class ArrayWrapper(Configured, PandasIndexer):
 
             ```pycon
             >>> # Generate a range every week, looking 5 days back
-            >>> data.wrapper.get_index_ranges(every="W", lookback_period=5)
+            >>> np.column_stack(data.wrapper.get_index_ranges(
+            ...     every="W",
+            ...     lookback_period=5
+            ... ))
             array([[ 0,  5],
                    [ 7, 12],
                    [14, 19],
                    [21, 26]])
 
             >>> # Generate a range every week, looking 2 weeks back
-            >>> data.wrapper.get_index_ranges(every="W", lookback_period="2W")
+            >>> np.column_stack(data.wrapper.get_index_ranges(
+            ...     every="W",
+            ...     lookback_period="2W"
+            ... ))
             array([[ 0, 12],
                    [ 5, 19],
                    [12, 26]])
@@ -1617,25 +1489,25 @@ class ArrayWrapper(Configured, PandasIndexer):
 
             ```pycon
             >>> # Generate one range
-            >>> data.wrapper.get_index_ranges(
+            >>> np.column_stack(data.wrapper.get_index_ranges(
             ...     start="2020-01-01",
             ...     end="2020-01-07"
-            ... )
+            ... ))
             array([[1, 7]])
 
             >>> # Generate ranges between multiple dates
-            >>> data.wrapper.get_index_ranges(
+            >>> np.column_stack(data.wrapper.get_index_ranges(
             ...     start=["2020-01-01", "2020-01-07"],
             ...     end=["2020-01-07", "2020-01-14"]
-            ... )
+            ... ))
             array([[ 1,  7],
                    [ 7, 14]])
 
             >>> # Generate ranges with a fixed start
-            >>> data.wrapper.get_index_ranges(
+            >>> np.column_stack(data.wrapper.get_index_ranges(
             ...     start="2020-01-01",
             ...     end=["2020-01-07", "2020-01-14"]
-            ... )
+            ... ))
             array([[ 1,  7],
                    [ 1, 14]])
             ```
@@ -1645,254 +1517,430 @@ class ArrayWrapper(Configured, PandasIndexer):
             ```pycon
             >>> # Generate ranges between multiple dates
             >>> # by excluding the start date and including the end date
-            >>> data.wrapper.get_index_ranges(
+            >>> np.column_stack(data.wrapper.get_index_ranges(
             ...     start=["2020-01-01", "2020-01-07"],
             ...     end=["2020-01-07", "2020-01-14"],
             ...     closed_start=False,
             ...     closed_end=True
-            ... )
+            ... ))
             array([[ 2,  8],
                    [ 8, 15]])
             ```
         """
-        if start is not None and isinstance(start, str):
-            try:
-                start = pd.Timestamp(start, tz=self.index.tzinfo)
-            except Exception as e:
-                start = dateparser.parse(start)
-                if self.index.tzinfo is not None:
-                    start = start.replace(tzinfo=self.index.tzinfo)
-        if end is not None and isinstance(end, str):
-            try:
-                end = pd.Timestamp(end, tz=self.index.tzinfo)
-            except Exception as e:
-                end = dateparser.parse(end)
-                if self.index.tzinfo is not None:
-                    end = end.replace(tzinfo=self.index.tzinfo)
-        if lookback_period is not None and not isinstance(lookback_period, int):
-            try:
-                lookback_period = to_offset(lookback_period)
-            except Exception as e:
-                lookback_period = to_offset(pd.Timedelta(lookback_period))
-        if fixed_start and lookback_period is not None:
-            raise ValueError("Cannot use fixed_start and lookback_period together")
-        if exact_start and lookback_period is not None:
-            raise ValueError("Cannot use exact_start and lookback_period together")
+        return get_index_ranges(self.index, self.any_freq, *args, **kwargs)
 
-        if start_time is not None or end_time is not None:
-            if every is None and start is None and end is None:
-                every = "D"
-        if every is not None:
-            if not fixed_start:
-                if start_time is None and end_time is not None:
-                    start_time = time(0, 0, 0, 0)
-                    closed_start = True
-                if start_time is not None and end_time is None:
-                    end_time = time(0, 0, 0, 0)
-                    if add_end_delta is None:
-                        add_end_delta = pd.Timedelta(days=1)
-                    else:
-                        add_end_delta += pd.Timedelta(days=1)
-                    closed_end = False
-            if start_time is not None and end_time is not None and not fixed_start:
-                split_every = False
+    def fill_using_index_dict(
+        self,
+        index_dct: index_dict,
+        fill_value: tp.Scalar = np.nan,
+        keep_flex: bool = False,
+    ) -> tp.AnyArray:
+        """Fill a new array using an index dictionary.
 
-            if isinstance(every, int):
-                if start is None:
-                    start = 0
-                if end is None:
-                    end = len(self.index)
-                if closed_end:
-                    end -= 1
-                if lookback_period is None:
-                    new_index = np.arange(start, end + 1, every)
-                    if not split_every:
-                        start = end = new_index
-                    else:
-                        if fixed_start:
-                            start = np.full(len(new_index) - 1, new_index[0])
-                        else:
-                            start = new_index[:-1]
-                        end = new_index[1:]
-                else:
-                    end = np.arange(start + lookback_period, end + 1, every)
-                    start = end - lookback_period
-                kind = "indices"
-                lookback_period = None
-            else:
-                if start is None:
-                    start = 0
-                if isinstance(start, int):
-                    start_date = self.index[start]
-                else:
-                    start_date = start
-                if end is None:
-                    end = len(self.index) - 1
-                if isinstance(end, int):
-                    end_date = self.index[end]
-                else:
-                    end_date = end
-                if lookback_period is None:
-                    new_index = pd.date_range(
-                        start_date,
-                        end_date,
-                        freq=every,
-                        tz=self.index.tzinfo,
-                        normalize=normalize_every,
-                    )
-                    if exact_start and new_index[0] > start_date:
-                        new_index = new_index.insert(0, start_date)
-                    if not split_every:
-                        start = end = new_index
-                    else:
-                        if fixed_start:
-                            start = repeat_index(new_index[[0]], len(new_index) - 1)
-                        else:
-                            start = new_index[:-1]
-                        end = new_index[1:]
-                else:
-                    if isinstance(lookback_period, int):
-                        lookback_period *= self.any_freq
-                    end = pd.date_range(
-                        start_date + lookback_period,
-                        end_date,
-                        freq=every,
-                        tz=self.index.tzinfo,
-                        normalize=normalize_every,
-                    )
-                    start = end - lookback_period
-                kind = "bounds"
-                lookback_period = None
+        Goes through each key acting as an indexer and puts its value at that index.
+        Resolves an indexer using `vectorbtpro.base.indexing.get_indices`. Values can
+        be scalars, arrays, and templates. Setting takes place on NumPy arrays, wrapping
+        is done on the final object.
 
-        if kind is None:
-            if start is None and end is None:
-                kind = "indices"
-            else:
-                if start is not None:
-                    start = try_to_datetime_index(start)
-                    ref_index = start
-                if end is not None:
-                    end = try_to_datetime_index(end)
-                    ref_index = end
-                if ref_index.is_integer() and not self.index.is_integer():
-                    kind = "indices"
-                elif isinstance(ref_index, pd.DatetimeIndex) and isinstance(self.index, pd.DatetimeIndex):
-                    kind = "bounds"
-                else:
-                    kind = "labels"
-        checks.assert_in(kind, ("indices", "labels", "bounds"))
-        if end is None:
-            if kind.lower() in ("labels", "bounds"):
-                end = self.index[-1]
-            else:
-                end = len(self.index)
-        end = try_to_datetime_index(end)
-        if start is not None and lookback_period is not None:
-            raise ValueError("Cannot use start and lookback_period together")
-        if start is None:
-            if lookback_period is None:
-                if kind.lower() in ("labels", "bounds"):
-                    start = self.index[0]
-                else:
-                    start = 0
-            else:
-                if isinstance(lookback_period, int) and not end.is_integer():
-                    lookback_period *= self.any_freq
-                start = end - lookback_period
-        start = try_to_datetime_index(start)
-        if len(start) == 1 and len(end) > 1:
-            start = repeat_index(start, len(end))
-        elif len(start) > 1 and len(end) == 1:
-            end = repeat_index(end, len(start))
-        checks.assert_len_equal(start, end)
+        If `to_pd` is True, will return a Pandas object, otherwise a NumPy array.
+        If `keep_flex` is True, will return the most memory-efficient array representation
+        capable of flexible indexing.
 
-        if start_time is not None:
-            checks.assert_instance_of(start, pd.DatetimeIndex)
-            start = start.floor("D")
-            add_start_time_delta = time_to_timedelta(start_time)
-            if add_start_delta is None:
-                add_start_delta = add_start_time_delta
-            else:
-                add_start_delta += add_start_time_delta
-        if end_time is not None:
-            checks.assert_instance_of(end, pd.DatetimeIndex)
-            end = end.floor("D")
-            add_end_time_delta = time_to_timedelta(end_time)
-            if add_end_delta is None:
-                add_end_delta = add_end_time_delta
-            else:
-                add_end_delta += add_end_time_delta
+        Usage:
+            * Set a single row:
 
-        if add_start_delta is not None:
-            if isinstance(add_start_delta, str):
-                try:
-                    add_start_delta = to_offset(add_start_delta)
-                except Exception as e:
-                    add_start_delta = to_offset(pd.Timedelta(add_start_delta))
-            start += add_start_delta
-        if add_end_delta is not None:
-            if isinstance(add_end_delta, str):
-                try:
-                    add_end_delta = to_offset(add_end_delta)
-                except Exception as e:
-                    add_end_delta = to_offset(pd.Timedelta(add_end_delta))
-            end += add_end_delta
+            ```pycon
+            >>> import vectorbtpro as vbt
+            >>> import pandas as pd
+            >>> import numpy as np
 
-        if kind.lower() == "bounds":
-            index_ranges = Resampler.map_bounds_to_source_ranges(
-                source_index=self.index.values,
-                target_lbound_index=start.values,
-                target_rbound_index=end.values,
-                closed_lbound=closed_start,
-                closed_rbound=closed_end,
-                skip_minus_one=skip_minus_one,
-                jitted=jitted,
+            >>> index = pd.date_range("2020", periods=5)
+            >>> columns = pd.Index(["a", "b", "c"])
+            >>> wrapper = vbt.ArrayWrapper(index, columns)
+
+            >>> wrapper.fill_using_index_dict(vbt.index_dict({
+            ...     "2020-01-02": 2
+            ... }))
+                          a    b    c
+            2020-01-01  NaN  NaN  NaN
+            2020-01-02  2.0  2.0  2.0
+            2020-01-03  NaN  NaN  NaN
+            2020-01-04  NaN  NaN  NaN
+            2020-01-05  NaN  NaN  NaN
+
+            >>> wrapper.fill_using_index_dict(vbt.index_dict({
+            ...     1: 2
+            ... }))
+                          a    b    c
+            2020-01-01  NaN  NaN  NaN
+            2020-01-02  2.0  2.0  2.0
+            2020-01-03  NaN  NaN  NaN
+            2020-01-04  NaN  NaN  NaN
+            2020-01-05  NaN  NaN  NaN
+
+            >>> wrapper.fill_using_index_dict(vbt.index_dict({
+            ...     1: [1, 2, 3]
+            ... }))
+                          a    b    c
+            2020-01-01  NaN  NaN  NaN
+            2020-01-02  1.0  2.0  3.0
+            2020-01-03  NaN  NaN  NaN
+            2020-01-04  NaN  NaN  NaN
+            2020-01-05  NaN  NaN  NaN
+            ```
+
+            * Set multiple rows:
+
+            ```pycon
+            >>> wrapper.fill_using_index_dict(vbt.index_dict({
+            ...     ("2020-01-02", "2020-01-04"): [2, 3]
+            ... }))
+                          a    b    c
+            2020-01-01  NaN  NaN  NaN
+            2020-01-02  2.0  2.0  2.0
+            2020-01-03  NaN  NaN  NaN
+            2020-01-04  3.0  3.0  3.0
+            2020-01-05  NaN  NaN  NaN
+
+            >>> wrapper.fill_using_index_dict(vbt.index_dict({
+            ...     ("2020-01-02", "2020-01-04"): [[1, 2, 3], [4, 5, 6]]
+            ... }))
+                          a    b    c
+            2020-01-01  NaN  NaN  NaN
+            2020-01-02  1.0  2.0  3.0
+            2020-01-03  NaN  NaN  NaN
+            2020-01-04  4.0  5.0  6.0
+            2020-01-05  NaN  NaN  NaN
+
+            >>> wrapper.fill_using_index_dict(vbt.index_dict({
+            ...     ("2020-01-02", "2020-01-04"): [[1, 2, 3]]
+            ... }))
+                          a    b    c
+            2020-01-01  NaN  NaN  NaN
+            2020-01-02  1.0  2.0  3.0
+            2020-01-03  NaN  NaN  NaN
+            2020-01-04  1.0  2.0  3.0
+            2020-01-05  NaN  NaN  NaN
+            ```
+
+            * Set rows using slices:
+
+            ```pycon
+            >>> wrapper.fill_using_index_dict(vbt.index_dict({
+            ...     vbt.hslice("2020-01-02", "2020-01-04"): 2
+            ... }))
+                          a    b    c
+            2020-01-01  NaN  NaN  NaN
+            2020-01-02  2.0  2.0  2.0
+            2020-01-03  2.0  2.0  2.0
+            2020-01-04  2.0  2.0  2.0
+            2020-01-05  NaN  NaN  NaN
+
+            >>> wrapper.fill_using_index_dict(vbt.index_dict({
+            ...     ((0, 2), (3, 5)): [[1], [2]]
+            ... }))
+                          a    b    c
+            2020-01-01  1.0  1.0  1.0
+            2020-01-02  1.0  1.0  1.0
+            2020-01-03  NaN  NaN  NaN
+            2020-01-04  2.0  2.0  2.0
+            2020-01-05  2.0  2.0  2.0
+
+            >>> wrapper.fill_using_index_dict(vbt.index_dict({
+            ...     ((0, 2), (3, 5)): [[1, 2, 3], [4, 5, 6]]
+            ... }))
+                          a    b    c
+            2020-01-01  1.0  2.0  3.0
+            2020-01-02  1.0  2.0  3.0
+            2020-01-03  NaN  NaN  NaN
+            2020-01-04  4.0  5.0  6.0
+            2020-01-05  4.0  5.0  6.0
+            ```
+
+            All the above indexers can be wrapped with `vectorbtpro.base.indexing.RowIdx`.
+            If the index is integer-like when querying an integer position, set `is_labels` to False.
+
+            * Set rows using index points:
+
+            ```pycon
+            >>> wrapper.fill_using_index_dict(vbt.index_dict({
+            ...     vbt.RowPoints(every="2D"): 2
+            ... }))
+                          a    b    c
+            2020-01-01  2.0  2.0  2.0
+            2020-01-02  NaN  NaN  NaN
+            2020-01-03  2.0  2.0  2.0
+            2020-01-04  NaN  NaN  NaN
+            2020-01-05  2.0  2.0  2.0
+            ```
+
+            * Set rows using index ranges:
+
+            ```pycon
+            >>> wrapper.fill_using_index_dict(vbt.index_dict({
+            ...     vbt.RowRanges(
+            ...         start=("2020-01-01", "2020-01-03"),
+            ...         end=("2020-01-02", "2020-01-05")
+            ...     ): 2
+            ... }))
+                          a    b    c
+            2020-01-01  2.0  2.0  2.0
+            2020-01-02  NaN  NaN  NaN
+            2020-01-03  2.0  2.0  2.0
+            2020-01-04  2.0  2.0  2.0
+            2020-01-05  NaN  NaN  NaN
+            ```
+
+            * Set column indices:
+
+            ```pycon
+            >>> wrapper.fill_using_index_dict(vbt.index_dict({
+            ...     vbt.ColIdx("a"): 2
+            ... }))
+                          a   b   c
+            2020-01-01  2.0 NaN NaN
+            2020-01-02  2.0 NaN NaN
+            2020-01-03  2.0 NaN NaN
+            2020-01-04  2.0 NaN NaN
+            2020-01-05  2.0 NaN NaN
+
+            >>> wrapper.fill_using_index_dict(vbt.index_dict({
+            ...     vbt.ColIdx(("a", "b")): [1, 2]
+            ... }))
+                          a    b   c
+            2020-01-01  1.0  2.0 NaN
+            2020-01-02  1.0  2.0 NaN
+            2020-01-03  1.0  2.0 NaN
+            2020-01-04  1.0  2.0 NaN
+            2020-01-05  1.0  2.0 NaN
+
+            >>> multi_columns = pd.MultiIndex.from_arrays(
+            ...     [["a", "a", "b", "b"], [1, 2, 1, 2]],
+            ...     names=["c1", "c2"]
+            ... )
+            >>> multi_wrapper = vbt.ArrayWrapper(index, multi_columns)
+
+            >>> multi_wrapper.fill_using_index_dict(vbt.index_dict({
+            ...     vbt.ColIdx(("a", 2)): 2
+            ... }))
+            c1           a        b
+            c2           1    2   1   2
+            2020-01-01 NaN  2.0 NaN NaN
+            2020-01-02 NaN  2.0 NaN NaN
+            2020-01-03 NaN  2.0 NaN NaN
+            2020-01-04 NaN  2.0 NaN NaN
+            2020-01-05 NaN  2.0 NaN NaN
+
+            >>> multi_wrapper.fill_using_index_dict(vbt.index_dict({
+            ...     vbt.ColIdx("b", level="c1"): [3, 4]
+            ... }))
+            c1           a        b
+            c2           1   2    1    2
+            2020-01-01 NaN NaN  3.0  4.0
+            2020-01-02 NaN NaN  3.0  4.0
+            2020-01-03 NaN NaN  3.0  4.0
+            2020-01-04 NaN NaN  3.0  4.0
+            2020-01-05 NaN NaN  3.0  4.0
+            ```
+
+            * Set element indices:
+
+            ```pycon
+            >>> wrapper.fill_using_index_dict(vbt.index_dict({
+            ...     vbt.ElemIdx(2, 2): 2
+            ... }))
+                         a   b    c
+            2020-01-01 NaN NaN  NaN
+            2020-01-02 NaN NaN  NaN
+            2020-01-03 NaN NaN  2.0
+            2020-01-04 NaN NaN  NaN
+            2020-01-05 NaN NaN  NaN
+
+            >>> wrapper.fill_using_index_dict(vbt.index_dict({
+            ...     vbt.ElemIdx(("2020-01-01", "2020-01-03"), 2): [1, 2]
+            ... }))
+                         a   b    c
+            2020-01-01 NaN NaN  1.0
+            2020-01-02 NaN NaN  NaN
+            2020-01-03 NaN NaN  2.0
+            2020-01-04 NaN NaN  NaN
+            2020-01-05 NaN NaN  NaN
+
+            >>> wrapper.fill_using_index_dict(vbt.index_dict({
+            ...     vbt.ElemIdx(("2020-01-01", "2020-01-03"), (0, 2)): [[1, 2], [3, 4]]
+            ... }))
+                          a   b    c
+            2020-01-01  1.0 NaN  2.0
+            2020-01-02  NaN NaN  NaN
+            2020-01-03  3.0 NaN  4.0
+            2020-01-04  NaN NaN  NaN
+            2020-01-05  NaN NaN  NaN
+
+            >>> multi_wrapper.fill_using_index_dict(vbt.index_dict({
+            ...     vbt.ElemIdx(
+            ...         vbt.RowPoints(every="2d"),
+            ...         vbt.ColIdx(1, level="c2")
+            ...     ): [1, 2]
+            ... }))
+            c1            a        b
+            c2            1   2    1   2
+            2020-01-01  1.0 NaN  2.0 NaN
+            2020-01-02  NaN NaN  NaN NaN
+            2020-01-03  1.0 NaN  2.0 NaN
+            2020-01-04  NaN NaN  NaN NaN
+            2020-01-05  1.0 NaN  2.0 NaN
+
+            >>> multi_wrapper.fill_using_index_dict(vbt.index_dict({
+            ...     vbt.ElemIdx(
+            ...         vbt.RowPoints(every="2d"),
+            ...         vbt.ColIdx(1, level="c2")
+            ...     ): [[1], [2], [3]]
+            ... }))
+            c1            a        b
+            c2            1   2    1   2
+            2020-01-01  1.0 NaN  1.0 NaN
+            2020-01-02  NaN NaN  NaN NaN
+            2020-01-03  2.0 NaN  2.0 NaN
+            2020-01-04  NaN NaN  NaN NaN
+            2020-01-05  3.0 NaN  3.0 NaN
+            ```
+        """
+        changed_rows = False
+        changed_cols = False
+        set_ops = []
+        if "_default" in index_dct:
+            fill_value = index_dct["_default"]
+        for indexer, set_v in index_dct.items():
+            if indexer == "_default":
+                continue
+            row_indices, col_indices = get_indices(
+                self.index,
+                self.columns,
+                indexer,
+                check_indices=True,
             )
-        elif kind.lower() == "labels":
-            if isinstance(start, pd.DatetimeIndex):
-                if start.tzinfo is None and self.index.tzinfo is not None:
-                    start = start.tz_localize(self.index.tzinfo)
-                elif start.tzinfo is not None and self.index.tzinfo is not None:
-                    start = start.tz_convert(self.index.tzinfo)
-            if isinstance(end, pd.DatetimeIndex):
-                if end.tzinfo is None and self.index.tzinfo is not None:
-                    end = end.tz_localize(self.index.tzinfo)
-                elif end.tzinfo is not None and self.index.tzinfo is not None:
-                    end = end.tz_convert(self.index.tzinfo)
-            if closed_start:
-                new_start = self.index.get_indexer(start, method=indexer_method)
-            else:
-                new_start = np.empty(len(start), dtype=np.int_)
-                for i in range(len(start)):
-                    if start[i] in self.index:
-                        new_start[i] = self.index.get_loc(start[i]) + 1
+            if isinstance(set_v, CustomTemplate):
+                context = dict(
+                    wrapper=self,
+                    keep_flex=keep_flex,
+                    fill_value=fill_value,
+                    indexer=indexer,
+                    row_indices=row_indices,
+                    col_indices=col_indices,
+                )
+                set_v = set_v.substitute(context, sub_id="get_indices")
+
+            def _check_use_indices(indices, _indexer=indexer):
+                use_indices = True
+                if isinstance(indices, (slice, hslice)):
+                    if indices.start is None and indices.stop is None:
+                        use_indices = False
+                if isinstance(indices, tuple):
+                    if all(_indices.size == 0 for _indices in indices):
+                        use_indices = False
+                if isinstance(indices, np.ndarray):
+                    if indices.size == 0:
+                        use_indices = False
+                return use_indices
+
+            use_row_indices = _check_use_indices(row_indices)
+            use_col_indices = _check_use_indices(col_indices)
+            set_v = np.asarray(set_v)
+
+            if use_row_indices and use_col_indices:
+
+                def _set_op(x, y=row_indices, z=col_indices, v=set_v):
+                    if isinstance(y, tuple):
+                        if np.isscalar(z):
+                            v = np.broadcast_to(v, (len(y[0]),))
+                        else:
+                            if isinstance(z, slice):
+                                z = np.arange(x.shape[1])[z]
+                            v = np.broadcast_to(v, (len(y[0]), len(z)))
+                        for j in range(len(y[0])):
+                            if len(y) == 2:
+                                x[y[0][j]: y[1][j], z] = v[j]
+                            else:
+                                x[y[0][j]: y[1][j]: y[2][j], z] = v[j]
                     else:
-                        new_start[i] = self.index.get_indexer([start[i]], method=indexer_method)[0]
-            if closed_end:
-                new_end = np.empty(len(end), dtype=np.int_)
-                for i in range(len(end)):
-                    if end[i] in self.index:
-                        new_end[i] = self.index.get_loc(end[i]) + 1
-                    else:
-                        new_end[i] = self.index.get_indexer([end[i]], method=indexer_method)[0]
+                        if np.isscalar(y) or np.isscalar(z):
+                            x[y, z] = v
+                        else:
+                            if isinstance(y, slice):
+                                y = np.arange(x.shape[1])[y]
+                            if isinstance(z, slice):
+                                z = np.arange(x.shape[1])[z]
+                            _y = np.repeat(y, len(z))
+                            _z = np.tile(z, len(y))
+                            if np.isscalar(v):
+                                x[_y, _z] = v
+                            else:
+                                v = np.broadcast_to(v, (len(y), len(z)))
+                                x[_y, _z] = v.flatten()
+
+                set_ops.append(_set_op)
+                changed_rows = True
+                changed_cols = True
+            elif use_col_indices:
+
+                def _set_op(x, z=col_indices, v=set_v):
+                    x[:, z] = v
+
+                set_ops.append(_set_op)
+                if isinstance(col_indices, (int, np.integer)):
+                    if set_v.size > 1:
+                        changed_rows = True
+                else:
+                    if set_v.ndim == 2:
+                        if set_v.shape[0] > 1:
+                            changed_rows = True
+                changed_cols = True
             else:
-                new_end = self.index.get_indexer(end, method=indexer_method)
-            index_ranges = np.column_stack((new_start, new_end))
-            if skip_minus_one:
-                index_ranges = index_ranges[(index_ranges != -1).all(axis=1)]
+
+                def _set_op(x, y=row_indices, v=set_v):
+                    if isinstance(y, tuple):
+                        if x.ndim == 2:
+                            v = np.broadcast_to(v, (len(y[0]), x.shape[1]))
+                        else:
+                            v = np.broadcast_to(v, (len(y[0]),))
+                        for j in range(len(y[0])):
+                            if len(y) == 2:
+                                x[y[0][j]: y[1][j]] = v[j]
+                            else:
+                                x[y[0][j]: y[1][j]: y[2][j]] = v[j]
+                    else:
+                        if x.ndim == 2:
+                            if not np.isscalar(y):
+                                if v.ndim == 1 and v.size > 1:
+                                    v = v[:, None]
+                        x[y] = v
+
+                set_ops.append(_set_op)
+                if use_row_indices:
+                    changed_rows = True
+                if self.ndim == 2:
+                    if isinstance(row_indices, (int, np.integer)):
+                        if set_v.size > 1:
+                            changed_cols = True
+                    else:
+                        if set_v.ndim == 2:
+                            if set_v.shape[1] > 1:
+                                changed_cols = True
+
+        if keep_flex and not changed_cols and not changed_rows:
+            new_obj = np.full((1,) if len(self.shape) == 1 else (1, 1), fill_value)
+        elif keep_flex and not changed_cols:
+            new_obj = np.full(self.shape if len(self.shape) == 1 else (self.shape[0], 1), fill_value)
+        elif keep_flex and not changed_rows:
+            new_obj = np.full((1, self.shape[1]), fill_value)
         else:
-            if not closed_start:
-                start += 1
-            if closed_end:
-                end += 1
-            index_ranges = np.column_stack((start, end))
-            if skip_minus_one:
-                index_ranges = index_ranges[(index_ranges != -1).all(axis=1)]
+            new_obj = np.full(self.shape, fill_value)
+        for set_op in set_ops:
+            set_op(new_obj)
 
-        if np.any(index_ranges[:, 0] >= index_ranges[:, 1]):
-            raise ValueError("Some start indices are higher than end indices")
-
-        return index_ranges
+        if not keep_flex:
+            new_obj = self.wrap(new_obj, group_by=False)
+        return new_obj
 
 
 WrappingT = tp.TypeVar("WrappingT", bound="Wrapping")

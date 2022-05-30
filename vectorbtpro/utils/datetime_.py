@@ -9,8 +9,11 @@ import dateparser
 import numpy as np
 import pandas as pd
 from pandas.tseries.frequencies import to_offset
-import pytz
 import re
+try:
+    import zoneinfo
+except ImportError:
+    from backports import zoneinfo
 
 from vectorbtpro import _typing as tp
 
@@ -105,6 +108,19 @@ def try_to_datetime_index(index: tp.IndexLike, **kwargs) -> tp.Index:
     return index
 
 
+def try_align_to_datetime_index(source_index: tp.IndexLike, target_index: tp.Index, **kwargs) -> tp.Index:
+    """Try aligning an index to another datetime index.
+
+    Keyword arguments are passed to `try_to_datetime_index`."""
+    source_index = try_to_datetime_index(source_index, **kwargs)
+    if isinstance(source_index, pd.DatetimeIndex) and isinstance(target_index, pd.DatetimeIndex):
+        if source_index.tzinfo is None and target_index.tzinfo is not None:
+            source_index = source_index.tz_localize(target_index.tzinfo)
+        elif source_index.tzinfo is not None and target_index.tzinfo is not None:
+            source_index = source_index.tz_convert(target_index.tzinfo)
+    return source_index
+
+
 def infer_index_freq(
     index: pd.Index,
     freq: tp.Optional[tp.FrequencyLike] = None,
@@ -184,7 +200,7 @@ def is_tz_aware(dt: tp.SupportsTZInfo) -> bool:
 def to_timezone(tz: tp.TimezoneLike, to_py_timezone: tp.Optional[bool] = None, **kwargs) -> tzinfo:
     """Parse the timezone.
 
-    Strings are parsed by `pytz` and `dateparser`, while integers and floats are treated as hour offsets.
+    Strings are parsed by `zoneinfo` and `dateparser`, while integers and floats are treated as hour offsets.
 
     If `to_py_timezone` is set to True, will convert to `datetime.timezone`. See global settings.
 
@@ -200,8 +216,8 @@ def to_timezone(tz: tp.TimezoneLike, to_py_timezone: tp.Optional[bool] = None, *
 
     if isinstance(tz, str):
         try:
-            tz = pytz.timezone(tz)
-        except pytz.UnknownTimeZoneError:
+            tz = zoneinfo.ZoneInfo(tz)
+        except zoneinfo.ZoneInfoNotFoundError:
             dt = dateparser.parse("now %s" % tz, **kwargs)
             if dt is not None:
                 tz = dt.tzinfo

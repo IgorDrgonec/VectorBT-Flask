@@ -2284,13 +2284,17 @@ class GenericAccessor(BaseAccessor, Analyzable):
         )
 
         if isinstance(cls_or_self, type):
-            template_context = merge_dicts(dict(resampler=resampler, index_ranges=index_ranges), template_context)
+            template_context = merge_dicts(dict(
+                resampler=resampler,
+                index_ranges=index_ranges,
+            ), template_context)
             args = deep_substitute(args, template_context, sub_id="args")
             func = jit_reg.resolve_option(nb.reduce_index_ranges_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             out = func(
                 wrapper.shape_2d[1],
-                index_ranges,
+                index_ranges[0],
+                index_ranges[1],
                 reduce_func_nb,
                 *args,
             )
@@ -2299,7 +2303,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
             func = ch_reg.resolve_option(func, chunked)
             out = func(
                 cls_or_self.to_2d_array(),
-                index_ranges,
+                index_ranges[0],
+                index_ranges[1],
                 reduce_func_nb,
                 *args,
             )
@@ -2461,7 +2466,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
             func = ch_reg.resolve_option(func, chunked)
             out = func(
                 wrapper.shape_2d[1],
-                index_ranges,
+                index_ranges[0],
+                index_ranges[1],
                 reduce_func_nb,
                 *args,
             )
@@ -2470,7 +2476,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
             func = ch_reg.resolve_option(func, chunked)
             out = func(
                 cls_or_self.to_2d_array(),
-                index_ranges,
+                index_ranges[0],
+                index_ranges[1],
                 reduce_func_nb,
                 *args,
             )

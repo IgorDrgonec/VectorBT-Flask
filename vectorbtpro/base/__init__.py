@@ -15,7 +15,17 @@ from vectorbtpro.base.chunking import (
 from vectorbtpro.base.grouping import *
 from vectorbtpro.base.resampling import *
 from vectorbtpro.base.indexes import repeat_index, tile_index, stack_indexes, combine_indexes
-from vectorbtpro.base.indexing import PandasIndexer, flex_select_auto_nb
+from vectorbtpro.base.indexing import (
+    PandasIndexer,
+    flex_select_auto_nb,
+    hslice,
+    RowIdx,
+    ColIdx,
+    RowPoints,
+    RowRanges,
+    ElemIdx,
+    index_dict,
+)
 from vectorbtpro.base.reshaping import (
     to_1d_array,
     to_2d_array,

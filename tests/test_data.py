@@ -2,7 +2,6 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import pytest
-import pytz
 
 import vectorbtpro as vbt
 from vectorbtpro.utils.config import merge_dicts
@@ -326,7 +325,7 @@ class TestData:
                 "2020-01-05 00:00:00",
             ],
             freq="D",
-            tz=pytz.utc,
+            tz="utc",
         ).tz_convert(to_timezone("Europe/Berlin"))
         assert_series_equal(
             MyData.fetch(0, shape=(5,), tz_localize="UTC", tz_convert="Europe/Berlin").data[0],
@@ -632,7 +631,7 @@ class TestData:
                 "2020-01-05 00:00:00",
             ],
             freq="D",
-            tz=pytz.utc,
+            tz="utc",
         ).tz_convert(to_timezone("Europe/Berlin"))
         assert_series_equal(
             MyData.fetch(0, shape=(5,), tz_localize="UTC", tz_convert="Europe/Berlin").update(tz_localize=None).data[0],

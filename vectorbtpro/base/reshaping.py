@@ -14,11 +14,12 @@ import pandas as pd
 from numpy.lib.stride_tricks import _broadcast_shape
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base import indexes, wrapping
+from vectorbtpro.base import indexes, wrapping, indexing
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import resolve_dict, merge_dicts
 from vectorbtpro.utils.params import generate_param_combs
 from vectorbtpro.utils.parsing import get_func_arg_names
+from vectorbtpro.utils.template import CustomTemplate
 
 
 def shape_to_tuple(shape: tp.ShapeLike) -> tp.Shape:
@@ -367,8 +368,8 @@ def broadcast_index(
 
 
 def wrap_broadcasted(
-    old_arg: tp.AnyArray,
-    new_arg: tp.Array,
+    new_obj: tp.Array,
+    old_obj: tp.Optional[tp.AnyArray] = None,
     is_pd: bool = False,
     new_index: tp.Optional[tp.Index] = None,
     new_columns: tp.Optional[tp.Index] = None,
@@ -377,32 +378,32 @@ def wrap_broadcasted(
     """If the newly brodcasted array was originally a Pandas object, make it Pandas object again
     and assign it the newly broadcast index/columns."""
     if is_pd:
-        if checks.is_pandas(old_arg):
+        if old_obj is not None and checks.is_pandas(old_obj):
             if new_index is None:
                 # Take index from original pandas object
-                old_index = indexes.get_index(old_arg, 0)
-                if old_arg.shape[0] == new_arg.shape[0]:
+                old_index = indexes.get_index(old_obj, 0)
+                if old_obj.shape[0] == new_obj.shape[0]:
                     new_index = old_index
                 else:
-                    new_index = indexes.repeat_index(old_index, new_arg.shape[0], ignore_ranges=ignore_ranges)
+                    new_index = indexes.repeat_index(old_index, new_obj.shape[0], ignore_ranges=ignore_ranges)
             if new_columns is None:
                 # Take columns from original pandas object
-                old_columns = indexes.get_index(old_arg, 1)
-                new_ncols = new_arg.shape[1] if new_arg.ndim == 2 else 1
+                old_columns = indexes.get_index(old_obj, 1)
+                new_ncols = new_obj.shape[1] if new_obj.ndim == 2 else 1
                 if len(old_columns) == new_ncols:
                     new_columns = old_columns
                 else:
                     new_columns = indexes.repeat_index(old_columns, new_ncols, ignore_ranges=ignore_ranges)
-        if new_arg.ndim == 2:
-            return pd.DataFrame(new_arg, index=new_index, columns=new_columns)
+        if new_obj.ndim == 2:
+            return pd.DataFrame(new_obj, index=new_index, columns=new_columns)
         if new_columns is not None and len(new_columns) == 1:
             name = new_columns[0]
             if name == 0:
                 name = None
         else:
             name = None
-        return pd.Series(new_arg, index=new_index, name=name)
-    return new_arg
+        return pd.Series(new_obj, index=new_index, name=name)
+    return new_obj
 
 
 def align_pd_arrays(
@@ -587,6 +588,7 @@ def broadcast(
     repeat_product: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
     keys_from_sr_index: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
     keys: tp.MaybeMappingSequence[tp.Optional[tp.IndexLike]] = None,
+    tile: tp.Union[None, int, tp.IndexLike] = None,
     random_subset: tp.Optional[int] = None,
     keep_wrap_default: tp.Optional[bool] = None,
     return_wrapper: bool = False,
@@ -607,7 +609,8 @@ def broadcast(
 
             If the first and only argument is a mapping, will return a dict.
 
-            Allows using `BCO` and `vectorbtpro.base.reshaping.Ref`.
+            Allows using `BCO`, `Ref`, `Default`, `vectorbtpro.base.indexing.index_dict`, and templates.
+            If an index dictionary, fills using `vectorbtpro.base.wrapping.ArrayWrapper.fill_using_index_dict`.
         to_shape (tuple of int): Target shape. If set, will broadcast every object in `args` to `to_shape`.
         align_index (bool): Whether to align index of Pandas objects using union.
 
@@ -644,6 +647,7 @@ def broadcast(
         repeat_product (bool, sequence or mapping): See `BCO.repeat_product`.
         keys_from_sr_index (bool, sequence or mapping): See `BCO.keys_from_sr_index`.
         keys (index_like, sequence or mapping): See `BCO.keys`.
+        tile (int or index_like): Tile the final object by the number of times or index.
         random_subset (int): Select a random subset of product parameter values.
 
             Seed can be set using NumPy before calling this function.
@@ -986,6 +990,7 @@ def broadcast(
     none_keys = set()
     default_keys = set()
     product_keys = set()
+    special_keys = set()
     bco_instances = {}
     pool = dict(zip(all_keys, objs))
     for i, k in enumerate(all_keys):
@@ -1008,8 +1013,6 @@ def broadcast(
         if value is None:
             none_keys.add(k)
             continue
-        value_is_index = checks.is_index(value)
-        value = to_any_array(value)
 
         _to_pd = _resolve_arg(obj, "to_pd", to_pd, None)
 
@@ -1037,6 +1040,7 @@ def broadcast(
             _require_kwargs = merge_dicts(require_kwargs[i], _require_kwargs)
         else:
             _require_kwargs = merge_dicts(require_kwargs, _require_kwargs)
+
         if isinstance(obj, BCO) and obj.reindex_kwargs is not None:
             _reindex_kwargs = obj.reindex_kwargs
         else:
@@ -1052,56 +1056,77 @@ def broadcast(
         else:
             _reindex_kwargs = merge_dicts(reindex_kwargs, _reindex_kwargs)
 
-        _index_to_product = _resolve_arg(obj, "index_to_product", index_to_product, None)
-        if _index_to_product is None:
-            _index_to_product = broadcasting_cfg["index_to_product"]
+        if isinstance(value, indexing.index_dict) or isinstance(value, CustomTemplate):
+            special_keys.add(k)
+            bco_instances[k] = BCO(
+                value,
+                to_pd=_to_pd,
+                keep_flex=_keep_flex,
+                min_one_dim=_min_one_dim,
+                post_func=_post_func,
+                require_kwargs=_require_kwargs,
+                reindex_kwargs=_reindex_kwargs,
+                index_to_product=None,
+                product=None,
+                product_idx=None,
+                repeat_product=None,
+                keys_from_sr_index=None,
+                keys=None,
+            )
+        else:
+            value_is_index = checks.is_index(value)
+            value = to_any_array(value)
 
-        _product = _resolve_arg(obj, "product", product, None)
-        if _product is None:
-            _product = _index_to_product and value_is_index
-        if _product:
-            product_keys.add(k)
+            _index_to_product = _resolve_arg(obj, "index_to_product", index_to_product, None)
+            if _index_to_product is None:
+                _index_to_product = broadcasting_cfg["index_to_product"]
 
-        _product_idx = _resolve_arg(obj, "product_idx", product_idx, None)
+            _product = _resolve_arg(obj, "product", product, None)
+            if _product is None:
+                _product = _index_to_product and value_is_index
+            if _product:
+                product_keys.add(k)
 
-        _repeat_product = _resolve_arg(obj, "repeat_product", repeat_product, None)
-        if _repeat_product is None:
-            _repeat_product = broadcasting_cfg["repeat_product"]
+            _product_idx = _resolve_arg(obj, "product_idx", product_idx, None)
 
-        _keys_from_sr_index = _resolve_arg(obj, "keys_from_sr_index", keys_from_sr_index, None)
-        if _keys_from_sr_index is None:
-            _keys_from_sr_index = broadcasting_cfg["keys_from_sr_index"]
+            _repeat_product = _resolve_arg(obj, "repeat_product", repeat_product, None)
+            if _repeat_product is None:
+                _repeat_product = broadcasting_cfg["repeat_product"]
 
-        _keys = _resolve_arg(obj, "keys", keys, None)
-        if _product:
-            if _keys is None:
-                if _keys_from_sr_index and checks.is_series(value) and not checks.is_default_index(value.index):
-                    _keys = value.index
-                else:
-                    _keys = value
-            if _keys is not None:
-                _keys = indexes.to_any_index(_keys)
-                if not checks.is_multi_index(_keys):
-                    if _keys.name is None and hasattr(value, "name"):
-                        _keys = _keys.rename(value.name)
-                    if _keys.name is None:
-                        _keys = _keys.rename(k)
+            _keys_from_sr_index = _resolve_arg(obj, "keys_from_sr_index", keys_from_sr_index, None)
+            if _keys_from_sr_index is None:
+                _keys_from_sr_index = broadcasting_cfg["keys_from_sr_index"]
 
-        bco_instances[k] = BCO(
-            value,
-            to_pd=_to_pd,
-            keep_flex=_keep_flex,
-            min_one_dim=_min_one_dim,
-            post_func=_post_func,
-            require_kwargs=_require_kwargs,
-            reindex_kwargs=_reindex_kwargs,
-            index_to_product=_index_to_product,
-            product=_product,
-            product_idx=_product_idx,
-            repeat_product=_repeat_product,
-            keys_from_sr_index=_keys_from_sr_index,
-            keys=_keys,
-        )
+            _keys = _resolve_arg(obj, "keys", keys, None)
+            if _product:
+                if _keys is None:
+                    if _keys_from_sr_index and checks.is_series(value) and not checks.is_default_index(value.index):
+                        _keys = value.index
+                    else:
+                        _keys = value
+                if _keys is not None:
+                    _keys = indexes.to_any_index(_keys)
+                    if not checks.is_multi_index(_keys):
+                        if _keys.name is None and hasattr(value, "name"):
+                            _keys = _keys.rename(value.name)
+                        if _keys.name is None:
+                            _keys = _keys.rename(k)
+
+            bco_instances[k] = BCO(
+                value,
+                to_pd=_to_pd,
+                keep_flex=_keep_flex,
+                min_one_dim=_min_one_dim,
+                post_func=_post_func,
+                require_kwargs=_require_kwargs,
+                reindex_kwargs=_reindex_kwargs,
+                index_to_product=_index_to_product,
+                product=_product,
+                product_idx=_product_idx,
+                repeat_product=_repeat_product,
+                keys_from_sr_index=_keys_from_sr_index,
+                keys=_keys,
+            )
 
     # Check whether we should broadcast Pandas metadata and work on 2-dim data
     is_pd = False
@@ -1110,7 +1135,7 @@ def broadcast(
     old_objs = []
     obj_reindex_kwargs = []
     for k, bco_obj in bco_instances.items():
-        if k in none_keys or k in product_keys:
+        if k in none_keys or k in product_keys or k in special_keys:
             continue
 
         obj = bco_obj.value
@@ -1158,7 +1183,7 @@ def broadcast(
         except ValueError:
             arr_shapes = {}
             for i, k in enumerate(bco_instances):
-                if k in none_keys or k in product_keys:
+                if k in none_keys or k in product_keys or k in special_keys:
                     continue
 
                 if len(ready_objs[i].shape) > 0:
@@ -1291,10 +1316,49 @@ def broadcast(
                 **stack_kwargs,
             )
 
+    # Tile
+    if tile is not None:
+        if isinstance(tile, int):
+            n_tile = tile
+            if param_columns is not None:
+                param_columns = indexes.tile_index(param_columns, n_tile)
+            if new_columns is not None:
+                new_columns = indexes.tile_index(new_columns, n_tile)
+        else:
+            n_tile = len(tile)
+            if param_columns is not None:
+                param_columns = indexes.combine_indexes(
+                    [tile, param_columns],
+                    ignore_ranges=ignore_ranges,
+                    **stack_kwargs,
+                )
+            if new_columns is not None:
+                new_columns = indexes.combine_indexes(
+                    [tile, new_columns],
+                    ignore_ranges=ignore_ranges,
+                    **stack_kwargs,
+                )
+        if param_product is not None:
+            param_product = {k: np.tile(v, n_tile) for k, v in param_product.items()}
+        n_params = max(n_params, 1) * n_tile
+
+    # Build wrapper
+    if n_params == 0:
+        new_shape = to_shape
+    else:
+        new_shape = (to_shape_2d[0], to_shape_2d[1] * n_params)
+    wrapper = wrapping.ArrayWrapper.from_shape(
+        new_shape,
+        index=new_index,
+        columns=new_columns,
+        **resolve_dict(wrapper_kwargs),
+    )
+
     # Perform broadcasting
+    old_objs2 = []
     new_objs = []
     for i, k in enumerate(all_keys):
-        if k in none_keys:
+        if k in none_keys or k in special_keys:
             continue
         _keep_flex = bco_instances[k].keep_flex
         _repeat_product = bco_instances[k].repeat_product
@@ -1335,48 +1399,96 @@ def broadcast(
                         new_obj = new_obj[:, None]  # product changes is_2d behavior
                     new_obj = np.tile(new_obj, (1, n_params))
 
-        # Force to match requirements
-        _require_kwargs = bco_instances[k].require_kwargs
-        new_obj = np.require(new_obj, **resolve_dict(_require_kwargs))
+        old_objs2.append(old_obj)
+        new_objs.append(new_obj)
 
-        # Bring arrays to their old types (e.g. array -> pandas)
-        if _keep_flex:
-            new_objs.append(new_obj)
+    # Resolve special objects
+    new_objs2 = []
+    for i, k in enumerate(all_keys):
+        if k in none_keys:
+            continue
+        if k in special_keys:
+            bco = bco_instances[k]
+            if isinstance(bco.value, indexing.index_dict):
+                # Index dict
+                _is_pd = bco.to_pd
+                if _is_pd is None:
+                    _is_pd = is_pd
+                _keep_flex = bco.keep_flex
+                _reindex_kwargs = resolve_dict(bco.reindex_kwargs)
+                _fill_value = _reindex_kwargs.get("fill_value", np.nan)
+                new_obj = wrapper.fill_using_index_dict(
+                    bco.value,
+                    fill_value=_fill_value,
+                    keep_flex=_keep_flex,
+                )
+                if not _is_pd and not _keep_flex:
+                    new_obj = new_obj.values
+            elif isinstance(bco.value, CustomTemplate):
+                # Template
+                context = dict(
+                    wrapper=wrapper,
+                    bco=bco,
+                )
+                new_obj = bco.value.substitute(context, sub_id="broadcast")
+            else:
+                raise TypeError(f"Special type {type(bco.value)} not supported")
         else:
+            new_obj = new_objs.pop(0)
+
+        # Force to match requirements
+        new_obj = np.require(new_obj, **resolve_dict(bco_instances[k].require_kwargs))
+        new_objs2.append(new_obj)
+
+    # Perform wrapping and post-processing
+    new_objs3 = []
+    for i, k in enumerate(all_keys):
+        if k in none_keys:
+            continue
+        new_obj = new_objs2.pop(0)
+        _keep_flex = bco_instances[k].keep_flex
+        _repeat_product = bco_instances[k].repeat_product
+
+        if _keep_flex:
+            new_objs3.append(new_obj)
+        else:
+            # Wrap array
             _is_pd = bco_instances[k].to_pd
             if _is_pd is None:
                 _is_pd = is_pd
             if k in product_keys and not _repeat_product:
-                wrapped_arr = wrap_broadcasted(
-                    old_obj,
+                new_obj = wrap_broadcasted(
                     new_obj,
+                    old_obj=old_objs2.pop(0) if k not in special_keys else None,
                     is_pd=_is_pd,
                     new_index=new_index,
                     new_columns=param_columns,
                     ignore_ranges=ignore_ranges,
                 )
             else:
-                wrapped_arr = wrap_broadcasted(
-                    old_obj,
+                new_obj = wrap_broadcasted(
                     new_obj,
+                    old_obj=old_objs2.pop(0) if k not in special_keys else None,
                     is_pd=_is_pd,
                     new_index=new_index,
                     new_columns=new_columns,
                     ignore_ranges=ignore_ranges,
                 )
+
+            # Post-process array
             _post_func = bco_instances[k].post_func
             if _post_func is not None:
-                wrapped_arr = _post_func(wrapped_arr)
-            new_objs.append(wrapped_arr)
+                new_obj = _post_func(new_obj)
+            new_objs3.append(new_obj)
 
     # Prepare outputs
     return_objs = []
     for k in all_keys:
         if k not in none_keys:
             if k in default_keys and keep_wrap_default:
-                return_objs.append(Default(new_objs.pop(0)))
+                return_objs.append(Default(new_objs3.pop(0)))
             else:
-                return_objs.append(new_objs.pop(0))
+                return_objs.append(new_objs3.pop(0))
         else:
             if k in default_keys and keep_wrap_default:
                 return_objs.append(Default(None))
@@ -1386,17 +1498,6 @@ def broadcast(
         return_objs = dict(zip(all_keys, return_objs))
     else:
         return_objs = tuple(return_objs)
-    if return_wrapper:
-        if n_params == 0:
-            new_shape = to_shape
-        else:
-            new_shape = (to_shape_2d[0], to_shape_2d[1] * n_params)
-        wrapper = wrapping.ArrayWrapper.from_shape(
-            new_shape,
-            index=new_index,
-            columns=new_columns,
-            **resolve_dict(wrapper_kwargs),
-        )
     if len(return_objs) > 1 or return_dict:
         if return_wrapper:
             return return_objs, wrapper

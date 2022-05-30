@@ -42,10 +42,11 @@ def get_alloc_points_nb(
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query="index_ranges", axis=0),
+    size=ch.ArraySizer(arg_query="range_starts", axis=0),
     arg_take_spec=dict(
         n_cols=None,
-        index_ranges=ch.ArraySlicer(axis=0),
+        range_starts=ch.ArraySlicer(axis=0),
+        range_ends=ch.ArraySlicer(axis=0),
         optimize_func_nb=None,
         args=ch.ArgsTaker(),
     ),
@@ -54,7 +55,8 @@ def get_alloc_points_nb(
 @register_jitted(tags={"can_parallel"})
 def optimize_meta_nb(
     n_cols: int,
-    index_ranges: tp.Array2d,
+    range_starts: tp.Array1d,
+    range_ends: tp.Array1d,
     optimize_func_nb: tp.Callable,
     *args,
 ) -> tp.Array2d:
@@ -62,9 +64,9 @@ def optimize_meta_nb(
 
     `reduce_func_nb` must take the range index, the range start, the range end, and `*args`.
     Must return a 1-dim array with the same size as `n_cols`."""
-    out = np.empty((index_ranges.shape[0], n_cols), dtype=np.float_)
-    for i in prange(len(index_ranges)):
-        out[i] = optimize_func_nb(i, index_ranges[i][0], index_ranges[i][1], *args)
+    out = np.empty((range_starts.shape[0], n_cols), dtype=np.float_)
+    for i in prange(len(range_starts)):
+        out[i] = optimize_func_nb(i, range_starts[i], range_ends[i], *args)
     return out
 
 

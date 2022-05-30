@@ -124,7 +124,7 @@ def map_index_to_source_ranges_nb(
     target_index: tp.Array1d,
     target_freq: tp.Optional[tp.Scalar] = None,
     before: bool = False,
-) -> tp.Array2d:
+) -> tp.Tuple[tp.Array1d, tp.Array1d]:
     """Get the source bounds that correspond to each target index.
 
     If `target_freq` is not None, the right bound is limited by the frequency in `target_freq`.
@@ -137,7 +137,8 @@ def map_index_to_source_ranges_nb(
 
     !!! note
         Both index arrays must be increasing. Repeating values are allowed."""
-    out = np.empty((len(target_index), 2), dtype=np.int_)
+    range_starts_out = np.empty(len(target_index), dtype=np.int_)
+    range_ends_out = np.empty(len(target_index), dtype=np.int_)
 
     to_j = 0
     for i in range(len(target_index)):
@@ -181,13 +182,13 @@ def map_index_to_source_ranges_nb(
                 to_j = j + 1
 
         if from_j == -1:
-            out[i, 0] = -1
-            out[i, 1] = -1
+            range_starts_out[i] = -1
+            range_ends_out[i] = -1
         else:
-            out[i, 0] = from_j
-            out[i, 1] = to_j
+            range_starts_out[i] = from_j
+            range_ends_out[i] = to_j
 
-    return out
+    return range_starts_out, range_ends_out
 
 
 @register_jitted(cache=True)
@@ -198,7 +199,7 @@ def map_bounds_to_source_ranges_nb(
     closed_lbound: bool = True,
     closed_rbound: bool = False,
     skip_minus_one: bool = False,
-) -> tp.Array2d:
+) -> tp.Tuple[tp.Array1d, tp.Array1d]:
     """Get the source bounds that correspond to the target bounds.
 
     Returns a 2-dim array where the first column is the absolute start index (including) nad
@@ -208,7 +209,8 @@ def map_bounds_to_source_ranges_nb(
 
     !!! note
         Both index arrays must be increasing. Repeating values are allowed."""
-    out = np.empty((len(target_lbound_index), 2), dtype=np.int_)
+    range_starts_out = np.empty(len(target_lbound_index), dtype=np.int_)
+    range_ends_out = np.empty(len(target_lbound_index), dtype=np.int_)
     k = 0
 
     to_j = 0
@@ -251,13 +253,13 @@ def map_bounds_to_source_ranges_nb(
         if from_j == -1:
             if skip_minus_one:
                 continue
-            out[i, 0] = -1
-            out[i, 1] = -1
+            range_starts_out[i] = -1
+            range_ends_out[i] = -1
         else:
-            out[i, 0] = from_j
-            out[i, 1] = to_j
+            range_starts_out[i] = from_j
+            range_ends_out[i] = to_j
             k += 1
 
     if skip_minus_one:
-        return out[:k]
-    return out
+        return range_starts_out[:k], range_ends_out[:k]
+    return range_starts_out, range_ends_out

@@ -9,11 +9,12 @@ from pandas.api.types import is_scalar
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import combining, reshaping, indexes
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
+from vectorbtpro.base.indexing import row_points_defaults, row_ranges_defaults
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts, resolve_dict
 from vectorbtpro.utils.decorators import class_or_instanceproperty, class_or_instancemethod
 from vectorbtpro.utils.magic_decorators import attach_binary_magic_methods, attach_unary_magic_methods
-from vectorbtpro.utils.parsing import get_func_arg_names, get_expr_var_names, get_context_vars
+from vectorbtpro.utils.parsing import get_expr_var_names, get_context_vars
 from vectorbtpro.utils.template import deep_substitute
 from vectorbtpro.utils.datetime_ import freq_to_timedelta
 
@@ -506,8 +507,7 @@ class BaseAccessor(Wrapping):
         index_points = self.wrapper.get_index_points(**kwargs)
 
         if callable(value_or_func):
-            arg_names = get_func_arg_names(self.wrapper.get_index_points)
-            func_kwargs = {k: v for k, v in kwargs.items() if k not in arg_names}
+            func_kwargs = {k: v for k, v in kwargs.items() if k not in row_points_defaults}
             template_context = merge_dicts(kwargs, template_context)
         else:
             func_kwargs = None
@@ -577,18 +577,18 @@ class BaseAccessor(Wrapping):
         index_ranges = self.wrapper.get_index_ranges(**kwargs)
 
         if callable(value_or_func):
-            arg_names = get_func_arg_names(self.wrapper.get_index_points)
-            func_kwargs = {k: v for k, v in kwargs.items() if k not in arg_names}
+            func_kwargs = {k: v for k, v in kwargs.items() if k not in row_ranges_defaults}
             template_context = merge_dicts(kwargs, template_context)
         else:
             func_kwargs = None
-        for i in range(len(index_ranges)):
+        for i in range(len(index_ranges[0])):
             if callable(value_or_func):
                 _template_context = merge_dicts(
                     dict(
                         i=i,
-                        index_slice=slice(index_ranges[i, 0], index_ranges[i, 1]),
-                        index_ranges=index_ranges,
+                        index_slice=slice(index_ranges[0][i], index_ranges[1][i]),
+                        range_starts=index_ranges[0],
+                        range_ends=index_ranges[1],
                         wrapper=self.wrapper,
                         obj=self.obj,
                         columns=columns,
@@ -605,11 +605,11 @@ class BaseAccessor(Wrapping):
             else:
                 v = value_or_func
             if self.is_series() or columns is None:
-                obj.iloc[index_ranges[i, 0] : index_ranges[i, 1]] = v
+                obj.iloc[index_ranges[0][i] : index_ranges[1][i]] = v
             elif is_scalar(columns):
-                obj.iloc[index_ranges[i, 0] : index_ranges[i, 1], obj.columns.get_indexer([columns])[0]] = v
+                obj.iloc[index_ranges[0][i] : index_ranges[1][i], obj.columns.get_indexer([columns])[0]] = v
             else:
-                obj.iloc[index_ranges[i, 0] : index_ranges[i, 1], obj.columns.get_indexer(columns)] = v
+                obj.iloc[index_ranges[0][i] : index_ranges[1][i], obj.columns.get_indexer(columns)] = v
         if inplace:
             return None
         return obj

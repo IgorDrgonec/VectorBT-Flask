@@ -11,7 +11,7 @@ import pandas as pd
 from vectorbtpro import _typing as tp
 from vectorbtpro.returns.accessors import ReturnsAccessor
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.parsing import get_func_arg_names, get_func_kwargs
+from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config, HybridConfig
 from vectorbtpro.utils.template import deep_substitute, Rep, RepFunc
 from vectorbtpro.utils.execution import execute
@@ -21,6 +21,7 @@ from vectorbtpro.utils.random_ import set_seed_nb
 from vectorbtpro.base.indexes import combine_indexes, stack_indexes
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, to_dict
+from vectorbtpro.base.indexing import row_points_defaults, row_ranges_defaults
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic.enums import RangeStatus
 from vectorbtpro.portfolio.enums import alloc_range_dt, alloc_point_dt
@@ -47,9 +48,6 @@ except ImportError as e:
 
 
 __pdoc__ = {}
-
-_points_kwargs = get_func_kwargs(ArrayWrapper.get_index_points)
-_ranges_kwargs = get_func_kwargs(ArrayWrapper.get_index_ranges)
 
 
 # ############# PyPortfolioOpt ############# #
@@ -875,9 +873,7 @@ class PortfolioOptimizer(Analyzable):
         new_indices, _ = self._alloc_records.col_mapper.select_cols(wrapper_meta["group_idxs"])
         new_allocations = to_2d_array(self._allocations)[new_indices]
         return self.replace(
-            wrapper=wrapper_meta["new_wrapper"],
-            alloc_records=new_alloc_records,
-            allocations=new_allocations
+            wrapper=wrapper_meta["new_wrapper"], alloc_records=new_alloc_records, allocations=new_allocations
         )
 
     def resample(self: PortfolioOptimizerT, *args, **kwargs) -> PortfolioOptimizerT:
@@ -898,17 +894,17 @@ class PortfolioOptimizer(Analyzable):
         allocate_func: tp.Union[tp.Callable, pfopt_group_dict],
         *args,
         jitted_loop: tp.Union[bool, pfopt_group_dict] = False,
-        every: tp.Union[None, tp.FrequencyLike, pfopt_group_dict] = _points_kwargs["every"],
-        normalize_every: tp.Union[bool, pfopt_group_dict] = _points_kwargs["normalize_every"],
-        at_time: tp.Union[None, tp.TimeLike, pfopt_group_dict] = _points_kwargs["at_time"],
-        start: tp.Union[None, int, tp.DatetimeLike, pfopt_group_dict] = _points_kwargs["start"],
-        end: tp.Union[None, int, tp.DatetimeLike, pfopt_group_dict] = _points_kwargs["end"],
-        exact_start: tp.Union[bool, pfopt_group_dict] = _points_kwargs["exact_start"],
-        on: tp.Union[None, int, tp.DatetimeLike, tp.IndexLike, pfopt_group_dict] = _points_kwargs["on"],
-        add_delta: tp.Union[None, tp.FrequencyLike, pfopt_group_dict] = _points_kwargs["add_delta"],
-        kind: tp.Union[None, str, pfopt_group_dict] = _points_kwargs["kind"],
-        indexer_method: tp.Union[None, str, pfopt_group_dict] = _points_kwargs["indexer_method"],
-        skip_minus_one: tp.Union[bool, pfopt_group_dict] = _points_kwargs["skip_minus_one"],
+        every: tp.Union[None, tp.FrequencyLike, pfopt_group_dict] = row_points_defaults["every"],
+        normalize_every: tp.Union[bool, pfopt_group_dict] = row_points_defaults["normalize_every"],
+        at_time: tp.Union[None, tp.TimeLike, pfopt_group_dict] = row_points_defaults["at_time"],
+        start: tp.Union[None, int, tp.DatetimeLike, pfopt_group_dict] = row_points_defaults["start"],
+        end: tp.Union[None, int, tp.DatetimeLike, pfopt_group_dict] = row_points_defaults["end"],
+        exact_start: tp.Union[bool, pfopt_group_dict] = row_points_defaults["exact_start"],
+        on: tp.Union[None, int, tp.DatetimeLike, tp.IndexLike, pfopt_group_dict] = row_points_defaults["on"],
+        add_delta: tp.Union[None, tp.FrequencyLike, pfopt_group_dict] = row_points_defaults["add_delta"],
+        kind: tp.Union[None, str, pfopt_group_dict] = row_points_defaults["kind"],
+        indexer_method: tp.Union[None, str, pfopt_group_dict] = row_points_defaults["indexer_method"],
+        skip_minus_one: tp.Union[bool, pfopt_group_dict] = row_points_defaults["skip_minus_one"],
         jitted: tp.Union[tp.JittedOption, pfopt_group_dict] = None,
         chunked: tp.Union[tp.ChunkedOption, pfopt_group_dict] = None,
         index_points: tp.Union[None, tp.MaybeSequence[int], pfopt_group_dict] = None,
@@ -1113,17 +1109,17 @@ class PortfolioOptimizer(Analyzable):
                     _args, _kwargs = pre_group_func(group, *_args, **_kwargs)
                 _allocate_func = _kwargs.pop("allocate_func")
                 _jitted_loop = _kwargs.pop("jitted_loop", False)
-                _every = _kwargs.pop("every", _points_kwargs["every"])
-                _normalize_every = _kwargs.pop("normalize_every", _points_kwargs["normalize_every"])
-                _at_time = _kwargs.pop("at_time", _points_kwargs["at_time"])
-                _start = _kwargs.pop("start", _points_kwargs["start"])
-                _end = _kwargs.pop("end", _points_kwargs["end"])
-                _exact_start = _kwargs.pop("exact_start", _points_kwargs["exact_start"])
-                _on = _kwargs.pop("on", _points_kwargs["on"])
-                _add_delta = _kwargs.pop("add_delta", _points_kwargs["add_delta"])
-                _kind = _kwargs.pop("kind", _points_kwargs["kind"])
-                _indexer_method = _kwargs.pop("indexer_method", _points_kwargs["indexer_method"])
-                _skip_minus_one = _kwargs.pop("skip_minus_one", _points_kwargs["skip_minus_one"])
+                _every = _kwargs.pop("every", row_points_defaults["every"])
+                _normalize_every = _kwargs.pop("normalize_every", row_points_defaults["normalize_every"])
+                _at_time = _kwargs.pop("at_time", row_points_defaults["at_time"])
+                _start = _kwargs.pop("start", row_points_defaults["start"])
+                _end = _kwargs.pop("end", row_points_defaults["end"])
+                _exact_start = _kwargs.pop("exact_start", row_points_defaults["exact_start"])
+                _on = _kwargs.pop("on", row_points_defaults["on"])
+                _add_delta = _kwargs.pop("add_delta", row_points_defaults["add_delta"])
+                _kind = _kwargs.pop("kind", row_points_defaults["kind"])
+                _indexer_method = _kwargs.pop("indexer_method", row_points_defaults["indexer_method"])
+                _skip_minus_one = _kwargs.pop("skip_minus_one", row_points_defaults["skip_minus_one"])
                 _jitted = _kwargs.pop("jitted", None)
                 _chunked = _kwargs.pop("chunked", None)
                 _index_points = _kwargs.pop("index_points", None)
@@ -1164,7 +1160,7 @@ class PortfolioOptimizer(Analyzable):
                 )
 
                 if _index_points is None:
-                    get_index_points_kwargs = deep_substitute(
+                    get_index_points_defaults = deep_substitute(
                         dict(
                             every=_every,
                             normalize_every=_normalize_every,
@@ -1179,13 +1175,13 @@ class PortfolioOptimizer(Analyzable):
                             skip_minus_one=_skip_minus_one,
                         ),
                         _template_context,
-                        sub_id="get_index_points_kwargs",
+                        sub_id="get_index_points_defaults",
                         strict=True,
                     )
-                    _index_points = wrapper.get_index_points(**get_index_points_kwargs)
+                    _index_points = wrapper.get_index_points(**get_index_points_defaults)
                     _template_context = merge_dicts(
                         _template_context,
-                        get_index_points_kwargs,
+                        get_index_points_defaults,
                         dict(index_points=_index_points),
                     )
                 else:
@@ -1479,23 +1475,23 @@ class PortfolioOptimizer(Analyzable):
         optimize_func: tp.Union[tp.Callable, pfopt_group_dict],
         *args,
         jitted_loop: tp.Union[bool, pfopt_group_dict] = False,
-        every: tp.Union[None, tp.FrequencyLike, pfopt_group_dict] = _ranges_kwargs["every"],
-        normalize_every: tp.Union[bool, pfopt_group_dict] = _ranges_kwargs["normalize_every"],
-        split_every: tp.Union[bool, pfopt_group_dict] = _ranges_kwargs["split_every"],
-        start_time: tp.Union[None, tp.TimeLike, pfopt_group_dict] = _ranges_kwargs["start_time"],
-        end_time: tp.Union[None, tp.TimeLike, pfopt_group_dict] = _ranges_kwargs["end_time"],
-        lookback_period: tp.Union[None, tp.FrequencyLike, pfopt_group_dict] = _ranges_kwargs["lookback_period"],
-        start: tp.Union[None, int, tp.DatetimeLike, tp.IndexLike, pfopt_group_dict] = _ranges_kwargs["start"],
-        end: tp.Union[None, int, tp.DatetimeLike, tp.IndexLike, pfopt_group_dict] = _ranges_kwargs["end"],
-        exact_start: tp.Union[bool, pfopt_group_dict] = _ranges_kwargs["exact_start"],
-        fixed_start: tp.Union[bool, pfopt_group_dict] = _ranges_kwargs["fixed_start"],
-        closed_start: tp.Union[bool, pfopt_group_dict] = _ranges_kwargs["closed_start"],
-        closed_end: tp.Union[bool, pfopt_group_dict] = _ranges_kwargs["closed_end"],
-        add_start_delta: tp.Union[None, tp.FrequencyLike, pfopt_group_dict] = _ranges_kwargs["add_start_delta"],
-        add_end_delta: tp.Union[None, tp.FrequencyLike, pfopt_group_dict] = _ranges_kwargs["add_end_delta"],
-        kind: tp.Union[None, str, pfopt_group_dict] = _ranges_kwargs["kind"],
-        indexer_method: tp.Union[None, str, pfopt_group_dict] = _ranges_kwargs["indexer_method"],
-        skip_minus_one: tp.Union[bool, pfopt_group_dict] = _ranges_kwargs["skip_minus_one"],
+        every: tp.Union[None, tp.FrequencyLike, pfopt_group_dict] = row_ranges_defaults["every"],
+        normalize_every: tp.Union[bool, pfopt_group_dict] = row_ranges_defaults["normalize_every"],
+        split_every: tp.Union[bool, pfopt_group_dict] = row_ranges_defaults["split_every"],
+        start_time: tp.Union[None, tp.TimeLike, pfopt_group_dict] = row_ranges_defaults["start_time"],
+        end_time: tp.Union[None, tp.TimeLike, pfopt_group_dict] = row_ranges_defaults["end_time"],
+        lookback_period: tp.Union[None, tp.FrequencyLike, pfopt_group_dict] = row_ranges_defaults["lookback_period"],
+        start: tp.Union[None, int, tp.DatetimeLike, tp.IndexLike, pfopt_group_dict] = row_ranges_defaults["start"],
+        end: tp.Union[None, int, tp.DatetimeLike, tp.IndexLike, pfopt_group_dict] = row_ranges_defaults["end"],
+        exact_start: tp.Union[bool, pfopt_group_dict] = row_ranges_defaults["exact_start"],
+        fixed_start: tp.Union[bool, pfopt_group_dict] = row_ranges_defaults["fixed_start"],
+        closed_start: tp.Union[bool, pfopt_group_dict] = row_ranges_defaults["closed_start"],
+        closed_end: tp.Union[bool, pfopt_group_dict] = row_ranges_defaults["closed_end"],
+        add_start_delta: tp.Union[None, tp.FrequencyLike, pfopt_group_dict] = row_ranges_defaults["add_start_delta"],
+        add_end_delta: tp.Union[None, tp.FrequencyLike, pfopt_group_dict] = row_ranges_defaults["add_end_delta"],
+        kind: tp.Union[None, str, pfopt_group_dict] = row_ranges_defaults["kind"],
+        indexer_method: tp.Union[None, str, pfopt_group_dict] = row_ranges_defaults["indexer_method"],
+        skip_minus_one: tp.Union[bool, pfopt_group_dict] = row_ranges_defaults["skip_minus_one"],
         jitted: tp.Union[tp.JittedOption, pfopt_group_dict] = None,
         chunked: tp.Union[tp.ChunkedOption, pfopt_group_dict] = None,
         index_ranges: tp.Union[None, tp.MaybeSequence[tp.MaybeSequence[int]], pfopt_group_dict] = None,
@@ -1790,23 +1786,23 @@ class PortfolioOptimizer(Analyzable):
                     _args, _kwargs = pre_group_func(group, *_args, **_kwargs)
                 _optimize_func = _kwargs.pop("optimize_func")
                 _jitted_loop = _kwargs.pop("jitted_loop", False)
-                _every = _kwargs.pop("every", _ranges_kwargs["every"])
-                _normalize_every = _kwargs.pop("normalize_every", _ranges_kwargs["normalize_every"])
-                _split_every = _kwargs.pop("split_every", _ranges_kwargs["split_every"])
-                _start_time = _kwargs.pop("start_time", _ranges_kwargs["start_time"])
-                _end_time = _kwargs.pop("end_time", _ranges_kwargs["end_time"])
-                _lookback_period = _kwargs.pop("lookback_period", _ranges_kwargs["lookback_period"])
-                _start = _kwargs.pop("start", _ranges_kwargs["start"])
-                _end = _kwargs.pop("end", _ranges_kwargs["end"])
-                _exact_start = _kwargs.pop("exact_start", _ranges_kwargs["exact_start"])
-                _fixed_start = _kwargs.pop("fixed_start", _ranges_kwargs["fixed_start"])
-                _closed_start = _kwargs.pop("closed_start", _ranges_kwargs["closed_start"])
-                _closed_end = _kwargs.pop("closed_end", _ranges_kwargs["closed_end"])
-                _add_start_delta = _kwargs.pop("add_start_delta", _ranges_kwargs["add_start_delta"])
-                _add_end_delta = _kwargs.pop("add_end_delta", _ranges_kwargs["add_end_delta"])
-                _kind = _kwargs.pop("kind", _ranges_kwargs["kind"])
-                _indexer_method = _kwargs.pop("indexer_method", _ranges_kwargs["indexer_method"])
-                _skip_minus_one = _kwargs.pop("skip_minus_one", _ranges_kwargs["skip_minus_one"])
+                _every = _kwargs.pop("every", row_ranges_defaults["every"])
+                _normalize_every = _kwargs.pop("normalize_every", row_ranges_defaults["normalize_every"])
+                _split_every = _kwargs.pop("split_every", row_ranges_defaults["split_every"])
+                _start_time = _kwargs.pop("start_time", row_ranges_defaults["start_time"])
+                _end_time = _kwargs.pop("end_time", row_ranges_defaults["end_time"])
+                _lookback_period = _kwargs.pop("lookback_period", row_ranges_defaults["lookback_period"])
+                _start = _kwargs.pop("start", row_ranges_defaults["start"])
+                _end = _kwargs.pop("end", row_ranges_defaults["end"])
+                _exact_start = _kwargs.pop("exact_start", row_ranges_defaults["exact_start"])
+                _fixed_start = _kwargs.pop("fixed_start", row_ranges_defaults["fixed_start"])
+                _closed_start = _kwargs.pop("closed_start", row_ranges_defaults["closed_start"])
+                _closed_end = _kwargs.pop("closed_end", row_ranges_defaults["closed_end"])
+                _add_start_delta = _kwargs.pop("add_start_delta", row_ranges_defaults["add_start_delta"])
+                _add_end_delta = _kwargs.pop("add_end_delta", row_ranges_defaults["add_end_delta"])
+                _kind = _kwargs.pop("kind", row_ranges_defaults["kind"])
+                _indexer_method = _kwargs.pop("indexer_method", row_ranges_defaults["indexer_method"])
+                _skip_minus_one = _kwargs.pop("skip_minus_one", row_ranges_defaults["skip_minus_one"])
                 _jitted = _kwargs.pop("jitted", None)
                 _chunked = _kwargs.pop("chunked", None)
                 _index_ranges = _kwargs.pop("index_ranges", None)
@@ -1856,7 +1852,7 @@ class PortfolioOptimizer(Analyzable):
                 )
 
                 if _index_ranges is None:
-                    get_index_ranges_kwargs = deep_substitute(
+                    get_index_ranges_defaults = deep_substitute(
                         dict(
                             every=_every,
                             normalize_every=_normalize_every,
@@ -1878,13 +1874,13 @@ class PortfolioOptimizer(Analyzable):
                             jitted=_jitted,
                         ),
                         _template_context,
-                        sub_id="get_index_ranges_kwargs",
+                        sub_id="get_index_ranges_defaults",
                         strict=True,
                     )
-                    _index_ranges = wrapper.get_index_ranges(**get_index_ranges_kwargs)
+                    _index_ranges = wrapper.get_index_ranges(**get_index_ranges_defaults)
                     _template_context = merge_dicts(
                         _template_context,
-                        get_index_ranges_kwargs,
+                        get_index_ranges_defaults,
                         dict(index_ranges=_index_ranges),
                     )
                 else:
@@ -1894,7 +1890,11 @@ class PortfolioOptimizer(Analyzable):
                         sub_id="index_ranges",
                         strict=True,
                     )
-                    _index_ranges = to_2d_array(_index_ranges, expand_axis=0)
+                    if isinstance(_index_ranges, np.ndarray):
+                        _index_ranges = (_index_ranges[:, 0], _index_ranges[:, 1])
+                    elif not isinstance(_index_ranges[0], np.ndarray) and not isinstance(_index_ranges[1], np.ndarray):
+                        _index_ranges = to_2d_array(_index_ranges, expand_axis=0)
+                        _index_ranges = (_index_ranges[:, 0], _index_ranges[:, 1])
                     _template_context = merge_dicts(_template_context, dict(index_ranges=_index_ranges))
                 if _index_loc is not None:
                     _index_loc = deep_substitute(
@@ -1926,11 +1926,18 @@ class PortfolioOptimizer(Analyzable):
                     _kwargs = deep_substitute(_kwargs, _template_context, sub_id="kwargs")
                     func = jit_reg.resolve_option(nb.optimize_meta_nb, jitted)
                     func = ch_reg.resolve_option(func, chunked)
-                    _allocations = func(len(wrapper.columns), _index_ranges, _optimize_func, *_args, **_kwargs)
+                    _allocations = func(
+                        len(wrapper.columns),
+                        _index_ranges[0],
+                        _index_ranges[1],
+                        _optimize_func,
+                        *_args,
+                        **_kwargs,
+                    )
                 else:
                     funcs_args = []
-                    for i in range(len(_index_ranges)):
-                        index_slice = slice(max(0, _index_ranges[i, 0]), _index_ranges[i, 1])
+                    for i in range(len(_index_ranges[0])):
+                        index_slice = slice(max(0, _index_ranges[0][i]), _index_ranges[1][i])
                         __template_context = merge_dicts(dict(i=i, index_slice=index_slice), _template_context)
                         __optimize_func = deep_substitute(
                             _optimize_func,
@@ -1958,17 +1965,17 @@ class PortfolioOptimizer(Analyzable):
 
                 notna_mask = ~np.isnan(_allocations).all(axis=1)
                 _allocations = _allocations[notna_mask]
-                _index_ranges = _index_ranges[notna_mask]
+                _index_ranges = (_index_ranges[0][notna_mask], _index_ranges[1][notna_mask])
                 if _index_loc is None:
-                    alloc_idx = _index_ranges[:, 1] - 1 + _alloc_wait
+                    alloc_idx = _index_ranges[1] - 1 + _alloc_wait
                 else:
                     alloc_idx = _index_loc[notna_mask]
 
                 _alloc_ranges = np.empty(len(_allocations), alloc_range_dt)
                 _alloc_ranges["id"] = np.arange(len(_allocations))
                 _alloc_ranges["col"] = g
-                _alloc_ranges["start_idx"] = _index_ranges[:, 0]
-                _alloc_ranges["end_idx"] = _index_ranges[:, 1]
+                _alloc_ranges["start_idx"] = _index_ranges[0]
+                _alloc_ranges["end_idx"] = _index_ranges[1]
                 _alloc_ranges["alloc_idx"] = alloc_idx
                 _alloc_ranges["status"] = np.where(
                     alloc_idx >= len(wrapper.index),
