@@ -708,8 +708,8 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
         self._records_arr = records_arr
         self._col_mapper = col_mapper
 
-        # Cannot select rows
-        self._column_only_select = True
+        # Only slices of rows can be selected
+        self._range_only_select = True
 
         # Copy writeable attrs
         self._field_config = type(self)._field_config.copy()
@@ -727,47 +727,74 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
                     kwargs["col_mapper"] = None
         return Wrapping.replace(self, **kwargs)
 
-    def get_by_col_idxs(self, col_idxs: tp.MaybeIndexArray, jitted: tp.JittedOption = None) -> tp.RecordArray:
-        """Get records corresponding to column indices.
+    def select_cols(
+        self,
+        col_idxs: tp.MaybeIndexArray,
+        jitted: tp.JittedOption = None,
+    ) -> tp.Tuple[tp.Array1d, tp.RecordArray]:
+        """Select columns.
 
-        Returns new records array."""
+        Returns indices and new record array. Automatically decides whether to use column lengths or column map."""
         if len(self.values) == 0:
-            return self.values
+            return np.arange(len(self.values)), self.values
         if isinstance(col_idxs, slice):
             if col_idxs.start is None and col_idxs.stop is None:
-                return self.values
+                return np.arange(len(self.values)), self.values
             col_idxs = np.arange(col_idxs.start, col_idxs.stop)
         if self.col_mapper.is_sorted():
             func = jit_reg.resolve_option(nb.record_col_lens_select_nb, jitted)
-            new_records_arr = func(self.values, self.col_mapper.col_lens, to_1d_array(col_idxs))  # faster
+            new_indices, new_records_arr = func(self.values, self.col_mapper.col_lens, to_1d_array(col_idxs))  # faster
         else:
             func = jit_reg.resolve_option(nb.record_col_map_select_nb, jitted)
-            new_records_arr = func(self.values, self.col_mapper.col_map, to_1d_array(col_idxs))  # more flexible
-        return new_records_arr
+            new_indices, new_records_arr = func(
+                self.values, self.col_mapper.col_map, to_1d_array(col_idxs)
+            )  # more flexible
+        return new_indices, new_records_arr
 
-    def indexing_func_meta(self, *args, **kwargs) -> dict:
+    def indexing_func_meta(self, *args, wrapper_meta: tp.DictLike = None, **kwargs) -> dict:
         """Perform indexing on `Records` and also return metadata."""
-        wrapper_meta = self.wrapper.indexing_func_meta(
-            *args,
-            column_only_select=self.column_only_select,
-            group_select=self.group_select,
-            **kwargs,
-        )
+        if wrapper_meta is None:
+            wrapper_meta = self.wrapper.indexing_func_meta(
+                *args,
+                column_only_select=self.column_only_select,
+                range_only_select=self.range_only_select,
+                group_select=self.group_select,
+                **kwargs,
+            )
         if self.get_field_setting("col", "group_indexing", False):
-            new_records_arr = self.get_by_col_idxs(wrapper_meta["group_idxs"])
+            new_indices, new_records_arr = self.select_cols(wrapper_meta["group_idxs"])
         else:
-            new_records_arr = self.get_by_col_idxs(wrapper_meta["col_idxs"])
+            new_indices, new_records_arr = self.select_cols(wrapper_meta["col_idxs"])
+        if wrapper_meta["rows_changed"]:
+            row_idxs = wrapper_meta["row_idxs"]
+            index_fields = []
+            for field in new_records_arr.dtype.names:
+                field_mapping = self.get_field_mapping(field)
+                if isinstance(field_mapping, str) and field_mapping == "index":
+                    index_fields.append(field)
+            if len(index_fields) > 0:
+                masks = []
+                for field in index_fields:
+                    field_arr = new_records_arr[field]
+                    masks.append((field_arr >= row_idxs.start) & (field_arr < row_idxs.stop))
+                mask = np.array(masks).all(axis=0)
+                new_indices = new_indices[mask]
+                new_records_arr = new_records_arr[mask]
+                for field in index_fields:
+                    new_records_arr[field] = new_records_arr[field] - row_idxs.start
         return dict(
             wrapper_meta=wrapper_meta,
+            new_indices=new_indices,
             new_records_arr=new_records_arr,
         )
 
-    def indexing_func(self: RecordsT, *args, **kwargs) -> RecordsT:
+    def indexing_func(self: RecordsT, *args, records_meta: tp.DictLike = None, **kwargs) -> RecordsT:
         """Perform indexing on `Records`."""
-        records_meta = self.indexing_func_meta(*args, **kwargs)
+        if records_meta is None:
+            records_meta = self.indexing_func_meta(*args, **kwargs)
         return self.replace(
             wrapper=records_meta["wrapper_meta"]["new_wrapper"],
-            records_arr=records_meta["new_records_arr"]
+            records_arr=records_meta["new_records_arr"],
         )
 
     def resample_records_arr(self, resampler: tp.Union[Resampler, tp.PandasResampler]) -> tp.RecordArray:
@@ -784,22 +811,20 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
                 new_records_arr[field_name] = index_map[new_records_arr[field_name]]
         return new_records_arr
 
-    def resample_meta(
-        self: RecordsT,
-        *args,
-        **kwargs,
-    ) -> tp.Tuple[tp.Union[Resampler, tp.PandasResampler], ArrayWrapper, tp.RecordArray]:
+    def resample_meta(self: RecordsT, *args, wrapper_meta: tp.DictLike = None, **kwargs) -> dict:
         """Perform resampling on `Records` and also return metadata."""
-        resampler, new_wrapper = self.wrapper.resample_meta(*args, **kwargs)
-        new_records_arr = self.resample_records_arr(resampler)
-        return resampler, new_wrapper, new_records_arr
+        if wrapper_meta is None:
+            wrapper_meta = self.wrapper.resample_meta(*args, **kwargs)
+        new_records_arr = self.resample_records_arr(wrapper_meta["resampler"])
+        return dict(wrapper_meta=wrapper_meta, new_records_arr=new_records_arr)
 
-    def resample(self: RecordsT, *args, **kwargs) -> RecordsT:
+    def resample(self: RecordsT, *args, records_meta: tp.DictLike = None, **kwargs) -> RecordsT:
         """Perform resampling on `Records`."""
-        _, new_wrapper, new_records_arr = self.resample_meta(*args, **kwargs)
+        if records_meta is None:
+            records_meta = self.resample_meta(*args, **kwargs)
         return self.replace(
-            wrapper=new_wrapper,
-            records_arr=new_records_arr,
+            wrapper=records_meta["wrapper_meta"]["new_wrapper"],
+            records_arr=records_meta["new_records_arr"],
         )
 
     @property

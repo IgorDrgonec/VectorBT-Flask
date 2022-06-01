@@ -676,7 +676,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
     @class_or_instancemethod
     def map(
         cls_or_self,
-        map_func_nb: tp.Union[tp.MapFunc, tp.MapMetaFunc],
+        map_func_nb: tp.Union[str, tp.MapFunc, tp.MapMetaFunc],
         *args,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
@@ -790,7 +790,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
     @class_or_instancemethod
     def apply_along_axis(
         cls_or_self,
-        apply_func_nb: tp.Union[tp.ApplyFunc, tp.ApplyMetaFunc],
+        apply_func_nb: tp.Union[str, tp.ApplyFunc, tp.ApplyMetaFunc],
         *args,
         axis: int = 1,
         broadcast_named_args: tp.KwargsLike = None,
@@ -915,7 +915,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
     def rolling_apply(
         cls_or_self,
         window: tp.Optional[tp.FrequencyLike],
-        reduce_func_nb: tp.Union[str, tp.ReduceFunc, tp.RangeReduceMetaFunc],
+        reduce_func_nb: tp.Union[str, str, tp.ReduceFunc, tp.RangeReduceMetaFunc],
         *args,
         minp: tp.Optional[int] = None,
         broadcast_named_args: tp.KwargsLike = None,
@@ -1080,7 +1080,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
     def groupby_apply(
         cls_or_self,
         by: tp.Union[Grouper, tp.PandasGroupByLike],
-        reduce_func_nb: tp.Union[tp.ReduceFunc, tp.GroupByReduceMetaFunc],
+        reduce_func_nb: tp.Union[str, tp.ReduceFunc, tp.GroupByReduceMetaFunc],
         *args,
         groupby_kwargs: tp.KwargsLike = None,
         broadcast_named_args: tp.KwargsLike = None,
@@ -1212,7 +1212,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
     def resample_apply(
         cls_or_self,
         rule: tp.Union[Resampler, tp.PandasResampler, tp.PandasFrequencyLike],
-        reduce_func_nb: tp.Union[tp.ReduceFunc, tp.GroupByReduceMetaFunc, tp.RangeReduceMetaFunc],
+        reduce_func_nb: tp.Union[str, tp.ReduceFunc, tp.GroupByReduceMetaFunc, tp.RangeReduceMetaFunc],
         *args,
         use_groupby_apply: bool = False,
         resample_kwargs: tp.KwargsLike = None,
@@ -1361,8 +1361,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
     @class_or_instancemethod
     def apply_and_reduce(
         cls_or_self,
-        apply_func_nb: tp.Union[tp.ApplyFunc, tp.ApplyMetaFunc],
-        reduce_func_nb: tp.Union[tp.ReduceFunc, tp.ReduceMetaFunc],
+        apply_func_nb: tp.Union[str, tp.ApplyFunc, tp.ApplyMetaFunc],
+        reduce_func_nb: tp.Union[str, tp.ReduceFunc, tp.ReduceMetaFunc],
         apply_args: tp.Optional[tuple] = None,
         reduce_args: tp.Optional[tuple] = None,
         broadcast_named_args: tp.KwargsLike = None,
@@ -1485,6 +1485,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
     def reduce(
         cls_or_self,
         reduce_func_nb: tp.Union[
+            str,
             tp.ReduceFunc,
             tp.ReduceMetaFunc,
             tp.ReduceToArrayFunc,
@@ -1741,7 +1742,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
     @class_or_instancemethod
     def squeeze_grouped(
         cls_or_self,
-        squeeze_func_nb: tp.Union[tp.ReduceFunc, tp.GroupSqueezeMetaFunc],
+        squeeze_func_nb: tp.Union[str, tp.ReduceFunc, tp.GroupSqueezeMetaFunc],
         *args,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
@@ -2127,7 +2128,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
     def resample_to_index(
         cls_or_self,
         target_index: tp.Union[Resampler, tp.IndexLike],
-        reduce_func_nb: tp.Union[tp.ReduceFunc, tp.RangeReduceMetaFunc],
+        reduce_func_nb: tp.Union[str, tp.ReduceFunc, tp.RangeReduceMetaFunc],
         *args,
         target_freq: tp.Union[None, bool, tp.FrequencyLike] = None,
         before: bool = False,
@@ -2317,7 +2318,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         cls_or_self,
         target_lbound_index: tp.IndexLike,
         target_rbound_index: tp.IndexLike,
-        reduce_func_nb: tp.Union[tp.ReduceFunc, tp.RangeReduceMetaFunc],
+        reduce_func_nb: tp.Union[str, tp.ReduceFunc, tp.RangeReduceMetaFunc],
         *args,
         closed_lbound: bool = True,
         closed_rbound: bool = False,

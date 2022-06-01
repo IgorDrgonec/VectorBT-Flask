@@ -59,14 +59,19 @@ def col_lens_nb(col_arr: tp.Array1d, n_cols: int) -> tp.GroupLens:
 
 
 @register_jitted(cache=True)
-def record_col_lens_select_nb(records: tp.RecordArray, col_lens: tp.GroupLens, new_cols: tp.Array1d) -> tp.RecordArray:
+def record_col_lens_select_nb(
+    records: tp.RecordArray,
+    col_lens: tp.GroupLens,
+    new_cols: tp.Array1d,
+) -> tp.Tuple[tp.Array1d, tp.RecordArray]:
     """Perform indexing on sorted records using column lengths.
 
     Returns new records."""
     col_end_idxs = np.cumsum(col_lens)
     col_start_idxs = col_end_idxs - col_lens
     n_values = np.sum(col_lens[new_cols])
-    out = np.empty(n_values, dtype=records.dtype)
+    indices_out = np.empty(n_values, dtype=np.int_)
+    records_arr_out = np.empty(n_values, dtype=records.dtype)
     j = 0
 
     for c in range(new_cols.shape[0]):
@@ -76,9 +81,11 @@ def record_col_lens_select_nb(records: tp.RecordArray, col_lens: tp.GroupLens, n
             continue
         col_records = np.copy(records[from_r:to_r])
         col_records["col"][:] = c  # don't forget to assign new column indices
-        out[j : j + col_records.shape[0]] = col_records
+        rang = np.arange(from_r, to_r)
+        indices_out[j: j + rang.shape[0]] = rang
+        records_arr_out[j : j + rang.shape[0]] = col_records
         j += col_records.shape[0]
-    return out
+    return indices_out, records_arr_out
 
 
 @register_jitted(cache=True)
@@ -105,11 +112,17 @@ def col_map_nb(col_arr: tp.Array1d, n_cols: int) -> tp.GroupMap:
 
 
 @register_jitted(cache=True)
-def record_col_map_select_nb(records: tp.RecordArray, col_map: tp.GroupMap, new_cols: tp.Array1d) -> tp.RecordArray:
+def record_col_map_select_nb(
+    records: tp.RecordArray,
+    col_map: tp.GroupMap,
+    new_cols: tp.Array1d,
+) -> tp.Tuple[tp.Array1d, tp.RecordArray]:
     """Same as `record_col_lens_select_nb` but using column map `col_map`."""
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
-    out = np.empty(np.sum(col_lens[new_cols]), dtype=records.dtype)
+    total_count = np.sum(col_lens[new_cols])
+    indices_out = np.empty(total_count, dtype=np.int_)
+    records_arr_out = np.empty(total_count, dtype=records.dtype)
     j = 0
 
     for new_col_i in range(len(new_cols)):
@@ -121,9 +134,10 @@ def record_col_map_select_nb(records: tp.RecordArray, col_map: tp.GroupMap, new_
         idxs = col_idxs[col_start_idx : col_start_idx + col_len]
         col_records = np.copy(records[idxs])
         col_records["col"][:] = new_col_i
-        out[j : j + col_len] = col_records
+        indices_out[j: j + col_len] = idxs
+        records_arr_out[j : j + col_len] = col_records
         j += col_len
-    return out
+    return indices_out, records_arr_out
 
 
 # ############# Sorting ############# #

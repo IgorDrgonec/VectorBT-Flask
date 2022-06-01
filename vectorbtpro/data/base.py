@@ -740,9 +740,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
         Args:
             concat (bool): Whether to concatenate existing and updated/new data.
-                Defaults to False.
             show_progress (bool): Whether to show the progress bar.
-                Defaults to False.
 
                 Will also forward this argument to `Data.update_symbol` if accepted by `Data.fetch_symbol`.
             pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`.
@@ -1211,7 +1209,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             data=new_data,
         )
 
-    def resample(self: DataT, *args, **kwargs) -> DataT:
+    def resample(self: DataT, *args, wrapper_meta: tp.DictLike = None, **kwargs) -> DataT:
         """Perform resampling on `Data` based on `Data.column_config`.
 
         Columns "open", "high", "low", "close", "volume", "trade count", and "vwap" (case-insensitive)
@@ -1219,7 +1217,8 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
         Looks for `resample_func` of each column in `Data.column_config`. The function must
         accept the `Data` instance, object, and resampler."""
-        resampler, new_wrapper = self.wrapper.resample_meta(*args, **kwargs)
+        if wrapper_meta is None:
+            wrapper_meta = self.wrapper.resample_meta(*args, **kwargs)
         new_data = symbol_dict()
         for k, v in self.data.items():
             if checks.is_series(v):
@@ -1234,22 +1233,22 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                     obj = v[c]
                 resample_func = self.column_config.get(c, {}).get("resample_func", None)
                 if resample_func is not None:
-                    new_v.append(resample_func(self, obj, resampler))
+                    new_v.append(resample_func(self, obj, wrapper_meta["resampler"]))
                 else:
                     if isinstance(c, str) and c.lower() == "open":
-                        new_v.append(obj.vbt.resample_apply(resampler, generic_nb.nth_reduce_nb, 0))
+                        new_v.append(obj.vbt.resample_apply(wrapper_meta["resampler"], generic_nb.nth_reduce_nb, 0))
                     elif isinstance(c, str) and c.lower() == "high":
-                        new_v.append(obj.vbt.resample_apply(resampler, generic_nb.max_reduce_nb))
+                        new_v.append(obj.vbt.resample_apply(wrapper_meta["resampler"], generic_nb.max_reduce_nb))
                     elif isinstance(c, str) and c.lower() == "low":
-                        new_v.append(obj.vbt.resample_apply(resampler, generic_nb.min_reduce_nb))
+                        new_v.append(obj.vbt.resample_apply(wrapper_meta["resampler"], generic_nb.min_reduce_nb))
                     elif isinstance(c, str) and c.lower() == "close":
-                        new_v.append(obj.vbt.resample_apply(resampler, generic_nb.last_reduce_nb))
+                        new_v.append(obj.vbt.resample_apply(wrapper_meta["resampler"], generic_nb.last_reduce_nb))
                     elif isinstance(c, str) and c.lower() == "volume":
-                        new_v.append(obj.vbt.resample_apply(resampler, generic_nb.sum_reduce_nb))
+                        new_v.append(obj.vbt.resample_apply(wrapper_meta["resampler"], generic_nb.sum_reduce_nb))
                     elif isinstance(c, str) and c.lower() == "trade count":
                         new_v.append(
                             obj.vbt.resample_apply(
-                                resampler,
+                                wrapper_meta["resampler"],
                                 generic_nb.sum_reduce_nb,
                                 wrap_kwargs=dict(dtype=int),
                             )
@@ -1263,7 +1262,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                             raise ValueError("Volume is required to resample VWAP")
                         new_v.append(
                             pd.DataFrame.vbt.resample_apply(
-                                resampler,
+                                wrapper_meta["resampler"],
                                 generic_nb.wmean_range_reduce_meta_nb,
                                 to_2d_array(obj),
                                 to_2d_array(volume_obj),
@@ -1278,7 +1277,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                 new_v = pd.concat(new_v, axis=1)
             new_data[k] = new_v
         return self.replace(
-            wrapper=new_wrapper,
+            wrapper=wrapper_meta["new_wrapper"],
             data=new_data,
         )
 

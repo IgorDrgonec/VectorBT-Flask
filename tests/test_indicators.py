@@ -75,15 +75,15 @@ class TestFactory:
         indicator1 = I.run(ts1, [0, 1])
         indicator2 = I.run(ts2, [0, 1])
         new_indicator = I.row_stack((indicator1, indicator2))
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             new_indicator.ts,
             pd.concat((indicator1.ts, indicator2.ts), axis=0),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             new_indicator.inout,
             pd.concat((indicator1.inout, indicator2.inout), axis=0),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             new_indicator.out,
             pd.concat((indicator1.out, indicator2.out), axis=0),
         )
@@ -108,20 +108,20 @@ class TestFactory:
             new_indicator._input_mapper,
             np.concatenate((indicator1._input_mapper, indicator2._input_mapper)),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             new_indicator.ts,
             pd.concat((indicator1.ts, indicator2.ts), axis=1),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             new_indicator.inout,
             pd.concat((indicator1.inout, indicator2.inout), axis=1),
         )
-        pd.testing.assert_frame_equal(
+        assert_frame_equal(
             new_indicator.out,
             pd.concat((indicator1.out, indicator2.out), axis=1),
         )
         assert new_indicator.p_list == indicator1.p_list + indicator2.p_list
-        pd.testing.assert_index_equal(
+        assert_index_equal(
             new_indicator._p_mapper,
             indicator1._p_mapper.append(indicator2._p_mapper),
         )
@@ -2378,6 +2378,7 @@ class TestFactory:
             "post_resolve_attr",
             "pre_resolve_attr",
             "prettify",
+            "range_only_select",
             "regroup",
             "replace",
             "resample",

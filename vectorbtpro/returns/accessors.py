@@ -231,8 +231,8 @@ class ReturnsAccessor(GenericAccessor):
             bm_returns = []
             stack_bm_returns = True
             for obj in objs:
-                if obj.config["bm_returns"] is not None:
-                    bm_returns.append(obj.config["bm_returns"])
+                if obj.bm_returns is not None:
+                    bm_returns.append(obj.bm_returns)
                 else:
                     stack_bm_returns = False
                     break
@@ -280,9 +280,10 @@ class ReturnsAccessor(GenericAccessor):
         """Accessor class for `pd.DataFrame`."""
         return ReturnsDFAccessor
 
-    def indexing_func(self: ReturnsAccessorT, *args, **kwargs) -> ReturnsAccessorT:
+    def indexing_func(self: ReturnsAccessorT, *args, wrapper_meta: tp.DictLike = None, **kwargs) -> ReturnsAccessorT:
         """Perform indexing on `ReturnsAccessor`."""
-        wrapper_meta = self.wrapper.indexing_func_meta(*args, **kwargs)
+        if wrapper_meta is None:
+            wrapper_meta = self.wrapper.indexing_func_meta(*args, **kwargs)
         new_obj = wrapper_meta["new_wrapper"].wrap(
             self.to_2d_array()[wrapper_meta["row_idxs"], :][:, wrapper_meta["col_idxs"]],
             group_by=False,
@@ -1492,20 +1493,27 @@ class ReturnsAccessor(GenericAccessor):
 
     # ############# Resampling ############# #
 
-    def resample(self: ReturnsAccessorT, *args, fill_with_zero: bool = True, **kwargs) -> ReturnsAccessorT:
+    def resample(
+        self: ReturnsAccessorT,
+        *args,
+        fill_with_zero: bool = True,
+        wrapper_meta: tp.DictLike = None,
+        **kwargs,
+    ) -> ReturnsAccessorT:
         """Perform resampling on `ReturnsAccessor`."""
-        resampler, new_wrapper = self.wrapper.resample_meta(*args, **kwargs)
-        new_obj = self.resample_apply(resampler, nb.cum_returns_final_1d_nb)
+        if wrapper_meta is None:
+            wrapper_meta = self.wrapper.resample_meta(*args, **kwargs)
+        new_obj = self.resample_apply(wrapper_meta["resampler"], nb.cum_returns_final_1d_nb)
         if fill_with_zero:
             new_obj = new_obj.vbt.fillna(0.0)
         if self.bm_returns is not None:
-            new_bm_returns = self.bm_returns.vbt.resample_apply(resampler, nb.cum_returns_final_1d_nb)
+            new_bm_returns = self.bm_returns.vbt.resample_apply(wrapper_meta["resampler"], nb.cum_returns_final_1d_nb)
             if fill_with_zero:
                 new_bm_returns = new_bm_returns.vbt.fillna(0.0)
         else:
             new_bm_returns = None
         return self.replace(
-            wrapper=new_wrapper,
+            wrapper=wrapper_meta["new_wrapper"],
             obj=new_obj,
             bm_returns=new_bm_returns,
         )

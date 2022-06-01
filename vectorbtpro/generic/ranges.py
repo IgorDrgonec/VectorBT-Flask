@@ -271,8 +271,8 @@ class Ranges(Records):
             stack_ts_objs = True
             any_not_none = False
             for obj in objs:
-                if obj.config["ts"] is not None:
-                    ts_objs.append(obj.config["ts"])
+                if obj.ts is not None:
+                    ts_objs.append(obj.ts)
                     any_not_none = True
                 else:
                     stack_ts_objs = False
@@ -302,11 +302,16 @@ class Ranges(Records):
         Records.__init__(self, wrapper, records_arr, ts=ts, **kwargs)
         self._ts = ts
 
-    def indexing_func(self: RangesT, *args, **kwargs) -> RangesT:
+    def indexing_func(self: RangesT, *args, records_meta: tp.DictLike = None, **kwargs) -> RangesT:
         """Perform indexing on `Ranges`."""
-        records_meta = Records.indexing_func_meta(self, *args, **kwargs)
-        if self.ts is not None:
-            new_ts = to_2d_array(self.ts)[:, records_meta["wrapper_meta"]["col_idxs"]]
+        if records_meta is None:
+            records_meta = Records.indexing_func_meta(self, *args, **kwargs)
+        if self._ts is not None:
+            new_ts = to_2d_array(self._ts)
+            if new_ts.shape[0] > 1:
+                new_ts = new_ts[records_meta["wrapper_meta"]["row_idxs"], :]
+            if new_ts.shape[1] > 1:
+                new_ts = new_ts[:, records_meta["wrapper_meta"]["col_idxs"]]
         else:
             new_ts = None
         return self.replace(
@@ -320,21 +325,26 @@ class Ranges(Records):
         *args,
         ffill_ts: bool = False,
         fbfill_ts: bool = False,
+        records_meta: tp.DictLike = None,
         **kwargs,
     ) -> RangesT:
         """Perform resampling on `Ranges`."""
-        resampler, new_wrapper, new_records_arr = self.resample_meta(*args, **kwargs)
-        if self.ts is None:
-            new_ts = self.ts
+        if records_meta is None:
+            records_meta = self.resample_meta(*args, **kwargs)
+        if self._ts is None:
+            new_ts = None
         else:
-            new_ts = self.ts.vbt.resample_apply(resampler, nb.last_reduce_nb)
+            new_ts = self.ts.vbt.resample_apply(
+                records_meta["wrapper_meta"]["resampler"],
+                nb.last_reduce_nb,
+            )
             if fbfill_ts:
                 new_ts = new_ts.vbt.fbfill()
             elif ffill_ts:
                 new_ts = new_ts.vbt.ffill()
         return self.replace(
-            wrapper=new_wrapper,
-            records_arr=new_records_arr,
+            wrapper=records_meta["wrapper_meta"]["new_wrapper"],
+            records_arr=records_meta["new_records_arr"],
             ts=new_ts,
         )
 

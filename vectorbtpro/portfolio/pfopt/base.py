@@ -859,27 +859,42 @@ class PortfolioOptimizer(Analyzable):
         self._alloc_records = alloc_records
         self._allocations = allocations
 
-        # Cannot select rows
-        self._column_only_select = True
+        # Only slices of rows can be selected
+        self._range_only_select = True
 
     def indexing_func(
         self: PortfolioOptimizerT,
-        pd_indexing_func: tp.PandasIndexingFunc,
+        *args,
+        wrapper_meta: tp.DictLike = None,
+        alloc_wrapper_meta: tp.DictLike = None,
+        alloc_records_meta: tp.DictLike = None,
         **kwargs,
     ) -> PortfolioOptimizerT:
         """Perform indexing on `PortfolioOptimizer`."""
-        wrapper_meta = self._wrapper.indexing_func_meta(pd_indexing_func, **kwargs)
-        new_alloc_records = self._alloc_records.indexing_func(pd_indexing_func, **kwargs)
-        new_indices, _ = self._alloc_records.col_mapper.select_cols(wrapper_meta["group_idxs"])
-        new_allocations = to_2d_array(self._allocations)[new_indices]
+        if wrapper_meta is None:
+            wrapper_meta = self.wrapper.indexing_func_meta(*args, **kwargs)
+        if alloc_records_meta is None:
+            alloc_records_meta = self.alloc_records.indexing_func_meta(
+                *args,
+                wrapper_meta=alloc_wrapper_meta,
+                **kwargs,
+            )
+        new_alloc_records = self.alloc_records.indexing_func(
+            *args,
+            records_meta=alloc_records_meta,
+            **kwargs,
+        )
+        new_allocations = to_2d_array(self._allocations)[alloc_records_meta["new_indices"]]
         return self.replace(
-            wrapper=wrapper_meta["new_wrapper"], alloc_records=new_alloc_records, allocations=new_allocations
+            wrapper=wrapper_meta["new_wrapper"],
+            alloc_records=new_alloc_records,
+            allocations=new_allocations,
         )
 
     def resample(self: PortfolioOptimizerT, *args, **kwargs) -> PortfolioOptimizerT:
         """Perform resampling on `PortfolioOptimizer`."""
-        new_wrapper = self._wrapper.resample(*args, **kwargs)
-        new_alloc_records = self._alloc_records.resample(*args, **kwargs)
+        new_wrapper = self.wrapper.resample(*args, **kwargs)
+        new_alloc_records = self.alloc_records.resample(*args, **kwargs)
         return self.replace(
             wrapper=new_wrapper,
             alloc_records=new_alloc_records,
@@ -1271,7 +1286,8 @@ class PortfolioOptimizer(Analyzable):
                 columns=new_columns,
                 ndim=2,
                 freq=wrapper.freq,
-                column_only_select=True,
+                column_only_select=False,
+                range_only_select=True,
                 group_select=True,
                 grouped_ndim=1 if single_group else 2,
                 group_by=group_index.name,
@@ -1288,7 +1304,8 @@ class PortfolioOptimizer(Analyzable):
                 columns=group_index,
                 ndim=1 if single_group else 2,
                 freq=wrapper.freq,
-                column_only_select=True,
+                column_only_select=False,
+                range_only_select=True,
             ),
             np.concatenate(alloc_points),
         )
@@ -2002,7 +2019,8 @@ class PortfolioOptimizer(Analyzable):
                 columns=new_columns,
                 ndim=2,
                 freq=wrapper.freq,
-                column_only_select=True,
+                column_only_select=False,
+                range_only_select=True,
                 group_select=True,
                 grouped_ndim=1 if single_group else 2,
                 group_by=group_index.name,
@@ -2019,7 +2037,8 @@ class PortfolioOptimizer(Analyzable):
                 columns=group_index,
                 ndim=1 if single_group else 2,
                 freq=wrapper.freq,
-                column_only_select=True,
+                column_only_select=False,
+                range_only_select=True,
             ),
             np.concatenate(alloc_ranges),
         )

@@ -693,8 +693,8 @@ class MappedArray(Analyzable):
         self._mapping = mapping
         self._col_mapper = col_mapper
 
-        # Cannot select rows
-        self._column_only_select = True
+        # Only slices of rows can be selected
+        self._range_only_select = True
 
     def replace(self: MappedArrayT, **kwargs) -> MappedArrayT:
         """See `vectorbtpro.utils.config.Configured.replace`.
@@ -709,14 +709,16 @@ class MappedArray(Analyzable):
                     kwargs["col_mapper"] = None
         return Wrapping.replace(self, **kwargs)
 
-    def indexing_func_meta(self, *args, **kwargs) -> dict:
+    def indexing_func_meta(self, *args, wrapper_meta: tp.DictLike = None, **kwargs) -> dict:
         """Perform indexing on `MappedArray` and also return metadata."""
-        wrapper_meta = self.wrapper.indexing_func_meta(
-            *args,
-            column_only_select=self.column_only_select,
-            group_select=self.group_select,
-            **kwargs,
-        )
+        if wrapper_meta is None:
+            wrapper_meta = self.wrapper.indexing_func_meta(
+                *args,
+                column_only_select=self.column_only_select,
+                range_only_select=self.range_only_select,
+                group_select=self.group_select,
+                **kwargs,
+            )
         new_indices, new_col_arr = self.col_mapper.select_cols(wrapper_meta["col_idxs"])
         new_mapped_arr = self.values[new_indices]
         if self.idx_arr is not None:
@@ -724,6 +726,15 @@ class MappedArray(Analyzable):
         else:
             new_idx_arr = None
         new_id_arr = self.id_arr[new_indices]
+        if wrapper_meta["rows_changed"] and new_idx_arr is not None:
+            row_idxs = wrapper_meta["row_idxs"]
+            mask = (new_idx_arr >= row_idxs.start) & (new_idx_arr < row_idxs.stop)
+            new_indices = new_indices[mask]
+            new_mapped_arr = new_mapped_arr[mask]
+            new_col_arr = new_col_arr[mask]
+            if new_idx_arr is not None:
+                new_idx_arr = new_idx_arr[mask] - row_idxs.start
+            new_id_arr = new_id_arr[mask]
         return dict(
             wrapper_meta=wrapper_meta,
             new_indices=new_indices,
@@ -733,9 +744,10 @@ class MappedArray(Analyzable):
             new_id_arr=new_id_arr,
         )
 
-    def indexing_func(self: MappedArrayT, *args, **kwargs) -> MappedArrayT:
+    def indexing_func(self: MappedArrayT, *args, mapped_meta: tp.DictLike = None, **kwargs) -> MappedArrayT:
         """Perform indexing on `MappedArray`."""
-        mapped_meta = self.indexing_func_meta(*args, **kwargs)
+        if mapped_meta is None:
+            mapped_meta = self.indexing_func_meta(*args, **kwargs)
         return self.replace(
             wrapper=mapped_meta["wrapper_meta"]["new_wrapper"],
             mapped_arr=mapped_meta["new_mapped_arr"],
@@ -744,26 +756,28 @@ class MappedArray(Analyzable):
             idx_arr=mapped_meta["new_idx_arr"],
         )
 
-    def resample_meta(self: MappedArrayT, *args, **kwargs) -> tp.Tuple[tp.PandasResampler, ArrayWrapper, tp.Array1d]:
+    def resample_meta(self: MappedArrayT, *args, wrapper_meta: tp.DictLike = None, **kwargs) -> dict:
         """Perform resampling on `MappedArray` and also return metadata."""
-        resampler, new_wrapper = self.wrapper.resample_meta(*args, **kwargs)
-        if isinstance(resampler, Resampler):
-            _resampler = resampler
+        if wrapper_meta is None:
+            wrapper_meta = self.wrapper.resample_meta(*args, **kwargs)
+        if isinstance(wrapper_meta["resampler"], Resampler):
+            _resampler = wrapper_meta["resampler"]
         else:
-            _resampler = Resampler.from_pd_resampler(resampler)
+            _resampler = Resampler.from_pd_resampler(wrapper_meta["resampler"])
         if self.idx_arr is not None:
             index_map = _resampler.map_to_target_index(return_index=False)
             new_idx_arr = index_map[self.idx_arr]
         else:
             new_idx_arr = None
-        return resampler, new_wrapper, new_idx_arr
+        return dict(wrapper_meta=wrapper_meta, new_idx_arr=new_idx_arr)
 
-    def resample(self: MappedArrayT, *args, **kwargs) -> MappedArrayT:
+    def resample(self: MappedArrayT, *args, mapped_meta: tp.DictLike = None, **kwargs) -> MappedArrayT:
         """Perform resampling on `MappedArray`."""
-        _, new_wrapper, new_idx_arr = self.resample_meta(*args, **kwargs)
+        if mapped_meta is None:
+            mapped_meta = self.resample_meta(*args, **kwargs)
         return self.replace(
-            wrapper=new_wrapper,
-            idx_arr=new_idx_arr,
+            wrapper=mapped_meta["wrapper_meta"]["new_wrapper"],
+            idx_arr=mapped_meta["new_idx_arr"],
         )
 
     @property

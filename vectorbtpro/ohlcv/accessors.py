@@ -227,24 +227,41 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
 
     # ############# Resampling ############# #
 
-    def resample(self: OHLCVDFAccessorT, *args, **kwargs) -> OHLCVDFAccessorT:
+    def resample(self: OHLCVDFAccessorT, *args, wrapper_meta: tp.DictLike = None, **kwargs) -> OHLCVDFAccessorT:
         """Perform resampling on `OHLCVDFAccessor`."""
-        resampler, new_wrapper = self.wrapper.resample_meta(*args, **kwargs)
+        if wrapper_meta is None:
+            wrapper_meta = self.wrapper.resample_meta(*args, **kwargs)
         sr_dct = {}
         for column in self.obj.columns:
             found = False
             for k, v in self.column_names.items():
                 if column.lower() == v.lower():
                     if k == "open":
-                        sr_dct[column] = self.obj[column].vbt.resample_apply(resampler, generic_nb.nth_reduce_nb, 0)
+                        sr_dct[column] = self.obj[column].vbt.resample_apply(
+                            wrapper_meta["resampler"],
+                            generic_nb.nth_reduce_nb,
+                            0,
+                        )
                     elif k == "high":
-                        sr_dct[column] = self.obj[column].vbt.resample_apply(resampler, generic_nb.max_reduce_nb)
+                        sr_dct[column] = self.obj[column].vbt.resample_apply(
+                            wrapper_meta["resampler"],
+                            generic_nb.max_reduce_nb,
+                        )
                     elif k == "low":
-                        sr_dct[column] = self.obj[column].vbt.resample_apply(resampler, generic_nb.min_reduce_nb)
+                        sr_dct[column] = self.obj[column].vbt.resample_apply(
+                            wrapper_meta["resampler"],
+                            generic_nb.min_reduce_nb,
+                        )
                     elif k == "close":
-                        sr_dct[column] = self.obj[column].vbt.resample_apply(resampler, generic_nb.last_reduce_nb)
+                        sr_dct[column] = self.obj[column].vbt.resample_apply(
+                            wrapper_meta["resampler"],
+                            generic_nb.last_reduce_nb,
+                        )
                     elif k == "volume":
-                        sr_dct[column] = self.obj[column].vbt.resample_apply(resampler, generic_nb.sum_reduce_nb)
+                        sr_dct[column] = self.obj[column].vbt.resample_apply(
+                            wrapper_meta["resampler"],
+                            generic_nb.sum_reduce_nb,
+                        )
                     else:
                         raise ValueError(f"Unknown key '{k}' in column_names")
                     found = True
@@ -253,7 +270,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
                 raise ValueError(f"Cannot match column '{column}'")
         new_obj = pd.DataFrame(sr_dct)
         return self.replace(
-            wrapper=new_wrapper,
+            wrapper=wrapper_meta["new_wrapper"],
             obj=new_obj,
         )
 

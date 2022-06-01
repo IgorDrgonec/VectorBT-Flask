@@ -233,9 +233,10 @@ class BaseAccessor(Wrapping):
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
         return cls.df_accessor_cls(**kwargs)
 
-    def indexing_func(self: BaseAccessorT, *args, **kwargs) -> BaseAccessorT:
+    def indexing_func(self: BaseAccessorT, *args, wrapper_meta: tp.DictLike = None, **kwargs) -> BaseAccessorT:
         """Perform indexing on `BaseAccessor`."""
-        wrapper_meta = self.wrapper.indexing_func_meta(*args, **kwargs)
+        if wrapper_meta is None:
+            wrapper_meta = self.wrapper.indexing_func_meta(*args, **kwargs)
         new_obj = wrapper_meta["new_wrapper"].wrap(
             self.to_2d_array()[wrapper_meta["row_idxs"], :][:, wrapper_meta["col_idxs"]],
             group_by=False,

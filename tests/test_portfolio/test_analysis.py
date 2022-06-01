@@ -178,8 +178,8 @@ class TestPortfolio:
         def tile_first_obj(arr):
             return np.column_stack((arr, arr, arr))
 
-        pd.testing.assert_index_equal(new_pf.wrapper.index, pf1.wrapper.index.append(pf2.wrapper.index))
-        pd.testing.assert_index_equal(new_pf.wrapper.columns, pf2.wrapper.columns)
+        assert_index_equal(new_pf.wrapper.index, pf1.wrapper.index.append(pf2.wrapper.index))
+        assert_index_equal(new_pf.wrapper.columns, pf2.wrapper.columns)
         assert new_pf.wrapper.grouper.group_by is None
         np.testing.assert_array_equal(
             new_pf._close,
@@ -195,7 +195,7 @@ class TestPortfolio:
         )
         assert not new_pf.cash_sharing
         assert new_pf._init_cash == InitCashMode.Auto
-        np.testing.assert_array_equal(new_pf._init_position, np.array([0., 0., 0.]))
+        np.testing.assert_array_equal(new_pf._init_position, np.array([0.0, 0.0, 0.0]))
         np.testing.assert_array_equal(new_pf._init_price, np.array([np.nan, np.nan, np.nan]))
         np.testing.assert_array_equal(
             new_pf._cash_deposits,
@@ -216,40 +216,44 @@ class TestPortfolio:
         new_pf = vbt.Portfolio.row_stack(pf1.replace(init_cash=100.0), pf2)
         np.testing.assert_array_equal(
             new_pf._init_cash,
-            np.array([100., 100., 100.]),
+            np.array([100.0, 100.0, 100.0]),
         )
         np.testing.assert_array_equal(
             new_pf._cash_deposits,
-            np.array([
-                [0.0, 0.0, 0.0],
-                [0.0, 0.0, 0.0],
-                [0.0, 0.0, 0.0],
-                [0.0, 0.0, 0.0],
-                [0.30402, 0.29998, 1.4241200000000003],
-                [0.0, 0.0, 0.0],
-                [100.0, 100.0, 0.0],
-                [0.0, 0.0, 0.0],
-                [0.0, 0.0, 0.0]
-            ]),
+            np.array(
+                [
+                    [0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0],
+                    [0.30402, 0.29998, 1.4241200000000003],
+                    [0.0, 0.0, 0.0],
+                    [100.0, 100.0, 0.0],
+                    [0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0],
+                ]
+            ),
         )
         new_pf = vbt.Portfolio.row_stack(pf1.replace(init_cash=100.0), pf2.replace(init_cash=50.0))
         np.testing.assert_array_equal(
             new_pf._init_cash,
-            np.array([100., 100., 100.]),
+            np.array([100.0, 100.0, 100.0]),
         )
         np.testing.assert_array_equal(
             new_pf._cash_deposits,
-            np.array([
-                [0.0, 0.0, 0.0],
-                [0.0, 0.0, 0.0],
-                [0.0, 0.0, 0.0],
-                [0.0, 0.0, 0.0],
-                [50.0, 50.0, 50.0],
-                [0.0, 0.0, 0.0],
-                [100.0, 100.0, 0.0],
-                [0.0, 0.0, 0.0],
-                [0.0, 0.0, 0.0]
-            ]),
+            np.array(
+                [
+                    [0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0],
+                    [50.0, 50.0, 50.0],
+                    [0.0, 0.0, 0.0],
+                    [100.0, 100.0, 0.0],
+                    [0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0],
+                ]
+            ),
         )
         with pytest.raises(Exception):
             vbt.Portfolio.row_stack(pf1.replace(init_cash=InitCashMode.AutoAlign), pf2)
@@ -315,10 +319,7 @@ class TestPortfolio:
                 pf1.replace(init_position=0.0),
                 pf2.replace(init_position=1.0),
             )
-        new_pf = vbt.Portfolio.row_stack(
-            pf1.replace(init_position=1.0, init_price=10.0),
-            pf2
-        )
+        new_pf = vbt.Portfolio.row_stack(pf1.replace(init_position=1.0, init_price=10.0), pf2)
         np.testing.assert_array_equal(
             new_pf._init_position,
             np.array([1.0, 1.0, 1.0]),
@@ -382,8 +383,7 @@ class TestPortfolio:
             pf2.replace(in_outputs=in_outputs2),
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.cash_flow,
-            np.row_stack((tile_first_obj(in_outputs1.cash_flow), in_outputs2.cash_flow))
+            new_pf.in_outputs.cash_flow, np.row_stack((tile_first_obj(in_outputs1.cash_flow), in_outputs2.cash_flow))
         )
         with pytest.raises(Exception):
             vbt.Portfolio.row_stack(
@@ -440,11 +440,11 @@ class TestPortfolio:
         pf1 = vbt.Portfolio.from_orders(**pf_kwargs1)
         pf2 = vbt.Portfolio.from_orders(**pf_kwargs2)
         new_pf = vbt.Portfolio.row_stack(pf1, pf2, combine_init_cash=True)
-        pd.testing.assert_index_equal(new_pf.wrapper.index, pf1.wrapper.index.append(pf2.wrapper.index))
-        pd.testing.assert_index_equal(new_pf.wrapper.columns, pf2.wrapper.columns)
-        pd.testing.assert_index_equal(
+        assert_index_equal(new_pf.wrapper.index, pf1.wrapper.index.append(pf2.wrapper.index))
+        assert_index_equal(new_pf.wrapper.columns, pf2.wrapper.columns)
+        assert_index_equal(
             new_pf.wrapper.grouper.group_by,
-            pd.Index(['first', 'first', 'second'], dtype='object', name='group'),
+            pd.Index(["first", "first", "second"], dtype="object", name="group"),
         )
         np.testing.assert_array_equal(
             new_pf._close,
@@ -460,7 +460,7 @@ class TestPortfolio:
         )
         assert not new_pf.cash_sharing
         np.testing.assert_array_equal(new_pf._init_cash, pf1._init_cash + pf2._init_cash)
-        np.testing.assert_array_equal(new_pf._init_position, np.array([0., 0., 0.]))
+        np.testing.assert_array_equal(new_pf._init_position, np.array([0.0, 0.0, 0.0]))
         np.testing.assert_array_equal(new_pf._init_price, np.array([np.nan, np.nan, np.nan]))
         np.testing.assert_array_equal(
             new_pf._cash_deposits,
@@ -479,8 +479,8 @@ class TestPortfolio:
             np.row_stack((pf1._bm_close, pf2._bm_close)),
         )
         new_pf = vbt.Portfolio.row_stack(pf1, pf2, combine_init_cash=True, wrapper_kwargs=dict(group_by=False))
-        pd.testing.assert_index_equal(new_pf.wrapper.index, pf1.wrapper.index.append(pf2.wrapper.index))
-        pd.testing.assert_index_equal(new_pf.wrapper.columns, pf2.wrapper.columns)
+        assert_index_equal(new_pf.wrapper.index, pf1.wrapper.index.append(pf2.wrapper.index))
+        assert_index_equal(new_pf.wrapper.columns, pf2.wrapper.columns)
         assert new_pf.wrapper.grouper.group_by is None
         np.testing.assert_array_equal(
             new_pf._close,
@@ -496,7 +496,7 @@ class TestPortfolio:
         )
         assert not new_pf.cash_sharing
         np.testing.assert_array_equal(new_pf._init_cash, pf1._init_cash + pf2._init_cash)
-        np.testing.assert_array_equal(new_pf._init_position, np.array([0., 0., 0.]))
+        np.testing.assert_array_equal(new_pf._init_position, np.array([0.0, 0.0, 0.0]))
         np.testing.assert_array_equal(new_pf._init_price, np.array([np.nan, np.nan, np.nan]))
         np.testing.assert_array_equal(
             new_pf._cash_deposits,
@@ -533,20 +533,16 @@ class TestPortfolio:
             pf2.replace(in_outputs=in_outputs2),
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.arr_2d_cs,
-            np.row_stack((in_outputs1.arr_2d_cs, in_outputs2.arr_2d_cs))
+            new_pf.in_outputs.arr_2d_cs, np.row_stack((in_outputs1.arr_2d_cs, in_outputs2.arr_2d_cs))
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.arr_2d_pcg,
-            np.row_stack((in_outputs1.arr_2d_pcg, in_outputs2.arr_2d_pcg))
+            new_pf.in_outputs.arr_2d_pcg, np.row_stack((in_outputs1.arr_2d_pcg, in_outputs2.arr_2d_pcg))
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.arr_2d_pg,
-            np.row_stack((in_outputs1.arr_2d_pg, in_outputs2.arr_2d_pg))
+            new_pf.in_outputs.arr_2d_pg, np.row_stack((in_outputs1.arr_2d_pg, in_outputs2.arr_2d_pg))
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.arr_2d_pc,
-            np.row_stack((in_outputs1.arr_2d_pc, in_outputs2.arr_2d_pc))
+            new_pf.in_outputs.arr_2d_pc, np.row_stack((in_outputs1.arr_2d_pc, in_outputs2.arr_2d_pc))
         )
         in_outputs1 = dict(
             arr=np.arange(8).reshape((4, 2)),
@@ -560,10 +556,7 @@ class TestPortfolio:
             pf1.replace(in_outputs=in_outputs1),
             pf2.replace(in_outputs=in_outputs2),
         )
-        np.testing.assert_array_equal(
-            new_pf.in_outputs.arr,
-            np.row_stack((in_outputs1.arr, in_outputs2.arr))
-        )
+        np.testing.assert_array_equal(new_pf.in_outputs.arr, np.row_stack((in_outputs1.arr, in_outputs2.arr)))
         in_outputs1 = dict(
             arr=np.arange(12).reshape((4, 3)),
         )
@@ -601,11 +594,11 @@ class TestPortfolio:
         pf1 = vbt.Portfolio.from_orders(**pf_kwargs1)
         pf2 = vbt.Portfolio.from_orders(**pf_kwargs2)
         new_pf = vbt.Portfolio.row_stack(pf1, pf2, combine_init_cash=True)
-        pd.testing.assert_index_equal(new_pf.wrapper.index, pf1.wrapper.index.append(pf2.wrapper.index))
-        pd.testing.assert_index_equal(new_pf.wrapper.columns, pf2.wrapper.columns)
-        pd.testing.assert_index_equal(
+        assert_index_equal(new_pf.wrapper.index, pf1.wrapper.index.append(pf2.wrapper.index))
+        assert_index_equal(new_pf.wrapper.columns, pf2.wrapper.columns)
+        assert_index_equal(
             new_pf.wrapper.grouper.group_by,
-            pd.Index(['first', 'first', 'second'], dtype='object', name='group'),
+            pd.Index(["first", "first", "second"], dtype="object", name="group"),
         )
         np.testing.assert_array_equal(
             new_pf._close,
@@ -621,7 +614,7 @@ class TestPortfolio:
         )
         assert new_pf.cash_sharing
         np.testing.assert_array_equal(new_pf._init_cash, pf1._init_cash + pf2._init_cash)
-        np.testing.assert_array_equal(new_pf._init_position, np.array([0., 0., 0.]))
+        np.testing.assert_array_equal(new_pf._init_position, np.array([0.0, 0.0, 0.0]))
         np.testing.assert_array_equal(new_pf._init_price, np.array([np.nan, np.nan, np.nan]))
         np.testing.assert_array_equal(
             new_pf._cash_deposits,
@@ -658,20 +651,16 @@ class TestPortfolio:
             pf2.replace(in_outputs=in_outputs2),
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.arr_2d_cs,
-            np.row_stack((in_outputs1.arr_2d_cs, in_outputs2.arr_2d_cs))
+            new_pf.in_outputs.arr_2d_cs, np.row_stack((in_outputs1.arr_2d_cs, in_outputs2.arr_2d_cs))
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.arr_2d_pcg,
-            np.row_stack((in_outputs1.arr_2d_pcg, in_outputs2.arr_2d_pcg))
+            new_pf.in_outputs.arr_2d_pcg, np.row_stack((in_outputs1.arr_2d_pcg, in_outputs2.arr_2d_pcg))
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.arr_2d_pg,
-            np.row_stack((in_outputs1.arr_2d_pg, in_outputs2.arr_2d_pg))
+            new_pf.in_outputs.arr_2d_pg, np.row_stack((in_outputs1.arr_2d_pg, in_outputs2.arr_2d_pg))
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.arr_2d_pc,
-            np.row_stack((in_outputs1.arr_2d_pc, in_outputs2.arr_2d_pc))
+            new_pf.in_outputs.arr_2d_pc, np.row_stack((in_outputs1.arr_2d_pc, in_outputs2.arr_2d_pc))
         )
         in_outputs1 = dict(
             arr=np.arange(8).reshape((4, 2)),
@@ -685,10 +674,7 @@ class TestPortfolio:
             pf1.replace(in_outputs=in_outputs1),
             pf2.replace(in_outputs=in_outputs2),
         )
-        np.testing.assert_array_equal(
-            new_pf.in_outputs.arr,
-            np.row_stack((in_outputs1.arr, in_outputs2.arr))
-        )
+        np.testing.assert_array_equal(new_pf.in_outputs.arr, np.row_stack((in_outputs1.arr, in_outputs2.arr)))
         in_outputs1 = dict(
             arr=np.arange(12).reshape((4, 3)),
         )
@@ -719,7 +705,7 @@ class TestPortfolio:
             df = df.copy()
             df.index = pd.date_range("2020-01-03", "2020-01-07")
             return df
-        
+
         def column_stack_arrs(arrs, pf1, pf2, fill_value=np.nan):
             df1 = pd.DataFrame(arrs[0], index=pf1.wrapper.index)
             df2 = pd.DataFrame(arrs[1], index=pf2.wrapper.index)
@@ -739,8 +725,8 @@ class TestPortfolio:
         pf1 = vbt.Portfolio.from_orders(**pf_kwargs1)
         pf2 = vbt.Portfolio.from_orders(**pf_kwargs2)
         new_pf = vbt.Portfolio.column_stack(pf1, pf2)
-        pd.testing.assert_index_equal(new_pf.wrapper.index, pf1.wrapper.index.union(pf2.wrapper.index))
-        pd.testing.assert_index_equal(new_pf.wrapper.columns, pf1.wrapper.columns.append(pf2.wrapper.columns))
+        assert_index_equal(new_pf.wrapper.index, pf1.wrapper.index.union(pf2.wrapper.index))
+        assert_index_equal(new_pf.wrapper.columns, pf1.wrapper.columns.append(pf2.wrapper.columns))
         assert new_pf.wrapper.grouper.group_by is None
         np.testing.assert_array_equal(
             new_pf._close,
@@ -827,12 +813,10 @@ class TestPortfolio:
             pf2.replace(in_outputs=in_outputs2),
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.cash_flow,
-            column_stack_arrs((in_outputs1.cash_flow, in_outputs2.cash_flow), pf1, pf2)
+            new_pf.in_outputs.cash_flow, column_stack_arrs((in_outputs1.cash_flow, in_outputs2.cash_flow), pf1, pf2)
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.total_return,
-            np.concatenate((in_outputs1.total_return, in_outputs2.total_return))
+            new_pf.in_outputs.total_return, np.concatenate((in_outputs1.total_return, in_outputs2.total_return))
         )
         with pytest.raises(Exception):
             vbt.Portfolio.column_stack(
@@ -885,9 +869,9 @@ class TestPortfolio:
         pf1 = vbt.Portfolio.from_orders(**pf_kwargs1)
         pf2 = vbt.Portfolio.from_orders(**pf_kwargs2)
         new_pf = vbt.Portfolio.column_stack(pf1, pf2)
-        pd.testing.assert_index_equal(new_pf.wrapper.index, pf1.wrapper.index.union(pf2.wrapper.index))
-        pd.testing.assert_index_equal(new_pf.wrapper.columns, pf1.wrapper.columns.append(pf2.wrapper.columns))
-        pd.testing.assert_index_equal(
+        assert_index_equal(new_pf.wrapper.index, pf1.wrapper.index.union(pf2.wrapper.index))
+        assert_index_equal(new_pf.wrapper.columns, pf1.wrapper.columns.append(pf2.wrapper.columns))
+        assert_index_equal(
             new_pf.wrapper.grouper.group_by,
             pd.Index(["first", "first", "second", "third", "fourth", "fourth"], name="group"),
         )
@@ -950,36 +934,28 @@ class TestPortfolio:
             pf2.replace(in_outputs=in_outputs2),
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.arr_2d_cs,
-            column_stack_arrs((in_outputs1.arr_2d_cs, in_outputs2.arr_2d_cs), pf1, pf2)
+            new_pf.in_outputs.arr_2d_cs, column_stack_arrs((in_outputs1.arr_2d_cs, in_outputs2.arr_2d_cs), pf1, pf2)
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.arr_2d_pcg,
-            column_stack_arrs((in_outputs1.arr_2d_pcg, in_outputs2.arr_2d_pcg), pf1, pf2)
+            new_pf.in_outputs.arr_2d_pcg, column_stack_arrs((in_outputs1.arr_2d_pcg, in_outputs2.arr_2d_pcg), pf1, pf2)
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.arr_2d_pg,
-            column_stack_arrs((in_outputs1.arr_2d_pg, in_outputs2.arr_2d_pg), pf1, pf2)
+            new_pf.in_outputs.arr_2d_pg, column_stack_arrs((in_outputs1.arr_2d_pg, in_outputs2.arr_2d_pg), pf1, pf2)
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.arr_2d_pc,
-            column_stack_arrs((in_outputs1.arr_2d_pc, in_outputs2.arr_2d_pc), pf1, pf2)
+            new_pf.in_outputs.arr_2d_pc, column_stack_arrs((in_outputs1.arr_2d_pc, in_outputs2.arr_2d_pc), pf1, pf2)
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.arr_1d_cs,
-            np.concatenate((in_outputs1.arr_1d_cs, in_outputs2.arr_1d_cs))
+            new_pf.in_outputs.arr_1d_cs, np.concatenate((in_outputs1.arr_1d_cs, in_outputs2.arr_1d_cs))
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.arr_1d_pcg,
-            np.concatenate((in_outputs1.arr_1d_pcg, in_outputs2.arr_1d_pcg))
+            new_pf.in_outputs.arr_1d_pcg, np.concatenate((in_outputs1.arr_1d_pcg, in_outputs2.arr_1d_pcg))
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.arr_1d_pg,
-            np.concatenate((in_outputs1.arr_1d_pg, in_outputs2.arr_1d_pg))
+            new_pf.in_outputs.arr_1d_pg, np.concatenate((in_outputs1.arr_1d_pg, in_outputs2.arr_1d_pg))
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.arr_1d_pc,
-            np.concatenate((in_outputs1.arr_1d_pc, in_outputs2.arr_1d_pc))
+            new_pf.in_outputs.arr_1d_pc, np.concatenate((in_outputs1.arr_1d_pc, in_outputs2.arr_1d_pc))
         )
         in_outputs1 = dict(
             arr=np.arange(10).reshape((5, 2)),
@@ -994,8 +970,7 @@ class TestPortfolio:
             pf2.replace(in_outputs=in_outputs2),
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.arr,
-            column_stack_arrs((in_outputs1.arr, in_outputs2.arr), pf1, pf2)
+            new_pf.in_outputs.arr, column_stack_arrs((in_outputs1.arr, in_outputs2.arr), pf1, pf2)
         )
         in_outputs1 = dict(
             arr=np.arange(15).reshape((5, 3)),
@@ -1028,9 +1003,9 @@ class TestPortfolio:
         pf1 = vbt.Portfolio.from_orders(**pf_kwargs1)
         pf2 = vbt.Portfolio.from_orders(**pf_kwargs2)
         new_pf = vbt.Portfolio.column_stack(pf1, pf2)
-        pd.testing.assert_index_equal(new_pf.wrapper.index, pf1.wrapper.index.union(pf2.wrapper.index))
-        pd.testing.assert_index_equal(new_pf.wrapper.columns, pf1.wrapper.columns.append(pf2.wrapper.columns))
-        pd.testing.assert_index_equal(
+        assert_index_equal(new_pf.wrapper.index, pf1.wrapper.index.union(pf2.wrapper.index))
+        assert_index_equal(new_pf.wrapper.columns, pf1.wrapper.columns.append(pf2.wrapper.columns))
+        assert_index_equal(
             new_pf.wrapper.grouper.group_by,
             pd.Index(["first", "first", "second", "third", "fourth", "fourth"], name="group"),
         )
@@ -1093,36 +1068,28 @@ class TestPortfolio:
             pf2.replace(in_outputs=in_outputs2),
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.arr_2d_cs,
-            column_stack_arrs((in_outputs1.arr_2d_cs, in_outputs2.arr_2d_cs), pf1, pf2)
+            new_pf.in_outputs.arr_2d_cs, column_stack_arrs((in_outputs1.arr_2d_cs, in_outputs2.arr_2d_cs), pf1, pf2)
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.arr_2d_pcg,
-            column_stack_arrs((in_outputs1.arr_2d_pcg, in_outputs2.arr_2d_pcg), pf1, pf2)
+            new_pf.in_outputs.arr_2d_pcg, column_stack_arrs((in_outputs1.arr_2d_pcg, in_outputs2.arr_2d_pcg), pf1, pf2)
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.arr_2d_pg,
-            column_stack_arrs((in_outputs1.arr_2d_pg, in_outputs2.arr_2d_pg), pf1, pf2)
+            new_pf.in_outputs.arr_2d_pg, column_stack_arrs((in_outputs1.arr_2d_pg, in_outputs2.arr_2d_pg), pf1, pf2)
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.arr_2d_pc,
-            column_stack_arrs((in_outputs1.arr_2d_pc, in_outputs2.arr_2d_pc), pf1, pf2)
+            new_pf.in_outputs.arr_2d_pc, column_stack_arrs((in_outputs1.arr_2d_pc, in_outputs2.arr_2d_pc), pf1, pf2)
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.arr_1d_cs,
-            np.concatenate((in_outputs1.arr_1d_cs, in_outputs2.arr_1d_cs))
+            new_pf.in_outputs.arr_1d_cs, np.concatenate((in_outputs1.arr_1d_cs, in_outputs2.arr_1d_cs))
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.arr_1d_pcg,
-            np.concatenate((in_outputs1.arr_1d_pcg, in_outputs2.arr_1d_pcg))
+            new_pf.in_outputs.arr_1d_pcg, np.concatenate((in_outputs1.arr_1d_pcg, in_outputs2.arr_1d_pcg))
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.arr_1d_pg,
-            np.concatenate((in_outputs1.arr_1d_pg, in_outputs2.arr_1d_pg))
+            new_pf.in_outputs.arr_1d_pg, np.concatenate((in_outputs1.arr_1d_pg, in_outputs2.arr_1d_pg))
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.arr_1d_pc,
-            np.concatenate((in_outputs1.arr_1d_pc, in_outputs2.arr_1d_pc))
+            new_pf.in_outputs.arr_1d_pc, np.concatenate((in_outputs1.arr_1d_pc, in_outputs2.arr_1d_pc))
         )
         in_outputs1 = dict(
             arr=np.arange(10).reshape((5, 2)),
@@ -1137,8 +1104,7 @@ class TestPortfolio:
             pf2.replace(in_outputs=in_outputs2),
         )
         np.testing.assert_array_equal(
-            new_pf.in_outputs.arr,
-            column_stack_arrs((in_outputs1.arr, in_outputs2.arr), pf1, pf2)
+            new_pf.in_outputs.arr, column_stack_arrs((in_outputs1.arr, in_outputs2.arr), pf1, pf2)
         )
         in_outputs1 = dict(
             arr=np.arange(15).reshape((5, 3)),
@@ -1193,6 +1159,8 @@ class TestPortfolio:
         assert pf["a"].orders == pf.orders["a"]
         assert pf["a"].logs == pf.logs["a"]
         assert pf["a"].init_cash == pf.init_cash["a"]
+        assert pf["a"].init_position == pf.init_position["a"]
+        assert pf["a"].init_price == pf.init_price["a"]
         assert_series_equal(pf["a"].call_seq, pf.call_seq["a"])
         assert_series_equal(pf["a"].cash_deposits, pf.cash_deposits["a"])
 
@@ -1200,6 +1168,8 @@ class TestPortfolio:
         assert pf["c"].orders == pf.orders["c"]
         assert pf["c"].logs == pf.logs["c"]
         assert pf["c"].init_cash == pf.init_cash["c"]
+        assert pf["c"].init_position == pf.init_position["c"]
+        assert pf["c"].init_price == pf.init_price["c"]
         assert_series_equal(pf["c"].call_seq, pf.call_seq["c"])
         assert_series_equal(pf["c"].cash_deposits, pf.cash_deposits["c"])
 
@@ -1207,6 +1177,8 @@ class TestPortfolio:
         assert pf[["c"]].orders == pf.orders[["c"]]
         assert pf[["c"]].logs == pf.logs[["c"]]
         assert_series_equal(pf[["c"]].init_cash, pf.init_cash[["c"]])
+        assert_series_equal(pf[["c"]].init_position, pf.init_position[["c"]])
+        assert_series_equal(pf[["c"]].init_price, pf.init_price[["c"]])
         assert_frame_equal(pf[["c"]].call_seq, pf.call_seq[["c"]])
         assert_frame_equal(pf[["c"]].cash_deposits, pf.cash_deposits[["c"]])
 
@@ -1214,6 +1186,8 @@ class TestPortfolio:
         assert pf_grouped["first"].orders == pf_grouped.orders["first"]
         assert pf_grouped["first"].logs == pf_grouped.logs["first"]
         assert pf_grouped["first"].init_cash == pf_grouped.init_cash["first"]
+        assert_series_equal(pf_grouped["first"].init_position, pf_grouped.init_position[["a", "b"]])
+        assert_series_equal(pf_grouped["first"].init_price, pf_grouped.init_price[["a", "b"]])
         assert_frame_equal(pf_grouped["first"].call_seq, pf_grouped.call_seq[["a", "b"]])
         assert_series_equal(pf_grouped["first"].cash_deposits, pf_grouped.cash_deposits["first"])
 
@@ -1221,6 +1195,8 @@ class TestPortfolio:
         assert pf_grouped[["first"]].orders == pf_grouped.orders[["first"]]
         assert pf_grouped[["first"]].logs == pf_grouped.logs[["first"]]
         assert_series_equal(pf_grouped[["first"]].init_cash, pf_grouped.init_cash[["first"]])
+        assert_series_equal(pf_grouped[["first"]].init_position, pf_grouped.init_position[["a", "b"]])
+        assert_series_equal(pf_grouped[["first"]].init_price, pf_grouped.init_price[["a", "b"]])
         assert_frame_equal(pf_grouped[["first"]].call_seq, pf_grouped.call_seq[["a", "b"]])
         assert_frame_equal(pf_grouped[["first"]].cash_deposits, pf_grouped.cash_deposits[["first"]])
 
@@ -1228,6 +1204,8 @@ class TestPortfolio:
         assert pf_grouped["second"].orders == pf_grouped.orders["second"]
         assert pf_grouped["second"].logs == pf_grouped.logs["second"]
         assert pf_grouped["second"].init_cash == pf_grouped.init_cash["second"]
+        assert pf_grouped["second"].init_position == pf_grouped.init_position["c"]
+        assert pf_grouped["second"].init_price == pf_grouped.init_price["c"]
         assert_series_equal(pf_grouped["second"].call_seq, pf_grouped.call_seq["c"])
         assert_series_equal(pf_grouped["second"].cash_deposits, pf_grouped.cash_deposits["second"])
 
@@ -1236,6 +1214,8 @@ class TestPortfolio:
         assert pf_grouped[["second"]].orders == pf_grouped.orders[["second"]]
         assert pf_grouped[["second"]].logs == pf_grouped.logs[["second"]]
         assert_series_equal(pf_grouped[["second"]].init_cash, pf_grouped.init_cash[["second"]])
+        assert_series_equal(pf_grouped[["second"]].init_position, pf_grouped.init_position[["c"]])
+        assert_series_equal(pf_grouped[["second"]].init_price, pf_grouped.init_price[["c"]])
         assert_frame_equal(pf_grouped[["second"]].call_seq, pf_grouped.call_seq[["c"]])
         assert_frame_equal(pf_grouped[["second"]].cash_deposits, pf_grouped.cash_deposits[["second"]])
 
@@ -1243,6 +1223,8 @@ class TestPortfolio:
         assert pf_shared["first"].orders == pf_shared.orders["first"]
         assert pf_shared["first"].logs == pf_shared.logs["first"]
         assert pf_shared["first"].init_cash == pf_shared.init_cash["first"]
+        assert_series_equal(pf_shared["first"].init_position, pf_shared.init_position[["a", "b"]])
+        assert_series_equal(pf_shared["first"].init_price, pf_shared.init_price[["a", "b"]])
         assert_frame_equal(pf_shared["first"].call_seq, pf_shared.call_seq[["a", "b"]])
         assert_series_equal(pf_shared["first"].cash_deposits, pf_shared.cash_deposits["first"])
 
@@ -1251,6 +1233,8 @@ class TestPortfolio:
         assert pf_shared[["first"]].orders == pf_shared.orders[["first"]]
         assert pf_shared[["first"]].logs == pf_shared.logs[["first"]]
         assert_series_equal(pf_shared[["first"]].init_cash, pf_shared.init_cash[["first"]])
+        assert_series_equal(pf_shared[["first"]].init_position, pf_shared.init_position[["a", "b"]])
+        assert_series_equal(pf_shared[["first"]].init_price, pf_shared.init_price[["a", "b"]])
         assert_frame_equal(pf_shared[["first"]].call_seq, pf_shared.call_seq[["a", "b"]])
         assert_frame_equal(pf_shared[["first"]].cash_deposits, pf_shared.cash_deposits[["first"]])
 
@@ -1258,6 +1242,8 @@ class TestPortfolio:
         assert pf_shared["second"].orders == pf_shared.orders["second"]
         assert pf_shared["second"].logs == pf_shared.logs["second"]
         assert pf_shared["second"].init_cash == pf_shared.init_cash["second"]
+        assert pf_shared["second"].init_position == pf_shared.init_position["c"]
+        assert pf_shared["second"].init_price == pf_shared.init_price["c"]
         assert_series_equal(pf_shared["second"].call_seq, pf_shared.call_seq["c"])
         assert_series_equal(pf_shared["second"].cash_deposits, pf_shared.cash_deposits["second"])
 
@@ -1265,8 +1251,112 @@ class TestPortfolio:
         assert pf_shared[["second"]].orders == pf_shared.orders[["second"]]
         assert pf_shared[["second"]].logs == pf_shared.logs[["second"]]
         assert_series_equal(pf_shared[["second"]].init_cash, pf_shared.init_cash[["second"]])
+        assert_series_equal(pf_shared[["second"]].init_position, pf_shared.init_position[["c"]])
+        assert_series_equal(pf_shared[["second"]].init_price, pf_shared.init_price[["c"]])
         assert_frame_equal(pf_shared[["second"]].call_seq, pf_shared.call_seq[["c"]])
         assert_frame_equal(pf_shared[["second"]].cash_deposits, pf_shared.cash_deposits[["second"]])
+
+        assert pf.loc[:"2020-01-03"].wrapper == pf.wrapper.loc[:"2020-01-03"]
+        assert pf.loc[:"2020-01-03"].orders == pf.orders.loc[:"2020-01-03"]
+        assert pf.loc[:"2020-01-03"].logs == pf.logs.loc[:"2020-01-03"]
+        assert_series_equal(pf.loc[:"2020-01-03"].init_cash, pf.init_cash)
+        assert_series_equal(pf.loc[:"2020-01-03"].init_position, pf.init_position)
+        assert_series_equal(pf.loc[:"2020-01-03"].init_price, pf.init_price)
+        assert_frame_equal(pf.loc[:"2020-01-03"].call_seq, pf.call_seq.loc[:"2020-01-03"])
+        assert_frame_equal(pf.loc[:"2020-01-03"].cash_deposits, pf.cash_deposits.loc[:"2020-01-03"])
+        assert pf.loc["2020-01-03":].wrapper == pf.wrapper.loc["2020-01-03":]
+        assert pf.loc["2020-01-03":].orders == pf.orders.loc["2020-01-03":]
+        assert pf.loc["2020-01-03":].logs == pf.logs.loc["2020-01-03":]
+        assert_series_equal(
+            pf.loc["2020-01-03":].init_cash,
+            pf.cash.loc["2020-01-02"].rename("init_cash"),
+        )
+        assert_series_equal(
+            pf.loc["2020-01-03":].init_position,
+            pf.assets.loc["2020-01-02"].rename("init_position"),
+        )
+        assert_series_equal(
+            pf.loc["2020-01-03":].init_price,
+            pf.filled_close.loc["2020-01-02"].rename("init_price"),
+        )
+        assert_frame_equal(pf.loc["2020-01-03":].call_seq, pf.call_seq.loc["2020-01-03":])
+        assert_frame_equal(pf.loc["2020-01-03":].cash_deposits, pf.cash_deposits.loc["2020-01-03":])
+
+        assert pf_grouped.loc[:"2020-01-03"].wrapper == pf_grouped.wrapper.loc[:"2020-01-03"]
+        assert pf_grouped.loc[:"2020-01-03"].orders == pf_grouped.orders.loc[:"2020-01-03"]
+        assert pf_grouped.loc[:"2020-01-03"].logs == pf_grouped.logs.loc[:"2020-01-03"]
+        assert_series_equal(pf_grouped.loc[:"2020-01-03"].init_cash, pf_grouped.init_cash)
+        assert_series_equal(pf_grouped.loc[:"2020-01-03"].init_position, pf_grouped.init_position)
+        assert_series_equal(pf_grouped.loc[:"2020-01-03"].init_price, pf_grouped.init_price)
+        assert_frame_equal(pf_grouped.loc[:"2020-01-03"].call_seq, pf_grouped.call_seq.loc[:"2020-01-03"])
+        assert_frame_equal(pf_grouped.loc[:"2020-01-03"].cash_deposits, pf_grouped.cash_deposits.loc[:"2020-01-03"])
+        assert pf_grouped.loc["2020-01-03":].wrapper == pf_grouped.wrapper.loc["2020-01-03":]
+        assert pf_grouped.loc["2020-01-03":].orders == pf_grouped.orders.loc["2020-01-03":]
+        assert pf_grouped.loc["2020-01-03":].logs == pf_grouped.logs.loc["2020-01-03":]
+        assert_series_equal(
+            pf_grouped.loc["2020-01-03":].init_cash,
+            pf_grouped.cash.loc["2020-01-02"].rename("init_cash"),
+        )
+        assert_series_equal(
+            pf_grouped.loc["2020-01-03":].init_position,
+            pf_grouped.assets.loc["2020-01-02"].rename("init_position"),
+        )
+        assert_series_equal(
+            pf_grouped.loc["2020-01-03":].init_price,
+            pf_grouped.filled_close.loc["2020-01-02"].rename("init_price"),
+        )
+        assert_frame_equal(pf_grouped.loc["2020-01-03":].call_seq, pf_grouped.call_seq.loc["2020-01-03":])
+        assert_frame_equal(pf_grouped.loc["2020-01-03":].cash_deposits, pf_grouped.cash_deposits.loc["2020-01-03":])
+
+        assert pf_shared.loc[:"2020-01-03"].wrapper == pf_shared.wrapper.loc[:"2020-01-03"]
+        assert pf_shared.loc[:"2020-01-03"].orders == pf_shared.orders.loc[:"2020-01-03"]
+        assert pf_shared.loc[:"2020-01-03"].logs == pf_shared.logs.loc[:"2020-01-03"]
+        assert_series_equal(pf_shared.loc[:"2020-01-03"].init_cash, pf_shared.init_cash)
+        assert_series_equal(pf_shared.loc[:"2020-01-03"].init_position, pf_shared.init_position)
+        assert_series_equal(pf_shared.loc[:"2020-01-03"].init_price, pf_shared.init_price)
+        assert_frame_equal(pf_shared.loc[:"2020-01-03"].call_seq, pf_shared.call_seq.loc[:"2020-01-03"])
+        assert_frame_equal(pf_shared.loc[:"2020-01-03"].cash_deposits, pf_shared.cash_deposits.loc[:"2020-01-03"])
+        assert pf_shared.loc["2020-01-03":].wrapper == pf_shared.wrapper.loc["2020-01-03":]
+        assert pf_shared.loc["2020-01-03":].orders == pf_shared.orders.loc["2020-01-03":]
+        assert pf_shared.loc["2020-01-03":].logs == pf_shared.logs.loc["2020-01-03":]
+        assert_series_equal(
+            pf_shared.loc["2020-01-03":].init_cash,
+            pf_shared.cash.loc["2020-01-02"].rename("init_cash"),
+        )
+        assert_series_equal(
+            pf_shared.loc["2020-01-03":].init_position,
+            pf_shared.assets.loc["2020-01-02"].rename("init_position"),
+        )
+        assert_series_equal(
+            pf_shared.loc["2020-01-03":].init_price,
+            pf_shared.filled_close.loc["2020-01-02"].rename("init_price"),
+        )
+        assert_frame_equal(pf_shared.loc["2020-01-03":].call_seq, pf_shared.call_seq.loc["2020-01-03":])
+        assert_frame_equal(pf_shared.loc["2020-01-03":].cash_deposits, pf_shared.cash_deposits.loc["2020-01-03":])
+
+        def _apply_loc(x):
+            return x.loc["2020-01-02":"2020-01-04", ["c"]]
+
+        def _apply_prev_loc(x):
+            return x.loc["2020-01-01", ["c"]]
+
+        assert _apply_loc(pf).wrapper == _apply_loc(pf.wrapper)
+        assert _apply_loc(pf).orders == _apply_loc(pf.orders)
+        assert _apply_loc(pf).logs == _apply_loc(pf.logs)
+        assert_series_equal(
+            _apply_loc(pf).init_cash,
+            _apply_prev_loc(pf.cash).rename("init_cash"),
+        )
+        assert_series_equal(
+            _apply_loc(pf).init_position,
+            _apply_prev_loc(pf.assets).rename("init_position"),
+        )
+        assert_series_equal(
+            _apply_loc(pf).init_price,
+            _apply_prev_loc(pf.filled_close).rename("init_price"),
+        )
+        assert_frame_equal(_apply_loc(pf).call_seq, _apply_loc(pf.call_seq))
+        assert_frame_equal(_apply_loc(pf).cash_deposits, _apply_loc(pf.cash_deposits))
 
     def test_regroup(self):
         assert pf.regroup(None) == pf
@@ -1314,95 +1404,359 @@ class TestPortfolio:
         )
 
     def test_in_outputs(self):
-        in_outputs = dict(
-            init_cash=np.arange(3),
-            init_position_value=np.arange(3),
-            close=np.arange(15).reshape((5, 3)),
-            cash_flow=np.arange(15).reshape((5, 3)),
-            orders=np.concatenate(
-                (np.full(5, 0, dtype=order_dt), np.full(5, 1, dtype=order_dt), np.full(5, 2, dtype=order_dt)),
-            ),
-        )
-        in_outputs = namedtuple("InOutputs", in_outputs)(**in_outputs)
-        pf2 = pf.replace(in_outputs=in_outputs)
-
-        np.testing.assert_array_equal(pf2.init_cash.values, in_outputs.init_cash)
-        np.testing.assert_array_equal(pf2.init_position_value.values, in_outputs.init_position_value)
-        np.testing.assert_array_equal(pf2.close.values, in_outputs.close)
-        np.testing.assert_array_equal(pf2.cash_flow.values, in_outputs.cash_flow)
-        np.testing.assert_array_equal(pf2.orders.values, in_outputs.orders)
-
-        assert pf2["a"].init_cash == in_outputs.init_cash[0]
-        assert pf2["a"].init_position_value == in_outputs.init_position_value[0]
-        np.testing.assert_array_equal(pf2["a"].close.values, in_outputs.close[:, 0])
-        np.testing.assert_array_equal(pf2["a"].cash_flow.values, in_outputs.cash_flow[:, 0])
-        np.testing.assert_array_equal(pf2["a"].orders.values, in_outputs.orders[:5])
+        def _apply_loc(x):
+            return x.loc["2020-01-02":"2020-01-04"]
 
         in_outputs = dict(
-            init_cash=np.arange(2),
-            init_position_value=np.arange(3),
-            close=np.arange(15).reshape((5, 3)),
-            cash_flow=np.arange(10).reshape((5, 2)),
-            orders=np.concatenate(
-                (np.full(5, 0, dtype=order_dt), np.full(5, 1, dtype=order_dt), np.full(5, 2, dtype=order_dt)),
-            ),
+            init_cash=pf.init_cash.values,
+            init_position_value=pf.init_position_value.values,
+            close=pf.close.values,
+            cash_flow=pf.cash_flow.values,
+            cash=pf.cash.values,
+            bm_returns=pf.bm_returns.values,
+            orders=pf.orders.values,
+            logs=pf.logs.values,
+            entry_trades=pf.entry_trades.values,
+            exit_trades=pf.exit_trades.values,
+            positions=pf.positions.values,
+            trades=pf.trades.values,
+            drawdowns=pf.drawdowns.values,
         )
         in_outputs = namedtuple("InOutputs", in_outputs)(**in_outputs)
-        pf_shared2 = pf_shared.replace(in_outputs=in_outputs)
+        pf2 = vbt.Portfolio.from_holding(price_na).replace(in_outputs=in_outputs)
 
-        np.testing.assert_array_equal(pf_shared2.init_cash.values, in_outputs.init_cash)
-        np.testing.assert_array_equal(pf_shared2.init_position_value.values, in_outputs.init_position_value)
-        np.testing.assert_array_equal(pf_shared2.close.values, in_outputs.close)
-        np.testing.assert_array_equal(pf_shared2.cash_flow.values, in_outputs.cash_flow)
-        np.testing.assert_array_equal(pf_shared2.orders.values, in_outputs.orders)
+        np.testing.assert_array_equal(pf2.init_cash.values, pf.init_cash.values)
+        np.testing.assert_array_equal(pf2.init_position_value.values, pf.init_position_value.values)
+        np.testing.assert_array_equal(pf2.close.values, pf.close.values)
+        np.testing.assert_array_equal(pf2.cash_flow.values, pf.cash_flow.values)
+        np.testing.assert_array_equal(pf2.cash.values, pf.cash.values)
+        np.testing.assert_array_equal(pf2.bm_returns.values, pf.bm_returns.values)
+        assert_records_close(pf2.orders.values, pf.orders.values)
+        assert_records_close(pf2.logs.values, pf.logs.values)
+        assert_records_close(pf2.entry_trades.values, pf.entry_trades.values)
+        assert_records_close(pf2.exit_trades.values, pf.exit_trades.values)
+        assert_records_close(pf2.positions.values, pf.positions.values)
+        assert_records_close(pf2.trades.values, pf.trades.values)
+        assert_records_close(pf2.drawdowns.values, pf.drawdowns.values)
 
-        assert pf_shared2["first"].init_cash == in_outputs.init_cash[0]
-        np.testing.assert_array_equal(
-            pf_shared2["first"].init_position_value.values,
-            in_outputs.init_position_value[:2],
-        )
-        np.testing.assert_array_equal(pf_shared2["first"].close.values, in_outputs.close[:, :2])
-        np.testing.assert_array_equal(pf_shared2["first"].cash_flow.values, in_outputs.cash_flow[:, 0])
-        np.testing.assert_array_equal(pf_shared2["first"].orders.values, in_outputs.orders[:10])
+        assert pf2["b"].init_cash == pf.init_cash["b"]
+        assert pf2["b"].init_position_value == pf.init_position_value["b"]
+        np.testing.assert_array_equal(pf2["b"].close.values, pf.close["b"].values)
+        np.testing.assert_array_equal(pf2["b"].cash_flow.values, pf.cash_flow["b"].values)
+        np.testing.assert_array_equal(pf2["b"].cash.values, pf.cash["b"].values)
+        np.testing.assert_array_equal(pf2["b"].bm_returns.values, pf.bm_returns["b"].values)
+        assert_records_close(pf2["b"].orders.values, pf.orders["b"].values)
+        assert_records_close(pf2["b"].logs.values, pf.logs["b"].values)
+        assert_records_close(pf2["b"].entry_trades.values, pf.entry_trades["b"].values)
+        assert_records_close(pf2["b"].exit_trades.values, pf.exit_trades["b"].values)
+        assert_records_close(pf2["b"].positions.values, pf.positions["b"].values)
+        assert_records_close(pf2["b"].trades.values, pf.trades["b"].values)
+        assert_records_close(pf2["b"].drawdowns.values, pf.drawdowns["b"].values)
 
-        def create_in_outputs(**kwargs):
-            return namedtuple("InOutputs", kwargs)(**kwargs)
+        np.testing.assert_array_equal(_apply_loc(pf2).init_cash.values, pf.init_cash.values)
+        np.testing.assert_array_equal(_apply_loc(pf2).init_position_value.values, pf.init_position_value.values)
+        np.testing.assert_array_equal(_apply_loc(pf2).close.values, _apply_loc(pf.close).values)
+        np.testing.assert_array_equal(_apply_loc(pf2).cash_flow.values, _apply_loc(pf.cash_flow).values)
+        np.testing.assert_array_equal(_apply_loc(pf2).cash.values, _apply_loc(pf.cash).values)
+        np.testing.assert_array_equal(_apply_loc(pf2).bm_returns.values, _apply_loc(pf.bm_returns).values)
+        assert_records_close(_apply_loc(pf2).orders.values, _apply_loc(pf.orders).values)
+        assert_records_close(_apply_loc(pf2).logs.values, _apply_loc(pf.logs).values)
+        assert_records_close(_apply_loc(pf2).entry_trades.values, _apply_loc(pf.entry_trades).values)
+        assert_records_close(_apply_loc(pf2).exit_trades.values, _apply_loc(pf.exit_trades).values)
+        assert_records_close(_apply_loc(pf2).positions.values, _apply_loc(pf.positions).values)
+        assert_records_close(_apply_loc(pf2).trades.values, _apply_loc(pf.trades).values)
+        assert_records_close(_apply_loc(pf2).drawdowns.values, _apply_loc(pf.drawdowns).values)
 
-        np.testing.assert_array_equal(
-            pf_shared.replace(in_outputs=create_in_outputs(init_cash_pg=np.arange(2))).init_cash.values,
-            np.arange(2),
+        pf2 = pf2.replace(call_seq=None)
+        np.testing.assert_allclose(
+            pf2.resample("2d").init_cash.values,
+            pf.init_cash.values,
         )
-        np.testing.assert_array_equal(
-            pf_shared.replace(in_outputs=create_in_outputs(init_cash_pcg=np.arange(2))).init_cash.values,
-            np.arange(2),
+        np.testing.assert_allclose(
+            pf2.resample("2d").init_position_value.values,
+            pf.init_position_value.values,
         )
-        np.testing.assert_array_equal(
-            pf_shared.replace(in_outputs=create_in_outputs(init_cash_cs=np.arange(2))).init_cash.values,
-            np.arange(2),
+        np.testing.assert_allclose(
+            pf2.resample("2d").close.values,
+            pf.close.resample("2d").last().values,
         )
-        np.testing.assert_array_equal(
-            pf_shared.replace(
-                in_outputs=create_in_outputs(init_position_value_pc=np.arange(3))
-            ).init_position_value.values,
-            np.arange(3),
+        np.testing.assert_allclose(
+            pf2.resample("2d").cash_flow.values,
+            pf.cash_flow.resample("2d").sum().fillna(0.0).values,
         )
-        np.testing.assert_array_equal(
-            pf_grouped.replace(
-                in_outputs=create_in_outputs(init_position_value_cs=np.arange(3))
-            ).init_position_value.values,
-            np.arange(3),
+        np.testing.assert_allclose(
+            pf2.resample("2d").cash.values,
+            pf.cash.resample("2d").last().values,
         )
-        np.testing.assert_array_equal(
-            pf.replace(in_outputs=create_in_outputs(init_cash_pc=np.arange(3))).init_cash.values,
-            np.arange(3),
+        np.testing.assert_allclose(
+            pf2.resample("2d").bm_returns.values,
+            pf.bm_returns.resample("2d").apply(lambda x: (1 + x).prod() - 1).values,
         )
-        np.testing.assert_array_equal(
-            pf.replace(in_outputs=create_in_outputs(init_cash_pcg=np.arange(3))).init_cash.values,
-            np.arange(3),
+        assert_records_close(
+            pf2.resample("2d").orders.values,
+            pf.orders.resample("2d").values,
         )
+        assert_records_close(
+            pf2.resample("2d").logs.values,
+            pf.logs.resample("2d").values,
+        )
+        assert_records_close(
+            pf2.resample("2d").entry_trades.values,
+            pf.entry_trades.resample("2d").values,
+        )
+        assert_records_close(
+            pf2.resample("2d").exit_trades.values,
+            pf.exit_trades.resample("2d").values,
+        )
+        assert_records_close(
+            pf2.resample("2d").positions.values,
+            pf.positions.resample("2d").values,
+        )
+        assert_records_close(
+            pf2.resample("2d").trades.values,
+            pf.trades.resample("2d").values,
+        )
+        assert_records_close(
+            pf2.resample("2d").drawdowns.values,
+            pf.drawdowns.resample("2d").values,
+        )
+
+        in_outputs = dict(
+            init_cash=pf_grouped.init_cash.values,
+            init_position_value=pf_grouped.init_position_value.values,
+            close=pf_grouped.close.values,
+            cash_flow=pf_grouped.cash_flow.values,
+            cash=pf_grouped.cash.values,
+            bm_returns=pf_grouped.bm_returns.values,
+            orders=pf_grouped.orders.values,
+            logs=pf_grouped.logs.values,
+            entry_trades=pf_grouped.entry_trades.values,
+            exit_trades=pf_grouped.exit_trades.values,
+            positions=pf_grouped.positions.values,
+            trades=pf_grouped.trades.values,
+            drawdowns=pf_grouped.drawdowns.values,
+        )
+        in_outputs = namedtuple("InOutputs", in_outputs)(**in_outputs)
+        pf_grouped2 = vbt.Portfolio.from_holding(price_na, group_by=group_by).replace(in_outputs=in_outputs)
+
+        np.testing.assert_array_equal(pf_grouped2.init_cash.values, pf_grouped.init_cash.values)
+        np.testing.assert_array_equal(pf_grouped2.init_position_value.values, pf_grouped.init_position_value.values)
+        np.testing.assert_array_equal(pf_grouped2.close.values, pf_grouped.close.values)
+        np.testing.assert_array_equal(pf_grouped2.cash_flow.values, pf_grouped.cash_flow.values)
+        np.testing.assert_array_equal(pf_grouped2.cash.values, pf_grouped.cash.values)
+        np.testing.assert_array_equal(pf_grouped2.bm_returns.values, pf_grouped.bm_returns.values)
+        assert_records_close(pf_grouped2.orders.values, pf_grouped.orders.values)
+        assert_records_close(pf_grouped2.logs.values, pf_grouped.logs.values)
+        assert_records_close(pf_grouped2.entry_trades.values, pf_grouped.entry_trades.values)
+        assert_records_close(pf_grouped2.exit_trades.values, pf_grouped.exit_trades.values)
+        assert_records_close(pf_grouped2.positions.values, pf_grouped.positions.values)
+        assert_records_close(pf_grouped2.trades.values, pf_grouped.trades.values)
+        assert_records_close(pf_grouped2.drawdowns.values, pf_grouped.drawdowns.values)
+
+        assert pf_grouped2["second"].init_cash == pf_grouped.init_cash["second"]
+        assert pf_grouped2["second"].init_position_value == pf_grouped.init_position_value["c"]
+        np.testing.assert_array_equal(pf_grouped2["second"].close.values, pf_grouped.close["c"].values)
+        np.testing.assert_array_equal(pf_grouped2["second"].cash_flow.values, pf_grouped.cash_flow["second"].values)
+        np.testing.assert_array_equal(pf_grouped2["second"].cash.values, pf_grouped.cash["second"].values)
+        np.testing.assert_array_equal(pf_grouped2["second"].bm_returns.values, pf_grouped.bm_returns["second"].values)
+        assert_records_close(pf_grouped2["second"].orders.values, pf_grouped.orders["second"].values)
+        assert_records_close(pf_grouped2["second"].logs.values, pf_grouped.logs["second"].values)
+        assert_records_close(pf_grouped2["second"].entry_trades.values, pf_grouped.entry_trades["second"].values)
+        assert_records_close(pf_grouped2["second"].exit_trades.values, pf_grouped.exit_trades["second"].values)
+        assert_records_close(pf_grouped2["second"].positions.values, pf_grouped.positions["second"].values)
+        assert_records_close(pf_grouped2["second"].trades.values, pf_grouped.trades["second"].values)
+        assert_records_close(pf_grouped2["second"].drawdowns.values, pf_grouped.drawdowns["second"].values)
+
+        np.testing.assert_array_equal(_apply_loc(pf_grouped2).init_cash.values, pf_grouped.init_cash.values)
         np.testing.assert_array_equal(
-            pf.replace(in_outputs=create_in_outputs(init_cash_cs=np.arange(3))).init_cash.values,
-            np.arange(3),
+            _apply_loc(pf_grouped2).init_position_value.values, pf_grouped.init_position_value.values
+        )
+        np.testing.assert_array_equal(_apply_loc(pf_grouped2).close.values, _apply_loc(pf_grouped.close).values)
+        np.testing.assert_array_equal(_apply_loc(pf_grouped2).cash_flow.values, _apply_loc(pf_grouped.cash_flow).values)
+        np.testing.assert_array_equal(_apply_loc(pf_grouped2).cash.values, _apply_loc(pf_grouped.cash).values)
+        np.testing.assert_array_equal(
+            _apply_loc(pf_grouped2).bm_returns.values, _apply_loc(pf_grouped.bm_returns).values
+        )
+        assert_records_close(_apply_loc(pf_grouped2).orders.values, _apply_loc(pf_grouped.orders).values)
+        assert_records_close(_apply_loc(pf_grouped2).logs.values, _apply_loc(pf_grouped.logs).values)
+        assert_records_close(_apply_loc(pf_grouped2).entry_trades.values, _apply_loc(pf_grouped.entry_trades).values)
+        assert_records_close(_apply_loc(pf_grouped2).exit_trades.values, _apply_loc(pf_grouped.exit_trades).values)
+        assert_records_close(_apply_loc(pf_grouped2).positions.values, _apply_loc(pf_grouped.positions).values)
+        assert_records_close(_apply_loc(pf_grouped2).trades.values, _apply_loc(pf_grouped.trades).values)
+        assert_records_close(_apply_loc(pf_grouped2).drawdowns.values, _apply_loc(pf_grouped.drawdowns).values)
+
+        pf_grouped2 = pf_grouped2.replace(call_seq=None)
+        np.testing.assert_allclose(
+            pf_grouped2.resample("2d").init_cash.values,
+            pf_grouped.init_cash.values,
+        )
+        np.testing.assert_allclose(
+            pf_grouped2.resample("2d").init_position_value.values,
+            pf_grouped.init_position_value.values,
+        )
+        np.testing.assert_allclose(
+            pf_grouped2.resample("2d").close.values,
+            pf_grouped.close.resample("2d").last().values,
+        )
+        np.testing.assert_allclose(
+            pf_grouped2.resample("2d").cash_flow.values,
+            pf_grouped.cash_flow.resample("2d").sum().fillna(0.0).values,
+        )
+        np.testing.assert_allclose(
+            pf_grouped2.resample("2d").cash.values,
+            pf_grouped.cash.resample("2d").last().values,
+        )
+        np.testing.assert_allclose(
+            pf_grouped2.resample("2d").bm_returns.values,
+            pf_grouped.bm_returns.resample("2d").apply(lambda x: (1 + x).prod() - 1).values,
+        )
+        assert_records_close(
+            pf_grouped2.resample("2d").orders.values,
+            pf_grouped.orders.resample("2d").values,
+        )
+        assert_records_close(
+            pf_grouped2.resample("2d").logs.values,
+            pf_grouped.logs.resample("2d").values,
+        )
+        assert_records_close(
+            pf_grouped2.resample("2d").entry_trades.values,
+            pf_grouped.entry_trades.resample("2d").values,
+        )
+        assert_records_close(
+            pf_grouped2.resample("2d").exit_trades.values,
+            pf_grouped.exit_trades.resample("2d").values,
+        )
+        assert_records_close(
+            pf_grouped2.resample("2d").positions.values,
+            pf_grouped.positions.resample("2d").values,
+        )
+        assert_records_close(
+            pf_grouped2.resample("2d").trades.values,
+            pf_grouped.trades.resample("2d").values,
+        )
+        assert_records_close(
+            pf_grouped2.resample("2d").drawdowns.values,
+            pf_grouped.drawdowns.resample("2d").values,
+        )
+
+        in_outputs = dict(
+            init_cash=pf_shared.init_cash.values,
+            init_position_value=pf_shared.init_position_value.values,
+            close=pf_shared.close.values,
+            cash_flow=pf_shared.cash_flow.values,
+            cash=pf_shared.cash.values,
+            bm_returns=pf_shared.bm_returns.values,
+            orders=pf_shared.orders.values,
+            logs=pf_shared.logs.values,
+            entry_trades=pf_shared.entry_trades.values,
+            exit_trades=pf_shared.exit_trades.values,
+            positions=pf_shared.positions.values,
+            trades=pf_shared.trades.values,
+            drawdowns=pf_shared.drawdowns.values,
+        )
+        in_outputs = namedtuple("InOutputs", in_outputs)(**in_outputs)
+        pf_shared2 = vbt.Portfolio.from_holding(
+            price_na,
+            group_by=group_by,
+            cash_sharing=True,
+        ).replace(in_outputs=in_outputs)
+
+        np.testing.assert_array_equal(pf_shared2.init_cash.values, pf_shared.init_cash.values)
+        np.testing.assert_array_equal(pf_shared2.init_position_value.values, pf_shared.init_position_value.values)
+        np.testing.assert_array_equal(pf_shared2.close.values, pf_shared.close.values)
+        np.testing.assert_array_equal(pf_shared2.cash_flow.values, pf_shared.cash_flow.values)
+        np.testing.assert_array_equal(pf_shared2.cash.values, pf_shared.cash.values)
+        np.testing.assert_array_equal(pf_shared2.bm_returns.values, pf_shared.bm_returns.values)
+        assert_records_close(pf_shared2.orders.values, pf_shared.orders.values)
+        assert_records_close(pf_shared2.logs.values, pf_shared.logs.values)
+        assert_records_close(pf_shared2.entry_trades.values, pf_shared.entry_trades.values)
+        assert_records_close(pf_shared2.exit_trades.values, pf_shared.exit_trades.values)
+        assert_records_close(pf_shared2.positions.values, pf_shared.positions.values)
+        assert_records_close(pf_shared2.trades.values, pf_shared.trades.values)
+        assert_records_close(pf_shared2.drawdowns.values, pf_shared.drawdowns.values)
+
+        assert pf_shared2["second"].init_cash == pf_shared.init_cash["second"]
+        assert pf_shared2["second"].init_position_value == pf_shared.init_position_value["c"]
+        np.testing.assert_array_equal(pf_shared2["second"].close.values, pf_shared.close["c"].values)
+        np.testing.assert_array_equal(pf_shared2["second"].cash_flow.values, pf_shared.cash_flow["second"].values)
+        np.testing.assert_array_equal(pf_shared2["second"].cash.values, pf_shared.cash["second"].values)
+        np.testing.assert_array_equal(pf_shared2["second"].bm_returns.values, pf_shared.bm_returns["second"].values)
+        assert_records_close(pf_shared2["second"].orders.values, pf_shared.orders["second"].values)
+        assert_records_close(pf_shared2["second"].logs.values, pf_shared.logs["second"].values)
+        assert_records_close(pf_shared2["second"].entry_trades.values, pf_shared.entry_trades["second"].values)
+        assert_records_close(pf_shared2["second"].exit_trades.values, pf_shared.exit_trades["second"].values)
+        assert_records_close(pf_shared2["second"].positions.values, pf_shared.positions["second"].values)
+        assert_records_close(pf_shared2["second"].trades.values, pf_shared.trades["second"].values)
+        assert_records_close(pf_shared2["second"].drawdowns.values, pf_shared.drawdowns["second"].values)
+
+        np.testing.assert_array_equal(_apply_loc(pf_shared2).init_cash.values, pf_shared.init_cash.values)
+        np.testing.assert_array_equal(
+            _apply_loc(pf_shared2).init_position_value.values, pf_shared.init_position_value.values
+        )
+        np.testing.assert_array_equal(_apply_loc(pf_shared2).close.values, _apply_loc(pf_shared.close).values)
+        np.testing.assert_array_equal(_apply_loc(pf_shared2).cash_flow.values, _apply_loc(pf_shared.cash_flow).values)
+        np.testing.assert_array_equal(_apply_loc(pf_shared2).cash.values, _apply_loc(pf_shared.cash).values)
+        np.testing.assert_array_equal(_apply_loc(pf_shared2).bm_returns.values, _apply_loc(pf_shared.bm_returns).values)
+        assert_records_close(_apply_loc(pf_shared2).orders.values, _apply_loc(pf_shared.orders).values)
+        assert_records_close(_apply_loc(pf_shared2).logs.values, _apply_loc(pf_shared.logs).values)
+        assert_records_close(_apply_loc(pf_shared2).entry_trades.values, _apply_loc(pf_shared.entry_trades).values)
+        assert_records_close(_apply_loc(pf_shared2).exit_trades.values, _apply_loc(pf_shared.exit_trades).values)
+        assert_records_close(_apply_loc(pf_shared2).positions.values, _apply_loc(pf_shared.positions).values)
+        assert_records_close(_apply_loc(pf_shared2).trades.values, _apply_loc(pf_shared.trades).values)
+        assert_records_close(_apply_loc(pf_shared2).drawdowns.values, _apply_loc(pf_shared.drawdowns).values)
+
+        pf_shared2 = pf_shared2.replace(call_seq=None)
+        np.testing.assert_allclose(
+            pf_shared2.resample("2d").init_cash.values,
+            pf_shared.init_cash.values,
+        )
+        np.testing.assert_allclose(
+            pf_shared2.resample("2d").init_position_value.values,
+            pf_shared.init_position_value.values,
+        )
+        np.testing.assert_allclose(
+            pf_shared2.resample("2d").close.values,
+            pf_shared.close.resample("2d").last().values,
+        )
+        np.testing.assert_allclose(
+            pf_shared2.resample("2d").cash_flow.values,
+            pf_shared.cash_flow.resample("2d").sum().fillna(0.0).values,
+        )
+        np.testing.assert_allclose(
+            pf_shared2.resample("2d").cash.values,
+            pf_shared.cash.resample("2d").last().values,
+        )
+        np.testing.assert_allclose(
+            pf_shared2.resample("2d").bm_returns.values,
+            pf_shared.bm_returns.resample("2d").apply(lambda x: (1 + x).prod() - 1).values,
+        )
+        assert_records_close(
+            pf_shared2.resample("2d").orders.values,
+            pf_shared.orders.resample("2d").values,
+        )
+        assert_records_close(
+            pf_shared2.resample("2d").logs.values,
+            pf_shared.logs.resample("2d").values,
+        )
+        assert_records_close(
+            pf_shared2.resample("2d").entry_trades.values,
+            pf_shared.entry_trades.resample("2d").values,
+        )
+        assert_records_close(
+            pf_shared2.resample("2d").exit_trades.values,
+            pf_shared.exit_trades.resample("2d").values,
+        )
+        assert_records_close(
+            pf_shared2.resample("2d").positions.values,
+            pf_shared.positions.resample("2d").values,
+        )
+        assert_records_close(
+            pf_shared2.resample("2d").trades.values,
+            pf_shared.trades.resample("2d").values,
+        )
+        assert_records_close(
+            pf_shared2.resample("2d").drawdowns.values,
+            pf_shared.drawdowns.resample("2d").values,
         )
 
     def test_custom_in_outputs(self):
@@ -5716,9 +6070,9 @@ class TestPortfolio:
             pd.Series(
                 np.array(
                     [
-                        pd.Timestamp('2020-01-01 00:00:00'),
-                        pd.Timestamp('2020-01-05 00:00:00'),
-                        pd.Timedelta('5 days 00:00:00'),
+                        pd.Timestamp("2020-01-01 00:00:00"),
+                        pd.Timestamp("2020-01-05 00:00:00"),
+                        pd.Timedelta("5 days 00:00:00"),
                         100.0,
                         202.62781999999999,
                         0.3108019801980197,
@@ -5726,23 +6080,24 @@ class TestPortfolio:
                         2.467578242711193,
                         0.48618000000000006,
                         0.10277254148026709,
-                        pd.Timedelta('2 days 00:00:00'),
+                        pd.Timedelta("2 days 00:00:00"),
                         3,
                         2,
                         1,
                         -0.20049999999999982,
-                        100.0, 41.25431425976392,
+                        100.0,
+                        41.25431425976392,
                         37.25295186194369,
                         39.25363306085381,
                         np.nan,
-                        pd.Timedelta('3 days 12:00:00'),
+                        pd.Timedelta("3 days 12:00:00"),
                         pd.NaT,
                         np.inf,
                         0.4141600000000001,
                         6.247748394546397,
                         665.2843559613844,
                         4.483949018487055,
-                        42.89733832278653
+                        42.89733832278653,
                     ]
                 ),
                 index=stats_index,

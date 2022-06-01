@@ -77,8 +77,8 @@ class TestAccessors:
         )
         acc = vbt.ReturnsAccessor.row_stack(ret_acc, ret_acc2)
         assert isinstance(acc, vbt.ReturnsDFAccessor)
-        pd.testing.assert_frame_equal(acc.obj, pd.concat((rets, rets2)))
-        pd.testing.assert_frame_equal(acc.bm_returns, pd.concat((bm_returns, bm_returns2)))
+        assert_frame_equal(acc.obj, pd.concat((rets, rets2)))
+        assert_frame_equal(acc.bm_returns, pd.concat((bm_returns, bm_returns2)))
 
     def test_column_stack(self):
         rets2 = rets * 2
@@ -90,8 +90,8 @@ class TestAccessors:
         )
         acc = vbt.ReturnsAccessor.column_stack(ret_acc, ret_acc2)
         assert isinstance(acc, vbt.ReturnsDFAccessor)
-        pd.testing.assert_frame_equal(acc.obj, pd.concat((rets, rets2), axis=1))
-        pd.testing.assert_frame_equal(acc.bm_returns, pd.concat((bm_returns, bm_returns2), axis=1))
+        assert_frame_equal(acc.obj, pd.concat((rets, rets2), axis=1))
+        assert_frame_equal(acc.bm_returns, pd.concat((bm_returns, bm_returns2), axis=1))
         with pytest.raises(Exception):
             vbt.ReturnsAccessor.column_stack(ret_acc, ret_acc2.replace(bm_returns=None))
         with pytest.raises(Exception):

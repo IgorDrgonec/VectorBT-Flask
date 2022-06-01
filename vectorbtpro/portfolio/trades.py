@@ -660,8 +660,8 @@ class Trades(Ranges):
             close_objs = []
             stack_close_objs = True
             for obj in objs:
-                if obj.config["close"] is not None:
-                    close_objs.append(obj.config["close"])
+                if obj._close is not None:
+                    close_objs.append(obj.close)
                 else:
                     stack_close_objs = False
                     break
@@ -682,22 +682,27 @@ class Trades(Ranges):
         self,
         wrapper: ArrayWrapper,
         records_arr: tp.RecordArray,
-        close: tp.Optional[tp.SeriesFrame],
+        close: tp.Optional[tp.ArrayLike] = None,
         **kwargs,
     ) -> None:
         Ranges.__init__(self, wrapper, records_arr, close=close, **kwargs)
         self._close = close
 
-    def indexing_func(self: TradesT, *args, **kwargs) -> TradesT:
+    def indexing_func(self: TradesT, *args, records_meta: tp.DictLike = None, **kwargs) -> TradesT:
         """Perform indexing on `Trades`."""
-        ranges_meta = Ranges.indexing_func_meta(self, *args, **kwargs)
-        if self.close is not None:
-            new_close = to_2d_array(self.close)[:, ranges_meta["wrapper_meta"]["col_idxs"]]
+        if records_meta is None:
+            records_meta = Ranges.indexing_func_meta(self, *args, **kwargs)
+        if self._close is not None:
+            new_close = to_2d_array(self._close)
+            if new_close.shape[0] > 1:
+                new_close = new_close[records_meta["wrapper_meta"]["row_idxs"], :]
+            if new_close.shape[1] > 1:
+                new_close = new_close[:, records_meta["wrapper_meta"]["col_idxs"]]
         else:
             new_close = None
         return self.replace(
-            wrapper=ranges_meta["wrapper_meta"]["new_wrapper"],
-            records_arr=ranges_meta["new_records_arr"],
+            wrapper=records_meta["wrapper_meta"]["new_wrapper"],
+            records_arr=records_meta["new_records_arr"],
             close=new_close
         )
 
@@ -706,21 +711,26 @@ class Trades(Ranges):
         *args,
         ffill_close: bool = False,
         fbfill_close: bool = False,
+        records_meta: tp.DictLike = None,
         **kwargs,
     ) -> TradesT:
         """Perform resampling on `Trades`."""
-        resampler, new_wrapper, new_records_arr = self.resample_meta(*args, **kwargs)
-        if self.close is None:
-            new_close = self.close
+        if records_meta is None:
+            records_meta = self.resample_meta(*args, **kwargs)
+        if self._close is None:
+            new_close = None
         else:
-            new_close = self.close.vbt.resample_apply(resampler, generic_nb.last_reduce_nb)
+            new_close = self.close.vbt.resample_apply(
+                records_meta["wrapper_meta"]["resampler"],
+                generic_nb.last_reduce_nb,
+            )
             if fbfill_close:
                 new_close = new_close.vbt.fbfill()
             elif ffill_close:
                 new_close = new_close.vbt.ffill()
         return self.replace(
-            wrapper=new_wrapper,
-            records_arr=new_records_arr,
+            wrapper=records_meta["wrapper_meta"]["new_wrapper"],
+            records_arr=records_meta["new_records_arr"],
             close=new_close,
         )
 
@@ -1260,7 +1270,7 @@ class Trades(Ranges):
         fig.update_layout(**layout_kwargs)
 
         # Plot close
-        if self_col.close is not None:
+        if self_col._close is not None:
             fig = self_col.close.vbt.plot(trace_kwargs=close_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
 
         if self_col.count() > 0:

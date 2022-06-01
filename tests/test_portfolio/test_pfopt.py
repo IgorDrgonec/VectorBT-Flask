@@ -687,6 +687,29 @@ class TestPyPortfolioOpt:
 # ############# PortfolioOptimizer ############# #
 
 class TestPortfolioOptimizer:
+    def test_indexing(self):
+        pf_opt = vbt.PortfolioOptimizer.from_random(
+            prices.vbt.wrapper,
+            seed=42,
+            on=vbt.pfopt_group_dict({"g1": [1, 3], "g2": [2, 4]}),
+        )
+        pf_opt2 = pf_opt.loc["2020-01-03": "2020-01-04", "g2"]
+        assert_index_equal(pf_opt2.wrapper.index, pf_opt.wrapper.index[2:4])
+        assert_index_equal(pf_opt2.wrapper.columns, pf_opt.wrapper.columns[5:])
+        assert_records_close(pf_opt2.alloc_records.values, np.array([(0, 0, 0)], dtype=alloc_point_dt))
+        np.testing.assert_array_equal(pf_opt2._allocations, pf_opt._allocations[[2]])
+        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+            prices.vbt.wrapper,
+            lambda index_slice: prices.iloc[index_slice].sum(),
+            vbt.Rep("index_slice"),
+            index_ranges=vbt.pfopt_group_dict({"g1": [0, 1], "g2": [2, 3]}),
+        )
+        pf_opt2 = pf_opt.loc["2020-01-03":"2020-01-04", "g2"]
+        assert_index_equal(pf_opt2.wrapper.index, pf_opt.wrapper.index[2:4])
+        assert_index_equal(pf_opt2.wrapper.columns, pf_opt.wrapper.columns[5:])
+        assert_records_close(pf_opt2.alloc_records.values, np.array([(0, 0, 0, 1, 1, 1)], dtype=alloc_range_dt))
+        np.testing.assert_array_equal(pf_opt2._allocations, pf_opt._allocations[[1]])
+
     def test_find_pfopt_groups(self):
         assert pfopt.find_pfopt_groups(
             vbt.pfopt_group_dict({"a": (1, 2, 3), "d": (4, 5, 6)}),
@@ -1823,8 +1846,8 @@ class TestPortfolioOptimizer:
             pf_opt.stats(),
             pd.Series(
                 [
-                    pd.Timestamp('2020-01-01 00:00:00', freq='D'),
-                    pd.Timestamp('2020-01-05 00:00:00', freq='D'),
+                    pd.Timestamp('2020-01-01 00:00:00'),
+                    pd.Timestamp('2020-01-05 00:00:00'),
                     pd.Timedelta('5 days 00:00:00'),
                     2.0,
                     0.07835996334253675,
@@ -1841,8 +1864,8 @@ class TestPortfolioOptimizer:
             pf_opt.stats(column="g1"),
             pd.Series(
                 [
-                    pd.Timestamp('2020-01-01 00:00:00', freq='D'),
-                    pd.Timestamp('2020-01-05 00:00:00', freq='D'),
+                    pd.Timestamp('2020-01-01 00:00:00'),
+                    pd.Timestamp('2020-01-05 00:00:00'),
                     pd.Timedelta('5 days 00:00:00'),
                     2,
                     0.09924097389247608,
@@ -1885,8 +1908,8 @@ class TestPortfolioOptimizer:
             pf_opt.stats(),
             pd.Series(
                 [
-                    pd.Timestamp('2020-01-01 00:00:00', freq='D'),
-                    pd.Timestamp('2020-01-05 00:00:00', freq='D'),
+                    pd.Timestamp('2020-01-01 00:00:00'),
+                    pd.Timestamp('2020-01-05 00:00:00'),
                     pd.Timedelta('5 days 00:00:00'),
                     1.0,
                     0.4,
@@ -1905,8 +1928,8 @@ class TestPortfolioOptimizer:
             pf_opt.stats(column="g1"),
             pd.Series(
                 [
-                    pd.Timestamp('2020-01-01 00:00:00', freq='D'),
-                    pd.Timestamp('2020-01-05 00:00:00', freq='D'),
+                    pd.Timestamp('2020-01-01 00:00:00'),
+                    pd.Timestamp('2020-01-05 00:00:00'),
                     pd.Timedelta('5 days 00:00:00'),
                     1,
                     0.4,

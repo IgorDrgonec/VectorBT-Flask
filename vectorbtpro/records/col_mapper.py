@@ -118,6 +118,8 @@ class ColumnMapper(Wrapping):
         """Select columns.
 
         Returns indices and new column array. Automatically decides whether to use column lengths or column map."""
+        if len(self.col_arr) == 0:
+            return np.arange(len(self.col_arr)), self.col_arr
         if isinstance(col_idxs, slice):
             if col_idxs.start is None and col_idxs.stop is None:
                 return np.arange(len(self.col_arr)), self.col_arr
@@ -130,14 +132,15 @@ class ColumnMapper(Wrapping):
             new_indices, new_col_arr = func(self.col_map, to_1d_array(col_idxs))  # more flexible
         return new_indices, new_col_arr
 
-    def indexing_func_meta(self, *args, **kwargs) -> dict:
+    def indexing_func_meta(self, *args, wrapper_meta: tp.DictLike = None, **kwargs) -> dict:
         """Perform indexing on `ColumnMapper` and also return metadata."""
-        wrapper_meta = self.wrapper.indexing_func_meta(
-            *args,
-            column_only_select=self.column_only_select,
-            group_select=self.group_select,
-            **kwargs,
-        )
+        if wrapper_meta is None:
+            wrapper_meta = self.wrapper.indexing_func_meta(
+                *args,
+                column_only_select=self.column_only_select,
+                group_select=self.group_select,
+                **kwargs,
+            )
         new_indices, new_col_arr = self.select_cols(wrapper_meta["col_idxs"])
         return dict(
             wrapper_meta=wrapper_meta,
@@ -145,9 +148,10 @@ class ColumnMapper(Wrapping):
             new_col_arr=new_col_arr,
         )
 
-    def indexing_func(self: ColumnMapperT, *args, **kwargs) -> ColumnMapperT:
+    def indexing_func(self: ColumnMapperT, *args, col_mapper_meta: tp.DictLike = None, **kwargs) -> ColumnMapperT:
         """Perform indexing on `ColumnMapper`."""
-        col_mapper_meta = self.indexing_func_meta(*args, **kwargs)
+        if col_mapper_meta is None:
+            col_mapper_meta = self.indexing_func_meta(*args, **kwargs)
         return self.replace(
             wrapper=col_mapper_meta["wrapper_meta"]["new_wrapper"],
             col_arr=col_mapper_meta["new_col_arr"],

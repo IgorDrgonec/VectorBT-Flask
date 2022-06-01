@@ -71,20 +71,12 @@ def attach_shortcut_properties(config: Config) -> tp.ClassWrapper:
 
     * `method_name`: Name of the source method. Defaults to the target name prepended with the prefix `get_`.
     * `use_in_outputs`: Whether the property can return an in-place output. Defaults to True.
-    * `field_aliases`: Fields to search for in `vectorbtpro.portfolio.base.Portfolio.in_outputs`.
-    * `obj_type`: Type of the returned object. Can be 'array' for 2-dim arrays, 'red_array' for 1-dim arrays,
-        and 'records' for record arrays. Defaults to 'array'.
-    * `group_aware`: Whether the returned object is aligned based on the current grouping.
-        Defaults to True.
-    * `wrap_kwargs`: Keyword arguments passed to `vectorbtpro.base.wrapping.ArrayWrapper.wrap` and
-        `vectorbtpro.base.wrapping.ArrayWrapper.wrap_reduced`. Defaults to None.
-    * `wrap_func`: Wrapping function. Defaults to None.
     * `method_kwargs`: Keyword arguments passed to the source method. Defaults to None.
     * `decorator`: Defaults to `vectorbtpro.utils.decorators.cached_property` for object types
         'records' and 'red_array'. Otherwise, to `vectorbtpro.utils.decorators.cacheable_property`.
-    * `decorator_kwargs`: Keyword arguments passed to the decorator. By default,
-        includes options `obj_type` and `group_aware`.
     * `docstring`: Method docstring.
+    * Other keyword arguments are passed to the decorator and can include settings for wrapping,
+        indexing, resampling, stacking, etc.
 
     The class must be a subclass of `vectorbtpro.portfolio.base.Portfolio`."""
 
@@ -92,29 +84,20 @@ def attach_shortcut_properties(config: Config) -> tp.ClassWrapper:
         checks.assert_subclass_of(cls, "Portfolio")
 
         for target_name, settings in config.items():
+            settings = dict(settings)
             if target_name.startswith("get_"):
                 raise ValueError(f"Property names cannot have prefix 'get_' ('{target_name}')")
-            method_name = settings.get("method_name", "get_" + target_name)
-            use_in_outputs = settings.get("use_in_outputs", True)
-            field_aliases = settings.get("field_aliases", None)
-            obj_type = settings.get("obj_type", "array")
-            group_by_aware = settings.get("group_by_aware", True)
-            wrap_kwargs = settings.get("wrap_kwargs", None)
-            wrap_kwargs = resolve_dict(wrap_kwargs)
-            wrap_func = settings.get("wrap_func", None)
-            method_kwargs = settings.get("method_kwargs", None)
+            method_name = settings.pop("method_name", "get_" + target_name)
+            use_in_outputs = settings.pop("use_in_outputs", True)
+            method_kwargs = settings.pop("method_kwargs", None)
             method_kwargs = resolve_dict(method_kwargs)
-            decorator = settings.get("decorator", None)
+            decorator = settings.pop("decorator", None)
             if decorator is None:
-                if obj_type in ("red_array", "records"):
+                if settings.get("obj_type", "array") in ("red_array", "records"):
                     decorator = cached_property
                 else:
                     decorator = cacheable_property
-            decorator_kwargs = merge_dicts(
-                dict(obj_type=obj_type, group_by_aware=group_by_aware, field_aliases=field_aliases),
-                settings.get("decorator_kwargs", None),
-            )
-            docstring = settings.get("docstring", None)
+            docstring = settings.pop("docstring", None)
             if docstring is None:
                 if len(method_kwargs) == 0:
                     docstring = f"`{cls.__name__}.{method_name}` with default arguments."
@@ -126,14 +109,12 @@ def attach_shortcut_properties(config: Config) -> tp.ClassWrapper:
                 _method_name: str = method_name,
                 _target_name: str = target_name,
                 _use_in_outputs: bool = use_in_outputs,
-                _wrap_kwargs: tp.Kwargs = wrap_kwargs,
-                _wrap_func: tp.Callable = wrap_func,
                 _method_kwargs: tp.Kwargs = method_kwargs,
             ) -> tp.Any:
 
                 if _use_in_outputs and self.use_in_outputs and self.in_outputs is not None:
                     try:
-                        out = self.get_in_output(_target_name, wrap_kwargs=_wrap_kwargs, wrap_func=_wrap_func)
+                        out = self.get_in_output(_target_name)
                         if out is not None:
                             return out
                     except AttributeError:
@@ -144,7 +125,7 @@ def attach_shortcut_properties(config: Config) -> tp.ClassWrapper:
             new_prop.__name__ = target_name
             new_prop.__qualname__ = f"{cls.__name__}.{target_name}"
             new_prop.__doc__ = docstring
-            setattr(cls, new_prop.__name__, decorator(new_prop, **decorator_kwargs))
+            setattr(cls, new_prop.__name__, decorator(new_prop, **settings))
         return cls
 
     return wrapper

@@ -388,6 +388,7 @@ _settings["indexing"] = indexing
 
 wrapping = ChildDict(
     column_only_select=False,
+    range_only_select=False,
     group_select=True,
     freq=None,
     silence_warnings=False,

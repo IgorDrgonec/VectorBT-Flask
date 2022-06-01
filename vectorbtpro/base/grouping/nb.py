@@ -143,7 +143,7 @@ def group_map_select_nb(group_map: tp.GroupMap, new_groups: tp.Array1d) -> tp.Tu
     group_idxs, group_lens = group_map
     group_start_idxs = np.cumsum(group_lens) - group_lens
     total_count = np.sum(group_lens[new_groups])
-    idxs_out = np.empty(total_count, dtype=np.int_)
+    indices_out = np.empty(total_count, dtype=np.int_)
     group_arr_out = np.empty(total_count, dtype=np.int_)
     j = 0
 
@@ -154,10 +154,10 @@ def group_map_select_nb(group_map: tp.GroupMap, new_groups: tp.Array1d) -> tp.Tu
             continue
         group_start_idx = group_start_idxs[new_group]
         idxs = group_idxs[group_start_idx : group_start_idx + group_len]
-        idxs_out[j : j + group_len] = idxs
+        indices_out[j : j + group_len] = idxs
         group_arr_out[j : j + group_len] = new_group_i
         j += group_len
-    return idxs_out, group_arr_out
+    return indices_out, group_arr_out
 
 
 @register_jitted(cache=True)

@@ -1003,9 +1003,10 @@ class IndicatorBase(Analyzable):
             tuple_mapper = list(zip(*list(mapper_list)))
             setattr(self, "_tuple_mapper", tuple_mapper)
 
-    def indexing_func(self: IndicatorBaseT, *args, **kwargs) -> IndicatorBaseT:
+    def indexing_func(self: IndicatorBaseT, *args, wrapper_meta: tp.DictLike = None, **kwargs) -> IndicatorBaseT:
         """Perform indexing on `IndicatorBase`."""
-        wrapper_meta = self.wrapper.indexing_func_meta(*args, **kwargs)
+        if wrapper_meta is None:
+            wrapper_meta = self.wrapper.indexing_func_meta(*args, **kwargs)
         row_idxs = wrapper_meta["row_idxs"]
         col_idxs = wrapper_meta["col_idxs"]
         if not isinstance(row_idxs, slice):

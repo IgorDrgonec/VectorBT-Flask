@@ -317,7 +317,7 @@ def get_entry_trades_nb(
                         col,
                         first_c,
                         last_c,
-                        close[0, col],
+                        _init_price,
                         first_entry_size,
                         first_entry_fees,
                         order_idx,
@@ -350,7 +350,7 @@ def get_entry_trades_nb(
                         col,
                         first_c,
                         last_c,
-                        close[0, col],
+                        _init_price,
                         first_entry_size,
                         first_entry_fees,
                         order_idx,
@@ -385,7 +385,13 @@ def get_entry_trades_nb(
             last_c = col_len - 1
             remaining_size = add_nb(entry_size_sum, -exit_size_sum)
             exit_size_sum = entry_size_sum
-            exit_gross_sum += remaining_size * close[close.shape[0] - 1, col]
+            last_close = close[close.shape[0] - 1, col]
+            if np.isnan(last_close):
+                for ri in range(close.shape[0] - 1, -1, -1):
+                    if not np.isnan(close[ri, col]):
+                        last_close = close[ri, col]
+                        break
+            exit_gross_sum += remaining_size * last_close
 
             # Fill trade records
             counts[col] = fill_entry_trades_in_position_nb(
@@ -394,7 +400,7 @@ def get_entry_trades_nb(
                 col,
                 first_c,
                 last_c,
-                close[0, col],
+                _init_price,
                 first_entry_size,
                 first_entry_fees,
                 close.shape[0] - 1,
@@ -627,7 +633,13 @@ def get_exit_trades_nb(
         if in_position and is_less_nb(-entry_size_sum, 0):
             # Trade hasn't been closed
             exit_size = entry_size_sum
-            exit_price = close[close.shape[0] - 1, col]
+            last_close = close[close.shape[0] - 1, col]
+            if np.isnan(last_close):
+                for ri in range(close.shape[0] - 1, -1, -1):
+                    if not np.isnan(close[ri, col]):
+                        last_close = close[ri, col]
+                        break
+            exit_price = last_close
             exit_fees = 0.0
             exit_idx = close.shape[0] - 1
 

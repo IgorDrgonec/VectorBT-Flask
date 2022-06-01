@@ -475,6 +475,12 @@ class ArrayWrapper(Configured, PandasIndexer):
                 if column_only_select is None or wrapper.column_only_select:
                     column_only_select = wrapper.column_only_select
             kwargs["column_only_select"] = column_only_select
+        if "range_only_select" not in kwargs:
+            range_only_select = None
+            for wrapper in wrappers:
+                if range_only_select is None or wrapper.range_only_select:
+                    range_only_select = wrapper.range_only_select
+            kwargs["range_only_select"] = range_only_select
         if "group_select" not in kwargs:
             group_select = None
             for wrapper in wrappers:
@@ -510,6 +516,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         ndim: tp.Optional[int] = None,
         freq: tp.Optional[tp.FrequencyLike] = None,
         column_only_select: tp.Optional[bool] = None,
+        range_only_select: tp.Optional[bool] = None,
         group_select: tp.Optional[bool] = None,
         grouped_ndim: tp.Optional[int] = None,
         grouper: tp.Optional[Grouper] = None,
@@ -545,6 +552,7 @@ class ArrayWrapper(Configured, PandasIndexer):
             ndim=ndim,
             freq=freq,
             column_only_select=column_only_select,
+            range_only_select=range_only_select,
             group_select=group_select,
             grouped_ndim=grouped_ndim,
             grouper=grouper,
@@ -556,6 +564,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         self._ndim = ndim
         self._freq = freq
         self._column_only_select = column_only_select
+        self._range_only_select = range_only_select
         self._group_select = group_select
         self._grouper = grouper
         self._grouped_ndim = grouped_ndim
@@ -566,19 +575,22 @@ class ArrayWrapper(Configured, PandasIndexer):
         index: tp.Optional[tp.IndexLike] = None,
         columns: tp.Optional[tp.IndexLike] = None,
         column_only_select: tp.Optional[bool] = None,
+        range_only_select: tp.Optional[bool] = None,
         group_select: tp.Optional[bool] = None,
         return_slices: bool = True,
         return_none_slices: bool = True,
         group_by: tp.GroupByLike = None,
+        wrapper_kwargs: tp.KwargsLike = None,
     ) -> dict:
         """Perform indexing on `ArrayWrapper` and also return metadata.
 
         Takes into account column grouping.
 
         Set `column_only_select` to True to index the array wrapper as a Series of columns/groups.
-        This way, selection of index (axis 0) can be avoided. Set `group_select` to True
-        to allow selection of groups. Otherwise, indexing is performed on columns, even if grouping
-        is enabled. Takes effect only if grouping is enabled.
+        This way, selection of index (axis 0) can be avoided. Set `range_only_select` to True to
+        allow selection of rows only using slices. Set `group_select` to True to allow selection of groups.
+        Otherwise, indexing is performed on columns, even if grouping is enabled. Takes effect only if
+        grouping is enabled.
 
         Returns the new array wrapper, row indices, column indices, and group indices.
         If `return_slices` is True (default), indices will be returned as a slice if they were
@@ -592,8 +604,12 @@ class ArrayWrapper(Configured, PandasIndexer):
             object is already a Series and thus has only one column/group."""
         if column_only_select is None:
             column_only_select = self.column_only_select
+        if range_only_select is None:
+            range_only_select = self.range_only_select
         if group_select is None:
             group_select = self.group_select
+        if wrapper_kwargs is None:
+            wrapper_kwargs = {}
         _self = self.regroup(group_by)
         group_select = group_select and _self.grouper.is_grouped()
         if index is None:
@@ -619,9 +635,9 @@ class ArrayWrapper(Configured, PandasIndexer):
         def _resolve_arr(arr: tp.MaybeArray, n: int) -> tp.Union[tp.MaybeArray, slice]:
             if return_slices and checks.is_np_array(arr) and is_range(arr):
                 if return_none_slices and arr[0] == 0 and arr[-1] == n - 1:
-                    return slice(None, None, None)
-                return slice(arr[0], arr[-1] + 1, None)
-            return arr
+                    return slice(None, None, None), False
+                return slice(arr[0], arr[-1] + 1, None), True
+            return arr, True
 
         if column_only_select:
             if i_wrapper.ndim == 1:
@@ -710,51 +726,144 @@ class ArrayWrapper(Configured, PandasIndexer):
                 else:
                     ungrouped_ndim = 2
 
+                row_idxs, rows_changed = _resolve_arr(row_idxs, _self.shape[0])
+                if range_only_select and rows_changed:
+                    if not isinstance(row_idxs, slice):
+                        raise ValueError("Rows can be selected only by slicing")
+                    if row_idxs.step not in (1, None):
+                        raise ValueError("Slice for selecting rows must have a step of 1 or None")
+                col_idxs, columns_changed = _resolve_arr(col_idxs, _self.shape_2d[1])
+                group_idxs, groups_changed = _resolve_arr(group_idxs, _self.get_shape_2d()[1])
                 return dict(
                     new_wrapper=_self.replace(
-                        index=new_index,
-                        columns=ungrouped_columns,
-                        ndim=ungrouped_ndim,
-                        grouped_ndim=new_ndim,
-                        group_by=new_columns[new_groups],
+                        **merge_dicts(
+                            dict(
+                                index=new_index,
+                                columns=ungrouped_columns,
+                                ndim=ungrouped_ndim,
+                                grouped_ndim=new_ndim,
+                                group_by=new_columns[new_groups],
+                            ),
+                            wrapper_kwargs,
+                        )
                     ),
-                    row_idxs=_resolve_arr(row_idxs, _self.shape[0]),
-                    col_idxs=_resolve_arr(col_idxs, _self.shape_2d[1]),
-                    group_idxs=_resolve_arr(group_idxs, _self.get_shape_2d()[1]),
+                    row_idxs=row_idxs,
+                    rows_changed=rows_changed,
+                    col_idxs=col_idxs,
+                    columns_changed=columns_changed,
+                    group_idxs=group_idxs,
+                    groups_changed=groups_changed,
                 )
 
             # Selection based on columns
             group_idxs = _self.grouper.get_groups()[col_idxs]
+            new_group_by = _self.grouper.group_by[reshaping.to_1d_array(col_idxs)]
+            row_idxs, rows_changed = _resolve_arr(row_idxs, _self.shape[0])
+            if range_only_select and rows_changed:
+                if not isinstance(row_idxs, slice):
+                    raise ValueError("Rows can be selected only by slicing")
+                if row_idxs.step not in (1, None):
+                    raise ValueError("Slice for selecting rows must have a step of 1 or None")
+            col_idxs, columns_changed = _resolve_arr(col_idxs, _self.shape_2d[1])
+            group_idxs, groups_changed = _resolve_arr(group_idxs, _self.get_shape_2d()[1])
             return dict(
                 new_wrapper=_self.replace(
-                    index=new_index,
-                    columns=new_columns,
-                    ndim=new_ndim,
-                    grouped_ndim=None,
-                    group_by=_self.grouper.group_by[reshaping.to_1d_array(col_idxs)],
+                    **merge_dicts(
+                        dict(
+                            index=new_index,
+                            columns=new_columns,
+                            ndim=new_ndim,
+                            grouped_ndim=None,
+                            group_by=new_group_by,
+                        ),
+                        wrapper_kwargs,
+                    )
                 ),
-                row_idxs=_resolve_arr(row_idxs, _self.shape[0]),
-                col_idxs=_resolve_arr(col_idxs, _self.shape_2d[1]),
-                group_idxs=_resolve_arr(group_idxs, _self.get_shape_2d()[1]),
+                row_idxs=row_idxs,
+                rows_changed=rows_changed,
+                col_idxs=col_idxs,
+                columns_changed=columns_changed,
+                group_idxs=group_idxs,
+                groups_changed=groups_changed,
             )
 
         # Grouping disabled
+        row_idxs, rows_changed = _resolve_arr(row_idxs, _self.shape[0])
+        if range_only_select and rows_changed:
+            if not isinstance(row_idxs, slice):
+                raise ValueError("Rows can be selected only by slicing")
+            if row_idxs.step not in (1, None):
+                raise ValueError("Slice for selecting rows must have a step of 1 or None")
+        col_idxs, columns_changed = _resolve_arr(col_idxs, _self.shape_2d[1])
         return dict(
             new_wrapper=_self.replace(
-                index=new_index,
-                columns=new_columns,
-                ndim=new_ndim,
-                grouped_ndim=None,
-                group_by=None,
+                **merge_dicts(
+                    dict(
+                        index=new_index,
+                        columns=new_columns,
+                        ndim=new_ndim,
+                        grouped_ndim=None,
+                        group_by=None,
+                    ),
+                    wrapper_kwargs,
+                )
             ),
-            row_idxs=_resolve_arr(row_idxs, _self.shape[0]),
-            col_idxs=_resolve_arr(col_idxs, _self.shape_2d[1]),
-            group_idxs=_resolve_arr(col_idxs, _self.shape_2d[1]),
+            row_idxs=row_idxs,
+            rows_changed=rows_changed,
+            col_idxs=col_idxs,
+            columns_changed=columns_changed,
+            group_idxs=col_idxs,
+            groups_changed=columns_changed,
         )
 
     def indexing_func(self: ArrayWrapperT, *args, **kwargs) -> ArrayWrapperT:
         """Perform indexing on `ArrayWrapper`"""
         return self.indexing_func_meta(*args, **kwargs)["new_wrapper"]
+
+    def create_resampler(
+        self,
+        rule: tp.Union[Resampler, tp.PandasResampler, tp.PandasFrequencyLike],
+        resample_kwargs: tp.KwargsLike = None,
+        return_pd_resampler: bool = False,
+    ) -> tp.Union[Resampler, tp.PandasResampler]:
+        """Create a resampler of type `vectorbtpro.base.resampling.base.Resampler`."""
+        if not isinstance(rule, Resampler):
+            if not isinstance(rule, PandasResampler):
+                resample_kwargs = merge_dicts(
+                    dict(closed="left", label="left"),
+                    resample_kwargs,
+                )
+                rule = pd.Series(index=self.index, dtype=object).resample(rule, **resolve_dict(resample_kwargs))
+            if return_pd_resampler:
+                return rule
+            rule = Resampler.from_pd_resampler(rule)
+        if return_pd_resampler:
+            raise TypeError("Cannot convert Resampler to Pandas Resampler")
+        return rule
+
+    def resample_meta(self: ArrayWrapperT, *args, wrapper_kwargs: tp.KwargsLike = None, **kwargs) -> dict:
+        """Perform resampling on `ArrayWrapper` and also return metadata.
+
+        `*args` and `**kwargs` are passed to `ArrayWrapper.create_resampler`."""
+        resampler = self.create_resampler(*args, **kwargs)
+        if isinstance(resampler, Resampler):
+            _resampler = resampler
+        else:
+            _resampler = Resampler.from_pd_resampler(resampler)
+        if wrapper_kwargs is None:
+            wrapper_kwargs = {}
+        if "index" not in wrapper_kwargs:
+            wrapper_kwargs["index"] = _resampler.target_index
+        if "freq" not in wrapper_kwargs:
+            wrapper_kwargs["freq"] = infer_index_freq(wrapper_kwargs["index"])
+        new_wrapper = self.replace(**wrapper_kwargs)
+        return dict(resampler=resampler, new_wrapper=new_wrapper)
+
+    def resample(self: ArrayWrapperT, *args, **kwargs) -> ArrayWrapperT:
+        """Perform resampling on `ArrayWrapper`.
+
+        Uses `ArrayWrapper.resample_meta`."""
+        return self.resample_meta(*args, **kwargs)["new_wrapper"]
 
     @property
     def index(self) -> tp.Index:
@@ -909,6 +1018,18 @@ class ArrayWrapper(Configured, PandasIndexer):
         return column_only_select
 
     @property
+    def range_only_select(self) -> tp.Optional[bool]:
+        """Whether to perform indexing on rows using slices only."""
+        from vectorbtpro._settings import settings
+
+        wrapping_cfg = settings["wrapping"]
+
+        range_only_select = self._range_only_select
+        if range_only_select is None:
+            range_only_select = wrapping_cfg["range_only_select"]
+        return range_only_select
+
+    @property
     def group_select(self) -> tp.Optional[bool]:
         """Whether to allow indexing on groups."""
         from vectorbtpro._settings import settings
@@ -987,51 +1108,6 @@ class ArrayWrapper(Configured, PandasIndexer):
                 pass
         pd_group_by = pd.Series(index=self.index, dtype=object).groupby(by, axis=0, **kwargs)
         return Grouper.from_pd_group_by(pd_group_by)
-
-    def create_resampler(
-        self,
-        rule: tp.Union[Resampler, tp.PandasResampler, tp.PandasFrequencyLike],
-        resample_kwargs: tp.KwargsLike = None,
-        return_pd_resampler: bool = False,
-    ) -> tp.Union[Resampler, tp.PandasResampler]:
-        """Create a resampler of type `vectorbtpro.base.resampling.base.Resampler`."""
-        if not isinstance(rule, Resampler):
-            if not isinstance(rule, PandasResampler):
-                resample_kwargs = merge_dicts(
-                    dict(closed="left", label="left"),
-                    resample_kwargs,
-                )
-                rule = pd.Series(index=self.index, dtype=object).resample(rule, **resolve_dict(resample_kwargs))
-            if return_pd_resampler:
-                return rule
-            rule = Resampler.from_pd_resampler(rule)
-        if return_pd_resampler:
-            raise TypeError("Cannot convert Resampler to Pandas Resampler")
-        return rule
-
-    def resample_meta(
-        self: ArrayWrapperT,
-        *args,
-        **kwargs,
-    ) -> tp.Tuple[tp.Union[Resampler, tp.PandasResampler], ArrayWrapperT]:
-        """Perform resampling on `ArrayWrapper` and also return metadata.
-
-        `*args` and `**kwargs` are passed to `ArrayWrapper.create_resampler`."""
-        resampler = self.create_resampler(*args, **kwargs)
-        if isinstance(resampler, Resampler):
-            _resampler = resampler
-        else:
-            _resampler = Resampler.from_pd_resampler(resampler)
-        new_index = _resampler.target_index
-        new_freq = infer_index_freq(new_index)
-        new_wrapper = self.replace(index=new_index, freq=new_freq)
-        return resampler, new_wrapper
-
-    def resample(self: ArrayWrapperT, *args, **kwargs) -> ArrayWrapperT:
-        """Perform resampling on `ArrayWrapper`.
-
-        Uses `ArrayWrapper.resample_meta`."""
-        return self.resample_meta(*args, **kwargs)[1]
 
     def wrap(
         self,
@@ -2022,6 +2098,7 @@ class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
         new_wrapper = self.wrapper.indexing_func(
             *args,
             column_only_select=self.column_only_select,
+            range_only_select=self.range_only_select,
             group_select=self.group_select,
             **kwargs,
         )
@@ -2046,6 +2123,14 @@ class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
         if column_only_select is None:
             return self.wrapper.column_only_select
         return column_only_select
+
+    @property
+    def range_only_select(self) -> tp.Optional[bool]:
+        """Overrides `ArrayWrapper.range_only_select`."""
+        range_only_select = getattr(self, "_range_only_select", None)
+        if range_only_select is None:
+            return self.wrapper.range_only_select
+        return range_only_select
 
     @property
     def group_select(self) -> tp.Optional[bool]:

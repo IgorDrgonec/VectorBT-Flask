@@ -117,18 +117,21 @@ mp_mapped_array_grouped = mapped_array_grouped.replace(mapping=mapping)
 
 class TestMappedArray:
     def test_row_stack(self):
-        df1 = pd.DataFrame({
-            "a": [True, True, False, True],
-        }, index=pd.date_range("2020-01-01", "2020-01-04"))
-        df2 = pd.DataFrame({
-            "a": [True, True, False, True, False, True],
-            "b": [False, False, True, False, True, False],
-        }, index=pd.date_range("2020-01-05", "2020-01-10"))
+        df1 = pd.DataFrame(
+            {
+                "a": [True, True, False, True],
+            },
+            index=pd.date_range("2020-01-01", "2020-01-04"),
+        )
+        df2 = pd.DataFrame(
+            {
+                "a": [True, True, False, True, False, True],
+                "b": [False, False, True, False, True, False],
+            },
+            index=pd.date_range("2020-01-05", "2020-01-10"),
+        )
         mapped_array1 = vbt.MappedArray(
-            df1.vbt.wrapper,
-            np.array([], dtype=np.int_),
-            np.array([], dtype=np.int_),
-            np.array([], dtype=np.int_)
+            df1.vbt.wrapper, np.array([], dtype=np.int_), np.array([], dtype=np.int_), np.array([], dtype=np.int_)
         )
         mapped_array2 = vbt.MappedArray(
             df2.vbt.wrapper,
@@ -137,8 +140,8 @@ class TestMappedArray:
             np.concatenate((np.flatnonzero(df2["a"]), np.flatnonzero(df2["b"]))),
         )
         new_mapped_array = vbt.MappedArray.row_stack(mapped_array1, mapped_array2)
-        pd.testing.assert_index_equal(new_mapped_array.wrapper.index, df1.index.append(df2.index))
-        pd.testing.assert_index_equal(new_mapped_array.wrapper.columns, df2.columns)
+        assert_index_equal(new_mapped_array.wrapper.index, df1.index.append(df2.index))
+        assert_index_equal(new_mapped_array.wrapper.columns, df2.columns)
         np.testing.assert_array_equal(new_mapped_array.mapped_arr, np.array([0, 1, 3, 5, 2, 4]))
         np.testing.assert_array_equal(new_mapped_array.col_arr, np.array([0, 0, 0, 0, 1, 1]))
         np.testing.assert_array_equal(new_mapped_array.idx_arr, np.array([4, 5, 7, 9, 6, 8]))
@@ -150,21 +153,27 @@ class TestMappedArray:
             np.flatnonzero(df1["a"]),
         )
         new_mapped_array = vbt.MappedArray.row_stack(mapped_array1, mapped_array2)
-        pd.testing.assert_index_equal(new_mapped_array.wrapper.index, df1.index.append(df2.index))
-        pd.testing.assert_index_equal(new_mapped_array.wrapper.columns, df2.columns)
+        assert_index_equal(new_mapped_array.wrapper.index, df1.index.append(df2.index))
+        assert_index_equal(new_mapped_array.wrapper.columns, df2.columns)
         np.testing.assert_array_equal(new_mapped_array.mapped_arr, np.array([0, 1, 3, 0, 1, 3, 5, 0, 1, 3, 2, 4]))
         np.testing.assert_array_equal(new_mapped_array.col_arr, np.array([0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1]))
         np.testing.assert_array_equal(new_mapped_array.idx_arr, np.array([0, 1, 3, 4, 5, 7, 9, 0, 1, 3, 6, 8]))
         np.testing.assert_array_equal(new_mapped_array.id_arr, np.array([0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4]))
 
-        df1 = pd.DataFrame({
-            "a": [True, True, False, True],
-            "b": [False, False, True, False],
-        }, index=pd.date_range("2020-01-01", "2020-01-04"))
-        df2 = pd.DataFrame({
-            "a": [True, True, False, True, False, True],
-            "b": [False, False, True, False, True, False],
-        }, index=pd.date_range("2020-01-05", "2020-01-10"))
+        df1 = pd.DataFrame(
+            {
+                "a": [True, True, False, True],
+                "b": [False, False, True, False],
+            },
+            index=pd.date_range("2020-01-01", "2020-01-04"),
+        )
+        df2 = pd.DataFrame(
+            {
+                "a": [True, True, False, True, False, True],
+                "b": [False, False, True, False, True, False],
+            },
+            index=pd.date_range("2020-01-05", "2020-01-10"),
+        )
         mapped_array1 = vbt.MappedArray(
             df1.vbt.wrapper,
             np.concatenate((np.flatnonzero(df1["a"]), np.flatnonzero(df1["b"]))),
@@ -178,8 +187,8 @@ class TestMappedArray:
             np.concatenate((np.flatnonzero(df2["a"]), np.flatnonzero(df2["b"]))),
         )
         new_mapped_array = vbt.MappedArray.row_stack(mapped_array1, mapped_array2)
-        pd.testing.assert_index_equal(new_mapped_array.wrapper.index, df1.index.append(df2.index))
-        pd.testing.assert_index_equal(new_mapped_array.wrapper.columns, df1.columns)
+        assert_index_equal(new_mapped_array.wrapper.index, df1.index.append(df2.index))
+        assert_index_equal(new_mapped_array.wrapper.columns, df1.columns)
         np.testing.assert_array_equal(new_mapped_array.mapped_arr, np.array([0, 1, 3, 0, 1, 3, 5, 2, 2, 4]))
         np.testing.assert_array_equal(new_mapped_array.col_arr, np.array([0, 0, 0, 0, 0, 0, 0, 1, 1, 1]))
         np.testing.assert_array_equal(new_mapped_array.idx_arr, np.array([0, 1, 3, 4, 5, 7, 9, 2, 6, 8]))
@@ -206,13 +215,19 @@ class TestMappedArray:
             )
 
     def test_column_stack(self):
-        df1 = pd.DataFrame({
-            "a": [True, True, False, True, True],
-        }, index=pd.date_range("2020-01-01", "2020-01-05"))
-        df2 = pd.DataFrame({
-            "b": [True, False, True, False, True],
-            "c": [False, True, False, True, False],
-        }, index=pd.date_range("2020-01-03", "2020-01-07"))
+        df1 = pd.DataFrame(
+            {
+                "a": [True, True, False, True, True],
+            },
+            index=pd.date_range("2020-01-01", "2020-01-05"),
+        )
+        df2 = pd.DataFrame(
+            {
+                "b": [True, False, True, False, True],
+                "c": [False, True, False, True, False],
+            },
+            index=pd.date_range("2020-01-03", "2020-01-07"),
+        )
         mapped_array1 = vbt.MappedArray(
             df1.vbt.wrapper,
             np.array([]),
@@ -226,8 +241,8 @@ class TestMappedArray:
             np.concatenate((np.flatnonzero(df2["b"]), np.flatnonzero(df2["c"]))),
         )
         mapped_array = vbt.MappedArray.column_stack(mapped_array1, mapped_array2)
-        pd.testing.assert_index_equal(mapped_array.wrapper.index, df1.index.union(df2.index))
-        pd.testing.assert_index_equal(mapped_array.wrapper.columns, df1.columns.append(df2.columns))
+        assert_index_equal(mapped_array.wrapper.index, df1.index.union(df2.index))
+        assert_index_equal(mapped_array.wrapper.columns, df1.columns.append(df2.columns))
         np.testing.assert_array_equal(mapped_array.mapped_arr, np.array([0, 2, 4, 1, 3]))
         np.testing.assert_array_equal(mapped_array.col_arr, np.array([1, 1, 1, 2, 2]))
         np.testing.assert_array_equal(mapped_array.idx_arr, np.array([2, 4, 6, 3, 5]))
@@ -239,8 +254,8 @@ class TestMappedArray:
             np.flatnonzero(df1["a"]),
         )
         mapped_array = vbt.MappedArray.column_stack(mapped_array1, mapped_array2)
-        pd.testing.assert_index_equal(mapped_array.wrapper.index, df1.index.union(df2.index))
-        pd.testing.assert_index_equal(mapped_array.wrapper.columns, df1.columns.append(df2.columns))
+        assert_index_equal(mapped_array.wrapper.index, df1.index.union(df2.index))
+        assert_index_equal(mapped_array.wrapper.columns, df1.columns.append(df2.columns))
         np.testing.assert_array_equal(mapped_array.mapped_arr, np.array([0, 1, 3, 4, 0, 2, 4, 1, 3]))
         np.testing.assert_array_equal(mapped_array.col_arr, np.array([0, 0, 0, 0, 1, 1, 1, 2, 2]))
         np.testing.assert_array_equal(mapped_array.idx_arr, np.array([0, 1, 3, 4, 2, 4, 6, 3, 5]))
@@ -1296,8 +1311,6 @@ class TestMappedArray:
         np.testing.assert_array_equal(ma[["a", "b"]].id_arr, np.array([0, 1, 2, 0, 1, 2]))
         np.testing.assert_array_equal(ma[["a", "b"]].col_arr, np.array([0, 0, 0, 1, 1, 1]))
         assert_index_equal(ma[["a", "b"]].wrapper.columns, pd.Index(["a", "b"], dtype="object"))
-        with pytest.raises(Exception):
-            ma.iloc[::2, :]  # changing time not supported
         assert_index_equal(ma_grouped["g1"].wrapper.columns, pd.Index(["a", "b"], dtype="object"))
         assert ma_grouped["g1"].wrapper.ndim == 2
         assert ma_grouped["g1"].wrapper.grouped_ndim == 1
@@ -1323,6 +1336,34 @@ class TestMappedArray:
             ma_grouped[["g1", "g2"]].wrapper.grouper.group_by,
             pd.Index(["g1", "g1", "g2", "g2"], dtype="object"),
         )
+
+        np.testing.assert_array_equal(ma.loc[["y"]].id_arr, np.array([1, 1, 1]))
+        np.testing.assert_array_equal(ma.loc[["y"]].col_arr, np.array([0, 1, 2]))
+        np.testing.assert_array_equal(ma.loc[["y"]].idx_arr, np.array([0, 0, 0]))
+        assert_index_equal(ma.loc[["y"]].wrapper.index, ma.wrapper.index[[1]])
+        assert ma.replace(idx_arr=None).loc[["y"]].idx_arr is None
+        if test_nosort:
+            np.testing.assert_array_equal(ma.loc["x":"y"].id_arr, np.array([0, 0, 0, 1, 1, 1]))
+            np.testing.assert_array_equal(ma.loc["x":"y"].col_arr, np.array([0, 1, 2, 0, 1, 2]))
+            np.testing.assert_array_equal(ma.loc["x":"y"].idx_arr, np.array([0, 0, 0, 1, 1, 1]))
+            assert_index_equal(ma.loc["x":"y"].wrapper.index, ma.wrapper.index[:2])
+            np.testing.assert_array_equal(ma.loc["y":"z"].id_arr, np.array([1, 1, 1, 2, 2, 2]))
+            np.testing.assert_array_equal(ma.loc["y":"z"].col_arr, np.array([0, 1, 2, 0, 1, 2]))
+            np.testing.assert_array_equal(ma.loc["y":"z"].idx_arr, np.array([0, 0, 0, 1, 1, 1]))
+            assert_index_equal(ma.loc["y":"z"].wrapper.index, ma.wrapper.index[1:])
+        else:
+            np.testing.assert_array_equal(ma.loc["x":"y"].id_arr, np.array([0, 1, 0, 1, 0, 1]))
+            np.testing.assert_array_equal(ma.loc["x":"y"].col_arr, np.array([0, 0, 1, 1, 2, 2]))
+            np.testing.assert_array_equal(ma.loc["x":"y"].idx_arr, np.array([0, 1, 0, 1, 0, 1]))
+            assert_index_equal(ma.loc["x":"y"].wrapper.index, ma.wrapper.index[:2])
+            np.testing.assert_array_equal(ma.loc["y":"z"].id_arr, np.array([1, 2, 1, 2, 1, 2]))
+            np.testing.assert_array_equal(ma.loc["y":"z"].col_arr, np.array([0, 0, 1, 1, 2, 2]))
+            np.testing.assert_array_equal(ma.loc["y":"z"].idx_arr, np.array([0, 1, 0, 1, 0, 1]))
+            assert_index_equal(ma.loc["y":"z"].wrapper.index, ma.wrapper.index[1:])
+        with pytest.raises(Exception):
+            ma.loc["y"]
+        with pytest.raises(Exception):
+            ma.loc[["x", "z"]]
 
     def test_magic(self):
         a = vbt.MappedArray(
@@ -1529,38 +1570,48 @@ class TestMappedArray:
 
 class TestRecords:
     def test_row_stack(self):
-        df1 = pd.DataFrame({
-            "a": [True, True, False, True],
-        }, index=pd.date_range("2020-01-01", "2020-01-04"))
-        df2 = pd.DataFrame({
-            "a": [True, True, False, True, False, True],
-            "b": [False, False, True, False, True, False],
-        }, index=pd.date_range("2020-01-05", "2020-01-10"))
+        df1 = pd.DataFrame(
+            {
+                "a": [True, True, False, True],
+            },
+            index=pd.date_range("2020-01-01", "2020-01-04"),
+        )
+        df2 = pd.DataFrame(
+            {
+                "a": [True, True, False, True, False, True],
+                "b": [False, False, True, False, True, False],
+            },
+            index=pd.date_range("2020-01-05", "2020-01-10"),
+        )
         records_arr1 = np.array(
-            list(zip(
-                np.array([]),
-                np.array([]),
-                np.array([]),
-                np.array([]),
-                np.array([]),
-            )),
+            list(
+                zip(
+                    np.array([]),
+                    np.array([]),
+                    np.array([]),
+                    np.array([]),
+                    np.array([]),
+                )
+            ),
             dtype=example_dt,
         )
         records_arr2 = np.array(
-            list(zip(
-                np.arange(len(np.concatenate((np.flatnonzero(df2["a"]), np.flatnonzero(df2["b"]))))),
-                np.concatenate((np.full(df2["a"].sum(), 0), np.full(df2["b"].sum(), 1))),
-                np.concatenate((np.flatnonzero(df2["a"]), np.flatnonzero(df2["b"]))),
-                np.arange(len(np.concatenate((np.flatnonzero(df2["a"]), np.flatnonzero(df2["b"]))))),
-                np.arange(len(np.concatenate((np.flatnonzero(df2["a"]), np.flatnonzero(df2["b"])))))[::-1],
-            )),
+            list(
+                zip(
+                    np.arange(len(np.concatenate((np.flatnonzero(df2["a"]), np.flatnonzero(df2["b"]))))),
+                    np.concatenate((np.full(df2["a"].sum(), 0), np.full(df2["b"].sum(), 1))),
+                    np.concatenate((np.flatnonzero(df2["a"]), np.flatnonzero(df2["b"]))),
+                    np.arange(len(np.concatenate((np.flatnonzero(df2["a"]), np.flatnonzero(df2["b"]))))),
+                    np.arange(len(np.concatenate((np.flatnonzero(df2["a"]), np.flatnonzero(df2["b"])))))[::-1],
+                )
+            ),
             dtype=example_dt,
         )
         records1 = vbt.Records(df1.vbt.wrapper, records_arr1)
         records2 = vbt.Records(df2.vbt.wrapper, records_arr2)
         new_records = vbt.Records.row_stack(records1, records2)
-        pd.testing.assert_index_equal(new_records.wrapper.index, df1.index.append(df2.index))
-        pd.testing.assert_index_equal(new_records.wrapper.columns, df2.columns)
+        assert_index_equal(new_records.wrapper.index, df1.index.append(df2.index))
+        assert_index_equal(new_records.wrapper.columns, df2.columns)
         np.testing.assert_array_equal(
             new_records.id_arr,
             vbt.MappedArray.row_stack(records1.map_field("some_field1"), records2.map_field("some_field1")).id_arr,
@@ -1582,20 +1633,22 @@ class TestRecords:
             vbt.MappedArray.row_stack(records1.map_field("some_field2"), records2.map_field("some_field2")).values,
         )
         records_arr1 = np.array(
-            list(zip(
-                np.arange(len(np.flatnonzero(df1["a"]))),
-                np.full(df1["a"].sum(), 0),
-                np.flatnonzero(df1["a"]),
-                np.arange(len(np.flatnonzero(df1["a"]))),
-                np.arange(len(np.flatnonzero(df1["a"])))[::-1],
-            )),
+            list(
+                zip(
+                    np.arange(len(np.flatnonzero(df1["a"]))),
+                    np.full(df1["a"].sum(), 0),
+                    np.flatnonzero(df1["a"]),
+                    np.arange(len(np.flatnonzero(df1["a"]))),
+                    np.arange(len(np.flatnonzero(df1["a"])))[::-1],
+                )
+            ),
             dtype=example_dt,
         )
         records1 = vbt.Records(df1.vbt.wrapper, records_arr1)
         records2 = vbt.Records(df2.vbt.wrapper, records_arr2)
         new_records = vbt.Records.row_stack(records1, records2)
-        pd.testing.assert_index_equal(new_records.wrapper.index, df1.index.append(df2.index))
-        pd.testing.assert_index_equal(new_records.wrapper.columns, df2.columns)
+        assert_index_equal(new_records.wrapper.index, df1.index.append(df2.index))
+        assert_index_equal(new_records.wrapper.columns, df2.columns)
         np.testing.assert_array_equal(
             new_records.id_arr,
             vbt.MappedArray.row_stack(records1.map_field("some_field1"), records2.map_field("some_field1")).id_arr,
@@ -1617,39 +1670,49 @@ class TestRecords:
             vbt.MappedArray.row_stack(records1.map_field("some_field2"), records2.map_field("some_field2")).values,
         )
 
-        df1 = pd.DataFrame({
-            "a": [True, True, False, True],
-            "b": [False, False, True, False],
-        }, index=pd.date_range("2020-01-01", "2020-01-04"))
-        df2 = pd.DataFrame({
-            "a": [True, True, False, True, False, True],
-            "b": [False, False, True, False, True, False],
-        }, index=pd.date_range("2020-01-05", "2020-01-10"))
+        df1 = pd.DataFrame(
+            {
+                "a": [True, True, False, True],
+                "b": [False, False, True, False],
+            },
+            index=pd.date_range("2020-01-01", "2020-01-04"),
+        )
+        df2 = pd.DataFrame(
+            {
+                "a": [True, True, False, True, False, True],
+                "b": [False, False, True, False, True, False],
+            },
+            index=pd.date_range("2020-01-05", "2020-01-10"),
+        )
         records_arr1 = np.array(
-            list(zip(
-                np.arange(len(np.concatenate((np.flatnonzero(df2["a"]), np.flatnonzero(df2["b"]))))),
-                np.concatenate((np.full(df2["a"].sum(), 0), np.full(df2["b"].sum(), 1))),
-                np.concatenate((np.flatnonzero(df2["a"]), np.flatnonzero(df2["b"]))),
-                np.arange(len(np.concatenate((np.flatnonzero(df2["a"]), np.flatnonzero(df2["b"]))))),
-                np.arange(len(np.concatenate((np.flatnonzero(df2["a"]), np.flatnonzero(df2["b"])))))[::-1],
-            )),
+            list(
+                zip(
+                    np.arange(len(np.concatenate((np.flatnonzero(df2["a"]), np.flatnonzero(df2["b"]))))),
+                    np.concatenate((np.full(df2["a"].sum(), 0), np.full(df2["b"].sum(), 1))),
+                    np.concatenate((np.flatnonzero(df2["a"]), np.flatnonzero(df2["b"]))),
+                    np.arange(len(np.concatenate((np.flatnonzero(df2["a"]), np.flatnonzero(df2["b"]))))),
+                    np.arange(len(np.concatenate((np.flatnonzero(df2["a"]), np.flatnonzero(df2["b"])))))[::-1],
+                )
+            ),
             dtype=example_dt,
         )
         records_arr2 = np.array(
-            list(zip(
-                np.arange(len(np.concatenate((np.flatnonzero(df2["a"]), np.flatnonzero(df2["b"]))))),
-                np.concatenate((np.full(df2["a"].sum(), 0), np.full(df2["b"].sum(), 1))),
-                np.concatenate((np.flatnonzero(df2["a"]), np.flatnonzero(df2["b"]))),
-                np.arange(len(np.concatenate((np.flatnonzero(df2["a"]), np.flatnonzero(df2["b"]))))),
-                np.arange(len(np.concatenate((np.flatnonzero(df2["a"]), np.flatnonzero(df2["b"])))))[::-1],
-            )),
+            list(
+                zip(
+                    np.arange(len(np.concatenate((np.flatnonzero(df2["a"]), np.flatnonzero(df2["b"]))))),
+                    np.concatenate((np.full(df2["a"].sum(), 0), np.full(df2["b"].sum(), 1))),
+                    np.concatenate((np.flatnonzero(df2["a"]), np.flatnonzero(df2["b"]))),
+                    np.arange(len(np.concatenate((np.flatnonzero(df2["a"]), np.flatnonzero(df2["b"]))))),
+                    np.arange(len(np.concatenate((np.flatnonzero(df2["a"]), np.flatnonzero(df2["b"])))))[::-1],
+                )
+            ),
             dtype=example_dt,
         )
         records1 = vbt.Records(df1.vbt.wrapper, records_arr1)
         records2 = vbt.Records(df2.vbt.wrapper, records_arr2)
         new_records = vbt.Records.row_stack(records1, records2)
-        pd.testing.assert_index_equal(new_records.wrapper.index, df1.index.append(df2.index))
-        pd.testing.assert_index_equal(new_records.wrapper.columns, df2.columns)
+        assert_index_equal(new_records.wrapper.index, df1.index.append(df2.index))
+        assert_index_equal(new_records.wrapper.columns, df2.columns)
         np.testing.assert_array_equal(
             new_records.id_arr,
             vbt.MappedArray.row_stack(records1.map_field("some_field1"), records2.map_field("some_field1")).id_arr,
@@ -1692,38 +1755,48 @@ class TestRecords:
             )
 
     def test_column_stack(self):
-        df1 = pd.DataFrame({
-            "a": [True, True, False, True, True],
-        }, index=pd.date_range("2020-01-01", "2020-01-05"))
-        df2 = pd.DataFrame({
-            "b": [True, False, True, False, True],
-            "c": [False, True, False, True, False],
-        }, index=pd.date_range("2020-01-03", "2020-01-07"))
+        df1 = pd.DataFrame(
+            {
+                "a": [True, True, False, True, True],
+            },
+            index=pd.date_range("2020-01-01", "2020-01-05"),
+        )
+        df2 = pd.DataFrame(
+            {
+                "b": [True, False, True, False, True],
+                "c": [False, True, False, True, False],
+            },
+            index=pd.date_range("2020-01-03", "2020-01-07"),
+        )
         records_arr1 = np.array(
-            list(zip(
-                np.array([]),
-                np.array([]),
-                np.array([]),
-                np.array([]),
-                np.array([]),
-            )),
+            list(
+                zip(
+                    np.array([]),
+                    np.array([]),
+                    np.array([]),
+                    np.array([]),
+                    np.array([]),
+                )
+            ),
             dtype=example_dt,
         )
         records_arr2 = np.array(
-            list(zip(
-                np.arange(len(np.concatenate((np.flatnonzero(df2["b"]), np.flatnonzero(df2["c"]))))),
-                np.concatenate((np.full(df2["b"].sum(), 0), np.full(df2["c"].sum(), 1))),
-                np.concatenate((np.flatnonzero(df2["b"]), np.flatnonzero(df2["c"]))),
-                np.arange(len(np.concatenate((np.flatnonzero(df2["b"]), np.flatnonzero(df2["c"]))))),
-                np.arange(len(np.concatenate((np.flatnonzero(df2["b"]), np.flatnonzero(df2["c"])))))[::-1],
-            )),
+            list(
+                zip(
+                    np.arange(len(np.concatenate((np.flatnonzero(df2["b"]), np.flatnonzero(df2["c"]))))),
+                    np.concatenate((np.full(df2["b"].sum(), 0), np.full(df2["c"].sum(), 1))),
+                    np.concatenate((np.flatnonzero(df2["b"]), np.flatnonzero(df2["c"]))),
+                    np.arange(len(np.concatenate((np.flatnonzero(df2["b"]), np.flatnonzero(df2["c"]))))),
+                    np.arange(len(np.concatenate((np.flatnonzero(df2["b"]), np.flatnonzero(df2["c"])))))[::-1],
+                )
+            ),
             dtype=example_dt,
         )
         records1 = vbt.Records(df1.vbt.wrapper, records_arr1)
         records2 = vbt.Records(df2.vbt.wrapper, records_arr2)
         new_records = vbt.Records.column_stack(records1, records2)
-        pd.testing.assert_index_equal(new_records.wrapper.index, df1.index.union(df2.index))
-        pd.testing.assert_index_equal(new_records.wrapper.columns, df1.columns.append(df2.columns))
+        assert_index_equal(new_records.wrapper.index, df1.index.union(df2.index))
+        assert_index_equal(new_records.wrapper.columns, df1.columns.append(df2.columns))
         np.testing.assert_array_equal(
             new_records.id_arr,
             vbt.MappedArray.column_stack(records1.map_field("some_field1"), records2.map_field("some_field1")).id_arr,
@@ -1745,20 +1818,22 @@ class TestRecords:
             vbt.MappedArray.column_stack(records1.map_field("some_field2"), records2.map_field("some_field2")).values,
         )
         records_arr1 = np.array(
-            list(zip(
-                np.arange(len(np.flatnonzero(df1["a"]))),
-                np.full(df1["a"].sum(), 0),
-                np.flatnonzero(df1["a"]),
-                np.arange(len(np.flatnonzero(df1["a"]))),
-                np.arange(len(np.flatnonzero(df1["a"])))[::-1],
-            )),
+            list(
+                zip(
+                    np.arange(len(np.flatnonzero(df1["a"]))),
+                    np.full(df1["a"].sum(), 0),
+                    np.flatnonzero(df1["a"]),
+                    np.arange(len(np.flatnonzero(df1["a"]))),
+                    np.arange(len(np.flatnonzero(df1["a"])))[::-1],
+                )
+            ),
             dtype=example_dt,
         )
         records1 = vbt.Records(df1.vbt.wrapper, records_arr1)
         records2 = vbt.Records(df2.vbt.wrapper, records_arr2)
         new_records = vbt.Records.column_stack(records1, records2)
-        pd.testing.assert_index_equal(new_records.wrapper.index, df1.index.union(df2.index))
-        pd.testing.assert_index_equal(new_records.wrapper.columns, df1.columns.append(df2.columns))
+        assert_index_equal(new_records.wrapper.index, df1.index.union(df2.index))
+        assert_index_equal(new_records.wrapper.columns, df1.columns.append(df2.columns))
         np.testing.assert_array_equal(
             new_records.id_arr,
             vbt.MappedArray.column_stack(records1.map_field("some_field1"), records2.map_field("some_field1")).id_arr,
@@ -2082,8 +2157,6 @@ class TestRecords:
             ),
         )
         assert_index_equal(r[["a", "b"]].wrapper.columns, pd.Index(["a", "b"], dtype="object"))
-        with pytest.raises(Exception):
-            r.iloc[::2, :]  # changing time not supported
         assert_index_equal(r_grouped["g1"].wrapper.columns, pd.Index(["a", "b"], dtype="object"))
         assert r_grouped["g1"].wrapper.ndim == 2
         assert r_grouped["g1"].wrapper.grouped_ndim == 1
@@ -2109,6 +2182,80 @@ class TestRecords:
             r_grouped[["g1", "g2"]].wrapper.grouper.group_by,
             pd.Index(["g1", "g1", "g2", "g2"], dtype="object"),
         )
+
+        assert_records_close(
+            r.loc[["y"]].values,
+            np.array(
+                [
+                    (1, 0, 0, 11, 20),
+                    (1, 1, 0, 14, 17),
+                    (1, 2, 0, 11, 20),
+                ],
+                dtype=example_dt,
+            ),
+        )
+        if test_nosort:
+            assert_records_close(
+                r.loc["x":"y"].values,
+                np.array(
+                    [
+                        (0, 0, 0, 10.0, 21.0),
+                        (0, 1, 0, 13.0, 18.0),
+                        (0, 2, 0, 12.0, 19.0),
+                        (1, 0, 1, 11.0, 20.0),
+                        (1, 1, 1, 14.0, 17.0),
+                        (1, 2, 1, 11.0, 20.0),
+                    ],
+                    dtype=example_dt,
+                ),
+            )
+            assert_records_close(
+                r.loc["y":"z"].values,
+                np.array(
+                    [
+                        (1, 0, 0, 11.0, 20.0),
+                        (1, 1, 0, 14.0, 17.0),
+                        (1, 2, 0, 11.0, 20.0),
+                        (2, 0, 1, 12.0, 19.0),
+                        (2, 1, 1, 13.0, 18.0),
+                        (2, 2, 1, 10.0, 21.0),
+                    ],
+                    dtype=example_dt,
+                ),
+            )
+        else:
+            assert_records_close(
+                r.loc["x":"y"].values,
+                np.array(
+                    [
+                        (0, 0, 0, 10.0, 21.0),
+                        (1, 0, 1, 11.0, 20.0),
+                        (0, 1, 0, 13.0, 18.0),
+                        (1, 1, 1, 14.0, 17.0),
+                        (0, 2, 0, 12.0, 19.0),
+                        (1, 2, 1, 11.0, 20.0),
+                    ],
+                    dtype=example_dt,
+                ),
+            )
+            assert_records_close(
+                r.loc["y":"z"].values,
+                np.array(
+                    [
+                        (1, 0, 0, 11.0, 20.0),
+                        (2, 0, 1, 12.0, 19.0),
+                        (1, 1, 0, 14.0, 17.0),
+                        (2, 1, 1, 13.0, 18.0),
+                        (1, 2, 0, 11.0, 20.0),
+                        (2, 2, 1, 10.0, 21.0),
+                    ],
+                    dtype=example_dt,
+                ),
+            )
+        with pytest.raises(Exception):
+            r.loc["y"]
+        with pytest.raises(Exception):
+            r.loc[["x", "z"]]
 
     def test_filtering(self):
         filtered_records = vbt.Records(wrapper, records_arr[[0, -1]])
@@ -2203,7 +2350,7 @@ class TestRanges:
         ranges1 = vbt.Ranges.from_ts(ts, wrapper_kwargs=dict(freq="1 days"))
         ranges2 = vbt.Ranges.from_ts(ts2, wrapper_kwargs=dict(freq="1 days"))
         new_ranges = vbt.Ranges.row_stack(ranges1, ranges2)
-        pd.testing.assert_frame_equal(new_ranges.ts, pd.concat((ts, ts2)))
+        assert_frame_equal(new_ranges.ts, pd.concat((ts, ts2)))
         with pytest.raises(Exception):
             vbt.Ranges.row_stack(ranges1.replace(ts=None), ranges2)
         with pytest.raises(Exception):
@@ -2217,13 +2364,23 @@ class TestRanges:
         ranges1 = vbt.Ranges.from_ts(ts, wrapper_kwargs=dict(freq="1 days"))
         ranges2 = vbt.Ranges.from_ts(ts2, wrapper_kwargs=dict(freq="1 days"))
         new_ranges = vbt.Ranges.column_stack(ranges1, ranges2)
-        pd.testing.assert_frame_equal(new_ranges.ts, pd.concat((ts, ts2), axis=1))
+        assert_frame_equal(new_ranges.ts, pd.concat((ts, ts2), axis=1))
         with pytest.raises(Exception):
             vbt.Ranges.column_stack(ranges1.replace(ts=None), ranges2)
         with pytest.raises(Exception):
             vbt.Ranges.column_stack(ranges1, ranges2.replace(ts=None))
         new_ranges = vbt.Ranges.column_stack(ranges1.replace(ts=None), ranges2.replace(ts=None))
         assert new_ranges.ts is None
+
+    def test_indexing(self):
+        ranges2 = ranges.loc["2020-01-02":"2020-01-05", ["a", "c"]]
+        assert_index_equal(ranges2.wrapper.index, ranges.wrapper.index[1:-1])
+        assert_index_equal(ranges2.wrapper.columns, ranges.wrapper.columns[[0, 2]])
+        assert_frame_equal(ranges2.ts, ranges.ts.loc["2020-01-02":"2020-01-05", ["a", "c"]])
+        assert_records_close(
+            ranges2.values,
+            np.array([(1, 0, 1, 2, 1)], dtype=range_dt),
+        )
 
     def test_mapped_fields(self):
         for name in range_dt.names:
@@ -2561,6 +2718,16 @@ drawdowns_grouped = vbt.Drawdowns.from_ts(ts2, wrapper_kwargs=dict(freq="1 days"
 
 
 class TestDrawdowns:
+    def test_indexing(self):
+        drawdowns2 = drawdowns.loc["2020-01-02":"2020-01-05", ["a", "c"]]
+        assert_index_equal(drawdowns2.wrapper.index, drawdowns.wrapper.index[1:-1])
+        assert_index_equal(drawdowns2.wrapper.columns, drawdowns.wrapper.columns[[0, 2]])
+        assert_frame_equal(drawdowns2.ts, drawdowns.ts.loc["2020-01-02":"2020-01-05", ["a", "c"]])
+        assert_records_close(
+            drawdowns2.values,
+            np.array([(1, 0, 1, 2, 2, 3, 3.0, 1.0, 4.0, 1)], dtype=drawdown_dt),
+        )
+
     def test_mapped_fields(self):
         for name in drawdown_dt.names:
             np.testing.assert_array_equal(getattr(drawdowns, name).values, drawdowns.values[name])
@@ -3299,7 +3466,7 @@ class TestOrders:
         orders1 = vbt.Portfolio.from_orders(close, size, fees=0.01, freq="1 days").orders
         orders2 = vbt.Portfolio.from_orders(close2, size, fees=0.01, freq="1 days").orders
         new_orders = vbt.Orders.row_stack(orders1, orders2)
-        pd.testing.assert_frame_equal(new_orders.close, pd.concat((close, close2)))
+        assert_frame_equal(new_orders.close, pd.concat((close, close2)))
         with pytest.raises(Exception):
             vbt.Orders.row_stack(orders1.replace(close=None), orders2)
         with pytest.raises(Exception):
@@ -3313,13 +3480,33 @@ class TestOrders:
         orders1 = vbt.Portfolio.from_orders(close, size, fees=0.01, freq="1 days").orders
         orders2 = vbt.Portfolio.from_orders(close2, size, fees=0.01, freq="1 days").orders
         new_orders = vbt.Orders.column_stack(orders1, orders2)
-        pd.testing.assert_frame_equal(new_orders.close, pd.concat((close, close2), axis=1))
+        assert_frame_equal(new_orders.close, pd.concat((close, close2), axis=1))
         with pytest.raises(Exception):
             vbt.Orders.column_stack(orders1.replace(close=None), orders2)
         with pytest.raises(Exception):
             vbt.Orders.column_stack(orders1, orders2.replace(close=None))
         new_orders = vbt.Orders.column_stack(orders1.replace(close=None), orders2.replace(close=None))
         assert new_orders.close is None
+
+    def test_indexing(self):
+        orders2 = orders.loc["2020-01-03":"2020-01-06", ["a", "c"]]
+        assert_index_equal(orders2.wrapper.index, orders.wrapper.index[2:-2])
+        assert_index_equal(orders2.wrapper.columns, orders.wrapper.columns[[0, 2]])
+        assert_frame_equal(orders2.close, orders.close.loc["2020-01-03":"2020-01-06", ["a", "c"]])
+        assert_records_close(
+            orders2.values,
+            np.array(
+                [
+                    (2, 0, 0, 1.0, 3.0, 0.03, 1),
+                    (3, 0, 1, 0.1, 4.0, 0.004, 1),
+                    (4, 0, 3, 1.0, 6.0, 0.06, 0),
+                    (2, 1, 0, 1.0, 3.0, 0.03, 1),
+                    (3, 1, 1, 0.1, 4.0, 0.004, 1),
+                    (4, 1, 3, 1.0, 6.0, 0.06, 0),
+                ],
+                dtype=order_dt,
+            ),
+        )
 
     def test_mapped_fields(self):
         for name in order_dt.names:
@@ -3756,7 +3943,7 @@ class TestExitTrades:
         trades1 = vbt.Portfolio.from_orders(close, size, fees=0.01, freq="1 days").exit_trades
         trades2 = vbt.Portfolio.from_orders(close2, size, fees=0.01, freq="1 days").exit_trades
         new_trades = vbt.Trades.row_stack(trades1, trades2)
-        pd.testing.assert_frame_equal(new_trades.close, pd.concat((close, close2)))
+        assert_frame_equal(new_trades.close, pd.concat((close, close2)))
         with pytest.raises(Exception):
             vbt.Orders.row_stack(trades1.replace(close=None), trades2)
         with pytest.raises(Exception):
@@ -3770,13 +3957,32 @@ class TestExitTrades:
         trades1 = vbt.Portfolio.from_orders(close, size, fees=0.01, freq="1 days").exit_trades
         trades2 = vbt.Portfolio.from_orders(close2, size, fees=0.01, freq="1 days").exit_trades
         new_trades = vbt.Trades.column_stack(trades1, trades2)
-        pd.testing.assert_frame_equal(new_trades.close, pd.concat((close, close2), axis=1))
+        assert_frame_equal(new_trades.close, pd.concat((close, close2), axis=1))
         with pytest.raises(Exception):
             vbt.Orders.column_stack(trades1.replace(close=None), trades2)
         with pytest.raises(Exception):
             vbt.Orders.column_stack(trades1, trades2.replace(close=None))
         new_trades = vbt.Trades.column_stack(trades1.replace(close=None), trades2.replace(close=None))
         assert new_trades.close is None
+
+    def test_indexing(self):
+        exit_trades2 = exit_trades.loc["2020-01-05":, ["a", "c"]]
+        assert_index_equal(exit_trades2.wrapper.index, exit_trades.wrapper.index[4:])
+        assert_index_equal(exit_trades2.wrapper.columns, exit_trades.wrapper.columns[[0, 2]])
+        assert_frame_equal(exit_trades2.close, exit_trades.close.loc["2020-01-05":, ["a", "c"]])
+        assert_records_close(
+            exit_trades2.values,
+            np.array(
+                [
+                    (2, 0, 1.0, 1, 6.0, 0.06, 2, 7.0, 0.07, 0.8699999999999999, 0.145, 0, 1, 1),
+                    (3, 0, 2.0, 3, 8.0, 0.16, 3, 8.0, 0.0, -0.16, -0.01, 0, 0, 2),
+                    (2, 1, 1.0, 1, 6.0, 0.06, 2, 7.0, 0.07, 0.8699999999999999, 0.145, 0, 1, 1),
+                    (3, 1, 1.0, 2, 7.0, 0.07, 3, 8.0, 0.08, -1.1500000000000001, -0.1642857142857143, 1, 1, 2),
+                    (4, 1, 1.0, 3, 8.0, 0.08, 3, 8.0, 0.0, -0.08, -0.01, 0, 0, 3),
+                ],
+                dtype=trade_dt,
+            ),
+        )
 
     def test_mapped_fields(self):
         for name in trade_dt.names:
@@ -4718,6 +4924,199 @@ logs_grouped = logs.regroup(group_by)
 
 
 class TestLogs:
+    def test_indexing(self):
+        logs2 = logs.loc["2020-01-03":"2020-01-04", ["a", "c"]]
+        assert_index_equal(logs2.wrapper.index, logs.wrapper.index[2:4])
+        assert_index_equal(logs2.wrapper.columns, logs.wrapper.columns[[0, 2]])
+        assert_records_close(
+            logs2.values,
+            np.array(
+                [
+                    (
+                        2,
+                        0,
+                        0,
+                        0,
+                        np.nan,
+                        np.nan,
+                        np.nan,
+                        3.0,
+                        98.788,
+                        1.1,
+                        0.0,
+                        98.788,
+                        3.0,
+                        102.088,
+                        -1.0,
+                        np.inf,
+                        0,
+                        2,
+                        0.01,
+                        0.0,
+                        0.0,
+                        1e-08,
+                        np.inf,
+                        np.nan,
+                        0.0,
+                        0,
+                        False,
+                        True,
+                        False,
+                        True,
+                        101.758,
+                        0.10000000000000009,
+                        0.0,
+                        101.758,
+                        3.0,
+                        102.088,
+                        1.0,
+                        3.0,
+                        0.03,
+                        1,
+                        0,
+                        -1,
+                        2,
+                    ),
+                    (
+                        3,
+                        0,
+                        0,
+                        1,
+                        np.nan,
+                        np.nan,
+                        np.nan,
+                        4.0,
+                        101.758,
+                        0.10000000000000009,
+                        0.0,
+                        101.758,
+                        4.0,
+                        102.158,
+                        -0.1,
+                        np.inf,
+                        0,
+                        2,
+                        0.01,
+                        0.0,
+                        0.0,
+                        1e-08,
+                        np.inf,
+                        np.nan,
+                        0.0,
+                        0,
+                        False,
+                        True,
+                        False,
+                        True,
+                        102.154,
+                        0.0,
+                        0.0,
+                        102.154,
+                        4.0,
+                        102.158,
+                        0.1,
+                        4.0,
+                        0.004,
+                        1,
+                        0,
+                        -1,
+                        3,
+                    ),
+                    (
+                        2,
+                        2,
+                        1,
+                        0,
+                        np.nan,
+                        np.nan,
+                        np.nan,
+                        3.0,
+                        98.788,
+                        1.1,
+                        0.0,
+                        98.788,
+                        3.0,
+                        102.088,
+                        -1.0,
+                        np.inf,
+                        0,
+                        2,
+                        0.01,
+                        0.0,
+                        0.0,
+                        1e-08,
+                        np.inf,
+                        np.nan,
+                        0.0,
+                        0,
+                        False,
+                        True,
+                        False,
+                        True,
+                        101.758,
+                        0.10000000000000009,
+                        0.0,
+                        101.758,
+                        3.0,
+                        102.088,
+                        1.0,
+                        3.0,
+                        0.03,
+                        1,
+                        0,
+                        -1,
+                        2,
+                    ),
+                    (
+                        3,
+                        2,
+                        1,
+                        1,
+                        np.nan,
+                        np.nan,
+                        np.nan,
+                        4.0,
+                        101.758,
+                        0.10000000000000009,
+                        0.0,
+                        101.758,
+                        4.0,
+                        102.158,
+                        -0.1,
+                        np.inf,
+                        0,
+                        2,
+                        0.01,
+                        0.0,
+                        0.0,
+                        1e-08,
+                        np.inf,
+                        np.nan,
+                        0.0,
+                        0,
+                        False,
+                        True,
+                        False,
+                        True,
+                        102.154,
+                        0.0,
+                        0.0,
+                        102.154,
+                        4.0,
+                        102.158,
+                        0.1,
+                        4.0,
+                        0.004,
+                        1,
+                        0,
+                        -1,
+                        3,
+                    ),
+                ],
+                dtype=log_dt,
+            ),
+        )
+
     def test_mapped_fields(self):
         for name in log_dt.names:
             np.testing.assert_array_equal(getattr(logs, name).values, logs.values[name])

@@ -1623,6 +1623,7 @@ import string
 import inspect
 import warnings
 from collections import namedtuple
+from functools import partial
 
 import numpy as np
 import pandas as pd
@@ -1644,6 +1645,7 @@ from vectorbtpro.portfolio.orders import Orders
 from vectorbtpro.portfolio.trades import Trades, EntryTrades, ExitTrades, Positions
 from vectorbtpro.portfolio.pfopt.base import PortfolioOptimizer
 from vectorbtpro.records import nb as records_nb
+from vectorbtpro.records.base import Records
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.returns.accessors import ReturnsAccessor
@@ -1675,6 +1677,56 @@ def fix_wrapper_for_records(pf: "Portfolio") -> ArrayWrapper:
     if pf.cash_sharing:
         return pf.wrapper.replace(allow_enable=True, allow_modify=True)
     return pf.wrapper
+
+
+def records_indexing_func(
+    self: "Portfolio",
+    obj: tp.RecordArray,
+    wrapper_meta: dict,
+    cls: type,
+    groups_only: bool = False,
+    **kwargs,
+) -> tp.RecordArray:
+    """Apply indexing function on records."""
+    wrapper = fix_wrapper_for_records(self)
+    if groups_only:
+        wrapper = wrapper.resolve()
+        wrapper_meta = dict(wrapper_meta)
+        wrapper_meta["col_idxs"] = wrapper_meta["group_idxs"]
+    records = cls(wrapper, obj)
+    records_meta = records.indexing_func_meta(wrapper_meta=wrapper_meta)
+    return records.indexing_func(records_meta=records_meta).values
+
+
+def records_resample_func(
+    self: "Portfolio",
+    obj: tp.ArrayLike,
+    resampler: tp.Union[Resampler, tp.PandasResampler],
+    wrapper: ArrayWrapper,
+    cls: type,
+    **kwargs,
+) -> tp.RecordArray:
+    """Apply resampling function on records."""
+    return cls(wrapper, obj).resample(resampler).values
+
+
+def returns_resample_func(
+    self: "Portfolio",
+    obj: tp.ArrayLike,
+    resampler: tp.Union[Resampler, tp.PandasResampler],
+    wrapper: ArrayWrapper,
+    fill_with_zero: bool = True,
+    **kwargs,
+):
+    """Apply resampling function on returns."""
+    return (
+        pd.DataFrame(obj, index=wrapper.index)
+        .vbt.returns.resample(
+            resampler,
+            fill_with_zero=fill_with_zero,
+        )
+        .obj.values
+    )
 
 
 returns_acc_config = ReadonlyConfig(
@@ -1722,48 +1774,70 @@ shortcut_config = ReadonlyConfig(
             obj_type="records",
             field_aliases=("order_records",),
             wrap_func=lambda pf, obj, **kwargs: Orders(fix_wrapper_for_records(pf), obj, pf.close),
+            indexing_func=partial(records_indexing_func, cls=Orders),
+            resample_func=partial(records_resample_func, cls=Orders),
         ),
         "logs": dict(
             obj_type="records",
             field_aliases=("log_records",),
             wrap_func=lambda pf, obj, **kwargs: Logs(fix_wrapper_for_records(pf), obj),
+            indexing_func=partial(records_indexing_func, cls=Logs),
+            resample_func=partial(records_resample_func, cls=Logs),
         ),
         "entry_trades": dict(
             obj_type="records",
             field_aliases=("entry_trade_records",),
             wrap_func=lambda pf, obj, **kwargs: EntryTrades.from_records(pf.orders.wrapper, obj, pf.close),
+            indexing_func=partial(records_indexing_func, cls=EntryTrades),
+            resample_func=partial(records_resample_func, cls=EntryTrades),
         ),
         "exit_trades": dict(
             obj_type="records",
             field_aliases=("exit_trade_records",),
             wrap_func=lambda pf, obj, **kwargs: ExitTrades.from_records(pf.orders.wrapper, obj, pf.close),
+            indexing_func=partial(records_indexing_func, cls=ExitTrades),
+            resample_func=partial(records_resample_func, cls=ExitTrades),
         ),
         "positions": dict(
             obj_type="records",
             field_aliases=("position_records",),
             wrap_func=lambda pf, obj, **kwargs: Positions.from_records(pf.orders.wrapper, obj, pf.close),
+            indexing_func=partial(records_indexing_func, cls=Positions),
+            resample_func=partial(records_resample_func, cls=Positions),
         ),
         "trades": dict(
             obj_type="records",
             field_aliases=("trade_records",),
             wrap_func=lambda pf, obj, **kwargs: Trades.from_records(pf.orders.wrapper, obj, pf.close),
+            indexing_func=partial(records_indexing_func, cls=Trades),
+            resample_func=partial(records_resample_func, cls=Trades),
         ),
         "drawdowns": dict(
             obj_type="records",
             field_aliases=("drawdown_records",),
-            wrap_func=lambda pf, obj, **kwargs: Drawdowns.from_records(pf.orders.wrapper.regroup(False), obj, pf.close),
+            wrap_func=lambda pf, obj, **kwargs: Drawdowns.from_records(pf.orders.wrapper.resolve(), obj, pf.close),
+            indexing_func=partial(records_indexing_func, cls=Drawdowns, groups_only=True),
+            resample_func=partial(records_resample_func, cls=Drawdowns),
         ),
         "init_position": dict(obj_type="red_array", group_by_aware=False),
-        "asset_flow": dict(group_by_aware=False),
+        "asset_flow": dict(
+            group_by_aware=False,
+            resample_func="sum",
+            resample_kwargs=dict(wrap_kwargs=dict(fillna=0.0)),
+        ),
         "longonly_asset_flow": dict(
             method_name="get_asset_flow",
             group_by_aware=False,
             method_kwargs=dict(direction="longonly"),
+            resample_func="sum",
+            resample_kwargs=dict(wrap_kwargs=dict(fillna=0.0)),
         ),
         "shortonly_asset_flow": dict(
             method_name="get_asset_flow",
             group_by_aware=False,
             method_kwargs=dict(direction="shortonly"),
+            resample_func="sum",
+            resample_kwargs=dict(wrap_kwargs=dict(fillna=0.0)),
         ),
         "assets": dict(group_by_aware=False),
         "longonly_assets": dict(
@@ -1791,10 +1865,15 @@ shortcut_config = ReadonlyConfig(
             method_kwargs=dict(direction="shortonly"),
         ),
         "init_cash": dict(obj_type="red_array"),
-        "cash_deposits": dict(),
-        "cash_earnings": dict(),
-        "cash_flow": dict(),
-        "free_cash_flow": dict(method_name="get_cash_flow", method_kwargs=dict(free=True)),
+        "cash_deposits": dict(resample_func="sum", resample_kwargs=dict(wrap_kwargs=dict(fillna=0.0))),
+        "cash_earnings": dict(resample_func="sum", resample_kwargs=dict(wrap_kwargs=dict(fillna=0.0))),
+        "cash_flow": dict(resample_func="sum", resample_kwargs=dict(wrap_kwargs=dict(fillna=0.0))),
+        "free_cash_flow": dict(
+            method_name="get_cash_flow",
+            method_kwargs=dict(free=True),
+            resample_func="sum",
+            resample_kwargs=dict(wrap_kwargs=dict(fillna=0.0)),
+        ),
         "cash": dict(),
         "free_cash": dict(method_name="get_cash", method_kwargs=dict(free=True)),
         "init_price": dict(obj_type="red_array", group_by_aware=False),
@@ -1812,15 +1891,15 @@ shortcut_config = ReadonlyConfig(
         "total_profit": dict(obj_type="red_array"),
         "final_value": dict(obj_type="red_array"),
         "total_return": dict(obj_type="red_array"),
-        "returns": dict(),
-        "asset_returns": dict(),
+        "returns": dict(resample_func=returns_resample_func),
+        "asset_returns": dict(resample_func=returns_resample_func),
         "market_value": dict(),
-        "market_returns": dict(),
+        "market_returns": dict(resample_func=returns_resample_func),
         "bm_value": dict(),
-        "bm_returns": dict(),
+        "bm_returns": dict(resample_func=returns_resample_func),
         "total_market_return": dict(obj_type="red_array"),
-        "daily_returns": dict(),
-        "annual_returns": dict(),
+        "daily_returns": dict(resample_func=returns_resample_func),
+        "annual_returns": dict(resample_func=returns_resample_func),
         "cumulative_returns": dict(),
         "annualized_return": dict(obj_type="red_array"),
         "annualized_volatility": dict(obj_type="red_array"),
@@ -2056,15 +2135,17 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 prop_options = getattr(prop, "options", {})
                 obj_type = prop_options.get("obj_type", "array")
                 group_by_aware = prop_options.get("group_by_aware", True)
+                row_stack_func = prop_options.get("row_stack_func", None)
             else:
                 obj_type = None
                 group_by_aware = True
+                row_stack_func = None
             _kwargs = merge_dicts(
                 dict(
                     grouping=field_options.get("grouping", "columns_or_groups" if group_by_aware else "columns"),
                     obj_name=field_options.get("field", field),
                     obj_type=field_options.get("obj_type", obj_type),
-                    row_stack_func=field_options.get("row_stack_func", None),
+                    row_stack_func=field_options.get("row_stack_func", row_stack_func),
                 ),
                 kwargs,
             )
@@ -2419,15 +2500,17 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 prop_options = getattr(prop, "options", {})
                 obj_type = prop_options.get("obj_type", "array")
                 group_by_aware = prop_options.get("group_by_aware", True)
+                column_stack_func = prop_options.get("column_stack_func", None)
             else:
                 obj_type = None
                 group_by_aware = True
+                column_stack_func = None
             _kwargs = merge_dicts(
                 dict(
                     grouping=field_options.get("grouping", "columns_or_groups" if group_by_aware else "columns"),
                     obj_name=field_options.get("field", field),
                     obj_type=field_options.get("obj_type", obj_type),
-                    column_stack_func=field_options.get("column_stack_func", None),
+                    column_stack_func=field_options.get("column_stack_func", column_stack_func),
                 ),
                 kwargs,
             )
@@ -2685,8 +2768,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         self._fillna_close = fillna_close
         self._trades_type = trades_type
 
-        # Cannot select rows
-        self._column_only_select = True
+        # Only slices of rows can be selected
+        self._range_only_select = True
 
         # Copy writeable attrs
         self._in_output_config = type(self)._in_output_config.copy()
@@ -2697,11 +2780,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         dict(
             returns=dict(
                 grouping="cash_sharing",
-                resample_func=lambda self, obj, resampler, wrapper, fill_with_zero=True, **kwargs: pd.DataFrame(
-                    obj, index=wrapper.index
-                )
-                .vbt.returns.resample(resampler, fill_with_zero=fill_with_zero)
-                .obj.values,
             ),
         )
     )
@@ -2974,6 +3052,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             prop_options = getattr(prop, "options", {})
             obj_type = prop_options.get("obj_type", "array")
             group_by_aware = prop_options.get("group_by_aware", True)
+            wrap_func = prop_options.get("wrap_func", None)
+            wrap_kwargs = prop_options.get("wrap_kwargs", None)
+            force_wrapping = prop_options.get("force_wrapping", False)
+            silence_warnings = prop_options.get("silence_warnings", False)
             field_aliases = prop_options.get("field_aliases", None)
             if field_aliases is None:
                 field_aliases = []
@@ -2982,6 +3064,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         else:
             obj_type = None
             group_by_aware = True
+            wrap_func = None
+            wrap_kwargs = None
+            force_wrapping = False
+            silence_warnings = False
             field_aliases = {field}
             found_attr = False
 
@@ -3015,10 +3101,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             dict(
                 grouping=found_field_options.get("grouping", "columns_or_groups" if group_by_aware else "columns"),
                 obj_type=found_field_options.get("obj_type", obj_type),
-                wrap_func=found_field_options.get("wrap_func", None),
-                wrap_kwargs=found_field_options.get("wrap_kwargs", None),
-                force_wrapping=found_field_options.get("force_wrapping", False),
-                silence_warnings=found_field_options.get("silence_warnings", False),
+                wrap_func=found_field_options.get("wrap_func", wrap_func),
+                wrap_kwargs=found_field_options.get("wrap_kwargs", wrap_kwargs),
+                force_wrapping=found_field_options.get("force_wrapping", force_wrapping),
+                silence_warnings=found_field_options.get("silence_warnings", silence_warnings),
             ),
             kwargs,
         )
@@ -3035,8 +3121,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     def index_obj(
         self,
         obj: tp.Any,
-        group_idxs: tp.MaybeIndexArray,
-        col_idxs: tp.MaybeIndexArray,
+        wrapper_meta: dict,
         obj_name: tp.Optional[str] = None,
         grouping: str = "columns_or_groups",
         obj_type: tp.Optional[str] = None,
@@ -3049,9 +3134,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     ) -> tp.Any:
         """Perform indexing on an object.
 
-        `indexing_func` must take the portfolio, `obj`, `group_idxs`, `col_idxs`,
-        all the arguments passed to this method, and `**kwargs`. If you don't need any of
-        the arguments, make `indexing_func` accept them as `**kwargs`.
+        `indexing_func` must take the portfolio, all the arguments passed to this method, and `**kwargs`.
+        If you don't need any of the arguments, make `indexing_func` accept them as `**kwargs`.
 
         If the object is None, boolean, or empty, returns as-is."""
         if obj is None or isinstance(obj, bool) or (checks.is_np_array(obj) and obj.size == 0):
@@ -3062,8 +3146,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             return indexing_func(
                 self,
                 obj,
-                group_idxs,
-                col_idxs,
+                wrapper_meta,
                 obj_name=obj_name,
                 grouping=grouping,
                 obj_type=obj_type,
@@ -3075,28 +3158,21 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             )
 
         def _index_1d_by_group(obj: tp.ArrayLike) -> tp.ArrayLike:
-            return to_1d_array(obj)[group_idxs]
+            return to_1d_array(obj)[wrapper_meta["group_idxs"]]
 
         def _index_1d_by_col(obj: tp.ArrayLike) -> tp.ArrayLike:
-            return to_1d_array(obj)[col_idxs]
+            return to_1d_array(obj)[wrapper_meta["col_idxs"]]
 
         def _index_2d_by_group(obj: tp.ArrayLike) -> tp.ArrayLike:
-            return to_2d_array(obj)[:, group_idxs]
+            return to_2d_array(obj)[wrapper_meta["row_idxs"], :][:, wrapper_meta["group_idxs"]]
 
         def _index_2d_by_col(obj: tp.ArrayLike) -> tp.ArrayLike:
-            return to_2d_array(obj)[:, col_idxs]
+            return to_2d_array(obj)[wrapper_meta["row_idxs"], :][:, wrapper_meta["col_idxs"]]
 
         def _index_records(obj: tp.RecordArray) -> tp.RecordArray:
-            if isinstance(col_idxs, slice):
-                if col_idxs.start is None and col_idxs.stop is None:
-                    return obj
-                col_idxs_arr = np.arange(col_idxs.start, col_idxs.stop)
-            else:
-                col_idxs_arr = col_idxs
-            func = jit_reg.resolve_option(records_nb.col_map_nb, None)
-            col_map = func(obj["col"], len(self.wrapper.columns))
-            func = jit_reg.resolve_option(records_nb.record_col_map_select_nb, None)
-            return func(obj, col_map, to_1d_array(col_idxs_arr))
+            records = Records(wrapper, obj)
+            records_meta = records.indexing_func_meta(wrapper_meta=wrapper_meta)
+            return records.indexing_func(records_meta=records_meta).values
 
         is_grouped = wrapper.grouper.is_grouped(group_by=group_by)
         if obj_type is not None and obj_type == "records":
@@ -3180,12 +3256,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             )
         return obj
 
-    def in_outputs_indexing_func(
-        self,
-        group_idxs: tp.MaybeIndexArray,
-        col_idxs: tp.MaybeIndexArray,
-        **kwargs,
-    ) -> tp.Optional[tp.NamedTuple]:
+    def in_outputs_indexing_func(self, wrapper_meta: dict, **kwargs) -> tp.Optional[tp.NamedTuple]:
         """Perform indexing on `Portfolio.in_outputs`.
 
         If the field can be found in the attributes of this `Portfolio` instance, reads the
@@ -3208,83 +3279,112 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 prop_options = getattr(prop, "options", {})
                 obj_type = prop_options.get("obj_type", "array")
                 group_by_aware = prop_options.get("group_by_aware", True)
+                indexing_func = prop_options.get("indexing_func", None)
+                force_indexing = prop_options.get("force_indexing", False)
+                silence_warnings = prop_options.get("silence_warnings", False)
             else:
                 obj_type = None
                 group_by_aware = True
+                indexing_func = None
+                force_indexing = False
+                silence_warnings = False
             _kwargs = merge_dicts(
                 dict(
                     grouping=field_options.get("grouping", "columns_or_groups" if group_by_aware else "columns"),
                     obj_name=field_options.get("field", field),
                     obj_type=field_options.get("obj_type", obj_type),
-                    indexing_func=field_options.get("indexing_func", None),
-                    force_indexing=field_options.get("force_indexing", False),
-                    silence_warnings=field_options.get("silence_warnings", False),
+                    indexing_func=field_options.get("indexing_func", indexing_func),
+                    force_indexing=field_options.get("force_indexing", force_indexing),
+                    silence_warnings=field_options.get("silence_warnings", silence_warnings),
                 ),
                 kwargs,
             )
-            new_obj = self.index_obj(
-                obj,
-                group_idxs,
-                col_idxs,
-                **_kwargs,
-            )
+            new_obj = self.index_obj(obj, wrapper_meta, **_kwargs)
             new_in_outputs[field] = new_obj
         return type(self.in_outputs)(**new_in_outputs)
 
-    def indexing_func(self: PortfolioT, *args, in_output_kwargs: tp.KwargsLike = None, **kwargs) -> PortfolioT:
+    def indexing_func(
+        self: PortfolioT,
+        *args,
+        in_output_kwargs: tp.KwargsLike = None,
+        wrapper_meta: tp.DictLike = None,
+        **kwargs,
+    ) -> PortfolioT:
         """Perform indexing on `Portfolio`.
 
         In-outputs are indexed using `Portfolio.in_outputs_indexing_func`."""
-        wrapper_meta = self.wrapper.indexing_func_meta(
-            *args,
-            column_only_select=self.column_only_select,
-            group_select=self.group_select,
-            **kwargs,
-        )
+        if wrapper_meta is None:
+            wrapper_meta = self.wrapper.indexing_func_meta(
+                *args,
+                column_only_select=self.column_only_select,
+                range_only_select=self.range_only_select,
+                group_select=self.group_select,
+                **kwargs,
+            )
+        row_idxs = wrapper_meta["row_idxs"]
+        rows_changed = wrapper_meta["rows_changed"]
+        col_idxs = wrapper_meta["col_idxs"]
+        columns_changed = wrapper_meta["columns_changed"]
+        group_idxs = wrapper_meta["group_idxs"]
+        groups_changed = wrapper_meta["groups_changed"]
+
         new_close = to_2d_array(self._close)
-        if new_close.shape[1] > 1:
-            new_close = new_close[:, wrapper_meta["col_idxs"]]
-        new_order_records = self.orders.get_by_col_idxs(wrapper_meta["col_idxs"])
-        new_log_records = self.logs.get_by_col_idxs(wrapper_meta["col_idxs"])
-        if isinstance(self._init_cash, int):
-            new_init_cash = self._init_cash
-        else:
-            new_init_cash = to_1d_array(self._init_cash)
-            if new_init_cash.shape[0] > 1:
-                if self.cash_sharing:
-                    new_init_cash = new_init_cash[wrapper_meta["group_idxs"]]
+        if rows_changed and new_close.shape[0] > 1:
+            new_close = new_close[row_idxs, :]
+        if columns_changed and new_close.shape[1] > 1:
+            new_close = new_close[:, col_idxs]
+        new_order_records = self.orders.indexing_func_meta(wrapper_meta=wrapper_meta)["new_records_arr"]
+        new_log_records = self.logs.indexing_func_meta(wrapper_meta=wrapper_meta)["new_records_arr"]
+        new_init_cash = self._init_cash
+        if not isinstance(new_init_cash, int):
+            new_init_cash = to_1d_array(new_init_cash)
+            if rows_changed and row_idxs.start > 0:
+                if self.wrapper.grouper.is_grouped() and not self.cash_sharing:
+                    cash = self.get_cash(group_by=False)
                 else:
-                    new_init_cash = new_init_cash[wrapper_meta["col_idxs"]]
+                    cash = self.cash
+                new_init_cash = to_1d_array(cash.iloc[row_idxs.start - 1])
+            if columns_changed and new_init_cash.shape[0] > 1:
+                if self.cash_sharing:
+                    new_init_cash = new_init_cash[group_idxs]
+                else:
+                    new_init_cash = new_init_cash[col_idxs]
         new_init_position = to_1d_array(self._init_position)
-        if new_init_position.shape[0] > 1:
-            new_init_position = new_init_position[wrapper_meta["col_idxs"]]
+        if rows_changed and row_idxs.start > 0:
+            new_init_position = to_1d_array(self.assets.iloc[row_idxs.start - 1])
+        if columns_changed and new_init_position.shape[0] > 1:
+            new_init_position = new_init_position[col_idxs]
         new_init_price = to_1d_array(self._init_price)
-        if new_init_price.shape[0] > 1:
-            new_init_price = new_init_price[wrapper_meta["col_idxs"]]
+        if rows_changed and row_idxs.start > 0:
+            new_init_price = to_1d_array(self.close.iloc[: row_idxs.start].ffill().iloc[-1])
+        if columns_changed and new_init_price.shape[0] > 1:
+            new_init_price = new_init_price[col_idxs]
         new_cash_deposits = to_2d_array(self._cash_deposits)
-        if new_cash_deposits.shape[1] > 1:
+        if rows_changed and new_cash_deposits.shape[0] > 1:
+            new_cash_deposits = new_cash_deposits[row_idxs, :]
+        if columns_changed and new_cash_deposits.shape[1] > 1:
             if self.cash_sharing:
-                new_cash_deposits = new_cash_deposits[:, wrapper_meta["group_idxs"]]
+                new_cash_deposits = new_cash_deposits[:, group_idxs]
             else:
-                new_cash_deposits = new_cash_deposits[:, wrapper_meta["col_idxs"]]
+                new_cash_deposits = new_cash_deposits[:, col_idxs]
         new_cash_earnings = to_2d_array(self._cash_earnings)
-        if new_cash_earnings.shape[1] > 1:
-            new_cash_earnings = new_cash_earnings[:, wrapper_meta["col_idxs"]]
+        if rows_changed and new_cash_earnings.shape[0] > 1:
+            new_cash_earnings = new_cash_earnings[row_idxs, :]
+        if columns_changed and new_cash_earnings.shape[1] > 1:
+            new_cash_earnings = new_cash_earnings[:, col_idxs]
         if self._call_seq is not None:
-            call_seq = to_2d_array(self._call_seq)
-            new_call_seq = call_seq[:, wrapper_meta["col_idxs"]]
+            new_call_seq = to_2d_array(self._call_seq)[row_idxs, :][:, col_idxs]
         else:
             new_call_seq = None
         if self._bm_close is not None and not isinstance(self._bm_close, bool):
-            bm_close = to_2d_array(self._bm_close)
-            new_bm_close = bm_close[:, wrapper_meta["col_idxs"]]
+            new_bm_close = to_2d_array(self._bm_close)
+            if rows_changed and new_bm_close.shape[0] > 1:
+                new_bm_close = new_bm_close[row_idxs, :]
+            if columns_changed and new_bm_close.shape[1] > 1:
+                new_bm_close = new_bm_close[:, col_idxs]
         else:
             new_bm_close = self._bm_close
-        new_in_outputs = self.in_outputs_indexing_func(
-            wrapper_meta["group_idxs"],
-            wrapper_meta["col_idxs"],
-            **resolve_dict(in_output_kwargs),
-        )
+        new_in_outputs = self.in_outputs_indexing_func(wrapper_meta, **resolve_dict(in_output_kwargs))
 
         return self.replace(
             wrapper=wrapper_meta["new_wrapper"],
@@ -3311,7 +3411,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         obj_type: tp.Optional[str] = None,
         group_by: tp.GroupByLike = None,
         wrapper: tp.Optional[ArrayWrapper] = None,
-        resample_func: tp.Optional[tp.Callable] = None,
+        resample_func: tp.Union[None, str, tp.Callable] = None,
+        resample_kwargs: tp.KwargsLike = None,
         force_resampling: bool = False,
         silence_warnings: bool = False,
         **kwargs,
@@ -3320,13 +3421,17 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         `resample_func` must take the portfolio, `obj`, `resampler`, all the arguments passed to this method,
         and `**kwargs`. If you don't need any of the arguments, make `resample_func` accept them as `**kwargs`.
+        If `resample_func` is a string, will use it as `reduce_func_nb` in
+        `vectorbtpro.generic.accessors.GenericAccessor.resample_apply`. Default is 'last'.
 
         If the object is None, boolean, or empty, returns as-is."""
         if obj is None or isinstance(obj, bool) or (checks.is_np_array(obj) and obj.size == 0):
             return obj
         if wrapper is None:
             wrapper = self.wrapper
-        if resample_func is not None:
+        if resample_func is None:
+            resample_func = "last"
+        if not isinstance(resample_func, str):
             return resample_func(
                 self,
                 obj,
@@ -3335,19 +3440,28 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 obj_type=obj_type,
                 group_by=group_by,
                 wrapper=wrapper,
+                resample_kwargs=resample_kwargs,
                 force_resampling=force_resampling,
                 silence_warnings=silence_warnings,
                 **kwargs,
             )
 
+        def _resample(obj: tp.Array) -> tp.SeriesFrame:
+            wrapped_obj = ArrayWrapper.from_obj(obj, index=wrapper.index).wrap(obj)
+            return wrapped_obj.vbt.resample_apply(resampler, resample_func, **resolve_dict(resample_kwargs)).values
+
         if obj_type is not None and obj_type == "red_array":
             return obj
-        if obj_type is None or obj_type not in {"records"}:
+        if obj_type is None or obj_type == "array":
             is_grouped = wrapper.grouper.is_grouped(group_by=group_by)
             if checks.is_np_array(obj):
                 if is_grouped:
+                    if shape_to_2d(obj.shape) == wrapper.get_shape_2d():
+                        return _resample(obj)
                     if obj.shape == (wrapper.get_shape_2d()[1],):
                         return obj
+                if shape_to_2d(obj.shape) == wrapper.shape_2d:
+                    return _resample(obj)
                 if obj.shape == (wrapper.shape_2d[1],):
                     return obj
         if force_resampling:
@@ -3385,23 +3499,28 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 prop = getattr(type(self), field_options["field"])
                 prop_options = getattr(prop, "options", {})
                 obj_type = prop_options.get("obj_type", "array")
+                resample_func = prop_options.get("resample_func", None)
+                resample_kwargs = prop_options.get("resample_kwargs", None)
+                force_resampling = prop_options.get("force_resampling", False)
+                silence_warnings = prop_options.get("silence_warnings", False)
             else:
                 obj_type = None
+                resample_func = None
+                resample_kwargs = None
+                force_resampling = False
+                silence_warnings = False
             _kwargs = merge_dicts(
                 dict(
                     obj_name=field_options.get("field", field),
                     obj_type=field_options.get("obj_type", obj_type),
-                    resample_func=field_options.get("resample_func", None),
-                    force_resampling=field_options.get("force_resampling", False),
-                    silence_warnings=field_options.get("silence_warnings", False),
+                    resample_func=field_options.get("resample_func", resample_func),
+                    resample_kwargs=field_options.get("resample_kwargs", resample_kwargs),
+                    force_resampling=field_options.get("force_resampling", force_resampling),
+                    silence_warnings=field_options.get("silence_warnings", silence_warnings),
                 ),
                 kwargs,
             )
-            new_obj = self.resample_obj(
-                obj,
-                resampler,
-                **_kwargs,
-            )
+            new_obj = self.resample_obj(obj, resampler, **_kwargs)
             new_in_outputs[field] = new_obj
         return type(self.in_outputs)(**new_in_outputs)
 
@@ -3411,6 +3530,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         ffill_close: bool = False,
         fbfill_close: bool = False,
         in_output_kwargs: tp.KwargsLike = None,
+        wrapper_meta: tp.DictLike = None,
         **kwargs,
     ) -> PortfolioT:
         """Resample the `Portfolio` instance.
@@ -3431,7 +3551,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 origin timeframe."""
         if self._call_seq is not None:
             raise ValueError("Cannot resample call_seq")
-        resampler, new_wrapper = self.wrapper.resample_meta(*args, **kwargs)
+        if wrapper_meta is None:
+            wrapper_meta = self.wrapper.resample_meta(*args, **kwargs)
+        resampler = wrapper_meta["resampler"]
+        new_wrapper = wrapper_meta["new_wrapper"]
+
         new_close = self.close.vbt.resample_apply(resampler, generic_nb.last_reduce_nb)
         if fbfill_close:
             new_close = new_close.vbt.fbfill()
@@ -7186,15 +7310,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if order_records is None:
                 order_records = cls_or_self.order_records
             if close is None:
-                if cls_or_self.fillna_close:
-                    close = cls_or_self.filled_close
-                else:
-                    close = cls_or_self.close
+                close = cls_or_self._close
             if wrapper is None:
                 wrapper = fix_wrapper_for_records(cls_or_self)
         else:
             checks.assert_not_none(order_records)
-            checks.assert_not_none(close)
             checks.assert_not_none(wrapper)
 
         return Orders(wrapper, order_records, close=close, **kwargs).regroup(group_by)
