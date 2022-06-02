@@ -1014,6 +1014,44 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             return concat_data[columns]
         return tuple(concat_data.values())
 
+    @property
+    def open(self) -> tp.Optional[tp.SeriesFrame]:
+        if hasattr(self.wrapper.columns, "str"):
+            column_names = self.wrapper.columns.str.lower().tolist()
+            if "open" in column_names:
+                col_index = column_names.index("open")
+                if col_index != -1:
+                    return self.get(columns=self.wrapper.columns[col_index])
+        return None
+
+    @property
+    def high(self) -> tp.Optional[tp.SeriesFrame]:
+        if hasattr(self.wrapper.columns, "str"):
+            column_names = self.wrapper.columns.str.lower().tolist()
+            if "high" in column_names:
+                col_index = column_names.index("high")
+                if col_index != -1:
+                    return self.get(columns=self.wrapper.columns[col_index])
+        return None
+
+    @property
+    def low(self) -> tp.Optional[tp.SeriesFrame]:
+        column_names = self.wrapper.columns.str.lower().tolist()
+        if "low" in column_names:
+            col_index = column_names.index("low")
+            if col_index != -1:
+                return self.get(columns=self.wrapper.columns[col_index])
+        return None
+
+    @property
+    def close(self) -> tp.Optional[tp.SeriesFrame]:
+        column_names = self.wrapper.columns.str.lower().tolist()
+        if "close" in column_names:
+            col_index = column_names.index("close")
+            if col_index != -1:
+                return self.get(columns=self.wrapper.columns[col_index])
+        return None
+
     # ############# Selecting ############# #
 
     def select(self: DataT, symbols: tp.Union[tp.Symbol, tp.Symbols], **kwargs) -> DataT:
@@ -1236,7 +1274,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                     new_v.append(resample_func(self, obj, wrapper_meta["resampler"]))
                 else:
                     if isinstance(c, str) and c.lower() == "open":
-                        new_v.append(obj.vbt.resample_apply(wrapper_meta["resampler"], generic_nb.nth_reduce_nb, 0))
+                        new_v.append(obj.vbt.resample_apply(wrapper_meta["resampler"], generic_nb.first_reduce_nb))
                     elif isinstance(c, str) and c.lower() == "high":
                         new_v.append(obj.vbt.resample_apply(wrapper_meta["resampler"], generic_nb.max_reduce_nb))
                     elif isinstance(c, str) and c.lower() == "low":

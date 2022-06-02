@@ -84,6 +84,41 @@ class InOutputs(NamedTuple):
 
 
 class TestFromOrderFunc:
+    def test_data(self):
+        data = vbt.RandomOHLCData.fetch(
+            [0, 1],
+            ohlc_freq="1d",
+            start="2020-01-01",
+            end="2020-02-01",
+            freq="1h",
+            seed=42,
+        )
+        pf = vbt.Portfolio.from_order_func(data, order_func_nb, np.asarray(np.inf))
+        assert pf.open is not None
+        assert pf.high is not None
+        assert pf.low is not None
+        assert pf.close is not None
+        pf = vbt.Portfolio.from_order_func(data.get("Close"), order_func_nb, np.asarray(np.inf))
+        assert pf.open is None
+        assert pf.high is None
+        assert pf.low is None
+        assert pf.close is not None
+        pf = vbt.Portfolio.from_order_func(data[["Open", "Close"]], order_func_nb, np.asarray(np.inf))
+        assert pf.open is not None
+        assert pf.high is None
+        assert pf.low is None
+        assert pf.close is not None
+        pf = vbt.Portfolio.from_order_func(data["Close"], order_func_nb, np.asarray(np.inf))
+        assert pf.open is None
+        assert pf.high is None
+        assert pf.low is None
+        assert pf.close is not None
+        pf = vbt.Portfolio.from_order_func(data["Close"], order_func_nb, np.asarray(np.inf), open=data.get("Open"))
+        assert pf.open is not None
+        assert pf.high is None
+        assert pf.low is None
+        assert pf.close is not None
+
     @pytest.mark.parametrize("test_row_wise", [False, True])
     @pytest.mark.parametrize("test_flexible", [False, True])
     def test_one_column(self, test_row_wise, test_flexible):

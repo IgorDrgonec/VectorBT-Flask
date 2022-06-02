@@ -72,6 +72,41 @@ def from_ls_signals_shortonly(close=price, entries=entries, exits=exits, **kwarg
 
 
 class TestFromSignals:
+    def test_data(self):
+        data = vbt.RandomOHLCData.fetch(
+            [0, 1],
+            ohlc_freq="1d",
+            start="2020-01-01",
+            end="2020-02-01",
+            freq="1h",
+            seed=42,
+        )
+        pf = vbt.Portfolio.from_signals(data)
+        assert pf.open is not None
+        assert pf.high is not None
+        assert pf.low is not None
+        assert pf.close is not None
+        pf = vbt.Portfolio.from_signals(data.get("Close"))
+        assert pf.open is None
+        assert pf.high is None
+        assert pf.low is None
+        assert pf.close is not None
+        pf = vbt.Portfolio.from_signals(data[["Open", "Close"]])
+        assert pf.open is not None
+        assert pf.high is None
+        assert pf.low is None
+        assert pf.close is not None
+        pf = vbt.Portfolio.from_signals(data["Close"])
+        assert pf.open is None
+        assert pf.high is None
+        assert pf.low is None
+        assert pf.close is not None
+        pf = vbt.Portfolio.from_signals(data["Close"], open=data.get("Open"))
+        assert pf.open is not None
+        assert pf.high is None
+        assert pf.low is None
+        assert pf.close is not None
+
     @pytest.mark.parametrize(
         "test_ls",
         [False, True],

@@ -43,7 +43,19 @@ def teardown_module():
 
 # ############# Portfolio ############# #
 
-price_na = pd.DataFrame(
+open_na = pd.DataFrame(
+    {"a": [np.nan, 1.0, 2.0, 3.0, 4.0], "b": [0.5, 1.0, np.nan, 3.0, 4.0], "c": [0.5, 1.0, 2.0, 3.0, np.nan]},
+    index=price.index,
+)
+high_na = pd.DataFrame(
+    {"a": [np.nan, 2.5, 3.5, 4.5, 5.5], "b": [1.5, 2.5, np.nan, 4.5, 5.5], "c": [1.5, 2.5, 3.5, 4.5, np.nan]},
+    index=price.index,
+)
+low_na = pd.DataFrame(
+    {"a": [np.nan, 0.5, 1.5, 2.5, 3.5], "b": [0.25, 0.5, np.nan, 2.5, 3.5], "c": [0.25, 0.5, 1.5, 2.5, np.nan]},
+    index=price.index,
+)
+close_na = pd.DataFrame(
     {"a": [np.nan, 2.0, 3.0, 4.0, 5.0], "b": [1.0, 2.0, np.nan, 4.0, 5.0], "c": [1.0, 2.0, 3.0, 4.0, np.nan]},
     index=price.index,
 )
@@ -51,7 +63,7 @@ order_size_new = pd.DataFrame(
     {"a": [0.0, 0.1, -1.0, -0.1, 1.0], "b": [0.0, 0.1, -1.0, -0.1, 1.0], "c": [1.0, 0.1, -1.0, -0.1, 1.0]},
     index=price.index,
 )
-bm_price_na = pd.DataFrame(
+bm_close_na = pd.DataFrame(
     {"a": [5.0, 4.0, 3.0, 2.0, np.nan], "b": [5.0, 4.0, np.nan, 2.0, 1.0], "c": [np.nan, 4.0, 3.0, 2.0, 1.0]},
     index=price.index,
 )
@@ -60,7 +72,10 @@ directions = ["longonly", "shortonly", "both"]
 group_by = pd.Index(["first", "first", "second"], name="group")
 
 pf_kwargs = dict(
-    close=price_na,
+    open=open_na,
+    high=high_na,
+    low=low_na,
+    close=close_na,
     size=order_size_new,
     size_type="amount",
     direction=directions,
@@ -72,7 +87,7 @@ pf_kwargs = dict(
     group_by=None,
     init_cash=[100.0, 100.0, 100.0],
     init_position=init_position,
-    init_price=price_na.bfill().values[0],
+    init_price=close_na.bfill().values[0],
     cash_deposits=pd.DataFrame(
         {"a": [0.0, 0.0, 100.0, 0.0, 0.0], "b": [0.0, 0.0, 100.0, 0.0, 0.0], "c": [0.0, 0.0, 0.0, 0.0, 0.0]},
         index=price.index,
@@ -80,14 +95,17 @@ pf_kwargs = dict(
     cash_earnings=0.0,
     freq="1D",
     attach_call_seq=True,
-    bm_close=bm_price_na,
+    bm_close=bm_close_na,
 )
 
 pf = vbt.Portfolio.from_orders(**pf_kwargs)  # independent
 pf_filled = vbt.Portfolio.from_orders(**pf_kwargs, fill_returns=True)
 
 pf_grouped_kwargs = dict(
-    close=price_na,
+    open=open_na,
+    high=high_na,
+    low=low_na,
+    close=close_na,
     size=order_size_new,
     size_type="amount",
     direction=directions,
@@ -100,7 +118,7 @@ pf_grouped_kwargs = dict(
     cash_sharing=False,
     init_cash=[100.0, 100.0, 100.0],
     init_position=init_position,
-    init_price=price_na.bfill().values[0],
+    init_price=close_na.bfill().values[0],
     cash_deposits=pd.DataFrame(
         {"a": [0.0, 0.0, 100.0, 0.0, 0.0], "b": [0.0, 0.0, 100.0, 0.0, 0.0], "c": [0.0, 0.0, 0.0, 0.0, 0.0]},
         index=price.index,
@@ -108,14 +126,17 @@ pf_grouped_kwargs = dict(
     cash_earnings=0.0,
     freq="1D",
     attach_call_seq=True,
-    bm_close=bm_price_na,
+    bm_close=bm_close_na,
 )
 
 pf_grouped = vbt.Portfolio.from_orders(**pf_grouped_kwargs)  # grouped
 pf_grouped_filled = vbt.Portfolio.from_orders(**pf_grouped_kwargs, fill_returns=True)
 
 pf_shared_kwargs = dict(
-    close=price_na,
+    open=open_na,
+    high=high_na,
+    low=low_na,
+    close=close_na,
     size=order_size_new,
     size_type="amount",
     direction=directions,
@@ -128,7 +149,7 @@ pf_shared_kwargs = dict(
     cash_sharing=True,
     init_cash=[200.0, 100.0],
     init_position=init_position,
-    init_price=price_na.bfill().values[0],
+    init_price=close_na.bfill().values[0],
     cash_deposits=pd.DataFrame(
         {"first": [0.0, 0.0, 200.0, 0.0, 0.0], "second": [0.0, 0.0, 0.0, 0.0, 0.0]},
         index=price.index,
@@ -136,7 +157,7 @@ pf_shared_kwargs = dict(
     cash_earnings=0.0,
     freq="1D",
     attach_call_seq=True,
-    bm_close=bm_price_na,
+    bm_close=bm_close_na,
 )
 
 pf_shared = vbt.Portfolio.from_orders(**pf_shared_kwargs)  # shared
@@ -153,6 +174,9 @@ class TestPortfolio:
         del pf_kwargs1["cash_earnings"]
         pf_kwargs1["init_cash"] = "auto"
         pf_kwargs1["size"] = pf_kwargs1["size"].loc["2020-01-01":"2020-01-04", "a"]
+        pf_kwargs1["open"] = pf_kwargs1["open"].loc["2020-01-01":"2020-01-04", "a"]
+        pf_kwargs1["high"] = pf_kwargs1["high"].loc["2020-01-01":"2020-01-04", "a"]
+        pf_kwargs1["low"] = pf_kwargs1["low"].loc["2020-01-01":"2020-01-04", "a"]
         pf_kwargs1["close"] = pf_kwargs1["close"].loc["2020-01-01":"2020-01-04", "a"]
         pf_kwargs1["bm_close"] = pf_kwargs1["bm_close"].loc["2020-01-01":"2020-01-04", "a"]
 
@@ -166,6 +190,9 @@ class TestPortfolio:
         del pf_kwargs2["init_price"]
         pf_kwargs2["init_cash"] = "auto"
         pf_kwargs2["size"] = reindex_second_obj(pf_kwargs2["size"])
+        pf_kwargs2["open"] = reindex_second_obj(pf_kwargs2["open"])
+        pf_kwargs2["high"] = reindex_second_obj(pf_kwargs2["high"])
+        pf_kwargs2["low"] = reindex_second_obj(pf_kwargs2["low"])
         pf_kwargs2["close"] = reindex_second_obj(pf_kwargs2["close"])
         pf_kwargs2["bm_close"] = reindex_second_obj(pf_kwargs2["bm_close"])
         pf_kwargs2["cash_deposits"] = reindex_second_obj(pf_kwargs2["cash_deposits"])
@@ -181,6 +208,18 @@ class TestPortfolio:
         assert_index_equal(new_pf.wrapper.index, pf1.wrapper.index.append(pf2.wrapper.index))
         assert_index_equal(new_pf.wrapper.columns, pf2.wrapper.columns)
         assert new_pf.wrapper.grouper.group_by is None
+        np.testing.assert_array_equal(
+            new_pf._open,
+            np.row_stack((tile_first_obj(pf1._open), pf2._open)),
+        )
+        np.testing.assert_array_equal(
+            new_pf._high,
+            np.row_stack((tile_first_obj(pf1._high), pf2._high)),
+        )
+        np.testing.assert_array_equal(
+            new_pf._low,
+            np.row_stack((tile_first_obj(pf1._low), pf2._low)),
+        )
         np.testing.assert_array_equal(
             new_pf._close,
             np.row_stack((tile_first_obj(pf1._close), pf2._close)),
@@ -423,6 +462,9 @@ class TestPortfolio:
         del pf_kwargs1["init_position"]
         del pf_kwargs1["init_price"]
         pf_kwargs1["size"] = pf_kwargs1["size"].loc["2020-01-01":"2020-01-04"]
+        pf_kwargs1["open"] = pf_kwargs1["open"].loc["2020-01-01":"2020-01-04"]
+        pf_kwargs1["high"] = pf_kwargs1["high"].loc["2020-01-01":"2020-01-04"]
+        pf_kwargs1["low"] = pf_kwargs1["low"].loc["2020-01-01":"2020-01-04"]
         pf_kwargs1["close"] = pf_kwargs1["close"].loc["2020-01-01":"2020-01-04"]
         pf_kwargs1["bm_close"] = pf_kwargs1["bm_close"].loc["2020-01-01":"2020-01-04"]
         pf_kwargs1["cash_deposits"] = pf_kwargs1["cash_deposits"].loc["2020-01-01":"2020-01-04"]
@@ -432,6 +474,9 @@ class TestPortfolio:
         del pf_kwargs2["init_position"]
         del pf_kwargs2["init_price"]
         pf_kwargs2["size"] = reindex_second_obj(pf_kwargs2["size"])
+        pf_kwargs2["open"] = reindex_second_obj(pf_kwargs2["open"])
+        pf_kwargs2["high"] = reindex_second_obj(pf_kwargs2["high"])
+        pf_kwargs2["low"] = reindex_second_obj(pf_kwargs2["low"])
         pf_kwargs2["close"] = reindex_second_obj(pf_kwargs2["close"])
         pf_kwargs2["bm_close"] = reindex_second_obj(pf_kwargs2["bm_close"])
         pf_kwargs2["cash_deposits"] = reindex_second_obj(pf_kwargs2["cash_deposits"])
@@ -445,6 +490,18 @@ class TestPortfolio:
         assert_index_equal(
             new_pf.wrapper.grouper.group_by,
             pd.Index(["first", "first", "second"], dtype="object", name="group"),
+        )
+        np.testing.assert_array_equal(
+            new_pf._open,
+            np.row_stack((pf1._open, pf2._open)),
+        )
+        np.testing.assert_array_equal(
+            new_pf._high,
+            np.row_stack((pf1._high, pf2._high)),
+        )
+        np.testing.assert_array_equal(
+            new_pf._low,
+            np.row_stack((pf1._low, pf2._low)),
         )
         np.testing.assert_array_equal(
             new_pf._close,
@@ -482,6 +539,18 @@ class TestPortfolio:
         assert_index_equal(new_pf.wrapper.index, pf1.wrapper.index.append(pf2.wrapper.index))
         assert_index_equal(new_pf.wrapper.columns, pf2.wrapper.columns)
         assert new_pf.wrapper.grouper.group_by is None
+        np.testing.assert_array_equal(
+            new_pf._open,
+            np.row_stack((pf1._open, pf2._open)),
+        )
+        np.testing.assert_array_equal(
+            new_pf._high,
+            np.row_stack((pf1._high, pf2._high)),
+        )
+        np.testing.assert_array_equal(
+            new_pf._low,
+            np.row_stack((pf1._low, pf2._low)),
+        )
         np.testing.assert_array_equal(
             new_pf._close,
             np.row_stack((pf1._close, pf2._close)),
@@ -576,6 +645,9 @@ class TestPortfolio:
         del pf_kwargs1["init_position"]
         del pf_kwargs1["init_price"]
         pf_kwargs1["size"] = pf_kwargs1["size"].loc["2020-01-01":"2020-01-04"]
+        pf_kwargs1["open"] = pf_kwargs1["open"].loc["2020-01-01":"2020-01-04"]
+        pf_kwargs1["high"] = pf_kwargs1["high"].loc["2020-01-01":"2020-01-04"]
+        pf_kwargs1["low"] = pf_kwargs1["low"].loc["2020-01-01":"2020-01-04"]
         pf_kwargs1["close"] = pf_kwargs1["close"].loc["2020-01-01":"2020-01-04"]
         pf_kwargs1["bm_close"] = pf_kwargs1["bm_close"].loc["2020-01-01":"2020-01-04"]
         pf_kwargs1["cash_deposits"] = pf_kwargs1["cash_deposits"].loc["2020-01-01":"2020-01-04"]
@@ -586,6 +658,9 @@ class TestPortfolio:
         del pf_kwargs2["init_position"]
         del pf_kwargs2["init_price"]
         pf_kwargs2["size"] = reindex_second_obj(pf_kwargs2["size"])
+        pf_kwargs2["open"] = reindex_second_obj(pf_kwargs2["open"])
+        pf_kwargs2["high"] = reindex_second_obj(pf_kwargs2["high"])
+        pf_kwargs2["low"] = reindex_second_obj(pf_kwargs2["low"])
         pf_kwargs2["close"] = reindex_second_obj(pf_kwargs2["close"])
         pf_kwargs2["bm_close"] = reindex_second_obj(pf_kwargs2["bm_close"])
         pf_kwargs2["cash_deposits"] = reindex_second_obj(pf_kwargs2["cash_deposits"])
@@ -599,6 +674,18 @@ class TestPortfolio:
         assert_index_equal(
             new_pf.wrapper.grouper.group_by,
             pd.Index(["first", "first", "second"], dtype="object", name="group"),
+        )
+        np.testing.assert_array_equal(
+            new_pf._open,
+            np.row_stack((pf1._open, pf2._open)),
+        )
+        np.testing.assert_array_equal(
+            new_pf._high,
+            np.row_stack((pf1._high, pf2._high)),
+        )
+        np.testing.assert_array_equal(
+            new_pf._low,
+            np.row_stack((pf1._low, pf2._low)),
         )
         np.testing.assert_array_equal(
             new_pf._close,
@@ -692,6 +779,9 @@ class TestPortfolio:
     def test_column_stack(self):
         pf_kwargs1 = dict(pf_kwargs)
         pf_kwargs1["size"] = pf_kwargs1["size"]["a"]
+        pf_kwargs1["open"] = pf_kwargs1["open"]["a"]
+        pf_kwargs1["high"] = pf_kwargs1["high"]["a"]
+        pf_kwargs1["low"] = pf_kwargs1["low"]["a"]
         pf_kwargs1["close"] = pf_kwargs1["close"]["a"]
         pf_kwargs1["bm_close"] = pf_kwargs1["bm_close"]["a"]
         pf_kwargs1["cash_deposits"] = pf_kwargs1["cash_deposits"]["a"]
@@ -716,6 +806,9 @@ class TestPortfolio:
 
         pf_kwargs2 = dict(pf_kwargs)
         pf_kwargs2["size"] = reindex_second_obj(pf_kwargs2["size"])
+        pf_kwargs2["open"] = reindex_second_obj(pf_kwargs2["open"])
+        pf_kwargs2["high"] = reindex_second_obj(pf_kwargs2["high"])
+        pf_kwargs2["low"] = reindex_second_obj(pf_kwargs2["low"])
         pf_kwargs2["close"] = reindex_second_obj(pf_kwargs2["close"])
         pf_kwargs2["bm_close"] = reindex_second_obj(pf_kwargs2["bm_close"])
         pf_kwargs2["cash_deposits"] = reindex_second_obj(pf_kwargs2["cash_deposits"])
@@ -728,6 +821,18 @@ class TestPortfolio:
         assert_index_equal(new_pf.wrapper.index, pf1.wrapper.index.union(pf2.wrapper.index))
         assert_index_equal(new_pf.wrapper.columns, pf1.wrapper.columns.append(pf2.wrapper.columns))
         assert new_pf.wrapper.grouper.group_by is None
+        np.testing.assert_array_equal(
+            new_pf._open,
+            column_stack_arrs((pf1._open, pf2._open), pf1, pf2),
+        )
+        np.testing.assert_array_equal(
+            new_pf._high,
+            column_stack_arrs((pf1._high, pf2._high), pf1, pf2),
+        )
+        np.testing.assert_array_equal(
+            new_pf._low,
+            column_stack_arrs((pf1._low, pf2._low), pf1, pf2),
+        )
         np.testing.assert_array_equal(
             new_pf._close,
             column_stack_arrs((pf1._close, pf2._close), pf1, pf2),
@@ -859,6 +964,9 @@ class TestPortfolio:
 
         pf_kwargs2 = dict(pf_grouped_kwargs)
         pf_kwargs2["size"] = reindex_second_obj(pf_kwargs2["size"])
+        pf_kwargs2["open"] = reindex_second_obj(pf_kwargs2["open"])
+        pf_kwargs2["high"] = reindex_second_obj(pf_kwargs2["high"])
+        pf_kwargs2["low"] = reindex_second_obj(pf_kwargs2["low"])
         pf_kwargs2["close"] = reindex_second_obj(pf_kwargs2["close"])
         pf_kwargs2["bm_close"] = reindex_second_obj(pf_kwargs2["bm_close"])
         pf_kwargs2["cash_deposits"] = reindex_second_obj(pf_kwargs2["cash_deposits"])
@@ -874,6 +982,18 @@ class TestPortfolio:
         assert_index_equal(
             new_pf.wrapper.grouper.group_by,
             pd.Index(["first", "first", "second", "third", "fourth", "fourth"], name="group"),
+        )
+        np.testing.assert_array_equal(
+            new_pf._open,
+            column_stack_arrs((pf1._open, pf2._open), pf1, pf2),
+        )
+        np.testing.assert_array_equal(
+            new_pf._high,
+            column_stack_arrs((pf1._high, pf2._high), pf1, pf2),
+        )
+        np.testing.assert_array_equal(
+            new_pf._low,
+            column_stack_arrs((pf1._low, pf2._low), pf1, pf2),
         )
         np.testing.assert_array_equal(
             new_pf._close,
@@ -993,6 +1113,9 @@ class TestPortfolio:
 
         pf_kwargs2 = dict(pf_shared_kwargs)
         pf_kwargs2["size"] = reindex_second_obj(pf_kwargs2["size"])
+        pf_kwargs2["open"] = reindex_second_obj(pf_kwargs2["open"])
+        pf_kwargs2["high"] = reindex_second_obj(pf_kwargs2["high"])
+        pf_kwargs2["low"] = reindex_second_obj(pf_kwargs2["low"])
         pf_kwargs2["close"] = reindex_second_obj(pf_kwargs2["close"])
         pf_kwargs2["bm_close"] = reindex_second_obj(pf_kwargs2["bm_close"])
         pf_kwargs2["cash_deposits"] = reindex_second_obj(pf_kwargs2["cash_deposits"])
@@ -1008,6 +1131,18 @@ class TestPortfolio:
         assert_index_equal(
             new_pf.wrapper.grouper.group_by,
             pd.Index(["first", "first", "second", "third", "fourth", "fourth"], name="group"),
+        )
+        np.testing.assert_array_equal(
+            new_pf._open,
+            column_stack_arrs((pf1._open, pf2._open), pf1, pf2),
+        )
+        np.testing.assert_array_equal(
+            new_pf._high,
+            column_stack_arrs((pf1._high, pf2._high), pf1, pf2),
+        )
+        np.testing.assert_array_equal(
+            new_pf._low,
+            column_stack_arrs((pf1._low, pf2._low), pf1, pf2),
         )
         np.testing.assert_array_equal(
             new_pf._close,
@@ -1132,22 +1267,22 @@ class TestPortfolio:
         assert vbt.Portfolio.load(tmp_path / "pf") == pf2
 
     def test_wrapper(self):
-        assert_index_equal(pf.wrapper.index, price_na.index)
-        assert_index_equal(pf.wrapper.columns, price_na.columns)
+        assert_index_equal(pf.wrapper.index, close_na.index)
+        assert_index_equal(pf.wrapper.columns, close_na.columns)
         assert pf.wrapper.ndim == 2
         assert pf.wrapper.grouper.group_by is None
         assert pf.wrapper.grouper.allow_enable
         assert pf.wrapper.grouper.allow_disable
         assert pf.wrapper.grouper.allow_modify
-        assert_index_equal(pf_grouped.wrapper.index, price_na.index)
-        assert_index_equal(pf_grouped.wrapper.columns, price_na.columns)
+        assert_index_equal(pf_grouped.wrapper.index, close_na.index)
+        assert_index_equal(pf_grouped.wrapper.columns, close_na.columns)
         assert pf_grouped.wrapper.ndim == 2
         assert_index_equal(pf_grouped.wrapper.grouper.group_by, group_by)
         assert pf_grouped.wrapper.grouper.allow_enable
         assert pf_grouped.wrapper.grouper.allow_disable
         assert pf_grouped.wrapper.grouper.allow_modify
-        assert_index_equal(pf_shared.wrapper.index, price_na.index)
-        assert_index_equal(pf_shared.wrapper.columns, price_na.columns)
+        assert_index_equal(pf_shared.wrapper.index, close_na.index)
+        assert_index_equal(pf_shared.wrapper.columns, close_na.columns)
         assert pf_shared.wrapper.ndim == 2
         assert_index_equal(pf_shared.wrapper.grouper.group_by, group_by)
         assert not pf_shared.wrapper.grouper.allow_enable
@@ -1382,24 +1517,24 @@ class TestPortfolio:
             pf.call_seq,
             pd.DataFrame(
                 np.array([[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]]),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
         assert_frame_equal(
             pf_grouped.call_seq,
             pd.DataFrame(
                 np.array([[1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0]]),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
         assert_frame_equal(
             pf_shared.call_seq,
             pd.DataFrame(
                 np.array([[1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0]]),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
 
@@ -1410,6 +1545,9 @@ class TestPortfolio:
         in_outputs = dict(
             init_cash=pf.init_cash.values,
             init_position_value=pf.init_position_value.values,
+            open=pf.open.values,
+            high=pf.high.values,
+            low=pf.low.values,
             close=pf.close.values,
             cash_flow=pf.cash_flow.values,
             cash=pf.cash.values,
@@ -1423,10 +1561,13 @@ class TestPortfolio:
             drawdowns=pf.drawdowns.values,
         )
         in_outputs = namedtuple("InOutputs", in_outputs)(**in_outputs)
-        pf2 = vbt.Portfolio.from_holding(price_na).replace(in_outputs=in_outputs)
+        pf2 = vbt.Portfolio.from_holding(close_na).replace(in_outputs=in_outputs)
 
         np.testing.assert_array_equal(pf2.init_cash.values, pf.init_cash.values)
         np.testing.assert_array_equal(pf2.init_position_value.values, pf.init_position_value.values)
+        np.testing.assert_array_equal(pf2.open.values, pf.open.values)
+        np.testing.assert_array_equal(pf2.high.values, pf.high.values)
+        np.testing.assert_array_equal(pf2.low.values, pf.low.values)
         np.testing.assert_array_equal(pf2.close.values, pf.close.values)
         np.testing.assert_array_equal(pf2.cash_flow.values, pf.cash_flow.values)
         np.testing.assert_array_equal(pf2.cash.values, pf.cash.values)
@@ -1441,6 +1582,9 @@ class TestPortfolio:
 
         assert pf2["b"].init_cash == pf.init_cash["b"]
         assert pf2["b"].init_position_value == pf.init_position_value["b"]
+        np.testing.assert_array_equal(pf2["b"].open.values, pf.open["b"].values)
+        np.testing.assert_array_equal(pf2["b"].high.values, pf.high["b"].values)
+        np.testing.assert_array_equal(pf2["b"].low.values, pf.low["b"].values)
         np.testing.assert_array_equal(pf2["b"].close.values, pf.close["b"].values)
         np.testing.assert_array_equal(pf2["b"].cash_flow.values, pf.cash_flow["b"].values)
         np.testing.assert_array_equal(pf2["b"].cash.values, pf.cash["b"].values)
@@ -1455,6 +1599,9 @@ class TestPortfolio:
 
         np.testing.assert_array_equal(_apply_loc(pf2).init_cash.values, pf.init_cash.values)
         np.testing.assert_array_equal(_apply_loc(pf2).init_position_value.values, pf.init_position_value.values)
+        np.testing.assert_array_equal(_apply_loc(pf2).open.values, _apply_loc(pf.open).values)
+        np.testing.assert_array_equal(_apply_loc(pf2).high.values, _apply_loc(pf.high).values)
+        np.testing.assert_array_equal(_apply_loc(pf2).low.values, _apply_loc(pf.low).values)
         np.testing.assert_array_equal(_apply_loc(pf2).close.values, _apply_loc(pf.close).values)
         np.testing.assert_array_equal(_apply_loc(pf2).cash_flow.values, _apply_loc(pf.cash_flow).values)
         np.testing.assert_array_equal(_apply_loc(pf2).cash.values, _apply_loc(pf.cash).values)
@@ -1475,6 +1622,18 @@ class TestPortfolio:
         np.testing.assert_allclose(
             pf2.resample("2d").init_position_value.values,
             pf.init_position_value.values,
+        )
+        np.testing.assert_allclose(
+            pf2.resample("2d").open.values,
+            pf.open.resample("2d").first().values,
+        )
+        np.testing.assert_allclose(
+            pf2.resample("2d").high.values,
+            pf.high.resample("2d").max().values,
+        )
+        np.testing.assert_allclose(
+            pf2.resample("2d").low.values,
+            pf.low.resample("2d").min().values,
         )
         np.testing.assert_allclose(
             pf2.resample("2d").close.values,
@@ -1524,6 +1683,9 @@ class TestPortfolio:
         in_outputs = dict(
             init_cash=pf_grouped.init_cash.values,
             init_position_value=pf_grouped.init_position_value.values,
+            open=pf_grouped.open.values,
+            high=pf_grouped.high.values,
+            low=pf_grouped.low.values,
             close=pf_grouped.close.values,
             cash_flow=pf_grouped.cash_flow.values,
             cash=pf_grouped.cash.values,
@@ -1537,10 +1699,13 @@ class TestPortfolio:
             drawdowns=pf_grouped.drawdowns.values,
         )
         in_outputs = namedtuple("InOutputs", in_outputs)(**in_outputs)
-        pf_grouped2 = vbt.Portfolio.from_holding(price_na, group_by=group_by).replace(in_outputs=in_outputs)
+        pf_grouped2 = vbt.Portfolio.from_holding(close_na, group_by=group_by).replace(in_outputs=in_outputs)
 
         np.testing.assert_array_equal(pf_grouped2.init_cash.values, pf_grouped.init_cash.values)
         np.testing.assert_array_equal(pf_grouped2.init_position_value.values, pf_grouped.init_position_value.values)
+        np.testing.assert_array_equal(pf_grouped2.open.values, pf_grouped.open.values)
+        np.testing.assert_array_equal(pf_grouped2.high.values, pf_grouped.high.values)
+        np.testing.assert_array_equal(pf_grouped2.low.values, pf_grouped.low.values)
         np.testing.assert_array_equal(pf_grouped2.close.values, pf_grouped.close.values)
         np.testing.assert_array_equal(pf_grouped2.cash_flow.values, pf_grouped.cash_flow.values)
         np.testing.assert_array_equal(pf_grouped2.cash.values, pf_grouped.cash.values)
@@ -1555,6 +1720,9 @@ class TestPortfolio:
 
         assert pf_grouped2["second"].init_cash == pf_grouped.init_cash["second"]
         assert pf_grouped2["second"].init_position_value == pf_grouped.init_position_value["c"]
+        np.testing.assert_array_equal(pf_grouped2["second"].open.values, pf_grouped.open["c"].values)
+        np.testing.assert_array_equal(pf_grouped2["second"].high.values, pf_grouped.high["c"].values)
+        np.testing.assert_array_equal(pf_grouped2["second"].low.values, pf_grouped.low["c"].values)
         np.testing.assert_array_equal(pf_grouped2["second"].close.values, pf_grouped.close["c"].values)
         np.testing.assert_array_equal(pf_grouped2["second"].cash_flow.values, pf_grouped.cash_flow["second"].values)
         np.testing.assert_array_equal(pf_grouped2["second"].cash.values, pf_grouped.cash["second"].values)
@@ -1571,6 +1739,9 @@ class TestPortfolio:
         np.testing.assert_array_equal(
             _apply_loc(pf_grouped2).init_position_value.values, pf_grouped.init_position_value.values
         )
+        np.testing.assert_array_equal(_apply_loc(pf_grouped2).open.values, _apply_loc(pf_grouped.open).values)
+        np.testing.assert_array_equal(_apply_loc(pf_grouped2).high.values, _apply_loc(pf_grouped.high).values)
+        np.testing.assert_array_equal(_apply_loc(pf_grouped2).low.values, _apply_loc(pf_grouped.low).values)
         np.testing.assert_array_equal(_apply_loc(pf_grouped2).close.values, _apply_loc(pf_grouped.close).values)
         np.testing.assert_array_equal(_apply_loc(pf_grouped2).cash_flow.values, _apply_loc(pf_grouped.cash_flow).values)
         np.testing.assert_array_equal(_apply_loc(pf_grouped2).cash.values, _apply_loc(pf_grouped.cash).values)
@@ -1593,6 +1764,18 @@ class TestPortfolio:
         np.testing.assert_allclose(
             pf_grouped2.resample("2d").init_position_value.values,
             pf_grouped.init_position_value.values,
+        )
+        np.testing.assert_allclose(
+            pf_grouped2.resample("2d").open.values,
+            pf_grouped.open.resample("2d").first().values,
+        )
+        np.testing.assert_allclose(
+            pf_grouped2.resample("2d").high.values,
+            pf_grouped.high.resample("2d").max().values,
+        )
+        np.testing.assert_allclose(
+            pf_grouped2.resample("2d").low.values,
+            pf_grouped.low.resample("2d").min().values,
         )
         np.testing.assert_allclose(
             pf_grouped2.resample("2d").close.values,
@@ -1642,6 +1825,9 @@ class TestPortfolio:
         in_outputs = dict(
             init_cash=pf_shared.init_cash.values,
             init_position_value=pf_shared.init_position_value.values,
+            open=pf_shared.open.values,
+            high=pf_shared.high.values,
+            low=pf_shared.low.values,
             close=pf_shared.close.values,
             cash_flow=pf_shared.cash_flow.values,
             cash=pf_shared.cash.values,
@@ -1656,13 +1842,16 @@ class TestPortfolio:
         )
         in_outputs = namedtuple("InOutputs", in_outputs)(**in_outputs)
         pf_shared2 = vbt.Portfolio.from_holding(
-            price_na,
+            close_na,
             group_by=group_by,
             cash_sharing=True,
         ).replace(in_outputs=in_outputs)
 
         np.testing.assert_array_equal(pf_shared2.init_cash.values, pf_shared.init_cash.values)
         np.testing.assert_array_equal(pf_shared2.init_position_value.values, pf_shared.init_position_value.values)
+        np.testing.assert_array_equal(pf_shared2.open.values, pf_shared.open.values)
+        np.testing.assert_array_equal(pf_shared2.high.values, pf_shared.high.values)
+        np.testing.assert_array_equal(pf_shared2.low.values, pf_shared.low.values)
         np.testing.assert_array_equal(pf_shared2.close.values, pf_shared.close.values)
         np.testing.assert_array_equal(pf_shared2.cash_flow.values, pf_shared.cash_flow.values)
         np.testing.assert_array_equal(pf_shared2.cash.values, pf_shared.cash.values)
@@ -1677,6 +1866,9 @@ class TestPortfolio:
 
         assert pf_shared2["second"].init_cash == pf_shared.init_cash["second"]
         assert pf_shared2["second"].init_position_value == pf_shared.init_position_value["c"]
+        np.testing.assert_array_equal(pf_shared2["second"].open.values, pf_shared.open["c"].values)
+        np.testing.assert_array_equal(pf_shared2["second"].high.values, pf_shared.high["c"].values)
+        np.testing.assert_array_equal(pf_shared2["second"].low.values, pf_shared.low["c"].values)
         np.testing.assert_array_equal(pf_shared2["second"].close.values, pf_shared.close["c"].values)
         np.testing.assert_array_equal(pf_shared2["second"].cash_flow.values, pf_shared.cash_flow["second"].values)
         np.testing.assert_array_equal(pf_shared2["second"].cash.values, pf_shared.cash["second"].values)
@@ -1693,6 +1885,9 @@ class TestPortfolio:
         np.testing.assert_array_equal(
             _apply_loc(pf_shared2).init_position_value.values, pf_shared.init_position_value.values
         )
+        np.testing.assert_array_equal(_apply_loc(pf_shared2).open.values, _apply_loc(pf_shared.open).values)
+        np.testing.assert_array_equal(_apply_loc(pf_shared2).high.values, _apply_loc(pf_shared.high).values)
+        np.testing.assert_array_equal(_apply_loc(pf_shared2).low.values, _apply_loc(pf_shared.low).values)
         np.testing.assert_array_equal(_apply_loc(pf_shared2).close.values, _apply_loc(pf_shared.close).values)
         np.testing.assert_array_equal(_apply_loc(pf_shared2).cash_flow.values, _apply_loc(pf_shared.cash_flow).values)
         np.testing.assert_array_equal(_apply_loc(pf_shared2).cash.values, _apply_loc(pf_shared.cash).values)
@@ -1713,6 +1908,18 @@ class TestPortfolio:
         np.testing.assert_allclose(
             pf_shared2.resample("2d").init_position_value.values,
             pf_shared.init_position_value.values,
+        )
+        np.testing.assert_allclose(
+            pf_shared2.resample("2d").open.values,
+            pf_shared.open.resample("2d").first().values,
+        )
+        np.testing.assert_allclose(
+            pf_shared2.resample("2d").high.values,
+            pf_shared.high.resample("2d").max().values,
+        )
+        np.testing.assert_allclose(
+            pf_shared2.resample("2d").low.values,
+            pf_shared.low.resample("2d").min().values,
         )
         np.testing.assert_allclose(
             pf_shared2.resample("2d").close.values,
@@ -1977,12 +2184,12 @@ class TestPortfolio:
         np.testing.assert_array_equal(pf_shared2["first"].in_outputs.arr_records, in_outputs.arr_records[:10])
 
     def test_close(self):
-        assert_frame_equal(pf.close, price_na)
-        assert_frame_equal(pf_grouped.close, price_na)
-        assert_frame_equal(pf_shared.close, price_na)
+        assert_frame_equal(pf.close, close_na)
+        assert_frame_equal(pf_grouped.close, close_na)
+        assert_frame_equal(pf_shared.close, close_na)
 
     def test_get_filled_close(self):
-        assert_frame_equal(pf.filled_close, price_na.ffill().bfill())
+        assert_frame_equal(pf.filled_close, close_na.ffill().bfill())
         assert_frame_equal(
             pf.filled_close,
             vbt.Portfolio.get_filled_close(close=pf.close, wrapper=pf.wrapper),
@@ -1994,14 +2201,14 @@ class TestPortfolio:
         assert_frame_equal(pf.get_filled_close(chunked=True), pf.get_filled_close(chunked=False))
 
     def test_bm_close(self):
-        assert_frame_equal(pf.bm_close, bm_price_na)
-        assert_frame_equal(pf_grouped.bm_close, bm_price_na)
-        assert_frame_equal(pf_shared.bm_close, bm_price_na)
+        assert_frame_equal(pf.bm_close, bm_close_na)
+        assert_frame_equal(pf_grouped.bm_close, bm_close_na)
+        assert_frame_equal(pf_shared.bm_close, bm_close_na)
         assert pf.replace(bm_close=None).bm_close is None
         assert not pf.replace(bm_close=False).bm_close
 
     def test_get_filled_bm_close(self):
-        assert_frame_equal(pf.filled_bm_close, bm_price_na.ffill().bfill())
+        assert_frame_equal(pf.filled_bm_close, bm_close_na.ffill().bfill())
         assert_frame_equal(
             pf.filled_bm_close,
             vbt.Portfolio.get_filled_bm_close(bm_close=pf.bm_close, wrapper=pf.wrapper),
@@ -2034,7 +2241,7 @@ class TestPortfolio:
         assert_records_close(pf.orders.values, result)
         assert_records_close(pf_grouped.orders.values, result)
         assert_records_close(pf_shared.orders.values, result)
-        result2 = pd.Series(np.array([4, 3, 4]), index=price_na.columns).rename("count")
+        result2 = pd.Series(np.array([4, 3, 4]), index=close_na.columns).rename("count")
         assert_series_equal(pf.orders.count(), result2)
         assert_series_equal(pf_grouped.get_orders(group_by=False).count(), result2)
         assert_series_equal(pf_shared.get_orders(group_by=False).count(), result2)
@@ -2098,9 +2305,9 @@ class TestPortfolio:
                     0,
                     0,
                     1,
-                    np.nan,
-                    np.nan,
-                    np.nan,
+                    1.0,
+                    2.5,
+                    0.5,
                     2.0,
                     100.0,
                     1.0,
@@ -2143,9 +2350,9 @@ class TestPortfolio:
                     0,
                     0,
                     2,
-                    np.nan,
-                    np.nan,
-                    np.nan,
+                    2.0,
+                    3.5,
+                    1.5,
                     3.0,
                     199.69598000000002,
                     1.1,
@@ -2188,9 +2395,9 @@ class TestPortfolio:
                     0,
                     0,
                     3,
-                    np.nan,
-                    np.nan,
-                    np.nan,
+                    3.0,
+                    4.5,
+                    2.5,
                     4.0,
                     202.53628000000003,
                     0.10000000000000009,
@@ -2233,9 +2440,9 @@ class TestPortfolio:
                     0,
                     0,
                     4,
-                    np.nan,
-                    np.nan,
-                    np.nan,
+                    4.0,
+                    5.5,
+                    3.5,
                     5.0,
                     202.82832000000002,
                     0.0,
@@ -2278,9 +2485,9 @@ class TestPortfolio:
                     1,
                     1,
                     0,
-                    np.nan,
-                    np.nan,
-                    np.nan,
+                    0.5,
+                    1.5,
+                    0.25,
                     1.0,
                     100.0,
                     -1.0,
@@ -2323,9 +2530,9 @@ class TestPortfolio:
                     1,
                     1,
                     1,
-                    np.nan,
-                    np.nan,
-                    np.nan,
+                    1.0,
+                    2.5,
+                    0.5,
                     2.0,
                     100.0,
                     -1.0,
@@ -2413,9 +2620,9 @@ class TestPortfolio:
                     1,
                     1,
                     3,
-                    np.nan,
-                    np.nan,
-                    np.nan,
+                    3.0,
+                    4.5,
+                    2.5,
                     4.0,
                     200.09602,
                     -1.1,
@@ -2458,9 +2665,9 @@ class TestPortfolio:
                     1,
                     1,
                     4,
-                    np.nan,
-                    np.nan,
-                    np.nan,
+                    4.0,
+                    5.5,
+                    3.5,
                     5.0,
                     199.58798000000002,
                     -1.0,
@@ -2503,9 +2710,9 @@ class TestPortfolio:
                     2,
                     2,
                     0,
-                    np.nan,
-                    np.nan,
-                    np.nan,
+                    0.5,
+                    1.5,
+                    0.25,
                     1.0,
                     100.0,
                     0.0,
@@ -2548,9 +2755,9 @@ class TestPortfolio:
                     2,
                     2,
                     1,
-                    np.nan,
-                    np.nan,
-                    np.nan,
+                    1.0,
+                    2.5,
+                    0.5,
                     2.0,
                     98.8799,
                     1.0,
@@ -2593,9 +2800,9 @@ class TestPortfolio:
                     2,
                     2,
                     2,
-                    np.nan,
-                    np.nan,
-                    np.nan,
+                    2.0,
+                    3.5,
+                    1.5,
                     3.0,
                     98.57588000000001,
                     1.1,
@@ -2638,9 +2845,9 @@ class TestPortfolio:
                     2,
                     2,
                     3,
-                    np.nan,
-                    np.nan,
-                    np.nan,
+                    3.0,
+                    4.5,
+                    2.5,
                     4.0,
                     101.41618000000001,
                     0.10000000000000009,
@@ -2780,9 +2987,9 @@ class TestPortfolio:
                     0,
                     0,
                     1,
-                    np.nan,
-                    np.nan,
-                    np.nan,
+                    1.0,
+                    2.5,
+                    0.5,
                     2.0,
                     200.09602,
                     1.0,
@@ -2825,9 +3032,9 @@ class TestPortfolio:
                     0,
                     0,
                     2,
-                    np.nan,
-                    np.nan,
-                    np.nan,
+                    2.0,
+                    3.5,
+                    1.5,
                     3.0,
                     399.79200000000003,
                     1.1,
@@ -2870,9 +3077,9 @@ class TestPortfolio:
                     0,
                     0,
                     3,
-                    np.nan,
-                    np.nan,
-                    np.nan,
+                    3.0,
+                    4.5,
+                    2.5,
                     4.0,
                     402.12426000000005,
                     0.10000000000000009,
@@ -2915,9 +3122,9 @@ class TestPortfolio:
                     0,
                     0,
                     4,
-                    np.nan,
-                    np.nan,
-                    np.nan,
+                    4.0,
+                    5.5,
+                    3.5,
                     5.0,
                     407.21680000000003,
                     0.0,
@@ -2960,9 +3167,9 @@ class TestPortfolio:
                     0,
                     1,
                     0,
-                    np.nan,
-                    np.nan,
-                    np.nan,
+                    0.5,
+                    1.5,
+                    0.25,
                     1.0,
                     200.0,
                     -1.0,
@@ -3005,9 +3212,9 @@ class TestPortfolio:
                     0,
                     1,
                     1,
-                    np.nan,
-                    np.nan,
-                    np.nan,
+                    1.0,
+                    2.5,
+                    0.5,
                     2.0,
                     200.0,
                     -1.0,
@@ -3095,9 +3302,9 @@ class TestPortfolio:
                     0,
                     1,
                     3,
-                    np.nan,
-                    np.nan,
-                    np.nan,
+                    3.0,
+                    4.5,
+                    2.5,
                     4.0,
                     402.63230000000004,
                     -1.1,
@@ -3140,9 +3347,9 @@ class TestPortfolio:
                     0,
                     1,
                     4,
-                    np.nan,
-                    np.nan,
-                    np.nan,
+                    4.0,
+                    5.5,
+                    3.5,
                     5.0,
                     402.41630000000004,
                     -1.0,
@@ -3185,9 +3392,9 @@ class TestPortfolio:
                     1,
                     2,
                     0,
-                    np.nan,
-                    np.nan,
-                    np.nan,
+                    0.5,
+                    1.5,
+                    0.25,
                     1.0,
                     100.0,
                     0.0,
@@ -3230,9 +3437,9 @@ class TestPortfolio:
                     1,
                     2,
                     1,
-                    np.nan,
-                    np.nan,
-                    np.nan,
+                    1.0,
+                    2.5,
+                    0.5,
                     2.0,
                     98.8799,
                     1.0,
@@ -3275,9 +3482,9 @@ class TestPortfolio:
                     1,
                     2,
                     2,
-                    np.nan,
-                    np.nan,
-                    np.nan,
+                    2.0,
+                    3.5,
+                    1.5,
                     3.0,
                     98.57588000000001,
                     1.1,
@@ -3320,9 +3527,9 @@ class TestPortfolio:
                     1,
                     2,
                     3,
-                    np.nan,
-                    np.nan,
-                    np.nan,
+                    3.0,
+                    4.5,
+                    2.5,
                     4.0,
                     101.41618000000001,
                     0.10000000000000009,
@@ -3409,7 +3616,7 @@ class TestPortfolio:
             dtype=log_dt,
         )
         assert_records_close(pf_shared.logs.values, result_shared)
-        result2 = pd.Series(np.array([5, 5, 5]), index=price_na.columns).rename("count")
+        result2 = pd.Series(np.array([5, 5, 5]), index=close_na.columns).rename("count")
         assert_series_equal(pf.logs.count(), result2)
         assert_series_equal(pf_grouped.get_logs(group_by=False).count(), result2)
         assert_series_equal(pf_shared.get_logs(group_by=False).count(), result2)
@@ -3528,7 +3735,7 @@ class TestPortfolio:
         assert_records_close(pf.entry_trades.values, result)
         assert_records_close(pf_grouped.entry_trades.values, result)
         assert_records_close(pf_shared.entry_trades.values, result)
-        result2 = pd.Series(np.array([3, 3, 2]), index=price_na.columns).rename("count")
+        result2 = pd.Series(np.array([3, 3, 2]), index=close_na.columns).rename("count")
         assert_series_equal(pf.entry_trades.count(), result2)
         assert_series_equal(pf_grouped.get_entry_trades(group_by=False).count(), result2)
         assert_series_equal(pf_shared.get_entry_trades(group_by=False).count(), result2)
@@ -3645,7 +3852,7 @@ class TestPortfolio:
         assert_records_close(pf.exit_trades.values, result)
         assert_records_close(pf_grouped.exit_trades.values, result)
         assert_records_close(pf_shared.exit_trades.values, result)
-        result2 = pd.Series(np.array([3, 2, 2]), index=price_na.columns).rename("count")
+        result2 = pd.Series(np.array([3, 2, 2]), index=close_na.columns).rename("count")
         assert_series_equal(pf.exit_trades.count(), result2)
         assert_series_equal(pf_grouped.get_exit_trades(group_by=False).count(), result2)
         assert_series_equal(pf_shared.get_exit_trades(group_by=False).count(), result2)
@@ -3714,7 +3921,7 @@ class TestPortfolio:
         assert_records_close(pf.positions.values, result)
         assert_records_close(pf_grouped.positions.values, result)
         assert_records_close(pf_shared.positions.values, result)
-        result2 = pd.Series(np.array([2, 1, 1]), index=price_na.columns).rename("count")
+        result2 = pd.Series(np.array([2, 1, 1]), index=close_na.columns).rename("count")
         assert_series_equal(pf.positions.count(), result2)
         assert_series_equal(pf_grouped.get_positions(group_by=False).count(), result2)
         assert_series_equal(pf_shared.get_positions(group_by=False).count(), result2)
@@ -3747,7 +3954,7 @@ class TestPortfolio:
         )
         assert_records_close(pf_grouped.drawdowns.values, result_grouped)
         assert_records_close(pf_shared.drawdowns.values, result_grouped)
-        result2 = pd.Series(np.array([2, 2, 1]), index=price_na.columns).rename("count")
+        result2 = pd.Series(np.array([2, 2, 1]), index=close_na.columns).rename("count")
         assert_series_equal(pf.drawdowns.count(), result2)
         assert_series_equal(pf_grouped.get_drawdowns(group_by=False).count(), result2)
         assert_series_equal(pf_shared.get_drawdowns(group_by=False).count(), result2)
@@ -3759,7 +3966,7 @@ class TestPortfolio:
         assert_series_equal(pf_shared.drawdowns.count(), result3)
 
     def test_init_position(self):
-        result = pd.Series(np.array([1.0, -1.0, 0.0]), index=price_na.columns).rename("init_position")
+        result = pd.Series(np.array([1.0, -1.0, 0.0]), index=close_na.columns).rename("init_position")
         assert_series_equal(pf.init_position, result)
         assert_series_equal(pf_grouped.init_position, result)
         assert_series_equal(pf_shared.init_position, result)
@@ -3769,22 +3976,22 @@ class TestPortfolio:
             pf.get_asset_flow(direction="longonly"),
             pd.DataFrame(
                 np.array([[0.0, 0.0, 1.0], [0.1, 0.0, 0.1], [-1, 0.0, -1.0], [-0.1, 0.0, -0.1], [1.0, 0.0, 0.0]]),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
         assert_frame_equal(
             pf.get_asset_flow(direction="shortonly"),
             pd.DataFrame(
                 np.array([[0.0, 0.0, 0.0], [0.0, 0.1, 0.0], [0.0, 0.0, 0.0], [0.0, -0.1, 0.0], [0.0, 1.0, 0.0]]),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
         result = pd.DataFrame(
             np.array([[0.0, 0.0, 1.0], [0.1, -0.1, 0.1], [-1, 0.0, -1.0], [-0.1, 0.1, -0.1], [1.0, -1.0, 0.0]]),
-            index=price_na.index,
-            columns=price_na.columns,
+            index=close_na.index,
+            columns=close_na.columns,
         )
         assert_frame_equal(pf.asset_flow, result)
         assert_frame_equal(pf_grouped.asset_flow, result)
@@ -3812,22 +4019,22 @@ class TestPortfolio:
             pf.get_assets(direction="longonly"),
             pd.DataFrame(
                 np.array([[1.0, 0.0, 1.0], [1.1, 0.0, 1.1], [0.1, 0.0, 0.1], [0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
         assert_frame_equal(
             pf.get_assets(direction="shortonly"),
             pd.DataFrame(
                 np.array([[0.0, 1.0, 0.0], [0.0, 1.1, 0.0], [0.0, 1.1, 0.0], [0.0, 1.0, 0.0], [0.0, 2.0, 0.0]]),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
         result = pd.DataFrame(
             np.array([[1.0, -1.0, 1.0], [1.1, -1.1, 1.1], [0.1, -1.1, 0.1], [0.0, -1.0, 0.0], [1.0, -2.0, 0.0]]),
-            index=price_na.index,
-            columns=price_na.columns,
+            index=close_na.index,
+            columns=close_na.columns,
         )
         assert_frame_equal(pf.assets, result)
         assert_frame_equal(pf_grouped.assets, result)
@@ -3871,8 +4078,8 @@ class TestPortfolio:
                         [True, False, False],
                     ]
                 ),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
         assert_frame_equal(
@@ -3887,23 +4094,23 @@ class TestPortfolio:
                         [False, True, False],
                     ]
                 ),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
         result = pd.DataFrame(
             np.array(
                 [[True, True, True], [True, True, True], [True, True, True], [False, True, False], [True, True, False]],
             ),
-            index=price_na.index,
-            columns=price_na.columns,
+            index=close_na.index,
+            columns=close_na.columns,
         )
         assert_frame_equal(pf.position_mask, result)
         assert_frame_equal(pf_grouped.get_position_mask(group_by=False), result)
         assert_frame_equal(pf_shared.get_position_mask(group_by=False), result)
         result = pd.DataFrame(
             np.array([[True, True], [True, True], [True, True], [True, False], [True, False]]),
-            index=price_na.index,
+            index=close_na.index,
             columns=pd.Index(["first", "second"], dtype="object", name="group"),
         )
         assert_frame_equal(pf.get_position_mask(group_by=group_by), result)
@@ -3933,13 +4140,13 @@ class TestPortfolio:
     def test_position_coverage(self):
         assert_series_equal(
             pf.get_position_coverage(direction="longonly"),
-            pd.Series(np.array([0.8, 0.0, 0.6]), index=price_na.columns).rename("position_coverage"),
+            pd.Series(np.array([0.8, 0.0, 0.6]), index=close_na.columns).rename("position_coverage"),
         )
         assert_series_equal(
             pf.get_position_coverage(direction="shortonly"),
-            pd.Series(np.array([0.0, 1.0, 0.0]), index=price_na.columns).rename("position_coverage"),
+            pd.Series(np.array([0.0, 1.0, 0.0]), index=close_na.columns).rename("position_coverage"),
         )
-        result = pd.Series(np.array([0.8, 1.0, 0.6]), index=price_na.columns).rename("position_coverage")
+        result = pd.Series(np.array([0.8, 1.0, 0.6]), index=close_na.columns).rename("position_coverage")
         assert_series_equal(pf.position_coverage, result)
         assert_series_equal(pf_grouped.get_position_coverage(group_by=False), result)
         assert_series_equal(pf_shared.get_position_coverage(group_by=False), result)
@@ -3989,8 +4196,8 @@ class TestPortfolio:
                         [0.9375, -5.0995, 0.0],
                     ]
                 ),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
         result = pd.DataFrame(
@@ -4003,8 +4210,8 @@ class TestPortfolio:
                     [-5.2005, 4.8005, 0.0],
                 ]
             ),
-            index=price_na.index,
-            columns=price_na.columns,
+            index=close_na.index,
+            columns=close_na.columns,
         )
         assert_frame_equal(pf.cash_flow, result)
         assert_frame_equal(pf_grouped.get_cash_flow(group_by=False), result)
@@ -4019,7 +4226,7 @@ class TestPortfolio:
                     [-0.39999999999999947, 0.0],
                 ]
             ),
-            index=price_na.index,
+            index=close_na.index,
             columns=pd.Index(["first", "second"], dtype="object", name="group"),
         )
         assert_frame_equal(pf.get_cash_flow(group_by=group_by), result)
@@ -4048,19 +4255,19 @@ class TestPortfolio:
     def test_init_cash(self):
         assert_series_equal(
             pf.init_cash,
-            pd.Series(np.array([100.0, 100.0, 100.0]), index=price_na.columns).rename("init_cash"),
+            pd.Series(np.array([100.0, 100.0, 100.0]), index=close_na.columns).rename("init_cash"),
         )
         assert_series_equal(
             pf_grouped.get_init_cash(group_by=False),
-            pd.Series(np.array([100.0, 100.0, 100.0]), index=price_na.columns).rename("init_cash"),
+            pd.Series(np.array([100.0, 100.0, 100.0]), index=close_na.columns).rename("init_cash"),
         )
         assert_series_equal(
             pf_shared.get_init_cash(group_by=False),
-            pd.Series(np.array([200.0, 200.0, 100.0]), index=price_na.columns).rename("init_cash"),
+            pd.Series(np.array([200.0, 200.0, 100.0]), index=close_na.columns).rename("init_cash"),
         )
         assert_series_equal(
             pf_shared.get_init_cash(group_by=False, split_shared=True),
-            pd.Series(np.array([100.0, 100.0, 100.0]), index=price_na.columns).rename("init_cash"),
+            pd.Series(np.array([100.0, 100.0, 100.0]), index=close_na.columns).rename("init_cash"),
         )
         result = pd.Series(
             np.array([200.0, 100.0]),
@@ -4070,11 +4277,11 @@ class TestPortfolio:
         assert_series_equal(pf_grouped.init_cash, result)
         assert_series_equal(pf_shared.init_cash, result)
         assert_series_equal(
-            vbt.Portfolio.from_orders(price_na, 1000.0, init_cash=InitCashMode.Auto, group_by=None).init_cash,
-            pd.Series(np.array([14000.0, 12000.0, 10000.0]), index=price_na.columns).rename("init_cash"),
+            vbt.Portfolio.from_orders(close_na, 1000.0, init_cash=InitCashMode.Auto, group_by=None).init_cash,
+            pd.Series(np.array([14000.0, 12000.0, 10000.0]), index=close_na.columns).rename("init_cash"),
         )
         assert_series_equal(
-            vbt.Portfolio.from_orders(price_na, 1000.0, init_cash=InitCashMode.Auto, group_by=group_by).init_cash,
+            vbt.Portfolio.from_orders(close_na, 1000.0, init_cash=InitCashMode.Auto, group_by=group_by).init_cash,
             pd.Series(
                 np.array([26000.0, 10000.0]),
                 index=pd.Index(["first", "second"], dtype="object", name="group"),
@@ -4082,7 +4289,7 @@ class TestPortfolio:
         )
         assert_series_equal(
             vbt.Portfolio.from_orders(
-                price_na,
+                close_na,
                 1000.0,
                 init_cash=InitCashMode.Auto,
                 group_by=group_by,
@@ -4094,11 +4301,11 @@ class TestPortfolio:
             ).rename("init_cash"),
         )
         assert_series_equal(
-            vbt.Portfolio.from_orders(price_na, 1000.0, init_cash=InitCashMode.AutoAlign, group_by=None).init_cash,
-            pd.Series(np.array([14000.0, 14000.0, 14000.0]), index=price_na.columns).rename("init_cash"),
+            vbt.Portfolio.from_orders(close_na, 1000.0, init_cash=InitCashMode.AutoAlign, group_by=None).init_cash,
+            pd.Series(np.array([14000.0, 14000.0, 14000.0]), index=close_na.columns).rename("init_cash"),
         )
         assert_series_equal(
-            vbt.Portfolio.from_orders(price_na, 1000.0, init_cash=InitCashMode.AutoAlign, group_by=group_by).init_cash,
+            vbt.Portfolio.from_orders(close_na, 1000.0, init_cash=InitCashMode.AutoAlign, group_by=group_by).init_cash,
             pd.Series(
                 np.array([26000.0, 26000.0]),
                 index=pd.Index(["first", "second"], dtype="object", name="group"),
@@ -4106,7 +4313,7 @@ class TestPortfolio:
         )
         assert_series_equal(
             vbt.Portfolio.from_orders(
-                price_na,
+                close_na,
                 1000.0,
                 init_cash=InitCashMode.AutoAlign,
                 group_by=group_by,
@@ -4145,7 +4352,7 @@ class TestPortfolio:
             ),
         )
         pf2 = vbt.Portfolio.from_orders(
-            price_na,
+            close_na,
             1000.0,
             init_cash=InitCashMode.AutoAlign,
             group_by=group_by,
@@ -4161,16 +4368,16 @@ class TestPortfolio:
             ),
         )
         assert_series_equal(
-            vbt.Portfolio.from_orders(price_na, 1000.0, init_cash=InitCashMode.Auto).get_init_cash(
+            vbt.Portfolio.from_orders(close_na, 1000.0, init_cash=InitCashMode.Auto).get_init_cash(
                 jitted=dict(parallel=True)
             ),
-            vbt.Portfolio.from_orders(price_na, 1000.0, init_cash=InitCashMode.Auto).get_init_cash(
+            vbt.Portfolio.from_orders(close_na, 1000.0, init_cash=InitCashMode.Auto).get_init_cash(
                 jitted=dict(parallel=False)
             ),
         )
         assert_series_equal(
-            vbt.Portfolio.from_orders(price_na, 1000.0, init_cash=InitCashMode.Auto).get_init_cash(chunked=True),
-            vbt.Portfolio.from_orders(price_na, 1000.0, init_cash=InitCashMode.Auto).get_init_cash(chunked=False),
+            vbt.Portfolio.from_orders(close_na, 1000.0, init_cash=InitCashMode.Auto).get_init_cash(chunked=True),
+            vbt.Portfolio.from_orders(close_na, 1000.0, init_cash=InitCashMode.Auto).get_init_cash(chunked=False),
         )
 
     def test_cash_deposits(self):
@@ -4178,37 +4385,37 @@ class TestPortfolio:
             pf.cash_deposits,
             pd.DataFrame(
                 np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [100.0, 100.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
         assert_frame_equal(
             pf_grouped.get_cash_deposits(group_by=False),
             pd.DataFrame(
                 np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [100.0, 100.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
         assert_frame_equal(
             pf_shared.get_cash_deposits(group_by=False),
             pd.DataFrame(
                 np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [200.0, 200.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
         assert_frame_equal(
             pf_shared.get_cash_deposits(group_by=False, split_shared=True),
             pd.DataFrame(
                 np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [100.0, 100.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
         result = pd.DataFrame(
             np.array([[0.0, 0.0], [0.0, 0.0], [200.0, 0.0], [0.0, 0.0], [0.0, 0.0]]),
-            index=price_na.index,
+            index=close_na.index,
             columns=pd.Index(["first", "second"], dtype="object", name="group"),
         )
         assert_frame_equal(pf.get_cash_deposits(group_by=group_by), result)
@@ -4286,15 +4493,15 @@ class TestPortfolio:
     def test_cash_earnings(self):
         result = pd.DataFrame(
             np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]),
-            index=price_na.index,
-            columns=price_na.columns,
+            index=close_na.index,
+            columns=close_na.columns,
         )
         assert_frame_equal(pf.cash_earnings, result)
         assert_frame_equal(pf_grouped.get_cash_earnings(group_by=False), result)
         assert_frame_equal(pf_shared.get_cash_earnings(group_by=False), result)
         result = pd.DataFrame(
             np.array([[0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]]),
-            index=price_na.index,
+            index=close_na.index,
             columns=pd.Index(["first", "second"], dtype="object", name="group"),
         )
         assert_frame_equal(pf.get_cash_earnings(group_by=group_by), result)
@@ -4342,8 +4549,8 @@ class TestPortfolio:
                         [197.62782000000004, 194.48847999999998, 101.70822000000001],
                     ]
                 ),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
         result = pd.DataFrame(
@@ -4356,8 +4563,8 @@ class TestPortfolio:
                     [197.62782, 204.38848000000002, 101.70822000000001],
                 ]
             ),
-            index=price_na.index,
-            columns=price_na.columns,
+            index=close_na.index,
+            columns=close_na.columns,
         )
         assert_frame_equal(pf.cash, result)
         assert_frame_equal(pf_grouped.get_cash(group_by=False), result)
@@ -4373,8 +4580,8 @@ class TestPortfolio:
                         [397.62782, 404.38848, 101.70822000000001],
                     ]
                 ),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
         result = pd.DataFrame(
@@ -4387,7 +4594,7 @@ class TestPortfolio:
                     [402.01630000000006, 101.70822000000001],
                 ]
             ),
-            index=price_na.index,
+            index=close_na.index,
             columns=pd.Index(["first", "second"], dtype="object", name="group"),
         )
         assert_frame_equal(pf.get_cash(group_by=group_by), result)
@@ -4422,7 +4629,7 @@ class TestPortfolio:
         assert_frame_equal(pf_grouped.get_cash(chunked=True), pf_grouped.get_cash(chunked=False))
 
     def test_init_position_value(self):
-        result = pd.Series(np.array([2.0, -1.0, 0.0]), index=price_na.columns).rename("init_position_value")
+        result = pd.Series(np.array([2.0, -1.0, 0.0]), index=close_na.columns).rename("init_position_value")
         assert_series_equal(pf.init_position_value, result)
         assert_series_equal(pf_grouped.init_position_value, result)
         assert_series_equal(pf_shared.init_position_value, result)
@@ -4454,15 +4661,15 @@ class TestPortfolio:
     def test_init_value(self):
         assert_series_equal(
             pf.init_value,
-            pd.Series(np.array([102.0, 99.0, 100.0]), index=price_na.columns).rename("init_value"),
+            pd.Series(np.array([102.0, 99.0, 100.0]), index=close_na.columns).rename("init_value"),
         )
         assert_series_equal(
             pf_grouped.get_init_value(group_by=False),
-            pd.Series(np.array([102.0, 99.0, 100.0]), index=price_na.columns).rename("init_value"),
+            pd.Series(np.array([102.0, 99.0, 100.0]), index=close_na.columns).rename("init_value"),
         )
         assert_series_equal(
             pf_shared.get_init_value(group_by=False),
-            pd.Series(np.array([202.0, 199.0, 100.0]), index=price_na.columns).rename("init_value"),
+            pd.Series(np.array([202.0, 199.0, 100.0]), index=close_na.columns).rename("init_value"),
         )
         result = pd.Series(
             np.array([201.0, 100.0]),
@@ -4516,15 +4723,15 @@ class TestPortfolio:
     def test_input_value(self):
         assert_series_equal(
             pf.input_value,
-            pd.Series(np.array([202.0, 199.0, 100.0]), index=price_na.columns).rename("input_value"),
+            pd.Series(np.array([202.0, 199.0, 100.0]), index=close_na.columns).rename("input_value"),
         )
         assert_series_equal(
             pf_grouped.get_input_value(group_by=False),
-            pd.Series(np.array([202.0, 199.0, 100.0]), index=price_na.columns).rename("input_value"),
+            pd.Series(np.array([202.0, 199.0, 100.0]), index=close_na.columns).rename("input_value"),
         )
         assert_series_equal(
             pf_shared.get_input_value(group_by=False),
-            pd.Series(np.array([402.0, 399.0, 100.0]), index=price_na.columns).rename("input_value"),
+            pd.Series(np.array([402.0, 399.0, 100.0]), index=close_na.columns).rename("input_value"),
         )
         result = pd.Series(
             np.array([401.0, 100.0]),
@@ -4592,16 +4799,16 @@ class TestPortfolio:
                         [5.0, 0.0, 0.0],
                     ]
                 ),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
         assert_frame_equal(
             pf.get_asset_value(direction="shortonly"),
             pd.DataFrame(
                 np.array([[0.0, 1.0, 0.0], [0.0, 2.2, 0.0], [0.0, 2.2, 0.0], [0.0, 4.0, 0.0], [0.0, 10.0, 0.0]]),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
         result = pd.DataFrame(
@@ -4614,15 +4821,15 @@ class TestPortfolio:
                     [5.0, -10.0, 0.0],
                 ]
             ),
-            index=price_na.index,
-            columns=price_na.columns,
+            index=close_na.index,
+            columns=close_na.columns,
         )
         assert_frame_equal(pf.asset_value, result)
         assert_frame_equal(pf_grouped.get_asset_value(group_by=False), result)
         assert_frame_equal(pf_shared.get_asset_value(group_by=False), result)
         result = pd.DataFrame(
             np.array([[1.0, 1.0], [0.0, 2.2], [-1.9, 0.30000000000000027], [-4.0, 0.0], [-5.0, 0.0]]),
-            index=price_na.index,
+            index=close_na.index,
             columns=pd.Index(["first", "second"], dtype="object", name="group"),
         )
         assert_frame_equal(pf.get_asset_value(group_by=group_by), result)
@@ -4670,8 +4877,8 @@ class TestPortfolio:
                         [0.02467578242711193, 0.0, 0.0],
                     ]
                 ),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
         assert_frame_equal(
@@ -4686,8 +4893,8 @@ class TestPortfolio:
                         [0.0, 0.04890251030278087, 0.0],
                     ]
                 ),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
         result = pd.DataFrame(
@@ -4700,8 +4907,8 @@ class TestPortfolio:
                     [0.02467578242711193, -0.05420392644570545, 0.0],
                 ]
             ),
-            index=price_na.index,
-            columns=price_na.columns,
+            index=close_na.index,
+            columns=close_na.columns,
         )
         assert_frame_equal(pf.gross_exposure, result)
         assert_frame_equal(pf_grouped.get_gross_exposure(group_by=False), result)
@@ -4717,8 +4924,8 @@ class TestPortfolio:
                         [0.01241841659128274, -0.02600858158351064, 0.0],
                     ]
                 ),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
         result = pd.DataFrame(
@@ -4731,7 +4938,7 @@ class TestPortfolio:
                     [-0.012916015161335238, 0.0],
                 ]
             ),
-            index=price_na.index,
+            index=close_na.index,
             columns=pd.Index(["first", "second"], dtype="object", name="group"),
         )
         assert_frame_equal(pf.get_gross_exposure(group_by=group_by), result)
@@ -4778,8 +4985,8 @@ class TestPortfolio:
                     [0.02467578242711193, -0.04890251030278087, 0.0],
                 ]
             ),
-            index=price_na.index,
-            columns=price_na.columns,
+            index=close_na.index,
+            columns=close_na.columns,
         )
         assert_frame_equal(pf.net_exposure, result)
         assert_frame_equal(pf_grouped.get_net_exposure(group_by=False), result)
@@ -4795,8 +5002,8 @@ class TestPortfolio:
                         [0.01241841659128274, -0.024722582952177028, 0.0],
                     ]
                 ),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
         result = pd.DataFrame(
@@ -4809,7 +5016,7 @@ class TestPortfolio:
                     [-0.012277657359218154, 0.0],
                 ]
             ),
-            index=price_na.index,
+            index=close_na.index,
             columns=pd.Index(["first", "second"], dtype="object", name="group"),
         )
         assert_frame_equal(pf.get_net_exposure(group_by=group_by), result)
@@ -4856,8 +5063,8 @@ class TestPortfolio:
                     [202.62782, 194.38848000000002, 101.70822000000001],
                 ]
             ),
-            index=price_na.index,
-            columns=price_na.columns,
+            index=close_na.index,
+            columns=close_na.columns,
         )
         assert_frame_equal(pf.value, result)
         assert_frame_equal(pf_grouped.get_value(group_by=False), result)
@@ -4873,8 +5080,8 @@ class TestPortfolio:
                         [402.62782, 394.38848, 101.70822000000001],
                     ]
                 ),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
         result = pd.DataFrame(
@@ -4887,7 +5094,7 @@ class TestPortfolio:
                     [397.01630000000006, 101.70822000000001],
                 ]
             ),
-            index=price_na.index,
+            index=close_na.index,
             columns=pd.Index(["first", "second"], dtype="object", name="group"),
         )
         assert_frame_equal(pf.get_value(group_by=group_by), result)
@@ -5090,8 +5297,8 @@ class TestPortfolio:
                     [-0.0009885207351715245, -0.006132789959792009, 0.0],
                 ]
             ),
-            index=price_na.index,
-            columns=price_na.columns,
+            index=close_na.index,
+            columns=close_na.columns,
         )
         assert_frame_equal(pf.returns, result)
         assert_frame_equal(pf_grouped.get_returns(group_by=False), result)
@@ -5107,8 +5314,8 @@ class TestPortfolio:
                         [-0.0004977306461471647, -0.003032195265386983, 0.0],
                     ]
                 ),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
         assert_frame_equal(
@@ -5133,7 +5340,7 @@ class TestPortfolio:
                     [-0.003513912457898879, 0.0],
                 ]
             ),
-            index=price_na.index,
+            index=close_na.index,
             columns=pd.Index(["first", "second"], dtype="object", name="group"),
         )
         assert_frame_equal(pf.get_returns(group_by=group_by), result)
@@ -5188,8 +5395,8 @@ class TestPortfolio:
                     [-0.04009999999999998, -0.2998749999999999, 0.0],
                 ]
             ),
-            index=price_na.index,
-            columns=price_na.columns,
+            index=close_na.index,
+            columns=close_na.columns,
         )
         assert_frame_equal(pf.asset_returns, result)
         assert_frame_equal(pf_grouped.get_asset_returns(group_by=False), result)
@@ -5216,7 +5423,7 @@ class TestPortfolio:
                     [-0.34999999999999987, 0.0],
                 ]
             ),
-            index=price_na.index,
+            index=close_na.index,
             columns=pd.Index(["first", "second"], dtype="object", name="group"),
         )
         assert_frame_equal(pf.get_asset_returns(group_by=group_by), result)
@@ -5285,8 +5492,8 @@ class TestPortfolio:
                     [421.66666666666663, 745.0, 400.0],
                 ]
             ),
-            index=price_na.index,
-            columns=price_na.columns,
+            index=close_na.index,
+            columns=close_na.columns,
         )
         assert_frame_equal(pf.market_value, result)
         assert_frame_equal(pf_grouped.get_market_value(group_by=False), result)
@@ -5302,8 +5509,8 @@ class TestPortfolio:
                         [838.3333333333333, 1495.0, 400.0],
                     ]
                 ),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
         result = pd.DataFrame(
@@ -5316,7 +5523,7 @@ class TestPortfolio:
                     [1166.6666666666665, 400.0],
                 ]
             ),
-            index=price_na.index,
+            index=close_na.index,
             columns=pd.Index(["first", "second"], dtype="object", name="group"),
         )
         assert_frame_equal(pf.get_market_value(group_by=group_by), result)
@@ -5377,8 +5584,8 @@ class TestPortfolio:
                     [0.24999999999999994, 0.25, 0.0],
                 ]
             ),
-            index=price_na.index,
-            columns=price_na.columns,
+            index=close_na.index,
+            columns=close_na.columns,
         )
         assert_frame_equal(pf.market_returns, result)
         assert_frame_equal(pf_grouped.get_market_returns(group_by=False), result)
@@ -5405,7 +5612,7 @@ class TestPortfolio:
                     [0.24999999999999994, 0.0],
                 ]
             ),
-            index=price_na.index,
+            index=close_na.index,
             columns=pd.Index(["first", "second"], dtype="object", name="group"),
         )
         assert_frame_equal(pf.get_market_returns(group_by=group_by), result)
@@ -5460,8 +5667,8 @@ class TestPortfolio:
                         [107.46666666666665, 44.8, 25.0],
                     ]
                 ),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
         assert_frame_equal(
@@ -5483,8 +5690,8 @@ class TestPortfolio:
                         [0.0, -0.5, -0.5],
                     ]
                 ),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
         assert_frame_equal(
@@ -5578,7 +5785,7 @@ class TestPortfolio:
                         [-0.010592514017524146, 0.017082199999999936],
                     ]
                 ),
-                index=price_na.index,
+                index=close_na.index,
                 columns=pd.Index(["first", "second"], dtype="object", name="group"),
             ),
         )
@@ -5594,8 +5801,8 @@ class TestPortfolio:
                         [0.003620376930300262, -0.014313952156949417, 0.017082199999999936],
                     ]
                 ),
-                index=price_na.index,
-                columns=price_na.columns,
+                index=close_na.index,
+                columns=close_na.columns,
             ),
         )
         assert_series_equal(pf_shared.sharpe_ratio, pf_shared.sharpe_ratio)
@@ -5624,14 +5831,14 @@ class TestPortfolio:
             pf_shared.get_sharpe_ratio(group_by=False),
             pd.Series(
                 np.array([6.260933805237826, -19.34902167642263, 12.345065267401496]),
-                index=price_na.columns,
+                index=close_na.columns,
             ).rename("sharpe_ratio"),
         )
         assert_series_equal(
             pf_shared.get_information_ratio(group_by=False),
             pd.Series(
                 np.array([1.0384749617059628, 0.9525372423693426, 1.0199058062359245]),
-                index=price_na.columns,
+                index=close_na.columns,
             ).rename("information_ratio"),
         )
         with pytest.raises(Exception):
@@ -6321,15 +6528,15 @@ class TestPortfolio:
         )
         assert_frame_equal(
             pf.stats(metrics="total_trades", agg_func=None, settings=dict(trades_type="entry_trades")),
-            pd.DataFrame([3, 2, 2], index=price_na.columns, columns=["Total Trades"]),
+            pd.DataFrame([3, 2, 2], index=close_na.columns, columns=["Total Trades"]),
         )
         assert_frame_equal(
             pf.stats(metrics="total_trades", agg_func=None, settings=dict(trades_type="exit_trades")),
-            pd.DataFrame([3, 2, 2], index=price_na.columns, columns=["Total Trades"]),
+            pd.DataFrame([3, 2, 2], index=close_na.columns, columns=["Total Trades"]),
         )
         assert_frame_equal(
             pf.stats(metrics="total_trades", agg_func=None, settings=dict(trades_type="positions")),
-            pd.DataFrame([3, 2, 2], index=price_na.columns, columns=["Total Trades"]),
+            pd.DataFrame([3, 2, 2], index=close_na.columns, columns=["Total Trades"]),
         )
         assert_series_equal(pf["c"].stats(), pf.stats(column="c"))
         assert_series_equal(pf["c"].stats(), pf_grouped.stats(column="c", group_by=False))
@@ -6497,6 +6704,22 @@ class TestPortfolio:
 
     @pytest.mark.parametrize("test_freq", ["1h", "10h", "3d"])
     def test_resample(self, test_freq):
+        assert_frame_equal(
+            pf.replace(call_seq=None).resample(test_freq).open,
+            pf.open.resample(test_freq).first(),
+        )
+        assert_frame_equal(
+            pf.replace(call_seq=None).resample(test_freq).high,
+            pf.high.resample(test_freq).max(),
+        )
+        assert_frame_equal(
+            pf.replace(call_seq=None).resample(test_freq).low,
+            pf.low.resample(test_freq).min(),
+        )
+        assert_frame_equal(
+            pf.replace(call_seq=None).resample(test_freq).close,
+            pf.close.resample(test_freq).last(),
+        )
         assert_frame_equal(
             pf.replace(call_seq=None).resample(test_freq).returns,
             pf.returns_acc.resample(test_freq).obj,

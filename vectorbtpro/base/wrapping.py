@@ -674,9 +674,8 @@ class ArrayWrapper(Configured, PandasIndexer):
                 row_idxs = idx_mapper.values
                 col_idxs = 0
             else:
-                col_mapper = pd_indexing_func(
-                    i_wrapper.wrap(np.broadcast_to(np.arange(n_cols), (n_rows, n_cols)), index=index, columns=columns),
-                )
+                col_mapper_values = np.broadcast_to(np.arange(n_cols), (n_rows, n_cols))
+                col_mapper = pd_indexing_func(i_wrapper.wrap(col_mapper_values, index=index, columns=columns))
                 if checks.is_frame(idx_mapper):
                     row_idxs = idx_mapper.values[:, 0]
                     col_idxs = col_mapper.values[0]

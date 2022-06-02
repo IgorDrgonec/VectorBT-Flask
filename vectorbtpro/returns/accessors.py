@@ -221,6 +221,7 @@ class ReturnsAccessor(GenericAccessor):
     ) -> tp.Kwargs:
         """Resolve keyword arguments for initializing `ReturnsAccessor` after stacking along columns."""
         kwargs = GenericAccessor.resolve_column_stack_kwargs(*objs, reindex_kwargs=reindex_kwargs, **kwargs)
+        kwargs.pop("reindex_kwargs", None)
         if len(objs) == 1:
             objs = objs[0]
         objs = list(objs)
@@ -1433,7 +1434,7 @@ class ReturnsAccessor(GenericAccessor):
 
         See `vectorbtpro.generic.drawdowns.Drawdowns`."""
         wrapper_kwargs = merge_dicts(self.wrapper.config, wrapper_kwargs)
-        return Drawdowns.from_ts(
+        return Drawdowns.from_price(
             self.cumulative(start_value=1.0, jitted=jitted),
             wrapper_kwargs=wrapper_kwargs,
             **kwargs,

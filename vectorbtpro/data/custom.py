@@ -892,8 +892,7 @@ class BinanceData(RemoteData):  # pragma: no cover
             "Close time": dict(
                 resample_func=lambda self, obj, resampler: obj.view(int).vbt.resample_apply(
                     resampler,
-                    generic_nb.nth_reduce_nb,
-                    -1,
+                    generic_nb.last_reduce_nb,
                     wrap_kwargs=dict(dtype=obj.dtype),
                 )
             ),

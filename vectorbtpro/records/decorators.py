@@ -103,7 +103,7 @@ def attach_fields(*args, on_conflict: str = "raise") -> tp.FlexClassWrapper:
             attr_name = attr_name.lower()
             if keyword.iskeyword(attr_name):
                 attr_name += "_"
-            return attr_name
+            return attr_name.replace("__", "_")
 
         def _check_attr_name(attr_name, _on_conflict: str = on_conflict) -> None:
             if attr_name not in cls.field_config.get("settings", {}):
@@ -166,6 +166,8 @@ def attach_fields(*args, on_conflict: str = "raise") -> tp.FlexClassWrapper:
                     for filter_value, target_filter_name in mapping.items():
                         if target_filter_name is None:
                             continue
+                        if isinstance(attach_filters, bool):
+                            target_filter_name = field_name + "_" + target_filter_name
                         target_filter_name = _prepare_attr_name(target_filter_name)
                         _check_attr_name(target_filter_name, _on_conflict)
                         if target_filter_name in filter_defaults:

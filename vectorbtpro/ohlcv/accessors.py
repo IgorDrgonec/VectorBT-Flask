@@ -79,7 +79,7 @@ Name: agg_stats, dtype: object
 `OHLCVDFAccessor` class has a single subplot based on `OHLCVDFAccessor.plot` (without volume):
 
 ```pycon
->>> ohlcv_acc.plots(settings=dict(plot_type='candlestick'))
+>>> ohlcv_acc.plots(settings=dict(ohlc_type='candlestick'))
 ```
 
 ![](/assets/images/ohlcv_plots.svg)
@@ -239,8 +239,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
                     if k == "open":
                         sr_dct[column] = self.obj[column].vbt.resample_apply(
                             wrapper_meta["resampler"],
-                            generic_nb.nth_reduce_nb,
-                            0,
+                            generic_nb.first_reduce_nb,
                         )
                     elif k == "high":
                         sr_dct[column] = self.obj[column].vbt.resample_apply(
@@ -368,7 +367,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
 
     def plot(
         self,
-        plot_type: tp.Union[None, str, tp.BaseTraceType] = None,
+        ohlc_type: tp.Union[None, str, tp.BaseTraceType] = None,
         plot_volume: tp.Optional[bool] = None,
         ohlc_trace_kwargs: tp.KwargsLike = None,
         volume_trace_kwargs: tp.KwargsLike = None,
@@ -380,11 +379,11 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
         """Plot OHLCV data.
 
         Args:
-            plot_type: Either 'OHLC', 'Candlestick' or Plotly trace.
+            ohlc_type: Either 'OHLC', 'Candlestick' or Plotly trace.
 
                 Pass None to use the default.
             plot_volume (bool): Whether to plot volume beneath.
-            ohlc_trace_kwargs (dict): Keyword arguments passed to `plot_type`.
+            ohlc_trace_kwargs (dict): Keyword arguments passed to `ohlc_type`.
             volume_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Bar`.
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace` for OHLC.
             volume_add_trace_kwargs (dict): Keyword arguments passed to `add_trace` for volume.
@@ -440,7 +439,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
                 fig = make_figure()
             fig.update_layout(
                 showlegend=True,
-                xaxis=dict(rangeslider_visible=False, showgrid=True),
+                xaxis=dict(showgrid=True),
                 yaxis=dict(showgrid=True),
             )
             if plot_volume:
@@ -450,31 +449,34 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
                     bargap=0,
                 )
         fig.update_layout(**layout_kwargs)
-        if plot_type is None:
-            plot_type = ohlcv_cfg["plot_type"]
-        if isinstance(plot_type, str):
-            if plot_type.lower() == "ohlc":
-                plot_type = "OHLC"
+        if ohlc_type is None:
+            ohlc_type = ohlcv_cfg["ohlc_type"]
+        if isinstance(ohlc_type, str):
+            if ohlc_type.lower() == "ohlc":
                 plot_obj = go.Ohlc
-            elif plot_type.lower() == "candlestick":
-                plot_type = "Candlestick"
+            elif ohlc_type.lower() == "candlestick":
                 plot_obj = go.Candlestick
             else:
                 raise ValueError("Plot type can be either 'OHLC' or 'Candlestick'")
         else:
-            plot_obj = plot_type
+            plot_obj = ohlc_type
         ohlc = plot_obj(
             x=self.wrapper.index,
             open=self.open,
             high=self.high,
             low=self.low,
             close=self.close,
-            name=plot_type,
+            name="OHLC",
             increasing=dict(line=dict(color=plotting_cfg["color_schema"]["increasing"])),
             decreasing=dict(line=dict(color=plotting_cfg["color_schema"]["decreasing"])),
         )
         ohlc.update(**ohlc_trace_kwargs)
         fig.add_trace(ohlc, **add_trace_kwargs)
+        xaxis = getattr(fig.data[-1], "xaxis", None)
+        if xaxis is None:
+            xaxis = "x"
+        if "rangeslider_visible" not in layout_kwargs.get(xaxis.replace("x", "xaxis"), {}):
+            fig.update_layout({xaxis.replace("x", "xaxis"): dict(rangeslider_visible=False)})
 
         if plot_volume:
             marker_colors = np.empty(self.volume.shape, dtype=object)

@@ -3576,7 +3576,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         See `vectorbtpro.generic.ranges.Ranges`."""
         wrapper_kwargs = merge_dicts(self.wrapper.config, wrapper_kwargs)
-        return Ranges.from_ts(self.obj, wrapper_kwargs=wrapper_kwargs, **kwargs)
+        return Ranges.from_generic(self.obj, wrapper_kwargs=wrapper_kwargs, **kwargs)
 
     @property
     def drawdowns(self) -> Drawdowns:
@@ -3588,7 +3588,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         See `vectorbtpro.generic.drawdowns.Drawdowns`."""
         wrapper_kwargs = merge_dicts(self.wrapper.config, wrapper_kwargs)
-        return Drawdowns.from_ts(self.obj, wrapper_kwargs=wrapper_kwargs, **kwargs)
+        return Drawdowns.from_price(self.obj, wrapper_kwargs=wrapper_kwargs, **kwargs)
 
     def to_mapped(
         self,

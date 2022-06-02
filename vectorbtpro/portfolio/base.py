@@ -1632,6 +1632,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, broadcast, broadcast_to, to_pd_array, shape_to_2d
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
+from vectorbtpro.data.base import Data
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic.drawdowns import Drawdowns
@@ -1773,49 +1774,91 @@ shortcut_config = ReadonlyConfig(
         "orders": dict(
             obj_type="records",
             field_aliases=("order_records",),
-            wrap_func=lambda pf, obj, **kwargs: Orders(fix_wrapper_for_records(pf), obj, pf.close),
+            wrap_func=lambda pf, obj, **kwargs: Orders.from_records(
+                fix_wrapper_for_records(pf),
+                obj,
+                open=pf._open,
+                high=pf._high,
+                low=pf._low,
+                close=pf._close,
+            ),
             indexing_func=partial(records_indexing_func, cls=Orders),
             resample_func=partial(records_resample_func, cls=Orders),
         ),
         "logs": dict(
             obj_type="records",
             field_aliases=("log_records",),
-            wrap_func=lambda pf, obj, **kwargs: Logs(fix_wrapper_for_records(pf), obj),
+            wrap_func=lambda pf, obj, **kwargs: Logs.from_records(
+                fix_wrapper_for_records(pf),
+                obj,
+                open=pf._open,
+                high=pf._high,
+                low=pf._low,
+                close=pf._close,
+            ),
             indexing_func=partial(records_indexing_func, cls=Logs),
             resample_func=partial(records_resample_func, cls=Logs),
         ),
         "entry_trades": dict(
             obj_type="records",
             field_aliases=("entry_trade_records",),
-            wrap_func=lambda pf, obj, **kwargs: EntryTrades.from_records(pf.orders.wrapper, obj, pf.close),
+            wrap_func=lambda pf, obj, **kwargs: EntryTrades.from_records(
+                pf.orders.wrapper,
+                obj,
+                open=pf._open,
+                high=pf._high,
+                low=pf._low,
+                close=pf._close,
+            ),
             indexing_func=partial(records_indexing_func, cls=EntryTrades),
             resample_func=partial(records_resample_func, cls=EntryTrades),
         ),
         "exit_trades": dict(
             obj_type="records",
             field_aliases=("exit_trade_records",),
-            wrap_func=lambda pf, obj, **kwargs: ExitTrades.from_records(pf.orders.wrapper, obj, pf.close),
+            wrap_func=lambda pf, obj, **kwargs: ExitTrades.from_records(
+                pf.orders.wrapper,
+                obj,
+                open=pf._open,
+                high=pf._high,
+                low=pf._low,
+                close=pf._close,
+            ),
             indexing_func=partial(records_indexing_func, cls=ExitTrades),
             resample_func=partial(records_resample_func, cls=ExitTrades),
         ),
         "positions": dict(
             obj_type="records",
             field_aliases=("position_records",),
-            wrap_func=lambda pf, obj, **kwargs: Positions.from_records(pf.orders.wrapper, obj, pf.close),
+            wrap_func=lambda pf, obj, **kwargs: Positions.from_records(
+                pf.orders.wrapper,
+                obj,
+                open=pf._open,
+                high=pf._high,
+                low=pf._low,
+                close=pf._close,
+            ),
             indexing_func=partial(records_indexing_func, cls=Positions),
             resample_func=partial(records_resample_func, cls=Positions),
         ),
         "trades": dict(
             obj_type="records",
             field_aliases=("trade_records",),
-            wrap_func=lambda pf, obj, **kwargs: Trades.from_records(pf.orders.wrapper, obj, pf.close),
+            wrap_func=lambda pf, obj, **kwargs: Trades.from_records(
+                pf.orders.wrapper,
+                obj,
+                open=pf._open,
+                high=pf._high,
+                low=pf._low,
+                close=pf._close,
+            ),
             indexing_func=partial(records_indexing_func, cls=Trades),
             resample_func=partial(records_resample_func, cls=Trades),
         ),
         "drawdowns": dict(
             obj_type="records",
             field_aliases=("drawdown_records",),
-            wrap_func=lambda pf, obj, **kwargs: Drawdowns.from_records(pf.orders.wrapper.resolve(), obj, pf.close),
+            wrap_func=lambda pf, obj, **kwargs: Drawdowns.from_records(pf.orders.wrapper.resolve(), obj),
             indexing_func=partial(records_indexing_func, cls=Drawdowns, groups_only=True),
             resample_func=partial(records_resample_func, cls=Drawdowns),
         ),
@@ -1974,6 +2017,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             See `vectorbtpro.base.wrapping.ArrayWrapper`.
         close (array_like): Last asset price at each time step.
         order_records (array_like): A structured NumPy array of order records.
+        open (array_like): Open price of each bar.
+        high (array_like): High price of each bar.
+        low (array_like): Low price of each bar.
         log_records (array_like): A structured NumPy array of log records.
         cash_sharing (bool): Whether to share cash within the same group.
         init_cash (InitCashMode or array_like of float): Initial capital.
@@ -2220,6 +2266,45 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 *[obj.close for obj in objs],
                 group_by=False,
             )
+        if "open" not in kwargs:
+            stack_open_objs = True
+            for obj in objs:
+                if obj._open is None:
+                    stack_open_objs = False
+                    break
+            if stack_open_objs:
+                kwargs["open"] = to_2d_array(
+                    kwargs["wrapper"].row_stack_and_wrap(
+                        *[obj.open for obj in objs],
+                        group_by=False,
+                    )
+                )
+        if "high" not in kwargs:
+            stack_high_objs = True
+            for obj in objs:
+                if obj._high is None:
+                    stack_high_objs = False
+                    break
+            if stack_high_objs:
+                kwargs["high"] = to_2d_array(
+                    kwargs["wrapper"].row_stack_and_wrap(
+                        *[obj.high for obj in objs],
+                        group_by=False,
+                    )
+                )
+        if "low" not in kwargs:
+            stack_low_objs = True
+            for obj in objs:
+                if obj._low is None:
+                    stack_low_objs = False
+                    break
+            if stack_low_objs:
+                kwargs["low"] = to_2d_array(
+                    kwargs["wrapper"].row_stack_and_wrap(
+                        *[obj.low for obj in objs],
+                        group_by=False,
+                    )
+                )
         if "order_records" not in kwargs:
             kwargs["order_records"] = Orders.row_stack_records_arrs(*[obj.orders for obj in objs], **kwargs)
         if "log_records" not in kwargs:
@@ -2574,6 +2659,45 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             elif ffill_close:
                 new_close = new_close.vbt.ffill()
             kwargs["close"] = new_close
+        if "open" not in kwargs:
+            stack_open_objs = True
+            for obj in objs:
+                if obj._open is None:
+                    stack_open_objs = False
+                    break
+            if stack_open_objs:
+                kwargs["open"] = to_2d_array(
+                    kwargs["wrapper"].column_stack_and_wrap(
+                        *[obj.open for obj in objs],
+                        group_by=False,
+                    )
+                )
+        if "high" not in kwargs:
+            stack_high_objs = True
+            for obj in objs:
+                if obj._high is None:
+                    stack_high_objs = False
+                    break
+            if stack_high_objs:
+                kwargs["high"] = to_2d_array(
+                    kwargs["wrapper"].column_stack_and_wrap(
+                        *[obj.high for obj in objs],
+                        group_by=False,
+                    )
+                )
+        if "low" not in kwargs:
+            stack_low_objs = True
+            for obj in objs:
+                if obj._low is None:
+                    stack_low_objs = False
+                    break
+            if stack_low_objs:
+                kwargs["low"] = to_2d_array(
+                    kwargs["wrapper"].column_stack_and_wrap(
+                        *[obj.low for obj in objs],
+                        group_by=False,
+                    )
+                )
         if "order_records" not in kwargs:
             kwargs["order_records"] = Orders.column_stack_records_arrs(*[obj.orders for obj in objs], **kwargs)
         if "log_records" not in kwargs:
@@ -2697,6 +2821,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         wrapper: ArrayWrapper,
         close: tp.ArrayLike,
         order_records: tp.RecordArray,
+        open: tp.Optional[tp.ArrayLike] = None,
+        high: tp.Optional[tp.ArrayLike] = None,
+        low: tp.Optional[tp.ArrayLike] = None,
         log_records: tp.Optional[tp.RecordArray] = None,
         cash_sharing: bool = False,
         init_cash: tp.Union[int, tp.FlexArray] = InitCashMode.Auto,
@@ -2736,6 +2863,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             wrapper,
             close=close,
             order_records=order_records,
+            open=open,
+            high=high,
+            low=low,
             log_records=log_records,
             cash_sharing=cash_sharing,
             init_cash=init_cash,
@@ -2752,6 +2882,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             **kwargs,
         )
 
+        self._open = open
+        self._high = high
+        self._low = low
         self._close = close
         self._order_records = order_records
         self._log_records = log_records
@@ -3333,6 +3466,30 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             new_close = new_close[row_idxs, :]
         if columns_changed and new_close.shape[1] > 1:
             new_close = new_close[:, col_idxs]
+        if self._open is not None:
+            new_open = to_2d_array(self._open)
+            if rows_changed and new_open.shape[0] > 1:
+                new_open = new_open[row_idxs, :]
+            if columns_changed and new_open.shape[1] > 1:
+                new_open = new_open[:, col_idxs]
+        else:
+            new_open = self._open
+        if self._high is not None:
+            new_high = to_2d_array(self._high)
+            if rows_changed and new_high.shape[0] > 1:
+                new_high = new_high[row_idxs, :]
+            if columns_changed and new_high.shape[1] > 1:
+                new_high = new_high[:, col_idxs]
+        else:
+            new_high = self._high
+        if self._low is not None:
+            new_low = to_2d_array(self._low)
+            if rows_changed and new_low.shape[0] > 1:
+                new_low = new_low[row_idxs, :]
+            if columns_changed and new_low.shape[1] > 1:
+                new_low = new_low[:, col_idxs]
+        else:
+            new_low = self._low
         new_order_records = self.orders.indexing_func_meta(wrapper_meta=wrapper_meta)["new_records_arr"]
         new_log_records = self.logs.indexing_func_meta(wrapper_meta=wrapper_meta)["new_records_arr"]
         new_init_cash = self._init_cash
@@ -3390,6 +3547,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             wrapper=wrapper_meta["new_wrapper"],
             close=new_close,
             order_records=new_order_records,
+            open=new_open,
+            high=new_high,
+            low=new_low,
             log_records=new_log_records,
             init_cash=new_init_cash,
             init_position=new_init_position,
@@ -3556,12 +3716,24 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         resampler = wrapper_meta["resampler"]
         new_wrapper = wrapper_meta["new_wrapper"]
 
-        new_close = self.close.vbt.resample_apply(resampler, generic_nb.last_reduce_nb)
+        new_close = self.close.vbt.resample_apply(resampler, "last")
         if fbfill_close:
             new_close = new_close.vbt.fbfill()
         elif ffill_close:
             new_close = new_close.vbt.ffill()
         new_close = new_close.values
+        if self._open is not None:
+            new_open = self.open.vbt.resample_apply(resampler, "first").values
+        else:
+            new_open = self._open
+        if self._high is not None:
+            new_high = self.high.vbt.resample_apply(resampler, "max").values
+        else:
+            new_high = self._high
+        if self._low is not None:
+            new_low = self.low.vbt.resample_apply(resampler, "min").values
+        else:
+            new_low = self._low
         new_order_records = self.orders.resample_records_arr(resampler)
         new_log_records = self.logs.resample_records_arr(resampler)
         if self._cash_deposits.size > 1 or self._cash_deposits.item() != 0:
@@ -3579,7 +3751,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         else:
             new_cash_earnings = self._cash_earnings
         if self._bm_close is not None and not isinstance(self._bm_close, bool):
-            new_bm_close = self.bm_close.vbt.resample_apply(resampler, generic_nb.last_reduce_nb)
+            new_bm_close = self.bm_close.vbt.resample_apply(resampler, "last")
             if fbfill_close:
                 new_bm_close = new_bm_close.vbt.fbfill()
             elif ffill_close:
@@ -3596,6 +3768,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             wrapper=new_wrapper,
             close=new_close,
             order_records=new_order_records,
+            open=new_open,
+            high=new_high,
+            low=new_low,
             log_records=new_log_records,
             cash_deposits=new_cash_deposits,
             cash_earnings=new_cash_earnings,
@@ -3608,7 +3783,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_orders(
         cls: tp.Type[PortfolioT],
-        close: tp.ArrayLike,
+        close: tp.Union[tp.ArrayLike, Data],
         size: tp.Optional[tp.ArrayLike] = None,
         size_type: tp.Optional[tp.ArrayLike] = None,
         direction: tp.Optional[tp.ArrayLike] = None,
@@ -3626,9 +3801,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         raise_reject: tp.Optional[tp.ArrayLike] = None,
         log: tp.Optional[tp.ArrayLike] = None,
         val_price: tp.Optional[tp.ArrayLike] = None,
-        open: tp.ArrayLike = np.nan,
-        high: tp.ArrayLike = np.nan,
-        low: tp.ArrayLike = np.nan,
+        open: tp.Optional[tp.ArrayLike] = None,
+        high: tp.Optional[tp.ArrayLike] = None,
+        low: tp.Optional[tp.ArrayLike] = None,
         init_cash: tp.Optional[tp.ArrayLike] = None,
         init_position: tp.Optional[tp.ArrayLike] = None,
         init_price: tp.Optional[tp.ArrayLike] = None,
@@ -3660,6 +3835,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         Args:
             close (array_like or Data): Latest asset price at each time step.
                 Will broadcast.
+
+                If an instance of `vectorbtpro.data.base.Data`, will extract the open, high,
+                low, and close price.
 
                 Used for calculating unrealized PnL and portfolio value.
             size (float or array_like): Size to order.
@@ -4031,6 +4209,33 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         portfolio_cfg = settings["portfolio"]
 
+        if isinstance(close, Data):
+            data = close
+            close = data.close
+            if close is None:
+                raise ValueError("Column for close couldn't be found in data")
+            if open is None:
+                open = data.open
+            if high is None:
+                high = data.high
+            if low is None:
+                low = data.low
+        if open is None:
+            open_none = True
+            open = np.nan
+        else:
+            open_none = False
+        if high is None:
+            high_none = True
+            high = np.nan
+        else:
+            high_none = False
+        if low is None:
+            low_none = True
+            low = np.nan
+        else:
+            low_none = False
+
         if size is None:
             size = portfolio_cfg["size"]
         if size_type is None:
@@ -4208,7 +4413,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             to_pd=False,
             keep_flex=True,
             reindex_kwargs=dict(fill_value=0.0),
-            **require_kwargs,
+            require_kwargs=require_kwargs,
         )
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
         if call_seq is None and attach_call_seq:
@@ -4315,9 +4520,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             wrapper,
             broadcasted_args["close"],
             sim_out.order_records,
-            sim_out.log_records,
-            cash_sharing,
-            init_cash if init_cash_mode is None else init_cash_mode,
+            open=broadcasted_args["open"] if not open_none else None,
+            high=broadcasted_args["high"] if not high_none else None,
+            low=broadcasted_args["low"] if not low_none else None,
+            log_records=sim_out.log_records,
+            cash_sharing=cash_sharing,
+            init_cash=init_cash if init_cash_mode is None else init_cash_mode,
             init_position=init_position,
             init_price=init_price,
             cash_deposits=sim_out.cash_deposits,
@@ -4331,7 +4539,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_signals(
         cls: tp.Type[PortfolioT],
-        close: tp.ArrayLike,
+        close: tp.Union[tp.ArrayLike, Data],
         entries: tp.Optional[tp.ArrayLike] = None,
         exits: tp.Optional[tp.ArrayLike] = None,
         short_entries: tp.Optional[tp.ArrayLike] = None,
@@ -4360,9 +4568,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         upon_opposite_entry: tp.Optional[tp.ArrayLike] = None,
         direction: tp.Optional[tp.ArrayLike] = None,
         val_price: tp.Optional[tp.ArrayLike] = None,
-        open: tp.ArrayLike = np.nan,
-        high: tp.ArrayLike = np.nan,
-        low: tp.ArrayLike = np.nan,
+        open: tp.Optional[tp.ArrayLike] = None,
+        high: tp.Optional[tp.ArrayLike] = None,
+        low: tp.Optional[tp.ArrayLike] = None,
         sl_stop: tp.Optional[tp.ArrayLike] = None,
         sl_trail: tp.Optional[tp.ArrayLike] = None,
         tp_stop: tp.Optional[tp.ArrayLike] = None,
@@ -4429,7 +4637,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             Best to use when signals should be placed dynamically based on custom conditions.
 
         Args:
-            close (array_like): See `Portfolio.from_orders`.
+            close (array_like or Data): See `Portfolio.from_orders`.
             entries (array_like of bool): Boolean array of entry signals.
                 Defaults to True if all other signal arrays are not set, otherwise False. Will broadcast.
 
@@ -5066,6 +5274,33 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         portfolio_cfg = settings["portfolio"]
 
+        if isinstance(close, Data):
+            data = close
+            close = data.close
+            if close is None:
+                raise ValueError("Column for close couldn't be found in data")
+            if open is None:
+                open = data.open
+            if high is None:
+                high = data.high
+            if low is None:
+                low = data.low
+        if open is None:
+            open_none = True
+            open = np.nan
+        else:
+            open_none = False
+        if high is None:
+            high_none = True
+            high = np.nan
+        else:
+            high_none = False
+        if low is None:
+            low_none = True
+            low = np.nan
+        else:
+            low_none = False
+
         ls_mode = short_entries is not None or short_exits is not None
         signal_func_mode = signal_func_nb is not nb.no_signal_func_nb
         if (entries is not None or exits is not None or ls_mode) and signal_func_mode:
@@ -5343,7 +5578,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             to_pd=False,
             keep_flex=True,
             reindex_kwargs=dict(fill_value=0.0),
-            **require_kwargs,
+            require_kwargs=require_kwargs,
         )
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
         if call_seq is None and attach_call_seq:
@@ -5557,9 +5792,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             wrapper,
             broadcasted_args["close"],
             sim_out.order_records,
-            sim_out.log_records,
-            cash_sharing,
-            init_cash if init_cash_mode is None else init_cash_mode,
+            open=broadcasted_args["open"] if not open_none else None,
+            high=broadcasted_args["high"] if not high_none else None,
+            low=broadcasted_args["low"] if not low_none else None,
+            log_records=sim_out.log_records,
+            cash_sharing=cash_sharing,
+            init_cash=init_cash if init_cash_mode is None else init_cash_mode,
             init_position=init_position,
             init_price=init_price,
             cash_deposits=sim_out.cash_deposits,
@@ -5573,7 +5811,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_holding(
         cls: tp.Type[PortfolioT],
-        close: tp.ArrayLike,
+        close: tp.Union[tp.ArrayLike, Data],
         size: tp.Optional[tp.ArrayLike] = None,
         direction: tp.Optional[tp.ArrayLike] = None,
         sell_at_end: tp.Optional[bool] = None,
@@ -5581,15 +5819,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         **kwargs,
     ) -> PortfolioT:
         """Simulate portfolio from plain holding.
-
-        Has two base methods:
-
-        * 'from_signals': Based on `Portfolio.from_signals`. Faster than the second method and allows
-            using the native broadcasting mechanism of the underlying class method, but has less
-            sizers available (e.g., there is no support for `SizeType.TargetPercent`).
-        * 'from_orders': Based on `Portfolio.from_orders`. Allows using all implemented sizers,
-            but requires conversion of `close` to pandas prior to broadcasting and must broadcast `size`
-            to `close` to set all elements after the first timestamp to `np.nan`.
 
         `**kwargs` are passed to the underlying class method.
 
@@ -5615,6 +5844,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         portfolio_cfg = settings["portfolio"]
 
+        if size is None:
+            size = portfolio_cfg["size"]
         if direction is None:
             direction = portfolio_cfg["hold_direction"]
         if sell_at_end is None:
@@ -5623,49 +5854,56 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             base_method = portfolio_cfg["hold_base_method"]
 
         if base_method.lower() == "from_signals":
-            if sell_at_end:
-                entries = broadcast_to(True, close, require_kwargs=dict(requirements="W"))
-                exits = broadcast_to(False, close, require_kwargs=dict(requirements="W"))
-                if checks.is_pandas(entries):
-                    entries.iloc[1:] = False
-                else:
-                    entries[1:] = False
-                if checks.is_pandas(exits):
-                    exits.iloc[-1] = True
-                else:
+
+            def _entries(wrapper, bco):
+                if bco.keep_flex:
+                    if wrapper.ndim == 1:
+                        entries = np.full(wrapper.shape[0], False, dtype=np.bool_)
+                    else:
+                        entries = np.full((wrapper.shape[0], 1), False, dtype=np.bool_)
+                entries[0] = True
+                return entries
+
+            def _exits(wrapper, bco, _sell_at_end=sell_at_end):
+                if bco.keep_flex:
+                    if wrapper.ndim == 1:
+                        exits = np.full(wrapper.shape[0], False, dtype=np.bool_)
+                    else:
+                        exits = np.full((wrapper.shape[0], 1), False, dtype=np.bool_)
+                if _sell_at_end:
                     exits[-1] = True
-            else:
-                entries = True
-                exits = False
+                return exits
+
             return cls.from_signals(
                 close,
-                entries=entries,
-                exits=exits,
+                entries=RepFunc(_entries),
+                exits=RepFunc(_exits),
                 accumulate=False,
                 size=size,
                 direction=direction,
                 **kwargs,
             )
+
         if base_method.lower() == "from_orders":
-            if size is None:
-                size = portfolio_cfg["size"]
-            close = to_pd_array(close)
-            size_arr = broadcast_to(size, close, require_kwargs=dict(requirements="W"))
-            if checks.is_pandas(size_arr):
-                size_arr.iloc[1:] = np.nan
-                if sell_at_end:
-                    size_arr.iloc[-1] = -size
-            else:
-                size_arr[1:] = np.nan
-                if sell_at_end:
-                    size_arr[-1] = -size
-            return cls.from_orders(close, size=size_arr, direction=direction, **kwargs)
+
+            def _size(wrapper, bco, _size=size, _sell_at_end=sell_at_end):
+                if bco.keep_flex:
+                    if wrapper.ndim == 1:
+                        size = np.full(wrapper.shape[0], np.nan, dtype=np.float_)
+                    else:
+                        size = np.full((wrapper.shape[0], 1), np.nan, dtype=np.float_)
+                size[0] = _size
+                if _sell_at_end:
+                    size[-1] = -_size
+                return size
+
+            return cls.from_orders(close, size=RepFunc(_size), direction=direction, **kwargs)
         raise ValueError(f"Unknown base method '{base_method}'")
 
     @classmethod
     def from_random_signals(
         cls: tp.Type[PortfolioT],
-        close: tp.ArrayLike,
+        close: tp.Union[tp.ArrayLike, Data],
         n: tp.Optional[tp.ArrayLike] = None,
         prob: tp.Optional[tp.ArrayLike] = None,
         entry_prob: tp.Optional[tp.ArrayLike] = None,
@@ -5730,8 +5968,16 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         portfolio_cfg = settings["portfolio"]
 
-        close = to_pd_array(close)
-        close_wrapper = ArrayWrapper.from_obj(close)
+        if isinstance(close, Data):
+            data = close
+            close = data.close
+            if close is None:
+                raise ValueError("Column for close couldn't be found in data")
+            close_wrapper = data.wrapper
+        else:
+            close = to_pd_array(close)
+            close_wrapper = ArrayWrapper.from_obj(close)
+            data = close
         if entry_prob is None:
             entry_prob = prob
         if exit_prob is None:
@@ -5770,13 +6016,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         else:
             raise ValueError("At least n or entry_prob and exit_prob must be provided")
 
-        return cls.from_signals(close, entries, exits, seed=seed, **kwargs)
+        return cls.from_signals(data, entries, exits, seed=seed, **kwargs)
 
     @classmethod
     def from_optimizer(
         cls: tp.Type[PortfolioT],
         optimizer: PortfolioOptimizer,
-        close: tp.ArrayLike,
+        close: tp.Union[tp.ArrayLike, Data],
         dropna: tp.Optional[str] = None,
         fill_value: tp.Scalar = np.nan,
         size_type: tp.Optional[tp.ArrayLike] = None,
@@ -5862,7 +6108,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_order_func(
         cls: tp.Type[PortfolioT],
-        close: tp.ArrayLike,
+        close: tp.Union[tp.ArrayLike, Data],
         order_func_nb: tp.Union[nb.OrderFuncT, nb.FlexOrderFuncT],
         *order_args,
         flexible: tp.Optional[bool] = None,
@@ -5895,9 +6141,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         post_segment_args: tp.Args = (),
         post_order_func_nb: nb.PostOrderFuncT = nb.no_post_func_nb,
         post_order_args: tp.Args = (),
-        open: tp.ArrayLike = np.nan,
-        high: tp.ArrayLike = np.nan,
-        low: tp.ArrayLike = np.nan,
+        open: tp.Optional[tp.ArrayLike] = None,
+        high: tp.Optional[tp.ArrayLike] = None,
+        low: tp.Optional[tp.ArrayLike] = None,
         ffill_val_price: tp.Optional[bool] = None,
         update_value: tp.Optional[bool] = None,
         fill_pos_record: tp.Optional[bool] = None,
@@ -5931,8 +6177,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         * `row_wise` and `flexible`: See `vectorbtpro.portfolio.nb.from_order_func.flex_simulate_row_wise_nb`
 
         Args:
-            close (array_like): Latest asset price at each time step.
+            close (array_like or Data): Latest asset price at each time step.
                 Will broadcast.
+
+                If an instance of `vectorbtpro.data.base.Data`, will extract the open, high,
+                low, and close price.
 
                 Used for calculating unrealized PnL and portfolio value.
             order_func_nb (callable): Order generation function.
@@ -6424,6 +6673,33 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         portfolio_cfg = settings["portfolio"]
 
+        if isinstance(close, Data):
+            data = close
+            close = data.close
+            if close is None:
+                raise ValueError("Column for close couldn't be found in data")
+            if open is None:
+                open = data.open
+            if high is None:
+                high = data.high
+            if low is None:
+                low = data.low
+        if open is None:
+            open_none = True
+            open = np.nan
+        else:
+            open_none = False
+        if high is None:
+            high_none = True
+            high = np.nan
+        else:
+            high_none = False
+        if low is None:
+            low_none = True
+            low = np.nan
+        else:
+            low_none = False
+
         if flexible is None:
             flexible = portfolio_cfg["flexible"]
         if init_cash is None:
@@ -6539,7 +6815,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             to_pd=False,
             keep_flex=keep_inout_raw,
             reindex_kwargs=dict(fill_value=0.0),
-            **require_kwargs,
+            require_kwargs=require_kwargs,
         )
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
         if isinstance(segment_mask, int):
@@ -6555,7 +6831,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 to_shape=(target_shape_2d[0], len(group_lens)),
                 to_pd=False,
                 keep_flex=keep_inout_raw,
-                **require_kwargs,
+                require_kwargs=require_kwargs,
             )
         if not flexible:
             if call_seq is None and attach_call_seq:
@@ -6837,9 +7113,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             wrapper,
             broadcasted_args["close"],
             sim_out.order_records,
-            sim_out.log_records,
-            cash_sharing,
-            init_cash if init_cash_mode is None else init_cash_mode,
+            open=broadcasted_args["open"] if not open_none else None,
+            high=broadcasted_args["high"] if not high_none else None,
+            low=broadcasted_args["low"] if not low_none else None,
+            log_records=sim_out.log_records,
+            cash_sharing=cash_sharing,
+            init_cash=init_cash if init_cash_mode is None else init_cash_mode,
             init_position=init_position,
             init_price=init_price,
             cash_deposits=sim_out.cash_deposits,
@@ -6853,7 +7132,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_def_order_func(
         cls: tp.Type[PortfolioT],
-        close: tp.ArrayLike,
+        close: tp.Union[tp.ArrayLike, Data],
         size: tp.Optional[tp.ArrayLike] = None,
         size_type: tp.Optional[tp.ArrayLike] = None,
         direction: tp.Optional[tp.ArrayLike] = None,
@@ -7211,9 +7490,45 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
     # ############# Price ############# #
 
-    @custom_property(group_by_aware=False)
+    @custom_property(group_by_aware=False, resample_func="first")
+    def open(self) -> tp.SeriesFrame:
+        """Open price of each bar."""
+        if self.use_in_outputs and self.in_outputs is not None and hasattr(self.in_outputs, "open"):
+            open = self.in_outputs.open
+        else:
+            open = self._open
+
+        if open is None:
+            return None
+        return self.wrapper.wrap(open, group_by=False)
+
+    @custom_property(group_by_aware=False, resample_func="max")
+    def high(self) -> tp.SeriesFrame:
+        """High price of each bar."""
+        if self.use_in_outputs and self.in_outputs is not None and hasattr(self.in_outputs, "high"):
+            high = self.in_outputs.high
+        else:
+            high = self._high
+
+        if high is None:
+            return None
+        return self.wrapper.wrap(high, group_by=False)
+
+    @custom_property(group_by_aware=False, resample_func="min")
+    def low(self) -> tp.SeriesFrame:
+        """Low price of each bar."""
+        if self.use_in_outputs and self.in_outputs is not None and hasattr(self.in_outputs, "low"):
+            low = self.in_outputs.low
+        else:
+            low = self._low
+
+        if low is None:
+            return None
+        return self.wrapper.wrap(low, group_by=False)
+
+    @custom_property(group_by_aware=False, resample_func="last")
     def close(self) -> tp.SeriesFrame:
-        """Price per unit series."""
+        """Last asset price at each time step."""
         if self.use_in_outputs and self.in_outputs is not None and hasattr(self.in_outputs, "close"):
             close = self.in_outputs.close
         else:
@@ -7247,7 +7562,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         filled_close = func(to_2d_array(close))
         return wrapper.wrap(filled_close, group_by=False, **resolve_dict(wrap_kwargs))
 
-    @custom_property(group_by_aware=False)
+    @custom_property(group_by_aware=False, resample_func="last")
     def bm_close(self) -> tp.Union[None, bool, tp.SeriesFrame]:
         """Benchmark price per unit series."""
         if self.use_in_outputs and self.in_outputs is not None and hasattr(self.in_outputs, "bm_close"):
@@ -7298,6 +7613,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     def get_orders(
         cls_or_self,
         order_records: tp.Optional[tp.RecordArray] = None,
+        open: tp.Optional[tp.SeriesFrame] = None,
+        high: tp.Optional[tp.SeriesFrame] = None,
+        low: tp.Optional[tp.SeriesFrame] = None,
         close: tp.Optional[tp.SeriesFrame] = None,
         group_by: tp.GroupByLike = None,
         wrapper: tp.Optional[ArrayWrapper] = None,
@@ -7309,6 +7627,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if not isinstance(cls_or_self, type):
             if order_records is None:
                 order_records = cls_or_self.order_records
+            if open is None:
+                open = cls_or_self._open
+            if high is None:
+                high = cls_or_self._high
+            if low is None:
+                low = cls_or_self._low
             if close is None:
                 close = cls_or_self._close
             if wrapper is None:
@@ -7317,7 +7641,15 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             checks.assert_not_none(order_records)
             checks.assert_not_none(wrapper)
 
-        return Orders(wrapper, order_records, close=close, **kwargs).regroup(group_by)
+        return Orders(
+            wrapper,
+            order_records,
+            open=open,
+            high=high,
+            low=low,
+            close=close,
+            **kwargs,
+        ).regroup(group_by)
 
     @property
     def log_records(self) -> tp.RecordArray:
@@ -7328,6 +7660,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     def get_logs(
         cls_or_self,
         log_records: tp.Optional[tp.RecordArray] = None,
+        open: tp.Optional[tp.SeriesFrame] = None,
+        high: tp.Optional[tp.SeriesFrame] = None,
+        low: tp.Optional[tp.SeriesFrame] = None,
+        close: tp.Optional[tp.SeriesFrame] = None,
         group_by: tp.GroupByLike = None,
         wrapper: tp.Optional[ArrayWrapper] = None,
         **kwargs,
@@ -7338,13 +7674,29 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if not isinstance(cls_or_self, type):
             if log_records is None:
                 log_records = cls_or_self.log_records
+            if open is None:
+                open = cls_or_self._open
+            if high is None:
+                high = cls_or_self._high
+            if low is None:
+                low = cls_or_self._low
+            if close is None:
+                close = cls_or_self._close
             if wrapper is None:
                 wrapper = fix_wrapper_for_records(cls_or_self)
         else:
             checks.assert_not_none(log_records)
             checks.assert_not_none(wrapper)
 
-        return Logs(wrapper, log_records, **kwargs).regroup(group_by)
+        return Logs(
+            wrapper,
+            log_records,
+            open=open,
+            high=high,
+            low=low,
+            close=close,
+            **kwargs,
+        ).regroup(group_by)
 
     @class_or_instancemethod
     def get_entry_trades(
@@ -7452,7 +7804,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         else:
             checks.assert_not_none(value)
 
-        return Drawdowns.from_ts(value, wrapper_kwargs=wrapper_kwargs, **kwargs)
+        return Drawdowns.from_price(value, wrapper_kwargs=wrapper_kwargs, **kwargs)
 
     # ############# Assets ############# #
 
@@ -8945,7 +9297,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             that is an instance of `vectorbtpro.portfolio.trades.Trades`."""
         if "incl_open" in final_kwargs:
             if isinstance(out, Trades) and not final_kwargs["incl_open"]:
-                out = out.closed
+                out = out.status_closed
         return out
 
     def resolve_shortcut_attr(self, attr_name: str, *args, **kwargs) -> tp.Any:
@@ -9077,18 +9429,18 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ),
             total_closed_trades=dict(
                 title="Total Closed Trades",
-                calc_func="trades.closed.count",
+                calc_func="trades.status_closed.count",
                 tags=["portfolio", "trades", "closed"],
             ),
             total_open_trades=dict(
                 title="Total Open Trades",
-                calc_func="trades.open.count",
+                calc_func="trades.status_open.count",
                 incl_open=True,
                 tags=["portfolio", "trades", "open"],
             ),
             open_trade_pnl=dict(
                 title="Open Trade PnL",
-                calc_func="trades.open.pnl.sum",
+                calc_func="trades.status_open.pnl.sum",
                 incl_open=True,
                 tags=["portfolio", "trades", "open"],
             ),
@@ -9642,7 +9994,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         plotting_cfg = settings["plotting"]
 
         kwargs = merge_dicts(
-            dict(ts_trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["purple"]), name="Value")),
+            dict(close_trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["purple"]), name="Value")),
             kwargs,
         )
         return self.resolve_shortcut_attr("drawdowns", group_by=group_by).plot(column=column, **kwargs)

@@ -28,13 +28,13 @@ a portfolio and can be accessed as `vectorbtpro.portfolio.base.Portfolio.orders`
 ... }, index=price.index, columns=price.columns)
 >>> pf = vbt.Portfolio.from_orders(price, size, fees=0.01, freq='d')
 
->>> pf.orders.buy.count()
+>>> pf.orders.side_buy.count()
 symbol
 a    17
 b    15
 Name: count, dtype: int64
 
->>> pf.orders.sell.count()
+>>> pf.orders.side_sell.count()
 symbol
 a    24
 b    26
@@ -114,13 +114,9 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.reshaping import to_2d_array
-from vectorbtpro.base.wrapping import ArrayWrapper
-from vectorbtpro.generic import nb as generic_nb
+from vectorbtpro.generic.price_records import PriceRecords
 from vectorbtpro.portfolio.enums import order_dt, OrderSide
-from vectorbtpro.records.base import Records
 from vectorbtpro.records.decorators import attach_fields, override_field_config
-from vectorbtpro.utils import checks
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig
 
@@ -166,141 +162,12 @@ OrdersT = tp.TypeVar("OrdersT", bound="Orders")
 
 @attach_fields(orders_attach_field_config)
 @override_field_config(orders_field_config)
-class Orders(Records):
-    """Extends `Records` for working with order records."""
+class Orders(PriceRecords):
+    """Extends `vectorbtpro.generic.price_records.PriceRecords` for working with order records."""
 
     @property
     def field_config(self) -> Config:
         return self._field_config
-
-    @classmethod
-    def resolve_row_stack_kwargs(
-        cls: tp.Type[OrdersT],
-        *objs: tp.MaybeTuple[OrdersT],
-        **kwargs,
-    ) -> tp.Kwargs:
-        """Resolve keyword arguments for initializing `Orders` after stacking along rows."""
-        kwargs = Records.resolve_row_stack_kwargs(*objs, **kwargs)
-        if len(objs) == 1:
-            objs = objs[0]
-        objs = list(objs)
-        for obj in objs:
-            if not checks.is_instance_of(obj, Orders):
-                raise TypeError("Each object to be merged must be an instance of Orders")
-        if "close" not in kwargs:
-            close_objs = []
-            stack_close_objs = True
-            for obj in objs:
-                if obj.config["close"] is not None:
-                    close_objs.append(obj.config["close"])
-                else:
-                    stack_close_objs = False
-                    break
-            if stack_close_objs:
-                kwargs["close"] = kwargs["wrapper"].row_stack_and_wrap(*close_objs, group_by=False)
-        return kwargs
-
-    @classmethod
-    def resolve_column_stack_kwargs(
-        cls: tp.Type[OrdersT],
-        *objs: tp.MaybeTuple[OrdersT],
-        reindex_kwargs: tp.KwargsLike = None,
-        ffill_close: bool = False,
-        fbfill_close: bool = False,
-        **kwargs,
-    ) -> tp.Kwargs:
-        """Resolve keyword arguments for initializing `Orders` after stacking along columns."""
-        kwargs = Records.resolve_column_stack_kwargs(*objs, reindex_kwargs=reindex_kwargs, **kwargs)
-        if len(objs) == 1:
-            objs = objs[0]
-        objs = list(objs)
-        for obj in objs:
-            if not checks.is_instance_of(obj, Orders):
-                raise TypeError("Each object to be merged must be an instance of Orders")
-        if "close" not in kwargs:
-            close_objs = []
-            stack_close_objs = True
-            for obj in objs:
-                if obj._close is not None:
-                    close_objs.append(obj.close)
-                else:
-                    stack_close_objs = False
-                    break
-            if stack_close_objs:
-                new_close = kwargs["wrapper"].column_stack_and_wrap(
-                    *close_objs,
-                    reindex_kwargs=reindex_kwargs,
-                    group_by=False,
-                )
-                if fbfill_close:
-                    new_close = new_close.vbt.fbfill()
-                elif ffill_close:
-                    new_close = new_close.vbt.ffill()
-                kwargs["close"] = new_close
-        return kwargs
-
-    def __init__(
-        self,
-        wrapper: ArrayWrapper,
-        records_arr: tp.RecordArray,
-        close: tp.Optional[tp.ArrayLike] = None,
-        **kwargs,
-    ) -> None:
-        Records.__init__(self, wrapper, records_arr, close=close, **kwargs)
-        self._close = close
-
-    def indexing_func(self: OrdersT, *args, records_meta: tp.DictLike = None, **kwargs) -> OrdersT:
-        """Perform indexing on `Orders`."""
-        if records_meta is None:
-            records_meta = Records.indexing_func_meta(self, *args, **kwargs)
-        if self._close is not None:
-            new_close = to_2d_array(self._close)
-            if new_close.shape[0] > 1:
-                new_close = new_close[records_meta["wrapper_meta"]["row_idxs"], :]
-            if new_close.shape[1] > 1:
-                new_close = new_close[:, records_meta["wrapper_meta"]["col_idxs"]]
-        else:
-            new_close = None
-        return self.replace(
-            wrapper=records_meta["wrapper_meta"]["new_wrapper"],
-            records_arr=records_meta["new_records_arr"],
-            close=new_close
-        )
-
-    def resample(
-        self: OrdersT,
-        *args,
-        ffill_close: bool = False,
-        fbfill_close: bool = False,
-        records_meta: tp.DictLike = None,
-        **kwargs,
-    ) -> OrdersT:
-        """Perform resampling on `Orders`."""
-        if records_meta is None:
-            records_meta = self.resample_meta(*args, **kwargs)
-        if self._close is None:
-            new_close = None
-        else:
-            new_close = self.close.vbt.resample_apply(
-                records_meta["wrapper_meta"]["resampler"],
-                generic_nb.last_reduce_nb,
-            )
-            if fbfill_close:
-                new_close = new_close.vbt.fbfill()
-            elif ffill_close:
-                new_close = new_close.vbt.ffill()
-        return self.replace(
-            wrapper=records_meta["wrapper_meta"]["new_wrapper"],
-            records_arr=records_meta["new_records_arr"],
-            close=new_close,
-        )
-
-    @property
-    def close(self) -> tp.Optional[tp.SeriesFrame]:
-        """Closing price."""
-        if self._close is None:
-            return None
-        return self.wrapper.wrap(self._close, group_by=False)
 
     # ############# Stats ############# #
 
@@ -308,13 +175,13 @@ class Orders(Records):
     def stats_defaults(self) -> tp.Kwargs:
         """Defaults for `Orders.stats`.
 
-        Merges `vectorbtpro.records.base.Records.stats_defaults` and
+        Merges `vectorbtpro.generic.price_records.PriceRecords.stats_defaults` and
         `stats` from `vectorbtpro._settings.orders`."""
         from vectorbtpro._settings import settings
 
         orders_stats_cfg = settings["orders"]["stats"]
 
-        return merge_dicts(Records.stats_defaults.__get__(self), orders_stats_cfg)
+        return merge_dicts(PriceRecords.stats_defaults.__get__(self), orders_stats_cfg)
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
@@ -328,21 +195,23 @@ class Orders(Records):
                 tags="wrapper",
             ),
             total_records=dict(title="Total Records", calc_func="count", tags="records"),
-            total_buy_orders=dict(title="Total Buy Orders", calc_func="buy.count", tags=["orders", "buy"]),
-            total_sell_orders=dict(title="Total Sell Orders", calc_func="sell.count", tags=["orders", "sell"]),
+            total_buy_orders=dict(title="Total Buy Orders", calc_func="side_buy.count", tags=["orders", "buy"]),
+            total_sell_orders=dict(title="Total Sell Orders", calc_func="side_sell.count", tags=["orders", "sell"]),
             min_size=dict(title="Min Size", calc_func="size.min", tags=["orders", "size"]),
             max_size=dict(title="Max Size", calc_func="size.max", tags=["orders", "size"]),
             avg_size=dict(title="Avg Size", calc_func="size.mean", tags=["orders", "size"]),
-            avg_buy_size=dict(title="Avg Buy Size", calc_func="buy.size.mean", tags=["orders", "buy", "size"]),
-            avg_sell_size=dict(title="Avg Sell Size", calc_func="sell.size.mean", tags=["orders", "sell", "size"]),
-            avg_buy_price=dict(title="Avg Buy Price", calc_func="buy.price.mean", tags=["orders", "buy", "price"]),
-            avg_sell_price=dict(title="Avg Sell Price", calc_func="sell.price.mean", tags=["orders", "sell", "price"]),
+            avg_buy_size=dict(title="Avg Buy Size", calc_func="side_buy.size.mean", tags=["orders", "buy", "size"]),
+            avg_sell_size=dict(title="Avg Sell Size", calc_func="side_sell.size.mean", tags=["orders", "sell", "size"]),
+            avg_buy_price=dict(title="Avg Buy Price", calc_func="side_buy.price.mean", tags=["orders", "buy", "price"]),
+            avg_sell_price=dict(
+                title="Avg Sell Price", calc_func="side_sell.price.mean", tags=["orders", "sell", "price"]
+            ),
             total_fees=dict(title="Total Fees", calc_func="fees.sum", tags=["orders", "fees"]),
             min_fees=dict(title="Min Fees", calc_func="fees.min", tags=["orders", "fees"]),
             max_fees=dict(title="Max Fees", calc_func="fees.max", tags=["orders", "fees"]),
             avg_fees=dict(title="Avg Fees", calc_func="fees.mean", tags=["orders", "fees"]),
-            avg_buy_fees=dict(title="Avg Buy Fees", calc_func="buy.fees.mean", tags=["orders", "buy", "fees"]),
-            avg_sell_fees=dict(title="Avg Sell Fees", calc_func="sell.fees.mean", tags=["orders", "sell", "fees"]),
+            avg_buy_fees=dict(title="Avg Buy Fees", calc_func="side_buy.fees.mean", tags=["orders", "buy", "fees"]),
+            avg_sell_fees=dict(title="Avg Sell Fees", calc_func="side_sell.fees.mean", tags=["orders", "sell", "fees"]),
         )
     )
 
@@ -355,6 +224,9 @@ class Orders(Records):
     def plot(
         self,
         column: tp.Optional[tp.Label] = None,
+        plot_ohlc: bool = True,
+        ohlc_type: tp.Union[None, str, tp.BaseTraceType] = None,
+        ohlc_trace_kwargs: tp.KwargsLike = None,
         close_trace_kwargs: tp.KwargsLike = None,
         buy_trace_kwargs: tp.KwargsLike = None,
         sell_trace_kwargs: tp.KwargsLike = None,
@@ -366,6 +238,11 @@ class Orders(Records):
 
         Args:
             column (str): Name of the column to plot.
+            plot_ohlc (bool): Whether to plot the OHLC or just close.
+            ohlc_type: Either 'OHLC', 'Candlestick' or Plotly trace.
+
+                Pass None to use the default.
+            ohlc_trace_kwargs (dict): Keyword arguments passed to `ohlc_type`.
             close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `Orders.close`.
             buy_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Buy" markers.
             sell_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Sell" markers.
@@ -396,6 +273,8 @@ class Orders(Records):
 
         self_col = self.select_col(column=column, group_by=False)
 
+        if ohlc_trace_kwargs is None:
+            ohlc_trace_kwargs = {}
         if close_trace_kwargs is None:
             close_trace_kwargs = {}
         close_trace_kwargs = merge_dicts(
@@ -414,8 +293,36 @@ class Orders(Records):
         fig.update_layout(**layout_kwargs)
 
         # Plot price
-        if self_col._close is not None:
-            fig = self_col.close.vbt.plot(trace_kwargs=close_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+        if (
+            plot_ohlc
+            and self_col._open is not None
+            and self_col._high is not None
+            and self_col._low is not None
+            and self_col._close is not None
+        ):
+            ohlc_df = pd.DataFrame(
+                {
+                    "open": self_col.open,
+                    "high": self_col.high,
+                    "low": self_col.low,
+                    "close": self_col.close,
+                }
+            )
+            if "opacity" not in ohlc_trace_kwargs:
+                ohlc_trace_kwargs["opacity"] = 0.5
+            fig = ohlc_df.vbt.ohlcv.plot(
+                ohlc_type=ohlc_type,
+                plot_volume=False,
+                ohlc_trace_kwargs=ohlc_trace_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                fig=fig,
+            )
+        elif self_col._close is not None:
+            fig = self_col.close.vbt.plot(
+                trace_kwargs=close_trace_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                fig=fig,
+            )
 
         if self_col.count() > 0:
             # Extract information
@@ -496,13 +403,13 @@ class Orders(Records):
     def plots_defaults(self) -> tp.Kwargs:
         """Defaults for `Orders.plots`.
 
-        Merges `vectorbtpro.records.base.Records.plots_defaults` and
+        Merges `vectorbtpro.generic.price_records.PriceRecords.plots_defaults` and
         `plots` from `vectorbtpro._settings.orders`."""
         from vectorbtpro._settings import settings
 
         orders_plots_cfg = settings["orders"]["plots"]
 
-        return merge_dicts(Records.plots_defaults.__get__(self), orders_plots_cfg)
+        return merge_dicts(PriceRecords.plots_defaults.__get__(self), orders_plots_cfg)
 
     _subplots: tp.ClassVar[Config] = Config(
         dict(

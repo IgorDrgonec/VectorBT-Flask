@@ -1024,6 +1024,17 @@ def nth_reduce_nb(arr: tp.Array1d, n: int) -> float:
 
 
 @register_jitted(cache=True)
+def first_reduce_nb(arr: tp.Array1d) -> float:
+    """Get first non-NA element."""
+    if arr.shape[0] == 0:
+        raise ValueError("index is out of bounds")
+    for i in range(len(arr)):
+        if not np.isnan(arr[i]):
+            return arr[i]
+    return np.nan
+
+
+@register_jitted(cache=True)
 def last_reduce_nb(arr: tp.Array1d) -> float:
     """Get last non-NA element."""
     if arr.shape[0] == 0:

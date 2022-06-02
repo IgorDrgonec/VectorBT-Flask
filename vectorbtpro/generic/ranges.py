@@ -31,7 +31,7 @@ are 0 and 20 (not 19!) respectively.
 >>> slow_ma = vbt.MA.run(price, 50)
 >>> fast_below_slow = fast_ma.ma_above(slow_ma)
 
->>> ranges = vbt.Ranges.from_ts(fast_below_slow, wrapper_kwargs=dict(freq='d'))
+>>> ranges = vbt.Ranges.from_generic(fast_below_slow, wrapper_kwargs=dict(freq='d'))
 
 >>> ranges.records_readable
    Range Id  Column           Start Timestamp             End Timestamp  \\
@@ -118,18 +118,19 @@ Name: group, dtype: object
 """
 
 import numpy as np
+import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_pd_array, to_2d_array
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic import nb
 from vectorbtpro.generic.enums import RangeStatus, range_dt
+from vectorbtpro.generic.price_records import PriceRecords
 from vectorbtpro.records.base import Records
 from vectorbtpro.records.decorators import override_field_config, attach_fields, attach_shortcut_properties
 from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
-from vectorbtpro.utils import checks
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig
 
@@ -197,8 +198,8 @@ RangesT = tp.TypeVar("RangesT", bound="Ranges")
 @attach_shortcut_properties(ranges_shortcut_config)
 @attach_fields(ranges_attach_field_config)
 @override_field_config(ranges_field_config)
-class Ranges(Records):
-    """Extends `Records` for working with range records.
+class Ranges(PriceRecords):
+    """Extends `vectorbtpro.generic.price_records.PriceRecords` for working with range records.
 
     Requires `records_arr` to have all fields defined in `vectorbtpro.generic.enums.range_dt`."""
 
@@ -207,159 +208,17 @@ class Ranges(Records):
         return self._field_config
 
     @classmethod
-    def from_records(
+    def from_generic(
         cls: tp.Type[RangesT],
-        wrapper: ArrayWrapper,
-        records: tp.RecordArray,
-        ts: tp.Optional[tp.ArrayLike] = None,
-        attach_ts: bool = True,
-        **kwargs,
-    ) -> RangesT:
-        """Build `Trades` from records."""
-        return cls(wrapper, records, ts=ts if attach_ts else None, **kwargs)
-
-    @classmethod
-    def resolve_row_stack_kwargs(
-        cls: tp.Type[RangesT],
-        *objs: tp.MaybeTuple[RangesT],
-        **kwargs,
-    ) -> tp.Kwargs:
-        """Resolve keyword arguments for initializing `Ranges` after stacking along rows."""
-        kwargs = Records.resolve_row_stack_kwargs(*objs, **kwargs)
-        if len(objs) == 1:
-            objs = objs[0]
-        objs = list(objs)
-        for obj in objs:
-            if not checks.is_instance_of(obj, Ranges):
-                raise TypeError("Each object to be merged must be an instance of Ranges")
-        if "ts" not in kwargs:
-            ts_objs = []
-            stack_ts_objs = True
-            any_not_none = False
-            for obj in objs:
-                if obj.config["ts"] is not None:
-                    ts_objs.append(obj.config["ts"])
-                    any_not_none = True
-                else:
-                    stack_ts_objs = False
-            if stack_ts_objs:
-                kwargs["ts"] = kwargs["wrapper"].row_stack_and_wrap(*ts_objs, group_by=False)
-            else:
-                if any_not_none:
-                    raise ValueError("Some objects to be merged have 'ts' while others not")
-        return kwargs
-
-    @classmethod
-    def resolve_column_stack_kwargs(
-        cls: tp.Type[RangesT],
-        *objs: tp.MaybeTuple[RangesT],
-        reindex_kwargs: tp.KwargsLike = None,
-        ffill_ts: bool = False,
-        fbfill_ts: bool = False,
-        **kwargs,
-    ) -> tp.Kwargs:
-        """Resolve keyword arguments for initializing `Ranges` after stacking along columns."""
-        kwargs = Records.resolve_column_stack_kwargs(*objs, reindex_kwargs=reindex_kwargs, **kwargs)
-        if len(objs) == 1:
-            objs = objs[0]
-        objs = list(objs)
-        for obj in objs:
-            if not checks.is_instance_of(obj, Ranges):
-                raise TypeError("Each object to be merged must be an instance of Ranges")
-        if "ts" not in kwargs:
-            ts_objs = []
-            stack_ts_objs = True
-            any_not_none = False
-            for obj in objs:
-                if obj.ts is not None:
-                    ts_objs.append(obj.ts)
-                    any_not_none = True
-                else:
-                    stack_ts_objs = False
-            if stack_ts_objs:
-                new_ts = kwargs["wrapper"].column_stack_and_wrap(
-                    *ts_objs,
-                    reindex_kwargs=reindex_kwargs,
-                    group_by=False,
-                )
-                if fbfill_ts:
-                    new_ts = new_ts.vbt.fbfill()
-                elif ffill_ts:
-                    new_ts = new_ts.vbt.ffill()
-                kwargs["ts"] = new_ts
-            else:
-                if any_not_none:
-                    raise ValueError("Some objects to be merged have 'ts' while others not")
-        return kwargs
-
-    def __init__(
-        self,
-        wrapper: ArrayWrapper,
-        records_arr: tp.RecordArray,
-        ts: tp.Optional[tp.SeriesFrame] = None,
-        **kwargs,
-    ) -> None:
-        Records.__init__(self, wrapper, records_arr, ts=ts, **kwargs)
-        self._ts = ts
-
-    def indexing_func(self: RangesT, *args, records_meta: tp.DictLike = None, **kwargs) -> RangesT:
-        """Perform indexing on `Ranges`."""
-        if records_meta is None:
-            records_meta = Records.indexing_func_meta(self, *args, **kwargs)
-        if self._ts is not None:
-            new_ts = to_2d_array(self._ts)
-            if new_ts.shape[0] > 1:
-                new_ts = new_ts[records_meta["wrapper_meta"]["row_idxs"], :]
-            if new_ts.shape[1] > 1:
-                new_ts = new_ts[:, records_meta["wrapper_meta"]["col_idxs"]]
-        else:
-            new_ts = None
-        return self.replace(
-            wrapper=records_meta["wrapper_meta"]["new_wrapper"],
-            records_arr=records_meta["new_records_arr"],
-            ts=new_ts
-        )
-
-    def resample(
-        self: RangesT,
-        *args,
-        ffill_ts: bool = False,
-        fbfill_ts: bool = False,
-        records_meta: tp.DictLike = None,
-        **kwargs,
-    ) -> RangesT:
-        """Perform resampling on `Ranges`."""
-        if records_meta is None:
-            records_meta = self.resample_meta(*args, **kwargs)
-        if self._ts is None:
-            new_ts = None
-        else:
-            new_ts = self.ts.vbt.resample_apply(
-                records_meta["wrapper_meta"]["resampler"],
-                nb.last_reduce_nb,
-            )
-            if fbfill_ts:
-                new_ts = new_ts.vbt.fbfill()
-            elif ffill_ts:
-                new_ts = new_ts.vbt.ffill()
-        return self.replace(
-            wrapper=records_meta["wrapper_meta"]["new_wrapper"],
-            records_arr=records_meta["new_records_arr"],
-            ts=new_ts,
-        )
-
-    @classmethod
-    def from_ts(
-        cls: tp.Type[RangesT],
-        ts: tp.ArrayLike,
+        generic: tp.ArrayLike,
         gap_value: tp.Optional[tp.Scalar] = None,
-        attach_ts: bool = True,
+        attach_as_close: bool = True,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrapper_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> RangesT:
-        """Build `Ranges` from time series `ts`.
+        """Build `Ranges` from time series `close`.
 
         Searches for sequences of
 
@@ -367,31 +226,27 @@ class Ranges(Records):
         * positive values in integer data (-1 acts as a gap), and
         * non-NaN values in any other data (NaN acts as a gap).
 
+        If `attach_as_close` is True, will attach `generic` as `close`.
+
         `**kwargs` will be passed to `Ranges.__init__`."""
         if wrapper_kwargs is None:
             wrapper_kwargs = {}
 
-        ts_pd = to_pd_array(ts)
-        ts_arr = to_2d_array(ts_pd)
+        generic_arr = to_2d_array(generic)
         if gap_value is None:
-            if np.issubdtype(ts_arr.dtype, np.bool_):
+            if np.issubdtype(generic_arr.dtype, np.bool_):
                 gap_value = False
-            elif np.issubdtype(ts_arr.dtype, np.integer):
+            elif np.issubdtype(generic_arr.dtype, np.integer):
                 gap_value = -1
             else:
                 gap_value = np.nan
         func = jit_reg.resolve_option(nb.get_ranges_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        records_arr = func(ts_arr, gap_value)
-        wrapper = ArrayWrapper.from_obj(ts_pd, **wrapper_kwargs)
-        return cls(wrapper, records_arr, ts=ts_pd if attach_ts else None, **kwargs)
-
-    @property
-    def ts(self) -> tp.Optional[tp.SeriesFrame]:
-        """Original time series that records are built from (optional)."""
-        if self._ts is None:
-            return None
-        return self.wrapper.wrap(self._ts, group_by=False)
+        records_arr = func(generic_arr, gap_value)
+        wrapper = ArrayWrapper.from_obj(generic, **wrapper_kwargs)
+        if attach_as_close:
+            return cls(wrapper, records_arr, close=generic_arr, **kwargs)
+        return cls(wrapper, records_arr, **kwargs)
 
     def get_mask(
         self,
@@ -539,7 +394,10 @@ class Ranges(Records):
         column: tp.Optional[tp.Label] = None,
         top_n: tp.Optional[int] = None,
         plot_zones: bool = True,
-        ts_trace_kwargs: tp.KwargsLike = None,
+        plot_ohlc: bool = True,
+        ohlc_type: tp.Union[None, str, tp.BaseTraceType] = None,
+        ohlc_trace_kwargs: tp.KwargsLike = None,
+        close_trace_kwargs: tp.KwargsLike = None,
         start_trace_kwargs: tp.KwargsLike = None,
         end_trace_kwargs: tp.KwargsLike = None,
         open_shape_kwargs: tp.KwargsLike = None,
@@ -556,7 +414,12 @@ class Ranges(Records):
             column (str): Name of the column to plot.
             top_n (int): Filter top N range records by maximum duration.
             plot_zones (bool): Whether to plot zones.
-            ts_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `Ranges.ts`.
+            plot_ohlc (bool): Whether to plot the OHLC or just close.
+            ohlc_type: Either 'OHLC', 'Candlestick' or Plotly trace.
+
+                Pass None to use the default.
+            ohlc_trace_kwargs (dict): Keyword arguments passed to `ohlc_type`.
+            close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `Ranges.close`.
             start_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for start values.
             end_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for end values.
             open_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for open zones.
@@ -571,7 +434,7 @@ class Ranges(Records):
             ```pycon
             >>> price = pd.Series([1, 2, 1, 2, 3, 2, 1, 2], name='Price')
             >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
-            >>> vbt.Ranges.from_ts(price >= 2, wrapper_kwargs=dict(freq='1 day')).plot()
+            >>> vbt.Ranges.from_generic(price >= 2, wrapper_kwargs=dict(freq='1 day')).plot()
             ```
 
             ![](/assets/images/ranges_plot.svg)
@@ -589,9 +452,13 @@ class Ranges(Records):
         if top_n is not None:
             self_col = self_col.apply_mask(self_col.duration.top_n_mask(top_n))
 
-        if ts_trace_kwargs is None:
-            ts_trace_kwargs = {}
-        ts_trace_kwargs = merge_dicts(dict(line=dict(color=plotting_cfg["color_schema"]["blue"])), ts_trace_kwargs)
+        if ohlc_trace_kwargs is None:
+            ohlc_trace_kwargs = {}
+        if close_trace_kwargs is None:
+            close_trace_kwargs = {}
+        close_trace_kwargs = merge_dicts(
+            dict(line=dict(color=plotting_cfg["color_schema"]["blue"])), close_trace_kwargs
+        )
         if start_trace_kwargs is None:
             start_trace_kwargs = {}
         if end_trace_kwargs is None:
@@ -608,8 +475,38 @@ class Ranges(Records):
         fig.update_layout(**layout_kwargs)
         y_domain = get_domain(yref, fig)
 
-        if self_col.ts is not None:
-            fig = self_col.ts.vbt.plot(trace_kwargs=ts_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+        plotting_ohlc = False
+        if (
+            plot_ohlc
+            and self_col._open is not None
+            and self_col._high is not None
+            and self_col._low is not None
+            and self_col._close is not None
+        ):
+            ohlc_df = pd.DataFrame(
+                {
+                    "open": self_col.open,
+                    "high": self_col.high,
+                    "low": self_col.low,
+                    "close": self_col.close,
+                }
+            )
+            if "opacity" not in ohlc_trace_kwargs:
+                ohlc_trace_kwargs["opacity"] = 0.5
+            fig = ohlc_df.vbt.ohlcv.plot(
+                ohlc_type=ohlc_type,
+                plot_volume=False,
+                ohlc_trace_kwargs=ohlc_trace_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                fig=fig,
+            )
+            plotting_ohlc = True
+        elif self_col._close is not None:
+            fig = self_col.close.vbt.plot(
+                trace_kwargs=close_trace_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                fig=fig,
+            )
 
         if self_col.count() > 0:
             # Extract information
@@ -618,15 +515,17 @@ class Ranges(Records):
 
             start_idx = self_col.get_map_field_to_index("start_idx")
             start_idx_title = self_col.get_field_title("start_idx")
-            if self_col.ts is not None:
-                start_val = self_col.ts.loc[start_idx]
+            if plotting_ohlc and self_col.open is not None:
+                start_val = self_col.open.loc[start_idx]
+            elif self_col.close is not None:
+                start_val = self_col.close.loc[start_idx]
             else:
                 start_val = np.full(len(start_idx), 0)
 
             end_idx = self_col.get_map_field_to_index("end_idx")
             end_idx_title = self_col.get_field_title("end_idx")
-            if self_col.ts is not None:
-                end_val = self_col.ts.loc[end_idx]
+            if self_col.close is not None:
+                end_val = self_col.close.loc[end_idx]
             else:
                 end_val = np.full(len(end_idx), 0)
 

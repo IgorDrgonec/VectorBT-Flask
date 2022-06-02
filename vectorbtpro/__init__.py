@@ -11,6 +11,7 @@ __version__ = _version
 from vectorbtpro.utils import *
 from vectorbtpro.base import *
 from vectorbtpro.data import *
+from vectorbtpro.ohlcv import *
 from vectorbtpro.generic import *
 from vectorbtpro.indicators import *
 from vectorbtpro.signals import *
@@ -20,7 +21,6 @@ from vectorbtpro.portfolio import *
 from vectorbtpro.labels import *
 from vectorbtpro.messaging import *
 from vectorbtpro.registries import *
-from vectorbtpro.ohlcv import *
 from vectorbtpro.px import *
 
 # Most important modules and objects

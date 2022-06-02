@@ -252,15 +252,55 @@ def drawdown_nb(arr: tp.Array2d) -> tp.Array2d:
     return out
 
 
+@register_jitted(cache=True)
+def fill_drawdown_record_nb(
+    new_records: tp.RecordArray2d,
+    counts: tp.Array2d,
+    i: int,
+    col: int,
+    peak_idx: int,
+    valley_idx: int,
+    peak_val: float,
+    valley_val: float,
+    end_val: float,
+    status: int,
+):
+    """Fill a drawdown record."""
+    r = counts[col]
+    new_records["id"][r, col] = r
+    new_records["col"][r, col] = col
+    new_records["peak_idx"][r, col] = peak_idx
+    new_records["start_idx"][r, col] = peak_idx + 1
+    new_records["valley_idx"][r, col] = valley_idx
+    new_records["end_idx"][r, col] = i
+    new_records["peak_val"][r, col] = peak_val
+    new_records["valley_val"][r, col] = valley_val
+    new_records["end_val"][r, col] = end_val
+    new_records["status"][r, col] = status
+    counts[col] += 1
+
+
 @register_chunkable(
-    size=ch.ArraySizer(arg_query="arr", axis=1),
-    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1)),
+    size=ch.ArraySizer(arg_query="close", axis=1),
+    arg_take_spec=dict(
+        open=ch.ArraySlicer(axis=1),
+        high=ch.ArraySlicer(axis=1),
+        low=ch.ArraySlicer(axis=1),
+        close=ch.ArraySlicer(axis=1),
+    ),
     merge_func=records_ch.merge_records,
     merge_kwargs=dict(chunk_meta=Rep("chunk_meta")),
 )
-@register_jitted(cache=True, tags={"can_parallel"})
-def get_drawdowns_nb(arr: tp.Array2d) -> tp.RecordArray:
+@register_jitted(tags={"can_parallel"})
+def get_drawdowns_nb(
+    open: tp.Optional[tp.Array2d],
+    high: tp.Optional[tp.Array2d],
+    low: tp.Optional[tp.Array2d],
+    close: tp.Array2d,
+) -> tp.RecordArray:
     """Fill drawdown records by analyzing a time series.
+
+    Only `close` must be provided, other time series are optional.
 
     Usage:
         ```pycon
@@ -268,14 +308,14 @@ def get_drawdowns_nb(arr: tp.Array2d) -> tp.RecordArray:
         >>> import pandas as pd
         >>> from vectorbtpro.generic.nb import get_drawdowns_nb
 
-        >>> a = np.asarray([
+        >>> close = np.asarray([
         ...     [1, 5, 1, 3],
         ...     [2, 4, 2, 2],
         ...     [3, 3, 3, 1],
         ...     [4, 2, 2, 2],
         ...     [5, 1, 1, 3]
         ... ])
-        >>> records = get_drawdowns_nb(a)
+        >>> records = get_drawdowns_nb(None, None, None, close)
 
         >>> pd.DataFrame.from_records(records)
            id  col  peak_idx  start_idx  valley_idx  end_idx  peak_val  valley_val  \\
@@ -289,75 +329,119 @@ def get_drawdowns_nb(arr: tp.Array2d) -> tp.RecordArray:
         2      3.0       1
         ```
     """
-    new_records = np.empty(arr.shape, dtype=drawdown_dt)
-    counts = np.full(arr.shape[1], 0, dtype=np.int_)
+    new_records = np.empty(close.shape, dtype=drawdown_dt)
+    counts = np.full(close.shape[1], 0, dtype=np.int_)
 
-    for col in prange(arr.shape[1]):
+    for col in prange(close.shape[1]):
         drawdown_started = False
-        peak_idx = -1
-        valley_idx = -1
-        peak_val = arr[0, col]
-        valley_val = arr[0, col]
-        store_record = False
-        status = -1
+        _close = close[0, col]
+        if open is None:
+            _open = np.nan
+        else:
+            _open = open[0, col]
+        peak_idx = 0
+        valley_idx = 0
+        peak_val = _open
+        valley_val = _open
 
-        for i in range(arr.shape[0]):
-            cur_val = arr[i, col]
-
-            if not np.isnan(cur_val):
-                if np.isnan(peak_val) or cur_val >= peak_val:
-                    # Value increased
-                    if not drawdown_started:
-                        # If not running, register new peak
-                        peak_val = cur_val
-                        peak_idx = i
-                    else:
-                        # If running, potential recovery
-                        if cur_val >= peak_val:
-                            drawdown_started = False
-                            store_record = True
-                            status = DrawdownStatus.Recovered
+        for i in range(close.shape[0]):
+            _close = close[i, col]
+            if open is None:
+                _open = np.nan
+            else:
+                _open = open[i, col]
+            if high is None:
+                _high = np.nan
+            else:
+                _high = high[i, col]
+            if low is None:
+                _low = np.nan
+            else:
+                _low = low[i, col]
+            if np.isnan(_high):
+                if np.isnan(_open):
+                    _high = _close
+                elif np.isnan(_close):
+                    _high = _open
                 else:
-                    # Value decreased
-                    if not drawdown_started:
-                        # If not running, start new drawdown
-                        drawdown_started = True
-                        valley_val = cur_val
-                        valley_idx = i
-                    else:
-                        # If running, potential valley
-                        if cur_val < valley_val:
-                            valley_val = cur_val
-                            valley_idx = i
+                    _high = max(_open, _close)
+            if np.isnan(_low):
+                if np.isnan(_open):
+                    _low = _close
+                elif np.isnan(_close):
+                    _low = _open
+                else:
+                    _low = min(_open, _close)
 
-                if i == arr.shape[0] - 1 and drawdown_started:
-                    # If still running, mark for save
+            if drawdown_started:
+                if _open >= peak_val:
                     drawdown_started = False
-                    store_record = True
-                    status = DrawdownStatus.Active
-
-                if store_record:
-                    # Save drawdown to the records
-                    r = counts[col]
-                    new_records["id"][r, col] = r
-                    new_records["col"][r, col] = col
-                    new_records["peak_idx"][r, col] = peak_idx
-                    new_records["start_idx"][r, col] = peak_idx + 1
-                    new_records["valley_idx"][r, col] = valley_idx
-                    new_records["end_idx"][r, col] = i
-                    new_records["peak_val"][r, col] = peak_val
-                    new_records["valley_val"][r, col] = valley_val
-                    new_records["end_val"][r, col] = cur_val
-                    new_records["status"][r, col] = status
-                    counts[col] += 1
-
-                    # Reset running vars for a new drawdown
+                    fill_drawdown_record_nb(
+                        new_records=new_records,
+                        counts=counts,
+                        i=i,
+                        col=col,
+                        peak_idx=peak_idx,
+                        valley_idx=valley_idx,
+                        peak_val=peak_val,
+                        valley_val=valley_val,
+                        end_val=_open,
+                        status=DrawdownStatus.Recovered,
+                    )
                     peak_idx = i
                     valley_idx = i
-                    peak_val = cur_val
-                    valley_val = cur_val
-                    store_record = False
-                    status = -1
+                    peak_val = _open
+                    valley_val = _open
+
+            if drawdown_started:
+                if _low < valley_val:
+                    valley_idx = i
+                    valley_val = _low
+                if _high >= peak_val:
+                    drawdown_started = False
+                    fill_drawdown_record_nb(
+                        new_records=new_records,
+                        counts=counts,
+                        i=i,
+                        col=col,
+                        peak_idx=peak_idx,
+                        valley_idx=valley_idx,
+                        peak_val=peak_val,
+                        valley_val=valley_val,
+                        end_val=_high,
+                        status=DrawdownStatus.Recovered,
+                    )
+                    peak_idx = i
+                    valley_idx = i
+                    peak_val = _high
+                    valley_val = _high
+            else:
+                if np.isnan(peak_val) or _high >= peak_val:
+                    peak_idx = i
+                    valley_idx = i
+                    peak_val = _high
+                    valley_val = _high
+                elif _low < valley_val:
+                    if not np.isnan(valley_val):
+                        drawdown_started = True
+                    valley_idx = i
+                    valley_val = _low
+
+            if drawdown_started:
+                if i == close.shape[0] - 1:
+                    drawdown_started = False
+                    fill_drawdown_record_nb(
+                        new_records=new_records,
+                        counts=counts,
+                        i=i,
+                        col=col,
+                        peak_idx=peak_idx,
+                        valley_idx=valley_idx,
+                        peak_val=peak_val,
+                        valley_val=valley_val,
+                        end_val=_close,
+                        status=DrawdownStatus.Active,
+                    )
 
     return repartition_nb(new_records, counts)
 

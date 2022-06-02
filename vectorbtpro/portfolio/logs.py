@@ -88,8 +88,8 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_dict
+from vectorbtpro.generic.price_records import PriceRecords
 from vectorbtpro.portfolio.enums import log_dt, SizeType, Direction, OrderSide, OrderStatus, OrderStatusInfo
-from vectorbtpro.records.base import Records
 from vectorbtpro.records.decorators import attach_fields, override_field_config
 from vectorbtpro.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig
 
@@ -103,16 +103,16 @@ logs_field_config = ReadonlyConfig(
             col=dict(title=("Meta", "Column")),
             idx=dict(title=("Meta", "Timestamp")),
             group=dict(title=("Meta", "Group")),
-            open=dict(title=("Price Area", "Open")),
-            high=dict(title=("Price Area", "High")),
-            low=dict(title=("Price Area", "Low")),
-            close=dict(title=("Price Area", "Close")),
-            cash=dict(title=("State", "Cash")),
-            position=dict(title=("State", "Position")),
-            debt=dict(title=("State", "Debt")),
-            free_cash=dict(title=("State", "Free Cash")),
-            val_price=dict(title=("State", "Valuation Price")),
-            value=dict(title=("State", "Value")),
+            price_area_open=dict(title=("Price Area", "Open")),
+            price_area_high=dict(title=("Price Area", "High")),
+            price_area_low=dict(title=("Price Area", "Low")),
+            price_area_close=dict(title=("Price Area", "Close")),
+            exec_state_cash=dict(title=("Exec State", "Cash")),
+            exec_state_position=dict(title=("Exec State", "Position")),
+            exec_state_debt=dict(title=("Exec State", "Debt")),
+            exec_state_free_cash=dict(title=("Exec State", "Free Cash")),
+            exec_state_val_price=dict(title=("Exec State", "Valuation Price")),
+            exec_state_value=dict(title=("Exec State", "Value")),
             req_size=dict(title=("Request", "Size")),
             req_price=dict(title=("Request", "Price")),
             req_size_type=dict(title=("Request", "Size Type"), mapping=SizeType),
@@ -129,12 +129,12 @@ logs_field_config = ReadonlyConfig(
             req_allow_partial=dict(title=("Request", "Allow Partial")),
             req_raise_reject=dict(title=("Request", "Raise Rejection")),
             req_log=dict(title=("Request", "Log")),
-            new_cash=dict(title=("New State", "Cash")),
-            new_position=dict(title=("New State", "Position")),
-            new_debt=dict(title=("New State", "Debt")),
-            new_free_cash=dict(title=("New State", "Free Cash")),
-            new_val_price=dict(title=("New State", "Valuation Price")),
-            new_value=dict(title=("New State", "Value")),
+            new_exec_state_cash=dict(title=("New Exec State", "Cash")),
+            new_exec_state_position=dict(title=("New Exec State", "Position")),
+            new_exec_state_debt=dict(title=("New Exec State", "Debt")),
+            new_exec_state_free_cash=dict(title=("New Exec State", "Free Cash")),
+            new_exec_state_val_price=dict(title=("New Exec State", "Valuation Price")),
+            new_exec_state_value=dict(title=("New Exec State", "Value")),
             res_size=dict(title=("Result", "Size")),
             res_price=dict(title=("Result", "Price")),
             res_fees=dict(title=("Result", "Fees")),
@@ -179,8 +179,8 @@ LogsT = tp.TypeVar("LogsT", bound="Logs")
 
 @attach_fields(logs_attach_field_config)
 @override_field_config(logs_field_config)
-class Logs(Records):
-    """Extends `Records` for working with log records."""
+class Logs(PriceRecords):
+    """Extends `vectorbtpro.generic.price_records.PriceRecords` for working with log records."""
 
     @property
     def field_config(self) -> Config:
@@ -192,13 +192,13 @@ class Logs(Records):
     def stats_defaults(self) -> tp.Kwargs:
         """Defaults for `Logs.stats`.
 
-        Merges `vectorbtpro.records.base.Records.stats_defaults` and
+        Merges `vectorbtpro.generic.price_records.PriceRecords.stats_defaults` and
         `stats` from `vectorbtpro._settings.logs`."""
         from vectorbtpro._settings import settings
 
         logs_stats_cfg = settings["logs"]["stats"]
 
-        return merge_dicts(Records.stats_defaults.__get__(self), logs_stats_cfg)
+        return merge_dicts(PriceRecords.stats_defaults.__get__(self), logs_stats_cfg)
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
@@ -238,13 +238,13 @@ class Logs(Records):
     def plots_defaults(self) -> tp.Kwargs:
         """Defaults for `Logs.plots`.
 
-        Merges `vectorbtpro.records.base.Records.plots_defaults` and
+        Merges `vectorbtpro.generic.price_records.PriceRecords.plots_defaults` and
         `plots` from `vectorbtpro._settings.logs`."""
         from vectorbtpro._settings import settings
 
         logs_plots_cfg = settings["logs"]["plots"]
 
-        return merge_dicts(Records.plots_defaults.__get__(self), logs_plots_cfg)
+        return merge_dicts(PriceRecords.plots_defaults.__get__(self), logs_plots_cfg)
 
     @property
     def subplots(self) -> Config:

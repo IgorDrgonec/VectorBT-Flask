@@ -56,6 +56,41 @@ def from_orders_shortonly(close=price, size=order_size, **kwargs):
 
 
 class TestFromOrders:
+    def test_data(self):
+        data = vbt.RandomOHLCData.fetch(
+            [0, 1],
+            ohlc_freq="1d",
+            start="2020-01-01",
+            end="2020-02-01",
+            freq="1h",
+            seed=42,
+        )
+        pf = vbt.Portfolio.from_orders(data)
+        assert pf.open is not None
+        assert pf.high is not None
+        assert pf.low is not None
+        assert pf.close is not None
+        pf = vbt.Portfolio.from_orders(data.get("Close"))
+        assert pf.open is None
+        assert pf.high is None
+        assert pf.low is None
+        assert pf.close is not None
+        pf = vbt.Portfolio.from_orders(data[["Open", "Close"]])
+        assert pf.open is not None
+        assert pf.high is None
+        assert pf.low is None
+        assert pf.close is not None
+        pf = vbt.Portfolio.from_orders(data["Close"])
+        assert pf.open is None
+        assert pf.high is None
+        assert pf.low is None
+        assert pf.close is not None
+        pf = vbt.Portfolio.from_orders(data["Close"], open=data.get("Open"))
+        assert pf.open is not None
+        assert pf.high is None
+        assert pf.low is None
+        assert pf.close is not None
+
     def test_one_column(self):
         assert_records_close(
             from_orders_both().order_records,

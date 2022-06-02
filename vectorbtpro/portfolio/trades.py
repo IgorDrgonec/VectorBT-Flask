@@ -14,7 +14,7 @@ of the entire symbol.
 
 !!! warning
     All classes return both closed AND open trades/positions, which may skew your performance results.
-    To only consider closed trades/positions, you should explicitly query the `Trades.closed` attribute.
+    To only consider closed trades/positions, you should explicitly query the `status_closed` attribute.
 
 ## Trade types
 
@@ -600,151 +600,6 @@ class Trades(Ranges):
     def field_config(self) -> Config:
         return self._field_config
 
-    @classmethod
-    def from_records(
-        cls: tp.Type[TradesT],
-        wrapper: ArrayWrapper,
-        records: tp.RecordArray,
-        close: tp.Optional[tp.ArrayLike] = None,
-        attach_close: bool = True,
-        **kwargs,
-    ) -> TradesT:
-        """Build `Trades` from records."""
-        return cls(wrapper, records, close=close if attach_close else None, **kwargs)
-
-    @classmethod
-    def resolve_row_stack_kwargs(
-        cls: tp.Type[TradesT],
-        *objs: tp.MaybeTuple[TradesT],
-        **kwargs,
-    ) -> tp.Kwargs:
-        """Resolve keyword arguments for initializing `Trades` after stacking along rows."""
-        kwargs = Ranges.resolve_row_stack_kwargs(*objs, **kwargs)
-        if len(objs) == 1:
-            objs = objs[0]
-        objs = list(objs)
-        for obj in objs:
-            if not checks.is_instance_of(obj, Trades):
-                raise TypeError("Each object to be merged must be an instance of Trades")
-        if "close" not in kwargs:
-            close_objs = []
-            stack_close_objs = True
-            for obj in objs:
-                if obj.config["close"] is not None:
-                    close_objs.append(obj.config["close"])
-                else:
-                    stack_close_objs = False
-                    break
-            if stack_close_objs:
-                kwargs["close"] = kwargs["wrapper"].row_stack_and_wrap(*close_objs, group_by=False)
-        return kwargs
-
-    @classmethod
-    def resolve_column_stack_kwargs(
-        cls: tp.Type[TradesT],
-        *objs: tp.MaybeTuple[TradesT],
-        reindex_kwargs: tp.KwargsLike = None,
-        ffill_close: bool = False,
-        fbfill_close: bool = False,
-        **kwargs,
-    ) -> tp.Kwargs:
-        """Resolve keyword arguments for initializing `Trades` after stacking along columns."""
-        kwargs = Ranges.resolve_column_stack_kwargs(*objs, reindex_kwargs=reindex_kwargs, **kwargs)
-        if len(objs) == 1:
-            objs = objs[0]
-        objs = list(objs)
-        for obj in objs:
-            if not checks.is_instance_of(obj, Trades):
-                raise TypeError("Each object to be merged must be an instance of Trades")
-        if "close" not in kwargs:
-            close_objs = []
-            stack_close_objs = True
-            for obj in objs:
-                if obj._close is not None:
-                    close_objs.append(obj.close)
-                else:
-                    stack_close_objs = False
-                    break
-            if stack_close_objs:
-                new_close = kwargs["wrapper"].column_stack_and_wrap(
-                    *close_objs,
-                    reindex_kwargs=reindex_kwargs,
-                    group_by=False,
-                )
-                if fbfill_close:
-                    new_close = new_close.vbt.fbfill()
-                elif ffill_close:
-                    new_close = new_close.vbt.ffill()
-                kwargs["close"] = new_close
-        return kwargs
-
-    def __init__(
-        self,
-        wrapper: ArrayWrapper,
-        records_arr: tp.RecordArray,
-        close: tp.Optional[tp.ArrayLike] = None,
-        **kwargs,
-    ) -> None:
-        Ranges.__init__(self, wrapper, records_arr, close=close, **kwargs)
-        self._close = close
-
-    def indexing_func(self: TradesT, *args, records_meta: tp.DictLike = None, **kwargs) -> TradesT:
-        """Perform indexing on `Trades`."""
-        if records_meta is None:
-            records_meta = Ranges.indexing_func_meta(self, *args, **kwargs)
-        if self._close is not None:
-            new_close = to_2d_array(self._close)
-            if new_close.shape[0] > 1:
-                new_close = new_close[records_meta["wrapper_meta"]["row_idxs"], :]
-            if new_close.shape[1] > 1:
-                new_close = new_close[:, records_meta["wrapper_meta"]["col_idxs"]]
-        else:
-            new_close = None
-        return self.replace(
-            wrapper=records_meta["wrapper_meta"]["new_wrapper"],
-            records_arr=records_meta["new_records_arr"],
-            close=new_close
-        )
-
-    def resample(
-        self: TradesT,
-        *args,
-        ffill_close: bool = False,
-        fbfill_close: bool = False,
-        records_meta: tp.DictLike = None,
-        **kwargs,
-    ) -> TradesT:
-        """Perform resampling on `Trades`."""
-        if records_meta is None:
-            records_meta = self.resample_meta(*args, **kwargs)
-        if self._close is None:
-            new_close = None
-        else:
-            new_close = self.close.vbt.resample_apply(
-                records_meta["wrapper_meta"]["resampler"],
-                generic_nb.last_reduce_nb,
-            )
-            if fbfill_close:
-                new_close = new_close.vbt.fbfill()
-            elif ffill_close:
-                new_close = new_close.vbt.ffill()
-        return self.replace(
-            wrapper=records_meta["wrapper_meta"]["new_wrapper"],
-            records_arr=records_meta["new_records_arr"],
-            close=new_close,
-        )
-
-    @property
-    def close(self) -> tp.Optional[tp.SeriesFrame]:
-        """Closing price."""
-        if self._close is None:
-            return None
-        return self.wrapper.wrap(self._close, group_by=False)
-
-    @classmethod
-    def from_ts(cls: tp.Type[TradesT], *args, **kwargs) -> TradesT:
-        raise NotImplementedError
-
     def get_winning(self: TradesT, **kwargs) -> TradesT:
         """Get winning trades."""
         filter_mask = self.values["pnl"] > 0.0
@@ -901,78 +756,80 @@ class Trades(Ranges):
                 tags=["ranges", "coverage"],
             ),
             total_records=dict(title="Total Records", calc_func="count", tags="records"),
-            total_long_trades=dict(title="Total Long Trades", calc_func="long.count", tags=["trades", "long"]),
-            total_short_trades=dict(title="Total Short Trades", calc_func="short.count", tags=["trades", "short"]),
-            total_closed_trades=dict(title="Total Closed Trades", calc_func="closed.count", tags=["trades", "closed"]),
-            total_open_trades=dict(title="Total Open Trades", calc_func="open.count", tags=["trades", "open"]),
-            open_trade_pnl=dict(title="Open Trade PnL", calc_func="open.pnl.sum", tags=["trades", "open"]),
+            total_long_trades=dict(title="Total Long Trades", calc_func="direction_long.count", tags=["trades", "long"]),
+            total_short_trades=dict(title="Total Short Trades", calc_func="direction_short.count", tags=["trades", "short"]),
+            total_closed_trades=dict(
+                title="Total Closed Trades", calc_func="status_closed.count", tags=["trades", "closed"]
+            ),
+            total_open_trades=dict(title="Total Open Trades", calc_func="status_open.count", tags=["trades", "open"]),
+            open_trade_pnl=dict(title="Open Trade PnL", calc_func="status_open.pnl.sum", tags=["trades", "open"]),
             win_rate=dict(
                 title="Win Rate [%]",
-                calc_func="closed.get_win_rate",
+                calc_func="status_closed.get_win_rate",
                 post_calc_func=lambda self, out, settings: out * 100,
                 tags=RepEval("['trades', *incl_open_tags]"),
             ),
             winning_streak=dict(
                 title="Max Win Streak",
-                calc_func=RepEval("'winning_streak.max' if incl_open else 'closed.winning_streak.max'"),
+                calc_func=RepEval("'winning_streak.max' if incl_open else 'status_closed.winning_streak.max'"),
                 wrap_kwargs=dict(dtype=pd.Int64Dtype()),
                 tags=RepEval("['trades', *incl_open_tags, 'streak']"),
             ),
             losing_streak=dict(
                 title="Max Loss Streak",
-                calc_func=RepEval("'losing_streak.max' if incl_open else 'closed.losing_streak.max'"),
+                calc_func=RepEval("'losing_streak.max' if incl_open else 'status_closed.losing_streak.max'"),
                 wrap_kwargs=dict(dtype=pd.Int64Dtype()),
                 tags=RepEval("['trades', *incl_open_tags, 'streak']"),
             ),
             best_trade=dict(
                 title="Best Trade [%]",
-                calc_func=RepEval("'returns.max' if incl_open else 'closed.returns.max'"),
+                calc_func=RepEval("'returns.max' if incl_open else 'status_closed.returns.max'"),
                 post_calc_func=lambda self, out, settings: out * 100,
                 tags=RepEval("['trades', *incl_open_tags]"),
             ),
             worst_trade=dict(
                 title="Worst Trade [%]",
-                calc_func=RepEval("'returns.min' if incl_open else 'closed.returns.min'"),
+                calc_func=RepEval("'returns.min' if incl_open else 'status_closed.returns.min'"),
                 post_calc_func=lambda self, out, settings: out * 100,
                 tags=RepEval("['trades', *incl_open_tags]"),
             ),
             avg_winning_trade=dict(
                 title="Avg Winning Trade [%]",
-                calc_func=RepEval("'winning.returns.mean' if incl_open else 'closed.winning.returns.mean'"),
+                calc_func=RepEval("'winning.returns.mean' if incl_open else 'status_closed.winning.returns.mean'"),
                 post_calc_func=lambda self, out, settings: out * 100,
                 tags=RepEval("['trades', *incl_open_tags, 'winning']"),
             ),
             avg_losing_trade=dict(
                 title="Avg Losing Trade [%]",
-                calc_func=RepEval("'losing.returns.mean' if incl_open else 'closed.losing.returns.mean'"),
+                calc_func=RepEval("'losing.returns.mean' if incl_open else 'status_closed.losing.returns.mean'"),
                 post_calc_func=lambda self, out, settings: out * 100,
                 tags=RepEval("['trades', *incl_open_tags, 'losing']"),
             ),
             avg_winning_trade_duration=dict(
                 title="Avg Winning Trade Duration",
-                calc_func=RepEval("'winning.avg_duration' if incl_open else 'closed.winning.get_avg_duration'"),
+                calc_func=RepEval("'winning.avg_duration' if incl_open else 'status_closed.winning.get_avg_duration'"),
                 fill_wrap_kwargs=True,
                 tags=RepEval("['trades', *incl_open_tags, 'winning', 'duration']"),
             ),
             avg_losing_trade_duration=dict(
                 title="Avg Losing Trade Duration",
-                calc_func=RepEval("'losing.avg_duration' if incl_open else 'closed.losing.get_avg_duration'"),
+                calc_func=RepEval("'losing.avg_duration' if incl_open else 'status_closed.losing.get_avg_duration'"),
                 fill_wrap_kwargs=True,
                 tags=RepEval("['trades', *incl_open_tags, 'losing', 'duration']"),
             ),
             profit_factor=dict(
                 title="Profit Factor",
-                calc_func=RepEval("'profit_factor' if incl_open else 'closed.get_profit_factor'"),
+                calc_func=RepEval("'profit_factor' if incl_open else 'status_closed.get_profit_factor'"),
                 tags=RepEval("['trades', *incl_open_tags]"),
             ),
             expectancy=dict(
                 title="Expectancy",
-                calc_func=RepEval("'expectancy' if incl_open else 'closed.get_expectancy'"),
+                calc_func=RepEval("'expectancy' if incl_open else 'status_closed.get_expectancy'"),
                 tags=RepEval("['trades', *incl_open_tags]"),
             ),
             sqn=dict(
                 title="SQN",
-                calc_func=RepEval("'sqn' if incl_open else 'closed.get_sqn'"),
+                calc_func=RepEval("'sqn' if incl_open else 'status_closed.get_sqn'"),
                 tags=RepEval("['trades', *incl_open_tags]"),
             ),
         )
@@ -1181,6 +1038,9 @@ class Trades(Ranges):
         self,
         column: tp.Optional[tp.Label] = None,
         plot_zones: bool = True,
+        plot_ohlc: bool = True,
+        ohlc_type: tp.Union[None, str, tp.BaseTraceType] = None,
+        ohlc_trace_kwargs: tp.KwargsLike = None,
         close_trace_kwargs: tp.KwargsLike = None,
         entry_trace_kwargs: tp.KwargsLike = None,
         exit_trace_kwargs: tp.KwargsLike = None,
@@ -1202,6 +1062,11 @@ class Trades(Ranges):
             plot_zones (bool): Whether to plot zones.
 
                 Set to False if there are many trades within one position.
+            plot_ohlc (bool): Whether to plot the OHLC or just close.
+            ohlc_type: Either 'OHLC', 'Candlestick' or Plotly trace.
+
+                Pass None to use the default.
+            ohlc_trace_kwargs (dict): Keyword arguments passed to `ohlc_type`.
             close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `Trades.close`.
             entry_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Entry" markers.
             exit_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Exit" markers.
@@ -1242,6 +1107,8 @@ class Trades(Ranges):
 
         self_col = self.select_col(column=column, group_by=False)
 
+        if ohlc_trace_kwargs is None:
+            ohlc_trace_kwargs = {}
         if close_trace_kwargs is None:
             close_trace_kwargs = {}
         close_trace_kwargs = merge_dicts(
@@ -1270,8 +1137,36 @@ class Trades(Ranges):
         fig.update_layout(**layout_kwargs)
 
         # Plot close
-        if self_col._close is not None:
-            fig = self_col.close.vbt.plot(trace_kwargs=close_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+        if (
+            plot_ohlc
+            and self_col._open is not None
+            and self_col._high is not None
+            and self_col._low is not None
+            and self_col._close is not None
+        ):
+            ohlc_df = pd.DataFrame(
+                {
+                    "open": self_col.open,
+                    "high": self_col.high,
+                    "low": self_col.low,
+                    "close": self_col.close,
+                }
+            )
+            if "opacity" not in ohlc_trace_kwargs:
+                ohlc_trace_kwargs["opacity"] = 0.5
+            fig = ohlc_df.vbt.ohlcv.plot(
+                ohlc_type=ohlc_type,
+                plot_volume=False,
+                ohlc_trace_kwargs=ohlc_trace_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                fig=fig,
+            )
+        elif self_col._close is not None:
+            fig = self_col.close.vbt.plot(
+                trace_kwargs=close_trace_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                fig=fig,
+            )
 
         if self_col.count() > 0:
             # Extract information
@@ -1575,15 +1470,23 @@ class EntryTrades(Trades):
     def from_orders(
         cls: tp.Type[EntryTradesT],
         orders: Orders,
+        open: tp.Optional[tp.ArrayLike] = None,
+        high: tp.Optional[tp.ArrayLike] = None,
+        low: tp.Optional[tp.ArrayLike] = None,
         close: tp.Optional[tp.ArrayLike] = None,
         init_position: tp.ArrayLike = 0.0,
         init_price: tp.ArrayLike = np.nan,
-        attach_close: bool = True,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         **kwargs,
     ) -> EntryTradesT:
         """Build `EntryTrades` from `vectorbtpro.portfolio.orders.Orders`."""
+        if open is None:
+            open = orders.open
+        if high is None:
+            high = orders.high
+        if low is None:
+            low = orders.low
         if close is None:
             close = orders.close
         func = jit_reg.resolve_option(nb.get_entry_trades_nb, jitted)
@@ -1595,7 +1498,15 @@ class EntryTrades(Trades):
             init_position=to_1d_array(init_position),
             init_price=to_1d_array(init_price),
         )
-        return cls(orders.wrapper, trade_records_arr, close=close if attach_close else None, **kwargs)
+        return cls.from_records(
+            orders.wrapper,
+            trade_records_arr,
+            open=open,
+            high=high,
+            low=low,
+            close=close,
+            **kwargs,
+        )
 
 
 # ############# ExitTrades ############# #
@@ -1623,15 +1534,23 @@ class ExitTrades(Trades):
     def from_orders(
         cls: tp.Type[ExitTradesT],
         orders: Orders,
+        open: tp.Optional[tp.ArrayLike] = None,
+        high: tp.Optional[tp.ArrayLike] = None,
+        low: tp.Optional[tp.ArrayLike] = None,
         close: tp.Optional[tp.ArrayLike] = None,
         init_position: tp.ArrayLike = 0.0,
         init_price: tp.ArrayLike = np.nan,
-        attach_close: bool = True,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         **kwargs,
     ) -> ExitTradesT:
         """Build `ExitTrades` from `vectorbtpro.portfolio.orders.Orders`."""
+        if open is None:
+            open = orders.open
+        if high is None:
+            high = orders.high
+        if low is None:
+            low = orders.low
         if close is None:
             close = orders.close
         func = jit_reg.resolve_option(nb.get_exit_trades_nb, jitted)
@@ -1643,7 +1562,15 @@ class ExitTrades(Trades):
             init_position=to_1d_array(init_position),
             init_price=to_1d_array(init_price),
         )
-        return cls(orders.wrapper, trade_records_arr, close=close if attach_close else None, **kwargs)
+        return cls.from_records(
+            orders.wrapper,
+            trade_records_arr,
+            open=open,
+            high=high,
+            low=low,
+            close=close,
+            **kwargs,
+        )
 
 
 # ############# Positions ############# #
@@ -1677,16 +1604,32 @@ class Positions(Trades):
     def from_trades(
         cls: tp.Type[PositionsT],
         trades: Trades,
+        open: tp.Optional[tp.ArrayLike] = None,
+        high: tp.Optional[tp.ArrayLike] = None,
+        low: tp.Optional[tp.ArrayLike] = None,
         close: tp.Optional[tp.ArrayLike] = None,
-        attach_close: bool = True,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         **kwargs,
     ) -> PositionsT:
         """Build `Positions` from `Trades`."""
+        if open is None:
+            open = trades.open
+        if high is None:
+            high = trades.high
+        if low is None:
+            low = trades.low
         if close is None:
             close = trades.close
         func = jit_reg.resolve_option(nb.get_positions_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         position_records_arr = func(trades.values, trades.col_mapper.col_map)
-        return cls(trades.wrapper, position_records_arr, close=close if attach_close else None, **kwargs)
+        return cls.from_records(
+            trades.wrapper,
+            position_records_arr,
+            open=open,
+            high=high,
+            low=low,
+            close=close,
+            **kwargs,
+        )

@@ -2339,44 +2339,44 @@ ts = pd.DataFrame(
     ],
 )
 
-ranges = vbt.Ranges.from_ts(ts, wrapper_kwargs=dict(freq="1 days"))
-ranges_grouped = vbt.Ranges.from_ts(ts, wrapper_kwargs=dict(freq="1 days", group_by=group_by))
+ranges = vbt.Ranges.from_generic(ts, wrapper_kwargs=dict(freq="1 days"))
+ranges_grouped = vbt.Ranges.from_generic(ts, wrapper_kwargs=dict(freq="1 days", group_by=group_by))
 
 
 class TestRanges:
     def test_row_stack(self):
         ts2 = ts * 2
         ts2.index = pd.date_range("2020-01-07", "2020-01-12")
-        ranges1 = vbt.Ranges.from_ts(ts, wrapper_kwargs=dict(freq="1 days"))
-        ranges2 = vbt.Ranges.from_ts(ts2, wrapper_kwargs=dict(freq="1 days"))
+        ranges1 = vbt.Ranges.from_generic(ts, wrapper_kwargs=dict(freq="1 days"))
+        ranges2 = vbt.Ranges.from_generic(ts2, wrapper_kwargs=dict(freq="1 days"))
         new_ranges = vbt.Ranges.row_stack(ranges1, ranges2)
-        assert_frame_equal(new_ranges.ts, pd.concat((ts, ts2)))
+        assert_frame_equal(new_ranges.close, pd.concat((ts, ts2)))
         with pytest.raises(Exception):
-            vbt.Ranges.row_stack(ranges1.replace(ts=None), ranges2)
+            vbt.Ranges.row_stack(ranges1.replace(close=None), ranges2)
         with pytest.raises(Exception):
-            vbt.Ranges.row_stack(ranges1, ranges2.replace(ts=None))
-        new_ranges = vbt.Ranges.row_stack(ranges1.replace(ts=None), ranges2.replace(ts=None))
-        assert new_ranges.ts is None
+            vbt.Ranges.row_stack(ranges1, ranges2.replace(close=None))
+        new_ranges = vbt.Ranges.row_stack(ranges1.replace(close=None), ranges2.replace(close=None))
+        assert new_ranges.close is None
 
     def test_column_stack(self):
         ts2 = ts * 2
         ts2.columns = ["e", "f", "g", "h"]
-        ranges1 = vbt.Ranges.from_ts(ts, wrapper_kwargs=dict(freq="1 days"))
-        ranges2 = vbt.Ranges.from_ts(ts2, wrapper_kwargs=dict(freq="1 days"))
+        ranges1 = vbt.Ranges.from_generic(ts, wrapper_kwargs=dict(freq="1 days"))
+        ranges2 = vbt.Ranges.from_generic(ts2, wrapper_kwargs=dict(freq="1 days"))
         new_ranges = vbt.Ranges.column_stack(ranges1, ranges2)
-        assert_frame_equal(new_ranges.ts, pd.concat((ts, ts2), axis=1))
+        assert_frame_equal(new_ranges.close, pd.concat((ts, ts2), axis=1))
         with pytest.raises(Exception):
-            vbt.Ranges.column_stack(ranges1.replace(ts=None), ranges2)
+            vbt.Ranges.column_stack(ranges1.replace(close=None), ranges2)
         with pytest.raises(Exception):
-            vbt.Ranges.column_stack(ranges1, ranges2.replace(ts=None))
-        new_ranges = vbt.Ranges.column_stack(ranges1.replace(ts=None), ranges2.replace(ts=None))
-        assert new_ranges.ts is None
+            vbt.Ranges.column_stack(ranges1, ranges2.replace(close=None))
+        new_ranges = vbt.Ranges.column_stack(ranges1.replace(close=None), ranges2.replace(close=None))
+        assert new_ranges.close is None
 
     def test_indexing(self):
         ranges2 = ranges.loc["2020-01-02":"2020-01-05", ["a", "c"]]
         assert_index_equal(ranges2.wrapper.index, ranges.wrapper.index[1:-1])
         assert_index_equal(ranges2.wrapper.columns, ranges.wrapper.columns[[0, 2]])
-        assert_frame_equal(ranges2.ts, ranges.ts.loc["2020-01-02":"2020-01-05", ["a", "c"]])
+        assert_frame_equal(ranges2.close, ranges.close.loc["2020-01-02":"2020-01-05", ["a", "c"]])
         assert_records_close(
             ranges2.values,
             np.array([(1, 0, 1, 2, 1)], dtype=range_dt),
@@ -2386,7 +2386,7 @@ class TestRanges:
         for name in range_dt.names:
             np.testing.assert_array_equal(getattr(ranges, name).values, ranges.values[name])
 
-    def test_from_ts(self):
+    def test_from_price(self):
         assert_records_close(
             ranges.values,
             np.array(
@@ -2397,10 +2397,13 @@ class TestRanges:
         assert ranges.wrapper.freq == day_dt
         assert_index_equal(ranges_grouped.wrapper.grouper.group_by, group_by)
         assert_records_close(
-            vbt.Ranges.from_ts(ts, jitted=dict(parallel=True)).values,
-            vbt.Ranges.from_ts(ts, jitted=dict(parallel=False)).values,
+            vbt.Ranges.from_generic(ts, jitted=dict(parallel=True)).values,
+            vbt.Ranges.from_generic(ts, jitted=dict(parallel=False)).values,
         )
-        assert_records_close(vbt.Ranges.from_ts(ts, chunked=True).values, vbt.Ranges.from_ts(ts, chunked=False).values)
+        assert_records_close(
+            vbt.Ranges.from_generic(ts, chunked=True).values,
+            vbt.Ranges.from_generic(ts, chunked=False).values,
+        )
 
     def test_records_readable(self):
         records_readable = ranges.records_readable
@@ -2661,40 +2664,40 @@ class TestRanges:
             np.array([0, 1, 1, 1, 1]),
         )
         assert_frame_equal(
-            ranges.resample("1h").ts,
-            ranges.ts.resample("1h").last().astype(np.float_),
+            ranges.resample("1h").close,
+            ranges.close.resample("1h").last().astype(np.float_),
         )
         assert_frame_equal(
-            ranges.resample("10h").ts,
-            ranges.ts.resample("10h").last().astype(np.float_),
+            ranges.resample("10h").close,
+            ranges.close.resample("10h").last().astype(np.float_),
         )
         assert_frame_equal(
-            ranges.resample("3d").ts,
-            ranges.ts.resample("3d").last().astype(np.float_),
+            ranges.resample("3d").close,
+            ranges.close.resample("3d").last().astype(np.float_),
         )
         assert_frame_equal(
-            ranges.resample("1h", ffill_ts=True).ts,
-            ranges.ts.resample("1h").last().ffill().astype(np.float_),
+            ranges.resample("1h", ffill_close=True).close,
+            ranges.close.resample("1h").last().ffill().astype(np.float_),
         )
         assert_frame_equal(
-            ranges.resample("10h", ffill_ts=True).ts,
-            ranges.ts.resample("10h").last().ffill().astype(np.float_),
+            ranges.resample("10h", ffill_close=True).close,
+            ranges.close.resample("10h").last().ffill().astype(np.float_),
         )
         assert_frame_equal(
-            ranges.resample("3d", ffill_ts=True).ts,
-            ranges.ts.resample("3d").last().ffill().astype(np.float_),
+            ranges.resample("3d", ffill_close=True).close,
+            ranges.close.resample("3d").last().ffill().astype(np.float_),
         )
         assert_frame_equal(
-            ranges.resample("1h", fbfill_ts=True).ts,
-            ranges.ts.resample("1h").last().ffill().bfill().astype(np.float_),
+            ranges.resample("1h", fbfill_close=True).close,
+            ranges.close.resample("1h").last().ffill().bfill().astype(np.float_),
         )
         assert_frame_equal(
-            ranges.resample("10h", fbfill_ts=True).ts,
-            ranges.ts.resample("10h").last().ffill().bfill().astype(np.float_),
+            ranges.resample("10h", fbfill_close=True).close,
+            ranges.close.resample("10h").last().ffill().bfill().astype(np.float_),
         )
         assert_frame_equal(
-            ranges.resample("3d", fbfill_ts=True).ts,
-            ranges.ts.resample("3d").last().ffill().bfill().astype(np.float_),
+            ranges.resample("3d", fbfill_close=True).close,
+            ranges.close.resample("3d").last().ffill().bfill().astype(np.float_),
         )
 
 
@@ -2713,8 +2716,8 @@ ts2 = pd.DataFrame(
     ],
 )
 
-drawdowns = vbt.Drawdowns.from_ts(ts2, wrapper_kwargs=dict(freq="1 days"))
-drawdowns_grouped = vbt.Drawdowns.from_ts(ts2, wrapper_kwargs=dict(freq="1 days", group_by=group_by))
+drawdowns = vbt.Drawdowns.from_price(ts2, wrapper_kwargs=dict(freq="1 days"))
+drawdowns_grouped = vbt.Drawdowns.from_price(ts2, wrapper_kwargs=dict(freq="1 days", group_by=group_by))
 
 
 class TestDrawdowns:
@@ -2722,7 +2725,7 @@ class TestDrawdowns:
         drawdowns2 = drawdowns.loc["2020-01-02":"2020-01-05", ["a", "c"]]
         assert_index_equal(drawdowns2.wrapper.index, drawdowns.wrapper.index[1:-1])
         assert_index_equal(drawdowns2.wrapper.columns, drawdowns.wrapper.columns[[0, 2]])
-        assert_frame_equal(drawdowns2.ts, drawdowns.ts.loc["2020-01-02":"2020-01-05", ["a", "c"]])
+        assert_frame_equal(drawdowns2.close, drawdowns.close.loc["2020-01-02":"2020-01-05", ["a", "c"]])
         assert_records_close(
             drawdowns2.values,
             np.array([(1, 0, 1, 2, 2, 3, 3.0, 1.0, 4.0, 1)], dtype=drawdown_dt),
@@ -2733,12 +2736,12 @@ class TestDrawdowns:
             np.testing.assert_array_equal(getattr(drawdowns, name).values, drawdowns.values[name])
 
     def test_ts(self):
-        assert_frame_equal(drawdowns.ts, ts2)
-        assert_series_equal(drawdowns["a"].ts, ts2["a"])
-        assert_frame_equal(drawdowns_grouped["g1"].ts, ts2[["a", "b"]])
-        assert drawdowns.replace(ts=None)["a"].ts is None
+        assert_frame_equal(drawdowns.close, ts2)
+        assert_series_equal(drawdowns["a"].close, ts2["a"])
+        assert_frame_equal(drawdowns_grouped["g1"].close, ts2[["a", "b"]])
+        assert drawdowns.replace(close=None)["a"].close is None
 
-    def test_from_ts(self):
+    def test_from_price(self):
         assert_records_close(
             drawdowns.values,
             np.array(
@@ -2756,12 +2759,12 @@ class TestDrawdowns:
         assert drawdowns.wrapper.freq == day_dt
         assert_index_equal(drawdowns_grouped.wrapper.grouper.group_by, group_by)
         assert_records_close(
-            vbt.Drawdowns.from_ts(ts2, jitted=dict(parallel=True)).values,
-            vbt.Drawdowns.from_ts(ts2, jitted=dict(parallel=False)).values,
+            vbt.Drawdowns.from_price(ts2, jitted=dict(parallel=True)).values,
+            vbt.Drawdowns.from_price(ts2, jitted=dict(parallel=False)).values,
         )
         assert_records_close(
-            vbt.Drawdowns.from_ts(ts2, chunked=True).values,
-            vbt.Drawdowns.from_ts(ts2, chunked=False).values,
+            vbt.Drawdowns.from_price(ts2, chunked=True).values,
+            vbt.Drawdowns.from_price(ts2, chunked=False).values,
         )
 
     def test_records_readable(self):
@@ -3075,28 +3078,28 @@ class TestDrawdowns:
         )
 
     def test_active_records(self):
-        assert isinstance(drawdowns.active, vbt.Drawdowns)
-        assert drawdowns.active.wrapper == drawdowns.wrapper
+        assert isinstance(drawdowns.status_active, vbt.Drawdowns)
+        assert drawdowns.status_active.wrapper == drawdowns.wrapper
         assert_records_close(
-            drawdowns["a"].active.values,
+            drawdowns["a"].status_active.values,
             np.array([(2, 0, 4, 5, 5, 5, 4.0, 1.0, 1.0, 0)], dtype=drawdown_dt),
         )
-        assert_records_close(drawdowns["a"].active.values, drawdowns.active["a"].values)
+        assert_records_close(drawdowns["a"].status_active.values, drawdowns.status_active["a"].values)
         assert_records_close(
-            drawdowns.active.values,
+            drawdowns.status_active.values,
             np.array([(2, 0, 4, 5, 5, 5, 4.0, 1.0, 1.0, 0), (0, 2, 2, 3, 4, 5, 3.0, 1.0, 2.0, 0)], dtype=drawdown_dt),
         )
 
     def test_recovered_records(self):
-        assert isinstance(drawdowns.recovered, vbt.Drawdowns)
-        assert drawdowns.recovered.wrapper == drawdowns.wrapper
+        assert isinstance(drawdowns.status_recovered, vbt.Drawdowns)
+        assert drawdowns.status_recovered.wrapper == drawdowns.wrapper
         assert_records_close(
-            drawdowns["a"].recovered.values,
+            drawdowns["a"].status_recovered.values,
             np.array([(0, 0, 0, 1, 1, 2, 2.0, 1.0, 3.0, 1), (1, 0, 2, 3, 3, 4, 3.0, 1.0, 4.0, 1)], dtype=drawdown_dt),
         )
-        assert_records_close(drawdowns["a"].recovered.values, drawdowns.recovered["a"].values)
+        assert_records_close(drawdowns["a"].status_recovered.values, drawdowns.status_recovered["a"].values)
         assert_records_close(
-            drawdowns.recovered.values,
+            drawdowns.status_recovered.values,
             np.array(
                 [
                     (0, 0, 0, 1, 1, 2, 2.0, 1.0, 3.0, 1),
@@ -3398,40 +3401,40 @@ class TestDrawdowns:
             np.array([0, 1, 1, 1, 1, 1]),
         )
         assert_frame_equal(
-            drawdowns.resample("1h").ts,
-            drawdowns.ts.resample("1h").last().astype(np.float_),
+            drawdowns.resample("1h").close,
+            drawdowns.close.resample("1h").last().astype(np.float_),
         )
         assert_frame_equal(
-            drawdowns.resample("10h").ts,
-            drawdowns.ts.resample("10h").last().astype(np.float_),
+            drawdowns.resample("10h").close,
+            drawdowns.close.resample("10h").last().astype(np.float_),
         )
         assert_frame_equal(
-            drawdowns.resample("3d").ts,
-            drawdowns.ts.resample("3d").last().astype(np.float_),
+            drawdowns.resample("3d").close,
+            drawdowns.close.resample("3d").last().astype(np.float_),
         )
         assert_frame_equal(
-            drawdowns.resample("1h", ffill_ts=True).ts,
-            drawdowns.ts.resample("1h").last().ffill().astype(np.float_),
+            drawdowns.resample("1h", ffill_close=True).close,
+            drawdowns.close.resample("1h").last().ffill().astype(np.float_),
         )
         assert_frame_equal(
-            drawdowns.resample("10h", ffill_ts=True).ts,
-            drawdowns.ts.resample("10h").last().ffill().astype(np.float_),
+            drawdowns.resample("10h", ffill_close=True).close,
+            drawdowns.close.resample("10h").last().ffill().astype(np.float_),
         )
         assert_frame_equal(
-            drawdowns.resample("3d", ffill_ts=True).ts,
-            drawdowns.ts.resample("3d").last().ffill().astype(np.float_),
+            drawdowns.resample("3d", ffill_close=True).close,
+            drawdowns.close.resample("3d").last().ffill().astype(np.float_),
         )
         assert_frame_equal(
-            drawdowns.resample("1h", fbfill_ts=True).ts,
-            drawdowns.ts.resample("1h").last().ffill().bfill().astype(np.float_),
+            drawdowns.resample("1h", fbfill_close=True).close,
+            drawdowns.close.resample("1h").last().ffill().bfill().astype(np.float_),
         )
         assert_frame_equal(
-            drawdowns.resample("10h", fbfill_ts=True).ts,
-            drawdowns.ts.resample("10h").last().ffill().bfill().astype(np.float_),
+            drawdowns.resample("10h", fbfill_close=True).close,
+            drawdowns.close.resample("10h").last().ffill().bfill().astype(np.float_),
         )
         assert_frame_equal(
-            drawdowns.resample("3d", fbfill_ts=True).ts,
-            drawdowns.ts.resample("3d").last().ffill().bfill().astype(np.float_),
+            drawdowns.resample("3d", fbfill_close=True).close,
+            drawdowns.close.resample("3d").last().ffill().bfill().astype(np.float_),
         )
 
 
@@ -3696,10 +3699,10 @@ class TestOrders:
         )
 
     def test_buy_records(self):
-        assert isinstance(orders.buy, vbt.Orders)
-        assert orders.buy.wrapper == orders.wrapper
+        assert isinstance(orders.side_buy, vbt.Orders)
+        assert orders.side_buy.wrapper == orders.wrapper
         assert_records_close(
-            orders["a"].buy.values,
+            orders["a"].side_buy.values,
             np.array(
                 [
                     (0, 0, 0, 1.0, 1.0, 0.01, 0),
@@ -3710,9 +3713,9 @@ class TestOrders:
                 dtype=order_dt,
             ),
         )
-        assert_records_close(orders["a"].buy.values, orders.buy["a"].values)
+        assert_records_close(orders["a"].side_buy.values, orders.side_buy["a"].values)
         assert_records_close(
-            orders.buy.values,
+            orders.side_buy.values,
             np.array(
                 [
                     (0, 0, 0, 1.0, 1.0, 0.01, 0),
@@ -3732,18 +3735,18 @@ class TestOrders:
         )
 
     def test_sell_records(self):
-        assert isinstance(orders.sell, vbt.Orders)
-        assert orders.sell.wrapper == orders.wrapper
+        assert isinstance(orders.side_sell, vbt.Orders)
+        assert orders.side_sell.wrapper == orders.wrapper
         assert_records_close(
-            orders["a"].sell.values,
+            orders["a"].side_sell.values,
             np.array(
                 [(2, 0, 2, 1.0, 3.0, 0.03, 1), (3, 0, 3, 0.1, 4.0, 0.004, 1), (5, 0, 6, 1.0, 7.0, 0.07, 1)],
                 dtype=order_dt,
             ),
         )
-        assert_records_close(orders["a"].sell.values, orders.sell["a"].values)
+        assert_records_close(orders["a"].side_sell.values, orders.side_sell["a"].values)
         assert_records_close(
-            orders.sell.values,
+            orders.side_sell.values,
             np.array(
                 [
                     (2, 0, 2, 1.0, 3.0, 0.03, 1),
@@ -4366,10 +4369,10 @@ class TestExitTrades:
         )
 
     def test_long_records(self):
-        assert isinstance(exit_trades.long, vbt.ExitTrades)
-        assert exit_trades.long.wrapper == exit_trades.wrapper
+        assert isinstance(exit_trades.direction_long, vbt.ExitTrades)
+        assert exit_trades.direction_long.wrapper == exit_trades.wrapper
         assert_records_close(
-            exit_trades["a"].long.values,
+            exit_trades["a"].direction_long.values,
             np.array(
                 [
                     (0, 0, 1.0, 0, 1.09090909, 0.01090909, 2, 3.0, 0.03, 1.86818182, 1.7125, 0, 1, 0),
@@ -4380,9 +4383,9 @@ class TestExitTrades:
                 dtype=trade_dt,
             ),
         )
-        assert_records_close(exit_trades["a"].long.values, exit_trades.long["a"].values)
+        assert_records_close(exit_trades["a"].direction_long.values, exit_trades.direction_long["a"].values)
         assert_records_close(
-            exit_trades.long.values,
+            exit_trades.direction_long.values,
             np.array(
                 [
                     (0, 0, 1.0, 0, 1.09090909, 0.01090909, 2, 3.0, 0.03, 1.86818182, 1.7125, 0, 1, 0),
@@ -4399,12 +4402,12 @@ class TestExitTrades:
         )
 
     def test_short_records(self):
-        assert isinstance(exit_trades.short, vbt.ExitTrades)
-        assert exit_trades.short.wrapper == exit_trades.wrapper
-        assert_records_close(exit_trades["a"].short.values, np.array([], dtype=trade_dt))
-        assert_records_close(exit_trades["a"].short.values, exit_trades.short["a"].values)
+        assert isinstance(exit_trades.direction_short, vbt.ExitTrades)
+        assert exit_trades.direction_short.wrapper == exit_trades.wrapper
+        assert_records_close(exit_trades["a"].direction_short.values, np.array([], dtype=trade_dt))
+        assert_records_close(exit_trades["a"].direction_short.values, exit_trades.direction_short["a"].values)
         assert_records_close(
-            exit_trades.short.values,
+            exit_trades.direction_short.values,
             np.array(
                 [
                     (0, 1, 1.0, 0, 1.09090909, 0.01090909, 2, 3.0, 0.03, -1.95, -1.7875, 1, 1, 0),
@@ -4418,15 +4421,15 @@ class TestExitTrades:
         )
 
     def test_open_records(self):
-        assert isinstance(exit_trades.open, vbt.ExitTrades)
-        assert exit_trades.open.wrapper == exit_trades.wrapper
+        assert isinstance(exit_trades.status_open, vbt.ExitTrades)
+        assert exit_trades.status_open.wrapper == exit_trades.wrapper
         assert_records_close(
-            exit_trades["a"].open.values,
+            exit_trades["a"].status_open.values,
             np.array([(3, 0, 2.0, 7, 8.0, 0.16, 7, 8.0, 0.0, -0.16, -0.01, 0, 0, 2)], dtype=trade_dt),
         )
-        assert_records_close(exit_trades["a"].open.values, exit_trades.open["a"].values)
+        assert_records_close(exit_trades["a"].status_open.values, exit_trades.status_open["a"].values)
         assert_records_close(
-            exit_trades.open.values,
+            exit_trades.status_open.values,
             np.array(
                 [
                     (3, 0, 2.0, 7, 8.0, 0.16, 7, 8.0, 0.0, -0.16, -0.01, 0, 0, 2),
@@ -4438,10 +4441,10 @@ class TestExitTrades:
         )
 
     def test_closed_records(self):
-        assert isinstance(exit_trades.closed, vbt.ExitTrades)
-        assert exit_trades.closed.wrapper == exit_trades.wrapper
+        assert isinstance(exit_trades.status_closed, vbt.ExitTrades)
+        assert exit_trades.status_closed.wrapper == exit_trades.wrapper
         assert_records_close(
-            exit_trades["a"].closed.values,
+            exit_trades["a"].status_closed.values,
             np.array(
                 [
                     (0, 0, 1.0, 0, 1.09090909, 0.01090909, 2, 3.0, 0.03, 1.86818182, 1.7125, 0, 1, 0),
@@ -4451,9 +4454,9 @@ class TestExitTrades:
                 dtype=trade_dt,
             ),
         )
-        assert_records_close(exit_trades["a"].closed.values, exit_trades.closed["a"].values)
+        assert_records_close(exit_trades["a"].status_closed.values, exit_trades.status_closed["a"].values)
         assert_records_close(
-            exit_trades.closed.values,
+            exit_trades.status_closed.values,
             np.array(
                 [
                     (0, 0, 1.0, 0, 1.09090909, 0.01090909, 2, 3.0, 0.03, 1.86818182, 1.7125, 0, 1, 0),
@@ -5368,7 +5371,7 @@ class TestLogs:
             ),
         )
         np.testing.assert_array_equal(
-            records_readable[("State", "Cash")].values,
+            records_readable[("Exec State", "Cash")].values,
             np.array(
                 [
                     100.0,
@@ -5407,7 +5410,7 @@ class TestLogs:
             ),
         )
         np.testing.assert_array_equal(
-            records_readable[("State", "Position")].values,
+            records_readable[("Exec State", "Position")].values,
             np.array(
                 [
                     0.0,
@@ -5446,7 +5449,7 @@ class TestLogs:
             ),
         )
         np.testing.assert_array_equal(
-            records_readable[("State", "Debt")].values,
+            records_readable[("Exec State", "Debt")].values,
             np.array(
                 [
                     0.0,
@@ -5485,7 +5488,7 @@ class TestLogs:
             ),
         )
         np.testing.assert_array_equal(
-            records_readable[("State", "Free Cash")].values,
+            records_readable[("Exec State", "Free Cash")].values,
             np.array(
                 [
                     100.0,
@@ -5524,7 +5527,7 @@ class TestLogs:
             ),
         )
         np.testing.assert_array_equal(
-            records_readable[("State", "Valuation Price")].values,
+            records_readable[("Exec State", "Valuation Price")].values,
             np.array(
                 [
                     1.0,
@@ -5563,7 +5566,7 @@ class TestLogs:
             ),
         )
         np.testing.assert_array_equal(
-            records_readable[("State", "Value")].values,
+            records_readable[("Exec State", "Value")].values,
             np.array(
                 [
                     100.0,
@@ -6191,7 +6194,7 @@ class TestLogs:
             ),
         )
         np.testing.assert_array_equal(
-            records_readable[("New State", "Cash")].values,
+            records_readable[("New Exec State", "Cash")].values,
             np.array(
                 [
                     98.99,
@@ -6230,7 +6233,7 @@ class TestLogs:
             ),
         )
         np.testing.assert_array_equal(
-            records_readable[("New State", "Position")].values,
+            records_readable[("New Exec State", "Position")].values,
             np.array(
                 [
                     1.0,
@@ -6269,7 +6272,7 @@ class TestLogs:
             ),
         )
         np.testing.assert_array_equal(
-            records_readable[("New State", "Debt")].values,
+            records_readable[("New Exec State", "Debt")].values,
             np.array(
                 [
                     0.0,
@@ -6308,7 +6311,7 @@ class TestLogs:
             ),
         )
         np.testing.assert_array_equal(
-            records_readable[("New State", "Free Cash")].values,
+            records_readable[("New Exec State", "Free Cash")].values,
             np.array(
                 [
                     98.99,
@@ -6347,7 +6350,7 @@ class TestLogs:
             ),
         )
         np.testing.assert_array_equal(
-            records_readable[("New State", "Valuation Price")].values,
+            records_readable[("New Exec State", "Valuation Price")].values,
             np.array(
                 [
                     1.0,
@@ -6386,7 +6389,7 @@ class TestLogs:
             ),
         )
         np.testing.assert_array_equal(
-            records_readable[("New State", "Value")].values,
+            records_readable[("New Exec State", "Value")].values,
             np.array(
                 [
                     100.0,

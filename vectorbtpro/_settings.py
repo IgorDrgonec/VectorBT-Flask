@@ -144,7 +144,7 @@ jitting = ChildDict(
             cls=NumbaJitter,
             aliases={"numba"},
             options=dict(),
-            override_options=dict(),
+            override_options=dict(cache=False),
             resolve_kwargs=dict(),
             tasks=dict(),
         ),
@@ -872,7 +872,7 @@ ${config_doc}
 _settings["drawdowns"] = drawdowns
 
 ohlcv = ChildDict(
-    plot_type="OHLC",
+    ohlc_type="candlestick",
     column_names=ChildDict(
         open="Open",
         high="High",
