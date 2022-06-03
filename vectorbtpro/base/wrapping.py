@@ -1879,6 +1879,20 @@ class ArrayWrapper(Configured, PandasIndexer):
             2020-01-04  NaN NaN  NaN NaN
             2020-01-05  3.0 NaN  3.0 NaN
             ```
+
+            * Set rows using a template:
+
+            ```pycon
+            >>> wrapper.fill_using_index_dict(vbt.index_dict({
+            ...     vbt.RepEval("index.day % 2 == 0"): 2
+            ... }))
+                          a    b    c
+            2020-01-01  NaN  NaN  NaN
+            2020-01-02  2.0  2.0  2.0
+            2020-01-03  NaN  NaN  NaN
+            2020-01-04  2.0  2.0  2.0
+            2020-01-05  NaN  NaN  NaN
+            ```
         """
         changed_rows = False
         changed_cols = False
@@ -1903,7 +1917,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                     row_indices=row_indices,
                     col_indices=col_indices,
                 )
-                set_v = set_v.substitute(context, sub_id="get_indices")
+                set_v = set_v.substitute(context, sub_id="fill_using_index_dict")
 
             def _check_use_indices(indices, _indexer=indexer):
                 use_indices = True

@@ -13,6 +13,7 @@ from vectorbtpro._settings import settings
 from vectorbtpro import _typing as tp
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import checks
+from vectorbtpro.utils.template import CustomTemplate
 from vectorbtpro.utils.datetime_ import (
     try_to_datetime_index,
     try_align_to_datetime_index,
@@ -1108,7 +1109,13 @@ def get_indices(
 ) -> tp.Tuple[tp.MaybeIndexArray, tp.MaybeIndexArray]:
     """Translate indexer to row and column indices, as both arrays and slices if possible.
 
-    If `indexer` is not an indexer class, wraps it with `RowIdx`."""
+    If `indexer` is not an indexer class, wraps it with `RowIdx`.
+
+    If `indexer` is an instance of `vectorbtpro.utils.template.CustomTemplate`, substitutes it.
+    The result can be either row indices or both row and column indices as a tuple.
+    Each object with indices will be converted to a NumPy array, even tuples. If the returned array is a mask,
+    will convert it into indices using `np.flatnonzero`. If the returned array is two-dimensional,
+    the first and second column will be considered as a range start, end, and (optionally) step respectively."""
     from vectorbtpro.base.indexes import select_levels
 
     def _check_indices(indices):
@@ -1120,6 +1127,8 @@ def get_indices(
             elif indices.stop == -1:
                 raise ValueError(f"{indexer}: Range end index couldn't be matched")
         if isinstance(indices, tuple):
+            if len(indices) not in (2, 3):
+                raise TypeError(f"Range tuples must consist of two or three arrays, not {len(indices)}")
             if -1 in indices[0] or -1 in indices[1]:
                 raise ValueError(f"{indexer}: Some indices couldn't be matched")
         if isinstance(indices, np.ndarray):
@@ -1128,6 +1137,16 @@ def get_indices(
         if isinstance(indices, (int, np.integer)):
             if indices == -1:
                 raise ValueError(f"{indexer}: Index couldn't be matched")
+
+    def _prepare_template_indices(indices):
+        if not isinstance(indices, (slice, hslice, int, np.integer)):
+            indices = np.asarray(indices)
+            if indices.ndim == 2:
+                indices = tuple(indices[:, col] for col in range(indices.shape[1]))
+            elif indices.dtype == np.bool_:
+                indices = np.flatnonzero(indices)
+        _check_indices(indices)
+        return indices
 
     if isinstance(indexer, RowIdx):
         value = indexer.value
@@ -1271,13 +1290,13 @@ def get_indices(
         _check_indices(row_indices)
         return row_indices, slice(None, None, None)
     if isinstance(indexer, ElemIdx):
-        if isinstance(indexer.row_indexer, (RowIdx, RowPoints, RowRanges)):
+        if isinstance(indexer.row_indexer, (RowIdx, RowPoints, RowRanges, CustomTemplate)):
             row_indexer = indexer.row_indexer
         else:
             if isinstance(indexer.row_indexer, ColIdx):
                 raise TypeError(f"Indexer {type(indexer.row_indexer)} not supported as a row indexer")
             row_indexer = RowIdx(indexer.row_indexer)
-        if isinstance(indexer.col_indexer, ColIdx):
+        if isinstance(indexer.col_indexer, (ColIdx, CustomTemplate)):
             col_indexer = indexer.col_indexer
         else:
             if isinstance(indexer.col_indexer, (RowIdx, RowPoints, RowRanges)):
@@ -1286,4 +1305,17 @@ def get_indices(
         row_indices = get_indices(index, columns, row_indexer)[0]
         col_indices = get_indices(index, columns, col_indexer)[1]
         return row_indices, col_indices
+    if isinstance(indexer, CustomTemplate):
+        context = dict(index=index, columns=columns, check_indices=check_indices)
+        indices = indexer.substitute(context=context, sub_id="get_indices")
+        if isinstance(indices, tuple):
+            if len(indices) != 2:
+                raise ValueError("Custom template must either return row indices/mask "
+                                 "or both row and column indices/masks")
+            row_indices = _prepare_template_indices(indices[0])
+            col_indices = _prepare_template_indices(indices[1])
+            return row_indices, col_indices
+        else:
+            row_indices = _prepare_template_indices(indices)
+            return row_indices, slice(None, None, None)
     return get_indices(index, columns, RowIdx(indexer))
