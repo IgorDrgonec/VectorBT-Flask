@@ -835,7 +835,7 @@ def trade_losing_streak_nb(records: tp.RecordArray) -> tp.Array1d:
 
 
 @register_jitted(cache=True)
-def win_rate_1d_nb(pnl_arr: tp.Array1d) -> float:
+def win_rate_reduce_nb(pnl_arr: tp.Array1d) -> float:
     """Win rate of a PnL array."""
     if pnl_arr.shape[0] == 0:
         return np.nan
@@ -850,7 +850,7 @@ def win_rate_1d_nb(pnl_arr: tp.Array1d) -> float:
 
 
 @register_jitted(cache=True)
-def profit_factor_1d_nb(pnl_arr: tp.Array1d) -> float:
+def profit_factor_reduce_nb(pnl_arr: tp.Array1d) -> float:
     """Profit factor of a PnL array."""
     if pnl_arr.shape[0] == 0:
         return np.nan
@@ -870,7 +870,7 @@ def profit_factor_1d_nb(pnl_arr: tp.Array1d) -> float:
 
 
 @register_jitted(cache=True)
-def expectancy_1d_nb(pnl_arr: tp.Array1d) -> float:
+def expectancy_reduce_nb(pnl_arr: tp.Array1d) -> float:
     """Expectancy of a PnL array."""
     if pnl_arr.shape[0] == 0:
         return np.nan
@@ -902,9 +902,151 @@ def expectancy_1d_nb(pnl_arr: tp.Array1d) -> float:
 
 
 @register_jitted(cache=True)
-def sqn_1d_nb(pnl_arr: tp.Array1d, ddof: int = 0) -> float:
+def sqn_reduce_nb(pnl_arr: tp.Array1d, ddof: int = 0) -> float:
     """SQN of a PnL array."""
     count = generic_nb.nancnt_1d_nb(pnl_arr)
     mean = np.nanmean(pnl_arr)
     std = generic_nb.nanstd_1d_nb(pnl_arr, ddof=ddof)
     return np.sqrt(count) * mean / std
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="records", axis=0),
+    arg_take_spec=dict(
+        records=ch.ArraySlicer(axis=0),
+        open=None,
+        high=None,
+        low=None,
+        close=None,
+        entry_price_open=None,
+        exit_price_close=None,
+        best_price=None,
+        flex_2d=None,
+    ),
+    merge_func=base_ch.concat,
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def best_worst_price_nb(
+    records: tp.RecordArray,
+    open: tp.Optional[tp.FlexArray],
+    high: tp.Optional[tp.FlexArray],
+    low: tp.Optional[tp.FlexArray],
+    close: tp.FlexArray,
+    entry_price_open: bool = False,
+    exit_price_close: bool = False,
+    best_price: bool = True,
+    flex_2d: bool = False,
+) -> tp.RecordArray:
+    """Best or worst price during a trade."""
+    out = np.empty(len(records), dtype=np.float_)
+    for r in prange(len(records)):
+        trade = records[r]
+        from_i = trade["entry_idx"]
+        to_i = trade["exit_idx"]
+        trade_open = trade["status"] == TradeStatus.Open
+        trade_long = trade["direction"] == TradeDirection.Long
+
+        vmin = np.nan
+        vmax = np.nan
+        for i in range(from_i, to_i + 1):
+            if i > from_i or entry_price_open:
+                if open is not None:
+                    _open = flex_select_auto_nb(open, i, trade["col"], flex_2d=flex_2d)
+                    if np.isnan(vmin) or _open < vmin:
+                        vmin = _open
+                    if np.isnan(vmax) or _open > vmax:
+                        vmax = _open
+            if (i > from_i or entry_price_open) and (i < to_i or exit_price_close or trade_open):
+                if low is not None:
+                    _low = flex_select_auto_nb(low, i, trade["col"], flex_2d=flex_2d)
+                    if np.isnan(vmin) or _low < vmin:
+                        vmin = _low
+                if high is not None:
+                    _high = flex_select_auto_nb(high, i, trade["col"], flex_2d=flex_2d)
+                    if np.isnan(vmax) or _high > vmax:
+                        vmax = _high
+            if i < to_i or exit_price_close or trade_open:
+                _close = flex_select_auto_nb(close, i, trade["col"], flex_2d=flex_2d)
+                if np.isnan(vmin) or _close < vmin:
+                    vmin = _close
+                if np.isnan(vmax) or _close > vmax:
+                    vmax = _close
+        if best_price:
+            if trade_long:
+                out[r] = vmax
+            else:
+                out[r] = vmin
+        else:
+            if trade_long:
+                out[r] = vmin
+            else:
+                out[r] = vmax
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="size", axis=0),
+    arg_take_spec=dict(
+        size=ch.ArraySlicer(axis=0),
+        direction=ch.ArraySlicer(axis=0),
+        entry_price=ch.ArraySlicer(axis=0),
+        best_price=ch.ArraySlicer(axis=0),
+    ),
+    merge_func=base_ch.concat,
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def mfe_nb(
+    size: tp.Array1d,
+    direction: tp.Array1d,
+    entry_price: tp.Array1d,
+    best_price: tp.Array1d,
+    as_returns: bool = False,
+) -> tp.Array1d:
+    """Compute Maximum Favorable Excursion (MFE)."""
+    out = np.empty(size.shape[0], dtype=np.float_)
+    for r in prange(size.shape[0]):
+        if direction[r] == TradeDirection.Long:
+            if as_returns:
+                out[r] = (best_price[r] - entry_price[r]) / entry_price[r]
+            else:
+                out[r] = (best_price[r] - entry_price[r]) * size[r]
+        else:
+            if as_returns:
+                out[r] = (entry_price[r] - best_price[r]) / best_price[r]
+            else:
+                out[r] = (entry_price[r] - best_price[r]) * size[r]
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="size", axis=0),
+    arg_take_spec=dict(
+        size=ch.ArraySlicer(axis=0),
+        direction=ch.ArraySlicer(axis=0),
+        entry_price=ch.ArraySlicer(axis=0),
+        worst_price=ch.ArraySlicer(axis=0),
+    ),
+    merge_func=base_ch.concat,
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def mae_nb(
+    size: tp.Array1d,
+    direction: tp.Array1d,
+    entry_price: tp.Array1d,
+    worst_price: tp.Array1d,
+    as_returns: bool = False,
+) -> tp.Array1d:
+    """Compute Maximum Adverse Excursion (MAE)."""
+    out = np.empty(size.shape[0], dtype=np.float_)
+    for r in prange(size.shape[0]):
+        if direction[r] == TradeDirection.Long:
+            if as_returns:
+                out[r] = (worst_price[r] - entry_price[r]) / entry_price[r]
+            else:
+                out[r] = (worst_price[r] - entry_price[r]) * size[r]
+        else:
+            if as_returns:
+                out[r] = (entry_price[r] - worst_price[r]) / worst_price[r]
+            else:
+                out[r] = (entry_price[r] - worst_price[r]) * size[r]
+    return out

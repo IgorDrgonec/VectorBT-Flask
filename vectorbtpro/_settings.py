@@ -144,7 +144,7 @@ jitting = ChildDict(
             cls=NumbaJitter,
             aliases={"numba"},
             options=dict(),
-            override_options=dict(cache=False),
+            override_options=dict(),
             resolve_kwargs=dict(),
             tasks=dict(),
         ),

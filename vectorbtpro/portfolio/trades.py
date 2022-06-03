@@ -486,14 +486,14 @@ Name: group, dtype: object
 ![](/assets/images/trades_plots.svg)
 """
 
+from functools import partialmethod
+
 import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_1d_array, to_2d_array
-from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic.ranges import Ranges
-from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.portfolio import nb
 from vectorbtpro.portfolio.enums import TradeDirection, TradeStatus, trade_dt
 from vectorbtpro.portfolio.orders import Orders
@@ -501,7 +501,6 @@ from vectorbtpro.records.decorators import attach_fields, override_field_config,
 from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
-from vectorbtpro.utils import checks
 from vectorbtpro.utils.array_ import min_rel_rescale, max_rel_rescale
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig
@@ -573,6 +572,20 @@ trades_shortcut_config = ReadonlyConfig(
         profit_factor=dict(obj_type="red_array"),
         expectancy=dict(obj_type="red_array"),
         sqn=dict(obj_type="red_array"),
+        best_price=dict(obj_type="mapped_array"),
+        worst_price=dict(obj_type="mapped_array"),
+        mfe=dict(obj_type="mapped_array"),
+        mae=dict(obj_type="mapped_array"),
+        mfe_returns=dict(
+            obj_type="mapped_array",
+            method_name="get_mfe",
+            method_kwargs=dict(as_returns=True),
+        ),
+        mae_returns=dict(
+            obj_type="mapped_array",
+            method_name="get_mae",
+            method_kwargs=dict(as_returns=True),
+        ),
     )
 )
 """_"""
@@ -633,7 +646,7 @@ class Trades(Ranges):
         """Get rate of winning trades."""
         wrap_kwargs = merge_dicts(dict(name_or_index="win_rate"), wrap_kwargs)
         return self.get_map_field("pnl").reduce(
-            nb.win_rate_1d_nb,
+            nb.win_rate_reduce_nb,
             group_by=group_by,
             jitted=jitted,
             chunked=chunked,
@@ -652,7 +665,7 @@ class Trades(Ranges):
         """Get profit factor."""
         wrap_kwargs = merge_dicts(dict(name_or_index="profit_factor"), wrap_kwargs)
         return self.get_map_field("pnl").reduce(
-            nb.profit_factor_1d_nb,
+            nb.profit_factor_reduce_nb,
             group_by=group_by,
             jitted=jitted,
             chunked=chunked,
@@ -671,7 +684,7 @@ class Trades(Ranges):
         """Get average profitability."""
         wrap_kwargs = merge_dicts(dict(name_or_index="expectancy"), wrap_kwargs)
         return self.get_map_field("pnl").reduce(
-            nb.expectancy_1d_nb,
+            nb.expectancy_reduce_nb,
             group_by=group_by,
             jitted=jitted,
             chunked=chunked,
@@ -691,7 +704,7 @@ class Trades(Ranges):
         """Get System Quality Number (SQN)."""
         wrap_kwargs = merge_dicts(dict(name_or_index="sqn"), wrap_kwargs)
         return self.get_map_field("pnl").reduce(
-            nb.sqn_1d_nb,
+            nb.sqn_reduce_nb,
             ddof,
             group_by=group_by,
             jitted=jitted,
@@ -699,6 +712,98 @@ class Trades(Ranges):
             wrap_kwargs=wrap_kwargs,
             **kwargs,
         )
+
+    def get_best_price(self, entry_price_open: bool = False, exit_price_close: bool = False, **kwargs) -> MappedArray:
+        """Get best price.
+
+        See `vectorbtpro.portfolio.nb.records.best_worst_price_nb`."""
+        return self.apply(
+            nb.best_worst_price_nb,
+            self._open,
+            self._high,
+            self._low,
+            self._close,
+            entry_price_open,
+            exit_price_close,
+            True,
+            **kwargs,
+        )
+
+    def get_worst_price(self, entry_price_open: bool = False, exit_price_close: bool = False, **kwargs) -> MappedArray:
+        """Get worst price.
+
+        See `vectorbtpro.portfolio.nb.records.best_worst_price_nb`."""
+        return self.apply(
+            nb.best_worst_price_nb,
+            self._open,
+            self._high,
+            self._low,
+            self._close,
+            entry_price_open,
+            exit_price_close,
+            False,
+            **kwargs,
+        )
+
+    def get_mfe(
+        self,
+        entry_price_open: bool = False,
+        exit_price_close: bool = False,
+        as_returns: bool = False,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        **kwargs,
+    ) -> MappedArray:
+        """Get MFE.
+
+        See `vectorbtpro.portfolio.nb.records.mfe_nb`."""
+        best_price = self.resolve_shortcut_attr(
+            "best_price",
+            entry_price_open=entry_price_open,
+            exit_price_close=exit_price_close,
+            jitted=jitted,
+            chunked=chunked,
+        )
+        func = jit_reg.resolve_option(nb.mfe_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        drawdown = func(
+            self.get_field_arr("size"),
+            self.get_field_arr("direction"),
+            self.get_field_arr("entry_price"),
+            best_price.values,
+            as_returns=as_returns,
+        )
+        return self.map_array(drawdown, **kwargs)
+
+    def get_mae(
+        self,
+        entry_price_open: bool = False,
+        exit_price_close: bool = False,
+        as_returns: bool = False,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        **kwargs,
+    ) -> MappedArray:
+        """Get MAE.
+
+        See `vectorbtpro.portfolio.nb.records.mae_nb`."""
+        worst_price = self.resolve_shortcut_attr(
+            "worst_price",
+            entry_price_open=entry_price_open,
+            exit_price_close=exit_price_close,
+            jitted=jitted,
+            chunked=chunked,
+        )
+        func = jit_reg.resolve_option(nb.mae_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        drawdown = func(
+            self.get_field_arr("size"),
+            self.get_field_arr("direction"),
+            self.get_field_arr("entry_price"),
+            worst_price.values,
+            as_returns=as_returns,
+        )
+        return self.map_array(drawdown, **kwargs)
 
     # ############# Stats ############# #
 
@@ -756,8 +861,12 @@ class Trades(Ranges):
                 tags=["ranges", "coverage"],
             ),
             total_records=dict(title="Total Records", calc_func="count", tags="records"),
-            total_long_trades=dict(title="Total Long Trades", calc_func="direction_long.count", tags=["trades", "long"]),
-            total_short_trades=dict(title="Total Short Trades", calc_func="direction_short.count", tags=["trades", "short"]),
+            total_long_trades=dict(
+                title="Total Long Trades", calc_func="direction_long.count", tags=["trades", "long"]
+            ),
+            total_short_trades=dict(
+                title="Total Short Trades", calc_func="direction_short.count", tags=["trades", "short"]
+            ),
             total_closed_trades=dict(
                 title="Total Closed Trades", calc_func="status_closed.count", tags=["trades", "closed"]
             ),
@@ -858,7 +967,7 @@ class Trades(Ranges):
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs,
     ) -> tp.BaseFigure:  # pragma: no cover
-        """Plot trade PnL and returns.
+        """Plot trade PnL or returns.
 
         Args:
             column (str): Name of the column to plot.
@@ -916,12 +1025,16 @@ class Trades(Ranges):
 
         if fig is None:
             fig = make_figure()
+        def_layout_kwargs = {xaxis: {}, yaxis: {}}
         if pct_scale:
-            _layout_kwargs = dict()
-            _layout_kwargs[yaxis] = dict(tickformat=".2%")
-            fig.update_layout(**_layout_kwargs)
+            def_layout_kwargs[yaxis]["tickformat"] = ".2%"
+            def_layout_kwargs[yaxis]["title"] = "Return"
+        else:
+            def_layout_kwargs[yaxis]["title"] = "PnL"
+        fig.update_layout(**def_layout_kwargs)
         fig.update_layout(**layout_kwargs)
         x_domain = get_domain(xref, fig)
+        y_domain = get_domain(yref, fig)
 
         if self_col.count() > 0:
             # Extract information
@@ -1033,6 +1146,267 @@ class Trades(Ranges):
             )
         )
         return fig
+
+    plot_returns = partialmethod(plot_pnl, pct_scale=True)
+    """`Trades.plot_pnl` for `Trades.returns`."""
+
+    def plot_against_pnl(
+        self,
+        field: tp.Union[str, tp.Array1d, MappedArray],
+        field_label: tp.Optional[str] = None,
+        column: tp.Optional[tp.Label] = None,
+        pct_scale: bool = True,
+        field_pct_scale: bool = False,
+        closed_trace_kwargs: tp.KwargsLike = None,
+        closed_profit_trace_kwargs: tp.KwargsLike = None,
+        closed_loss_trace_kwargs: tp.KwargsLike = None,
+        open_trace_kwargs: tp.KwargsLike = None,
+        hline_shape_kwargs: tp.KwargsLike = None,
+        vline_shape_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        xref: str = "x",
+        yref: str = "y",
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
+        """Plot a field against PnL or returns.
+
+        Args:
+            field (str, MappedArray, or array_like): Field to be plotted.
+            field_label (str): Label of the field to be displayed on hover.
+            column (str): Name of the column to plot.
+            pct_scale (bool): Whether to set x-axis to `Trades.returns`, otherwise to `Trades.pnl`.
+            field_pct_scale (bool): Whether to make y-axis a percentage scale.
+            closed_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Closed" markers.
+            closed_profit_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Closed - Profit" markers.
+            closed_loss_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Closed - Loss" markers.
+            open_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Open" markers.
+            hline_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for horizontal zeroline.
+            vline_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for vertical zeroline.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
+            xref (str): X coordinate axis.
+            yref (str): Y coordinate axis.
+            fig (Figure or FigureWidget): Figure to add traces to.
+            **layout_kwargs: Keyword arguments for layout.
+
+        Usage:
+            ```pycon
+            >>> price = pd.Series([1., 2., 3., 4., 5., 6., 5., 3., 2., 1.])
+            >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
+            >>> orders = pd.Series([1., -0.5, 0., -0.5, 2., 0., -0.5, -0.5, 0., -0.5])
+            >>> pf = vbt.Portfolio.from_orders(price, orders)
+            >>> trades = pf.trades
+            >>> trades.plot_against_pnl("MFE")
+            ```
+
+            ![](/assets/images/trades_plot_against_pnl.svg)
+        """
+        from vectorbtpro.utils.opt_packages import assert_can_import
+
+        assert_can_import("plotly")
+        import plotly.graph_objects as go
+        from vectorbtpro.utils.figure import make_figure, get_domain
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
+
+        self_col = self.select_col(column=column, group_by=False)
+
+        if closed_trace_kwargs is None:
+            closed_trace_kwargs = {}
+        if closed_profit_trace_kwargs is None:
+            closed_profit_trace_kwargs = {}
+        if closed_loss_trace_kwargs is None:
+            closed_loss_trace_kwargs = {}
+        if open_trace_kwargs is None:
+            open_trace_kwargs = {}
+        if hline_shape_kwargs is None:
+            hline_shape_kwargs = {}
+        if add_trace_kwargs is None:
+            add_trace_kwargs = {}
+        xaxis = "xaxis" + xref[1:]
+        yaxis = "yaxis" + yref[1:]
+
+        if isinstance(field, str):
+            if field_label is None:
+                field_label = field
+            field = getattr(self_col, field.lower())
+        if isinstance(field, MappedArray):
+            field = field.values
+        if field_label is None:
+            field_label = "Field"
+
+        if fig is None:
+            fig = make_figure()
+        def_layout_kwargs = {xaxis: {}, yaxis: {}}
+        if pct_scale:
+            def_layout_kwargs[xaxis]["tickformat"] = ".2%"
+            def_layout_kwargs[xaxis]["title"] = "Return"
+        else:
+            def_layout_kwargs[xaxis]["title"] = "PnL"
+        if field_pct_scale:
+            def_layout_kwargs[yaxis]["tickformat"] = ".2%"
+        def_layout_kwargs[yaxis]["title"] = field_label
+        fig.update_layout(**def_layout_kwargs)
+        fig.update_layout(**layout_kwargs)
+        x_domain = get_domain(xref, fig)
+        y_domain = get_domain(yref, fig)
+
+        if self_col.count() > 0:
+            # Extract information
+            id_ = self_col.get_field_arr("id")
+            id_title = self_col.get_field_title("id")
+
+            pnl = self_col.get_field_arr("pnl")
+            pnl_title = self_col.get_field_title("pnl")
+
+            returns = self_col.get_field_arr("return")
+            return_title = self_col.get_field_title("return")
+
+            status = self_col.get_field_arr("status")
+
+            valid_mask = ~np.isnan(returns)
+            neutral_mask = (pnl == 0) & valid_mask
+            profit_mask = (pnl > 0) & valid_mask
+            loss_mask = (pnl < 0) & valid_mask
+
+            open_mask = status == TradeStatus.Open
+            closed_profit_mask = (~open_mask) & profit_mask
+            closed_loss_mask = (~open_mask) & loss_mask
+            open_mask &= ~neutral_mask
+
+            def _plot_scatter(mask: tp.Array1d, name: tp.TraceName, color: tp.Any, kwargs: tp.Kwargs) -> None:
+                if np.any(mask):
+                    if self_col.get_field_setting("parent_id", "ignore", False):
+                        customdata = np.stack((id_[mask], pnl[mask], returns[mask]), axis=1)
+                        hovertemplate = (
+                            f"{id_title}: %{{customdata[0]}}"
+                            f"<br>{field_label}: %{{y}}"
+                            f"<br>{pnl_title}: %{{customdata[1]:.6f}}"
+                            f"<br>{return_title}: %{{customdata[2]:.2%}}"
+                        )
+                    else:
+                        parent_id = self_col.get_field_arr("parent_id")
+                        parent_id_title = self_col.get_field_title("parent_id")
+                        customdata = np.stack((id_[mask], parent_id[mask], pnl[mask], returns[mask]), axis=1)
+                        hovertemplate = (
+                            f"{id_title}: %{{customdata[0]}}"
+                            f"<br>{parent_id_title}: %{{customdata[1]}}"
+                            f"<br>{field_label}: %{{y}}"
+                            f"<br>{pnl_title}: %{{customdata[2]:.6f}}"
+                            f"<br>{return_title}: %{{customdata[3]:.2%}}"
+                        )
+                    scatter = go.Scatter(
+                        x=returns[mask] if pct_scale else pnl[mask],
+                        y=field[mask],
+                        mode="markers",
+                        marker=dict(
+                            symbol="circle",
+                            color=color,
+                            size=7,
+                            line=dict(width=1, color=adjust_lightness(color)),
+                        ),
+                        name=name,
+                        customdata=customdata,
+                        hovertemplate=hovertemplate,
+                    )
+                    scatter.update(**kwargs)
+                    fig.add_trace(scatter, **add_trace_kwargs)
+
+            # Plot Closed - Neutral scatter
+            _plot_scatter(neutral_mask, "Closed", plotting_cfg["contrast_color_schema"]["gray"], closed_trace_kwargs)
+
+            # Plot Closed - Profit scatter
+            _plot_scatter(
+                closed_profit_mask,
+                "Closed - Profit",
+                plotting_cfg["contrast_color_schema"]["green"],
+                closed_profit_trace_kwargs,
+            )
+
+            # Plot Closed - Profit scatter
+            _plot_scatter(
+                closed_loss_mask,
+                "Closed - Loss",
+                plotting_cfg["contrast_color_schema"]["red"],
+                closed_loss_trace_kwargs,
+            )
+
+            # Plot Open scatter
+            _plot_scatter(open_mask, "Open", plotting_cfg["contrast_color_schema"]["orange"], open_trace_kwargs)
+
+        # Plot zerolines
+        fig.add_shape(
+            **merge_dicts(
+                dict(
+                    type="line",
+                    xref="paper",
+                    yref=yref,
+                    x0=x_domain[0],
+                    y0=0,
+                    x1=x_domain[1],
+                    y1=0,
+                    line=dict(
+                        color="gray",
+                        dash="dash",
+                    ),
+                ),
+                hline_shape_kwargs,
+            )
+        )
+        fig.add_shape(
+            **merge_dicts(
+                dict(
+                    type="line",
+                    xref=xref,
+                    yref="paper",
+                    x0=0,
+                    y0=y_domain[0],
+                    x1=0,
+                    y1=y_domain[1],
+                    line=dict(
+                        color="gray",
+                        dash="dash",
+                    ),
+                ),
+                vline_shape_kwargs,
+            )
+        )
+        return fig
+
+    plot_mfe = partialmethod(
+        plot_against_pnl,
+        field="mfe",
+        field_label="MFE",
+        pct_scale=False,
+    )
+    """`Trades.plot_against_pnl` for `Trades.mfe`."""
+
+    plot_mae = partialmethod(
+        plot_against_pnl,
+        field="mae",
+        field_label="MAE",
+        pct_scale=False,
+    )
+    """`Trades.plot_against_pnl` for `Trades.mae`."""
+
+    plot_mfe_returns = partialmethod(
+        plot_against_pnl,
+        field="mfe_returns",
+        field_label="MFE Return",
+        pct_scale=True,
+        field_pct_scale=True,
+    )
+    """`Trades.plot_against_pnl` for `Trades.mfe_returns`."""
+
+    plot_mae_returns = partialmethod(
+        plot_against_pnl,
+        field="mae_returns",
+        field_label="MAE Return",
+        pct_scale=True,
+        field_pct_scale=True,
+    )
+    """`Trades.plot_against_pnl` for `Trades.mae_returns`."""
 
     def plot(
         self,
@@ -1482,18 +1856,18 @@ class EntryTrades(Trades):
     ) -> EntryTradesT:
         """Build `EntryTrades` from `vectorbtpro.portfolio.orders.Orders`."""
         if open is None:
-            open = orders.open
+            open = orders._open
         if high is None:
-            high = orders.high
+            high = orders._high
         if low is None:
-            low = orders.low
+            low = orders._low
         if close is None:
-            close = orders.close
+            close = orders._close
         func = jit_reg.resolve_option(nb.get_entry_trades_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         trade_records_arr = func(
             orders.values,
-            to_2d_array(close),
+            to_2d_array(orders.wrapper.wrap(close, group_by=False)),
             orders.col_mapper.col_map,
             init_position=to_1d_array(init_position),
             init_price=to_1d_array(init_price),
@@ -1546,18 +1920,18 @@ class ExitTrades(Trades):
     ) -> ExitTradesT:
         """Build `ExitTrades` from `vectorbtpro.portfolio.orders.Orders`."""
         if open is None:
-            open = orders.open
+            open = orders._open
         if high is None:
-            high = orders.high
+            high = orders._high
         if low is None:
-            low = orders.low
+            low = orders._low
         if close is None:
-            close = orders.close
+            close = orders._close
         func = jit_reg.resolve_option(nb.get_exit_trades_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         trade_records_arr = func(
             orders.values,
-            to_2d_array(close),
+            to_2d_array(orders.wrapper.wrap(close, group_by=False)),
             orders.col_mapper.col_map,
             init_position=to_1d_array(init_position),
             init_price=to_1d_array(init_price),
@@ -1614,13 +1988,13 @@ class Positions(Trades):
     ) -> PositionsT:
         """Build `Positions` from `Trades`."""
         if open is None:
-            open = trades.open
+            open = trades._open
         if high is None:
-            high = trades.high
+            high = trades._high
         if low is None:
-            low = trades.low
+            low = trades._low
         if close is None:
-            close = trades.close
+            close = trades._close
         func = jit_reg.resolve_option(nb.get_positions_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         position_records_arr = func(trades.values, trades.col_mapper.col_map)

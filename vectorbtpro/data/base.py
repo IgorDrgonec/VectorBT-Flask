@@ -951,6 +951,11 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             **kwargs,
         )
 
+    @property
+    def symbol_wrapper(self):
+        """`Data.get_symbol_wrapper` with default arguments."""
+        return self.get_symbol_wrapper()
+
     def concat(self, symbols: tp.Optional[tp.Symbols] = None, level_name: str = "symbol") -> dict:
         """Return a dict of Series/DataFrames with symbols as columns, keyed by column name."""
         if symbols is None:

@@ -5973,7 +5973,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             close = data.close
             if close is None:
                 raise ValueError("Column for close couldn't be found in data")
-            close_wrapper = data.wrapper
+            close_wrapper = data.symbol_wrapper
         else:
             close = to_pd_array(close)
             close_wrapper = ArrayWrapper.from_obj(close)
@@ -5992,7 +5992,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if n is not None:
             rand = RANDNX.run(
                 n=n,
-                input_shape=close.shape,
+                input_shape=close_wrapper.shape,
                 input_index=close_wrapper.index,
                 input_columns=close_wrapper.columns,
                 seed=seed,
@@ -6005,7 +6005,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 entry_prob=entry_prob,
                 exit_prob=exit_prob,
                 param_product=param_product,
-                input_shape=close.shape,
+                input_shape=close_wrapper.shape,
                 input_index=close_wrapper.index,
                 input_columns=close_wrapper.columns,
                 seed=seed,

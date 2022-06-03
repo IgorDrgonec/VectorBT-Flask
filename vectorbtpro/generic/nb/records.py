@@ -291,7 +291,7 @@ def fill_drawdown_record_nb(
     merge_func=records_ch.merge_records,
     merge_kwargs=dict(chunk_meta=Rep("chunk_meta")),
 )
-@register_jitted(tags={"can_parallel"})
+@register_jitted(cache=True, tags={"can_parallel"})
 def get_drawdowns_nb(
     open: tp.Optional[tp.Array2d],
     high: tp.Optional[tp.Array2d],
