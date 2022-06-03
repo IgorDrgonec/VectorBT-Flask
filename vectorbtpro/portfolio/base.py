@@ -4408,8 +4408,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         init_position = np.require(np.broadcast_to(init_position, (target_shape_2d[1],)), dtype=np.float_)
         init_price = np.require(np.broadcast_to(init_price, (target_shape_2d[1],)), dtype=np.float_)
         cash_deposits = broadcast(
-            to_2d_array(cash_deposits, expand_axis=int(not flex_2d)),
+            cash_deposits,
             to_shape=(target_shape_2d[0], len(cs_group_lens)),
+            wrapper_kwargs=dict(
+                index=wrapper.index,
+                columns=wrapper.get_columns(group_by=None if cash_sharing else False),
+            ),
             to_pd=False,
             keep_flex=True,
             reindex_kwargs=dict(fill_value=0.0),
@@ -5573,8 +5577,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         init_position = np.require(np.broadcast_to(init_position, (target_shape_2d[1],)), dtype=np.float_)
         init_price = np.require(np.broadcast_to(init_price, (target_shape_2d[1],)), dtype=np.float_)
         cash_deposits = broadcast(
-            to_2d_array(cash_deposits, expand_axis=int(not flex_2d)),
+            cash_deposits,
             to_shape=(target_shape_2d[0], len(cs_group_lens)),
+            wrapper_kwargs=dict(
+                index=wrapper.index,
+                columns=wrapper.get_columns(group_by=None if cash_sharing else False),
+            ),
             to_pd=False,
             keep_flex=True,
             reindex_kwargs=dict(fill_value=0.0),
@@ -6760,8 +6768,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         init_position = np.require(np.broadcast_to(init_position, (target_shape_2d[1],)), dtype=np.float_)
         init_price = np.require(np.broadcast_to(init_price, (target_shape_2d[1],)), dtype=np.float_)
         cash_deposits = broadcast(
-            to_2d_array(cash_deposits, expand_axis=int(not flex_2d)),
+            cash_deposits,
             to_shape=(target_shape_2d[0], len(cs_group_lens)),
+            wrapper_kwargs=dict(
+                index=wrapper.index,
+                columns=wrapper.get_columns(group_by=None if cash_sharing else False),
+            ),
             to_pd=False,
             keep_flex=keep_inout_raw,
             reindex_kwargs=dict(fill_value=0.0),
@@ -6777,10 +6789,15 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             segment_mask = _segment_mask
         else:
             segment_mask = broadcast(
-                to_2d_array(segment_mask, expand_axis=int(not flex_2d)),
+                segment_mask,
                 to_shape=(target_shape_2d[0], len(group_lens)),
+                wrapper_kwargs=dict(
+                    index=wrapper.index,
+                    columns=wrapper.get_columns(),
+                ),
                 to_pd=False,
                 keep_flex=keep_inout_raw,
+                reindex_kwargs=dict(fill_value=False),
                 require_kwargs=require_kwargs,
             )
         if not flexible:

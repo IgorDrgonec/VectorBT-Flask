@@ -418,7 +418,7 @@ def align_pd_arrays(
     if align_index:
         indexes_to_align = []
         for i in range(len(args)):
-            if checks.is_pandas(args[i]) and len(args[i].index) > 1 and not checks.is_default_index(args[i].index):
+            if checks.is_pandas(args[i]) and not checks.is_default_index(args[i].index):
                 indexes_to_align.append(i)
         if len(indexes_to_align) > 1:
             new_index = None
@@ -966,7 +966,7 @@ def broadcast(
         reindex_arg_names = get_func_arg_names(pd.DataFrame.reindex)
         if set(reindex_kwargs) <= set(reindex_arg_names):
             reindex_kwargs_per_obj = False
-    if checks.is_mapping(args[0]):
+    if checks.is_mapping(args[0]) and not isinstance(args[0], indexing.index_dict):
         if len(args) > 1:
             raise ValueError("Only one argument is allowed when passing a mapping")
         all_keys = list(dict(args[0]).keys())
@@ -1349,9 +1349,13 @@ def broadcast(
         new_shape = (to_shape_2d[0], to_shape_2d[1] * n_params)
     wrapper = wrapping.ArrayWrapper.from_shape(
         new_shape,
-        index=new_index,
-        columns=new_columns,
-        **resolve_dict(wrapper_kwargs),
+        **merge_dicts(
+            dict(
+                index=new_index,
+                columns=new_columns,
+            ),
+            wrapper_kwargs,
+        )
     )
 
     # Perform broadcasting

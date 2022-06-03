@@ -2962,6 +2962,7 @@ class TestReshapeFns:
                 drop_duplicates=True,
                 drop_redundant=True,
                 ignore_sr_names=True,
+                align_index=False,
             )
         # 2d
         to_broadcast = df1, df2
@@ -2973,6 +2974,7 @@ class TestReshapeFns:
                 drop_duplicates=True,
                 drop_redundant=True,
                 ignore_sr_names=True,
+                align_index=False,
             )
 
     def test_broadcast_dirty(self):
@@ -2986,6 +2988,7 @@ class TestReshapeFns:
             drop_duplicates=False,
             drop_redundant=False,
             ignore_sr_names=False,
+            align_index=False,
         )
         for i in range(len(broadcasted)):
             assert_series_equal(
@@ -3013,6 +3016,7 @@ class TestReshapeFns:
             drop_duplicates=True,
             drop_redundant=True,
             ignore_sr_names=True,
+            align_index=False,
         )
         for i in range(len(broadcasted)):
             assert_frame_equal(
@@ -3039,6 +3043,7 @@ class TestReshapeFns:
             drop_duplicates=True,
             drop_redundant=True,
             ignore_sr_names=True,
+            align_index=False,
         )
         for i in range(len(broadcasted)):
             np.testing.assert_array_equal(broadcasted[i], broadcasted_arrs[i])
