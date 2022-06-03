@@ -3134,16 +3134,8 @@ class TestFromHolding:
         exits = pd.Series.vbt.signals.empty_like(price)
         exits.iloc[-1] = True
         assert_records_close(
-            vbt.Portfolio.from_holding(price, sell_at_end=True).order_records,
+            vbt.Portfolio.from_holding(price, close_at_end=True).order_records,
             vbt.Portfolio.from_signals(price, entries, exits, accumulate=False).order_records,
-        )
-        assert_records_close(
-            vbt.Portfolio.from_holding(price, base_method="from_signals").order_records,
-            vbt.Portfolio.from_holding(price, base_method="from_orders").order_records,
-        )
-        assert_records_close(
-            vbt.Portfolio.from_holding(price, base_method="from_signals", sell_at_end=True).order_records,
-            vbt.Portfolio.from_holding(price, base_method="from_orders", sell_at_end=True).order_records,
         )
 
 

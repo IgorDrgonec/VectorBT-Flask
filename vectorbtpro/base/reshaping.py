@@ -1132,8 +1132,8 @@ def broadcast(
     is_pd = False
     is_2d = False
 
-    old_objs = []
-    obj_reindex_kwargs = []
+    old_objs = {}
+    obj_reindex_kwargs = {}
     for k, bco_obj in bco_instances.items():
         if k in none_keys or k in product_keys or k in special_keys:
             continue
@@ -1145,8 +1145,8 @@ def broadcast(
             is_pd = True
         if bco_obj.to_pd is not None and bco_obj.to_pd:
             is_pd = True
-        old_objs.append(obj)
-        obj_reindex_kwargs.append(bco_obj.reindex_kwargs)
+        old_objs[k] = obj
+        obj_reindex_kwargs[k] = bco_obj.reindex_kwargs
 
     if to_shape is not None:
         if isinstance(to_shape, int):
@@ -1161,33 +1161,33 @@ def broadcast(
         is_pd = to_pd or (return_wrapper and is_pd)
 
     # Align pandas arrays
-    old_objs = align_pd_arrays(
-        old_objs,
+    old_objs = dict(zip(old_objs.keys(), align_pd_arrays(
+        list(old_objs.values()),
         align_index=align_index,
         align_columns=align_columns,
-        reindex_kwargs=obj_reindex_kwargs,
-    )
+        reindex_kwargs=list(obj_reindex_kwargs.values()),
+    )))
 
     # Convert all pd.Series objects to pd.DataFrame if we work on 2-dim data
-    ready_objs = []
-    for obj in old_objs:
+    ready_objs = {}
+    for k, obj in old_objs.items():
         if is_2d and checks.is_series(obj):
-            ready_objs.append(obj.values[:, None])
+            ready_objs[k] = obj.values[:, None]
         else:
-            ready_objs.append(np.asarray(obj))
+            ready_objs[k] = np.asarray(obj)
 
     # Get final shape
     if to_shape is None:
         try:
-            to_shape = _broadcast_shape(*ready_objs)
+            to_shape = _broadcast_shape(*ready_objs.values())
         except ValueError:
             arr_shapes = {}
             for i, k in enumerate(bco_instances):
                 if k in none_keys or k in product_keys or k in special_keys:
                     continue
 
-                if len(ready_objs[i].shape) > 0:
-                    arr_shapes[k] = ready_objs[i].shape
+                if len(ready_objs[k].shape) > 0:
+                    arr_shapes[k] = ready_objs[k].shape
             raise ValueError("Could not broadcast shapes: %s" % str(arr_shapes))
     if not isinstance(to_shape, tuple):
         to_shape = (to_shape,)
@@ -1199,7 +1199,7 @@ def broadcast(
         # Decide on index and columns
         # NOTE: Important to pass old_objs, not ready_objs, to preserve original shape info
         new_index = broadcast_index(
-            old_objs,
+            list(old_objs.values()),
             to_shape,
             index_from=index_from,
             axis=0,
@@ -1209,7 +1209,7 @@ def broadcast(
             **stack_kwargs,
         )
         new_columns = broadcast_index(
-            old_objs,
+            list(old_objs.values()),
             to_shape,
             index_from=columns_from,
             axis=1,
@@ -1355,8 +1355,8 @@ def broadcast(
     )
 
     # Perform broadcasting
-    old_objs2 = []
-    new_objs = []
+    old_objs2 = {}
+    new_objs = {}
     for i, k in enumerate(all_keys):
         if k in none_keys or k in special_keys:
             continue
@@ -1377,8 +1377,8 @@ def broadcast(
             new_obj = obj
         else:
             # Broadcast regular objects
-            old_obj = old_objs.pop(0)
-            new_obj = ready_objs.pop(0)
+            old_obj = old_objs[k]
+            new_obj = ready_objs[k]
             _min_one_dim = bco_instances[k].min_one_dim
             if _min_one_dim and new_obj.ndim == 0:
                 new_obj = new_obj[None]
@@ -1399,11 +1399,11 @@ def broadcast(
                         new_obj = new_obj[:, None]  # product changes is_2d behavior
                     new_obj = np.tile(new_obj, (1, n_params))
 
-        old_objs2.append(old_obj)
-        new_objs.append(new_obj)
+        old_objs2[k] = old_obj
+        new_objs[k] = new_obj
 
     # Resolve special objects
-    new_objs2 = []
+    new_objs2 = {}
     for i, k in enumerate(all_keys):
         if k in none_keys:
             continue
@@ -1427,30 +1427,33 @@ def broadcast(
             elif isinstance(bco.value, CustomTemplate):
                 # Template
                 context = dict(
+                    bco_instances=bco_instances,
+                    new_objs=new_objs,
                     wrapper=wrapper,
+                    obj_name=k,
                     bco=bco,
                 )
                 new_obj = bco.value.substitute(context, sub_id="broadcast")
             else:
                 raise TypeError(f"Special type {type(bco.value)} not supported")
         else:
-            new_obj = new_objs.pop(0)
+            new_obj = new_objs[k]
 
         # Force to match requirements
         new_obj = np.require(new_obj, **resolve_dict(bco_instances[k].require_kwargs))
-        new_objs2.append(new_obj)
+        new_objs2[k] = new_obj
 
     # Perform wrapping and post-processing
-    new_objs3 = []
+    new_objs3 = {}
     for i, k in enumerate(all_keys):
         if k in none_keys:
             continue
-        new_obj = new_objs2.pop(0)
+        new_obj = new_objs2[k]
         _keep_flex = bco_instances[k].keep_flex
         _repeat_product = bco_instances[k].repeat_product
 
         if _keep_flex:
-            new_objs3.append(new_obj)
+            new_objs3[k] = new_obj
         else:
             # Wrap array
             _is_pd = bco_instances[k].to_pd
@@ -1459,7 +1462,7 @@ def broadcast(
             if k in product_keys and not _repeat_product:
                 new_obj = wrap_broadcasted(
                     new_obj,
-                    old_obj=old_objs2.pop(0) if k not in special_keys else None,
+                    old_obj=old_objs2[k] if k not in special_keys else None,
                     is_pd=_is_pd,
                     new_index=new_index,
                     new_columns=param_columns,
@@ -1468,7 +1471,7 @@ def broadcast(
             else:
                 new_obj = wrap_broadcasted(
                     new_obj,
-                    old_obj=old_objs2.pop(0) if k not in special_keys else None,
+                    old_obj=old_objs2[k] if k not in special_keys else None,
                     is_pd=_is_pd,
                     new_index=new_index,
                     new_columns=new_columns,
@@ -1479,16 +1482,16 @@ def broadcast(
             _post_func = bco_instances[k].post_func
             if _post_func is not None:
                 new_obj = _post_func(new_obj)
-            new_objs3.append(new_obj)
+            new_objs3[k] = new_obj
 
     # Prepare outputs
     return_objs = []
     for k in all_keys:
         if k not in none_keys:
             if k in default_keys and keep_wrap_default:
-                return_objs.append(Default(new_objs3.pop(0)))
+                return_objs.append(Default(new_objs3[k]))
             else:
-                return_objs.append(new_objs3.pop(0))
+                return_objs.append(new_objs3[k])
         else:
             if k in default_keys and keep_wrap_default:
                 return_objs.append(Default(None))

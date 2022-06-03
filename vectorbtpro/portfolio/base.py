@@ -5812,30 +5812,20 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     def from_holding(
         cls: tp.Type[PortfolioT],
         close: tp.Union[tp.ArrayLike, Data],
-        size: tp.Optional[tp.ArrayLike] = None,
-        direction: tp.Optional[tp.ArrayLike] = None,
-        sell_at_end: tp.Optional[bool] = None,
-        base_method: tp.Optional[str] = None,
+        direction: tp.Optional[int] = None,
+        close_at_end: tp.Optional[bool] = None,
         **kwargs,
     ) -> PortfolioT:
-        """Simulate portfolio from plain holding.
+        """Simulate portfolio from plain holding using signals.
 
-        `**kwargs` are passed to the underlying class method.
+        If `close_at_end` is True, will place an opposite signal at the very end.
 
-        For the default base method, see `hold_base_method` in `vectorbtpro._settings.portfolio`.
-
-        !!! note
-            If `sell_at_end` is True, will place an opposite signal at the very end.
-            Be careful when using both directions, since this will most likely reverse the position.
+        `**kwargs` are passed to the class method `Portfolio.from_signals`.
 
         Usage:
             ```pycon
             >>> close = pd.Series([1, 2, 3, 4, 5])
             >>> pf = vbt.Portfolio.from_holding(close, base_method='from_signals')
-            >>> pf.final_value
-            500.0
-
-            >>> pf = vbt.Portfolio.from_holding(close, base_method='from_orders')
             >>> pf.final_value
             500.0
             ```
@@ -5844,61 +5834,21 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         portfolio_cfg = settings["portfolio"]
 
-        if size is None:
-            size = portfolio_cfg["size"]
         if direction is None:
             direction = portfolio_cfg["hold_direction"]
-        if sell_at_end is None:
-            sell_at_end = portfolio_cfg["sell_at_end"]
-        if base_method is None:
-            base_method = portfolio_cfg["hold_base_method"]
+        direction = map_enum_fields(direction, Direction)
+        if not isinstance(direction, int):
+            raise TypeError("Direction must be a scalar")
+        if close_at_end is None:
+            close_at_end = portfolio_cfg["close_at_end"]
 
-        if base_method.lower() == "from_signals":
-
-            def _entries(wrapper, bco):
-                if bco.keep_flex:
-                    if wrapper.ndim == 1:
-                        entries = np.full(wrapper.shape[0], False, dtype=np.bool_)
-                    else:
-                        entries = np.full((wrapper.shape[0], 1), False, dtype=np.bool_)
-                entries[0] = True
-                return entries
-
-            def _exits(wrapper, bco, _sell_at_end=sell_at_end):
-                if bco.keep_flex:
-                    if wrapper.ndim == 1:
-                        exits = np.full(wrapper.shape[0], False, dtype=np.bool_)
-                    else:
-                        exits = np.full((wrapper.shape[0], 1), False, dtype=np.bool_)
-                if _sell_at_end:
-                    exits[-1] = True
-                return exits
-
-            return cls.from_signals(
-                close,
-                entries=RepFunc(_entries),
-                exits=RepFunc(_exits),
-                accumulate=False,
-                size=size,
-                direction=direction,
-                **kwargs,
-            )
-
-        if base_method.lower() == "from_orders":
-
-            def _size(wrapper, bco, _size=size, _sell_at_end=sell_at_end):
-                if bco.keep_flex:
-                    if wrapper.ndim == 1:
-                        size = np.full(wrapper.shape[0], np.nan, dtype=np.float_)
-                    else:
-                        size = np.full((wrapper.shape[0], 1), np.nan, dtype=np.float_)
-                size[0] = _size
-                if _sell_at_end:
-                    size[-1] = -_size
-                return size
-
-            return cls.from_orders(close, size=RepFunc(_size), direction=direction, **kwargs)
-        raise ValueError(f"Unknown base method '{base_method}'")
+        return cls.from_signals(
+            close,
+            signal_func_nb=nb.holding_enex_signal_func_nb,
+            signal_args=(RepEval("close"), direction, close_at_end),
+            accumulate=False,
+            **kwargs,
+        )
 
     @classmethod
     def from_random_signals(
@@ -9387,8 +9337,16 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 agg_func=None,
                 tags="wrapper",
             ),
-            start_value=dict(title="Start Value", calc_func="init_cash", tags="portfolio"),
+            start_value=dict(title="Start Value", calc_func="init_value", tags="portfolio"),
+            min_value=dict(title="Min Value", calc_func="value.vbt.min", tags="portfolio"),
+            max_value=dict(title="Max Value", calc_func="value.vbt.max", tags="portfolio"),
             end_value=dict(title="End Value", calc_func="final_value", tags="portfolio"),
+            cash_deposits=dict(
+                title="Cash Deposits", calc_func="cash_deposits.vbt.sum", check_has_cash_deposits=True, tags="portfolio"
+            ),
+            cash_earnings=dict(
+                title="Cash Earnings", calc_func="cash_earnings.vbt.sum", check_has_cash_earnings=True, tags="portfolio"
+            ),
             total_return=dict(
                 title="Total Return [%]",
                 calc_func="total_return",
@@ -9402,13 +9360,18 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 check_has_bm_returns=True,
                 tags="portfolio",
             ),
+            total_time_exposure=dict(
+                title="Total Time Exposure [%]",
+                calc_func="position_mask.vbt.mean",
+                post_calc_func=lambda self, out, settings: out * 100,
+                tags="portfolio",
+            ),
             max_gross_exposure=dict(
                 title="Max Gross Exposure [%]",
                 calc_func="gross_exposure.vbt.max",
                 post_calc_func=lambda self, out, settings: out * 100,
                 tags="portfolio",
             ),
-            total_fees_paid=dict(title="Total Fees Paid", calc_func="orders.fees.sum", tags=["portfolio", "orders"]),
             max_dd=dict(
                 title="Max Drawdown [%]",
                 calc_func="drawdowns.max_drawdown",
@@ -9421,28 +9384,21 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 fill_wrap_kwargs=True,
                 tags=["portfolio", "drawdowns", "duration"],
             ),
+            total_orders=dict(
+                title="Total Orders",
+                calc_func="orders.count",
+                tags=["portfolio", "orders"],
+            ),
+            total_fees_paid=dict(
+                title="Total Fees Paid",
+                calc_func="orders.fees.sum",
+                tags=["portfolio", "orders"],
+            ),
             total_trades=dict(
                 title="Total Trades",
                 calc_func="trades.count",
                 incl_open=True,
                 tags=["portfolio", "trades"],
-            ),
-            total_closed_trades=dict(
-                title="Total Closed Trades",
-                calc_func="trades.status_closed.count",
-                tags=["portfolio", "trades", "closed"],
-            ),
-            total_open_trades=dict(
-                title="Total Open Trades",
-                calc_func="trades.status_open.count",
-                incl_open=True,
-                tags=["portfolio", "trades", "open"],
-            ),
-            open_trade_pnl=dict(
-                title="Open Trade PnL",
-                calc_func="trades.status_open.pnl.sum",
-                incl_open=True,
-                tags=["portfolio", "trades", "open"],
             ),
             win_rate=dict(
                 title="Win Rate [%]",

@@ -760,6 +760,7 @@ def simulate_from_signal_func_nb(
 
                 # Get user-defined signal
                 signal_ctx = SignalContext(
+                    target_shape=target_shape,
                     i=i,
                     col=col,
                     position_now=position_now,
@@ -1083,6 +1084,32 @@ def simulate_from_signal_func_nb(
         call_seq=call_seq,
         in_outputs=in_outputs,
     )
+
+
+@register_jitted
+def holding_enex_signal_func_nb(
+    c: SignalContext,
+    close: tp.FlexArray,
+    direction: int,
+    close_at_end: bool,
+) -> tp.Tuple[bool, bool, bool, bool]:
+    """Resolve direction-aware signals out of specification for holding."""
+    if c.position_now == 0:
+        _close = flex_select_auto_nb(close, c.i, c.col, c.flex_2d)
+        if not np.isnan(_close) and not np.isinf(_close):
+            if direction == Direction.LongOnly:
+                return True, False, False, False
+            if direction == Direction.ShortOnly:
+                return False, False, True, False
+            raise ValueError("Either long-only or short-only direction is allowed for holding")
+        return False, False, False, False
+    if close_at_end and c.i == c.target_shape[0] - 1:
+        if direction == Direction.LongOnly:
+            return False, True, False, False
+        if direction == Direction.ShortOnly:
+            return False, False, False, True
+        raise ValueError("Either long-only or short-only direction is allowed for holding")
+    return False, False, False, False
 
 
 @register_jitted

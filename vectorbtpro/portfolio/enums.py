@@ -2058,6 +2058,7 @@ __pdoc__["AdjustTPContext.curr_stop"] = "See `AdjustSLContext.curr_stop`."
 
 
 class SignalContext(tp.NamedTuple):
+    target_shape: tp.Shape
     i: int
     col: int
     position_now: float
@@ -2066,6 +2067,7 @@ class SignalContext(tp.NamedTuple):
 
 
 __pdoc__["SignalContext"] = "A named tuple representing the context for generation of signals."
+__pdoc__["SignalContext.target_shape"] = "Target shape."
 __pdoc__[
     "SignalContext.i"
 ] = """Index of the current row.

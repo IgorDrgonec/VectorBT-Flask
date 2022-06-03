@@ -725,6 +725,7 @@ _settings["plotting"] = plotting
 stats_builder = ChildDict(
     metrics="all",
     tags="all",
+    dropna=False,
     silence_warnings=False,
     template_context=Config(),
     filters=Config(
@@ -1118,8 +1119,7 @@ portfolio = ChildDict(
     upon_opposite_entry="reversereduce",
     # Holding
     hold_direction="longonly",
-    sell_at_end=False,
-    hold_base_method="from_signals",
+    close_at_end=False,
     # Setup
     init_cash=100.0,
     init_position=0.0,
@@ -1166,6 +1166,14 @@ portfolio = ChildDict(
                 )
                 is not None,
                 warning_message=Sub("Metric '$metric_name' requires bm_returns to be set"),
+            ),
+            has_cash_deposits=dict(
+                filter_func=lambda self, metric_settings: self._cash_deposits.size > 1
+                or self._cash_deposits.item() != 0,
+            ),
+            has_cash_earnings=dict(
+                filter_func=lambda self, metric_settings: self._cash_earnings.size > 1
+                or self._cash_earnings.item() != 0,
             ),
         ),
         settings=dict(

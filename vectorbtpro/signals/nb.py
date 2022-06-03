@@ -323,7 +323,7 @@ def rand_by_prob_place_nb(
     ),
     merge_func=base_ch.column_stack,
 )
-@register_jitted(cache=True, tags={"can_parallel"})
+@register_jitted(tags={"can_parallel"})
 def generate_rand_enex_nb(
     target_shape: tp.Shape,
     n: tp.FlexArray,

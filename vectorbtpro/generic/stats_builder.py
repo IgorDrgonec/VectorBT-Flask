@@ -99,6 +99,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
         column: tp.Optional[tp.Label] = None,
         group_by: tp.GroupByLike = None,
         agg_func: tp.Optional[tp.Callable] = np.mean,
+        dropna: tp.Optional[bool] = None,
         silence_warnings: tp.Optional[bool] = None,
         template_context: tp.Optional[tp.Mapping] = None,
         settings: tp.KwargsLike = None,
@@ -201,6 +202,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
                 * Takes effect if global `agg_func` is not None
                 * Raises a warning if it's None but the result of calculation has multiple values
+            dropna (bool): Whether to hide metrics that are all NaN.
             silence_warnings (bool): Whether to silence all warnings.
             template_context (mapping): Global context to replace templates.
 
@@ -249,6 +251,8 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
             See `vectorbtpro.portfolio.base`.
         """
         # Resolve defaults
+        if dropna is None:
+            dropna = self.stats_defaults.get("dropna", False)
         if silence_warnings is None:
             silence_warnings = self.stats_defaults.get("silence_warnings", False)
         template_context = merge_dicts(
@@ -713,13 +717,21 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
         # Return the stats
         if reself.wrapper.get_ndim(group_by=group_by) == 1:
-            return pd.Series(
+            sr = pd.Series(
                 stats_dct,
                 name=reself.wrapper.get_name(group_by=group_by),
                 dtype=object,
             )
+            if dropna:
+                sr.replace([np.inf, -np.inf], np.nan, inplace=True)
+                return sr.dropna()
+            return sr
         if column is not None:
-            return pd.Series(stats_dct, name=column, dtype=object)
+            sr = pd.Series(stats_dct, name=column, dtype=object)
+            if dropna:
+                sr.replace([np.inf, -np.inf], np.nan, inplace=True)
+                return sr.dropna()
+            return sr
         if agg_func is not None:
             if used_agg_func and not silence_warnings:
                 warnings.warn(
@@ -727,10 +739,17 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                     "Pass column to select a single column/group.",
                     stacklevel=2,
                 )
-            return pd.Series(stats_dct, name="agg_stats", dtype=object)
+            sr = pd.Series(stats_dct, name="agg_stats", dtype=object)
+            if dropna:
+                sr.replace([np.inf, -np.inf], np.nan, inplace=True)
+                return sr.dropna()
+            return sr
         new_index = reself.wrapper.grouper.get_index(group_by=group_by)
-        stats_df = pd.DataFrame(stats_dct, index=new_index)
-        return stats_df
+        df = pd.DataFrame(stats_dct, index=new_index)
+        if dropna:
+            df.replace([np.inf, -np.inf], np.nan, inplace=True)
+            return df.dropna(axis=1, how="all")
+        return df
 
     # ############# Docs ############# #
 

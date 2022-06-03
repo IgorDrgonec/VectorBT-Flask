@@ -1,5 +1,4 @@
 import os
-from datetime import datetime
 
 import pytest
 from numba import njit
@@ -230,9 +229,9 @@ class TestMappedArray:
         )
         mapped_array1 = vbt.MappedArray(
             df1.vbt.wrapper,
-            np.array([]),
-            np.array([]),
-            np.array([]),
+            np.array([], dtype=np.int_),
+            np.array([], dtype=np.int_),
+            np.array([], dtype=np.int_),
         )
         mapped_array2 = vbt.MappedArray(
             df2.vbt.wrapper,
@@ -2329,14 +2328,7 @@ class TestRecords:
 
 ts = pd.DataFrame(
     {"a": [1, -1, 3, -1, 5, -1], "b": [-1, -1, -1, 4, 5, 6], "c": [1, 2, 3, -1, -1, -1], "d": [-1, -1, -1, -1, -1, -1]},
-    index=[
-        datetime(2020, 1, 1),
-        datetime(2020, 1, 2),
-        datetime(2020, 1, 3),
-        datetime(2020, 1, 4),
-        datetime(2020, 1, 5),
-        datetime(2020, 1, 6),
-    ],
+    index=pd.date_range("2020", periods=6),
 )
 
 ranges = vbt.Ranges.from_generic(ts, wrapper_kwargs=dict(freq="1 days"))
@@ -2706,14 +2698,7 @@ class TestRanges:
 
 ts2 = pd.DataFrame(
     {"a": [2, 1, 3, 1, 4, 1], "b": [1, 2, 1, 3, 1, 4], "c": [1, 2, 3, 2, 1, 2], "d": [1, 2, 3, 4, 5, 6]},
-    index=[
-        datetime(2020, 1, 1),
-        datetime(2020, 1, 2),
-        datetime(2020, 1, 3),
-        datetime(2020, 1, 4),
-        datetime(2020, 1, 5),
-        datetime(2020, 1, 6),
-    ],
+    index=pd.date_range("2020", periods=6),
 )
 
 drawdowns = vbt.Drawdowns.from_price(ts2, wrapper_kwargs=dict(freq="1 days"))
@@ -3440,25 +3425,36 @@ class TestDrawdowns:
 
 # ############# orders.py ############# #
 
+open = pd.Series(
+    [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5],
+    index=pd.date_range("2020", periods=8),
+).vbt.tile(4, keys=["a", "b", "c", "d"])
+high = pd.Series(
+    [1.25, 2.25, 3.25, 4.25, 5.25, 6.25, 7.25, 8.25],
+    index=pd.date_range("2020", periods=8),
+).vbt.tile(4, keys=["a", "b", "c", "d"])
+low = pd.Series(
+    [0.25, 1.25, 2.25, 3.25, 4.25, 5.25, 6.25, 7.25],
+    index=pd.date_range("2020", periods=8),
+).vbt.tile(4, keys=["a", "b", "c", "d"])
 close = pd.Series(
     [1, 2, 3, 4, 5, 6, 7, 8],
-    index=[
-        datetime(2020, 1, 1),
-        datetime(2020, 1, 2),
-        datetime(2020, 1, 3),
-        datetime(2020, 1, 4),
-        datetime(2020, 1, 5),
-        datetime(2020, 1, 6),
-        datetime(2020, 1, 7),
-        datetime(2020, 1, 8),
-    ],
+    index=pd.date_range("2020", periods=8),
 ).vbt.tile(4, keys=["a", "b", "c", "d"])
 
 size = np.full(close.shape, np.nan, dtype=np.float_)
 size[:, 0] = [1, 0.1, -1, -0.1, np.nan, 1, -1, 2]
 size[:, 1] = [-1, -0.1, 1, 0.1, np.nan, -1, 1, -2]
 size[:, 2] = [1, 0.1, -1, -0.1, np.nan, 1, -2, 2]
-orders = vbt.Portfolio.from_orders(close, size, fees=0.01, freq="1 days").orders
+orders = vbt.Portfolio.from_orders(
+    open=open,
+    high=high,
+    low=low,
+    close=close,
+    size=size,
+    fees=0.01,
+    freq="1 days",
+).orders
 orders_grouped = orders.regroup(group_by)
 
 
@@ -4366,6 +4362,256 @@ class TestExitTrades:
         assert_series_equal(
             exit_trades_grouped.sqn,
             pd.Series(np.array([-0.20404671, 0.71660403]), index=pd.Index(["g1", "g2"], dtype="object")).rename("sqn"),
+        )
+
+    def test_best_price(self):
+        np.testing.assert_array_almost_equal(exit_trades["a"].best_price.values, np.array([2.5, 3.5, 6.5, 8.0]))
+        np.testing.assert_array_almost_equal(
+            exit_trades.best_price.values,
+            np.array([2.5, 3.5, 6.5, 8.0, 1.0, 1.0, 6.0, 8.0, 2.5, 3.5, 6.5, 7.0, 8.0]),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades.get_best_price(entry_price_open=True).values,
+            np.array([2.5, 3.5, 6.5, 8.25, 0.25, 0.25, 5.25, 7.25, 2.5, 3.5, 6.5, 6.25, 8.25]),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades.get_best_price(exit_price_close=True).values,
+            np.array([3.25, 4.25, 7.25, 8.0, 1.0, 1.0, 6.0, 8.0, 3.25, 4.25, 7.25, 7.0, 8.0]),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades.get_best_price(entry_price_open=True, exit_price_close=True).values,
+            np.array([3.25, 4.25, 7.25, 8.25, 0.25, 0.25, 5.25, 7.25, 3.25, 4.25, 7.25, 6.25, 8.25]),
+        )
+
+    def test_worst_price(self):
+        np.testing.assert_array_almost_equal(exit_trades["a"].worst_price.values, np.array([1.0, 1.0, 6.0, 8.0]))
+        np.testing.assert_array_almost_equal(
+            exit_trades.worst_price.values,
+            np.array([1.0, 1.0, 6.0, 8.0, 2.5, 3.5, 6.5, 8.0, 1.0, 1.0, 6.0, 7.5, 8.0]),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades.get_worst_price(entry_price_open=True).values,
+            np.array([0.25, 0.25, 5.25, 7.25, 2.5, 3.5, 6.5, 8.25, 0.25, 0.25, 5.25, 7.5, 7.25]),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades.get_worst_price(exit_price_close=True).values,
+            np.array([1.0, 1.0, 6.0, 8.0, 3.25, 4.25, 7.25, 8.0, 1.0, 1.0, 6.0, 8.25, 8.0]),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades.get_worst_price(entry_price_open=True, exit_price_close=True).values,
+            np.array([0.25, 0.25, 5.25, 7.25, 3.25, 4.25, 7.25, 8.25, 0.25, 0.25, 5.25, 8.25, 7.25]),
+        )
+
+    def test_mfe(self):
+        np.testing.assert_array_almost_equal(
+            exit_trades["a"].mfe.values,
+            np.array([1.4090909090909092, 0.24090909090909113, 0.5, 0.0]),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades.mfe.values,
+            np.array(
+                [
+                    1.4090909090909092,
+                    0.24090909090909113,
+                    0.5,
+                    0.0,
+                    0.09090909090909083,
+                    0.00909090909090909,
+                    0.0,
+                    0.0,
+                    1.4090909090909092,
+                    0.24090909090909113,
+                    0.5,
+                    0.0,
+                    0.0,
+                ]
+            ),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades.get_mfe(entry_price_open=True).values,
+            np.array(
+                [
+                    1.4090909090909092,
+                    0.24090909090909113,
+                    0.5,
+                    0.5,
+                    0.8409090909090908,
+                    0.08409090909090916,
+                    0.75,
+                    1.5,
+                    1.4090909090909092,
+                    0.24090909090909113,
+                    0.5,
+                    0.75,
+                    0.25,
+                ]
+            ),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades.get_mfe(exit_price_close=True).values,
+            np.array(
+                [
+                    2.159090909090909,
+                    0.3159090909090912,
+                    1.25,
+                    0.0,
+                    0.09090909090909083,
+                    0.00909090909090909,
+                    0.0,
+                    0.0,
+                    2.159090909090909,
+                    0.3159090909090912,
+                    1.25,
+                    0.0,
+                    0.0,
+                ]
+            ),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades.get_mfe(entry_price_open=True, exit_price_close=True).values,
+            np.array(
+                [
+                    2.159090909090909,
+                    0.3159090909090912,
+                    1.25,
+                    0.5,
+                    0.8409090909090908,
+                    0.08409090909090916,
+                    0.75,
+                    1.5,
+                    2.159090909090909,
+                    0.3159090909090912,
+                    1.25,
+                    0.75,
+                    0.25,
+                ]
+            ),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades.mfe_returns.values,
+            np.array(
+                [
+                    1.2916666666666667,
+                    2.2083333333333335,
+                    0.08333333333333333,
+                    0.0,
+                    0.09090909090909083,
+                    0.09090909090909083,
+                    0.0,
+                    0.0,
+                    1.2916666666666667,
+                    2.2083333333333335,
+                    0.08333333333333333,
+                    0.0,
+                    0.0,
+                ]
+            ),
+        )
+
+    def test_mae(self):
+        np.testing.assert_array_almost_equal(
+            exit_trades["a"].mae.values,
+            np.array([-0.09090909090909083, -0.00909090909090909, 0.0, 0.0]),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades.mae.values,
+            np.array(
+                [
+                    -0.09090909090909083,
+                    -0.00909090909090909,
+                    0.0,
+                    0.0,
+                    -1.4090909090909092,
+                    -0.24090909090909113,
+                    -0.5,
+                    0.0,
+                    -0.09090909090909083,
+                    -0.00909090909090909,
+                    0.0,
+                    -0.5,
+                    0.0,
+                ]
+            ),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades.get_mae(entry_price_open=True).values,
+            np.array(
+                [
+                    -0.8409090909090908,
+                    -0.08409090909090916,
+                    -0.75,
+                    -1.5,
+                    -1.4090909090909092,
+                    -0.24090909090909113,
+                    -0.5,
+                    -0.5,
+                    -0.8409090909090908,
+                    -0.08409090909090916,
+                    -0.75,
+                    -0.5,
+                    -0.75,
+                ]
+            ),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades.get_mae(exit_price_close=True).values,
+            np.array(
+                [
+                    -0.09090909090909083,
+                    -0.00909090909090909,
+                    0.0,
+                    0.0,
+                    -2.159090909090909,
+                    -0.3159090909090912,
+                    -1.25,
+                    0.0,
+                    -0.09090909090909083,
+                    -0.00909090909090909,
+                    0.0,
+                    -1.25,
+                    0.0,
+                ]
+            ),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades.get_mae(entry_price_open=True, exit_price_close=True).values,
+            np.array(
+                [
+                    -0.8409090909090908,
+                    -0.08409090909090916,
+                    -0.75,
+                    -1.5,
+                    -2.159090909090909,
+                    -0.3159090909090912,
+                    -1.25,
+                    -0.5,
+                    -0.8409090909090908,
+                    -0.08409090909090916,
+                    -0.75,
+                    -1.25,
+                    -0.75,
+                ]
+            ),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades.mae_returns.values,
+            np.array(
+                [
+                    -0.08333333333333326,
+                    -0.08333333333333326,
+                    0.0,
+                    0.0,
+                    -0.5636363636363637,
+                    -0.6883116883116883,
+                    -0.07692307692307693,
+                    0.0,
+                    -0.08333333333333326,
+                    -0.08333333333333326,
+                    0.0,
+                    -0.06666666666666667,
+                    0.0,
+                ]
+            ),
         )
 
     def test_long_records(self):

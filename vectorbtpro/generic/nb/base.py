@@ -138,6 +138,42 @@ def set_by_mask_mult_nb(arr: tp.Array2d, mask: tp.Array2d, values: tp.Array2d) -
 
 
 @register_jitted(cache=True)
+def first_valid_index_1d_nb(arr: tp.Array1d) -> int:
+    """Get the index of the first valid value."""
+    for i in range(arr.shape[0]):
+        if not np.isnan(arr[i]) and not np.isinf(arr[i]):
+            return i
+    return -1
+
+
+@register_jitted(cache=True)
+def first_valid_index_nb(arr):
+    """2-dim version of `first_valid_index_1d_nb`."""
+    out = np.empty(arr.shape[1], dtype=np.int_)
+    for col in range(arr.shape[1]):
+        out[col] = first_valid_index_1d_nb(arr[:, col])
+    return out
+
+
+@register_jitted(cache=True)
+def last_valid_index_1d_nb(arr: tp.Array1d) -> int:
+    """Get the index of the last valid value."""
+    for i in range(arr.shape[0] - 1, -1, -1):
+        if not np.isnan(arr[i]) and not np.isinf(arr[i]):
+            return i
+    return -1
+
+
+@register_jitted(cache=True)
+def last_valid_index_nb(arr):
+    """2-dim version of `last_valid_index_1d_nb`."""
+    out = np.empty(arr.shape[1], dtype=np.int_)
+    for col in range(arr.shape[1]):
+        out[col] = last_valid_index_1d_nb(arr[:, col])
+    return out
+
+
+@register_jitted(cache=True)
 def fillna_1d_nb(arr: tp.Array1d, value: tp.Scalar) -> tp.Array1d:
     """Replace NaNs with value.
 
