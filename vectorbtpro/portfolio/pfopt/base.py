@@ -919,6 +919,7 @@ class PortfolioOptimizer(Analyzable):
         add_delta: tp.Union[None, tp.FrequencyLike, pfopt_group_dict] = row_points_defaults["add_delta"],
         kind: tp.Union[None, str, pfopt_group_dict] = row_points_defaults["kind"],
         indexer_method: tp.Union[None, str, pfopt_group_dict] = row_points_defaults["indexer_method"],
+        indexer_tolerance: tp.Union[None, str, pfopt_group_dict] = row_points_defaults["indexer_tolerance"],
         skip_minus_one: tp.Union[bool, pfopt_group_dict] = row_points_defaults["skip_minus_one"],
         jitted: tp.Union[tp.JittedOption, pfopt_group_dict] = None,
         chunked: tp.Union[tp.ChunkedOption, pfopt_group_dict] = None,
@@ -1090,6 +1091,7 @@ class PortfolioOptimizer(Analyzable):
             "add_delta": add_delta,
             "kind": kind,
             "indexer_method": indexer_method,
+            "indexer_tolerance": indexer_tolerance,
             "skip_minus_one": skip_minus_one,
             "jitted": jitted,
             "chunked": chunked,
@@ -1134,6 +1136,7 @@ class PortfolioOptimizer(Analyzable):
                 _add_delta = _kwargs.pop("add_delta", row_points_defaults["add_delta"])
                 _kind = _kwargs.pop("kind", row_points_defaults["kind"])
                 _indexer_method = _kwargs.pop("indexer_method", row_points_defaults["indexer_method"])
+                _indexer_tolerance = _kwargs.pop("indexer_tolerance", row_points_defaults["indexer_tolerance"])
                 _skip_minus_one = _kwargs.pop("skip_minus_one", row_points_defaults["skip_minus_one"])
                 _jitted = _kwargs.pop("jitted", None)
                 _chunked = _kwargs.pop("chunked", None)
@@ -1161,6 +1164,7 @@ class PortfolioOptimizer(Analyzable):
                         add_delta=_add_delta,
                         kind=_kind,
                         indexer_method=_indexer_method,
+                        indexer_tolerance=_indexer_tolerance,
                         skip_minus_one=_skip_minus_one,
                         jitted=_jitted,
                         chunked=_chunked,
@@ -1187,6 +1191,7 @@ class PortfolioOptimizer(Analyzable):
                             add_delta=_add_delta,
                             kind=_kind,
                             indexer_method=_indexer_method,
+                            indexer_tolerance=_indexer_tolerance,
                             skip_minus_one=_skip_minus_one,
                         ),
                         _template_context,
@@ -1507,7 +1512,6 @@ class PortfolioOptimizer(Analyzable):
         add_start_delta: tp.Union[None, tp.FrequencyLike, pfopt_group_dict] = row_ranges_defaults["add_start_delta"],
         add_end_delta: tp.Union[None, tp.FrequencyLike, pfopt_group_dict] = row_ranges_defaults["add_end_delta"],
         kind: tp.Union[None, str, pfopt_group_dict] = row_ranges_defaults["kind"],
-        indexer_method: tp.Union[None, str, pfopt_group_dict] = row_ranges_defaults["indexer_method"],
         skip_minus_one: tp.Union[bool, pfopt_group_dict] = row_ranges_defaults["skip_minus_one"],
         jitted: tp.Union[tp.JittedOption, pfopt_group_dict] = None,
         chunked: tp.Union[tp.ChunkedOption, pfopt_group_dict] = None,
@@ -1766,7 +1770,6 @@ class PortfolioOptimizer(Analyzable):
             "add_start_delta": add_start_delta,
             "add_end_delta": add_end_delta,
             "kind": kind,
-            "indexer_method": indexer_method,
             "skip_minus_one": skip_minus_one,
             "jitted": jitted,
             "chunked": chunked,
@@ -1818,7 +1821,6 @@ class PortfolioOptimizer(Analyzable):
                 _add_start_delta = _kwargs.pop("add_start_delta", row_ranges_defaults["add_start_delta"])
                 _add_end_delta = _kwargs.pop("add_end_delta", row_ranges_defaults["add_end_delta"])
                 _kind = _kwargs.pop("kind", row_ranges_defaults["kind"])
-                _indexer_method = _kwargs.pop("indexer_method", row_ranges_defaults["indexer_method"])
                 _skip_minus_one = _kwargs.pop("skip_minus_one", row_ranges_defaults["skip_minus_one"])
                 _jitted = _kwargs.pop("jitted", None)
                 _chunked = _kwargs.pop("chunked", None)
@@ -1853,7 +1855,6 @@ class PortfolioOptimizer(Analyzable):
                         add_start_delta=_add_start_delta,
                         add_end_delta=_add_end_delta,
                         kind=_kind,
-                        indexer_method=_indexer_method,
                         skip_minus_one=_skip_minus_one,
                         jitted=_jitted,
                         chunked=_chunked,
@@ -1886,7 +1887,6 @@ class PortfolioOptimizer(Analyzable):
                             add_start_delta=_add_start_delta,
                             add_end_delta=_add_end_delta,
                             kind=_kind,
-                            indexer_method=_indexer_method,
                             skip_minus_one=_skip_minus_one,
                             jitted=_jitted,
                         ),

@@ -542,6 +542,12 @@ class RowPoints:
     indexer_method: str = attr.ib(default="bfill")
     """Method for `pd.Index.get_indexer`."""
 
+    indexer_tolerance: tp.Optional[tp.Union[int, tp.TimedeltaLike, tp.IndexLike]] = attr.ib(default=None)
+    """Tolerance for `pd.Index.get_indexer`.
+    
+    If `at_time` is set and `indexer_method` is neither exact nor nearest, `indexer_tolerance` 
+    becomes such that the next element must be within the current day."""
+
     skip_minus_one: bool = attr.ib(default=True)
     """Whether to remove indices that are -1 (not found)."""
 
@@ -654,9 +660,6 @@ class RowRanges:
     `start` and `end` get wrapped with NumPy. If kind` is 'bounds', 
     `vectorbtpro.base.resampling.base.Resampler.map_bounds_to_source_ranges` is used."""
 
-    indexer_method: str = attr.ib(default="bfill")
-    """Method for `pd.Index.get_indexer`."""
-
     skip_minus_one: bool = attr.ib(default=True)
     """Whether to remove indices that are -1 (not found)."""
 
@@ -691,6 +694,7 @@ def get_index_points(
     add_delta: tp.Optional[tp.FrequencyLike] = row_points_defaults["add_delta"],
     kind: tp.Optional[str] = row_points_defaults["kind"],
     indexer_method: str = row_points_defaults["indexer_method"],
+    indexer_tolerance: str = row_points_defaults["indexer_tolerance"],
     skip_minus_one: bool = row_points_defaults["skip_minus_one"],
 ) -> tp.Array1d:
     """Translate indices or labels into index points.
@@ -787,6 +791,11 @@ def get_index_points(
         checks.assert_instance_of(on, pd.DatetimeIndex)
         on = on.floor("D")
         add_time_delta = time_to_timedelta(at_time)
+        if indexer_tolerance is None:
+            if indexer_method in ("pad", "ffill"):
+                indexer_tolerance = add_time_delta
+            elif indexer_method in ("backfill", "bfill"):
+                indexer_tolerance = pd.Timedelta(days=1) - pd.Timedelta(1, "ns") - add_time_delta
         if add_delta is None:
             add_delta = add_time_delta
         else:
@@ -802,17 +811,17 @@ def get_index_points(
 
     if kind.lower() == "labels":
         on = try_align_to_datetime_index(on, index)
-        index_points = index.get_indexer(on, method=indexer_method)
+        index_points = index.get_indexer(on, method=indexer_method, tolerance=indexer_tolerance)
     else:
         index_points = np.asarray(on)
 
     if start is not None and not start_used:
         if not isinstance(start, (int, np.integer)):
-            start = index.get_indexer([start], method=indexer_method).item(0)
+            start = index.get_indexer([start], method="bfill").item(0)
         index_points = index_points[index_points >= start]
     if end is not None and not end_used:
         if not isinstance(end, (int, np.integer)):
-            end = index.get_indexer([end], method=indexer_method).item(0)
+            end = index.get_indexer([end], method="ffill").item(0)
             index_points = index_points[index_points <= end]
         else:
             index_points = index_points[index_points < end]
@@ -841,7 +850,6 @@ def get_index_ranges(
     add_start_delta: tp.Optional[tp.FrequencyLike] = row_ranges_defaults["add_start_delta"],
     add_end_delta: tp.Optional[tp.FrequencyLike] = row_ranges_defaults["add_end_delta"],
     kind: tp.Optional[str] = row_ranges_defaults["kind"],
-    indexer_method: str = row_ranges_defaults["indexer_method"],
     skip_minus_one: bool = row_ranges_defaults["skip_minus_one"],
     jitted: tp.JittedOption = row_ranges_defaults["jitted"],
 ) -> tp.Tuple[tp.Array1d, tp.Array1d]:
@@ -1047,24 +1055,21 @@ def get_index_ranges(
     elif kind.lower() == "labels":
         start = try_align_to_datetime_index(start, index)
         end = try_align_to_datetime_index(end, index)
-        if closed_start:
-            range_starts = index.get_indexer(start, method=indexer_method)
-        else:
-            range_starts = np.empty(len(start), dtype=np.int_)
-            for i in range(len(start)):
-                if start[i] in index:
-                    range_starts[i] = index.get_loc(start[i]) + 1
-                else:
-                    range_starts[i] = index.get_indexer([start[i]], method=indexer_method).item(0)
-        if closed_end:
-            range_ends = np.empty(len(end), dtype=np.int_)
-            for i in range(len(end)):
-                if end[i] in index:
-                    range_ends[i] = index.get_loc(end[i]) + 1
-                else:
-                    range_ends[i] = index.get_indexer([end[i]], method=indexer_method).item(0)
-        else:
-            range_ends = index.get_indexer(end, method=indexer_method)
+        range_starts = np.empty(len(start), dtype=np.int_)
+        range_ends = np.empty(len(end), dtype=np.int_)
+        range_index = pd.Series(np.arange(len(index)), index=index)
+        for i in range(len(range_starts)):
+            selected_range = range_index[start[i]:end[i]]
+            if len(selected_range) > 0 and not closed_start and selected_range.index[0] == start[i]:
+                selected_range = selected_range.iloc[1:]
+            if len(selected_range) > 0 and not closed_end and selected_range.index[-1] == end[i]:
+                selected_range = selected_range.iloc[:-1]
+            if len(selected_range) > 0:
+                range_starts[i] = selected_range.iloc[0]
+                range_ends[i] = selected_range.iloc[-1]
+            else:
+                range_starts[i] = -1
+                range_ends[i] = -1
         if skip_minus_one:
             valid_mask = (range_starts != -1) & (range_ends != -1)
             range_starts = range_starts[valid_mask]

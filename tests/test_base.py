@@ -4572,7 +4572,7 @@ class TestIndexing:
             indexing.get_index_ranges(index, start=0, end=index[10])
         np.testing.assert_array_equal(
             np.column_stack(indexing.get_index_ranges(index, start=index[0], end=index[10], kind="labels")),
-            np.array([[0, 10]]),
+            np.array([[0, 9]]),
         )
         np.testing.assert_array_equal(
             np.column_stack(indexing.get_index_ranges(index, end=10, lookback_period=3)), np.array([[7, 10]])
@@ -4591,11 +4591,11 @@ class TestIndexing:
                 indexing.get_index_ranges(
                     index,
                     start=index[5],
-                    end=index[10],
+                    end=index[9],
                     kind="labels",
                 )
             ),
-            np.array([[5, 10]]),
+            np.array([[5, 8]]),
         )
         np.testing.assert_array_equal(
             np.column_stack(
@@ -4606,7 +4606,7 @@ class TestIndexing:
                     kind="labels",
                 )
             ),
-            np.array([[6, 10]]),
+            np.array([[6, 9]]),
         )
         np.testing.assert_array_equal(
             np.column_stack(
@@ -4617,7 +4617,7 @@ class TestIndexing:
                     kind="labels",
                 )
             ),
-            np.array([[5, 10]]),
+            np.array([[5, 9]]),
         )
         np.testing.assert_array_equal(
             np.column_stack(
@@ -4628,7 +4628,7 @@ class TestIndexing:
                     kind="labels",
                 )
             ),
-            np.array([[5, 10]]),
+            np.array([[5, 9]]),
         )
         np.testing.assert_array_equal(
             np.column_stack(
@@ -4639,7 +4639,7 @@ class TestIndexing:
                     kind="labels",
                 )
             ),
-            np.array([[5, 11]]),
+            np.array([[5, 10]]),
         )
         np.testing.assert_array_equal(
             np.column_stack(
@@ -4651,7 +4651,7 @@ class TestIndexing:
                     closed_start=False,
                 )
             ),
-            np.array([[6, 10]]),
+            np.array([[6, 9]]),
         )
         np.testing.assert_array_equal(
             np.column_stack(
@@ -4663,7 +4663,7 @@ class TestIndexing:
                     closed_start=False,
                 )
             ),
-            np.array([[6, 10]]),
+            np.array([[6, 9]]),
         )
         np.testing.assert_array_equal(
             np.column_stack(
@@ -4675,7 +4675,7 @@ class TestIndexing:
                     closed_end=True,
                 )
             ),
-            np.array([[5, 11]]),
+            np.array([[5, 10]]),
         )
         np.testing.assert_array_equal(
             np.column_stack(
@@ -4687,7 +4687,7 @@ class TestIndexing:
                     closed_end=True,
                 )
             ),
-            np.array([[5, 11]]),
+            np.array([[5, 10]]),
         )
 
     def test_get_indices(self):
