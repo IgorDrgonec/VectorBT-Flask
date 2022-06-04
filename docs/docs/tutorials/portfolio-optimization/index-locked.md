@@ -841,18 +841,11 @@ Let's demonstrate usage of this method by splitting the entire period into month
 
 ```pycon
 >>> example_ranges = data.wrapper.get_index_ranges(every="MS")
->>> example_ranges
-array([[   0,  744],
-       [ 744, 1434],
-       [1434, 2177],
-       [2177, 2895],
-       [2895, 3639],
-       [3639, 4356],
-       [4356, 5100],
-       [5100, 5844],
-       [5844, 6564],
-       [6564, 7308],
-       [7308, 8027]])
+>>> example_ranges[0]
+array([0, 744, 1434, 2177, 2895, 3639, 4356, 5100, 5844, 6564, 7308])
+
+>>> example_ranges[1]
+array([744, 1434, 2177, 2895, 3639, 4356, 5100, 5844, 6564, 7308, 8027])
 ```
 
 What happened is the following: vectorbt created a new datetime index with a monthly frequency,
@@ -861,7 +854,7 @@ and created a range from each pair of values in that index.
 To translate each index range back into timestamps:
 
 ```pycon
->>> data.wrapper.index[example_ranges[0, 0]:example_ranges[0, 1]]  # (1)!
+>>> data.wrapper.index[example_ranges[0][0]:example_ranges[1][0]]  # (1)!
 DatetimeIndex(['2020-01-01 00:00:00+00:00', '2020-01-01 01:00:00+00:00',
                '2020-01-01 02:00:00+00:00', '2020-01-01 03:00:00+00:00',
                '2020-01-01 04:00:00+00:00', '2020-01-01 05:00:00+00:00',
@@ -872,7 +865,7 @@ DatetimeIndex(['2020-01-01 00:00:00+00:00', '2020-01-01 01:00:00+00:00',
               dtype='datetime64[ns, UTC]', name='Open time', length=744, freq=None)
 ```
 
-1. The first number select a range, and the second number (either 0 or 1) selects the bound (left or right)
+1. The first number (either 0 or 1) selects the bound (left or right), and the second number a range
 
 !!! important
     The right bound (second column) is always excluding, thus you shouldn't use it for indexing
@@ -890,14 +883,14 @@ indices each month while looking back for 3 months:
 ...     lookback_period="3MS"  # (1)!
 ... )
 
->>> def get_index_bounds(index_ranges):  # (2)!
-...     for i in range(len(index_ranges)):
-...         start_idx = index_ranges[i, 0]  # (3)!
-...         end_idx = index_ranges[i, 1]  # (4)!
+>>> def get_index_bounds(range_starts, range_ends):  # (2)!
+...     for i in range(len(range_starts)):
+...         start_idx = range_starts[i]  # (3)!
+...         end_idx = range_ends[i]  # (4)!
 ...         range_index = data.wrapper.index[start_idx:end_idx]
 ...         yield range_index[0], range_index[-1]
 
->>> list(get_index_bounds(example_ranges))
+>>> list(get_index_bounds(*example_ranges))
 [(Timestamp('2020-01-01 00:00:00+0000', tz='UTC'),
   Timestamp('2020-03-31 23:00:00+0000', tz='UTC')),
  (Timestamp('2020-02-01 00:00:00+0000', tz='UTC'),
@@ -920,7 +913,7 @@ indices each month while looking back for 3 months:
 
 1. Lookback period can also be provided as an integer (gets multiplied with the source frequency), 
 `pd.Timedelta` object, or `pd.DateOffset` object
-2. A simple function that returns the first and the last timestamp in each index range
+2. A simple function that returns the first and the last timestamp for each index range
 3. Including
 4. Excluding
 
@@ -934,7 +927,7 @@ denoting the range bounds:
 ...     end=["2020-04-01", "2020-08-01", "2020-12-01"]
 ... )
 
->>> list(get_index_bounds(example_ranges))
+>>> list(get_index_bounds(*example_ranges))
 [(Timestamp('2020-01-01 00:00:00+0000', tz='UTC'),
   Timestamp('2020-03-31 23:00:00+0000', tz='UTC')),
  (Timestamp('2020-04-01 00:00:00+0000', tz='UTC'),
@@ -957,7 +950,7 @@ the length of another argument. Let's simulate the movement of an expanding wind
 ...     end=["2020-04-01", "2020-08-01", "2020-12-01"]
 ... )
 
->>> list(get_index_bounds(example_ranges))
+>>> list(get_index_bounds(*example_ranges))
 [(Timestamp('2020-01-01 00:00:00+0000', tz='UTC'),
   Timestamp('2020-03-31 23:00:00+0000', tz='UTC')),
  (Timestamp('2020-01-01 00:00:00+0000', tz='UTC'),
@@ -976,7 +969,7 @@ also simulate an expanding window:
 ...     fixed_start=True
 ... )
 
->>> list(get_index_bounds(example_ranges))
+>>> list(get_index_bounds(*example_ranges))
 [(Timestamp('2020-01-01 00:00:00+0000', tz='UTC'),
   Timestamp('2020-03-30 23:00:00+0000', tz='UTC')),
  (Timestamp('2020-01-01 00:00:00+0000', tz='UTC'),

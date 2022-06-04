@@ -4,7 +4,8 @@ __pycache__
 .idea
 .mypy_cache
 .pytest_cache
-build
+/dist/
+/build/
 vectorbtpro.egg-info
 docs/docs/api
 docs/site

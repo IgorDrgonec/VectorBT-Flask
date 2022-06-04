@@ -6,6 +6,93 @@ title: Release notes
 
 All notable changes in reverse chronological order.
 
+## Version 1.3.0 (4 Jun, 2022)
+
+- Added default resamplers for trade count and VWAP in [Data](/api/data/base/#vectorbtpro.data.base.Data)
+and resamplers for stock splits, dividends, and other columns in custom data classes
+- Fixed resampling of the open price with NaN values
+- Improved data type handling when wrapping, which previously threw an error when trying
+to cast a floating array with NaN values to an integer data type. Data type is now being cast softly.
+- Fixed the implementation of VWAP: the indicator now resets with each day or any custom frequency
+- Implemented the method [ArrayWrapper.create_index_grouper](/api/base/wrapping/#vectorbtpro.base.wrapping.ArrayWrapper.create_index_grouper),
+which similarly to [ArrayWrapper.create_resampler](/api/base/wrapping/#vectorbtpro.base.wrapping.ArrayWrapper.create_resampler)
+can be passed to any accelerated method in vectorbt that makes use of row grouping
+- Added the ability to generate log returns and daily returns (or both) along with simple returns,
+such as by using `pf.get_returns(log_returns=True)`. Also, every metric in [ReturnsAccessor](/api/returns/accessors/#vectorbtpro.returns.accessors.ReturnsAccessor)
+can natively work on log returns. Since the accessor cannot identify whether the passed return
+series is simple or log, passing the flag `log_returns=True` is required, which is done automatically
+by [Portfolio](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio). For instance, to get the accessor 
+with log returns, use `pf.get_returns_acc(log_returns=True)`. To use log/daily returns in portfolio stats, 
+define the corresponding flag in the `settings` dictionary.
+- Implemented NB and SP rolling linear regression using OLS ([GenericAccessor.rolling_linreg](/api/generic/accessors/#vectorbtpro.generic.accessors.GenericAccessor.rolling_linreg))
+that returns two arrays: slope and intercept. The implemented algorithm can be used in cointegration tests and 
+is 1100x faster than [RollingOLS](https://www.statsmodels.org/dev/generated/statsmodels.regression.rolling.RollingOLS.html) :fire:
+- Implemented two new indicators:
+    1. [OLS](/api/indicators/custom/#vectorbtpro.indicators.custom.OLS) for computing and plotting the rolling 
+      linear regression between two time series
+    2. [OLSS](/api/indicators/custom/#vectorbtpro.indicators.custom.OLSS) for computing and plotting the spread 
+      and the z-score of the spread of the linear regression between two time series (for cointegration)
+- Added `minp` argument to all custom indicators
+- Updated [PolygonData](/api/data/custom/#vectorbtpro.data.custom.PolygonData) for `polygon==1.0.0`
+- Implemented row ([Wrapping.row_stack](/api/base/wrapping/#vectorbtpro.base.wrapping.Wrapping.row_stack)) and column 
+([Wrapping.column_stack](/api/base/wrapping/#vectorbtpro.base.wrapping.Wrapping.column_stack)) stacking for 
+vectorbt objects of arbitrary complexity. Since every vectorbt object wraps a bunch of arrays, 
+multiple objects can be effectively merged by stacking their arrays stored internally and unifying other
+input information. Under the hood, the stacking first takes place between wrappers of all objects
+using [ArrayWrapper.row_stack](/api/base/wrapping/#vectorbtpro.base.wrapping.ArrayWrapper.row_stack)
+and [ArrayWrapper.column_stack](/api/base/wrapping/#vectorbtpro.base.wrapping.ArrayWrapper.column_stack).
+While some objects can be stacked easily, such as [ReturnsAccessor](/api/returns/accessors/#vectorbtpro.returns.accessors.ReturnsAccessor),
+stacking records and portfolios is a complex process and requires some assumptions to be made
+(see the corresponding methods).
+- Refactored the indexing mechanism in [ArrayWrapper](/api/base/wrapping/#vectorbtpro.base.wrapping.ArrayWrapper)
+to also return slices whenever possible (because data can be selected faster using slices than index arrays).
+- Lifted the limitation of objects combined together being required to have the same index!
+Previously, an error was thrown as soon as one of the objects had a different index.
+Now, similarly to how Pandas does it, indexes of all objects are aligned using a "union" set operation 
+and missing values are set to NaN or any other user-defined value specified in `reindex_kwargs`. Additionally,
+each broadcastable argument in all the simulation methods of 
+[Portfolio](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio), such as 
+`size` in [Portfolio.from_orders](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_orders),
+have sensible fill values.
+- Fixed axis labels in the [Volume](/api/generic/plotting/#vectorbtpro.generic.plotting.Volume) widget
+- Changed the representation of index ranges from one two-dimensional array to a tuple of 
+one-dimensional arrays, which are easier to manage
+- Deprecated pytz, now using [zoneinfo](https://docs.python.org/3/library/zoneinfo.html)
+- Implemented an entirely new way of creating arrays using index dictionaries.
+Instead of building an array and setting its data manually, index dictionaries allow providing
+row and column information as keys and data as values. The function [get_indices](/api/base/indexing/#vectorbtpro.base.indexing.get_indices)
+converts each key of such a dictionary into integer indices, while the method [ArrayWrapper.fill_using_index_dict](/api/base/wrapping/#vectorbtpro.base.wrapping.ArrayWrapper.fill_using_index_dict) 
+sets the corresponding values at those indices by taking into account flexible indexing requirements.
+This makes it almost too easy to provide data such as order size at specific timestamps or even time intervals. 
+For example, to deposit $100 monthly, provide the following to [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_signals):
+`cash_deposits=vbt.index_dict({vbt.RowPoints(every="MS"): 100})` (see the [indexing](/api/base/indexing/) module).
+Also, all arguments passed to the broadcaster can be passed as templates to be created using the final shape
+instead of taking part in actual broadcasting. This means, passing the following to [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_signals)
+or any other method now works: `size=vbt.RepEval("size = wrapper.fill(); size.iloc[0] = np.inf; size")`, 
+which waits until all other arrays were successfully broadcast and the final wrapper was built, and only
+then creates an array and fills the first row with `np.inf`.
+- Enabled row selection in all vectorbt objects except [ColumnMapper](/api/records/col_mapper/#vectorbtpro.records.col_mapper.ColumnMapper).
+In objects with complex data, such as records and portfolios, only slices (that is, non-interrupting ranges) 
+are allowed. For example, selecting a date range from a portfolio means taking the last cash, position, 
+and close prior to the first point in the new slice, and using them as `init_cash`, `init_position`, and 
+`init_price` respectively.
+- Made every simulation method in [Portfolio](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio)
+accept an instance of [Data](/api/data/base/#vectorbtpro.data.base.Data) as `close`.
+Open, high, low, and close price series will be extracted automatically.
+- [Portfolio](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio) now stores and makes use of OHLC data.
+Moreover, all records from [Ranges](/api/generic/ranges/#vectorbtpro.generic.ranges.Ranges)
+to [Logs](/portfolio/logs/#vectorbtpro.portfolio.logs.Logs) also take OHLC data by subclassing
+a new class [PriceRecords](/api/generic/price_records/#vectorbtpro.generic.price_records.PriceRecords).
+- Implemented MFE and MAE metrics and plots in [Trades](/api/portfolio/trades/#vectorbtpro.portfolio.trades.Trades)
+- Fixed [Portfolio.from_holding](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_holding),
+which previously set the entry signal at the first timestamp, but since not all assets may start
+from the first timestamp, the entry signal may be ignored. Now, the entry signal is set dynamically 
+using a signal function whenever a new valid value in `close` is encountered.
+- Optimized indexer in [ArrayWrapper.get_index_points](/api/base/wrapping/#vectorbtpro.base.wrapping.ArrayWrapper.get_index_points)
+and [ArrayWrapper.get_index_ranges](/api/base/wrapping/#vectorbtpro.base.wrapping.ArrayWrapper.get_index_ranges)
+by adding `indexer_tolerance` argument to the first method and removing `indexer_method` argument from 
+the second method
+
 ## Version 1.2.3 (7 May, 2022)
 
 - Fixed marker color in [OHLCVDFAccessor.plot](/api/ohlcv/accessors/#vectorbtpro.ohlcv.accessors.OHLCVDFAccessor.plot)
@@ -615,7 +702,7 @@ which can be overridden by setting any of the arguments.
 - Introduced extra validation of arguments passed to simulation. For instance, passing arrays
 that look boolean but have object data type raises an (informative) error.
 - Not only [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_signals) 
-but all simulation functions accept `open`, `high`, and `low` (all optional).
+but all the simulation functions accept `open`, `high`, and `low` (all optional).
 This enables various interesting automatisms: order price of  `-np.inf` gets automatically 
 replaced by the opening price and `np.inf` (default everywhere) by the closing price. 
 The highest and lowest prices are being used for bar boundary checks.

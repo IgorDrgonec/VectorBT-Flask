@@ -194,6 +194,7 @@ nav:
         - rolling: api/generic/nb/rolling.md
       - plots_builder: api/generic/plots_builder.md
       - plotting: api/generic/plotting.md
+      - price_records: api/generic/price_records.md
       - ranges: api/generic/ranges.md
       - splitters: api/generic/splitters.md
       - stats_builder: api/generic/stats_builder.md

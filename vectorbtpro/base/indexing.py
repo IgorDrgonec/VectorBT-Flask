@@ -8,6 +8,7 @@ from datetime import time
 
 import numpy as np
 import pandas as pd
+from pandas.tseries.frequencies import to_offset
 
 from vectorbtpro._settings import settings
 from vectorbtpro import _typing as tp
@@ -18,7 +19,6 @@ from vectorbtpro.utils.datetime_ import (
     try_to_datetime_index,
     try_align_to_datetime_index,
     time_to_timedelta,
-    to_offset,
     infer_index_freq,
 )
 
@@ -529,7 +529,8 @@ class RowPoints:
     add_delta: tp.Optional[tp.FrequencyLike] = attr.ib(default=None)
     """Offset to be added to each in `on`.
     
-    If string, gets converted into an offset using `vectorbtpro.utils.datetime_.to_offset`."""
+    If string, gets converted into an offset using 
+    [to_offset](https://pandas.pydata.org/docs/reference/api/pandas.tseries.frequencies.to_offset.html)."""
 
     kind: tp.Optional[str] = attr.ib(default=None)
     """Kind of data in `on`: indices or labels.
@@ -599,7 +600,8 @@ class RowRanges:
     If `lookback_period` is set, `start` becomes `end-lookback_period`. If `every` is not None, 
     the sequence is generated from `start+lookback_period` to `end` and then assigned to `end`.
 
-    If string, gets converted into an offset using `vectorbtpro.utils.datetime_.to_offset`.
+    If string, gets converted into an offset using 
+    [to_offset](https://pandas.pydata.org/docs/reference/api/pandas.tseries.frequencies.to_offset.html).
     If integer, gets multiplied by the frequency of the index if the index is not integer."""
 
     start: tp.Optional[tp.Union[int, tp.DatetimeLike, tp.IndexLike]] = attr.ib(default=None)
@@ -643,12 +645,14 @@ class RowRanges:
     add_start_delta: tp.Optional[tp.FrequencyLike] = attr.ib(default=None)
     """Offset to be added to each in `start`.
 
-    If string, gets converted into an offset using `vectorbtpro.utils.datetime_.to_offset`."""
+    If string, gets converted into an offset using 
+    [to_offset](https://pandas.pydata.org/docs/reference/api/pandas.tseries.frequencies.to_offset.html)."""
 
     add_end_delta: tp.Optional[tp.FrequencyLike] = attr.ib(default=None)
     """Offset to be added to each in `end`.
 
-    If string, gets converted into an offset using `vectorbtpro.utils.datetime_.to_offset`."""
+    If string, gets converted into an offset using 
+    [to_offset](https://pandas.pydata.org/docs/reference/api/pandas.tseries.frequencies.to_offset.html)."""
 
     kind: tp.Optional[str] = attr.ib(default=None)
     """Kind of data in `on`: indices, labels or bounds.

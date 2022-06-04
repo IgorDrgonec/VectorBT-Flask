@@ -754,7 +754,7 @@ those two issues simultaneously because we want to access the timestamp of the f
 which requires us to work on a Pandas Series instead of a NumPy array, and Numba cannot work on Pandas 
 Series :expressionless:
 
-Thus, we will use the vectorbt's accessor method [GenericAccessor.rolling_apply](o/api/generic/accessors/#vectorbtpro.generic.accessors.GenericAccessor.rolling_apply),
+Thus, we will use the vectorbt's accessor method [GenericAccessor.rolling_apply](/api/generic/accessors/#vectorbtpro.generic.accessors.GenericAccessor.rolling_apply),
 which offers two modes: regular and meta. The regular mode rolls over the data of a Pandas object just 
 like Pandas does it, and does not give us any information about the current window :no_good: 
 The meta mode rolls over the __metadata__ of a Pandas object, so we can easily select the data 
@@ -854,8 +854,8 @@ dtype: int64
     Be cautious when setting `min_periods` to a higher number and converting to a boolean data type:
     each NaN will become `True`. Thus, at least replace NaNs with zeros before casting.
 
-If the window size is fixed, we can also use [GenericAccessor.rolling_any](o/api/generic/accessors/#vectorbtpro.generic.accessors.GenericAccessor.rolling_any)
-and [GenericAccessor.rolling_all](o/api/generic/accessors/#vectorbtpro.generic.accessors.GenericAccessor.rolling_all),
+If the window size is fixed, we can also use [GenericAccessor.rolling_any](/api/generic/accessors/#vectorbtpro.generic.accessors.GenericAccessor.rolling_any)
+and [GenericAccessor.rolling_all](/api/generic/accessors/#vectorbtpro.generic.accessors.GenericAccessor.rolling_all),
 which are tailored for computing rolling truth testing operations:
 
 ```pycon
@@ -871,7 +871,7 @@ dtype: int64
 ```
 
 Another way of doing the same rolling operations is by using the accessor method
-[GenericAccessor.rolling_apply](o/api/generic/accessors/#vectorbtpro.generic.accessors.GenericAccessor.rolling_apply)
+[GenericAccessor.rolling_apply](/api/generic/accessors/#vectorbtpro.generic.accessors.GenericAccessor.rolling_apply)
 and specifying `reduce_func_nb` as "any" or "all" string. We should use the argument `wrap_kwargs`
 to instruct vectorbt to fill NaNs with `False` and change the data type. This method allows 
 flexible windows to be passed. Again, let's roll a window of 5 days:

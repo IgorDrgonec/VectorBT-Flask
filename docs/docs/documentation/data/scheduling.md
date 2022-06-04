@@ -148,7 +148,7 @@ Finally, run the job of `OHLCFigUpdater` every 10 seconds:
 ```pycon
 >>> import pandas as pd
 
->>> fig = data.plot(plot_type='candlestick', plot_volume=False)
+>>> fig = data.plot(ohlc_type='candlestick', plot_volume=False)
 >>> fig  # (1)!
 
 >>> with imageio.get_writer('ohlc_fig_updater.gif', fps=3) as writer:

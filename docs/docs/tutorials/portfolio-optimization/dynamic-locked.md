@@ -82,15 +82,16 @@ Here's a general template:
 ...             group_memory.target_alloc, 
 ...             group_memory.size_type, 
 ...             group_memory.direction, 
-...             group_memory.order_value_out
+...             group_memory.order_value_out,
+...             ctx_select=False  # (13)!
 ...         )
 ...         
 ...     return group_memory, should_rebalance
 
 >>> @njit
-... def order_func_nb(  # (13)!
+... def order_func_nb(  # (14)!
 ...     c, 
-...     group_memory,  # (14)! 
+...     group_memory,  # (15)! 
 ...     should_rebalance, 
 ...     price,
 ...     fees
@@ -98,7 +99,7 @@ Here's a general template:
 ...     if not should_rebalance:
 ...         return pf_nb.order_nothing_nb()
 ...     
-...     group_col = c.col - c.from_col  # (15)!
+...     group_col = c.col - c.from_col  # (16)!
 ...     return pf_nb.order_nb(
 ...         size=group_memory.target_alloc[group_col], 
 ...         price=pf_nb.get_elem_nb(c, price),
@@ -124,9 +125,11 @@ of assets at a specific timestamp, and in this function we should decide whether
 11. Allocation function should change arrays in the group context and return nothing (None)
 12. Sort the current call sequence by order value to execute sell orders before buy orders
 (to release funds early) using [sort_call_seq_nb](/api/portfolio/nb/from_order_func/#vectorbtpro.portfolio.nb.from_order_func.sort_call_seq_nb)
-13. For each asset in the current group (sorted by order value), vectorbt will call this order function
-14. Again, the arguments returned by `pre_segment_func_nb` are passed right after the context
-15. Index of the current column within the current group
+13. By default, vectorbt thinks that the passed arrays can broadcast against the target shape,
+and thus it selects each element flexibly. Disable it when passing one-dimensional arrays per group.
+14. For each asset in the current group (sorted by order value), vectorbt will call this order function
+15. Again, the arguments returned by `pre_segment_func_nb` are passed right after the context
+16. Index of the current column within the current group
 
 Let's create an allocation function for an equally-weighted portfolio:
 
@@ -568,7 +571,8 @@ Here's our raw Numba-compiled pipeline (optimization function agnostic):
 ... def optimize_portfolio_nb(
 ...     close, 
 ...     val_price,
-...     index_ranges,
+...     range_starts,
+...     range_ends,
 ...     optimize_func_nb,
 ...     optimize_args=(),
 ...     price=np.asarray(np.inf),  # (1)!
@@ -588,11 +592,11 @@ Here's our raw Numba-compiled pipeline (optimization function agnostic):
 ...     free_cash_now = float(init_cash)
 ...     value_now = float(init_cash)
 ... 
-...     for k in range(len(index_ranges)):  # (5)!
-...         i = index_ranges[k][1]  # (6)!
+...     for k in range(len(range_starts)):  # (5)!
+...         i = range_ends[k]  # (6)!
 ...         size = optimize_func_nb(  # (7)!
-...             index_ranges[k][0], 
-...             index_ranges[k][1], 
+...             range_starts[k], 
+...             range_ends[k], 
 ...             *optimize_args
 ...         )
 ...         
@@ -679,12 +683,11 @@ related to each asset. We do this using a one-dimensional array with elements al
 4. Every information associated with cash is a constant since we have only one group with cash sharing.
 We'll update those constants at each iteration.
 5. There is no significant difference in iteration over the entire shape of `close` or only 
-over the timestamps where the optimization should really take place, thus we iterate over `index_ranges`.
+over the timestamps where the optimization should really take place, thus we iterate over ranges.
 If you additionally want to pair the optimization with a stop loss or other continuous checks,
 you should iterate over `close.shape[0]` and run `optimize_func_nb` only if the current iteration
-can be found in the second column of `index_ranges`.
-6. Allocation index (at which optimization and order execution should take place) is by default 
-the right bound in `index_ranges`
+can be found in `range_ends`.
+6. Allocation index (at which optimization and order execution should take place) is by default the range end.
 7. Run the optimization function, which should return the weights. You can adapt it to return
 the size type, direction, and other information as well.
 8. Calculate the current group value using the open price
@@ -738,7 +741,7 @@ calculate its Sharpe ratio, and store it if it's better than other Sharpe ratios
 Let's run the MVO on a weekly basis:
 
 ```pycon
->>> index_ranges = data.wrapper.get_index_ranges(every="W")
+>>> range_starts, range_ends = data.wrapper.get_index_ranges(every="W")
 >>> ann_factor = pd.Timedelta("365d") / pd.Timedelta("1h")
 >>> init_cash = 100
 >>> num_tests = 30
@@ -747,7 +750,8 @@ Let's run the MVO on a weekly basis:
 >>> order_records = optimize_portfolio_nb(
 ...     data.get("Close").values,
 ...     data.get("Open").values,
-...     index_ranges,
+...     range_starts,
+...     range_ends,
 ...     sharpe_optimize_func_nb,
 ...     optimize_args=(data.get("Close").values, num_tests, ann_factor),
 ...     fees=fees,
@@ -796,12 +800,12 @@ and their arguments, one combination per execution.
 Let's test the Cartesian product of different index ranges, number of tests, and fees:
 
 ```pycon
->>> test_index_ranges = pd.Index(["D", "W", "MS"], name="every")  # (1)!
+>>> test_every = pd.Index(["D", "W", "MS"], name="every")  # (1)!
 >>> test_num_tests = pd.Index([30, 50, 100], name="num_tests")
 >>> test_fees = pd.Index([0.0, 0.005, 0.01], name="fees")
 
 >>> index_ranges_cache = {}  # (2)!
->>> for every in test_index_ranges:
+>>> for every in test_every:
 ...     index_ranges_cache[every] = symbol_wrapper.get_index_ranges(every=every)
 
 >>> param_index = vbt.combine_indexes((  # (3)!
@@ -823,7 +827,8 @@ Let's test the Cartesian product of different index ranges, number of tests, and
 ...         (),
 ...         {
 ...             **kwargs,
-...             "index_ranges": index_ranges_cache[param_index[i][0]],
+...             "range_starts": index_ranges_cache[param_index[i][0]][0],
+...             "range_ends": index_ranges_cache[param_index[i][0]][1],
 ...             "optimize_args": (
 ...                 kwargs["close"],
 ...                 param_index[i][1],
@@ -924,7 +929,8 @@ To use Hyperopt, we need to implement the objective function first. This is an e
 ...     order_records = optimize_portfolio_nb(
 ...         close_values,
 ...         open_values,
-...         index_ranges,
+...         index_ranges[0],  # (1)!
+...         index_ranges[1],  # (2)!
 ...         sharpe_optimize_func_nb,
 ...         optimize_args=(close_values, kwargs["num_tests"], ann_factor),
 ...         fees=np.asarray(kwargs["fees"]),
@@ -938,10 +944,12 @@ To use Hyperopt, we need to implement the objective function first. This is an e
 ...         cash_sharing=True, 
 ...         init_cash=init_cash
 ...     )
-...     return -pf.sharpe_ratio  # (1)!
+...     return -pf.sharpe_ratio  # (3)!
 ```
 
-1. Must be a float-valued function value that you are trying to **minimize**
+1. Array with range start indices
+2. Array with range end indices
+3. Must be a float-valued function value that you are trying to **minimize**
 
 Then, we need to construct the grid:
 

@@ -633,8 +633,10 @@ Let's upgrade our `CorrStats` class to work on NumPy arrays and with an array wr
 ...         self._obj2 = vbt.to_2d_array(obj2)
 ...
 ...     def indexing_func(self, pd_indexing_func, **kwargs):  # (2)!
-...         meta = self.wrapper.indexing_func_meta(pd_indexing_func, **kwargs)
-...         new_wrapper, row_idxs, _, col_idxs = meta
+...         wrapper_meta = self.wrapper.indexing_func_meta(pd_indexing_func, **kwargs)
+...         new_wrapper = wrapper_meta["new_wrapper"]
+...         row_idxs = wrapper_meta["row_idxs"]
+...         col_idxs = wrapper_meta["col_idxs"]
 ...         return self.replace(
 ...             wrapper=new_wrapper,
 ...             obj1=self.obj1[row_idxs, :][:, col_idxs],
@@ -710,8 +712,7 @@ dtype: float64
 2020-01-04     4  2        1  5
 2020-01-05     5  1        4  1
 
->>> corrstats = CorrStats.from_objs(df1, df2_sh)
->>> corrstats.corr()  # (3)!
+>>> df1.corrwith(df2_sh)  # (3)!
 ValueError: cannot join with no overlapping index names
 
 >>> corrstats = CorrStats.from_objs(df1, df2_sh)
@@ -906,8 +907,10 @@ What are we waiting for? Let's adapt our `CorrStats` class to become analyzable!
 ...         self._obj2 = vbt.to_2d_array(obj2)
 ...
 ...     def indexing_func(self, pd_indexing_func, **kwargs):
-...         meta = self.wrapper.indexing_func_meta(pd_indexing_func, **kwargs)
-...         new_wrapper, row_idxs, _, col_idxs = meta
+...         wrapper_meta = self.wrapper.indexing_func_meta(pd_indexing_func, **kwargs)
+...         new_wrapper = wrapper_meta["new_wrapper"]
+...         row_idxs = wrapper_meta["row_idxs"]
+...         col_idxs = wrapper_meta["col_idxs"]
 ...         return self.replace(
 ...             wrapper=new_wrapper,
 ...             obj1=self.obj1[row_idxs, :][:, col_idxs],

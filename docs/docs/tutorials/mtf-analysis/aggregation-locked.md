@@ -462,14 +462,14 @@ for meta calls. Let's run the same meta function as above:
 ```pycon
 >>> from vectorbtpro.base.resampling.nb import map_bounds_to_source_ranges_nb
 
->>> index_ranges = map_bounds_to_source_ranges_nb(  # (1)!
+>>> range_starts, range_ends = map_bounds_to_source_ranges_nb(  # (1)!
 ...     source_index=h1_high.index.values,
 ...     target_lbound_index=target_lbound_index.values,
 ...     target_rbound_index=target_rbound_index.values,
 ...     closed_lbound=True,
 ...     closed_rbound=False,
 ... )
->>> index_ranges  # (2)!
+>>> np.column_stack((range_starts, range_ends))  # (2)!
 array([[   0,  744],
        [ 744, 1434],
        [1434, 2177],
@@ -485,7 +485,8 @@ array([[   0,  744],
 
 >>> ms_mdd_arr = vbt.nb.reduce_index_ranges_meta_nb(  # (3)!
 ...     1,  # (4)!
-...     index_ranges,
+...     range_starts,
+...     range_ends,
 ...     mdd_nb,
 ...     vbt.to_2d_array(h1_high),  # (5)!
 ...     vbt.to_2d_array(h1_low)
@@ -507,7 +508,8 @@ array([[-0.28262268],
 
 1. The first function iterates over each pair of bounds and returns the start and end index
 in the source index within that bounds
-2. The returned indices are in fact the same indices we printed out previously
+2. The returned indices are in fact the same indices we printed out previously.
+Use `np.column_stack` to print start and end indices next to each other.
 3. The second function iterates over each index range and calls `mdd_nb` on it
 4. Number of columns in `h1_high` and `h1_low`
 5. Custom arrays should be two-dimensional

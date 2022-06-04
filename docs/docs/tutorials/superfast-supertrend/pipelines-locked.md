@@ -1068,7 +1068,7 @@ order execution:
 ...                     )
 ...                     new_exec_state, _ = pf_nb.execute_order_nb(  # (12)!
 ...                         exec_state, order, price_area)
-...                     cash, position, debt, free_cash = new_exec_state
+...                     cash, position, debt, free_cash, val_price, value = new_exec_state
 ... 
 ...                 value = cash + position * val_price
 ...                 return_ = ret_nb.get_return_nb(prev_value, value)  # (13)!

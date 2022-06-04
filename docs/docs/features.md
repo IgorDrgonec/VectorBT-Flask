@@ -262,6 +262,96 @@ NaN      False       0.941681
 Name: sharpe_ratio, dtype: float64
 ```
 
+### Smart array creation
+
+- [x] Tired of manually constructing arrays and setting their data with Pandas? There is a functionality
+to make your life much easier! Broadcaster now takes an index dictionary containing instructions on
+where to set values in the array, and does the filling job for you. It knows exactly which axis has
+to be modifed and doesn't create a full array if not necessary, with much care for RAM.
+
+```pycon title="Compare accumulation daily and exit on Sunday, and accumulation weekly and exit on month end"
+>>> price = vbt.YFData.fetch(['BTC-USD', 'ETH-USD']).get('Close')
+
+>>> tile = pd.Index(["daily", "weekly"], name="strategy")  # (1)!
+>>> pf = vbt.Portfolio.from_orders(
+...     price,
+...     size=vbt.index_dict({  # (2)!
+...         vbt.ElemIdx(
+...             vbt.RowPoints(every="D"), 
+...             vbt.ColIdx("daily", level="strategy")): 100,  # (3)!
+...         vbt.ElemIdx(
+...             vbt.RowPoints(every="W-SUN"), 
+...             vbt.ColIdx("daily", level="strategy")): -np.inf,  # (4)!
+...         vbt.ElemIdx(
+...             vbt.RowPoints(every="W-MON"), 
+...             vbt.ColIdx("weekly", level="strategy")): 100,
+...         vbt.ElemIdx(
+...             vbt.RowPoints(every="M"), 
+...             vbt.ColIdx("weekly", level="strategy")): -np.inf,
+...     }),
+...     size_type="value",
+...     direction="longonly",
+...     init_cash="auto",
+...     broadcast_kwargs=dict(tile=tile)
+... )
+>>> pf.sharpe_ratio
+strategy  symbol 
+daily     BTC-USD    0.753833
+          ETH-USD    0.832737
+weekly    BTC-USD    0.859790
+          ETH-USD    0.503182
+Name: sharpe_ratio, dtype: float64
+```
+
+1. To represent two strategies, we need to tile the same data twice. For this,
+create an index with strategy names and pass it as `tile` to the broadcaster for it to tile
+the columns of each array (such as price) by two times.
+2. Index dictionary contains index instructions as keys and data as values to be set.
+Keys can be anything from row indices and labels, to custom indexer classes such as 
+[RowPoints](/api/base/indexing/#vectorbtpro.base.indexing.RowPoints).
+3. Find the indices of the rows that correspond to the beginning of each day and the index of the 
+column "daily", and set each element under those indices to 100 (= accumulate)
+4. Find the indices of the rows that correspond to Sunday. If any value under those indices has already 
+been set with any previous instruction, it will be overridden.
+
+### Index alignment
+
+- [x] There is no more limitation of each Pandas array being required to have the same index.
+Indexes of all arrays that should broadcast against each other are automatically aligned, as long as they
+have the same data type.
+
+```pycon title="Predict ETH price with BTC price using linear regression"
+>>> btc_data = vbt.YFData.fetch('BTC-USD')
+>>> btc_data.wrapper.shape
+(2817, 7)
+
+>>> eth_data = vbt.YFData.fetch('ETH-USD')  # (1)!
+>>> eth_data.wrapper.shape
+(1668, 7)
+
+>>> ols = vbt.OLS.run(  # (2)!
+...     btc_data.get("Close"),
+...     eth_data.get("Close")
+... )
+>>> ols.pred
+Date
+2014-09-17 00:00:00+00:00            NaN
+2014-09-18 00:00:00+00:00            NaN
+2014-09-19 00:00:00+00:00            NaN
+2014-09-20 00:00:00+00:00            NaN
+2014-09-21 00:00:00+00:00            NaN
+...                                  ...
+2022-05-30 00:00:00+00:00    2109.769242
+2022-05-31 00:00:00+00:00    2028.856767
+2022-06-01 00:00:00+00:00    1911.555689
+2022-06-02 00:00:00+00:00    1930.169725
+2022-06-03 00:00:00+00:00    1882.573170
+Freq: D, Name: Close, Length: 2817, dtype: float64
+```
+
+1. ETH-USD history is shorter than BTC-USD history
+2. This now works! Just make sure that all arrays share the same timeframe and timezone.
+
 ### Meta methods
 
 - [x] Many methods such as rolling apply are now available in two flavors: regular (instance methods) 
@@ -835,6 +925,157 @@ there is a time frame parameter in each TA-Lib indicator!
 [=100% "Period 8/8"]{: .candystripe}
 
 ![](/assets/images/features/mtf_heatmap.svg)
+
+### Merging
+
+- [x] Complex vectorbt objects of the same type can be easily merged along columns.
+For instance, you can combine multiple totally-unrelated trading strategies into the same portfolio 
+for analysis. Under the hood, the final object is still represented as a monolithic multi-dimensional
+structure that can be processed even faster than merged objects separately!
+
+```pycon title="Analyze two trading strategies separately and jointly"
+>>> def strategy1(data):
+...     fast_ma = vbt.MA.run(data.get("Close"), 50, short_name="fast_ma")
+...     slow_ma = vbt.MA.run(data.get("Close"), 200, short_name='slow_ma')
+...     entries = fast_ma.ma_crossed_above(slow_ma)
+...     exits = fast_ma.ma_crossed_below(slow_ma)
+...     return vbt.Portfolio.from_signals(
+...         data.get("Close"), 
+...         entries, 
+...         exits, 
+...         size=100,
+...         size_type="value",
+...         init_cash="auto"
+...     )
+
+>>> def strategy2(data):
+...     bbands = vbt.BBANDS.run(data.get("Close"), window=14)
+...     entries = bbands.close_crossed_below(bbands.lower)
+...     exits = bbands.close_crossed_above(bbands.upper)
+...     return vbt.Portfolio.from_signals(
+...         data.get("Close"), 
+...         entries, 
+...         exits, 
+...         init_cash=200
+...     )
+
+>>> data1 = vbt.BinanceData.fetch("BTCUSDT")
+>>> pf1 = strategy1(data1)  # (1)!
+>>> pf1.sharpe_ratio
+0.9100317671866922
+
+>>> data2 = vbt.BinanceData.fetch("ETHUSDT")
+>>> pf2 = strategy2(data2)  # (2)!
+>>> pf2.sharpe_ratio
+-0.11596286232734827
+
+>>> pf_sep = vbt.Portfolio.column_stack((pf1, pf2))  # (3)!
+>>> pf_sep.sharpe_ratio
+0    0.910032
+1   -0.115963
+Name: sharpe_ratio, dtype: float64
+
+>>> pf_join = vbt.Portfolio.column_stack((pf1, pf2), group_by=True)  # (4)!
+>>> pf_join.sharpe_ratio
+0.42820898354646514
+```
+
+1. Analyze the first strategy in a separate portfolio
+2. Analyze the second strategy in a separate portfolio
+3. Analyze both strategies in the same portfolio separately
+4. Analyze both strategies in the same portfolio jointly
+
+### Appending
+
+- [x] Complex vectorbt objects of the same type can be easily concatenated along rows.
+For instance, you can append new data to an existing portfolio, or even concatenate in-sample 
+portfolios with their out-of-sample counterparts :material-connection:
+
+```pycon title="Analyze two date ranges separately and jointly"
+>>> def strategy(data, start=None, end=None):
+...     fast_ma = vbt.MA.run(data.get("Close"), 50, short_name="fast_ma")
+...     slow_ma = vbt.MA.run(data.get("Close"), 200, short_name='slow_ma')
+...     entries = fast_ma.ma_crossed_above(slow_ma)
+...     exits = fast_ma.ma_crossed_below(slow_ma)
+...     return vbt.Portfolio.from_signals(
+...         data.get("Close")[start:end], 
+...         entries[start:end], 
+...         exits[start:end], 
+...         size=100,
+...         size_type="value",
+...         init_cash="auto"
+...     )
+
+>>> data = vbt.BinanceData.fetch("BTCUSDT")
+
+>>> pf_whole = strategy(data)  # (1)!
+>>> pf_whole.sharpe_ratio
+0.9100317671866922
+
+>>> pf_sub1 = strategy(data, end="2019-12-31")  # (2)!
+>>> pf_sub1.sharpe_ratio
+0.7810397448678937
+
+>>> pf_sub2 = strategy(data, start="2020-01-01")  # (3)!
+>>> pf_sub2.sharpe_ratio
+1.070339534746574
+
+>>> pf_join = vbt.Portfolio.row_stack((pf_sub1, pf_sub2))  # (4)!
+>>> pf_join.sharpe_ratio
+0.9100317671866922
+```
+
+1. Analyze the entire range
+2. Analyze the first date range
+3. Analyze the second date range
+4. Join both date ranges and analyze as a whole
+
+### Slicing
+
+- [x] Similarly to selecting columns, each vectorbt object is now capable of selecting rows, using the
+exact same mechanism as in Pandas. This makes it supereasy to analyze and plot any subset of simulated data, 
+without the need of re-simulation!
+
+```pycon title="Analyze multiple date ranges of the same portfolio"
+>>> data = vbt.YFData.fetch('BTC-USD')
+>>> pf = vbt.Portfolio.from_holding(data, freq="d")
+
+>>> pf.sharpe_ratio
+1.116727709477293
+
+>>> pf.loc[:"2020"].sharpe_ratio  # (1)!
+1.2699801554196481
+
+>>> pf.loc["2021": "2021"].sharpe_ratio  # (2)!
+0.9825161170278687
+
+>>> pf.loc["2022":].sharpe_ratio  # (3)!
+-1.0423271337174647
+```
+
+1. Get the Sharpe during the year 2020 and before
+2. Get the Sharpe during the year 2021
+3. Get the Sharpe during the year 2022 and after
+
+### More metrics
+
+- [x] Portfolio, trades, drawdowns, and other vectorbt objects offer more analysis capabilities to choose from.
+
+```pycon title="Analyze the MFE of a random portfolio without take profit"
+>>> data = vbt.YFData.fetch('BTC-USD')
+
+>>> pf = vbt.Portfolio.from_random_signals(data, n=50)
+>>> pf.trades.plot_mfe_returns()
+```
+
+![](/assets/images/features/mfe_without_tp.svg)
+
+```pycon title="Analyze the MFE of a random portfolio with take profit"
+>>> pf = vbt.Portfolio.from_random_signals(data, n=50, tp_stop=0.1)
+>>> pf.trades.plot_mfe_returns()
+```
+
+![](/assets/images/features/mfe_with_tp.svg)
 
 ## And many more...
 

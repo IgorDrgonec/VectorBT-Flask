@@ -30,16 +30,19 @@ flowchart TD;
     id8["Updating"]
     id9["Querying"]
     id10["Resampling"]
+    id11["Transforming"]
     
     id1 --> id2;
     id2 --> id5;
     id3 --> id5;
     id4 --> id5;
     id5 --> id6;
-    id6 -->|"creates"| id7;
+    id6 -->|"creates new"| id7;
     id7 --> id8;
     id7 --> id10;
-    id10 -->|"creates"| id7;
+    id10 -->|"creates new"| id7;
+    id7 --> id11;
+    id11 -->|"creates new"| id7;
     id8 --> id5;
     id7 --> id9;
 ```
@@ -959,6 +962,47 @@ The same can be done with a single copy operation using
 Open time
 2020-01-01 00:00:00+00:00    7344.96
 Freq: MS, Name: Close, dtype: float64
+```
+
+## Transforming
+
+The main challenge in transforming any data is that each symbol must have the same index and columns
+because we need to concatenate them into one Pandas object later, thus any transformation operation
+must ensure that it's applied on each symbol in the same way. To enforce that, the method 
+[Data.transform](/api/data/base/#vectorbtpro.data.base.Data.transform) concatenates the data across
+all symbols and columns into one big DataFrame, and passes it to a UDF for transformation. 
+Once transformed, the method splits the result back into multiple smaller Pandas objects - one per symbol,
+puts them into a new `data` dictionary, creates a new data wrapper based on the returned index and columns,
+and finally, initializes a new data instance.
+
+Let's drop any row that contains at least one NaN:
+
+```pycon
+>>> full_yf_data = YFData.fetch(["BTC-USD", "ETH-USD"])
+>>> full_yf_data.get("Close").info()
+<class 'pandas.core.frame.DataFrame'>
+DatetimeIndex: 2792 entries, 2014-09-17 00:00:00+00:00 to 2022-05-09 00:00:00+00:00
+Freq: D
+Data columns (total 2 columns):
+ #   Column   Non-Null Count  Dtype  
+---  ------   --------------  -----  
+ 0   BTC-USD  2792 non-null   float64
+ 1   ETH-USD  1643 non-null   float64
+dtypes: float64(2)
+memory usage: 130.0 KB
+
+>>> new_full_yf_data = full_yf_data.transform(lambda df: df.dropna())
+>>> new_full_yf_data.get("Close").info()
+<class 'pandas.core.frame.DataFrame'>
+DatetimeIndex: 1643 entries, 2017-11-09 00:00:00+00:00 to 2022-05-09 00:00:00+00:00
+Freq: D
+Data columns (total 2 columns):
+ #   Column   Non-Null Count  Dtype  
+---  ------   --------------  -----  
+ 0   BTC-USD  1643 non-null   float64
+ 1   ETH-USD  1643 non-null   float64
+dtypes: float64(2)
+memory usage: 103.0 KB
 ```
 
 ## Analysis
