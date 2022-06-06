@@ -10,6 +10,13 @@
     --md-primary-bg-color--light: hsla(0, 0%, 100%, .7);
     --md-progress: #546d78;
     --md-progress-stripe: rgba(0, 0, 0, 0.2);
+
+    --md-mermaid-font-family: var(--md-text-font-family),sans-serif;
+    --md-mermaid-edge-color: #9397b2;
+    --md-mermaid-node-bg-color: #2f303e;
+    --md-mermaid-node-fg-color: #d5d7e2;
+    --md-mermaid-label-bg-color: #2f303e;
+    --md-mermaid-label-fg-color: #d5d7e2;
 }
 
 ::marker {

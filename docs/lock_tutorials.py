@@ -62,15 +62,15 @@ if __name__ == "__main__":
     with gzip.open("./site/sitemap.xml.gz", "wb") as f:
         tree.write(f, encoding="utf-8", xml_declaration=True)
 
-    with open("./site/search/search_index.js", "r") as f:
-        dct = json.loads(f.read()[30:-1])
+    with open("./site/search/search_index.json", "r") as f:
+        dct = json.loads(f.read())
     new_docs = []
     for doc in dct["docs"]:
         if "locked/" not in doc["location"]:
             new_docs.append(doc)
     dct["docs"] = new_docs
-    with open("./site/search/search_index.js", "w") as f:
-        f.write("var __index = Promise.resolve(" + json.dumps(dct) + ")")
+    with open("./site/search/search_index.json", "w") as f:
+        f.write(json.dumps(dct))
 
     for p in list(glob.iglob("./site/**/*-locked", recursive=True)):
         p_path = Path(p)
