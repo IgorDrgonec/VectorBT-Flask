@@ -128,12 +128,13 @@ def attach_qs_methods(cls: tp.Type[tp.T], replace_signature: bool = True) -> tp.
                 else:
                     new_method_name = qs_func_name
 
-                def new_method(self, *, _func: tp.Callable = qs_func, **kwargs) -> tp.Any:
-                    returns = self.returns_accessor.obj
-                    if isinstance(returns, pd.DataFrame):
-                        null_mask = returns.isnull().any(axis=1)
-                    else:
-                        null_mask = returns.isnull()
+                def new_method(
+                    self,
+                    *,
+                    _func: tp.Callable = qs_func,
+                    column: tp.Optional[tp.Label] = None,
+                    **kwargs,
+                ) -> tp.Any:
                     func_arg_names = get_func_arg_names(_func)
                     defaults = self.defaults
 
@@ -143,22 +144,38 @@ def attach_qs_methods(cls: tp.Type[tp.T], replace_signature: bool = True) -> tp.
                             if arg_name in defaults:
                                 pass_kwargs[arg_name] = defaults[arg_name]
                             elif arg_name == "benchmark":
-                                if self.returns_accessor.bm_returns is not None:
-                                    pass_kwargs["benchmark"] = self.returns_accessor.bm_returns
+                                if self.returns_acc.bm_returns is not None:
+                                    pass_kwargs["benchmark"] = self.returns_acc.bm_returns
                             elif arg_name == "periods":
-                                pass_kwargs["periods"] = int(self.returns_accessor.ann_factor)
+                                pass_kwargs["periods"] = int(self.returns_acc.ann_factor)
                             elif arg_name == "periods_per_year":
-                                pass_kwargs["periods_per_year"] = int(self.returns_accessor.ann_factor)
+                                pass_kwargs["periods_per_year"] = int(self.returns_acc.ann_factor)
                         else:
                             pass_kwargs[arg_name] = kwargs[arg_name]
 
+                    returns = self.returns_acc.select_col_from_obj(
+                        self.returns_acc.obj,
+                        column=column,
+                        wrapper=self.returns_acc.wrapper.regroup(False),
+                    )
+                    if returns.name is None:
+                        returns = returns.rename("Strategy")
+                    null_mask = returns.isnull()
                     if "benchmark" in pass_kwargs:
-                        if isinstance(pass_kwargs["benchmark"], pd.DataFrame):
-                            bm_null_mask = pass_kwargs["benchmark"].isnull().any(axis=1)
-                        else:
-                            bm_null_mask = pass_kwargs["benchmark"].isnull()
+                        benchmark = pass_kwargs["benchmark"]
+                        benchmark = self.returns_acc.select_col_from_obj(
+                            benchmark,
+                            column=column,
+                            wrapper=self.returns_acc.wrapper.regroup(False),
+                        )
+                        if benchmark.name is None:
+                            benchmark = benchmark.rename("Benchmark")
+                        bm_null_mask = benchmark.isnull()
                         null_mask = null_mask | bm_null_mask
-                        pass_kwargs["benchmark"] = pass_kwargs["benchmark"].loc[~null_mask]
+                        benchmark = benchmark.loc[~null_mask]
+                        if isinstance(benchmark.index, (pd.DatetimeIndex, pd.PeriodIndex)):
+                            benchmark = benchmark.tz_localize(None)
+                        pass_kwargs["benchmark"] = benchmark
                     returns = returns.loc[~null_mask]
                     if isinstance(returns.index, (pd.DatetimeIndex, pd.PeriodIndex)):
                         returns = returns.tz_localize(None)
@@ -171,13 +188,14 @@ def attach_qs_methods(cls: tp.Type[tp.T], replace_signature: bool = True) -> tp.
                     source_sig = signature(qs_func)
                     new_method_params = tuple(signature(new_method).parameters.values())
                     self_arg = new_method_params[0]
+                    column_arg = new_method_params[2]
                     other_args = [
                         p.replace(kind=Parameter.KEYWORD_ONLY)
                         if p.kind in (Parameter.POSITIONAL_ONLY, Parameter.POSITIONAL_OR_KEYWORD)
                         else p
                         for p in list(source_sig.parameters.values())[1:]
                     ]
-                    source_sig = source_sig.replace(parameters=(self_arg,) + tuple(other_args))
+                    source_sig = source_sig.replace(parameters=(self_arg, column_arg) + tuple(other_args))
                     new_method.__signature__ = source_sig
 
                 new_method.__doc__ = f"See `quantstats.{module_name}.{qs_func_name}`."
@@ -194,13 +212,13 @@ QSAdapterT = tp.TypeVar("QSAdapterT", bound="QSAdapter")
 class QSAdapter(Configured):
     """Adapter class for quantstats."""
 
-    def __init__(self, returns_accessor: ReturnsAccessor, defaults: tp.KwargsLike = None, **kwargs) -> None:
-        checks.assert_instance_of(returns_accessor, ReturnsAccessor)
+    def __init__(self, returns_acc: ReturnsAccessor, defaults: tp.KwargsLike = None, **kwargs) -> None:
+        checks.assert_instance_of(returns_acc, ReturnsAccessor)
 
-        self._returns_accessor = returns_accessor
+        self._returns_acc = returns_acc
         self._defaults = defaults
 
-        Configured.__init__(self, returns_accessor=returns_accessor, defaults=defaults, **kwargs)
+        Configured.__init__(self, returns_acc=returns_acc, defaults=defaults, **kwargs)
 
     def __call__(self: QSAdapterT, **kwargs) -> QSAdapterT:
         """Allows passing arguments to the initializer."""
@@ -208,9 +226,9 @@ class QSAdapter(Configured):
         return self.replace(**kwargs)
 
     @property
-    def returns_accessor(self) -> ReturnsAccessor:
+    def returns_acc(self) -> ReturnsAccessor:
         """Returns accessor."""
-        return self._returns_accessor
+        return self._returns_acc
 
     @property
     def defaults_mapping(self) -> tp.Dict:
@@ -221,7 +239,7 @@ class QSAdapter(Configured):
     def defaults(self) -> tp.Kwargs:
         """Defaults for `QSAdapter`.
 
-        Merges `defaults` from `vectorbtpro._settings.qs_adapter`, `returns_accessor.defaults`
+        Merges `defaults` from `vectorbtpro._settings.qs_adapter`, `returns_acc.defaults`
         (with adapted naming), and `defaults` from `QSAdapter.__init__`."""
         from vectorbtpro._settings import settings
 
@@ -229,6 +247,6 @@ class QSAdapter(Configured):
 
         mapped_defaults = dict()
         for k, v in self.defaults_mapping.items():
-            if v in self.returns_accessor.defaults:
-                mapped_defaults[k] = self.returns_accessor.defaults[v]
+            if v in self.returns_acc.defaults:
+                mapped_defaults[k] = self.returns_acc.defaults[v]
         return merge_dicts(qs_adapter_defaults_cfg, mapped_defaults, self._defaults)

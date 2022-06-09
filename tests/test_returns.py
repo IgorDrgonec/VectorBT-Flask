@@ -1185,16 +1185,14 @@ class TestAccessors:
 
     def test_qs(self):
         if qs_available:
-            assert_series_equal(ret_acc.qs.sharpe(), qs.stats.sharpe(rets.dropna(), periods=365, rf=0.001))
-            assert_series_equal(
-                ret_acc(freq="h", year_freq="252d").qs.sharpe(),
-                qs.stats.sharpe(rets.dropna(), periods=252 * 24, rf=0.001),
-            )
-            assert_series_equal(
-                ret_acc(freq="h", year_freq="252d").qs.sharpe(periods=252, periods_per_year=252, rf=0),
-                qs.stats.sharpe(rets.dropna()),
-            )
-            assert ret_acc["a"].qs.r_squared() == 0.8038014307754487
+            for c in rets.columns:
+                assert ret_acc.qs.sharpe(column=c) == qs.stats.sharpe(rets[c].dropna(), periods=365, rf=0.001)
+                assert ret_acc(freq="h", year_freq="252d").qs.sharpe(column=c) == qs.stats.sharpe(
+                    rets[c].dropna(), periods=252 * 24, rf=0.001
+                )
+                assert ret_acc(freq="h", year_freq="252d").qs.sharpe(
+                    column=c, periods=252, periods_per_year=252, rf=0
+                ) == qs.stats.sharpe(rets[c].dropna())
 
     @pytest.mark.parametrize("test_freq", ["1h", "10h", "3d"])
     def test_resample(self, test_freq):
