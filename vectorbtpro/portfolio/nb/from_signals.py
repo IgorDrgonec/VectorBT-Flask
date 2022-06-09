@@ -8,7 +8,7 @@ from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.portfolio import chunking as portfolio_ch
 from vectorbtpro.portfolio.nb.core import *
 from vectorbtpro.registries.ch_registry import register_chunkable
-from vectorbtpro.returns.nb import get_return_nb
+from vectorbtpro.returns import nb as returns_nb_
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.array_ import insert_argsort_nb
 from vectorbtpro.utils.math_ import is_less_nb
@@ -308,17 +308,15 @@ def get_stop_price_nb(
     """Get stop price.
 
     If hit before open, returns open."""
-    if stop < 0:
-        raise ValueError("Stop value must be nan, 0, or greater than 0")
     if (position_now > 0 and hit_below) or (position_now < 0 and not hit_below):
-        stop_price = stop_price * (1 - stop)
+        stop_price = stop_price * (1 - abs(stop))
         if open <= stop_price:
             return open
         if low <= stop_price:
             return stop_price
         return np.nan
     if (position_now < 0 and hit_below) or (position_now > 0 and not hit_below):
-        stop_price = stop_price * (1 + stop)
+        stop_price = stop_price * (1 + abs(stop))
         if open >= stop_price:
             return open
         if high >= stop_price:
@@ -333,21 +331,7 @@ def no_signal_func_nb(c: SignalContext, *args) -> tp.Tuple[bool, bool, bool, boo
     return False, False, False, False
 
 
-@register_jitted
-def no_adjust_sl_func_nb(c: AdjustSLContext, *args) -> tp.Tuple[float, bool]:
-    """Placeholder function that returns the initial stop-loss value and trailing flag."""
-    return c.curr_stop, c.curr_trail
-
-
-@register_jitted
-def no_adjust_tp_func_nb(c: AdjustTPContext, *args) -> float:
-    """Placeholder function that returns the initial take-profit value."""
-    return c.curr_stop
-
-
 SignalFuncT = tp.Callable[[SignalContext, tp.VarArg()], tp.Tuple[bool, bool, bool, bool]]
-AdjustSLFuncT = tp.Callable[[AdjustSLContext, tp.VarArg()], tp.Tuple[float, bool]]
-AdjustTPFuncT = tp.Callable[[AdjustTPContext, tp.VarArg()], float]
 
 
 @register_chunkable(
@@ -390,17 +374,15 @@ AdjustTPFuncT = tp.Callable[[AdjustTPContext, tp.VarArg()], float]
         low=portfolio_ch.flex_array_gl_slicer,
         close=portfolio_ch.flex_array_gl_slicer,
         sl_stop=portfolio_ch.flex_array_gl_slicer,
-        sl_trail=portfolio_ch.flex_array_gl_slicer,
+        tsl_stop=portfolio_ch.flex_array_gl_slicer,
         tp_stop=portfolio_ch.flex_array_gl_slicer,
+        ttp_th=portfolio_ch.flex_array_gl_slicer,
+        ttp_stop=portfolio_ch.flex_array_gl_slicer,
         stop_entry_price=portfolio_ch.flex_array_gl_slicer,
         stop_exit_price=portfolio_ch.flex_array_gl_slicer,
         upon_stop_exit=portfolio_ch.flex_array_gl_slicer,
         upon_stop_update=portfolio_ch.flex_array_gl_slicer,
         signal_priority=portfolio_ch.flex_array_gl_slicer,
-        adjust_sl_func_nb=None,
-        adjust_sl_args=ch.ArgsTaker(),
-        adjust_tp_func_nb=None,
-        adjust_tp_args=ch.ArgsTaker(),
         use_stops=None,
         auto_call_seq=None,
         ffill_val_price=None,
@@ -410,7 +392,7 @@ AdjustTPFuncT = tp.Callable[[AdjustTPContext, tp.VarArg()], float]
         max_logs=None,
         flex_2d=None,
     ),
-    **portfolio_ch.merge_sim_outs_config
+    **portfolio_ch.merge_sim_outs_config,
 )
 @register_jitted(tags={"can_parallel"})
 def simulate_from_signal_func_nb(
@@ -451,17 +433,15 @@ def simulate_from_signal_func_nb(
     low: tp.FlexArray = np.asarray(np.nan),
     close: tp.FlexArray = np.asarray(np.nan),
     sl_stop: tp.FlexArray = np.asarray(np.nan),
-    sl_trail: tp.FlexArray = np.asarray(False),
+    tsl_stop: tp.FlexArray = np.asarray(np.nan),
     tp_stop: tp.FlexArray = np.asarray(np.nan),
+    ttp_th: tp.FlexArray = np.asarray(np.nan),
+    ttp_stop: tp.FlexArray = np.asarray(np.nan),
     stop_entry_price: tp.FlexArray = np.asarray(StopEntryPrice.Close),
     stop_exit_price: tp.FlexArray = np.asarray(StopExitPrice.StopLimit),
     upon_stop_exit: tp.FlexArray = np.asarray(StopExitMode.Close),
     upon_stop_update: tp.FlexArray = np.asarray(StopUpdateMode.Override),
     signal_priority: tp.FlexArray = np.asarray(SignalPriority.Stop),
-    adjust_sl_func_nb: AdjustSLFuncT = no_adjust_sl_func_nb,
-    adjust_sl_args: tp.Args = (),
-    adjust_tp_func_nb: AdjustTPFuncT = no_adjust_tp_func_nb,
-    adjust_tp_args: tp.Args = (),
     use_stops: bool = True,
     auto_call_seq: bool = False,
     ffill_val_price: bool = True,
@@ -471,18 +451,9 @@ def simulate_from_signal_func_nb(
     max_logs: tp.Optional[int] = 0,
     flex_2d: bool = False,
 ) -> SimulationOutput:
-    """Creates an order out of each element by resolving entry and exit signals returned by `signal_func_nb`.
+    """Simulate given a signal function `signal_func_nb`.
 
     Iterates in the column-major order. Utilizes flexible broadcasting.
-
-    Signals are processed using the following pipeline:
-
-    1. If there is a stop signal, convert it to direction-aware signals and proceed to the step 7
-    2. Get direction-aware signals using `signal_func_nb`
-    3. Resolve any entry and exit conflict of each direction using `resolve_signal_conflict_nb`
-    4. Resolve any direction conflict using `resolve_dir_conflict_nb`
-    5. Resolve an opposite entry signal scenario using `resolve_opposite_entry_nb`
-    7. Convert the final signals into size, size type, and direction using `signals_to_size_nb`
 
     !!! note
         Should be only grouped if cash sharing is enabled.
@@ -490,43 +461,14 @@ def simulate_from_signal_func_nb(
         If `auto_call_seq` is True, make sure that `call_seq` follows `CallSeqType.Default`.
 
         Single value must be passed as a 0-dim array (for example, by using `np.asarray(value)`).
-
-    Usage:
-        * Buy and hold using all cash and closing price (default):
-
-        ```pycon
-        >>> import numpy as np
-        >>> from vectorbtpro.records.nb import col_map_nb
-        >>> from vectorbtpro.portfolio import nb
-        >>> from vectorbtpro.portfolio.enums import Direction
-
-        >>> close = np.array([1, 2, 3, 4, 5])[:, None]
-        >>> sim_out = nb.simulate_from_signal_func_nb(
-        ...     target_shape=close.shape,
-        ...     group_lens=np.array([1]),
-        ...     call_seq=np.full(close.shape, 0),
-        ...     signal_func_nb=nb.dir_enex_signal_func_nb,
-        ...     signal_args=(
-        ...         np.asarray(True),
-        ...         np.asarray(False),
-        ...         np.asarray(Direction.LongOnly)
-        ...     ),
-        ...     close=close
-        ... )
-        >>> col_map = col_map_nb(sim_out.order_records['col'], close.shape[1])
-        >>> asset_flow = nb.asset_flow_nb(close.shape, sim_out.order_records, col_map)
-        >>> asset_flow
-        array([[100.],
-               [  0.],
-               [  0.],
-               [  0.],
-               [  0.]])
-        ```
     """
     check_group_lens_nb(group_lens, target_shape[1])
     cash_sharing = is_grouped_nb(group_lens)
 
     order_records, log_records = prepare_records_nb(target_shape, max_orders, max_logs)
+    order_counts = np.full(target_shape[1], 0, dtype=np.int_)
+    log_counts = np.full(target_shape[1], 0, dtype=np.int_)
+
     last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash)
     last_position = prepare_last_position_nb(target_shape, init_position)
     last_value = prepare_last_value_nb(
@@ -537,13 +479,12 @@ def simulate_from_signal_func_nb(
         init_position=init_position,
         init_price=init_price,
     )
-
+    last_cash_deposits = np.full_like(last_cash, 0.0)
     last_val_price = np.full_like(last_position, np.nan)
     last_debt = np.full(target_shape[1], 0.0, dtype=np.float_)
+    last_free_cash = last_cash.copy()
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
-    order_counts = np.full(target_shape[1], 0, dtype=np.int_)
-    log_counts = np.full(target_shape[1], 0, dtype=np.int_)
     track_cash_deposits = np.any(cash_deposits)
     if track_cash_deposits:
         cash_deposits_out = np.full((target_shape[0], len(group_lens)), 0.0, dtype=np.float_)
@@ -554,33 +495,55 @@ def simulate_from_signal_func_nb(
         cash_earnings_out = np.full(target_shape, 0.0, dtype=np.float_)
     else:
         cash_earnings_out = np.full((1, 1), 0.0, dtype=np.float_)
-
     if fill_returns:
-        returns = np.empty((target_shape[0], len(group_lens)), dtype=np.float_)
+        returns_out = np.empty((target_shape[0], len(group_lens)), dtype=np.float_)
     else:
-        returns = np.empty((0, 0), dtype=np.float_)
-    in_outputs = FSInOutputs(returns=returns)
+        returns_out = np.empty((0, 0), dtype=np.float_)
+    in_outputs = FSInOutputs(returns=returns_out)
 
     if use_stops:
         sl_init_i = np.full(target_shape[1], -1, dtype=np.int_)
         sl_init_price = np.full(target_shape[1], np.nan, dtype=np.float_)
-        sl_curr_i = np.full(target_shape[1], -1, dtype=np.int_)
-        sl_curr_price = np.full(target_shape[1], np.nan, dtype=np.float_)
         sl_curr_stop = np.full(target_shape[1], np.nan, dtype=np.float_)
-        sl_curr_trail = np.full(target_shape[1], False, dtype=np.bool_)
+
+        tsl_init_i = np.full(target_shape[1], -1, dtype=np.int_)
+        tsl_init_price = np.full(target_shape[1], np.nan, dtype=np.float_)
+        tsl_curr_i = np.full(target_shape[1], -1, dtype=np.int_)
+        tsl_curr_price = np.full(target_shape[1], np.nan, dtype=np.float_)
+        tsl_curr_stop = np.full(target_shape[1], np.nan, dtype=np.float_)
+
+        ttp_init_i = np.full(target_shape[1], -1, dtype=np.int_)
+        ttp_init_price = np.full(target_shape[1], np.nan, dtype=np.float_)
+        ttp_curr_i = np.full(target_shape[1], -1, dtype=np.int_)
+        ttp_curr_price = np.full(target_shape[1], np.nan, dtype=np.float_)
+        ttp_curr_th = np.full(target_shape[1], np.nan, dtype=np.float_)
+        ttp_curr_stop = np.full(target_shape[1], np.nan, dtype=np.float_)
+
         tp_init_i = np.full(target_shape[1], -1, dtype=np.int_)
         tp_init_price = np.full(target_shape[1], np.nan, dtype=np.float_)
         tp_curr_stop = np.full(target_shape[1], np.nan, dtype=np.float_)
     else:
         sl_init_i = np.empty(0, dtype=np.int_)
         sl_init_price = np.empty(0, dtype=np.float_)
-        sl_curr_i = np.empty(0, dtype=np.int_)
-        sl_curr_price = np.empty(0, dtype=np.float_)
         sl_curr_stop = np.empty(0, dtype=np.float_)
-        sl_curr_trail = np.empty(0, dtype=np.bool_)
+
+        tsl_init_i = np.empty(0, dtype=np.int_)
+        tsl_init_price = np.empty(0, dtype=np.float_)
+        tsl_curr_i = np.empty(0, dtype=np.int_)
+        tsl_curr_price = np.empty(0, dtype=np.float_)
+        tsl_curr_stop = np.empty(0, dtype=np.float_)
+
+        ttp_init_i = np.empty(0, dtype=np.int_)
+        ttp_init_price = np.empty(0, dtype=np.float_)
+        ttp_curr_i = np.empty(0, dtype=np.int_)
+        ttp_curr_price = np.empty(0, dtype=np.float_)
+        ttp_curr_th = np.empty(0, dtype=np.float_)
+        ttp_curr_stop = np.empty(0, dtype=np.float_)
+
         tp_init_i = np.empty(0, dtype=np.int_)
         tp_init_price = np.empty(0, dtype=np.float_)
         tp_curr_stop = np.empty(0, dtype=np.float_)
+
     price_arr = np.full(target_shape[1], np.nan, dtype=np.float_)
     size_arr = np.empty(target_shape[1], dtype=np.float_)
     size_type_arr = np.empty(target_shape[1], dtype=np.float_)
@@ -597,16 +560,15 @@ def simulate_from_signal_func_nb(
         from_col = group_start_idxs[group]
         to_col = group_end_idxs[group]
         group_len = to_col - from_col
-        cash_now = last_cash[group]
-        free_cash_now = cash_now
 
         for i in range(target_shape[0]):
             # Add cash
             _cash_deposits = flex_select_auto_nb(cash_deposits, i, group, flex_2d)
             if _cash_deposits < 0:
-                _cash_deposits = max(_cash_deposits, -cash_now)
-            cash_now += _cash_deposits
-            free_cash_now += _cash_deposits
+                _cash_deposits = max(_cash_deposits, -last_cash[group])
+            last_cash[group] += _cash_deposits
+            last_free_cash[group] += _cash_deposits
+            last_cash_deposits[group] = _cash_deposits
             if track_cash_deposits:
                 cash_deposits_out[i, group] += _cash_deposits
 
@@ -634,99 +596,168 @@ def simulate_from_signal_func_nb(
                 if not np.isnan(_val_price) or not ffill_val_price:
                     last_val_price[col] = _val_price
 
+            # Update value and return
+            group_value = last_cash[group]
+            for col in range(from_col, to_col):
+                if last_position[col] != 0:
+                    group_value += last_position[col] * last_val_price[col]
+            last_value[group] = group_value
+            last_return[group] = returns_nb_.get_return_nb(
+                prev_close_value[group],
+                last_value[group] - _cash_deposits,
+            )
+
             # Get size and value of each order
             for c in range(group_len):
                 col = from_col + c  # order doesn't matter
 
-                position_now = last_position[col]
+                # Get signals
+                signal_ctx = SignalContext(
+                    target_shape=target_shape,
+                    group_lens=group_lens,
+                    cash_sharing=cash_sharing,
+                    call_seq=call_seq,
+                    open=open,
+                    high=high,
+                    low=low,
+                    close=close,
+                    flex_2d=flex_2d,
+                    order_records=order_records,
+                    order_counts=order_counts,
+                    log_records=log_records,
+                    log_counts=log_counts,
+                    track_cash_deposits=track_cash_deposits,
+                    cash_deposits_out=cash_deposits_out,
+                    track_cash_earnings=track_cash_earnings,
+                    cash_earnings_out=cash_earnings_out,
+                    in_outputs=in_outputs,
+                    last_cash=last_cash,
+                    last_position=last_position,
+                    last_debt=last_debt,
+                    last_free_cash=last_free_cash,
+                    last_val_price=last_val_price,
+                    last_value=last_value,
+                    last_return=last_return,
+                    sl_init_i=sl_init_i,
+                    sl_init_price=sl_init_price,
+                    sl_curr_stop=sl_curr_stop,
+                    tsl_init_i=tsl_init_i,
+                    tsl_init_price=tsl_init_price,
+                    tsl_curr_i=tsl_curr_i,
+                    tsl_curr_price=tsl_curr_price,
+                    tsl_curr_stop=tsl_curr_stop,
+                    ttp_init_i=ttp_init_i,
+                    ttp_init_price=ttp_init_price,
+                    ttp_curr_i=ttp_curr_i,
+                    ttp_curr_price=ttp_curr_price,
+                    ttp_curr_th=ttp_curr_th,
+                    ttp_curr_stop=ttp_curr_stop,
+                    tp_init_i=tp_init_i,
+                    tp_init_price=tp_init_price,
+                    tp_curr_stop=tp_curr_stop,
+                    group=group,
+                    group_len=group_len,
+                    from_col=from_col,
+                    to_col=to_col,
+                    i=i,
+                    col=col,
+                )
+                is_long_entry, is_long_exit, is_short_entry, is_short_exit = signal_func_nb(signal_ctx, *signal_args)
+
                 stop_price = np.nan
                 if use_stops:
-                    # Adjust stops
-                    adjust_sl_ctx = AdjustSLContext(
-                        i=i,
-                        col=col,
-                        position_now=last_position[col],
-                        val_price_now=last_val_price[col],
-                        init_i=sl_init_i[col],
-                        init_price=sl_init_price[col],
-                        curr_i=sl_curr_i[col],
-                        curr_price=sl_curr_price[col],
-                        curr_stop=sl_curr_stop[col],
-                        curr_trail=sl_curr_trail[col],
-                    )
-                    sl_curr_stop[col], sl_curr_trail[col] = adjust_sl_func_nb(adjust_sl_ctx, *adjust_sl_args)
-                    adjust_tp_ctx = AdjustTPContext(
-                        i=i,
-                        col=col,
-                        position_now=last_position[col],
-                        val_price_now=last_val_price[col],
-                        init_i=tp_init_i[col],
-                        init_price=tp_init_price[col],
-                        curr_stop=tp_curr_stop[col],
-                    )
-                    tp_curr_stop[col] = adjust_tp_func_nb(adjust_tp_ctx, *adjust_tp_args)
+                    # Resolve current bar
+                    _open = flex_select_auto_nb(open, i, col, flex_2d)
+                    _high = flex_select_auto_nb(high, i, col, flex_2d)
+                    _low = flex_select_auto_nb(low, i, col, flex_2d)
+                    _close = flex_select_auto_nb(close, i, col, flex_2d)
+                    if np.isnan(_high):
+                        if np.isnan(_open):
+                            _high = _close
+                        elif np.isnan(_close):
+                            _high = _open
+                        else:
+                            _high = max(_open, _close)
+                    if np.isnan(_low):
+                        if np.isnan(_open):
+                            _low = _close
+                        elif np.isnan(_close):
+                            _low = _open
+                        else:
+                            _low = min(_open, _close)
 
-                    if not np.isnan(sl_curr_stop[col]) or not np.isnan(tp_curr_stop[col]):
-                        # Resolve current bar
-                        _open = flex_select_auto_nb(open, i, col, flex_2d)
-                        _high = flex_select_auto_nb(high, i, col, flex_2d)
-                        _low = flex_select_auto_nb(low, i, col, flex_2d)
-                        _close = flex_select_auto_nb(close, i, col, flex_2d)
-                        if np.isnan(_high):
-                            if np.isnan(_open):
-                                _high = _close
-                            elif np.isnan(_close):
-                                _high = _open
-                            else:
-                                _high = max(_open, _close)
-                        if np.isnan(_low):
-                            if np.isnan(_open):
-                                _low = _close
-                            elif np.isnan(_close):
-                                _low = _open
-                            else:
-                                _low = min(_open, _close)
-
-                        # Get stop price
-                        if not np.isnan(sl_curr_stop[col]):
+                    # Get stop price
+                    if not np.isnan(sl_curr_stop[col]):
+                        stop_price = get_stop_price_nb(
+                            last_position[col],
+                            sl_init_price[col],
+                            sl_curr_stop[col],
+                            _open,
+                            _high,
+                            _low,
+                            True,
+                        )
+                    if np.isnan(stop_price) and not np.isnan(tsl_curr_stop[col]):
+                        stop_price = get_stop_price_nb(
+                            last_position[col],
+                            tsl_curr_price[col],
+                            tsl_curr_stop[col],
+                            _open,
+                            _high,
+                            _low,
+                            True,
+                        )
+                        if last_position[col] > 0:
+                            if _high > tsl_curr_price[col]:
+                                tsl_curr_i[col] = i
+                                tsl_curr_price[col] = _high
+                        elif last_position[col] < 0:
+                            if _low < tsl_curr_price[col]:
+                                tsl_curr_i[col] = i
+                                tsl_curr_price[col] = _low
+                    if np.isnan(stop_price) and not np.isnan(ttp_curr_stop[col]):
+                        if abs(ttp_curr_price[col] / ttp_init_price[col] - 1) >= abs(ttp_curr_th[col]):
                             stop_price = get_stop_price_nb(
-                                position_now,
-                                sl_curr_price[col],
-                                sl_curr_stop[col],
+                                last_position[col],
+                                ttp_curr_price[col],
+                                ttp_curr_stop[col],
                                 _open,
                                 _high,
                                 _low,
                                 True,
                             )
-                        if np.isnan(stop_price) and not np.isnan(tp_curr_stop[col]):
-                            stop_price = get_stop_price_nb(
-                                position_now,
-                                tp_init_price[col],
-                                tp_curr_stop[col],
-                                _open,
-                                _high,
-                                _low,
-                                False,
-                            )
-
-                        if not np.isnan(sl_curr_stop[col]) and sl_curr_trail[col]:
-                            # Update trailing stop
-                            if position_now > 0:
-                                if _high > sl_curr_price[col]:
-                                    sl_curr_i[col] = i
-                                    sl_curr_price[col] = _high
-                            elif position_now < 0:
-                                if _low < sl_curr_price[col]:
-                                    sl_curr_i[col] = i
-                                    sl_curr_price[col] = _low
+                        if last_position[col] > 0:
+                            if _high > ttp_curr_price[col]:
+                                ttp_curr_i[col] = i
+                                ttp_curr_price[col] = _high
+                        elif last_position[col] < 0:
+                            if _low < ttp_curr_price[col]:
+                                ttp_curr_i[col] = i
+                                ttp_curr_price[col] = _low
+                    if np.isnan(stop_price) and not np.isnan(tp_curr_stop[col]):
+                        stop_price = get_stop_price_nb(
+                            last_position[col],
+                            tp_init_price[col],
+                            tp_curr_stop[col],
+                            _open,
+                            _high,
+                            _low,
+                            False,
+                        )
 
                 _accumulate = flex_select_auto_nb(accumulate, i, col, flex_2d)
                 stop_signal_set = False
                 if use_stops and not np.isnan(stop_price):
                     # Get stop signal
                     _upon_stop_exit = flex_select_auto_nb(upon_stop_exit, i, col, flex_2d)
-                    is_long_entry, is_long_exit, is_short_entry, is_short_exit, _accumulate = generate_stop_signal_nb(
-                        position_now,
+                    (
+                        stop_is_long_entry,
+                        stop_is_long_exit,
+                        stop_is_short_entry,
+                        stop_is_short_exit,
+                        _accumulate,
+                    ) = generate_stop_signal_nb(
+                        last_position[col],
                         _upon_stop_exit,
                         _accumulate,
                     )
@@ -747,10 +778,10 @@ def simulate_from_signal_func_nb(
                     # Convert both signals to size (direction-aware), size type, and direction
                     _stex_size, _stex_size_type, _stex_direction = signals_to_size_nb(
                         last_position[col],
-                        is_long_entry,
-                        is_long_exit,
-                        is_short_entry,
-                        is_short_exit,
+                        stop_is_long_entry,
+                        stop_is_long_exit,
+                        stop_is_short_entry,
+                        stop_is_short_exit,
                         flex_select_auto_nb(size, i, col, flex_2d),
                         flex_select_auto_nb(size_type, i, col, flex_2d),
                         _accumulate,
@@ -758,22 +789,11 @@ def simulate_from_signal_func_nb(
                     )
                     stop_signal_set = not np.isnan(_stex_size)
 
-                # Get user-defined signal
-                signal_ctx = SignalContext(
-                    target_shape=target_shape,
-                    i=i,
-                    col=col,
-                    position_now=position_now,
-                    val_price_now=last_val_price[col],
-                    flex_2d=flex_2d,
-                )
-                is_long_entry, is_long_exit, is_short_entry, is_short_exit = signal_func_nb(signal_ctx, *signal_args)
-
                 # Resolve signal conflicts
                 if is_long_entry or is_short_entry:
                     _upon_long_conflict = flex_select_auto_nb(upon_long_conflict, i, col, flex_2d)
                     is_long_entry, is_long_exit = resolve_signal_conflict_nb(
-                        position_now,
+                        last_position[col],
                         is_long_entry,
                         is_long_exit,
                         Direction.LongOnly,
@@ -781,7 +801,7 @@ def simulate_from_signal_func_nb(
                     )
                     _upon_short_conflict = flex_select_auto_nb(upon_short_conflict, i, col, flex_2d)
                     is_short_entry, is_short_exit = resolve_signal_conflict_nb(
-                        position_now,
+                        last_position[col],
                         is_short_entry,
                         is_short_exit,
                         Direction.ShortOnly,
@@ -791,7 +811,7 @@ def simulate_from_signal_func_nb(
                     # Resolve direction conflicts
                     _upon_dir_conflict = flex_select_auto_nb(upon_dir_conflict, i, col, flex_2d)
                     is_long_entry, is_short_entry = resolve_dir_conflict_nb(
-                        position_now,
+                        last_position[col],
                         is_long_entry,
                         is_short_entry,
                         _upon_dir_conflict,
@@ -800,7 +820,7 @@ def simulate_from_signal_func_nb(
                     # Resolve opposite entry
                     _upon_opposite_entry = flex_select_auto_nb(upon_opposite_entry, i, col, flex_2d)
                     is_long_entry, is_long_exit, is_short_entry, is_short_exit, _accumulate = resolve_opposite_entry_nb(
-                        position_now,
+                        last_position[col],
                         is_long_entry,
                         is_long_exit,
                         is_short_entry,
@@ -860,13 +880,13 @@ def simulate_from_signal_func_nb(
                             temp_order_value[c] = _size
                         else:  # SizeType.Percent
                             if _size >= 0:
-                                temp_order_value[c] = _size * cash_now
+                                temp_order_value[c] = _size * last_cash[group]
                             else:
                                 asset_value_now = last_position[col] * last_val_price[col]
                                 if _direction == Direction.LongOnly:
                                     temp_order_value[c] = _size * asset_value_now
                                 else:
-                                    max_exposure = 2 * max(asset_value_now, 0) + max(free_cash_now, 0)
+                                    max_exposure = 2 * max(asset_value_now, 0) + max(last_free_cash[group], 0)
                                     temp_order_value[c] = _size * max_exposure
 
             if cash_sharing:
@@ -883,13 +903,6 @@ def simulate_from_signal_func_nb(
                             raise ValueError("Call sequence must follow CallSeqType.Default")
                     insert_argsort_nb(temp_order_value[:group_len], call_seq_now)
 
-                # Same as get_group_value_ctx_nb but with flexible indexing
-                value_now = cash_now
-                for c in range(group_len):
-                    col = from_col + c
-                    if last_position[col] != 0:
-                        value_now += last_position[col] * last_val_price[col]
-
             for k in range(group_len):
                 if cash_sharing:
                     c = call_seq_now[k]
@@ -903,10 +916,10 @@ def simulate_from_signal_func_nb(
                 position_now = last_position[col]
                 debt_now = last_debt[col]
                 val_price_now = last_val_price[col]
-                if not cash_sharing:
-                    value_now = cash_now
-                    if position_now != 0:
-                        value_now += position_now * val_price_now
+                cash_now = last_cash[group]
+                free_cash_now = last_free_cash[group]
+                value_now = last_value[group]
+                return_now = last_return[group]
 
                 # Generate the next order
                 _price = price_arr[col]
@@ -982,10 +995,23 @@ def simulate_from_signal_func_nb(
                         if order_result.status == OrderStatus.Filled:
                             if position_now == 0:
                                 # Position closed -> clear stops
-                                sl_curr_i[col] = sl_init_i[col] = -1
-                                sl_curr_price[col] = sl_init_price[col] = np.nan
+                                sl_init_i[col] = -1
+                                sl_init_price[col] = np.nan
                                 sl_curr_stop[col] = np.nan
-                                sl_curr_trail[col] = False
+
+                                tsl_init_i[col] = -1
+                                tsl_init_price[col] = np.nan
+                                tsl_curr_i[col] = -1
+                                tsl_curr_price[col] = np.nan
+                                tsl_curr_stop[col] = np.nan
+
+                                ttp_init_i[col] = -1
+                                ttp_init_price[col] = np.nan
+                                ttp_curr_i[col] = -1
+                                ttp_curr_price[col] = np.nan
+                                ttp_curr_th[col] = np.nan
+                                ttp_curr_stop[col] = np.nan
+
                                 tp_init_i[col] = -1
                                 tp_init_price[col] = np.nan
                                 tp_curr_stop[col] = np.nan
@@ -1000,26 +1026,68 @@ def simulate_from_signal_func_nb(
                                 else:
                                     new_init_price = flex_select_auto_nb(close, i, col, flex_2d)
                                 _upon_stop_update = flex_select_auto_nb(upon_stop_update, i, col, flex_2d)
-                                _sl_stop = flex_select_auto_nb(sl_stop, i, col, flex_2d)
-                                _sl_trail = flex_select_auto_nb(sl_trail, i, col, flex_2d)
-                                _tp_stop = flex_select_auto_nb(tp_stop, i, col, flex_2d)
+
+                                _sl_stop = abs(flex_select_auto_nb(sl_stop, i, col, flex_2d))
+                                if _sl_stop == 0:
+                                    _sl_stop = np.nan
+                                _tsl_stop = abs(flex_select_auto_nb(tsl_stop, i, col, flex_2d))
+                                if _tsl_stop == 0:
+                                    _tsl_stop = np.nan
+                                _ttp_th = abs(flex_select_auto_nb(ttp_th, i, col, flex_2d))
+                                if _ttp_th == 0:
+                                    _ttp_th = np.nan
+                                _ttp_stop = abs(flex_select_auto_nb(ttp_stop, i, col, flex_2d))
+                                if _ttp_stop == 0:
+                                    _ttp_stop = np.nan
+                                if not np.isnan(_ttp_th) and np.isnan(_ttp_stop):
+                                    raise ValueError("TTP threshold requires a finite stop value")
+                                if np.isnan(_ttp_th) and not np.isnan(_ttp_stop):
+                                    raise ValueError("TTP stop requires a finite threshold value")
+                                _tp_stop = abs(flex_select_auto_nb(tp_stop, i, col, flex_2d))
+                                if _tp_stop == 0:
+                                    _tp_stop = np.nan
 
                                 if exec_state.position == 0 or np.sign(position_now) != np.sign(exec_state.position):
                                     # Position opened/reversed -> set stops
-                                    sl_curr_i[col] = sl_init_i[col] = i
-                                    sl_curr_price[col] = sl_init_price[col] = new_init_price
+                                    sl_init_i[col] = i
+                                    sl_init_price[col] = new_init_price
                                     sl_curr_stop[col] = _sl_stop
-                                    sl_curr_trail[col] = _sl_trail
+
+                                    tsl_init_i[col] = i
+                                    tsl_init_price[col] = new_init_price
+                                    tsl_curr_i[col] = i
+                                    tsl_curr_price[col] = new_init_price
+                                    tsl_curr_stop[col] = _tsl_stop
+
+                                    ttp_init_i[col] = i
+                                    ttp_init_price[col] = new_init_price
+                                    ttp_curr_i[col] = i
+                                    ttp_curr_price[col] = new_init_price
+                                    ttp_curr_th[col] = _ttp_th
+                                    ttp_curr_stop[col] = _ttp_stop
+
                                     tp_init_i[col] = i
                                     tp_init_price[col] = new_init_price
                                     tp_curr_stop[col] = _tp_stop
                                 elif abs(position_now) > abs(exec_state.position):
                                     # Position increased -> keep/override stops
                                     if should_update_stop_nb(_sl_stop, _upon_stop_update):
-                                        sl_curr_i[col] = sl_init_i[col] = i
-                                        sl_curr_price[col] = sl_init_price[col] = new_init_price
+                                        sl_init_i[col] = i
+                                        sl_init_price[col] = new_init_price
                                         sl_curr_stop[col] = _sl_stop
-                                        sl_curr_trail[col] = _sl_trail
+                                    if should_update_stop_nb(_tsl_stop, _upon_stop_update):
+                                        tsl_init_i[col] = i
+                                        tsl_init_price[col] = new_init_price
+                                        tsl_curr_i[col] = i
+                                        tsl_curr_price[col] = new_init_price
+                                        tsl_curr_stop[col] = _tsl_stop
+                                    if should_update_stop_nb(_ttp_stop, _upon_stop_update):
+                                        ttp_init_i[col] = i
+                                        ttp_init_price[col] = new_init_price
+                                        ttp_curr_i[col] = i
+                                        ttp_curr_price[col] = new_init_price
+                                        ttp_curr_th[col] = _ttp_th
+                                        ttp_curr_stop[col] = _ttp_stop
                                     if should_update_stop_nb(_tp_stop, _upon_stop_update):
                                         tp_init_i[col] = i
                                         tp_init_price[col] = new_init_price
@@ -1030,8 +1098,11 @@ def simulate_from_signal_func_nb(
                 last_debt[col] = debt_now
                 if not np.isnan(val_price_now) or not ffill_val_price:
                     last_val_price[col] = val_price_now
+                last_cash[group] = cash_now
+                last_free_cash[group] = free_cash_now
+                last_value[group] = value_now
+                last_return[group] = return_now
 
-            group_value = cash_now
             for col in range(from_col, to_col):
                 # Update valuation price using current close
                 _close = flex_select_auto_nb(close, i, col, flex_2d)
@@ -1042,36 +1113,24 @@ def simulate_from_signal_func_nb(
                 _cash_dividends = flex_select_auto_nb(cash_dividends, i, col, flex_2d)
                 _cash_earnings += _cash_dividends * last_position[col]
                 if _cash_earnings < 0:
-                    _cash_earnings = max(_cash_earnings, -cash_now)
-                cash_now += _cash_earnings
-                free_cash_now += _cash_earnings
+                    _cash_earnings = max(_cash_earnings, -last_cash[group])
+                last_cash[group] += _cash_earnings
+                last_free_cash[group] += _cash_earnings
                 if track_cash_earnings:
                     cash_earnings_out[i, col] += _cash_earnings
 
-                # Update previous value, current value, and return
-                if fill_returns:
-                    if cash_sharing:
-                        if last_position[col] != 0:
-                            group_value += last_position[col] * last_val_price[col]
-                    else:
-                        if last_position[col] == 0:
-                            last_value[col] = cash_now
-                        else:
-                            last_value[col] = cash_now + last_position[col] * last_val_price[col]
-                        last_return[col] = get_return_nb(
-                            prev_close_value[col],
-                            last_value[col] - _cash_deposits,
-                        )
-                        prev_close_value[col] = last_value[col]
-                        in_outputs.returns[i, group] = last_return[col]
-
-            if fill_returns and cash_sharing:
-                last_value[group] = group_value
-                last_return[group] = get_return_nb(
-                    prev_close_value[group],
-                    last_value[group] - _cash_deposits,
-                )
-                prev_close_value[group] = last_value[group]
+            # Update value and return
+            group_value = last_cash[group]
+            for col in range(from_col, to_col):
+                if last_position[col] != 0:
+                    group_value += last_position[col] * last_val_price[col]
+            last_value[group] = group_value
+            last_return[group] = returns_nb_.get_return_nb(
+                prev_close_value[group],
+                last_value[group] - _cash_deposits,
+            )
+            prev_close_value[group] = last_value[group]
+            if fill_returns:
                 in_outputs.returns[i, group] = last_return[group]
 
     return prepare_simout_nb(
@@ -1089,20 +1148,16 @@ def simulate_from_signal_func_nb(
 @register_jitted
 def holding_enex_signal_func_nb(
     c: SignalContext,
-    close: tp.FlexArray,
     direction: int,
     close_at_end: bool,
 ) -> tp.Tuple[bool, bool, bool, bool]:
-    """Resolve direction-aware signals out of specification for holding."""
-    if c.position_now == 0:
-        _close = flex_select_auto_nb(close, c.i, c.col, c.flex_2d)
-        if not np.isnan(_close) and not np.isinf(_close):
-            if direction == Direction.LongOnly:
-                return True, False, False, False
-            if direction == Direction.ShortOnly:
-                return False, False, True, False
-            raise ValueError("Either long-only or short-only direction is allowed for holding")
-        return False, False, False, False
+    """Resolve direction-aware signals for holding."""
+    if c.last_position[c.col] == 0:
+        if direction == Direction.LongOnly:
+            return True, False, False, False
+        if direction == Direction.ShortOnly:
+            return False, False, True, False
+        raise ValueError("Either long-only or short-only direction is allowed for holding")
     if close_at_end and c.i == c.target_shape[0] - 1:
         if direction == Direction.LongOnly:
             return False, True, False, False
@@ -1112,14 +1167,39 @@ def holding_enex_signal_func_nb(
     return False, False, False, False
 
 
+AdjustFuncT = tp.Callable[[SignalContext, tp.VarArg()], None]
+
+
+@register_jitted
+def no_adjust_func_nb(c: SignalContext, *args) -> None:
+    """Placeholder adjustment function."""
+    return None
+
+
 @register_jitted
 def dir_enex_signal_func_nb(
     c: SignalContext,
     entries: tp.FlexArray,
     exits: tp.FlexArray,
     direction: tp.FlexArray,
+    adjust_func_nb: AdjustFuncT = no_adjust_func_nb,
+    adjust_args: tp.Args = (),
 ) -> tp.Tuple[bool, bool, bool, bool]:
-    """Resolve direction-aware signals out of entries, exits, and direction."""
+    """Resolve direction-aware signals out of entries, exits, and direction.
+
+    The direction of each pair of signals is taken from `direction` argument:
+
+    * True, True, `Direction.LongOnly` -> True, True, False, False
+    * True, True, `Direction.ShortOnly` -> False, False, True, True
+    * True, True, `Direction.Both` -> True, False, True, False
+
+    Best to use when the direction doesn't change throughout time.
+
+    Prior to returning the signals, calls user-defined `adjust_func_nb`, which can be used to adjust
+    stop values in the context. Must accept `vectorbtpro.portfolio.enums.SignalContext` and `*adjust_args`,
+    and return nothing."""
+    adjust_func_nb(c, *adjust_args)
+
     is_entry = flex_select_auto_nb(entries, c.i, c.col, c.flex_2d)
     is_exit = flex_select_auto_nb(exits, c.i, c.col, c.flex_2d)
     _direction = flex_select_auto_nb(direction, c.i, c.col, c.flex_2d)
@@ -1137,8 +1217,19 @@ def ls_enex_signal_func_nb(
     long_exits: tp.FlexArray,
     short_entries: tp.FlexArray,
     short_exits: tp.FlexArray,
+    adjust_func_nb: AdjustFuncT = no_adjust_func_nb,
+    adjust_args: tp.Args = (),
 ) -> tp.Tuple[bool, bool, bool, bool]:
-    """Get an element of direction-aware signals."""
+    """Get an element of direction-aware signals.
+
+    The direction is already built into the arrays. Best to use when the direction changes frequently
+    (for example, if you have one indicator providing long signals and one providing short signals).
+
+    Prior to returning the signals, calls user-defined `adjust_func_nb`, which can be used to adjust
+    stop values in the context. Must accept `vectorbtpro.portfolio.enums.SignalContext` and `*adjust_args`,
+    and return nothing."""
+    adjust_func_nb(c, *adjust_args)
+
     is_long_entry = flex_select_auto_nb(long_entries, c.i, c.col, c.flex_2d)
     is_long_exit = flex_select_auto_nb(long_exits, c.i, c.col, c.flex_2d)
     is_short_entry = flex_select_auto_nb(short_entries, c.i, c.col, c.flex_2d)

@@ -237,7 +237,7 @@ portfolio:0.trades                  0       1    70.5 kB
 - [x] Broadcasting mechanism was completely refactored and now supports parameters. Build a product 
 of multiple hyperparameter combinations with a single line of code :magic_wand:
 
-```pycon title="Backtest the Golden Cross with different stop configurations"
+```pycon title="Backtest the Golden Cross with different configurations of TSL and TP"
 >>> price = vbt.YFData.fetch('BTC-USD').get('Close')
 >>> fast_ma = vbt.MA.run(price, 50, short_name='fast_ma')
 >>> slow_ma = vbt.MA.run(price, 200, short_name='slow_ma')
@@ -246,19 +246,20 @@ of multiple hyperparameter combinations with a single line of code :magic_wand:
 
 >>> pf = vbt.Portfolio.from_signals(
 ...     price, entries, exits, 
-...     sl_stop=pd.Index([np.nan, 0.1, 0.2, 0.3]),
-...     sl_trail=pd.Index([False, True])
+...     tsl_stop=pd.Index([np.nan, 0.1, 0.2]),
+...     tp_stop=pd.Index([np.nan, 0.1, 0.2]),
 ... )
 >>> pf.sharpe_ratio
-sl_stop  sl_trail
-NaN      False       0.941681
-         True        0.941681
-0.1      False       1.090223
-         True        0.289617
-0.2      False       1.038723
-         True        1.409230
-0.3      False       0.971036
-         True        1.142365
+tsl_stop  tp_stop
+NaN       NaN        1.216473
+          0.1       -0.001308
+          0.2        0.208434
+0.1       NaN        0.305441
+          0.1        0.082011
+          0.2        0.198531
+0.2       NaN        0.930212
+          0.1        0.043703
+          0.2        0.381851
 Name: sharpe_ratio, dtype: float64
 ```
 

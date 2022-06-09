@@ -1410,11 +1410,6 @@ class TestAccessors:
         )
 
     def test_generate_ohlc_stop_exits(self):
-        with pytest.raises(Exception):
-            mask.vbt.signals.generate_ohlc_stop_exits(ts, sl_stop=-0.1)
-        with pytest.raises(Exception):
-            mask.vbt.signals.generate_ohlc_stop_exits(ts, tp_stop=-0.1)
-
         assert_frame_equal(
             mask.vbt.signals.generate_stop_exits(ts, stop=-0.1),
             mask.vbt.signals.generate_ohlc_stop_exits(ts, sl_stop=0.1),

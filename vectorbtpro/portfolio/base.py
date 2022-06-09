@@ -27,7 +27,7 @@ Run for the examples below:
 >>> from vectorbtpro.base.reshaping import broadcast, to_2d_array
 >>> from vectorbtpro.base.indexing import flex_select_auto_nb
 >>> from vectorbtpro.portfolio.enums import SizeType, Direction, NoOrder, OrderStatus, OrderSide
->>> from vectorbtpro.portfolio import nb
+>>> from vectorbtpro.portfolio import nb as pf_nb
 ```
 
 ## Workflow
@@ -156,7 +156,7 @@ Let's replicate our example using an order function:
 ```pycon
 >>> @njit
 >>> def order_func_nb(c, size, direction, fees):
-...     return nb.order_nb(
+...     return pf_nb.order_nb(
 ...         price=c.close[c.i, c.col],
 ...         size=size[c.i],
 ...         direction=direction[c.col],
@@ -574,11 +574,11 @@ Name: sharpe_ratio, dtype: float64
 
 >>> @njit
 ... def order_func_nb(c, size, price, fees, slippage):
-...     return nb.order_nb(
-...         size=nb.get_elem_nb(c, size),
-...         price=nb.get_elem_nb(c, price),
-...         fees=nb.get_elem_nb(c, fees),
-...         slippage=nb.get_elem_nb(c, slippage),
+...     return pf_nb.order_nb(
+...         size=pf_nb.get_elem_nb(c, size),
+...         price=pf_nb.get_elem_nb(c, price),
+...         fees=pf_nb.get_elem_nb(c, fees),
+...         slippage=pf_nb.get_elem_nb(c, slippage),
 ...     )
 
 >>> @njit
@@ -1662,6 +1662,7 @@ from vectorbtpro.utils.mapping import to_mapping
 from vectorbtpro.utils.parsing import get_func_kwargs
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.template import Rep, RepEval, RepFunc, deep_substitute
+from vectorbtpro.utils.chunking import ArgsTaker
 
 try:
     import quantstats as qs
@@ -4576,18 +4577,18 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         high: tp.Optional[tp.ArrayLike] = None,
         low: tp.Optional[tp.ArrayLike] = None,
         sl_stop: tp.Optional[tp.ArrayLike] = None,
-        sl_trail: tp.Optional[tp.ArrayLike] = None,
+        tsl_stop: tp.Optional[tp.ArrayLike] = None,
+        ttp_th: tp.Optional[tp.ArrayLike] = None,
+        ttp_stop: tp.Optional[tp.ArrayLike] = None,
         tp_stop: tp.Optional[tp.ArrayLike] = None,
         stop_entry_price: tp.Optional[tp.ArrayLike] = None,
         stop_exit_price: tp.Optional[tp.ArrayLike] = None,
         upon_stop_exit: tp.Optional[tp.ArrayLike] = None,
         upon_stop_update: tp.Optional[tp.ArrayLike] = None,
         signal_priority: tp.Optional[tp.ArrayLike] = None,
-        adjust_sl_func_nb: nb.AdjustSLFuncT = nb.no_adjust_sl_func_nb,
-        adjust_sl_args: tp.Args = (),
-        adjust_tp_func_nb: nb.AdjustTPFuncT = nb.no_adjust_tp_func_nb,
-        adjust_tp_args: tp.Args = (),
         use_stops: tp.Optional[bool] = None,
+        adjust_func_nb: nb.AdjustFuncT = nb.no_adjust_func_nb,
+        adjust_args: tp.Args = (),
         init_cash: tp.Optional[tp.ArrayLike] = None,
         init_position: tp.Optional[tp.ArrayLike] = None,
         init_price: tp.Optional[tp.ArrayLike] = None,
@@ -4619,26 +4620,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         You have three options to provide signals:
 
-        1. `entries` and `exits`: The direction of each pair of signals is taken from `direction` argument.
-            Best to use when the direction doesn't change throughout time.
-
+        1. `entries` and `exits`:
             Uses `vectorbtpro.portfolio.nb.from_signals.dir_enex_signal_func_nb` as `signal_func_nb`.
-
-            !!! hint
-                `entries` and `exits` can be easily translated to direction-aware signals:
-
-                * (True, True, 'longonly') -> True, True, False, False
-                * (True, True, 'shortonly') -> False, False, True, True
-                * (True, True, 'both') -> True, False, True, False
-
         2. `entries` (acting as long), `exits` (acting as long), `short_entries`, and `short_exits`:
-            The direction is already built into the arrays. Best to use when the direction changes frequently
-            (for example, if you have one indicator providing long signals and one providing short signals).
-
             Uses `vectorbtpro.portfolio.nb.from_signals.ls_enex_signal_func_nb` as `signal_func_nb`.
-
         3. `signal_func_nb` and `signal_args`: Custom signal function that returns direction-aware signals.
-            Best to use when signals should be placed dynamically based on custom conditions.
 
         Args:
             close (array_like or Data): See `Portfolio.from_orders`.
@@ -4724,15 +4710,23 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             sl_stop (array_like of float): Stop loss.
                 Will broadcast.
 
-                A percentage below/above the acquisition price for long/short position.
-                Note that 0.01 = 1%.
-            sl_trail (array_like of bool): Whether `sl_stop` should be trailing.
+                Set an element to `np.nan` or `0` to disable.
+            tsl_stop (array_like of float): Trailing stop loss.
                 Will broadcast.
+
+                Set an element to `np.nan` or `0` to disable.
+            ttp_th (array_like of float): Take profit threshold for the trailing take profit.
+                Will broadcast.
+
+                Set an element to `np.nan` or `0` to disable. Requires `ttp_stop`.
+            ttp_stop (array_like of float): Trailing stop loss for the trailing take profit.
+                Will broadcast.
+
+                Set an element to `np.nan` or `0` to disable. Requires `ttp_th`.
             tp_stop (array_like of float): Take profit.
                 Will broadcast.
 
-                A percentage above/below the acquisition price for long/short position.
-                Note that 0.01 = 1%.
+                Set an element to `np.nan` or `0` to disable.
             stop_entry_price (StopEntryPrice or array_like): See `vectorbtpro.portfolio.enums.StopEntryPrice`.
                 Will broadcast.
 
@@ -4762,29 +4756,19 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     * at open (user signal wins)
                     * between open and close (not enough information!)
                     * at close (stop signal wins)
-            adjust_sl_func_nb (callable): Function to adjust stop loss.
-                Defaults to `vectorbtpro.portfolio.nb.from_signals.no_adjust_sl_func_nb`.
-
-                Called for each element before each row.
-
-                Must accept `vectorbtpro.portfolio.enums.AdjustSLContext` and `*adjust_sl_args`.
-                Must return a tuple of a new stop value and trailing flag.
-            adjust_sl_args (tuple): Packed arguments passed to `adjust_sl_func_nb`.
-                Defaults to `()`.
-            adjust_tp_func_nb (callable): Function to adjust take profit.
-                Defaults to `vectorbtpro.portfolio.nb.from_signals.no_adjust_tp_func_nb`.
-
-                Called for each element before each row.
-
-                Must accept `vectorbtpro.portfolio.enums.AdjustTPContext` and `*adjust_tp_args`.
-                of the stop, and `*adjust_tp_args`. Must return a new stop value.
-            adjust_tp_args (tuple): Packed arguments passed to `adjust_tp_func_nb`.
-                Defaults to `()`.
             use_stops (bool): Whether to use stops.
                 Defaults to None, which becomes True if any of the stops are not NaN or
                 any of the adjustment functions are custom.
 
                 Disable this to make simulation a bit faster for simple use cases.
+            adjust_func_nb (callable): User-defined function to adjust the current simulation state.
+                Defaults to `vectorbtpro.portfolio.nb.from_signals.no_adjust_func_nb`.
+
+                Passed as argument to `vectorbtpro.portfolio.nb.from_signals.dir_enex_signal_func_nb`
+                and `vectorbtpro.portfolio.nb.from_signals.ls_enex_signal_func_nb`. Has no effect
+                when using other signal functions.
+            adjust_args (tuple): Packed arguments passed to `adjust_func_nb`.
+                Defaults to `()`.
             init_cash (InitCashMode, float or array_like): See `Portfolio.from_orders`.
             init_position (float or array_like): See `Portfolio.from_orders`.
             init_price (float or array_like): See `Portfolio.from_orders`.
@@ -5149,7 +5133,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> exits = pd.Series([False, False, False, False, False, True])
             >>> pf = vbt.Portfolio.from_signals(
             ...     close, entries, exits,
-            ...     sl_stop=0.1, sl_trail=True, tp_stop=0.2)  # take profit hit
+            ...     tsl_stop=0.1, tp_stop=0.2)  # take profit hit
             >>> pf.asset_flow
             0    10.0
             1     0.0
@@ -5161,7 +5145,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
             >>> pf = vbt.Portfolio.from_signals(
             ...     close, entries, exits,
-            ...     sl_stop=0.1, sl_trail=True, tp_stop=0.3)  # stop loss hit
+            ...     tsl_stop=0.1, tp_stop=0.3)  # trailing stop loss hit
             >>> pf.asset_flow
             0    10.0
             1     0.0
@@ -5173,7 +5157,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
             >>> pf = vbt.Portfolio.from_signals(
             ...     close, entries, exits,
-            ...     sl_stop=np.inf, sl_trail=True, tp_stop=np.inf)  # nothing hit, exit as usual
+            ...     tsl_stop=np.inf, tp_stop=np.inf)  # nothing hit, exit as usual
             >>> pf.asset_flow
             0    10.0
             1     0.0
@@ -5184,25 +5168,23 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             dtype: float64
             ```
 
-            * Test all stop combinations:
+            * Test different stop combinations:
 
             ```pycon
             >>> pf = vbt.Portfolio.from_signals(
             ...     close, entries, exits,
-            ...     sl_stop=pd.Index([0.1, 0.2]),
-            ...     sl_trail=pd.Index([False, True]),
+            ...     tsl_stop=pd.Index([0.1, 0.2]),
             ...     tp_stop=pd.Index([0.2, 0.3])
             ... )
             >>> pf.asset_flow
-            sl_stop                      0.1                     0.2
-            sl_trail       False        True       False        True
-            tp_stop    0.2   0.3   0.2   0.3   0.2   0.3   0.2   0.3
-            0         10.0  10.0  10.0  10.0  10.0  10.0  10.0  10.0
-            1          0.0   0.0   0.0   0.0   0.0   0.0   0.0   0.0
-            2        -10.0   0.0 -10.0   0.0 -10.0   0.0 -10.0   0.0
-            3          0.0   0.0   0.0   0.0   0.0   0.0   0.0   0.0
-            4          0.0   0.0   0.0 -10.0   0.0   0.0   0.0   0.0
-            5          0.0 -10.0   0.0   0.0   0.0 -10.0   0.0 -10.0
+            tsl_stop   0.1         0.2
+            tp_stop    0.2   0.3   0.2   0.3
+            0         10.0  10.0  10.0  10.0
+            1          0.0   0.0   0.0   0.0
+            2        -10.0   0.0 -10.0   0.0
+            3          0.0   0.0   0.0   0.0
+            4          0.0 -10.0   0.0   0.0
+            5          0.0   0.0   0.0 -10.0
             ```
 
             This works because `pd.Index` automatically translates into `vectorbtpro.base.reshaping.BCO`
@@ -5213,24 +5195,25 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
             ```pycon
             >>> @njit
-            ... def adjust_sl_func_nb(c):
-            ...     current_profit = (c.val_price_now - c.init_price) / c.init_price
+            ... def adjust_func_nb(c):
+            ...     val_price_now = c.last_val_price[c.col]
+            ...     tsl_init_price = c.tsl_init_price[c.col]
+            ...     current_profit = (val_price_now - tsl_init_price) / tsl_init_price
             ...     if current_profit >= 0.40:
-            ...         return 0.25, True
+            ...         c.tsl_curr_stop[c.col] = 0.25
             ...     elif current_profit >= 0.25:
-            ...         return 0.15, True
+            ...         c.tsl_curr_stop[c.col] = 0.15
             ...     elif current_profit >= 0.20:
-            ...         return 0.07, True
-            ...     return c.curr_stop, c.curr_trail
+            ...         c.tsl_curr_stop[c.col] = 0.07
 
             >>> close = pd.Series([10, 11, 12, 11, 10])
-            >>> pf = vbt.Portfolio.from_signals(close, adjust_sl_func_nb=adjust_sl_func_nb)
+            >>> pf = vbt.Portfolio.from_signals(close, adjust_func_nb=adjust_func_nb)
             >>> pf.asset_flow
             0    10.0
             1     0.0
             2     0.0
             3   -10.0  # 7% from 12 hit
-            4    11.0
+            4    11.16
             dtype: float64
             ```
 
@@ -5242,8 +5225,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ```pycon
             >>> @njit
             ... def signal_func_nb(c, long_num_arr, short_num_arr):
-            ...     long_num = nb.get_elem_nb(c, long_num_arr)
-            ...     short_num = nb.get_elem_nb(c, short_num_arr)
+            ...     long_num = pf_nb.get_elem_nb(c, long_num_arr)
+            ...     short_num = pf_nb.get_elem_nb(c, short_num_arr)
             ...     is_long_entry = long_num > 0
             ...     is_long_exit = long_num < 0
             ...     is_short_entry = short_num > 0
@@ -5373,8 +5356,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             val_price = portfolio_cfg["val_price"]
         if sl_stop is None:
             sl_stop = portfolio_cfg["sl_stop"]
-        if sl_trail is None:
-            sl_trail = portfolio_cfg["sl_trail"]
+        if tsl_stop is None:
+            tsl_stop = portfolio_cfg["tsl_stop"]
+        if ttp_th is None:
+            ttp_th = portfolio_cfg["ttp_th"]
+        if ttp_stop is None:
+            ttp_stop = portfolio_cfg["ttp_stop"]
         if tp_stop is None:
             tp_stop = portfolio_cfg["tp_stop"]
         if stop_entry_price is None:
@@ -5391,12 +5378,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             use_stops = portfolio_cfg["use_stops"]
         if use_stops is None:
             if (
-                isinstance(sl_stop, float)
-                and np.isnan(sl_stop)
-                and isinstance(tp_stop, float)
-                and np.isnan(tp_stop)
-                and adjust_sl_func_nb == nb.no_adjust_sl_func_nb
-                and adjust_tp_func_nb == nb.no_adjust_tp_func_nb
+                not np.any(sl_stop)
+                and not np.any(tsl_stop)
+                and not np.any(ttp_stop)
+                and not np.any(tp_stop)
+                and adjust_func_nb == nb.no_adjust_func_nb
             ):
                 use_stops = False
             else:
@@ -5488,7 +5474,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             low=low,
             close=close,
             sl_stop=sl_stop,
-            sl_trail=sl_trail,
+            tsl_stop=tsl_stop,
+            ttp_th=ttp_th,
+            ttp_stop=ttp_stop,
             tp_stop=tp_stop,
             stop_entry_price=stop_entry_price,
             stop_exit_price=stop_exit_price,
@@ -5545,7 +5533,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     close=dict(fill_value=np.nan),
                     bm_close=dict(fill_value=np.nan),
                     sl_stop=dict(fill_value=np.nan),
-                    sl_trail=dict(fill_value=np.nan),
+                    tsl_stop=dict(fill_value=np.nan),
+                    ttp_th=dict(fill_value=np.nan),
+                    ttp_stop=dict(fill_value=np.nan),
                     tp_stop=dict(fill_value=np.nan),
                     stop_entry_price=dict(fill_value=StopEntryPrice.Close),
                     stop_exit_price=dict(fill_value=StopExitPrice.StopLimit),
@@ -5673,7 +5663,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         checks.assert_subdtype(broadcasted_args["low"], np.number)
         checks.assert_subdtype(broadcasted_args["close"], np.number)
         checks.assert_subdtype(broadcasted_args["sl_stop"], np.number)
-        checks.assert_subdtype(broadcasted_args["sl_trail"], np.bool_)
+        checks.assert_subdtype(broadcasted_args["tsl_stop"], np.number)
+        checks.assert_subdtype(broadcasted_args["ttp_th"], np.number)
+        checks.assert_subdtype(broadcasted_args["ttp_stop"], np.number)
         checks.assert_subdtype(broadcasted_args["tp_stop"], np.number)
         checks.assert_subdtype(broadcasted_args["stop_entry_price"], np.integer)
         checks.assert_subdtype(broadcasted_args["stop_exit_price"], np.integer)
@@ -5706,11 +5698,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 cash_deposits=cash_deposits,
                 cash_earnings=cash_earnings,
                 cash_dividends=cash_dividends,
-                adjust_sl_func_nb=adjust_sl_func_nb,
-                adjust_sl_args=adjust_sl_args,
-                adjust_tp_func_nb=adjust_tp_func_nb,
-                adjust_tp_args=adjust_tp_args,
                 use_stops=use_stops,
+                adjust_func_nb=adjust_func_nb,
+                adjust_args=adjust_args,
                 auto_call_seq=auto_call_seq,
                 ffill_val_price=ffill_val_price,
                 update_value=update_value,
@@ -5722,17 +5712,18 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ),
             template_context,
         )
-        adjust_sl_args = deep_substitute(adjust_sl_args, template_context, sub_id="adjust_sl_args")
-        adjust_tp_args = deep_substitute(adjust_tp_args, template_context, sub_id="adjust_tp_args")
         if signal_func_mode:
             signal_args = deep_substitute(signal_args, template_context, sub_id="signal_args")
         else:
+            adjust_args = deep_substitute(adjust_args, template_context, sub_id="adjust_args")
             if ls_mode:
                 signal_args = (
                     broadcasted_args.pop("entries"),
                     broadcasted_args.pop("exits"),
                     broadcasted_args.pop("short_entries"),
                     broadcasted_args.pop("short_exits"),
+                    adjust_func_nb,
+                    adjust_args,
                 )
                 chunked = ch.specialize_chunked_option(
                     chunked,
@@ -5742,6 +5733,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                             portfolio_ch.flex_array_gl_slicer,
                             portfolio_ch.flex_array_gl_slicer,
                             portfolio_ch.flex_array_gl_slicer,
+                            None,
+                            ArgsTaker(),
                         )
                     ),
                 )
@@ -5750,6 +5743,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     broadcasted_args.pop("entries"),
                     broadcasted_args.pop("exits"),
                     broadcasted_args.pop("direction"),
+                    adjust_func_nb,
+                    adjust_args,
                 )
                 chunked = ch.specialize_chunked_option(
                     chunked,
@@ -5758,6 +5753,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                             portfolio_ch.flex_array_gl_slicer,
                             portfolio_ch.flex_array_gl_slicer,
                             portfolio_ch.flex_array_gl_slicer,
+                            None,
+                            ArgsTaker(),
                         )
                     ),
                 )
@@ -5781,10 +5778,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             signal_func_nb=signal_func_nb,
             signal_args=signal_args,
             **broadcasted_args,
-            adjust_sl_func_nb=adjust_sl_func_nb,
-            adjust_sl_args=adjust_sl_args,
-            adjust_tp_func_nb=adjust_tp_func_nb,
-            adjust_tp_args=adjust_tp_args,
             use_stops=use_stops,
             auto_call_seq=auto_call_seq,
             ffill_val_price=ffill_val_price,
@@ -5853,7 +5846,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         return cls.from_signals(
             close,
             signal_func_nb=nb.holding_enex_signal_func_nb,
-            signal_args=(RepEval("close"), direction, close_at_end),
+            signal_args=(direction, close_at_end),
             accumulate=False,
             **kwargs,
         )
@@ -6302,7 +6295,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ```pycon
             >>> @njit
             ... def order_func_nb(c, size):
-            ...     return nb.order_nb(size=size)
+            ...     return pf_nb.order_nb(size=size)
 
             >>> close = pd.Series([1, 2, 3, 4, 5])
             >>> pf = vbt.Portfolio.from_order_func(close, order_func_nb, 10)
@@ -6335,7 +6328,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> @njit
             ... def order_func_nb(c, last_pos_state):
             ...     if c.position_now != 0:
-            ...         return nb.close_position_nb()
+            ...         return pf_nb.close_position_nb()
             ...
             ...     if last_pos_state[0] == 1:
             ...         size = -np.inf  # open short
@@ -6343,7 +6336,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ...     else:
             ...         size = np.inf  # open long
             ...         last_pos_state[0] = 1
-            ...     return nb.order_nb(size=size)
+            ...     return pf_nb.order_nb(size=size)
 
             >>> pf = vbt.Portfolio.from_order_func(
             ...     close,
@@ -6378,20 +6371,20 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> @njit
             ... def pre_segment_func_nb(c, order_value_out, size, price, size_type, direction):
             ...     for col in range(c.from_col, c.to_col):
-            ...         c.last_val_price[col] = nb.get_col_elem_nb(c, col, price)
-            ...     nb.sort_call_seq_nb(c, size, size_type, direction, order_value_out)
+            ...         c.last_val_price[col] = pf_nb.get_col_elem_nb(c, col, price)
+            ...     pf_nb.sort_call_seq_nb(c, size, size_type, direction, order_value_out)
             ...     return ()
 
             >>> @njit
             ... def order_func_nb(c, size, price, size_type, direction, fees, fixed_fees, slippage):
-            ...     return nb.order_nb(
-            ...         size=nb.get_elem_nb(c, size),
-            ...         price=nb.get_elem_nb(c, price),
-            ...         size_type=nb.get_elem_nb(c, size_type),
-            ...         direction=nb.get_elem_nb(c, direction),
-            ...         fees=nb.get_elem_nb(c, fees),
-            ...         fixed_fees=nb.get_elem_nb(c, fixed_fees),
-            ...         slippage=nb.get_elem_nb(c, slippage)
+            ...     return pf_nb.order_nb(
+            ...         size=pf_nb.get_elem_nb(c, size),
+            ...         price=pf_nb.get_elem_nb(c, price),
+            ...         size_type=pf_nb.get_elem_nb(c, size_type),
+            ...         direction=pf_nb.get_elem_nb(c, direction),
+            ...         fees=pf_nb.get_elem_nb(c, fees),
+            ...         fixed_fees=pf_nb.get_elem_nb(c, fixed_fees),
+            ...         slippage=pf_nb.get_elem_nb(c, slippage)
             ...     )
 
             >>> np.random.seed(42)
@@ -6469,22 +6462,22 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> @njit
             ... def order_func_nb(c, stop_price, entries, exits, size):
             ...     # Select info related to this order
-            ...     entry_now = nb.get_elem_nb(c, entries)
-            ...     exit_now = nb.get_elem_nb(c, exits)
-            ...     size_now = nb.get_elem_nb(c, size)
-            ...     price_now = nb.get_elem_nb(c, c.close)
+            ...     entry_now = pf_nb.get_elem_nb(c, entries)
+            ...     exit_now = pf_nb.get_elem_nb(c, exits)
+            ...     size_now = pf_nb.get_elem_nb(c, size)
+            ...     price_now = pf_nb.get_elem_nb(c, c.close)
             ...     stop_price_now = stop_price[c.col]
             ...
             ...     # Our logic
             ...     if entry_now:
             ...         if c.position_now == 0:
-            ...             return nb.order_nb(
+            ...             return pf_nb.order_nb(
             ...                 size=size_now,
             ...                 price=price_now,
             ...                 direction=Direction.LongOnly)
             ...     elif exit_now or price_now >= stop_price_now:
             ...         if c.position_now > 0:
-            ...             return nb.order_nb(
+            ...             return pf_nb.order_nb(
             ...                 size=-size_now,
             ...                 price=price_now,
             ...                 direction=Direction.LongOnly)
@@ -6493,7 +6486,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> @njit
             ... def post_order_func_nb(c, stop_price, stop):
             ...     # Same broadcasting as for size
-            ...     stop_now = nb.get_elem_nb(c, stop)
+            ...     stop_now = pf_nb.get_elem_nb(c, stop)
             ...
             ...     if c.order_result.status == OrderStatus.Filled:
             ...         if c.order_result.side == OrderSide.Buy:
@@ -6590,9 +6583,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> @njit
             ... def flex_order_func_nb(c, size):
             ...     if c.call_idx == 0:
-            ...         return c.from_col, nb.order_nb(size=size, price=c.open[c.i, c.from_col])
+            ...         return c.from_col, pf_nb.order_nb(size=size, price=c.open[c.i, c.from_col])
             ...     if c.call_idx == 1:
-            ...         return c.from_col, nb.close_position_nb(price=c.close[c.i, c.from_col])
+            ...         return c.from_col, pf_nb.close_position_nb(price=c.close[c.i, c.from_col])
             ...     return -1, NoOrder
 
             >>> open = pd.DataFrame({'a': [1, 2, 3], 'b': [4, 5, 6]})

@@ -621,29 +621,19 @@ def ohlc_stop_place_nb(
         raise ValueError("Wait must be either 0 or 1")
     init_i = c.from_i - c.wait
     init_entry_price = flex_select_auto_nb(entry_price, init_i, c.col, flex_2d)
-    init_sl_stop = flex_select_auto_nb(sl_stop, init_i, c.col, flex_2d)
-    if init_sl_stop < 0:
-        raise ValueError("SL stop value must be nan, 0, or greater than 0")
+    init_sl_stop = abs(flex_select_auto_nb(sl_stop, init_i, c.col, flex_2d))
     if init_sl_stop == 0:
         init_sl_stop = np.nan
-    init_tsl_stop = flex_select_auto_nb(tsl_stop, init_i, c.col, flex_2d)
-    if init_tsl_stop < 0:
-        raise ValueError("TSL stop value must be nan, 0, or greater than 0")
+    init_tsl_stop = abs(flex_select_auto_nb(tsl_stop, init_i, c.col, flex_2d))
     if init_tsl_stop == 0:
         init_tsl_stop = np.nan
-    init_tp_stop = flex_select_auto_nb(tp_stop, init_i, c.col, flex_2d)
-    if init_tp_stop < 0:
-        raise ValueError("TP stop value must be nan, 0, or greater than 0")
+    init_tp_stop = abs(flex_select_auto_nb(tp_stop, init_i, c.col, flex_2d))
     if init_tp_stop == 0:
         init_tp_stop = np.nan
-    init_ttp_th = flex_select_auto_nb(ttp_th, init_i, c.col, flex_2d)
-    if init_ttp_th < 0:
-        raise ValueError("TTP threshold value must be nan, 0, or greater than 0")
+    init_ttp_th = abs(flex_select_auto_nb(ttp_th, init_i, c.col, flex_2d))
     if init_ttp_th == 0:
         init_ttp_th = np.nan
-    init_ttp_stop = flex_select_auto_nb(ttp_stop, init_i, c.col, flex_2d)
-    if init_ttp_stop < 0:
-        raise ValueError("TTP stop value must be nan, 0, or greater than 0")
+    init_ttp_stop = abs(flex_select_auto_nb(ttp_stop, init_i, c.col, flex_2d))
     if init_ttp_stop == 0:
         init_ttp_stop = np.nan
     if not np.isnan(init_ttp_th) and np.isnan(init_ttp_stop):

@@ -47,8 +47,6 @@ __all__ = [
     "Order",
     "NoOrder",
     "OrderResult",
-    "AdjustSLContext",
-    "AdjustTPContext",
     "SignalContext",
     "FSInOutputs",
     "FOInOutputs",
@@ -753,10 +751,18 @@ class SimulationOutput(tp.NamedTuple):
 __pdoc__["SimulationOutput"] = "A named tuple representing the output of a simulation."
 __pdoc__["SimulationOutput.order_records"] = "Order records (flattened)."
 __pdoc__["SimulationOutput.log_records"] = "Log records (flattened)."
-__pdoc__["SimulationOutput.cash_deposits"] = "Cash deposited/withdrawn at each timestamp."
-__pdoc__["SimulationOutput.cash_earnings"] = "Cash earnings added/removed at each timestamp."
-__pdoc__["SimulationOutput.call_seq"] = "Call sequence."
-__pdoc__["SimulationOutput.in_outputs"] = "Named tuple with in-output objects."
+__pdoc__["SimulationOutput.cash_deposits"] = """Cash deposited/withdrawn at each timestamp.
+
+If not tracked, becomes shape `(0, 0)`."""
+__pdoc__["SimulationOutput.cash_earnings"] = """Cash earnings added/removed at each timestamp.
+
+If not tracked, becomes shape `(0, 0)`."""
+__pdoc__["SimulationOutput.call_seq"] = """Call sequence.
+
+If not tracked, becomes None."""
+__pdoc__["SimulationOutput.in_outputs"] = """Named tuple with in-output objects.
+
+If not tracked, becomes None."""
 
 
 class SimulationContext(tp.NamedTuple):
@@ -1979,108 +1985,123 @@ __pdoc__["OrderResult.status"] = "See `OrderStatus`."
 __pdoc__["OrderResult.status_info"] = "See `OrderStatusInfo`."
 
 
-class AdjustSLContext(tp.NamedTuple):
-    i: int
-    col: int
-    position_now: float
-    val_price_now: float
-    init_i: int
-    init_price: float
-    curr_i: int
-    curr_price: float
-    curr_stop: float
-    curr_trail: bool
-
-
-__pdoc__["AdjustSLContext"] = "A named tuple representing the context for adjusting (trailing) stop loss."
-__pdoc__[
-    "AdjustSLContext.i"
-] = """Index of the current row.
-
-Has range `[0, target_shape[0])`."""
-__pdoc__[
-    "AdjustSLContext.col"
-] = """Current column.
-
-Has range `[0, target_shape[1])` and is always within `[from_col, to_col)`."""
-__pdoc__["AdjustSLContext.position_now"] = "Latest position."
-__pdoc__["AdjustSLContext.val_price_now"] = "Latest valuation price."
-__pdoc__[
-    "AdjustSLContext.init_i"
-] = """Index of the row of the initial stop.
-
-Doesn't change."""
-__pdoc__[
-    "AdjustSLContext.init_price"
-] = """Price of the initial stop.
-
-Doesn't change."""
-__pdoc__[
-    "AdjustSLContext.curr_i"
-] = """Index of the row of the updated stop.
-
-Gets updated once the price is updated."""
-__pdoc__[
-    "AdjustSLContext.curr_price"
-] = """Current stop price.
-
-Gets updated in trailing SL once a higher price is discovered."""
-__pdoc__[
-    "AdjustSLContext.curr_stop"
-] = """Current stop value.
-
-Can be updated by adjustment function."""
-__pdoc__[
-    "AdjustSLContext.curr_trail"
-] = """Current trailing flag.
-
-Can be updated by adjustment function."""
-
-
-class AdjustTPContext(tp.NamedTuple):
-    i: int
-    col: int
-    position_now: float
-    val_price_now: float
-    init_i: int
-    init_price: float
-    curr_stop: float
-
-
-__pdoc__["AdjustTPContext"] = "A named tuple representing the context for adjusting take profit."
-__pdoc__["AdjustTPContext.i"] = "See `AdjustSLContext.i`."
-__pdoc__["AdjustTPContext.col"] = "See `AdjustSLContext.col`."
-__pdoc__["AdjustTPContext.position_now"] = "See `AdjustSLContext.position_now`."
-__pdoc__["AdjustTPContext.val_price_now"] = "See `AdjustSLContext.val_price_now`."
-__pdoc__["AdjustTPContext.init_i"] = "See `AdjustSLContext.init_i`."
-__pdoc__["AdjustTPContext.init_price"] = "See `AdjustSLContext.curr_price`."
-__pdoc__["AdjustTPContext.curr_stop"] = "See `AdjustSLContext.curr_stop`."
-
-
 class SignalContext(tp.NamedTuple):
     target_shape: tp.Shape
-    i: int
-    col: int
-    position_now: float
-    val_price_now: float
+    group_lens: tp.Array1d
+    cash_sharing: bool
+    call_seq: tp.Optional[tp.Array2d]
+    open: tp.Array
+    high: tp.Array
+    low: tp.Array
+    close: tp.Array
     flex_2d: bool
 
+    order_records: tp.RecordArray2d
+    order_counts: tp.Array1d
+    log_records: tp.RecordArray2d
+    log_counts: tp.Array1d
 
-__pdoc__["SignalContext"] = "A named tuple representing the context for generation of signals."
-__pdoc__["SignalContext.target_shape"] = "Target shape."
+    track_cash_deposits: bool
+    cash_deposits_out: tp.Array2d
+    track_cash_earnings: bool
+    cash_earnings_out: tp.Array2d
+    in_outputs: tp.Optional[tp.NamedTuple]
+
+    last_cash: tp.Array1d
+    last_position: tp.Array1d
+    last_debt: tp.Array1d
+    last_free_cash: tp.Array1d
+    last_val_price: tp.Array1d
+    last_value: tp.Array1d
+    last_return: tp.Array1d
+
+    sl_init_i: tp.Array1d
+    sl_init_price: tp.Array1d
+    sl_curr_stop: tp.Array1d
+    tsl_init_i: tp.Array1d
+    tsl_init_price: tp.Array1d
+    tsl_curr_i: tp.Array1d
+    tsl_curr_price: tp.Array1d
+    tsl_curr_stop: tp.Array1d
+    ttp_init_i: tp.Array1d
+    ttp_init_price: tp.Array1d
+    ttp_curr_i: tp.Array1d
+    ttp_curr_price: tp.Array1d
+    ttp_curr_th: tp.Array1d
+    ttp_curr_stop: tp.Array1d
+    tp_init_i: tp.Array1d
+    tp_init_price: tp.Array1d
+    tp_curr_stop: tp.Array1d
+
+    group: int
+    group_len: int
+    from_col: int
+    to_col: int
+    i: int
+    col: int
+
+
 __pdoc__[
-    "SignalContext.i"
-] = """Index of the current row.
+    "SignalContext"
+] = """A named tuple representing the context of a simulation from signals.
 
-Has range `[0, target_shape[0])`."""
-__pdoc__[
-    "SignalContext.col"
-] = """Current column.
+Contains information related to the cascade of the simulation, such as OHLC, but also
+internal information that is not passed by the user but created at the beginning of the simulation.
+To make use of other information, such as order size, use templates.
 
-Has range `[0, target_shape[1])` and is always within `[from_col, to_col)`."""
-__pdoc__["SignalContext.position_now"] = "Latest position."
-__pdoc__["SignalContext.val_price_now"] = "Latest valuation price."
-__pdoc__["SignalContext.flex_2d"] = "Whether flexible 1-dim arrays are considered per column in 2-dim regime."
+Passed to `signal_func_nb` and `adjust_func_nb`."""
+__pdoc__["SignalContext.target_shape"] = "See `SimulationContext.target_shape`."
+__pdoc__["SignalContext.group_lens"] = "See `SimulationContext.group_lens`."
+__pdoc__["SignalContext.cash_sharing"] = "See `SimulationContext.cash_sharing`."
+__pdoc__["SignalContext.call_seq"] = "See `SimulationContext.call_seq`."
+__pdoc__["SignalContext.open"] = "See `SimulationContext.open`."
+__pdoc__["SignalContext.high"] = "See `SimulationContext.high`."
+__pdoc__["SignalContext.low"] = "See `SimulationContext.low`."
+__pdoc__["SignalContext.close"] = "See `SimulationContext.close`."
+__pdoc__["SignalContext.flex_2d"] = "See `SimulationContext.flex_2d`."
+__pdoc__["SignalContext.order_records"] = "See `SimulationContext.order_records`."
+__pdoc__["SignalContext.order_counts"] = "See `SimulationContext.order_counts`."
+__pdoc__["SignalContext.log_records"] = "See `SimulationContext.log_records`."
+__pdoc__["SignalContext.log_counts"] = "See `SimulationContext.log_counts`."
+__pdoc__["SignalContext.track_cash_deposits"] = """Whether to track cash deposits.
+
+Becomes True if any value in `cash_deposits` is not zero."""
+__pdoc__["SignalContext.cash_deposits_out"] = "See `SimulationOutput.cash_deposits`."
+__pdoc__["SignalContext.track_cash_earnings"] = """Whether to track cash earnings.
+
+Becomes True if any value in `cash_earnings` is not zero."""
+__pdoc__["SignalContext.cash_earnings_out"] = "See `SimulationOutput.cash_earnings`."
+__pdoc__["SignalContext.in_outputs"] = "See `FSInOutputs`."
+__pdoc__["SignalContext.last_cash"] = "See `SimulationContext.last_cash`."
+__pdoc__["SignalContext.last_position"] = "See `SimulationContext.last_position`."
+__pdoc__["SignalContext.last_debt"] = "See `SimulationContext.last_debt`."
+__pdoc__["SignalContext.last_free_cash"] = "See `SimulationContext.last_free_cash`."
+__pdoc__["SignalContext.last_val_price"] = "See `SimulationContext.last_val_price`."
+__pdoc__["SignalContext.last_value"] = "See `SimulationContext.last_value`."
+__pdoc__["SignalContext.last_return"] = "See `SimulationContext.last_return`."
+__pdoc__["SignalContext.sl_init_i"] = "Entry row for SL."
+__pdoc__["SignalContext.sl_init_price"] = "Entry price for SL."
+__pdoc__["SignalContext.sl_curr_stop"] = "Latest updated stop value for SL."
+__pdoc__["SignalContext.tsl_init_i"] = "Entry row for TSL."
+__pdoc__["SignalContext.tsl_init_price"] = "Entry price for TSL."
+__pdoc__["SignalContext.tsl_curr_i"] = "Row of the latest price update for TSL."
+__pdoc__["SignalContext.tsl_curr_price"] = "Latest updated price for TSL."
+__pdoc__["SignalContext.tsl_curr_stop"] = "Latest updated stop value for TSL."
+__pdoc__["SignalContext.ttp_init_i"] = "Entry row for TTP."
+__pdoc__["SignalContext.ttp_init_price"] = "Entry price for TTP."
+__pdoc__["SignalContext.ttp_curr_i"] = "Row of the latest price update for TTP."
+__pdoc__["SignalContext.ttp_curr_price"] = "Latest updated price for TTP."
+__pdoc__["SignalContext.ttp_curr_th"] = "Latest updated threshold value for TTP."
+__pdoc__["SignalContext.ttp_curr_stop"] = "Latest updated stop value for TTP."
+__pdoc__["SignalContext.tp_init_i"] = "Entry row for TP."
+__pdoc__["SignalContext.tp_init_price"] = "Entry price for TP."
+__pdoc__["SignalContext.tp_curr_stop"] = "Latest updated stop value for TP."
+__pdoc__["SignalContext.group"] = "See `GroupContext.group`."
+__pdoc__["SignalContext.group_len"] = "See `GroupContext.group_len`."
+__pdoc__["SignalContext.from_col"] = "See `GroupContext.from_col`."
+__pdoc__["SignalContext.to_col"] = "See `GroupContext.to_col`."
+__pdoc__["SignalContext.i"] = "See `RowContext.i`."
+__pdoc__["SignalContext.col"] = "See `OrderContext.col`."
 
 
 # ############# In-outputs ############# #
