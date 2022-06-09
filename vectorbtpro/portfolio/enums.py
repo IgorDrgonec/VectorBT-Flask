@@ -17,6 +17,7 @@ __all__ = [
     "ConflictMode",
     "DirectionConflictMode",
     "OppositeEntryMode",
+    "StopFormat",
     "StopEntryPrice",
     "StopExitPrice",
     "StopExitMode",
@@ -250,6 +251,30 @@ Attributes:
     CloseReduce: Close the current position or reduce it if accumulation is enabled.
     Reverse: Reverse the current position.
     ReverseReduce: Reverse the current position or reduce it if accumulation is enabled.
+"""
+
+
+class StopFormatT(tp.NamedTuple):
+    Relative: int = 0
+    Absolute: int = 1
+
+
+StopFormat = StopFormatT()
+"""_"""
+
+__pdoc__[
+    "StopFormat"
+] = f"""Stop format.
+
+```python
+{prettify(StopFormat)}
+```
+
+In which format the stop value is provided?
+
+Attributes:
+    Relative: Relative terms (i.e., as a percentage where 0.01 means 1%)
+    Absolute: Absolute terms
 """
 
 

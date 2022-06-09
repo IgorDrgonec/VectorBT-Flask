@@ -4581,6 +4581,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         ttp_th: tp.Optional[tp.ArrayLike] = None,
         ttp_stop: tp.Optional[tp.ArrayLike] = None,
         tp_stop: tp.Optional[tp.ArrayLike] = None,
+        stop_format: tp.Optional[tp.ArrayLike] = None,
         stop_entry_price: tp.Optional[tp.ArrayLike] = None,
         stop_exit_price: tp.Optional[tp.ArrayLike] = None,
         upon_stop_exit: tp.Optional[tp.ArrayLike] = None,
@@ -4727,6 +4728,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 Will broadcast.
 
                 Set an element to `np.nan` or `0` to disable.
+            stop_format (StopFormat or array_like): See `vectorbtpro.portfolio.enums.StopFormat`.
+                Will broadcast.
+
+                If provided on per-element basis, gets applied upon entry.
             stop_entry_price (StopEntryPrice or array_like): See `vectorbtpro.portfolio.enums.StopEntryPrice`.
                 Will broadcast.
 
@@ -5364,6 +5369,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ttp_stop = portfolio_cfg["ttp_stop"]
         if tp_stop is None:
             tp_stop = portfolio_cfg["tp_stop"]
+        if stop_format is None:
+            stop_format = portfolio_cfg["stop_format"]
         if stop_entry_price is None:
             stop_entry_price = portfolio_cfg["stop_entry_price"]
         if stop_exit_price is None:
@@ -5478,6 +5485,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ttp_th=ttp_th,
             ttp_stop=ttp_stop,
             tp_stop=tp_stop,
+            stop_format=stop_format,
             stop_entry_price=stop_entry_price,
             stop_exit_price=stop_exit_price,
             upon_stop_exit=upon_stop_exit,
@@ -5537,6 +5545,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     ttp_th=dict(fill_value=np.nan),
                     ttp_stop=dict(fill_value=np.nan),
                     tp_stop=dict(fill_value=np.nan),
+                    stop_format=dict(fill_value=StopFormat.Relative),
                     stop_entry_price=dict(fill_value=StopEntryPrice.Close),
                     stop_exit_price=dict(fill_value=StopExitPrice.StopLimit),
                     upon_stop_exit=dict(fill_value=StopExitMode.Close),
@@ -5619,6 +5628,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             broadcasted_args["upon_opposite_entry"],
             OppositeEntryMode,
         )
+        broadcasted_args["stop_format"] = map_enum_fields(broadcasted_args["stop_format"], StopFormat)
         broadcasted_args["stop_entry_price"] = map_enum_fields(broadcasted_args["stop_entry_price"], StopEntryPrice)
         broadcasted_args["stop_exit_price"] = map_enum_fields(broadcasted_args["stop_exit_price"], StopExitPrice)
         broadcasted_args["upon_stop_exit"] = map_enum_fields(broadcasted_args["upon_stop_exit"], StopExitMode)
@@ -5667,6 +5677,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         checks.assert_subdtype(broadcasted_args["ttp_th"], np.number)
         checks.assert_subdtype(broadcasted_args["ttp_stop"], np.number)
         checks.assert_subdtype(broadcasted_args["tp_stop"], np.number)
+        checks.assert_subdtype(broadcasted_args["stop_format"], np.integer)
         checks.assert_subdtype(broadcasted_args["stop_entry_price"], np.integer)
         checks.assert_subdtype(broadcasted_args["stop_exit_price"], np.integer)
         checks.assert_subdtype(broadcasted_args["upon_stop_exit"], np.integer)

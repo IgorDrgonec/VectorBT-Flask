@@ -1108,6 +1108,7 @@ portfolio = ChildDict(
     ttp_th=np.nan,
     ttp_stop=np.nan,
     tp_stop=np.nan,
+    stop_format="relative",
     stop_entry_price="close",
     stop_exit_price="stoplimit",
     stop_conflict_mode="exit",

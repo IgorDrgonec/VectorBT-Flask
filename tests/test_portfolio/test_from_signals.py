@@ -1875,6 +1875,28 @@ class TestFromSignals:
                 dtype=order_dt,
             ),
         )
+        assert_records_close(
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                open=open,
+                high=high,
+                low=low,
+                sl_stop=[[np.nan, 0.5, 0.75, 1.0, np.inf]],
+                stop_format="relative",
+            ).order_records,
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                open=open,
+                high=high,
+                low=low,
+                sl_stop=[[np.nan, 5 * 0.5, 5 * 0.75, 5 * 1.0, np.inf]],
+                stop_format="absolute",
+            ).order_records
+        )
 
         close = pd.Series([1.0, 2.0, 3.0, 4.0, 5.0], index=price.index)
         open = close - 0.25
@@ -2110,6 +2132,28 @@ class TestFromSignals:
                 ],
                 dtype=order_dt,
             ),
+        )
+        assert_records_close(
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                open=open,
+                high=high,
+                low=low,
+                tsl_stop=[[np.nan, 0.15, 0.2, 0.25, np.inf]],
+                stop_format="relative",
+            ).order_records,
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                open=open,
+                high=high,
+                low=low,
+                tsl_stop=[[np.nan, 5.5 * 0.15, 5.5 * 0.2, 5.5 * 0.25, np.inf]],
+                stop_format="absolute",
+            ).order_records
         )
 
         close = pd.Series([2.0, 1.0, 2.0, 3.0, 4.0], index=price.index)
@@ -2363,6 +2407,30 @@ class TestFromSignals:
                 dtype=order_dt,
             ),
         )
+        assert_records_close(
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                open=open,
+                high=high,
+                low=low,
+                ttp_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                ttp_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
+                stop_format="relative",
+            ).order_records,
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                open=open,
+                high=high,
+                low=low,
+                ttp_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                ttp_stop=[[np.nan, 5.5 * 0.1, 5.5 * 0.1, 5.5 * 0.5, 5.5 * 0.5, np.inf]],
+                stop_format="absolute",
+            ).order_records
+        )
 
         close = pd.Series([3.0, 4.0, 2.0, 3.0, 4.0], index=price.index)
         open = close - 0.25
@@ -2615,6 +2683,28 @@ class TestFromSignals:
                 ],
                 dtype=order_dt,
             ),
+        )
+        assert_records_close(
+            from_signals_shortonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                open=open,
+                high=high,
+                low=low,
+                tp_stop=[[np.nan, 0.1, 0.15, 0.2, np.inf]],
+                stop_format="relative",
+            ).order_records,
+            from_signals_shortonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                open=open,
+                high=high,
+                low=low,
+                tp_stop=[[np.nan, 5 * 0.1, 5 * 0.15, 5 * 0.2, np.inf]],
+                stop_format="absolute",
+            ).order_records
         )
 
         close = pd.Series([1.0, 2.0, 3.0, 4.0, 5.0], index=price.index)

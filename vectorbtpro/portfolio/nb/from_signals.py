@@ -300,6 +300,7 @@ def get_stop_price_nb(
     position_now: float,
     stop_price: float,
     stop: float,
+    stop_format: int,
     open: float,
     high: float,
     low: float,
@@ -309,14 +310,20 @@ def get_stop_price_nb(
 
     If hit before open, returns open."""
     if (position_now > 0 and hit_below) or (position_now < 0 and not hit_below):
-        stop_price = stop_price * (1 - abs(stop))
+        if stop_format == StopFormat.Relative:
+            stop_price = stop_price * (1 - abs(stop))
+        else:
+            stop_price = stop_price - abs(stop)
         if open <= stop_price:
             return open
         if low <= stop_price:
             return stop_price
         return np.nan
     if (position_now < 0 and hit_below) or (position_now > 0 and not hit_below):
-        stop_price = stop_price * (1 + abs(stop))
+        if stop_format == StopFormat.Relative:
+            stop_price = stop_price * (1 + abs(stop))
+        else:
+            stop_price = stop_price + abs(stop)
         if open >= stop_price:
             return open
         if high >= stop_price:
@@ -378,6 +385,7 @@ SignalFuncT = tp.Callable[[SignalContext, tp.VarArg()], tp.Tuple[bool, bool, boo
         tp_stop=portfolio_ch.flex_array_gl_slicer,
         ttp_th=portfolio_ch.flex_array_gl_slicer,
         ttp_stop=portfolio_ch.flex_array_gl_slicer,
+        stop_format=portfolio_ch.flex_array_gl_slicer,
         stop_entry_price=portfolio_ch.flex_array_gl_slicer,
         stop_exit_price=portfolio_ch.flex_array_gl_slicer,
         upon_stop_exit=portfolio_ch.flex_array_gl_slicer,
@@ -437,6 +445,7 @@ def simulate_from_signal_func_nb(
     tp_stop: tp.FlexArray = np.asarray(np.nan),
     ttp_th: tp.FlexArray = np.asarray(np.nan),
     ttp_stop: tp.FlexArray = np.asarray(np.nan),
+    stop_format: tp.FlexArray = np.asarray(StopFormat.Relative),
     stop_entry_price: tp.FlexArray = np.asarray(StopEntryPrice.Close),
     stop_exit_price: tp.FlexArray = np.asarray(StopExitPrice.StopLimit),
     upon_stop_exit: tp.FlexArray = np.asarray(StopExitMode.Close),
@@ -688,20 +697,24 @@ def simulate_from_signal_func_nb(
 
                     # Get stop price
                     if not np.isnan(sl_curr_stop[col]):
+                        _stop_format = flex_select_auto_nb(stop_format, sl_init_i[col], col, flex_2d)
                         stop_price = get_stop_price_nb(
                             last_position[col],
                             sl_init_price[col],
                             sl_curr_stop[col],
+                            _stop_format,
                             _open,
                             _high,
                             _low,
                             True,
                         )
                     if np.isnan(stop_price) and not np.isnan(tsl_curr_stop[col]):
+                        _stop_format = flex_select_auto_nb(stop_format, tsl_init_i[col], col, flex_2d)
                         stop_price = get_stop_price_nb(
                             last_position[col],
                             tsl_curr_price[col],
                             tsl_curr_stop[col],
+                            _stop_format,
                             _open,
                             _high,
                             _low,
@@ -717,10 +730,12 @@ def simulate_from_signal_func_nb(
                                 tsl_curr_price[col] = _low
                     if np.isnan(stop_price) and not np.isnan(ttp_curr_stop[col]):
                         if abs(ttp_curr_price[col] / ttp_init_price[col] - 1) >= abs(ttp_curr_th[col]):
+                            _stop_format = flex_select_auto_nb(stop_format, ttp_init_i[col], col, flex_2d)
                             stop_price = get_stop_price_nb(
                                 last_position[col],
                                 ttp_curr_price[col],
                                 ttp_curr_stop[col],
+                                _stop_format,
                                 _open,
                                 _high,
                                 _low,
@@ -735,10 +750,12 @@ def simulate_from_signal_func_nb(
                                 ttp_curr_i[col] = i
                                 ttp_curr_price[col] = _low
                     if np.isnan(stop_price) and not np.isnan(tp_curr_stop[col]):
+                        _stop_format = flex_select_auto_nb(stop_format, tp_init_i[col], col, flex_2d)
                         stop_price = get_stop_price_nb(
                             last_position[col],
                             tp_init_price[col],
                             tp_curr_stop[col],
+                            _stop_format,
                             _open,
                             _high,
                             _low,
