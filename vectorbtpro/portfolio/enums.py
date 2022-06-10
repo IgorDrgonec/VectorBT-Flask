@@ -282,7 +282,8 @@ class StopEntryPriceT(tp.NamedTuple):
     ValPrice: int = 0
     Price: int = 1
     FillPrice: int = 2
-    Close: int = 3
+    Open: int = 3
+    Close: int = 4
 
 
 StopEntryPrice = StopEntryPriceT()
@@ -302,6 +303,7 @@ Attributes:
     ValPrice: Asset valuation price.
     Price: Order price.
     FillPrice: Filled order price (that is, slippage is already applied).
+    Open: Opening price.
     Close: Closing price.
 """
 

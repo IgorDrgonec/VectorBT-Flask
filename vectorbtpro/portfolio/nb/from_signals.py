@@ -283,6 +283,8 @@ def signals_to_size_nb(
             # Open short position
             order_size = -size
 
+    if direction == Direction.ShortOnly:
+        order_size = -order_size
     return order_size, size_type, direction
 
 
@@ -296,17 +298,37 @@ def should_update_stop_nb(stop: float, upon_stop_update: int) -> bool:
 
 
 @register_jitted(cache=True)
-def get_stop_price_nb(
+def resolve_hl_nb(curr_open, curr_high, curr_low, curr_close):
+    """Resolve the current high and low."""
+    if np.isnan(curr_high):
+        if np.isnan(curr_open):
+            curr_high = curr_close
+        elif np.isnan(curr_close):
+            curr_high = curr_open
+        else:
+            curr_high = max(curr_open, curr_close)
+    if np.isnan(curr_low):
+        if np.isnan(curr_open):
+            curr_low = curr_close
+        elif np.isnan(curr_close):
+            curr_low = curr_open
+        else:
+            curr_low = min(curr_open, curr_close)
+    return curr_high, curr_low
+
+
+@register_jitted(cache=True)
+def resolve_stop_price_nb(
     position_now: float,
     stop_price: float,
     stop: float,
     stop_format: int,
-    open: float,
-    high: float,
-    low: float,
+    curr_open: float,
+    curr_high: float,
+    curr_low: float,
     hit_below: bool,
 ) -> float:
-    """Get stop price.
+    """Resolve the current stop price.
 
     If hit before open, returns open."""
     if (position_now > 0 and hit_below) or (position_now < 0 and not hit_below):
@@ -314,9 +336,9 @@ def get_stop_price_nb(
             stop_price = stop_price * (1 - abs(stop))
         else:
             stop_price = stop_price - abs(stop)
-        if open <= stop_price:
-            return open
-        if low <= stop_price:
+        if curr_open <= stop_price:
+            return curr_open
+        if curr_low <= stop_price:
             return stop_price
         return np.nan
     if (position_now < 0 and hit_below) or (position_now > 0 and not hit_below):
@@ -324,12 +346,38 @@ def get_stop_price_nb(
             stop_price = stop_price * (1 + abs(stop))
         else:
             stop_price = stop_price + abs(stop)
-        if open >= stop_price:
-            return open
-        if high >= stop_price:
+        if curr_open >= stop_price:
+            return curr_open
+        if curr_high >= stop_price:
             return stop_price
         return np.nan
     return np.nan
+
+
+@register_jitted(cache=True)
+def ttp_threshold_hit_nb(
+    position_now: float,
+    init_price: float,
+    curr_price: float,
+    threshold: float,
+    stop_format: int,
+) -> bool:
+    """Return whether TTP threshold has been hit."""
+    if position_now > 0:
+        if stop_format == StopFormat.Relative:
+            if curr_price / init_price - 1 >= abs(threshold):
+                return True
+        else:
+            if curr_price - init_price >= abs(threshold):
+                return True
+    if position_now < 0:
+        if stop_format == StopFormat.Relative:
+            if curr_price / init_price - 1 <= -abs(threshold):
+                return True
+        else:
+            if curr_price - init_price <= -abs(threshold):
+                return True
+    return False
 
 
 @register_jitted
@@ -553,6 +601,8 @@ def simulate_from_signal_func_nb(
         tp_init_price = np.empty(0, dtype=np.float_)
         tp_curr_stop = np.empty(0, dtype=np.float_)
 
+    stop_signal_set = np.full(target_shape[1], False, dtype=np.bool_)
+    user_signal_set = np.full(target_shape[1], False, dtype=np.bool_)
     price_arr = np.full(target_shape[1], np.nan, dtype=np.float_)
     size_arr = np.empty(target_shape[1], dtype=np.float_)
     size_type_arr = np.empty(target_shape[1], dtype=np.float_)
@@ -620,6 +670,16 @@ def simulate_from_signal_func_nb(
             for c in range(group_len):
                 col = from_col + c  # order doesn't matter
 
+                # Set defaults
+                user_signal_set[col] = False
+                stop_signal_set[col] = False
+                price_arr[col] = np.nan
+                slippage_arr[col] = np.nan
+                size_arr[col] = np.nan
+                size_type_arr[col] = -1
+                direction_arr[col] = -1
+                temp_order_value[col] = 0.0
+
                 # Get signals
                 signal_ctx = SignalContext(
                     target_shape=target_shape,
@@ -673,32 +733,31 @@ def simulate_from_signal_func_nb(
                 )
                 is_long_entry, is_long_exit, is_short_entry, is_short_exit = signal_func_nb(signal_ctx, *signal_args)
 
-                stop_price = np.nan
-                if use_stops:
+                # Shortcut
+                any_stop_signal = use_stops and (
+                    not np.isnan(sl_curr_stop[col])
+                    or not np.isnan(tsl_curr_stop[col])
+                    or not np.isnan(ttp_curr_stop[col])
+                    or not np.isnan(tp_curr_stop[col])
+                )
+                any_user_signal = is_long_entry or is_long_exit or is_short_entry or is_short_exit
+                if not any_stop_signal and not any_user_signal:  # shortcut
+                    continue
+
+                if any_stop_signal:
                     # Resolve current bar
                     _open = flex_select_auto_nb(open, i, col, flex_2d)
                     _high = flex_select_auto_nb(high, i, col, flex_2d)
                     _low = flex_select_auto_nb(low, i, col, flex_2d)
                     _close = flex_select_auto_nb(close, i, col, flex_2d)
-                    if np.isnan(_high):
-                        if np.isnan(_open):
-                            _high = _close
-                        elif np.isnan(_close):
-                            _high = _open
-                        else:
-                            _high = max(_open, _close)
-                    if np.isnan(_low):
-                        if np.isnan(_open):
-                            _low = _close
-                        elif np.isnan(_close):
-                            _low = _open
-                        else:
-                            _low = min(_open, _close)
+                    _high, _low = resolve_hl_nb(_open, _high, _low, _close)
 
                     # Get stop price
+                    stop_price = np.nan
                     if not np.isnan(sl_curr_stop[col]):
                         _stop_format = flex_select_auto_nb(stop_format, sl_init_i[col], col, flex_2d)
-                        stop_price = get_stop_price_nb(
+                        # Check against high and low
+                        stop_price = resolve_stop_price_nb(
                             last_position[col],
                             sl_init_price[col],
                             sl_curr_stop[col],
@@ -710,7 +769,8 @@ def simulate_from_signal_func_nb(
                         )
                     if np.isnan(stop_price) and not np.isnan(tsl_curr_stop[col]):
                         _stop_format = flex_select_auto_nb(stop_format, tsl_init_i[col], col, flex_2d)
-                        stop_price = get_stop_price_nb(
+                        # Check against high and low
+                        stop_price = resolve_stop_price_nb(
                             last_position[col],
                             tsl_curr_price[col],
                             tsl_curr_stop[col],
@@ -728,10 +788,30 @@ def simulate_from_signal_func_nb(
                             if _low < tsl_curr_price[col]:
                                 tsl_curr_i[col] = i
                                 tsl_curr_price[col] = _low
+                        if np.isnan(stop_price):
+                            # After update, check one more time against close
+                            stop_price = resolve_stop_price_nb(
+                                last_position[col],
+                                tsl_curr_price[col],
+                                tsl_curr_stop[col],
+                                _stop_format,
+                                _open,
+                                _close,
+                                _close,
+                                True,
+                            )
                     if np.isnan(stop_price) and not np.isnan(ttp_curr_stop[col]):
-                        if abs(ttp_curr_price[col] / ttp_init_price[col] - 1) >= abs(ttp_curr_th[col]):
-                            _stop_format = flex_select_auto_nb(stop_format, ttp_init_i[col], col, flex_2d)
-                            stop_price = get_stop_price_nb(
+                        _stop_format = flex_select_auto_nb(stop_format, ttp_init_i[col], col, flex_2d)
+                        # Check against high and low
+                        threshold_hit = ttp_threshold_hit_nb(
+                            last_position[col],
+                            ttp_init_price[col],
+                            ttp_curr_price[col],
+                            ttp_curr_th[col],
+                            _stop_format,
+                        )
+                        if threshold_hit:
+                            stop_price = resolve_stop_price_nb(
                                 last_position[col],
                                 ttp_curr_price[col],
                                 ttp_curr_stop[col],
@@ -749,9 +829,30 @@ def simulate_from_signal_func_nb(
                             if _low < ttp_curr_price[col]:
                                 ttp_curr_i[col] = i
                                 ttp_curr_price[col] = _low
+                        if np.isnan(stop_price):
+                            # After update, check one more time against close
+                            threshold_hit = ttp_threshold_hit_nb(
+                                last_position[col],
+                                ttp_init_price[col],
+                                ttp_curr_price[col],
+                                ttp_curr_th[col],
+                                _stop_format,
+                            )
+                            if threshold_hit:
+                                stop_price = resolve_stop_price_nb(
+                                    last_position[col],
+                                    ttp_curr_price[col],
+                                    ttp_curr_stop[col],
+                                    _stop_format,
+                                    _open,
+                                    _close,
+                                    _close,
+                                    True,
+                                )
                     if np.isnan(stop_price) and not np.isnan(tp_curr_stop[col]):
                         _stop_format = flex_select_auto_nb(stop_format, tp_init_i[col], col, flex_2d)
-                        stop_price = get_stop_price_nb(
+                        # Check against high and low
+                        stop_price = resolve_stop_price_nb(
                             last_position[col],
                             tp_init_price[col],
                             tp_curr_stop[col],
@@ -762,203 +863,200 @@ def simulate_from_signal_func_nb(
                             False,
                         )
 
-                _accumulate = flex_select_auto_nb(accumulate, i, col, flex_2d)
-                stop_signal_set = False
-                if use_stops and not np.isnan(stop_price):
-                    # Get stop signal
-                    _upon_stop_exit = flex_select_auto_nb(upon_stop_exit, i, col, flex_2d)
-                    (
-                        stop_is_long_entry,
-                        stop_is_long_exit,
-                        stop_is_short_entry,
-                        stop_is_short_exit,
-                        _accumulate,
-                    ) = generate_stop_signal_nb(
-                        last_position[col],
-                        _upon_stop_exit,
-                        _accumulate,
-                    )
+                    if not np.isnan(stop_price):
+                        # Get stop signal
+                        _accumulate = flex_select_auto_nb(accumulate, i, col, flex_2d)
+                        _upon_stop_exit = flex_select_auto_nb(upon_stop_exit, i, col, flex_2d)
+                        (
+                            stop_is_long_entry,
+                            stop_is_long_exit,
+                            stop_is_short_entry,
+                            stop_is_short_exit,
+                            _accumulate,
+                        ) = generate_stop_signal_nb(
+                            last_position[col],
+                            _upon_stop_exit,
+                            _accumulate,
+                        )
+
+                        # Resolve price and slippage
+                        _close = flex_select_auto_nb(close, i, col, flex_2d)
+                        _stop_exit_price = flex_select_auto_nb(stop_exit_price, i, col, flex_2d)
+                        _price = flex_select_auto_nb(price, i, col, flex_2d)
+                        _slippage = flex_select_auto_nb(slippage, i, col, flex_2d)
+                        _price, _slippage = resolve_stop_price_and_slippage_nb(
+                            stop_price,
+                            _price,
+                            _close,
+                            _slippage,
+                            _stop_exit_price,
+                        )
+
+                        # Convert both signals to size (direction-aware), size type, and direction
+                        _size, _size_type, _direction = signals_to_size_nb(
+                            last_position[col],
+                            stop_is_long_entry,
+                            stop_is_long_exit,
+                            stop_is_short_entry,
+                            stop_is_short_exit,
+                            flex_select_auto_nb(size, i, col, flex_2d),
+                            flex_select_auto_nb(size_type, i, col, flex_2d),
+                            _accumulate,
+                            last_val_price[col],
+                        )
+
+                        # Save info
+                        stop_signal_set[col] = not np.isnan(_size)
+                        price_arr[col] = _price
+                        slippage_arr[col] = _slippage
+                        size_arr[col] = _size
+                        size_type_arr[col] = _size_type
+                        direction_arr[col] = _direction
+
+                # Resolve signal conflicts
+                if any_user_signal:
+                    _accumulate = flex_select_auto_nb(accumulate, i, col, flex_2d)
+                    if is_long_entry or is_short_entry:
+                        _upon_long_conflict = flex_select_auto_nb(upon_long_conflict, i, col, flex_2d)
+                        is_long_entry, is_long_exit = resolve_signal_conflict_nb(
+                            last_position[col],
+                            is_long_entry,
+                            is_long_exit,
+                            Direction.LongOnly,
+                            _upon_long_conflict,
+                        )
+                        _upon_short_conflict = flex_select_auto_nb(upon_short_conflict, i, col, flex_2d)
+                        is_short_entry, is_short_exit = resolve_signal_conflict_nb(
+                            last_position[col],
+                            is_short_entry,
+                            is_short_exit,
+                            Direction.ShortOnly,
+                            _upon_short_conflict,
+                        )
+
+                        # Resolve direction conflicts
+                        _upon_dir_conflict = flex_select_auto_nb(upon_dir_conflict, i, col, flex_2d)
+                        is_long_entry, is_short_entry = resolve_dir_conflict_nb(
+                            last_position[col],
+                            is_long_entry,
+                            is_short_entry,
+                            _upon_dir_conflict,
+                        )
+
+                        # Resolve opposite entry
+                        _upon_opposite_entry = flex_select_auto_nb(upon_opposite_entry, i, col, flex_2d)
+                        (
+                            is_long_entry,
+                            is_long_exit,
+                            is_short_entry,
+                            is_short_exit,
+                            _accumulate,
+                        ) = resolve_opposite_entry_nb(
+                            last_position[col],
+                            is_long_entry,
+                            is_long_exit,
+                            is_short_entry,
+                            is_short_exit,
+                            _upon_opposite_entry,
+                            _accumulate,
+                        )
 
                     # Resolve price and slippage
-                    _close = flex_select_auto_nb(close, i, col, flex_2d)
-                    _stop_exit_price = flex_select_auto_nb(stop_exit_price, i, col, flex_2d)
                     _price = flex_select_auto_nb(price, i, col, flex_2d)
                     _slippage = flex_select_auto_nb(slippage, i, col, flex_2d)
-                    _stex_price, _stex_slippage = resolve_stop_price_and_slippage_nb(
-                        stop_price,
-                        _price,
-                        _close,
-                        _slippage,
-                        _stop_exit_price,
-                    )
 
                     # Convert both signals to size (direction-aware), size type, and direction
-                    _stex_size, _stex_size_type, _stex_direction = signals_to_size_nb(
+                    _size, _size_type, _direction = signals_to_size_nb(
                         last_position[col],
-                        stop_is_long_entry,
-                        stop_is_long_exit,
-                        stop_is_short_entry,
-                        stop_is_short_exit,
+                        is_long_entry,
+                        is_long_exit,
+                        is_short_entry,
+                        is_short_exit,
                         flex_select_auto_nb(size, i, col, flex_2d),
                         flex_select_auto_nb(size_type, i, col, flex_2d),
                         _accumulate,
                         last_val_price[col],
                     )
-                    stop_signal_set = not np.isnan(_stex_size)
 
-                # Resolve signal conflicts
-                if is_long_entry or is_short_entry:
-                    _upon_long_conflict = flex_select_auto_nb(upon_long_conflict, i, col, flex_2d)
-                    is_long_entry, is_long_exit = resolve_signal_conflict_nb(
-                        last_position[col],
-                        is_long_entry,
-                        is_long_exit,
-                        Direction.LongOnly,
-                        _upon_long_conflict,
-                    )
-                    _upon_short_conflict = flex_select_auto_nb(upon_short_conflict, i, col, flex_2d)
-                    is_short_entry, is_short_exit = resolve_signal_conflict_nb(
-                        last_position[col],
-                        is_short_entry,
-                        is_short_exit,
-                        Direction.ShortOnly,
-                        _upon_short_conflict,
-                    )
+                    # Save info
+                    if not stop_signal_set[col] or signal_priority != SignalPriority.Stop:
+                        user_signal_set[col] = not np.isnan(_size)
+                        price_arr[col] = _price
+                        slippage_arr[col] = _slippage
+                        size_arr[col] = _size
+                        size_type_arr[col] = _size_type
+                        direction_arr[col] = _direction
 
-                    # Resolve direction conflicts
-                    _upon_dir_conflict = flex_select_auto_nb(upon_dir_conflict, i, col, flex_2d)
-                    is_long_entry, is_short_entry = resolve_dir_conflict_nb(
-                        last_position[col],
-                        is_long_entry,
-                        is_short_entry,
-                        _upon_dir_conflict,
-                    )
+                # Approximate order value
+                if stop_signal_set[col] or user_signal_set[col]:
+                    if cash_sharing and auto_call_seq:
+                        if np.isnan(size_arr[col]):
+                            temp_order_value[c] = 0.0
+                        else:
+                            exec_state = ExecState(
+                                cash=last_cash[group],
+                                position=last_position[col],
+                                debt=last_debt[col],
+                                free_cash=last_free_cash[group],
+                                val_price=last_val_price[col],
+                                value=last_value[group],
+                            )
+                            temp_order_value[c] = approx_order_value_nb(
+                                exec_state,
+                                size_arr[col],
+                                size_type_arr[col],
+                                direction_arr[col],
+                            )
 
-                    # Resolve opposite entry
-                    _upon_opposite_entry = flex_select_auto_nb(upon_opposite_entry, i, col, flex_2d)
-                    is_long_entry, is_long_exit, is_short_entry, is_short_exit, _accumulate = resolve_opposite_entry_nb(
-                        last_position[col],
-                        is_long_entry,
-                        is_long_exit,
-                        is_short_entry,
-                        is_short_exit,
-                        _upon_opposite_entry,
-                        _accumulate,
-                    )
-
-                # Resolve price and slippage
-                _price = flex_select_auto_nb(price, i, col, flex_2d)
-                _slippage = flex_select_auto_nb(slippage, i, col, flex_2d)
-
-                # Convert both signals to size (direction-aware), size type, and direction
-                _size, _size_type, _direction = signals_to_size_nb(
-                    last_position[col],
-                    is_long_entry,
-                    is_long_exit,
-                    is_short_entry,
-                    is_short_exit,
-                    flex_select_auto_nb(size, i, col, flex_2d),
-                    flex_select_auto_nb(size_type, i, col, flex_2d),
-                    _accumulate,
-                    last_val_price[col],
-                )
-                user_signal_set = not np.isnan(_size)
-
-                # Decide on which signal should be executed: stop or user-defined?
-                if stop_signal_set and user_signal_set:
-                    if signal_priority == SignalPriority.Stop:
-                        _price = _stex_price
-                        _slippage = _stex_slippage
-                        _size = _stex_size
-                        _size_type = _stex_size_type
-                        _direction = _stex_direction
-                elif stop_signal_set:
-                    _price = _stex_price
-                    _slippage = _stex_slippage
-                    _size = _stex_size
-                    _size_type = _stex_size_type
-                    _direction = _stex_direction
-
-                # Save all info
-                price_arr[col] = _price
-                slippage_arr[col] = _slippage
-                size_arr[col] = _size
-                size_type_arr[col] = _size_type
-                direction_arr[col] = _direction
-
-                if cash_sharing and auto_call_seq:
-                    if np.isnan(_size):
-                        temp_order_value[c] = 0.0
-                    else:
-                        # Approximate order value
-                        if _size_type == SizeType.Amount:
-                            temp_order_value[c] = _size * last_val_price[col]
-                        elif _size_type == SizeType.Value:
-                            temp_order_value[c] = _size
-                        else:  # SizeType.Percent
-                            if _size >= 0:
-                                temp_order_value[c] = _size * last_cash[group]
-                            else:
-                                asset_value_now = last_position[col] * last_val_price[col]
-                                if _direction == Direction.LongOnly:
-                                    temp_order_value[c] = _size * asset_value_now
-                                else:
-                                    max_exposure = 2 * max(asset_value_now, 0) + max(last_free_cash[group], 0)
-                                    temp_order_value[c] = _size * max_exposure
-
-            if cash_sharing:
-                # Dynamically sort by order value -> selling comes first to release funds early
-                if call_seq is None:
-                    for c in range(group_len):
-                        temp_call_seq[c] = c
-                    call_seq_now = temp_call_seq[:group_len]
-                else:
-                    call_seq_now = call_seq[i, from_col:to_col]
-                if auto_call_seq:
-                    for c in range(group_len):
-                        if call_seq_now[c] != c:
-                            raise ValueError("Call sequence must follow CallSeqType.Default")
-                    insert_argsort_nb(temp_order_value[:group_len], call_seq_now)
-
-            for k in range(group_len):
+            any_signal_set = False
+            for col in range(from_col, to_col):
+                if stop_signal_set[col] or user_signal_set[col]:
+                    any_signal_set = True
+                    break
+            if any_signal_set:
                 if cash_sharing:
-                    c = call_seq_now[k]
-                    if c >= group_len:
-                        raise ValueError("Call index out of bounds of the group")
-                else:
-                    c = k
-                col = from_col + c
+                    # Dynamically sort by order value -> selling comes first to release funds early
+                    if call_seq is None:
+                        for c in range(group_len):
+                            temp_call_seq[c] = c
+                        call_seq_now = temp_call_seq[:group_len]
+                    else:
+                        call_seq_now = call_seq[i, from_col:to_col]
+                    if auto_call_seq:
+                        for c in range(group_len):
+                            if call_seq_now[c] != c:
+                                raise ValueError("Call sequence must follow CallSeqType.Default")
+                        insert_argsort_nb(temp_order_value[:group_len], call_seq_now)
 
-                # Get current values per column
-                position_now = last_position[col]
-                debt_now = last_debt[col]
-                val_price_now = last_val_price[col]
-                cash_now = last_cash[group]
-                free_cash_now = last_free_cash[group]
-                value_now = last_value[group]
-                return_now = last_return[group]
+                for k in range(group_len):
+                    if cash_sharing:
+                        c = call_seq_now[k]
+                        if c >= group_len:
+                            raise ValueError("Call index out of bounds of the group")
+                    else:
+                        c = k
+                    col = from_col + c
+                    if not stop_signal_set[col] and not user_signal_set[col]:  # shortcut
+                        continue
 
-                # Generate the next order
-                _price = price_arr[col]
-                _size = size_arr[col]  # already takes into account direction
-                _size_type = size_type_arr[col]
-                _direction = direction_arr[col]
-                _slippage = slippage_arr[col]
-                if not np.isnan(_size):
-                    if _size > 0:  # long order
-                        if _direction == Direction.ShortOnly:
-                            _size *= -1  # must reverse for process_order_nb
-                    elif _size < 0:  # short order
-                        if _direction == Direction.ShortOnly:
-                            _size *= -1
+                    # Get current values per column
+                    position_now = last_position[col]
+                    debt_now = last_debt[col]
+                    val_price_now = last_val_price[col]
+                    cash_now = last_cash[group]
+                    free_cash_now = last_free_cash[group]
+                    value_now = last_value[group]
+                    return_now = last_return[group]
+
+                    # Generate the next order
                     order = order_nb(
-                        size=_size,
-                        price=_price,
-                        size_type=_size_type,
-                        direction=_direction,
+                        size=size_arr[col],
+                        price=price_arr[col],
+                        size_type=size_type_arr[col],
+                        direction=direction_arr[col],
                         fees=flex_select_auto_nb(fees, i, col, flex_2d),
                         fixed_fees=flex_select_auto_nb(fixed_fees, i, col, flex_2d),
-                        slippage=_slippage,
+                        slippage=slippage_arr[col],
                         min_size=flex_select_auto_nb(min_size, i, col, flex_2d),
                         max_size=flex_select_auto_nb(max_size, i, col, flex_2d),
                         size_granularity=flex_select_auto_nb(size_granularity, i, col, flex_2d),
@@ -1009,116 +1107,166 @@ def simulate_from_signal_func_nb(
 
                     if use_stops:
                         # Update stop price
-                        if order_result.status == OrderStatus.Filled:
-                            if position_now == 0:
-                                # Position closed -> clear stops
-                                sl_init_i[col] = -1
-                                sl_init_price[col] = np.nan
-                                sl_curr_stop[col] = np.nan
+                        if stop_signal_set[col] or position_now == 0:
+                            # Stop signal executed or not in position -> clear stops (irrespective of order success)
+                            sl_init_i[col] = -1
+                            sl_init_price[col] = np.nan
+                            sl_curr_stop[col] = np.nan
 
-                                tsl_init_i[col] = -1
-                                tsl_init_price[col] = np.nan
-                                tsl_curr_i[col] = -1
-                                tsl_curr_price[col] = np.nan
-                                tsl_curr_stop[col] = np.nan
+                            tsl_init_i[col] = -1
+                            tsl_init_price[col] = np.nan
+                            tsl_curr_i[col] = -1
+                            tsl_curr_price[col] = np.nan
+                            tsl_curr_stop[col] = np.nan
 
-                                ttp_init_i[col] = -1
-                                ttp_init_price[col] = np.nan
-                                ttp_curr_i[col] = -1
-                                ttp_curr_price[col] = np.nan
-                                ttp_curr_th[col] = np.nan
-                                ttp_curr_stop[col] = np.nan
+                            ttp_init_i[col] = -1
+                            ttp_init_price[col] = np.nan
+                            ttp_curr_i[col] = -1
+                            ttp_curr_price[col] = np.nan
+                            ttp_curr_th[col] = np.nan
+                            ttp_curr_stop[col] = np.nan
 
-                                tp_init_i[col] = -1
-                                tp_init_price[col] = np.nan
-                                tp_curr_stop[col] = np.nan
+                            tp_init_i[col] = -1
+                            tp_init_price[col] = np.nan
+                            tp_curr_stop[col] = np.nan
+
+                        if order_result.status == OrderStatus.Filled and position_now != 0:
+                            # Order filled and in position -> possibly set stops
+                            _price = flex_select_auto_nb(price, i, col, flex_2d)
+                            _stop_entry_price = flex_select_auto_nb(stop_entry_price, i, col, flex_2d)
+                            if _stop_entry_price == StopEntryPrice.ValPrice:
+                                new_init_price = val_price_now
+                                can_use_ohlc = False
+                            elif _stop_entry_price == StopEntryPrice.Price:
+                                new_init_price = order.price
+                                can_use_ohlc = np.isinf(_price) and _price < 0
+                                if np.isinf(new_init_price):
+                                    if new_init_price > 0:
+                                        new_init_price = flex_select_auto_nb(close, i, col, flex_2d)
+                                    else:
+                                        new_init_price = flex_select_auto_nb(open, i, col, flex_2d)
+                            elif _stop_entry_price == StopEntryPrice.FillPrice:
+                                new_init_price = order_result.price
+                                can_use_ohlc = np.isinf(_price) and _price < 0
+                            elif _stop_entry_price == StopEntryPrice.Open:
+                                new_init_price = flex_select_auto_nb(open, i, col, flex_2d)
+                                can_use_ohlc = True
                             else:
-                                _stop_entry_price = flex_select_auto_nb(stop_entry_price, i, col, flex_2d)
-                                if _stop_entry_price == StopEntryPrice.ValPrice:
-                                    new_init_price = val_price_now
-                                elif _stop_entry_price == StopEntryPrice.Price:
-                                    new_init_price = order.price
-                                elif _stop_entry_price == StopEntryPrice.FillPrice:
-                                    new_init_price = order_result.price
-                                else:
-                                    new_init_price = flex_select_auto_nb(close, i, col, flex_2d)
-                                _upon_stop_update = flex_select_auto_nb(upon_stop_update, i, col, flex_2d)
+                                new_init_price = flex_select_auto_nb(close, i, col, flex_2d)
+                                can_use_ohlc = False
+                            _upon_stop_update = flex_select_auto_nb(upon_stop_update, i, col, flex_2d)
 
-                                _sl_stop = abs(flex_select_auto_nb(sl_stop, i, col, flex_2d))
-                                if _sl_stop == 0:
-                                    _sl_stop = np.nan
-                                _tsl_stop = abs(flex_select_auto_nb(tsl_stop, i, col, flex_2d))
-                                if _tsl_stop == 0:
-                                    _tsl_stop = np.nan
-                                _ttp_th = abs(flex_select_auto_nb(ttp_th, i, col, flex_2d))
-                                if _ttp_th == 0:
-                                    _ttp_th = np.nan
-                                _ttp_stop = abs(flex_select_auto_nb(ttp_stop, i, col, flex_2d))
-                                if _ttp_stop == 0:
-                                    _ttp_stop = np.nan
-                                if not np.isnan(_ttp_th) and np.isnan(_ttp_stop):
-                                    raise ValueError("TTP threshold requires a finite stop value")
-                                if np.isnan(_ttp_th) and not np.isnan(_ttp_stop):
-                                    raise ValueError("TTP stop requires a finite threshold value")
-                                _tp_stop = abs(flex_select_auto_nb(tp_stop, i, col, flex_2d))
-                                if _tp_stop == 0:
-                                    _tp_stop = np.nan
+                            _sl_stop = abs(flex_select_auto_nb(sl_stop, i, col, flex_2d))
+                            if _sl_stop == 0:
+                                _sl_stop = np.nan
+                            _tsl_stop = abs(flex_select_auto_nb(tsl_stop, i, col, flex_2d))
+                            if _tsl_stop == 0:
+                                _tsl_stop = np.nan
+                            _ttp_th = abs(flex_select_auto_nb(ttp_th, i, col, flex_2d))
+                            if _ttp_th == 0:
+                                _ttp_th = np.nan
+                            _ttp_stop = abs(flex_select_auto_nb(ttp_stop, i, col, flex_2d))
+                            if _ttp_stop == 0:
+                                _ttp_stop = np.nan
+                            if not np.isnan(_ttp_th) and np.isnan(_ttp_stop):
+                                raise ValueError("TTP threshold requires a finite stop value")
+                            if np.isnan(_ttp_th) and not np.isnan(_ttp_stop):
+                                raise ValueError("TTP stop requires a finite threshold value")
+                            _tp_stop = abs(flex_select_auto_nb(tp_stop, i, col, flex_2d))
+                            if _tp_stop == 0:
+                                _tp_stop = np.nan
 
-                                if exec_state.position == 0 or np.sign(position_now) != np.sign(exec_state.position):
-                                    # Position opened/reversed -> set stops
+                            tsl_updated = ttp_updated = False
+                            if exec_state.position == 0 or np.sign(position_now) != np.sign(exec_state.position):
+                                # Position opened/reversed -> set stops
+                                sl_init_i[col] = i
+                                sl_init_price[col] = new_init_price
+                                sl_curr_stop[col] = _sl_stop
+
+                                tsl_updated = True
+                                tsl_init_i[col] = i
+                                tsl_init_price[col] = new_init_price
+                                tsl_curr_i[col] = i
+                                tsl_curr_price[col] = new_init_price
+                                tsl_curr_stop[col] = _tsl_stop
+
+                                ttp_updated = True
+                                ttp_init_i[col] = i
+                                ttp_init_price[col] = new_init_price
+                                ttp_curr_i[col] = i
+                                ttp_curr_price[col] = new_init_price
+                                ttp_curr_th[col] = _ttp_th
+                                ttp_curr_stop[col] = _ttp_stop
+
+                                tp_init_i[col] = i
+                                tp_init_price[col] = new_init_price
+                                tp_curr_stop[col] = _tp_stop
+
+                            elif abs(position_now) > abs(exec_state.position):
+                                # Position increased -> keep/override stops
+                                if should_update_stop_nb(_sl_stop, _upon_stop_update):
                                     sl_init_i[col] = i
                                     sl_init_price[col] = new_init_price
                                     sl_curr_stop[col] = _sl_stop
-
+                                if should_update_stop_nb(_tsl_stop, _upon_stop_update):
+                                    tsl_updated = True
                                     tsl_init_i[col] = i
                                     tsl_init_price[col] = new_init_price
                                     tsl_curr_i[col] = i
                                     tsl_curr_price[col] = new_init_price
                                     tsl_curr_stop[col] = _tsl_stop
-
+                                if should_update_stop_nb(_ttp_stop, _upon_stop_update):
+                                    ttp_updated = True
                                     ttp_init_i[col] = i
                                     ttp_init_price[col] = new_init_price
                                     ttp_curr_i[col] = i
                                     ttp_curr_price[col] = new_init_price
                                     ttp_curr_th[col] = _ttp_th
                                     ttp_curr_stop[col] = _ttp_stop
-
+                                if should_update_stop_nb(_tp_stop, _upon_stop_update):
                                     tp_init_i[col] = i
                                     tp_init_price[col] = new_init_price
                                     tp_curr_stop[col] = _tp_stop
-                                elif abs(position_now) > abs(exec_state.position):
-                                    # Position increased -> keep/override stops
-                                    if should_update_stop_nb(_sl_stop, _upon_stop_update):
-                                        sl_init_i[col] = i
-                                        sl_init_price[col] = new_init_price
-                                        sl_curr_stop[col] = _sl_stop
-                                    if should_update_stop_nb(_tsl_stop, _upon_stop_update):
-                                        tsl_init_i[col] = i
-                                        tsl_init_price[col] = new_init_price
-                                        tsl_curr_i[col] = i
-                                        tsl_curr_price[col] = new_init_price
-                                        tsl_curr_stop[col] = _tsl_stop
-                                    if should_update_stop_nb(_ttp_stop, _upon_stop_update):
-                                        ttp_init_i[col] = i
-                                        ttp_init_price[col] = new_init_price
-                                        ttp_curr_i[col] = i
-                                        ttp_curr_price[col] = new_init_price
-                                        ttp_curr_th[col] = _ttp_th
-                                        ttp_curr_stop[col] = _ttp_stop
-                                    if should_update_stop_nb(_tp_stop, _upon_stop_update):
-                                        tp_init_i[col] = i
-                                        tp_init_price[col] = new_init_price
-                                        tp_curr_stop[col] = _tp_stop
 
-                # Now becomes last
-                last_position[col] = position_now
-                last_debt[col] = debt_now
-                if not np.isnan(val_price_now) or not ffill_val_price:
-                    last_val_price[col] = val_price_now
-                last_cash[group] = cash_now
-                last_free_cash[group] = free_cash_now
-                last_value[group] = value_now
-                last_return[group] = return_now
+                            if tsl_updated or ttp_updated:
+                                # Update highest/lowest price
+                                if can_use_ohlc:
+                                    _open = flex_select_auto_nb(open, i, col, flex_2d)
+                                    _high = flex_select_auto_nb(high, i, col, flex_2d)
+                                    _low = flex_select_auto_nb(low, i, col, flex_2d)
+                                    _close = flex_select_auto_nb(close, i, col, flex_2d)
+                                    _high, _low = resolve_hl_nb(_open, _high, _low, _close)
+                                else:
+                                    _open = np.nan
+                                    _high = _low = _close = flex_select_auto_nb(close, i, col, flex_2d)
+                                if tsl_updated:
+                                    if position_now > 0:
+                                        if _high > tsl_curr_price[col]:
+                                            tsl_curr_i[col] = i
+                                            tsl_curr_price[col] = _high
+                                    elif position_now < 0:
+                                        if _low < tsl_curr_price[col]:
+                                            tsl_curr_i[col] = i
+                                            tsl_curr_price[col] = _low
+                                if ttp_updated:
+                                    if position_now > 0:
+                                        if _high > ttp_curr_price[col]:
+                                            ttp_curr_i[col] = i
+                                            ttp_curr_price[col] = _high
+                                    elif position_now < 0:
+                                        if _low < ttp_curr_price[col]:
+                                            ttp_curr_i[col] = i
+                                            ttp_curr_price[col] = _low
+
+                    # Now becomes last
+                    last_position[col] = position_now
+                    last_debt[col] = debt_now
+                    if not np.isnan(val_price_now) or not ffill_val_price:
+                        last_val_price[col] = val_price_now
+                    last_cash[group] = cash_now
+                    last_free_cash[group] = free_cash_now
+                    last_value[group] = value_now
+                    last_return[group] = return_now
 
             for col in range(from_col, to_col):
                 # Update valuation price using current close
