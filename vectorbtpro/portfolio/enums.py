@@ -11,6 +11,8 @@ from vectorbtpro.utils.formatting import prettify
 
 __all__ = [
     "RejectedOrderError",
+    "PriceType",
+    "ValPriceType",
     "InitCashMode",
     "CallSeqType",
     "AccumulationMode",
@@ -71,6 +73,50 @@ class RejectedOrderError(Exception):
 
 
 # ############# Enums ############# #
+
+
+class PriceTypeT(tp.NamedTuple):
+    Open: int = -np.inf
+    Close: int = np.inf
+
+
+PriceType = PriceTypeT()
+"""_"""
+
+__pdoc__[
+    "PriceType"
+] = f"""Price type.
+
+```python
+{prettify(PriceType)}
+```
+
+Attributes:
+    Open: Opening price. Will be substituted by `-np.inf`.
+    Close: Closing price. Will be substituted by `np.inf`.
+"""
+
+
+class ValPriceTypeT(tp.NamedTuple):
+    Latest: int = -np.inf
+    Price: int = np.inf
+
+
+ValPriceType = ValPriceTypeT()
+"""_"""
+
+__pdoc__[
+    "ValPriceType"
+] = f"""Asset valuation price type.
+
+```python
+{prettify(ValPriceType)}
+```
+
+Attributes:
+    Latest: Latest price. Will be substituted by `-np.inf`.
+    Price: Order price. Will be substituted by `np.inf`.
+"""
 
 
 class InitCashModeT(tp.NamedTuple):

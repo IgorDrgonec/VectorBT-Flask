@@ -3848,7 +3848,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             direction (Direction or array_like): See `vectorbtpro.portfolio.enums.Direction` and
                 `vectorbtpro.portfolio.enums.Order.direction`. Will broadcast.
             price (array_like of float): Order price.
-                See `vectorbtpro.portfolio.enums.Order.price`. Defaults to `np.inf`. Will broadcast.
+                Will broadcast.
+
+                See `vectorbtpro.portfolio.enums.Order.price`. Can be also provided as
+                `vectorbtpro.portfolio.enums.PriceType`.
 
                 !!! note
                     Make sure to use the same timestamp for all order prices in the group with cash sharing
@@ -3882,7 +3885,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             log (bool or array_like): Whether to log orders.
                 See `vectorbtpro.portfolio.enums.Order.log`. Will broadcast.
             val_price (array_like of float): Asset valuation price.
-                Defaults to `np.inf`. Will broadcast.
+                Will broadcast.
+
+                Can be also provided as `vectorbtpro.portfolio.enums.ValPriceType`.
 
                 * Any `-np.inf` element is replaced by the latest valuation price
                     (`open` or the latest known valuation price if `ffill_val_price`).
@@ -4452,11 +4457,17 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     max_logs = int(np.max(np.sum(_log, axis=0)))
 
         # Convert strings to numbers
+        broadcasted_args["price"] = map_enum_fields(broadcasted_args["price"], PriceType, ignore_type=(int, float))
         broadcasted_args["size_type"] = map_enum_fields(broadcasted_args["size_type"], SizeType)
         broadcasted_args["direction"] = map_enum_fields(broadcasted_args["direction"], Direction)
         broadcasted_args["price_area_vio_mode"] = map_enum_fields(
             broadcasted_args["price_area_vio_mode"],
             PriceAreaVioMode,
+        )
+        broadcasted_args["val_price"] = map_enum_fields(
+            broadcasted_args["val_price"],
+            ValPriceType,
+            ignore_type=(int, float),
         )
 
         # Check data types
@@ -4719,7 +4730,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ttp_th (array_like of float): Take profit threshold for the trailing take profit.
                 Will broadcast.
 
-                Set an element to `np.nan` or `0` to disable. Requires `ttp_stop`.
+                Requires `ttp_stop`.
             ttp_stop (array_like of float): Trailing stop loss for the trailing take profit.
                 Will broadcast.
 
@@ -4763,7 +4774,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     * at close (stop signal wins)
             use_stops (bool): Whether to use stops.
                 Defaults to None, which becomes True if any of the stops are not NaN or
-                any of the adjustment functions are custom.
+                the adjustment function is not the default one.
 
                 Disable this to make simulation a bit faster for simple use cases.
             adjust_func_nb (callable): User-defined function to adjust the current simulation state.
@@ -5608,10 +5619,16 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     max_logs = int(np.max(np.sum(_log, axis=0)))
 
         # Convert strings to numbers
+        broadcasted_args["price"] = map_enum_fields(broadcasted_args["price"], PriceType, ignore_type=(int, float))
         broadcasted_args["size_type"] = map_enum_fields(broadcasted_args["size_type"], SizeType)
         broadcasted_args["price_area_vio_mode"] = map_enum_fields(
             broadcasted_args["price_area_vio_mode"],
             PriceAreaVioMode,
+        )
+        broadcasted_args["val_price"] = map_enum_fields(
+            broadcasted_args["val_price"],
+            ValPriceType,
+            ignore_type=(int, float),
         )
         broadcasted_args["accumulate"] = map_enum_fields(
             broadcasted_args["accumulate"],
@@ -7314,7 +7331,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         # Check data types
         checks.assert_subdtype(size, np.number)
-        checks.assert_subdtype(price, np.number)
         checks.assert_subdtype(fees, np.number)
         checks.assert_subdtype(fixed_fees, np.number)
         checks.assert_subdtype(slippage, np.number)
@@ -7326,7 +7342,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         checks.assert_subdtype(allow_partial, np.bool_)
         checks.assert_subdtype(raise_reject, np.bool_)
         checks.assert_subdtype(log, np.bool_)
-        checks.assert_subdtype(val_price, np.number)
+
+        def _postprocess_price(price):
+            price = map_enum_fields(price, PriceType, ignore_type=(int, float))
+            checks.assert_subdtype(price, np.number)
+            return price
 
         def _postprocess_size_type(size_type):
             size_type = map_enum_fields(size_type, SizeType)
@@ -7343,6 +7363,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             checks.assert_subdtype(price_area_vio_mode, np.integer)
             return price_area_vio_mode
 
+        def _postprocess_val_price(val_price):
+            val_price = map_enum_fields(val_price, ValPriceType, ignore_type=(int, float))
+            checks.assert_subdtype(val_price, np.number)
+            return val_price
+
         # Prepare arguments and pass to from_order_func
         if flexible:
             if pre_segment_func_nb is None:
@@ -7356,7 +7381,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 order_func_nb = nb.def_order_func_nb
         order_args = (
             Rep("size"),
-            Rep("price"),
+            RepFunc(_postprocess_price),
             RepFunc(_postprocess_size_type),
             RepFunc(_postprocess_direction),
             Rep("fees"),
@@ -7373,8 +7398,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             Rep("log"),
         )
         pre_segment_args = (
-            Rep("val_price"),
-            Rep("price"),
+            RepFunc(_postprocess_val_price),
+            RepFunc(_postprocess_price),
             Rep("size"),
             RepFunc(_postprocess_size_type),
             RepFunc(_postprocess_direction),
