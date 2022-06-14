@@ -264,15 +264,16 @@ class PickleableDict(Pickleable, dict):
                 config[k] = v.cls.loads(v.dumps, **kwargs)
         return cls(**config)
 
-    def load_update(self, path: tp.PathLike, clear: bool = False, **kwargs) -> None:
+    def load_update(self, path: tp.Optional[tp.PathLike] = None, clear: bool = False, **kwargs) -> None:
         """Load dumps from a file and update this instance in-place."""
         if clear:
             self.clear()
-        self.update(self.load(path, **kwargs))
+        self.update(self.load(path=path, **kwargs))
 
 
 class ChildDict(dict):
     """Subclass of `dict` acting as a child dict."""
+
     pass
 
 
@@ -732,12 +733,18 @@ class Config(PickleableDict, Prettified):
             as_attrs_=obj["as_attrs_"],
         )
 
-    def load_update(self, path: tp.PathLike, clear: bool = False, nested: tp.Optional[bool] = None, **kwargs) -> None:
+    def load_update(
+        self,
+        path: tp.Optional[tp.PathLike] = None,
+        clear: bool = False,
+        nested: tp.Optional[bool] = None,
+        **kwargs,
+    ) -> None:
         """Load dumps from a file and update this instance in-place.
 
         !!! note
             Updates both the config properties and dictionary."""
-        loaded = self.load(path, **kwargs)
+        loaded = self.load(path=path, **kwargs)
         if clear:
             self.clear(force=True)
             self.__dict__.clear()

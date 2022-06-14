@@ -39,26 +39,40 @@ class Pickleable:
 
         return pickle.loads(dumps, **kwargs)
 
-    def save(self, path: tp.PathLike, mkdir_kwargs: tp.KwargsLike = None, **kwargs) -> None:
+    @classmethod
+    def file_exists(cls, path: tp.Optional[tp.PathLike] = None) -> bool:
+        """Return whether a file already exists."""
+        if path is None:
+            path = cls.__name__
+        path = Path(path)
+        if path.suffix == "":
+            path = path.with_suffix(".pickle")
+        return path.exists()
+
+    def save(self, path: tp.Optional[tp.PathLike] = None, mkdir_kwargs: tp.KwargsLike = None, **kwargs) -> None:
         """Save dumps to a file.
 
         If `path` has no suffix, adds the suffix '.pickle'."""
+        if path is None:
+            path = type(self).__name__
         path = Path(path)
-        if mkdir_kwargs is None:
-            mkdir_kwargs = {}
         if path.suffix == "":
             path = path.with_suffix(".pickle")
+        if mkdir_kwargs is None:
+            mkdir_kwargs = {}
         check_mkdir(path.parent, **mkdir_kwargs)
         dumps = self.dumps(**kwargs)
         with open(path, "wb") as f:
             f.write(dumps)
 
     @classmethod
-    def load(cls: tp.Type[PickleableT], path: tp.PathLike, **kwargs) -> PickleableT:
+    def load(cls: tp.Type[PickleableT], path: tp.Optional[tp.PathLike] = None, **kwargs) -> PickleableT:
         """Load dumps from a file and create new instance.
 
         If `path` has no suffix and doesn't exist, checks whether there is the same path
         but with the suffix '.pickle' or '.pkl'."""
+        if path is None:
+            path = cls.__name__
         path = Path(path)
         if path.suffix == "" and not path.exists():
             if path.with_suffix(".pickle").exists():
