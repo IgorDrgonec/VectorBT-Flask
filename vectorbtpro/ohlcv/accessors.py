@@ -446,7 +446,6 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
                 fig.update_layout(
                     xaxis2=dict(showgrid=True),
                     yaxis2=dict(showgrid=True),
-                    bargap=0,
                 )
         fig.update_layout(**layout_kwargs)
         if ohlc_type is None:
@@ -467,8 +466,14 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             low=self.low,
             close=self.close,
             name="OHLC",
-            increasing=dict(line=dict(color=plotting_cfg["color_schema"]["increasing"])),
-            decreasing=dict(line=dict(color=plotting_cfg["color_schema"]["decreasing"])),
+            increasing=dict(
+                fillcolor=plotting_cfg["color_schema"]["increasing"],
+                line=dict(color=plotting_cfg["color_schema"]["increasing"])
+            ),
+            decreasing=dict(
+                fillcolor=plotting_cfg["color_schema"]["decreasing"],
+                line=dict(color=plotting_cfg["color_schema"]["decreasing"])
+            ),
         )
         ohlc.update(**ohlc_trace_kwargs)
         fig.add_trace(ohlc, **add_trace_kwargs)
@@ -489,7 +494,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
                 x=self.wrapper.index,
                 y=self.volume,
                 marker=dict(color=marker_colors, line_width=0),
-                opacity=0.5,
+                opacity=0.65,
                 name="Volume",
             )
             volume_bar.update(**volume_trace_kwargs)
