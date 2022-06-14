@@ -1758,6 +1758,431 @@ class TestFromSignals:
         _ = from_signals_longonly(attach_call_seq=False, **kwargs)
         _ = from_signals_shortonly(attach_call_seq=False, **kwargs)
 
+    def test_limit_signal_type(self):
+        entries = pd.Series([True, False, False, False, False], index=price.index)
+        exits = pd.Series([False, False, False, False, False], index=price.index)
+
+        close = pd.Series([3.0, 4.0, 5.0, 2.0, 1.0], index=price.index)
+        open = close + 0.25
+        high = close + 0.5
+        low = close - 0.5
+        assert_records_close(
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                signal_type="limit",
+                slippage=0.01,
+                price=[[np.nan, 3.0, 4.5, 2.5, 1.0, np.inf]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 1, 0, 33.333333333333336, 3.0, 0.0, 0),
+                    (0, 2, 0, 22.22222222222222, 4.5, 0.0, 0),
+                    (0, 3, 3, 40.0, 2.5, 0.0, 0),
+                    (0, 4, 4, 100.0, 1.0, 0.0, 0),
+                    (0, 5, 3, 33.333333333333336, 3.0, 0.0, 0),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        assert_records_close(
+            from_signals_longonly(
+                open=open,
+                high=high,
+                low=low,
+                close=close,
+                entries=entries,
+                exits=exits,
+                slippage=0.01,
+                signal_type="limit",
+                price=[[np.nan, 3.0, 4.5, 2.5, 1.0, np.inf]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 1, 0, 33.333333333333336, 3.0, 0.0, 0),
+                    (0, 2, 0, 22.22222222222222, 4.5, 0.0, 0),
+                    (0, 3, 3, 44.44444444444444, 2.25, 0.0, 0),
+                    (0, 4, 4, 100.0, 1.0, 0.0, 0),
+                    (0, 5, 3, 44.44444444444444, 2.25, 0.0, 0),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        assert_records_close(
+            from_signals_shortonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                signal_type="limit",
+                slippage=0.01,
+                price=[[np.nan, 3.0, 4.5, 2.5, 1.0, np.inf]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 1, 0, 33.333333333333336, 3.0, 0.0, 1),
+                    (0, 2, 2, 22.22222222222222, 4.5, 0.0, 1),
+                    (0, 3, 0, 40.0, 2.5, 0.0, 1),
+                    (0, 4, 0, 100.0, 1.0, 0.0, 1),
+                    (0, 5, 1, 33.333333333333336, 3.0, 0.0, 1),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        assert_records_close(
+            from_signals_shortonly(
+                open=open,
+                high=high,
+                low=low,
+                close=close,
+                entries=entries,
+                exits=exits,
+                signal_type="limit",
+                slippage=0.01,
+                price=[[np.nan, 3.0, 4.5, 2.5, 1.0, np.inf]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 1, 0, 33.333333333333336, 3.0, 0.0, 1),
+                    (0, 2, 1, 22.22222222222222, 4.5, 0.0, 1),
+                    (0, 3, 0, 40.0, 2.5, 0.0, 1),
+                    (0, 4, 0, 100.0, 1.0, 0.0, 1),
+                    (0, 5, 1, 23.529411764705884, 4.25, 0.0, 1),
+                ],
+                dtype=order_dt,
+            ),
+        )
+
+    def test_upon_adj_limit_conflict(self):
+        entries = pd.Series([True, True, False, False, False], index=price.index)
+        entries2 = pd.Series([True, False, False, True, False], index=price.index)
+        entries3 = pd.Series([True, False, True, False, False], index=price.index)
+        exits = pd.Series([False, False, False, False, False], index=price.index)
+        size = pd.Series([1.0, 0.5, 0.5, 0.5, 0.5], index=price.index)
+        close = pd.Series([3.0, 4.0, 5.0, 2.0, 1.0], index=price.index)
+        open = pd.Series([3.1, 4.1, 5.1, 2.1, 1.1], index=price.index)
+        price2 = pd.Series([2.5, np.inf, np.inf, np.inf, np.inf], index=price.index)
+        price3 = pd.Series([4.5, np.inf, np.inf, np.inf, np.inf], index=price.index)
+        price4 = pd.Series([2.5, -np.inf, -np.inf, -np.inf, -np.inf], index=price.index)
+        price5 = pd.Series([4.5, -np.inf, -np.inf, -np.inf, -np.inf], index=price.index)
+        signal_type = pd.Series(["limit", "market", "market", "market", "market"], index=price.index)
+        assert_records_close(
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                size=size,
+                accumulate=True,
+                signal_type=signal_type,
+                price=price2,
+                upon_adj_limit_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 3, 1.0, 2.5, 0.0, 0),
+                    (0, 1, 1, 0.5, 4.0, 0.0, 0),
+                    (1, 1, 3, 1.0, 2.5, 0.0, 0),
+                    (0, 3, 1, 0.5, 4.0, 0.0, 0),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        with pytest.raises(Exception):
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                size=size,
+                accumulate=True,
+                signal_type="limit",
+                price=price2,
+                upon_adj_limit_conflict="KeepExecute",
+            )
+        assert_records_close(
+            from_signals_longonly(
+                close=close,
+                entries=entries2,
+                exits=exits,
+                size=size,
+                accumulate=True,
+                signal_type=signal_type,
+                price=price2,
+                upon_adj_limit_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 3, 1.0, 2.5, 0.0, 0),
+                    (0, 1, 3, 1.0, 2.5, 0.0, 0),
+                    (0, 2, 3, 1.0, 2.5, 0.0, 0),
+                    (0, 3, 3, 1.0, 2.5, 0.0, 0),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        assert_records_close(
+            from_signals_longonly(
+                open=open,
+                close=close,
+                entries=entries2,
+                exits=exits,
+                size=size,
+                accumulate=True,
+                signal_type=signal_type,
+                price=price4,
+                upon_adj_limit_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 3, 1.0, 2.1, 0.0, 0),
+                    (0, 1, 3, 1.0, 2.1, 0.0, 0),
+                    (0, 2, 3, 1.0, 2.1, 0.0, 0),
+                    (0, 3, 3, 1.0, 2.1, 0.0, 0),
+                ],
+                dtype=order_dt,
+            ),
+        )
+
+        assert_records_close(
+            from_signals_shortonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                size=size,
+                accumulate=True,
+                signal_type=signal_type,
+                price=price3,
+                upon_adj_limit_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 2, 1.0, 4.5, 0.0, 1),
+                    (0, 1, 1, 0.5, 4.0, 0.0, 1),
+                    (1, 1, 2, 1.0, 4.5, 0.0, 1),
+                    (0, 3, 1, 0.5, 4.0, 0.0, 1),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        with pytest.raises(Exception):
+            from_signals_shortonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                size=size,
+                accumulate=True,
+                signal_type="limit",
+                price=price3,
+                upon_adj_limit_conflict="KeepExecute",
+            )
+        assert_records_close(
+            from_signals_shortonly(
+                close=close,
+                entries=entries3,
+                exits=exits,
+                size=size,
+                accumulate=True,
+                signal_type=signal_type,
+                price=price3,
+                upon_adj_limit_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 2, 1.0, 4.5, 0.0, 1),
+                    (0, 1, 2, 1.0, 4.5, 0.0, 1),
+                    (0, 2, 2, 1.0, 4.5, 0.0, 1),
+                    (0, 3, 2, 1.0, 4.5, 0.0, 1),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        assert_records_close(
+            from_signals_shortonly(
+                open=open,
+                close=close,
+                entries=entries3,
+                exits=exits,
+                size=size,
+                accumulate=True,
+                signal_type=signal_type,
+                price=price5,
+                upon_adj_limit_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 2, 1.0, 5.1, 0.0, 1),
+                    (0, 1, 2, 1.0, 5.1, 0.0, 1),
+                    (0, 2, 2, 1.0, 5.1, 0.0, 1),
+                    (0, 3, 2, 1.0, 5.1, 0.0, 1),
+                ],
+                dtype=order_dt,
+            ),
+        )
+
+    def test_upon_opp_limit_conflict(self):
+        entries = pd.Series([True, False, False, False, False], index=price.index)
+        exits = pd.Series([False, True, False, False, False], index=price.index)
+        exits2 = pd.Series([False, False, False, True, False], index=price.index)
+        exits3 = pd.Series([False, False, True, False, False], index=price.index)
+        size = pd.Series([1.0, 0.5, 0.5, 0.5, 0.5], index=price.index)
+        close = pd.Series([3.0, 4.0, 5.0, 2.0, 1.0], index=price.index)
+        open = pd.Series([3.1, 4.1, 5.1, 2.1, 1.1], index=price.index)
+        price2 = pd.Series([2.5, np.inf, np.inf, np.inf, np.inf], index=price.index)
+        price3 = pd.Series([4.5, np.inf, np.inf, np.inf, np.inf], index=price.index)
+        price4 = pd.Series([2.5, -np.inf, -np.inf, -np.inf, -np.inf], index=price.index)
+        price5 = pd.Series([4.5, -np.inf, -np.inf, -np.inf, -np.inf], index=price.index)
+        signal_type = pd.Series(["limit", "market", "market", "market", "market"], index=price.index)
+        assert_records_close(
+            from_signals_both(
+                close=close,
+                entries=entries,
+                exits=exits,
+                size=size,
+                accumulate=True,
+                signal_type=signal_type,
+                price=price2,
+                upon_opp_limit_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 3, 1.0, 2.5, 0.0, 0),
+                    (0, 1, 1, 0.5, 4.0, 0.0, 1),
+                    (1, 1, 3, 1.0, 2.5, 0.0, 0),
+                    (0, 3, 1, 0.5, 4.0, 0.0, 1),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        with pytest.raises(Exception):
+            from_signals_both(
+                close=close,
+                entries=entries,
+                exits=exits,
+                size=size,
+                accumulate=True,
+                signal_type="limit",
+                price=price2,
+                upon_opp_limit_conflict="KeepExecute",
+            )
+        assert_records_close(
+            from_signals_both(
+                close=close,
+                entries=entries,
+                exits=exits2,
+                size=size,
+                accumulate=True,
+                signal_type=signal_type,
+                price=price2,
+                upon_opp_limit_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 3, 1.0, 2.5, 0.0, 0),
+                    (0, 1, 3, 1.0, 2.5, 0.0, 0),
+                    (0, 2, 3, 1.0, 2.5, 0.0, 0),
+                    (0, 3, 3, 1.0, 2.5, 0.0, 0),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        assert_records_close(
+            from_signals_both(
+                open=open,
+                close=close,
+                entries=entries,
+                exits=exits2,
+                size=size,
+                accumulate=True,
+                signal_type=signal_type,
+                price=price4,
+                upon_opp_limit_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 3, 1.0, 2.1, 0.0, 0),
+                    (0, 1, 3, 1.0, 2.1, 0.0, 0),
+                    (0, 2, 3, 1.0, 2.1, 0.0, 0),
+                    (0, 3, 3, 1.0, 2.1, 0.0, 0),
+                ],
+                dtype=order_dt,
+            ),
+        )
+
+        assert_records_close(
+            from_signals_both(
+                close=close,
+                entries=exits,
+                exits=entries,
+                size=size,
+                accumulate=True,
+                signal_type=signal_type,
+                price=price3,
+                upon_opp_limit_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 2, 1.0, 4.5, 0.0, 1),
+                    (0, 1, 1, 0.5, 4.0, 0.0, 0),
+                    (1, 1, 2, 1.0, 4.5, 0.0, 1),
+                    (0, 3, 1, 0.5, 4.0, 0.0, 0),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        with pytest.raises(Exception):
+            from_signals_both(
+                close=close,
+                entries=exits,
+                exits=entries,
+                size=size,
+                accumulate=True,
+                signal_type="limit",
+                price=price3,
+                upon_opp_limit_conflict="KeepExecute",
+            )
+        assert_records_close(
+            from_signals_both(
+                close=close,
+                entries=exits3,
+                exits=entries,
+                size=size,
+                accumulate=True,
+                signal_type=signal_type,
+                price=price3,
+                upon_opp_limit_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 2, 1.0, 4.5, 0.0, 1),
+                    (0, 1, 2, 1.0, 4.5, 0.0, 1),
+                    (0, 2, 2, 1.0, 4.5, 0.0, 1),
+                    (0, 3, 2, 1.0, 4.5, 0.0, 1),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        assert_records_close(
+            from_signals_both(
+                open=open,
+                close=close,
+                entries=exits3,
+                exits=entries,
+                size=size,
+                accumulate=True,
+                signal_type=signal_type,
+                price=price5,
+                upon_opp_limit_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 2, 1.0, 5.1, 0.0, 1),
+                    (0, 1, 2, 1.0, 5.1, 0.0, 1),
+                    (0, 2, 2, 1.0, 5.1, 0.0, 1),
+                    (0, 3, 2, 1.0, 5.1, 0.0, 1),
+                ],
+                dtype=order_dt,
+            ),
+        )
+
     def test_sl_stop(self):
         entries = pd.Series([True, False, False, False, False], index=price.index)
         exits = pd.Series([False, False, False, False, False], index=price.index)
@@ -2320,7 +2745,7 @@ class TestFromSignals:
             ),
         )
 
-    def test_ttp_stop(self):
+    def test_tsl_delta(self):
         entries = pd.Series([True, False, False, False, False], index=price.index)
         exits = pd.Series([False, False, False, False, False], index=price.index)
 
@@ -2333,8 +2758,8 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                ttp_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
-                ttp_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
+                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
             np.array(
                 [
@@ -2355,8 +2780,8 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                ttp_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
-                ttp_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
+                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
             np.array(
                 [
@@ -2377,15 +2802,15 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                ttp_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
-                ttp_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
+                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
             from_signals_longonly(
                 close=close,
                 entries=entries,
                 exits=exits,
-                ttp_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
-                ttp_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
+                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
         )
         assert_records_close(
@@ -2393,15 +2818,15 @@ class TestFromSignals:
                 close=close,
                 entries=exits,
                 exits=entries,
-                ttp_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
-                ttp_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
+                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
             from_signals_shortonly(
                 close=close,
                 entries=entries,
                 exits=exits,
-                ttp_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
-                ttp_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
+                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
         )
         assert_records_close(
@@ -2412,8 +2837,8 @@ class TestFromSignals:
                 open=open,
                 high=high,
                 low=low,
-                ttp_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
-                ttp_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
+                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
             np.array(
                 [
@@ -2437,8 +2862,8 @@ class TestFromSignals:
                 open=open,
                 high=high,
                 low=low,
-                ttp_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
-                ttp_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
+                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
             np.array(
                 [
@@ -2464,8 +2889,8 @@ class TestFromSignals:
                 open=open,
                 high=high,
                 low=low,
-                ttp_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
-                ttp_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
+                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
                 stop_format="relative",
             ).order_records,
             from_signals_longonly(
@@ -2475,8 +2900,8 @@ class TestFromSignals:
                 open=open,
                 high=high,
                 low=low,
-                ttp_th=[[np.nan, 5.5 * 0.1, 5.5 * 0.5, 5.5 * 0.1, 5.5 * 0.5, np.inf]],
-                ttp_stop=[[np.nan, 5.5 * 0.1, 5.5 * 0.1, 5.5 * 0.5, 5.5 * 0.5, np.inf]],
+                tsl_delta=[[np.nan, 5.5 * 0.1, 5.5 * 0.5, 5.5 * 0.1, 5.5 * 0.5, np.inf]],
+                tsl_stop=[[np.nan, 5.5 * 0.1, 5.5 * 0.1, 5.5 * 0.5, 5.5 * 0.5, np.inf]],
                 stop_format="absolute",
             ).order_records
         )
@@ -2490,8 +2915,8 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                ttp_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
-                ttp_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
+                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
             np.array(
                 [
@@ -2512,8 +2937,8 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                ttp_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
-                ttp_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
+                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
             np.array(
                 [
@@ -2534,15 +2959,15 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                ttp_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
-                ttp_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
+                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
             from_signals_longonly(
                 close=close,
                 entries=entries,
                 exits=exits,
-                ttp_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
-                ttp_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
+                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
         )
         assert_records_close(
@@ -2550,15 +2975,15 @@ class TestFromSignals:
                 close=close,
                 entries=exits,
                 exits=entries,
-                ttp_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
-                ttp_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
+                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
             from_signals_shortonly(
                 close=close,
                 entries=entries,
                 exits=exits,
-                ttp_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
-                ttp_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
+                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
         )
         assert_records_close(
@@ -2569,8 +2994,8 @@ class TestFromSignals:
                 open=open,
                 high=high,
                 low=low,
-                ttp_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
-                ttp_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
+                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
             np.array(
                 [
@@ -2596,8 +3021,8 @@ class TestFromSignals:
                 open=open,
                 high=high,
                 low=low,
-                ttp_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
-                ttp_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
+                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
             np.array(
                 [
@@ -2624,8 +3049,8 @@ class TestFromSignals:
                 entries=pd.Series([True, False]),
                 exits=pd.Series([False, False]),
                 price=pd.Series([10.0, 10.0]),
-                ttp_th=[[0.05, 0.1, 0.2]],
-                ttp_stop=0.1,
+                tsl_delta=[[0.05, 0.1, 0.2]],
+                tsl_stop=0.1,
                 stop_entry_price="price",
             ).order_records,
             np.array(
@@ -2648,8 +3073,8 @@ class TestFromSignals:
                 entries=pd.Series([True, False]),
                 exits=pd.Series([False, False]),
                 price=-np.inf,
-                ttp_th=[[0.05, 0.1, 0.2]],
-                ttp_stop=0.1,
+                tsl_delta=[[0.05, 0.1, 0.2]],
+                tsl_stop=0.1,
                 stop_entry_price="price",
             ).order_records,
             np.array(
@@ -3017,6 +3442,33 @@ class TestFromSignals:
                 sl_stop=[[0.05, 0.5, 0.75]],
                 price=1.1 * close,
                 val_price=1.05 * close,
+                stop_entry_price="open",
+                stop_exit_price="stoplimit",
+                slippage=0.1,
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 16.52892561983471, 6.050000000000001, 0.0, 0),
+                    (1, 0, 1, 16.52892561983471, 4.25, 0.0, 1),
+                    (0, 1, 0, 16.52892561983471, 6.050000000000001, 0.0, 0),
+                    (1, 1, 2, 16.52892561983471, 2.625, 0.0, 1),
+                    (0, 2, 0, 16.52892561983471, 6.050000000000001, 0.0, 0),
+                    (1, 2, 4, 16.52892561983471, 1.25, 0.0, 1),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        assert_records_close(
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                open=open,
+                high=high,
+                low=low,
+                sl_stop=[[0.05, 0.5, 0.75]],
+                price=1.1 * close,
+                val_price=1.05 * close,
                 stop_entry_price="close",
                 stop_exit_price="stoplimit",
                 slippage=0.1,
@@ -3032,6 +3484,36 @@ class TestFromSignals:
                 ],
                 dtype=order_dt,
             ),
+        )
+        assert_records_close(
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                open=open,
+                high=high,
+                low=low,
+                sl_stop=[[0.05, 0.5, 0.75]],
+                price=1.1 * close,
+                val_price=1.05 * close,
+                stop_entry_price=close,
+                stop_exit_price="stoplimit",
+                slippage=0.1,
+            ).order_records,
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                open=open,
+                high=high,
+                low=low,
+                sl_stop=[[0.05, 0.5, 0.75]],
+                price=1.1 * close,
+                val_price=1.05 * close,
+                stop_entry_price="close",
+                stop_exit_price="stoplimit",
+                slippage=0.1,
+            ).order_records,
         )
 
     def test_stop_exit_price(self):
@@ -3113,31 +3595,6 @@ class TestFromSignals:
                     (1, 1, 2, 16.528926, 2.7, 0.0, 1),
                     (0, 2, 0, 16.528926, 6.05, 0.0, 0),
                     (1, 2, 4, 16.528926, 0.9, 0.0, 1),
-                ],
-                dtype=order_dt,
-            ),
-        )
-        assert_records_close(
-            from_signals_longonly(
-                close=close,
-                entries=entries,
-                exits=exits,
-                open=open,
-                high=high,
-                low=low,
-                sl_stop=[[0.05, 0.5, 0.75]],
-                price=1.1 * close,
-                stop_exit_price="price",
-                slippage=0.1,
-            ).order_records,
-            np.array(
-                [
-                    (0, 0, 0, 16.528926, 6.05, 0.0, 0),
-                    (1, 0, 1, 16.528926, 3.9600000000000004, 0.0, 1),
-                    (0, 1, 0, 16.528926, 6.05, 0.0, 0),
-                    (1, 1, 2, 16.528926, 2.97, 0.0, 1),
-                    (0, 2, 0, 16.528926, 6.05, 0.0, 0),
-                    (1, 2, 4, 16.528926, 0.9900000000000001, 0.0, 1),
                 ],
                 dtype=order_dt,
             ),
@@ -3248,48 +3705,111 @@ class TestFromSignals:
             ),
         )
 
-    def test_signal_priority(self):
+    def test_upon_adj_stop_conflict(self):
         entries = pd.Series([True, False, False, False, False], index=price.index)
-        exits = pd.Series([False, False, False, True, False], index=price.index)
-
+        exits = pd.Series([False, True, False, False, False], index=price.index)
+        size = pd.Series([1.0, 0.5, 0.5, 0.5, 0.5], index=price.index)
         close = pd.Series([5.0, 4.0, 3.0, 2.0, 1.0], index=price.index)
-        open = close + 0.25
-        high = close + 0.5
-        low = close - 0.5
         assert_records_close(
-            from_signals_both(
+            from_signals_longonly(
                 close=close,
                 entries=entries,
                 exits=exits,
-                sl_stop=[[0.1, 0.5]],
-                signal_priority="stop",
+                size=size,
+                accumulate=True,
+                sl_stop=0.5,
+                upon_adj_stop_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
             ).order_records,
             np.array(
                 [
-                    (0, 0, 0, 20.0, 5.0, 0.0, 0),
-                    (1, 0, 1, 20.0, 4.5, 0.0, 1),
-                    (2, 0, 3, 45.0, 2.0, 0.0, 1),
-                    (0, 1, 0, 20.0, 5.0, 0.0, 0),
-                    (1, 1, 3, 20.0, 2.5, 0.0, 1),
+                    (0, 0, 0, 1.0, 5.0, 0.0, 0),
+                    (1, 0, 3, 1.0, 2.5, 0.0, 1),
+                    (0, 1, 0, 1.0, 5.0, 0.0, 0),
+                    (1, 1, 1, 0.5, 4.0, 0.0, 1),
+                    (2, 1, 3, 0.5, 2.5, 0.0, 1),
+                    (0, 2, 0, 1.0, 5.0, 0.0, 0),
+                    (0, 3, 0, 1.0, 5.0, 0.0, 0),
+                    (1, 3, 1, 0.5, 4.0, 0.0, 1),
                 ],
                 dtype=order_dt,
             ),
         )
+        close = pd.Series([1.0, 2.0, 3.0, 4.0, 5.0], index=price.index)
         assert_records_close(
-            from_signals_both(
+            from_signals_shortonly(
                 close=close,
                 entries=entries,
                 exits=exits,
-                sl_stop=[[0.1, 0.5]],
-                signal_priority="user",
+                size=size,
+                accumulate=True,
+                sl_stop=2.5,
+                upon_adj_stop_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
             ).order_records,
             np.array(
                 [
-                    (0, 0, 0, 20.0, 5.0, 0.0, 0),
-                    (1, 0, 1, 20.0, 4.5, 0.0, 1),
-                    (2, 0, 3, 45.0, 2.0, 0.0, 1),
-                    (0, 1, 0, 20.0, 5.0, 0.0, 0),
-                    (1, 1, 3, 40.0, 2.0, 0.0, 1),
+                    (0, 0, 0, 1.0, 1.0, 0.0, 1),
+                    (1, 0, 3, 1.0, 3.5, 0.0, 0),
+                    (0, 1, 0, 1.0, 1.0, 0.0, 1),
+                    (1, 1, 1, 0.5, 2.0, 0.0, 0),
+                    (2, 1, 3, 0.5, 3.5, 0.0, 0),
+                    (0, 2, 0, 1.0, 1.0, 0.0, 1),
+                    (0, 3, 0, 1.0, 1.0, 0.0, 1),
+                    (1, 3, 1, 0.5, 2.0, 0.0, 0),
+                ],
+                dtype=order_dt,
+            ),
+        )
+
+    def test_upon_opp_stop_conflict(self):
+        entries = pd.Series([True, True, False, False, False], index=price.index)
+        exits = pd.Series([False, False, False, False, False], index=price.index)
+        size = pd.Series([1.0, 0.5, 0.5, 0.5, 0.5], index=price.index)
+        close = pd.Series([5.0, 4.0, 3.0, 2.0, 1.0], index=price.index)
+        assert_records_close(
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                size=size,
+                accumulate=True,
+                sl_stop=0.5,
+                upon_opp_stop_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 1.0, 5.0, 0.0, 0),
+                    (1, 0, 3, 1.0, 2.5, 0.0, 1),
+                    (0, 1, 0, 1.0, 5.0, 0.0, 0),
+                    (1, 1, 1, 0.5, 4.0, 0.0, 0),
+                    (2, 1, 3, 1.5, 2.0, 0.0, 1),
+                    (0, 2, 0, 1.0, 5.0, 0.0, 0),
+                    (0, 3, 0, 1.0, 5.0, 0.0, 0),
+                    (1, 3, 1, 0.5, 4.0, 0.0, 0),
+                    (2, 3, 3, 1.5, 2.0, 0.0, 1),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        close = pd.Series([1.0, 2.0, 3.0, 4.0, 5.0], index=price.index)
+        assert_records_close(
+            from_signals_shortonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                size=size,
+                accumulate=True,
+                sl_stop=2.5,
+                upon_opp_stop_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 1.0, 1.0, 0.0, 1),
+                    (1, 0, 3, 1.0, 3.5, 0.0, 0),
+                    (0, 1, 0, 1.0, 1.0, 0.0, 1),
+                    (1, 1, 1, 0.5, 2.0, 0.0, 1),
+                    (0, 2, 0, 1.0, 1.0, 0.0, 1),
+                    (0, 3, 0, 1.0, 1.0, 0.0, 1),
+                    (1, 3, 1, 0.5, 2.0, 0.0, 1),
                 ],
                 dtype=order_dt,
             ),
@@ -3302,8 +3822,8 @@ class TestFromSignals:
 
         @njit
         def adjust_sl_func_nb(c, dur):
-            if c.i - c.sl_init_i >= dur:
-                c.sl_curr_stop[c.col] = 0.0
+            if c.i - c.last_sl_info["init_i"][c.col] >= dur:
+                c.last_sl_info["curr_stop"][c.col] = 0.0
 
         assert_records_close(
             from_signals_longonly(
@@ -3323,8 +3843,8 @@ class TestFromSignals:
 
         @njit
         def adjust_tp_func_nb(c, dur):
-            if c.i - c.tp_init_i >= dur:
-                c.tp_curr_stop[c.col] = 0.0
+            if c.i - c.last_tp_info["init_i"][c.col] >= dur:
+                c.last_tp_info["curr_stop"][c.col] = 0.0
 
         assert_records_close(
             from_signals_longonly(

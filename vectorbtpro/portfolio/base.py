@@ -4560,6 +4560,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         exits: tp.Optional[tp.ArrayLike] = None,
         short_entries: tp.Optional[tp.ArrayLike] = None,
         short_exits: tp.Optional[tp.ArrayLike] = None,
+        direction: tp.Optional[tp.ArrayLike] = None,
+        adjust_func_nb: nb.AdjustFuncT = nb.no_adjust_func_nb,
+        adjust_args: tp.Args = (),
         signal_func_nb: nb.SignalFuncT = nb.no_signal_func_nb,
         signal_args: tp.ArgsLike = (),
         size: tp.Optional[tp.ArrayLike] = None,
@@ -4577,30 +4580,30 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         allow_partial: tp.Optional[tp.ArrayLike] = None,
         raise_reject: tp.Optional[tp.ArrayLike] = None,
         log: tp.Optional[tp.ArrayLike] = None,
+        val_price: tp.Optional[tp.ArrayLike] = None,
         accumulate: tp.Optional[tp.ArrayLike] = None,
         upon_long_conflict: tp.Optional[tp.ArrayLike] = None,
         upon_short_conflict: tp.Optional[tp.ArrayLike] = None,
         upon_dir_conflict: tp.Optional[tp.ArrayLike] = None,
         upon_opposite_entry: tp.Optional[tp.ArrayLike] = None,
-        direction: tp.Optional[tp.ArrayLike] = None,
-        val_price: tp.Optional[tp.ArrayLike] = None,
-        open: tp.Optional[tp.ArrayLike] = None,
-        high: tp.Optional[tp.ArrayLike] = None,
-        low: tp.Optional[tp.ArrayLike] = None,
+        signal_type: tp.Optional[tp.ArrayLike] = None,
+        upon_adj_limit_conflict: tp.Optional[tp.ArrayLike] = None,
+        upon_opp_limit_conflict: tp.Optional[tp.ArrayLike] = None,
+        use_stops: tp.Optional[bool] = None,
         sl_stop: tp.Optional[tp.ArrayLike] = None,
+        tsl_delta: tp.Optional[tp.ArrayLike] = None,
         tsl_stop: tp.Optional[tp.ArrayLike] = None,
-        ttp_th: tp.Optional[tp.ArrayLike] = None,
-        ttp_stop: tp.Optional[tp.ArrayLike] = None,
         tp_stop: tp.Optional[tp.ArrayLike] = None,
         stop_format: tp.Optional[tp.ArrayLike] = None,
         stop_entry_price: tp.Optional[tp.ArrayLike] = None,
         stop_exit_price: tp.Optional[tp.ArrayLike] = None,
         upon_stop_exit: tp.Optional[tp.ArrayLike] = None,
         upon_stop_update: tp.Optional[tp.ArrayLike] = None,
-        signal_priority: tp.Optional[tp.ArrayLike] = None,
-        use_stops: tp.Optional[bool] = None,
-        adjust_func_nb: nb.AdjustFuncT = nb.no_adjust_func_nb,
-        adjust_args: tp.Args = (),
+        upon_adj_stop_conflict: tp.Optional[tp.ArrayLike] = None,
+        upon_opp_stop_conflict: tp.Optional[tp.ArrayLike] = None,
+        open: tp.Optional[tp.ArrayLike] = None,
+        high: tp.Optional[tp.ArrayLike] = None,
+        low: tp.Optional[tp.ArrayLike] = None,
         init_cash: tp.Optional[tp.ArrayLike] = None,
         init_position: tp.Optional[tp.ArrayLike] = None,
         init_price: tp.Optional[tp.ArrayLike] = None,
@@ -4656,13 +4659,20 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 Defaults to False. Will broadcast.
             short_exits (array_like of bool): Boolean array of short exit signals.
                 Defaults to False. Will broadcast.
+            direction (Direction or array_like): See `Portfolio.from_orders`.
+
+                Takes only effect if `short_entries` and `short_exits` are not set.
+            adjust_func_nb (callable): User-defined function to adjust the current simulation state.
+                Defaults to `vectorbtpro.portfolio.nb.from_signals.no_adjust_func_nb`.
+
+                Passed as argument to `vectorbtpro.portfolio.nb.from_signals.dir_enex_signal_func_nb`
+                and `vectorbtpro.portfolio.nb.from_signals.ls_enex_signal_func_nb`. Has no effect
+                when using other signal functions.
+            adjust_args (tuple): Packed arguments passed to `adjust_func_nb`.
+                Defaults to `()`.
             signal_func_nb (callable): Function called to generate signals.
 
-                Must accept `vectorbtpro.portfolio.enums.SignalContext` and `*signal_args`.
-                Must return long entry signal, long exit signal, short entry signal, and short exit signal.
-
-                !!! note
-                    Stop signal has priority: `signal_func_nb` is executed only if there is no stop signal.
+                See `vectorbtpro.portfolio.nb.from_signals.simulate_from_signal_func_nb`.
             signal_args (tuple): Packed arguments passed to `signal_func_nb`.
                 Defaults to `()`.
             size (float or array_like): See `Portfolio.from_orders`.
@@ -4696,6 +4706,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             allow_partial (bool or array_like): See `Portfolio.from_orders`.
             raise_reject (bool or array_like): See `Portfolio.from_orders`.
             log (bool or array_like): See `Portfolio.from_orders`.
+            val_price (array_like of float): See `Portfolio.from_orders`.
             accumulate (bool, AccumulationMode or array_like): See `vectorbtpro.portfolio.enums.AccumulationMode`.
                 If True, becomes 'both'. If False, becomes 'disabled'. Will broadcast.
 
@@ -4704,37 +4715,33 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 See `vectorbtpro.portfolio.enums.ConflictMode`. Will broadcast.
             upon_short_conflict (ConflictMode or array_like): Conflict mode for short signals.
                 See `vectorbtpro.portfolio.enums.ConflictMode`. Will broadcast.
-            upon_dir_conflict (DirectionConflictMode or array_like): See `vectorbtpro.portfolio.enums.DirectionConflictMode`. Will broadcast.
-            upon_opposite_entry (OppositeEntryMode or array_like): See `vectorbtpro.portfolio.enums.OppositeEntryMode`. Will broadcast.
-            direction (Direction or array_like): See `Portfolio.from_orders`.
+            upon_dir_conflict (DirectionConflictMode or array_like): See `vectorbtpro.portfolio.enums.DirectionConflictMode`.
+                Will broadcast.
+            upon_opposite_entry (OppositeEntryMode or array_like): See `vectorbtpro.portfolio.enums.OppositeEntryMode`.
+                Will broadcast.
+            signal_type (SignalType or array_like): See `vectorbtpro.portfolio.enums.SignalType`.
+                Will broadcast.
+            upon_adj_limit_conflict (PendingConflictMode or array_like): Conflict mode for limit and user-defined
+                signals of adjacent sign. See `vectorbtpro.portfolio.enums.PendingConflictMode`. Will broadcast.
+            upon_opp_limit_conflict (PendingConflictMode or array_like): Conflict mode for limit and user-defined
+                signals of opposite sign. See `vectorbtpro.portfolio.enums.PendingConflictMode`. Will broadcast.
+            use_stops (bool): Whether to use stops.
+                Defaults to None, which becomes True if any of the stops are not NaN or
+                the adjustment function is not the default one.
 
-                Takes only effect if `short_entries` and `short_exits` are not set.
-            val_price (array_like of float): See `Portfolio.from_orders`.
-            open (array_like of float): See `Portfolio.from_orders`.
-
-                For stop signals, `np.nan` gets replaced by `close`.
-            high (array_like of float): See `Portfolio.from_orders`.
-
-                For stop signals, `np.nan` replaced by the maximum out of `open` and `close`.
-            low (array_like of float): See `Portfolio.from_orders`.
-
-                For stop signals, `np.nan` replaced by the minimum out of `open` and `close`.
+                Disable this to make simulation a bit faster for simple use cases.
             sl_stop (array_like of float): Stop loss.
                 Will broadcast.
 
                 Set an element to `np.nan` or `0` to disable.
-            tsl_stop (array_like of float): Trailing stop loss.
+            tsl_delta (array_like of float): Take profit threshold for the trailing stop loss.
+                Will broadcast.
+                
+                Set an element to `np.nan` or `0` to disable.
+            tsl_stop (array_like of float): Trailing stop loss for the trailing stop loss.
                 Will broadcast.
 
                 Set an element to `np.nan` or `0` to disable.
-            ttp_th (array_like of float): Take profit threshold for the trailing take profit.
-                Will broadcast.
-
-                Requires `ttp_stop`.
-            ttp_stop (array_like of float): Trailing stop loss for the trailing take profit.
-                Will broadcast.
-
-                Set an element to `np.nan` or `0` to disable. Requires `ttp_th`.
             tp_stop (array_like of float): Take profit.
                 Will broadcast.
 
@@ -4746,7 +4753,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             stop_entry_price (StopEntryPrice or array_like): See `vectorbtpro.portfolio.enums.StopEntryPrice`.
                 Will broadcast.
 
-                If provided on per-element basis, gets applied upon entry.
+                If provided on per-element basis, gets applied upon entry. If a positive value is provided,
+                used directly as a price, otherwise used as an enumerated value.
             stop_exit_price (StopExitPrice or array_like): See `vectorbtpro.portfolio.enums.StopExitPrice`.
                 Will broadcast.
 
@@ -4761,30 +4769,19 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 Only has effect if accumulation is enabled.
 
                 If provided on per-element basis, gets applied upon repeated entry.
-            signal_priority (SignalPriority or array_like): See `vectorbtpro.portfolio.enums.SignalPriority`.
-                Will broadcast.
+            upon_adj_stop_conflict (PendingConflictMode or array_like): Conflict mode for stop and user-defined
+                signals of adjacent sign. See `vectorbtpro.portfolio.enums.PendingConflictMode`. Will broadcast.
+            upon_opp_stop_conflict (PendingConflictMode or array_like): Conflict mode for stop and user-defined
+                signals of opposite sign. See `vectorbtpro.portfolio.enums.PendingConflictMode`. Will broadcast.
+            open (array_like of float): See `Portfolio.from_orders`.
 
-                Only has effect if both stop signal and user-defined signal are executable.
+                For stop signals, `np.nan` gets replaced by `close`.
+            high (array_like of float): See `Portfolio.from_orders`.
 
-                !!! note
-                    Which option to choose depends on **when** the user-defined signal is available:
+                For stop signals, `np.nan` replaced by the maximum out of `open` and `close`.
+            low (array_like of float): See `Portfolio.from_orders`.
 
-                    * at open (user signal wins)
-                    * between open and close (not enough information!)
-                    * at close (stop signal wins)
-            use_stops (bool): Whether to use stops.
-                Defaults to None, which becomes True if any of the stops are not NaN or
-                the adjustment function is not the default one.
-
-                Disable this to make simulation a bit faster for simple use cases.
-            adjust_func_nb (callable): User-defined function to adjust the current simulation state.
-                Defaults to `vectorbtpro.portfolio.nb.from_signals.no_adjust_func_nb`.
-
-                Passed as argument to `vectorbtpro.portfolio.nb.from_signals.dir_enex_signal_func_nb`
-                and `vectorbtpro.portfolio.nb.from_signals.ls_enex_signal_func_nb`. Has no effect
-                when using other signal functions.
-            adjust_args (tuple): Packed arguments passed to `adjust_func_nb`.
-                Defaults to `()`.
+                For stop signals, `np.nan` replaced by the minimum out of `open` and `close`.
             init_cash (InitCashMode, float or array_like): See `Portfolio.from_orders`.
             init_position (float or array_like): See `Portfolio.from_orders`.
             init_price (float or array_like): See `Portfolio.from_orders`.
@@ -4820,11 +4817,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         NaN values after reindexing: vectorbt uses its own sensible defaults, which are usually NaN
         for floating arrays and default flags for integer arrays. Use `vectorbtpro.base.reshaping.BCO`
         with `fill_value` to override.
-
-        !!! note
-            Stop signal has priority - it's executed before other signals within the same bar.
-            That is, if a stop signal is present, no other signals are generated and executed
-            since there is a limit of one order per symbol and bar.
 
         !!! hint
             If you generated signals using close price, don't forget to shift your signals by one tick
@@ -5319,6 +5311,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             short_entries = False
         if short_exits is None:
             short_exits = False
+        if direction is not None and ls_mode:
+            warnings.warn("direction has no effect if short_entries and short_exits are set", stacklevel=2)
+        if direction is None:
+            direction = portfolio_cfg["signal_direction"]
         if signal_func_nb is nb.no_signal_func_nb:
             if ls_mode:
                 signal_func_nb = nb.ls_enex_signal_func_nb
@@ -5354,6 +5350,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             raise_reject = portfolio_cfg["raise_reject"]
         if log is None:
             log = portfolio_cfg["log"]
+        if val_price is None:
+            val_price = portfolio_cfg["val_price"]
         if accumulate is None:
             accumulate = portfolio_cfg["accumulate"]
         if upon_long_conflict is None:
@@ -5364,22 +5362,32 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             upon_dir_conflict = portfolio_cfg["upon_dir_conflict"]
         if upon_opposite_entry is None:
             upon_opposite_entry = portfolio_cfg["upon_opposite_entry"]
-        if direction is not None and ls_mode:
-            warnings.warn("direction has no effect if short_entries and short_exits are set", stacklevel=2)
-        if direction is None:
-            direction = portfolio_cfg["signal_direction"]
-        if val_price is None:
-            val_price = portfolio_cfg["val_price"]
+        if signal_type is None:
+            signal_type = portfolio_cfg["signal_type"]
+        if upon_adj_limit_conflict is None:
+            upon_adj_limit_conflict = portfolio_cfg["upon_adj_limit_conflict"]
+        if upon_opp_limit_conflict is None:
+            upon_opp_limit_conflict = portfolio_cfg["upon_opp_limit_conflict"]
         if sl_stop is None:
             sl_stop = portfolio_cfg["sl_stop"]
+        if tsl_delta is None:
+            tsl_delta = portfolio_cfg["tsl_delta"]
         if tsl_stop is None:
             tsl_stop = portfolio_cfg["tsl_stop"]
-        if ttp_th is None:
-            ttp_th = portfolio_cfg["ttp_th"]
-        if ttp_stop is None:
-            ttp_stop = portfolio_cfg["ttp_stop"]
         if tp_stop is None:
             tp_stop = portfolio_cfg["tp_stop"]
+        if use_stops is None:
+            use_stops = portfolio_cfg["use_stops"]
+        if use_stops is None:
+            if (
+                not np.any(sl_stop)
+                and not np.any(tsl_stop)
+                and not np.any(tp_stop)
+                and adjust_func_nb == nb.no_adjust_func_nb
+            ):
+                use_stops = False
+            else:
+                use_stops = True
         if stop_format is None:
             stop_format = portfolio_cfg["stop_format"]
         if stop_entry_price is None:
@@ -5390,21 +5398,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             upon_stop_exit = portfolio_cfg["upon_stop_exit"]
         if upon_stop_update is None:
             upon_stop_update = portfolio_cfg["upon_stop_update"]
-        if signal_priority is None:
-            signal_priority = portfolio_cfg["signal_priority"]
-        if use_stops is None:
-            use_stops = portfolio_cfg["use_stops"]
-        if use_stops is None:
-            if (
-                not np.any(sl_stop)
-                and not np.any(tsl_stop)
-                and not np.any(ttp_stop)
-                and not np.any(tp_stop)
-                and adjust_func_nb == nb.no_adjust_func_nb
-            ):
-                use_stops = False
-            else:
-                use_stops = True
+        if upon_adj_stop_conflict is None:
+            upon_adj_stop_conflict = portfolio_cfg["upon_adj_stop_conflict"]
+        if upon_opp_stop_conflict is None:
+            upon_opp_stop_conflict = portfolio_cfg["upon_opp_stop_conflict"]
 
         if init_cash is None:
             init_cash = portfolio_cfg["init_cash"]
@@ -5481,27 +5478,30 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             allow_partial=allow_partial,
             raise_reject=raise_reject,
             log=log,
+            val_price=val_price,
             accumulate=accumulate,
             upon_long_conflict=upon_long_conflict,
             upon_short_conflict=upon_short_conflict,
             upon_dir_conflict=upon_dir_conflict,
             upon_opposite_entry=upon_opposite_entry,
-            val_price=val_price,
-            open=open,
-            high=high,
-            low=low,
-            close=close,
+            signal_type=signal_type,
+            upon_adj_limit_conflict=upon_adj_limit_conflict,
+            upon_opp_limit_conflict=upon_opp_limit_conflict,
             sl_stop=sl_stop,
+            tsl_delta=tsl_delta,
             tsl_stop=tsl_stop,
-            ttp_th=ttp_th,
-            ttp_stop=ttp_stop,
             tp_stop=tp_stop,
             stop_format=stop_format,
             stop_entry_price=stop_entry_price,
             stop_exit_price=stop_exit_price,
             upon_stop_exit=upon_stop_exit,
             upon_stop_update=upon_stop_update,
-            signal_priority=signal_priority,
+            upon_adj_stop_conflict=upon_adj_stop_conflict,
+            upon_opp_stop_conflict=upon_opp_stop_conflict,
+            open=open,
+            high=high,
+            low=low,
+            close=close,
         )
         if bm_close is not None and not isinstance(bm_close, bool):
             broadcastable_args["bm_close"] = bm_close
@@ -5522,8 +5522,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             dict(
                 keep_flex=True,
                 reindex_kwargs=dict(
-                    cash_earnings=dict(fill_value=0.0),
-                    cash_dividends=dict(fill_value=0.0),
+                    entries=dict(fill_value=False),
+                    exits=dict(fill_value=False),
+                    short_entries=dict(fill_value=False),
+                    short_exits=dict(fill_value=False),
                     size=dict(fill_value=np.nan),
                     price=dict(fill_value=np.nan),
                     size_type=dict(fill_value=SizeType.Amount),
@@ -5540,32 +5542,33 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     allow_partial=dict(fill_value=True),
                     raise_reject=dict(fill_value=False),
                     log=dict(fill_value=False),
+                    val_price=dict(fill_value=np.nan),
                     accumulate=dict(fill_value=False),
                     upon_long_conflict=dict(fill_value=ConflictMode.Ignore),
                     upon_short_conflict=dict(fill_value=ConflictMode.Ignore),
                     upon_dir_conflict=dict(fill_value=DirectionConflictMode.Ignore),
                     upon_opposite_entry=dict(fill_value=OppositeEntryMode.ReverseReduce),
-                    val_price=dict(fill_value=np.nan),
-                    open=dict(fill_value=np.nan),
-                    high=dict(fill_value=np.nan),
-                    low=dict(fill_value=np.nan),
-                    close=dict(fill_value=np.nan),
-                    bm_close=dict(fill_value=np.nan),
+                    signal_type=dict(fill_value=SignalType.Market),
+                    upon_adj_limit_conflict=dict(fill_value=PendingConflictMode.KeepIgnore),
+                    upon_opp_limit_conflict=dict(fill_value=PendingConflictMode.CancelExecute),
                     sl_stop=dict(fill_value=np.nan),
+                    tsl_delta=dict(fill_value=np.nan),
                     tsl_stop=dict(fill_value=np.nan),
-                    ttp_th=dict(fill_value=np.nan),
-                    ttp_stop=dict(fill_value=np.nan),
                     tp_stop=dict(fill_value=np.nan),
                     stop_format=dict(fill_value=StopFormat.Relative),
                     stop_entry_price=dict(fill_value=StopEntryPrice.Close),
                     stop_exit_price=dict(fill_value=StopExitPrice.StopLimit),
                     upon_stop_exit=dict(fill_value=StopExitMode.Close),
                     upon_stop_update=dict(fill_value=StopUpdateMode.Override),
-                    signal_priority=dict(fill_value=SignalPriority.Stop),
-                    entries=dict(fill_value=False),
-                    exits=dict(fill_value=False),
-                    short_entries=dict(fill_value=False),
-                    short_exits=dict(fill_value=False),
+                    upon_adj_stop_conflict=dict(fill_value=PendingConflictMode.KeepExecute),
+                    upon_opp_stop_conflict=dict(fill_value=PendingConflictMode.KeepExecute),
+                    open=dict(fill_value=np.nan),
+                    high=dict(fill_value=np.nan),
+                    low=dict(fill_value=np.nan),
+                    close=dict(fill_value=np.nan),
+                    bm_close=dict(fill_value=np.nan),
+                    cash_earnings=dict(fill_value=0.0),
+                    cash_dividends=dict(fill_value=0.0),
                 ),
                 wrapper_kwargs=dict(
                     freq=freq,
@@ -5619,6 +5622,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     max_logs = int(np.max(np.sum(_log, axis=0)))
 
         # Convert strings to numbers
+        if "direction" in broadcasted_args:
+            broadcasted_args["direction"] = map_enum_fields(broadcasted_args["direction"], Direction)
         broadcasted_args["price"] = map_enum_fields(broadcasted_args["price"], PriceType, ignore_type=(int, float))
         broadcasted_args["size_type"] = map_enum_fields(broadcasted_args["size_type"], SizeType)
         broadcasted_args["price_area_vio_mode"] = map_enum_fields(
@@ -5645,25 +5650,44 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             broadcasted_args["upon_opposite_entry"],
             OppositeEntryMode,
         )
+        broadcasted_args["signal_type"] = map_enum_fields(broadcasted_args["signal_type"], SignalType)
+        broadcasted_args["upon_adj_limit_conflict"] = map_enum_fields(
+            broadcasted_args["upon_adj_limit_conflict"],
+            PendingConflictMode,
+        )
+        broadcasted_args["upon_opp_limit_conflict"] = map_enum_fields(
+            broadcasted_args["upon_opp_limit_conflict"],
+            PendingConflictMode,
+        )
         broadcasted_args["stop_format"] = map_enum_fields(broadcasted_args["stop_format"], StopFormat)
-        broadcasted_args["stop_entry_price"] = map_enum_fields(broadcasted_args["stop_entry_price"], StopEntryPrice)
+        broadcasted_args["stop_entry_price"] = map_enum_fields(
+            broadcasted_args["stop_entry_price"],
+            StopEntryPrice,
+            ignore_type=(int, float),
+        )
         broadcasted_args["stop_exit_price"] = map_enum_fields(broadcasted_args["stop_exit_price"], StopExitPrice)
         broadcasted_args["upon_stop_exit"] = map_enum_fields(broadcasted_args["upon_stop_exit"], StopExitMode)
         broadcasted_args["upon_stop_update"] = map_enum_fields(broadcasted_args["upon_stop_update"], StopUpdateMode)
-        broadcasted_args["signal_priority"] = map_enum_fields(broadcasted_args["signal_priority"], SignalPriority)
-        if "direction" in broadcasted_args:
-            broadcasted_args["direction"] = map_enum_fields(broadcasted_args["direction"], Direction)
+        broadcasted_args["upon_adj_stop_conflict"] = map_enum_fields(
+            broadcasted_args["upon_adj_stop_conflict"],
+            PendingConflictMode,
+        )
+        broadcasted_args["upon_opp_stop_conflict"] = map_enum_fields(
+            broadcasted_args["upon_opp_stop_conflict"],
+            PendingConflictMode,
+        )
 
         # Check data types
-        checks.assert_subdtype(cs_group_lens, np.integer)
-        if call_seq is not None:
-            checks.assert_subdtype(call_seq, np.integer)
-        checks.assert_subdtype(init_cash, np.number)
-        checks.assert_subdtype(init_position, np.number)
-        checks.assert_subdtype(init_price, np.number)
-        checks.assert_subdtype(cash_deposits, np.number)
-        checks.assert_subdtype(cash_earnings, np.number)
-        checks.assert_subdtype(cash_dividends, np.number)
+        if "entries" in broadcasted_args:
+            checks.assert_subdtype(broadcasted_args["entries"], np.bool_)
+        if "exits" in broadcasted_args:
+            checks.assert_subdtype(broadcasted_args["exits"], np.bool_)
+        if "short_entries" in broadcasted_args:
+            checks.assert_subdtype(broadcasted_args["short_entries"], np.bool_)
+        if "short_exits" in broadcasted_args:
+            checks.assert_subdtype(broadcasted_args["short_exits"], np.bool_)
+        if "direction" in broadcasted_args:
+            checks.assert_subdtype(broadcasted_args["direction"], np.integer)
         checks.assert_subdtype(broadcasted_args["size"], np.number)
         checks.assert_subdtype(broadcasted_args["price"], np.number)
         checks.assert_subdtype(broadcasted_args["size_type"], np.integer)
@@ -5679,39 +5703,41 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         checks.assert_subdtype(broadcasted_args["allow_partial"], np.bool_)
         checks.assert_subdtype(broadcasted_args["raise_reject"], np.bool_)
         checks.assert_subdtype(broadcasted_args["log"], np.bool_)
+        checks.assert_subdtype(broadcasted_args["val_price"], np.number)
         checks.assert_subdtype(broadcasted_args["accumulate"], (np.integer, np.bool_))
         checks.assert_subdtype(broadcasted_args["upon_long_conflict"], np.integer)
         checks.assert_subdtype(broadcasted_args["upon_short_conflict"], np.integer)
         checks.assert_subdtype(broadcasted_args["upon_dir_conflict"], np.integer)
         checks.assert_subdtype(broadcasted_args["upon_opposite_entry"], np.integer)
-        checks.assert_subdtype(broadcasted_args["val_price"], np.number)
+        checks.assert_subdtype(broadcasted_args["signal_type"], np.integer)
+        checks.assert_subdtype(broadcasted_args["upon_adj_limit_conflict"], np.integer)
+        checks.assert_subdtype(broadcasted_args["upon_opp_limit_conflict"], np.integer)
+        checks.assert_subdtype(broadcasted_args["sl_stop"], np.number)
+        checks.assert_subdtype(broadcasted_args["tsl_delta"], np.number)
+        checks.assert_subdtype(broadcasted_args["tsl_stop"], np.number)
+        checks.assert_subdtype(broadcasted_args["tp_stop"], np.number)
+        checks.assert_subdtype(broadcasted_args["stop_format"], np.integer)
+        checks.assert_subdtype(broadcasted_args["stop_entry_price"], np.number)
+        checks.assert_subdtype(broadcasted_args["stop_exit_price"], np.integer)
+        checks.assert_subdtype(broadcasted_args["upon_stop_exit"], np.integer)
+        checks.assert_subdtype(broadcasted_args["upon_stop_update"], np.integer)
+        checks.assert_subdtype(broadcasted_args["upon_adj_stop_conflict"], np.integer)
+        checks.assert_subdtype(broadcasted_args["upon_opp_stop_conflict"], np.integer)
         checks.assert_subdtype(broadcasted_args["open"], np.number)
         checks.assert_subdtype(broadcasted_args["high"], np.number)
         checks.assert_subdtype(broadcasted_args["low"], np.number)
         checks.assert_subdtype(broadcasted_args["close"], np.number)
-        checks.assert_subdtype(broadcasted_args["sl_stop"], np.number)
-        checks.assert_subdtype(broadcasted_args["tsl_stop"], np.number)
-        checks.assert_subdtype(broadcasted_args["ttp_th"], np.number)
-        checks.assert_subdtype(broadcasted_args["ttp_stop"], np.number)
-        checks.assert_subdtype(broadcasted_args["tp_stop"], np.number)
-        checks.assert_subdtype(broadcasted_args["stop_format"], np.integer)
-        checks.assert_subdtype(broadcasted_args["stop_entry_price"], np.integer)
-        checks.assert_subdtype(broadcasted_args["stop_exit_price"], np.integer)
-        checks.assert_subdtype(broadcasted_args["upon_stop_exit"], np.integer)
-        checks.assert_subdtype(broadcasted_args["upon_stop_update"], np.integer)
-        checks.assert_subdtype(broadcasted_args["signal_priority"], np.integer)
-        if "entries" in broadcasted_args:
-            checks.assert_subdtype(broadcasted_args["entries"], np.bool_)
-        if "exits" in broadcasted_args:
-            checks.assert_subdtype(broadcasted_args["exits"], np.bool_)
-        if "short_entries" in broadcasted_args:
-            checks.assert_subdtype(broadcasted_args["short_entries"], np.bool_)
-        if "short_exits" in broadcasted_args:
-            checks.assert_subdtype(broadcasted_args["short_exits"], np.bool_)
-        if "direction" in broadcasted_args:
-            checks.assert_subdtype(broadcasted_args["direction"], np.integer)
         if bm_close is not None and not isinstance(bm_close, bool):
             checks.assert_subdtype(broadcasted_args["bm_close"], np.number)
+        checks.assert_subdtype(cs_group_lens, np.integer)
+        if call_seq is not None:
+            checks.assert_subdtype(call_seq, np.integer)
+        checks.assert_subdtype(init_cash, np.number)
+        checks.assert_subdtype(init_position, np.number)
+        checks.assert_subdtype(init_price, np.number)
+        checks.assert_subdtype(cash_deposits, np.number)
+        checks.assert_subdtype(cash_earnings, np.number)
+        checks.assert_subdtype(cash_dividends, np.number)
 
         # Prepare arguments
         template_context = merge_dicts(
@@ -5805,7 +5831,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             cash_dividends=cash_dividends,
             signal_func_nb=signal_func_nb,
             signal_args=signal_args,
-            **broadcasted_args,
             use_stops=use_stops,
             auto_call_seq=auto_call_seq,
             ffill_val_price=ffill_val_price,
@@ -5814,6 +5839,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             max_orders=max_orders,
             max_logs=max_logs,
             flex_2d=flex_2d,
+            **broadcasted_args,
         )
 
         # Create an instance

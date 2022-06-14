@@ -15,6 +15,8 @@ __all__ = [
     "ValPriceType",
     "InitCashMode",
     "CallSeqType",
+    "SignalType",
+    "PendingConflictMode",
     "AccumulationMode",
     "ConflictMode",
     "DirectionConflictMode",
@@ -24,7 +26,6 @@ __all__ = [
     "StopExitPrice",
     "StopExitMode",
     "StopUpdateMode",
-    "SignalPriority",
     "SizeType",
     "Direction",
     "PriceAreaVioMode",
@@ -58,6 +59,10 @@ __all__ = [
     "log_dt",
     "alloc_range_dt",
     "alloc_point_dt",
+    "limit_info_dt",
+    "sl_info_dt",
+    "tsl_info_dt",
+    "tp_info_dt",
 ]
 
 __pdoc__ = {}
@@ -167,6 +172,56 @@ Attributes:
 """
 
 
+class SignalTypeT(tp.NamedTuple):
+    Market: int = 0
+    Limit: int = 1
+
+
+SignalType = SignalTypeT()
+"""_"""
+
+__pdoc__[
+    "SignalType"
+] = f"""Signal type.
+
+```python
+{prettify(SignalType)}
+```
+
+Attributes:
+    Market: Signal acts as a market order.
+    Limit: Signal acts as a limit order.
+"""
+
+
+class PendingConflictModeT(tp.NamedTuple):
+    KeepIgnore: int = 0
+    KeepExecute: int = 1
+    CancelIgnore: int = 2
+    CancelExecute: int = 3
+
+
+PendingConflictMode = PendingConflictModeT()
+"""_"""
+
+__pdoc__[
+    "PendingConflictMode"
+] = f"""Conflict mode for pending signals.
+
+```python
+{prettify(PendingConflictMode)}
+```
+
+What should happen if a user-defined signal occurs during a pending (limit/stop) signal?
+
+Attributes:
+    KeepIgnore: Keep the pending signal and cancel the user-defined signal.
+    KeepExecute: Keep the pending signal and execute the user-defined signal.
+    CancelIgnore: Cancel the pending signal and ignore the user-defined signal.
+    CancelExecute: Cancel the pending signal and execute the user-defined signal.
+"""
+
+
 class AccumulationModeT(tp.NamedTuple):
     Disabled: int = 0
     Both: int = 1
@@ -221,7 +276,7 @@ __pdoc__[
 {prettify(ConflictMode)}
 ```
 
-What should happen if both entry and exit signals occur simultaneously?
+What should happen if both an entry signal and an exit signal occur simultaneously?
 
 Attributes:
     Ignore: Ignore both signals.
@@ -255,7 +310,7 @@ __pdoc__[
 {prettify(DirectionConflictMode)}
 ```
 
-What should happen if both long and short entry signals occur simultaneously?
+What should happen if both a long entry signal and a short entry signals occur simultaneously?
 
 Attributes:
     Ignore: Ignore both entry signals.
@@ -325,11 +380,11 @@ Attributes:
 
 
 class StopEntryPriceT(tp.NamedTuple):
-    ValPrice: int = 0
-    Price: int = 1
-    FillPrice: int = 2
-    Open: int = 3
-    Close: int = 4
+    ValPrice: int = -1
+    Price: int = -2
+    FillPrice: int = -3
+    Open: int = -4
+    Close: int = -5
 
 
 StopEntryPrice = StopEntryPriceT()
@@ -351,14 +406,16 @@ Attributes:
     FillPrice: Filled order price (that is, slippage is already applied).
     Open: Opening price.
     Close: Closing price.
+    
+!!! note
+    Each flag is negative, thus if a positive value is provided, it's used directly as price.
 """
 
 
 class StopExitPriceT(tp.NamedTuple):
     StopLimit: int = 0
     StopMarket: int = 1
-    Price: int = 2
-    Close: int = 3
+    Close: int = 2
 
 
 StopExitPrice = StopExitPriceT()
@@ -383,26 +440,9 @@ Attributes:
     
         If the stop was hit before, the opening price at the next bar is used.
         User-defined slippage is applied.
-    Price: Default order price.
-                
-        User-defined slippage is applied.
-    
-        !!! note
-            Make sure to use `StopExitPrice.Price` only together with `StopEntryPrice.Close`.
-            Otherwise, there is no proof that the price comes after the stop price.
     Close: Closing price.
     
         User-defined slippage is applied.
-        
-!!! note
-    We can execute only one signal per asset and bar. This means the following:
-    
-    1) Stop signal cannot be processed at the same bar as the entry signal.
-    
-    2) When dealing with stop orders, we have another signal - stop signal - that may be in a conflict 
-    with the signals placed by the user. To choose between both, we assume that any stop signal comes 
-    before any other signal in time. Thus, make sure to always execute ordinary signals using the 
-    closing price when using stop orders. Otherwise, you're looking into the future.
 """
 
 
@@ -452,36 +492,12 @@ __pdoc__[
 {prettify(StopUpdateMode)}
 ```
 
-What to do with the old stop upon new acquisition? 
+What to do with the old stop upon a new entry/accumulation? 
 
 Attributes:
     Keep: Keep the old stop.
     Override: Override the old stop, but only if the new stop is not NaN.
     OverrideNaN: Override the old stop, even if the new stop is NaN.
-"""
-
-
-class SignalPriorityT(tp.NamedTuple):
-    Stop: int = 0
-    User: int = 1
-
-
-SignalPriority = SignalPriorityT()
-"""_"""
-
-__pdoc__[
-    "SignalPriority"
-] = f"""Signal priority.
-
-```python
-{prettify(SignalPriority)}
-```
-
-Which signal comes first if both stop signal or user-defined signal are executable?
-
-Attributes:
-    Stop: Stop signal comes first.
-    User: User-defined signal comes first.
 """
 
 
@@ -2062,7 +2078,6 @@ class SignalContext(tp.NamedTuple):
     target_shape: tp.Shape
     group_lens: tp.Array1d
     cash_sharing: bool
-    call_seq: tp.Optional[tp.Array2d]
     open: tp.Array
     high: tp.Array
     low: tp.Array
@@ -2088,23 +2103,10 @@ class SignalContext(tp.NamedTuple):
     last_value: tp.Array1d
     last_return: tp.Array1d
 
-    sl_init_i: tp.Array1d
-    sl_init_price: tp.Array1d
-    sl_curr_stop: tp.Array1d
-    tsl_init_i: tp.Array1d
-    tsl_init_price: tp.Array1d
-    tsl_curr_i: tp.Array1d
-    tsl_curr_price: tp.Array1d
-    tsl_curr_stop: tp.Array1d
-    ttp_init_i: tp.Array1d
-    ttp_init_price: tp.Array1d
-    ttp_curr_i: tp.Array1d
-    ttp_curr_price: tp.Array1d
-    ttp_curr_th: tp.Array1d
-    ttp_curr_stop: tp.Array1d
-    tp_init_i: tp.Array1d
-    tp_init_price: tp.Array1d
-    tp_curr_stop: tp.Array1d
+    last_limit_info: tp.Array1d
+    last_sl_info: tp.Array1d
+    last_tsl_info: tp.Array1d
+    last_tp_info: tp.Array1d
 
     group: int
     group_len: int
@@ -2126,7 +2128,6 @@ Passed to `signal_func_nb` and `adjust_func_nb`."""
 __pdoc__["SignalContext.target_shape"] = "See `SimulationContext.target_shape`."
 __pdoc__["SignalContext.group_lens"] = "See `SimulationContext.group_lens`."
 __pdoc__["SignalContext.cash_sharing"] = "See `SimulationContext.cash_sharing`."
-__pdoc__["SignalContext.call_seq"] = "See `SimulationContext.call_seq`."
 __pdoc__["SignalContext.open"] = "See `SimulationContext.open`."
 __pdoc__["SignalContext.high"] = "See `SimulationContext.high`."
 __pdoc__["SignalContext.low"] = "See `SimulationContext.low`."
@@ -2152,23 +2153,18 @@ __pdoc__["SignalContext.last_free_cash"] = "See `SimulationContext.last_free_cas
 __pdoc__["SignalContext.last_val_price"] = "See `SimulationContext.last_val_price`."
 __pdoc__["SignalContext.last_value"] = "See `SimulationContext.last_value`."
 __pdoc__["SignalContext.last_return"] = "See `SimulationContext.last_return`."
-__pdoc__["SignalContext.sl_init_i"] = "Entry row for SL."
-__pdoc__["SignalContext.sl_init_price"] = "Entry price for SL."
-__pdoc__["SignalContext.sl_curr_stop"] = "Latest updated stop value for SL."
-__pdoc__["SignalContext.tsl_init_i"] = "Entry row for TSL."
-__pdoc__["SignalContext.tsl_init_price"] = "Entry price for TSL."
-__pdoc__["SignalContext.tsl_curr_i"] = "Row of the latest price update for TSL."
-__pdoc__["SignalContext.tsl_curr_price"] = "Latest updated price for TSL."
-__pdoc__["SignalContext.tsl_curr_stop"] = "Latest updated stop value for TSL."
-__pdoc__["SignalContext.ttp_init_i"] = "Entry row for TTP."
-__pdoc__["SignalContext.ttp_init_price"] = "Entry price for TTP."
-__pdoc__["SignalContext.ttp_curr_i"] = "Row of the latest price update for TTP."
-__pdoc__["SignalContext.ttp_curr_price"] = "Latest updated price for TTP."
-__pdoc__["SignalContext.ttp_curr_th"] = "Latest updated threshold value for TTP."
-__pdoc__["SignalContext.ttp_curr_stop"] = "Latest updated stop value for TTP."
-__pdoc__["SignalContext.tp_init_i"] = "Entry row for TP."
-__pdoc__["SignalContext.tp_init_price"] = "Entry price for TP."
-__pdoc__["SignalContext.tp_curr_stop"] = "Latest updated stop value for TP."
+__pdoc__["SignalContext.last_limit_info"] = """Record of type `limit_info_dt` per column.
+
+Accessible via `c.limit_info_dt[field][col]`."""
+__pdoc__["SignalContext.last_sl_info"] = """Record of type `sl_info_dt` per column.
+
+Accessible via `c.last_sl_info[field][col]`."""
+__pdoc__["SignalContext.last_tsl_info"] = """Record of type `tsl_info_dt` per column.
+
+Accessible via `c.last_tsl_info[field][col]`."""
+__pdoc__["SignalContext.last_tp_info"] = """Record of type `tp_info_dt` per column.
+
+Accessible via `c.last_tp_info[field][col]`."""
 __pdoc__["SignalContext.group"] = "See `GroupContext.group`."
 __pdoc__["SignalContext.group_len"] = "See `GroupContext.group_len`."
 __pdoc__["SignalContext.from_col"] = "See `GroupContext.from_col`."
@@ -2354,4 +2350,105 @@ __pdoc__[
 ```python
 {prettify(alloc_point_dt)}
 ```
+"""
+
+# ############# Info records ############# #
+
+limit_info_dt = np.dtype(
+    [
+        ("init_i", np.int_),
+        ("init_price", np.float_),
+        ("init_size", np.float_),
+        ("init_size_type", np.float_),
+        ("init_direction", np.float_),
+    ],
+    align=True,
+)
+"""_"""
+
+__pdoc__[
+    "limit_info_dt"
+] = f"""`np.dtype` of limit information.
+
+```python
+{prettify(limit_info_dt)}
+```
+"""
+
+sl_info_dt = np.dtype(
+    [
+        ("init_i", np.int_),
+        ("init_price", np.float_),
+        ("curr_stop", np.float_),
+    ],
+    align=True,
+)
+"""_"""
+
+__pdoc__[
+    "sl_info_dt"
+] = f"""`np.dtype` of SL information.
+
+```python
+{prettify(sl_info_dt)}
+```
+
+Attributes:
+    init_i: Entry row.
+    init_price: Entry price.
+    curr_stop: Latest updated stop value.
+"""
+
+tsl_info_dt = np.dtype(
+    [
+        ("init_i", np.int_),
+        ("init_price", np.float_),
+        ("curr_i", np.int_),
+        ("curr_price", np.float_),
+        ("curr_delta", np.float_),
+        ("curr_stop", np.float_),
+    ],
+    align=True,
+)
+"""_"""
+
+__pdoc__[
+    "tsl_info_dt"
+] = f"""`np.dtype` of TSL information.
+
+```python
+{prettify(tsl_info_dt)}
+```
+
+Attributes:
+    init_i: Entry row.
+    init_price: Entry price.
+    curr_i: Row of the latest price update.
+    curr_price: Latest updated price.
+    curr_delta: Latest updated delta value.
+    curr_stop: Latest updated stop value.
+"""
+
+tp_info_dt = np.dtype(
+    [
+        ("init_i", np.int_),
+        ("init_price", np.float_),
+        ("curr_stop", np.float_),
+    ],
+    align=True,
+)
+"""_"""
+
+__pdoc__[
+    "tp_info_dt"
+] = f"""`np.dtype` of TP information.
+
+```python
+{prettify(tp_info_dt)}
+```
+
+Attributes:
+    init_i: Entry row.
+    init_price: Entry price.
+    curr_stop: Latest updated stop value.
 """

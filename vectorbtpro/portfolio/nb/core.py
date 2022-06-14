@@ -35,7 +35,7 @@ def check_adj_price_nb(
             adj_price = price_area.high
     if adj_price < price_area.low:
         if price_area_vio_mode == PriceAreaVioMode.Error:
-            raise ValueError("Adjusted order price is below than the lowest price")
+            raise ValueError("Adjusted order price is below the lowest price")
         elif price_area_vio_mode == PriceAreaVioMode.Cap:
             adj_price = price_area.low
     if is_closing_price and adj_price != price_area.close:

@@ -555,10 +555,9 @@ def ohlc_stop_place_nb(
     stop_price_out: tp.Array2d,
     stop_type_out: tp.Array2d,
     sl_stop: tp.FlexArray = np.asarray(np.nan),
+    tsl_delta: tp.FlexArray = np.asarray(np.nan),
     tsl_stop: tp.FlexArray = np.asarray(np.nan),
     tp_stop: tp.FlexArray = np.asarray(np.nan),
-    ttp_th: tp.FlexArray = np.asarray(np.nan),
-    ttp_stop: tp.FlexArray = np.asarray(np.nan),
     reverse: tp.FlexArray = np.asarray(False),
     is_entry_open: bool = False,
     flex_2d: bool = False,
@@ -597,18 +596,15 @@ def ohlc_stop_place_nb(
         sl_stop (array of float): Stop loss as a percentage.
 
             Utilizes flexible indexing. Set an element to `np.nan` or `0` to disable.
-        tsl_stop (array of bool): Trailing stop loss as a percentage.
+        tsl_delta (array of float): Take profit delta as a percentage for the trailing stop loss.
+
+            Utilizes flexible indexing. Set an element to `np.nan` or `0` to disable.
+        tsl_stop (array of float): Trailing stop loss as a percentage for the trailing stop loss.
 
             Utilizes flexible indexing. Set an element to `np.nan` or `0` to disable.
         tp_stop (array of float): Take profit as a percentage.
 
             Utilizes flexible indexing. Set an element to `np.nan` or `0` to disable.
-        ttp_th (array of float): Take profit threshold as a percentage for the trailing take profit.
-
-            Utilizes flexible indexing. Requires `ttp_stop`. Set an element to `np.nan` or `0` to disable.
-        ttp_stop (array of float): Trailing stop loss as a percentage for the trailing take profit.
-
-            Utilizes flexible indexing. Requires `ttp_th`. Set an element to `np.nan` or `0` to disable.
         reverse (array of float): Whether to do the opposite, i.e.: prices are followed downwards.
 
             Utilizes flexible indexing.
@@ -624,22 +620,15 @@ def ohlc_stop_place_nb(
     init_sl_stop = abs(flex_select_auto_nb(sl_stop, init_i, c.col, flex_2d))
     if init_sl_stop == 0:
         init_sl_stop = np.nan
-    init_tsl_stop = abs(flex_select_auto_nb(tsl_stop, init_i, c.col, flex_2d))
-    if init_tsl_stop == 0:
-        init_tsl_stop = np.nan
     init_tp_stop = abs(flex_select_auto_nb(tp_stop, init_i, c.col, flex_2d))
     if init_tp_stop == 0:
         init_tp_stop = np.nan
-    init_ttp_th = abs(flex_select_auto_nb(ttp_th, init_i, c.col, flex_2d))
-    if init_ttp_th == 0:
-        init_ttp_th = np.nan
-    init_ttp_stop = abs(flex_select_auto_nb(ttp_stop, init_i, c.col, flex_2d))
-    if init_ttp_stop == 0:
-        init_ttp_stop = np.nan
-    if not np.isnan(init_ttp_th) and np.isnan(init_ttp_stop):
-        raise ValueError("TTP threshold requires a finite stop value")
-    if np.isnan(init_ttp_th) and not np.isnan(init_ttp_stop):
-        raise ValueError("TTP stop requires a finite threshold value")
+    init_tsl_delta = abs(flex_select_auto_nb(tsl_delta, init_i, c.col, flex_2d))
+    if init_tsl_delta == 0:
+        init_tsl_delta = np.nan
+    init_tsl_stop = abs(flex_select_auto_nb(tsl_stop, init_i, c.col, flex_2d))
+    if init_tsl_stop == 0:
+        init_tsl_stop = np.nan
     init_reverse = flex_select_auto_nb(reverse, init_i, c.col, flex_2d)
     last_high = last_low = init_entry_price
 
@@ -683,26 +672,27 @@ def ohlc_stop_place_nb(
                 else:
                     curr_sl_stop_price = init_entry_price * (1 - init_sl_stop)
             if not np.isnan(init_tsl_stop):
-                if init_reverse:
-                    curr_tsl_stop_price = last_low * (1 + init_tsl_stop)
+                if np.isnan(init_tsl_delta):
+                    if init_reverse:
+                        curr_tsl_stop_price = last_low * (1 + init_tsl_stop)
+                    else:
+                        curr_tsl_stop_price = last_high * (1 - init_tsl_stop)
                 else:
-                    curr_tsl_stop_price = last_high * (1 - init_tsl_stop)
+                    if init_reverse:
+                        if last_low <= init_entry_price * (1 - init_tsl_delta):
+                            curr_tsl_stop_price = last_low * (1 + init_tsl_stop)
+                        else:
+                            curr_tsl_stop_price = np.nan
+                    else:
+                        if last_high >= init_entry_price * (1 + init_tsl_delta):
+                            curr_tsl_stop_price = last_high * (1 - init_tsl_stop)
+                        else:
+                            curr_tsl_stop_price = np.nan
             if not np.isnan(init_tp_stop):
                 if init_reverse:
                     curr_tp_stop_price = init_entry_price * (1 - init_tp_stop)
                 else:
                     curr_tp_stop_price = init_entry_price * (1 + init_tp_stop)
-            if not np.isnan(init_ttp_stop):
-                if init_reverse:
-                    if last_low <= init_entry_price * (1 - init_ttp_th):
-                        curr_ttp_stop_price = last_low * (1 + init_ttp_stop)
-                    else:
-                        curr_ttp_stop_price = np.nan
-                else:
-                    if last_high >= init_entry_price * (1 + init_ttp_th):
-                        curr_ttp_stop_price = last_high * (1 - init_ttp_stop)
-                    else:
-                        curr_ttp_stop_price = np.nan
 
             # Check if stop price is within bar
             exit_signal = False
@@ -725,7 +715,7 @@ def ohlc_stop_place_nb(
                     exit_signal = True
 
             if not exit_signal and not np.isnan(init_tsl_stop):
-                # TSL hit?
+                # TSL/TTP hit?
                 stop_price = np.nan
                 if not init_reverse:
                     if _open <= curr_tsl_stop_price:
@@ -739,25 +729,10 @@ def ohlc_stop_place_nb(
                         stop_price = curr_tsl_stop_price
                 if not np.isnan(stop_price):
                     stop_price_out[i, c.col] = stop_price
-                    stop_type_out[i, c.col] = StopType.TSL
-                    exit_signal = True
-
-            if not exit_signal and not np.isnan(init_ttp_stop):
-                # TTP hit?
-                stop_price = np.nan
-                if not init_reverse:
-                    if _open <= curr_ttp_stop_price:
-                        stop_price = _open
-                    if curr_low <= curr_ttp_stop_price:
-                        stop_price = curr_ttp_stop_price
-                else:
-                    if _open >= curr_ttp_stop_price:
-                        stop_price = _open
-                    if curr_high >= curr_ttp_stop_price:
-                        stop_price = curr_ttp_stop_price
-                if not np.isnan(stop_price):
-                    stop_price_out[i, c.col] = stop_price
-                    stop_type_out[i, c.col] = StopType.TTP
+                    if np.isnan(init_tsl_delta):
+                        stop_type_out[i, c.col] = StopType.TSL
+                    else:
+                        stop_type_out[i, c.col] = StopType.TTP
                     exit_signal = True
 
             if not exit_signal and not np.isnan(init_tp_stop):

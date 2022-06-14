@@ -18,8 +18,8 @@ __pdoc__ = {}
 class StopTypeT(tp.NamedTuple):
     SL: int = 0
     TSL: int = 1
-    TP: int = 2
-    TTP: int = 3
+    TTP: int = 2
+    TP: int = 3
 
 
 StopType = StopTypeT()

@@ -309,7 +309,7 @@ class Orders(PriceRecords):
                 }
             )
             if "opacity" not in ohlc_trace_kwargs:
-                ohlc_trace_kwargs["opacity"] = 0.5
+                ohlc_trace_kwargs["opacity"] = 0.65
             fig = ohlc_df.vbt.ohlcv.plot(
                 ohlc_type=ohlc_type,
                 plot_volume=False,
