@@ -1109,6 +1109,7 @@ portfolio = ChildDict(
     upon_opposite_entry="reversereduce",
     signal_type="market",
     limit_delta=np.nan,
+    limit_tif=-1,
     upon_adj_limit_conflict="keepignore",
     upon_opp_limit_conflict="cancelexecute",
     use_stops=None,
@@ -1123,6 +1124,7 @@ portfolio = ChildDict(
     upon_adj_stop_conflict="keepexecute",
     upon_opp_stop_conflict="keepexecute",
     delta_format="percent",
+    time_delta_format="rows",
     # Holding
     hold_direction="longonly",
     close_at_end=False,

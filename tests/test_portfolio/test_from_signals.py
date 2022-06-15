@@ -2043,6 +2043,118 @@ class TestFromSignals:
             ),
         )
 
+    def test_limit_tif(self):
+        entries = pd.Series([True, False, False, False, False], index=price.index)
+        exits = pd.Series([False, False, False, False, False], index=price.index)
+        close = pd.Series([5.0, 4.0, 3.0, 2.0, 1.0], index=price.index)
+
+        assert_records_close(
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                signal_type="limit",
+                price=3,
+                limit_tif=[[-1, 0, 1, 2]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 2, 33.333333333333336, 3.0, 0.0, 0),
+                    (0, 3, 2, 33.333333333333336, 3.0, 0.0, 0),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        assert_records_close(
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                signal_type="limit",
+                price=3,
+                limit_tif=[[-1, 0, 1, 2]],
+                time_delta_format="rows",
+            ).order_records,
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                signal_type="limit",
+                price=3,
+                limit_tif=[[-1, 0 * day_dt, 1 * day_dt, 2 * day_dt]],
+                time_delta_format="index",
+            ).order_records,
+        )
+        assert_records_close(
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                signal_type="limit",
+                price=3,
+                limit_tif="1d",
+                time_delta_format="index",
+            ).order_records,
+            np.array(
+                [],
+                dtype=order_dt,
+            ),
+        )
+        assert_records_close(
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                signal_type="limit",
+                price=3,
+                limit_tif=pd.Timedelta("1d"),
+                time_delta_format="index",
+            ).order_records,
+            np.array(
+                [],
+                dtype=order_dt,
+            ),
+        )
+        assert_records_close(
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                signal_type="limit",
+                price=3,
+                limit_tif=pd.Timedelta("2d"),
+                time_delta_format="index",
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 2, 33.333333333333336, 3.0, 0.0, 0),
+                ],
+                dtype=order_dt,
+            ),
+        )
+
+        entries2 = pd.Series([True, False, True, False, False], index=price.index)
+        limit_tif = pd.Series([1, -1, 1, -1, -1], index=price.index)
+        price2 = pd.Series([4.0, 3.0, 1.0, 1.0, 1.0], index=price.index)
+        assert_records_close(
+            from_signals_longonly(
+                close=close,
+                entries=entries2,
+                exits=exits,
+                size=1,
+                accumulate=True,
+                signal_type="limit",
+                price=price2,
+                limit_tif=limit_tif,
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 1, 1.0, 4.0, 0.0, 0),
+                ],
+                dtype=order_dt,
+            ),
+        )
+
     def test_upon_adj_limit_conflict(self):
         entries = pd.Series([True, True, False, False, False], index=price.index)
         entries2 = pd.Series([True, False, False, True, False], index=price.index)

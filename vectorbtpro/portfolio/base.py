@@ -1624,12 +1624,13 @@ import inspect
 import warnings
 from collections import namedtuple
 from functools import partial
+from datetime import timedelta
 
 import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, broadcast, broadcast_to, to_pd_array, shape_to_2d
+from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, broadcast, broadcast_to, to_pd_array, shape_to_2d, BCO
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.data.base import Data
@@ -1656,6 +1657,7 @@ from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig
+from vectorbtpro.utils.datetime_ import freq_to_timedelta64
 from vectorbtpro.utils.decorators import custom_property, cached_property, class_or_instancemethod
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.mapping import to_mapping
@@ -4588,6 +4590,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         upon_opposite_entry: tp.Optional[tp.ArrayLike] = None,
         signal_type: tp.Optional[tp.ArrayLike] = None,
         limit_delta: tp.Optional[tp.ArrayLike] = None,
+        limit_tif: tp.Optional[tp.ArrayLike] = None,
         upon_adj_limit_conflict: tp.Optional[tp.ArrayLike] = None,
         upon_opp_limit_conflict: tp.Optional[tp.ArrayLike] = None,
         use_stops: tp.Optional[bool] = None,
@@ -4602,6 +4605,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         upon_adj_stop_conflict: tp.Optional[tp.ArrayLike] = None,
         upon_opp_stop_conflict: tp.Optional[tp.ArrayLike] = None,
         delta_format: tp.Optional[tp.ArrayLike] = None,
+        time_delta_format: tp.Optional[tp.ArrayLike] = None,
         open: tp.Optional[tp.ArrayLike] = None,
         high: tp.Optional[tp.ArrayLike] = None,
         low: tp.Optional[tp.ArrayLike] = None,
@@ -4721,7 +4725,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             upon_opposite_entry (OppositeEntryMode or array_like): See `vectorbtpro.portfolio.enums.OppositeEntryMode`.
                 Will broadcast.
             signal_type (SignalType or array_like): See `vectorbtpro.portfolio.enums.SignalType`.
-            limit_delta (float or array_like): Delta from `price` to build a limit price.
+            limit_delta (float or array_like): Delta from `price` to build the limit price.
                 Will broadcast.
 
                 If NaN, `price` becomes limit price. Otherwise, applied on top of `price` depending
@@ -4729,7 +4733,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 will decrease the limit price; if the direction-aware size is negative (= selling), a positive delta
                 will increase the limit price. Delta can be negative.
 
-                Set an element to `np.nan` to disable.
+                Set an element to `np.nan` to disable. Use `delta_format` to specify the format.
+            limit_tif (frequency_like or array_like): Time in force for limit signals.
+                Will broadcast.
+
+                Any frequency-like object is converted using `vectorbtpro.utils.datetime_.freq_to_timedelta64`.
+                Any array is cast into integer format.
+
+                Set an element to `-1` to disable. Use `time_delta_format` to specify the format.
             upon_adj_limit_conflict (PendingConflictMode or array_like): Conflict mode for limit and user-defined
                 signals of adjacent sign. See `vectorbtpro.portfolio.enums.PendingConflictMode`. Will broadcast.
             upon_opp_limit_conflict (PendingConflictMode or array_like): Conflict mode for limit and user-defined
@@ -4742,19 +4753,19 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             sl_stop (array_like of float): Stop loss.
                 Will broadcast.
 
-                Set an element to `np.nan` to disable.
+                Set an element to `np.nan` to disable. Use `delta_format` to specify the format.
             tsl_th (array_like of float): Take profit threshold for the trailing stop loss.
                 Will broadcast.
                 
-                Set an element to `np.nan` to disable.
+                Set an element to `np.nan` to disable. Use `delta_format` to specify the format.
             tsl_stop (array_like of float): Trailing stop loss for the trailing stop loss.
                 Will broadcast.
 
-                Set an element to `np.nan` to disable.
+                Set an element to `np.nan` to disable. Use `delta_format` to specify the format.
             tp_stop (array_like of float): Take profit.
                 Will broadcast.
 
-                Set an element to `np.nan` to disable.
+                Set an element to `np.nan` to disable. Use `delta_format` to specify the format.
             stop_entry_price (StopEntryPrice or array_like): See `vectorbtpro.portfolio.enums.StopEntryPrice`.
                 Will broadcast.
 
@@ -4780,8 +4791,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 signals of opposite sign. See `vectorbtpro.portfolio.enums.PendingConflictMode`. Will broadcast.
             delta_format (DeltaFormat or array_like): See `vectorbtpro.portfolio.enums.DeltaFormat`.
                 Will broadcast.
-
-                Gets applied on each limit delta value, stop value, and stop delta value.
+            time_delta_format (TimeDeltaFormat or array_like): See `vectorbtpro.portfolio.enums.TimeDeltaFormat`.
+                Will broadcast.
             open (array_like of float): See `Portfolio.from_orders`.
 
                 For stop signals, `np.nan` gets replaced by `close`.
@@ -5375,6 +5386,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             signal_type = portfolio_cfg["signal_type"]
         if limit_delta is None:
             limit_delta = portfolio_cfg["limit_delta"]
+        if limit_tif is None:
+            limit_tif = portfolio_cfg["limit_tif"]
+        if isinstance(limit_tif, (str, timedelta, pd.DateOffset, pd.Timedelta)):
+            limit_tif = freq_to_timedelta64(limit_tif)
         if upon_adj_limit_conflict is None:
             upon_adj_limit_conflict = portfolio_cfg["upon_adj_limit_conflict"]
         if upon_opp_limit_conflict is None:
@@ -5413,6 +5428,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             upon_opp_stop_conflict = portfolio_cfg["upon_opp_stop_conflict"]
         if delta_format is None:
             delta_format = portfolio_cfg["delta_format"]
+        if time_delta_format is None:
+            time_delta_format = portfolio_cfg["time_delta_format"]
 
         if init_cash is None:
             init_cash = portfolio_cfg["init_cash"]
@@ -5497,6 +5514,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             upon_opposite_entry=upon_opposite_entry,
             signal_type=signal_type,
             limit_delta=limit_delta,
+            limit_tif=limit_tif,
             upon_adj_limit_conflict=upon_adj_limit_conflict,
             upon_opp_limit_conflict=upon_opp_limit_conflict,
             sl_stop=sl_stop,
@@ -5510,6 +5528,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             upon_adj_stop_conflict=upon_adj_stop_conflict,
             upon_opp_stop_conflict=upon_opp_stop_conflict,
             delta_format=delta_format,
+            time_delta_format=time_delta_format,
             open=open,
             high=high,
             low=low,
@@ -5562,6 +5581,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     upon_opposite_entry=dict(fill_value=OppositeEntryMode.ReverseReduce),
                     signal_type=dict(fill_value=SignalType.Market),
                     limit_delta=dict(fill_value=np.nan),
+                    limit_tif=dict(fill_value=-1),
                     upon_adj_limit_conflict=dict(fill_value=PendingConflictMode.KeepIgnore),
                     upon_opp_limit_conflict=dict(fill_value=PendingConflictMode.CancelExecute),
                     sl_stop=dict(fill_value=np.nan),
@@ -5575,6 +5595,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     upon_adj_stop_conflict=dict(fill_value=PendingConflictMode.KeepExecute),
                     upon_opp_stop_conflict=dict(fill_value=PendingConflictMode.KeepExecute),
                     delta_format=dict(fill_value=DeltaFormat.Percent),
+                    time_delta_format=dict(fill_value=TimeDeltaFormat.Rows),
                     open=dict(fill_value=np.nan),
                     high=dict(fill_value=np.nan),
                     low=dict(fill_value=np.nan),
@@ -5583,6 +5604,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     cash_earnings=dict(fill_value=0.0),
                     cash_dividends=dict(fill_value=0.0),
                 ),
+                post_func=dict(limit_tif=lambda x: x.astype(np.int_)),
                 wrapper_kwargs=dict(
                     freq=freq,
                     group_by=group_by,
@@ -5597,6 +5619,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cash_dividends = broadcasted_args.pop("cash_dividends")
         flex_2d = wrapper.ndim == 2
         target_shape_2d = (wrapper.shape[0], wrapper.shape_2d[1])
+        index = wrapper.index
+        if isinstance(index, pd.DatetimeIndex):
+            index = index.tz_localize(None).tz_localize("utc")
+        index = index.values.astype(np.int_)
 
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
         init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)
@@ -5689,6 +5715,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             PendingConflictMode,
         )
         broadcasted_args["delta_format"] = map_enum_fields(broadcasted_args["delta_format"], DeltaFormat)
+        broadcasted_args["time_delta_format"] = map_enum_fields(broadcasted_args["time_delta_format"], TimeDeltaFormat)
 
         # Check data types
         if "entries" in broadcasted_args:
@@ -5724,6 +5751,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         checks.assert_subdtype(broadcasted_args["upon_opposite_entry"], np.integer)
         checks.assert_subdtype(broadcasted_args["signal_type"], np.integer)
         checks.assert_subdtype(broadcasted_args["limit_delta"], np.number)
+        checks.assert_subdtype(broadcasted_args["limit_tif"], np.number)
         checks.assert_subdtype(broadcasted_args["upon_adj_limit_conflict"], np.integer)
         checks.assert_subdtype(broadcasted_args["upon_opp_limit_conflict"], np.integer)
         checks.assert_subdtype(broadcasted_args["sl_stop"], np.number)
@@ -5737,6 +5765,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         checks.assert_subdtype(broadcasted_args["upon_adj_stop_conflict"], np.integer)
         checks.assert_subdtype(broadcasted_args["upon_opp_stop_conflict"], np.integer)
         checks.assert_subdtype(broadcasted_args["delta_format"], np.integer)
+        checks.assert_subdtype(broadcasted_args["time_delta_format"], np.integer)
         checks.assert_subdtype(broadcasted_args["open"], np.number)
         checks.assert_subdtype(broadcasted_args["high"], np.number)
         checks.assert_subdtype(broadcasted_args["low"], np.number)
@@ -5758,6 +5787,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             broadcasted_args,
             dict(
                 target_shape=target_shape_2d,
+                index=index,
                 group_lens=cs_group_lens,
                 call_seq=call_seq,
                 init_cash=init_cash,
@@ -5836,7 +5866,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         sim_out = func(
             target_shape=target_shape_2d,
             group_lens=cs_group_lens,  # group only if cash sharing is enabled to speed up
-            call_seq=call_seq,
+            index=index,
             init_cash=init_cash,
             init_position=init_position,
             init_price=init_price,
@@ -5846,6 +5876,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             signal_func_nb=signal_func_nb,
             signal_args=signal_args,
             use_stops=use_stops,
+            call_seq=call_seq,
             auto_call_seq=auto_call_seq,
             ffill_val_price=ffill_val_price,
             update_value=update_value,
@@ -6823,6 +6854,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cash_earnings = broadcasted_args.pop("cash_earnings")
         flex_2d = wrapper.ndim == 2
         target_shape_2d = (wrapper.shape[0], wrapper.shape_2d[1])
+        index = wrapper.index
+        if isinstance(index, pd.DatetimeIndex):
+            index = index.tz_localize(None).tz_localize("utc")
+        index = index.values.astype(np.int_)
 
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
         init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)
@@ -6892,6 +6927,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             broadcasted_args,
             dict(
                 target_shape=target_shape_2d,
+                index=index,
                 cs_group_lens=cs_group_lens,
                 group_lens=group_lens,
                 cash_sharing=cash_sharing,
@@ -6981,6 +7017,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     flex_order_args=order_args,
                     post_order_func_nb=post_order_func_nb,
                     post_order_args=post_order_args,
+                    index=index,
                     open=broadcasted_args["open"],
                     high=broadcasted_args["high"],
                     low=broadcasted_args["low"],
@@ -7027,6 +7064,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     order_args=order_args,
                     post_order_func_nb=post_order_func_nb,
                     post_order_args=post_order_args,
+                    index=index,
                     open=broadcasted_args["open"],
                     high=broadcasted_args["high"],
                     low=broadcasted_args["low"],
@@ -7073,6 +7111,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     flex_order_args=order_args,
                     post_order_func_nb=post_order_func_nb,
                     post_order_args=post_order_args,
+                    index=index,
                     open=broadcasted_args["open"],
                     high=broadcasted_args["high"],
                     low=broadcasted_args["low"],
@@ -7119,6 +7158,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     order_args=order_args,
                     post_order_func_nb=post_order_func_nb,
                     post_order_args=post_order_args,
+                    index=index,
                     open=broadcasted_args["open"],
                     high=broadcasted_args["high"],
                     low=broadcasted_args["low"],

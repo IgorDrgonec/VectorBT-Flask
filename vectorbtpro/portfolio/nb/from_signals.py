@@ -432,6 +432,25 @@ def check_limit_hit_nb(
     return limit_price, can_execute
 
 
+def check_limit_expired_nb(
+    index: tp.Optional[tp.Array1d],
+    init_i: int,
+    i: int,
+    tif: int,
+    time_delta_format: int,
+) -> bool:
+    """Check whether limit is expired."""
+    if tif == -1:
+        return False
+    if time_delta_format == TimeDeltaFormat.Rows:
+        return i - init_i >= tif
+    if time_delta_format == TimeDeltaFormat.Index:
+        if index is None:
+            raise ValueError("Index must be provided for limit expiration")
+        return index[i] - index[init_i] >= tif
+    return False
+
+
 @register_jitted(cache=True)
 def check_stop_hit_nb(
     is_position_long: bool,
@@ -513,6 +532,7 @@ SignalFuncT = tp.Callable[[SignalContext, tp.VarArg()], tp.Tuple[bool, bool, boo
     arg_take_spec=dict(
         target_shape=ch.ShapeSlicer(axis=1, mapper=base_ch.group_lens_mapper),
         group_lens=ch.ArraySlicer(axis=0),
+        index=None,
         open=portfolio_ch.flex_array_gl_slicer,
         high=portfolio_ch.flex_array_gl_slicer,
         low=portfolio_ch.flex_array_gl_slicer,
@@ -548,6 +568,7 @@ SignalFuncT = tp.Callable[[SignalContext, tp.VarArg()], tp.Tuple[bool, bool, boo
         upon_opposite_entry=portfolio_ch.flex_array_gl_slicer,
         signal_type=portfolio_ch.flex_array_gl_slicer,
         limit_delta=portfolio_ch.flex_array_gl_slicer,
+        limit_tif=portfolio_ch.flex_array_gl_slicer,
         upon_adj_limit_conflict=portfolio_ch.flex_array_gl_slicer,
         upon_opp_limit_conflict=portfolio_ch.flex_array_gl_slicer,
         use_stops=None,
@@ -562,6 +583,7 @@ SignalFuncT = tp.Callable[[SignalContext, tp.VarArg()], tp.Tuple[bool, bool, boo
         upon_adj_stop_conflict=portfolio_ch.flex_array_gl_slicer,
         upon_opp_stop_conflict=portfolio_ch.flex_array_gl_slicer,
         delta_format=portfolio_ch.flex_array_gl_slicer,
+        time_delta_format=portfolio_ch.flex_array_gl_slicer,
         call_seq=ch.ArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
         auto_call_seq=None,
         ffill_val_price=None,
@@ -577,6 +599,7 @@ SignalFuncT = tp.Callable[[SignalContext, tp.VarArg()], tp.Tuple[bool, bool, boo
 def simulate_from_signal_func_nb(
     target_shape: tp.Shape,
     group_lens: tp.Array1d,
+    index: tp.Optional[tp.Array1d] = None,
     open: tp.FlexArray = np.asarray(np.nan),
     high: tp.FlexArray = np.asarray(np.nan),
     low: tp.FlexArray = np.asarray(np.nan),
@@ -612,6 +635,7 @@ def simulate_from_signal_func_nb(
     upon_opposite_entry: tp.FlexArray = np.asarray(OppositeEntryMode.ReverseReduce),
     signal_type: tp.FlexArray = np.asarray(SignalType.Market),
     limit_delta: tp.FlexArray = np.asarray(np.nan),
+    limit_tif: tp.FlexArray = np.asarray(-1),
     upon_adj_limit_conflict: tp.FlexArray = np.asarray(PendingConflictMode.KeepIgnore),
     upon_opp_limit_conflict: tp.FlexArray = np.asarray(PendingConflictMode.CancelExecute),
     use_stops: bool = True,
@@ -626,6 +650,7 @@ def simulate_from_signal_func_nb(
     upon_adj_stop_conflict: tp.FlexArray = np.asarray(PendingConflictMode.KeepExecute),
     upon_opp_stop_conflict: tp.FlexArray = np.asarray(PendingConflictMode.KeepExecute),
     delta_format: tp.FlexArray = np.asarray(DeltaFormat.Percent),
+    time_delta_format: tp.FlexArray = np.asarray(TimeDeltaFormat.Rows),
     call_seq: tp.Optional[tp.Array2d] = None,
     auto_call_seq: bool = False,
     ffill_val_price: bool = True,
@@ -693,6 +718,8 @@ def simulate_from_signal_func_nb(
     last_limit_info["init_direction"][:] = -1
     last_limit_info["delta"][:] = np.nan
     last_limit_info["delta_format"][:] = -1
+    last_limit_info["tif"][:] = -1
+    last_limit_info["time_delta_format"][:] = -1
 
     if use_stops:
         last_sl_info = np.empty(target_shape[1], dtype=sl_info_dt)
@@ -810,6 +837,7 @@ def simulate_from_signal_func_nb(
                     target_shape=target_shape,
                     group_lens=group_lens,
                     cash_sharing=cash_sharing,
+                    index=index,
                     open=open,
                     high=high,
                     low=low,
@@ -872,6 +900,8 @@ def simulate_from_signal_func_nb(
                     _direction = last_limit_info["init_direction"][col]
                     _delta = last_limit_info["delta"][col]
                     _delta_format = last_limit_info["delta_format"][col]
+                    _tif = last_limit_info["tif"][col]
+                    _time_delta_format = last_limit_info["time_delta_format"][col]
 
                     limit_price, can_execute = check_limit_hit_nb(
                         _open,
@@ -895,6 +925,26 @@ def simulate_from_signal_func_nb(
                         size_arr[col] = _size
                         size_type_arr[col] = _size_type
                         direction_arr[col] = _direction
+                    else:
+                        limit_expired = check_limit_expired_nb(
+                            index,
+                            _init_i,
+                            i,
+                            _tif,
+                            _time_delta_format,
+                        )
+                        if limit_expired:
+                            # Expired limit signal
+                            any_limit_signal = False
+                            last_limit_info["init_i"][col] = -1
+                            last_limit_info["init_price"][col] = np.nan
+                            last_limit_info["init_size"][col] = np.nan
+                            last_limit_info["init_size_type"][col] = -1
+                            last_limit_info["init_direction"][col] = -1
+                            last_limit_info["delta"][col] = np.nan
+                            last_limit_info["delta_format"][col] = -1
+                            last_limit_info["tif"][col] = -1
+                            last_limit_info["time_delta_format"][col] = -1
 
                 # Process stop signal
                 if any_stop_signal:
@@ -1142,6 +1192,8 @@ def simulate_from_signal_func_nb(
                                     last_limit_info["init_direction"][col] = -1
                                     last_limit_info["delta"][col] = np.nan
                                     last_limit_info["delta_format"][col] = -1
+                                    last_limit_info["tif"][col] = -1
+                                    last_limit_info["time_delta_format"][col] = -1
 
                             if any_stop_signal:
                                 # Pending stop signal
@@ -1226,6 +1278,8 @@ def simulate_from_signal_func_nb(
                                 else:
                                     _limit_delta = flex_select_auto_nb(limit_delta, i, col, flex_2d)
                                     _delta_format = flex_select_auto_nb(delta_format, i, col, flex_2d)
+                                    _limit_tif = flex_select_auto_nb(limit_tif, i, col, flex_2d)
+                                    _time_delta_format = flex_select_auto_nb(time_delta_format, i, col, flex_2d)
                                     last_limit_info["init_i"][col] = i
                                     last_limit_info["init_price"][col] = _price
                                     last_limit_info["init_size"][col] = _size
@@ -1233,6 +1287,8 @@ def simulate_from_signal_func_nb(
                                     last_limit_info["init_direction"][col] = _direction
                                     last_limit_info["delta"][col] = _limit_delta
                                     last_limit_info["delta_format"][col] = _delta_format
+                                    last_limit_info["tif"][col] = _limit_tif
+                                    last_limit_info["time_delta_format"][col] = _time_delta_format
                                     continue
 
                 if limit_signal_set[col] or stop_signal_set[col] or user_signal_set[col]:
@@ -1363,6 +1419,8 @@ def simulate_from_signal_func_nb(
                         last_limit_info["init_direction"][col] = -1
                         last_limit_info["delta"][col] = np.nan
                         last_limit_info["delta_format"][col] = -1
+                        last_limit_info["tif"][col] = -1
+                        last_limit_info["time_delta_format"][col] = -1
 
                     if use_stops:
                         # Update stop price

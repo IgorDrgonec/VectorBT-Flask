@@ -22,6 +22,7 @@ __all__ = [
     "DirectionConflictMode",
     "OppositeEntryMode",
     "DeltaFormat",
+    "TimeDeltaFormat",
     "StopEntryPrice",
     "StopExitPrice",
     "StopExitMode",
@@ -366,7 +367,7 @@ DeltaFormat = DeltaFormatT()
 
 __pdoc__[
     "DeltaFormat"
-] = f"""Stop format.
+] = f"""Delta format.
 
 ```python
 {prettify(DeltaFormat)}
@@ -378,6 +379,36 @@ Attributes:
     Absolute: Absolute terms
     Percent: Percentage terms where 0.01 means 1%
     Percent100: Percentage terms where 1.0 means 1%
+"""
+
+
+class TimeDeltaFormatT(tp.NamedTuple):
+    Rows: int = 0
+    Index: int = 1
+
+
+TimeDeltaFormat = TimeDeltaFormatT()
+"""_"""
+
+__pdoc__[
+    "TimeDeltaFormat"
+] = f"""Time delta format.
+
+```python
+{prettify(TimeDeltaFormat)}
+```
+
+In which format a time delta value is provided?
+
+Attributes:
+    Rows: Row terms where 1 means one row (simulation step) has passed. 
+    
+        Doesn't require the index to be provided.
+    Index: Index terms where 1 means one value in index has passed. 
+    
+        If index is datetime-like, 1 means one nanosecond.
+    
+        Requires the index to be provided.
 """
 
 
@@ -877,14 +908,15 @@ class SimulationContext(tp.NamedTuple):
     init_price: tp.FlexArray
     cash_deposits: tp.FlexArray
     cash_earnings: tp.FlexArray
-    segment_mask: tp.Array
+    segment_mask: tp.FlexArray
     call_pre_segment: bool
     call_post_segment: bool
-    open: tp.Array
-    high: tp.Array
-    low: tp.Array
-    close: tp.Array
-    bm_close: tp.Optional[tp.Array]
+    index: tp.Optional[tp.Array1d]
+    open: tp.FlexArray
+    high: tp.FlexArray
+    low: tp.FlexArray
+    close: tp.FlexArray
+    bm_close: tp.Optional[tp.FlexArray]
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
@@ -1086,6 +1118,11 @@ __pdoc__[
 `SimulationContext.segment_mask`.
 
 Allows, for example, to write user-defined arrays such as returns at the end of each segment."""
+__pdoc__[
+    "SimulationContext.index"
+] = """Index.
+
+If datetime-like, assumed to have the UTC timezone."""
 __pdoc__[
     "SimulationContext.open"
 ] = """Opening price.
@@ -1421,14 +1458,15 @@ class GroupContext(tp.NamedTuple):
     init_price: tp.FlexArray
     cash_deposits: tp.FlexArray
     cash_earnings: tp.FlexArray
-    segment_mask: tp.Array
+    segment_mask: tp.FlexArray
     call_pre_segment: bool
     call_post_segment: bool
-    open: tp.Array
-    high: tp.Array
-    low: tp.Array
-    close: tp.Array
-    bm_close: tp.Optional[tp.Array]
+    index: tp.Optional[tp.Array1d]
+    open: tp.FlexArray
+    high: tp.FlexArray
+    low: tp.FlexArray
+    close: tp.FlexArray
+    bm_close: tp.Optional[tp.FlexArray]
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
@@ -1517,14 +1555,15 @@ class RowContext(tp.NamedTuple):
     init_price: tp.FlexArray
     cash_deposits: tp.FlexArray
     cash_earnings: tp.FlexArray
-    segment_mask: tp.Array
+    segment_mask: tp.FlexArray
     call_pre_segment: bool
     call_post_segment: bool
-    open: tp.Array
-    high: tp.Array
-    low: tp.Array
-    close: tp.Array
-    bm_close: tp.Optional[tp.Array]
+    index: tp.Optional[tp.Array1d]
+    open: tp.FlexArray
+    high: tp.FlexArray
+    low: tp.FlexArray
+    close: tp.FlexArray
+    bm_close: tp.Optional[tp.FlexArray]
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
@@ -1577,14 +1616,15 @@ class SegmentContext(tp.NamedTuple):
     init_price: tp.FlexArray
     cash_deposits: tp.FlexArray
     cash_earnings: tp.FlexArray
-    segment_mask: tp.Array
+    segment_mask: tp.FlexArray
     call_pre_segment: bool
     call_post_segment: bool
-    open: tp.Array
-    high: tp.Array
-    low: tp.Array
-    close: tp.Array
-    bm_close: tp.Optional[tp.Array]
+    index: tp.Optional[tp.Array1d]
+    open: tp.FlexArray
+    high: tp.FlexArray
+    low: tp.FlexArray
+    close: tp.FlexArray
+    bm_close: tp.Optional[tp.FlexArray]
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
@@ -1656,14 +1696,15 @@ class OrderContext(tp.NamedTuple):
     init_price: tp.FlexArray
     cash_deposits: tp.FlexArray
     cash_earnings: tp.FlexArray
-    segment_mask: tp.Array
+    segment_mask: tp.FlexArray
     call_pre_segment: bool
     call_post_segment: bool
-    open: tp.Array
-    high: tp.Array
-    low: tp.Array
-    close: tp.Array
-    bm_close: tp.Optional[tp.Array]
+    index: tp.Optional[tp.Array1d]
+    open: tp.FlexArray
+    high: tp.FlexArray
+    low: tp.FlexArray
+    close: tp.FlexArray
+    bm_close: tp.Optional[tp.FlexArray]
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
@@ -1749,14 +1790,15 @@ class PostOrderContext(tp.NamedTuple):
     init_price: tp.FlexArray
     cash_deposits: tp.FlexArray
     cash_earnings: tp.FlexArray
-    segment_mask: tp.Array
+    segment_mask: tp.FlexArray
     call_pre_segment: bool
     call_post_segment: bool
-    open: tp.Array
-    high: tp.Array
-    low: tp.Array
-    close: tp.Array
-    bm_close: tp.Optional[tp.Array]
+    index: tp.Optional[tp.Array1d]
+    open: tp.FlexArray
+    high: tp.FlexArray
+    low: tp.FlexArray
+    close: tp.FlexArray
+    bm_close: tp.Optional[tp.FlexArray]
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
@@ -1862,14 +1904,15 @@ class FlexOrderContext(tp.NamedTuple):
     init_price: tp.FlexArray
     cash_deposits: tp.FlexArray
     cash_earnings: tp.FlexArray
-    segment_mask: tp.Array
+    segment_mask: tp.FlexArray
     call_pre_segment: bool
     call_post_segment: bool
-    open: tp.Array
-    high: tp.Array
-    low: tp.Array
-    close: tp.Array
-    bm_close: tp.Optional[tp.Array]
+    index: tp.Optional[tp.Array1d]
+    open: tp.FlexArray
+    high: tp.FlexArray
+    low: tp.FlexArray
+    close: tp.FlexArray
+    bm_close: tp.Optional[tp.FlexArray]
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
@@ -2091,10 +2134,11 @@ class SignalContext(tp.NamedTuple):
     target_shape: tp.Shape
     group_lens: tp.Array1d
     cash_sharing: bool
-    open: tp.Array
-    high: tp.Array
-    low: tp.Array
-    close: tp.Array
+    index: tp.Optional[tp.Array1d]
+    open: tp.FlexArray
+    high: tp.FlexArray
+    low: tp.FlexArray
+    close: tp.FlexArray
     flex_2d: bool
 
     order_records: tp.RecordArray2d
@@ -2141,6 +2185,7 @@ Passed to `signal_func_nb` and `adjust_func_nb`."""
 __pdoc__["SignalContext.target_shape"] = "See `SimulationContext.target_shape`."
 __pdoc__["SignalContext.group_lens"] = "See `SimulationContext.group_lens`."
 __pdoc__["SignalContext.cash_sharing"] = "See `SimulationContext.cash_sharing`."
+__pdoc__["SignalContext.open"] = "See `SimulationContext.index`."
 __pdoc__["SignalContext.open"] = "See `SimulationContext.open`."
 __pdoc__["SignalContext.high"] = "See `SimulationContext.high`."
 __pdoc__["SignalContext.low"] = "See `SimulationContext.low`."
@@ -2376,6 +2421,8 @@ limit_info_dt = np.dtype(
         ("init_direction", np.int_),
         ("delta", np.float_),
         ("delta_format", np.int_),
+        ("tif", int),
+        ("time_delta_format", np.int_),
     ],
     align=True,
 )
@@ -2397,6 +2444,8 @@ Attributes:
     init_direction: Direction of the requested size. See `Direction`.
     delta: Delta from the initial price.
     delta_format: Format of the delta value. See `DeltaFormat`.
+    tif: Time in force in integer format. Set to `-1` to disable.
+    time_delta_format: Format of the time-in-force value. See `TimeDeltaFormat`.
 """
 
 sl_info_dt = np.dtype(
