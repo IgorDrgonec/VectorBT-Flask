@@ -1788,6 +1788,26 @@ class TestFromSignals:
         )
         assert_records_close(
             from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                signal_type="limit",
+                slippage=0.01,
+                limit_delta=[[-np.inf, 0.0, -1 / 2, 1 / 6, 2 / 3, np.inf]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 1, 25.0, 4.0, 0.0, 0),
+                    (0, 1, 3, 33.333333333333336, 3.0, 0.0, 0),
+                    (0, 2, 1, 22.22222222222222, 4.5, 0.0, 0),
+                    (0, 3, 3, 40.0, 2.5, 0.0, 0),
+                    (0, 4, 4, 100.0, 1.0, 0.0, 0),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        assert_records_close(
+            from_signals_longonly(
                 open=open,
                 high=high,
                 low=low,
@@ -1805,6 +1825,29 @@ class TestFromSignals:
                     (0, 3, 3, 44.44444444444444, 2.25, 0.0, 0),
                     (0, 4, 4, 100.0, 1.0, 0.0, 0),
                     (0, 5, 3, 44.44444444444444, 2.25, 0.0, 0),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        assert_records_close(
+            from_signals_longonly(
+                open=open,
+                high=high,
+                low=low,
+                close=close,
+                entries=entries,
+                exits=exits,
+                slippage=0.01,
+                signal_type="limit",
+                limit_delta=[[-np.inf, 0.0, -1 / 2, 1 / 6, 2 / 3, np.inf]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 1, 23.529411764705884, 4.25, 0.0, 0),
+                    (0, 1, 3, 44.44444444444444, 2.25, 0.0, 0),
+                    (0, 2, 1, 23.529411764705884, 4.25, 0.0, 0),
+                    (0, 3, 3, 44.44444444444444, 2.25, 0.0, 0),
+                    (0, 4, 4, 100.0, 1.0, 0.0, 0),
                 ],
                 dtype=order_dt,
             ),
@@ -1831,6 +1874,26 @@ class TestFromSignals:
         )
         assert_records_close(
             from_signals_shortonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                signal_type="limit",
+                slippage=0.01,
+                limit_delta=[[-np.inf, 0.0, -1 / 2, 1 / 6, 2 / 3, np.inf]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 1, 25.0, 4.0, 0.0, 1),
+                    (0, 1, 1, 33.333333333333336, 3.0, 0.0, 1),
+                    (0, 2, 1, 66.66666666666667, 1.5, 0.0, 1),
+                    (0, 3, 1, 28.571428571428573, 3.5, 0.0, 1),
+                    (0, 4, 2, 20.0, 5.0, 0.0, 1),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        assert_records_close(
+            from_signals_shortonly(
                 open=open,
                 high=high,
                 low=low,
@@ -1848,6 +1911,29 @@ class TestFromSignals:
                     (0, 3, 0, 40.0, 2.5, 0.0, 1),
                     (0, 4, 0, 100.0, 1.0, 0.0, 1),
                     (0, 5, 1, 23.529411764705884, 4.25, 0.0, 1),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        assert_records_close(
+            from_signals_shortonly(
+                open=open,
+                high=high,
+                low=low,
+                close=close,
+                entries=entries,
+                exits=exits,
+                signal_type="limit",
+                slippage=0.01,
+                limit_delta=[[-np.inf, 0.0, -1 / 2, 1 / 6, 2 / 3, np.inf]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 1, 23.529411764705884, 4.25, 0.0, 1),
+                    (0, 1, 1, 23.529411764705884, 4.25, 0.0, 1),
+                    (0, 2, 1, 23.529411764705884, 4.25, 0.0, 1),
+                    (0, 3, 1, 23.529411764705884, 4.25, 0.0, 1),
+                    (0, 4, 2, 19.047619047619047, 5.25, 0.0, 1),
                 ],
                 dtype=order_dt,
             ),
@@ -2309,7 +2395,7 @@ class TestFromSignals:
                 high=high,
                 low=low,
                 sl_stop=[[np.nan, 0.5, 0.75, 1.0, np.inf]],
-                stop_format="relative",
+                delta_format="relative",
             ).order_records,
             from_signals_longonly(
                 close=close,
@@ -2319,7 +2405,7 @@ class TestFromSignals:
                 high=high,
                 low=low,
                 sl_stop=[[np.nan, 5 * 0.5, 5 * 0.75, 5 * 1.0, np.inf]],
-                stop_format="absolute",
+                delta_format="absolute",
             ).order_records
         )
 
@@ -2567,7 +2653,7 @@ class TestFromSignals:
                 high=high,
                 low=low,
                 tsl_stop=[[np.nan, 0.15, 0.2, 0.25, np.inf]],
-                stop_format="relative",
+                delta_format="relative",
             ).order_records,
             from_signals_longonly(
                 close=close,
@@ -2577,7 +2663,7 @@ class TestFromSignals:
                 high=high,
                 low=low,
                 tsl_stop=[[np.nan, 5.5 * 0.15, 5.5 * 0.2, 5.5 * 0.25, np.inf]],
-                stop_format="absolute",
+                delta_format="absolute",
             ).order_records
         )
 
@@ -2745,7 +2831,7 @@ class TestFromSignals:
             ),
         )
 
-    def test_tsl_delta(self):
+    def test_tsl_th(self):
         entries = pd.Series([True, False, False, False, False], index=price.index)
         exits = pd.Series([False, False, False, False, False], index=price.index)
 
@@ -2758,7 +2844,7 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
                 tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
             np.array(
@@ -2780,7 +2866,7 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
                 tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
             np.array(
@@ -2802,14 +2888,14 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
                 tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
             from_signals_longonly(
                 close=close,
                 entries=entries,
                 exits=exits,
-                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
                 tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
         )
@@ -2818,14 +2904,14 @@ class TestFromSignals:
                 close=close,
                 entries=exits,
                 exits=entries,
-                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
                 tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
             from_signals_shortonly(
                 close=close,
                 entries=entries,
                 exits=exits,
-                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
                 tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
         )
@@ -2837,7 +2923,7 @@ class TestFromSignals:
                 open=open,
                 high=high,
                 low=low,
-                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
                 tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
             np.array(
@@ -2862,7 +2948,7 @@ class TestFromSignals:
                 open=open,
                 high=high,
                 low=low,
-                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
                 tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
             np.array(
@@ -2889,9 +2975,9 @@ class TestFromSignals:
                 open=open,
                 high=high,
                 low=low,
-                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
                 tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
-                stop_format="relative",
+                delta_format="relative",
             ).order_records,
             from_signals_longonly(
                 close=close,
@@ -2900,9 +2986,9 @@ class TestFromSignals:
                 open=open,
                 high=high,
                 low=low,
-                tsl_delta=[[np.nan, 5.5 * 0.1, 5.5 * 0.5, 5.5 * 0.1, 5.5 * 0.5, np.inf]],
+                tsl_th=[[np.nan, 5.5 * 0.1, 5.5 * 0.5, 5.5 * 0.1, 5.5 * 0.5, np.inf]],
                 tsl_stop=[[np.nan, 5.5 * 0.1, 5.5 * 0.1, 5.5 * 0.5, 5.5 * 0.5, np.inf]],
-                stop_format="absolute",
+                delta_format="absolute",
             ).order_records
         )
 
@@ -2915,7 +3001,7 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
                 tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
             np.array(
@@ -2937,7 +3023,7 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
                 tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
             np.array(
@@ -2959,14 +3045,14 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
                 tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
             from_signals_longonly(
                 close=close,
                 entries=entries,
                 exits=exits,
-                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
                 tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
         )
@@ -2975,14 +3061,14 @@ class TestFromSignals:
                 close=close,
                 entries=exits,
                 exits=entries,
-                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
                 tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
             from_signals_shortonly(
                 close=close,
                 entries=entries,
                 exits=exits,
-                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
                 tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
         )
@@ -2994,7 +3080,7 @@ class TestFromSignals:
                 open=open,
                 high=high,
                 low=low,
-                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
                 tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
             np.array(
@@ -3021,7 +3107,7 @@ class TestFromSignals:
                 open=open,
                 high=high,
                 low=low,
-                tsl_delta=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
+                tsl_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
                 tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
             ).order_records,
             np.array(
@@ -3049,7 +3135,7 @@ class TestFromSignals:
                 entries=pd.Series([True, False]),
                 exits=pd.Series([False, False]),
                 price=pd.Series([10.0, 10.0]),
-                tsl_delta=[[0.05, 0.1, 0.2]],
+                tsl_th=[[0.05, 0.1, 0.2]],
                 tsl_stop=0.1,
                 stop_entry_price="price",
             ).order_records,
@@ -3073,7 +3159,7 @@ class TestFromSignals:
                 entries=pd.Series([True, False]),
                 exits=pd.Series([False, False]),
                 price=-np.inf,
-                tsl_delta=[[0.05, 0.1, 0.2]],
+                tsl_th=[[0.05, 0.1, 0.2]],
                 tsl_stop=0.1,
                 stop_entry_price="price",
             ).order_records,
@@ -3214,7 +3300,7 @@ class TestFromSignals:
                 high=high,
                 low=low,
                 tp_stop=[[np.nan, 0.1, 0.15, 0.2, np.inf]],
-                stop_format="relative",
+                delta_format="relative",
             ).order_records,
             from_signals_shortonly(
                 close=close,
@@ -3224,7 +3310,7 @@ class TestFromSignals:
                 high=high,
                 low=low,
                 tp_stop=[[np.nan, 5 * 0.1, 5 * 0.15, 5 * 0.2, np.inf]],
-                stop_format="absolute",
+                delta_format="absolute",
             ).order_records
         )
 
@@ -3823,7 +3909,7 @@ class TestFromSignals:
         @njit
         def adjust_sl_func_nb(c, dur):
             if c.i - c.last_sl_info["init_i"][c.col] >= dur:
-                c.last_sl_info["curr_stop"][c.col] = 0.0
+                c.last_sl_info["stop"][c.col] = 0.0
 
         assert_records_close(
             from_signals_longonly(
@@ -3844,7 +3930,7 @@ class TestFromSignals:
         @njit
         def adjust_tp_func_nb(c, dur):
             if c.i - c.last_tp_info["init_i"][c.col] >= dur:
-                c.last_tp_info["curr_stop"][c.col] = 0.0
+                c.last_tp_info["stop"][c.col] = 0.0
 
         assert_records_close(
             from_signals_longonly(

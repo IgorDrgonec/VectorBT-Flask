@@ -491,7 +491,7 @@ ohlcstx_config = ReadonlyConfig(
         mode="exits",
         input_names=["entry_price", "open", "high", "low", "close"],
         in_output_names=["stop_price", "stop_type"],
-        param_names=["sl_stop", "tsl_delta", "tsl_stop", "tp_stop", "reverse"],
+        param_names=["sl_stop", "tsl_th", "tsl_stop", "tp_stop", "reverse"],
         attr_settings=dict(stop_type=dict(dtype=StopType)),  # creates rand_type_readable
     )
 )
@@ -503,14 +503,14 @@ ohlcstx_func_config = ReadonlyConfig(
         exit_settings=dict(
             pass_inputs=["entry_price", "open", "high", "low", "close"],  # do not pass entries
             pass_in_outputs=["stop_price", "stop_type"],
-            pass_params=["sl_stop", "tsl_delta", "tsl_stop", "tp_stop", "reverse"],
+            pass_params=["sl_stop", "tsl_th", "tsl_stop", "tp_stop", "reverse"],
             pass_kwargs=["is_entry_open", "flex_2d"],
         ),
         pass_flex_2d=True,
         in_output_settings=dict(stop_price=dict(dtype=np.float_), stop_type=dict(dtype=np.int_)),
         param_settings=dict(
             sl_stop=flex_elem_param_config,
-            tsl_delta=flex_elem_param_config,
+            tsl_th=flex_elem_param_config,
             tsl_stop=flex_elem_param_config,
             tp_stop=flex_elem_param_config,
             reverse=flex_elem_param_config,
@@ -522,7 +522,7 @@ ohlcstx_func_config = ReadonlyConfig(
         stop_price=np.nan,
         stop_type=-1,
         sl_stop=np.nan,
-        tsl_delta=np.nan,
+        tsl_th=np.nan,
         tsl_stop=np.nan,
         tp_stop=np.nan,
         reverse=False,
@@ -654,14 +654,14 @@ class _OHLCSTX(OHLCSTX):
         ...     price['low'],
         ...     price['close'],
         ...     sl_stop=[0.1, np.nan, np.nan, np.nan],
-        ...     tsl_delta=[np.nan, np.nan, 0.2, np.nan],
+        ...     tsl_th=[np.nan, np.nan, 0.2, np.nan],
         ...     tsl_stop=[np.nan, 0.1, 0.3, np.nan],
         ...     tp_stop=[np.nan, np.nan, np.nan, 0.1],
         ...     is_entry_open=True)
 
         >>> ohlcstx.entries
         ohlcstx_sl_stop      0.1    NaN    NaN    NaN
-        ohlcstx_tsl_delta    NaN    NaN    0.2    NaN
+        ohlcstx_tsl_th       NaN    NaN    0.2    NaN
         ohlcstx_tsl_stop     NaN    0.1    0.3    NaN
         ohlcstx_tp_stop      NaN    NaN    NaN    0.1
         0                   True   True   True   True
@@ -673,7 +673,7 @@ class _OHLCSTX(OHLCSTX):
 
         >>> ohlcstx.exits
         ohlcstx_sl_stop      0.1    NaN    NaN    NaN
-        ohlcstx_tsl_delta    NaN    NaN    0.2    NaN
+        ohlcstx_tsl_th       NaN    NaN    0.2    NaN
         ohlcstx_tsl_stop     NaN    0.1    0.3    NaN
         ohlcstx_tp_stop      NaN    NaN    NaN    0.1
         0                  False  False  False  False
@@ -685,7 +685,7 @@ class _OHLCSTX(OHLCSTX):
 
         >>> ohlcstx.stop_price
         ohlcstx_sl_stop    0.1   NaN  NaN   NaN
-        ohlcstx_tsl_delta  NaN   NaN  0.2   NaN
+        ohlcstx_tsl_th     NaN   NaN  0.2   NaN
         ohlcstx_tsl_stop   NaN   0.1  0.3   NaN
         ohlcstx_tp_stop    NaN   NaN  NaN   0.1
         0                  NaN   NaN  NaN   NaN
@@ -697,7 +697,7 @@ class _OHLCSTX(OHLCSTX):
 
         >>> ohlcstx.stop_type_readable
         ohlcstx_sl_stop     0.1   NaN   NaN   NaN
-        ohlcstx_tsl_delta   NaN   NaN   0.2   NaN
+        ohlcstx_tsl_th      NaN   NaN   0.2   NaN
         ohlcstx_tsl_stop    NaN   0.1   0.3   NaN
         ohlcstx_tp_stop     NaN   NaN   NaN   0.1
         0                  None  None  None  None

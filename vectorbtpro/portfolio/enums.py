@@ -21,7 +21,7 @@ __all__ = [
     "ConflictMode",
     "DirectionConflictMode",
     "OppositeEntryMode",
-    "StopFormat",
+    "DeltaFormat",
     "StopEntryPrice",
     "StopExitPrice",
     "StopExitMode",
@@ -355,23 +355,23 @@ Attributes:
 """
 
 
-class StopFormatT(tp.NamedTuple):
+class DeltaFormatT(tp.NamedTuple):
     Relative: int = 0
     Absolute: int = 1
 
 
-StopFormat = StopFormatT()
+DeltaFormat = DeltaFormatT()
 """_"""
 
 __pdoc__[
-    "StopFormat"
+    "DeltaFormat"
 ] = f"""Stop format.
 
 ```python
-{prettify(StopFormat)}
+{prettify(DeltaFormat)}
 ```
 
-In which format the stop value is provided?
+In which format a delta value is provided?
 
 Attributes:
     Relative: Relative terms (i.e., as a percentage where 0.01 means 1%)
@@ -2359,8 +2359,10 @@ limit_info_dt = np.dtype(
         ("init_i", np.int_),
         ("init_price", np.float_),
         ("init_size", np.float_),
-        ("init_size_type", np.float_),
-        ("init_direction", np.float_),
+        ("init_size_type", np.int_),
+        ("init_direction", np.int_),
+        ("delta", np.float_),
+        ("delta_format", np.int_),
     ],
     align=True,
 )
@@ -2368,18 +2370,28 @@ limit_info_dt = np.dtype(
 
 __pdoc__[
     "limit_info_dt"
-] = f"""`np.dtype` of limit information.
+] = f"""`np.dtype` of limit signal records.
 
 ```python
 {prettify(limit_info_dt)}
 ```
+
+Attributes:
+    init_i: Initial row.
+    init_price: Initial price.
+    init_size: Requested size.
+    init_size_type: Type of the requested size. See `SizeType`.
+    init_direction: Direction of the requested size. See `Direction`.
+    delta: Delta from the initial price.
+    delta_format: Format of the delta value. See `DeltaFormat`.
 """
 
 sl_info_dt = np.dtype(
     [
         ("init_i", np.int_),
         ("init_price", np.float_),
-        ("curr_stop", np.float_),
+        ("stop", np.float_),
+        ("delta_format", np.int_),
     ],
     align=True,
 )
@@ -2387,26 +2399,28 @@ sl_info_dt = np.dtype(
 
 __pdoc__[
     "sl_info_dt"
-] = f"""`np.dtype` of SL information.
+] = f"""`np.dtype` of SL signal records.
 
 ```python
 {prettify(sl_info_dt)}
 ```
 
 Attributes:
-    init_i: Entry row.
-    init_price: Entry price.
-    curr_stop: Latest updated stop value.
+    init_i: Initial row.
+    init_price: Initial price.
+    stop: Latest updated stop value.
+    delta_format: Format of the stop value. See `DeltaFormat`.
 """
 
 tsl_info_dt = np.dtype(
     [
         ("init_i", np.int_),
         ("init_price", np.float_),
-        ("curr_i", np.int_),
-        ("curr_price", np.float_),
-        ("curr_delta", np.float_),
-        ("curr_stop", np.float_),
+        ("i", np.int_),
+        ("price", np.float_),
+        ("th", np.float_),
+        ("stop", np.float_),
+        ("delta_format", np.int_),
     ],
     align=True,
 )
@@ -2414,26 +2428,28 @@ tsl_info_dt = np.dtype(
 
 __pdoc__[
     "tsl_info_dt"
-] = f"""`np.dtype` of TSL information.
+] = f"""`np.dtype` of TSL signal records.
 
 ```python
 {prettify(tsl_info_dt)}
 ```
 
 Attributes:
-    init_i: Entry row.
-    init_price: Entry price.
-    curr_i: Row of the latest price update.
-    curr_price: Latest updated price.
-    curr_delta: Latest updated delta value.
-    curr_stop: Latest updated stop value.
+    init_i: Initial row.
+    init_price: Initial price.
+    i: Row of the latest price update.
+    price: Latest updated price.
+    th: Latest updated threshold value.
+    stop: Latest updated stop value.
+    delta_format: Format of the threshold and stop values. See `DeltaFormat`.
 """
 
 tp_info_dt = np.dtype(
     [
         ("init_i", np.int_),
         ("init_price", np.float_),
-        ("curr_stop", np.float_),
+        ("stop", np.float_),
+        ("delta_format", np.int_),
     ],
     align=True,
 )
@@ -2441,14 +2457,15 @@ tp_info_dt = np.dtype(
 
 __pdoc__[
     "tp_info_dt"
-] = f"""`np.dtype` of TP information.
+] = f"""`np.dtype` of TP signal records.
 
 ```python
 {prettify(tp_info_dt)}
 ```
 
 Attributes:
-    init_i: Entry row.
-    init_price: Entry price.
-    curr_stop: Latest updated stop value.
+    init_i: Initial row.
+    init_price: Initial price.
+    stop: Latest updated stop value.
+    delta_format: Format of the stop value. See `DeltaFormat`.
 """

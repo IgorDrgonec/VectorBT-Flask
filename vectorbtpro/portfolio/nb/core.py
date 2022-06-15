@@ -353,6 +353,14 @@ def update_value_nb(
 
 
 @register_jitted(cache=True)
+def get_diraware_size_nb(size: float, direction: int) -> float:
+    """Get direction-aware size."""
+    if direction == Direction.ShortOnly:
+        return size * -1
+    return size
+
+
+@register_jitted(cache=True)
 def execute_order_nb(
     exec_state: ExecState,
     order: Order,
@@ -452,12 +460,9 @@ def execute_order_nb(
     if not np.isfinite(order.reject_prob) or order.reject_prob < 0 or order.reject_prob > 1:
         raise ValueError("order.reject_prob must be between 0 and 1")
 
-    order_size = order.size
+    # Positive/negative size in short direction should be treated as negative/positive
+    order_size = get_diraware_size_nb(order.size, order.direction)
     order_size_type = order.size_type
-
-    if order.direction == Direction.ShortOnly:
-        # Positive/negative size in short direction should be treated as negative/positive
-        order_size *= -1
 
     if order_size_type == SizeType.TargetPercent:
         # Target percentage of current value

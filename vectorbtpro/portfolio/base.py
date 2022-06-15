@@ -4587,20 +4587,21 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         upon_dir_conflict: tp.Optional[tp.ArrayLike] = None,
         upon_opposite_entry: tp.Optional[tp.ArrayLike] = None,
         signal_type: tp.Optional[tp.ArrayLike] = None,
+        limit_delta: tp.Optional[tp.ArrayLike] = None,
         upon_adj_limit_conflict: tp.Optional[tp.ArrayLike] = None,
         upon_opp_limit_conflict: tp.Optional[tp.ArrayLike] = None,
         use_stops: tp.Optional[bool] = None,
         sl_stop: tp.Optional[tp.ArrayLike] = None,
-        tsl_delta: tp.Optional[tp.ArrayLike] = None,
+        tsl_th: tp.Optional[tp.ArrayLike] = None,
         tsl_stop: tp.Optional[tp.ArrayLike] = None,
         tp_stop: tp.Optional[tp.ArrayLike] = None,
-        stop_format: tp.Optional[tp.ArrayLike] = None,
         stop_entry_price: tp.Optional[tp.ArrayLike] = None,
         stop_exit_price: tp.Optional[tp.ArrayLike] = None,
         upon_stop_exit: tp.Optional[tp.ArrayLike] = None,
         upon_stop_update: tp.Optional[tp.ArrayLike] = None,
         upon_adj_stop_conflict: tp.Optional[tp.ArrayLike] = None,
         upon_opp_stop_conflict: tp.Optional[tp.ArrayLike] = None,
+        delta_format: tp.Optional[tp.ArrayLike] = None,
         open: tp.Optional[tp.ArrayLike] = None,
         high: tp.Optional[tp.ArrayLike] = None,
         low: tp.Optional[tp.ArrayLike] = None,
@@ -4720,7 +4721,15 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             upon_opposite_entry (OppositeEntryMode or array_like): See `vectorbtpro.portfolio.enums.OppositeEntryMode`.
                 Will broadcast.
             signal_type (SignalType or array_like): See `vectorbtpro.portfolio.enums.SignalType`.
+            limit_delta (float or array_like): Delta from `price` to build a limit price.
                 Will broadcast.
+
+                If NaN, `price` becomes limit price. Otherwise, applied on top of `price` depending
+                on the current direction: if the direction-aware size is positive (= buying), a positive delta
+                will decrease the limit price; if the direction-aware size is negative (= selling), a positive delta
+                will increase the limit price. Delta can be negative.
+
+                Set an element to `np.nan` to disable.
             upon_adj_limit_conflict (PendingConflictMode or array_like): Conflict mode for limit and user-defined
                 signals of adjacent sign. See `vectorbtpro.portfolio.enums.PendingConflictMode`. Will broadcast.
             upon_opp_limit_conflict (PendingConflictMode or array_like): Conflict mode for limit and user-defined
@@ -4733,23 +4742,19 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             sl_stop (array_like of float): Stop loss.
                 Will broadcast.
 
-                Set an element to `np.nan` or `0` to disable.
-            tsl_delta (array_like of float): Take profit threshold for the trailing stop loss.
+                Set an element to `np.nan` to disable.
+            tsl_th (array_like of float): Take profit threshold for the trailing stop loss.
                 Will broadcast.
                 
-                Set an element to `np.nan` or `0` to disable.
+                Set an element to `np.nan` to disable.
             tsl_stop (array_like of float): Trailing stop loss for the trailing stop loss.
                 Will broadcast.
 
-                Set an element to `np.nan` or `0` to disable.
+                Set an element to `np.nan` to disable.
             tp_stop (array_like of float): Take profit.
                 Will broadcast.
 
-                Set an element to `np.nan` or `0` to disable.
-            stop_format (StopFormat or array_like): See `vectorbtpro.portfolio.enums.StopFormat`.
-                Will broadcast.
-
-                If provided on per-element basis, gets applied upon entry.
+                Set an element to `np.nan` to disable.
             stop_entry_price (StopEntryPrice or array_like): See `vectorbtpro.portfolio.enums.StopEntryPrice`.
                 Will broadcast.
 
@@ -4773,6 +4778,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 signals of adjacent sign. See `vectorbtpro.portfolio.enums.PendingConflictMode`. Will broadcast.
             upon_opp_stop_conflict (PendingConflictMode or array_like): Conflict mode for stop and user-defined
                 signals of opposite sign. See `vectorbtpro.portfolio.enums.PendingConflictMode`. Will broadcast.
+            delta_format (DeltaFormat or array_like): See `vectorbtpro.portfolio.enums.DeltaFormat`.
+                Will broadcast.
+
+                Gets applied on each limit delta value, stop value, and stop delta value.
             open (array_like of float): See `Portfolio.from_orders`.
 
                 For stop signals, `np.nan` gets replaced by `close`.
@@ -5205,14 +5214,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> @njit
             ... def adjust_func_nb(c):
             ...     val_price_now = c.last_val_price[c.col]
-            ...     tsl_init_price = c.tsl_init_price[c.col]
+            ...     tsl_init_price = c.last_tsl_info["init_price"][c.col]
             ...     current_profit = (val_price_now - tsl_init_price) / tsl_init_price
             ...     if current_profit >= 0.40:
-            ...         c.tsl_curr_stop[c.col] = 0.25
+            ...         c.last_tsl_info["stop"][c.col] = 0.25
             ...     elif current_profit >= 0.25:
-            ...         c.tsl_curr_stop[c.col] = 0.15
+            ...         c.last_tsl_info["stop"][c.col] = 0.15
             ...     elif current_profit >= 0.20:
-            ...         c.tsl_curr_stop[c.col] = 0.07
+            ...         c.last_tsl_info["stop"][c.col] = 0.07
 
             >>> close = pd.Series([10, 11, 12, 11, 10])
             >>> pf = vbt.Portfolio.from_signals(close, adjust_func_nb=adjust_func_nb)
@@ -5364,14 +5373,16 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             upon_opposite_entry = portfolio_cfg["upon_opposite_entry"]
         if signal_type is None:
             signal_type = portfolio_cfg["signal_type"]
+        if limit_delta is None:
+            limit_delta = portfolio_cfg["limit_delta"]
         if upon_adj_limit_conflict is None:
             upon_adj_limit_conflict = portfolio_cfg["upon_adj_limit_conflict"]
         if upon_opp_limit_conflict is None:
             upon_opp_limit_conflict = portfolio_cfg["upon_opp_limit_conflict"]
         if sl_stop is None:
             sl_stop = portfolio_cfg["sl_stop"]
-        if tsl_delta is None:
-            tsl_delta = portfolio_cfg["tsl_delta"]
+        if tsl_th is None:
+            tsl_th = portfolio_cfg["tsl_th"]
         if tsl_stop is None:
             tsl_stop = portfolio_cfg["tsl_stop"]
         if tp_stop is None:
@@ -5388,8 +5399,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 use_stops = False
             else:
                 use_stops = True
-        if stop_format is None:
-            stop_format = portfolio_cfg["stop_format"]
         if stop_entry_price is None:
             stop_entry_price = portfolio_cfg["stop_entry_price"]
         if stop_exit_price is None:
@@ -5402,6 +5411,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             upon_adj_stop_conflict = portfolio_cfg["upon_adj_stop_conflict"]
         if upon_opp_stop_conflict is None:
             upon_opp_stop_conflict = portfolio_cfg["upon_opp_stop_conflict"]
+        if delta_format is None:
+            delta_format = portfolio_cfg["delta_format"]
 
         if init_cash is None:
             init_cash = portfolio_cfg["init_cash"]
@@ -5485,19 +5496,20 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             upon_dir_conflict=upon_dir_conflict,
             upon_opposite_entry=upon_opposite_entry,
             signal_type=signal_type,
+            limit_delta=limit_delta,
             upon_adj_limit_conflict=upon_adj_limit_conflict,
             upon_opp_limit_conflict=upon_opp_limit_conflict,
             sl_stop=sl_stop,
-            tsl_delta=tsl_delta,
+            tsl_th=tsl_th,
             tsl_stop=tsl_stop,
             tp_stop=tp_stop,
-            stop_format=stop_format,
             stop_entry_price=stop_entry_price,
             stop_exit_price=stop_exit_price,
             upon_stop_exit=upon_stop_exit,
             upon_stop_update=upon_stop_update,
             upon_adj_stop_conflict=upon_adj_stop_conflict,
             upon_opp_stop_conflict=upon_opp_stop_conflict,
+            delta_format=delta_format,
             open=open,
             high=high,
             low=low,
@@ -5549,19 +5561,20 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     upon_dir_conflict=dict(fill_value=DirectionConflictMode.Ignore),
                     upon_opposite_entry=dict(fill_value=OppositeEntryMode.ReverseReduce),
                     signal_type=dict(fill_value=SignalType.Market),
+                    limit_delta=dict(fill_value=np.nan),
                     upon_adj_limit_conflict=dict(fill_value=PendingConflictMode.KeepIgnore),
                     upon_opp_limit_conflict=dict(fill_value=PendingConflictMode.CancelExecute),
                     sl_stop=dict(fill_value=np.nan),
-                    tsl_delta=dict(fill_value=np.nan),
+                    tsl_th=dict(fill_value=np.nan),
                     tsl_stop=dict(fill_value=np.nan),
                     tp_stop=dict(fill_value=np.nan),
-                    stop_format=dict(fill_value=StopFormat.Relative),
                     stop_entry_price=dict(fill_value=StopEntryPrice.Close),
                     stop_exit_price=dict(fill_value=StopExitPrice.StopLimit),
                     upon_stop_exit=dict(fill_value=StopExitMode.Close),
                     upon_stop_update=dict(fill_value=StopUpdateMode.Override),
                     upon_adj_stop_conflict=dict(fill_value=PendingConflictMode.KeepExecute),
                     upon_opp_stop_conflict=dict(fill_value=PendingConflictMode.KeepExecute),
+                    delta_format=dict(fill_value=DeltaFormat.Relative),
                     open=dict(fill_value=np.nan),
                     high=dict(fill_value=np.nan),
                     low=dict(fill_value=np.nan),
@@ -5659,7 +5672,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             broadcasted_args["upon_opp_limit_conflict"],
             PendingConflictMode,
         )
-        broadcasted_args["stop_format"] = map_enum_fields(broadcasted_args["stop_format"], StopFormat)
         broadcasted_args["stop_entry_price"] = map_enum_fields(
             broadcasted_args["stop_entry_price"],
             StopEntryPrice,
@@ -5676,6 +5688,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             broadcasted_args["upon_opp_stop_conflict"],
             PendingConflictMode,
         )
+        broadcasted_args["delta_format"] = map_enum_fields(broadcasted_args["delta_format"], DeltaFormat)
 
         # Check data types
         if "entries" in broadcasted_args:
@@ -5710,19 +5723,20 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         checks.assert_subdtype(broadcasted_args["upon_dir_conflict"], np.integer)
         checks.assert_subdtype(broadcasted_args["upon_opposite_entry"], np.integer)
         checks.assert_subdtype(broadcasted_args["signal_type"], np.integer)
+        checks.assert_subdtype(broadcasted_args["limit_delta"], np.number)
         checks.assert_subdtype(broadcasted_args["upon_adj_limit_conflict"], np.integer)
         checks.assert_subdtype(broadcasted_args["upon_opp_limit_conflict"], np.integer)
         checks.assert_subdtype(broadcasted_args["sl_stop"], np.number)
-        checks.assert_subdtype(broadcasted_args["tsl_delta"], np.number)
+        checks.assert_subdtype(broadcasted_args["tsl_th"], np.number)
         checks.assert_subdtype(broadcasted_args["tsl_stop"], np.number)
         checks.assert_subdtype(broadcasted_args["tp_stop"], np.number)
-        checks.assert_subdtype(broadcasted_args["stop_format"], np.integer)
         checks.assert_subdtype(broadcasted_args["stop_entry_price"], np.number)
         checks.assert_subdtype(broadcasted_args["stop_exit_price"], np.integer)
         checks.assert_subdtype(broadcasted_args["upon_stop_exit"], np.integer)
         checks.assert_subdtype(broadcasted_args["upon_stop_update"], np.integer)
         checks.assert_subdtype(broadcasted_args["upon_adj_stop_conflict"], np.integer)
         checks.assert_subdtype(broadcasted_args["upon_opp_stop_conflict"], np.integer)
+        checks.assert_subdtype(broadcasted_args["delta_format"], np.integer)
         checks.assert_subdtype(broadcasted_args["open"], np.number)
         checks.assert_subdtype(broadcasted_args["high"], np.number)
         checks.assert_subdtype(broadcasted_args["low"], np.number)
