@@ -1939,6 +1939,18 @@ class TestFromOrders:
             ).order_records,
             np.array([(0, 0, 0, 50.0, 1.0, 0.0, 0), (0, 1, 0, 50.0, 1.0, 0.0, 0)], dtype=order_dt),
         )
+        assert_records_close(
+            from_orders_both(size=[[0.5, -0.5]], size_type="targetpercent").order_records,
+            from_orders_both(size=[[50, -50]], size_type="targetpercent100").order_records,
+        )
+        assert_records_close(
+            from_orders_longonly(size=[[0.5, -0.5]], size_type="targetpercent").order_records,
+            from_orders_longonly(size=[[50, -50]], size_type="targetpercent100").order_records,
+        )
+        assert_records_close(
+            from_orders_shortonly(size=[[0.5, -0.5]], size_type="targetpercent").order_records,
+            from_orders_shortonly(size=[[50, -50]], size_type="targetpercent100").order_records,
+        )
 
     def test_update_value(self):
         assert_records_close(

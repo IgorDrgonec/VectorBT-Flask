@@ -4682,12 +4682,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     Negative size is not allowed. You must express direction using signals.
             size_type (SizeType or array_like): See `Portfolio.from_orders`.
 
-                Only `SizeType.Amount`, `SizeType.Value`, and `SizeType.Percent` are supported.
-                Other modes such as target percentage are not compatible with signals since
-                their logic may contradict the direction of the signal.
+                Only `SizeType.Amount`, `SizeType.Value`, `SizeType.Percent(100)`, and
+                `SizeType.ValuePercent(100)` are supported. Other modes such as target percentage
+                are not compatible with signals since their logic may contradict the direction of the signal.
 
                 !!! note
-                    `SizeType.Percent` does not support position reversal. Switch to a single
+                    `SizeType.Percent(100)` does not support position reversal. Switch to a single
                     direction or use `OppositeEntryMode.Close` to close the position first.
 
                 See warning in `Portfolio.from_orders`.
@@ -5574,7 +5574,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     upon_stop_update=dict(fill_value=StopUpdateMode.Override),
                     upon_adj_stop_conflict=dict(fill_value=PendingConflictMode.KeepExecute),
                     upon_opp_stop_conflict=dict(fill_value=PendingConflictMode.KeepExecute),
-                    delta_format=dict(fill_value=DeltaFormat.Relative),
+                    delta_format=dict(fill_value=DeltaFormat.Percent),
                     open=dict(fill_value=np.nan),
                     high=dict(fill_value=np.nan),
                     low=dict(fill_value=np.nan),

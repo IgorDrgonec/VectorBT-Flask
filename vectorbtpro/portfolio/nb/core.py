@@ -464,18 +464,27 @@ def execute_order_nb(
     order_size = get_diraware_size_nb(order.size, order.direction)
     order_size_type = order.size_type
 
-    if order_size_type == SizeType.TargetPercent:
-        # Target percentage of current value
+    if order_size_type == SizeType.ValuePercent100:
+        order_size /= 100
+        order_size_type = SizeType.ValuePercent
+    if order_size_type == SizeType.TargetPercent100:
+        order_size /= 100
+        order_size_type = SizeType.TargetPercent
+    if order_size_type == SizeType.ValuePercent or order_size_type == SizeType.TargetPercent:
+        # Percentage or target percentage of the current value
         if np.isnan(value):
             return exec_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.ValueNaN)
         if value <= 0:
             return exec_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.ValueZeroNeg)
 
         order_size *= value
-        order_size_type = SizeType.TargetValue
+        if order_size_type == SizeType.ValuePercent:
+            order_size_type = SizeType.Value
+        else:
+            order_size_type = SizeType.TargetValue
 
     if order_size_type == SizeType.Value or order_size_type == SizeType.TargetValue:
-        # Target value
+        # Value or target value
         if np.isinf(val_price) or val_price <= 0:
             raise ValueError("val_price_now must be finite and greater than 0")
         if np.isnan(val_price):
@@ -500,6 +509,9 @@ def execute_order_nb(
                 order_size_type = SizeType.Percent
 
     percent = np.nan
+    if order_size_type == SizeType.Percent100:
+        order_size /= 100
+        order_size_type = SizeType.Percent
     if order_size_type == SizeType.Percent:
         # Percentage of resources
         percent = abs(order_size)
@@ -877,6 +889,9 @@ def approx_order_value_nb(
         return size * exec_state.val_price
     if size_type == SizeType.Value:
         return size
+    if size_type == SizeType.Percent100:
+        size /= 100
+        size_type = SizeType.Percent
     if size_type == SizeType.Percent:
         if size >= 0:
             return size * exec_state.cash
@@ -884,10 +899,18 @@ def approx_order_value_nb(
             if direction == Direction.LongOnly:
                 return size * asset_value_now
             return size * (2 * max(asset_value_now, 0) + max(exec_state.free_cash, 0))
+    if size_type == SizeType.ValuePercent100:
+        size /= 100
+        size_type = SizeType.ValuePercent
+    if size_type == SizeType.ValuePercent:
+        return size * exec_state.value
     if size_type == SizeType.TargetAmount:
         return size * exec_state.val_price - asset_value_now
     if size_type == SizeType.TargetValue:
         return size - asset_value_now
+    if size_type == SizeType.TargetPercent100:
+        size /= 100
+        size_type = SizeType.TargetPercent
     if size_type == SizeType.TargetPercent:
         return size * exec_state.value - asset_value_now
     return np.nan

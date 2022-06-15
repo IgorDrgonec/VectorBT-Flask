@@ -1122,7 +1122,7 @@ portfolio = ChildDict(
     upon_stop_update="override",
     upon_adj_stop_conflict="keepexecute",
     upon_opp_stop_conflict="keepexecute",
-    delta_format="relative",
+    delta_format="percent",
     # Holding
     hold_direction="longonly",
     close_at_end=False,

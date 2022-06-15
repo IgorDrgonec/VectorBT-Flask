@@ -361,6 +361,70 @@ class TestFromSignals:
                 dtype=order_dt,
             ),
         )
+        assert_records_close(
+            from_signals_longonly(
+                close=price_wide,
+                size=0.5,
+                size_type="percent",
+                group_by=np.array([0, 0, 0]),
+                cash_sharing=True,
+            ).order_records,
+            from_signals_longonly(
+                close=price_wide,
+                size=50,
+                size_type="percent100",
+                group_by=np.array([0, 0, 0]),
+                cash_sharing=True,
+            ).order_records,
+        )
+
+    def test_value_percent(self):
+        assert_records_close(
+            from_signals_both(size=0.5, size_type="valuepercent").order_records,
+            np.array([(0, 0, 0, 50.0, 1.0, 0.0, 0), (1, 0, 3, 81.25, 4.0, 0.0, 1)], dtype=order_dt),
+        )
+        assert_records_close(
+            from_signals_longonly(size=0.5, size_type="valuepercent").order_records,
+            np.array([(0, 0, 0, 50.0, 1.0, 0.0, 0), (1, 0, 3, 50.0, 4.0, 0.0, 1)], dtype=order_dt),
+        )
+        assert_records_close(
+            from_signals_shortonly(size=0.5, size_type="valuepercent").order_records,
+            np.array([(0, 0, 0, 50.0, 1.0, 0.0, 1), (1, 0, 3, 37.5, 4.0, 0.0, 0)], dtype=order_dt),
+        )
+        assert_records_close(
+            from_signals_longonly(
+                close=price_wide,
+                size=0.5,
+                size_type="valuepercent",
+                group_by=np.array([0, 0, 0]),
+                cash_sharing=True,
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 50.0, 1.0, 0.0, 0),
+                    (1, 0, 3, 50.0, 4.0, 0.0, 1),
+                    (0, 1, 0, 50.0, 1.0, 0.0, 0),
+                    (1, 1, 3, 50.0, 4.0, 0.0, 1),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        assert_records_close(
+            from_signals_longonly(
+                close=price_wide,
+                size=0.5,
+                size_type="valuepercent",
+                group_by=np.array([0, 0, 0]),
+                cash_sharing=True,
+            ).order_records,
+            from_signals_longonly(
+                close=price_wide,
+                size=50,
+                size_type="valuepercent100",
+                group_by=np.array([0, 0, 0]),
+                cash_sharing=True,
+            ).order_records,
+        )
 
     def test_price(self):
         assert_records_close(
@@ -1808,6 +1872,26 @@ class TestFromSignals:
         )
         assert_records_close(
             from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                signal_type="limit",
+                slippage=0.01,
+                limit_delta=[[-np.inf, 0.0, -1 / 2, 1 / 6, 2 / 3, np.inf]],
+                delta_format="percent",
+            ).order_records,
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                signal_type="limit",
+                slippage=0.01,
+                limit_delta=[[-np.inf, 0.0, -1.5, 0.5, 2.0, np.inf]],
+                delta_format="absolute",
+            ).order_records,
+        )
+        assert_records_close(
+            from_signals_longonly(
                 open=open,
                 high=high,
                 low=low,
@@ -1891,6 +1975,26 @@ class TestFromSignals:
                 ],
                 dtype=order_dt,
             ),
+        )
+        assert_records_close(
+            from_signals_shortonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                signal_type="limit",
+                slippage=0.01,
+                limit_delta=[[-np.inf, 0.0, -1 / 2, 1 / 6, 2 / 3, np.inf]],
+                delta_format="percent",
+            ).order_records,
+            from_signals_shortonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                signal_type="limit",
+                slippage=0.01,
+                limit_delta=[[-np.inf, 0.0, -1.5, 0.5, 2.0, np.inf]],
+                delta_format="absolute",
+            ).order_records,
         )
         assert_records_close(
             from_signals_shortonly(
@@ -2395,7 +2499,7 @@ class TestFromSignals:
                 high=high,
                 low=low,
                 sl_stop=[[np.nan, 0.5, 0.75, 1.0, np.inf]],
-                delta_format="relative",
+                delta_format="percent",
             ).order_records,
             from_signals_longonly(
                 close=close,
@@ -2653,7 +2757,7 @@ class TestFromSignals:
                 high=high,
                 low=low,
                 tsl_stop=[[np.nan, 0.15, 0.2, 0.25, np.inf]],
-                delta_format="relative",
+                delta_format="percent",
             ).order_records,
             from_signals_longonly(
                 close=close,
@@ -2977,7 +3081,7 @@ class TestFromSignals:
                 low=low,
                 tsl_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
                 tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
-                delta_format="relative",
+                delta_format="percent",
             ).order_records,
             from_signals_longonly(
                 close=close,
@@ -3300,7 +3404,7 @@ class TestFromSignals:
                 high=high,
                 low=low,
                 tp_stop=[[np.nan, 0.1, 0.15, 0.2, np.inf]],
-                delta_format="relative",
+                delta_format="percent",
             ).order_records,
             from_signals_shortonly(
                 close=close,

@@ -356,8 +356,9 @@ Attributes:
 
 
 class DeltaFormatT(tp.NamedTuple):
-    Relative: int = 0
-    Absolute: int = 1
+    Absolute: int = 0
+    Percent: int = 1
+    Percent100: int = 2
 
 
 DeltaFormat = DeltaFormatT()
@@ -374,8 +375,9 @@ __pdoc__[
 In which format a delta value is provided?
 
 Attributes:
-    Relative: Relative terms (i.e., as a percentage where 0.01 means 1%)
     Absolute: Absolute terms
+    Percent: Percentage terms where 0.01 means 1%
+    Percent100: Percentage terms where 1.0 means 1%
 """
 
 
@@ -505,9 +507,13 @@ class SizeTypeT(tp.NamedTuple):
     Amount: int = 0
     Value: int = 1
     Percent: int = 2
-    TargetAmount: int = 3
-    TargetValue: int = 4
-    TargetPercent: int = 5
+    Percent100: int = 3
+    ValuePercent: int = 4
+    ValuePercent100: int = 5
+    TargetAmount: int = 6
+    TargetValue: int = 7
+    TargetPercent: int = 8
+    TargetPercent100: int = 9
 
 
 SizeType = SizeTypeT()
@@ -527,7 +533,7 @@ Attributes:
     
         Gets converted into `SizeType.Amount` using `OrderContext.val_price_now`.
     Percent: Percentage of available resources to use in either direction (not to be confused with 
-        the percentage of position value!)
+        the percentage of position value!) where 0.01 means 1%
     
         * When buying, it's the percentage of `OrderContext.cash_now`. 
         * When selling, it's the percentage of `OrderContext.position_now`.
@@ -538,6 +544,12 @@ Attributes:
         !!! note
             Takes into account fees and slippage to find the limit.
             In reality, slippage and fees are not known beforehand.
+    Percent100: `SizeType.Percent` where 1.0 means 1%.
+    ValuePercent: Percentage of total value.
+    
+        Uses `OrderContext.value_now` to get the current total value.
+        Gets converted into `SizeType.Value`.
+    ValuePercent100: `SizeType.ValuePercent` where 1.0 means 1%.
     TargetAmount: Target amount of assets to hold (= target position).
     
         Uses `OrderContext.position_now` to get the current position.
@@ -550,6 +562,7 @@ Attributes:
 
         Uses `OrderContext.value_now` to get the current total value.
         Gets converted into `SizeType.TargetValue`.
+    TargetPercent100: `SizeType.TargetPercent` where 1.0 means 1%.
 """
 
 
@@ -2416,8 +2429,8 @@ tsl_info_dt = np.dtype(
     [
         ("init_i", np.int_),
         ("init_price", np.float_),
-        ("i", np.int_),
-        ("price", np.float_),
+        ("peak_i", np.int_),
+        ("peak_price", np.float_),
         ("th", np.float_),
         ("stop", np.float_),
         ("delta_format", np.int_),
@@ -2437,8 +2450,8 @@ __pdoc__[
 Attributes:
     init_i: Initial row.
     init_price: Initial price.
-    i: Row of the latest price update.
-    price: Latest updated price.
+    peak_i: Row of the highest/lowest price.
+    peak_price: Highest/lowest price.
     th: Latest updated threshold value.
     stop: Latest updated stop value.
     delta_format: Format of the threshold and stop values. See `DeltaFormat`.
