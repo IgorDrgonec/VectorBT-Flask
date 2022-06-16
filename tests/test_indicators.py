@@ -2335,6 +2335,7 @@ class TestFactory:
             "custom_func",
             "deep_getattr",
             "dumps",
+            "file_exists",
             "get_ca_setup",
             "get_writeable_attrs",
             "getsize",

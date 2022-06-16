@@ -432,6 +432,7 @@ def check_limit_hit_nb(
     return limit_price, can_execute
 
 
+@register_jitted(cache=True)
 def check_limit_expired_nb(
     index: tp.Optional[tp.Array1d],
     init_i: int,

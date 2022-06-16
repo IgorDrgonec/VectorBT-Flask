@@ -2067,12 +2067,18 @@ class TestTemplate:
         assert template.deep_substitute(template.Sub("$hello"), {"hello": 100}) == "100"
         with pytest.raises(Exception):
             template.deep_substitute(template.Sub("$hello2"), {"hello": 100})
-        assert template.deep_substitute([template.Rep("hello")], {"hello": 100}) == [100]
-        assert template.deep_substitute((template.Rep("hello"),), {"hello": 100}) == (100,)
+        assert template.deep_substitute([template.Rep("hello")], {"hello": 100}, except_types=()) == [100]
+        assert template.deep_substitute({template.Rep("hello")}, {"hello": 100}, except_types=()) == {100}
         assert template.deep_substitute({"test": template.Rep("hello")}, {"hello": 100}) == {"test": 100}
         Tup = namedtuple("Tup", ["a"])
         tup = Tup(template.Rep("hello"))
         assert template.deep_substitute(tup, {"hello": 100}) == Tup(100)
+        assert template.deep_substitute(template.RepEval("100"), max_depth=0) == 100
+        assert template.deep_substitute((template.RepEval("100"),), max_depth=0) == (template.RepEval("100"),)
+        assert template.deep_substitute((template.RepEval("100"),), max_depth=1) == (100,)
+        assert template.deep_substitute((template.RepEval("100"),), max_len=1) == (100,)
+        assert template.deep_substitute((0, template.RepEval("100")), max_len=1) == (0, template.RepEval("100"),)
+        assert template.deep_substitute((0, template.RepEval("100")), max_len=2) == (0, 100,)
 
 
 # ############# parsing.py ############# #

@@ -290,6 +290,9 @@ _settings["chunking"] = chunking
 
 template = ChildDict(
     strict=True,
+    except_types=(list, set, frozenset),
+    max_len=None,
+    max_depth=None,
     context=Config(),
 )
 """_"""

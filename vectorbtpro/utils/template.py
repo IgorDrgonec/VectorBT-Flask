@@ -190,18 +190,54 @@ class RepFunc(CustomTemplate):
         return self
 
 
-def has_templates(obj: tp.Any) -> tp.Any:
-    """Check if the object has any templates."""
+def has_templates(
+    obj: tp.Any,
+    except_types: tp.Optional[tp.Sequence[type]] = None,
+    max_len: tp.Optional[int] = None,
+    max_depth: tp.Optional[int] = None,
+    _depth: int = 0,
+) -> tp.Any:
+    """Check if the object has any templates.
+
+    For arguments, see `deep_substitute`."""
+    from vectorbtpro._settings import settings
+
+    template_cfg = settings["template"]
+
+    if except_types is None:
+        except_types = template_cfg["except_types"]
+    if max_len is None:
+        max_len = template_cfg["max_len"]
+    if max_depth is None:
+        max_depth = template_cfg["max_depth"]
+
+    if except_types is not None and checks.is_instance_of(obj, except_types):
+        return False
     if isinstance(obj, (Template, CustomTemplate)):
         return True
-    if isinstance(obj, dict):
-        for k, v in obj.items():
-            if has_templates(v):
-                return True
-    if isinstance(obj, (tuple, list, set, frozenset)):
-        for v in obj:
-            if has_templates(v):
-                return True
+    if max_depth is None or _depth < max_depth:
+        if isinstance(obj, dict):
+            if max_len is None or len(obj) <= max_len:
+                for k, v in obj.items():
+                    if has_templates(
+                        v,
+                        except_types=except_types,
+                        max_len=max_len,
+                        max_depth=max_depth,
+                        _depth=_depth + 1,
+                    ):
+                        return True
+        if isinstance(obj, (tuple, list, set, frozenset)):
+            if max_len is None or len(obj) <= max_len:
+                for v in obj:
+                    if has_templates(
+                        v,
+                        except_types=except_types,
+                        max_len=max_len,
+                        max_depth=max_depth,
+                        _depth=_depth + 1,
+                    ):
+                        return True
     return False
 
 
@@ -211,12 +247,27 @@ def deep_substitute(
     strict: tp.Optional[bool] = None,
     make_copy: bool = True,
     sub_id: tp.Optional[Hashable] = None,
+    except_types: tp.Optional[tp.Sequence[type]] = None,
+    max_len: tp.Optional[int] = None,
+    max_depth: tp.Optional[int] = None,
+    _depth: int = 0,
 ) -> tp.Any:
     """Traverses the object recursively and, if any template found, substitutes it using a context.
 
     Traverses tuples, lists, dicts and (frozen-)sets. Does not look for templates in keys.
 
+    If `except_types` is not None, uses `vectorbtpro.utils.checks.is_instance_of` to check whether
+    the object is one of the types that are blacklisted. If so, the object is simply returned.
+    By default, out of all sequences, only dicts and tuples are substituted.
+
+    If `max_len` is not None, processes any object only if it's shorter than the specified length.
+
+    If `max_depth` is not None, processes any object only up to a certain recursion level.
+    Level of 0 means dicts and other iterables are not processed, only templates are expected.
+
     If `strict` is True, raises an error if processing template fails. Otherwise, returns the original template.
+
+    For defaults, see `vectorbtpro._settings.template`.
 
     !!! note
         If the object is deep (such as a dict or a list), creates a copy of it if any template found inside,
@@ -235,7 +286,7 @@ def deep_substitute(
         100100
         >>> vbt.deep_substitute(vbt.Rep('key'), {'key': 100})
         100
-        >>> vbt.deep_substitute([vbt.Rep('key'), vbt.Sub('$key$key')], {'key': 100})
+        >>> vbt.deep_substitute([vbt.Rep('key'), vbt.Sub('$key$key')], {'key': 100}, except_types=())
         [100, '100100']
         >>> vbt.deep_substitute(vbt.RepFunc(lambda key: key == 100), {'key': 100})
         True
@@ -247,33 +298,89 @@ def deep_substitute(
         <vectorbtpro.utils.template.RepEval at 0x7fe3ad2ab668>
         ```
     """
+    from vectorbtpro._settings import settings
+
+    template_cfg = settings["template"]
+
+    if except_types is None:
+        except_types = template_cfg["except_types"]
+    if max_len is None:
+        max_len = template_cfg["max_len"]
+    if max_depth is None:
+        max_depth = template_cfg["max_depth"]
     if context is None:
         context = {}
 
-    if not has_templates(obj):
+    if not has_templates(
+        obj,
+        except_types=except_types,
+        max_len=max_len,
+        max_depth=max_depth,
+        _depth=_depth,
+    ):
         return obj
 
     if isinstance(obj, CustomTemplate):
         return obj.substitute(context=context, strict=strict, sub_id=sub_id)
     if isinstance(obj, Template):
         return obj.substitute(context=context)
-    if isinstance(obj, dict):
-        if make_copy:
-            obj = copy(obj)
-        for k, v in obj.items():
-            set_dict_item(obj, k, deep_substitute(v, context=context, strict=strict, sub_id=sub_id), force=True)
-        return obj
-    if isinstance(obj, list):
-        if make_copy:
-            obj = copy(obj)
-        for i in range(len(obj)):
-            obj[i] = deep_substitute(obj[i], context=context, strict=strict, sub_id=sub_id)
-        return obj
-    if isinstance(obj, (tuple, set, frozenset)):
-        result = []
-        for o in obj:
-            result.append(deep_substitute(o, context=context, strict=strict, sub_id=sub_id))
-        if checks.is_namedtuple(obj):
-            return type(obj)(*result)
-        return type(obj)(result)
+    if max_depth is None or _depth < max_depth:
+        if except_types is not None and checks.is_instance_of(obj, except_types):
+            return obj
+        if isinstance(obj, dict):
+            if max_len is None or len(obj) <= max_len:
+                if make_copy:
+                    obj = copy(obj)
+                for k, v in obj.items():
+                    set_dict_item(
+                        obj,
+                        k,
+                        deep_substitute(
+                            v,
+                            context=context,
+                            strict=strict,
+                            sub_id=sub_id,
+                            except_types=except_types,
+                            max_len=max_len,
+                            max_depth=max_depth,
+                            _depth=_depth + 1,
+                        ),
+                        force=True,
+                    )
+                return obj
+        if isinstance(obj, list):
+            if max_len is None or len(obj) <= max_len:
+                if make_copy:
+                    obj = copy(obj)
+                for i in range(len(obj)):
+                    obj[i] = deep_substitute(
+                        obj[i],
+                        context=context,
+                        strict=strict,
+                        sub_id=sub_id,
+                        except_types=except_types,
+                        max_len=max_len,
+                        max_depth=max_depth,
+                        _depth=_depth + 1,
+                    )
+                return obj
+        if isinstance(obj, (tuple, set, frozenset)):
+            if max_len is None or len(obj) <= max_len:
+                result = []
+                for o in obj:
+                    result.append(
+                        deep_substitute(
+                            o,
+                            context=context,
+                            strict=strict,
+                            sub_id=sub_id,
+                            except_types=except_types,
+                            max_len=max_len,
+                            max_depth=max_depth,
+                            _depth=_depth + 1,
+                        )
+                    )
+                if checks.is_namedtuple(obj):
+                    return type(obj)(*result)
+                return type(obj)(result)
     return obj
