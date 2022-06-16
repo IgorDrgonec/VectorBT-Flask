@@ -526,7 +526,7 @@ def ewm_mean_1d_nb(arr: tp.Array1d, span: int, minp: tp.Optional[int] = None, ad
         return out
     com = (span - 1) / 2.0
     alpha = 1.0 / (1.0 + com)
-    weighted_avg = float(arr[0])
+    weighted_avg = float(arr[0]) + 0.0  # cast to np.float_
     nobs = 0
     old_wt = 1.0
 
@@ -665,8 +665,8 @@ def ewm_std_1d_nb(arr: tp.Array1d, span: int, minp: tp.Optional[int] = None, adj
         return out
     com = (span - 1) / 2.0
     alpha = 1.0 / (1.0 + com)
-    mean_x = float(arr[0])
-    mean_y = float(arr[0])
+    mean_x = float(arr[0]) + 0.0  # cast to np.float_
+    mean_y = float(arr[0]) + 0.0  # cast to np.float_
     nobs = 0
     cov = 0.0
     sum_wt = 1.0
