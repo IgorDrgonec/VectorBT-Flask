@@ -1822,7 +1822,7 @@ class TestFromSignals:
         _ = from_signals_longonly(attach_call_seq=False, **kwargs)
         _ = from_signals_shortonly(attach_call_seq=False, **kwargs)
 
-    def test_limit_signal_type(self):
+    def test_limit_order_type(self):
         entries = pd.Series([True, False, False, False, False], index=price.index)
         exits = pd.Series([False, False, False, False, False], index=price.index)
 
@@ -1835,7 +1835,7 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                signal_type="limit",
+                order_type="limit",
                 slippage=0.01,
                 price=[[np.nan, 3.0, 4.5, 2.5, 1.0, np.inf]],
             ).order_records,
@@ -1855,7 +1855,7 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                signal_type="limit",
+                order_type="limit",
                 slippage=0.01,
                 limit_delta=[[-np.inf, 0.0, -1 / 2, 1 / 6, 2 / 3, np.inf]],
             ).order_records,
@@ -1875,7 +1875,7 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                signal_type="limit",
+                order_type="limit",
                 slippage=0.01,
                 limit_delta=[[-np.inf, 0.0, -1 / 2, 1 / 6, 2 / 3, np.inf]],
                 delta_format="percent",
@@ -1884,7 +1884,7 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                signal_type="limit",
+                order_type="limit",
                 slippage=0.01,
                 limit_delta=[[-np.inf, 0.0, -1.5, 0.5, 2.0, np.inf]],
                 delta_format="absolute",
@@ -1899,7 +1899,7 @@ class TestFromSignals:
                 entries=entries,
                 exits=exits,
                 slippage=0.01,
-                signal_type="limit",
+                order_type="limit",
                 price=[[np.nan, 3.0, 4.5, 2.5, 1.0, np.inf]],
             ).order_records,
             np.array(
@@ -1922,7 +1922,7 @@ class TestFromSignals:
                 entries=entries,
                 exits=exits,
                 slippage=0.01,
-                signal_type="limit",
+                order_type="limit",
                 limit_delta=[[-np.inf, 0.0, -1 / 2, 1 / 6, 2 / 3, np.inf]],
             ).order_records,
             np.array(
@@ -1941,7 +1941,7 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                signal_type="limit",
+                order_type="limit",
                 slippage=0.01,
                 price=[[np.nan, 3.0, 4.5, 2.5, 1.0, np.inf]],
             ).order_records,
@@ -1961,7 +1961,7 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                signal_type="limit",
+                order_type="limit",
                 slippage=0.01,
                 limit_delta=[[-np.inf, 0.0, -1 / 2, 1 / 6, 2 / 3, np.inf]],
             ).order_records,
@@ -1981,7 +1981,7 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                signal_type="limit",
+                order_type="limit",
                 slippage=0.01,
                 limit_delta=[[-np.inf, 0.0, -1 / 2, 1 / 6, 2 / 3, np.inf]],
                 delta_format="percent",
@@ -1990,7 +1990,7 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                signal_type="limit",
+                order_type="limit",
                 slippage=0.01,
                 limit_delta=[[-np.inf, 0.0, -1.5, 0.5, 2.0, np.inf]],
                 delta_format="absolute",
@@ -2004,7 +2004,7 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                signal_type="limit",
+                order_type="limit",
                 slippage=0.01,
                 price=[[np.nan, 3.0, 4.5, 2.5, 1.0, np.inf]],
             ).order_records,
@@ -2027,7 +2027,7 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                signal_type="limit",
+                order_type="limit",
                 slippage=0.01,
                 limit_delta=[[-np.inf, 0.0, -1 / 2, 1 / 6, 2 / 3, np.inf]],
             ).order_records,
@@ -2053,7 +2053,7 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                signal_type="limit",
+                order_type="limit",
                 price=3,
                 limit_tif=[[-1, 0, 1, 2]],
             ).order_records,
@@ -2070,7 +2070,7 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                signal_type="limit",
+                order_type="limit",
                 price=3,
                 limit_tif=[[-1, 0, 1, 2]],
                 time_delta_format="rows",
@@ -2079,7 +2079,7 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                signal_type="limit",
+                order_type="limit",
                 price=3,
                 limit_tif=[[-1, 0 * day_dt, 1 * day_dt, 2 * day_dt]],
                 time_delta_format="index",
@@ -2090,7 +2090,7 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                signal_type="limit",
+                order_type="limit",
                 price=3,
                 limit_tif="1d",
                 time_delta_format="index",
@@ -2105,7 +2105,7 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                signal_type="limit",
+                order_type="limit",
                 price=3,
                 limit_tif=pd.Timedelta("1d"),
                 time_delta_format="index",
@@ -2120,7 +2120,7 @@ class TestFromSignals:
                 close=close,
                 entries=entries,
                 exits=exits,
-                signal_type="limit",
+                order_type="limit",
                 price=3,
                 limit_tif=pd.Timedelta("2d"),
                 time_delta_format="index",
@@ -2143,7 +2143,7 @@ class TestFromSignals:
                 exits=exits,
                 size=1,
                 accumulate=True,
-                signal_type="limit",
+                order_type="limit",
                 price=price2,
                 limit_tif=limit_tif,
             ).order_records,
@@ -2167,7 +2167,7 @@ class TestFromSignals:
         price3 = pd.Series([4.5, np.inf, np.inf, np.inf, np.inf], index=price.index)
         price4 = pd.Series([2.5, -np.inf, -np.inf, -np.inf, -np.inf], index=price.index)
         price5 = pd.Series([4.5, -np.inf, -np.inf, -np.inf, -np.inf], index=price.index)
-        signal_type = pd.Series(["limit", "market", "market", "market", "market"], index=price.index)
+        order_type = pd.Series(["limit", "market", "market", "market", "market"], index=price.index)
         assert_records_close(
             from_signals_longonly(
                 close=close,
@@ -2175,7 +2175,7 @@ class TestFromSignals:
                 exits=exits,
                 size=size,
                 accumulate=True,
-                signal_type=signal_type,
+                order_type=order_type,
                 price=price2,
                 upon_adj_limit_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
             ).order_records,
@@ -2196,7 +2196,7 @@ class TestFromSignals:
                 exits=exits,
                 size=size,
                 accumulate=True,
-                signal_type="limit",
+                order_type="limit",
                 price=price2,
                 upon_adj_limit_conflict="KeepExecute",
             )
@@ -2207,7 +2207,7 @@ class TestFromSignals:
                 exits=exits,
                 size=size,
                 accumulate=True,
-                signal_type=signal_type,
+                order_type=order_type,
                 price=price2,
                 upon_adj_limit_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
             ).order_records,
@@ -2229,7 +2229,7 @@ class TestFromSignals:
                 exits=exits,
                 size=size,
                 accumulate=True,
-                signal_type=signal_type,
+                order_type=order_type,
                 price=price4,
                 upon_adj_limit_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
             ).order_records,
@@ -2251,7 +2251,7 @@ class TestFromSignals:
                 exits=exits,
                 size=size,
                 accumulate=True,
-                signal_type=signal_type,
+                order_type=order_type,
                 price=price3,
                 upon_adj_limit_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
             ).order_records,
@@ -2272,7 +2272,7 @@ class TestFromSignals:
                 exits=exits,
                 size=size,
                 accumulate=True,
-                signal_type="limit",
+                order_type="limit",
                 price=price3,
                 upon_adj_limit_conflict="KeepExecute",
             )
@@ -2283,7 +2283,7 @@ class TestFromSignals:
                 exits=exits,
                 size=size,
                 accumulate=True,
-                signal_type=signal_type,
+                order_type=order_type,
                 price=price3,
                 upon_adj_limit_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
             ).order_records,
@@ -2305,7 +2305,7 @@ class TestFromSignals:
                 exits=exits,
                 size=size,
                 accumulate=True,
-                signal_type=signal_type,
+                order_type=order_type,
                 price=price5,
                 upon_adj_limit_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
             ).order_records,
@@ -2332,7 +2332,7 @@ class TestFromSignals:
         price3 = pd.Series([4.5, np.inf, np.inf, np.inf, np.inf], index=price.index)
         price4 = pd.Series([2.5, -np.inf, -np.inf, -np.inf, -np.inf], index=price.index)
         price5 = pd.Series([4.5, -np.inf, -np.inf, -np.inf, -np.inf], index=price.index)
-        signal_type = pd.Series(["limit", "market", "market", "market", "market"], index=price.index)
+        order_type = pd.Series(["limit", "market", "market", "market", "market"], index=price.index)
         assert_records_close(
             from_signals_both(
                 close=close,
@@ -2340,7 +2340,7 @@ class TestFromSignals:
                 exits=exits,
                 size=size,
                 accumulate=True,
-                signal_type=signal_type,
+                order_type=order_type,
                 price=price2,
                 upon_opp_limit_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
             ).order_records,
@@ -2361,7 +2361,7 @@ class TestFromSignals:
                 exits=exits,
                 size=size,
                 accumulate=True,
-                signal_type="limit",
+                order_type="limit",
                 price=price2,
                 upon_opp_limit_conflict="KeepExecute",
             )
@@ -2372,7 +2372,7 @@ class TestFromSignals:
                 exits=exits2,
                 size=size,
                 accumulate=True,
-                signal_type=signal_type,
+                order_type=order_type,
                 price=price2,
                 upon_opp_limit_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
             ).order_records,
@@ -2394,7 +2394,7 @@ class TestFromSignals:
                 exits=exits2,
                 size=size,
                 accumulate=True,
-                signal_type=signal_type,
+                order_type=order_type,
                 price=price4,
                 upon_opp_limit_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
             ).order_records,
@@ -2416,7 +2416,7 @@ class TestFromSignals:
                 exits=entries,
                 size=size,
                 accumulate=True,
-                signal_type=signal_type,
+                order_type=order_type,
                 price=price3,
                 upon_opp_limit_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
             ).order_records,
@@ -2437,7 +2437,7 @@ class TestFromSignals:
                 exits=entries,
                 size=size,
                 accumulate=True,
-                signal_type="limit",
+                order_type="limit",
                 price=price3,
                 upon_opp_limit_conflict="KeepExecute",
             )
@@ -2448,7 +2448,7 @@ class TestFromSignals:
                 exits=entries,
                 size=size,
                 accumulate=True,
-                signal_type=signal_type,
+                order_type=order_type,
                 price=price3,
                 upon_opp_limit_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
             ).order_records,
@@ -2470,7 +2470,7 @@ class TestFromSignals:
                 exits=entries,
                 size=size,
                 accumulate=True,
-                signal_type=signal_type,
+                order_type=order_type,
                 price=price5,
                 upon_opp_limit_conflict=[["KeepIgnore", "KeepExecute", "CancelIgnore", "CancelExecute"]],
             ).order_records,
@@ -3648,6 +3648,7 @@ class TestFromSignals:
         entries = pd.Series([True, False, False, False, False], index=price.index)
         exits = pd.Series([False, False, False, False, False], index=price.index)
         close = pd.Series([5.0, 4.0, 3.0, 2.0, 1.0], index=price.index)
+        slippage = pd.Series([0.1, 0.0, 0.0, 0.0, 0.0], index=price.index)
         open = close + 0.25
         high = close + 0.5
         low = close - 0.5
@@ -3663,9 +3664,8 @@ class TestFromSignals:
                 sl_stop=[[0.05, 0.5, 0.75]],
                 price=1.1 * close,
                 val_price=1.05 * close,
+                slippage=slippage,
                 stop_entry_price="val_price",
-                stop_exit_price="stoplimit",
-                slippage=0.1,
             ).order_records,
             np.array(
                 [
@@ -3690,9 +3690,8 @@ class TestFromSignals:
                 sl_stop=[[0.05, 0.5, 0.75]],
                 price=1.1 * close,
                 val_price=1.05 * close,
+                slippage=slippage,
                 stop_entry_price="price",
-                stop_exit_price="stoplimit",
-                slippage=0.1,
             ).order_records,
             np.array(
                 [
@@ -3717,9 +3716,8 @@ class TestFromSignals:
                 sl_stop=[[0.05, 0.5, 0.75]],
                 price=1.1 * close,
                 val_price=1.05 * close,
+                slippage=slippage,
                 stop_entry_price="fillprice",
-                stop_exit_price="stoplimit",
-                slippage=0.1,
             ).order_records,
             np.array(
                 [
@@ -3744,9 +3742,8 @@ class TestFromSignals:
                 sl_stop=[[0.05, 0.5, 0.75]],
                 price=1.1 * close,
                 val_price=1.05 * close,
+                slippage=slippage,
                 stop_entry_price="open",
-                stop_exit_price="stoplimit",
-                slippage=0.1,
             ).order_records,
             np.array(
                 [
@@ -3771,9 +3768,8 @@ class TestFromSignals:
                 sl_stop=[[0.05, 0.5, 0.75]],
                 price=1.1 * close,
                 val_price=1.05 * close,
+                slippage=slippage,
                 stop_entry_price="close",
-                stop_exit_price="stoplimit",
-                slippage=0.1,
             ).order_records,
             np.array(
                 [
@@ -3798,9 +3794,8 @@ class TestFromSignals:
                 sl_stop=[[0.05, 0.5, 0.75]],
                 price=1.1 * close,
                 val_price=1.05 * close,
+                slippage=slippage,
                 stop_entry_price=close,
-                stop_exit_price="stoplimit",
-                slippage=0.1,
             ).order_records,
             from_signals_longonly(
                 close=close,
@@ -3812,9 +3807,8 @@ class TestFromSignals:
                 sl_stop=[[0.05, 0.5, 0.75]],
                 price=1.1 * close,
                 val_price=1.05 * close,
+                slippage=slippage,
                 stop_entry_price="close",
-                stop_exit_price="stoplimit",
-                slippage=0.1,
             ).order_records,
         )
 
@@ -3822,6 +3816,7 @@ class TestFromSignals:
         entries = pd.Series([True, False, False, False, False], index=price.index)
         exits = pd.Series([False, False, False, False, False], index=price.index)
         close = pd.Series([5.0, 4.0, 3.0, 2.0, 1.0], index=price.index)
+        slippage = pd.Series([0.1, 0.0, 0.0, 0.0, 0.0], index=price.index)
         open = close + 0.25
         high = close + 0.5
         low = close - 0.5
@@ -3836,8 +3831,8 @@ class TestFromSignals:
                 low=low,
                 sl_stop=[[0.05, 0.5, 0.75]],
                 price=1.1 * close,
-                stop_exit_price="stoplimit",
-                slippage=0.1,
+                slippage=slippage,
+                stop_exit_price="stopmarket",
             ).order_records,
             np.array(
                 [
@@ -3861,17 +3856,45 @@ class TestFromSignals:
                 low=low,
                 sl_stop=[[0.05, 0.5, 0.75]],
                 price=1.1 * close,
-                stop_exit_price="stopmarket",
                 slippage=0.1,
+                stop_exit_price="close",
             ).order_records,
             np.array(
                 [
                     (0, 0, 0, 16.528926, 6.05, 0.0, 0),
-                    (1, 0, 1, 16.528926, 3.825, 0.0, 1),
+                    (1, 0, 1, 16.528926, 3.6, 0.0, 1),
                     (0, 1, 0, 16.528926, 6.05, 0.0, 0),
-                    (1, 1, 2, 16.528926, 2.25, 0.0, 1),
+                    (1, 1, 2, 16.528926, 2.7, 0.0, 1),
                     (0, 2, 0, 16.528926, 6.05, 0.0, 0),
-                    (1, 2, 4, 16.528926, 1.125, 0.0, 1),
+                    (1, 2, 4, 16.528926, 0.9, 0.0, 1),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        close = pd.Series([5.0, 4.0, 3.0, 4.0, 5.0], index=price.index)
+        open = close + 0.25
+        high = close + 0.5
+        low = close - 0.5
+        assert_records_close(
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                open=open,
+                high=high,
+                low=low,
+                sl_stop=[[0.05, 0.5, 0.75]],
+                price=1.1 * close,
+                slippage=0.1,
+                stop_exit_price="stoplimit",
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 16.52892561983471, 6.050000000000001, 0.0, 0),
+                    (1, 0, 3, 16.52892561983471, 4.25, 0.0, 1),
+                    (0, 1, 0, 16.52892561983471, 6.050000000000001, 0.0, 0),
+                    (1, 1, 2, 16.52892561983471, 2.5, 0.0, 1),
+                    (0, 2, 0, 16.52892561983471, 6.050000000000001, 0.0, 0),
                 ],
                 dtype=order_dt,
             ),
@@ -3886,17 +3909,17 @@ class TestFromSignals:
                 low=low,
                 sl_stop=[[0.05, 0.5, 0.75]],
                 price=1.1 * close,
-                stop_exit_price="close",
                 slippage=0.1,
+                stop_exit_price="stoplimit",
+                stop_limit_delta=0.25,
             ).order_records,
             np.array(
                 [
-                    (0, 0, 0, 16.528926, 6.05, 0.0, 0),
-                    (1, 0, 1, 16.528926, 3.6, 0.0, 1),
-                    (0, 1, 0, 16.528926, 6.05, 0.0, 0),
-                    (1, 1, 2, 16.528926, 2.7, 0.0, 1),
-                    (0, 2, 0, 16.528926, 6.05, 0.0, 0),
-                    (1, 2, 4, 16.528926, 0.9, 0.0, 1),
+                    (0, 0, 0, 16.52892561983471, 6.050000000000001, 0.0, 0),
+                    (1, 0, 4, 16.52892561983471, 5.3125, 0.0, 1),
+                    (0, 1, 0, 16.52892561983471, 6.050000000000001, 0.0, 0),
+                    (1, 1, 3, 16.52892561983471, 4.25, 0.0, 1),
+                    (0, 2, 0, 16.52892561983471, 6.050000000000001, 0.0, 0),
                 ],
                 dtype=order_dt,
             ),

@@ -4588,7 +4588,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         upon_short_conflict: tp.Optional[tp.ArrayLike] = None,
         upon_dir_conflict: tp.Optional[tp.ArrayLike] = None,
         upon_opposite_entry: tp.Optional[tp.ArrayLike] = None,
-        signal_type: tp.Optional[tp.ArrayLike] = None,
+        order_type: tp.Optional[tp.ArrayLike] = None,
         limit_delta: tp.Optional[tp.ArrayLike] = None,
         limit_tif: tp.Optional[tp.ArrayLike] = None,
         upon_adj_limit_conflict: tp.Optional[tp.ArrayLike] = None,
@@ -4600,6 +4600,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         tp_stop: tp.Optional[tp.ArrayLike] = None,
         stop_entry_price: tp.Optional[tp.ArrayLike] = None,
         stop_exit_price: tp.Optional[tp.ArrayLike] = None,
+        stop_limit_delta: tp.Optional[tp.ArrayLike] = None,
         upon_stop_exit: tp.Optional[tp.ArrayLike] = None,
         upon_stop_update: tp.Optional[tp.ArrayLike] = None,
         upon_adj_stop_conflict: tp.Optional[tp.ArrayLike] = None,
@@ -4724,11 +4725,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 Will broadcast.
             upon_opposite_entry (OppositeEntryMode or array_like): See `vectorbtpro.portfolio.enums.OppositeEntryMode`.
                 Will broadcast.
-            signal_type (SignalType or array_like): See `vectorbtpro.portfolio.enums.SignalType`.
+            order_type (OrderType or array_like): See `vectorbtpro.portfolio.enums.OrderType`.
+
+                Only one active limit order is allowed at a time.
             limit_delta (float or array_like): Delta from `price` to build the limit price.
                 Will broadcast.
 
-                If NaN, `price` becomes limit price. Otherwise, applied on top of `price` depending
+                If NaN, `price` becomes the limit price. Otherwise, applied on top of `price` depending
                 on the current direction: if the direction-aware size is positive (= buying), a positive delta
                 will decrease the limit price; if the direction-aware size is negative (= selling), a positive delta
                 will increase the limit price. Delta can be negative.
@@ -4775,6 +4778,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 Will broadcast.
 
                 If provided on per-element basis, gets applied upon exit.
+            stop_limit_delta (float or array_like): Similar to `limit_delta` but only for stop orders.
+                Will broadcast.
             upon_stop_exit (StopExitMode or array_like): See `vectorbtpro.portfolio.enums.StopExitMode`.
                 Will broadcast.
 
@@ -5382,8 +5387,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             upon_dir_conflict = portfolio_cfg["upon_dir_conflict"]
         if upon_opposite_entry is None:
             upon_opposite_entry = portfolio_cfg["upon_opposite_entry"]
-        if signal_type is None:
-            signal_type = portfolio_cfg["signal_type"]
+        if order_type is None:
+            order_type = portfolio_cfg["order_type"]
         if limit_delta is None:
             limit_delta = portfolio_cfg["limit_delta"]
         if limit_tif is None:
@@ -5418,6 +5423,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             stop_entry_price = portfolio_cfg["stop_entry_price"]
         if stop_exit_price is None:
             stop_exit_price = portfolio_cfg["stop_exit_price"]
+        if stop_limit_delta is None:
+            stop_limit_delta = portfolio_cfg["stop_limit_delta"]
         if upon_stop_exit is None:
             upon_stop_exit = portfolio_cfg["upon_stop_exit"]
         if upon_stop_update is None:
@@ -5512,7 +5519,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             upon_short_conflict=upon_short_conflict,
             upon_dir_conflict=upon_dir_conflict,
             upon_opposite_entry=upon_opposite_entry,
-            signal_type=signal_type,
+            order_type=order_type,
             limit_delta=limit_delta,
             limit_tif=limit_tif,
             upon_adj_limit_conflict=upon_adj_limit_conflict,
@@ -5523,6 +5530,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             tp_stop=tp_stop,
             stop_entry_price=stop_entry_price,
             stop_exit_price=stop_exit_price,
+            stop_limit_delta=stop_limit_delta,
             upon_stop_exit=upon_stop_exit,
             upon_stop_update=upon_stop_update,
             upon_adj_stop_conflict=upon_adj_stop_conflict,
@@ -5579,7 +5587,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     upon_short_conflict=dict(fill_value=ConflictMode.Ignore),
                     upon_dir_conflict=dict(fill_value=DirectionConflictMode.Ignore),
                     upon_opposite_entry=dict(fill_value=OppositeEntryMode.ReverseReduce),
-                    signal_type=dict(fill_value=SignalType.Market),
+                    order_type=dict(fill_value=OrderType.Market),
                     limit_delta=dict(fill_value=np.nan),
                     limit_tif=dict(fill_value=-1),
                     upon_adj_limit_conflict=dict(fill_value=PendingConflictMode.KeepIgnore),
@@ -5589,7 +5597,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     tsl_stop=dict(fill_value=np.nan),
                     tp_stop=dict(fill_value=np.nan),
                     stop_entry_price=dict(fill_value=StopEntryPrice.Close),
-                    stop_exit_price=dict(fill_value=StopExitPrice.StopLimit),
+                    stop_exit_price=dict(fill_value=StopExitPrice.StopMarket),
+                    stop_limit_delta=dict(fill_value=np.nan),
                     upon_stop_exit=dict(fill_value=StopExitMode.Close),
                     upon_stop_update=dict(fill_value=StopUpdateMode.Override),
                     upon_adj_stop_conflict=dict(fill_value=PendingConflictMode.KeepExecute),
@@ -5689,7 +5698,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             broadcasted_args["upon_opposite_entry"],
             OppositeEntryMode,
         )
-        broadcasted_args["signal_type"] = map_enum_fields(broadcasted_args["signal_type"], SignalType)
+        broadcasted_args["order_type"] = map_enum_fields(broadcasted_args["order_type"], OrderType)
         broadcasted_args["upon_adj_limit_conflict"] = map_enum_fields(
             broadcasted_args["upon_adj_limit_conflict"],
             PendingConflictMode,
@@ -5749,7 +5758,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         checks.assert_subdtype(broadcasted_args["upon_short_conflict"], np.integer)
         checks.assert_subdtype(broadcasted_args["upon_dir_conflict"], np.integer)
         checks.assert_subdtype(broadcasted_args["upon_opposite_entry"], np.integer)
-        checks.assert_subdtype(broadcasted_args["signal_type"], np.integer)
+        checks.assert_subdtype(broadcasted_args["order_type"], np.integer)
         checks.assert_subdtype(broadcasted_args["limit_delta"], np.number)
         checks.assert_subdtype(broadcasted_args["limit_tif"], np.number)
         checks.assert_subdtype(broadcasted_args["upon_adj_limit_conflict"], np.integer)
@@ -5760,6 +5769,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         checks.assert_subdtype(broadcasted_args["tp_stop"], np.number)
         checks.assert_subdtype(broadcasted_args["stop_entry_price"], np.number)
         checks.assert_subdtype(broadcasted_args["stop_exit_price"], np.integer)
+        checks.assert_subdtype(broadcasted_args["stop_limit_delta"], np.number)
         checks.assert_subdtype(broadcasted_args["upon_stop_exit"], np.integer)
         checks.assert_subdtype(broadcasted_args["upon_stop_update"], np.integer)
         checks.assert_subdtype(broadcasted_args["upon_adj_stop_conflict"], np.integer)

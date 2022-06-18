@@ -15,7 +15,6 @@ __all__ = [
     "ValPriceType",
     "InitCashMode",
     "CallSeqType",
-    "SignalType",
     "PendingConflictMode",
     "AccumulationMode",
     "ConflictMode",
@@ -34,6 +33,7 @@ __all__ = [
     "OrderStatusInfo",
     "status_info_desc",
     "OrderSide",
+    "OrderType",
     "TradeDirection",
     "TradeStatus",
     "TradesType",
@@ -56,10 +56,12 @@ __all__ = [
     "FSInOutputs",
     "FOInOutputs",
     "order_dt",
+    "fs_order_dt",
     "trade_dt",
     "log_dt",
     "alloc_range_dt",
     "alloc_point_dt",
+    "main_info_dt",
     "limit_info_dt",
     "sl_info_dt",
     "tsl_info_dt",
@@ -170,28 +172,6 @@ Attributes:
     Reversed: Place calls from right to left.
     Random: Place calls randomly.
     Auto: Place calls dynamically based on order value.
-"""
-
-
-class SignalTypeT(tp.NamedTuple):
-    Market: int = 0
-    Limit: int = 1
-
-
-SignalType = SignalTypeT()
-"""_"""
-
-__pdoc__[
-    "SignalType"
-] = f"""Signal type.
-
-```python
-{prettify(SignalType)}
-```
-
-Attributes:
-    Market: Signal acts as a market order.
-    Limit: Signal acts as a limit order.
 """
 
 
@@ -740,6 +720,24 @@ __pdoc__[
 
 ```python
 {prettify(OrderSide)}
+```
+"""
+
+
+class OrderTypeT(tp.NamedTuple):
+    Market: int = 0
+    Limit: int = 1
+
+
+OrderType = OrderTypeT()
+"""_"""
+
+__pdoc__[
+    "OrderType"
+] = f"""Order type.
+
+```python
+{prettify(OrderType)}
 ```
 """
 
@@ -2282,6 +2280,32 @@ __pdoc__[
 ```
 """
 
+fs_order_dt = np.dtype(
+    [
+        ("id", np.int_),
+        ("col", np.int_),
+        ("idx", np.int_),
+        ("size", np.float_),
+        ("price", np.float_),
+        ("fees", np.float_),
+        ("side", np.int_),
+        ("type", np.int_),
+        ("stop_type", np.int_),
+        ("creation_idx", np.int_),
+    ],
+    align=True,
+)
+"""_"""
+
+__pdoc__[
+    "fs_order_dt"
+] = f"""`np.dtype` of order records generated from signals.
+
+```python
+{prettify(fs_order_dt)}
+```
+"""
+
 _trade_fields = [
     ("id", np.int_),
     ("col", np.int_),
@@ -2412,6 +2436,40 @@ __pdoc__[
 
 # ############# Info records ############# #
 
+main_info_dt = np.dtype(
+    [
+        ("init_i", np.int_),
+        ("trigger_i", np.int_),
+        ("price", np.float_),
+        ("size", np.float_),
+        ("size_type", np.int_),
+        ("direction", np.int_),
+        ("type", np.int_),
+        ("stop_type", np.int_),
+    ],
+    align=True,
+)
+"""_"""
+
+__pdoc__[
+    "main_info_dt"
+] = f"""`np.dtype` of main signal records.
+
+```python
+{prettify(main_info_dt)}
+```
+
+Attributes:
+    init_i: Row where order was placed.
+    trigger_i: Row from where order information such as price should be taken.
+    price: Requested price.
+    size: Order size.
+    size_type: Order size type. See `SizeType`.
+    direction: Order direction. See `Direction`.
+    type: Order type. See `OrderType`.
+    stop_type: Stop type. See `vectorbtpro.signals.enums.StopType`.
+"""
+
 limit_info_dt = np.dtype(
     [
         ("init_i", np.int_),
@@ -2419,6 +2477,7 @@ limit_info_dt = np.dtype(
         ("init_size", np.float_),
         ("init_size_type", np.int_),
         ("init_direction", np.int_),
+        ("init_stop_type", np.int_),
         ("delta", np.float_),
         ("delta_format", np.int_),
         ("tif", int),
@@ -2442,6 +2501,7 @@ Attributes:
     init_size: Requested size.
     init_size_type: Type of the requested size. See `SizeType`.
     init_direction: Direction of the requested size. See `Direction`.
+    init_stop_type: Stop type. See `vectorbtpro.signals.enums.StopType`.
     delta: Delta from the initial price.
     delta_format: Format of the delta value. See `DeltaFormat`.
     tif: Time in force in integer format. Set to `-1` to disable.
@@ -2453,6 +2513,7 @@ sl_info_dt = np.dtype(
         ("init_i", np.int_),
         ("init_price", np.float_),
         ("stop", np.float_),
+        ("limit_delta", np.float_),
         ("delta_format", np.int_),
     ],
     align=True,
@@ -2471,6 +2532,7 @@ Attributes:
     init_i: Initial row.
     init_price: Initial price.
     stop: Latest updated stop value.
+    limit_delta: Delta from the hit price. Only for `StopExitPrice.StopLimit`.
     delta_format: Format of the stop value. See `DeltaFormat`.
 """
 
@@ -2482,6 +2544,7 @@ tsl_info_dt = np.dtype(
         ("peak_price", np.float_),
         ("th", np.float_),
         ("stop", np.float_),
+        ("limit_delta", np.float_),
         ("delta_format", np.int_),
     ],
     align=True,
@@ -2503,6 +2566,7 @@ Attributes:
     peak_price: Highest/lowest price.
     th: Latest updated threshold value.
     stop: Latest updated stop value.
+    limit_delta: Delta from the hit price. Only for `StopExitPrice.StopLimit`.
     delta_format: Format of the threshold and stop values. See `DeltaFormat`.
 """
 
@@ -2511,6 +2575,7 @@ tp_info_dt = np.dtype(
         ("init_i", np.int_),
         ("init_price", np.float_),
         ("stop", np.float_),
+        ("limit_delta", np.float_),
         ("delta_format", np.int_),
     ],
     align=True,
@@ -2529,5 +2594,6 @@ Attributes:
     init_i: Initial row.
     init_price: Initial price.
     stop: Latest updated stop value.
+    limit_delta: Delta from the hit price. Only for `StopExitPrice.StopLimit`.
     delta_format: Format of the stop value. See `DeltaFormat`.
 """
