@@ -61,6 +61,10 @@ try:
     from alpha_vantage.alphavantage import AlphaVantage as AlphaVantageT
 except ImportError:
     AlphaVantageT = tp.Any
+try:
+    from tvDatafeed import TvDatafeed as TvDatafeedT
+except ImportError:
+    TvDatafeedT = tp.Any
 
 __all__ = [
     "SyntheticData",
@@ -79,6 +83,7 @@ __all__ = [
     "PolygonData",
     "AlphaVantageData",
     "NDLData",
+    "TVData",
 ]
 
 __pdoc__ = {}
@@ -1104,7 +1109,7 @@ class BinanceData(RemoteData):  # pragma: no cover
         df["Volume"] = df["Volume"].astype(float)
         df["Close time"] = pd.to_datetime(df["Close time"], unit="ms", utc=True)
         df["Quote volume"] = df["Quote volume"].astype(float)
-        df["Trade count"] = df["Trade count"].astype(int, errors='ignore')
+        df["Trade count"] = df["Trade count"].astype(int, errors="ignore")
         df["Taker base volume"] = df["Taker base volume"].astype(float)
         df["Taker quote volume"] = df["Taker quote volume"].astype(float)
         del df["Ignore"]
@@ -1518,7 +1523,7 @@ class AlpacaData(RemoteData):  # pragma: no cover
         if "Volume" in df.columns:
             df["Volume"] = df["Volume"].astype(float)
         if "Trade count" in df.columns:
-            df["Trade count"] = df["Trade count"].astype(int, errors='ignore')
+            df["Trade count"] = df["Trade count"].astype(int, errors="ignore")
         if "VWAP" in df.columns:
             df["VWAP"] = df["VWAP"].astype(float)
 
@@ -1672,6 +1677,7 @@ class PolygonData(RemoteData):  # pragma: no cover
         # Resolve the timeframe
         if not isinstance(timeframe, str):
             raise ValueError(f"Invalid timeframe '{timeframe}'")
+        timeframe = timeframe.strip().lower()
         match = re.match(r"^(\d*)\s*(\w+)$", timeframe)
         if not match:
             raise ValueError(f"Invalid timeframe '{timeframe}'")
@@ -1736,18 +1742,23 @@ class PolygonData(RemoteData):  # pragma: no cover
 
         @_retry
         def _fetch(_start_ts, _limit):
-            return list(map(_postprocess, client.get_aggs(
-                ticker=symbol,
-                multiplier=multiplier,
-                timespan=timespan,
-                from_=_start_ts,
-                to=end_ts,
-                adjusted=adjusted,
-                sort="asc",
-                limit=_limit,
-                params=params,
-                raw=False,
-            )))
+            return list(
+                map(
+                    _postprocess,
+                    client.get_aggs(
+                        ticker=symbol,
+                        multiplier=multiplier,
+                        timespan=timespan,
+                        from_=_start_ts,
+                        to=end_ts,
+                        adjusted=adjusted,
+                        sort="asc",
+                        limit=_limit,
+                        params=params,
+                        raw=False,
+                    ),
+                )
+            )
 
         # Establish the timestamps
         try:
@@ -1823,7 +1834,7 @@ class PolygonData(RemoteData):  # pragma: no cover
         if "Volume" in df.columns:
             df["Volume"] = df["Volume"].astype(float)
         if "Trade count" in df.columns:
-            df["Trade count"] = df["Trade count"].astype(int, errors='ignore')
+            df["Trade count"] = df["Trade count"].astype(int, errors="ignore")
         if "VWAP" in df.columns:
             df["VWAP"] = df["VWAP"].astype(float)
 
@@ -2038,6 +2049,7 @@ class AlphaVantageData(RemoteData):  # pragma: no cover
         if timeframe is not None:
             if not isinstance(timeframe, str):
                 raise ValueError(f"Invalid timeframe '{timeframe}'")
+            timeframe = timeframe.strip().lower()
             match = re.match(r"^(\d*)\s*(\w+)$", timeframe)
             if not match:
                 raise ValueError(f"Invalid timeframe '{timeframe}'")
@@ -2296,3 +2308,166 @@ class NDLData(RemoteData):  # pragma: no cover
         df = df.rename(columns=dict(zip(df.columns, new_columns)))
 
         return df
+
+
+TVDataT = tp.TypeVar("TVDataT", bound="TVData")
+
+
+class TVData(RemoteData):  # pragma: no cover
+    """Subclass of `vectorbtpro.data.base.Data` for `tvdatafeed`.
+
+    See https://github.com/StreamAlpha/tvdatafeed"""
+
+    @classmethod
+    def fetch(
+        cls: tp.Type[TVDataT],
+        symbols: tp.Union[tp.Symbol, tp.Symbols] = None,
+        *,
+        client: tp.Optional[TvDatafeedT] = None,
+        client_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> TVDataT:
+        """Override `vectorbtpro.data.base.Data.fetch` to instantiate a `TvDatafeed` client.
+
+        For defaults, see `custom.tv` in `vectorbtpro._settings.data`."""
+        from vectorbtpro.utils.opt_packages import assert_can_import
+
+        assert_can_import("tvDatafeed")
+        from tvDatafeed import TvDatafeed
+
+        from vectorbtpro._settings import settings
+
+        tv_cfg = settings["data"]["custom"]["tv"]
+
+        if client is None:
+            client = tv_cfg["client"]
+        if client_kwargs is None:
+            client_kwargs = {}
+        has_client_kwargs = len(client_kwargs) > 0
+        client_kwargs = merge_dicts(tv_cfg["client_kwargs"], client_kwargs)
+        if client is None:
+            client = TvDatafeed(**client_kwargs)
+        elif has_client_kwargs:
+            raise ValueError("Cannot apply config after instantiation of the client")
+        return super(TVData, cls).fetch(symbols, client=client, **kwargs)
+
+    @classmethod
+    def fetch_symbol(
+        cls,
+        symbol: str,
+        client: tp.Optional[TvDatafeedT] = None,
+        timeframe: tp.Optional[str] = None,
+        limit: tp.Optional[int] = None,
+        fut_contract: tp.Optional[int] = None,
+        extended_session: tp.Optional[bool] = None,
+    ) -> tp.Frame:
+        """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from TradingView.
+
+        Args:
+            symbol (str): Symbol in format `EXCHANGE:SYMBOL`.
+            client (TvDatafeed): Client of type `tvDatafeed.main.TvDatafeed`.
+            timeframe (str): Time interval between two consecutive data points in the time series, i.e. '15m'.
+
+                If the multiplier not provided, defaults to 1.
+
+                Supported intervals:
+
+                * 'm', 'min', or 'minute(s)'
+                * 'h', 'hour(s)', or 'hourly'
+                * 'd', 'day(s)', or 'daily' (only multiplier of 1)
+                * 'w', 'week(s)', or 'weekly' (only multiplier of 1)
+                * 'M', 'mo', 'month(s)', or 'monthly' (only multiplier of 1)
+            limit (int): The maximum number of returned items.
+            fut_contract (int): None for cash, 1 for continuous current contract in front,
+                2 for continuous next contract in front.
+            extended_session (bool): Regular session if False, extended session if True.
+
+        For defaults, see `custom.tv` in `vectorbtpro._settings.data`.
+        """
+        from vectorbtpro.utils.opt_packages import assert_can_import
+
+        assert_can_import("tvDatafeed")
+        from tvDatafeed import Interval
+
+        from vectorbtpro._settings import settings
+
+        tv_cfg = settings["data"]["custom"]["tv"]
+
+        if timeframe is None:
+            timeframe = tv_cfg["timeframe"]
+        if limit is None:
+            limit = tv_cfg["limit"]
+        if fut_contract is None:
+            fut_contract = tv_cfg["fut_contract"]
+        if extended_session is None:
+            extended_session = tv_cfg["extended_session"]
+
+        if ":" not in symbol:
+            raise ValueError("Symbol must be in format EXCHANGE:SYMBOL")
+
+        if not isinstance(timeframe, str):
+            raise ValueError(f"Invalid timeframe '{timeframe}'")
+        timeframe = timeframe.strip().lower()
+        match = re.match(r"^(\d*)\s*(\w+)$", timeframe)
+        if not match:
+            raise ValueError(f"Invalid timeframe '{timeframe}'")
+        multiplier = match.group(1).strip()
+        if len(multiplier) == 0:
+            multiplier = 1
+        else:
+            multiplier = int(multiplier)
+        timespan = match.group(2).strip()
+
+        if timespan in ("m", "min", "minute", "minutes"):
+            interval = getattr(Interval, f"in_{str(multiplier)}_minute")
+        elif timespan in ("h", "hour", "hours", "hourly"):
+            interval = getattr(Interval, f"in_{str(multiplier)}_hour")
+        elif timespan in ("d", "day", "days", "daily"):
+            if multiplier > 1:
+                raise ValueError("Multiplier cannot be greater than 1 for daily")
+            interval = getattr(Interval, "in_daily")
+        elif timespan in ("w", "week", "weeks", "weekly"):
+            if multiplier > 1:
+                raise ValueError("Multiplier cannot be greater than 1 for weekly")
+            interval = getattr(Interval, "in_weekly")
+        elif timespan in ("M", "mo", "month", "months", "monthly"):
+            if multiplier > 1:
+                raise ValueError("Multiplier cannot be greater than 1 for monthly")
+            interval = getattr(Interval, "in_monthly")
+        else:
+            raise ValueError(f"Invalid timeframe '{timeframe}'")
+
+        df = client.get_hist(
+            symbol=symbol,
+            exchange=None,
+            interval=interval,
+            n_bars=limit,
+            fut_contract=fut_contract,
+            extended_session=extended_session,
+        )
+        df.rename(
+            columns={
+                "open": "Open",
+                "high": "High",
+                "low": "Low",
+                "close": "Close",
+                "volume": "Volume",
+            },
+            inplace=True,
+        )
+
+        if "Open" in df.columns:
+            df["Open"] = df["Open"].astype(float)
+        if "High" in df.columns:
+            df["High"] = df["High"].astype(float)
+        if "Low" in df.columns:
+            df["Low"] = df["Low"].astype(float)
+        if "Close" in df.columns:
+            df["Close"] = df["Close"].astype(float)
+        if "Volume" in df.columns:
+            df["Volume"] = df["Volume"].astype(float)
+
+        return df
+
+
+TVData.override_column_config_doc(__pdoc__)

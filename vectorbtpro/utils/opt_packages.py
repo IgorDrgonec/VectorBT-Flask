@@ -35,6 +35,7 @@ opt_package_config = ReadonlyConfig(
         nasdaqdatalink=dict(name="Nasdaq Data Link", link="https://github.com/Nasdaq/data-link-python"),
         pypfopt=dict(name="PyPortfolioOpt", link="https://github.com/robertmartin8/PyPortfolioOpt"),
         universal=dict(name="Universal Portfolios", link="https://github.com/Marigold/universal-portfolios"),
+        tvDatafeed=dict(name="TradingView Data Feed", like="https://github.com/StreamAlpha/tvdatafeed"),
     )
 )
 """_"""

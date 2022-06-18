@@ -11,6 +11,7 @@ tables:                     data
 polygon-api-client>=1.0.0:  data
 beautifulsoup4:             data
 nasdaq-data-link:           data
+tvdatafeed:                 data
 ta:                         ta
 pandas_ta:                  ta
 TA-Lib:                     ta, base
