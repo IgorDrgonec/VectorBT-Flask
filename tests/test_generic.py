@@ -3170,7 +3170,7 @@ class TestAccessors:
             df["a"].vbt.value_counts(),
             pd.Series(
                 np.array([1, 1, 1, 1, 1]),
-                index=pd.Float64Index([1.0, 2.0, 3.0, 4.0, np.nan], dtype="float64"),
+                index=pd.Index([1.0, 2.0, 3.0, 4.0, np.nan], dtype="float64"),
                 name="a",
             ),
         )
@@ -3187,7 +3187,7 @@ class TestAccessors:
             df.vbt.value_counts(),
             pd.DataFrame(
                 np.array([[1, 1, 2], [1, 1, 2], [1, 1, 0], [1, 1, 0], [1, 1, 1]]),
-                index=pd.Float64Index([1.0, 2.0, 3.0, 4.0, np.nan], dtype="float64"),
+                index=pd.Index([1.0, 2.0, 3.0, 4.0, np.nan], dtype="float64"),
                 columns=df.columns,
             ),
         )
@@ -3200,7 +3200,7 @@ class TestAccessors:
             df.vbt.value_counts(axis=0),
             pd.DataFrame(
                 np.array([[2, 0, 0, 0, 2], [0, 2, 0, 2, 0], [0, 0, 2, 0, 0], [0, 1, 0, 1, 0], [1, 0, 1, 0, 1]]),
-                index=pd.Float64Index([1.0, 2.0, 3.0, 4.0, np.nan], dtype="float64"),
+                index=pd.Index([1.0, 2.0, 3.0, 4.0, np.nan], dtype="float64"),
                 columns=df.index,
             ),
         )
@@ -3216,7 +3216,7 @@ class TestAccessors:
             df.vbt.value_counts(axis=-1),
             pd.Series(
                 np.array([4, 4, 2, 2, 3]),
-                index=pd.Float64Index([1.0, 2.0, 3.0, 4.0, np.nan], dtype="float64"),
+                index=pd.Index([1.0, 2.0, 3.0, 4.0, np.nan], dtype="float64"),
                 name="value_counts",
             ),
         )
@@ -3228,7 +3228,7 @@ class TestAccessors:
             df.vbt.value_counts(group_by=group_by),
             pd.DataFrame(
                 np.array([[2, 2], [2, 2], [2, 0], [2, 0], [2, 1]]),
-                index=pd.Float64Index([1.0, 2.0, 3.0, 4.0, np.nan], dtype="float64"),
+                index=pd.Index([1.0, 2.0, 3.0, 4.0, np.nan], dtype="float64"),
                 columns=pd.Index(["g1", "g2"], dtype="object"),
             ),
         )
@@ -3236,7 +3236,7 @@ class TestAccessors:
             df.vbt.value_counts(sort_uniques=False),
             pd.DataFrame(
                 np.array([[1, 1, 2], [1, 1, 2], [1, 1, 0], [1, 1, 0], [1, 1, 1]]),
-                index=pd.Float64Index([1.0, 2.0, 4.0, 3.0, np.nan], dtype="float64"),
+                index=pd.Index([1.0, 2.0, 4.0, 3.0, np.nan], dtype="float64"),
                 columns=df.columns,
             ),
         )
@@ -3244,7 +3244,7 @@ class TestAccessors:
             df.vbt.value_counts(sort=True),
             pd.DataFrame(
                 np.array([[1, 1, 2], [1, 1, 2], [1, 1, 1], [1, 1, 0], [1, 1, 0]]),
-                index=pd.Float64Index([1.0, 2.0, np.nan, 3.0, 4.0], dtype="float64"),
+                index=pd.Index([1.0, 2.0, np.nan, 3.0, 4.0], dtype="float64"),
                 columns=df.columns,
             ),
         )
@@ -3252,7 +3252,7 @@ class TestAccessors:
             df.vbt.value_counts(sort=True, ascending=True),
             pd.DataFrame(
                 np.array([[1, 1, 0], [1, 1, 0], [1, 1, 1], [1, 1, 2], [1, 1, 2]]),
-                index=pd.Float64Index([3.0, 4.0, np.nan, 1.0, 2.0], dtype="float64"),
+                index=pd.Index([3.0, 4.0, np.nan, 1.0, 2.0], dtype="float64"),
                 columns=df.columns,
             ),
         )
@@ -3268,7 +3268,7 @@ class TestAccessors:
                         [0.06666666666666667, 0.06666666666666667, 0.0],
                     ]
                 ),
-                index=pd.Float64Index([1.0, 2.0, np.nan, 3.0, 4.0], dtype="float64"),
+                index=pd.Index([1.0, 2.0, np.nan, 3.0, 4.0], dtype="float64"),
                 columns=df.columns,
             ),
         )
@@ -3283,7 +3283,7 @@ class TestAccessors:
                         [0.08333333333333333, 0.08333333333333333, 0.0],
                     ]
                 ),
-                index=pd.Float64Index([1.0, 2.0, 3.0, 4.0], dtype="float64"),
+                index=pd.Index([1.0, 2.0, 3.0, 4.0], dtype="float64"),
                 columns=df.columns,
             ),
         )

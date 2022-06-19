@@ -953,11 +953,12 @@ class MappedArray(Analyzable):
     def apply_mapping(
         self: MappedArrayT,
         mapping: tp.Union[None, bool, tp.MappingLike] = None,
+        mapping_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> MappedArrayT:
         """Apply mapping on each element."""
         mapping = self.resolve_mapping(mapping)
-        new_mapped_arr = apply_mapping(self.values, mapping)
+        new_mapped_arr = apply_mapping(self.values, mapping, **resolve_dict(mapping_kwargs))
         return self.replace(mapped_arr=new_mapped_arr, **kwargs)
 
     def to_index(self, minus_one_to_zero: bool = False) -> tp.Index:

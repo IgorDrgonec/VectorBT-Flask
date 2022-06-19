@@ -1643,7 +1643,7 @@ from vectorbtpro.portfolio.call_seq import require_call_seq, build_call_seq
 from vectorbtpro.portfolio.decorators import attach_shortcut_properties, attach_returns_acc_methods
 from vectorbtpro.portfolio.enums import *
 from vectorbtpro.portfolio.logs import Logs
-from vectorbtpro.portfolio.orders import Orders
+from vectorbtpro.portfolio.orders import Orders, FSOrders
 from vectorbtpro.portfolio.trades import Trades, EntryTrades, ExitTrades, Positions
 from vectorbtpro.portfolio.pfopt.base import PortfolioOptimizer
 from vectorbtpro.records import nb as records_nb
@@ -1687,7 +1687,7 @@ def records_indexing_func(
     self: "Portfolio",
     obj: tp.RecordArray,
     wrapper_meta: dict,
-    cls: type,
+    cls: tp.Union[type, str],
     groups_only: bool = False,
     **kwargs,
 ) -> tp.RecordArray:
@@ -1697,6 +1697,8 @@ def records_indexing_func(
         wrapper = wrapper.resolve()
         wrapper_meta = dict(wrapper_meta)
         wrapper_meta["col_idxs"] = wrapper_meta["group_idxs"]
+    if isinstance(cls, str):
+        cls = getattr(self, cls)
     records = cls(wrapper, obj)
     records_meta = records.indexing_func_meta(wrapper_meta=wrapper_meta)
     return records.indexing_func(records_meta=records_meta).values
@@ -1707,10 +1709,12 @@ def records_resample_func(
     obj: tp.ArrayLike,
     resampler: tp.Union[Resampler, tp.PandasResampler],
     wrapper: ArrayWrapper,
-    cls: type,
+    cls: tp.Union[type, str],
     **kwargs,
 ) -> tp.RecordArray:
     """Apply resampling function on records."""
+    if isinstance(cls, str):
+        cls = getattr(self, cls)
     return cls(wrapper, obj).resample(resampler).values
 
 
@@ -1777,7 +1781,7 @@ shortcut_config = ReadonlyConfig(
         "orders": dict(
             obj_type="records",
             field_aliases=("order_records",),
-            wrap_func=lambda pf, obj, **kwargs: Orders.from_records(
+            wrap_func=lambda pf, obj, **kwargs: pf.orders_cls.from_records(
                 fix_wrapper_for_records(pf),
                 obj,
                 open=pf._open,
@@ -1785,13 +1789,13 @@ shortcut_config = ReadonlyConfig(
                 low=pf._low,
                 close=pf._close,
             ),
-            indexing_func=partial(records_indexing_func, cls=Orders),
-            resample_func=partial(records_resample_func, cls=Orders),
+            indexing_func=partial(records_indexing_func, cls="orders_cls"),
+            resample_func=partial(records_resample_func, cls="orders_cls"),
         ),
         "logs": dict(
             obj_type="records",
             field_aliases=("log_records",),
-            wrap_func=lambda pf, obj, **kwargs: Logs.from_records(
+            wrap_func=lambda pf, obj, **kwargs: pf.logs_cls.from_records(
                 fix_wrapper_for_records(pf),
                 obj,
                 open=pf._open,
@@ -1799,13 +1803,13 @@ shortcut_config = ReadonlyConfig(
                 low=pf._low,
                 close=pf._close,
             ),
-            indexing_func=partial(records_indexing_func, cls=Logs),
-            resample_func=partial(records_resample_func, cls=Logs),
+            indexing_func=partial(records_indexing_func, cls="logs_cls"),
+            resample_func=partial(records_resample_func, cls="logs_cls"),
         ),
         "entry_trades": dict(
             obj_type="records",
             field_aliases=("entry_trade_records",),
-            wrap_func=lambda pf, obj, **kwargs: EntryTrades.from_records(
+            wrap_func=lambda pf, obj, **kwargs: pf.entry_trades_cls.from_records(
                 pf.orders.wrapper,
                 obj,
                 open=pf._open,
@@ -1813,13 +1817,13 @@ shortcut_config = ReadonlyConfig(
                 low=pf._low,
                 close=pf._close,
             ),
-            indexing_func=partial(records_indexing_func, cls=EntryTrades),
-            resample_func=partial(records_resample_func, cls=EntryTrades),
+            indexing_func=partial(records_indexing_func, cls="entry_trades_cls"),
+            resample_func=partial(records_resample_func, cls="entry_trades_cls"),
         ),
         "exit_trades": dict(
             obj_type="records",
             field_aliases=("exit_trade_records",),
-            wrap_func=lambda pf, obj, **kwargs: ExitTrades.from_records(
+            wrap_func=lambda pf, obj, **kwargs: pf.exit_trades_cls.from_records(
                 pf.orders.wrapper,
                 obj,
                 open=pf._open,
@@ -1827,13 +1831,13 @@ shortcut_config = ReadonlyConfig(
                 low=pf._low,
                 close=pf._close,
             ),
-            indexing_func=partial(records_indexing_func, cls=ExitTrades),
-            resample_func=partial(records_resample_func, cls=ExitTrades),
+            indexing_func=partial(records_indexing_func, cls="exit_trades_cls"),
+            resample_func=partial(records_resample_func, cls="exit_trades_cls"),
         ),
         "positions": dict(
             obj_type="records",
             field_aliases=("position_records",),
-            wrap_func=lambda pf, obj, **kwargs: Positions.from_records(
+            wrap_func=lambda pf, obj, **kwargs: pf.positions_cls.from_records(
                 pf.orders.wrapper,
                 obj,
                 open=pf._open,
@@ -1841,13 +1845,13 @@ shortcut_config = ReadonlyConfig(
                 low=pf._low,
                 close=pf._close,
             ),
-            indexing_func=partial(records_indexing_func, cls=Positions),
-            resample_func=partial(records_resample_func, cls=Positions),
+            indexing_func=partial(records_indexing_func, cls="positions_cls"),
+            resample_func=partial(records_resample_func, cls="positions_cls"),
         ),
         "trades": dict(
             obj_type="records",
             field_aliases=("trade_records",),
-            wrap_func=lambda pf, obj, **kwargs: Trades.from_records(
+            wrap_func=lambda pf, obj, **kwargs: pf.trades_cls.from_records(
                 pf.orders.wrapper,
                 obj,
                 open=pf._open,
@@ -1855,15 +1859,15 @@ shortcut_config = ReadonlyConfig(
                 low=pf._low,
                 close=pf._close,
             ),
-            indexing_func=partial(records_indexing_func, cls=Trades),
-            resample_func=partial(records_resample_func, cls=Trades),
+            indexing_func=partial(records_indexing_func, cls="trades_cls"),
+            resample_func=partial(records_resample_func, cls="trades_cls"),
         ),
         "drawdowns": dict(
             obj_type="records",
             field_aliases=("drawdown_records",),
-            wrap_func=lambda pf, obj, **kwargs: Drawdowns.from_records(pf.orders.wrapper.resolve(), obj),
-            indexing_func=partial(records_indexing_func, cls=Drawdowns, groups_only=True),
-            resample_func=partial(records_resample_func, cls=Drawdowns),
+            wrap_func=lambda pf, obj, **kwargs: pf.drawdowns_cls.from_records(pf.orders.wrapper.resolve(), obj),
+            indexing_func=partial(records_indexing_func, cls="drawdowns_cls", groups_only=True),
+            resample_func=partial(records_resample_func, cls="drawdowns_cls"),
         ),
         "init_position": dict(obj_type="red_array", group_by_aware=False),
         "asset_flow": dict(
@@ -2057,6 +2061,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         trades_type (str or int): Default `vectorbtpro.portfolio.trades.Trades` to use across `Portfolio`.
 
             See `vectorbtpro.portfolio.enums.TradesType`.
+        orders_cls (type): Class for wrapping order records.
+        logs_cls (type): Class for wrapping log records.
+        entry_trades_cls (type): Class for wrapping entry trade records.
+        exit_trades_cls (type): Class for wrapping exit trade records.
+        trades_cls (type): Class for wrapping trade records.
+        positions_cls (type): Class for wrapping position records.
+        drawdowns_cls (type): Class for wrapping drawdown records.
 
     For defaults, see `vectorbtpro._settings.portfolio`.
 
@@ -2840,6 +2851,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         bm_close: tp.Optional[tp.ArrayLike] = None,
         fillna_close: tp.Optional[bool] = None,
         trades_type: tp.Optional[tp.Union[int, str]] = None,
+        orders_cls: type = Orders,
+        logs_cls: type = Logs,
+        entry_trades_cls: type = EntryTrades,
+        exit_trades_cls: type = ExitTrades,
+        trades_cls: type = Trades,
+        positions_cls: type = Positions,
+        drawdowns_cls: type = Drawdowns,
         **kwargs,
     ) -> None:
 
@@ -2882,6 +2900,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             bm_close=bm_close,
             fillna_close=fillna_close,
             trades_type=trades_type,
+            orders_cls=orders_cls,
+            logs_cls=logs_cls,
+            entry_trades_cls=entry_trades_cls,
+            exit_trades_cls=exit_trades_cls,
+            trades_cls=trades_cls,
+            positions_cls=positions_cls,
+            drawdowns_cls=drawdowns_cls,
             **kwargs,
         )
 
@@ -2903,6 +2928,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         self._bm_close = bm_close
         self._fillna_close = fillna_close
         self._trades_type = trades_type
+        self._orders_cls = orders_cls
+        self._logs_cls = logs_cls
+        self._entry_trades_cls = entry_trades_cls
+        self._exit_trades_cls = exit_trades_cls
+        self._trades_cls = trades_cls
+        self._positions_cls = positions_cls
+        self._drawdowns_cls = drawdowns_cls
 
         # Only slices of rows can be selected
         self._range_only_select = True
@@ -4600,6 +4632,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         tp_stop: tp.Optional[tp.ArrayLike] = None,
         stop_entry_price: tp.Optional[tp.ArrayLike] = None,
         stop_exit_price: tp.Optional[tp.ArrayLike] = None,
+        stop_order_type: tp.Optional[tp.ArrayLike] = None,
         stop_limit_delta: tp.Optional[tp.ArrayLike] = None,
         upon_stop_exit: tp.Optional[tp.ArrayLike] = None,
         upon_stop_update: tp.Optional[tp.ArrayLike] = None,
@@ -4778,7 +4811,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 Will broadcast.
 
                 If provided on per-element basis, gets applied upon exit.
-            stop_limit_delta (float or array_like): Similar to `limit_delta` but only for stop orders.
+            stop_order_type (OrderType or array_like): Similar to `order_type` but for stop orders.
+                Will broadcast.
+
+                If provided on per-element basis, gets applied upon exit.
+            stop_limit_delta (float or array_like): Similar to `limit_delta` but for stop orders.
                 Will broadcast.
             upon_stop_exit (StopExitMode or array_like): See `vectorbtpro.portfolio.enums.StopExitMode`.
                 Will broadcast.
@@ -5423,6 +5460,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             stop_entry_price = portfolio_cfg["stop_entry_price"]
         if stop_exit_price is None:
             stop_exit_price = portfolio_cfg["stop_exit_price"]
+        if stop_order_type is None:
+            stop_order_type = portfolio_cfg["stop_order_type"]
         if stop_limit_delta is None:
             stop_limit_delta = portfolio_cfg["stop_limit_delta"]
         if upon_stop_exit is None:
@@ -5530,6 +5569,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             tp_stop=tp_stop,
             stop_entry_price=stop_entry_price,
             stop_exit_price=stop_exit_price,
+            stop_order_type=stop_order_type,
             stop_limit_delta=stop_limit_delta,
             upon_stop_exit=upon_stop_exit,
             upon_stop_update=upon_stop_update,
@@ -5597,7 +5637,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     tsl_stop=dict(fill_value=np.nan),
                     tp_stop=dict(fill_value=np.nan),
                     stop_entry_price=dict(fill_value=StopEntryPrice.Close),
-                    stop_exit_price=dict(fill_value=StopExitPrice.StopMarket),
+                    stop_exit_price=dict(fill_value=StopExitPrice.Stop),
+                    stop_order_type=dict(fill_value=OrderType.Market),
                     stop_limit_delta=dict(fill_value=np.nan),
                     upon_stop_exit=dict(fill_value=StopExitMode.Close),
                     upon_stop_update=dict(fill_value=StopUpdateMode.Override),
@@ -5713,6 +5754,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ignore_type=(int, float),
         )
         broadcasted_args["stop_exit_price"] = map_enum_fields(broadcasted_args["stop_exit_price"], StopExitPrice)
+        broadcasted_args["stop_order_type"] = map_enum_fields(broadcasted_args["stop_order_type"], OrderType)
         broadcasted_args["upon_stop_exit"] = map_enum_fields(broadcasted_args["upon_stop_exit"], StopExitMode)
         broadcasted_args["upon_stop_update"] = map_enum_fields(broadcasted_args["upon_stop_update"], StopUpdateMode)
         broadcasted_args["upon_adj_stop_conflict"] = map_enum_fields(
@@ -5769,6 +5811,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         checks.assert_subdtype(broadcasted_args["tp_stop"], np.number)
         checks.assert_subdtype(broadcasted_args["stop_entry_price"], np.number)
         checks.assert_subdtype(broadcasted_args["stop_exit_price"], np.integer)
+        checks.assert_subdtype(broadcasted_args["stop_order_type"], np.integer)
         checks.assert_subdtype(broadcasted_args["stop_limit_delta"], np.number)
         checks.assert_subdtype(broadcasted_args["upon_stop_exit"], np.integer)
         checks.assert_subdtype(broadcasted_args["upon_stop_update"], np.integer)
@@ -5898,6 +5941,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         )
 
         # Create an instance
+        if "orders_cls" not in kwargs:
+            kwargs["orders_cls"] = FSOrders
         return cls(
             wrapper,
             broadcasted_args["close"],
@@ -7543,6 +7588,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         return self._cash_sharing
 
     @property
+    def in_outputs(self) -> tp.Optional[tp.NamedTuple]:
+        """Named tuple with in-output objects."""
+        return self._in_outputs
+
+    @property
     def use_in_outputs(self) -> bool:
         """Whether to return in-output objects when calling properties."""
         return self._use_in_outputs
@@ -7558,9 +7608,39 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         return self._trades_type
 
     @property
-    def in_outputs(self) -> tp.Optional[tp.NamedTuple]:
-        """Named tuple with in-output objects."""
-        return self._in_outputs
+    def orders_cls(self) -> type:
+        """Class for wrapping order records."""
+        return self._orders_cls
+
+    @property
+    def logs_cls(self) -> type:
+        """Class for wrapping log records."""
+        return self._logs_cls
+
+    @property
+    def entry_trades_cls(self) -> type:
+        """Class for wrapping entry trade records."""
+        return self._entry_trades_cls
+
+    @property
+    def exit_trades_cls(self) -> type:
+        """Class for wrapping exit trade records."""
+        return self._exit_trades_cls
+
+    @property
+    def trades_cls(self) -> type:
+        """Class for wrapping trade records."""
+        return self._trades_cls
+
+    @property
+    def positions_cls(self) -> type:
+        """Class for wrapping position records."""
+        return self._positions_cls
+
+    @property
+    def drawdowns_cls(self) -> type:
+        """Class for wrapping drawdown records."""
+        return self._drawdowns_cls
 
     @custom_property(group_by_aware=False)
     def call_seq(self) -> tp.Optional[tp.SeriesFrame]:
@@ -7703,6 +7783,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         high: tp.Optional[tp.SeriesFrame] = None,
         low: tp.Optional[tp.SeriesFrame] = None,
         close: tp.Optional[tp.SeriesFrame] = None,
+        orders_cls: tp.Optional[type] = None,
         group_by: tp.GroupByLike = None,
         wrapper: tp.Optional[ArrayWrapper] = None,
         **kwargs,
@@ -7723,11 +7804,15 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 close = cls_or_self._close
             if wrapper is None:
                 wrapper = fix_wrapper_for_records(cls_or_self)
+            if orders_cls is None:
+                orders_cls = cls_or_self.orders_cls
         else:
             checks.assert_not_none(order_records)
             checks.assert_not_none(wrapper)
+            if orders_cls is None:
+                orders_cls = Orders
 
-        return Orders(
+        return orders_cls(
             wrapper,
             order_records,
             open=open,
@@ -7750,6 +7835,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         high: tp.Optional[tp.SeriesFrame] = None,
         low: tp.Optional[tp.SeriesFrame] = None,
         close: tp.Optional[tp.SeriesFrame] = None,
+        logs_cls: tp.Optional[type] = None,
         group_by: tp.GroupByLike = None,
         wrapper: tp.Optional[ArrayWrapper] = None,
         **kwargs,
@@ -7770,11 +7856,15 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 close = cls_or_self._close
             if wrapper is None:
                 wrapper = fix_wrapper_for_records(cls_or_self)
+            if logs_cls is None:
+                logs_cls = cls_or_self.logs_cls
         else:
             checks.assert_not_none(log_records)
             checks.assert_not_none(wrapper)
+            if logs_cls is None:
+                logs_cls = Logs
 
-        return Logs(
+        return logs_cls(
             wrapper,
             log_records,
             open=open,
@@ -7790,6 +7880,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         orders: tp.Optional[Orders] = None,
         init_position: tp.Optional[tp.ArrayLike] = None,
         init_price: tp.Optional[tp.ArrayLike] = None,
+        entry_trades_cls: tp.Optional[type] = None,
         group_by: tp.GroupByLike = None,
         **kwargs,
     ) -> EntryTrades:
@@ -7803,12 +7894,16 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 init_position = cls_or_self._init_position
             if init_price is None:
                 init_price = cls_or_self._init_price
+            if entry_trades_cls is None:
+                entry_trades_cls = cls_or_self.entry_trades_cls
         else:
             checks.assert_not_none(orders)
             if init_position is None:
                 init_position = 0.0
+            if entry_trades_cls is None:
+                entry_trades_cls = EntryTrades
 
-        return EntryTrades.from_orders(
+        return entry_trades_cls.from_orders(
             orders,
             init_position=init_position,
             init_price=init_price,
@@ -7821,6 +7916,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         orders: tp.Optional[Orders] = None,
         init_position: tp.Optional[tp.ArrayLike] = None,
         init_price: tp.Optional[tp.ArrayLike] = None,
+        exit_trades_cls: tp.Optional[type] = None,
         group_by: tp.GroupByLike = None,
         **kwargs,
     ) -> ExitTrades:
@@ -7834,12 +7930,16 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 init_position = cls_or_self._init_position
             if init_price is None:
                 init_price = cls_or_self._init_price
+            if exit_trades_cls is None:
+                exit_trades_cls = cls_or_self.exit_trades_cls
         else:
             checks.assert_not_none(orders)
             if init_position is None:
                 init_position = 0.0
+            if exit_trades_cls is None:
+                exit_trades_cls = ExitTrades
 
-        return ExitTrades.from_orders(
+        return exit_trades_cls.from_orders(
             orders,
             init_position=init_position,
             init_price=init_price,
@@ -7850,6 +7950,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     def get_positions(
         cls_or_self,
         trades: tp.Optional[Trades] = None,
+        positions_cls: tp.Optional[type] = None,
         group_by: tp.GroupByLike = None,
         **kwargs,
     ) -> Positions:
@@ -7859,10 +7960,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if not isinstance(cls_or_self, type):
             if trades is None:
                 trades = cls_or_self.exit_trades
+            if positions_cls is None:
+                positions_cls = cls_or_self.positions_cls
         else:
             checks.assert_not_none(trades)
+            if positions_cls is None:
+                positions_cls = Positions
 
-        return Positions.from_trades(trades, **kwargs).regroup(group_by)
+        return positions_cls.from_trades(trades, **kwargs).regroup(group_by)
 
     def get_trades(self, group_by: tp.GroupByLike = None, **kwargs) -> Trades:
         """Get trade/position records depending upon `Portfolio.trades_type`."""
@@ -7876,6 +7981,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     def get_drawdowns(
         cls_or_self,
         value: tp.Optional[tp.SeriesFrame] = None,
+        drawdowns_cls: tp.Optional[type] = None,
         group_by: tp.GroupByLike = None,
         wrapper_kwargs: tp.KwargsLike = None,
         **kwargs,
@@ -7887,10 +7993,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if value is None:
                 value = cls_or_self.resolve_shortcut_attr("value", group_by=group_by)
             wrapper_kwargs = merge_dicts(cls_or_self.orders.wrapper.config, wrapper_kwargs, dict(group_by=None))
+            if drawdowns_cls is None:
+                drawdowns_cls = cls_or_self.drawdowns_cls
         else:
             checks.assert_not_none(value)
+            if drawdowns_cls is None:
+                drawdowns_cls = Drawdowns
 
-        return Drawdowns.from_price(value, wrapper_kwargs=wrapper_kwargs, **kwargs)
+        return drawdowns_cls.from_price(value, wrapper_kwargs=wrapper_kwargs, **kwargs)
 
     # ############# Assets ############# #
 

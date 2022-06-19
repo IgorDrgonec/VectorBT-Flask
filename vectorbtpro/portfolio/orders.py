@@ -48,25 +48,20 @@ Name: count, dtype: int64
 
 ```pycon
 >>> pf.orders['a'].stats()
-Start                2019-12-31 23:00:00+00:00
-End                  2020-02-29 23:00:00+00:00
-Period                        61 days 00:00:00
-Total Records                               41
-Total Buy Orders                            17
-Total Sell Orders                           24
-Min Size                              0.814641
-Max Size                                   1.0
-Avg Size                              0.995108
-Avg Buy Size                          0.988202
-Avg Sell Size                              1.0
-Avg Buy Price                        94.814501
-Avg Sell Price                       95.742148
-Total Fees                           38.887032
-Min Fees                              0.851689
-Max Fees                               1.04474
-Avg Fees                              0.948464
-Avg Buy Fees                          0.935819
-Avg Sell Fees                         0.957421
+Start                  2019-12-31 22:00:00+00:00
+End                    2020-02-29 22:00:00+00:00
+Period                          61 days 00:00:00
+Total Records                                 41
+Side Counts: Buy                              17
+Side Counts: Sell                             24
+Size: Min              0 days 19:33:05.006182372
+Size: Median                     1 days 00:00:00
+Size: Max                        1 days 00:00:00
+Fees: Min              0 days 20:26:25.905776572
+Fees: Median           0 days 22:46:22.693324744
+Fees: Max              1 days 01:04:25.541681491
+Weighted Buy Price                      94.69917
+Weighted Sell Price                    95.742148
 Name: a, dtype: object
 ```
 
@@ -74,25 +69,20 @@ Name: a, dtype: object
 
 ```pycon
 >>> pf.orders.stats(group_by=True)
-Start                2019-12-31 23:00:00+00:00
-End                  2020-02-29 23:00:00+00:00
-Period                        61 days 00:00:00
-Total Records                               82
-Total Buy Orders                            32
-Total Sell Orders                           50
-Min Size                              0.814641
-Max Size                                   1.0
-Avg Size                              0.995936
-Avg Buy Size                          0.989587
-Avg Sell Size                              1.0
-Avg Buy Price                        98.843447
-Avg Sell Price                       99.969934
-Total Fees                            81.27316
-Min Fees                              0.851689
-Max Fees                              1.103575
-Avg Fees                              0.991136
-Avg Buy Fees                          0.977756
-Avg Sell Fees                         0.999699
+Start                  2019-12-31 22:00:00+00:00
+End                    2020-02-29 22:00:00+00:00
+Period                          61 days 00:00:00
+Total Records                                 82
+Side Counts: Buy                              32
+Side Counts: Sell                             50
+Size: Min              0 days 19:33:05.006182372
+Size: Median                     1 days 00:00:00
+Size: Max                        1 days 00:00:00
+Fees: Min              0 days 20:26:25.905776572
+Fees: Median           0 days 23:58:29.773897679
+Fees: Max              1 days 02:29:08.904770159
+Weighted Buy Price                     98.804452
+Weighted Sell Price                    99.969934
 Name: group, dtype: object
 ```
 
@@ -114,11 +104,16 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.base.reshaping import to_dict
 from vectorbtpro.generic.price_records import PriceRecords
-from vectorbtpro.portfolio.enums import order_dt, OrderSide
-from vectorbtpro.records.decorators import attach_fields, override_field_config
+from vectorbtpro.portfolio import nb
+from vectorbtpro.portfolio.enums import order_dt, OrderSide, fs_order_dt, OrderType
+from vectorbtpro.records.mapped_array import MappedArray
+from vectorbtpro.records.decorators import attach_fields, override_field_config, attach_shortcut_properties
+from vectorbtpro.signals.enums import StopType
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig
+from vectorbtpro.utils.template import Sub
 
 __pdoc__ = {}
 
@@ -157,9 +152,26 @@ __pdoc__[
 ```
 """
 
+orders_shortcut_config = ReadonlyConfig(
+    dict(
+        weighted_price=dict(obj_type="red_array"),
+    )
+)
+"""_"""
+
+__pdoc__[
+    "orders_shortcut_config"
+] = f"""Config of shortcut properties to be attached to `Orders`.
+
+```python
+{orders_shortcut_config.prettify()}
+```
+"""
+
 OrdersT = tp.TypeVar("OrdersT", bound="Orders")
 
 
+@attach_shortcut_properties(orders_shortcut_config)
 @attach_fields(orders_attach_field_config)
 @override_field_config(orders_field_config)
 class Orders(PriceRecords):
@@ -170,6 +182,28 @@ class Orders(PriceRecords):
         return self._field_config
 
     # ############# Stats ############# #
+
+    def get_weighted_price(
+        self,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.MaybeSeries:
+        """Get size-weighted price average."""
+        wrap_kwargs = merge_dicts(dict(name_or_index="weighted_price"), wrap_kwargs)
+        return MappedArray.reduce(
+            nb.weighted_price_reduce_meta_nb,
+            self.get_field_arr("size"),
+            self.get_field_arr("price"),
+            group_by=group_by,
+            jitted=jitted,
+            chunked=chunked,
+            wrap_kwargs=wrap_kwargs,
+            col_mapper=self.col_mapper,
+            **kwargs,
+        )
 
     @property
     def stats_defaults(self) -> tp.Kwargs:
@@ -195,23 +229,45 @@ class Orders(PriceRecords):
                 tags="wrapper",
             ),
             total_records=dict(title="Total Records", calc_func="count", tags="records"),
-            total_buy_orders=dict(title="Total Buy Orders", calc_func="side_buy.count", tags=["orders", "buy"]),
-            total_sell_orders=dict(title="Total Sell Orders", calc_func="side_sell.count", tags=["orders", "sell"]),
-            min_size=dict(title="Min Size", calc_func="size.min", tags=["orders", "size"]),
-            max_size=dict(title="Max Size", calc_func="size.max", tags=["orders", "size"]),
-            avg_size=dict(title="Avg Size", calc_func="size.mean", tags=["orders", "size"]),
-            avg_buy_size=dict(title="Avg Buy Size", calc_func="side_buy.size.mean", tags=["orders", "buy", "size"]),
-            avg_sell_size=dict(title="Avg Sell Size", calc_func="side_sell.size.mean", tags=["orders", "sell", "size"]),
-            avg_buy_price=dict(title="Avg Buy Price", calc_func="side_buy.price.mean", tags=["orders", "buy", "price"]),
-            avg_sell_price=dict(
-                title="Avg Sell Price", calc_func="side_sell.price.mean", tags=["orders", "sell", "price"]
+            side_counts=dict(
+                title="Side Counts",
+                calc_func="side.value_counts",
+                incl_all_keys=True,
+                post_calc_func=lambda self, out, settings: to_dict(out, orient="index_series"),
+                tags=["orders", "side"],
             ),
-            total_fees=dict(title="Total Fees", calc_func="fees.sum", tags=["orders", "fees"]),
-            min_fees=dict(title="Min Fees", calc_func="fees.min", tags=["orders", "fees"]),
-            max_fees=dict(title="Max Fees", calc_func="fees.max", tags=["orders", "fees"]),
-            avg_fees=dict(title="Avg Fees", calc_func="fees.mean", tags=["orders", "fees"]),
-            avg_buy_fees=dict(title="Avg Buy Fees", calc_func="side_buy.fees.mean", tags=["orders", "buy", "fees"]),
-            avg_sell_fees=dict(title="Avg Sell Fees", calc_func="side_sell.fees.mean", tags=["orders", "sell", "fees"]),
+            size=dict(
+                title="Size",
+                calc_func="size.describe",
+                post_calc_func=lambda self, out, settings: {
+                    "Min": out.loc["min"],
+                    "Median": out.loc["50%"],
+                    "Max": out.loc["max"],
+                },
+                apply_to_timedelta=True,
+                tags=["orders", "size"],
+            ),
+            fees=dict(
+                title="Fees",
+                calc_func="fees.describe",
+                post_calc_func=lambda self, out, settings: {
+                    "Min": out.loc["min"],
+                    "Median": out.loc["50%"],
+                    "Max": out.loc["max"],
+                },
+                apply_to_timedelta=True,
+                tags=["orders", "fees"],
+            ),
+            weighted_buy_price=dict(
+                title="Weighted Buy Price",
+                calc_func="side_buy.get_weighted_price",
+                tags=["orders", "buy", "price"],
+            ),
+            weighted_sell_price=dict(
+                title="Weighted Sell Price",
+                calc_func="side_sell.get_weighted_price",
+                tags=["orders", "sell", "price"],
+            ),
         )
     )
 
@@ -249,6 +305,13 @@ class Orders(PriceRecords):
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
+
+        To display additional field on hover, define `customdata_index` as a key for a field in the field config
+        and specify the index where to insert the data as a value. Additionally, you can define `hover_template`
+        such as using `vectorbtpro.utils.template.Sub` where `title` is substituted by the title and
+        `index` is substituted by (final) index in the customdata. If provided as a string, will be wrapped
+        with `vectorbtpro.utils.template.Sub`. Defaults to "$title: %{{customdata[$index]}}". Enable
+        `customdata_as_str` to stringify the data.
 
         Usage:
             ```pycon
@@ -328,25 +391,100 @@ class Orders(PriceRecords):
             # Extract information
             id_ = self_col.get_field_arr("id")
             id_title = self_col.get_field_title("id")
+            id_hover_template = self_col.get_field_setting(
+                "id",
+                "hover_template",
+                "$title: %{customdata[$index]}",
+            )
+            if isinstance(id_hover_template, str):
+                id_hover_template = Sub(id_hover_template)
 
             idx = self_col.get_map_field_to_index("idx")
             idx_title = self_col.get_field_title("idx")
+            idx_hover_template = self_col.get_field_setting(
+                "idx",
+                "hover_template",
+                "$title: %{customdata[$index]}",
+            )
+            if isinstance(idx_hover_template, str):
+                idx_hover_template = Sub(idx_hover_template)
 
             size = self_col.get_field_arr("size")
             size_title = self_col.get_field_title("size")
+            size_hover_template = self_col.get_field_setting(
+                "size",
+                "hover_template",
+                "$title: %{customdata[$index]:,}",
+            )
+            if isinstance(size_hover_template, str):
+                size_hover_template = Sub(size_hover_template)
 
             fees = self_col.get_field_arr("fees")
             fees_title = self_col.get_field_title("fees")
+            fees_hover_template = self_col.get_field_setting(
+                "fees",
+                "hover_template",
+                "$title: %{customdata[$index]:,}",
+            )
+            if isinstance(fees_hover_template, str):
+                fees_hover_template = Sub(fees_hover_template)
 
             price = self_col.get_field_arr("price")
             price_title = self_col.get_field_title("price")
+            price_hover_template = self_col.get_field_setting(
+                "price",
+                "hover_template",
+                "$title: %{customdata[$index]:,}",
+            )
+            if isinstance(price_hover_template, str):
+                price_hover_template = Sub(price_hover_template)
 
             side = self_col.get_field_arr("side")
+
+            def _prepare_customdata(mask):
+                customdata_info = [
+                    (id_, id_title, id_hover_template),
+                    (idx.astype(str).values, idx_title, idx_hover_template),
+                    (price, price_title, price_hover_template),
+                    (size, size_title, size_hover_template),
+                    (fees, fees_title, fees_hover_template),
+                ]
+                dtype = self.field_config.get("dtype")
+                for field in dtype.names:
+                    field_customdata_index = self_col.get_field_setting(field, "customdata_index", None)
+                    if field_customdata_index is not None:
+                        if not isinstance(field_customdata_index, int):
+                            raise ValueError("Setting customdata_index must be an integer or None")
+                        if field_customdata_index < 0:
+                            field_customdata_index = len(customdata_info) + field_customdata_index + 1
+                        field_hover_template = self_col.get_field_setting(
+                            field,
+                            "hover_template",
+                            "$title: %{customdata[$index]}",
+                        )
+                        if isinstance(field_hover_template, str):
+                            field_hover_template = Sub(field_hover_template)
+                        field_title = self_col.get_field_title(field)
+                        customdata_as_str = self_col.get_field_setting(field, "customdata_as_str", False)
+                        if customdata_as_str:
+                            field_arr = self_col.get_apply_mapping_str_arr(field)
+                        else:
+                            field_arr = self_col.get_apply_mapping_arr(field)
+                        customdata_info.insert(field_customdata_index, (field_arr, field_title, field_hover_template))
+                customdata = []
+                hovertemplate = []
+                for i in range(len(customdata_info)):
+                    customdata.append(customdata_info[i][0][mask])
+                    _hovertemplate = customdata_info[i][2].substitute(dict(title=customdata_info[i][1], index=i))
+                    if not _hovertemplate.startswith("<br>"):
+                        _hovertemplate = "<br>" + _hovertemplate
+                    hovertemplate.append(_hovertemplate)
+                return np.stack(customdata, axis=1), "\n".join(hovertemplate)
 
             buy_mask = side == OrderSide.Buy
             if buy_mask.any():
                 # Plot buy markers
-                buy_customdata = np.stack((id_[buy_mask], size[buy_mask], fees[buy_mask]), axis=1)
+                buy_customdata, buy_hovertemplate = _prepare_customdata(buy_mask)
                 buy_scatter = go.Scatter(
                     x=idx[buy_mask],
                     y=price[buy_mask],
@@ -359,13 +497,7 @@ class Orders(PriceRecords):
                     ),
                     name="Buy",
                     customdata=buy_customdata,
-                    hovertemplate=(
-                        f"{id_title}: %{{customdata[0]}}"
-                        f"<br>{idx_title}: %{{x}}"
-                        f"<br>{price_title}: %{{y}}"
-                        f"<br>{size_title}: %{{customdata[1]:.6f}}"
-                        f"<br>{fees_title}: %{{customdata[2]:.6f}}"
-                    ),
+                    hovertemplate=buy_hovertemplate,
                 )
                 buy_scatter.update(**buy_trace_kwargs)
                 fig.add_trace(buy_scatter, **add_trace_kwargs)
@@ -373,7 +505,7 @@ class Orders(PriceRecords):
             sell_mask = side == OrderSide.Sell
             if sell_mask.any():
                 # Plot sell markers
-                sell_customdata = np.stack((id_[sell_mask], size[sell_mask], fees[sell_mask]), axis=1)
+                sell_customdata, sell_hovertemplate = _prepare_customdata(sell_mask)
                 sell_scatter = go.Scatter(
                     x=idx[sell_mask],
                     y=price[sell_mask],
@@ -386,13 +518,7 @@ class Orders(PriceRecords):
                     ),
                     name="Sell",
                     customdata=sell_customdata,
-                    hovertemplate=(
-                        f"{id_title}: %{{customdata[0]}}"
-                        f"<br>{idx_title}: %{{x}}"
-                        f"<br>{price_title}: %{{y}}"
-                        f"<br>{size_title}: %{{customdata[1]:.6f}}"
-                        f"<br>{fees_title}: %{{customdata[2]:.6f}}"
-                    ),
+                    hovertemplate=sell_hovertemplate,
                 )
                 sell_scatter.update(**sell_trace_kwargs)
                 fig.add_trace(sell_scatter, **add_trace_kwargs)
@@ -431,3 +557,164 @@ class Orders(PriceRecords):
 Orders.override_field_config_doc(__pdoc__)
 Orders.override_metrics_doc(__pdoc__)
 Orders.override_subplots_doc(__pdoc__)
+
+
+fs_orders_field_config = ReadonlyConfig(
+    dict(
+        dtype=fs_order_dt,
+        settings=dict(
+            idx=dict(title="Fill Timestamp"),
+            signal_idx=dict(
+                title="Signal Timestamp",
+                mapping="index",
+                noindex=True,
+                customdata_as_str=True,
+                customdata_index=1,
+            ),
+            creation_idx=dict(
+                title="Creation Timestamp",
+                mapping="index",
+                noindex=True,
+                customdata_as_str=True,
+                customdata_index=2,
+            ),
+            type=dict(
+                title="Type",
+                mapping=OrderType,
+                customdata_index=-1,
+                customdata_as_str=True,
+            ),
+            stop_type=dict(
+                title="Stop Type",
+                mapping=StopType,
+                customdata_index=-1,
+                customdata_as_str=True,
+            ),
+        ),
+    )
+)
+"""_"""
+
+__pdoc__[
+    "fs_orders_field_config"
+] = f"""Field config for `FSOrders`.
+
+```python
+{fs_orders_field_config.prettify()}
+```
+"""
+
+fs_orders_attach_field_config = ReadonlyConfig(
+    dict(
+        type=dict(attach_filters=True),
+        stop_type=dict(attach_filters=True),
+    )
+)
+"""_"""
+
+__pdoc__[
+    "fs_orders_attach_field_config"
+] = f"""Config of fields to be attached to `FSOrders`.
+
+```python
+{fs_orders_attach_field_config.prettify()}
+```
+"""
+
+fs_orders_shortcut_config = ReadonlyConfig(
+    dict(
+        signal_to_creation_duration=dict(obj_type="mapped_array"),
+        creation_to_fill_duration=dict(obj_type="mapped_array"),
+        signal_to_fill_duration=dict(obj_type="mapped_array"),
+    )
+)
+"""_"""
+
+__pdoc__[
+    "fs_orders_shortcut_config"
+] = f"""Config of shortcut properties to be attached to `FSOrders`.
+
+```python
+{fs_orders_shortcut_config.prettify()}
+```
+"""
+
+FSOrdersT = tp.TypeVar("FSOrdersT", bound="FSOrders")
+
+
+@attach_shortcut_properties(fs_orders_shortcut_config)
+@attach_fields(fs_orders_attach_field_config)
+@override_field_config(fs_orders_field_config)
+class FSOrders(Orders):
+    """Extends `Orders` for working with order records generated from signals."""
+
+    @property
+    def field_config(self) -> Config:
+        return self._field_config
+
+    def get_signal_to_creation_duration(self, **kwargs) -> MappedArray:
+        """Get duration between signal and creation."""
+        duration = self.get_field_arr("creation_idx") - self.get_field_arr("signal_idx")
+        return self.map_array(duration, **kwargs)
+
+    def get_creation_to_fill_duration(self, **kwargs) -> MappedArray:
+        """Get duration between creation and fill."""
+        duration = self.get_field_arr("idx") - self.get_field_arr("creation_idx")
+        return self.map_array(duration, **kwargs)
+
+    def get_signal_to_fill_duration(self, **kwargs) -> MappedArray:
+        """Get duration between signal and fill."""
+        duration = self.get_field_arr("idx") - self.get_field_arr("signal_idx")
+        return self.map_array(duration, **kwargs)
+
+    _metrics: tp.ClassVar[Config] = HybridConfig(
+        start=Orders.metrics["start"],
+        end=Orders.metrics["end"],
+        period=Orders.metrics["period"],
+        total_records=Orders.metrics["total_records"],
+        side_counts=Orders.metrics["side_counts"],
+        type_counts=dict(
+            title="Type Counts",
+            calc_func="type.value_counts",
+            incl_all_keys=True,
+            post_calc_func=lambda self, out, settings: to_dict(out, orient="index_series"),
+            tags=["orders", "type"],
+        ),
+        stop_type_counts=dict(
+            title="Stop Type Counts",
+            calc_func="stop_type.value_counts",
+            incl_all_keys=True,
+            post_calc_func=lambda self, out, settings: to_dict(out, orient="index_series"),
+            tags=["orders", "stop_type"],
+        ),
+        size=Orders.metrics["size"],
+        fees=Orders.metrics["fees"],
+        weighted_buy_price=Orders.metrics["weighted_buy_price"],
+        weighted_sell_price=Orders.metrics["weighted_sell_price"],
+        avg_signal_to_creation_duration=dict(
+            title="Avg Signal-Creation Duration",
+            calc_func="signal_to_creation_duration.mean",
+            apply_to_timedelta=True,
+            tags=["orders", "duration"],
+        ),
+        avg_creation_to_fill_duration=dict(
+            title="Avg Creation-Fill Duration",
+            calc_func="creation_to_fill_duration.mean",
+            apply_to_timedelta=True,
+            tags=["orders", "duration"],
+        ),
+        avg_signal_to_fill_duration=dict(
+            title="Avg Signal-Fill Duration",
+            calc_func="signal_to_fill_duration.mean",
+            apply_to_timedelta=True,
+            tags=["orders", "duration"],
+        ),
+    )
+
+    @property
+    def metrics(self) -> Config:
+        return self._metrics
+
+
+FSOrders.override_field_config_doc(__pdoc__)
+FSOrders.override_metrics_doc(__pdoc__)

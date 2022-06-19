@@ -1175,7 +1175,7 @@ class TestMappedArray:
     def test_value_counts(self):
         assert_series_equal(
             mapped_array["a"].value_counts(),
-            pd.Series(np.array([1, 1, 1]), index=pd.Float64Index([10.0, 11.0, 12.0], dtype="float64"), name="a"),
+            pd.Series(np.array([1, 1, 1]), index=pd.Index([10.0, 11.0, 12.0], dtype="float64"), name="a"),
         )
         assert_series_equal(
             mapped_array["a"].value_counts(mapping=mapping),
@@ -1189,7 +1189,7 @@ class TestMappedArray:
             mapped_array.value_counts(),
             pd.DataFrame(
                 np.array([[1, 0, 1, 0], [1, 0, 1, 0], [1, 0, 1, 0], [0, 2, 0, 0], [0, 1, 0, 0]]),
-                index=pd.Float64Index([10.0, 11.0, 12.0, 13.0, 14.0], dtype="float64"),
+                index=pd.Index([10.0, 11.0, 12.0, 13.0, 14.0], dtype="float64"),
                 columns=wrapper.columns,
             ),
         )
@@ -1202,7 +1202,7 @@ class TestMappedArray:
             mapped_array.value_counts(axis=0),
             pd.DataFrame(
                 np.array([[1, 0, 1], [0, 2, 0], [1, 0, 1], [1, 0, 1], [0, 1, 0]]),
-                index=pd.Float64Index([10.0, 11.0, 12.0, 13.0, 14.0], dtype="float64"),
+                index=pd.Index([10.0, 11.0, 12.0, 13.0, 14.0], dtype="float64"),
                 columns=wrapper.index,
             ),
         )
@@ -1210,7 +1210,7 @@ class TestMappedArray:
             mapped_array.value_counts(axis=-1),
             pd.Series(
                 np.array([2, 2, 2, 2, 1]),
-                index=pd.Float64Index([10.0, 11.0, 12.0, 13.0, 14.0], dtype="float64"),
+                index=pd.Index([10.0, 11.0, 12.0, 13.0, 14.0], dtype="float64"),
                 name="value_counts",
             ),
         )
@@ -1218,7 +1218,7 @@ class TestMappedArray:
             mapped_array_grouped.value_counts(),
             pd.DataFrame(
                 np.array([[1, 1], [1, 1], [1, 1], [2, 0], [1, 0]]),
-                index=pd.Float64Index([10.0, 11.0, 12.0, 13.0, 14.0], dtype="float64"),
+                index=pd.Index([10.0, 11.0, 12.0, 13.0, 14.0], dtype="float64"),
                 columns=pd.Index(["g1", "g2"], dtype="object"),
             ),
         )
@@ -1227,7 +1227,7 @@ class TestMappedArray:
             mapped_array2.value_counts(sort_uniques=False),
             pd.DataFrame(
                 np.array([[2, 1, 0, 0], [1, 0, 1, 0], [0, 1, 1, 0], [0, 0, 1, 0], [0, 1, 0, 0]]),
-                index=pd.Float64Index([4.0, 3.0, 2.0, 1.0, None], dtype="float64"),
+                index=pd.Index([4.0, 3.0, 2.0, 1.0, None], dtype="float64"),
                 columns=wrapper.columns,
             ),
         )
@@ -1235,7 +1235,7 @@ class TestMappedArray:
             mapped_array2.value_counts(sort_uniques=True),
             pd.DataFrame(
                 np.array([[0, 0, 1, 0], [0, 1, 1, 0], [1, 0, 1, 0], [2, 1, 0, 0], [0, 1, 0, 0]]),
-                index=pd.Float64Index([1.0, 2.0, 3.0, 4.0, None], dtype="float64"),
+                index=pd.Index([1.0, 2.0, 3.0, 4.0, None], dtype="float64"),
                 columns=wrapper.columns,
             ),
         )
@@ -1243,7 +1243,7 @@ class TestMappedArray:
             mapped_array2.value_counts(sort=True),
             pd.DataFrame(
                 np.array([[2, 1, 0, 0], [0, 1, 1, 0], [1, 0, 1, 0], [0, 0, 1, 0], [0, 1, 0, 0]]),
-                index=pd.Float64Index([4.0, 2.0, 3.0, 1.0, np.nan], dtype="float64"),
+                index=pd.Index([4.0, 2.0, 3.0, 1.0, np.nan], dtype="float64"),
                 columns=wrapper.columns,
             ),
         )
@@ -1251,7 +1251,7 @@ class TestMappedArray:
             mapped_array2.value_counts(sort=True, ascending=True),
             pd.DataFrame(
                 np.array([[0, 0, 1, 0], [0, 1, 0, 0], [0, 1, 1, 0], [1, 0, 1, 0], [2, 1, 0, 0]]),
-                index=pd.Float64Index([1.0, np.nan, 2.0, 3.0, 4.0], dtype="float64"),
+                index=pd.Index([1.0, np.nan, 2.0, 3.0, 4.0], dtype="float64"),
                 columns=wrapper.columns,
             ),
         )
@@ -1267,7 +1267,7 @@ class TestMappedArray:
                         [0.0, 0.1111111111111111, 0.0, 0.0],
                     ]
                 ),
-                index=pd.Float64Index([4.0, 2.0, 3.0, 1.0, np.nan], dtype="float64"),
+                index=pd.Index([4.0, 2.0, 3.0, 1.0, np.nan], dtype="float64"),
                 columns=wrapper.columns,
             ),
         )
@@ -1282,7 +1282,7 @@ class TestMappedArray:
                         [0.0, 0.0, 0.125, 0.0],
                     ]
                 ),
-                index=pd.Float64Index([4.0, 2.0, 3.0, 1.0], dtype="float64"),
+                index=pd.Index([4.0, 2.0, 3.0, 1.0], dtype="float64"),
                 columns=wrapper.columns,
             ),
         )
@@ -3760,6 +3760,21 @@ class TestOrders:
             ),
         )
 
+    def test_weighted_price(self):
+        assert orders["a"].weighted_price == 5.419354838709678
+        pd.testing.assert_series_equal(
+            orders.weighted_price,
+            pd.Series(
+                [
+                    5.419354838709678,
+                    5.419354838709678,
+                    5.638888888888889,
+                    np.nan,
+                ],
+                index=close.columns,
+            ).rename("weighted_price"),
+        )
+
     def test_stats(self):
         stats_index = pd.Index(
             [
@@ -3767,21 +3782,16 @@ class TestOrders:
                 "End",
                 "Period",
                 "Total Records",
-                "Total Buy Orders",
-                "Total Sell Orders",
-                "Min Size",
-                "Max Size",
-                "Avg Size",
-                "Avg Buy Size",
-                "Avg Sell Size",
-                "Avg Buy Price",
-                "Avg Sell Price",
-                "Total Fees",
-                "Min Fees",
-                "Max Fees",
-                "Avg Fees",
-                "Avg Buy Fees",
-                "Avg Sell Fees",
+                "Side Counts: Buy",
+                "Side Counts: Sell",
+                "Size: Min",
+                "Size: Median",
+                "Size: Max",
+                "Fees: Min",
+                "Fees: Median",
+                "Fees: Max",
+                "Weighted Buy Price",
+                "Weighted Sell Price",
             ],
             dtype="object",
         )
@@ -3795,19 +3805,14 @@ class TestOrders:
                     5.25,
                     2.75,
                     2.5,
-                    0.10000000000000002,
-                    2.0,
-                    0.9333333333333335,
-                    0.9166666666666666,
-                    0.9194444444444446,
-                    4.388888888888889,
-                    4.527777777777779,
-                    0.26949999999999996,
-                    0.002,
-                    0.16,
-                    0.051333333333333335,
-                    0.050222222222222224,
-                    0.050222222222222224,
+                    pd.Timedelta("0 days 02:24:00"),
+                    pd.Timedelta("1 days 00:00:00"),
+                    pd.Timedelta("2 days 00:00:00"),
+                    pd.Timedelta("0 days 00:02:52.800000"),
+                    pd.Timedelta("0 days 00:43:12"),
+                    pd.Timedelta("0 days 03:50:24"),
+                    5.423151374370888,
+                    5.4079402545177535,
                 ],
                 index=stats_index,
                 name="agg_stats",
@@ -3823,19 +3828,14 @@ class TestOrders:
                     7,
                     4,
                     3,
-                    0.1,
-                    2.0,
-                    0.8857142857142858,
-                    1.025,
-                    0.7000000000000001,
-                    4.25,
-                    4.666666666666667,
-                    0.33599999999999997,
-                    0.002,
-                    0.16,
-                    0.047999999999999994,
-                    0.057999999999999996,
-                    0.03466666666666667,
+                    pd.Timedelta("0 days 02:24:00"),
+                    pd.Timedelta("1 days 00:00:00"),
+                    pd.Timedelta("2 days 00:00:00"),
+                    pd.Timedelta("0 days 00:02:52.800000"),
+                    pd.Timedelta("0 days 00:43:12"),
+                    pd.Timedelta("0 days 03:50:24"),
+                    5.658536585365854,
+                    4.9523809523809526,
                 ],
                 index=stats_index,
                 name="a",
@@ -3851,19 +3851,14 @@ class TestOrders:
                     14,
                     7,
                     7,
-                    0.1,
-                    2.0,
-                    0.8857142857142858,
-                    0.8857142857142856,
-                    0.8857142857142858,
-                    4.428571428571429,
-                    4.428571428571429,
-                    0.672,
-                    0.002,
-                    0.16,
-                    0.048,
-                    0.048,
-                    0.047999999999999994,
+                    pd.Timedelta("0 days 02:24:00"),
+                    pd.Timedelta("1 days 00:00:00"),
+                    pd.Timedelta("2 days 00:00:00"),
+                    pd.Timedelta("0 days 00:02:52.800000"),
+                    pd.Timedelta("0 days 00:43:12"),
+                    pd.Timedelta("0 days 03:50:24"),
+                    5.419354838709677,
+                    5.419354838709678,
                 ],
                 index=stats_index,
                 name="g1",
@@ -3874,7 +3869,7 @@ class TestOrders:
         assert_series_equal(orders_grouped["g2"].stats(), orders_grouped.stats(column="g2"))
         assert_series_equal(orders_grouped["g2"].stats(), orders.stats(column="g2", group_by=group_by))
         stats_df = orders.stats(agg_func=None)
-        assert stats_df.shape == (4, 19)
+        assert stats_df.shape == (4, 14)
         assert_index_equal(stats_df.index, orders.wrapper.columns)
         assert_index_equal(stats_df.columns, stats_index)
 
@@ -3927,6 +3922,241 @@ class TestOrders:
             orders.resample("3d", fbfill_close=True).close,
             orders.close.resample("3d").last().ffill().bfill().astype(np.float_),
         )
+
+
+fs_orders = vbt.Portfolio.from_signals(
+    open=open,
+    high=high,
+    low=low,
+    close=close,
+    entries=np.where(size > 0, True, False),
+    exits=np.where(size < 0, True, False),
+    order_type="limit",
+    direction="both",
+    accumulate=True,
+    size=np.abs(size),
+    fees=0.01,
+    freq="1 days",
+).orders
+fs_orders_grouped = fs_orders.regroup(group_by)
+
+
+class TestFSOrders:
+    def test_records_readable(self):
+        records_readable = fs_orders.records_readable
+
+        np.testing.assert_array_equal(
+            records_readable["Order Id"].values,
+            np.array([0, 1, 0, 1, 0, 1]),
+        )
+        np.testing.assert_array_equal(
+            records_readable["Signal Timestamp"].values,
+            np.array(
+                [
+                    "2020-01-03T00:00:00.000000000",
+                    "2020-01-07T00:00:00.000000000",
+                    "2020-01-01T00:00:00.000000000",
+                    "2020-01-06T00:00:00.000000000",
+                    "2020-01-03T00:00:00.000000000",
+                    "2020-01-07T00:00:00.000000000",
+                ],
+                dtype="datetime64[ns]",
+            ),
+        )
+        np.testing.assert_array_equal(
+            records_readable["Creation Timestamp"].values,
+            np.array(
+                [
+                    "2020-01-03T00:00:00.000000000",
+                    "2020-01-07T00:00:00.000000000",
+                    "2020-01-01T00:00:00.000000000",
+                    "2020-01-06T00:00:00.000000000",
+                    "2020-01-03T00:00:00.000000000",
+                    "2020-01-07T00:00:00.000000000",
+                ],
+                dtype="datetime64[ns]",
+            ),
+        )
+        np.testing.assert_array_equal(
+            records_readable["Fill Timestamp"].values,
+            np.array(
+                [
+                    "2020-01-04T00:00:00.000000000",
+                    "2020-01-08T00:00:00.000000000",
+                    "2020-01-02T00:00:00.000000000",
+                    "2020-01-07T00:00:00.000000000",
+                    "2020-01-04T00:00:00.000000000",
+                    "2020-01-08T00:00:00.000000000",
+                ],
+                dtype="datetime64[ns]",
+            ),
+        )
+        np.testing.assert_array_equal(
+            records_readable["Column"].values,
+            np.array(["a", "a", "b", "b", "c", "c"]),
+        )
+        np.testing.assert_array_equal(
+            records_readable["Size"].values,
+            np.array([1.0, 1.0, 1.0, 1.0, 1.0, 2.0]),
+        )
+        np.testing.assert_array_equal(
+            records_readable["Price"].values,
+            np.array([3.5, 7.5, 1.5, 6.5, 3.5, 7.5]),
+        )
+        np.testing.assert_array_equal(
+            records_readable["Fees"].values,
+            np.array([0.035, 0.075, 0.015, 0.065, 0.035, 0.15]),
+        )
+        np.testing.assert_array_equal(
+            records_readable["Side"].values,
+            np.array(["Sell", "Sell", "Sell", "Sell", "Sell", "Sell"]),
+        )
+        np.testing.assert_array_equal(
+            records_readable["Type"].values,
+            np.array(["Limit", "Limit", "Limit", "Limit", "Limit", "Limit"]),
+        )
+        np.testing.assert_array_equal(
+            records_readable["Stop Type"].values,
+            np.array([None, None, None, None, None, None]),
+        )
+
+    def test_stats(self):
+        stats_index = pd.Index(
+            [
+                "Start",
+                "End",
+                "Period",
+                "Total Records",
+                "Side Counts: Buy",
+                "Side Counts: Sell",
+                "Type Counts: Market",
+                "Type Counts: Limit",
+                "Stop Type Counts: None",
+                "Stop Type Counts: SL",
+                "Stop Type Counts: TSL",
+                "Stop Type Counts: TTP",
+                "Stop Type Counts: TP",
+                "Size: Min",
+                "Size: Median",
+                "Size: Max",
+                "Fees: Min",
+                "Fees: Median",
+                "Fees: Max",
+                "Weighted Buy Price",
+                "Weighted Sell Price",
+                "Avg Signal-Creation Duration",
+                "Avg Creation-Fill Duration",
+                "Avg Signal-Fill Duration",
+            ],
+            dtype="object",
+        )
+        assert_series_equal(
+            fs_orders.stats(),
+            pd.Series(
+                [
+                    pd.Timestamp('2020-01-01 00:00:00', freq='D'),
+                    pd.Timestamp('2020-01-08 00:00:00', freq='D'),
+                    pd.Timedelta('8 days 00:00:00'),
+                    1.5,
+                    0.0,
+                    1.5,
+                    0.0,
+                    1.5,
+                    1.5,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    pd.Timedelta('1 days 00:00:00'),
+                    pd.Timedelta('1 days 04:00:00'),
+                    pd.Timedelta('1 days 08:00:00'),
+                    pd.Timedelta('0 days 00:40:48'),
+                    pd.Timedelta('0 days 01:30:00'),
+                    pd.Timedelta('0 days 02:19:12'),
+                    np.nan,
+                    5.222222222222222,
+                    pd.Timedelta('0 days 00:00:00'),
+                    pd.Timedelta('1 days 00:00:00'),
+                    pd.Timedelta('1 days 00:00:00'),
+                ],
+                index=stats_index,
+                name="agg_stats",
+            ),
+        )
+        assert_series_equal(
+            fs_orders.stats(column="a"),
+            pd.Series(
+                [
+                    pd.Timestamp('2020-01-01 00:00:00', freq='D'),
+                    pd.Timestamp('2020-01-08 00:00:00', freq='D'),
+                    pd.Timedelta('8 days 00:00:00'),
+                    2,
+                    0,
+                    2,
+                    0,
+                    2,
+                    2,
+                    0,
+                    0,
+                    0,
+                    0,
+                    pd.Timedelta('1 days 00:00:00'),
+                    pd.Timedelta('1 days 00:00:00'),
+                    pd.Timedelta('1 days 00:00:00'),
+                    pd.Timedelta('0 days 00:50:24'),
+                    pd.Timedelta('0 days 01:19:12'),
+                    pd.Timedelta('0 days 01:48:00'),
+                    np.nan,
+                    5.5,
+                    pd.Timedelta('0 days 00:00:00'),
+                    pd.Timedelta('1 days 00:00:00'),
+                    pd.Timedelta('1 days 00:00:00'),
+                ],
+                index=stats_index,
+                name="a",
+            ),
+        )
+        assert_series_equal(
+            fs_orders.stats(column="g1", group_by=group_by),
+            pd.Series(
+                [
+                    pd.Timestamp('2020-01-01 00:00:00', freq='D'),
+                    pd.Timestamp('2020-01-08 00:00:00', freq='D'),
+                    pd.Timedelta('8 days 00:00:00'),
+                    4,
+                    0,
+                    4,
+                    0,
+                    4,
+                    4,
+                    0,
+                    0,
+                    0,
+                    0,
+                    pd.Timedelta('1 days 00:00:00'),
+                    pd.Timedelta('1 days 00:00:00'),
+                    pd.Timedelta('1 days 00:00:00'),
+                    pd.Timedelta('0 days 00:21:36'),
+                    pd.Timedelta('0 days 01:12:00'),
+                    pd.Timedelta('0 days 01:48:00'),
+                    np.nan,
+                    4.75,
+                    pd.Timedelta('0 days 00:00:00'),
+                    pd.Timedelta('1 days 00:00:00'),
+                    pd.Timedelta('1 days 00:00:00'),
+                ],
+                index=stats_index,
+                name="g1",
+            ),
+        )
+        assert_series_equal(fs_orders["c"].stats(), fs_orders.stats(column="c"))
+        assert_series_equal(fs_orders["c"].stats(), fs_orders.stats(column="c", group_by=False))
+        assert_series_equal(fs_orders_grouped["g2"].stats(), fs_orders_grouped.stats(column="g2"))
+        assert_series_equal(fs_orders_grouped["g2"].stats(), fs_orders.stats(column="g2", group_by=group_by))
+        stats_df = fs_orders.stats(agg_func=None)
+        assert stats_df.shape == (4, 24)
+        assert_index_equal(stats_df.index, fs_orders.wrapper.columns)
+        assert_index_equal(stats_df.columns, stats_index)
 
 
 # ############# trades.py ############# #

@@ -2226,7 +2226,7 @@ class TestIndexFns:
     def test_index_from_values(self):
         assert_index_equal(
             indexes.index_from_values([0.1, 0.2], name="a"),
-            pd.Float64Index([0.1, 0.2], dtype="float64", name="a"),
+            pd.Index([0.1, 0.2], dtype="float64", name="a"),
         )
         assert_index_equal(
             indexes.index_from_values(np.tile(np.arange(1, 4)[:, None][:, None], (1, 3, 3)), name="b"),

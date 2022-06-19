@@ -752,7 +752,10 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
         return new_indices, new_records_arr
 
     def indexing_func_meta(self, *args, wrapper_meta: tp.DictLike = None, **kwargs) -> dict:
-        """Perform indexing on `Records` and also return metadata."""
+        """Perform indexing on `Records` and also return metadata.
+
+        By default, all fields that are mapped to index are indexed.
+        To avoid indexing on some fields, set their setting `noindex` to True."""
         if wrapper_meta is None:
             wrapper_meta = self.wrapper.indexing_func_meta(
                 *args,
@@ -770,7 +773,8 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
             index_fields = []
             for field in new_records_arr.dtype.names:
                 field_mapping = self.get_field_mapping(field)
-                if isinstance(field_mapping, str) and field_mapping == "index":
+                noindex = self.get_field_setting(field, "noindex", False)
+                if isinstance(field_mapping, str) and field_mapping == "index" and not noindex:
                     index_fields.append(field)
             if len(index_fields) > 0:
                 masks = []
@@ -911,13 +915,23 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
             mapping = None
         return self.map_field(self.get_field_name(field), mapping=mapping, **kwargs)
 
-    def get_apply_mapping_arr(self, field: str, **kwargs) -> tp.Array1d:
-        """Get the mapped array on the field, with mapping applied. Uses `Records.field_config`."""
-        return self.get_map_field(field, **kwargs).apply_mapping().values
-
     def get_map_field_to_index(self, field: str, minus_one_to_zero: bool = False, **kwargs) -> tp.Index:
         """Get the mapped array on the field, with index applied. Uses `Records.field_config`."""
         return self.get_map_field(field, **kwargs).to_index(minus_one_to_zero=minus_one_to_zero)
+
+    def get_apply_mapping_arr(self, field: str, mapping_kwargs: tp.KwargsLike = None, **kwargs) -> tp.Array1d:
+        """Get the mapped array on the field, with mapping applied. Uses `Records.field_config`."""
+        mapping = self.get_field_mapping(field)
+        if isinstance(mapping, str) and mapping == "index":
+            return self.get_map_field_to_index(field, **kwargs).values
+        return self.get_map_field(field, **kwargs).apply_mapping(mapping_kwargs=mapping_kwargs).values
+
+    def get_apply_mapping_str_arr(self, field: str, mapping_kwargs: tp.KwargsLike = None, **kwargs) -> tp.Array1d:
+        """Get the mapped array on the field, with mapping applied and stringified. Uses `Records.field_config`."""
+        mapping = self.get_field_mapping(field)
+        if isinstance(mapping, str) and mapping == "index":
+            return self.get_map_field_to_index(field, **kwargs).astype(str).values
+        return self.get_map_field(field, **kwargs).apply_mapping(mapping_kwargs=mapping_kwargs).values.astype(str)
 
     @property
     def id_arr(self) -> tp.Array1d:

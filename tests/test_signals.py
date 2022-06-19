@@ -3253,7 +3253,7 @@ class TestGenerators:
                         [False, False, True],
                     ]
                 ),
-                columns=pd.Float64Index([0, 0.5, 1], dtype="float64", name="rprob_prob"),
+                columns=pd.Index([0, 0.5, 1], dtype="float64", name="rprob_prob"),
             ),
         )
         rprob = vbt.RPROB.run(prob=[np.array([0, 0.25]), np.array([0.75, 1])], input_shape=(5, 2), seed=seed)

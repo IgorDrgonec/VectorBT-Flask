@@ -426,9 +426,8 @@ Attributes:
 
 
 class StopExitPriceT(tp.NamedTuple):
-    StopLimit: int = 0
-    StopMarket: int = 1
-    Close: int = 2
+    Stop: int = 0
+    Close: int = 1
 
 
 StopExitPrice = StopExitPriceT()
@@ -445,17 +444,10 @@ __pdoc__[
 Which price to use when exiting a position upon a stop signal?
 
 Attributes:
-    StopLimit: Stop price as from a limit order.
+    Stop: Stop price. 
     
         If the stop was hit before, the opening price at the next bar is used.
-        User-defined slippage is not applied.
-    StopMarket: Stop price as from a market order.
-    
-        If the stop was hit before, the opening price at the next bar is used.
-        User-defined slippage is applied.
     Close: Closing price.
-    
-        User-defined slippage is applied.
 """
 
 
@@ -2284,6 +2276,8 @@ fs_order_dt = np.dtype(
     [
         ("id", np.int_),
         ("col", np.int_),
+        ("signal_idx", np.int_),
+        ("creation_idx", np.int_),
         ("idx", np.int_),
         ("size", np.float_),
         ("price", np.float_),
@@ -2291,7 +2285,6 @@ fs_order_dt = np.dtype(
         ("side", np.int_),
         ("type", np.int_),
         ("stop_type", np.int_),
-        ("creation_idx", np.int_),
     ],
     align=True,
 )
@@ -2438,8 +2431,9 @@ __pdoc__[
 
 main_info_dt = np.dtype(
     [
-        ("init_i", np.int_),
-        ("trigger_i", np.int_),
+        ("signal_i", np.int_),
+        ("creation_i", np.int_),
+        ("i", np.int_),
         ("price", np.float_),
         ("size", np.float_),
         ("size_type", np.int_),
@@ -2460,8 +2454,9 @@ __pdoc__[
 ```
 
 Attributes:
-    init_i: Row where order was placed.
-    trigger_i: Row from where order information such as price should be taken.
+    signal_i: Row where signal was placed.
+    creation_i: Row where order was created.
+    i: Row from where order information was taken.
     price: Requested price.
     size: Order size.
     size_type: Order size type. See `SizeType`.
@@ -2472,6 +2467,7 @@ Attributes:
 
 limit_info_dt = np.dtype(
     [
+        ("signal_i", np.int_),
         ("init_i", np.int_),
         ("init_price", np.float_),
         ("init_size", np.float_),
@@ -2496,6 +2492,7 @@ __pdoc__[
 ```
 
 Attributes:
+    signal_i: Signal row.
     init_i: Initial row.
     init_price: Initial price.
     init_size: Requested size.
@@ -2532,7 +2529,7 @@ Attributes:
     init_i: Initial row.
     init_price: Initial price.
     stop: Latest updated stop value.
-    limit_delta: Delta from the hit price. Only for `StopExitPrice.StopLimit`.
+    limit_delta: Delta from the hit price. Only for `StopType.Limit`.
     delta_format: Format of the stop value. See `DeltaFormat`.
 """
 
@@ -2566,7 +2563,7 @@ Attributes:
     peak_price: Highest/lowest price.
     th: Latest updated threshold value.
     stop: Latest updated stop value.
-    limit_delta: Delta from the hit price. Only for `StopExitPrice.StopLimit`.
+    limit_delta: Delta from the hit price. Only for `StopType.Limit`.
     delta_format: Format of the threshold and stop values. See `DeltaFormat`.
 """
 
@@ -2594,6 +2591,6 @@ Attributes:
     init_i: Initial row.
     init_price: Initial price.
     stop: Latest updated stop value.
-    limit_delta: Delta from the hit price. Only for `StopExitPrice.StopLimit`.
+    limit_delta: Delta from the hit price. Only for `StopType.Limit`.
     delta_format: Format of the stop value. See `DeltaFormat`.
 """

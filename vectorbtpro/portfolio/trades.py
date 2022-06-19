@@ -613,6 +613,8 @@ class Trades(Ranges):
     def field_config(self) -> Config:
         return self._field_config
 
+    # ############# Stats ############# #
+
     def get_winning(self: TradesT, **kwargs) -> TradesT:
         """Get winning trades."""
         filter_mask = self.values["pnl"] > 0.0
@@ -804,8 +806,6 @@ class Trades(Ranges):
             as_returns=as_returns,
         )
         return self.map_array(drawdown, **kwargs)
-
-    # ############# Stats ############# #
 
     @property
     def stats_defaults(self) -> tp.Kwargs:

@@ -17,6 +17,28 @@ invalid_price_msg = "Encountered an order with price less than 0"
 
 
 @register_jitted(cache=True)
+def weighted_price_reduce_meta_nb(
+    idxs: tp.Array1d,
+    col: int,
+    size_arr: tp.Array1d,
+    price_arr: tp.Array1d,
+) -> float:
+    """Size-weighted price average."""
+    if len(idxs) == 0:
+        return np.nan
+    size_price_sum = 0.0
+    size_sum = 0.0
+    for i in range(len(idxs)):
+        j = idxs[i]
+        if not np.isnan(size_arr[j]) and not np.isnan(price_arr[j]):
+            size_price_sum += size_arr[j] * price_arr[j]
+            size_sum += size_arr[j]
+    if size_sum == 0:
+        return np.nan
+    return size_price_sum / size_sum
+
+
+@register_jitted(cache=True)
 def fill_trade_record_nb(
     new_records: tp.Record,
     r: int,

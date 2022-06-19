@@ -577,6 +577,7 @@ SignalFuncT = tp.Callable[[SignalContext, tp.VarArg()], tp.Tuple[bool, bool, boo
         tp_stop=portfolio_ch.flex_array_gl_slicer,
         stop_entry_price=portfolio_ch.flex_array_gl_slicer,
         stop_exit_price=portfolio_ch.flex_array_gl_slicer,
+        stop_order_type=portfolio_ch.flex_array_gl_slicer,
         stop_limit_delta=portfolio_ch.flex_array_gl_slicer,
         upon_stop_exit=portfolio_ch.flex_array_gl_slicer,
         upon_stop_update=portfolio_ch.flex_array_gl_slicer,
@@ -644,7 +645,8 @@ def simulate_from_signal_func_nb(
     tsl_stop: tp.FlexArray = np.asarray(np.nan),
     tp_stop: tp.FlexArray = np.asarray(np.nan),
     stop_entry_price: tp.FlexArray = np.asarray(StopEntryPrice.Close),
-    stop_exit_price: tp.FlexArray = np.asarray(StopExitPrice.StopMarket),
+    stop_exit_price: tp.FlexArray = np.asarray(StopExitPrice.Stop),
+    stop_order_type: tp.FlexArray = np.asarray(OrderType.Market),
     stop_limit_delta: tp.FlexArray = np.asarray(np.nan),
     upon_stop_exit: tp.FlexArray = np.asarray(StopExitMode.Close),
     upon_stop_update: tp.FlexArray = np.asarray(StopUpdateMode.Keep),
@@ -675,7 +677,14 @@ def simulate_from_signal_func_nb(
     check_group_lens_nb(group_lens, target_shape[1])
     cash_sharing = is_grouped_nb(group_lens)
 
-    order_records, log_records = prepare_records_nb(target_shape, max_orders, max_logs)
+    if max_orders is None:
+        order_records = np.empty((target_shape[0], target_shape[1]), dtype=fs_order_dt)
+    else:
+        order_records = np.empty((max_orders, target_shape[1]), dtype=fs_order_dt)
+    if max_logs is None:
+        log_records = np.empty((target_shape[0], target_shape[1]), dtype=log_dt)
+    else:
+        log_records = np.empty((max_logs, target_shape[1]), dtype=log_dt)
     order_counts = np.full(target_shape[1], 0, dtype=np.int_)
     log_counts = np.full(target_shape[1], 0, dtype=np.int_)
 
@@ -712,6 +721,7 @@ def simulate_from_signal_func_nb(
     in_outputs = FSInOutputs(returns=returns_out)
 
     last_limit_info = np.empty(target_shape[1], dtype=limit_info_dt)
+    last_limit_info["signal_i"][:] = -1
     last_limit_info["init_i"][:] = -1
     last_limit_info["init_price"][:] = np.nan
     last_limit_info["init_size"][:] = np.nan
@@ -817,6 +827,7 @@ def simulate_from_signal_func_nb(
 
                 # Set defaults
                 exec_limit_is_set = False
+                exec_limit_signal_i = -1
                 exec_limit_init_i = -1
                 exec_limit_price = np.nan
                 exec_limit_size = np.nan
@@ -845,8 +856,9 @@ def simulate_from_signal_func_nb(
                 exec_user_stop_type = -1
                 exec_user_make_limit = False
 
-                main_info["init_i"][col] = -1
-                main_info["trigger_i"][col] = i
+                main_info["signal_i"][col] = -1
+                main_info["creation_i"][col] = -1
+                main_info["i"][col] = i
                 main_info["price"][col] = np.nan
                 main_info["size"][col] = np.nan
                 main_info["size_type"][col] = -1
@@ -917,6 +929,7 @@ def simulate_from_signal_func_nb(
                 # Process the limit signal
                 if any_limit_signal:
                     # Check whether the limit price has been hit
+                    _signal_i = last_limit_info["signal_i"][col]
                     _init_i = last_limit_info["init_i"][col]
                     _price = last_limit_info["init_price"][col]
                     _size = last_limit_info["init_size"][col]
@@ -945,6 +958,7 @@ def simulate_from_signal_func_nb(
                     if can_execute:
                         # Executable limit signal
                         exec_limit_is_set = True
+                        exec_limit_signal_i = _signal_i
                         exec_limit_init_i = _init_i
                         exec_limit_price = limit_price
                         exec_limit_size = _size
@@ -963,6 +977,7 @@ def simulate_from_signal_func_nb(
                             # Expired limit signal
                             any_limit_signal = False
 
+                            last_limit_info["signal_i"][col] = -1
                             last_limit_info["init_i"][col] = -1
                             last_limit_info["init_price"][col] = np.nan
                             last_limit_info["init_size"][col] = np.nan
@@ -1123,7 +1138,8 @@ def simulate_from_signal_func_nb(
                         if not np.isnan(_size):
                             # Executable stop signal
                             can_execute = True
-                            if _stop_exit_price == StopExitPrice.StopLimit:
+                            _stop_order_type = flex_select_auto_nb(stop_order_type, i, col, flex_2d)
+                            if _stop_order_type == OrderType.Limit:
                                 # Use close to check whether the limit price has been hit
                                 limit_price, can_execute = check_limit_hit_nb(
                                     _open,
@@ -1148,10 +1164,7 @@ def simulate_from_signal_func_nb(
                             exec_stop_size = _size
                             exec_stop_size_type = _size_type
                             exec_stop_direction = _direction
-                            if _stop_exit_price == StopExitPrice.StopLimit:
-                                exec_stop_type = OrderType.Limit
-                            else:
-                                exec_stop_type = OrderType.Market
+                            exec_stop_type = _stop_order_type
                             exec_stop_stop_type = _stop_type
                             exec_stop_delta = _limit_delta
                             exec_stop_delta_format = _delta_format
@@ -1294,6 +1307,7 @@ def simulate_from_signal_func_nb(
                                 any_limit_signal = False
 
                                 exec_limit_is_set = False
+                                exec_limit_signal_i = -1
                                 exec_limit_init_i = -1
                                 exec_limit_price = np.nan
                                 exec_limit_size = np.nan
@@ -1301,6 +1315,7 @@ def simulate_from_signal_func_nb(
                                 exec_limit_direction = -1
                                 exec_limit_stop_type = -1
 
+                                last_limit_info["signal_i"][col] = -1
                                 last_limit_info["init_i"][col] = -1
                                 last_limit_info["init_price"][col] = np.nan
                                 last_limit_info["init_size"][col] = np.nan
@@ -1425,6 +1440,7 @@ def simulate_from_signal_func_nb(
                         any_limit_signal = False
 
                         exec_limit_is_set = False
+                        exec_limit_signal_i = -1
                         exec_limit_init_i = -1
                         exec_limit_price = np.nan
                         exec_limit_size = np.nan
@@ -1432,6 +1448,7 @@ def simulate_from_signal_func_nb(
                         exec_limit_direction = -1
                         exec_limit_stop_type = -1
 
+                        last_limit_info["signal_i"][col] = -1
                         last_limit_info["init_i"][col] = -1
                         last_limit_info["init_price"][col] = np.nan
                         last_limit_info["init_size"][col] = np.nan
@@ -1445,8 +1462,9 @@ def simulate_from_signal_func_nb(
 
                 if exec_limit_is_set or exec_stop_is_set or exec_user_is_set:
                     if exec_limit_is_set:
-                        main_info["init_i"][col] = exec_limit_init_i
-                        main_info["trigger_i"][col] = exec_limit_init_i
+                        main_info["signal_i"][col] = exec_limit_signal_i
+                        main_info["creation_i"][col] = exec_limit_init_i
+                        main_info["i"][col] = exec_limit_init_i
                         main_info["price"][col] = exec_limit_price
                         main_info["size"][col] = exec_limit_size
                         main_info["size_type"][col] = exec_limit_size_type
@@ -1455,6 +1473,7 @@ def simulate_from_signal_func_nb(
                         main_info["stop_type"][col] = exec_limit_stop_type
 
                         # Clear pending signal
+                        last_limit_info["signal_i"][col] = -1
                         last_limit_info["init_i"][col] = -1
                         last_limit_info["init_price"][col] = np.nan
                         last_limit_info["init_size"][col] = np.nan
@@ -1472,18 +1491,21 @@ def simulate_from_signal_func_nb(
 
                             _limit_tif = flex_select_auto_nb(limit_tif, i, col, flex_2d)
                             _time_delta_format = flex_select_auto_nb(time_delta_format, i, col, flex_2d)
+                            last_limit_info["signal_i"][col] = exec_stop_init_i
                             last_limit_info["init_i"][col] = i
                             last_limit_info["init_price"][col] = exec_stop_price
                             last_limit_info["init_size"][col] = exec_stop_size
                             last_limit_info["init_size_type"][col] = exec_stop_size_type
                             last_limit_info["init_direction"][col] = exec_stop_direction
+                            last_limit_info["init_stop_type"][col] = exec_stop_stop_type
                             last_limit_info["delta"][col] = exec_stop_delta
                             last_limit_info["delta_format"][col] = exec_stop_delta_format
                             last_limit_info["tif"][col] = _limit_tif
                             last_limit_info["time_delta_format"][col] = _time_delta_format
                         else:
-                            main_info["init_i"][col] = exec_stop_init_i
-                            main_info["trigger_i"][col] = i
+                            main_info["signal_i"][col] = exec_stop_init_i
+                            main_info["creation_i"][col] = i
+                            main_info["i"][col] = i
                             main_info["price"][col] = exec_stop_price
                             main_info["size"][col] = exec_stop_size
                             main_info["size_type"][col] = exec_stop_size_type
@@ -1521,18 +1543,21 @@ def simulate_from_signal_func_nb(
                             _delta_format = flex_select_auto_nb(delta_format, i, col, flex_2d)
                             _limit_tif = flex_select_auto_nb(limit_tif, i, col, flex_2d)
                             _time_delta_format = flex_select_auto_nb(time_delta_format, i, col, flex_2d)
+                            last_limit_info["signal_i"][col] = i
                             last_limit_info["init_i"][col] = i
                             last_limit_info["init_price"][col] = exec_user_price
                             last_limit_info["init_size"][col] = exec_user_size
                             last_limit_info["init_size_type"][col] = exec_user_size_type
                             last_limit_info["init_direction"][col] = exec_user_direction
+                            last_limit_info["init_stop_type"][col] = -1
                             last_limit_info["delta"][col] = _limit_delta
                             last_limit_info["delta_format"][col] = _delta_format
                             last_limit_info["tif"][col] = _limit_tif
                             last_limit_info["time_delta_format"][col] = _time_delta_format
                         else:
-                            main_info["init_i"][col] = i
-                            main_info["trigger_i"][col] = i
+                            main_info["signal_i"][col] = i
+                            main_info["creation_i"][col] = i
+                            main_info["i"][col] = i
                             main_info["price"][col] = exec_user_price
                             main_info["size"][col] = exec_user_size
                             main_info["size_type"][col] = exec_user_size_type
@@ -1601,7 +1626,7 @@ def simulate_from_signal_func_nb(
                     return_now = last_return[group]
 
                     # Generate the next order
-                    _i = main_info["trigger_i"][col]
+                    _i = main_info["i"][col]
                     if main_info["type"][col] == OrderType.Limit:
                         _slippage = 0.0
                     else:
@@ -1653,6 +1678,14 @@ def simulate_from_signal_func_nb(
                         log_records=log_records,
                         log_counts=log_counts,
                     )
+
+                    # Append more order information
+                    if order_result.status == OrderStatus.Filled:
+                        if order_counts[col] >= 1:
+                            order_records["signal_idx"][order_counts[col] - 1, col] = main_info["signal_i"][col]
+                            order_records["creation_idx"][order_counts[col] - 1, col] = main_info["creation_i"][col]
+                            order_records["type"][order_counts[col] - 1, col] = main_info["type"][col]
+                            order_records["stop_type"][order_counts[col] - 1, col] = main_info["stop_type"][col]
 
                     # Update execution state
                     cash_now = new_exec_state.cash
