@@ -368,8 +368,10 @@ def check_limit_hit_nb(
     delta_format: int,
     can_use_ohlc: bool = True,
     check_open: bool = True,
-) -> tp.Tuple[float, bool]:
+) -> tp.Tuple[float, bool, bool]:
     """Resolve the limit price and check whether it has been hit.
+
+    Returns the limit price, whether it has been hit before open, and whether it has been hit during this bar.
 
     If `check_open` is True and hit before open, returns open."""
     if size == 0:
@@ -402,52 +404,90 @@ def check_limit_hit_nb(
                     limit_price = price * (1 + limit_delta)
     else:
         limit_price = price
+    hit_on_open = False
     if can_use_ohlc:
         curr_high, curr_low = resolve_hl_nb(curr_open, curr_high, curr_low, curr_close)
         if _size > 0:  # buy order
             if check_open and curr_open <= limit_price:
-                can_execute = True
+                hit_on_open = True
+                hit = True
                 limit_price = curr_open
             else:
-                can_execute = curr_low <= limit_price
-                if can_execute and np.isinf(limit_price):
+                hit = curr_low <= limit_price
+                if hit and np.isinf(limit_price):
                     limit_price = curr_low
         else:  # sell order
             if check_open and curr_open >= limit_price:
-                can_execute = True
+                hit_on_open = True
+                hit = True
                 limit_price = curr_open
             else:
-                can_execute = curr_high >= limit_price
-                if can_execute and np.isinf(limit_price):
+                hit = curr_high >= limit_price
+                if hit and np.isinf(limit_price):
                     limit_price = curr_high
     else:
         if _size > 0:  # buy order
-            can_execute = curr_close <= limit_price
+            hit = curr_close <= limit_price
         else:  # sell order
-            can_execute = curr_close >= limit_price
-        if can_execute and np.isinf(limit_price):
+            hit = curr_close >= limit_price
+        if hit and np.isinf(limit_price):
             limit_price = curr_close
-    return limit_price, can_execute
+    return limit_price, hit_on_open, hit
 
 
 @register_jitted(cache=True)
 def check_limit_expired_nb(
     index: tp.Optional[tp.Array1d],
+    freq: tp.Optional[int],
     init_i: int,
     i: int,
     tif: int,
+    expiry: int,
     time_delta_format: int,
-) -> bool:
-    """Check whether limit is expired."""
-    if tif == -1:
-        return False
+) -> tp.Tuple[bool, bool]:
+    """Check whether limit is expired by comparing the current index with the initial index.
+
+    Returns whether the limit expires already on open, and whether the limit expires during this bar."""
+    if tif == -1 and expiry == -1:
+        return False, False
     if time_delta_format == TimeDeltaFormat.Rows:
-        return i - init_i >= tif
+        is_expired_on_open = False
+        is_expired = False
+        if tif != -1:
+            if init_i + tif <= i:
+                is_expired_on_open = True
+                is_expired = True
+            elif i < init_i + tif < i + 1:
+                is_expired = True
+        if expiry != -1:
+            if expiry <= i:
+                is_expired_on_open = True
+                is_expired = True
+            elif i < expiry < i + 1:
+                is_expired = True
+        return is_expired_on_open, is_expired
     if time_delta_format == TimeDeltaFormat.Index:
         if index is None:
-            raise ValueError("Index must be provided for limit expiration")
-        return index[i] - index[init_i] >= tif
-    return False
+            raise ValueError("Index must be provided for TimeDeltaFormat.Index")
+        if freq is None:
+            raise ValueError("Frequency must be provided for TimeDeltaFormat.Index")
+        if index is not None and freq is not None:
+            is_expired_on_open = False
+            is_expired = False
+            if tif != -1:
+                if index[init_i] + tif <= index[i]:
+                    is_expired_on_open = True
+                    is_expired = True
+                elif index[i] < index[init_i] + tif < index[i] + freq:
+                    is_expired = True
+            if expiry != -1:
+                if expiry <= index[i]:
+                    is_expired_on_open = True
+                    is_expired = True
+                elif index[i] < expiry < index[i] + freq:
+                    is_expired = True
+            return is_expired_on_open, is_expired
+    return False, False
 
 
 @register_jitted(cache=True)
@@ -532,6 +572,7 @@ SignalFuncT = tp.Callable[[SignalContext, tp.VarArg()], tp.Tuple[bool, bool, boo
         target_shape=ch.ShapeSlicer(axis=1, mapper=base_ch.group_lens_mapper),
         group_lens=ch.ArraySlicer(axis=0),
         index=None,
+        freq=None,
         open=portfolio_ch.flex_array_gl_slicer,
         high=portfolio_ch.flex_array_gl_slicer,
         low=portfolio_ch.flex_array_gl_slicer,
@@ -568,6 +609,7 @@ SignalFuncT = tp.Callable[[SignalContext, tp.VarArg()], tp.Tuple[bool, bool, boo
         order_type=portfolio_ch.flex_array_gl_slicer,
         limit_delta=portfolio_ch.flex_array_gl_slicer,
         limit_tif=portfolio_ch.flex_array_gl_slicer,
+        limit_expiry=portfolio_ch.flex_array_gl_slicer,
         upon_adj_limit_conflict=portfolio_ch.flex_array_gl_slicer,
         upon_opp_limit_conflict=portfolio_ch.flex_array_gl_slicer,
         use_stops=None,
@@ -601,6 +643,7 @@ def simulate_from_signal_func_nb(
     target_shape: tp.Shape,
     group_lens: tp.Array1d,
     index: tp.Optional[tp.Array1d] = None,
+    freq: tp.Optional[int] = None,
     open: tp.FlexArray = np.asarray(np.nan),
     high: tp.FlexArray = np.asarray(np.nan),
     low: tp.FlexArray = np.asarray(np.nan),
@@ -637,6 +680,7 @@ def simulate_from_signal_func_nb(
     order_type: tp.FlexArray = np.asarray(OrderType.Market),
     limit_delta: tp.FlexArray = np.asarray(np.nan),
     limit_tif: tp.FlexArray = np.asarray(-1),
+    limit_expiry: tp.FlexArray = np.asarray(-1),
     upon_adj_limit_conflict: tp.FlexArray = np.asarray(PendingConflictMode.KeepIgnore),
     upon_opp_limit_conflict: tp.FlexArray = np.asarray(PendingConflictMode.CancelExecute),
     use_stops: bool = True,
@@ -653,7 +697,7 @@ def simulate_from_signal_func_nb(
     upon_adj_stop_conflict: tp.FlexArray = np.asarray(PendingConflictMode.KeepExecute),
     upon_opp_stop_conflict: tp.FlexArray = np.asarray(PendingConflictMode.KeepExecute),
     delta_format: tp.FlexArray = np.asarray(DeltaFormat.Percent),
-    time_delta_format: tp.FlexArray = np.asarray(TimeDeltaFormat.Rows),
+    time_delta_format: tp.FlexArray = np.asarray(TimeDeltaFormat.Index),
     call_seq: tp.Optional[tp.Array2d] = None,
     auto_call_seq: bool = False,
     ffill_val_price: bool = True,
@@ -731,6 +775,7 @@ def simulate_from_signal_func_nb(
     last_limit_info["delta"][:] = np.nan
     last_limit_info["delta_format"][:] = -1
     last_limit_info["tif"][:] = -1
+    last_limit_info["expiry"][:] = -1
     last_limit_info["time_delta_format"][:] = -1
 
     if use_stops:
@@ -874,6 +919,7 @@ def simulate_from_signal_func_nb(
                     group_lens=group_lens,
                     cash_sharing=cash_sharing,
                     index=index,
+                    freq=freq,
                     open=open,
                     high=high,
                     low=low,
@@ -939,8 +985,19 @@ def simulate_from_signal_func_nb(
                     _delta = last_limit_info["delta"][col]
                     _delta_format = last_limit_info["delta_format"][col]
                     _tif = last_limit_info["tif"][col]
+                    _expiry = last_limit_info["expiry"][col]
                     _time_delta_format = last_limit_info["time_delta_format"][col]
-                    limit_price, can_execute = check_limit_hit_nb(
+
+                    limit_expired_on_open, limit_expired = check_limit_expired_nb(
+                        index,
+                        freq,
+                        _init_i,
+                        i,
+                        _tif,
+                        _expiry,
+                        _time_delta_format,
+                    )
+                    limit_price, limit_hit_on_open, limit_hit = check_limit_hit_nb(
                         _open,
                         _high,
                         _low,
@@ -953,40 +1010,33 @@ def simulate_from_signal_func_nb(
                         can_use_ohlc=True,
                         check_open=True,
                     )
+                    if limit_expired_on_open or (not limit_hit_on_open and limit_expired):
+                        # Expired limit signal
+                        any_limit_signal = False
 
-                    # Save info
-                    if can_execute:
-                        # Executable limit signal
-                        exec_limit_is_set = True
-                        exec_limit_signal_i = _signal_i
-                        exec_limit_init_i = _init_i
-                        exec_limit_price = limit_price
-                        exec_limit_size = _size
-                        exec_limit_size_type = _size_type
-                        exec_limit_direction = _direction
-                        exec_limit_stop_type = _stop_type
+                        last_limit_info["signal_i"][col] = -1
+                        last_limit_info["init_i"][col] = -1
+                        last_limit_info["init_price"][col] = np.nan
+                        last_limit_info["init_size"][col] = np.nan
+                        last_limit_info["init_size_type"][col] = -1
+                        last_limit_info["init_direction"][col] = -1
+                        last_limit_info["delta"][col] = np.nan
+                        last_limit_info["delta_format"][col] = -1
+                        last_limit_info["tif"][col] = -1
+                        last_limit_info["expiry"][col] = -1
+                        last_limit_info["time_delta_format"][col] = -1
                     else:
-                        limit_expired = check_limit_expired_nb(
-                            index,
-                            _init_i,
-                            i,
-                            _tif,
-                            _time_delta_format,
-                        )
-                        if limit_expired:
-                            # Expired limit signal
-                            any_limit_signal = False
-
-                            last_limit_info["signal_i"][col] = -1
-                            last_limit_info["init_i"][col] = -1
-                            last_limit_info["init_price"][col] = np.nan
-                            last_limit_info["init_size"][col] = np.nan
-                            last_limit_info["init_size_type"][col] = -1
-                            last_limit_info["init_direction"][col] = -1
-                            last_limit_info["delta"][col] = np.nan
-                            last_limit_info["delta_format"][col] = -1
-                            last_limit_info["tif"][col] = -1
-                            last_limit_info["time_delta_format"][col] = -1
+                        # Save info
+                        if limit_hit:
+                            # Executable limit signal
+                            exec_limit_is_set = True
+                            exec_limit_signal_i = _signal_i
+                            exec_limit_init_i = _init_i
+                            exec_limit_price = limit_price
+                            exec_limit_size = _size
+                            exec_limit_size_type = _size_type
+                            exec_limit_direction = _direction
+                            exec_limit_stop_type = _stop_type
 
                 # Process the stop signal
                 if any_stop_signal:
@@ -1141,7 +1191,7 @@ def simulate_from_signal_func_nb(
                             _stop_order_type = flex_select_auto_nb(stop_order_type, i, col, flex_2d)
                             if _stop_order_type == OrderType.Limit:
                                 # Use close to check whether the limit price has been hit
-                                limit_price, can_execute = check_limit_hit_nb(
+                                limit_price, _, can_execute = check_limit_hit_nb(
                                     _open,
                                     _high,
                                     _low,
@@ -1254,7 +1304,7 @@ def simulate_from_signal_func_nb(
                             if can_execute:
                                 _limit_delta = flex_select_auto_nb(limit_delta, i, col, flex_2d)
                                 _delta_format = flex_select_auto_nb(delta_format, i, col, flex_2d)
-                                limit_price, can_execute = check_limit_hit_nb(
+                                limit_price, _, can_execute = check_limit_hit_nb(
                                     _open,
                                     _high,
                                     _low,
@@ -1325,6 +1375,7 @@ def simulate_from_signal_func_nb(
                                 last_limit_info["delta"][col] = np.nan
                                 last_limit_info["delta_format"][col] = -1
                                 last_limit_info["tif"][col] = -1
+                                last_limit_info["expiry"][col] = -1
                                 last_limit_info["time_delta_format"][col] = -1
 
                         if any_stop_signal:
@@ -1458,6 +1509,7 @@ def simulate_from_signal_func_nb(
                         last_limit_info["delta"][col] = np.nan
                         last_limit_info["delta_format"][col] = -1
                         last_limit_info["tif"][col] = -1
+                        last_limit_info["expiry"][col] = -1
                         last_limit_info["time_delta_format"][col] = -1
 
                 if exec_limit_is_set or exec_stop_is_set or exec_user_is_set:
@@ -1483,6 +1535,7 @@ def simulate_from_signal_func_nb(
                         last_limit_info["delta"][col] = np.nan
                         last_limit_info["delta_format"][col] = -1
                         last_limit_info["tif"][col] = -1
+                        last_limit_info["expiry"][col] = -1
                         last_limit_info["time_delta_format"][col] = -1
                     elif exec_stop_is_set:
                         if exec_stop_make_limit:
@@ -1490,6 +1543,7 @@ def simulate_from_signal_func_nb(
                                 raise ValueError("Only one active limit signal is allowed at a time")
 
                             _limit_tif = flex_select_auto_nb(limit_tif, i, col, flex_2d)
+                            _limit_expiry = flex_select_auto_nb(limit_expiry, i, col, flex_2d)
                             _time_delta_format = flex_select_auto_nb(time_delta_format, i, col, flex_2d)
                             last_limit_info["signal_i"][col] = exec_stop_init_i
                             last_limit_info["init_i"][col] = i
@@ -1501,6 +1555,7 @@ def simulate_from_signal_func_nb(
                             last_limit_info["delta"][col] = exec_stop_delta
                             last_limit_info["delta_format"][col] = exec_stop_delta_format
                             last_limit_info["tif"][col] = _limit_tif
+                            last_limit_info["expiry"][col] = _limit_expiry
                             last_limit_info["time_delta_format"][col] = _time_delta_format
                         else:
                             main_info["signal_i"][col] = exec_stop_init_i
@@ -1542,6 +1597,7 @@ def simulate_from_signal_func_nb(
                             _limit_delta = flex_select_auto_nb(limit_delta, i, col, flex_2d)
                             _delta_format = flex_select_auto_nb(delta_format, i, col, flex_2d)
                             _limit_tif = flex_select_auto_nb(limit_tif, i, col, flex_2d)
+                            _limit_expiry = flex_select_auto_nb(limit_expiry, i, col, flex_2d)
                             _time_delta_format = flex_select_auto_nb(time_delta_format, i, col, flex_2d)
                             last_limit_info["signal_i"][col] = i
                             last_limit_info["init_i"][col] = i
@@ -1553,6 +1609,7 @@ def simulate_from_signal_func_nb(
                             last_limit_info["delta"][col] = _limit_delta
                             last_limit_info["delta_format"][col] = _delta_format
                             last_limit_info["tif"][col] = _limit_tif
+                            last_limit_info["expiry"][col] = _limit_expiry
                             last_limit_info["time_delta_format"][col] = _time_delta_format
                         else:
                             main_info["signal_i"][col] = i

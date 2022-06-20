@@ -16,9 +16,7 @@ day_dt = np.timedelta64(86400000000000)
 
 price = pd.Series(
     [1.0, 2.0, 3.0, 4.0, 5.0],
-    index=pd.Index(
-        [datetime(2020, 1, 1), datetime(2020, 1, 2), datetime(2020, 1, 3), datetime(2020, 1, 4), datetime(2020, 1, 5)],
-    ),
+    index=pd.date_range("2020", periods=5)
 )
 price_wide = price.vbt.tile(3, keys=["a", "b", "c"])
 
@@ -2144,9 +2142,12 @@ class TestFromSignals:
         )
 
     def test_limit_tif(self):
-        entries = pd.Series([True, False, False, False, False], index=price.index)
-        exits = pd.Series([False, False, False, False, False], index=price.index)
-        close = pd.Series([5.0, 4.0, 3.0, 2.0, 1.0], index=price.index)
+        entries = pd.Series([True, False, False, False, False], index=price.index.tz_localize("+0200"))
+        exits = pd.Series([False, False, False, False, False], index=price.index.tz_localize("+0200"))
+        close = pd.Series([5.0, 4.0, 3.0, 2.0, 1.0], index=price.index.tz_localize("+0200"))
+        open = close - 0.25
+        high = close + 0.5
+        low = close - 0.5
 
         assert_records_close(
             from_signals_longonly(
@@ -2155,12 +2156,34 @@ class TestFromSignals:
                 exits=exits,
                 order_type="limit",
                 price=3,
-                limit_tif=[[-1, 0, 1, 2]],
+                limit_tif=[[-1, 0, 1, 2, 3]],
+                time_delta_format="rows",
             ).order_records,
             np.array(
                 [
                     (0, 0, 0, 0, 2, 33.333333333333336, 3.0, 0.0, 0, 1, -1),
-                    (0, 3, 0, 0, 2, 33.333333333333336, 3.0, 0.0, 0, 1, -1),
+                    (0, 4, 0, 0, 2, 33.333333333333336, 3.0, 0.0, 0, 1, -1),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
+        assert_records_close(
+            from_signals_longonly(
+                open=open,
+                high=high,
+                low=low,
+                close=close,
+                entries=entries,
+                exits=exits,
+                order_type="limit",
+                price=3,
+                limit_tif=[[-1, 0, 1, 2, 3]],
+                time_delta_format="rows",
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 2, 36.36363636363637, 2.75, 0.0, 0, 1, -1),
+                    (0, 4, 0, 0, 2, 36.36363636363637, 2.75, 0.0, 0, 1, -1),
                 ],
                 dtype=fs_order_dt,
             ),
@@ -2172,7 +2195,7 @@ class TestFromSignals:
                 exits=exits,
                 order_type="limit",
                 price=3,
-                limit_tif=[[-1, 0, 1, 2]],
+                limit_tif=[[-1, 0, 1, 2, 3]],
                 time_delta_format="rows",
             ).order_records,
             from_signals_longonly(
@@ -2181,22 +2204,27 @@ class TestFromSignals:
                 exits=exits,
                 order_type="limit",
                 price=3,
-                limit_tif=[[-1, 0 * day_dt, 1 * day_dt, 2 * day_dt]],
+                limit_tif=[[1000 * day_dt, 0 * day_dt, 1 * day_dt, 2 * day_dt, 3 * day_dt]],
                 time_delta_format="index",
             ).order_records,
         )
         assert_records_close(
             from_signals_longonly(
+                open=open,
+                high=high,
+                low=low,
                 close=close,
                 entries=entries,
                 exits=exits,
                 order_type="limit",
                 price=3,
-                limit_tif="1d",
+                limit_tif=[[2 * day_dt, 2.5 * day_dt]],
                 time_delta_format="index",
             ).order_records,
             np.array(
-                [],
+                [
+                    (0, 1, 0, 0, 2, 36.36363636363637, 2.75, 0.0, 0, 1, -1),
+                ],
                 dtype=fs_order_dt,
             ),
         )
@@ -2207,7 +2235,7 @@ class TestFromSignals:
                 exits=exits,
                 order_type="limit",
                 price=3,
-                limit_tif=pd.Timedelta("1d"),
+                limit_tif="2d",
                 time_delta_format="index",
             ).order_records,
             np.array(
@@ -2226,6 +2254,21 @@ class TestFromSignals:
                 time_delta_format="index",
             ).order_records,
             np.array(
+                [],
+                dtype=fs_order_dt,
+            ),
+        )
+        assert_records_close(
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                order_type="limit",
+                price=3,
+                limit_tif=pd.Timedelta("3d"),
+                time_delta_format="index",
+            ).order_records,
+            np.array(
                 [
                     (0, 0, 0, 0, 2, 33.333333333333336, 3.0, 0.0, 0, 1, -1),
                 ],
@@ -2233,9 +2276,9 @@ class TestFromSignals:
             ),
         )
 
-        entries2 = pd.Series([True, False, True, False, False], index=price.index)
-        limit_tif = pd.Series([1, -1, 1, -1, -1], index=price.index)
-        price2 = pd.Series([4.0, 3.0, 1.0, 1.0, 1.0], index=price.index)
+        entries2 = pd.Series([True, False, True, False, False], index=price.index.tz_localize("+0200"))
+        limit_tif = pd.Series([2, -1, 2, -1, -1], index=price.index.tz_localize("+0200"))
+        price2 = pd.Series([4.0, 3.0, 1.0, 1.0, 1.0], index=price.index.tz_localize("+0200"))
         assert_records_close(
             from_signals_longonly(
                 close=close,
@@ -2246,6 +2289,181 @@ class TestFromSignals:
                 order_type="limit",
                 price=price2,
                 limit_tif=limit_tif,
+                time_delta_format="rows",
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 1, 1.0, 4.0, 0.0, 0, 1, -1),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
+
+    def test_limit_expiry(self):
+        entries = pd.Series([True, False, False, False, False], index=price.index.tz_localize("+0200"))
+        exits = pd.Series([False, False, False, False, False], index=price.index.tz_localize("+0200"))
+        close = pd.Series([5.0, 4.0, 3.0, 2.0, 1.0], index=price.index.tz_localize("+0200"))
+        open = close - 0.25
+        high = close + 0.5
+        low = close - 0.5
+
+        assert_records_close(
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                order_type="limit",
+                price=3,
+                limit_expiry=[[-1, 0, 1, 2, 3]],
+                time_delta_format="rows",
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 2, 33.333333333333336, 3.0, 0.0, 0, 1, -1),
+                    (0, 4, 0, 0, 2, 33.333333333333336, 3.0, 0.0, 0, 1, -1),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
+        assert_records_close(
+            from_signals_longonly(
+                open=open,
+                high=high,
+                low=low,
+                close=close,
+                entries=entries,
+                exits=exits,
+                order_type="limit",
+                price=3,
+                limit_expiry=[[-1, 0, 1, 2, 3]],
+                time_delta_format="rows",
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 2, 36.36363636363637, 2.75, 0.0, 0, 1, -1),
+                    (0, 4, 0, 0, 2, 36.36363636363637, 2.75, 0.0, 0, 1, -1),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
+        assert_records_close(
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                order_type="limit",
+                price=3,
+                limit_expiry=[[-1, 0, 1, 2, 3]],
+                time_delta_format="rows",
+            ).order_records,
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                order_type="limit",
+                price=3,
+                limit_expiry=[
+                    [
+                        pd.Timestamp.max,
+                        close.index[0] + 0 * day_dt,
+                        close.index[0] + 1 * day_dt,
+                        close.index[0] + 2 * day_dt,
+                        close.index[0] + 3 * day_dt,
+                    ]
+                ],
+                time_delta_format="index",
+            ).order_records,
+        )
+        assert_records_close(
+            from_signals_longonly(
+                open=open,
+                high=high,
+                low=low,
+                close=close,
+                entries=entries,
+                exits=exits,
+                order_type="limit",
+                price=3,
+                limit_expiry=[[close.index[0] + 2 * day_dt, close.index[0] + 2.5 * day_dt]],
+                time_delta_format="index",
+            ).order_records,
+            np.array(
+                [
+                    (0, 1, 0, 0, 2, 36.36363636363637, 2.75, 0.0, 0, 1, -1),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
+        assert_records_close(
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                order_type="limit",
+                price=3,
+                limit_expiry="2d",
+                time_delta_format="index",
+            ).order_records,
+            np.array(
+                [],
+                dtype=fs_order_dt,
+            ),
+        )
+        assert_records_close(
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                order_type="limit",
+                price=3,
+                limit_expiry=pd.Timedelta("2d"),
+                time_delta_format="index",
+            ).order_records,
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                order_type="limit",
+                price=3,
+                limit_expiry=close.index[2],
+                time_delta_format="index",
+            ).order_records,
+        )
+        assert_records_close(
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                order_type="limit",
+                price=3,
+                limit_expiry=pd.Timedelta("3d"),
+                time_delta_format="index",
+            ).order_records,
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                order_type="limit",
+                price=3,
+                limit_expiry=close.index[3],
+                time_delta_format="index",
+            ).order_records,
+        )
+
+        entries2 = pd.Series([True, False, True, False, False], index=price.index.tz_localize("+0200"))
+        limit_expiry = pd.Series([2, -1, 4, -1, -1], index=price.index.tz_localize("+0200"))
+        price2 = pd.Series([4.0, 3.0, 1.0, 1.0, 1.0], index=price.index.tz_localize("+0200"))
+        assert_records_close(
+            from_signals_longonly(
+                close=close,
+                entries=entries2,
+                exits=exits,
+                size=1,
+                accumulate=True,
+                order_type="limit",
+                price=price2,
+                limit_expiry=limit_expiry,
+                time_delta_format="rows",
             ).order_records,
             np.array(
                 [

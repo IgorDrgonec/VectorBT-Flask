@@ -902,6 +902,7 @@ class SimulationContext(tp.NamedTuple):
     call_pre_segment: bool
     call_post_segment: bool
     index: tp.Optional[tp.Array1d]
+    freq: tp.Optional[int]
     open: tp.FlexArray
     high: tp.FlexArray
     low: tp.FlexArray
@@ -1110,9 +1111,14 @@ __pdoc__[
 Allows, for example, to write user-defined arrays such as returns at the end of each segment."""
 __pdoc__[
     "SimulationContext.index"
-] = """Index.
+] = """Index in integer (nanosecond) format.
 
-If datetime-like, assumed to have the UTC timezone."""
+If datetime-like, assumed to have the UTC timezone. Preset simulation methods
+will automatically format any index as UTC without actually converting it to UTC, that is, 
+`12:00 +02:00` will become `12:00 +00:00` to avoid timezone conversion issues."""
+__pdoc__[
+    "SimulationContext.freq"
+] = """Frequency of index in integer (nanosecond) format."""
 __pdoc__[
     "SimulationContext.open"
 ] = """Opening price.
@@ -1452,6 +1458,7 @@ class GroupContext(tp.NamedTuple):
     call_pre_segment: bool
     call_post_segment: bool
     index: tp.Optional[tp.Array1d]
+    freq: tp.Optional[int]
     open: tp.FlexArray
     high: tp.FlexArray
     low: tp.FlexArray
@@ -1549,6 +1556,7 @@ class RowContext(tp.NamedTuple):
     call_pre_segment: bool
     call_post_segment: bool
     index: tp.Optional[tp.Array1d]
+    freq: tp.Optional[int]
     open: tp.FlexArray
     high: tp.FlexArray
     low: tp.FlexArray
@@ -1610,6 +1618,7 @@ class SegmentContext(tp.NamedTuple):
     call_pre_segment: bool
     call_post_segment: bool
     index: tp.Optional[tp.Array1d]
+    freq: tp.Optional[int]
     open: tp.FlexArray
     high: tp.FlexArray
     low: tp.FlexArray
@@ -1690,6 +1699,7 @@ class OrderContext(tp.NamedTuple):
     call_pre_segment: bool
     call_post_segment: bool
     index: tp.Optional[tp.Array1d]
+    freq: tp.Optional[int]
     open: tp.FlexArray
     high: tp.FlexArray
     low: tp.FlexArray
@@ -1784,6 +1794,7 @@ class PostOrderContext(tp.NamedTuple):
     call_pre_segment: bool
     call_post_segment: bool
     index: tp.Optional[tp.Array1d]
+    freq: tp.Optional[int]
     open: tp.FlexArray
     high: tp.FlexArray
     low: tp.FlexArray
@@ -1898,6 +1909,7 @@ class FlexOrderContext(tp.NamedTuple):
     call_pre_segment: bool
     call_post_segment: bool
     index: tp.Optional[tp.Array1d]
+    freq: tp.Optional[int]
     open: tp.FlexArray
     high: tp.FlexArray
     low: tp.FlexArray
@@ -2125,6 +2137,7 @@ class SignalContext(tp.NamedTuple):
     group_lens: tp.Array1d
     cash_sharing: bool
     index: tp.Optional[tp.Array1d]
+    freq: tp.Optional[int]
     open: tp.FlexArray
     high: tp.FlexArray
     low: tp.FlexArray
@@ -2175,7 +2188,8 @@ Passed to `signal_func_nb` and `adjust_func_nb`."""
 __pdoc__["SignalContext.target_shape"] = "See `SimulationContext.target_shape`."
 __pdoc__["SignalContext.group_lens"] = "See `SimulationContext.group_lens`."
 __pdoc__["SignalContext.cash_sharing"] = "See `SimulationContext.cash_sharing`."
-__pdoc__["SignalContext.open"] = "See `SimulationContext.index`."
+__pdoc__["SignalContext.index"] = "See `SimulationContext.index`."
+__pdoc__["SignalContext.freq"] = "See `SimulationContext.freq`."
 __pdoc__["SignalContext.open"] = "See `SimulationContext.open`."
 __pdoc__["SignalContext.high"] = "See `SimulationContext.high`."
 __pdoc__["SignalContext.low"] = "See `SimulationContext.low`."
@@ -2477,6 +2491,7 @@ limit_info_dt = np.dtype(
         ("delta", np.float_),
         ("delta_format", np.int_),
         ("tif", int),
+        ("expiry", int),
         ("time_delta_format", np.int_),
     ],
     align=True,
@@ -2502,7 +2517,8 @@ Attributes:
     delta: Delta from the initial price.
     delta_format: Format of the delta value. See `DeltaFormat`.
     tif: Time in force in integer format. Set to `-1` to disable.
-    time_delta_format: Format of the time-in-force value. See `TimeDeltaFormat`.
+    expiry: Expiry time in integer format. Set to `-1` to disable.
+    time_delta_format: Format of the time-in-force and expire-time values. See `TimeDeltaFormat`.
 """
 
 sl_info_dt = np.dtype(

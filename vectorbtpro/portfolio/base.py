@@ -1624,7 +1624,7 @@ import inspect
 import warnings
 from collections import namedtuple
 from functools import partial
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import numpy as np
 import pandas as pd
@@ -4623,6 +4623,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         order_type: tp.Optional[tp.ArrayLike] = None,
         limit_delta: tp.Optional[tp.ArrayLike] = None,
         limit_tif: tp.Optional[tp.ArrayLike] = None,
+        limit_expiry: tp.Optional[tp.ArrayLike] = None,
         upon_adj_limit_conflict: tp.Optional[tp.ArrayLike] = None,
         upon_opp_limit_conflict: tp.Optional[tp.ArrayLike] = None,
         use_stops: tp.Optional[bool] = None,
@@ -4774,9 +4775,31 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 Will broadcast.
 
                 Any frequency-like object is converted using `vectorbtpro.utils.datetime_.freq_to_timedelta64`.
-                Any array is cast into integer format.
+                Any array must either contain timedeltas or integers, and will be cast into integer format
+                after broadcasting. If the object provided is of data type `object`, will be converted
+                to timedelta automatically.
+
+                Measured in the distance after the open time of the signal bar. If the expiration time happens
+                in the middle of the current bar, we pessimistically assume that the order has been expired.
+                The check is performed at the beginning of the bar, and the first check is performed at the
+                next bar after the signal. For example, if the format is `TimeDeltaFormat.Rows`, 0 or 1 means
+                the order must execute at the same bar or not at all; 2 means the order must execute at the
+                same or next bar or not at all.
 
                 Set an element to `-1` to disable. Use `time_delta_format` to specify the format.
+            limit_expiry (frequency_like, datetime_like, or array_like): Expiration time.
+                Will broadcast.
+
+                Any frequency-like object is used to build a period index, such that each timestamp in the original
+                index is pointing to the timestamp where the period ends. For example, providing "d" will
+                make any limit order expire on the next day. Any array must either contain timestamps or integers
+                (not timedeltas!), and will be cast into integer format after broadcasting. If the object
+                provided is of data type `object`, will be converted to datetime and its timezone will
+                be removed automatically (as done on the index).
+
+                Behaves in a similar way as `limit_tif`.
+
+                Set an element to `-1` or `pd.Timestamp.max` to disable. Use `time_delta_format` to specify the format.
             upon_adj_limit_conflict (PendingConflictMode or array_like): Conflict mode for limit and user-defined
                 signals of adjacent sign. See `vectorbtpro.portfolio.enums.PendingConflictMode`. Will broadcast.
             upon_opp_limit_conflict (PendingConflictMode or array_like): Conflict mode for limit and user-defined
@@ -4792,7 +4815,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 Set an element to `np.nan` to disable. Use `delta_format` to specify the format.
             tsl_th (array_like of float): Take profit threshold for the trailing stop loss.
                 Will broadcast.
-                
+
                 Set an element to `np.nan` to disable. Use `delta_format` to specify the format.
             tsl_stop (array_like of float): Trailing stop loss for the trailing stop loss.
                 Will broadcast.
@@ -5432,6 +5455,47 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             limit_tif = portfolio_cfg["limit_tif"]
         if isinstance(limit_tif, (str, timedelta, pd.DateOffset, pd.Timedelta)):
             limit_tif = freq_to_timedelta64(limit_tif)
+        else:
+            # NumPy doesn't like pd.Timedelta
+            if not isinstance(limit_tif, int):
+                limit_tif_arr = np.asarray(limit_tif)
+                if limit_tif_arr.dtype == object:
+                    if limit_tif_arr.ndim in (0, 1):
+                        limit_tif = pd.to_timedelta(limit_tif)
+                        if isinstance(limit_tif, pd.Timedelta):
+                            limit_tif = limit_tif.to_timedelta64()
+                        else:
+                            limit_tif = limit_tif.values
+                    else:
+                        limit_tif_cols = []
+                        for col in range(limit_tif_arr.shape[1]):
+                            limit_tif_col = pd.to_timedelta(limit_tif_arr[:, col])
+                            limit_tif_cols.append(limit_tif_col.values)
+                        limit_tif = np.column_stack(limit_tif_cols)
+        if limit_expiry is None:
+            limit_expiry = portfolio_cfg["limit_expiry"]
+        if isinstance(limit_expiry, (str, timedelta, pd.DateOffset, pd.Timedelta)):
+            limit_expiry = RepEval(
+                "wrapper.index.to_period(limit_expiry).shift().to_timestamp().astype(np.int_)",
+                context=dict(limit_expiry=limit_expiry),
+            )
+        else:
+            # NumPy doesn't like pd.Timestamp
+            if not isinstance(limit_expiry, int):
+                limit_expiry_arr = np.asarray(limit_expiry)
+                if limit_expiry_arr.dtype == object:
+                    if limit_expiry_arr.ndim in (0, 1):
+                        limit_expiry = pd.to_datetime(limit_expiry).tz_localize(None)
+                        if isinstance(limit_expiry, pd.Timestamp):
+                            limit_expiry = limit_expiry.to_datetime64()
+                        else:
+                            limit_expiry = limit_expiry.values
+                    else:
+                        limit_expiry_cols = []
+                        for col in range(limit_expiry_arr.shape[1]):
+                            limit_expiry_col = pd.to_datetime(limit_expiry_arr[:, col]).tz_localize(None)
+                            limit_expiry_cols.append(limit_expiry_col.values)
+                        limit_expiry = np.column_stack(limit_expiry_cols)
         if upon_adj_limit_conflict is None:
             upon_adj_limit_conflict = portfolio_cfg["upon_adj_limit_conflict"]
         if upon_opp_limit_conflict is None:
@@ -5561,6 +5625,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             order_type=order_type,
             limit_delta=limit_delta,
             limit_tif=limit_tif,
+            limit_expiry=limit_expiry,
             upon_adj_limit_conflict=upon_adj_limit_conflict,
             upon_opp_limit_conflict=upon_opp_limit_conflict,
             sl_stop=sl_stop,
@@ -5630,6 +5695,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     order_type=dict(fill_value=OrderType.Market),
                     limit_delta=dict(fill_value=np.nan),
                     limit_tif=dict(fill_value=-1),
+                    limit_expiry=dict(fill_value=-1),
                     upon_adj_limit_conflict=dict(fill_value=PendingConflictMode.KeepIgnore),
                     upon_opp_limit_conflict=dict(fill_value=PendingConflictMode.CancelExecute),
                     sl_stop=dict(fill_value=np.nan),
@@ -5645,7 +5711,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     upon_adj_stop_conflict=dict(fill_value=PendingConflictMode.KeepExecute),
                     upon_opp_stop_conflict=dict(fill_value=PendingConflictMode.KeepExecute),
                     delta_format=dict(fill_value=DeltaFormat.Percent),
-                    time_delta_format=dict(fill_value=TimeDeltaFormat.Rows),
+                    time_delta_format=dict(fill_value=TimeDeltaFormat.Index),
                     open=dict(fill_value=np.nan),
                     high=dict(fill_value=np.nan),
                     low=dict(fill_value=np.nan),
@@ -5654,7 +5720,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     cash_earnings=dict(fill_value=0.0),
                     cash_dividends=dict(fill_value=0.0),
                 ),
-                post_func=dict(limit_tif=lambda x: x.astype(np.int_)),
+                post_func=dict(
+                    limit_tif=lambda x: x.astype(np.int_),
+                    limit_expiry=lambda x: x.astype(np.int_),
+                ),
                 wrapper_kwargs=dict(
                     freq=freq,
                     group_by=group_by,
@@ -5673,6 +5742,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if isinstance(index, pd.DatetimeIndex):
             index = index.tz_localize(None).tz_localize("utc")
         index = index.values.astype(np.int_)
+        freq = wrapper.freq
+        if freq is not None:
+            freq = freq_to_timedelta64(freq).astype(np.int_)
 
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
         init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)
@@ -5802,7 +5874,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         checks.assert_subdtype(broadcasted_args["upon_opposite_entry"], np.integer)
         checks.assert_subdtype(broadcasted_args["order_type"], np.integer)
         checks.assert_subdtype(broadcasted_args["limit_delta"], np.number)
-        checks.assert_subdtype(broadcasted_args["limit_tif"], np.number)
+        checks.assert_subdtype(broadcasted_args["limit_tif"], np.integer)
+        checks.assert_subdtype(broadcasted_args["limit_expiry"], np.integer)
         checks.assert_subdtype(broadcasted_args["upon_adj_limit_conflict"], np.integer)
         checks.assert_subdtype(broadcasted_args["upon_opp_limit_conflict"], np.integer)
         checks.assert_subdtype(broadcasted_args["sl_stop"], np.number)
@@ -5841,6 +5914,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             dict(
                 target_shape=target_shape_2d,
                 index=index,
+                freq=freq,
                 group_lens=cs_group_lens,
                 call_seq=call_seq,
                 init_cash=init_cash,
@@ -5920,6 +5994,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             target_shape=target_shape_2d,
             group_lens=cs_group_lens,  # group only if cash sharing is enabled to speed up
             index=index,
+            freq=freq,
             init_cash=init_cash,
             init_position=init_position,
             init_price=init_price,
@@ -6913,6 +6988,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if isinstance(index, pd.DatetimeIndex):
             index = index.tz_localize(None).tz_localize("utc")
         index = index.values.astype(np.int_)
+        freq = wrapper.freq
+        if freq is not None:
+            freq = freq_to_timedelta64(freq).astype(np.int_)
 
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
         init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)
@@ -6983,6 +7061,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             dict(
                 target_shape=target_shape_2d,
                 index=index,
+                freq=freq,
                 cs_group_lens=cs_group_lens,
                 group_lens=group_lens,
                 cash_sharing=cash_sharing,
@@ -7073,6 +7152,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     post_order_func_nb=post_order_func_nb,
                     post_order_args=post_order_args,
                     index=index,
+                    freq=freq,
                     open=broadcasted_args["open"],
                     high=broadcasted_args["high"],
                     low=broadcasted_args["low"],
@@ -7120,6 +7200,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     post_order_func_nb=post_order_func_nb,
                     post_order_args=post_order_args,
                     index=index,
+                    freq=freq,
                     open=broadcasted_args["open"],
                     high=broadcasted_args["high"],
                     low=broadcasted_args["low"],
@@ -7167,6 +7248,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     post_order_func_nb=post_order_func_nb,
                     post_order_args=post_order_args,
                     index=index,
+                    freq=freq,
                     open=broadcasted_args["open"],
                     high=broadcasted_args["high"],
                     low=broadcasted_args["low"],
@@ -7214,6 +7296,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     post_order_func_nb=post_order_func_nb,
                     post_order_args=post_order_args,
                     index=index,
+                    freq=freq,
                     open=broadcasted_args["open"],
                     high=broadcasted_args["high"],
                     low=broadcasted_args["low"],

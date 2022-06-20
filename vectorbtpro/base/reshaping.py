@@ -1168,10 +1168,11 @@ def broadcast(
         reindex_kwargs=list(obj_reindex_kwargs.values()),
     )))
 
-    # Convert all pd.Series objects to pd.DataFrame if we work on 2-dim data
+    # Convert to NumPy
     ready_objs = {}
     for k, obj in old_objs.items():
         if is_2d and checks.is_series(obj):
+            # Convert all pd.Series objects to pd.DataFrame if we work on 2-dim data
             ready_objs[k] = obj.values[:, None]
         else:
             ready_objs[k] = np.asarray(obj)
@@ -1456,9 +1457,7 @@ def broadcast(
         _keep_flex = bco_instances[k].keep_flex
         _repeat_product = bco_instances[k].repeat_product
 
-        if _keep_flex:
-            new_objs3[k] = new_obj
-        else:
+        if not _keep_flex:
             # Wrap array
             _is_pd = bco_instances[k].to_pd
             if _is_pd is None:
@@ -1482,11 +1481,11 @@ def broadcast(
                     ignore_ranges=ignore_ranges,
                 )
 
-            # Post-process array
-            _post_func = bco_instances[k].post_func
-            if _post_func is not None:
-                new_obj = _post_func(new_obj)
-            new_objs3[k] = new_obj
+        # Post-process array
+        _post_func = bco_instances[k].post_func
+        if _post_func is not None:
+            new_obj = _post_func(new_obj)
+        new_objs3[k] = new_obj
 
     # Prepare outputs
     return_objs = []
