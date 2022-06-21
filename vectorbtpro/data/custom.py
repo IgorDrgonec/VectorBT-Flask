@@ -894,13 +894,6 @@ class BinanceData(RemoteData):  # pragma: no cover
 
     _column_config: tp.ClassVar[Config] = HybridConfig(
         {
-            "Close time": dict(
-                resample_func=lambda self, obj, resampler: obj.view(int).vbt.resample_apply(
-                    resampler,
-                    generic_nb.last_reduce_nb,
-                    wrap_kwargs=dict(dtype=obj.dtype),
-                )
-            ),
             "Quote volume": dict(
                 resample_func=lambda self, obj, resampler: obj.vbt.resample_apply(
                     resampler,
@@ -1101,17 +1094,17 @@ class BinanceData(RemoteData):  # pragma: no cover
             ],
         )
         df.index = pd.to_datetime(df["Open time"], unit="ms", utc=True)
-        del df["Open time"]
         df["Open"] = df["Open"].astype(float)
         df["High"] = df["High"].astype(float)
         df["Low"] = df["Low"].astype(float)
         df["Close"] = df["Close"].astype(float)
         df["Volume"] = df["Volume"].astype(float)
-        df["Close time"] = pd.to_datetime(df["Close time"], unit="ms", utc=True)
         df["Quote volume"] = df["Quote volume"].astype(float)
         df["Trade count"] = df["Trade count"].astype(int, errors="ignore")
         df["Taker base volume"] = df["Taker base volume"].astype(float)
         df["Taker quote volume"] = df["Taker quote volume"].astype(float)
+        del df["Open time"]
+        del df["Close time"]
         del df["Ignore"]
 
         return df

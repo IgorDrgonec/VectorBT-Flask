@@ -871,36 +871,6 @@ def simulate_from_signal_func_nb(
                 col = from_col + c  # order doesn't matter
 
                 # Set defaults
-                exec_limit_is_set = False
-                exec_limit_signal_i = -1
-                exec_limit_init_i = -1
-                exec_limit_price = np.nan
-                exec_limit_size = np.nan
-                exec_limit_size_type = -1
-                exec_limit_direction = -1
-                exec_limit_stop_type = -1
-
-                exec_stop_is_set = False
-                exec_stop_init_i = -1
-                exec_stop_price = np.nan
-                exec_stop_size = np.nan
-                exec_stop_size_type = -1
-                exec_stop_direction = -1
-                exec_stop_type = -1
-                exec_stop_stop_type = -1
-                exec_stop_delta = np.nan
-                exec_stop_delta_format = -1
-                exec_stop_make_limit = False
-
-                exec_user_is_set = False
-                exec_user_price = np.nan
-                exec_user_size = np.nan
-                exec_user_size_type = -1
-                exec_user_direction = -1
-                exec_user_type = -1
-                exec_user_stop_type = -1
-                exec_user_make_limit = False
-
                 main_info["signal_i"][col] = -1
                 main_info["creation_i"][col] = -1
                 main_info["i"][col] = i
@@ -910,7 +880,6 @@ def simulate_from_signal_func_nb(
                 main_info["direction"][col] = -1
                 main_info["type"][col] = -1
                 main_info["stop_type"][col] = -1
-
                 temp_order_value[col] = 0.0
 
                 # Get signals
@@ -964,6 +933,37 @@ def simulate_from_signal_func_nb(
                 any_user_signal = is_long_entry or is_long_exit or is_short_entry or is_short_exit
                 if not any_limit_signal and not any_stop_signal and not any_user_signal:  # shortcut
                     continue
+
+                # Set initial info
+                exec_limit_is_set = False
+                exec_limit_signal_i = -1
+                exec_limit_init_i = -1
+                exec_limit_price = np.nan
+                exec_limit_size = np.nan
+                exec_limit_size_type = -1
+                exec_limit_direction = -1
+                exec_limit_stop_type = -1
+
+                exec_stop_is_set = False
+                exec_stop_init_i = -1
+                exec_stop_price = np.nan
+                exec_stop_size = np.nan
+                exec_stop_size_type = -1
+                exec_stop_direction = -1
+                exec_stop_type = -1
+                exec_stop_stop_type = -1
+                exec_stop_delta = np.nan
+                exec_stop_delta_format = -1
+                exec_stop_make_limit = False
+
+                exec_user_is_set = False
+                exec_user_price = np.nan
+                exec_user_size = np.nan
+                exec_user_size_type = -1
+                exec_user_direction = -1
+                exec_user_type = -1
+                exec_user_stop_type = -1
+                exec_user_make_limit = False
 
                 # Resolve the current bar
                 _open = flex_select_auto_nb(open, i, col, flex_2d)
