@@ -35,7 +35,7 @@ def get_extra_requires(path, add_all=True):
 setup(
     name="vectorbtpro",
     version=version["__version__"],
-    description="Ultimate engine for quants",
+    description="Next-Generation Quantitative Analysis Tool",
     author="Oleg Polakow",
     author_email="olegpolakow@gmail.com",
     long_description=long_description,

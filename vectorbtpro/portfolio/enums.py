@@ -193,7 +193,7 @@ __pdoc__[
 {prettify(PendingConflictMode)}
 ```
 
-What should happen if a user-defined signal occurs during a pending (limit/stop) signal?
+What should happen if an executable signal occurs during a pending signal?
 
 Attributes:
     KeepIgnore: Keep the pending signal and cancel the user-defined signal.

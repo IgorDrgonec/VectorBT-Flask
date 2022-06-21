@@ -24,12 +24,11 @@
 }
 
 .md-header {
-    background-color: var(--md-default-bg-color--darkest);
-    border-bottom: 0.05rem solid #4051b5;
+    background-color: var(--md-default-bg-color--darker);
 }
 
 .md-tabs {
-    background-color: rgba(64, 81, 181, 0.3);
+    background-color: var(--md-default-bg-color--darker);
 }
 
 /* API */

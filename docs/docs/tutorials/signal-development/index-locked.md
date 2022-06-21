@@ -2087,7 +2087,7 @@ generated strictly one after another, and the entry/exit price will be the close
 
 >>> fig = data.plot(
 ...     symbol="BTCUSDT", 
-...     ohlc_trace_kwargs=dict(opacity=0.5), 
+...     ohlc_trace_kwargs=dict(opacity=0.65), 
 ...     plot_volume=False
 ... )
 >>> entries["BTCUSDT"].vbt.signals.plot_as_entries(
@@ -2148,7 +2148,7 @@ but rather determine it from the input arrays automatically:
 ... )
 >>> fig = data.plot(
 ...     symbol="BTCUSDT", 
-...     ohlc_trace_kwargs=dict(opacity=0.5), 
+...     ohlc_trace_kwargs=dict(opacity=0.65), 
 ...     plot_volume=False
 ... )
 >>> both_generator.plot(
@@ -2526,7 +2526,7 @@ the first signal at the entry bar by making `wait` zero:
 ... )
 >>> fig = data.plot(
 ...     symbol="BTCUSDT", 
-...     ohlc_trace_kwargs=dict(opacity=0.5), 
+...     ohlc_trace_kwargs=dict(opacity=0.65), 
 ...     plot_volume=False
 ... )
 >>> stcx.plot(
@@ -2679,8 +2679,8 @@ take profit](https://capitalise.ai/trailing-take-profit-manage-your-risk-while-l
 ...     data.get("High"),
 ...     data.get("Low"),
 ...     data.get("Close"),
-...     ttp_th=vbt.Default(0.2),  # (3)!
-...     ttp_stop=vbt.Default(0.1),
+...     tsl_th=vbt.Default(0.2),  # (3)!
+...     tsl_stop=vbt.Default(0.1),
 ...     reverse=vbt.Default(short_entries),  # (4)!
 ...     is_entry_open=False
 ... )
@@ -2691,8 +2691,8 @@ take profit](https://capitalise.ai/trailing-take-profit-manage-your-risk-while-l
 [SignalsAccessor.pos_rank](/api/signals/accessors/#vectorbtpro.signals.accessors.SignalsAccessor.pos_rank)
 2. Select only those entries whose position is odd, that is, doesn't divide by 2.
 Those will become our short entries.
-3. TTP information consists of two parts: a threshold (`ttp_th`) that needs to be crossed upwards,
-and a trailing stop loss (`ttp_stop`) that becomes enabled once the threshold has been crossed
+3. TTP information consists of two parts: a take profit threshold (`tsl_th`) that needs to be crossed upwards,
+and a trailing stop loss (`tsl_stop`) that becomes enabled once the threshold has been crossed
 4. Short entry mask becomes our reversal mask
 
 ![](/assets/images/tutorials/signal_dev_ohlcstcx3.svg)
@@ -2707,7 +2707,7 @@ We can then split both final arrays into four direction-aware arrays for simulat
 
 >>> fig = data.plot(
 ...     symbol="BTCUSDT", 
-...     ohlc_trace_kwargs=dict(opacity=0.5), 
+...     ohlc_trace_kwargs=dict(opacity=0.65), 
 ...     plot_volume=False
 ... )
 >>> long_entries["BTCUSDT"].vbt.signals.plot_as_entries(
@@ -3111,7 +3111,7 @@ Let's visualize the selected signals:
 >>> symbol = "ETHUSDT"
 >>> fig = data.plot(
 ...     symbol=symbol, 
-...     ohlc_trace_kwargs=dict(opacity=0.5), 
+...     ohlc_trace_kwargs=dict(opacity=0.65), 
 ...     plot_volume=False
 ... )
 >>> entries[symbol].vbt.signals.plot_as_entries(

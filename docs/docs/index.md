@@ -1,4 +1,4 @@
 ---
-title: Ultimate engine for quants
+title: Next-Generation Quantitative Analysis Tool
 template: home.html
 ---
