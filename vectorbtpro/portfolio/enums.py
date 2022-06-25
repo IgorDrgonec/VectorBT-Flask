@@ -86,6 +86,8 @@ class RejectedOrderError(Exception):
 class PriceTypeT(tp.NamedTuple):
     Open: int = -np.inf
     Close: int = np.inf
+    NextOpen: int = -1
+    NextClose: int = -2
 
 
 PriceType = PriceTypeT()
@@ -100,8 +102,18 @@ __pdoc__[
 ```
 
 Attributes:
-    Open: Opening price. Will be substituted by `-np.inf`.
-    Close: Closing price. Will be substituted by `np.inf`.
+    Open: Opening price. 
+    
+        Will be substituted by `-np.inf`.
+    Close: Closing price. 
+    
+        Will be substituted by `np.inf`.
+    NextOpen: Next opening price. 
+    
+        Will be substituted by `-np.inf` and `from_ago` will be set to 1.
+    NextClose: Next closing price. 
+    
+        Will be substituted by `np.inf` and `from_ago` will be set to 1.
 """
 
 
@@ -2482,6 +2494,7 @@ Attributes:
 limit_info_dt = np.dtype(
     [
         ("signal_i", np.int_),
+        ("creation_i", np.int_),
         ("init_i", np.int_),
         ("init_price", np.float_),
         ("init_size", np.float_),
@@ -2508,7 +2521,8 @@ __pdoc__[
 
 Attributes:
     signal_i: Signal row.
-    init_i: Initial row.
+    creation_i: Limit creation row.
+    init_i: Initial row from where order information is taken.
     init_price: Initial price.
     init_size: Requested size.
     init_size_type: Type of the requested size. See `SizeType`.

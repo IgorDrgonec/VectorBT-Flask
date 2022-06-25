@@ -2,6 +2,7 @@
 
 """Numba-compiled functions for portfolio modeling based on signals."""
 
+import numpy as np
 from numba import prange
 
 from vectorbtpro.base import chunking as base_ch
@@ -439,13 +440,13 @@ def check_limit_hit_nb(
 def check_limit_expired_nb(
     index: tp.Optional[tp.Array1d],
     freq: tp.Optional[int],
-    init_i: int,
+    creation_i: int,
     i: int,
     tif: int,
     expiry: int,
     time_delta_format: int,
 ) -> tp.Tuple[bool, bool]:
-    """Check whether limit is expired by comparing the current index with the initial index.
+    """Check whether limit is expired by comparing the current index with the creation index.
 
     Returns whether the limit expires already on open, and whether the limit expires during this bar."""
     if tif == -1 and expiry == -1:
@@ -454,10 +455,10 @@ def check_limit_expired_nb(
         is_expired_on_open = False
         is_expired = False
         if tif != -1:
-            if init_i + tif <= i:
+            if creation_i + tif <= i:
                 is_expired_on_open = True
                 is_expired = True
-            elif i < init_i + tif < i + 1:
+            elif i < creation_i + tif < i + 1:
                 is_expired = True
         if expiry != -1:
             if expiry <= i:
@@ -475,10 +476,10 @@ def check_limit_expired_nb(
             is_expired_on_open = False
             is_expired = False
             if tif != -1:
-                if index[init_i] + tif <= index[i]:
+                if index[creation_i] + tif <= index[i]:
                     is_expired_on_open = True
                     is_expired = True
-                elif index[i] < index[init_i] + tif < index[i] + freq:
+                elif index[i] < index[creation_i] + tif < index[i] + freq:
                     is_expired = True
             if expiry != -1:
                 if expiry <= index[i]:
@@ -501,10 +502,12 @@ def check_stop_hit_nb(
     curr_low: float,
     curr_close: float,
     hit_below: bool,
-) -> tp.Tuple[float, bool]:
+) -> tp.Tuple[float, bool, bool]:
     """Resolve the stop price and check whether it has been hit.
 
-    If hit before open, returns open."""
+    If hit before open, returns open.
+
+    Returns the stop price, whether it has been hit before open, and whether it has been hit during this bar."""
     curr_high, curr_low = resolve_hl_nb(curr_open, curr_high, curr_low, curr_close)
     if delta_format == DeltaFormat.Percent100:
         stop /= 100
@@ -514,19 +517,19 @@ def check_stop_hit_nb(
         else:
             stop_price = stop_price * (1 - abs(stop))
         if curr_open <= stop_price:
-            return curr_open, True
+            return curr_open, True, True
         if curr_low <= stop_price:
-            return stop_price, True
-        return stop_price, False
+            return stop_price, False, True
+        return stop_price, False, False
     if delta_format == DeltaFormat.Absolute:
         stop_price = stop_price + abs(stop)
     else:
         stop_price = stop_price * (1 + abs(stop))
     if curr_open >= stop_price:
-        return curr_open, True
+        return curr_open, True, True
     if curr_high >= stop_price:
-        return stop_price, True
-    return stop_price, False
+        return stop_price, False, True
+    return stop_price, False, False
 
 
 @register_jitted(cache=True)
@@ -627,6 +630,7 @@ SignalFuncT = tp.Callable[[SignalContext, tp.VarArg()], tp.Tuple[bool, bool, boo
         upon_opp_stop_conflict=portfolio_ch.flex_array_gl_slicer,
         delta_format=portfolio_ch.flex_array_gl_slicer,
         time_delta_format=portfolio_ch.flex_array_gl_slicer,
+        from_ago=portfolio_ch.flex_array_gl_slicer,
         call_seq=ch.ArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
         auto_call_seq=None,
         ffill_val_price=None,
@@ -698,6 +702,7 @@ def simulate_from_signal_func_nb(
     upon_opp_stop_conflict: tp.FlexArray = np.asarray(PendingConflictMode.KeepExecute),
     delta_format: tp.FlexArray = np.asarray(DeltaFormat.Percent),
     time_delta_format: tp.FlexArray = np.asarray(TimeDeltaFormat.Index),
+    from_ago: tp.FlexArray = np.asarray(0),
     call_seq: tp.Optional[tp.Array2d] = None,
     auto_call_seq: bool = False,
     ffill_val_price: bool = True,
@@ -766,6 +771,7 @@ def simulate_from_signal_func_nb(
 
     last_limit_info = np.empty(target_shape[1], dtype=limit_info_dt)
     last_limit_info["signal_i"][:] = -1
+    last_limit_info["creation_i"][:] = -1
     last_limit_info["init_i"][:] = -1
     last_limit_info["init_price"][:] = np.nan
     last_limit_info["init_size"][:] = np.nan
@@ -843,7 +849,11 @@ def simulate_from_signal_func_nb(
                 _val_price = flex_select_auto_nb(val_price, i, col, flex_2d)
                 if np.isinf(_val_price):
                     if _val_price > 0:
-                        _price = flex_select_auto_nb(price, i, col, flex_2d)
+                        _i = i - abs(flex_select_auto_nb(from_ago, i, col, flex_2d))
+                        if _i < 0:
+                            _price = np.nan
+                        else:
+                            _price = flex_select_auto_nb(price, _i, col, flex_2d)
                         if np.isinf(_price):
                             if _price > 0:
                                 _price = flex_select_auto_nb(close, i, col, flex_2d)
@@ -935,8 +945,10 @@ def simulate_from_signal_func_nb(
                     continue
 
                 # Set initial info
-                exec_limit_is_set = False
+                exec_limit_set = False
+                exec_limit_set_on_open = False
                 exec_limit_signal_i = -1
+                exec_limit_creation_i = -1
                 exec_limit_init_i = -1
                 exec_limit_price = np.nan
                 exec_limit_size = np.nan
@@ -944,7 +956,9 @@ def simulate_from_signal_func_nb(
                 exec_limit_direction = -1
                 exec_limit_stop_type = -1
 
-                exec_stop_is_set = False
+                exec_stop_set = False
+                exec_stop_set_on_open = False
+                exec_stop_set_on_close = False
                 exec_stop_init_i = -1
                 exec_stop_price = np.nan
                 exec_stop_size = np.nan
@@ -956,7 +970,9 @@ def simulate_from_signal_func_nb(
                 exec_stop_delta_format = -1
                 exec_stop_make_limit = False
 
-                exec_user_is_set = False
+                user_on_open = False
+                user_on_close = False
+                exec_user_set = False
                 exec_user_price = np.nan
                 exec_user_size = np.nan
                 exec_user_size_type = -1
@@ -976,6 +992,7 @@ def simulate_from_signal_func_nb(
                 if any_limit_signal:
                     # Check whether the limit price has been hit
                     _signal_i = last_limit_info["signal_i"][col]
+                    _creation_i = last_limit_info["creation_i"][col]
                     _init_i = last_limit_info["init_i"][col]
                     _price = last_limit_info["init_price"][col]
                     _size = last_limit_info["init_size"][col]
@@ -991,7 +1008,7 @@ def simulate_from_signal_func_nb(
                     limit_expired_on_open, limit_expired = check_limit_expired_nb(
                         index,
                         freq,
-                        _init_i,
+                        _creation_i,
                         i,
                         _tif,
                         _expiry,
@@ -1015,6 +1032,7 @@ def simulate_from_signal_func_nb(
                         any_limit_signal = False
 
                         last_limit_info["signal_i"][col] = -1
+                        last_limit_info["creation_i"][col] = -1
                         last_limit_info["init_i"][col] = -1
                         last_limit_info["init_price"][col] = np.nan
                         last_limit_info["init_size"][col] = np.nan
@@ -1029,8 +1047,10 @@ def simulate_from_signal_func_nb(
                         # Save info
                         if limit_hit:
                             # Executable limit signal
-                            exec_limit_is_set = True
+                            exec_limit_set = True
+                            exec_limit_set_on_open = limit_hit_on_open
                             exec_limit_signal_i = _signal_i
+                            exec_limit_creation_i = _creation_i
                             exec_limit_init_i = _init_i
                             exec_limit_price = limit_price
                             exec_limit_size = _size
@@ -1042,12 +1062,13 @@ def simulate_from_signal_func_nb(
                 if any_stop_signal:
                     # Resolve the stop price
                     stop_price = np.nan
+                    stop_hit_on_open = False
                     stop_hit = False
 
                     # Check SL
                     if not np.isnan(last_sl_info["stop"][col]):
                         # Check against high and low
-                        stop_price, stop_hit = check_stop_hit_nb(
+                        stop_price, stop_hit_on_open, stop_hit = check_stop_hit_nb(
                             last_position[col] > 0,
                             last_sl_info["init_price"][col],
                             last_sl_info["stop"][col],
@@ -1078,7 +1099,7 @@ def simulate_from_signal_func_nb(
                                 last_tsl_info["delta_format"][col],
                             )
                         if delta_hit:
-                            stop_price, stop_hit = check_stop_hit_nb(
+                            stop_price, stop_hit_on_open, stop_hit = check_stop_hit_nb(
                                 last_position[col] > 0,
                                 last_tsl_info["peak_price"][col],
                                 last_tsl_info["stop"][col],
@@ -1110,7 +1131,7 @@ def simulate_from_signal_func_nb(
                                     last_tsl_info["delta_format"][col],
                                 )
                             if delta_hit:
-                                stop_price, stop_hit = check_stop_hit_nb(
+                                stop_price, stop_hit_on_open, stop_hit = check_stop_hit_nb(
                                     last_position[col] > 0,
                                     last_tsl_info["peak_price"][col],
                                     last_tsl_info["stop"][col],
@@ -1133,7 +1154,7 @@ def simulate_from_signal_func_nb(
                     # Check TP
                     if not stop_hit and not np.isnan(last_tp_info["stop"][col]):
                         # Check against high and low
-                        stop_price, stop_hit = check_stop_hit_nb(
+                        stop_price, stop_hit_on_open, stop_hit = check_stop_hit_nb(
                             last_position[col] > 0,
                             last_tp_info["init_price"][col],
                             last_tp_info["stop"][col],
@@ -1208,7 +1229,9 @@ def simulate_from_signal_func_nb(
                                     _price = limit_price
 
                             # Save info
-                            exec_stop_is_set = True
+                            exec_stop_set = True
+                            exec_stop_set_on_open = stop_hit_on_open
+                            exec_stop_set_on_close = _stop_exit_price == StopExitPrice.Close
                             exec_stop_init_i = _init_i
                             exec_stop_price = _price
                             exec_stop_size = _size
@@ -1222,74 +1245,86 @@ def simulate_from_signal_func_nb(
 
                 # Process user signal
                 if any_user_signal:
-                    _accumulate = flex_select_auto_nb(accumulate, i, col, flex_2d)
-                    if is_long_entry or is_short_entry:
-                        # Resolve any conflicts
-                        _upon_long_conflict = flex_select_auto_nb(upon_long_conflict, i, col, flex_2d)
-                        is_long_entry, is_long_exit = resolve_signal_conflict_nb(
+                    _i = i - abs(flex_select_auto_nb(from_ago, i, col, flex_2d))
+                    if _i < 0:
+                        _price = np.nan
+                        _size = np.nan
+                        _size_type = -1
+                        _direction = -1
+                    else:
+                        _accumulate = flex_select_auto_nb(accumulate, _i, col, flex_2d)
+                        if is_long_entry or is_short_entry:
+                            # Resolve any conflicts
+                            _upon_long_conflict = flex_select_auto_nb(upon_long_conflict, _i, col, flex_2d)
+                            is_long_entry, is_long_exit = resolve_signal_conflict_nb(
+                                last_position[col],
+                                is_long_entry,
+                                is_long_exit,
+                                Direction.LongOnly,
+                                _upon_long_conflict,
+                            )
+                            _upon_short_conflict = flex_select_auto_nb(upon_short_conflict, _i, col, flex_2d)
+                            is_short_entry, is_short_exit = resolve_signal_conflict_nb(
+                                last_position[col],
+                                is_short_entry,
+                                is_short_exit,
+                                Direction.ShortOnly,
+                                _upon_short_conflict,
+                            )
+
+                            # Resolve anu direction conflicts
+                            _upon_dir_conflict = flex_select_auto_nb(upon_dir_conflict, _i, col, flex_2d)
+                            is_long_entry, is_short_entry = resolve_dir_conflict_nb(
+                                last_position[col],
+                                is_long_entry,
+                                is_short_entry,
+                                _upon_dir_conflict,
+                            )
+
+                            # Resolve opposite entry
+                            _upon_opposite_entry = flex_select_auto_nb(upon_opposite_entry, _i, col, flex_2d)
+                            (
+                                is_long_entry,
+                                is_long_exit,
+                                is_short_entry,
+                                is_short_exit,
+                                _accumulate,
+                            ) = resolve_opposite_entry_nb(
+                                last_position[col],
+                                is_long_entry,
+                                is_long_exit,
+                                is_short_entry,
+                                is_short_exit,
+                                _upon_opposite_entry,
+                                _accumulate,
+                            )
+
+                        # Resolve the price
+                        _price = flex_select_auto_nb(price, _i, col, flex_2d)
+
+                        # Convert both signals to size (direction-aware), size type, and direction
+                        _size, _size_type, _direction = signals_to_size_nb(
                             last_position[col],
                             is_long_entry,
                             is_long_exit,
-                            Direction.LongOnly,
-                            _upon_long_conflict,
-                        )
-                        _upon_short_conflict = flex_select_auto_nb(upon_short_conflict, i, col, flex_2d)
-                        is_short_entry, is_short_exit = resolve_signal_conflict_nb(
-                            last_position[col],
                             is_short_entry,
                             is_short_exit,
-                            Direction.ShortOnly,
-                            _upon_short_conflict,
-                        )
-
-                        # Resolve anu direction conflicts
-                        _upon_dir_conflict = flex_select_auto_nb(upon_dir_conflict, i, col, flex_2d)
-                        is_long_entry, is_short_entry = resolve_dir_conflict_nb(
-                            last_position[col],
-                            is_long_entry,
-                            is_short_entry,
-                            _upon_dir_conflict,
-                        )
-
-                        # Resolve opposite entry
-                        _upon_opposite_entry = flex_select_auto_nb(upon_opposite_entry, i, col, flex_2d)
-                        (
-                            is_long_entry,
-                            is_long_exit,
-                            is_short_entry,
-                            is_short_exit,
+                            flex_select_auto_nb(size, _i, col, flex_2d),
+                            flex_select_auto_nb(size_type, _i, col, flex_2d),
                             _accumulate,
-                        ) = resolve_opposite_entry_nb(
-                            last_position[col],
-                            is_long_entry,
-                            is_long_exit,
-                            is_short_entry,
-                            is_short_exit,
-                            _upon_opposite_entry,
-                            _accumulate,
+                            last_val_price[col],
+                            last_value[group],
                         )
 
-                    # Resolve the price
-                    _price = flex_select_auto_nb(price, i, col, flex_2d)
-
-                    # Convert both signals to size (direction-aware), size type, and direction
-                    _size, _size_type, _direction = signals_to_size_nb(
-                        last_position[col],
-                        is_long_entry,
-                        is_long_exit,
-                        is_short_entry,
-                        is_short_exit,
-                        flex_select_auto_nb(size, i, col, flex_2d),
-                        flex_select_auto_nb(size_type, i, col, flex_2d),
-                        _accumulate,
-                        last_val_price[col],
-                        last_value[group],
-                    )
-
+                    if np.isinf(_price):
+                        if _price > 0:
+                            user_on_close = True
+                        else:
+                            user_on_open = True
                     if not np.isnan(_size):
                         # Executable user signal
                         can_execute = True
-                        _order_type = flex_select_auto_nb(order_type, i, col, flex_2d)
+                        _order_type = flex_select_auto_nb(order_type, _i, col, flex_2d)
                         if _order_type == OrderType.Limit:
                             # Use close to check whether the limit price has been hit
                             can_use_ohlc = False
@@ -1302,8 +1337,8 @@ def simulate_from_signal_func_nb(
                                     can_use_ohlc = True
                                     _price = _open
                             if can_execute:
-                                _limit_delta = flex_select_auto_nb(limit_delta, i, col, flex_2d)
-                                _delta_format = flex_select_auto_nb(delta_format, i, col, flex_2d)
+                                _limit_delta = flex_select_auto_nb(limit_delta, _i, col, flex_2d)
+                                _delta_format = flex_select_auto_nb(delta_format, _i, col, flex_2d)
                                 limit_price, _, can_execute = check_limit_hit_nb(
                                     _open,
                                     _high,
@@ -1321,7 +1356,7 @@ def simulate_from_signal_func_nb(
                                     _price = limit_price
 
                         # Save info
-                        exec_user_is_set = True
+                        exec_user_set = True
                         exec_user_price = _price
                         exec_user_size = _size
                         exec_user_size_type = _size_type
@@ -1330,192 +1365,117 @@ def simulate_from_signal_func_nb(
                         exec_user_stop_type = -1
                         exec_user_make_limit = not can_execute
 
-                # If the user signal is set, resolve pending limit and stop signals
-                if exec_user_is_set and (any_limit_signal or any_stop_signal):
-                    user_signal_first = True
-                    if exec_limit_is_set or exec_stop_is_set:
-                        _price = flex_select_auto_nb(close, i, col, flex_2d)
-                        user_signal_first = np.isinf(_price) and _price < 0
-                    if user_signal_first:
-                        # User signal is executed using open and thus is before any pending signal
+                if (
+                    exec_limit_set
+                    or exec_stop_set
+                    or exec_user_set
+                    or ((any_limit_signal or any_stop_signal) and any_user_signal)
+                ):
+                    # Choose the main executable signal
+                    # Priority: limit -> stop -> user
+
+                    # Check whether the main signal comes on open
+                    keep_limit = True
+                    keep_stop = True
+                    execute_limit = False
+                    execute_stop = False
+                    execute_user = False
+                    if exec_limit_set_on_open:
+                        keep_limit = False
+                        keep_stop = False
+                        execute_limit = True
+                    elif exec_stop_set_on_open:
+                        keep_limit = False
+                        keep_stop = False
+                        execute_stop = True
+                    elif any_user_signal and user_on_open:
                         execute_user = True
-                        if any_limit_signal:
-                            # What to do with the pending limit signal?
+                        if any_limit_signal and (execute_user or not exec_user_set):
                             stop_size = get_diraware_size_nb(
                                 last_limit_info["init_size"][col],
                                 last_limit_info["init_direction"][col],
                             )
-                            user_size = get_diraware_size_nb(exec_user_size, exec_user_direction)
                             keep_limit, execute_user = resolve_pending_conflict_nb(
                                 stop_size >= 0,
-                                user_size >= 0,
+                                is_long_entry or is_short_exit,
                                 flex_select_auto_nb(upon_adj_limit_conflict, i, col, flex_2d),
                                 flex_select_auto_nb(upon_opp_limit_conflict, i, col, flex_2d),
                             )
-                            if not keep_limit:
-                                # Clear the limit signal
-                                any_limit_signal = False
-
-                                exec_limit_is_set = False
-                                exec_limit_signal_i = -1
-                                exec_limit_init_i = -1
-                                exec_limit_price = np.nan
-                                exec_limit_size = np.nan
-                                exec_limit_size_type = -1
-                                exec_limit_direction = -1
-                                exec_limit_stop_type = -1
-
-                                last_limit_info["signal_i"][col] = -1
-                                last_limit_info["init_i"][col] = -1
-                                last_limit_info["init_price"][col] = np.nan
-                                last_limit_info["init_size"][col] = np.nan
-                                last_limit_info["init_size_type"][col] = -1
-                                last_limit_info["init_direction"][col] = -1
-                                last_limit_info["init_stop_type"][col] = -1
-                                last_limit_info["delta"][col] = np.nan
-                                last_limit_info["delta_format"][col] = -1
-                                last_limit_info["tif"][col] = -1
-                                last_limit_info["expiry"][col] = -1
-                                last_limit_info["time_delta_format"][col] = -1
-
-                        if any_stop_signal:
-                            # What to do with the pending stop signal?
-                            user_size = get_diraware_size_nb(exec_user_size, exec_user_direction)
+                        if any_stop_signal and (execute_user or not exec_user_set):
                             keep_stop, execute_user = resolve_pending_conflict_nb(
                                 last_position[col] < 0,
-                                user_size >= 0,
+                                is_long_entry or is_short_exit,
                                 flex_select_auto_nb(upon_adj_stop_conflict, i, col, flex_2d),
                                 flex_select_auto_nb(upon_opp_stop_conflict, i, col, flex_2d),
                             )
-                            if not keep_stop:
-                                # Clear the stop signal
-                                any_stop_signal = False
+                        if not exec_user_set:
+                            execute_user = False
+                    if not execute_limit and not execute_stop and not execute_user:
+                        # Check whether the main signal comes in the middle of the bar
+                        if exec_limit_set and not exec_limit_set_on_open and keep_limit:
+                            keep_limit = False
+                            keep_stop = False
+                            execute_limit = True
+                        elif exec_stop_set and not exec_stop_set_on_open and not exec_stop_set_on_close and keep_stop:
+                            keep_limit = False
+                            keep_stop = False
+                            execute_stop = True
+                        elif any_user_signal and not user_on_open and not user_on_close:
+                            execute_user = True
+                            if any_limit_signal and keep_limit and (execute_user or not exec_user_set):
+                                stop_size = get_diraware_size_nb(
+                                    last_limit_info["init_size"][col],
+                                    last_limit_info["init_direction"][col],
+                                )
+                                keep_limit, execute_user = resolve_pending_conflict_nb(
+                                    stop_size >= 0,
+                                    is_long_entry or is_short_exit,
+                                    flex_select_auto_nb(upon_adj_limit_conflict, i, col, flex_2d),
+                                    flex_select_auto_nb(upon_opp_limit_conflict, i, col, flex_2d),
+                                )
+                            if any_stop_signal and keep_stop and (execute_user or not exec_user_set):
+                                keep_stop, execute_user = resolve_pending_conflict_nb(
+                                    last_position[col] < 0,
+                                    is_long_entry or is_short_exit,
+                                    flex_select_auto_nb(upon_adj_stop_conflict, i, col, flex_2d),
+                                    flex_select_auto_nb(upon_opp_stop_conflict, i, col, flex_2d),
+                                )
+                            if not exec_user_set:
+                                execute_user = False
+                        if not execute_limit and not execute_stop and not execute_user:
+                            # Check whether the main signal comes on close
+                            if exec_stop_set_on_close and keep_stop:
+                                keep_limit = False
+                                keep_stop = False
+                                execute_stop = True
+                            elif any_user_signal and user_on_close:
+                                execute_user = True
+                                if any_limit_signal and keep_limit and (execute_user or not exec_user_set):
+                                    stop_size = get_diraware_size_nb(
+                                        last_limit_info["init_size"][col],
+                                        last_limit_info["init_direction"][col],
+                                    )
+                                    keep_limit, execute_user = resolve_pending_conflict_nb(
+                                        stop_size >= 0,
+                                        is_long_entry or is_short_exit,
+                                        flex_select_auto_nb(upon_adj_limit_conflict, i, col, flex_2d),
+                                        flex_select_auto_nb(upon_opp_limit_conflict, i, col, flex_2d),
+                                    )
+                                if any_stop_signal and keep_stop and (execute_user or not exec_user_set):
+                                    keep_stop, execute_user = resolve_pending_conflict_nb(
+                                        last_position[col] < 0,
+                                        is_long_entry or is_short_exit,
+                                        flex_select_auto_nb(upon_adj_stop_conflict, i, col, flex_2d),
+                                        flex_select_auto_nb(upon_opp_stop_conflict, i, col, flex_2d),
+                                    )
+                                if not exec_user_set:
+                                    execute_user = False
 
-                                exec_stop_is_set = False
-                                exec_stop_init_i = -1
-                                exec_stop_price = np.nan
-                                exec_stop_size = np.nan
-                                exec_stop_size_type = -1
-                                exec_stop_direction = -1
-                                exec_stop_type = -1
-                                exec_stop_stop_type = -1
-                                exec_stop_delta = np.nan
-                                exec_stop_delta_format = -1
-                                exec_stop_make_limit = False
-
-                                last_sl_info["init_i"][col] = -1
-                                last_sl_info["init_price"][col] = np.nan
-                                last_sl_info["stop"][col] = np.nan
-                                last_sl_info["limit_delta"][col] = np.nan
-                                last_sl_info["delta_format"][col] = -1
-
-                                last_tsl_info["init_i"][col] = -1
-                                last_tsl_info["init_price"][col] = np.nan
-                                last_tsl_info["peak_i"][col] = -1
-                                last_tsl_info["peak_price"][col] = np.nan
-                                last_tsl_info["th"][col] = np.nan
-                                last_tsl_info["stop"][col] = np.nan
-                                last_tsl_info["limit_delta"][col] = np.nan
-                                last_tsl_info["delta_format"][col] = -1
-
-                                last_tp_info["init_i"][col] = -1
-                                last_tp_info["init_price"][col] = np.nan
-                                last_tp_info["stop"][col] = np.nan
-                                last_tp_info["limit_delta"][col] = np.nan
-                                last_tp_info["delta_format"][col] = -1
-
-                        if not execute_user:
-                            # Clear the user signal
-                            any_user_signal = False
-
-                            exec_user_is_set = False
-                            exec_user_price = np.nan
-                            exec_user_size = np.nan
-                            exec_user_size_type = -1
-                            exec_user_direction = -1
-                            exec_user_type = -1
-                            exec_user_stop_type = -1
-                            exec_user_make_limit = False
-
-                if exec_limit_is_set and any_stop_signal:
-                    # When stop and limit are hit within the same bar, we pessimistically
-                    # assume the limit was hit before the stop (i.e. "before it counts")
-
-                    # What to do with the pending stop signal?
-                    limit_size = get_diraware_size_nb(exec_limit_size, exec_limit_direction)
-                    keep_stop, execute_limit = resolve_pending_conflict_nb(
-                        last_position[col] < 0,
-                        limit_size >= 0,
-                        flex_select_auto_nb(upon_adj_stop_conflict, i, col, flex_2d),
-                        flex_select_auto_nb(upon_opp_stop_conflict, i, col, flex_2d),
-                    )
-                    if not keep_stop:
-                        # Clear the stop signal
-                        any_stop_signal = False
-
-                        exec_stop_is_set = False
-                        exec_stop_init_i = -1
-                        exec_stop_price = np.nan
-                        exec_stop_size = np.nan
-                        exec_stop_size_type = -1
-                        exec_stop_direction = -1
-                        exec_stop_type = -1
-                        exec_stop_stop_type = -1
-                        exec_stop_delta = np.nan
-                        exec_stop_delta_format = -1
-                        exec_stop_make_limit = False
-
-                        last_sl_info["init_i"][col] = -1
-                        last_sl_info["init_price"][col] = np.nan
-                        last_sl_info["stop"][col] = np.nan
-                        last_sl_info["limit_delta"][col] = np.nan
-                        last_sl_info["delta_format"][col] = -1
-
-                        last_tsl_info["init_i"][col] = -1
-                        last_tsl_info["init_price"][col] = np.nan
-                        last_tsl_info["peak_i"][col] = -1
-                        last_tsl_info["peak_price"][col] = np.nan
-                        last_tsl_info["th"][col] = np.nan
-                        last_tsl_info["stop"][col] = np.nan
-                        last_tsl_info["limit_delta"][col] = np.nan
-                        last_tsl_info["delta_format"][col] = -1
-
-                        last_tp_info["init_i"][col] = -1
-                        last_tp_info["init_price"][col] = np.nan
-                        last_tp_info["stop"][col] = np.nan
-                        last_tp_info["limit_delta"][col] = np.nan
-                        last_tp_info["delta_format"][col] = -1
-
-                    if not execute_limit:
-                        # Clear the limit signal
-                        any_limit_signal = False
-
-                        exec_limit_is_set = False
-                        exec_limit_signal_i = -1
-                        exec_limit_init_i = -1
-                        exec_limit_price = np.nan
-                        exec_limit_size = np.nan
-                        exec_limit_size_type = -1
-                        exec_limit_direction = -1
-                        exec_limit_stop_type = -1
-
-                        last_limit_info["signal_i"][col] = -1
-                        last_limit_info["init_i"][col] = -1
-                        last_limit_info["init_price"][col] = np.nan
-                        last_limit_info["init_size"][col] = np.nan
-                        last_limit_info["init_size_type"][col] = -1
-                        last_limit_info["init_direction"][col] = -1
-                        last_limit_info["init_stop_type"][col] = -1
-                        last_limit_info["delta"][col] = np.nan
-                        last_limit_info["delta_format"][col] = -1
-                        last_limit_info["tif"][col] = -1
-                        last_limit_info["expiry"][col] = -1
-                        last_limit_info["time_delta_format"][col] = -1
-
-                if exec_limit_is_set or exec_stop_is_set or exec_user_is_set:
-                    if exec_limit_is_set:
+                    # Process the limit signal
+                    if execute_limit:
+                        # Execute the signal
                         main_info["signal_i"][col] = exec_limit_signal_i
-                        main_info["creation_i"][col] = exec_limit_init_i
+                        main_info["creation_i"][col] = exec_limit_creation_i
                         main_info["i"][col] = exec_limit_init_i
                         main_info["price"][col] = exec_limit_price
                         main_info["size"][col] = exec_limit_size
@@ -1523,9 +1483,10 @@ def simulate_from_signal_func_nb(
                         main_info["direction"][col] = exec_limit_direction
                         main_info["type"][col] = OrderType.Limit
                         main_info["stop_type"][col] = exec_limit_stop_type
-
-                        # Clear pending signal
+                    if execute_limit or (any_limit_signal and not keep_limit):
+                        # Clear the pending info
                         last_limit_info["signal_i"][col] = -1
+                        last_limit_info["creation_i"][col] = -1
                         last_limit_info["init_i"][col] = -1
                         last_limit_info["init_price"][col] = np.nan
                         last_limit_info["init_size"][col] = np.nan
@@ -1537,7 +1498,10 @@ def simulate_from_signal_func_nb(
                         last_limit_info["tif"][col] = -1
                         last_limit_info["expiry"][col] = -1
                         last_limit_info["time_delta_format"][col] = -1
-                    elif exec_stop_is_set:
+
+                    # Process the stop signal
+                    if execute_stop:
+                        # Execute the signal
                         if exec_stop_make_limit:
                             if any_limit_signal:
                                 raise ValueError("Only one active limit signal is allowed at a time")
@@ -1546,6 +1510,7 @@ def simulate_from_signal_func_nb(
                             _limit_expiry = flex_select_auto_nb(limit_expiry, i, col, flex_2d)
                             _time_delta_format = flex_select_auto_nb(time_delta_format, i, col, flex_2d)
                             last_limit_info["signal_i"][col] = exec_stop_init_i
+                            last_limit_info["creation_i"][col] = i
                             last_limit_info["init_i"][col] = i
                             last_limit_info["init_price"][col] = exec_stop_price
                             last_limit_info["init_size"][col] = exec_stop_size
@@ -1567,8 +1532,8 @@ def simulate_from_signal_func_nb(
                             main_info["direction"][col] = exec_stop_direction
                             main_info["type"][col] = exec_stop_type
                             main_info["stop_type"][col] = exec_stop_stop_type
-
-                        # Clear pending signal
+                    if execute_stop or (any_stop_signal and not keep_stop):
+                        # Clear the pending info
                         last_sl_info["init_i"][col] = -1
                         last_sl_info["init_price"][col] = np.nan
                         last_sl_info["stop"][col] = np.nan
@@ -1589,58 +1554,65 @@ def simulate_from_signal_func_nb(
                         last_tp_info["stop"][col] = np.nan
                         last_tp_info["limit_delta"][col] = np.nan
                         last_tp_info["delta_format"][col] = -1
-                    else:
-                        if exec_user_make_limit:
-                            if any_limit_signal:
-                                raise ValueError("Only one active limit signal is allowed at a time")
 
-                            _limit_delta = flex_select_auto_nb(limit_delta, i, col, flex_2d)
-                            _delta_format = flex_select_auto_nb(delta_format, i, col, flex_2d)
-                            _limit_tif = flex_select_auto_nb(limit_tif, i, col, flex_2d)
-                            _limit_expiry = flex_select_auto_nb(limit_expiry, i, col, flex_2d)
-                            _time_delta_format = flex_select_auto_nb(time_delta_format, i, col, flex_2d)
-                            last_limit_info["signal_i"][col] = i
-                            last_limit_info["init_i"][col] = i
-                            last_limit_info["init_price"][col] = exec_user_price
-                            last_limit_info["init_size"][col] = exec_user_size
-                            last_limit_info["init_size_type"][col] = exec_user_size_type
-                            last_limit_info["init_direction"][col] = exec_user_direction
-                            last_limit_info["init_stop_type"][col] = -1
-                            last_limit_info["delta"][col] = _limit_delta
-                            last_limit_info["delta_format"][col] = _delta_format
-                            last_limit_info["tif"][col] = _limit_tif
-                            last_limit_info["expiry"][col] = _limit_expiry
-                            last_limit_info["time_delta_format"][col] = _time_delta_format
-                        else:
-                            main_info["signal_i"][col] = i
-                            main_info["creation_i"][col] = i
-                            main_info["i"][col] = i
-                            main_info["price"][col] = exec_user_price
-                            main_info["size"][col] = exec_user_size
-                            main_info["size_type"][col] = exec_user_size_type
-                            main_info["direction"][col] = exec_user_direction
-                            main_info["type"][col] = exec_user_type
-                            main_info["stop_type"][col] = exec_user_stop_type
+                    # Process the user signal
+                    if execute_user:
+                        # Execute the signal
+                        _i = i - abs(flex_select_auto_nb(from_ago, i, col, flex_2d))
+                        if _i >= 0:
+                            if exec_user_make_limit:
+                                if any_limit_signal:
+                                    raise ValueError("Only one active limit signal is allowed at a time")
 
-                    if cash_sharing and auto_call_seq:
-                        # Approximate order value
-                        if np.isnan(main_info["size"][col]):
-                            temp_order_value[c] = 0.0
-                        else:
-                            exec_state = ExecState(
-                                cash=last_cash[group],
-                                position=last_position[col],
-                                debt=last_debt[col],
-                                free_cash=last_free_cash[group],
-                                val_price=last_val_price[col],
-                                value=last_value[group],
-                            )
-                            temp_order_value[c] = approx_order_value_nb(
-                                exec_state,
-                                main_info["size"][col],
-                                main_info["size_type"][col],
-                                main_info["direction"][col],
-                            )
+                                _limit_delta = flex_select_auto_nb(limit_delta, _i, col, flex_2d)
+                                _delta_format = flex_select_auto_nb(delta_format, _i, col, flex_2d)
+                                _limit_tif = flex_select_auto_nb(limit_tif, _i, col, flex_2d)
+                                _limit_expiry = flex_select_auto_nb(limit_expiry, _i, col, flex_2d)
+                                _time_delta_format = flex_select_auto_nb(time_delta_format, _i, col, flex_2d)
+                                last_limit_info["signal_i"][col] = _i
+                                last_limit_info["creation_i"][col] = i
+                                last_limit_info["init_i"][col] = _i
+                                last_limit_info["init_price"][col] = exec_user_price
+                                last_limit_info["init_size"][col] = exec_user_size
+                                last_limit_info["init_size_type"][col] = exec_user_size_type
+                                last_limit_info["init_direction"][col] = exec_user_direction
+                                last_limit_info["init_stop_type"][col] = -1
+                                last_limit_info["delta"][col] = _limit_delta
+                                last_limit_info["delta_format"][col] = _delta_format
+                                last_limit_info["tif"][col] = _limit_tif
+                                last_limit_info["expiry"][col] = _limit_expiry
+                                last_limit_info["time_delta_format"][col] = _time_delta_format
+                            else:
+                                main_info["signal_i"][col] = _i
+                                main_info["creation_i"][col] = i
+                                main_info["i"][col] = _i
+                                main_info["price"][col] = exec_user_price
+                                main_info["size"][col] = exec_user_size
+                                main_info["size_type"][col] = exec_user_size_type
+                                main_info["direction"][col] = exec_user_direction
+                                main_info["type"][col] = exec_user_type
+                                main_info["stop_type"][col] = exec_user_stop_type
+
+                    if execute_limit or execute_stop or execute_user:
+                        if cash_sharing and auto_call_seq:
+                            # Approximate order value
+                            if np.isnan(main_info["size"][col]):
+                                temp_order_value[c] = 0.0
+                            else:
+                                exec_state = ExecState(
+                                    cash=last_cash[group],
+                                    position=last_position[col],
+                                    debt=last_debt[col],
+                                    free_cash=last_free_cash[group],
+                                    val_price=last_val_price[col],
+                                    value=last_value[group],
+                                )
+                                temp_order_value[c] = approx_order_value_nb(
+                                    exec_state,
+                                    main_info["size"][col],
+                                    main_info["size_type"][col],
+                                    main_info["direction"][col],
+                                )
 
             any_signal_set = False
             for col in range(from_col, to_col):
@@ -1979,6 +1951,7 @@ def dir_enex_signal_func_nb(
     entries: tp.FlexArray,
     exits: tp.FlexArray,
     direction: tp.FlexArray,
+    from_ago: tp.FlexArray = np.asarray(0),
     adjust_func_nb: AdjustFuncT = no_adjust_func_nb,
     adjust_args: tp.Args = (),
 ) -> tp.Tuple[bool, bool, bool, bool]:
@@ -1997,9 +1970,12 @@ def dir_enex_signal_func_nb(
     and return nothing."""
     adjust_func_nb(c, *adjust_args)
 
-    is_entry = flex_select_auto_nb(entries, c.i, c.col, c.flex_2d)
-    is_exit = flex_select_auto_nb(exits, c.i, c.col, c.flex_2d)
-    _direction = flex_select_auto_nb(direction, c.i, c.col, c.flex_2d)
+    _i = c.i - abs(flex_select_auto_nb(from_ago, c.i, c.col, c.flex_2d))
+    if _i < 0:
+        return False, False, False, False
+    is_entry = flex_select_auto_nb(entries, _i, c.col, c.flex_2d)
+    is_exit = flex_select_auto_nb(exits, _i, c.col, c.flex_2d)
+    _direction = flex_select_auto_nb(direction, _i, c.col, c.flex_2d)
     if _direction == Direction.LongOnly:
         return is_entry, is_exit, False, False
     if _direction == Direction.ShortOnly:
@@ -2014,6 +1990,7 @@ def ls_enex_signal_func_nb(
     long_exits: tp.FlexArray,
     short_entries: tp.FlexArray,
     short_exits: tp.FlexArray,
+    from_ago: tp.FlexArray = np.asarray(0),
     adjust_func_nb: AdjustFuncT = no_adjust_func_nb,
     adjust_args: tp.Args = (),
 ) -> tp.Tuple[bool, bool, bool, bool]:
@@ -2027,8 +2004,11 @@ def ls_enex_signal_func_nb(
     and return nothing."""
     adjust_func_nb(c, *adjust_args)
 
-    is_long_entry = flex_select_auto_nb(long_entries, c.i, c.col, c.flex_2d)
-    is_long_exit = flex_select_auto_nb(long_exits, c.i, c.col, c.flex_2d)
-    is_short_entry = flex_select_auto_nb(short_entries, c.i, c.col, c.flex_2d)
-    is_short_exit = flex_select_auto_nb(short_exits, c.i, c.col, c.flex_2d)
+    _i = c.i - abs(flex_select_auto_nb(from_ago, c.i, c.col, c.flex_2d))
+    if _i < 0:
+        return False, False, False, False
+    is_long_entry = flex_select_auto_nb(long_entries, _i, c.col, c.flex_2d)
+    is_long_exit = flex_select_auto_nb(long_exits, _i, c.col, c.flex_2d)
+    is_short_entry = flex_select_auto_nb(short_entries, _i, c.col, c.flex_2d)
+    is_short_exit = flex_select_auto_nb(short_exits, _i, c.col, c.flex_2d)
     return is_long_entry, is_long_exit, is_short_entry, is_short_exit

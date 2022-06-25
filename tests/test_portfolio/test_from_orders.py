@@ -1603,6 +1603,20 @@ class TestFromOrders:
         with pytest.raises(Exception):
             pf.regroup(group_by=False)
 
+    def test_from_ago(self):
+        assert_records_close(
+            from_orders_both(from_ago=2, price=price * 0.9).order_records,
+            from_orders_both(size=order_size.shift(2), price=(price * 0.9).shift(2)).order_records,
+        )
+        assert_records_close(
+            from_orders_both(price="nextclose").order_records,
+            from_orders_both(price=np.inf, from_ago=1).order_records,
+        )
+        assert_records_close(
+            from_orders_both(open=price * 0.9, price="nextopen").order_records,
+            from_orders_both(open=price * 0.9, price=-np.inf, from_ago=1).order_records,
+        )
+
     def test_call_seq(self):
         pf = from_orders_both(close=price_wide, group_by=np.array([0, 0, 1]), cash_sharing=True)
         assert_records_close(

@@ -3846,6 +3846,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cash_earnings: tp.Optional[tp.ArrayLike] = None,
         cash_dividends: tp.Optional[tp.ArrayLike] = None,
         cash_sharing: tp.Optional[bool] = None,
+        from_ago: tp.Optional[tp.ArrayLike] = None,
         call_seq: tp.Optional[tp.ArrayLike] = None,
         attach_call_seq: tp.Optional[bool] = None,
         ffill_val_price: tp.Optional[bool] = None,
@@ -3885,11 +3886,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 Will broadcast.
 
                 See `vectorbtpro.portfolio.enums.Order.price`. Can be also provided as
-                `vectorbtpro.portfolio.enums.PriceType`.
-
-                !!! note
-                    Make sure to use the same timestamp for all order prices in the group with cash sharing
-                    and `call_seq` set to `CallSeqType.Auto`.
+                `vectorbtpro.portfolio.enums.PriceType`. Options `PriceType.NextOpen` and `PriceType.NextClose`
+                are only applicable as single values, that is, they cannot be used inside arrays.
+                In addition, they require the argument `from_ago` to be None.
             fees (float or array_like): Fees in percentage of the order value.
                 See `vectorbtpro.portfolio.enums.Order.fees`. Will broadcast.
             fixed_fees (float or array_like): Fixed amount of fees to pay per order.
@@ -3993,6 +3992,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     orders will be executed within the same tick and retain their price regardless
                     of their position in the queue, even though they depend upon each other and thus
                     cannot be executed in parallel.
+            from_ago (int or array_like): Take order information from a number of bars ago.
+                Will broadcast.
+
+                Negative numbers will be cast to positive to avoid the look-ahead bias. Defaults to 0.
+                Remember to account of it if you're using a custom signal function!
             call_seq (CallSeqType or array_like): Default sequence of calls per row and group.
 
                 Each value in this sequence must indicate the position of column in the group to
@@ -4284,6 +4288,17 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             direction = portfolio_cfg["direction"]
         if price is None:
             price = portfolio_cfg["price"]
+        if isinstance(price, str):
+            price = map_enum_fields(price, PriceType)
+        if isinstance(price, (int, float)):
+            if price in (-1, -2):
+                if from_ago is not None:
+                    raise ValueError("Price of next open/close and from_ago cannot be used simultaneously")
+                if price == -1:
+                    price = -np.inf
+                if price == -2:
+                    price = np.inf
+                from_ago = 1
         if size is None:
             size = portfolio_cfg["size"]
         if fees is None:
@@ -4335,6 +4350,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             cash_sharing = portfolio_cfg["cash_sharing"]
         if cash_sharing and group_by is None:
             group_by = True
+        if from_ago is None:
+            from_ago = portfolio_cfg["from_ago"]
         if call_seq is None:
             call_seq = portfolio_cfg["call_seq"]
         auto_call_seq = False
@@ -4393,6 +4410,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             high=high,
             low=low,
             close=close,
+            from_ago=from_ago,
         )
         if bm_close is not None and not isinstance(bm_close, bool):
             broadcastable_args["bm_close"] = bm_close
@@ -4427,6 +4445,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     low=dict(fill_value=np.nan),
                     close=dict(fill_value=np.nan),
                     bm_close=dict(fill_value=np.nan),
+                    from_ago=dict(fill_value=0),
                 ),
                 wrapper_kwargs=dict(
                     freq=freq,
@@ -4537,6 +4556,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         checks.assert_subdtype(broadcasted_args["close"], np.number)
         if bm_close is not None and not isinstance(bm_close, bool):
             checks.assert_subdtype(broadcasted_args["bm_close"], np.number)
+        checks.assert_subdtype(broadcasted_args["from_ago"], np.integer)
 
         # Remove arguments
         bm_close = broadcasted_args.pop("bm_close", None)
@@ -4651,6 +4671,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cash_earnings: tp.Optional[tp.ArrayLike] = None,
         cash_dividends: tp.Optional[tp.ArrayLike] = None,
         cash_sharing: tp.Optional[bool] = None,
+        from_ago: tp.Optional[tp.ArrayLike] = None,
         call_seq: tp.Optional[tp.ArrayLike] = None,
         attach_call_seq: tp.Optional[bool] = None,
         ffill_val_price: tp.Optional[bool] = None,
@@ -4874,6 +4895,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             cash_earnings (float or array_like): See `Portfolio.from_orders`.
             cash_dividends (float or array_like): See `Portfolio.from_orders`.
             cash_sharing (bool): See `Portfolio.from_orders`.
+            from_ago (int or array_like): See `Portfolio.from_orders`.
+
+                Take effect only for user-defined signals, not for stop signals.
             call_seq (CallSeqType or array_like): See `Portfolio.from_orders`.
             attach_call_seq (bool): See `Portfolio.from_orders`.
             ffill_val_price (bool): See `Portfolio.from_orders`.
@@ -4902,11 +4926,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         NaN values after reindexing: vectorbt uses its own sensible defaults, which are usually NaN
         for floating arrays and default flags for integer arrays. Use `vectorbtpro.base.reshaping.BCO`
         with `fill_value` to override.
-
-        !!! hint
-            If you generated signals using close price, don't forget to shift your signals by one tick
-            forward, for example, with `signals.vbt.fshift(1)`. In general, make sure to use a price
-            that comes after the signal.
 
         Also see notes and hints for `Portfolio.from_orders`.
 
@@ -5411,6 +5430,17 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             size_type = portfolio_cfg["size_type"]
         if price is None:
             price = portfolio_cfg["price"]
+        if isinstance(price, str):
+            price = map_enum_fields(price, PriceType)
+        if isinstance(price, (int, float)):
+            if price in (-1, -2):
+                if from_ago is not None:
+                    raise ValueError("Price of next open/close and from_ago cannot be used simultaneously")
+                if price == -1:
+                    price = -np.inf
+                if price == -2:
+                    price = np.inf
+                from_ago = 1
         if fees is None:
             fees = portfolio_cfg["fees"]
         if fixed_fees is None:
@@ -5510,16 +5540,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             tp_stop = portfolio_cfg["tp_stop"]
         if use_stops is None:
             use_stops = portfolio_cfg["use_stops"]
-        if use_stops is None:
-            if (
-                not np.any(sl_stop)
-                and not np.any(tsl_stop)
-                and not np.any(tp_stop)
-                and adjust_func_nb == nb.no_adjust_func_nb
-            ):
-                use_stops = False
-            else:
-                use_stops = True
         if stop_entry_price is None:
             stop_entry_price = portfolio_cfg["stop_entry_price"]
         if stop_exit_price is None:
@@ -5564,6 +5584,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             cash_sharing = portfolio_cfg["cash_sharing"]
         if cash_sharing and group_by is None:
             group_by = True
+        if from_ago is None:
+            from_ago = portfolio_cfg["from_ago"]
         if call_seq is None:
             call_seq = portfolio_cfg["call_seq"]
         auto_call_seq = False
@@ -5646,6 +5668,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             high=high,
             low=low,
             close=close,
+            from_ago=from_ago,
         )
         if bm_close is not None and not isinstance(bm_close, bool):
             broadcastable_args["bm_close"] = bm_close
@@ -5666,6 +5689,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             dict(
                 keep_flex=True,
                 reindex_kwargs=dict(
+                    cash_earnings=dict(fill_value=0.0),
+                    cash_dividends=dict(fill_value=0.0),
                     entries=dict(fill_value=False),
                     exits=dict(fill_value=False),
                     short_entries=dict(fill_value=False),
@@ -5717,8 +5742,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     low=dict(fill_value=np.nan),
                     close=dict(fill_value=np.nan),
                     bm_close=dict(fill_value=np.nan),
-                    cash_earnings=dict(fill_value=0.0),
-                    cash_dividends=dict(fill_value=0.0),
+                    from_ago=dict(fill_value=0),
                 ),
                 post_func=dict(
                     limit_tif=lambda x: x.astype(np.int_),
@@ -5781,6 +5805,16 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     max_logs = target_shape_2d[0] * int(np.any(_log))
                 else:
                     max_logs = int(np.max(np.sum(_log, axis=0)))
+        if use_stops is None:
+            if (
+                not np.any(broadcasted_args["sl_stop"])
+                and not np.any(broadcasted_args["tsl_stop"])
+                and not np.any(broadcasted_args["tp_stop"])
+                and adjust_func_nb == nb.no_adjust_func_nb
+            ):
+                use_stops = False
+            else:
+                use_stops = True
 
         # Convert strings to numbers
         if "direction" in broadcasted_args:
@@ -5899,6 +5933,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if bm_close is not None and not isinstance(bm_close, bool):
             checks.assert_subdtype(broadcasted_args["bm_close"], np.number)
         checks.assert_subdtype(cs_group_lens, np.integer)
+        checks.assert_subdtype(broadcasted_args["from_ago"], np.integer)
         if call_seq is not None:
             checks.assert_subdtype(call_seq, np.integer)
         checks.assert_subdtype(init_cash, np.number)
@@ -5947,6 +5982,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     broadcasted_args.pop("exits"),
                     broadcasted_args.pop("short_entries"),
                     broadcasted_args.pop("short_exits"),
+                    broadcasted_args["from_ago"],
                     adjust_func_nb,
                     adjust_args,
                 )
@@ -5954,6 +5990,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     chunked,
                     arg_take_spec=dict(
                         signal_args=ch.ArgsTaker(
+                            portfolio_ch.flex_array_gl_slicer,
                             portfolio_ch.flex_array_gl_slicer,
                             portfolio_ch.flex_array_gl_slicer,
                             portfolio_ch.flex_array_gl_slicer,
@@ -5968,6 +6005,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     broadcasted_args.pop("entries"),
                     broadcasted_args.pop("exits"),
                     broadcasted_args.pop("direction"),
+                    broadcasted_args["from_ago"],
                     adjust_func_nb,
                     adjust_args,
                 )
@@ -5975,6 +6013,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     chunked,
                     arg_take_spec=dict(
                         signal_args=ch.ArgsTaker(
+                            portfolio_ch.flex_array_gl_slicer,
                             portfolio_ch.flex_array_gl_slicer,
                             portfolio_ch.flex_array_gl_slicer,
                             portfolio_ch.flex_array_gl_slicer,

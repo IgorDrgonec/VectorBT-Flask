@@ -1,7 +1,7 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
 """Numba-compiled functions for portfolio modeling based on orders."""
-
+import numpy as np
 from numba import prange
 
 from vectorbtpro.base import chunking as base_ch
@@ -45,6 +45,7 @@ from vectorbtpro.utils.array_ import insert_argsort_nb
         raise_reject=portfolio_ch.flex_array_gl_slicer,
         log=portfolio_ch.flex_array_gl_slicer,
         val_price=portfolio_ch.flex_array_gl_slicer,
+        from_ago=portfolio_ch.flex_array_gl_slicer,
         call_seq=ch.ArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
         auto_call_seq=None,
         ffill_val_price=None,
@@ -88,6 +89,7 @@ def simulate_from_orders_nb(
     raise_reject: tp.FlexArray = np.asarray(False),
     log: tp.FlexArray = np.asarray(False),
     val_price: tp.FlexArray = np.asarray(np.inf),
+    from_ago: tp.FlexArray = np.asarray(0),
     call_seq: tp.Optional[tp.Array2d] = None,
     auto_call_seq: bool = False,
     ffill_val_price: bool = True,
@@ -196,7 +198,10 @@ def simulate_from_orders_nb(
                 skip = True
                 for c in range(group_len):
                     col = from_col + c
-                    if not np.isnan(flex_select_auto_nb(size, i, col, flex_2d)):
+                    _i = i - abs(flex_select_auto_nb(from_ago, i, col, flex_2d))
+                    if _i < 0:
+                        continue
+                    if not np.isnan(flex_select_auto_nb(size, _i, col, flex_2d)):
                         skip = False
                         break
                 if skip:
@@ -223,7 +228,11 @@ def simulate_from_orders_nb(
                 _val_price = flex_select_auto_nb(val_price, i, col, flex_2d)
                 if np.isinf(_val_price):
                     if _val_price > 0:
-                        _price = flex_select_auto_nb(price, i, col, flex_2d)
+                        _i = i - abs(flex_select_auto_nb(from_ago, i, col, flex_2d))
+                        if _i < 0:
+                            _price = np.nan
+                        else:
+                            _price = flex_select_auto_nb(price, _i, col, flex_2d)
                         if np.isinf(_price):
                             if _price > 0:
                                 _price = flex_select_auto_nb(close, i, col, flex_2d)
@@ -264,12 +273,16 @@ def simulate_from_orders_nb(
                             val_price=last_val_price[col],
                             value=value_now,
                         )
-                        temp_order_value[c] = approx_order_value_nb(
-                            exec_state,
-                            flex_select_auto_nb(size, i, col, flex_2d),
-                            flex_select_auto_nb(size_type, i, col, flex_2d),
-                            flex_select_auto_nb(direction, i, col, flex_2d),
-                        )
+                        _i = i - abs(flex_select_auto_nb(from_ago, i, col, flex_2d))
+                        if _i < 0:
+                            temp_order_value[c] = 0.0
+                        else:
+                            temp_order_value[c] = approx_order_value_nb(
+                                exec_state,
+                                flex_select_auto_nb(size, _i, col, flex_2d),
+                                flex_select_auto_nb(size_type, _i, col, flex_2d),
+                                flex_select_auto_nb(direction, _i, col, flex_2d),
+                            )
                         if call_seq_now[c] != c:
                             raise ValueError("Call sequence must follow CallSeqType.Default")
 
@@ -295,23 +308,26 @@ def simulate_from_orders_nb(
                         value_now += position_now * val_price_now
 
                 # Generate the next order
+                _i = i - abs(flex_select_auto_nb(from_ago, i, col, flex_2d))
+                if _i < 0:
+                    continue
                 order = order_nb(
-                    size=flex_select_auto_nb(size, i, col, flex_2d),
-                    price=flex_select_auto_nb(price, i, col, flex_2d),
-                    size_type=flex_select_auto_nb(size_type, i, col, flex_2d),
-                    direction=flex_select_auto_nb(direction, i, col, flex_2d),
-                    fees=flex_select_auto_nb(fees, i, col, flex_2d),
-                    fixed_fees=flex_select_auto_nb(fixed_fees, i, col, flex_2d),
-                    slippage=flex_select_auto_nb(slippage, i, col, flex_2d),
-                    min_size=flex_select_auto_nb(min_size, i, col, flex_2d),
-                    max_size=flex_select_auto_nb(max_size, i, col, flex_2d),
-                    size_granularity=flex_select_auto_nb(size_granularity, i, col, flex_2d),
-                    reject_prob=flex_select_auto_nb(reject_prob, i, col, flex_2d),
-                    price_area_vio_mode=flex_select_auto_nb(price_area_vio_mode, i, col, flex_2d),
-                    lock_cash=flex_select_auto_nb(lock_cash, i, col, flex_2d),
-                    allow_partial=flex_select_auto_nb(allow_partial, i, col, flex_2d),
-                    raise_reject=flex_select_auto_nb(raise_reject, i, col, flex_2d),
-                    log=flex_select_auto_nb(log, i, col, flex_2d),
+                    size=flex_select_auto_nb(size, _i, col, flex_2d),
+                    price=flex_select_auto_nb(price, _i, col, flex_2d),
+                    size_type=flex_select_auto_nb(size_type, _i, col, flex_2d),
+                    direction=flex_select_auto_nb(direction, _i, col, flex_2d),
+                    fees=flex_select_auto_nb(fees, _i, col, flex_2d),
+                    fixed_fees=flex_select_auto_nb(fixed_fees, _i, col, flex_2d),
+                    slippage=flex_select_auto_nb(slippage, _i, col, flex_2d),
+                    min_size=flex_select_auto_nb(min_size, _i, col, flex_2d),
+                    max_size=flex_select_auto_nb(max_size, _i, col, flex_2d),
+                    size_granularity=flex_select_auto_nb(size_granularity, _i, col, flex_2d),
+                    reject_prob=flex_select_auto_nb(reject_prob, _i, col, flex_2d),
+                    price_area_vio_mode=flex_select_auto_nb(price_area_vio_mode, _i, col, flex_2d),
+                    lock_cash=flex_select_auto_nb(lock_cash, _i, col, flex_2d),
+                    allow_partial=flex_select_auto_nb(allow_partial, _i, col, flex_2d),
+                    raise_reject=flex_select_auto_nb(raise_reject, _i, col, flex_2d),
+                    log=flex_select_auto_nb(log, _i, col, flex_2d),
                 )
 
                 # Process the order
