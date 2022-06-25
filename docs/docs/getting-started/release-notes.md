@@ -6,6 +6,24 @@ title: Release notes
 
 All notable changes in reverse chronological order.
 
+## Version 1.4.1 (25 Jun, 2022)
+
+- Fixed error when providing any stop in [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_signals)
+as an index or a [BCO](/api/base/reshaping/#vectorbtpro.base.reshaping.BCO) instance
+- Added new argument `from_ago` to [Portfolio.from_orders](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_orders)
+and [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_signals),
+which controls how many bars ago the order information should be taken from. This feature can be used
+instead of shifting arrays manually. For example, setting `from_ago=1` will shift order information by one bar
+and thus execute using the next close by default.
+- [PriceType](/api/portfolio/enums/#vectorbtpro.portfolio.enums.PriceType) has been extended
+and `price` can now be provided as `nextopen` and `nextclose`, which will set `from_ago` to 1 automatically.
+Those types cannot be used as part of arrays.
+- Limit signals, stop signals, and user signals in [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_signals)
+can be better distinguished where exactly in a bar they execute. Limit signals can be executed at open
+and in the middle of the bar. Stop signals can be executed at open, in the middle of the bar,
+or postponed to close. User signals can be executed at open, in the middle of the bar, and at close.
+Knowing this allows us to build an accurate execution chain that respects the timing of each signal.
+
 ## Version 1.4.0 (21 Jun, 2022)
 
 - Completely refactored [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_signals):

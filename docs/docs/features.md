@@ -534,7 +534,7 @@ symbol                             R1         R2          R3
 ### Remote data
 
 - [x] Supports more data classes for pulling remote data, such as from [Polygon.io](https://polygon.io/), 
-[Alpha Vantage](https://www.alphavantage.co/), and [Nasdaq Data Link](https://data.nasdaq.com/).
+[Alpha Vantage](https://www.alphavantage.co/), [Nasdaq Data Link](https://data.nasdaq.com/), and [TradingView](https://www.tradingview.com/).
 Allows for gradually collecting and persisting any remote data.
 
 ```pycon
@@ -830,6 +830,31 @@ and [Universal Portfolios](https://github.com/Marigold/universal-portfolios).
 [=100% "Allocation 15/15"]{: .candystripe}
 
 ![](/assets/images/features/hrp.svg)
+
+### New order types
+
+- [x] [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_signals)
+has been extended with a variety of new order types, such as stop loss, trailing stop loss, trailing take profit, 
+take profit, stop-limit, delta-limit, delayed, and time-in-force.
+
+```pycon title="Explore how the limit delta affects the number of orders"
+>>> pf = vbt.Portfolio.from_random_signals(
+...     vbt.YFData.fetch('BTC-USD'), 
+...     n=100, 
+...     order_type="limit", 
+...     limit_delta=pd.Index(np.arange(0.001, 0.1, 0.001)),  # (1)!
+...     seed=42
+... )
+>>> pf.orders.count().vbt.plot(
+...     xaxis_title="Limit delta", 
+...     yaxis_title="Order count"
+... )
+```
+
+1. Limit delta is the distance between the close (or any other price) and the target limit price
+in percentage terms. The highest the delta, the less is the chance that it will be eventually hit.
+
+![](/assets/images/features/limit_delta.svg)
 
 ## Analysis
 

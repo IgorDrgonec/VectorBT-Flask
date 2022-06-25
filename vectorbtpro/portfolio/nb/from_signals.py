@@ -719,8 +719,6 @@ def simulate_from_signal_func_nb(
     !!! note
         Should be only grouped if cash sharing is enabled.
 
-        If `auto_call_seq` is True, make sure that `call_seq` follows `CallSeqType.Default`.
-
         Single value must be passed as a 0-dim array (for example, by using `np.asarray(value)`).
     """
     check_group_lens_nb(group_lens, target_shape[1])
