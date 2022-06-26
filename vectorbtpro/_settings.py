@@ -645,6 +645,7 @@ _settings["data"] = data
 
 plotting = ChildDict(
     use_widgets=True,
+    use_resampler=None,
     show_kwargs=Config(),
     use_gl=None,
     color_schema=Config(

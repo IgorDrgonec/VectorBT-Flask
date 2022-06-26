@@ -23,6 +23,12 @@ df = pd.DataFrame(
 )
 group_by = np.array(["g1", "g1", "g2"])
 
+plotly_resampler_available = True
+try:
+    import plotly_resampler
+except:
+    plotly_resampler_available = False
+
 
 # ############# Global ############# #
 
@@ -577,12 +583,13 @@ class TestAccessors:
     @pytest.mark.parametrize("test_window", [2, 3, 4, 5])
     def test_rolling_ols(self, test_window):
         def sr_ols(x, y):
-            intercept_slope = RollingOLS(
-                y,
-                np.column_stack((np.broadcast_to(1, x.shape), x)),
-                window=test_window,
-                min_nobs=test_window
-            ).fit().params
+            intercept_slope = (
+                RollingOLS(
+                    y, np.column_stack((np.broadcast_to(1, x.shape), x)), window=test_window, min_nobs=test_window
+                )
+                .fit()
+                .params
+            )
             intercept = intercept_slope.iloc[:, 0].rename(x.name)
             slope = intercept_slope.iloc[:, 1].rename(x.name)
             return slope, intercept
@@ -598,19 +605,25 @@ class TestAccessors:
         )
         assert_frame_equal(
             df.vbt.rolling_ols(df2, test_window)[0],
-            pd.concat((
-                sr_ols(df["a"], df2["a"])[0],
-                sr_ols(df["b"], df2["b"])[0],
-                sr_ols(df["c"], df2["c"])[0],
-            ), axis=1),
+            pd.concat(
+                (
+                    sr_ols(df["a"], df2["a"])[0],
+                    sr_ols(df["b"], df2["b"])[0],
+                    sr_ols(df["c"], df2["c"])[0],
+                ),
+                axis=1,
+            ),
         )
         assert_frame_equal(
             df.vbt.rolling_ols(df2, test_window)[1],
-            pd.concat((
-                sr_ols(df["a"], df2["a"])[1],
-                sr_ols(df["b"], df2["b"])[1],
-                sr_ols(df["c"], df2["c"])[1],
-            ), axis=1),
+            pd.concat(
+                (
+                    sr_ols(df["a"], df2["a"])[1],
+                    sr_ols(df["b"], df2["b"])[1],
+                    sr_ols(df["c"], df2["c"])[1],
+                ),
+                axis=1,
+            ),
         )
         assert_frame_equal(
             df.vbt.rolling_ols(df2, test_window, jitted=dict(parallel=True))[0],
@@ -631,11 +644,9 @@ class TestAccessors:
 
     def test_expanding_ols(self):
         def sr_ols(x, y):
-            intercept_slope = RollingOLS(
-                y,
-                np.column_stack((np.broadcast_to(1, x.shape), x)),
-                expanding=True
-            ).fit().params
+            intercept_slope = (
+                RollingOLS(y, np.column_stack((np.broadcast_to(1, x.shape), x)), expanding=True).fit().params
+            )
             intercept = intercept_slope.iloc[:, 0].rename(x.name)
             slope = intercept_slope.iloc[:, 1].rename(x.name)
             return slope, intercept
@@ -651,19 +662,25 @@ class TestAccessors:
         )
         assert_frame_equal(
             df.vbt.expanding_ols(df2)[0],
-            pd.concat((
-                sr_ols(df["a"], df2["a"])[0],
-                sr_ols(df["b"], df2["b"])[0],
-                sr_ols(df["c"], df2["c"])[0],
-            ), axis=1),
+            pd.concat(
+                (
+                    sr_ols(df["a"], df2["a"])[0],
+                    sr_ols(df["b"], df2["b"])[0],
+                    sr_ols(df["c"], df2["c"])[0],
+                ),
+                axis=1,
+            ),
         )
         assert_frame_equal(
             df.vbt.expanding_ols(df2)[1],
-            pd.concat((
-                sr_ols(df["a"], df2["a"])[1],
-                sr_ols(df["b"], df2["b"])[1],
-                sr_ols(df["c"], df2["c"])[1],
-            ), axis=1),
+            pd.concat(
+                (
+                    sr_ols(df["a"], df2["a"])[1],
+                    sr_ols(df["b"], df2["b"])[1],
+                    sr_ols(df["c"], df2["c"])[1],
+                ),
+                axis=1,
+            ),
         )
         assert_frame_equal(
             df.vbt.expanding_ols(df2, jitted=dict(parallel=True))[0],
@@ -2067,13 +2084,15 @@ class TestAccessors:
 
         assert_frame_equal(
             df.vbt.resample_between_bounds(
-                pd.DatetimeIndex([
-                    df.index[0],
-                    df.index[0],
-                    df.index[1],
-                    df.index[2],
-                    df.index[3],
-                ]),
+                pd.DatetimeIndex(
+                    [
+                        df.index[0],
+                        df.index[0],
+                        df.index[1],
+                        df.index[2],
+                        df.index[3],
+                    ]
+                ),
                 df.index,
                 mean_nb,
                 closed_lbound=True,
@@ -4169,3 +4188,281 @@ class TestAccessors:
         assert stats_df.shape == (3, 8)
         assert_index_equal(stats_df.index, df.vbt.wrapper.columns)
         assert_index_equal(stats_df.columns, stats_index)
+
+
+# ############# plotting.py ############# #
+
+
+class TestPlotting:
+    def test_gauge(self):
+        vbt.Gauge(
+            value=2,
+            value_range=(1, 3),
+            label="My Gauge",
+            make_figure_kwargs=dict(
+                use_widgets=False,
+                use_resampler=False,
+            ),
+        )
+        vbt.Gauge(
+            value=2,
+            value_range=(1, 3),
+            label="My Gauge",
+            make_figure_kwargs=dict(
+                use_widgets=True,
+                use_resampler=False,
+            ),
+        )
+        if plotly_resampler_available:
+            with pytest.raises(Exception):
+                vbt.Gauge(
+                    value=2,
+                    value_range=(1, 3),
+                    label="My Gauge",
+                    make_figure_kwargs=dict(
+                        use_widgets=False,
+                        use_resampler=True,
+                    ),
+                )
+            with pytest.raises(Exception):
+                vbt.Gauge(
+                    value=2,
+                    value_range=(1, 3),
+                    label="My Gauge",
+                    make_figure_kwargs=dict(
+                        use_widgets=True,
+                        use_resampler=True,
+                    ),
+                )
+
+    def test_bar(self):
+        vbt.Bar(
+            data=[[1, 2], [3, 4]],
+            trace_names=['a', 'b'],
+            x_labels=['x', 'y'],
+            make_figure_kwargs = dict(
+                use_widgets=False,
+                use_resampler=False,
+            ),
+        )
+        vbt.Bar(
+            data=[[1, 2], [3, 4]],
+            trace_names=['a', 'b'],
+            x_labels=['x', 'y'],
+            make_figure_kwargs=dict(
+                use_widgets=True,
+                use_resampler=False,
+            ),
+        )
+        if plotly_resampler_available:
+            vbt.Bar(
+                data=[[1, 2], [3, 4]],
+                trace_names=['a', 'b'],
+                x_labels=['x', 'y'],
+                make_figure_kwargs=dict(
+                    use_widgets=False,
+                    use_resampler=True,
+                ),
+            )
+            vbt.Bar(
+                data=[[1, 2], [3, 4]],
+                trace_names=['a', 'b'],
+                x_labels=['x', 'y'],
+                make_figure_kwargs=dict(
+                    use_widgets=True,
+                    use_resampler=True,
+                ),
+            )
+
+    def test_scatter(self):
+        vbt.Scatter(
+            data=[[1, 2], [3, 4]],
+            trace_names=['a', 'b'],
+            x_labels=['x', 'y'],
+            make_figure_kwargs=dict(
+                use_widgets=False,
+                use_resampler=False,
+            ),
+        )
+        vbt.Scatter(
+            data=[[1, 2], [3, 4]],
+            trace_names=['a', 'b'],
+            x_labels=['x', 'y'],
+            make_figure_kwargs=dict(
+                use_widgets=True,
+                use_resampler=False,
+            ),
+        )
+        if plotly_resampler_available:
+            vbt.Scatter(
+                data=[[1, 2], [3, 4]],
+                trace_names=['a', 'b'],
+                x_labels=['x', 'y'],
+                make_figure_kwargs=dict(
+                    use_widgets=False,
+                    use_resampler=True,
+                ),
+            )
+            vbt.Scatter(
+                data=[[1, 2], [3, 4]],
+                trace_names=['a', 'b'],
+                x_labels=['x', 'y'],
+                make_figure_kwargs=dict(
+                    use_widgets=True,
+                    use_resampler=True,
+                ),
+            )
+
+    def test_histogram(self):
+        vbt.Histogram(
+            data=[[1, 2], [3, 4], [2, 1]],
+            trace_names=['a', 'b'],
+            make_figure_kwargs=dict(
+                use_widgets=False,
+                use_resampler=False,
+            ),
+        )
+        vbt.Histogram(
+            data=[[1, 2], [3, 4], [2, 1]],
+            trace_names=['a', 'b'],
+            make_figure_kwargs=dict(
+                use_widgets=True,
+                use_resampler=False,
+            ),
+        )
+        if plotly_resampler_available:
+            vbt.Histogram(
+                data=[[1, 2], [3, 4], [2, 1]],
+                trace_names=['a', 'b'],
+                make_figure_kwargs=dict(
+                    use_widgets=False,
+                    use_resampler=True,
+                ),
+            )
+            vbt.Histogram(
+                data=[[1, 2], [3, 4], [2, 1]],
+                trace_names=['a', 'b'],
+                make_figure_kwargs=dict(
+                    use_widgets=True,
+                    use_resampler=True,
+                ),
+            )
+
+    def test_box(self):
+        vbt.Box(
+            data=[[1, 2], [3, 4], [2, 1]],
+            trace_names=['a', 'b'],
+            make_figure_kwargs=dict(
+                use_widgets=False,
+                use_resampler=False,
+            ),
+        )
+        vbt.Box(
+            data=[[1, 2], [3, 4], [2, 1]],
+            trace_names=['a', 'b'],
+            make_figure_kwargs=dict(
+                use_widgets=True,
+                use_resampler=False,
+            ),
+        )
+        if plotly_resampler_available:
+            with pytest.raises(Exception):
+                vbt.Box(
+                    data=[[1, 2], [3, 4], [2, 1]],
+                    trace_names=['a', 'b'],
+                    make_figure_kwargs=dict(
+                        use_widgets=False,
+                        use_resampler=True,
+                    ),
+                )
+            with pytest.raises(Exception):
+                vbt.Box(
+                    data=[[1, 2], [3, 4], [2, 1]],
+                    trace_names=['a', 'b'],
+                    make_figure_kwargs=dict(
+                        use_widgets=True,
+                        use_resampler=True,
+                    ),
+                )
+
+    def test_heatmap(self):
+        vbt.Heatmap(
+            data=[[1, 2], [3, 4]],
+            x_labels=['a', 'b'],
+            y_labels=['x', 'y'],
+            make_figure_kwargs=dict(
+                use_widgets=False,
+                use_resampler=False,
+            ),
+        )
+        vbt.Heatmap(
+            data=[[1, 2], [3, 4]],
+            x_labels=['a', 'b'],
+            y_labels=['x', 'y'],
+            make_figure_kwargs=dict(
+                use_widgets=True,
+                use_resampler=False,
+            ),
+        )
+        if plotly_resampler_available:
+            vbt.Heatmap(
+                data=[[1, 2], [3, 4]],
+                x_labels=['a', 'b'],
+                y_labels=['x', 'y'],
+                make_figure_kwargs=dict(
+                    use_widgets=False,
+                    use_resampler=True,
+                ),
+            )
+            vbt.Heatmap(
+                data=[[1, 2], [3, 4]],
+                x_labels=['a', 'b'],
+                y_labels=['x', 'y'],
+                make_figure_kwargs=dict(
+                    use_widgets=True,
+                    use_resampler=True,
+                ),
+            )
+
+    def test_volume(self):
+        vbt.Volume(
+            data=np.random.randint(1, 10, size=(3, 3, 3)),
+            x_labels=['a', 'b', 'c'],
+            y_labels=['d', 'e', 'f'],
+            z_labels=['g', 'h', 'i'],
+            make_figure_kwargs=dict(
+                use_widgets=False,
+                use_resampler=False,
+            ),
+        )
+        vbt.Volume(
+            data=np.random.randint(1, 10, size=(3, 3, 3)),
+            x_labels=['a', 'b', 'c'],
+            y_labels=['d', 'e', 'f'],
+            z_labels=['g', 'h', 'i'],
+            make_figure_kwargs=dict(
+                use_widgets=True,
+                use_resampler=False,
+            ),
+        )
+        if plotly_resampler_available:
+            vbt.Volume(
+                data=np.random.randint(1, 10, size=(3, 3, 3)),
+                x_labels=['a', 'b', 'c'],
+                y_labels=['d', 'e', 'f'],
+                z_labels=['g', 'h', 'i'],
+                make_figure_kwargs=dict(
+                    use_widgets=False,
+                    use_resampler=True,
+                ),
+            )
+            vbt.Volume(
+                data=np.random.randint(1, 10, size=(3, 3, 3)),
+                x_labels=['a', 'b', 'c'],
+                y_labels=['d', 'e', 'f'],
+                z_labels=['g', 'h', 'i'],
+                make_figure_kwargs=dict(
+                    use_widgets=True,
+                    use_resampler=True,
+                ),
+            )

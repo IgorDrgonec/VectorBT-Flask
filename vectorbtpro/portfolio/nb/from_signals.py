@@ -1483,6 +1483,8 @@ def simulate_from_signal_func_nb(
                         main_info["stop_type"][col] = exec_limit_stop_type
                     if execute_limit or (any_limit_signal and not keep_limit):
                         # Clear the pending info
+                        any_limit_signal = False
+
                         last_limit_info["signal_i"][col] = -1
                         last_limit_info["creation_i"][col] = -1
                         last_limit_info["init_i"][col] = -1
@@ -1532,6 +1534,8 @@ def simulate_from_signal_func_nb(
                             main_info["stop_type"][col] = exec_stop_stop_type
                     if execute_stop or (any_stop_signal and not keep_stop):
                         # Clear the pending info
+                        any_stop_signal = False
+
                         last_sl_info["init_i"][col] = -1
                         last_sl_info["init_price"][col] = np.nan
                         last_sl_info["stop"][col] = np.nan

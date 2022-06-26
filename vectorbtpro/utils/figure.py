@@ -85,20 +85,97 @@ class FigureWidget(_FigureWidget, FigureMixin):
         _Figure.show(self, *args, **show_kwargs)
 
 
-def make_figure(*args, **kwargs) -> tp.BaseFigure:
-    """Make new figure.
+try:
+    from plotly_resampler import FigureResampler as _FigureResampler, FigureWidgetResampler as _FigureWidgetResampler
 
-    Returns either `Figure` or `FigureWidget`, depending on `use_widgets`
-    defined under `vectorbtpro._settings.plotting`."""
+    class FigureResampler(_FigureResampler, FigureMixin):
+        """Figure resampler."""
+
+        def __init__(self, *args, **kwargs) -> None:
+            """Extends `plotly.graph_objects.Figure`."""
+            from vectorbtpro._settings import settings
+
+            plotting_cfg = settings["plotting"]
+
+            layout = kwargs.pop("layout", {})
+            super().__init__(*args, **kwargs)
+            self.update_layout(**merge_dicts(plotting_cfg["layout"], layout))
+
+        def show(self, *args, **kwargs) -> None:
+            """Show the figure."""
+            from vectorbtpro._settings import settings
+
+            plotting_cfg = settings["plotting"]
+
+            fig_kwargs = dict(width=self.layout.width, height=self.layout.height)
+            show_kwargs = merge_dicts(fig_kwargs, plotting_cfg["show_kwargs"], kwargs)
+            _Figure.show(self, *args, **show_kwargs)
+
+    class FigureWidgetResampler(_FigureWidgetResampler, FigureMixin):
+        """Figure widget resampler."""
+
+        def __init__(self, *args, **kwargs) -> None:
+            """Extends `plotly.graph_objects.FigureWidget`."""
+            from vectorbtpro._settings import settings
+
+            plotting_cfg = settings["plotting"]
+
+            layout = kwargs.pop("layout", {})
+            super().__init__(*args, **kwargs)
+            self.update_layout(**merge_dicts(plotting_cfg["layout"], layout))
+
+        def show(self, *args, **kwargs) -> None:
+            """Show the figure."""
+            from vectorbtpro._settings import settings
+
+            plotting_cfg = settings["plotting"]
+
+            fig_kwargs = dict(width=self.layout.width, height=self.layout.height)
+            show_kwargs = merge_dicts(fig_kwargs, plotting_cfg["show_kwargs"], kwargs)
+            _Figure.show(self, *args, **show_kwargs)
+
+except ImportError:
+    FigureResampler = Figure
+    FigureWidgetResampler = FigureWidget
+
+
+def make_figure(
+    *args,
+    use_widgets: tp.Optional[bool] = None,
+    use_resampler: tp.Optional[bool] = None,
+    **kwargs,
+) -> tp.BaseFigure:
+    """Make a new Plotly figure.
+
+    If `use_widgets` is True, returns `FigureWidget`, otherwise `Figure`.
+
+    If `use_resampler` is True, additionally wraps the class using `plotly_resampler`.
+
+    Defaults are defined under `vectorbtpro._settings.plotting`."""
     from vectorbtpro._settings import settings
 
     plotting_cfg = settings["plotting"]
 
-    if plotting_cfg["use_widgets"]:
+    if use_widgets is None:
+        use_widgets = plotting_cfg["use_widgets"]
+    if use_resampler is None:
+        use_resampler = plotting_cfg["use_resampler"]
+
+    if use_widgets:
+        if use_resampler is None:
+            return FigureWidgetResampler(*args, **kwargs)
+        if use_resampler:
+            assert_can_import("plotly_resampler")
+            return FigureWidgetResampler(*args, **kwargs)
         return FigureWidget(*args, **kwargs)
+    if use_resampler is None:
+        return FigureResampler(*args, **kwargs)
+    if use_resampler:
+        assert_can_import("plotly_resampler")
+        return FigureResampler(*args, **kwargs)
     return Figure(*args, **kwargs)
 
 
 def make_subplots(*args, **kwargs) -> tp.BaseFigure:
-    """Makes subplots and passes them to `FigureWidget`."""
+    """Make Plotly subplots using `make_figure`."""
     return make_figure(_make_subplots(*args, **kwargs))
