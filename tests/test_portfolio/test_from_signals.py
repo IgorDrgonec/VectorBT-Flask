@@ -2014,6 +2014,27 @@ class TestFromSignals:
                 exits=exits,
                 order_type="limit",
                 slippage=0.01,
+                limit_reverse=True,
+                limit_delta=[[-np.inf, 0.0, -1 / 2, 1 / 6, 2 / 3, np.inf]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 1, 25.0, 4.0, 0.0, 0, 1, -1),
+                    (0, 1, 0, 0, 1, 33.333333333333336, 3.0, 0.0, 0, 1, -1),
+                    (0, 2, 0, 0, 1, 66.66666666666667, 1.5, 0.0, 0, 1, -1),
+                    (0, 3, 0, 0, 1, 28.571428571428573, 3.5, 0.0, 0, 1, -1),
+                    (0, 4, 0, 0, 2, 20.0, 5.0, 0.0, 0, 1, -1),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
+        assert_records_close(
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                order_type="limit",
+                slippage=0.01,
                 limit_delta=[[-np.inf, 0.0, -1 / 2, 1 / 6, 2 / 3, np.inf]],
                 delta_format="percent",
             ).order_records,
@@ -2074,6 +2095,30 @@ class TestFromSignals:
             ),
         )
         assert_records_close(
+            from_signals_longonly(
+                open=open,
+                high=high,
+                low=low,
+                close=close,
+                entries=entries,
+                exits=exits,
+                slippage=0.01,
+                order_type="limit",
+                limit_reverse=True,
+                limit_delta=[[-np.inf, 0.0, -1 / 2, 1 / 6, 2 / 3, np.inf]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 1, 23.529411764705884, 4.25, 0.0, 0, 1, -1),
+                    (0, 1, 0, 0, 1, 23.529411764705884, 4.25, 0.0, 0, 1, -1),
+                    (0, 2, 0, 0, 1, 23.529411764705884, 4.25, 0.0, 0, 1, -1),
+                    (0, 3, 0, 0, 1, 23.529411764705884, 4.25, 0.0, 0, 1, -1),
+                    (0, 4, 0, 0, 2, 19.047619047619047, 5.25, 0.0, 0, 1, -1),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
+        assert_records_close(
             from_signals_shortonly(
                 close=close,
                 entries=entries,
@@ -2109,6 +2154,27 @@ class TestFromSignals:
                     (0, 2, 0, 0, 1, 66.66666666666667, 1.5, 0.0, 1, 1, -1),
                     (0, 3, 0, 0, 1, 28.571428571428573, 3.5, 0.0, 1, 1, -1),
                     (0, 4, 0, 0, 2, 20.0, 5.0, 0.0, 1, 1, -1),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
+        assert_records_close(
+            from_signals_shortonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                order_type="limit",
+                slippage=0.01,
+                limit_reverse=True,
+                limit_delta=[[-np.inf, 0.0, -1 / 2, 1 / 6, 2 / 3, np.inf]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 1, 25.0, 4.0, 0.0, 1, 1, -1),
+                    (0, 1, 0, 0, 3, 33.333333333333336, 3.0, 0.0, 1, 1, -1),
+                    (0, 2, 0, 0, 1, 22.22222222222222, 4.5, 0.0, 1, 1, -1),
+                    (0, 3, 0, 0, 3, 40.0, 2.5, 0.0, 1, 1, -1),
+                    (0, 4, 0, 0, 4, 100.0, 1.0, 0.0, 1, 1, -1),
                 ],
                 dtype=fs_order_dt,
             ),
@@ -2175,6 +2241,30 @@ class TestFromSignals:
                     (0, 2, 0, 0, 1, 23.529411764705884, 4.25, 0.0, 1, 1, -1),
                     (0, 3, 0, 0, 1, 23.529411764705884, 4.25, 0.0, 1, 1, -1),
                     (0, 4, 0, 0, 2, 19.047619047619047, 5.25, 0.0, 1, 1, -1),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
+        assert_records_close(
+            from_signals_shortonly(
+                open=open,
+                high=high,
+                low=low,
+                close=close,
+                entries=entries,
+                exits=exits,
+                order_type="limit",
+                slippage=0.01,
+                limit_reverse=True,
+                limit_delta=[[-np.inf, 0.0, -1 / 2, 1 / 6, 2 / 3, np.inf]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 1, 23.529411764705884, 4.25, 0.0, 1, 1, -1),
+                    (0, 1, 0, 0, 3, 44.44444444444444, 2.25, 0.0, 1, 1, -1),
+                    (0, 2, 0, 0, 1, 23.529411764705884, 4.25, 0.0, 1, 1, -1),
+                    (0, 3, 0, 0, 3, 44.44444444444444, 2.25, 0.0, 1, 1, -1),
+                    (0, 4, 0, 0, 4, 100.0, 1.0, 0.0, 1, 1, -1),
                 ],
                 dtype=fs_order_dt,
             ),

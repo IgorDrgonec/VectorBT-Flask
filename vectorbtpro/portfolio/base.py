@@ -4641,6 +4641,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         upon_dir_conflict: tp.Optional[tp.ArrayLike] = None,
         upon_opposite_entry: tp.Optional[tp.ArrayLike] = None,
         order_type: tp.Optional[tp.ArrayLike] = None,
+        limit_reverse: tp.Optional[tp.ArrayLike] = None,
         limit_delta: tp.Optional[tp.ArrayLike] = None,
         limit_tif: tp.Optional[tp.ArrayLike] = None,
         limit_expiry: tp.Optional[tp.ArrayLike] = None,
@@ -4783,6 +4784,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             order_type (OrderType or array_like): See `vectorbtpro.portfolio.enums.OrderType`.
 
                 Only one active limit order is allowed at a time.
+            limit_reverse (bool or array_like): Whether to reverse the price hit detection.
+                Will broadcast.
+
+                If True, a buy/sell limit price will be checked against high/low (not low/high).
+                Also, the limit delta will be applied above/below (not below/above) the initial price.
             limit_delta (float or array_like): Delta from `price` to build the limit price.
                 Will broadcast.
 
@@ -5479,6 +5485,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             upon_opposite_entry = portfolio_cfg["upon_opposite_entry"]
         if order_type is None:
             order_type = portfolio_cfg["order_type"]
+        if limit_reverse is None:
+            limit_reverse = portfolio_cfg["limit_reverse"]
         if limit_delta is None:
             limit_delta = portfolio_cfg["limit_delta"]
         if limit_tif is None:
@@ -5645,6 +5653,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             upon_dir_conflict=upon_dir_conflict,
             upon_opposite_entry=upon_opposite_entry,
             order_type=order_type,
+            limit_reverse=limit_reverse,
             limit_delta=limit_delta,
             limit_tif=limit_tif,
             limit_expiry=limit_expiry,
@@ -5718,6 +5727,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     upon_dir_conflict=dict(fill_value=DirectionConflictMode.Ignore),
                     upon_opposite_entry=dict(fill_value=OppositeEntryMode.ReverseReduce),
                     order_type=dict(fill_value=OrderType.Market),
+                    limit_reverse=dict(fill_value=False),
                     limit_delta=dict(fill_value=np.nan),
                     limit_tif=dict(fill_value=-1),
                     limit_expiry=dict(fill_value=-1),
@@ -5907,6 +5917,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         checks.assert_subdtype(broadcasted_args["upon_dir_conflict"], np.integer)
         checks.assert_subdtype(broadcasted_args["upon_opposite_entry"], np.integer)
         checks.assert_subdtype(broadcasted_args["order_type"], np.integer)
+        checks.assert_subdtype(broadcasted_args["limit_reverse"], np.bool_)
         checks.assert_subdtype(broadcasted_args["limit_delta"], np.number)
         checks.assert_subdtype(broadcasted_args["limit_tif"], np.integer)
         checks.assert_subdtype(broadcasted_args["limit_expiry"], np.integer)

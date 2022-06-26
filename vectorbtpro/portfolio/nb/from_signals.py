@@ -365,6 +365,7 @@ def check_limit_hit_nb(
     price: float,
     size: float,
     direction: int,
+    limit_reverse: bool,
     limit_delta: float,
     delta_format: int,
     can_use_ohlc: bool = True,
@@ -380,8 +381,9 @@ def check_limit_hit_nb(
     _size = get_diraware_size_nb(size, direction)
     if delta_format == DeltaFormat.Percent100:
         limit_delta /= 100
+    place_below = (_size > 0 and not limit_reverse) or (_size < 0 and limit_reverse)
     if not np.isnan(limit_delta):
-        if _size > 0:
+        if place_below:
             if np.isinf(limit_delta):
                 if limit_delta > 0:
                     limit_price = -np.inf
@@ -406,9 +408,10 @@ def check_limit_hit_nb(
     else:
         limit_price = price
     hit_on_open = False
+
     if can_use_ohlc:
         curr_high, curr_low = resolve_hl_nb(curr_open, curr_high, curr_low, curr_close)
-        if _size > 0:  # buy order
+        if place_below:
             if check_open and curr_open <= limit_price:
                 hit_on_open = True
                 hit = True
@@ -417,7 +420,7 @@ def check_limit_hit_nb(
                 hit = curr_low <= limit_price
                 if hit and np.isinf(limit_price):
                     limit_price = curr_low
-        else:  # sell order
+        else:
             if check_open and curr_open >= limit_price:
                 hit_on_open = True
                 hit = True
@@ -427,9 +430,9 @@ def check_limit_hit_nb(
                 if hit and np.isinf(limit_price):
                     limit_price = curr_high
     else:
-        if _size > 0:  # buy order
+        if place_below:
             hit = curr_close <= limit_price
-        else:  # sell order
+        else:
             hit = curr_close >= limit_price
         if hit and np.isinf(limit_price):
             limit_price = curr_close
@@ -610,6 +613,7 @@ SignalFuncT = tp.Callable[[SignalContext, tp.VarArg()], tp.Tuple[bool, bool, boo
         upon_dir_conflict=portfolio_ch.flex_array_gl_slicer,
         upon_opposite_entry=portfolio_ch.flex_array_gl_slicer,
         order_type=portfolio_ch.flex_array_gl_slicer,
+        limit_reverse=portfolio_ch.flex_array_gl_slicer,
         limit_delta=portfolio_ch.flex_array_gl_slicer,
         limit_tif=portfolio_ch.flex_array_gl_slicer,
         limit_expiry=portfolio_ch.flex_array_gl_slicer,
@@ -682,6 +686,7 @@ def simulate_from_signal_func_nb(
     upon_dir_conflict: tp.FlexArray = np.asarray(DirectionConflictMode.Ignore),
     upon_opposite_entry: tp.FlexArray = np.asarray(OppositeEntryMode.ReverseReduce),
     order_type: tp.FlexArray = np.asarray(OrderType.Market),
+    limit_reverse: tp.FlexArray = np.asarray(False),
     limit_delta: tp.FlexArray = np.asarray(np.nan),
     limit_tif: tp.FlexArray = np.asarray(-1),
     limit_expiry: tp.FlexArray = np.asarray(-1),
@@ -776,6 +781,7 @@ def simulate_from_signal_func_nb(
     last_limit_info["init_size_type"][:] = -1
     last_limit_info["init_direction"][:] = -1
     last_limit_info["init_stop_type"][:] = -1
+    last_limit_info["reverse"][:] = False
     last_limit_info["delta"][:] = np.nan
     last_limit_info["delta_format"][:] = -1
     last_limit_info["tif"][:] = -1
@@ -997,6 +1003,7 @@ def simulate_from_signal_func_nb(
                     _size_type = last_limit_info["init_size_type"][col]
                     _direction = last_limit_info["init_direction"][col]
                     _stop_type = last_limit_info["init_stop_type"][col]
+                    _reverse = last_limit_info["reverse"][col]
                     _delta = last_limit_info["delta"][col]
                     _delta_format = last_limit_info["delta_format"][col]
                     _tif = last_limit_info["tif"][col]
@@ -1020,6 +1027,7 @@ def simulate_from_signal_func_nb(
                         _price,
                         _size,
                         _direction,
+                        _reverse,
                         _delta,
                         _delta_format,
                         can_use_ohlc=True,
@@ -1036,6 +1044,7 @@ def simulate_from_signal_func_nb(
                         last_limit_info["init_size"][col] = np.nan
                         last_limit_info["init_size_type"][col] = -1
                         last_limit_info["init_direction"][col] = -1
+                        last_limit_info["reverse"][col] = False
                         last_limit_info["delta"][col] = np.nan
                         last_limit_info["delta_format"][col] = -1
                         last_limit_info["tif"][col] = -1
@@ -1218,6 +1227,7 @@ def simulate_from_signal_func_nb(
                                     _price,
                                     _size,
                                     _direction,
+                                    False,
                                     _limit_delta,
                                     _delta_format,
                                     can_use_ohlc=False,
@@ -1335,6 +1345,7 @@ def simulate_from_signal_func_nb(
                                     can_use_ohlc = True
                                     _price = _open
                             if can_execute:
+                                _limit_reverse = flex_select_auto_nb(limit_reverse, _i, col, flex_2d)
                                 _limit_delta = flex_select_auto_nb(limit_delta, _i, col, flex_2d)
                                 _delta_format = flex_select_auto_nb(delta_format, _i, col, flex_2d)
                                 limit_price, _, can_execute = check_limit_hit_nb(
@@ -1345,6 +1356,7 @@ def simulate_from_signal_func_nb(
                                     _price,
                                     _size,
                                     _direction,
+                                    _limit_reverse,
                                     _limit_delta,
                                     _delta_format,
                                     can_use_ohlc=can_use_ohlc,
@@ -1493,6 +1505,7 @@ def simulate_from_signal_func_nb(
                         last_limit_info["init_size_type"][col] = -1
                         last_limit_info["init_direction"][col] = -1
                         last_limit_info["init_stop_type"][col] = -1
+                        last_limit_info["reverse"][col] = False
                         last_limit_info["delta"][col] = np.nan
                         last_limit_info["delta_format"][col] = -1
                         last_limit_info["tif"][col] = -1
@@ -1517,6 +1530,7 @@ def simulate_from_signal_func_nb(
                             last_limit_info["init_size_type"][col] = exec_stop_size_type
                             last_limit_info["init_direction"][col] = exec_stop_direction
                             last_limit_info["init_stop_type"][col] = exec_stop_stop_type
+                            last_limit_info["reverse"][col] = False
                             last_limit_info["delta"][col] = exec_stop_delta
                             last_limit_info["delta_format"][col] = exec_stop_delta_format
                             last_limit_info["tif"][col] = _limit_tif
@@ -1566,6 +1580,7 @@ def simulate_from_signal_func_nb(
                                 if any_limit_signal:
                                     raise ValueError("Only one active limit signal is allowed at a time")
 
+                                _limit_reverse = flex_select_auto_nb(limit_reverse, _i, col, flex_2d)
                                 _limit_delta = flex_select_auto_nb(limit_delta, _i, col, flex_2d)
                                 _delta_format = flex_select_auto_nb(delta_format, _i, col, flex_2d)
                                 _limit_tif = flex_select_auto_nb(limit_tif, _i, col, flex_2d)
@@ -1579,6 +1594,7 @@ def simulate_from_signal_func_nb(
                                 last_limit_info["init_size_type"][col] = exec_user_size_type
                                 last_limit_info["init_direction"][col] = exec_user_direction
                                 last_limit_info["init_stop_type"][col] = -1
+                                last_limit_info["reverse"][col] = _limit_reverse
                                 last_limit_info["delta"][col] = _limit_delta
                                 last_limit_info["delta_format"][col] = _delta_format
                                 last_limit_info["tif"][col] = _limit_tif

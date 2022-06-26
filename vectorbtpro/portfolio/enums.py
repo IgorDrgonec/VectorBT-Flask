@@ -2501,6 +2501,7 @@ limit_info_dt = np.dtype(
         ("init_size_type", np.int_),
         ("init_direction", np.int_),
         ("init_stop_type", np.int_),
+        ("reverse", np.float_),
         ("delta", np.float_),
         ("delta_format", np.int_),
         ("tif", int),
@@ -2528,6 +2529,7 @@ Attributes:
     init_size_type: Type of the requested size. See `SizeType`.
     init_direction: Direction of the requested size. See `Direction`.
     init_stop_type: Stop type. See `vectorbtpro.signals.enums.StopType`.
+    reverse: Whether to reverse the price hit detection.
     delta: Delta from the initial price.
     delta_format: Format of the delta value. See `DeltaFormat`.
     tif: Time in force in integer format. Set to `-1` to disable.

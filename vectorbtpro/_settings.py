@@ -1125,6 +1125,7 @@ portfolio = ChildDict(
     upon_dir_conflict="ignore",
     upon_opposite_entry="reversereduce",
     order_type="market",
+    limit_reverse=False,
     limit_delta=np.nan,
     limit_tif=-1,
     limit_expiry=-1,
