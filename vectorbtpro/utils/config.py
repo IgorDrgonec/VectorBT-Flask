@@ -2,6 +2,7 @@
 
 """Utilities for configuration."""
 
+import warnings
 import functools
 import inspect
 from collections import namedtuple
@@ -825,6 +826,9 @@ class Configured(Cacheable, Pickleable, Prettified):
         their values won't be copied over. Make sure to pass them explicitly to
         make that the saved & loaded / copied instance is resilient to any changes in globals."""
 
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = None
+    """Set of expected keys."""
+
     _writeable_attrs: tp.ClassVar[tp.Optional[tp.Set[str]]] = None
     """Set of writeable attributes that will be saved/copied along with the config."""
 
@@ -832,6 +836,22 @@ class Configured(Cacheable, Pickleable, Prettified):
         from vectorbtpro._settings import settings
 
         configured_cfg = settings["configured"]
+
+        check_expected_keys_ = config.get("check_expected_keys_", None)
+        if self._expected_keys is None:
+            check_expected_keys_ = False
+        if check_expected_keys_ is None:
+            check_expected_keys_ = configured_cfg["check_expected_keys_"]
+        if check_expected_keys_:
+            if isinstance(check_expected_keys_, bool):
+                check_expected_keys_ = "raise"
+            keys_diff = set(config.keys()).difference(self._expected_keys)
+            if len(keys_diff) > 0:
+                checks.assert_in(check_expected_keys_, ("warn", "raise"))
+                if check_expected_keys_ == "warn":
+                    warnings.warn(f"{type(self).__name__} doesn't expect keys {keys_diff}", stacklevel=2)
+                else:
+                    raise ValueError(f"{type(self).__name__} doesn't expect keys {keys_diff}")
 
         self._config = Config(**merge_dicts(configured_cfg["config"], config))
 

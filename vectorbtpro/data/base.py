@@ -185,6 +185,18 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
         return cls(**kwargs)
 
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Analyzable._expected_keys or set()) | {
+        "data",
+        "single_symbol",
+        "fetch_kwargs",
+        "returned_kwargs",
+        "last_index",
+        "tz_localize",
+        "tz_convert",
+        "missing_index",
+        "missing_columns",
+    }
+
     def __init__(
         self,
         wrapper: ArrayWrapper,

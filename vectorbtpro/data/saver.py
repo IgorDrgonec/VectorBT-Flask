@@ -24,6 +24,11 @@ class DataSaver(DataUpdater):
         **kwargs: Keyword arguments passed to the constructor of `DataUpdater`.
     """
 
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (DataUpdater._expected_keys or set()) | {
+        "save_kwargs",
+        "init_save_kwargs",
+    }
+
     def __init__(
         self,
         data: Data,
@@ -71,9 +76,7 @@ class DataSaver(DataUpdater):
         To stop this method from running again, raise `vectorbtpro.utils.schedule_.CancelledError`."""
         # In case the method was called by the user
         kwargs = merge_dicts(
-            dict(save_kwargs=self.save_kwargs),
-            self.update_kwargs,
-            {"save_kwargs": save_kwargs, **kwargs}
+            dict(save_kwargs=self.save_kwargs), self.update_kwargs, {"save_kwargs": save_kwargs, **kwargs}
         )
         save_kwargs = kwargs.pop("save_kwargs")
 

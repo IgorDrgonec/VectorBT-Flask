@@ -27,7 +27,7 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils.array_ import renormalize
 from vectorbtpro.utils.colors import rgb_from_cmap
 from vectorbtpro.utils.config import Configured, resolve_dict
-from vectorbtpro.utils.figure import make_figure
+from vectorbtpro.utils.figure import make_figure, FigureResampler, FigureWidgetResampler
 
 __all__ = ["TraceUpdater", "Gauge", "Bar", "Scatter", "Histogram", "Box", "Heatmap", "Volume"]
 
@@ -393,11 +393,17 @@ class Scatter(Configured, TraceUpdater):
                 scatter_obj = go.Scattergl
             else:
                 scatter_obj = go.Scatter
-            trace = scatter_obj(x=x_labels, name=trace_name, showlegend=trace_name is not None)
-            trace.update(**_trace_kwargs)
-            if data is not None:
-                self.update_trace(trace, data, i)
-            fig.add_trace(trace, **add_trace_kwargs)
+            if isinstance(fig, (FigureResampler, FigureWidgetResampler)):
+                if data is None:
+                    raise ValueError("Cannot create empty scatter traces when using plotly-resampler")
+                trace = scatter_obj(name=trace_name, showlegend=trace_name is not None)
+                fig.add_trace(trace, hf_x=x_labels, hf_y=data[:, i], **add_trace_kwargs)
+            else:
+                trace = scatter_obj(x=x_labels, name=trace_name, showlegend=trace_name is not None)
+                trace.update(**_trace_kwargs)
+                if data is not None:
+                    self.update_trace(trace, data, i)
+                fig.add_trace(trace, **add_trace_kwargs)
 
         TraceUpdater.__init__(self, fig, fig.data[-len(trace_names) :])
 

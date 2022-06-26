@@ -245,6 +245,13 @@ class ReturnsAccessor(GenericAccessor):
                 )
         return kwargs
 
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (GenericAccessor._expected_keys or set()) | {
+        "bm_returns",
+        "log_returns",
+        "year_freq",
+        "defaults",
+    }
+
     def __init__(
         self,
         obj: tp.SeriesFrame,

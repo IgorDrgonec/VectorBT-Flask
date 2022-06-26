@@ -2294,6 +2294,7 @@ class TestFactory:
             "__subclasshook__",
             "__weakref__",
             "_config",
+            "_expected_keys",
             "_iloc",
             "_in_out",
             "_in_output_names",

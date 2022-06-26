@@ -193,24 +193,24 @@ class TestMappedArray:
         np.testing.assert_array_equal(new_mapped_array.idx_arr, np.array([0, 1, 3, 4, 5, 7, 9, 2, 6, 8]))
         np.testing.assert_array_equal(new_mapped_array.id_arr, np.array([0, 1, 2, 3, 4, 5, 6, 0, 1, 2]))
         new_mapped_array = vbt.MappedArray.row_stack(
-            mapped_array1.replace(some_arg=2),
-            mapped_array2.replace(some_arg=2),
+            mapped_array1.replace(some_arg=2, check_expected_keys_=False),
+            mapped_array2.replace(some_arg=2, check_expected_keys_=False),
         )
         assert new_mapped_array.config["some_arg"] == 2
         with pytest.raises(Exception):
             vbt.MappedArray.row_stack(
-                mapped_array1.replace(some_arg=2),
-                mapped_array2.replace(some_arg=3),
+                mapped_array1.replace(some_arg=2, check_expected_keys_=False),
+                mapped_array2.replace(some_arg=3, check_expected_keys_=False),
             )
         with pytest.raises(Exception):
             vbt.MappedArray.row_stack(
-                mapped_array1.replace(some_arg=2),
+                mapped_array1.replace(some_arg=2, check_expected_keys_=False),
                 mapped_array2,
             )
         with pytest.raises(Exception):
             vbt.MappedArray.row_stack(
                 mapped_array1,
-                mapped_array2.replace(some_arg=2),
+                mapped_array2.replace(some_arg=2, check_expected_keys_=False),
             )
 
     def test_column_stack(self):
@@ -260,24 +260,24 @@ class TestMappedArray:
         np.testing.assert_array_equal(mapped_array.idx_arr, np.array([0, 1, 3, 4, 2, 4, 6, 3, 5]))
         np.testing.assert_array_equal(mapped_array.id_arr, np.array([0, 1, 2, 3, 0, 1, 2, 0, 1]))
         mapped_array = vbt.MappedArray.column_stack(
-            mapped_array1.replace(some_arg=2),
-            mapped_array2.replace(some_arg=2),
+            mapped_array1.replace(some_arg=2, check_expected_keys_=False),
+            mapped_array2.replace(some_arg=2, check_expected_keys_=False),
         )
         assert mapped_array.config["some_arg"] == 2
         with pytest.raises(Exception):
             vbt.MappedArray.column_stack(
-                mapped_array1.replace(some_arg=2),
-                mapped_array2.replace(some_arg=3),
+                mapped_array1.replace(some_arg=2, check_expected_keys_=False),
+                mapped_array2.replace(some_arg=3, check_expected_keys_=False),
             )
         with pytest.raises(Exception):
             vbt.MappedArray.column_stack(
-                mapped_array1.replace(some_arg=2),
+                mapped_array1.replace(some_arg=2, check_expected_keys_=False),
                 mapped_array2,
             )
         with pytest.raises(Exception):
             vbt.MappedArray.column_stack(
                 mapped_array1,
-                mapped_array2.replace(some_arg=2),
+                mapped_array2.replace(some_arg=2, check_expected_keys_=False),
             )
 
     def test_config(self, tmp_path):
@@ -1733,24 +1733,24 @@ class TestRecords:
             vbt.MappedArray.row_stack(records1.map_field("some_field2"), records2.map_field("some_field2")).values,
         )
         new_records = vbt.Records.row_stack(
-            records1.replace(some_arg=2),
-            records2.replace(some_arg=2),
+            records1.replace(some_arg=2, check_expected_keys_=False),
+            records2.replace(some_arg=2, check_expected_keys_=False),
         )
         assert new_records.config["some_arg"] == 2
         with pytest.raises(Exception):
             vbt.Records.row_stack(
-                records1.replace(some_arg=2),
-                records2.replace(some_arg=3),
+                records1.replace(some_arg=2, check_expected_keys_=False),
+                records2.replace(some_arg=3, check_expected_keys_=False),
             )
         with pytest.raises(Exception):
             vbt.Records.row_stack(
-                records1.replace(some_arg=2),
+                records1.replace(some_arg=2, check_expected_keys_=False),
                 records2,
             )
         with pytest.raises(Exception):
             vbt.Records.row_stack(
                 records1,
-                records2.replace(some_arg=2),
+                records2.replace(some_arg=2, check_expected_keys_=False),
             )
 
     def test_column_stack(self):
@@ -4054,9 +4054,9 @@ class TestFSOrders:
             fs_orders.stats(),
             pd.Series(
                 [
-                    pd.Timestamp('2020-01-01 00:00:00', freq='D'),
-                    pd.Timestamp('2020-01-08 00:00:00', freq='D'),
-                    pd.Timedelta('8 days 00:00:00'),
+                    pd.Timestamp("2020-01-01 00:00:00", freq="D"),
+                    pd.Timestamp("2020-01-08 00:00:00", freq="D"),
+                    pd.Timedelta("8 days 00:00:00"),
                     1.5,
                     0.0,
                     1.5,
@@ -4067,17 +4067,17 @@ class TestFSOrders:
                     0.0,
                     0.0,
                     0.0,
-                    pd.Timedelta('1 days 00:00:00'),
-                    pd.Timedelta('1 days 04:00:00'),
-                    pd.Timedelta('1 days 08:00:00'),
-                    pd.Timedelta('0 days 00:40:48'),
-                    pd.Timedelta('0 days 01:30:00'),
-                    pd.Timedelta('0 days 02:19:12'),
+                    pd.Timedelta("1 days 00:00:00"),
+                    pd.Timedelta("1 days 04:00:00"),
+                    pd.Timedelta("1 days 08:00:00"),
+                    pd.Timedelta("0 days 00:40:48"),
+                    pd.Timedelta("0 days 01:30:00"),
+                    pd.Timedelta("0 days 02:19:12"),
                     np.nan,
                     5.222222222222222,
-                    pd.Timedelta('0 days 00:00:00'),
-                    pd.Timedelta('1 days 00:00:00'),
-                    pd.Timedelta('1 days 00:00:00'),
+                    pd.Timedelta("0 days 00:00:00"),
+                    pd.Timedelta("1 days 00:00:00"),
+                    pd.Timedelta("1 days 00:00:00"),
                 ],
                 index=stats_index,
                 name="agg_stats",
@@ -4087,9 +4087,9 @@ class TestFSOrders:
             fs_orders.stats(column="a"),
             pd.Series(
                 [
-                    pd.Timestamp('2020-01-01 00:00:00', freq='D'),
-                    pd.Timestamp('2020-01-08 00:00:00', freq='D'),
-                    pd.Timedelta('8 days 00:00:00'),
+                    pd.Timestamp("2020-01-01 00:00:00", freq="D"),
+                    pd.Timestamp("2020-01-08 00:00:00", freq="D"),
+                    pd.Timedelta("8 days 00:00:00"),
                     2,
                     0,
                     2,
@@ -4100,17 +4100,17 @@ class TestFSOrders:
                     0,
                     0,
                     0,
-                    pd.Timedelta('1 days 00:00:00'),
-                    pd.Timedelta('1 days 00:00:00'),
-                    pd.Timedelta('1 days 00:00:00'),
-                    pd.Timedelta('0 days 00:50:24'),
-                    pd.Timedelta('0 days 01:19:12'),
-                    pd.Timedelta('0 days 01:48:00'),
+                    pd.Timedelta("1 days 00:00:00"),
+                    pd.Timedelta("1 days 00:00:00"),
+                    pd.Timedelta("1 days 00:00:00"),
+                    pd.Timedelta("0 days 00:50:24"),
+                    pd.Timedelta("0 days 01:19:12"),
+                    pd.Timedelta("0 days 01:48:00"),
                     np.nan,
                     5.5,
-                    pd.Timedelta('0 days 00:00:00'),
-                    pd.Timedelta('1 days 00:00:00'),
-                    pd.Timedelta('1 days 00:00:00'),
+                    pd.Timedelta("0 days 00:00:00"),
+                    pd.Timedelta("1 days 00:00:00"),
+                    pd.Timedelta("1 days 00:00:00"),
                 ],
                 index=stats_index,
                 name="a",
@@ -4120,9 +4120,9 @@ class TestFSOrders:
             fs_orders.stats(column="g1", group_by=group_by),
             pd.Series(
                 [
-                    pd.Timestamp('2020-01-01 00:00:00', freq='D'),
-                    pd.Timestamp('2020-01-08 00:00:00', freq='D'),
-                    pd.Timedelta('8 days 00:00:00'),
+                    pd.Timestamp("2020-01-01 00:00:00", freq="D"),
+                    pd.Timestamp("2020-01-08 00:00:00", freq="D"),
+                    pd.Timedelta("8 days 00:00:00"),
                     4,
                     0,
                     4,
@@ -4133,17 +4133,17 @@ class TestFSOrders:
                     0,
                     0,
                     0,
-                    pd.Timedelta('1 days 00:00:00'),
-                    pd.Timedelta('1 days 00:00:00'),
-                    pd.Timedelta('1 days 00:00:00'),
-                    pd.Timedelta('0 days 00:21:36'),
-                    pd.Timedelta('0 days 01:12:00'),
-                    pd.Timedelta('0 days 01:48:00'),
+                    pd.Timedelta("1 days 00:00:00"),
+                    pd.Timedelta("1 days 00:00:00"),
+                    pd.Timedelta("1 days 00:00:00"),
+                    pd.Timedelta("0 days 00:21:36"),
+                    pd.Timedelta("0 days 01:12:00"),
+                    pd.Timedelta("0 days 01:48:00"),
                     np.nan,
                     4.75,
-                    pd.Timedelta('0 days 00:00:00'),
-                    pd.Timedelta('1 days 00:00:00'),
-                    pd.Timedelta('1 days 00:00:00'),
+                    pd.Timedelta("0 days 00:00:00"),
+                    pd.Timedelta("1 days 00:00:00"),
+                    pd.Timedelta("1 days 00:00:00"),
                 ],
                 index=stats_index,
                 name="g1",

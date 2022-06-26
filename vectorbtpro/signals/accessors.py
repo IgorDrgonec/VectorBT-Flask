@@ -1781,7 +1781,6 @@ class SignalsAccessor(GenericAccessor):
         from_other: bool = False,
         broadcast_kwargs: tp.KwargsLike = None,
         group_by: tp.GroupByLike = None,
-        attach_ts: bool = True,
         attach_other: bool = False,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -1867,12 +1866,11 @@ class SignalsAccessor(GenericAccessor):
             range_records = func(reshaping.to_2d_array(obj), reshaping.to_2d_array(other), from_other=from_other)
             wrapper = ArrayWrapper.from_obj(obj)
             to_attach = other if attach_other else obj
-        return Ranges(wrapper, range_records, ts=to_attach if attach_ts else None, **kwargs).regroup(group_by)
+        return Ranges.from_records(wrapper, range_records, close=to_attach, **kwargs).regroup(group_by)
 
     def partition_ranges(
         self,
         group_by: tp.GroupByLike = None,
-        attach_ts: bool = True,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         **kwargs,
@@ -1895,12 +1893,11 @@ class SignalsAccessor(GenericAccessor):
         func = jit_reg.resolve_option(nb.partition_ranges_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         range_records = func(self.to_2d_array())
-        return Ranges(self.wrapper, range_records, ts=self.obj if attach_ts else None, **kwargs).regroup(group_by)
+        return Ranges.from_records(self.wrapper, range_records, close=self.obj, **kwargs).regroup(group_by)
 
     def between_partition_ranges(
         self,
         group_by: tp.GroupByLike = None,
-        attach_ts: bool = True,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         **kwargs,
@@ -1920,7 +1917,7 @@ class SignalsAccessor(GenericAccessor):
         func = jit_reg.resolve_option(nb.between_partition_ranges_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         range_records = func(self.to_2d_array())
-        return Ranges(self.wrapper, range_records, ts=self.obj if attach_ts else None, **kwargs).regroup(group_by)
+        return Ranges.from_records(self.wrapper, range_records, close=self.obj, **kwargs).regroup(group_by)
 
     # ############# Index ############# #
 

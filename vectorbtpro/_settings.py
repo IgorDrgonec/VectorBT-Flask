@@ -321,6 +321,7 @@ ${config_doc}
 _settings["config"] = config
 
 configured = ChildDict(
+    check_expected_keys_=True,
     config=Config(
         dict(
             readonly_=True,

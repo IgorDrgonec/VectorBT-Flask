@@ -648,6 +648,15 @@ class MappedArray(Analyzable):
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
         return cls(**kwargs)
 
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Analyzable._expected_keys or set()) | {
+        "mapped_arr",
+        "col_arr",
+        "idx_arr",
+        "id_arr",
+        "mapping",
+        "col_mapper",
+    }
+
     def __init__(
         self,
         wrapper: ArrayWrapper,
@@ -679,17 +688,17 @@ class MappedArray(Analyzable):
             wrapper,
             mapped_arr=mapped_arr,
             col_arr=col_arr,
-            id_arr=id_arr,
             idx_arr=idx_arr,
+            id_arr=id_arr,
             mapping=mapping,
             col_mapper=col_mapper,
             **kwargs,
         )
 
         self._mapped_arr = mapped_arr
-        self._id_arr = id_arr
         self._col_arr = col_arr
         self._idx_arr = idx_arr
+        self._id_arr = id_arr
         self._mapping = mapping
         self._col_mapper = col_mapper
 
@@ -806,14 +815,14 @@ class MappedArray(Analyzable):
         return self._col_mapper
 
     @property
-    def id_arr(self) -> tp.Array1d:
-        """Id array."""
-        return self._id_arr
-
-    @property
     def idx_arr(self) -> tp.Optional[tp.Array1d]:
         """Index array."""
         return self._idx_arr
+
+    @property
+    def id_arr(self) -> tp.Array1d:
+        """Id array."""
+        return self._id_arr
 
     @property
     def mapping(self) -> tp.Optional[tp.MappingLike]:

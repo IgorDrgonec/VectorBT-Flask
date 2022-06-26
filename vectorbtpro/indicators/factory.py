@@ -946,6 +946,17 @@ class IndicatorBase(Analyzable):
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
         return cls(**kwargs)
 
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Analyzable._expected_keys or set()) | {
+        "input_list",
+        "input_mapper",
+        "in_output_list",
+        "output_list",
+        "param_list",
+        "mapper_list",
+        "short_name",
+        "level_names",
+    }
+
     def __init__(
         self,
         wrapper: ArrayWrapper,
@@ -1081,6 +1092,25 @@ class IndicatorBase(Analyzable):
 
 
 class IndicatorFactory(Configured):
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Configured._expected_keys or set()) | {
+        "class_name",
+        "class_docstring",
+        "module_name",
+        "short_name",
+        "prepend_name",
+        "input_names",
+        "param_names",
+        "in_output_names",
+        "output_names",
+        "output_flags",
+        "lazy_outputs",
+        "attr_settings",
+        "metrics",
+        "stats_defaults",
+        "subplots",
+        "plots_defaults",
+    }
+
     def __init__(
         self,
         class_name: tp.Optional[str] = None,
@@ -1099,6 +1129,7 @@ class IndicatorFactory(Configured):
         stats_defaults: tp.Union[None, tp.Callable, tp.Kwargs] = None,
         subplots: tp.Optional[tp.Kwargs] = None,
         plots_defaults: tp.Union[None, tp.Callable, tp.Kwargs] = None,
+        **kwargs,
     ) -> None:
         """A factory for creating new indicators.
 
@@ -1151,6 +1182,7 @@ class IndicatorFactory(Configured):
             plots_defaults (callable or dict): Defaults for `vectorbtpro.generic.plots_builder.PlotsBuilderMixin.plots`.
 
                 If dict, will be converted into a property.
+            **kwargs: Custom keyword arguments passed to the config.
 
         !!! note
             The `__init__` method is not used for running the indicator, for this use `run`.
@@ -1175,6 +1207,7 @@ class IndicatorFactory(Configured):
             stats_defaults=stats_defaults,
             subplots=subplots,
             plots_defaults=plots_defaults,
+            **kwargs,
         )
 
         # Check parameters

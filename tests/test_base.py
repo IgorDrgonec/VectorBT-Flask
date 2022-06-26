@@ -726,9 +726,7 @@ class TestArrayWrapper:
                 pd.Index([4, 5, 6]), pd.MultiIndex.from_tuples([("a", "a"), ("b", "b")], names=["c1", "c2"]), 2
             ),
         )
-        assert_index_equal(
-            wrapper.columns, pd.MultiIndex.from_tuples([("a", "a"), ("b", "b")], names=["c1", "c2"])
-        )
+        assert_index_equal(wrapper.columns, pd.MultiIndex.from_tuples([("a", "a"), ("b", "b")], names=["c1", "c2"]))
         wrapper = vbt.ArrayWrapper.row_stack(
             vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c1"), 2),
             vbt.ArrayWrapper(
@@ -794,24 +792,36 @@ class TestArrayWrapper:
                 vbt.ArrayWrapper(pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c"), 2, group_by=[1, 0]),
             )
         wrapper = vbt.ArrayWrapper.row_stack(
-            vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2, some_arg=2),
-            vbt.ArrayWrapper(pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c"), 2, some_arg=2),
+            vbt.ArrayWrapper(
+                pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2, some_arg=2, check_expected_keys_=False
+            ),
+            vbt.ArrayWrapper(
+                pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c"), 2, some_arg=2, check_expected_keys_=False
+            ),
         )
         assert wrapper.config["some_arg"] == 2
         with pytest.raises(Exception):
             vbt.ArrayWrapper.row_stack(
-                vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2, some_arg=2),
-                vbt.ArrayWrapper(pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c"), 2, some_arg=3),
+                vbt.ArrayWrapper(
+                    pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2, some_arg=2, check_expected_keys_=False
+                ),
+                vbt.ArrayWrapper(
+                    pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c"), 2, some_arg=3, check_expected_keys_=False
+                ),
             )
         with pytest.raises(Exception):
             vbt.ArrayWrapper.row_stack(
-                vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2, some_arg=2),
+                vbt.ArrayWrapper(
+                    pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2, some_arg=2, check_expected_keys_=False
+                ),
                 vbt.ArrayWrapper(pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c"), 2),
             )
         with pytest.raises(Exception):
             vbt.ArrayWrapper.row_stack(
                 vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2),
-                vbt.ArrayWrapper(pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c"), 2, some_arg=2),
+                vbt.ArrayWrapper(
+                    pd.Index([4, 5, 6]), pd.Index(["a", "b"], name="c"), 2, some_arg=2, check_expected_keys_=False
+                ),
             )
         with pytest.raises(Exception):
             vbt.ArrayWrapper.row_stack(
@@ -1140,24 +1150,24 @@ class TestArrayWrapper:
         assert wrapper.grouper == grouper
         assert wrapper.grouper.allow_modify
         wrapper = vbt.ArrayWrapper.column_stack(
-            vbt.ArrayWrapper(index, columns1, 2, some_arg=2),
-            vbt.ArrayWrapper(index, columns2, 2, some_arg=2),
+            vbt.ArrayWrapper(index, columns1, 2, some_arg=2, check_expected_keys_=False),
+            vbt.ArrayWrapper(index, columns2, 2, some_arg=2, check_expected_keys_=False),
         )
         assert wrapper.config["some_arg"] == 2
         with pytest.raises(Exception):
             vbt.ArrayWrapper.column_stack(
-                vbt.ArrayWrapper(index, columns1, 2, some_arg=2),
-                vbt.ArrayWrapper(index, columns2, 2, some_arg=3),
+                vbt.ArrayWrapper(index, columns1, 2, some_arg=2, check_expected_keys_=False),
+                vbt.ArrayWrapper(index, columns2, 2, some_arg=3, check_expected_keys_=False),
             )
         with pytest.raises(Exception):
             vbt.ArrayWrapper.column_stack(
-                vbt.ArrayWrapper(index, columns1, 2, some_arg=2),
+                vbt.ArrayWrapper(index, columns1, 2, some_arg=2, check_expected_keys_=False),
                 vbt.ArrayWrapper(index, columns2, 2),
             )
         with pytest.raises(Exception):
             vbt.ArrayWrapper.column_stack(
                 vbt.ArrayWrapper(index, columns1, 2),
-                vbt.ArrayWrapper(index, columns2, 2, some_arg=2),
+                vbt.ArrayWrapper(index, columns2, 2, some_arg=2, check_expected_keys_=False),
             )
 
     def test_config(self, tmp_path):
@@ -1814,365 +1824,375 @@ class TestArrayWrapper:
         df = pd.DataFrame(np.nan, index=i, columns=c)
         df_wrapper = wrapping.ArrayWrapper.from_obj(df)
 
-        obj = sr_wrapper.fill_using_index_dict(indexing.index_dict({
-            vbt.RowIdx(0): 100,
-            "_default": 0,
-        }))
+        obj = sr_wrapper.fill_using_index_dict(
+            indexing.index_dict(
+                {
+                    vbt.RowIdx(0): 100,
+                    "_default": 0,
+                }
+            )
+        )
         assert_series_equal(
             obj,
             pd.Series([100, 0, 0, 0, 0], index=i, name=c[0]),
         )
-        obj = df_wrapper.fill_using_index_dict(indexing.index_dict({
-            vbt.ElemIdx(1, 1): 100,
-            "_default": 1,
-        }))
+        obj = df_wrapper.fill_using_index_dict(
+            indexing.index_dict(
+                {
+                    vbt.ElemIdx(1, 1): 100,
+                    "_default": 1,
+                }
+            )
+        )
         assert_frame_equal(
             obj,
-            pd.DataFrame([
-                [1, 1, 1],
-                [1, 100, 1],
-                [1, 1, 1],
-                [1, 1, 1],
-                [1, 1, 1],
-            ], index=i, columns=c),
+            pd.DataFrame(
+                [
+                    [1, 1, 1],
+                    [1, 100, 1],
+                    [1, 1, 1],
+                    [1, 1, 1],
+                    [1, 1, 1],
+                ],
+                index=i,
+                columns=c,
+            ),
         )
 
         def _sr_assert_flex_index_dct(index_dct, target_arr):
             arr = sr_wrapper.fill_using_index_dict(indexing.index_dict(index_dct), keep_flex=True)
             np.testing.assert_array_equal(arr, target_arr)
 
+        _sr_assert_flex_index_dct({indexing.hslice(None, None, None): 0}, np.array([0.0]))
+        _sr_assert_flex_index_dct({0: 0}, np.array([0.0, np.nan, np.nan, np.nan, np.nan]))
+        _sr_assert_flex_index_dct({(0, 2): 0}, np.array([0.0, np.nan, 0.0, np.nan, np.nan]))
+        _sr_assert_flex_index_dct({(0, 2): [0, 1]}, np.array([0.0, np.nan, 1.0, np.nan, np.nan]))
         _sr_assert_flex_index_dct(
-            {indexing.hslice(None, None, None): 0},
-            np.array([0.0])
+            {(0, 2): vbt.RepEval("np.arange(len(row_indices))")}, np.array([0.0, np.nan, 1.0, np.nan, np.nan])
         )
+        _sr_assert_flex_index_dct({((0, 2), (3, 5)): 0}, np.array([0, 0, np.nan, 0, 0]))
+        _sr_assert_flex_index_dct({((0, 2, 2), (3, 5, 2)): 0}, np.array([0, np.nan, np.nan, 0, np.nan]))
         _sr_assert_flex_index_dct(
-            {0: 0},
-            np.array([0.0, np.nan, np.nan, np.nan, np.nan])
-        )
-        _sr_assert_flex_index_dct(
-            {(0, 2): 0},
-            np.array([0.0, np.nan, 0.0, np.nan, np.nan])
-        )
-        _sr_assert_flex_index_dct(
-            {(0, 2): [0, 1]},
-            np.array([0.0, np.nan, 1.0, np.nan, np.nan])
-        )
-        _sr_assert_flex_index_dct(
-            {(0, 2): vbt.RepEval("np.arange(len(row_indices))")},
-            np.array([0.0, np.nan, 1.0, np.nan, np.nan])
-        )
-        _sr_assert_flex_index_dct(
-            {((0, 2), (3, 5)): 0},
-            np.array([0, 0, np.nan, 0, 0])
-        )
-        _sr_assert_flex_index_dct(
-            {((0, 2, 2), (3, 5, 2)): 0},
-            np.array([0, np.nan, np.nan, 0, np.nan])
-        )
-        _sr_assert_flex_index_dct(
-            {indexing.ElemIdx(0, indexing.hslice(None, None, None)): 0},
-            np.array([0, np.nan, np.nan, np.nan, np.nan])
+            {indexing.ElemIdx(0, indexing.hslice(None, None, None)): 0}, np.array([0, np.nan, np.nan, np.nan, np.nan])
         )
 
         def _df_assert_flex_index_dct(index_dct, target_arr):
             arr = df_wrapper.fill_using_index_dict(indexing.index_dict(index_dct), keep_flex=True)
             np.testing.assert_array_equal(arr, target_arr)
 
+        _df_assert_flex_index_dct({indexing.RowIdx(indexing.hslice(None, None, None)): 0}, np.array([0.0])[:, None])
+        _df_assert_flex_index_dct({indexing.RowIdx(0): 0}, np.array([0.0, np.nan, np.nan, np.nan, np.nan])[:, None])
+        _df_assert_flex_index_dct({indexing.RowIdx((0, 2)): 0}, np.array([0.0, np.nan, 0.0, np.nan, np.nan])[:, None])
         _df_assert_flex_index_dct(
-            {indexing.RowIdx(indexing.hslice(None, None, None)): 0},
-            np.array([0.0])[:, None]
-        )
-        _df_assert_flex_index_dct(
-            {indexing.RowIdx(0): 0},
-            np.array([0.0, np.nan, np.nan, np.nan, np.nan])[:, None]
-        )
-        _df_assert_flex_index_dct(
-            {indexing.RowIdx((0, 2)): 0},
-            np.array([0.0, np.nan, 0.0, np.nan, np.nan])[:, None]
-        )
-        _df_assert_flex_index_dct(
-            {indexing.RowIdx((0, 2)): [0, 1]},
-            np.array([0.0, np.nan, 1.0, np.nan, np.nan])[:, None]
+            {indexing.RowIdx((0, 2)): [0, 1]}, np.array([0.0, np.nan, 1.0, np.nan, np.nan])[:, None]
         )
         _df_assert_flex_index_dct(
             {indexing.RowIdx((0, 2)): vbt.RepEval("np.arange(len(row_indices))")},
-            np.array([0.0, np.nan, 1.0, np.nan, np.nan])[:, None]
+            np.array([0.0, np.nan, 1.0, np.nan, np.nan])[:, None],
         )
         _df_assert_flex_index_dct(
             {indexing.RowIdx(0): [0, 1, 2]},
-            np.array([
-                [0, 1, 2],
-                [np.nan, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-            ])
+            np.array(
+                [
+                    [0, 1, 2],
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                ]
+            ),
         )
         _df_assert_flex_index_dct(
             {indexing.RowIdx((0, 2)): [[0, 1, 2]]},
-            np.array([
-                [0, 1, 2],
-                [np.nan, np.nan, np.nan],
-                [0, 1, 2],
-                [np.nan, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-            ])
+            np.array(
+                [
+                    [0, 1, 2],
+                    [np.nan, np.nan, np.nan],
+                    [0, 1, 2],
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                ]
+            ),
         )
         _df_assert_flex_index_dct(
             {indexing.RowIdx((0, 2)): [[0, 1, 2], [0, 1, 2]]},
-            np.array([
-                [0, 1, 2],
-                [np.nan, np.nan, np.nan],
-                [0, 1, 2],
-                [np.nan, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-            ])
+            np.array(
+                [
+                    [0, 1, 2],
+                    [np.nan, np.nan, np.nan],
+                    [0, 1, 2],
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                ]
+            ),
         )
+        _df_assert_flex_index_dct({indexing.RowIdx((0, 2)): 0}, np.array([0.0, np.nan, 0.0, np.nan, np.nan])[:, None])
+        _df_assert_flex_index_dct({indexing.RowIdx(((0, 2), (3, 5))): 0}, np.array([0, 0, np.nan, 0, 0])[:, None])
         _df_assert_flex_index_dct(
-            {indexing.RowIdx((0, 2)): 0},
-            np.array([0.0, np.nan, 0.0, np.nan, np.nan])[:, None]
+            {indexing.RowIdx(((0, 2, 2), (3, 5, 2))): 0}, np.array([0, np.nan, np.nan, 0, np.nan])[:, None]
         )
+        _df_assert_flex_index_dct({indexing.ColIdx(indexing.hslice(None, None, None)): 0}, np.array([0.0])[None])
+        _df_assert_flex_index_dct({indexing.ColIdx(0): 0}, np.array([0.0, np.nan, np.nan])[None])
+        _df_assert_flex_index_dct({indexing.ColIdx((0, 2)): 0}, np.array([0.0, np.nan, 0.0])[None])
+        _df_assert_flex_index_dct({indexing.ColIdx((0, 2)): [0, 1]}, np.array([0.0, np.nan, 1.0])[None])
         _df_assert_flex_index_dct(
-            {indexing.RowIdx(((0, 2), (3, 5))): 0},
-            np.array([0, 0, np.nan, 0, 0])[:, None]
-        )
-        _df_assert_flex_index_dct(
-            {indexing.RowIdx(((0, 2, 2), (3, 5, 2))): 0},
-            np.array([0, np.nan, np.nan, 0, np.nan])[:, None]
-        )
-        _df_assert_flex_index_dct(
-            {indexing.ColIdx(indexing.hslice(None, None, None)): 0},
-            np.array([0.0])[None]
-        )
-        _df_assert_flex_index_dct(
-            {indexing.ColIdx(0): 0},
-            np.array([0.0, np.nan, np.nan])[None]
-        )
-        _df_assert_flex_index_dct(
-            {indexing.ColIdx((0, 2)): 0},
-            np.array([0.0, np.nan, 0.0])[None]
-        )
-        _df_assert_flex_index_dct(
-            {indexing.ColIdx((0, 2)): [0, 1]},
-            np.array([0.0, np.nan, 1.0])[None]
-        )
-        _df_assert_flex_index_dct(
-            {indexing.ColIdx((0, 2)): vbt.RepEval("np.arange(len(col_indices))")},
-            np.array([0.0, np.nan, 1.0])[None]
+            {indexing.ColIdx((0, 2)): vbt.RepEval("np.arange(len(col_indices))")}, np.array([0.0, np.nan, 1.0])[None]
         )
         _df_assert_flex_index_dct(
             {indexing.ColIdx(0): [0, 1, 2, 3, 4]},
-            np.array([
-                [0, np.nan, np.nan],
-                [1, np.nan, np.nan],
-                [2, np.nan, np.nan],
-                [3, np.nan, np.nan],
-                [4, np.nan, np.nan],
-            ])
+            np.array(
+                [
+                    [0, np.nan, np.nan],
+                    [1, np.nan, np.nan],
+                    [2, np.nan, np.nan],
+                    [3, np.nan, np.nan],
+                    [4, np.nan, np.nan],
+                ]
+            ),
         )
         _df_assert_flex_index_dct(
             {indexing.ColIdx((0, 2)): [[0], [1], [2], [3], [4]]},
-            np.array([
-                [0, np.nan, 0],
-                [1, np.nan, 1],
-                [2, np.nan, 2],
-                [3, np.nan, 3],
-                [4, np.nan, 4],
-            ])
+            np.array(
+                [
+                    [0, np.nan, 0],
+                    [1, np.nan, 1],
+                    [2, np.nan, 2],
+                    [3, np.nan, 3],
+                    [4, np.nan, 4],
+                ]
+            ),
         )
         _df_assert_flex_index_dct(
             {indexing.ColIdx((0, 2)): [[0, 0], [1, 1], [2, 2], [3, 3], [4, 4]]},
-            np.array([
-                [0, np.nan, 0],
-                [1, np.nan, 1],
-                [2, np.nan, 2],
-                [3, np.nan, 3],
-                [4, np.nan, 4],
-            ])
+            np.array(
+                [
+                    [0, np.nan, 0],
+                    [1, np.nan, 1],
+                    [2, np.nan, 2],
+                    [3, np.nan, 3],
+                    [4, np.nan, 4],
+                ]
+            ),
         )
         _df_assert_flex_index_dct(
             {indexing.ElemIdx(indexing.hslice(None, None, None), indexing.hslice(None, None, None)): 0},
-            np.array([0.0])[None]
+            np.array([0.0])[None],
         )
         _df_assert_flex_index_dct(
             {indexing.ElemIdx(0, 0): 0},
-            np.array([
-                [0, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-            ])
+            np.array(
+                [
+                    [0, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                ]
+            ),
         )
         _df_assert_flex_index_dct(
             {indexing.ElemIdx((0, 2), 0): 0},
-            np.array([
-                [0, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-                [0, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-            ])
+            np.array(
+                [
+                    [0, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [0, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                ]
+            ),
         )
         _df_assert_flex_index_dct(
             {indexing.ElemIdx(0, (0, 2)): 0},
-            np.array([
-                [0, np.nan, 0],
-                [np.nan, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-            ])
+            np.array(
+                [
+                    [0, np.nan, 0],
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                ]
+            ),
         )
         _df_assert_flex_index_dct(
             {indexing.ElemIdx((0, 2), (0, 2)): 0},
-            np.array([
-                [0, np.nan, 0],
-                [np.nan, np.nan, np.nan],
-                [0, np.nan, 0],
-                [np.nan, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-            ])
+            np.array(
+                [
+                    [0, np.nan, 0],
+                    [np.nan, np.nan, np.nan],
+                    [0, np.nan, 0],
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                ]
+            ),
         )
         _df_assert_flex_index_dct(
             {indexing.ElemIdx((0, 2), (0, 2)): [0, 1]},
-            np.array([
-                [0, np.nan, 1],
-                [np.nan, np.nan, np.nan],
-                [0, np.nan, 1],
-                [np.nan, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-            ])
+            np.array(
+                [
+                    [0, np.nan, 1],
+                    [np.nan, np.nan, np.nan],
+                    [0, np.nan, 1],
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                ]
+            ),
         )
         _df_assert_flex_index_dct(
             {indexing.ElemIdx((0, 2), (0, 2)): [[0], [1]]},
-            np.array([
-                [0, np.nan, 0],
-                [np.nan, np.nan, np.nan],
-                [1, np.nan, 1],
-                [np.nan, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-            ])
+            np.array(
+                [
+                    [0, np.nan, 0],
+                    [np.nan, np.nan, np.nan],
+                    [1, np.nan, 1],
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                ]
+            ),
         )
         _df_assert_flex_index_dct(
             {indexing.ElemIdx((0, 2), (0, 2)): [[0, 1], [2, 3]]},
-            np.array([
-                [0, np.nan, 1],
-                [np.nan, np.nan, np.nan],
-                [2, np.nan, 3],
-                [np.nan, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-            ])
+            np.array(
+                [
+                    [0, np.nan, 1],
+                    [np.nan, np.nan, np.nan],
+                    [2, np.nan, 3],
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                ]
+            ),
         )
         _df_assert_flex_index_dct(
             {indexing.ElemIdx(indexing.hslice(0, 2), indexing.hslice(0, 2)): [[0, 1], [2, 3]]},
-            np.array([
-                [0, 1, np.nan],
-                [2, 3, np.nan],
-                [np.nan, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-            ])
+            np.array(
+                [
+                    [0, 1, np.nan],
+                    [2, 3, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                ]
+            ),
         )
         _df_assert_flex_index_dct(
             {indexing.ElemIdx(((0, 2), (3, 5)), 0): 0},
-            np.array([
-                [0, np.nan, np.nan],
-                [0, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-                [0, np.nan, np.nan],
-                [0, np.nan, np.nan],
-            ])
+            np.array(
+                [
+                    [0, np.nan, np.nan],
+                    [0, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [0, np.nan, np.nan],
+                    [0, np.nan, np.nan],
+                ]
+            ),
         )
         _df_assert_flex_index_dct(
             {indexing.ElemIdx(((0, 2), (3, 5)), 0): [1, 2]},
-            np.array([
-                [1, np.nan, np.nan],
-                [1, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-                [2, np.nan, np.nan],
-                [2, np.nan, np.nan],
-            ])
+            np.array(
+                [
+                    [1, np.nan, np.nan],
+                    [1, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [2, np.nan, np.nan],
+                    [2, np.nan, np.nan],
+                ]
+            ),
         )
         _df_assert_flex_index_dct(
             {indexing.ElemIdx(((0, 2), (3, 5)), (0, 1)): [1, 2]},
-            np.array([
-                [1, 2, np.nan],
-                [1, 2, np.nan],
-                [np.nan, np.nan, np.nan],
-                [1, 2, np.nan],
-                [1, 2, np.nan],
-            ])
+            np.array(
+                [
+                    [1, 2, np.nan],
+                    [1, 2, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [1, 2, np.nan],
+                    [1, 2, np.nan],
+                ]
+            ),
         )
         _df_assert_flex_index_dct(
             {indexing.ElemIdx(((0, 2), (3, 5)), (0, 1)): [[1], [2]]},
-            np.array([
-                [1, 1, np.nan],
-                [1, 1, np.nan],
-                [np.nan, np.nan, np.nan],
-                [2, 2, np.nan],
-                [2, 2, np.nan],
-            ])
+            np.array(
+                [
+                    [1, 1, np.nan],
+                    [1, 1, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [2, 2, np.nan],
+                    [2, 2, np.nan],
+                ]
+            ),
         )
         _df_assert_flex_index_dct(
             {indexing.ElemIdx(((0, 2), (3, 5)), indexing.hslice(0, 2)): [[1], [2]]},
-            np.array([
-                [1, 1, np.nan],
-                [1, 1, np.nan],
-                [np.nan, np.nan, np.nan],
-                [2, 2, np.nan],
-                [2, 2, np.nan],
-            ])
+            np.array(
+                [
+                    [1, 1, np.nan],
+                    [1, 1, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [2, 2, np.nan],
+                    [2, 2, np.nan],
+                ]
+            ),
         )
         _df_assert_flex_index_dct(
             {indexing.ElemIdx(((0, 2, 2), (3, 5, 2)), 0): 0},
-            np.array([
-                [0, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-                [0, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-            ])
+            np.array(
+                [
+                    [0, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [0, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                ]
+            ),
         )
         _df_assert_flex_index_dct(
             {indexing.ElemIdx(((0, 2, 2), (3, 5, 2)), 0): [1, 2]},
-            np.array([
-                [1, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-                [2, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-            ])
+            np.array(
+                [
+                    [1, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [2, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                ]
+            ),
         )
         _df_assert_flex_index_dct(
             {indexing.ElemIdx(((0, 2, 2), (3, 5, 2)), (0, 1)): [1, 2]},
-            np.array([
-                [1, 2, np.nan],
-                [np.nan, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-                [1, 2, np.nan],
-                [np.nan, np.nan, np.nan],
-            ])
+            np.array(
+                [
+                    [1, 2, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [1, 2, np.nan],
+                    [np.nan, np.nan, np.nan],
+                ]
+            ),
         )
         _df_assert_flex_index_dct(
             {indexing.ElemIdx(((0, 2, 2), (3, 5, 2)), (0, 1)): [[1], [2]]},
-            np.array([
-                [1, 1, np.nan],
-                [np.nan, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-                [2, 2, np.nan],
-                [np.nan, np.nan, np.nan],
-            ])
+            np.array(
+                [
+                    [1, 1, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [2, 2, np.nan],
+                    [np.nan, np.nan, np.nan],
+                ]
+            ),
         )
         _df_assert_flex_index_dct(
             {indexing.ElemIdx(((0, 2, 2), (3, 5, 2)), indexing.hslice(0, 2)): [[1], [2]]},
-            np.array([
-                [1, 1, np.nan],
-                [np.nan, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-                [2, 2, np.nan],
-                [np.nan, np.nan, np.nan],
-            ])
+            np.array(
+                [
+                    [1, 1, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [2, 2, np.nan],
+                    [np.nan, np.nan, np.nan],
+                ]
+            ),
         )
 
 
@@ -3816,52 +3836,78 @@ class TestReshapeFns:
         c = pd.Index(["a", "b", "c"], name="c")
         sr = pd.Series(np.nan, index=i, name=c[0])
         df = pd.DataFrame(np.nan, index=i, columns=c)
-        _, obj = reshaping.broadcast(sr, indexing.index_dict({
-            vbt.RowIdx(0): 100,
-            "_default": 0,
-        }))
+        _, obj = reshaping.broadcast(
+            sr,
+            indexing.index_dict(
+                {
+                    vbt.RowIdx(0): 100,
+                    "_default": 0,
+                }
+            ),
+        )
         assert_series_equal(
             obj,
             pd.Series([100, 0, 0, 0, 0], index=i, name=c[0]),
         )
-        _, obj = reshaping.broadcast(df, indexing.index_dict({
-            vbt.ElemIdx(1, 1): 100,
-            "_default": 1,
-        }))
+        _, obj = reshaping.broadcast(
+            df,
+            indexing.index_dict(
+                {
+                    vbt.ElemIdx(1, 1): 100,
+                    "_default": 1,
+                }
+            ),
+        )
         assert_frame_equal(
             obj,
-            pd.DataFrame([
-                [1, 1, 1],
-                [1, 100, 1],
-                [1, 1, 1],
-                [1, 1, 1],
-                [1, 1, 1],
-            ], index=i, columns=c),
+            pd.DataFrame(
+                [
+                    [1, 1, 1],
+                    [1, 100, 1],
+                    [1, 1, 1],
+                    [1, 1, 1],
+                    [1, 1, 1],
+                ],
+                index=i,
+                columns=c,
+            ),
         )
-        _, obj = reshaping.broadcast(df, indexing.index_dict({
-            vbt.ElemIdx(1, 1): 100,
-            "_default": 1,
-        }), keep_flex=True)
+        _, obj = reshaping.broadcast(
+            df,
+            indexing.index_dict(
+                {
+                    vbt.ElemIdx(1, 1): 100,
+                    "_default": 1,
+                }
+            ),
+            keep_flex=True,
+        )
         np.testing.assert_array_equal(
             obj,
-            np.array([
-                [1, 1, 1],
-                [1, 100, 1],
-                [1, 1, 1],
-                [1, 1, 1],
-                [1, 1, 1],
-            ]),
+            np.array(
+                [
+                    [1, 1, 1],
+                    [1, 100, 1],
+                    [1, 1, 1],
+                    [1, 1, 1],
+                    [1, 1, 1],
+                ]
+            ),
         )
         _, obj = reshaping.broadcast(df, vbt.RepEval("wrapper.fill(0)"))
         assert_frame_equal(
             obj,
-            pd.DataFrame([
-                [0, 0, 0],
-                [0, 0, 0],
-                [0, 0, 0],
-                [0, 0, 0],
-                [0, 0, 0],
-            ], index=i, columns=c),
+            pd.DataFrame(
+                [
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                ],
+                index=i,
+                columns=c,
+            ),
         )
 
     def test_broadcast_to(self):
@@ -4877,10 +4923,9 @@ class TestIndexing:
         np.testing.assert_array_equal(row_indices, np.array([1, 3, 5]))
         assert col_indices == slice(None, None, None)
 
-        row_indices, col_indices = indexing.get_indices(dti, c, indexing.RowRanges(
-            start="2020-01-01 12:00",
-            end="2020-01-01 17:00"
-        ))
+        row_indices, col_indices = indexing.get_indices(
+            dti, c, indexing.RowRanges(start="2020-01-01 12:00", end="2020-01-01 17:00")
+        )
         np.testing.assert_array_equal(row_indices[0], np.array([12]))
         np.testing.assert_array_equal(row_indices[1], np.array([17]))
         assert col_indices == slice(None, None, None)
@@ -4889,22 +4934,34 @@ class TestIndexing:
         np.testing.assert_array_equal(row_indices[1], np.array([2, 6]))
         assert col_indices == slice(None, None, None)
 
-        row_indices, col_indices = indexing.get_indices(i, c, indexing.ElemIdx(
-            indexing.RowIdx(1, is_labels=False),
-            indexing.ColIdx(2, is_labels=False),
-        ))
+        row_indices, col_indices = indexing.get_indices(
+            i,
+            c,
+            indexing.ElemIdx(
+                indexing.RowIdx(1, is_labels=False),
+                indexing.ColIdx(2, is_labels=False),
+            ),
+        )
         assert row_indices == 1
         assert col_indices == 2
         with pytest.raises(Exception):
-            indexing.get_indices(i, c, indexing.ElemIdx(
-                indexing.ColIdx(1, is_labels=False),
-                indexing.ColIdx(2, is_labels=False),
-            ))
+            indexing.get_indices(
+                i,
+                c,
+                indexing.ElemIdx(
+                    indexing.ColIdx(1, is_labels=False),
+                    indexing.ColIdx(2, is_labels=False),
+                ),
+            )
         with pytest.raises(Exception):
-            indexing.get_indices(i, c, indexing.ElemIdx(
-                indexing.RowIdx(1, is_labels=False),
-                indexing.RowIdx(2, is_labels=False),
-            ))
+            indexing.get_indices(
+                i,
+                c,
+                indexing.ElemIdx(
+                    indexing.RowIdx(1, is_labels=False),
+                    indexing.RowIdx(2, is_labels=False),
+                ),
+            )
 
         row_indices, col_indices = indexing.get_indices(i, c, 1)
         assert row_indices == 0
@@ -5141,8 +5198,8 @@ class TestAccessors:
 
     def test_row_stack(self):
         acc = vbt.BaseAccessor.row_stack(
-            pd.Series([0, 1, 2], index=pd.Index(["a", "b", "c"])).vbt,
-            pd.Series([3, 4, 5], index=pd.Index(["d", "e", "f"])).vbt,
+            vbt.BaseAccessor(pd.Series([0, 1, 2], index=pd.Index(["a", "b", "c"]))),
+            vbt.BaseAccessor(pd.Series([3, 4, 5], index=pd.Index(["d", "e", "f"]))),
         )
         target_obj = pd.DataFrame(
             [0, 1, 2, 3, 4, 5],
@@ -5156,8 +5213,8 @@ class TestAccessors:
         assert acc.wrapper.name is None
         assert target_obj.vbt.wrapper.ndim == target_obj.ndim
         acc = vbt.BaseAccessor.row_stack(
-            pd.Series([0, 1, 2], name="sr").vbt,
-            pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c")).vbt,
+            vbt.BaseAccessor(pd.Series([0, 1, 2], name="sr")),
+            vbt.BaseAccessor(pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c"))),
         )
         target_obj = pd.DataFrame(
             [[0, 0], [1, 1], [2, 2], [0, 1], [2, 3], [4, 5]],
@@ -5175,30 +5232,42 @@ class TestAccessors:
         )
         assert target_obj.vbt.wrapper.ndim == target_obj.ndim
         acc = vbt.BaseAccessor.row_stack(
-            pd.Series([0, 1, 2], name="sr").vbt(some_arg=2),
-            pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c")).vbt(some_arg=2),
+            vbt.BaseAccessor(pd.Series([0, 1, 2], name="sr"), some_arg=2, check_expected_keys_=False),
+            vbt.BaseAccessor(
+                pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c")),
+                some_arg=2,
+                check_expected_keys_=False,
+            ),
         )
         assert acc.config["some_arg"] == 2
         with pytest.raises(Exception):
             vbt.BaseAccessor.row_stack(
-                pd.Series([0, 1, 2], name="sr").vbt(some_arg=2),
-                pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c")).vbt,
+                vbt.BaseAccessor(pd.Series([0, 1, 2], name="sr"), some_arg=2, check_expected_keys_=False),
+                vbt.BaseAccessor(pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c"))),
             )
         with pytest.raises(Exception):
             vbt.BaseAccessor.row_stack(
-                pd.Series([0, 1, 2], name="sr").vbt,
-                pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c")).vbt(some_arg=2),
+                vbt.BaseAccessor(pd.Series([0, 1, 2], name="sr")),
+                vbt.BaseAccessor(
+                    pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c")),
+                    some_arg=2,
+                    check_expected_keys_=False,
+                ),
             )
         with pytest.raises(Exception):
             vbt.BaseAccessor.row_stack(
-                pd.Series([0, 1, 2], name="sr").vbt(some_arg=2),
-                pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c")).vbt(some_arg=3),
+                vbt.BaseAccessor(pd.Series([0, 1, 2], name="sr"), some_arg=2, check_expected_keys_=False),
+                vbt.BaseAccessor(
+                    pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c")),
+                    some_arg=3,
+                    check_expected_keys_=False,
+                ),
             )
 
     def test_column_stack(self):
         acc = vbt.BaseAccessor.column_stack(
-            pd.Series([0, 1, 2], name="sr").vbt,
-            pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c")).vbt,
+            vbt.BaseAccessor(pd.Series([0, 1, 2], name="sr")),
+            vbt.BaseAccessor(pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c"))),
         )
         target_obj = pd.DataFrame(
             [[0, 0, 1], [1, 2, 3], [2, 4, 5]],
@@ -5215,24 +5284,36 @@ class TestAccessors:
             target_obj.columns,
         )
         acc = vbt.BaseAccessor.column_stack(
-            pd.Series([0, 1, 2], name="sr").vbt(some_arg=2),
-            pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c")).vbt(some_arg=2),
+            vbt.BaseAccessor(pd.Series([0, 1, 2], name="sr"), some_arg=2, check_expected_keys_=False),
+            vbt.BaseAccessor(
+                pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c")),
+                some_arg=2,
+                check_expected_keys_=False,
+            ),
         )
         assert acc.config["some_arg"] == 2
         with pytest.raises(Exception):
             vbt.BaseAccessor.column_stack(
-                pd.Series([0, 1, 2], name="sr").vbt(some_arg=2),
-                pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c")).vbt,
+                vbt.BaseAccessor(pd.Series([0, 1, 2], name="sr"), some_arg=2, check_expected_keys_=False),
+                vbt.BaseAccessor(pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c"))),
             )
         with pytest.raises(Exception):
             vbt.BaseAccessor.column_stack(
-                pd.Series([0, 1, 2], name="sr").vbt,
-                pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c")).vbt(some_arg=2),
+                vbt.BaseAccessor(pd.Series([0, 1, 2], name="sr")),
+                vbt.BaseAccessor(
+                    pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c")),
+                    some_arg=2,
+                    check_expected_keys_=False,
+                ),
             )
         with pytest.raises(Exception):
             vbt.BaseAccessor.column_stack(
-                pd.Series([0, 1, 2], name="sr").vbt(some_arg=2),
-                pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c")).vbt(some_arg=3),
+                vbt.BaseAccessor(pd.Series([0, 1, 2], name="sr"), some_arg=2, check_expected_keys_=False),
+                vbt.BaseAccessor(
+                    pd.DataFrame([[0, 1], [2, 3], [4, 5]], columns=pd.Index(["a", "b"], name="c")),
+                    some_arg=3,
+                    check_expected_keys_=False,
+                ),
             )
 
     def test_empty(self):

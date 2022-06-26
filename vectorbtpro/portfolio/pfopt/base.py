@@ -841,6 +841,11 @@ PortfolioOptimizerT = tp.TypeVar("PortfolioOptimizerT", bound="PortfolioOptimize
 class PortfolioOptimizer(Analyzable):
     """Class that exposes methods for generating allocations."""
 
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Analyzable._expected_keys or set()) | {
+        "alloc_records",
+        "allocations",
+    }
+
     def __init__(
         self,
         wrapper: ArrayWrapper,

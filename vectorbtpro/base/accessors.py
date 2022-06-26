@@ -245,6 +245,10 @@ class BaseAccessor(Wrapping):
             return self.replace(cls_=self.sr_accessor_cls, obj=new_obj, wrapper=wrapper_meta["new_wrapper"])
         return self.replace(cls_=self.df_accessor_cls, obj=new_obj, wrapper=wrapper_meta["new_wrapper"])
 
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Wrapping._expected_keys or set()) | {
+        "obj",
+    }
+
     def __init__(self, obj: tp.SeriesFrame, wrapper: tp.Optional[ArrayWrapper] = None, **kwargs) -> None:
         checks.assert_instance_of(obj, (pd.Series, pd.DataFrame))
 

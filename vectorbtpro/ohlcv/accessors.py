@@ -116,6 +116,10 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
 
     Accessible via `pd.DataFrame.vbt.ohlcv`."""
 
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (GenericDFAccessor._expected_keys or set()) | {
+        "column_names",
+    }
+
     def __init__(self, obj: tp.Frame, column_names: tp.KwargsLike = None, **kwargs) -> None:
         self._column_names = column_names
 

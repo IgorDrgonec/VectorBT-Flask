@@ -21,6 +21,12 @@ class DataUpdater(Configured):
         **kwargs: Keyword arguments passed to the constructor of `Configured`.
     """
 
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Configured._expected_keys or set()) | {
+        "data",
+        "schedule_manager",
+        "update_kwargs",
+    }
+
     def __init__(
         self,
         data: Data,

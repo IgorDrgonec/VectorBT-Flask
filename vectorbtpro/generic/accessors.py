@@ -355,6 +355,10 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
     Accessible via `pd.Series.vbt` and `pd.DataFrame.vbt`."""
 
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (BaseAccessor._expected_keys or set()) | {
+        "mapping",
+    }
+
     def __init__(self, obj: tp.SeriesFrame, mapping: tp.Optional[tp.MappingLike] = None, **kwargs) -> None:
         BaseAccessor.__init__(self, obj, mapping=mapping, **kwargs)
         StatsBuilderMixin.__init__(self)

@@ -673,14 +673,22 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
             kwargs["col_mapper"] = ColumnMapper.column_stack(
                 *[obj.col_mapper for obj in objs],
                 wrapper=kwargs["wrapper"],
-                get_indexer_kwargs=get_indexer_kwargs,
             )
         if "records_arr" not in kwargs:
-            kwargs["records_arr"] = cls.column_stack_records_arrs(*objs, **kwargs)
+            kwargs["records_arr"] = cls.column_stack_records_arrs(
+                *objs,
+                get_indexer_kwargs=get_indexer_kwargs,
+                **kwargs,
+            )
 
-        kwargs = cls.resolve_column_stack_kwargs(*objs, get_indexer_kwargs=get_indexer_kwargs, **kwargs)
+        kwargs = cls.resolve_column_stack_kwargs(*objs, **kwargs)
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
         return cls(**kwargs)
+
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Analyzable._expected_keys or set()) | {
+        "records_arr",
+        "col_mapper",
+    }
 
     def __init__(
         self,

@@ -1661,7 +1661,7 @@ from vectorbtpro.utils.datetime_ import freq_to_timedelta64
 from vectorbtpro.utils.decorators import custom_property, cached_property, class_or_instancemethod
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.mapping import to_mapping
-from vectorbtpro.utils.parsing import get_func_kwargs
+from vectorbtpro.utils.parsing import get_func_kwargs, get_func_arg_names
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.template import Rep, RepEval, RepFunc, deep_substitute
 from vectorbtpro.utils.chunking import ArgsTaker
@@ -2829,6 +2829,34 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         kwargs = cls.resolve_column_stack_kwargs(*objs, **kwargs)
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
         return cls(**kwargs)
+
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Analyzable._expected_keys or set()) | {
+        "close",
+        "order_records",
+        "open",
+        "high",
+        "low",
+        "log_records",
+        "cash_sharing",
+        "init_cash",
+        "init_position",
+        "init_price",
+        "cash_deposits",
+        "cash_earnings",
+        "call_seq",
+        "in_outputs",
+        "use_in_outputs",
+        "bm_close",
+        "fillna_close",
+        "trades_type",
+        "orders_cls",
+        "logs_cls",
+        "entry_trades_cls",
+        "exit_trades_cls",
+        "trades_cls",
+        "positions_cls",
+        "drawdowns_cls",
+    }
 
     def __init__(
         self,

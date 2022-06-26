@@ -37,6 +37,10 @@ class SignalFactory(IndicatorFactory):
     Other arguments are passed to `vectorbtpro.indicators.factory.IndicatorFactory`.
     """
 
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (IndicatorFactory._expected_keys or set()) | {
+        "mode",
+    }
+
     def __init__(
         self,
         *args,
@@ -75,12 +79,13 @@ class SignalFactory(IndicatorFactory):
         IndicatorFactory.__init__(
             self,
             *args,
+            mode=mode,
             input_names=input_names,
             output_names=output_names,
             attr_settings=attr_settings,
             **kwargs,
         )
-        self.mode = mode
+        self._mode = mode
 
         def plot(
             _self,
@@ -189,6 +194,11 @@ class SignalFactory(IndicatorFactory):
         )
 
         setattr(self.Indicator, "plot", plot)
+
+    @property
+    def mode(self):
+        """Factory mode."""
+        return self._mode
 
     def with_place_func(
         self,
