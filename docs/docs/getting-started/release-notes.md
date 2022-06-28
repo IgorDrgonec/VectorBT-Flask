@@ -6,6 +6,17 @@ title: Release notes
 
 All notable changes in reverse chronological order.
 
+## Version 1.4.2 (28 Jun, 2022)
+
+- Integrated [plotly-resampler](https://predict-idlab.github.io/plotly-resampler/). If installed,
+resampled figures/widgets will be used automatically. If not, will fall back to regular Plotly figures/widgets.
+Can be force-enabled or disabled in the global settings. Only scatter traces are supported.
+- Hit detection of limit order price in [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_signals)
+can be reversed using the argument `limit_reverse`
+- Previously, not expected arguments that were passed to any class method were "swallowed" by the class.
+Now, passing such arguments will raise an error. No more mistyping arguments!
+- Created a Dockerfile that runs JupyterLab and includes vectorbtpro and most of its optional dependencies
+
 ## Version 1.4.1 (25 Jun, 2022)
 
 - Fixed error when providing any stop in [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_signals)
