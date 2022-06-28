@@ -393,7 +393,15 @@ class Scatter(Configured, TraceUpdater):
                 scatter_obj = go.Scattergl
             else:
                 scatter_obj = go.Scatter
-            if isinstance(fig, (FigureResampler, FigureWidgetResampler)):
+            try:
+                from plotly_resampler.aggregation import AbstractFigureAggregator
+                if isinstance(fig, AbstractFigureAggregator):
+                    use_resampler = True
+                else:
+                    use_resampler = False
+            except ImportError:
+                use_resampler = False
+            if use_resampler:
                 if data is None:
                     raise ValueError("Cannot create empty scatter traces when using plotly-resampler")
                 trace = scatter_obj(name=trace_name, showlegend=trace_name is not None)

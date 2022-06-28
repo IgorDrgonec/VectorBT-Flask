@@ -15,3 +15,4 @@ docs/site
 *.h5
 .github_gist_token
 /venvs/
+/work/

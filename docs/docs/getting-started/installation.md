@@ -12,6 +12,8 @@ title: Installation
 
 ## Requirements
 
+### Token
+
 After you've been added to the list of collaborators and accepted the
 repository invitation, the next step is to create a [Personal Access Token] for
 your GitHub account in order to access the PRO repository programmatically 
@@ -51,13 +53,13 @@ The PRO version can be installed with `pip`.
 
 Uninstall the community version if installed:
 
-```sh
+```shell
 pip uninstall vectorbt
 ```
 
 Install the base PRO version (with recommended dependencies):
 
-```sh
+```shell
 # if you're using Git/HTTPS authentication
 pip install -U "vectorbtpro[base] @ git+https://github.com/polakowo/vectorbt.pro.git"
 
@@ -72,13 +74,13 @@ pip install -U "vectorbtpro[base] @ git+ssh://github.com/polakowo/vectorbt.pro.g
     [add it to your system](https://stackoverflow.com/a/68781050) 
     or set an environment variable `GH_TOKEN` and then install the package as follows:
 
-    ```sh
+    ```shell
     pip install -U "vectorbtpro[base] @ git+https://${GH_TOKEN}@github.com/polakowo/vectorbt.pro.git"
     ```
 
 Lightweight version (with only required dependencies):
 
-```sh
+```shell
 pip install -U git+https://github.com/polakowo/vectorbt.pro.git
 ```
 
@@ -124,15 +126,118 @@ setup(
 
 Of course, you can pull vectorbt PRO directly from `git`:
 
-```sh
+```shell
 git clone git@github.com:polakowo/vectorbt.pro.git vectorbtpro
 ```
 
 Install the package:
 
-```sh
+```shell
 pip install -e vectorbtpro
 ```
+
+## With Docker
+
+[Docker](https://www.docker.com/) containers package all the dependencies needed to run a piece of software. 
+Each container can be thought of its own machine with its own OS and file system, while being lightweight 
+and taking only seconds to run. What this means is that we don't mind installing packages "globally" anymore, 
+because the container will only be used for one specific application - vectorbtpro.
+
+Docker image of vectorbtpro is based on [Jupyter Docker Stacks](https://jupyter-docker-stacks.readthedocs.io/en/latest/) -
+a set of ready-to-run Docker images containing Jupyter applications and interactive computing tools.
+Particularly, the image is based on [jupyter/scipy-notebook](https://jupyter-docker-stacks.readthedocs.io/en/latest/using/selecting.html#jupyter-scipy-notebook),
+which includes a minimally-functional JupyterLab server and preinstalled popular packages from the scientific 
+Python ecosystem, and extends it with Plotly and Dash for interactive visualizations and plots,
+and vectorbtpro and most of its optional dependencies. The image requires the source of vectorbtpro to be 
+available in the current depository.
+
+Before proceeding, make sure to [have Docker installed](https://docs.docker.com/install/).
+
+Launch Docker using Docker Desktop.
+
+### Building
+
+Clone the vectorbtpro repository (if not already). Run this from a directory where you want
+vectorbtpro to reside, for example, in Documents/GitHub:
+
+```shell
+git clone git@github.com:polakowo/vectorbt.pro.git vectorbtpro --depth=1
+```
+
+Go into the directory:
+
+```shell
+cd vectorbtpro
+```
+
+Build the image (this can take some time):
+
+```shell
+docker build . -t vectorbtpro
+```
+
+Create a working directory inside the current directory:
+
+```shell
+mkdir work
+```
+
+### Running
+
+Start a container running a JupyterLab Server on the port 8888:
+
+```shell
+docker run -it --rm -p 8888:8888 -v "$PWD/work":/home/jovyan/work vectorbtpro
+```
+
+!!! info
+    The use of the `-v` flag in the command mounts the current working directory on the host 
+    (`{PWD/work}` in the example command) as `/home/jovyan/work` in the container. The server logs 
+    appear in the terminal. Due to the usage of [the flag --rm](https://docs.docker.com/engine/reference/run/#clean-up---rm) 
+    Docker automatically cleans up the container and removes the file system when the container exits, 
+    but any changes made to the `~/work` directory and its files in the container will remain intact on the host. 
+    [The -it flag](https://docs.docker.com/engine/reference/commandline/run/#assign-name-and-allocate-pseudo-tty---name--it) 
+    allocates pseudo-TTY.
+
+Alternatively, if the port 8888 is already in use, use another port (here 10000):
+
+```shell
+docker run -it --rm -p 10000:8888 -v "$PWD/work":/home/jovyan/work vectorbtpro
+```
+
+Once the server has been launched, visit its address in a browser. The address is printed in
+the console, for example: `http://127.0.0.1:8888/lab?token=9e85949d9901633d1de9dad7a963b43257e29fb232883908`
+
+!!! note
+    Change the port if necessary.
+
+This will open JupyterLab where you can create a new notebook and start working with vectorbt PRO :tada:
+
+To make use of any files on the host, put them into to the working directory `work` on the host 
+and they will appear in the file browser of JupyterLab. Alternatively, you can drag and drop them 
+directly into the file browser of JupyterLab.
+
+### Stopping
+
+To stop the container, first hit ++ctrl+c++, and then upon prompt, type `y` and hit ++enter++
+
+### Upgrading
+
+To upgrade the Docker image to a new version of vectorbtpro, first, update the local version 
+of the repository from the remote:
+
+```shell
+git pull
+```
+
+Then, rebuild the image:
+
+```shell
+docker build . -t vectorbtpro
+```
+
+!!! info
+    This won't rebuild the entire image, only the vectorbtpro installation step.
 
 ## Troubleshooting
 

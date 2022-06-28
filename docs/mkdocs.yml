@@ -28,7 +28,6 @@ theme:
     - search.suggest
     - search.share
     - content.code.annotate
-    - content.tabs.link
     - toc.follow
   palette:
     scheme: slate
@@ -60,6 +59,8 @@ markdown_extensions:
   - toc:
       permalink: true
   - abbr
+  - pymdownx.keys
+  - pymdownx.details
   - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.superfences:

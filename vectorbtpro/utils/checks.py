@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 from pandas.api.types import is_datetime64_any_dtype as is_datetime
 from numba.core.registry import CPUDispatcher
+import numba
 
 from vectorbtpro import _typing as tp
 
@@ -84,7 +85,7 @@ def is_iterable(arg: tp.Any) -> bool:
 
 def is_numba_enabled() -> bool:
     """Check whether Numba is enabled globally."""
-    return not os.environ.get("NUMBA_DISABLE_JIT", "0") == "1"
+    return numba.config.DISABLE_JIT != 1
 
 
 def is_numba_func(arg: tp.Any) -> bool:
@@ -95,13 +96,12 @@ def is_numba_func(arg: tp.Any) -> bool:
 
     if not numba_cfg["check_func_type"]:
         return True
-    if "NUMBA_DISABLE_JIT" in os.environ:
-        if not is_numba_enabled():
-            if numba_cfg["check_func_suffix"]:
-                if arg.__name__.endswith("_nb"):
-                    return True
-                return False
+    if not is_numba_enabled():
+        if numba_cfg["check_func_suffix"]:
+            if arg.__name__.endswith("_nb"):
+                return True
             return False
+        return False
     return isinstance(arg, CPUDispatcher)
 
 

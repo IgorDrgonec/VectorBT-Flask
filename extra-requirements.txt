@@ -6,7 +6,7 @@
 yfinance>=0.1.63:           data, base
 python-binance:             data
 alpaca_trade_api:           data
-ccxt:                       data
+ccxt>=1.89.14:              data
 tables:                     data
 polygon-api-client>=1.0.0:  data
 beautifulsoup4:             data
@@ -20,9 +20,9 @@ numexpr:                    compute, base
 ray>=1.4.1:                 distribute
 dask:                       distribute, base
 matplotlib:                 plot, base
-plotly>=4.12.0:             plot, base
+plotly>=5.0.0:              plot, base
 ipywidgets>=7.0.0:          plot, base
-plotly-resampler            plot
+plotly-resampler:           plot
 quantstats>=0.0.37:         stats, base
 PyPortfolioOpt>=1.5.1:      stats, base
 universal-portfolios:       stats

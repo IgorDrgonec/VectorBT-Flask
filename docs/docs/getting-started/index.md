@@ -6,6 +6,11 @@ title: Getting started
 
 ![](/assets/logo/header.svg)
 
+![](/assets/badges/version.svg)
+![](/assets/badges/python-version.svg)
+![](/assets/badges/license.svg)
+![](/assets/badges/build-passing.svg)
+
 vectorbt PRO is the next-generation engine for backtesting, algorithmic trading, and research. 
 It's a high-performance, actively-developed, commercial successor to the [vectorbt](https://github.com/polakowo/vectorbt) 
 library, one of the world's most innovative open-source backtesting engines. The PRO version extends the 
@@ -69,7 +74,103 @@ algorithmic trading accessible to everyone. Join us!
     vectorbt PRO is a commercial successor to the community version of vectorbt. The entire functionality
     of this package is proprietary and will not be released to the public.
 
-## What is vectorbt PRO?
+## What is vectorbt?
+
+vectorbt is a Python package that combines a variety of acceleration and data science tools 
+to make trading strategies and markets more transparent to quants. 
+
+One of the unique features of vectorbt is the ability to represent any trading setup as a set of 
+multidimensional arrays, where each column represents a separate configuration of a trading strategy 
+and its environment. This approach allows building and backtesting entire grids of parameters at the 
+speed of C, while the results can be analyzed in detail using the Python's vibrant package ecosystem - 
+the best of both worlds. [Learn more](/documentation/fundamentals).
+
+## Why vectorbt?
+
+vectorbt follows an approach totally opposite to that of a conventional backtesting software:
+instead of running a backtesting job as a single monolithic process, vectorbt divides the job
+into dozens of isolated components that can be composed by the user like Lego bricks
+and run independently of each other; such components include [data](/documentation/data), 
+[indicators](/documentation/indicators), [signals](/tutorials/signal-development), 
+[allocations](/tutorials/portfolio-optimization), [portfolio](/documentation/portfolio), and more.
+Each component has its own ecosystem of analysis tools, enabling quants to analyze many facets
+of a trading strategy even before it hits the actual backtesting step. This also means that
+ML models can be connected at many places and integrated more easily. Finally, vectorbt 
+was build with parameter optimization in mind: even large spaces of parameters can be
+tested in the blink of an eye, allowing quants to build dashboards and explore how 
+even a tiny change in parameters impacts the overall performance, in real time!
+
+!!! example
+
+    Pull daily history of the BTC/USDT and ETH/USDT pairs from Binance, backtest 20k configurations 
+    of the MACD indicator, and visualize the win rate as a function of the MACD parameters, 
+    *in less than 30 seconds* :ice_cube:
+    
+    === "Dashboard"
+    
+        <iframe id="igraph" scrolling="no" style="border:none;" seamless="seamless" src="/assets/macd_cube.html" height="590" width="100%"></iframe>
+    
+    === "Code"
+    
+        ```python
+        import numpy as np
+        import pandas as pd
+        from itertools import combinations, product
+        import vectorbtpro as vbt
+        vbt.settings.set_theme("dark")
+        
+        @vbt.chunked(  # (1)!
+            size=vbt.LenSizer(arg_query='fastp'),
+            arg_take_spec=dict(
+                data=None,
+                fastp=vbt.ChunkSlicer(),
+                slowp=vbt.ChunkSlicer(),
+                signalp=vbt.ChunkSlicer()
+            ),
+            merge_func=lambda x: pd.concat(x).vbt.sort_index(),
+            show_progress=True,
+            chunk_len=1000  # (2)!
+        )
+        def pipeline(data, fastp, slowp, signalp):  # (3)!
+            macd = vbt.talib("MACD").run(data.get("Close"), fastp, slowp, signalp)
+            entries = macd.macd_above(0) & macd.macd_above(macd.macdsignal)  # (4)!
+            exits = macd.macd_below(0) | macd.macd_below(macd.macdsignal)  # (5)!
+            pf = vbt.Portfolio.from_signals(data, entries, exits, freq='d')
+            return pf.trades.win_rate
+        
+        btc_data = vbt.BinanceData.fetch(["BTCUSDT"])  # (6)!
+        eth_data = vbt.BinanceData.fetch(["ETHUSDT"])
+        
+        p = np.arange(4, 31)
+        fastp, slowp, signalp = zip(*product(p, p, p))  # (7)!
+        btc_win_rates = pipeline(btc_data, fastp, slowp, signalp)  # (8)!
+        eth_win_rates = pipeline(eth_data, fastp, slowp, signalp)
+        win_rates = pd.concat((btc_win_rates, eth_win_rates))  # (9)!
+        win_rates.vbt.volume(  # (10)!
+            slider_level="symbol",
+            trace_kwargs=dict(
+                colorscale="icefire", 
+                colorbar=dict(title='win_rate', tickformat='.0%'),
+                cmid=0.5
+            ),
+        ).show()
+        ```
+    
+        1. Use chunking to reduce RAM consumption
+        2. Process at most 1000 parameter combinations at a time
+        3. Create a pipeline that returns the win rate for each parameter combination
+        4. Enter a position whenever the MACD line is above zero and the signal line
+        5. Exit the position whenever the MACD line is below zero or the signal line
+        6. Fetch both datasets separately to avoid NaNs
+        7. Generate 27 * 27 * 27 = 19683 parameter combinations. Since fast and slow periods
+        are conditionally bound, we could (and should) have run the `itertools.combinations` instead,
+        but this would only colorize a half of the cube.
+        8. Win rates of each chunk get concatenated into a single series
+        9. Concatenate both series. They can still be destinguished by the index level "symbol".
+        10. Plot a cube by making a slider out of the index level "symbol"
+        and using three other index levels (our period parameters) as the X, Y, and Z axis.
+
+## How to get access?
 
 vectorbt PRO is a private fork of vectorbt, hosted as a private GitHub repository. 
 All new features are developed as part of this fork, which means that they are immediately 
@@ -86,13 +187,13 @@ One-time payments can also be made in :material-bitcoin: and :material-ethereum:
     This rate applies to individuals only. To grant access for an organization, please 
     [contact me](emailto:olegpolakow@gmail.com).
 
-## What sponsorships achieve
+## What sponsorships achieve?
 
 Sponsorships make this project sustainable, as they buy the maintainers of this
 project time – a very scarce resource – which is spent on the development of new
 features, bug fixing, stability improvement, issue triage and general support.
 
-## How to become a sponsor
+## How to become a sponsor?
 
 In order to become an eligible sponsor with your GitHub account, visit @polakowo, 
 and complete a sponsorship of __$25 a month or more__.
