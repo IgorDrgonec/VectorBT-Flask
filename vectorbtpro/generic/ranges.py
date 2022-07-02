@@ -393,8 +393,10 @@ class Ranges(PriceRecords):
         self,
         column: tp.Optional[tp.Label] = None,
         top_n: tp.Optional[int] = None,
-        plot_zones: bool = True,
         plot_ohlc: bool = True,
+        plot_close: bool = True,
+        plot_markers: bool = True,
+        plot_zones: bool = True,
         ohlc_type: tp.Union[None, str, tp.BaseTraceType] = None,
         ohlc_trace_kwargs: tp.KwargsLike = None,
         close_trace_kwargs: tp.KwargsLike = None,
@@ -413,8 +415,10 @@ class Ranges(PriceRecords):
         Args:
             column (str): Name of the column to plot.
             top_n (int): Filter top N range records by maximum duration.
+            plot_ohlc (bool): Whether to plot OHLC.
+            plot_close (bool): Whether to plot close.
+            plot_markers (bool): Whether to plot markers.
             plot_zones (bool): Whether to plot zones.
-            plot_ohlc (bool): Whether to plot the OHLC or just close.
             ohlc_type: Either 'OHLC', 'Candlestick' or Plotly trace.
 
                 Pass None to use the default.
@@ -501,7 +505,7 @@ class Ranges(PriceRecords):
                 fig=fig,
             )
             plotting_ohlc = True
-        elif self_col._close is not None:
+        elif plot_close and self_col._close is not None:
             fig = self_col.close.vbt.plot(
                 trace_kwargs=close_trace_kwargs,
                 add_trace_kwargs=add_trace_kwargs,
@@ -535,47 +539,49 @@ class Ranges(PriceRecords):
 
             status = self_col.get_field_arr("status")
 
-            # Plot start markers
-            start_customdata = id_[:, None]
-            start_scatter = go.Scatter(
-                x=start_idx,
-                y=start_val,
-                mode="markers",
-                marker=dict(
-                    symbol="diamond",
-                    color=plotting_cfg["contrast_color_schema"]["blue"],
-                    size=7,
-                    line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["blue"])),
-                ),
-                name="Start",
-                customdata=start_customdata,
-                hovertemplate=f"{id_title}: %{{customdata[0]}}<br>{start_idx_title}: %{{x}}",
-            )
-            start_scatter.update(**start_trace_kwargs)
-            fig.add_trace(start_scatter, **add_trace_kwargs)
-
-            closed_mask = status == RangeStatus.Closed
-            if closed_mask.any():
-                # Plot end markers
-                closed_end_customdata = np.stack((id_[closed_mask], duration[closed_mask]), axis=1)
-                closed_end_scatter = go.Scatter(
-                    x=end_idx[closed_mask],
-                    y=end_val[closed_mask],
+            if plot_markers:
+                # Plot start markers
+                start_customdata = id_[:, None]
+                start_scatter = go.Scatter(
+                    x=start_idx,
+                    y=start_val,
                     mode="markers",
                     marker=dict(
                         symbol="diamond",
-                        color=plotting_cfg["contrast_color_schema"]["green"],
+                        color=plotting_cfg["contrast_color_schema"]["blue"],
                         size=7,
-                        line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["green"])),
+                        line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["blue"])),
                     ),
-                    name="Closed",
-                    customdata=closed_end_customdata,
-                    hovertemplate=(
-                        f"{id_title}: %{{customdata[0]}}<br>{end_idx_title}: %{{x}}<br>Duration: %{{customdata[1]}}"
-                    ),
+                    name="Start",
+                    customdata=start_customdata,
+                    hovertemplate=f"{id_title}: %{{customdata[0]}}<br>{start_idx_title}: %{{x}}",
                 )
-                closed_end_scatter.update(**end_trace_kwargs)
-                fig.add_trace(closed_end_scatter, **add_trace_kwargs)
+                start_scatter.update(**start_trace_kwargs)
+                fig.add_trace(start_scatter, **add_trace_kwargs)
+
+            closed_mask = status == RangeStatus.Closed
+            if closed_mask.any():
+                if plot_markers:
+                    # Plot end markers
+                    closed_end_customdata = np.stack((id_[closed_mask], duration[closed_mask]), axis=1)
+                    closed_end_scatter = go.Scatter(
+                        x=end_idx[closed_mask],
+                        y=end_val[closed_mask],
+                        mode="markers",
+                        marker=dict(
+                            symbol="diamond",
+                            color=plotting_cfg["contrast_color_schema"]["green"],
+                            size=7,
+                            line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["green"])),
+                        ),
+                        name="Closed",
+                        customdata=closed_end_customdata,
+                        hovertemplate=(
+                            f"{id_title}: %{{customdata[0]}}<br>{end_idx_title}: %{{x}}<br>Duration: %{{customdata[1]}}"
+                        ),
+                    )
+                    closed_end_scatter.update(**end_trace_kwargs)
+                    fig.add_trace(closed_end_scatter, **add_trace_kwargs)
 
                 if plot_zones:
                     # Plot closed range zones
@@ -601,26 +607,27 @@ class Ranges(PriceRecords):
 
             open_mask = status == RangeStatus.Open
             if open_mask.any():
-                # Plot end markers
-                open_end_customdata = np.stack((id_[open_mask], duration[open_mask]), axis=1)
-                open_end_scatter = go.Scatter(
-                    x=end_idx[open_mask],
-                    y=end_val[open_mask],
-                    mode="markers",
-                    marker=dict(
-                        symbol="diamond",
-                        color=plotting_cfg["contrast_color_schema"]["orange"],
-                        size=7,
-                        line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["orange"])),
-                    ),
-                    name="Open",
-                    customdata=open_end_customdata,
-                    hovertemplate=(
-                        f"{id_title}: %{{customdata[0]}}<br>{end_idx_title}: %{{x}}<br>Duration: %{{customdata[1]}}"
-                    ),
-                )
-                open_end_scatter.update(**end_trace_kwargs)
-                fig.add_trace(open_end_scatter, **add_trace_kwargs)
+                if plot_markers:
+                    # Plot end markers
+                    open_end_customdata = np.stack((id_[open_mask], duration[open_mask]), axis=1)
+                    open_end_scatter = go.Scatter(
+                        x=end_idx[open_mask],
+                        y=end_val[open_mask],
+                        mode="markers",
+                        marker=dict(
+                            symbol="diamond",
+                            color=plotting_cfg["contrast_color_schema"]["orange"],
+                            size=7,
+                            line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["orange"])),
+                        ),
+                        name="Open",
+                        customdata=open_end_customdata,
+                        hovertemplate=(
+                            f"{id_title}: %{{customdata[0]}}<br>{end_idx_title}: %{{x}}<br>Duration: %{{customdata[1]}}"
+                        ),
+                    )
+                    open_end_scatter.update(**end_trace_kwargs)
+                    fig.add_trace(open_end_scatter, **add_trace_kwargs)
 
                 if plot_zones:
                     # Plot open range zones

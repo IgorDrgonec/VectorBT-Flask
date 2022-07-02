@@ -701,8 +701,10 @@ class Drawdowns(Ranges):
         self,
         column: tp.Optional[tp.Label] = None,
         top_n: tp.Optional[int] = 5,
-        plot_zones: bool = True,
         plot_ohlc: bool = True,
+        plot_close: bool = True,
+        plot_markers: bool = True,
+        plot_zones: bool = True,
         ohlc_type: tp.Union[None, str, tp.BaseTraceType] = None,
         ohlc_trace_kwargs: tp.KwargsLike = None,
         close_trace_kwargs: tp.KwargsLike = None,
@@ -724,8 +726,10 @@ class Drawdowns(Ranges):
         Args:
             column (str): Name of the column to plot.
             top_n (int): Filter top N drawdown records by maximum drawdown.
+            plot_ohlc (bool): Whether to plot OHLC.
+            plot_close (bool): Whether to plot close.
+            plot_markers (bool): Whether to plot markers.
             plot_zones (bool): Whether to plot zones.
-            plot_ohlc (bool): Whether to plot the OHLC or just close.
             ohlc_type: Either 'OHLC', 'Candlestick' or Plotly trace.
 
                 Pass None to use the default.
@@ -823,7 +827,7 @@ class Drawdowns(Ranges):
                 add_trace_kwargs=add_trace_kwargs,
                 fig=fig,
             )
-        elif self_col._close is not None:
+        elif plot_close and self_col._close is not None:
             fig = self_col.close.vbt.plot(
                 trace_kwargs=close_trace_kwargs,
                 add_trace_kwargs=add_trace_kwargs,
@@ -879,56 +883,58 @@ class Drawdowns(Ranges):
             # Peak and recovery at same time -> recovery wins
             peak_mask = (peak_val != np.roll(end_val, 1)) | (peak_idx != np.roll(end_idx, 1))
             if peak_mask.any():
-                # Plot peak markers
-                peak_customdata = id_[peak_mask][:, None]
-                peak_scatter = go.Scatter(
-                    x=peak_idx[peak_mask],
-                    y=peak_val[peak_mask],
-                    mode="markers",
-                    marker=dict(
-                        symbol="diamond",
-                        color=plotting_cfg["contrast_color_schema"]["blue"],
-                        size=7,
-                        line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["blue"])),
-                    ),
-                    name="Peak",
-                    customdata=peak_customdata,
-                    hovertemplate=(
-                        f"{id_title}: %{{customdata[0]}}<br>{peak_idx_title}: %{{x}}<br>{peak_val_title}: %{{y}}"
-                    ),
-                )
-                peak_scatter.update(**peak_trace_kwargs)
-                fig.add_trace(peak_scatter, **add_trace_kwargs)
+                if plot_markers:
+                    # Plot peak markers
+                    peak_customdata = id_[peak_mask][:, None]
+                    peak_scatter = go.Scatter(
+                        x=peak_idx[peak_mask],
+                        y=peak_val[peak_mask],
+                        mode="markers",
+                        marker=dict(
+                            symbol="diamond",
+                            color=plotting_cfg["contrast_color_schema"]["blue"],
+                            size=7,
+                            line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["blue"])),
+                        ),
+                        name="Peak",
+                        customdata=peak_customdata,
+                        hovertemplate=(
+                            f"{id_title}: %{{customdata[0]}}<br>{peak_idx_title}: %{{x}}<br>{peak_val_title}: %{{y}}"
+                        ),
+                    )
+                    peak_scatter.update(**peak_trace_kwargs)
+                    fig.add_trace(peak_scatter, **add_trace_kwargs)
 
             recovered_mask = status == DrawdownStatus.Recovered
             if recovered_mask.any():
-                # Plot valley markers
-                valley_customdata = np.stack(
-                    (id_[recovered_mask], drawdown[recovered_mask], decline_duration[recovered_mask]),
-                    axis=1,
-                )
-                valley_scatter = go.Scatter(
-                    x=valley_idx[recovered_mask],
-                    y=valley_val[recovered_mask],
-                    mode="markers",
-                    marker=dict(
-                        symbol="diamond",
-                        color=plotting_cfg["contrast_color_schema"]["red"],
-                        size=7,
-                        line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["red"])),
-                    ),
-                    name="Valley",
-                    customdata=valley_customdata,
-                    hovertemplate=(
-                        f"{id_title}: %{{customdata[0]}}"
-                        f"<br>{valley_idx_title}: %{{x}}"
-                        f"<br>{valley_val_title}: %{{y}}"
-                        "<br>Drawdown: %{customdata[1]:.2%}"
-                        "<br>Duration: %{customdata[2]}"
-                    ),
-                )
-                valley_scatter.update(**valley_trace_kwargs)
-                fig.add_trace(valley_scatter, **add_trace_kwargs)
+                if plot_markers:
+                    # Plot valley markers
+                    valley_customdata = np.stack(
+                        (id_[recovered_mask], drawdown[recovered_mask], decline_duration[recovered_mask]),
+                        axis=1,
+                    )
+                    valley_scatter = go.Scatter(
+                        x=valley_idx[recovered_mask],
+                        y=valley_val[recovered_mask],
+                        mode="markers",
+                        marker=dict(
+                            symbol="diamond",
+                            color=plotting_cfg["contrast_color_schema"]["red"],
+                            size=7,
+                            line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["red"])),
+                        ),
+                        name="Valley",
+                        customdata=valley_customdata,
+                        hovertemplate=(
+                            f"{id_title}: %{{customdata[0]}}"
+                            f"<br>{valley_idx_title}: %{{x}}"
+                            f"<br>{valley_val_title}: %{{y}}"
+                            "<br>Drawdown: %{customdata[1]:.2%}"
+                            "<br>Duration: %{customdata[2]}"
+                        ),
+                    )
+                    valley_scatter.update(**valley_trace_kwargs)
+                    fig.add_trace(valley_scatter, **add_trace_kwargs)
 
                 if plot_zones:
                     # Plot drawdown zones
@@ -952,33 +958,34 @@ class Drawdowns(Ranges):
                             )
                         )
 
-                # Plot recovery markers
-                recovery_customdata = np.stack(
-                    (id_[recovered_mask], recovery_return[recovered_mask], recovery_duration[recovered_mask]),
-                    axis=1,
-                )
-                recovery_scatter = go.Scatter(
-                    x=end_idx[recovered_mask],
-                    y=end_val[recovered_mask],
-                    mode="markers",
-                    marker=dict(
-                        symbol="diamond",
-                        color=plotting_cfg["contrast_color_schema"]["green"],
-                        size=7,
-                        line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["green"])),
-                    ),
-                    name="Recovery/Peak",
-                    customdata=recovery_customdata,
-                    hovertemplate=(
-                        f"{id_title}: %{{customdata[0]}}"
-                        f"<br>{end_idx_title}: %{{x}}"
-                        f"<br>{end_val_title}: %{{y}}"
-                        "<br>Return: %{customdata[1]:.2%}"
-                        "<br>Duration: %{customdata[2]}"
-                    ),
-                )
-                recovery_scatter.update(**recovery_trace_kwargs)
-                fig.add_trace(recovery_scatter, **add_trace_kwargs)
+                if plot_markers:
+                    # Plot recovery markers
+                    recovery_customdata = np.stack(
+                        (id_[recovered_mask], recovery_return[recovered_mask], recovery_duration[recovered_mask]),
+                        axis=1,
+                    )
+                    recovery_scatter = go.Scatter(
+                        x=end_idx[recovered_mask],
+                        y=end_val[recovered_mask],
+                        mode="markers",
+                        marker=dict(
+                            symbol="diamond",
+                            color=plotting_cfg["contrast_color_schema"]["green"],
+                            size=7,
+                            line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["green"])),
+                        ),
+                        name="Recovery/Peak",
+                        customdata=recovery_customdata,
+                        hovertemplate=(
+                            f"{id_title}: %{{customdata[0]}}"
+                            f"<br>{end_idx_title}: %{{x}}"
+                            f"<br>{end_val_title}: %{{y}}"
+                            "<br>Return: %{customdata[1]:.2%}"
+                            "<br>Duration: %{customdata[2]}"
+                        ),
+                    )
+                    recovery_scatter.update(**recovery_trace_kwargs)
+                    fig.add_trace(recovery_scatter, **add_trace_kwargs)
 
                 if plot_zones:
                     # Plot recovery zones
@@ -1002,32 +1009,33 @@ class Drawdowns(Ranges):
                             )
                         )
 
-            # Plot active markers
             active_mask = status == DrawdownStatus.Active
             if active_mask.any():
-                active_customdata = np.stack((id_[active_mask], drawdown[active_mask], duration[active_mask]), axis=1)
-                active_scatter = go.Scatter(
-                    x=end_idx[active_mask],
-                    y=end_val[active_mask],
-                    mode="markers",
-                    marker=dict(
-                        symbol="diamond",
-                        color=plotting_cfg["contrast_color_schema"]["orange"],
-                        size=7,
-                        line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["orange"])),
-                    ),
-                    name="Active",
-                    customdata=active_customdata,
-                    hovertemplate=(
-                        f"{id_title}: %{{customdata[0]}}"
-                        f"<br>{end_idx_title}: %{{x}}"
-                        f"<br>{end_val_title}: %{{y}}"
-                        "<br>Return: %{customdata[1]:.2%}"
-                        "<br>Duration: %{customdata[2]}"
-                    ),
-                )
-                active_scatter.update(**active_trace_kwargs)
-                fig.add_trace(active_scatter, **add_trace_kwargs)
+                if plot_markers:
+                    # Plot active markers
+                    active_customdata = np.stack((id_[active_mask], drawdown[active_mask], duration[active_mask]), axis=1)
+                    active_scatter = go.Scatter(
+                        x=end_idx[active_mask],
+                        y=end_val[active_mask],
+                        mode="markers",
+                        marker=dict(
+                            symbol="diamond",
+                            color=plotting_cfg["contrast_color_schema"]["orange"],
+                            size=7,
+                            line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["orange"])),
+                        ),
+                        name="Active",
+                        customdata=active_customdata,
+                        hovertemplate=(
+                            f"{id_title}: %{{customdata[0]}}"
+                            f"<br>{end_idx_title}: %{{x}}"
+                            f"<br>{end_val_title}: %{{y}}"
+                            "<br>Return: %{customdata[1]:.2%}"
+                            "<br>Duration: %{customdata[2]}"
+                        ),
+                    )
+                    active_scatter.update(**active_trace_kwargs)
+                    fig.add_trace(active_scatter, **add_trace_kwargs)
 
                 if plot_zones:
                     # Plot active drawdown zones

@@ -281,6 +281,7 @@ class Orders(PriceRecords):
         self,
         column: tp.Optional[tp.Label] = None,
         plot_ohlc: bool = True,
+        plot_close: bool = True,
         ohlc_type: tp.Union[None, str, tp.BaseTraceType] = None,
         ohlc_trace_kwargs: tp.KwargsLike = None,
         close_trace_kwargs: tp.KwargsLike = None,
@@ -294,7 +295,8 @@ class Orders(PriceRecords):
 
         Args:
             column (str): Name of the column to plot.
-            plot_ohlc (bool): Whether to plot the OHLC or just close.
+            plot_ohlc (bool): Whether to plot OHLC.
+            plot_close (bool): Whether to plot close.
             ohlc_type: Either 'OHLC', 'Candlestick' or Plotly trace.
 
                 Pass None to use the default.
@@ -380,7 +382,7 @@ class Orders(PriceRecords):
                 add_trace_kwargs=add_trace_kwargs,
                 fig=fig,
             )
-        elif self_col._close is not None:
+        elif plot_close and self_col._close is not None:
             fig = self_col.close.vbt.plot(
                 trace_kwargs=close_trace_kwargs,
                 add_trace_kwargs=add_trace_kwargs,
