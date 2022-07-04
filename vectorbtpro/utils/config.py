@@ -801,13 +801,27 @@ class AtomicConfig(Config, atomic_dict):
     pass
 
 
-FrozenConfig = functools.partial(Config, frozen_keys_=True)
+class FrozenConfig(Config):
+    pass
+
+
+FrozenConfig = functools.partial(FrozenConfig, frozen_keys_=True)
 """`Config` with `frozen_keys_` flag set to True."""
 
-ReadonlyConfig = functools.partial(Config, readonly_=True)
+
+class ReadonlyConfig(Config):
+    pass
+
+
+ReadonlyConfig = functools.partial(ReadonlyConfig, readonly_=True)
 """`Config` with `readonly_` flag set to True."""
 
-HybridConfig = functools.partial(Config, copy_kwargs_=dict(copy_mode="hybrid"))
+
+class HybridConfig(Config):
+    pass
+
+
+HybridConfig = functools.partial(HybridConfig, copy_kwargs_=dict(copy_mode="hybrid"))
 """`Config` with `copy_kwargs_` set to `copy_mode='hybrid'`."""
 
 ConfiguredT = tp.TypeVar("ConfiguredT", bound="Configured")
@@ -965,4 +979,4 @@ class Configured(Cacheable, Pickleable, Prettified):
         self.config.update(*args, **kwargs, force=True)
 
     def prettify(self, **kwargs) -> str:
-        return "%s(%s)" % (type(self).__name__, self.config.prettify(**kwargs)[7:-1])
+        return "%s(%s)" % (type(self).__name__, self.config.prettify(**kwargs)[len(type(self.config).__name__) + 1:-1])

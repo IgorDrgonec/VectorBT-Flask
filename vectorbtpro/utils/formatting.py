@@ -27,37 +27,6 @@ class Prettified:
             return repr(self)
 
 
-def prettify_dict(
-    obj: tp.Any,
-    replace: tp.DictLike = None,
-    path: str = None,
-    htchar: str = "    ",
-    lfchar: str = "\n",
-    indent: int = 0,
-) -> tp.Any:
-    """Prettify a dictionary."""
-    items = []
-    for k, v in obj.items():
-        if replace is None:
-            replace = {}
-        if path is None:
-            new_path = k
-        else:
-            new_path = str(path) + "." + str(k)
-        if new_path in replace:
-            new_v = replace[new_path]
-        else:
-            new_v = prettify(v, replace=replace, path=new_path, htchar=htchar, lfchar=lfchar, indent=indent + 1)
-        items.append(lfchar + htchar * (indent + 1) + repr(k) + ": " + new_v)
-    if type(obj) is dict:
-        if len(items) == 0:
-            return "{}"
-        return "{%s}" % (",".join(items) + lfchar + htchar * indent)
-    if len(items) == 0:
-        return "%s({})" % (type(obj).__name__,)
-    return "%s({%s})" % (type(obj).__name__, ",".join(items) + lfchar + htchar * indent)
-
-
 def prettify_inited(
     cls: type,
     kwargs: tp.Any,
@@ -87,6 +56,47 @@ def prettify_inited(
     if len(items) == 0:
         return "%s()" % (cls.__name__,)
     return "%s(%s)" % (cls.__name__, ",".join(items) + lfchar + htchar * indent)
+
+
+def prettify_dict(
+    obj: tp.Any,
+    replace: tp.DictLike = None,
+    path: str = None,
+    htchar: str = "    ",
+    lfchar: str = "\n",
+    indent: int = 0,
+) -> tp.Any:
+    """Prettify a dictionary."""
+    if all([isinstance(k, str) and k.isidentifier() for k in obj]):
+        return prettify_inited(
+            type(obj),
+            obj,
+            replace=replace,
+            path=path,
+            htchar=htchar,
+            lfchar=lfchar,
+            indent=indent,
+        )
+    items = []
+    for k, v in obj.items():
+        if replace is None:
+            replace = {}
+        if path is None:
+            new_path = k
+        else:
+            new_path = str(path) + "." + str(k)
+        if new_path in replace:
+            new_v = replace[new_path]
+        else:
+            new_v = prettify(v, replace=replace, path=new_path, htchar=htchar, lfchar=lfchar, indent=indent + 1)
+        items.append(lfchar + htchar * (indent + 1) + repr(k) + ": " + new_v)
+    if type(obj) is dict:
+        if len(items) == 0:
+            return "{}"
+        return "{%s}" % (",".join(items) + lfchar + htchar * indent)
+    if len(items) == 0:
+        return "%s({})" % (type(obj).__name__,)
+    return "%s({%s})" % (type(obj).__name__, ",".join(items) + lfchar + htchar * indent)
 
 
 def prettify(

@@ -574,7 +574,7 @@ data = ChildDict(
             pbar_kwargs=dict(),
             silence_warnings=False,
         ),
-        alpha_vantage=dict(
+        alpha_vantage=FrozenConfig(
             apikey=None,
             api_meta=None,
             category=None,
@@ -595,7 +595,7 @@ data = ChildDict(
             params=dict(),
             silence_warnings=False,
         ),
-        ndl=dict(
+        ndl=FrozenConfig(
             api_key=None,
             start=None,
             end=None,
@@ -604,7 +604,7 @@ data = ChildDict(
             transform=None,
             params=dict(),
         ),
-        tv=dict(
+        tv=FrozenConfig(
             client=None,
             client_kwargs=dict(
                 username=None,
