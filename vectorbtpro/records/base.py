@@ -431,6 +431,7 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.decorators import cached_method, class_or_instancemethod
+from vectorbtpro.utils.random_ import set_seed_nb
 
 __pdoc__ = {}
 
@@ -989,6 +990,48 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
         """Return a new class instance, filtered by mask."""
         mask_indices = np.flatnonzero(mask)
         return self.replace(records_arr=np.take(self.values, mask_indices), **kwargs).regroup(group_by)
+
+    def first_n(
+        self: RecordsT,
+        n: int,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        **kwargs,
+    ) -> RecordsT:
+        """Return the first N records in each column."""
+        col_map = self.col_mapper.get_col_map(group_by=False)
+        func = jit_reg.resolve_option(nb.first_n_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        return self.apply_mask(func(col_map, n), **kwargs)
+
+    def last_n(
+        self: RecordsT,
+        n: int,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        **kwargs,
+    ) -> RecordsT:
+        """Return the last N records in each column."""
+        col_map = self.col_mapper.get_col_map(group_by=False)
+        func = jit_reg.resolve_option(nb.last_n_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        return self.apply_mask(func(col_map, n), **kwargs)
+
+    def random_n(
+        self: RecordsT,
+        n: int,
+        seed: tp.Optional[int] = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        **kwargs,
+    ) -> RecordsT:
+        """Return random N records in each column."""
+        if seed is not None:
+            set_seed_nb(seed)
+        col_map = self.col_mapper.get_col_map(group_by=False)
+        func = jit_reg.resolve_option(nb.random_n_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        return self.apply_mask(func(col_map, n), **kwargs)
 
     # ############# Mapping ############# #
 

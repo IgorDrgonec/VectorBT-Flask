@@ -169,6 +169,81 @@ def is_col_id_sorted_nb(col_arr: tp.Array1d, id_arr: tp.Array1d) -> bool:
 @register_chunkable(
     size=base_ch.GroupLensSizer(arg_query="col_map"),
     arg_take_spec=dict(
+        col_map=base_ch.GroupMapSlicer(),
+        n=None,
+    ),
+    merge_func=base_ch.concat,
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def first_n_nb(col_map: tp.GroupMap, n: int) -> tp.Array1d:
+    """Returns the mask of the first N elements."""
+    col_idxs, col_lens = col_map
+    col_start_idxs = np.cumsum(col_lens) - col_lens
+    out = np.full(col_idxs.shape[0], False, dtype=np.bool_)
+
+    for col in prange(col_lens.shape[0]):
+        col_len = col_lens[col]
+        if col_len == 0:
+            continue
+        col_start_idx = col_start_idxs[col]
+        idxs = col_idxs[col_start_idx : col_start_idx + col_len]
+        out[idxs[:n]] = True
+    return out
+
+
+@register_chunkable(
+    size=base_ch.GroupLensSizer(arg_query="col_map"),
+    arg_take_spec=dict(
+        col_map=base_ch.GroupMapSlicer(),
+        n=None,
+    ),
+    merge_func=base_ch.concat,
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def last_n_nb(col_map: tp.GroupMap, n: int) -> tp.Array1d:
+    """Returns the mask of the last N elements."""
+    col_idxs, col_lens = col_map
+    col_start_idxs = np.cumsum(col_lens) - col_lens
+    out = np.full(col_idxs.shape[0], False, dtype=np.bool_)
+
+    for col in prange(col_lens.shape[0]):
+        col_len = col_lens[col]
+        if col_len == 0:
+            continue
+        col_start_idx = col_start_idxs[col]
+        idxs = col_idxs[col_start_idx : col_start_idx + col_len]
+        out[idxs[-n:]] = True
+    return out
+
+
+@register_chunkable(
+    size=base_ch.GroupLensSizer(arg_query="col_map"),
+    arg_take_spec=dict(
+        col_map=base_ch.GroupMapSlicer(),
+        n=None,
+    ),
+    merge_func=base_ch.concat,
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def random_n_nb(col_map: tp.GroupMap, n: int) -> tp.Array1d:
+    """Returns the mask of random N elements."""
+    col_idxs, col_lens = col_map
+    col_start_idxs = np.cumsum(col_lens) - col_lens
+    out = np.full(col_idxs.shape[0], False, dtype=np.bool_)
+
+    for col in prange(col_lens.shape[0]):
+        col_len = col_lens[col]
+        if col_len == 0:
+            continue
+        col_start_idx = col_start_idxs[col]
+        idxs = col_idxs[col_start_idx : col_start_idx + col_len]
+        out[np.random.choice(idxs, n, replace=False)] = True
+    return out
+
+
+@register_chunkable(
+    size=base_ch.GroupLensSizer(arg_query="col_map"),
+    arg_take_spec=dict(
         mapped_arr=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
         col_map=base_ch.GroupMapSlicer(),
         n=None,
@@ -177,7 +252,7 @@ def is_col_id_sorted_nb(col_arr: tp.Array1d, id_arr: tp.Array1d) -> bool:
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def top_n_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.GroupMap, n: int) -> tp.Array1d:
-    """Returns mask of top N mapped elements."""
+    """Returns the mask of the top N mapped elements."""
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
     out = np.full(mapped_arr.shape[0], False, dtype=np.bool_)
@@ -203,7 +278,7 @@ def top_n_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.GroupMap, n: int) -> tp.
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def bottom_n_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.GroupMap, n: int) -> tp.Array1d:
-    """Returns mask of bottom N mapped elements."""
+    """Returns the mask of the bottom N mapped elements."""
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
     out = np.full(mapped_arr.shape[0], False, dtype=np.bool_)
@@ -269,7 +344,7 @@ def map_records_meta_nb(n_values: int, map_func_nb: tp.MappedReduceMetaFunc, *ar
 def apply_nb(arr: tp.Array1d, col_map: tp.GroupMap, apply_func_nb: tp.ApplyFunc, *args) -> tp.Array1d:
     """Apply function on mapped array or records per column.
 
-    Returns the same shape as `mapped_or_records`.
+    Returns the same shape as `arr`.
 
     `apply_func_nb` must accept the values of the column and `*args`. Must return an array."""
     col_idxs, col_lens = col_map
