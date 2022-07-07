@@ -2327,20 +2327,32 @@ class TestRecords:
 # ############# ranges.py ############# #
 
 ts = pd.DataFrame(
-    {"a": [1, -1, 3, -1, 5, -1], "b": [-1, -1, -1, 4, 5, 6], "c": [1, 2, 3, -1, -1, -1], "d": [-1, -1, -1, -1, -1, -1]},
-    index=pd.date_range("2020", periods=6),
+    {
+        "a": [1, -1, 3, -1, 5, -1],
+        "b": [-1, -1, -1, 4, 5, 6],
+        "c": [1, 2, 3, -1, -1, -1],
+        "d": [-1, -1, -1, -1, -1, -1],
+    },
+    index=[
+        pd.Timestamp("2020-01-01"),
+        pd.Timestamp("2020-01-02"),
+        pd.Timestamp("2020-01-04"),
+        pd.Timestamp("2020-01-05"),
+        pd.Timestamp("2020-01-07"),
+        pd.Timestamp("2020-01-08"),
+    ],
 )
 
-ranges = vbt.Ranges.from_generic(ts, wrapper_kwargs=dict(freq="1 days"))
-ranges_grouped = vbt.Ranges.from_generic(ts, wrapper_kwargs=dict(freq="1 days", group_by=group_by))
+ranges = vbt.Ranges.from_pd(ts, wrapper_kwargs=dict(freq="1 days"))
+ranges_grouped = vbt.Ranges.from_pd(ts, wrapper_kwargs=dict(freq="1 days", group_by=group_by))
 
 
 class TestRanges:
     def test_row_stack(self):
         ts2 = ts * 2
-        ts2.index = pd.date_range("2020-01-07", "2020-01-12")
-        ranges1 = vbt.Ranges.from_generic(ts, wrapper_kwargs=dict(freq="1 days"))
-        ranges2 = vbt.Ranges.from_generic(ts2, wrapper_kwargs=dict(freq="1 days"))
+        ts2.index = pd.date_range("2020-01-09", "2020-01-14")
+        ranges1 = vbt.Ranges.from_pd(ts, wrapper_kwargs=dict(freq="1 days"))
+        ranges2 = vbt.Ranges.from_pd(ts2, wrapper_kwargs=dict(freq="1 days"))
         new_ranges = vbt.Ranges.row_stack(ranges1, ranges2)
         assert_frame_equal(new_ranges.close, pd.concat((ts, ts2)))
         with pytest.raises(Exception):
@@ -2353,8 +2365,8 @@ class TestRanges:
     def test_column_stack(self):
         ts2 = ts * 2
         ts2.columns = ["e", "f", "g", "h"]
-        ranges1 = vbt.Ranges.from_generic(ts, wrapper_kwargs=dict(freq="1 days"))
-        ranges2 = vbt.Ranges.from_generic(ts2, wrapper_kwargs=dict(freq="1 days"))
+        ranges1 = vbt.Ranges.from_pd(ts, wrapper_kwargs=dict(freq="1 days"))
+        ranges2 = vbt.Ranges.from_pd(ts2, wrapper_kwargs=dict(freq="1 days"))
         new_ranges = vbt.Ranges.column_stack(ranges1, ranges2)
         assert_frame_equal(new_ranges.close, pd.concat((ts, ts2), axis=1))
         with pytest.raises(Exception):
@@ -2366,7 +2378,10 @@ class TestRanges:
 
     def test_indexing(self):
         ranges2 = ranges.loc["2020-01-02":"2020-01-05", ["a", "c"]]
-        assert_index_equal(ranges2.wrapper.index, ranges.wrapper.index[1:-1])
+        assert_index_equal(
+            ranges2.wrapper.index,
+            pd.DatetimeIndex(["2020-01-02", "2020-01-04", "2020-01-05"], dtype="datetime64[ns]", freq=None),
+        )
         assert_index_equal(ranges2.wrapper.columns, ranges.wrapper.columns[[0, 2]])
         assert_frame_equal(ranges2.close, ranges.close.loc["2020-01-02":"2020-01-05", ["a", "c"]])
         assert_records_close(
@@ -2378,7 +2393,7 @@ class TestRanges:
         for name in range_dt.names:
             np.testing.assert_array_equal(getattr(ranges, name).values, ranges.values[name])
 
-    def test_from_price(self):
+    def test_from_pd(self):
         assert_records_close(
             ranges.values,
             np.array(
@@ -2389,12 +2404,129 @@ class TestRanges:
         assert ranges.wrapper.freq == day_dt
         assert_index_equal(ranges_grouped.wrapper.grouper.group_by, group_by)
         assert_records_close(
-            vbt.Ranges.from_generic(ts, jitted=dict(parallel=True)).values,
-            vbt.Ranges.from_generic(ts, jitted=dict(parallel=False)).values,
+            vbt.Ranges.from_pd(ts, jitted=dict(parallel=True)).values,
+            vbt.Ranges.from_pd(ts, jitted=dict(parallel=False)).values,
         )
         assert_records_close(
-            vbt.Ranges.from_generic(ts, chunked=True).values,
-            vbt.Ranges.from_generic(ts, chunked=False).values,
+            vbt.Ranges.from_pd(ts, chunked=True).values,
+            vbt.Ranges.from_pd(ts, chunked=False).values,
+        )
+
+    def test_from_delta(self):
+        assert_records_close(
+            vbt.Ranges.from_delta(ranges, delta=2).values,
+            np.array(
+                [(0, 0, 1, 3, 1), (1, 0, 3, 5, 1), (2, 0, 5, 5, 0), (0, 1, 5, 5, 0), (0, 2, 3, 5, 1)],
+                dtype=range_dt,
+            ),
+        )
+        assert_records_close(
+            vbt.Ranges.from_delta(ranges, delta=3).values,
+            np.array(
+                [(0, 0, 1, 4, 1), (1, 0, 3, 5, 0), (2, 0, 5, 5, 0), (0, 1, 5, 5, 0), (0, 2, 3, 5, 0)],
+                dtype=range_dt,
+            ),
+        )
+        assert_records_close(
+            vbt.Ranges.from_delta(ranges, delta=4).values,
+            np.array(
+                [(0, 0, 1, 5, 1), (1, 0, 3, 5, 0), (2, 0, 5, 5, 0), (0, 1, 5, 5, 0), (0, 2, 3, 5, 0)],
+                dtype=range_dt,
+            ),
+        )
+        assert_records_close(
+            vbt.Ranges.from_delta(ranges, delta="2d").values,
+            np.array(
+                [(0, 0, 1, 2, 1), (1, 0, 3, 4, 1), (2, 0, 5, 5, 0), (0, 1, 5, 5, 0), (0, 2, 3, 4, 1)],
+                dtype=range_dt,
+            ),
+        )
+        assert_records_close(
+            vbt.Ranges.from_delta(ranges, delta="3d").values,
+            np.array(
+                [(0, 0, 1, 3, 1), (1, 0, 3, 5, 1), (2, 0, 5, 5, 0), (0, 1, 5, 5, 0), (0, 2, 3, 5, 1)],
+                dtype=range_dt,
+            ),
+        )
+        assert_records_close(
+            vbt.Ranges.from_delta(ranges, delta="4d").values,
+            np.array(
+                [(0, 0, 1, 4, 1), (1, 0, 3, 5, 0), (2, 0, 5, 5, 0), (0, 1, 5, 5, 0), (0, 2, 3, 5, 0)],
+                dtype=range_dt,
+            ),
+        )
+        assert_records_close(
+            vbt.Ranges.from_delta(ranges, delta=-2).values,
+            np.array(
+                [(0, 0, 0, 1, 1), (1, 0, 1, 3, 1), (2, 0, 3, 5, 1), (0, 1, 3, 5, 1), (0, 2, 1, 3, 1)],
+                dtype=range_dt,
+            ),
+        )
+        assert_records_close(
+            vbt.Ranges.from_delta(ranges, delta=-3).values,
+            np.array(
+                [(0, 0, 0, 1, 1), (1, 0, 0, 3, 1), (2, 0, 2, 5, 1), (0, 1, 2, 5, 1), (0, 2, 0, 3, 1)],
+                dtype=range_dt,
+            ),
+        )
+        assert_records_close(
+            vbt.Ranges.from_delta(ranges, delta=-4).values,
+            np.array(
+                [(0, 0, 0, 1, 1), (1, 0, 0, 3, 1), (2, 0, 1, 5, 1), (0, 1, 1, 5, 1), (0, 2, 0, 3, 1)],
+                dtype=range_dt,
+            ),
+        )
+        assert_records_close(
+            vbt.Ranges.from_delta(ranges, delta="-2d").values,
+            np.array(
+                [(0, 0, 0, 1, 1), (1, 0, 1, 3, 1), (2, 0, 3, 5, 1), (0, 1, 3, 5, 1), (0, 2, 1, 3, 1)],
+                dtype=range_dt,
+            ),
+        )
+        assert_records_close(
+            vbt.Ranges.from_delta(ranges, delta="-3d").values,
+            np.array(
+                [(0, 0, 0, 1, 1), (1, 0, 1, 3, 1), (2, 0, 3, 5, 1), (0, 1, 3, 5, 1), (0, 2, 1, 3, 1)],
+                dtype=range_dt,
+            ),
+        )
+        assert_records_close(
+            vbt.Ranges.from_delta(ranges, delta="-4d").values,
+            np.array(
+                [(0, 0, 0, 1, 1), (1, 0, 0, 3, 1), (2, 0, 2, 5, 1), (0, 1, 2, 5, 1), (0, 2, 0, 3, 1)],
+                dtype=range_dt,
+            ),
+        )
+        assert_records_close(
+            vbt.Ranges.from_delta(ranges, delta=2, idx_field_or_arr="start_idx").values,
+            np.array(
+                [(0, 0, 0, 2, 1), (1, 0, 2, 4, 1), (2, 0, 4, 5, 0), (0, 1, 3, 5, 1), (0, 2, 0, 2, 1)],
+                dtype=range_dt,
+            ),
+        )
+        assert_records_close(
+            vbt.Ranges.from_delta(ranges, delta=2, idx_field_or_arr="start_idx").values,
+            vbt.Ranges.from_delta(ranges, delta=2, idx_field_or_arr=ranges.start_idx.values).values,
+        )
+        assert_records_close(
+            vbt.Ranges.from_delta(ranges.start_idx, delta=2).values,
+            vbt.Ranges.from_delta(ranges, delta=2).values,
+        )
+        assert_records_close(
+            vbt.Ranges.from_delta(ranges.map_field("start_idx", idx_arr=ranges.start_idx.values), delta=2).values,
+            vbt.Ranges.from_delta(ranges.start_idx, delta=2, idx_field_or_arr=ranges.start_idx.values).values,
+        )
+        assert vbt.Ranges.from_delta(ranges, delta=2).open is None
+        assert vbt.Ranges.from_delta(ranges, delta=2).high is None
+        assert vbt.Ranges.from_delta(ranges, delta=2).low is None
+        assert_frame_equal(vbt.Ranges.from_delta(ranges, delta=2).close, ts)
+        assert_records_close(
+            vbt.Ranges.from_delta(ranges, delta=2, jitted=dict(parallel=True)).values,
+            vbt.Ranges.from_delta(ranges, delta=2, jitted=dict(parallel=False)).values,
+        )
+        assert_records_close(
+            vbt.Ranges.from_delta(ranges, delta=2, chunked=True).values,
+            vbt.Ranges.from_delta(ranges, delta=2, chunked=False).values,
         )
 
     def test_records_readable(self):
@@ -2407,9 +2539,9 @@ class TestRanges:
             np.array(
                 [
                     "2020-01-01T00:00:00.000000000",
-                    "2020-01-03T00:00:00.000000000",
-                    "2020-01-05T00:00:00.000000000",
                     "2020-01-04T00:00:00.000000000",
+                    "2020-01-07T00:00:00.000000000",
+                    "2020-01-05T00:00:00.000000000",
                     "2020-01-01T00:00:00.000000000",
                 ],
                 dtype="datetime64[ns]",
@@ -2420,10 +2552,10 @@ class TestRanges:
             np.array(
                 [
                     "2020-01-02T00:00:00.000000000",
-                    "2020-01-04T00:00:00.000000000",
-                    "2020-01-06T00:00:00.000000000",
-                    "2020-01-06T00:00:00.000000000",
-                    "2020-01-04T00:00:00.000000000",
+                    "2020-01-05T00:00:00.000000000",
+                    "2020-01-08T00:00:00.000000000",
+                    "2020-01-08T00:00:00.000000000",
+                    "2020-01-05T00:00:00.000000000",
                 ],
                 dtype="datetime64[ns]",
             ),
@@ -2462,6 +2594,27 @@ class TestRanges:
             ranges.get_duration(chunked=False).values,
         )
 
+    def test_real_duration(self):
+        np.testing.assert_array_equal(
+            ranges["a"].real_duration.values,
+            np.array([86400000000000, 86400000000000, 86400000000000], dtype="timedelta64[ns]"),
+        )
+        np.testing.assert_array_equal(
+            ranges.real_duration.values,
+            np.array(
+                [86400000000000, 86400000000000, 86400000000000, 86400000000000 * 4, 86400000000000 * 4],
+                dtype="timedelta64[ns]",
+            ),
+        )
+        np.testing.assert_array_equal(
+            ranges.get_real_duration(jitted=dict(parallel=True)).values,
+            ranges.get_real_duration(jitted=dict(parallel=False)).values,
+        )
+        np.testing.assert_array_equal(
+            ranges.get_real_duration(chunked=True).values,
+            ranges.get_real_duration(chunked=False).values,
+        )
+
     def test_avg_duration(self):
         assert ranges["a"].avg_duration == pd.Timedelta("1 days 00:00:00")
         assert_series_equal(
@@ -2479,10 +2632,325 @@ class TestRanges:
             ).rename("avg_duration"),
         )
         assert_series_equal(
+            ranges_grouped.get_avg_duration(real=True),
+            pd.Series(
+                np.array([151200000000000, 345600000000000], dtype="timedelta64[ns]"),
+                index=pd.Index(["g1", "g2"], dtype="object"),
+            ).rename("avg_real_duration"),
+        )
+        assert_series_equal(
             ranges.get_avg_duration(jitted=dict(parallel=True)),
             ranges.get_avg_duration(jitted=dict(parallel=False)),
         )
         assert_series_equal(ranges.get_avg_duration(chunked=True), ranges.get_avg_duration(chunked=False))
+
+    def test_filter_min_duration(self):
+        assert_records_close(
+            ranges.filter_min_duration(1).values,
+            np.array(
+                [(0, 0, 0, 1, 1), (1, 0, 2, 3, 1), (2, 0, 4, 5, 1), (0, 1, 3, 5, 0), (0, 2, 0, 3, 1)],
+                dtype=range_dt,
+            ),
+        )
+        assert_records_close(
+            ranges.filter_min_duration(2).values,
+            np.array(
+                [(0, 1, 3, 5, 0), (0, 2, 0, 3, 1)],
+                dtype=range_dt,
+            ),
+        )
+        assert_records_close(
+            ranges.filter_min_duration(4).values,
+            np.array(
+                [],
+                dtype=range_dt,
+            ),
+        )
+        assert_records_close(
+            ranges.filter_min_duration(1).values,
+            ranges.filter_min_duration("1d").values,
+        )
+        assert_records_close(
+            ranges.filter_min_duration(2).values,
+            ranges.filter_min_duration("2d").values,
+        )
+        assert_records_close(
+            ranges.filter_min_duration(4).values,
+            ranges.filter_min_duration("4d").values,
+        )
+        assert_records_close(
+            ranges.filter_min_duration("1d", real=True).values,
+            np.array(
+                [(0, 0, 0, 1, 1), (1, 0, 2, 3, 1), (2, 0, 4, 5, 1), (0, 1, 3, 5, 0), (0, 2, 0, 3, 1)],
+                dtype=range_dt,
+            ),
+        )
+        assert_records_close(
+            ranges.filter_min_duration("2d", real=True).values,
+            np.array(
+                [(0, 1, 3, 5, 0), (0, 2, 0, 3, 1)],
+                dtype=range_dt,
+            ),
+        )
+        assert_records_close(
+            ranges.filter_min_duration("4d", real=True).values,
+            np.array(
+                [(0, 1, 3, 5, 0), (0, 2, 0, 3, 1)],
+                dtype=range_dt,
+            ),
+        )
+
+    def test_filter_max_duration(self):
+        assert_records_close(
+            ranges.filter_max_duration(3).values,
+            np.array(
+                [(0, 0, 0, 1, 1), (1, 0, 2, 3, 1), (2, 0, 4, 5, 1), (0, 1, 3, 5, 0), (0, 2, 0, 3, 1)],
+                dtype=range_dt,
+            ),
+        )
+        assert_records_close(
+            ranges.filter_max_duration(1).values,
+            np.array(
+                [(0, 0, 0, 1, 1), (1, 0, 2, 3, 1), (2, 0, 4, 5, 1)],
+                dtype=range_dt,
+            ),
+        )
+        assert_records_close(
+            ranges.filter_max_duration(0).values,
+            np.array(
+                [],
+                dtype=range_dt,
+            ),
+        )
+        assert_records_close(
+            ranges.filter_max_duration(3).values,
+            ranges.filter_max_duration("3d").values,
+        )
+        assert_records_close(
+            ranges.filter_max_duration(1).values,
+            ranges.filter_max_duration("1d").values,
+        )
+        assert_records_close(
+            ranges.filter_max_duration(0).values,
+            ranges.filter_max_duration("0d").values,
+        )
+        assert_records_close(
+            ranges.filter_max_duration("3d", real=True).values,
+            np.array(
+                [(0, 0, 0, 1, 1), (1, 0, 2, 3, 1), (2, 0, 4, 5, 1)],
+                dtype=range_dt,
+            ),
+        )
+        assert_records_close(
+            ranges.filter_max_duration("1d", real=True).values,
+            np.array(
+                [(0, 0, 0, 1, 1), (1, 0, 2, 3, 1), (2, 0, 4, 5, 1)],
+                dtype=range_dt,
+            ),
+        )
+        assert_records_close(
+            ranges.filter_max_duration("0d", real=True).values,
+            np.array(
+                [],
+                dtype=range_dt,
+            ),
+        )
+
+    def test_get_projections(self):
+        assert_frame_equal(
+            ranges.get_projections(),
+            pd.DataFrame(
+                [
+                    [1.0, 1.0, 1.0, 1.0, 1.0],
+                    [-1.0, -0.3333333333333333, -0.2, 1.25, 2.0],
+                    [np.nan, np.nan, np.nan, 1.5, 3.0],
+                    [np.nan, np.nan, np.nan, np.nan, -1.0],
+                ],
+                index=pd.DatetimeIndex(
+                    ["2020-01-08", "2020-01-09", "2020-01-10", "2020-01-11"], dtype="datetime64[ns]", freq="D"
+                ),
+                columns=pd.MultiIndex.from_tuples(
+                    [
+                        ("a", 0),
+                        ("a", 1),
+                        ("a", 2),
+                        ("b", 0),
+                        ("c", 0),
+                    ],
+                    names=[None, "range_id"],
+                ),
+            ),
+        )
+        assert_frame_equal(
+            ranges.get_projections(proj_start=1),
+            pd.DataFrame(
+                [[1.0, 1.0], [1.2, 1.5], [np.nan, -0.5]],
+                index=pd.DatetimeIndex(["2020-01-08", "2020-01-09", "2020-01-10"], dtype="datetime64[ns]", freq="D"),
+                columns=pd.MultiIndex.from_tuples(
+                    [
+                        ("b", 0),
+                        ("c", 0),
+                    ],
+                    names=[None, "range_id"],
+                ),
+            ),
+        )
+        assert_frame_equal(
+            ranges.get_projections(proj_start="1d"),
+            pd.DataFrame(
+                [[1.0, 1.0], [1.2, 1.5], [np.nan, -0.5]],
+                index=pd.DatetimeIndex(["2020-01-08", "2020-01-09", "2020-01-10"], dtype="datetime64[ns]", freq="D"),
+                columns=pd.MultiIndex.from_tuples(
+                    [
+                        ("b", 0),
+                        ("c", 0),
+                    ],
+                    names=[None, "range_id"],
+                ),
+            ),
+        )
+        assert_frame_equal(
+            ranges.get_projections(proj_period=10),
+            pd.DataFrame(
+                [
+                    [1.0, 1.0, 1.0, 1.0, 1.0],
+                    [-1.0, -0.3333333333333333, -0.2, 1.25, 2.0],
+                    [np.nan, np.nan, np.nan, 1.5, 3.0],
+                    [np.nan, np.nan, np.nan, np.nan, -1.0],
+                ],
+                index=pd.DatetimeIndex(
+                    ["2020-01-08", "2020-01-09", "2020-01-10", "2020-01-11"], dtype="datetime64[ns]", freq="D"
+                ),
+                columns=pd.MultiIndex.from_tuples(
+                    [
+                        ("a", 0),
+                        ("a", 1),
+                        ("a", 2),
+                        ("b", 0),
+                        ("c", 0),
+                    ],
+                    names=[None, "range_id"],
+                ),
+            ),
+        )
+        assert_frame_equal(
+            ranges.get_projections(proj_period=3, stretch=True),
+            pd.DataFrame(
+                [
+                    [1.0, 1.0, 1.0, 1.0, 1.0],
+                    [-1.0, -0.3333333333333333, -0.2, 1.25, 2.0],
+                    [3.0, 1.6666666666666665, np.nan, 1.5, 3.0],
+                    [-1.0, -0.3333333333333333, np.nan, np.nan, -1.0],
+                ],
+                index=pd.DatetimeIndex(
+                    ["2020-01-08", "2020-01-09", "2020-01-10", "2020-01-11"], dtype="datetime64[ns]", freq="D"
+                ),
+                columns=pd.MultiIndex.from_tuples(
+                    [
+                        ("a", 0),
+                        ("a", 1),
+                        ("a", 2),
+                        ("b", 0),
+                        ("c", 0),
+                    ],
+                    names=[None, "range_id"],
+                ),
+            ),
+        )
+        assert_frame_equal(
+            ranges.get_projections(proj_period="3d", stretch=True),
+            pd.DataFrame(
+                [
+                    [1.0, 1.0, 1.0, 1.0, 1.0],
+                    [-1.0, -0.3333333333333333, -0.2, 1.25, 2.0],
+                    [3.0, 1.6666666666666665, np.nan, 1.5, 3.0],
+                ],
+                index=pd.DatetimeIndex(["2020-01-08", "2020-01-09", "2020-01-10"], dtype="datetime64[ns]", freq="D"),
+                columns=pd.MultiIndex.from_tuples(
+                    [
+                        ("a", 0),
+                        ("a", 1),
+                        ("a", 2),
+                        ("b", 0),
+                        ("c", 0),
+                    ],
+                    names=[None, "range_id"],
+                ),
+            ),
+        )
+        assert_frame_equal(
+            ranges.get_projections(normalize=False),
+            pd.DataFrame(
+                [
+                    [1.0, 3.0, 5.0, 4.0, 1.0],
+                    [-1.0, -1.0, -1.0, 5.0, 2.0],
+                    [np.nan, np.nan, np.nan, 6.0, 3.0],
+                    [np.nan, np.nan, np.nan, np.nan, -1.0],
+                ],
+                index=pd.DatetimeIndex(
+                    ["2020-01-08", "2020-01-09", "2020-01-10", "2020-01-11"], dtype="datetime64[ns]", freq="D"
+                ),
+                columns=pd.MultiIndex.from_tuples(
+                    [
+                        ("a", 0),
+                        ("a", 1),
+                        ("a", 2),
+                        ("b", 0),
+                        ("c", 0),
+                    ],
+                    names=[None, "range_id"],
+                ),
+            ),
+        )
+        assert_frame_equal(
+            ranges.get_projections(proj_period=3, stretch=True, ffill=True),
+            pd.DataFrame(
+                [
+                    [1.0, 1.0, 1.0, 1.0, 1.0],
+                    [-1.0, -0.3333333333333333, -0.2, 1.25, 2.0],
+                    [3.0, 1.6666666666666665, -0.2, 1.5, 3.0],
+                    [-1.0, -0.3333333333333333, -0.2, 1.5, -1.0],
+                ],
+                index=pd.DatetimeIndex(
+                    ["2020-01-08", "2020-01-09", "2020-01-10", "2020-01-11"], dtype="datetime64[ns]", freq="D"
+                ),
+                columns=pd.MultiIndex.from_tuples(
+                    [
+                        ("a", 0),
+                        ("a", 1),
+                        ("a", 2),
+                        ("b", 0),
+                        ("c", 0),
+                    ],
+                    names=[None, "range_id"],
+                ),
+            ),
+        )
+        assert_frame_equal(
+            ranges.get_projections(remove_empty=False, proj_start=1),
+            pd.DataFrame(
+                [[1.0, 1.0, 1.0, 1.0, 1.0], [np.nan, np.nan, np.nan, 1.2, 1.5], [np.nan, np.nan, np.nan, np.nan, -0.5]],
+                index=pd.DatetimeIndex(["2020-01-08", "2020-01-09", "2020-01-10"], dtype="datetime64[ns]", freq="D"),
+                columns=pd.MultiIndex.from_tuples(
+                    [
+                        ("a", 0),
+                        ("a", 1),
+                        ("a", 2),
+                        ("b", 0),
+                        ("c", 0),
+                    ],
+                    names=[None, "range_id"],
+                ),
+            ),
+        )
+        np.testing.assert_array_equal(
+            ranges.get_projections(return_raw=True)[0],
+            np.array([0, 1, 2, 3, 4]),
+        )
+        np.testing.assert_array_equal(
+            ranges.get_projections(return_raw=True)[1],
+            ranges.get_projections().values.T,
+        )
 
     def test_max_duration(self):
         assert ranges["a"].max_duration == pd.Timedelta("1 days 00:00:00")
@@ -2499,6 +2967,13 @@ class TestRanges:
                 np.array([259200000000000, 259200000000000], dtype="timedelta64[ns]"),
                 index=pd.Index(["g1", "g2"], dtype="object"),
             ).rename("max_duration"),
+        )
+        assert_series_equal(
+            ranges_grouped.get_max_duration(real=True),
+            pd.Series(
+                np.array([345600000000000, 345600000000000], dtype="timedelta64[ns]"),
+                index=pd.Index(["g1", "g2"], dtype="object"),
+            ).rename("max_real_duration"),
         )
         assert_series_equal(
             ranges.get_max_duration(jitted=dict(parallel=True)),
@@ -2566,7 +3041,7 @@ class TestRanges:
             pd.Series(
                 [
                     pd.Timestamp("2020-01-01 00:00:00"),
-                    pd.Timestamp("2020-01-06 00:00:00"),
+                    pd.Timestamp("2020-01-08 00:00:00"),
                     pd.Timedelta("6 days 00:00:00"),
                     1.25,
                     0.5,
@@ -2586,7 +3061,7 @@ class TestRanges:
             pd.Series(
                 [
                     pd.Timestamp("2020-01-01 00:00:00"),
-                    pd.Timestamp("2020-01-06 00:00:00"),
+                    pd.Timestamp("2020-01-08 00:00:00"),
                     pd.Timedelta("6 days 00:00:00"),
                     3,
                     0.5,
@@ -2606,7 +3081,7 @@ class TestRanges:
             pd.Series(
                 [
                     pd.Timestamp("2020-01-01 00:00:00"),
-                    pd.Timestamp("2020-01-06 00:00:00"),
+                    pd.Timestamp("2020-01-08 00:00:00"),
                     pd.Timedelta("6 days 00:00:00"),
                     4,
                     0.4166666666666667,
@@ -2633,27 +3108,27 @@ class TestRanges:
     def test_resample(self):
         np.testing.assert_array_equal(
             ranges.resample("1h").start_idx.values,
-            np.array([0, 48, 96, 72, 0]),
+            np.array([0, 72, 144, 96, 0]),
         )
         np.testing.assert_array_equal(
             ranges.resample("1h").end_idx.values,
-            np.array([24, 72, 120, 120, 72]),
+            np.array([24, 96, 168, 168, 96]),
         )
         np.testing.assert_array_equal(
             ranges.resample("10h").start_idx.values,
-            np.array([0, 4, 9, 7, 0]),
+            np.array([0, 7, 14, 9, 0]),
         )
         np.testing.assert_array_equal(
             ranges.resample("10h").end_idx.values,
-            np.array([2, 7, 12, 12, 7]),
+            np.array([2, 9, 16, 16, 9]),
         )
         np.testing.assert_array_equal(
             ranges.resample("3d").start_idx.values,
-            np.array([0, 0, 1, 1, 0]),
+            np.array([0, 1, 2, 1, 0]),
         )
         np.testing.assert_array_equal(
             ranges.resample("3d").end_idx.values,
-            np.array([0, 1, 1, 1, 1]),
+            np.array([0, 1, 2, 2, 1]),
         )
         assert_frame_equal(
             ranges.resample("1h").close,
@@ -2819,6 +3294,33 @@ class TestDrawdowns:
         np.testing.assert_array_equal(
             records_readable["Status"].values,
             np.array(["Recovered", "Recovered", "Active", "Recovered", "Recovered", "Active"]),
+        )
+
+    def test_ranges(self):
+        assert_records_close(
+            drawdowns.ranges.values,
+            np.array(
+                [(0, 0, 0, 2, 1), (1, 0, 2, 4, 1), (2, 0, 4, 5, 0), (0, 1, 1, 3, 1), (1, 1, 3, 5, 1), (0, 2, 2, 5, 0)],
+                dtype=range_dt,
+            ),
+        )
+
+    def test_drawdown_ranges(self):
+        assert_records_close(
+            drawdowns.drawdown_ranges.values,
+            np.array(
+                [(0, 0, 0, 1, 1), (1, 0, 2, 3, 1), (2, 0, 4, 5, 0), (0, 1, 1, 2, 1), (1, 1, 3, 4, 1), (0, 2, 2, 4, 0)],
+                dtype=range_dt,
+            ),
+        )
+
+    def test_recovery_ranges(self):
+        assert_records_close(
+            drawdowns.recovery_ranges.values,
+            np.array(
+                [(0, 0, 1, 2, 1), (1, 0, 3, 4, 1), (2, 0, 5, 5, 0), (0, 1, 2, 3, 1), (1, 1, 4, 5, 1), (0, 2, 4, 5, 0)],
+                dtype=range_dt,
+            ),
         )
 
     def test_drawdown(self):
@@ -4020,6 +4522,33 @@ class TestFSOrders:
             np.array([None, None, None, None, None, None]),
         )
 
+    def test_ranges(self):
+        assert_records_close(
+            fs_orders.ranges.values,
+            np.array(
+                [(0, 0, 2, 3, 1), (1, 0, 6, 7, 1), (0, 1, 0, 1, 1), (1, 1, 5, 6, 1), (0, 2, 2, 3, 1), (1, 2, 6, 7, 1)],
+                dtype=range_dt,
+            ),
+        )
+
+    def test_creation_ranges(self):
+        assert_records_close(
+            fs_orders.creation_ranges.values,
+            np.array(
+                [(0, 0, 2, 2, 1), (1, 0, 6, 6, 1), (0, 1, 0, 0, 1), (1, 1, 5, 5, 1), (0, 2, 2, 2, 1), (1, 2, 6, 6, 1)],
+                dtype=range_dt,
+            ),
+        )
+
+    def test_fill_ranges(self):
+        assert_records_close(
+            fs_orders.fill_ranges.values,
+            np.array(
+                [(0, 0, 2, 3, 1), (1, 0, 6, 7, 1), (0, 1, 0, 1, 1), (1, 1, 5, 6, 1), (0, 2, 2, 3, 1), (1, 2, 6, 7, 1)],
+                dtype=range_dt,
+            ),
+        )
+
     def test_stats(self):
         stats_index = pd.Index(
             [
@@ -4471,6 +5000,29 @@ class TestExitTrades:
         np.testing.assert_array_equal(
             records_readable["Position Id"].values,
             np.array([0, 0, 1, 2, 0, 0, 1, 2, 0, 0, 1, 2, 3]),
+        )
+
+    def test_ranges(self):
+        assert_records_close(
+            exit_trades.ranges.values,
+            np.array(
+                [
+                    (0, 0, 0, 2, 1),
+                    (1, 0, 0, 3, 1),
+                    (2, 0, 5, 6, 1),
+                    (3, 0, 7, 7, 0),
+                    (0, 1, 0, 2, 1),
+                    (1, 1, 0, 3, 1),
+                    (2, 1, 5, 6, 1),
+                    (3, 1, 7, 7, 0),
+                    (0, 2, 0, 2, 1),
+                    (1, 2, 0, 3, 1),
+                    (2, 2, 5, 6, 1),
+                    (3, 2, 6, 7, 1),
+                    (4, 2, 7, 7, 0),
+                ],
+                dtype=range_dt,
+            ),
         )
 
     def test_duration(self):

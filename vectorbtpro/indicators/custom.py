@@ -153,8 +153,16 @@ class _MA(MA):
         ma_trace_kwargs = merge_dicts(dict(name="MA"), ma_trace_kwargs)
 
         if plot_close:
-            fig = self_col.close.vbt.plot(trace_kwargs=close_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
-        fig = self_col.ma.vbt.plot(trace_kwargs=ma_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+            fig = self_col.close.vbt.lineplot(
+                trace_kwargs=close_trace_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                fig=fig,
+            )
+        fig = self_col.ma.vbt.lineplot(
+            trace_kwargs=ma_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+        )
 
         return fig
 
@@ -226,7 +234,11 @@ class _MSTD(MSTD):
             mstd_trace_kwargs = {}
         mstd_trace_kwargs = merge_dicts(dict(name="MSTD"), mstd_trace_kwargs)
 
-        fig = self_col.mstd.vbt.plot(trace_kwargs=mstd_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+        fig = self_col.mstd.vbt.lineplot(
+            trace_kwargs=mstd_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+        )
 
         return fig
 
@@ -327,31 +339,47 @@ class _BBANDS(BBANDS):
             lower_trace_kwargs = {}
         lower_trace_kwargs = merge_dicts(
             dict(
-                name="Lower Band",
+                name="Lower band",
                 line=dict(color=adjust_opacity(plotting_cfg["color_schema"]["gray"], 0.75)),
             ),
             lower_trace_kwargs,
         )
         upper_trace_kwargs = merge_dicts(
             dict(
-                name="Upper Band",
+                name="Upper band",
                 line=dict(color=adjust_opacity(plotting_cfg["color_schema"]["gray"], 0.75)),
                 fill="tonexty",
                 fillcolor="rgba(128, 128, 128, 0.2)",
             ),
             upper_trace_kwargs,
         )  # default kwargs
-        middle_trace_kwargs = merge_dicts(dict(name="Middle Band"), middle_trace_kwargs)
+        middle_trace_kwargs = merge_dicts(dict(name="Middle band"), middle_trace_kwargs)
         close_trace_kwargs = merge_dicts(
             dict(name="Close", line=dict(color=plotting_cfg["color_schema"]["blue"])),
             close_trace_kwargs,
         )
 
-        fig = self_col.lower.vbt.plot(trace_kwargs=lower_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
-        fig = self_col.upper.vbt.plot(trace_kwargs=upper_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
-        fig = self_col.middle.vbt.plot(trace_kwargs=middle_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+        fig = self_col.lower.vbt.lineplot(
+            trace_kwargs=lower_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+        )
+        fig = self_col.upper.vbt.lineplot(
+            trace_kwargs=upper_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+        )
+        fig = self_col.middle.vbt.lineplot(
+            trace_kwargs=middle_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+        )
         if plot_close:
-            fig = self_col.close.vbt.plot(trace_kwargs=close_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+            fig = self_col.close.vbt.lineplot(
+                trace_kwargs=close_trace_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                fig=fig,
+            )
 
         return fig
 
@@ -430,7 +458,11 @@ class _RSI(RSI):
             rsi_trace_kwargs = {}
         rsi_trace_kwargs = merge_dicts(dict(name="RSI"), rsi_trace_kwargs)
 
-        fig = self_col.rsi.vbt.plot(trace_kwargs=rsi_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+        fig = self_col.rsi.vbt.lineplot(
+            trace_kwargs=rsi_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+        )
 
         xaxis = getattr(fig.data[-1], "xaxis", None)
         if xaxis is None:
@@ -544,12 +576,12 @@ class _STOCH(STOCH):
         percent_k_trace_kwargs = merge_dicts(dict(name="%K"), percent_k_trace_kwargs)
         percent_d_trace_kwargs = merge_dicts(dict(name="%D"), percent_d_trace_kwargs)
 
-        fig = self_col.percent_k.vbt.plot(
+        fig = self_col.percent_k.vbt.lineplot(
             trace_kwargs=percent_k_trace_kwargs,
             add_trace_kwargs=add_trace_kwargs,
             fig=fig,
         )
-        fig = self_col.percent_d.vbt.plot(
+        fig = self_col.percent_d.vbt.lineplot(
             trace_kwargs=percent_d_trace_kwargs,
             add_trace_kwargs=add_trace_kwargs,
             fig=fig,
@@ -678,8 +710,16 @@ class _MACD(MACD):
         signal_trace_kwargs = merge_dicts(dict(name="Signal"), signal_trace_kwargs)
         hist_trace_kwargs = merge_dicts(dict(name="Histogram"), hist_trace_kwargs)
 
-        fig = self_col.macd.vbt.plot(trace_kwargs=macd_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
-        fig = self_col.signal.vbt.plot(trace_kwargs=signal_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+        fig = self_col.macd.vbt.lineplot(
+            trace_kwargs=macd_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+        )
+        fig = self_col.signal.vbt.lineplot(
+            trace_kwargs=signal_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+        )
 
         # Plot hist
         hist = self_col.hist.values
@@ -780,8 +820,16 @@ class _ATR(ATR):
         tr_trace_kwargs = merge_dicts(dict(name="TR"), tr_trace_kwargs)
         atr_trace_kwargs = merge_dicts(dict(name="ATR"), atr_trace_kwargs)
 
-        fig = self_col.tr.vbt.plot(trace_kwargs=tr_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
-        fig = self_col.atr.vbt.plot(trace_kwargs=atr_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+        fig = self_col.tr.vbt.lineplot(
+            trace_kwargs=tr_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+        )
+        fig = self_col.atr.vbt.lineplot(
+            trace_kwargs=atr_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+        )
 
         return fig
 
@@ -845,7 +893,11 @@ class _OBV(OBV):
             obv_trace_kwargs = {}
         obv_trace_kwargs = merge_dicts(dict(name="OBV"), obv_trace_kwargs)
 
-        fig = self_col.obv.vbt.plot(trace_kwargs=obv_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+        fig = self_col.obv.vbt.lineplot(
+            trace_kwargs=obv_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+        )
 
         return fig
 
@@ -937,8 +989,16 @@ class _OLS(OLS):
         pred_trace_kwargs = merge_dicts(dict(name="Pred"), pred_trace_kwargs)
 
         if plot_y:
-            fig = self_col.y.vbt.plot(trace_kwargs=y_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
-        fig = self_col.pred.vbt.plot(trace_kwargs=pred_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+            fig = self_col.y.vbt.lineplot(
+                trace_kwargs=y_trace_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                fig=fig,
+            )
+        fig = self_col.pred.vbt.lineplot(
+            trace_kwargs=pred_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+        )
 
         return fig
 
@@ -1010,8 +1070,12 @@ class _OLSS(OLSS):
             fig = make_figure()
         fig.update_layout(**layout_kwargs)
 
-        zscore_trace_kwargs = merge_dicts(dict(name="Z-Score"), zscore_trace_kwargs)
-        fig = self_col.zscore.vbt.plot(trace_kwargs=zscore_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+        zscore_trace_kwargs = merge_dicts(dict(name="Z-score"), zscore_trace_kwargs)
+        fig = self_col.zscore.vbt.lineplot(
+            trace_kwargs=zscore_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+        )
 
         # Fill void between limits
         xaxis = getattr(fig.data[-1], "xaxis", None)

@@ -1773,7 +1773,39 @@ class SignalsAccessor(GenericAccessor):
         Uses `SignalsAccessor.partition_pos_rank`."""
         return self.partition_pos_rank(as_mapped=True, group_by=group_by, **kwargs)
 
+    # ############# Conversion ############# #
+
+    def to_mapped(
+        self,
+        group_by: tp.GroupByLike = None,
+        **kwargs,
+    ) -> MappedArray:
+        """Convert this object into an instance of `vectorbtpro.records.mapped_array.MappedArray`."""
+        mapped_arr = self.to_2d_array().flatten(order="F")
+        col_arr = np.repeat(np.arange(self.wrapper.shape_2d[1]), self.wrapper.shape_2d[0])
+        idx_arr = np.tile(np.arange(self.wrapper.shape_2d[0]), self.wrapper.shape_2d[1])
+        new_mapped_arr = mapped_arr[mapped_arr]
+        new_col_arr = col_arr[mapped_arr]
+        new_idx_arr = idx_arr[mapped_arr]
+        return MappedArray(
+            wrapper=self.wrapper,
+            mapped_arr=new_mapped_arr,
+            col_arr=new_col_arr,
+            idx_arr=new_idx_arr,
+            **kwargs,
+        ).regroup(group_by)
+
     # ############# Ranges ############# #
+
+    def delta_ranges(
+        self,
+        delta: tp.Union[str, int, tp.FrequencyLike],
+        group_by: tp.GroupByLike = None,
+        **kwargs,
+    ) -> Ranges:
+        """Build a record array of the type `vectorbtpro.generic.ranges.Ranges`
+        from a delta applied after each signal (or before if delta is negative)."""
+        return Ranges.from_delta(self.to_mapped(), delta, **kwargs).regroup(group_by)
 
     def between_ranges(
         self,
@@ -1866,7 +1898,8 @@ class SignalsAccessor(GenericAccessor):
             range_records = func(reshaping.to_2d_array(obj), reshaping.to_2d_array(other), from_other=from_other)
             wrapper = ArrayWrapper.from_obj(obj)
             to_attach = other if attach_other else obj
-        return Ranges.from_records(wrapper, range_records, close=to_attach, **kwargs).regroup(group_by)
+        kwargs = merge_dicts(dict(close=to_attach), kwargs)
+        return Ranges.from_records(wrapper, range_records, **kwargs).regroup(group_by)
 
     def partition_ranges(
         self,
@@ -1893,7 +1926,8 @@ class SignalsAccessor(GenericAccessor):
         func = jit_reg.resolve_option(nb.partition_ranges_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         range_records = func(self.to_2d_array())
-        return Ranges.from_records(self.wrapper, range_records, close=self.obj, **kwargs).regroup(group_by)
+        kwargs = merge_dicts(dict(close=self.obj), kwargs)
+        return Ranges.from_records(self.wrapper, range_records, **kwargs).regroup(group_by)
 
     def between_partition_ranges(
         self,
@@ -1917,7 +1951,8 @@ class SignalsAccessor(GenericAccessor):
         func = jit_reg.resolve_option(nb.between_partition_ranges_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         range_records = func(self.to_2d_array())
-        return Ranges.from_records(self.wrapper, range_records, close=self.obj, **kwargs).regroup(group_by)
+        kwargs = merge_dicts(dict(close=self.obj), kwargs)
+        return Ranges.from_records(self.wrapper, range_records, **kwargs).regroup(group_by)
 
     # ############# Index ############# #
 

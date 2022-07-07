@@ -2,6 +2,9 @@
 
 """Base class for working with records that can make use of OHLC data."""
 
+import numpy as np
+import pandas as pd
+
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_2d_array
 from vectorbtpro.base.wrapping import ArrayWrapper
@@ -20,21 +23,30 @@ class PriceRecords(Records):
         cls: tp.Type[PriceRecordsT],
         wrapper: ArrayWrapper,
         records: tp.RecordArray,
+        data: tp.Optional["Data"] = None,
         open: tp.Optional[tp.ArrayLike] = None,
         high: tp.Optional[tp.ArrayLike] = None,
         low: tp.Optional[tp.ArrayLike] = None,
         close: tp.Optional[tp.ArrayLike] = None,
-        attach_price: bool = True,
+        attach_data: bool = True,
         **kwargs,
     ) -> PriceRecordsT:
         """Build `PriceRecords` from records."""
+        if open is None and data is not None:
+            open = data.open
+        if high is None and data is not None:
+            high = data.high
+        if low is None and data is not None:
+            low = data.low
+        if close is None and data is not None:
+            close = data.close
         return cls(
             wrapper,
             records,
-            open=open if attach_price else None,
-            high=high if attach_price else None,
-            low=low if attach_price else None,
-            close=close if attach_price else None,
+            open=open if attach_data else None,
+            high=high if attach_data else None,
+            low=low if attach_data else None,
+            close=close if attach_data else None,
             **kwargs,
         )
 

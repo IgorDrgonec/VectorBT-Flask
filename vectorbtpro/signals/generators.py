@@ -571,7 +571,7 @@ def _bind_ohlcstx_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pra
                 self_col.close
             ), axis=1)
             ohlc_df.columns = ["Open", "High", "Low", "Close"]
-            ohlc_kwargs = merge_dicts(layout_kwargs, dict(ohlc_trace_kwargs=dict(opacity=0.65)), ohlc_kwargs)
+            ohlc_kwargs = merge_dicts(layout_kwargs, dict(ohlc_trace_kwargs=dict(opacity=0.5)), ohlc_kwargs)
             fig = ohlc_df.vbt.ohlcv.plot(fig=fig, **ohlc_kwargs)
         else:
             entry_price_kwargs = merge_dicts(layout_kwargs, entry_price_kwargs)

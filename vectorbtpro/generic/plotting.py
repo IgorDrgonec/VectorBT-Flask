@@ -25,7 +25,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base import reshaping
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.array_ import renormalize
-from vectorbtpro.utils.colors import rgb_from_cmap
+from vectorbtpro.utils.colors import map_value_to_cmap
 from vectorbtpro.utils.config import Configured, resolve_dict
 from vectorbtpro.utils.figure import make_figure, FigureResampler, FigureWidgetResampler
 
@@ -171,7 +171,7 @@ class Gauge(Configured, TraceUpdater):
         if value_range is not None:
             trace.gauge.axis.range = value_range
             if cmap_name is not None:
-                trace.gauge.bar.color = rgb_from_cmap(cmap_name, value, value_range)
+                trace.gauge.bar.color = map_value_to_cmap(value, cmap_name, vmin=value_range[0], vmax=value_range[1])
         trace.delta.reference = trace.value
         trace.value = value
 

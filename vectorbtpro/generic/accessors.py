@@ -243,6 +243,7 @@ from vectorbtpro.utils.decorators import class_or_instancemethod, class_or_insta
 from vectorbtpro.utils.mapping import apply_mapping, to_mapping
 from vectorbtpro.utils.template import deep_substitute
 from vectorbtpro.utils.datetime_ import freq_to_timedelta64, try_to_datetime_index
+from vectorbtpro.utils.colors import adjust_opacity, map_value_to_cmap
 
 try:  # pragma: no cover
     import bottleneck as bn
@@ -2289,10 +2290,13 @@ class GenericAccessor(BaseAccessor, Analyzable):
         )
 
         if isinstance(cls_or_self, type):
-            template_context = merge_dicts(dict(
-                resampler=resampler,
-                index_ranges=index_ranges,
-            ), template_context)
+            template_context = merge_dicts(
+                dict(
+                    resampler=resampler,
+                    index_ranges=index_ranges,
+                ),
+                template_context,
+            )
             args = deep_substitute(args, template_context, sub_id="args")
             func = jit_reg.resolve_option(nb.reduce_index_ranges_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
@@ -3580,7 +3584,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         See `vectorbtpro.generic.ranges.Ranges`."""
         wrapper_kwargs = merge_dicts(self.wrapper.config, wrapper_kwargs)
-        return Ranges.from_generic(self.obj, wrapper_kwargs=wrapper_kwargs, **kwargs)
+        return Ranges.from_pd(self.obj, wrapper_kwargs=wrapper_kwargs, **kwargs)
 
     @property
     def drawdowns(self) -> Drawdowns:
@@ -4519,3 +4523,375 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
     ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:  # pragma: no cover
         """Heatmap of time-series data."""
         return self.obj.transpose().iloc[::-1].vbt.heatmap(is_y_category=is_y_category, **kwargs)
+
+    def plot_projections(
+        self,
+        plot_projections: bool = True,
+        plot_lower: tp.Union[bool, str, tp.Callable] = True,
+        plot_middle: tp.Union[bool, str, tp.Callable] = True,
+        plot_upper: tp.Union[bool, str, tp.Callable] = True,
+        plot_fill: bool = True,
+        colorize: tp.Union[bool, str, tp.Callable] = True,
+        rename_levels: tp.Union[None, dict, tp.Sequence] = None,
+        projection_trace_kwargs: tp.KwargsLike = None,
+        upper_trace_kwargs: tp.KwargsLike = None,
+        middle_trace_kwargs: tp.KwargsLike = None,
+        lower_trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
+        """Plot a DataFrame where each column is a projection.
+
+        If `plot_projections` is True, will plot each projection as a semi-transparent line.
+
+        The arguments `plot_lower`, `plot_middle`, and `plot_upper` represent bands and accept the following:
+
+        * True: Plot the band using the default quantile (20/50/80)
+        * False: Do not plot the band
+        * "50%": 50th quantile
+        * "Q=50%": 50th quantile
+        * "Q=0.5": 50th quantile
+        * "Z=1.96": Z-score of 1.96
+        * "P=95%": One-tailed p-value of 0.95 (translated into z-score)
+        * "P=0.95": One-tailed p-value of 0.95 (translated into z-score)
+        * "median": Median (50th quantile)
+        * "mean": Mean across all projections
+        * "min": Min across all projections
+        * "max": Max across all projections
+        * "lowest": Projection with the lowest final value
+        * "highest": Projection with the highest final value
+        * callable: Custom function that accepts DataFrame and reduces it across columns
+
+        !!! note
+            When providing z-scores, the upper should be positive, the middle should be "mean", and
+            the lower should be negative. When providing p-values, the middle should be "mean", while
+            the lower should be positive and lower than the upper, for example, 25% and 75%.
+
+        Argument `colorize` allows the following values:
+
+        * True: Colorize bands by their median
+        * False: Do not colorize
+        * "median": Median
+        * "mean": Mean
+        * "last": Last value
+        * callable: Custom function that accepts (normalized to 0) Series/DataFrame and reduces it across rows
+
+        Colorization is performed by mapping the metric value of the band to the range between the
+        minimum and maximum value across all projections where 0 is always the middle point.
+        If none of the bands is plotted, projections got colorized. Otherwise, projections stay gray.
+
+        Usage:
+            ```pycon
+            >>> df = pd.DataFrame({
+            ...     0: [10, 11, 12, 11, 10],
+            ...     1: [10, 12, 14, np.nan, np.nan],
+            ...     2: [10, 12, 11, 12, np.nan],
+            ...     3: [10, 9, 8, 9, 8],
+            ...     4: [10, 11, np.nan, np.nan, np.nan],
+            ... })
+            >>> df.vbt.plot_projections()
+            ```
+
+            ![](/assets/images/df_plot_projections.svg)
+        """
+        from vectorbtpro.utils.figure import make_figure
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
+
+        if projection_trace_kwargs is None:
+            projection_trace_kwargs = {}
+        if lower_trace_kwargs is None:
+            lower_trace_kwargs = {}
+        if upper_trace_kwargs is None:
+            upper_trace_kwargs = {}
+        if middle_trace_kwargs is None:
+            middle_trace_kwargs = {}
+        if add_trace_kwargs is None:
+            add_trace_kwargs = {}
+
+        # Resolve band functions and names
+        if isinstance(plot_lower, bool):
+            if plot_lower:
+                plot_lower = "20%"
+            else:
+                plot_lower = None
+        if isinstance(plot_middle, bool):
+            if plot_middle:
+                plot_middle = "50%"
+            else:
+                plot_middle = None
+        if isinstance(plot_upper, bool):
+            if plot_upper:
+                plot_upper = "80%"
+            else:
+                plot_upper = None
+
+        def _resolve_band_and_name(plot_band, arg_name):
+            band_name = None
+            if isinstance(plot_band, str):
+                plot_band = plot_band.lower().strip()
+                if plot_band == "median":
+                    plot_band = "50%"
+                if "%" in plot_band and not plot_band.startswith("q=") and not plot_band.startswith("p="):
+                    plot_band = f"q={plot_band}"
+                if plot_band.startswith("q="):
+                    if "%" in plot_band:
+                        q = float(plot_band.replace("q=", "").replace("%", "")) / 100
+                    else:
+                        q = float(plot_band.replace("q=", ""))
+                    q_readable = np.around(q * 100, decimals=2)
+                    if q_readable.is_integer():
+                        q_readable = int(q_readable)
+                    band_name = f"Q={q_readable}% (proj)"
+                    plot_band = lambda df, _q=q: df.quantile(_q, axis=1)
+                elif plot_band.startswith("z="):
+                    z = float(plot_band.replace("z=", ""))
+                    z_readable = np.around(z, decimals=2)
+                    if z_readable.is_integer():
+                        z_readable = int(z_readable)
+                    band_name = f"Z={z_readable} (proj)"
+                    plot_band = lambda df, _z=z: df.mean(axis=1) + _z * df.std(axis=1)
+                elif plot_band.startswith("p="):
+                    import scipy.stats as st
+
+                    if "%" in plot_band:
+                        p = float(plot_band.replace("p=", "").replace("%", "")) / 100
+                    else:
+                        p = float(plot_band.replace("p=", ""))
+                    p_readable = np.around(p * 100, decimals=2)
+                    if p_readable.is_integer():
+                        p_readable = int(p_readable)
+                    band_name = f"P={p_readable}% (proj)"
+                    z = st.norm.ppf(p)
+                    plot_band = lambda df, _z=z: df.mean(axis=1) + _z * df.std(axis=1)
+                elif plot_band == "mean":
+                    band_name = "Mean (proj)"
+                    plot_band = lambda df: df.mean(axis=1)
+                elif plot_band == "min":
+                    band_name = "Min (proj)"
+                    plot_band = lambda df: df.min(axis=1)
+                elif plot_band == "max":
+                    band_name = "Max (proj)"
+                    plot_band = lambda df: df.max(axis=1)
+                elif plot_band == "lowest":
+                    band_name = "Lowest (proj)"
+                    plot_band = lambda df: df[df.ffill().iloc[-1].idxmin()]
+                elif plot_band == "highest":
+                    band_name = "Highest (proj)"
+                    plot_band = lambda df: df[df.ffill().iloc[-1].idxmax()]
+                else:
+                    raise ValueError(f"Argument {arg_name} has wrong value '{plot_band}'")
+            if plot_band is not None and not callable(plot_band):
+                raise TypeError(f"Argument {arg_name} has wrong type '{type(plot_band)}'")
+            return plot_band, band_name
+
+        plot_lower, lower_name = _resolve_band_and_name(plot_lower, "plot_lower")
+        if lower_name is None:
+            lower_name = "Lower (proj)"
+        plot_middle, middle_name = _resolve_band_and_name(plot_middle, "plot_middle")
+        if middle_name is None:
+            middle_name = "Middle (proj)"
+        plot_upper, upper_name = _resolve_band_and_name(plot_upper, "plot_upper")
+        if upper_name is None:
+            upper_name = "Upper (proj)"
+
+        if isinstance(colorize, bool):
+            if colorize:
+                colorize = "median"
+            else:
+                colorize = None
+        if colorize is not None:
+            if isinstance(colorize, str):
+                colorize = colorize.lower().strip()
+                if colorize == "median":
+                    colorize = lambda x: x.median()
+                elif colorize == "mean":
+                    colorize = lambda x: x.mean()
+                elif colorize == "last":
+                    colorize = lambda x: x.ffill().iloc[-1]
+                else:
+                    raise ValueError(f"Argument colorize has wrong value '{colorize}'")
+            if colorize is not None and not callable(colorize):
+                raise TypeError(f"Argument colorize has wrong type '{type(colorize)}'")
+        if colorize is not None:
+            proj_min = colorize(self.obj - self.obj.iloc[0]).min()
+            proj_max = colorize(self.obj - self.obj.iloc[0]).max()
+        else:
+            proj_min = None
+            proj_max = None
+
+        if fig is None:
+            fig = make_figure()
+        fig.update_layout(**layout_kwargs)
+
+        if len(self.obj.columns) > 0:
+            if plot_projections:
+                # Plot projections
+                for col in range(self.wrapper.shape[1]):
+                    proj_sr = self.obj.iloc[:, col]
+                    hovertemplate = f"(%{{x}}, %{{y}})"
+                    if not checks.is_default_index(self.wrapper.columns):
+                        level_names = []
+                        level_values = []
+                        if isinstance(self.wrapper.columns, pd.MultiIndex):
+                            for l in range(self.wrapper.columns.nlevels):
+                                level_names.append(self.wrapper.columns.names[l])
+                                level_values.append(self.wrapper.columns.get_level_values(l)[col])
+                        else:
+                            level_names.append(self.wrapper.columns.name)
+                            level_values.append(self.wrapper.columns[col])
+                        for l in range(len(level_names)):
+                            level_name = level_names[l]
+                            level_value = level_values[l]
+                            if rename_levels is not None:
+                                if isinstance(rename_levels, dict):
+                                    if level_name in rename_levels:
+                                        level_name = rename_levels[level_name]
+                                    elif l in rename_levels:
+                                        level_name = rename_levels[l]
+                                else:
+                                    level_name = rename_levels[l]
+                            if level_name is None:
+                                level_name = f"Level {l}"
+                            hovertemplate += f"<br>{level_name}: {level_value}"
+
+                    if colorize is not None:
+                        proj_color = map_value_to_cmap(
+                            colorize(proj_sr - proj_sr.iloc[0]),
+                            [
+                                plotting_cfg["color_schema"]["red"],
+                                plotting_cfg["color_schema"]["yellow"],
+                                plotting_cfg["color_schema"]["green"],
+                            ],
+                            vmin=proj_min,
+                            vcenter=0,
+                            vmax=proj_max,
+                        )
+                    else:
+                        proj_color = plotting_cfg["color_schema"]["gray"]
+                    if not plot_lower and not plot_middle and not plot_upper:
+                        proj_color = adjust_opacity(proj_color, 0.5)
+                    else:
+                        proj_color = adjust_opacity(proj_color, 0.1)
+                    _projection_trace_kwargs = merge_dicts(
+                        dict(
+                            name=f"proj ({self.obj.shape[1]})",
+                            line=dict(color=proj_color),
+                            legendgroup="proj",
+                            showlegend=col == 0,
+                            hovertemplate=hovertemplate,
+                        ),
+                        projection_trace_kwargs,
+                    )
+                    proj_sr.rename(None).vbt.lineplot(
+                        trace_kwargs=_projection_trace_kwargs,
+                        add_trace_kwargs=add_trace_kwargs,
+                        fig=fig,
+                    )
+
+        if len(self.obj.columns) > 1:
+            # Calculate bands
+            if plot_lower is not None:
+                lower_band = plot_lower(self.obj)
+            else:
+                lower_band = None
+            if plot_upper is not None:
+                upper_band = plot_upper(self.obj)
+            else:
+                upper_band = None
+            if plot_middle is not None:
+                middle_band = plot_middle(self.obj)
+            else:
+                middle_band = None
+
+            if lower_band is not None:
+                # Plot lower band
+                def_lower_trace_kwargs = dict(name=lower_name)
+                if colorize is not None:
+                    lower_color = map_value_to_cmap(
+                        colorize(lower_band - lower_band.iloc[0]),
+                        [
+                            plotting_cfg["color_schema"]["red"],
+                            plotting_cfg["color_schema"]["yellow"],
+                            plotting_cfg["color_schema"]["green"],
+                        ],
+                        vmin=proj_min,
+                        vcenter=0,
+                        vmax=proj_max,
+                    )
+                    def_lower_trace_kwargs["line"] = dict(
+                        color=adjust_opacity(lower_color, 0.75)
+                    )
+                else:
+                    lower_color = plotting_cfg["color_schema"]["gray"]
+                    def_lower_trace_kwargs["line"] = dict(
+                        color=adjust_opacity(lower_color, 0.5)
+                    )
+                lower_band.rename(None).vbt.lineplot(
+                    trace_kwargs=merge_dicts(def_lower_trace_kwargs, lower_trace_kwargs),
+                    add_trace_kwargs=add_trace_kwargs,
+                    fig=fig,
+                )
+
+            if middle_band is not None:
+                # Plot middle band
+                def_middle_trace_kwargs = dict(name=middle_name)
+                if colorize is not None:
+                    middle_color = map_value_to_cmap(
+                        colorize(middle_band - middle_band.iloc[0]),
+                        [
+                            plotting_cfg["color_schema"]["red"],
+                            plotting_cfg["color_schema"]["yellow"],
+                            plotting_cfg["color_schema"]["green"],
+                        ],
+                        vmin=proj_min,
+                        vcenter=0,
+                        vmax=proj_max,
+                    )
+                else:
+                    middle_color = plotting_cfg["color_schema"]["gray"]
+                def_middle_trace_kwargs["line"] = dict(color=middle_color)
+                if plot_fill and lower_band is not None:
+                    def_middle_trace_kwargs["fill"] = "tonexty"
+                    def_middle_trace_kwargs["fillcolor"] = adjust_opacity(plotting_cfg["color_schema"]["gray"], 0.25)
+                middle_band.rename(None).vbt.lineplot(
+                    trace_kwargs=merge_dicts(def_middle_trace_kwargs, middle_trace_kwargs),
+                    add_trace_kwargs=add_trace_kwargs,
+                    fig=fig,
+                )
+
+            if upper_band is not None:
+                # Plot upper band
+                def_upper_trace_kwargs = dict(name=upper_name)
+                if colorize is not None:
+                    upper_color = map_value_to_cmap(
+                        colorize(upper_band - upper_band.iloc[0]),
+                        [
+                            plotting_cfg["color_schema"]["red"],
+                            plotting_cfg["color_schema"]["yellow"],
+                            plotting_cfg["color_schema"]["green"],
+                        ],
+                        vmin=proj_min,
+                        vcenter=0,
+                        vmax=proj_max,
+                    )
+                    def_upper_trace_kwargs["line"] = dict(
+                        color=adjust_opacity(upper_color, 0.75)
+                    )
+                else:
+                    upper_color = plotting_cfg["color_schema"]["gray"]
+                    def_upper_trace_kwargs["line"] = dict(
+                        color=adjust_opacity(upper_color, 0.5)
+                    )
+                if plot_fill and (lower_band is not None or middle_band is not None):
+                    def_upper_trace_kwargs["fill"] = "tonexty"
+                    def_upper_trace_kwargs["fillcolor"] = adjust_opacity(plotting_cfg["color_schema"]["gray"], 0.25)
+                upper_band.rename(None).vbt.lineplot(
+                    trace_kwargs=merge_dicts(def_upper_trace_kwargs, upper_trace_kwargs),
+                    add_trace_kwargs=add_trace_kwargs,
+                    fig=fig,
+                )
+
+        return fig

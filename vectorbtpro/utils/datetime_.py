@@ -25,6 +25,11 @@ def freq_to_timedelta(freq: tp.FrequencyLike) -> pd.Timedelta:
     """Convert a frequency-like object to `pd.Timedelta`."""
     if isinstance(freq, pd.Timedelta):
         return freq
+    if isinstance(freq, str) and freq.startswith("-"):
+        neg_td = True
+        freq = freq[1:]
+    else:
+        neg_td = False
     if isinstance(freq, str):
         freq = "".join(freq.strip().split())
         match = re.match(r"^(\d*)([m]?)$", freq)
@@ -34,8 +39,12 @@ def freq_to_timedelta(freq: tp.FrequencyLike) -> pd.Timedelta:
             raise ValueError("Units 'M', 'Y' and 'y' do not represent unambiguous timedelta values")
     if isinstance(freq, str) and not freq[0].isdigit():
         # Otherwise "ValueError: unit abbreviation w/o a number"
-        return pd.Timedelta(1, unit=freq)
-    return pd.Timedelta(freq)
+        td = pd.Timedelta(1, unit=freq)
+    else:
+        td = pd.Timedelta(freq)
+    if neg_td:
+        return -td
+    return td
 
 
 def time_to_timedelta(time: tp.TimeLike) -> pd.Timedelta:

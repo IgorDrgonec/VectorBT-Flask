@@ -802,27 +802,58 @@ class AtomicConfig(Config, atomic_dict):
 
 
 class FrozenConfig(Config):
-    pass
+    """`Config` with `frozen_keys_` flag set to True."""
 
-
-FrozenConfig = functools.partial(FrozenConfig, frozen_keys_=True)
-"""`Config` with `frozen_keys_` flag set to True."""
+    def __init__(
+        self,
+        *args,
+        **kwargs,
+    ) -> None:
+        if "frozen_keys_" in kwargs:
+            del kwargs["frozen_keys_"]
+        Config.__init__(
+            self,
+            *args,
+            frozen_keys_=True,
+            **kwargs,
+        )
 
 
 class ReadonlyConfig(Config):
-    pass
+    """`Config` with `readonly_` flag set to True."""
 
-
-ReadonlyConfig = functools.partial(ReadonlyConfig, readonly_=True)
-"""`Config` with `readonly_` flag set to True."""
+    def __init__(
+        self,
+        *args,
+        **kwargs,
+    ) -> None:
+        if "readonly_" in kwargs:
+            del kwargs["readonly_"]
+        Config.__init__(
+            self,
+            *args,
+            readonly_=True,
+            **kwargs,
+        )
 
 
 class HybridConfig(Config):
-    pass
+    """`Config` with `copy_kwargs_` set to `copy_mode='hybrid'`."""
 
+    def __init__(
+        self,
+        *args,
+        **kwargs,
+    ) -> None:
+        copy_kwargs_ = kwargs.pop("copy_kwargs_", dict())
+        copy_kwargs_["copy_mode"] = "hybrid"
+        Config.__init__(
+            self,
+            *args,
+            copy_kwargs_=copy_kwargs_,
+            **kwargs,
+        )
 
-HybridConfig = functools.partial(HybridConfig, copy_kwargs_=dict(copy_mode="hybrid"))
-"""`Config` with `copy_kwargs_` set to `copy_mode='hybrid'`."""
 
 ConfiguredT = tp.TypeVar("ConfiguredT", bound="Configured")
 
@@ -894,6 +925,7 @@ class Configured(Cacheable, Pickleable, Prettified):
         copy_mode_: tp.Optional[str] = None,
         nested_: tp.Optional[bool] = None,
         cls_: tp.Optional[type] = None,
+        copy_writeable_attrs_: tp.Optional[bool] = None,
         **new_config,
     ) -> ConfiguredT:
         """Create a new instance by copying and (optionally) changing the config.
@@ -903,19 +935,22 @@ class Configured(Cacheable, Pickleable, Prettified):
             initialized with the same config and writeable attributes (or their copy, depending on `copy_mode`)."""
         if cls_ is None:
             cls_ = type(self)
+        if copy_writeable_attrs_ is None:
+            copy_writeable_attrs_ = cls_ is type(self)
         new_config = self.config.merge_with(new_config, copy_mode=copy_mode_, nested=nested_)
         new_instance = cls_(**new_config)
-        for attr in self.get_writeable_attrs():
-            attr_obj = getattr(self, attr)
-            if isinstance(attr_obj, Config):
-                attr_obj = attr_obj.copy(copy_mode=copy_mode_, nested=nested_)
-            else:
-                if copy_mode_ is not None:
-                    if copy_mode_ == "hybrid":
-                        attr_obj = copy(attr_obj)
-                    elif copy_mode_ == "deep":
-                        attr_obj = deepcopy(attr_obj)
-            setattr(new_instance, attr, attr_obj)
+        if copy_writeable_attrs_:
+            for attr in self.get_writeable_attrs():
+                attr_obj = getattr(self, attr)
+                if isinstance(attr_obj, Config):
+                    attr_obj = attr_obj.copy(copy_mode=copy_mode_, nested=nested_)
+                else:
+                    if copy_mode_ is not None:
+                        if copy_mode_ == "hybrid":
+                            attr_obj = copy(attr_obj)
+                        elif copy_mode_ == "deep":
+                            attr_obj = deepcopy(attr_obj)
+                setattr(new_instance, attr, attr_obj)
         return new_instance
 
     def copy(
@@ -979,4 +1014,7 @@ class Configured(Cacheable, Pickleable, Prettified):
         self.config.update(*args, **kwargs, force=True)
 
     def prettify(self, **kwargs) -> str:
-        return "%s(%s)" % (type(self).__name__, self.config.prettify(**kwargs)[len(type(self.config).__name__) + 1:-1])
+        return "%s(%s)" % (
+            type(self).__name__,
+            self.config.prettify(**kwargs)[len(type(self.config).__name__) + 1 : -1],
+        )

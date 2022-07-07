@@ -106,21 +106,109 @@ def get_ranges_nb(arr: tp.Array2d, gap_value: tp.Scalar) -> tp.RecordArray:
 
 
 @register_chunkable(
+    size=base_ch.GroupLensSizer(arg_query="col_map"),
+    arg_take_spec=dict(
+        n_rows=None,
+        idx_arr=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
+        id_arr=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
+        col_map=base_ch.GroupMapSlicer(),
+        index=None,
+        delta=None,
+        delta_use_index=None,
+    ),
+    merge_func=records_ch.merge_records,
+    merge_kwargs=dict(chunk_meta=Rep("chunk_meta")),
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def get_ranges_from_delta_nb(
+    n_rows: int,
+    idx_arr: tp.Array1d,
+    id_arr: tp.Array1d,
+    col_map: tp.GroupMap,
+    index: tp.Optional[tp.Array1d] = None,
+    delta: int = 0,
+    delta_use_index: bool = False,
+) -> tp.RecordArray:
+    """Build delta ranges."""
+    col_idxs, col_lens = col_map
+    col_start_idxs = np.cumsum(col_lens) - col_lens
+    out = np.empty(idx_arr.shape[0], dtype=range_dt)
+
+    for col in prange(col_lens.shape[0]):
+        col_len = col_lens[col]
+        if col_len == 0:
+            continue
+        col_start_idx = col_start_idxs[col]
+        ridxs = col_idxs[col_start_idx: col_start_idx + col_len]
+
+        for r in ridxs:
+            if delta >= 0:
+                start_idx = idx_arr[r]
+                if delta_use_index:
+                    if index is None:
+                        raise ValueError("Index is required")
+                    end_idx = len(index) - 1
+                    status = RangeStatus.Open
+                    for i in range(start_idx, index.shape[0]):
+                        if index[i] >= index[start_idx] + delta:
+                            end_idx = i
+                            status = RangeStatus.Closed
+                            break
+                else:
+                    if start_idx + delta < n_rows:
+                        end_idx = start_idx + delta
+                        status = RangeStatus.Closed
+                    else:
+                        end_idx = n_rows - 1
+                        status = RangeStatus.Open
+            else:
+                end_idx = idx_arr[r]
+                status = RangeStatus.Closed
+                if delta_use_index:
+                    if index is None:
+                        raise ValueError("Index is required")
+                    start_idx = 0
+                    for i in range(end_idx, -1, -1):
+                        if index[i] <= index[end_idx] + delta:
+                            start_idx = i
+                            break
+                else:
+                    if end_idx + delta >= 0:
+                        start_idx = end_idx + delta
+                    else:
+                        start_idx = 0
+
+            out["id"][r] = id_arr[r]
+            out["col"][r] = col
+            out["start_idx"][r] = start_idx
+            out["end_idx"][r] = end_idx
+            out["status"][r] = status
+
+    return out
+
+
+@register_chunkable(
     size=ch.ArraySizer(arg_query="start_idx_arr", axis=0),
     arg_take_spec=dict(
         start_idx_arr=ch.ArraySlicer(axis=0),
         end_idx_arr=ch.ArraySlicer(axis=0),
         status_arr=ch.ArraySlicer(axis=0),
+        freq=None,
     ),
     merge_func=base_ch.concat,
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def range_duration_nb(start_idx_arr: tp.Array1d, end_idx_arr: tp.Array1d, status_arr: tp.Array2d) -> tp.Array1d:
-    """Get duration of each duration record."""
+def range_duration_nb(
+    start_idx_arr: tp.Array1d,
+    end_idx_arr: tp.Array1d,
+    status_arr: tp.Array2d,
+    freq: int = 1,
+) -> tp.Array1d:
+    """Get duration of each range record."""
     out = np.empty(start_idx_arr.shape[0], dtype=np.int_)
     for r in prange(start_idx_arr.shape[0]):
         if status_arr[r] == RangeStatus.Open:
-            out[r] = end_idx_arr[r] - start_idx_arr[r] + 1
+            out[r] = end_idx_arr[r] - start_idx_arr[r] + freq
         else:
             out[r] = end_idx_arr[r] - start_idx_arr[r]
     return out
@@ -221,6 +309,113 @@ def ranges_to_mask_nb(
                 out[start_idx_arr[r] : end_idx_arr[r], col] = True
 
     return out
+
+
+@register_jitted(cache=True)
+def map_ranges_to_projections_nb(
+    close: tp.Array2d,
+    col_arr: tp.Array1d,
+    start_idx_arr: tp.Array1d,
+    end_idx_arr: tp.Array1d,
+    status_arr: tp.Array1d,
+    index: tp.Optional[tp.Array1d] = None,
+    proj_start: int = 0,
+    proj_start_use_index: bool = False,
+    proj_period: tp.Optional[int] = None,
+    proj_period_use_index: bool = False,
+    stretch: bool = False,
+    normalize: bool = True,
+    start_value: float = 1.0,
+    ffill: bool = False,
+    remove_empty: bool = False,
+) -> tp.Tuple[tp.Array1d, tp.Array2d]:
+    """Map each range into a projection.
+
+    Returns two arrays:
+
+    1. One-dimensional array where elements are record indices
+    2. Two-dimensional array where rows are projections"""
+    index_ranges_temp = np.empty((start_idx_arr.shape[0], 2), dtype=np.int_)
+
+    max_duration = 0
+    for r in range(start_idx_arr.shape[0]):
+        if proj_start_use_index:
+            if index is None:
+                raise ValueError("Index is required")
+            r_proj_start = len(index) - start_idx_arr[r]
+            for i in range(start_idx_arr[r], index.shape[0]):
+                if index[i] >= index[start_idx_arr[r]] + proj_start:
+                    r_proj_start = i - start_idx_arr[r]
+                    break
+            r_start_idx = start_idx_arr[r] + r_proj_start
+        else:
+            r_start_idx = start_idx_arr[r] + proj_start
+        if status_arr[r] == RangeStatus.Open:
+            r_duration = end_idx_arr[r] - start_idx_arr[r] + 1
+        else:
+            r_duration = end_idx_arr[r] - start_idx_arr[r]
+        if proj_period is None:
+            r_end_idx = start_idx_arr[r] + r_duration
+        else:
+            if proj_period_use_index:
+                if index is None:
+                    raise ValueError("Index is required")
+                r_proj_period = -1
+                for i in range(r_start_idx, index.shape[0]):
+                    if index[i] <= index[r_start_idx] + proj_period:
+                        r_proj_period = i - r_start_idx
+                    else:
+                        break
+            else:
+                r_proj_period = proj_period
+            if stretch:
+                r_end_idx = r_start_idx + r_proj_period
+            else:
+                r_end_idx = min(start_idx_arr[r] + r_duration, r_start_idx + r_proj_period)
+        r_end_idx = r_end_idx + 1
+        if r_end_idx > close.shape[0]:
+            r_end_idx = close.shape[0]
+        if r_start_idx > r_end_idx:
+            r_start_idx = r_end_idx
+        if r_end_idx - r_start_idx > max_duration:
+            max_duration = r_end_idx - r_start_idx
+        index_ranges_temp[r, 0] = r_start_idx
+        index_ranges_temp[r, 1] = r_end_idx
+
+    ridx_out = np.empty((start_idx_arr.shape[0],), dtype=np.int_)
+    proj_out = np.empty((start_idx_arr.shape[0], max_duration), dtype=np.float_)
+
+    k = 0
+    for r in range(start_idx_arr.shape[0]):
+        if stretch:
+            r_start_idx = index_ranges_temp[r, 0]
+            r_end_idx = index_ranges_temp[r, 0] + proj_out.shape[1]
+        else:
+            r_start_idx = index_ranges_temp[r, 0]
+            r_end_idx = index_ranges_temp[r, 1]
+        r_close = close[r_start_idx:r_end_idx, col_arr[r]]
+        any_set = False
+        for i in range(proj_out.shape[1]):
+            if i >= r_close.shape[0]:
+                proj_out[k, i] = np.nan
+            else:
+                if normalize:
+                    if i == 0:
+                        proj_out[k, i] = start_value
+                    else:
+                        proj_out[k, i] = proj_out[k, i - 1] * r_close[i] / r_close[i - 1]
+                else:
+                    proj_out[k, i] = r_close[i]
+            if not np.isnan(proj_out[k, i]) and i > 0:
+                any_set = True
+            if ffill and np.isnan(proj_out[k, i]) and i > 0:
+                proj_out[k, i] = proj_out[k, i - 1]
+        if any_set or not remove_empty:
+            ridx_out[k] = r
+            k += 1
+    if remove_empty:
+        return ridx_out[:k], proj_out[:k]
+    return ridx_out, proj_out
 
 
 # ############# Drawdowns ############# #

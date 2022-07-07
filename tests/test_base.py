@@ -3911,21 +3911,21 @@ class TestReshapeFns:
         )
 
     def test_broadcast_to(self):
-        np.testing.assert_array_equal(reshaping.broadcast_to(0, a5), np.broadcast_to(0, a5.shape))
+        np.testing.assert_array_equal(reshaping.broadcast_to(0, a5, align_index=False), np.broadcast_to(0, a5.shape))
         assert_series_equal(
-            reshaping.broadcast_to(0, sr2),
+            reshaping.broadcast_to(0, sr2, align_index=False),
             pd.Series(np.broadcast_to(0, sr2.shape), index=sr2.index, name=sr2.name),
         )
         assert_frame_equal(
-            reshaping.broadcast_to(0, df5),
+            reshaping.broadcast_to(0, df5, align_index=False),
             pd.DataFrame(np.broadcast_to(0, df5.shape), index=df5.index, columns=df5.columns),
         )
         assert_frame_equal(
-            reshaping.broadcast_to(sr2, df5),
+            reshaping.broadcast_to(sr2, df5, align_index=False),
             pd.DataFrame(np.broadcast_to(sr2.to_frame(), df5.shape), index=df5.index, columns=df5.columns),
         )
         assert_frame_equal(
-            reshaping.broadcast_to(sr2, df5, index_from=0, columns_from=0),
+            reshaping.broadcast_to(sr2, df5, index_from=0, columns_from=0, align_index=False),
             pd.DataFrame(
                 np.broadcast_to(sr2.to_frame(), df5.shape),
                 index=sr2.index,
@@ -5670,8 +5670,8 @@ class TestAccessors:
         assert_series_equal(b, b_target)
 
     def test_broadcast_to(self):
-        assert_frame_equal(sr2.vbt.broadcast_to(df2), df2)
-        assert_frame_equal(sr2.vbt.broadcast_to(df2.vbt), df2)
+        assert_frame_equal(sr2.vbt.broadcast_to(df2, align_index=False), df2)
+        assert_frame_equal(sr2.vbt.broadcast_to(df2.vbt, align_index=False), df2)
 
     def test_broadcast_combs(self):
         new_index = pd.MultiIndex.from_tuples(
