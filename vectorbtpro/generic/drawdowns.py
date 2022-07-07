@@ -177,7 +177,7 @@ from vectorbtpro.base.reshaping import to_2d_array
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic import nb
 from vectorbtpro.generic.enums import DrawdownStatus, drawdown_dt
-from vectorbtpro.generic.ranges import Ranges
+from vectorbtpro.generic.ranges import Ranges, range_dt
 from vectorbtpro.records.decorators import override_field_config, attach_fields, attach_shortcut_properties
 from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.registries.ch_registry import ch_reg
@@ -233,6 +233,9 @@ __pdoc__[
 
 dd_shortcut_config = ReadonlyConfig(
     dict(
+        ranges=dict(),
+        drawdown_ranges=dict(),
+        recovery_ranges=dict(),
         drawdown=dict(obj_type="mapped_array"),
         avg_drawdown=dict(obj_type="red_array"),
         max_drawdown=dict(obj_type="red_array"),
@@ -283,7 +286,7 @@ class Drawdowns(Ranges):
         open: tp.Optional[tp.ArrayLike] = None,
         high: tp.Optional[tp.ArrayLike] = None,
         low: tp.Optional[tp.ArrayLike] = None,
-        attach_price: bool = True,
+        attach_data: bool = True,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrapper_kwargs: tp.KwargsLike = None,
@@ -304,10 +307,64 @@ class Drawdowns(Ranges):
         return cls(
             wrapper,
             records_arr,
-            open=open if attach_price else None,
-            high=high if attach_price else None,
-            low=low if attach_price else None,
-            close=close if attach_price else None,
+            open=open if attach_data else None,
+            high=high if attach_data else None,
+            low=low if attach_data else None,
+            close=close if attach_data else None,
+            **kwargs,
+        )
+
+    def get_ranges(self, **kwargs) -> Ranges:
+        """Get records of type `vectorbtpro.generic.ranges.Ranges` for peak-to-end ranges."""
+        new_records_arr = np.empty(self.values.shape, dtype=range_dt)
+        new_records_arr["id"][:] = self.get_field_arr("id").copy()
+        new_records_arr["col"][:] = self.get_field_arr("col").copy()
+        new_records_arr["start_idx"][:] = self.get_field_arr("peak_idx").copy()
+        new_records_arr["end_idx"][:] = self.get_field_arr("end_idx").copy()
+        new_records_arr["status"][:] = self.get_field_arr("status").copy()
+        return Ranges.from_records(
+            self.wrapper,
+            new_records_arr,
+            open=self._open,
+            high=self._high,
+            low=self._low,
+            close=self._close,
+            **kwargs,
+        )
+
+    def get_drawdown_ranges(self, **kwargs) -> Ranges:
+        """Get records of type `vectorbtpro.generic.ranges.Ranges` for peak-to-valley ranges."""
+        new_records_arr = np.empty(self.values.shape, dtype=range_dt)
+        new_records_arr["id"][:] = self.get_field_arr("id").copy()
+        new_records_arr["col"][:] = self.get_field_arr("col").copy()
+        new_records_arr["start_idx"][:] = self.get_field_arr("peak_idx").copy()
+        new_records_arr["end_idx"][:] = self.get_field_arr("valley_idx").copy()
+        new_records_arr["status"][:] = self.get_field_arr("status").copy()
+        return Ranges.from_records(
+            self.wrapper,
+            new_records_arr,
+            open=self._open,
+            high=self._high,
+            low=self._low,
+            close=self._close,
+            **kwargs,
+        )
+
+    def get_recovery_ranges(self, **kwargs) -> Ranges:
+        """Get records of type `vectorbtpro.generic.ranges.Ranges` for valley-to-end ranges."""
+        new_records_arr = np.empty(self.values.shape, dtype=range_dt)
+        new_records_arr["id"][:] = self.get_field_arr("id").copy()
+        new_records_arr["col"][:] = self.get_field_arr("col").copy()
+        new_records_arr["start_idx"][:] = self.get_field_arr("valley_idx").copy()
+        new_records_arr["end_idx"][:] = self.get_field_arr("end_idx").copy()
+        new_records_arr["status"][:] = self.get_field_arr("status").copy()
+        return Ranges.from_records(
+            self.wrapper,
+            new_records_arr,
+            open=self._open,
+            high=self._high,
+            low=self._low,
+            close=self._close,
             **kwargs,
         )
 

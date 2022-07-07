@@ -494,6 +494,7 @@ import pandas as pd
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_1d_array, to_2d_array
 from vectorbtpro.generic.ranges import Ranges
+from vectorbtpro.generic.enums import range_dt
 from vectorbtpro.portfolio import nb
 from vectorbtpro.portfolio.enums import TradeDirection, TradeStatus, trade_dt
 from vectorbtpro.portfolio.orders import Orders
@@ -564,6 +565,7 @@ __pdoc__[
 
 trades_shortcut_config = ReadonlyConfig(
     dict(
+        ranges=dict(),
         winning=dict(),
         losing=dict(),
         winning_streak=dict(obj_type="mapped_array"),
@@ -612,6 +614,24 @@ class Trades(Ranges):
     @property
     def field_config(self) -> Config:
         return self._field_config
+
+    def get_ranges(self, **kwargs) -> Ranges:
+        """Get records of type `vectorbtpro.generic.ranges.Ranges`."""
+        new_records_arr = np.empty(self.values.shape, dtype=range_dt)
+        new_records_arr["id"][:] = self.get_field_arr("id").copy()
+        new_records_arr["col"][:] = self.get_field_arr("col").copy()
+        new_records_arr["start_idx"][:] = self.get_field_arr("entry_idx").copy()
+        new_records_arr["end_idx"][:] = self.get_field_arr("exit_idx").copy()
+        new_records_arr["status"][:] = self.get_field_arr("status").copy()
+        return Ranges.from_records(
+            self.wrapper,
+            new_records_arr,
+            open=self._open,
+            high=self._high,
+            low=self._low,
+            close=self._close,
+            **kwargs,
+        )
 
     # ############# Stats ############# #
 

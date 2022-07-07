@@ -106,6 +106,8 @@ import pandas as pd
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_dict
 from vectorbtpro.generic.price_records import PriceRecords
+from vectorbtpro.generic.enums import RangeStatus, range_dt
+from vectorbtpro.generic.ranges import Ranges
 from vectorbtpro.portfolio import nb
 from vectorbtpro.portfolio.enums import order_dt, OrderSide, fs_order_dt, OrderType
 from vectorbtpro.records.mapped_array import MappedArray
@@ -374,7 +376,7 @@ class Orders(PriceRecords):
                 }
             )
             if "opacity" not in ohlc_trace_kwargs:
-                ohlc_trace_kwargs["opacity"] = 0.65
+                ohlc_trace_kwargs["opacity"] = 0.5
             fig = ohlc_df.vbt.ohlcv.plot(
                 ohlc_type=ohlc_type,
                 plot_volume=False,
@@ -625,6 +627,10 @@ __pdoc__[
 
 fs_orders_shortcut_config = ReadonlyConfig(
     dict(
+        stop_orders=dict(),
+        ranges=dict(),
+        creation_ranges=dict(),
+        fill_ranges=dict(),
         signal_to_creation_duration=dict(obj_type="mapped_array"),
         creation_to_fill_duration=dict(obj_type="mapped_array"),
         signal_to_fill_duration=dict(obj_type="mapped_array"),
@@ -653,6 +659,64 @@ class FSOrders(Orders):
     @property
     def field_config(self) -> Config:
         return self._field_config
+
+    def get_stop_orders(self, **kwargs):
+        """Get stop orders."""
+        return self.apply_mask(self.get_field_arr("stop_type") != -1, **kwargs)
+
+    def get_ranges(self, **kwargs) -> Ranges:
+        """Get records of type `vectorbtpro.generic.ranges.Ranges` for signal-to-fill ranges."""
+        new_records_arr = np.empty(self.values.shape, dtype=range_dt)
+        new_records_arr["id"][:] = self.get_field_arr("id").copy()
+        new_records_arr["col"][:] = self.get_field_arr("col").copy()
+        new_records_arr["start_idx"][:] = self.get_field_arr("signal_idx").copy()
+        new_records_arr["end_idx"][:] = self.get_field_arr("idx").copy()
+        new_records_arr["status"][:] = RangeStatus.Closed
+        return Ranges.from_records(
+            self.wrapper,
+            new_records_arr,
+            open=self._open,
+            high=self._high,
+            low=self._low,
+            close=self._close,
+            **kwargs,
+        )
+
+    def get_creation_ranges(self, **kwargs) -> Ranges:
+        """Get records of type `vectorbtpro.generic.ranges.Ranges` for signal-to-creation ranges."""
+        new_records_arr = np.empty(self.values.shape, dtype=range_dt)
+        new_records_arr["id"][:] = self.get_field_arr("id").copy()
+        new_records_arr["col"][:] = self.get_field_arr("col").copy()
+        new_records_arr["start_idx"][:] = self.get_field_arr("signal_idx").copy()
+        new_records_arr["end_idx"][:] = self.get_field_arr("creation_idx").copy()
+        new_records_arr["status"][:] = RangeStatus.Closed
+        return Ranges.from_records(
+            self.wrapper,
+            new_records_arr,
+            open=self._open,
+            high=self._high,
+            low=self._low,
+            close=self._close,
+            **kwargs,
+        )
+
+    def get_fill_ranges(self, **kwargs) -> Ranges:
+        """Get records of type `vectorbtpro.generic.ranges.Ranges` for creation-to-fill ranges."""
+        new_records_arr = np.empty(self.values.shape, dtype=range_dt)
+        new_records_arr["id"][:] = self.get_field_arr("id").copy()
+        new_records_arr["col"][:] = self.get_field_arr("col").copy()
+        new_records_arr["start_idx"][:] = self.get_field_arr("creation_idx").copy()
+        new_records_arr["end_idx"][:] = self.get_field_arr("idx").copy()
+        new_records_arr["status"][:] = RangeStatus.Closed
+        return Ranges.from_records(
+            self.wrapper,
+            new_records_arr,
+            open=self._open,
+            high=self._high,
+            low=self._low,
+            close=self._close,
+            **kwargs,
+        )
 
     def get_signal_to_creation_duration(self, **kwargs) -> MappedArray:
         """Get duration between signal and creation."""
