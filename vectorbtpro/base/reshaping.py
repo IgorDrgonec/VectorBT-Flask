@@ -407,11 +407,13 @@ def wrap_broadcasted(
 
 
 def align_pd_arrays(
-    args: tp.Iterable[tp.AnyArray],
+    *args: tp.AnyArray,
     align_index: bool = True,
     align_columns: bool = True,
+    to_index: tp.Optional[tp.Index] = None,
+    to_columns: tp.Optional[tp.Index] = None,
     reindex_kwargs: tp.KwargsLikeSequence = None,
-) -> tp.List[tp.ArrayLike]:
+) -> tp.MaybeTuple[tp.ArrayLike]:
     """Align Pandas arrays against common index and/or column levels using reindexing
     and `vectorbtpro.base.indexes.align_indexes` respectively."""
     args = list(args)
@@ -420,47 +422,56 @@ def align_pd_arrays(
         for i in range(len(args)):
             if checks.is_pandas(args[i]) and not checks.is_default_index(args[i].index):
                 indexes_to_align.append(i)
-        if len(indexes_to_align) > 1:
-            new_index = None
-            index_changed = False
-            for i in indexes_to_align:
-                arg_index = args[i].index
-                if new_index is None:
-                    new_index = arg_index
-                else:
-                    if not checks.is_index_equal(new_index, arg_index):
-                        if new_index.dtype != arg_index.dtype:
-                            raise ValueError("Indexes to be aligned must have the same data type")
-                        new_index = new_index.union(arg_index)
-                        index_changed = True
+        if (len(indexes_to_align) > 0 and to_index is not None) or len(indexes_to_align) > 1:
+            if to_index is None:
+                new_index = None
+                index_changed = False
+                for i in indexes_to_align:
+                    arg_index = args[i].index
+                    if new_index is None:
+                        new_index = arg_index
+                    else:
+                        if not checks.is_index_equal(new_index, arg_index):
+                            if new_index.dtype != arg_index.dtype:
+                                raise ValueError("Indexes to be aligned must have the same data type")
+                            new_index = new_index.union(arg_index)
+                            index_changed = True
+            else:
+                new_index = to_index
+                index_changed = True
             if index_changed:
                 for i in indexes_to_align:
-                    if args[i].index.has_duplicates:
-                        raise ValueError(f"Index at position {i} contains duplicates")
-                    if not args[i].index.is_monotonic_increasing:
-                        raise ValueError(f"Index at position {i} is not monotonically increasing")
-                    _reindex_kwargs = resolve_dict(reindex_kwargs, i=i)
-                    was_bool = (isinstance(args[i], pd.Series) and args[i].dtype == "bool") or (
-                        isinstance(args[i], pd.DataFrame) and (args[i].dtypes == "bool").all()
-                    )
-                    args[i] = args[i].reindex(new_index, **_reindex_kwargs)
-                    is_object = (isinstance(args[i], pd.Series) and args[i].dtype == "object") or (
-                        isinstance(args[i], pd.DataFrame) and (args[i].dtypes == "object").all()
-                    )
-                    if was_bool and is_object:
-                        args[i] = args[i].astype(None)
+                    if to_index is None or not checks.is_index_equal(args[i].index, to_index):
+                        if args[i].index.has_duplicates:
+                            raise ValueError(f"Index at position {i} contains duplicates")
+                        if not args[i].index.is_monotonic_increasing:
+                            raise ValueError(f"Index at position {i} is not monotonically increasing")
+                        _reindex_kwargs = resolve_dict(reindex_kwargs, i=i)
+                        was_bool = (isinstance(args[i], pd.Series) and args[i].dtype == "bool") or (
+                            isinstance(args[i], pd.DataFrame) and (args[i].dtypes == "bool").all()
+                        )
+                        args[i] = args[i].reindex(new_index, **_reindex_kwargs)
+                        is_object = (isinstance(args[i], pd.Series) and args[i].dtype == "object") or (
+                            isinstance(args[i], pd.DataFrame) and (args[i].dtypes == "object").all()
+                        )
+                        if was_bool and is_object:
+                            args[i] = args[i].astype(None)
     if align_columns:
         columns_to_align = []
         for i in range(len(args)):
             if checks.is_frame(args[i]) and len(args[i].columns) > 1 and not checks.is_default_index(args[i].columns):
                 columns_to_align.append(i)
-        if len(columns_to_align) > 1:
+        if (len(columns_to_align) > 0 and to_columns is not None) or len(columns_to_align) > 1:
             indexes_ = [args[i].columns for i in columns_to_align]
+            if to_columns is not None:
+                indexes_.append(to_columns)
             if len(set(map(len, indexes_))) > 1:
-                col_indices = indexes.align_indexes(indexes_)
+                col_indices = indexes.align_indexes(*indexes_)
                 for i in columns_to_align:
                     args[i] = args[i].iloc[:, col_indices[columns_to_align.index(i)]]
-    return args
+    if len(args) == 1:
+        return args[0]
+    return tuple(args)
 
 
 @attr.s(frozen=True)
@@ -1161,16 +1172,25 @@ def broadcast(
         is_pd = to_pd or (return_wrapper and is_pd)
 
     # Align pandas arrays
-    old_objs = dict(zip(old_objs.keys(), align_pd_arrays(
-        list(old_objs.values()),
+    if index_from is not None and not isinstance(index_from, (int, str, pd.Index)):
+        index_from = pd.Index(index_from)
+    if columns_from is not None and not isinstance(columns_from, (int, str, pd.Index)):
+        columns_from = pd.Index(columns_from)
+    aligned_objs = align_pd_arrays(
+        *old_objs.values(),
         align_index=align_index,
         align_columns=align_columns,
+        to_index=index_from if isinstance(index_from, pd.Index) else None,
+        to_columns=columns_from if isinstance(columns_from, pd.Index) else None,
         reindex_kwargs=list(obj_reindex_kwargs.values()),
-    )))
+    )
+    if not isinstance(aligned_objs, tuple):
+        aligned_objs = (aligned_objs,)
+    aligned_objs = dict(zip(old_objs.keys(), aligned_objs))
 
     # Convert to NumPy
     ready_objs = {}
-    for k, obj in old_objs.items():
+    for k, obj in aligned_objs.items():
         if is_2d and checks.is_series(obj):
             # Convert all pd.Series objects to pd.DataFrame if we work on 2-dim data
             ready_objs[k] = obj.values[:, None]
@@ -1198,9 +1218,9 @@ def broadcast(
 
     if is_pd:
         # Decide on index and columns
-        # NOTE: Important to pass old_objs, not ready_objs, to preserve original shape info
+        # NOTE: Important to pass aligned_objs, not ready_objs, to preserve original shape info
         new_index = broadcast_index(
-            list(old_objs.values()),
+            list(aligned_objs.values()),
             to_shape,
             index_from=index_from,
             axis=0,
@@ -1210,7 +1230,7 @@ def broadcast(
             **stack_kwargs,
         )
         new_columns = broadcast_index(
-            list(old_objs.values()),
+            list(aligned_objs.values()),
             to_shape,
             index_from=columns_from,
             axis=1,
@@ -1360,7 +1380,7 @@ def broadcast(
     )
 
     # Perform broadcasting
-    old_objs2 = {}
+    aligned_objs2 = {}
     new_objs = {}
     for i, k in enumerate(all_keys):
         if k in none_keys or k in special_keys:
@@ -1382,7 +1402,7 @@ def broadcast(
             new_obj = obj
         else:
             # Broadcast regular objects
-            old_obj = old_objs[k]
+            old_obj = aligned_objs[k]
             new_obj = ready_objs[k]
             _min_one_dim = bco_instances[k].min_one_dim
             if _min_one_dim and new_obj.ndim == 0:
@@ -1404,7 +1424,7 @@ def broadcast(
                         new_obj = new_obj[:, None]  # product changes is_2d behavior
                     new_obj = np.tile(new_obj, (1, n_params))
 
-        old_objs2[k] = old_obj
+        aligned_objs2[k] = old_obj
         new_objs[k] = new_obj
 
     # Resolve special objects
@@ -1465,7 +1485,7 @@ def broadcast(
             if k in product_keys and not _repeat_product:
                 new_obj = wrap_broadcasted(
                     new_obj,
-                    old_obj=old_objs2[k] if k not in special_keys else None,
+                    old_obj=aligned_objs2[k] if k not in special_keys else None,
                     is_pd=_is_pd,
                     new_index=new_index,
                     new_columns=param_columns,
@@ -1474,7 +1494,7 @@ def broadcast(
             else:
                 new_obj = wrap_broadcasted(
                     new_obj,
-                    old_obj=old_objs2[k] if k not in special_keys else None,
+                    old_obj=aligned_objs2[k] if k not in special_keys else None,
                     is_pd=_is_pd,
                     new_index=new_index,
                     new_columns=new_columns,

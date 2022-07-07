@@ -934,34 +934,34 @@ class ArrayWrapper(Configured, PandasIndexer):
         """Get group-aware `ArrayWrapper.shape_2d`."""
         return self.resolve(group_by=group_by).shape_2d
 
-    @property
-    def freq(self) -> tp.Optional[pd.Timedelta]:
-        """Index frequency as `pd.Timedelta` or None if it cannot be converted.
-
-        Date offsets and integer frequencies are not allowed."""
+    def get_freq(
+        self,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+        **kwargs,
+    ) -> tp.Union[None, float, tp.PandasFrequency]:
+        """Index frequency as `pd.Timedelta` or None if it cannot be converted."""
         from vectorbtpro._settings import settings
 
         wrapping_cfg = settings["wrapping"]
 
-        freq = self._freq
+        if freq is None:
+            freq = self._freq
         if freq is None:
             freq = wrapping_cfg["freq"]
         try:
-            return infer_index_freq(self.index, freq=freq, allow_date_offset=False, allow_numeric=False)
+            return infer_index_freq(self.index, freq=freq, **kwargs)
         except Exception as e:
             return None
 
     @property
+    def freq(self) -> tp.Optional[pd.Timedelta]:
+        """`ArrayWrapper.get_freq` with date offsets and integer frequencies not allowed."""
+        return self.get_freq(allow_date_offset=False, allow_numeric=False)
+
+    @property
     def any_freq(self) -> tp.Union[None, float, tp.PandasFrequency]:
         """Index frequency of any type."""
-        from vectorbtpro._settings import settings
-
-        wrapping_cfg = settings["wrapping"]
-
-        freq = self._freq
-        if freq is None:
-            freq = wrapping_cfg["freq"]
-        return infer_index_freq(self.index, freq=freq)
+        return self.get_freq()
 
     @property
     def period(self) -> int:
@@ -1171,12 +1171,17 @@ class ArrayWrapper(Configured, PandasIndexer):
             return obj.astype(dtype, errors="ignore")
 
         def _wrap(arr):
+            orig_arr = arr
             arr = np.asarray(arr)
             if fillna is not None:
                 arr[pd.isnull(arr)] = fillna
             shape_2d = (arr.shape[0] if arr.ndim > 0 else 1, arr.shape[1] if arr.ndim > 1 else 1)
             target_shape_2d = (len(index), len(columns))
             if shape_2d != target_shape_2d:
+                if isinstance(orig_arr, (pd.Series, pd.DataFrame)):
+                    arr = reshaping.align_pd_arrays(orig_arr, to_index=index, to_columns=columns).values
+                if isinstance(orig_arr, pd.Series) and arr.ndim == 1:
+                    arr = arr[:, None]
                 arr = np.broadcast_to(arr, target_shape_2d)
             arr = reshaping.soft_to_ndim(arr, self.ndim)
             if arr.ndim == 1:
@@ -1960,9 +1965,9 @@ class ArrayWrapper(Configured, PandasIndexer):
                             v = np.broadcast_to(v, (len(y[0]), len(z)))
                         for j in range(len(y[0])):
                             if len(y) == 2:
-                                x[y[0][j]: y[1][j], z] = v[j]
+                                x[y[0][j] : y[1][j], z] = v[j]
                             else:
-                                x[y[0][j]: y[1][j]: y[2][j], z] = v[j]
+                                x[y[0][j] : y[1][j] : y[2][j], z] = v[j]
                     else:
                         if np.isscalar(y) or np.isscalar(z):
                             x[y, z] = v
@@ -2006,9 +2011,9 @@ class ArrayWrapper(Configured, PandasIndexer):
                             v = np.broadcast_to(v, (len(y[0]),))
                         for j in range(len(y[0])):
                             if len(y) == 2:
-                                x[y[0][j]: y[1][j]] = v[j]
+                                x[y[0][j] : y[1][j]] = v[j]
                             else:
-                                x[y[0][j]: y[1][j]: y[2][j]] = v[j]
+                                x[y[0][j] : y[1][j] : y[2][j]] = v[j]
                     else:
                         if x.ndim == 2:
                             if not np.isscalar(y):
