@@ -97,6 +97,7 @@ from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.grouping import Grouper
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.accessors import GenericAccessor, GenericDFAccessor
+from vectorbtpro.generic.drawdowns import Drawdowns
 from vectorbtpro.ohlcv import nb
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
@@ -275,6 +276,23 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
         return self.replace(
             wrapper=wrapper_meta["new_wrapper"],
             obj=new_obj,
+        )
+
+    @property
+    def drawdowns(self) -> Drawdowns:
+        """`OHLCVDFAccessor.get_drawdowns` with default arguments."""
+        return self.get_drawdowns()
+
+    def get_drawdowns(self, **kwargs) -> Drawdowns:
+        """Generate drawdown records.
+
+        See `vectorbtpro.generic.drawdowns.Drawdowns`."""
+        return Drawdowns.from_price(
+            open=self.open,
+            high=self.high,
+            low=self.low,
+            close=self.close,
+            **kwargs,
         )
 
     # ############# Stats ############# #
@@ -478,6 +496,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
                 fillcolor=plotting_cfg["color_schema"]["decreasing"],
                 line=dict(color=plotting_cfg["color_schema"]["decreasing"])
             ),
+            opacity=0.75,
         )
         ohlc.update(**ohlc_trace_kwargs)
         fig.add_trace(ohlc, **add_trace_kwargs)
@@ -498,7 +517,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
                 x=self.wrapper.index,
                 y=self.volume,
                 marker=dict(color=marker_colors, line_width=0),
-                opacity=0.65,
+                opacity=0.5,
                 name="Volume",
             )
             volume_bar.update(**volume_trace_kwargs)
