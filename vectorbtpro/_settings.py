@@ -143,7 +143,7 @@ jitting = ChildDict(
         nb=FrozenConfig(
             cls=NumbaJitter,
             aliases={"numba"},
-            options=dict(),
+            options=dict(boundscheck=True),
             override_options=dict(),
             resolve_kwargs=dict(),
             tasks=dict(),
@@ -646,7 +646,7 @@ _settings["data"] = data
 
 plotting = ChildDict(
     use_widgets=True,
-    use_resampler=None,
+    use_resampler=False,
     show_kwargs=Config(),
     use_gl=None,
     color_schema=Config(
