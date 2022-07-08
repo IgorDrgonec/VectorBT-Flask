@@ -478,8 +478,8 @@ understanding the following code:
 ```pycon
 >>> class RollSharpeAIS(vbt.tp.NamedTuple):
 ...     i: int
-...     close: float
-...     pre_window_close: float
+...     ret: float
+...     pre_window_ret: float
 ...     cumsum: float
 ...     cumsum_sq: float
 ...     nancnt: int
@@ -499,8 +499,8 @@ understanding the following code:
 ...     # (1)!
 ...     mean_in_state = vbt.nb.RollMeanAIS(
 ...         i=in_state.i,
-...         value=in_state.close,
-...         pre_window_value=in_state.pre_window_close,
+...         value=in_state.ret,
+...         pre_window_value=in_state.pre_window_ret,
 ...         cumsum=in_state.cumsum,
 ...         nancnt=in_state.nancnt,
 ...         window=in_state.window,
@@ -511,8 +511,8 @@ understanding the following code:
 ...     # (2)!
 ...     std_in_state = vbt.nb.RollStdAIS(
 ...         i=in_state.i,
-...         value=in_state.close,
-...         pre_window_value=in_state.pre_window_close,
+...         value=in_state.ret,
+...         pre_window_value=in_state.pre_window_ret,
 ...         cumsum=in_state.cumsum,
 ...         cumsum_sq=in_state.cumsum_sq,
 ...         nancnt=in_state.nancnt,
