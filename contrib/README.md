@@ -7,3 +7,6 @@ As a rule of thumb, use the pascal case for notebooks (such as "ChartPatternDete
 to Python (such as "tradingview_parser/main.py"). Files with other extensions can also include hyphens (such as "gdp-data.json").
 
 Please also make sure to use [Python's style recommendations](https://github.com/naming-convention/naming-convention-guides/tree/master/python).
+
+This folder has a separate license - [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) - allowing its (and only its!) contents to be open-sourced.
+If you want to restrict that, create a subfolder and a separate "LICENSE.md" file inside.
