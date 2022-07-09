@@ -43,6 +43,42 @@ def get_func_arg_names(func: tp.Callable, arg_kind: tp.Optional[tp.MaybeTuple[in
     return [p.name for p in signature.parameters.values() if p.kind in arg_kind]
 
 
+def extend_args(func: tp.Callable, args: tp.Args, kwargs: tp.Kwargs, **with_kwargs) -> tp.Tuple[tp.Args, tp.Kwargs]:
+    """Extend arguments and keyword arguments with other arguments."""
+    kwargs = dict(kwargs)
+    new_args = ()
+    new_kwargs = dict()
+    signature = inspect.signature(func)
+    for p in signature.parameters.values():
+        if p.kind == p.VAR_POSITIONAL:
+            new_args += args
+            args = ()
+            continue
+        if p.kind == p.VAR_KEYWORD:
+            for k in list(kwargs.keys()):
+                new_kwargs[k] = kwargs.pop(k)
+            continue
+
+        arg_name = p.name.lower()
+        took_from_args = False
+        if arg_name not in kwargs and arg_name in with_kwargs:
+            arg_value = with_kwargs[arg_name]
+        elif len(args) > 0:
+            arg_value = args[0]
+            args = args[1:]
+            took_from_args = True
+        elif arg_name in kwargs:
+            arg_value = kwargs.pop(arg_name)
+        else:
+            continue
+        if p.kind == p.POSITIONAL_ONLY or len(args) > 0 or took_from_args:
+            new_args += (arg_value,)
+        else:
+            new_kwargs[arg_name] = arg_value
+
+    return new_args + args, {**new_kwargs, **kwargs}
+
+
 def annotate_args(func: tp.Callable, args: tp.Args, kwargs: tp.Kwargs, only_passed: bool = False) -> tp.AnnArgs:
     """Annotate arguments and keyword arguments using the function's signature."""
     kwargs = dict(kwargs)

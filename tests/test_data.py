@@ -39,6 +39,7 @@ class MyData(vbt.Data):
         columns=None,
         index_mask=None,
         column_mask=None,
+        return_numeric=False,
         return_arr=False,
         tz_localize=None,
         is_update=False,
@@ -61,18 +62,24 @@ class MyData(vbt.Data):
                 return pd.DataFrame(a, columns=columns)
             return pd.Series(a, name=columns)
         np.random.seed(seed)
-        a = np.empty(shape, dtype=object)
+        a = np.empty(shape, dtype=np.float_ if return_numeric else object)
         if a.ndim == 1:
-            for i in range(a.shape[0]):
-                a[i] = str(symbol) + "_" + str(i)
-                if is_update:
-                    a[i] += "_u"
-        else:
-            for col in range(a.shape[1]):
+            if return_numeric:
+                a[:] = np.arange(len(a))
+            else:
                 for i in range(a.shape[0]):
-                    a[i, col] = str(symbol) + "_" + str(col) + "_" + str(i)
+                    a[i] = str(symbol) + "_" + str(i)
                     if is_update:
-                        a[i, col] += "_u"
+                        a[i] += "_u"
+        else:
+            if return_numeric:
+                a[:, :] = np.arange(a.shape[0] * a.shape[1]).reshape(a.shape)
+            else:
+                for col in range(a.shape[1]):
+                    for i in range(a.shape[0]):
+                        a[i, col] = str(symbol) + "_" + str(col) + "_" + str(i)
+                        if is_update:
+                            a[i, col] += "_u"
         if return_arr:
             return a
         index = [start_date + timedelta(days=i) for i in range(a.shape[0])]
@@ -182,11 +189,11 @@ class TestData:
             new_data.data[0],
             pd.DataFrame(
                 [
-                    ['0_0_0', '0_0_0', '0_1_0', '0_2_0'],
-                    ['0_0_1', '0_0_1', '0_1_1', '0_2_1'],
-                    ['0_0_2', '0_0_2', '0_1_2', '0_2_2'],
-                    ['0_0_3', '0_0_3', '0_1_3', '0_2_3'],
-                    ['0_0_4', '0_0_4', '0_1_4', '0_2_4'],
+                    ["0_0_0", "0_0_0", "0_1_0", "0_2_0"],
+                    ["0_0_1", "0_0_1", "0_1_1", "0_2_1"],
+                    ["0_0_2", "0_0_2", "0_1_2", "0_2_2"],
+                    ["0_0_3", "0_0_3", "0_1_3", "0_2_3"],
+                    ["0_0_4", "0_0_4", "0_1_4", "0_2_4"],
                 ],
                 index=new_data.wrapper.index,
                 columns=new_data.wrapper.columns,
@@ -196,11 +203,11 @@ class TestData:
             new_data.data[1],
             pd.DataFrame(
                 [
-                    ['1_0_0', '1_0_0', '1_1_0', '1_2_0'],
-                    ['1_0_1', '1_0_1', '1_1_1', '1_2_1'],
-                    ['1_0_2', '1_0_2', '1_1_2', '1_2_2'],
-                    ['1_0_3', '1_0_3', '1_1_3', '1_2_3'],
-                    ['1_0_4', '1_0_4', '1_1_4', '1_2_4'],
+                    ["1_0_0", "1_0_0", "1_1_0", "1_2_0"],
+                    ["1_0_1", "1_0_1", "1_1_1", "1_2_1"],
+                    ["1_0_2", "1_0_2", "1_1_2", "1_2_2"],
+                    ["1_0_3", "1_0_3", "1_1_3", "1_2_3"],
+                    ["1_0_4", "1_0_4", "1_1_4", "1_2_4"],
                 ],
                 index=new_data.wrapper.index,
                 columns=new_data.wrapper.columns,
@@ -1610,6 +1617,33 @@ class TestData:
                 ),
                 axis=1,
             ),
+        )
+
+    def test_run(self):
+        data = MyData.fetch(
+            ["S1", "S2"],
+            shape=(5, 6),
+            columns=["open", "high", "low", "close", "volume", "some_column"],
+            return_numeric=True,
+        )
+        pd.testing.assert_frame_equal(data.run("from_holding").open, data.open)
+        pd.testing.assert_frame_equal(data.run("from_holding").high, data.high)
+        pd.testing.assert_frame_equal(data.run("from_holding").low, data.low)
+        pd.testing.assert_frame_equal(data.run("from_holding").close, data.close)
+        pd.testing.assert_frame_equal(data.run("ma", 3).ma, vbt.MA.run(data.close, 3).ma)
+        pd.testing.assert_frame_equal(data.run("talib_sma", 3).real, vbt.talib("SMA").run(data.close, 3).real)
+        pd.testing.assert_frame_equal(data.run("pandas_ta_sma", 3).sma, vbt.pandas_ta("SMA").run(data.close, 3).sma)
+        pd.testing.assert_frame_equal(data.run("wqa101_1").out, vbt.wqa101(1).run(data.close).out)
+        pd.testing.assert_frame_equal(data.run("sma", 3).real, vbt.talib("SMA").run(data.close, 3).real)
+        pd.testing.assert_frame_equal(data.run(lambda open: open), data.open)
+        pd.testing.assert_frame_equal(data.run(lambda x, open: open + x, 100), data.open + 100)
+        pd.testing.assert_frame_equal(data.run(lambda open, x: open + x, 100), data.open + 100)
+        pd.testing.assert_frame_equal(data.run(lambda open, x, y=2: open + x + y, 100, 200), data.open + 100 + 200)
+        pd.testing.assert_frame_equal(data.run(lambda open, x, y=2: open + x + y, x=100, y=200), data.open + 100 + 200)
+        pd.testing.assert_frame_equal(data.run(lambda x, data: data.open + x, 100), data.open + 100)
+        pd.testing.assert_frame_equal(data.run(lambda x, y: x.open + y, 100, pass_as_first=True), data.open + 100)
+        pd.testing.assert_frame_equal(
+            data.run(lambda x, y: x.open + y, 100, rename_args={"x": "data"}), data.open + 100
         )
 
 

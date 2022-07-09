@@ -24,7 +24,7 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.datetime_ import is_tz_aware, to_timezone, try_to_datetime_index
-from vectorbtpro.utils.parsing import get_func_arg_names
+from vectorbtpro.utils.parsing import get_func_arg_names, extend_args
 from vectorbtpro.utils.path_ import check_mkdir
 from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.template import RepEval
@@ -1000,7 +1000,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
     def get(
         self,
         columns: tp.Optional[tp.Union[tp.Label, tp.Labels]] = None,
-        symbols: tp.Optional[tp.Union[tp.Symbol, tp.Symbols]] = None,
+        symbols: tp.Union[None, tp.Symbol, tp.Symbols] = None,
         **kwargs,
     ) -> tp.MaybeTuple[tp.SeriesFrame]:
         """Get one or more columns of one or more symbols of data.
@@ -1031,43 +1031,63 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             return concat_data[columns]
         return tuple(concat_data.values())
 
-    @property
-    def open(self) -> tp.Optional[tp.SeriesFrame]:
+    def get_column(self, col_name: str) -> tp.Optional[tp.SeriesFrame]:
+        """Get column."""
+        if col_name in self.wrapper.columns:
+            return self.get(columns=col_name)
+        col_name = col_name.lower().strip().replace(" ", "_")
         if hasattr(self.wrapper.columns, "str"):
-            column_names = self.wrapper.columns.str.lower().tolist()
-            if "open" in column_names:
-                col_index = column_names.index("open")
+            column_names = self.wrapper.columns.str.lower().str.strip().str.replace(" ", "_").tolist()
+            if col_name in column_names:
+                col_index = column_names.index(col_name)
                 if col_index != -1:
                     return self.get(columns=self.wrapper.columns[col_index])
         return None
+
+    @property
+    def open(self) -> tp.Optional[tp.SeriesFrame]:
+        """Open (magnet)."""
+        return self.get_column("Open")
 
     @property
     def high(self) -> tp.Optional[tp.SeriesFrame]:
-        if hasattr(self.wrapper.columns, "str"):
-            column_names = self.wrapper.columns.str.lower().tolist()
-            if "high" in column_names:
-                col_index = column_names.index("high")
-                if col_index != -1:
-                    return self.get(columns=self.wrapper.columns[col_index])
-        return None
+        """High (magnet)."""
+        return self.get_column("High")
 
     @property
     def low(self) -> tp.Optional[tp.SeriesFrame]:
-        column_names = self.wrapper.columns.str.lower().tolist()
-        if "low" in column_names:
-            col_index = column_names.index("low")
-            if col_index != -1:
-                return self.get(columns=self.wrapper.columns[col_index])
-        return None
+        """Low (magnet)."""
+        return self.get_column("Low")
 
     @property
     def close(self) -> tp.Optional[tp.SeriesFrame]:
-        column_names = self.wrapper.columns.str.lower().tolist()
-        if "close" in column_names:
-            col_index = column_names.index("close")
-            if col_index != -1:
-                return self.get(columns=self.wrapper.columns[col_index])
-        return None
+        """Close (magnet)."""
+        return self.get_column("Close")
+
+    @property
+    def volume(self) -> tp.Optional[tp.SeriesFrame]:
+        """Volume (magnet)."""
+        return self.get_column("Volume")
+
+    @property
+    def trade_count(self) -> tp.Optional[tp.SeriesFrame]:
+        """Trade count (magnet)."""
+        return self.get_column("Trade count")
+
+    @property
+    def vwap(self) -> tp.Optional[tp.SeriesFrame]:
+        """VWAP (magnet)."""
+        return self.get_column("VWAP")
+
+    @property
+    def hlc3(self) -> tp.Optional[tp.SeriesFrame]:
+        """HLC/3 (magnet)."""
+        return (self.high + self.low + self.close) / 3
+
+    @property
+    def ohlc4(self) -> tp.Optional[tp.SeriesFrame]:
+        """OHLC/4 (magnet)."""
+        return (self.open + self.high + self.low + self.close) / 4
 
     # ############# Selecting ############# #
 
@@ -1335,6 +1355,113 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             wrapper=wrapper_meta["new_wrapper"],
             data=new_data,
         )
+
+    # ############# Running ############# #
+
+    def run(
+        self,
+        func: tp.Union[str, tp.Callable],
+        *args,
+        on_indices: tp.Union[None, slice, tp.Sequence] = None,
+        on_dates: tp.Union[None, slice, tp.Sequence] = None,
+        on_symbols: tp.Union[None, tp.Symbol, tp.Symbols] = None,
+        pass_as_first: bool = False,
+        rename_args: tp.DictLike = None,
+        **kwargs,
+    ) -> tp.Any:
+        """Run a function on data.
+
+        Looks into the signature of the function and searches for arguments with the name `data` or
+        those found among magnet columns.
+
+        `func` can be one of the following:
+
+        * "talib_{name}": Name of a TA-Lib indicator
+        * "pandas_ta_{name}": Name of a Pandas TA indicator
+        * "ta_{name}": Name of a TA indicator
+        * "wqa101_{number}": Number of a WQA indicator
+        * "{name}": Name of a custom indicator, otherwise of the above if found
+        * "from_{mode}": Name of the simulation mode in `vectorbtpro.portfolio.base.Portfolio`
+        * Indicator: Any indicator class built with the indicator factory
+        * Callable: Function to run
+
+        For example, the argument `open` will be substituted by `Data.open`.
+
+        Use `on_indices` (using `iloc`), `on_dates` (using `loc`), and `on_symbols` (using `Data.select`)
+        to filter data. For example, to filter a date range, pass `slice(start_date, end_date)`.
+
+        Use `rename_args` to rename arguments. For example, in `vectorbtpro.portfolio.base.Portfolio`,
+        data can be passed instead of `close`."""
+        from vectorbtpro.indicators.factory import IndicatorBase, IndicatorFactory
+        from vectorbtpro.indicators import custom
+        from vectorbtpro.portfolio.base import Portfolio
+        from vectorbtpro.utils.opt_packages import check_installed
+
+        _self = self
+        if on_indices is not None:
+            _self = _self.iloc[on_indices]
+        if on_dates is not None:
+            _self = _self.loc[on_dates]
+        if on_symbols is not None:
+            _self = _self.select(on_symbols)
+
+        if pass_as_first:
+            return func(_self, *args, **kwargs)
+
+        if isinstance(func, str):
+            func = func.lower().strip()
+            if func.startswith("from_") and getattr(Portfolio, func):
+                func = getattr(Portfolio, func)
+                return func(_self, *args, **kwargs)
+            if hasattr(custom, func.upper()):
+                func = getattr(custom, func.upper())
+            elif func.startswith("talib_"):
+                func = IndicatorFactory.from_talib(func.replace("talib_", ""))
+            elif func.startswith("pandas_ta_"):
+                func = IndicatorFactory.from_pandas_ta(func.replace("pandas_ta_", ""))
+            elif func.startswith("ta_"):
+                func = IndicatorFactory.from_ta(func.replace("ta_", ""))
+            elif func.startswith("wqa101_"):
+                func = IndicatorFactory.from_wqa101(int(func.replace("wqa101_", "")))
+            elif check_installed("talib") and func.upper() in IndicatorFactory.get_talib_indicators():
+                func = IndicatorFactory.from_talib(func)
+            elif check_installed("pandas_ta") and func.upper() in IndicatorFactory.get_pandas_ta_indicators():
+                func = IndicatorFactory.from_pandas_ta(func)
+            elif check_installed("ta") and func.upper() in IndicatorFactory.get_ta_indicators():
+                func = IndicatorFactory.from_ta(func)
+            else:
+                raise ValueError(f"Could not find indicator with name '{func}'")
+        if isinstance(func, type) and issubclass(func, IndicatorBase):
+            func = func.run
+
+        with_kwargs = dict()
+        for arg_name in get_func_arg_names(func):
+            real_arg_name = arg_name
+            if rename_args is not None:
+                if arg_name in rename_args:
+                    arg_name = rename_args[arg_name]
+            if real_arg_name not in kwargs and arg_name == "data":
+                with_kwargs[real_arg_name] = _self
+            elif real_arg_name not in kwargs and arg_name == "open":
+                with_kwargs[real_arg_name] = _self.open
+            elif real_arg_name not in kwargs and arg_name == "high":
+                with_kwargs[real_arg_name] = _self.high
+            elif real_arg_name not in kwargs and arg_name == "low":
+                with_kwargs[real_arg_name] = _self.low
+            elif real_arg_name not in kwargs and arg_name == "close":
+                with_kwargs[real_arg_name] = _self.close
+            elif real_arg_name not in kwargs and arg_name == "volume":
+                with_kwargs[real_arg_name] = _self.volume
+            elif real_arg_name not in kwargs and arg_name == "trade_count":
+                with_kwargs[real_arg_name] = _self.trade_count
+            elif real_arg_name not in kwargs and arg_name == "vwap":
+                with_kwargs[real_arg_name] = _self.vwap
+            elif real_arg_name not in kwargs and arg_name == "hlc3":
+                with_kwargs[real_arg_name] = _self.hlc3
+            elif real_arg_name not in kwargs and arg_name == "ohlc4":
+                with_kwargs[real_arg_name] = _self.ohlc4
+        new_args, new_kwargs = extend_args(func, args, kwargs, **with_kwargs)
+        return func(*new_args, **new_kwargs)
 
     # ############# Stats ############# #
 
