@@ -111,7 +111,10 @@ def prepare_params(
         )
 
         new_p_values = params_to_list(p_values, is_tuple, is_array_like)
-        if bc_to_input is not False:
+        if not bc_to_input:
+            if is_array_like:
+                new_p_values = list(map(np.asarray, new_p_values))
+        else:
             # Broadcast to input or its axis
             if is_tuple:
                 raise ValueError("Cannot broadcast to input if tuple")
@@ -151,6 +154,7 @@ def build_columns(
     input_columns: tp.IndexLike,
     level_names: tp.Optional[tp.Sequence[str]] = None,
     hide_levels: tp.Optional[tp.Sequence[tp.Union[str, int]]] = None,
+    single_value: tp.Optional[tp.Sequence[bool]] = None,
     param_settings: tp.KwargsLikeSequence = None,
     per_column: bool = False,
     ignore_ranges: bool = False,
@@ -173,17 +177,20 @@ def build_columns(
         level_name = None
         if level_names is not None:
             level_name = level_names[i]
+        _single_value = False
+        if single_value is not None:
+            _single_value = single_value[i]
         _param_settings = resolve_dict(param_settings, i=i)
         _per_column = _param_settings.get("per_column", False)
         _post_index_func = _param_settings.get("post_index_func", None)
         if per_column:
-            param_index = indexes.index_from_values(p_values, name=level_name)
+            param_index = indexes.index_from_values(p_values, single_value=_single_value, name=level_name)
         else:
             if _per_column:
                 param_index = None
                 for p in p_values:
                     bc_param = np.broadcast_to(p, (len(input_columns),))
-                    _param_index = indexes.index_from_values(bc_param, name=level_name)
+                    _param_index = indexes.index_from_values(bc_param, single_value=_single_value, name=level_name)
                     if param_index is None:
                         param_index = _param_index
                     else:
@@ -192,7 +199,7 @@ def build_columns(
                     # When using flexible column-wise parameters
                     param_index = indexes.repeat_index(param_index, len(input_columns), ignore_ranges=ignore_ranges)
             else:
-                param_index = indexes.index_from_values(p_values, name=level_name)
+                param_index = indexes.index_from_values(p_values, single_value=_single_value, name=level_name)
                 param_index = indexes.repeat_index(param_index, len(input_columns), ignore_ranges=ignore_ranges)
         if _post_index_func is not None:
             param_index = _post_index_func(param_index)
@@ -485,6 +492,7 @@ def run_pipeline(
     # NOTE: input_shape instead of input_shape_ready since parameters should
     # broadcast by the same rules as inputs
     param_list = prepare_params(param_list, param_names, param_settings, input_shape=input_shape, to_2d=to_2d)
+    single_value = list(map(lambda x: len(x) == 1, param_list))
     if len(param_list) > 1:
         if level_names is not None:
             # Check level names
@@ -730,6 +738,7 @@ def run_pipeline(
             input_columns,
             level_names=level_names,
             hide_levels=hide_levels,
+            single_value=single_value,
             param_settings=param_settings,
             per_column=per_column,
             **build_col_kwargs,

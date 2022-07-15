@@ -66,13 +66,13 @@ import numpy as np
 import scipy.stats as st
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.generic import nb as generic_nb
+from vectorbtpro.generic import nb as generic_nb, enums as generic_enums
 from vectorbtpro.indicators import nb
 from vectorbtpro.indicators.factory import IndicatorFactory
 from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.config import merge_dicts
 
-__all__ = ["MA", "MSTD", "BBANDS", "RSI", "STOCH", "MACD", "ATR", "OBV", "OLS", "OLSS"]
+__all__ = ["MA", "MSTD", "BBANDS", "RSI", "STOCH", "MACD", "ATR", "OBV", "OLS", "OLSS", "PATSIM"]
 
 # ############# MA ############# #
 
@@ -708,7 +708,6 @@ class _MACD(MACD):
             hist_trace_kwargs = {}
         macd_trace_kwargs = merge_dicts(dict(name="MACD"), macd_trace_kwargs)
         signal_trace_kwargs = merge_dicts(dict(name="Signal"), signal_trace_kwargs)
-        hist_trace_kwargs = merge_dicts(dict(name="Histogram"), hist_trace_kwargs)
 
         fig = self_col.macd.vbt.lineplot(
             trace_kwargs=macd_trace_kwargs,
@@ -730,13 +729,14 @@ class _MACD(MACD):
         marker_colors[(hist < 0) & (hist_diff < 0)] = adjust_opacity("red", 0.75)
         marker_colors[(hist < 0) & (hist_diff >= 0)] = adjust_opacity("lightcoral", 0.75)
 
-        hist_bar = go.Bar(
+        _hist_trace_kwargs = merge_dicts(dict(
+            name="Histogram",
             x=self_col.hist.index,
             y=self_col.hist.values,
             marker_color=marker_colors,
             marker_line_width=0,
-        )
-        hist_bar.update(**hist_trace_kwargs)
+        ), hist_trace_kwargs)
+        hist_bar = go.Bar(**_hist_trace_kwargs)
         if add_trace_kwargs is None:
             add_trace_kwargs = {}
         fig.add_trace(hist_bar, **add_trace_kwargs)
@@ -1107,3 +1107,107 @@ class _OLSS(OLSS):
 
 setattr(OLSS, "__doc__", _OLSS.__doc__)
 setattr(OLSS, "plot", _OLSS.plot)
+
+
+# ############# PATSIM ############# #
+
+
+PATSIM = IndicatorFactory(
+    class_name="PATSIM",
+    module_name=__name__,
+    short_name="patsim",
+    input_names=["close"],
+    param_names=[
+        "pattern",
+        "window",
+        "interp_mode",
+        "rescale_mode",
+        "vmin",
+        "vmax",
+        "pmin",
+        "pmax",
+        "min_pct_change",
+        "max_pct_change",
+        "max_error",
+        "max_error_interp_mode",
+        "max_error_as_maxdist",
+        "max_error_strict",
+        "min_similarity",
+    ],
+    output_names=["similarity"],
+).with_apply_func(
+    generic_nb.rolling_pattern_similarity_nb,
+    param_settings=dict(
+        pattern=dict(is_array_like=True),
+        interp_mode=dict(dtype=generic_enums.InterpMode),
+        rescale_mode=dict(dtype=generic_enums.RescaleMode),
+        max_error=dict(is_array_like=True),
+        max_error_interp_mode=dict(dtype=generic_enums.InterpMode),
+    ),
+    window=None,
+    interp_mode="linear",
+    rescale_mode="minmax",
+    vmin=np.nan,
+    vmax=np.nan,
+    pmin=np.nan,
+    pmax=np.nan,
+    min_pct_change=np.nan,
+    max_pct_change=np.nan,
+    max_error=np.nan,
+    max_error_interp_mode=None,
+    max_error_as_maxdist=False,
+    max_error_strict=False,
+    min_similarity=np.nan,
+)
+
+
+class _PATSIM(PATSIM):
+    """Rolling pattern similarity.
+
+    Based on `vectorbtpro.generic.nb.rolling.rolling_pattern_similarity_nb`."""
+
+    def plot(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        similarity_trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs
+    ) -> tp.BaseFigure:  # pragma: no cover
+        """Plot `PATSIM.ma` against `PATSIM.close`.
+
+        Args:
+            column (str): Name of the column to plot.
+            similarity_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `PATSIM.similarity`.
+            add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
+            fig (Figure or FigureWidget): Figure to add traces to.
+            **layout_kwargs: Keyword arguments passed to `fig.update_layout`.
+
+        Usage:
+            ```pycon
+            >>> vbt.PATSIM.run(ohlcv['Close'], np.array([1, 2, 3, 2, 1]), 30).plot()
+            ```
+
+            ![](/assets/images/PATSIM.svg)
+        """
+        from vectorbtpro.utils.figure import make_figure
+
+        self_col = self.select_col(column=column)
+
+        if fig is None:
+            fig = make_figure()
+        fig.update_layout(**layout_kwargs)
+
+        similarity_trace_kwargs = merge_dicts(dict(name="Similarity"), similarity_trace_kwargs)
+
+        fig = self_col.similarity.vbt.lineplot(
+            trace_kwargs=similarity_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+        )
+
+        return fig
+
+
+setattr(PATSIM, "__doc__", _PATSIM.__doc__)
+setattr(PATSIM, "plot", _PATSIM.plot)

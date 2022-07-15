@@ -9,6 +9,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.generic.enums import *
 from vectorbtpro.generic.nb.base import rank_1d_nb
+from vectorbtpro.generic.nb.patterns import pattern_similarity_nb
 from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import chunking as ch
@@ -1165,8 +1166,8 @@ def rolling_rank_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = No
         else:
             from_i = max(0, i + 1 - window)
             to_i = i + 1
-            window_a = arr[from_i:to_i]
-            out[i] = rank_1d_nb(window_a, pct=pct)[-1]
+            arr_window = arr[from_i:to_i]
+            out[i] = rank_1d_nb(arr_window, pct=pct)[-1]
     return out
 
 
@@ -1374,6 +1375,192 @@ def rolling_argmax_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = Non
     return out
 
 
+@register_jitted(cache=True)
+def rolling_any_1d_nb(arr: tp.Array1d, window: int) -> tp.Array1d:
+    """Compute rolling any."""
+    out = np.empty_like(arr, dtype=np.bool_)
+    last_true_i = -1
+    for i in range(arr.shape[0]):
+        if not np.isnan(arr[i]) and arr[i]:
+            last_true_i = i
+        from_i = max(0, i + 1 - window)
+        if last_true_i >= from_i:
+            out[i] = True
+        else:
+            out[i] = False
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="arr", axis=1),
+    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def rolling_any_nb(arr: tp.Array2d, window: int) -> tp.Array2d:
+    """2-dim version of `rolling_any_1d_nb`."""
+    out = np.empty_like(arr, dtype=np.bool_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = rolling_any_1d_nb(arr[:, col], window)
+    return out
+
+
+@register_jitted(cache=True)
+def rolling_all_1d_nb(arr: tp.Array1d, window: int) -> tp.Array1d:
+    """Compute rolling all."""
+    out = np.empty_like(arr, dtype=np.bool_)
+    last_false_i = -1
+    for i in range(arr.shape[0]):
+        if np.isnan(arr[i]) or not arr[i]:
+            last_false_i = i
+        from_i = max(0, i + 1 - window)
+        if last_false_i >= from_i:
+            out[i] = False
+        else:
+            out[i] = True
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="arr", axis=1),
+    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def rolling_all_nb(arr: tp.Array2d, window: int) -> tp.Array2d:
+    """2-dim version of `rolling_all_1d_nb`."""
+    out = np.empty_like(arr, dtype=np.bool_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = rolling_all_1d_nb(arr[:, col], window)
+    return out
+
+
+@register_jitted(cache=True)
+def rolling_pattern_similarity_1d_nb(
+    arr: tp.Array1d,
+    pattern: tp.Array1d,
+    window: tp.Optional[int] = None,
+    interp_mode: int = InterpMode.Linear,
+    rescale_mode: int = RescaleMode.MinMax,
+    vmin: float = np.nan,
+    vmax: float = np.nan,
+    pmin: float = np.nan,
+    pmax: float = np.nan,
+    min_pct_change: float = np.nan,
+    max_pct_change: float = np.nan,
+    max_error: tp.FlexArray = np.asarray(np.nan),
+    max_error_interp_mode: tp.Optional[int] = None,
+    max_error_as_maxdist: bool = False,
+    max_error_strict: bool = False,
+    min_similarity: float = np.nan,
+) -> tp.Array1d:
+    """Compute rolling pattern similarity.
+
+    Uses `vectorbtpro.generic.nb.patterns.pattern_similarity_nb`."""
+    if window is None:
+        window = pattern.shape[0]
+    out = np.empty_like(arr, dtype=np.float_)
+    nancnt = 0
+    for i in range(arr.shape[0]):
+        if np.isnan(arr[i]):
+            nancnt = nancnt + 1
+        if i < window:
+            valid_cnt = i + 1 - nancnt
+        else:
+            if np.isnan(arr[i - window]):
+                nancnt = nancnt - 1
+            valid_cnt = window - nancnt
+        if valid_cnt < window:
+            out[i] = np.nan
+        else:
+            from_i = max(0, i + 1 - window)
+            to_i = i + 1
+            arr_window = arr[from_i:to_i]
+            out[i] = pattern_similarity_nb(
+                arr_window,
+                pattern,
+                interp_mode=interp_mode,
+                rescale_mode=rescale_mode,
+                vmin=vmin,
+                vmax=vmax,
+                pmin=pmin,
+                pmax=pmax,
+                min_pct_change=min_pct_change,
+                max_pct_change=max_pct_change,
+                max_error=max_error,
+                max_error_interp_mode=max_error_interp_mode,
+                max_error_strict=max_error_strict,
+                max_error_as_maxdist=max_error_as_maxdist,
+                min_similarity=min_similarity,
+            )
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="arr", axis=1),
+    arg_take_spec=dict(
+        arr=ch.ArraySlicer(axis=1),
+        pattern=None,
+        window=None,
+        interp_mode=None,
+        rescale_mode=None,
+        vmin=None,
+        vmax=None,
+        pmin=None,
+        pmax=None,
+        min_pct_change=None,
+        max_pct_change=None,
+        max_error=None,
+        max_error_interp_mode=None,
+        max_error_as_maxdist=None,
+        max_error_strict=None,
+        min_similarity=None,
+    ),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def rolling_pattern_similarity_nb(
+    arr: tp.Array2d,
+    pattern: tp.Array1d,
+    window: tp.Optional[int] = None,
+    interp_mode: int = InterpMode.Linear,
+    rescale_mode: int = RescaleMode.MinMax,
+    vmin: float = np.nan,
+    vmax: float = np.nan,
+    pmin: float = np.nan,
+    pmax: float = np.nan,
+    min_pct_change: float = np.nan,
+    max_pct_change: float = np.nan,
+    max_error: tp.FlexArray = np.asarray(np.nan),
+    max_error_interp_mode: tp.Optional[int] = None,
+    max_error_as_maxdist: bool = False,
+    max_error_strict: bool = False,
+    min_similarity: float = np.nan,
+) -> tp.Array2d:
+    """2-dim version of `rolling_pattern_similarity_1d_nb`."""
+    out = np.empty_like(arr, dtype=np.float_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = rolling_pattern_similarity_1d_nb(
+            arr[:, col],
+            pattern,
+            window=window,
+            interp_mode=interp_mode,
+            rescale_mode=rescale_mode,
+            vmin=vmin,
+            vmax=vmax,
+            pmin=pmin,
+            pmax=pmax,
+            min_pct_change=min_pct_change,
+            max_pct_change=max_pct_change,
+            max_error=max_error,
+            max_error_interp_mode=max_error_interp_mode,
+            max_error_as_maxdist=max_error_as_maxdist,
+            max_error_strict=max_error_strict,
+            min_similarity=min_similarity,
+        )
+    return out
+
+
 # ############# Expanding functions ############# #
 
 
@@ -1442,64 +1629,4 @@ def expanding_max_nb(arr: tp.Array2d, minp: int = 1) -> tp.Array2d:
     out = np.empty_like(arr, dtype=np.float_)
     for col in prange(arr.shape[1]):
         out[:, col] = expanding_max_1d_nb(arr[:, col], minp=minp)
-    return out
-
-
-@register_jitted(cache=True)
-def rolling_any_1d_nb(arr: tp.Array1d, window: int) -> tp.Array1d:
-    """Compute rolling any."""
-    out = np.empty_like(arr, dtype=np.bool_)
-    last_true_i = -1
-    for i in range(arr.shape[0]):
-        if not np.isnan(arr[i]) and arr[i]:
-            last_true_i = i
-        from_i = max(0, i + 1 - window)
-        if last_true_i >= from_i:
-            out[i] = True
-        else:
-            out[i] = False
-    return out
-
-
-@register_chunkable(
-    size=ch.ArraySizer(arg_query="arr", axis=1),
-    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None),
-    merge_func=base_ch.column_stack,
-)
-@register_jitted(cache=True, tags={"can_parallel"})
-def rolling_any_nb(arr: tp.Array2d, window: int) -> tp.Array2d:
-    """2-dim version of `rolling_any_1d_nb`."""
-    out = np.empty_like(arr, dtype=np.bool_)
-    for col in prange(arr.shape[1]):
-        out[:, col] = rolling_any_1d_nb(arr[:, col], window)
-    return out
-
-
-@register_jitted(cache=True)
-def rolling_all_1d_nb(arr: tp.Array1d, window: int) -> tp.Array1d:
-    """Compute rolling all."""
-    out = np.empty_like(arr, dtype=np.bool_)
-    last_false_i = -1
-    for i in range(arr.shape[0]):
-        if np.isnan(arr[i]) or not arr[i]:
-            last_false_i = i
-        from_i = max(0, i + 1 - window)
-        if last_false_i >= from_i:
-            out[i] = False
-        else:
-            out[i] = True
-    return out
-
-
-@register_chunkable(
-    size=ch.ArraySizer(arg_query="arr", axis=1),
-    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None),
-    merge_func=base_ch.column_stack,
-)
-@register_jitted(cache=True, tags={"can_parallel"})
-def rolling_all_nb(arr: tp.Array2d, window: int) -> tp.Array2d:
-    """2-dim version of `rolling_all_1d_nb`."""
-    out = np.empty_like(arr, dtype=np.bool_)
-    for col in prange(arr.shape[1]):
-        out[:, col] = rolling_all_1d_nb(arr[:, col], window)
     return out

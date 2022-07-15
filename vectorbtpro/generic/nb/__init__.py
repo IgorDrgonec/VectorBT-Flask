@@ -25,3 +25,4 @@ from vectorbtpro.generic.nb.base import *
 from vectorbtpro.generic.nb.rolling import *
 from vectorbtpro.generic.nb.apply_reduce import *
 from vectorbtpro.generic.nb.records import *
+from vectorbtpro.generic.nb.patterns import *

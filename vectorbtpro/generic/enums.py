@@ -11,9 +11,12 @@ from vectorbtpro.utils.formatting import prettify
 
 __all__ = [
     "RangeStatus",
+    "RescaleMode",
+    "InterpMode",
     "DrawdownStatus",
-    "drawdown_dt",
     "range_dt",
+    "pattern_range_dt",
+    "drawdown_dt",
     "RollSumAIS",
     "RollSumAOS",
     "RollProdAIS",
@@ -43,11 +46,11 @@ __pdoc__ = {}
 
 
 class RangeStatusT(tp.NamedTuple):
-    Open: int
-    Closed: int
+    Open: int = 0
+    Closed: int = 1
 
 
-RangeStatus = RangeStatusT(*range(2))
+RangeStatus = RangeStatusT()
 """_"""
 
 __pdoc__[
@@ -60,12 +63,78 @@ __pdoc__[
 """
 
 
+class RescaleModeT(tp.NamedTuple):
+    MinMax: int = 0
+    Rebase: int = 1
+    Disable: int = 2
+
+
+RescaleMode = RescaleModeT()
+"""_"""
+
+__pdoc__[
+    "RescaleMode"
+] = f"""Rescaling mode.
+
+```python
+{prettify(RescaleMode)}
+```
+
+Attributes:
+    MinMax: Array is rescaled from its min-max range to the min-max range of another array.
+    
+        For example: `[3.0, 2.0, 1.0]` to `[10, 11, 12]` -> `[12.0, 11.0, 10.0]`
+    
+        Use this to search for patterns irrespective of their vertical scale.
+    Rebase: Array is rebased to the first value in another array.
+    
+        For example: `[3.0, 2.0, 1.0]` to `[10, 11, 12]` -> `[10.0, 6.6, 3.3]`
+    
+        Use this to search for percentage changes.
+    Disable: Disable any rescaling.
+    
+        For example: `[3.0, 2.0, 1.0]` to `[10, 11, 12]` -> `[3.0, 2.0, 1.0]`
+    
+        Use this to search for particular numbers.
+"""
+
+
+class InterpModeT(tp.NamedTuple):
+    Linear: int = 0
+    Nearest: int = 1
+    Discrete: int = 2
+
+
+InterpMode = InterpModeT()
+"""_"""
+
+__pdoc__[
+    "InterpMode"
+] = f"""Interpolation mode.
+
+```python
+{prettify(InterpMode)}
+```
+
+Attributes:
+    Line: Linear interpolation.
+    
+        For example: `[1.0, 2.0, 3.0]` -> `[1.0, 1.5, 2.0, 2.5, 3.0]`
+    Nearest: Nearest-neighbor interpolation.
+    
+        For example: `[1.0, 2.0, 3.0]` -> `[1.0, 1.0, 2.0, 3.0, 3.0]`
+    Point: Discrete interpolation.
+    
+        For example: `[1.0, 2.0, 3.0]` -> `[1.0, np.nan, 2.0, np.nan, 3.0]`
+"""
+
+
 class DrawdownStatusT(tp.NamedTuple):
-    Active: int
-    Recovered: int
+    Active: int = 0
+    Recovered: int = 1
 
 
-DrawdownStatus = DrawdownStatusT(*range(2))
+DrawdownStatus = DrawdownStatusT()
 """_"""
 
 __pdoc__[
@@ -91,6 +160,28 @@ __pdoc__[
 
 ```python
 {prettify(range_dt)}
+```
+"""
+
+pattern_range_dt = np.dtype(
+    [
+        ("id", np.int_),
+        ("col", np.int_),
+        ("start_idx", np.int_),
+        ("end_idx", np.int_),
+        ("status", np.int_),
+        ("similarity", np.float_),
+    ],
+    align=True,
+)
+"""_"""
+
+__pdoc__[
+    "pattern_range_dt"
+] = f"""`np.dtype` of pattern range records.
+
+```python
+{prettify(pattern_range_dt)}
 ```
 """
 

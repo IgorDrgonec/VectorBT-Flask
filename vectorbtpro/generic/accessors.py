@@ -230,9 +230,10 @@ from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic.decorators import attach_nb_methods, attach_transform_methods
 from vectorbtpro.generic.drawdowns import Drawdowns
 from vectorbtpro.generic.plots_builder import PlotsBuilderMixin
-from vectorbtpro.generic.ranges import Ranges
+from vectorbtpro.generic.ranges import Ranges, PatternRanges
 from vectorbtpro.generic.splitters import SplitterT, RangeSplitter, RollingSplitter, ExpandingSplitter
 from vectorbtpro.generic.stats_builder import StatsBuilderMixin
+from vectorbtpro.generic.enums import InterpMode, RescaleMode
 from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
@@ -244,6 +245,7 @@ from vectorbtpro.utils.mapping import apply_mapping, to_mapping
 from vectorbtpro.utils.template import deep_substitute
 from vectorbtpro.utils.datetime_ import freq_to_timedelta64, try_to_datetime_index
 from vectorbtpro.utils.colors import adjust_opacity, map_value_to_cmap
+from vectorbtpro.utils.enum_ import map_enum_fields
 
 try:  # pragma: no cover
     import bottleneck as bn
@@ -675,6 +677,56 @@ class GenericAccessor(BaseAccessor, Analyzable):
     def expanding_rank(self, minp: tp.Optional[int] = 1, **kwargs) -> tp.SeriesFrame:
         """Expanding version of `GenericAccessor.rolling_rank`."""
         return self.rolling_rank(None, minp=minp, **kwargs)
+
+    def rolling_pattern_similarity(
+        self,
+        pattern: tp.ArrayLike,
+        window: tp.Optional[int] = None,
+        interp_mode: tp.Union[int, str] = "linear",
+        rescale_mode: tp.Union[int, str] = "minmax",
+        vmin: float = np.nan,
+        vmax: float = np.nan,
+        pmin: float = np.nan,
+        pmax: float = np.nan,
+        min_pct_change: float = np.nan,
+        max_pct_change: float = np.nan,
+        max_error: tp.ArrayLike = np.nan,
+        max_error_interp_mode: tp.Union[None, int, str] = None,
+        max_error_as_maxdist: bool = False,
+        max_error_strict: bool = False,
+        min_similarity: float = np.nan,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """See `vectorbtpro.generic.nb.rolling.rolling_pattern_similarity_nb`."""
+        if isinstance(interp_mode, str):
+            interp_mode = map_enum_fields(interp_mode, InterpMode)
+        if isinstance(rescale_mode, str):
+            rescale_mode = map_enum_fields(rescale_mode, RescaleMode)
+        if max_error_interp_mode is not None and isinstance(max_error_interp_mode, str):
+            max_error_interp_mode = map_enum_fields(max_error_interp_mode, InterpMode)
+        func = jit_reg.resolve_option(nb.rolling_pattern_similarity_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        out = func(
+            self.to_2d_array(),
+            reshaping.to_1d_array(pattern),
+            window=window,
+            interp_mode=interp_mode,
+            rescale_mode=rescale_mode,
+            vmin=vmin,
+            vmax=vmax,
+            pmin=pmin,
+            pmax=pmax,
+            min_pct_change=min_pct_change,
+            max_pct_change=max_pct_change,
+            max_error=reshaping.to_1d_array(max_error),
+            max_error_interp_mode=max_error_interp_mode,
+            max_error_as_maxdist=max_error_as_maxdist,
+            max_error_strict=max_error_strict,
+            min_similarity=min_similarity,
+        )
+        return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
     # ############# Mapping ############# #
 
@@ -3579,24 +3631,24 @@ class GenericAccessor(BaseAccessor, Analyzable):
         """`GenericAccessor.get_ranges` with default arguments."""
         return self.get_ranges()
 
-    def get_ranges(self, wrapper_kwargs: tp.KwargsLike = None, **kwargs) -> Ranges:
+    def get_ranges(self, *args, wrapper_kwargs: tp.KwargsLike = None, **kwargs) -> Ranges:
         """Generate range records.
 
-        See `vectorbtpro.generic.ranges.Ranges`."""
+        See `vectorbtpro.generic.ranges.Ranges.from_array`."""
         wrapper_kwargs = merge_dicts(self.wrapper.config, wrapper_kwargs)
-        return Ranges.from_pd(self.obj, wrapper_kwargs=wrapper_kwargs, **kwargs)
+        return Ranges.from_array(self.obj, *args, wrapper_kwargs=wrapper_kwargs, **kwargs)
 
     @property
     def drawdowns(self) -> Drawdowns:
         """`GenericAccessor.get_drawdowns` with default arguments."""
         return self.get_drawdowns()
 
-    def get_drawdowns(self, wrapper_kwargs: tp.KwargsLike = None, **kwargs) -> Drawdowns:
+    def get_drawdowns(self, *args, wrapper_kwargs: tp.KwargsLike = None, **kwargs) -> Drawdowns:
         """Generate drawdown records.
 
-        See `vectorbtpro.generic.drawdowns.Drawdowns`."""
+        See `vectorbtpro.generic.drawdowns.Drawdowns.from_price`."""
         wrapper_kwargs = merge_dicts(self.wrapper.config, wrapper_kwargs)
-        return Drawdowns.from_price(self.obj, wrapper_kwargs=wrapper_kwargs, **kwargs)
+        return Drawdowns.from_price(self.obj, *args, wrapper_kwargs=wrapper_kwargs, **kwargs)
 
     def to_mapped(
         self,
@@ -3625,6 +3677,14 @@ class GenericAccessor(BaseAccessor, Analyzable):
     def to_returns(self, **kwargs) -> tp.SeriesFrame:
         """Get returns of this object."""
         return self.obj.vbt.returns.from_value(self.obj, **kwargs).obj
+
+    # ############# Patterns ############# #
+
+    def find_pattern(self, *args, **kwargs) -> PatternRanges:
+        """Generate pattern range records.
+
+        See `vectorbtpro.generic.ranges.PatternRanges.from_pattern_search`."""
+        return PatternRanges.from_pattern_search(self.obj, *args, **kwargs)
 
     # ############# Crossover ############# #
 
@@ -4028,7 +4088,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             # Fill positive area
             pos_obj = self.obj.copy()
             pos_obj[~pos_mask] = other[~pos_mask]
-            other.vbt.plot(
+            other.vbt.lineplot(
                 trace_kwargs=merge_dicts(
                     dict(
                         line=dict(color="rgba(0, 0, 0, 0)", width=0),
@@ -4042,7 +4102,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
                 add_trace_kwargs=add_trace_kwargs,
                 fig=fig,
             )
-            pos_obj.vbt.plot(
+            pos_obj.vbt.lineplot(
                 trace_kwargs=merge_dicts(
                     dict(
                         fillcolor="rgba(0, 128, 0, 0.3)",
@@ -4064,7 +4124,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             # Fill negative area
             neg_obj = self.obj.copy()
             neg_obj[~neg_mask] = other[~neg_mask]
-            other.vbt.plot(
+            other.vbt.lineplot(
                 trace_kwargs=merge_dicts(
                     dict(
                         line=dict(color="rgba(0, 0, 0, 0)", width=0),
@@ -4078,7 +4138,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
                 add_trace_kwargs=add_trace_kwargs,
                 fig=fig,
             )
-            neg_obj.vbt.plot(
+            neg_obj.vbt.lineplot(
                 trace_kwargs=merge_dicts(
                     dict(
                         line=dict(color="rgba(0, 0, 0, 0)", width=0),
@@ -4097,7 +4157,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             )
 
         # Plot main traces
-        self.plot(trace_kwargs=trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+        self.lineplot(trace_kwargs=trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
         if other_trace_kwargs == "hidden":
             other_trace_kwargs = dict(
                 line=dict(color="rgba(0, 0, 0, 0)", width=0),
@@ -4106,7 +4166,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
                 showlegend=False,
                 name=None,
             )
-        other.vbt.plot(trace_kwargs=other_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+        other.vbt.lineplot(trace_kwargs=other_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
         return fig
 
     def overlay_with_heatmap(
@@ -4156,7 +4216,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         fig.update_layout(**layout_kwargs)
 
         other.vbt.ts_heatmap(**heatmap_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
-        self.plot(
+        self.lineplot(
             trace_kwargs=merge_dicts(dict(line=dict(color=plotting_cfg["color_schema"]["blue"])), trace_kwargs),
             add_trace_kwargs=merge_dicts(dict(secondary_y=True), add_trace_kwargs),
             fig=fig,
@@ -4527,9 +4587,11 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
     def plot_projections(
         self,
         plot_projections: bool = True,
+        plot_bands: bool = True,
         plot_lower: tp.Union[bool, str, tp.Callable] = True,
         plot_middle: tp.Union[bool, str, tp.Callable] = True,
         plot_upper: tp.Union[bool, str, tp.Callable] = True,
+        plot_aux_middle: tp.Union[bool, str, tp.Callable] = True,
         plot_fill: bool = True,
         colorize: tp.Union[bool, str, tp.Callable] = True,
         rename_levels: tp.Union[None, dict, tp.Sequence] = None,
@@ -4537,6 +4599,7 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
         upper_trace_kwargs: tp.KwargsLike = None,
         middle_trace_kwargs: tp.KwargsLike = None,
         lower_trace_kwargs: tp.KwargsLike = None,
+        aux_middle_trace_kwargs: tp.KwargsLike = None,
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs,
@@ -4545,7 +4608,8 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
 
         If `plot_projections` is True, will plot each projection as a semi-transparent line.
 
-        The arguments `plot_lower`, `plot_middle`, and `plot_upper` represent bands and accept the following:
+        The arguments `plot_lower`, `plot_middle`, `plot_aux_middle`, and `plot_upper` represent
+        bands and accept the following:
 
         * True: Plot the band using the default quantile (20/50/80)
         * False: Do not plot the band
@@ -4612,6 +4676,13 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
             add_trace_kwargs = {}
 
         # Resolve band functions and names
+        if len(self.obj.columns) == 1:
+            plot_bands = False
+        if not plot_bands:
+            plot_lower = False
+            plot_middle = False
+            plot_upper = False
+            plot_aux_middle = False
         if isinstance(plot_lower, bool):
             if plot_lower:
                 plot_lower = "20%"
@@ -4627,11 +4698,16 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
                 plot_upper = "80%"
             else:
                 plot_upper = None
+        if isinstance(plot_aux_middle, bool):
+            if plot_aux_middle:
+                plot_aux_middle = "mean"
+            else:
+                plot_aux_middle = None
 
         def _resolve_band_and_name(plot_band, arg_name):
             band_name = None
             if isinstance(plot_band, str):
-                plot_band = plot_band.lower().strip()
+                plot_band = plot_band.lower().replace(" ", "")
                 if plot_band == "median":
                     plot_band = "50%"
                 if "%" in plot_band and not plot_band.startswith("q=") and not plot_band.startswith("p="):
@@ -4696,6 +4772,9 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
         plot_upper, upper_name = _resolve_band_and_name(plot_upper, "plot_upper")
         if upper_name is None:
             upper_name = "Upper (proj)"
+        plot_aux_middle, aux_middle_name = _resolve_band_and_name(plot_aux_middle, "plot_aux_middle")
+        if aux_middle_name is None:
+            aux_middle_name = "Aux middle (proj)"
 
         if isinstance(colorize, bool):
             if colorize:
@@ -4704,7 +4783,7 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
                 colorize = None
         if colorize is not None:
             if isinstance(colorize, str):
-                colorize = colorize.lower().strip()
+                colorize = colorize.lower().replace(" ", "")
                 if colorize == "median":
                     colorize = lambda x: x.median()
                 elif colorize == "mean":
@@ -4771,7 +4850,7 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
                         )
                     else:
                         proj_color = plotting_cfg["color_schema"]["gray"]
-                    if not plot_lower and not plot_middle and not plot_upper:
+                    if not plot_bands:
                         proj_color = adjust_opacity(proj_color, 0.5)
                     else:
                         proj_color = adjust_opacity(proj_color, 0.1)
@@ -4791,20 +4870,24 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
                         fig=fig,
                     )
 
-        if len(self.obj.columns) > 1:
+        if plot_bands and len(self.obj.columns) > 1:
             # Calculate bands
             if plot_lower is not None:
                 lower_band = plot_lower(self.obj)
             else:
                 lower_band = None
-            if plot_upper is not None:
-                upper_band = plot_upper(self.obj)
-            else:
-                upper_band = None
             if plot_middle is not None:
                 middle_band = plot_middle(self.obj)
             else:
                 middle_band = None
+            if plot_upper is not None:
+                upper_band = plot_upper(self.obj)
+            else:
+                upper_band = None
+            if plot_aux_middle is not None:
+                aux_middle_band = plot_aux_middle(self.obj)
+            else:
+                aux_middle_band = None
 
             if lower_band is not None:
                 # Plot lower band
@@ -4890,6 +4973,30 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
                     def_upper_trace_kwargs["fillcolor"] = adjust_opacity(plotting_cfg["color_schema"]["gray"], 0.25)
                 upper_band.rename(None).vbt.lineplot(
                     trace_kwargs=merge_dicts(def_upper_trace_kwargs, upper_trace_kwargs),
+                    add_trace_kwargs=add_trace_kwargs,
+                    fig=fig,
+                )
+
+            if aux_middle_band is not None:
+                # Plot auxiliary band
+                def_aux_middle_trace_kwargs = dict(name=aux_middle_name)
+                if colorize is not None:
+                    aux_middle_color = map_value_to_cmap(
+                        colorize(aux_middle_band - aux_middle_band.iloc[0]),
+                        [
+                            plotting_cfg["color_schema"]["red"],
+                            plotting_cfg["color_schema"]["yellow"],
+                            plotting_cfg["color_schema"]["green"],
+                        ],
+                        vmin=proj_min,
+                        vcenter=0,
+                        vmax=proj_max,
+                    )
+                else:
+                    aux_middle_color = plotting_cfg["color_schema"]["gray"]
+                def_aux_middle_trace_kwargs["line"] = dict(dash='dot', color=aux_middle_color)
+                aux_middle_band.rename(None).vbt.lineplot(
+                    trace_kwargs=merge_dicts(def_aux_middle_trace_kwargs, aux_middle_trace_kwargs),
                     add_trace_kwargs=add_trace_kwargs,
                     fig=fig,
                 )
