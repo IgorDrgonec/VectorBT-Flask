@@ -3526,6 +3526,35 @@ class TestReshapeFns:
     def test_broadcast_product_idx(self):
         result, wrapper = reshaping.broadcast(
             dict(
+                a=vbt.Param([1, 2]),
+                b=vbt.Param([False, True]),
+                c=vbt.Param(["x", "y"]),
+                sr=pd.Series([1, 2, 3]),
+            ),
+            keep_flex=True,
+            return_wrapper=True,
+        )
+        np.testing.assert_array_equal(result["a"], np.array([1, 1, 1, 1, 2, 2, 2, 2]))
+        np.testing.assert_array_equal(result["b"], np.array([False, False, True, True, False, False, True, True]))
+        np.testing.assert_array_equal(result["c"], np.array(["x", "y", "x", "y", "x", "y", "x", "y"]))
+        assert_index_equal(
+            wrapper.columns,
+            pd.MultiIndex.from_tuples(
+                [
+                    (1, False, "x"),
+                    (1, False, "y"),
+                    (1, True, "x"),
+                    (1, True, "y"),
+                    (2, False, "x"),
+                    (2, False, "y"),
+                    (2, True, "x"),
+                    (2, True, "y"),
+                ],
+                names=["a", "b", "c"],
+            ),
+        )
+        result, wrapper = reshaping.broadcast(
+            dict(
                 a=vbt.BCO([1, 2], product=True),
                 b=vbt.BCO([False, True], product=True),
                 c=vbt.BCO(["x", "y"], product=True),

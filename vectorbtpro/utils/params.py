@@ -2,14 +2,18 @@
 
 """Utilities for working with parameters."""
 
+import attr
 import itertools
+from collections import defaultdict, OrderedDict
 from collections.abc import Callable
 
 import numpy as np
+import pandas as pd
 from numba.typed import List
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
+from vectorbtpro.utils.random_ import set_seed
 
 
 def to_typed_list(lst: list) -> List:
@@ -74,7 +78,7 @@ def generate_param_combs(op_tree: tp.Tuple, depth: int = 0) -> tp.List[tp.List]:
     return out
 
 
-def broadcast_params(param_list: tp.Sequence[tp.Sequence], to_n: tp.Optional[int] = None) -> tp.List[tp.List]:
+def broadcast_params(param_list: tp.Sequence[tp.Params], to_n: tp.Optional[int] = None) -> tp.List[tp.List]:
     """Broadcast parameters in `param_list`."""
     if to_n is None:
         to_n = max(list(map(len, param_list)))
@@ -91,7 +95,7 @@ def broadcast_params(param_list: tp.Sequence[tp.Sequence], to_n: tp.Optional[int
     return new_param_list
 
 
-def create_param_product(param_list: tp.Sequence[tp.Sequence]) -> tp.List[tp.List]:
+def create_param_product(param_list: tp.Sequence[tp.Params]) -> tp.List[tp.List]:
     """Make Cartesian product out of all params in `param_list`."""
     return list(map(list, zip(*itertools.product(*param_list))))
 
@@ -108,3 +112,120 @@ def params_to_list(params: tp.Params, is_tuple: bool, is_array_like: bool) -> li
     else:
         new_params = [params]
     return new_params
+
+
+@attr.s(frozen=True)
+class Param:
+    """Class that represents a parameter."""
+
+    value: tp.MaybeSequence[tp.Param] = attr.ib()
+    """One or more parameter values."""
+
+    product_idx: tp.Optional[int] = attr.ib(default=None)
+    """Index of the product the parameter takes part in.
+
+    Parameters in the same product are stacked together, not combined, 
+    and appear in the index hierarchy next to each other.
+
+    Product index can be used to order index levels: the higher the product index, 
+    the lower the index level. Index levels with the same product index appear in the same 
+    order as they are passed to the processor."""
+
+    keys: tp.Optional[tp.IndexLike] = attr.ib(default=None)
+    """Keys acting as an index level.
+
+    If None, converts `Param.value` to an index using 
+    `vectorbtpro.base.indexes.index_from_values`."""
+
+
+def combine_params(
+    param_dct: tp.Dict[tp.Hashable, Param],
+    random_subset: tp.Optional[int] = None,
+    seed: tp.Optional[int] = None,
+    stack_kwargs: tp.KwargsLike = None,
+) -> tp.Tuple[dict, pd.Index]:
+    """Combine a dictionary with parameters of the type `Param`.
+
+    Returns a dictionary with combined parameters and an index."""
+    from vectorbtpro.base import indexes
+
+    if stack_kwargs is None:
+        stack_kwargs = {}
+
+    # Build a product
+    param_index = None
+    product_idx_values = defaultdict(OrderedDict)
+    product_indexes = OrderedDict()
+    product_idx_seen = False
+    curr_idx = 0
+    max_idx = 0
+    for k, p in param_dct.items():
+        if p.product_idx is None:
+            if product_idx_seen:
+                raise ValueError("Please provide product index for all product parameters")
+            product_idx = curr_idx
+        else:
+            if curr_idx > 0 and not product_idx_seen:
+                raise ValueError("Please provide product index for all product parameters")
+            product_idx_seen = True
+            product_idx = p.product_idx
+        if product_idx > max_idx:
+            max_idx = product_idx
+
+        product_idx_values[product_idx][k] = list(p.value)
+        if p.keys is not None:
+            if isinstance(p.keys, pd.Index):
+                product_indexes[k] = p.keys
+            else:
+                product_indexes[k] = pd.Index(p.keys, name=k)
+        else:
+            product_indexes[k] = indexes.index_from_values(p.value, name=k)
+        curr_idx += 1
+
+    # Build an operation tree and parameter index
+    op_tree_operands = []
+    param_keys = []
+    for product_idx in range(max_idx + 1):
+        if product_idx not in product_idx_values:
+            raise ValueError("Group index must come in a strict order starting with 0 and without gaps")
+        for k in product_idx_values[product_idx].keys():
+            param_keys.append(k)
+
+        # Broadcast parameter arrays
+        param_lists = tuple(product_idx_values[product_idx].values())
+        if len(param_lists) > 1:
+            op_tree_operands.append((zip, *broadcast_params(param_lists)))
+        else:
+            op_tree_operands.append(param_lists[0])
+
+        # Stack or combine parameter indexes together
+        levels = []
+        for k in product_idx_values[product_idx].keys():
+            levels.append(product_indexes[k])
+        if len(levels) > 1:
+            _param_index = indexes.stack_indexes(levels, **stack_kwargs)
+        else:
+            _param_index = levels[0]
+        if param_index is None:
+            param_index = _param_index
+        else:
+            param_index = indexes.combine_indexes([param_index, _param_index], **stack_kwargs)
+
+    # Generate parameter combinations using the operation tree
+    if len(op_tree_operands) > 1:
+        param_product = dict(zip(param_keys, generate_param_combs((itertools.product, *op_tree_operands))))
+    elif isinstance(op_tree_operands[0], tuple):
+        param_product = dict(zip(param_keys, generate_param_combs(op_tree_operands[0])))
+    else:
+        param_product = dict(zip(param_keys, op_tree_operands))
+    n_params = len(param_product[param_keys[0]])
+
+    # Select a random subset
+    if random_subset is not None:
+        if seed is not None:
+            set_seed(seed)
+        random_indices = np.sort(np.random.permutation(np.arange(n_params))[:random_subset])
+        param_product = {k: [v[i] for i in range(n_params)] for k, v in param_product.items()}
+        if param_index is not None:
+            param_index = param_index[random_indices]
+    return param_product, param_index

@@ -4,11 +4,10 @@
 
 Reshape functions transform a Pandas object/NumPy array in some way."""
 
+import attr
 import functools
 import itertools
-from collections import OrderedDict, defaultdict
 
-import attr
 import numpy as np
 import pandas as pd
 from numpy.lib.stride_tricks import _broadcast_shape
@@ -17,7 +16,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base import indexes, wrapping, indexing
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import resolve_dict, merge_dicts
-from vectorbtpro.utils.params import generate_param_combs
+from vectorbtpro.utils.params import combine_params, Param
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.template import CustomTemplate
 
@@ -512,10 +511,12 @@ class BCO:
     Treats `BCO.value` as a parameter holding a sequence of scalar values, one per entire shape.
     
     If None, becomes True if `BCO.value` is an index and `BCO.index_to_product` is True, 
-    otherwise False."""
+    otherwise False.
+    
+    Uses `vectorbtpro.utils.params.combine_params`."""
 
     product_idx: tp.Optional[int] = attr.ib(default=None)
-    """Index of the product the parameter take part in.
+    """Index of the product the parameter takes part in.
     
     Parameters in the same product broadcast but are not combined together, 
     and appear in the column hierarchy next to each other.
@@ -524,14 +525,14 @@ class BCO:
     the lower the column level. Column levels with the same product index appear in the same 
     order as the parameters were passed to `broadcast`."""
 
-    keys_from_sr_index: tp.Optional[bool] = attr.ib(default=None)
-    """Whether to set `BCO.keys` to the index of `BCO.value` if `BCO.value` is a Series."""
-
     keys: tp.Optional[tp.IndexLike] = attr.ib(default=None)
     """Keys acting as a column level if `BCO.product` is True.
-    
+
     If None, becomes the index of `BCO.value` if `BCO.value` is a Series and 
     `keys_from_sr_index` is True, otherwise the values of `BCO.value`."""
+
+    keys_from_sr_index: tp.Optional[bool] = attr.ib(default=None)
+    """Whether to set `BCO.keys` to the index of `BCO.value` if `BCO.value` is a Series."""
 
     repeat_product: tp.Optional[bool] = attr.ib(default=None)
     """Whether to repeat every parameter value to match the number of columns in regular arrays."""
@@ -596,11 +597,12 @@ def broadcast(
     index_to_product: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
     product: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
     product_idx: tp.MaybeMappingSequence[tp.Optional[int]] = None,
-    repeat_product: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
-    keys_from_sr_index: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
     keys: tp.MaybeMappingSequence[tp.Optional[tp.IndexLike]] = None,
+    keys_from_sr_index: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
+    repeat_product: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
     tile: tp.Union[None, int, tp.IndexLike] = None,
     random_subset: tp.Optional[int] = None,
+    seed: tp.Optional[int] = None,
     keep_wrap_default: tp.Optional[bool] = None,
     return_wrapper: bool = False,
     wrapper_kwargs: tp.KwargsLike = None,
@@ -620,8 +622,9 @@ def broadcast(
 
             If the first and only argument is a mapping, will return a dict.
 
-            Allows using `BCO`, `Ref`, `Default`, `vectorbtpro.base.indexing.index_dict`, and templates.
-            If an index dictionary, fills using `vectorbtpro.base.wrapping.ArrayWrapper.fill_using_index_dict`.
+            Allows using `BCO`, `Ref`, `Default`, `vectorbtpro.utils.params.Param`,
+            `vectorbtpro.base.indexing.index_dict`, and templates. If an index dictionary,
+            fills using `vectorbtpro.base.wrapping.ArrayWrapper.fill_using_index_dict`.
         to_shape (tuple of int): Target shape. If set, will broadcast every object in `args` to `to_shape`.
         align_index (bool): Whether to align index of Pandas objects using union.
 
@@ -655,13 +658,14 @@ def broadcast(
         index_to_product (bool, sequence or mapping): See `BCO.index_to_product`.
         product (bool, sequence or mapping): See `BCO.product`.
         product_idx (int, sequence or mapping): See `BCO.product_idx`.
-        repeat_product (bool, sequence or mapping): See `BCO.repeat_product`.
-        keys_from_sr_index (bool, sequence or mapping): See `BCO.keys_from_sr_index`.
         keys (index_like, sequence or mapping): See `BCO.keys`.
+        keys_from_sr_index (bool, sequence or mapping): See `BCO.keys_from_sr_index`.
+        repeat_product (bool, sequence or mapping): See `BCO.repeat_product`.
         tile (int or index_like): Tile the final object by the number of times or index.
         random_subset (int): Select a random subset of product parameter values.
 
             Seed can be set using NumPy before calling this function.
+        seed (int): Set seed to make output deterministic.
         keep_wrap_default (bool): Whether to keep wrapping with `vectorbtpro.base.reshaping.Default`.
         return_wrapper (bool): Whether to also return the wrapper associated with the operation.
         wrapper_kwargs (dict): Keyword arguments passed to `vectorbtpro.base.wrapping.ArrayWrapper`.
@@ -1012,6 +1016,13 @@ def broadcast(
             default_keys.add(k)
         if isinstance(obj, Ref):
             obj = resolve_ref(pool, k)
+        if isinstance(obj, Param):
+            obj = BCO(
+                value=obj.value,
+                product=True,
+                product_idx=obj.product_idx,
+                keys=obj.keys,
+            )
         if isinstance(obj, BCO):
             value = obj.value
         else:
@@ -1247,87 +1258,25 @@ def broadcast(
     param_columns = None
     n_params = 0
     if len(product_keys) > 0:
-        # Prepare and group parameters
-        product_idx_values = defaultdict(OrderedDict)
-        product_indexes = OrderedDict()
-        product_idx_seen = False
-        curr_idx = 0
-        max_idx = 0
+        # Combine parameters
+        param_dct = {}
         for k, bco_obj in bco_instances.items():
             if k not in product_keys:
                 continue
-            if bco_obj.product_idx is None:
-                if product_idx_seen:
-                    raise ValueError("Please provide product index for all product parameters")
-                product_idx = curr_idx
-            else:
-                if curr_idx > 0 and not product_idx_seen:
-                    raise ValueError("Please provide product index for all product parameters")
-                product_idx_seen = True
-                product_idx = bco_obj.product_idx
-            if product_idx > max_idx:
-                max_idx = product_idx
-
             value = np.asarray(bco_obj.value)
             if value.ndim == 0:
                 value = value[None]
             elif value.ndim > 1:
                 raise ValueError(f"Product parameter '{k}' cannot be multi-dimensional")
-            product_idx_values[product_idx][k] = value
-            product_indexes[k] = bco_obj.keys
-            curr_idx += 1
-
-        # Build an operation tree and parameter columns
-        op_tree_operands = []
-        param_keys = []
-        for product_idx in range(max_idx + 1):
-            if product_idx not in product_idx_values:
-                raise ValueError("Group index must come in a strict order starting with 0 and without gaps")
-            for k in product_idx_values[product_idx].keys():
-                param_keys.append(k)
-
-            # Broadcast parameter arrays
-            param_arrays = tuple(product_idx_values[product_idx].values())
-            if len(param_arrays) > 1:
-                param_arrays = np.broadcast_arrays(*param_arrays)
-                op_tree_operands.append((zip, *param_arrays))
-            else:
-                op_tree_operands.append(param_arrays[0])
-
-            # Stack or combine parameter columns together
-            if new_columns is not None:
-                levels = []
-                for k in product_idx_values[product_idx].keys():
-                    levels.append(product_indexes[k])
-                if len(levels) > 1:
-                    _param_columns = indexes.stack_indexes(levels, **stack_kwargs)
-                else:
-                    _param_columns = levels[0]
-                if param_columns is None:
-                    param_columns = _param_columns
-                else:
-                    param_columns = indexes.combine_indexes(
-                        [param_columns, _param_columns],
-                        ignore_ranges=ignore_ranges,
-                        **stack_kwargs,
-                    )
-
-        # Generate parameter combinations using the operation tree
-        if len(op_tree_operands) > 1:
-            param_product = dict(zip(param_keys, generate_param_combs((itertools.product, *op_tree_operands))))
-        elif isinstance(op_tree_operands[0], tuple):
-            param_product = dict(zip(param_keys, generate_param_combs(op_tree_operands[0])))
-        else:
-            param_product = dict(zip(param_keys, op_tree_operands))
-        n_params = len(param_product[param_keys[0]])
-
-        # Select random subset
-        if random_subset is not None:
-            random_indices = np.sort(np.random.permutation(np.arange(n_params))[:random_subset])
-            n_params = len(random_indices)
-            param_product = {k: np.asarray(v)[random_indices] for k, v in param_product.items()}
-            if param_columns is not None:
-                param_columns = param_columns[random_indices]
+            param_dct[k] = Param(value, product_idx=bco_obj.product_idx, keys=bco_obj.keys)
+        param_product, param_columns = combine_params(
+            param_dct,
+            random_subset=random_subset,
+            seed=seed,
+            stack_kwargs=stack_kwargs,
+        )
+        param_product = {k: np.asarray(v) for k, v in param_product.items()}
+        n_params = len(param_columns)
 
         # Combine parameter columns with new columns
         if param_columns is not None and new_columns is not None:
