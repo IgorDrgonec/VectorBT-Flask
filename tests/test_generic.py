@@ -1,5 +1,6 @@
 import os
 from datetime import datetime
+from itertools import permutations
 
 import pytest
 from numba import njit
@@ -8,6 +9,7 @@ from statsmodels.regression.rolling import RollingOLS
 
 import vectorbtpro as vbt
 from vectorbtpro.generic import nb
+from vectorbtpro.generic import enums
 
 from tests.utils import *
 
@@ -480,6 +482,73 @@ class TestAccessors:
         assert_frame_equal(
             df.vbt.wwm_std(test_window, minp=test_minp, chunked=True),
             df.vbt.wwm_std(test_window, minp=test_minp, chunked=False),
+        )
+
+    @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
+    @pytest.mark.parametrize("test_minp", [1, None])
+    def test_ma(self, test_window, test_minp):
+        if test_minp is None:
+            test_minp = test_window
+        assert_series_equal(
+            df["a"].vbt.ma(test_window, wtype="simple", minp=test_minp),
+            df["a"].vbt.rolling_mean(test_window, minp=test_minp),
+        )
+        assert_frame_equal(
+            df.vbt.ma(test_window, wtype="simple", minp=test_minp),
+            df.vbt.rolling_mean(test_window, minp=test_minp),
+        )
+        assert_frame_equal(
+            df.vbt.ma(test_window, wtype="weighted", minp=test_minp),
+            df.vbt.wm_mean(test_window, minp=test_minp),
+        )
+        assert_frame_equal(
+            df.vbt.ma(test_window, wtype="exp", minp=test_minp),
+            df.vbt.ewm_mean(test_window, minp=test_minp),
+        )
+        assert_frame_equal(
+            df.vbt.ma(test_window, wtype="wilder", minp=test_minp),
+            df.vbt.wwm_mean(test_window, minp=test_minp),
+        )
+        assert_frame_equal(
+            df.vbt.ma(test_window, minp=test_minp, jitted=dict(parallel=True)),
+            df.vbt.ma(test_window, minp=test_minp, jitted=dict(parallel=False)),
+        )
+        assert_frame_equal(
+            df.vbt.ma(test_window, minp=test_minp, chunked=True),
+            df.vbt.ma(test_window, minp=test_minp, chunked=False),
+        )
+
+    @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
+    @pytest.mark.parametrize("test_minp", [1, None])
+    @pytest.mark.parametrize("test_ddof", [0, 1])
+    def test_msd(self, test_window, test_minp, test_ddof):
+        if test_minp is None:
+            test_minp = test_window
+        assert_series_equal(
+            df["a"].vbt.msd(test_window, wtype="simple", minp=test_minp, ddof=test_ddof),
+            df["a"].vbt.rolling_std(test_window, minp=test_minp, ddof=test_ddof),
+        )
+        assert_frame_equal(
+            df.vbt.msd(test_window, wtype="simple", minp=test_minp, ddof=test_ddof),
+            df.vbt.rolling_std(test_window, minp=test_minp, ddof=test_ddof),
+        )
+        with pytest.raises(Exception):
+            df.vbt.msd(test_window, wtype="weighted", minp=test_minp)
+        assert_frame_equal(
+            df.vbt.msd(test_window, wtype="exp", minp=test_minp),
+            df.vbt.ewm_std(test_window, minp=test_minp),
+        )
+        assert_frame_equal(
+            df.vbt.msd(test_window, wtype="wilder", minp=test_minp),
+            df.vbt.wwm_std(test_window, minp=test_minp),
+        )
+        assert_frame_equal(
+            df.vbt.msd(test_window, minp=test_minp, ddof=test_ddof, jitted=dict(parallel=True)),
+            df.vbt.msd(test_window, minp=test_minp, ddof=test_ddof, jitted=dict(parallel=False)),
+        )
+        assert_frame_equal(
+            df.vbt.msd(test_window, minp=test_minp, ddof=test_ddof, chunked=True),
+            df.vbt.msd(test_window, minp=test_minp, ddof=test_ddof, chunked=False),
         )
 
     @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
@@ -966,6 +1035,44 @@ class TestAccessors:
         assert_frame_equal(
             mask.vbt.rolling_all(test_window, chunked=True),
             mask.vbt.rolling_all(test_window, chunked=False),
+        )
+
+    def test_rolling_pattern_similarity(self):
+        assert_frame_equal(
+            df.vbt.rolling_pattern_similarity([1, 2, 3]),
+            pd.DataFrame(
+                [
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [1.0, np.nan, np.nan],
+                    [1.0, 0.19999999999999996, np.nan],
+                    [np.nan, 0.19999999999999996, np.nan],
+                ],
+                index=pd.DatetimeIndex(['2018-01-01', '2018-01-02', '2018-01-03', '2018-01-04', '2018-01-05']),
+                columns=pd.Index(['a', 'b', 'c'], dtype='object'),
+            )
+        )
+        assert_frame_equal(
+            df.vbt.rolling_pattern_similarity([1, 2, 3], 4),
+            pd.DataFrame(
+                [
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [1.0, np.nan, np.nan],
+                    [np.nan, 0.19999999999999996, np.nan],
+                ],
+                index=pd.DatetimeIndex(['2018-01-01', '2018-01-02', '2018-01-03', '2018-01-04', '2018-01-05']),
+                columns=pd.Index(['a', 'b', 'c'], dtype='object'),
+            )
+        )
+        assert_frame_equal(
+            df.vbt.rolling_pattern_similarity([1, 2, 3], jitted=dict(parallel=True)),
+            df.vbt.rolling_pattern_similarity([1, 2, 3], jitted=dict(parallel=False)),
+        )
+        assert_frame_equal(
+            df.vbt.rolling_pattern_similarity([1, 2, 3], chunked=True),
+            df.vbt.rolling_pattern_similarity([1, 2, 3], chunked=False),
         )
 
     def test_map(self):
@@ -4190,6 +4297,491 @@ class TestAccessors:
         assert_index_equal(stats_df.columns, stats_index)
 
 
+# ############# patterns.py ############# #
+
+
+class TestPatterns:
+    def test_linear_interp_nb(self):
+        pattern_arr = np.array([3, 2, 1, 4])
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 1, enums.InterpMode.Linear),
+            np.array([3.0]),
+        )
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 2, enums.InterpMode.Linear),
+            np.array([3.0, 4.0]),
+        )
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 3, enums.InterpMode.Linear),
+            np.array([3.0, 1.5, 4.0]),
+        )
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 4, enums.InterpMode.Linear),
+            np.array([3.0, 2.0, 1.0, 4.0]),
+        )
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 5, enums.InterpMode.Linear),
+            np.array([3.0, 2.25, 1.5, 1.75, 4.0]),
+        )
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 6, enums.InterpMode.Linear),
+            np.array([3.0, 2.4, 1.7999999999999998, 1.2000000000000002, 2.200000000000001, 4.0]),
+        )
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 7, enums.InterpMode.Linear),
+            np.array([3.0, 2.5, 2.0, 1.5, 1.0, 2.5, 4.0]),
+        )
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 8, enums.InterpMode.Linear),
+            np.array(
+                [
+                    3.0,
+                    2.5714285714285716,
+                    2.142857142857143,
+                    1.7142857142857144,
+                    1.2857142857142858,
+                    1.4285714285714284,
+                    2.7142857142857135,
+                    4.0,
+                ]
+            ),
+        )
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 9, enums.InterpMode.Linear),
+            np.array([3.0, 2.625, 2.25, 1.875, 1.5, 1.125, 1.75, 2.875, 4.0]),
+        )
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 10, enums.InterpMode.Linear),
+            np.array(
+                [
+                    3.0,
+                    2.6666666666666665,
+                    2.3333333333333335,
+                    2.0,
+                    1.6666666666666667,
+                    1.3333333333333333,
+                    1.0,
+                    2.0000000000000004,
+                    2.9999999999999996,
+                    4.0,
+                ]
+            ),
+        )
+
+    def test_nearest_interp_nb(self):
+        pattern_arr = np.array([3, 2, 1, 4])
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 1, enums.InterpMode.Nearest),
+            np.array([3.0]),
+        )
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 2, enums.InterpMode.Nearest),
+            np.array([3.0, 4.0]),
+        )
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 3, enums.InterpMode.Nearest),
+            np.array([3.0, 1.0, 4.0]),
+        )
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 4, enums.InterpMode.Nearest),
+            np.array([3.0, 2.0, 1.0, 4.0]),
+        )
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 5, enums.InterpMode.Nearest),
+            np.array([3.0, 2.0, 1.0, 1.0, 4.0]),
+        )
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 6, enums.InterpMode.Nearest),
+            np.array([3.0, 2.0, 2.0, 1.0, 1.0, 4.0]),
+        )
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 7, enums.InterpMode.Nearest),
+            np.array([3.0, 3.0, 2.0, 1.0, 1.0, 1.0, 4.0]),
+        )
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 8, enums.InterpMode.Nearest),
+            np.array([3.0, 3.0, 2.0, 2.0, 1.0, 1.0, 4.0, 4.0]),
+        )
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 9, enums.InterpMode.Nearest),
+            np.array([3.0, 3.0, 2.0, 2.0, 1.0, 1.0, 1.0, 4.0, 4.0]),
+        )
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 10, enums.InterpMode.Nearest),
+            np.array([3.0, 3.0, 2.0, 2.0, 2.0, 1.0, 1.0, 1.0, 4.0, 4.0]),
+        )
+
+    def test_discrete_interp_nb(self):
+        pattern_arr = np.array([3, 2, 1, 4])
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 1, enums.InterpMode.Discrete),
+            np.array([3.0]),
+        )
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 2, enums.InterpMode.Discrete),
+            np.array([3.0, 4.0]),
+        )
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 3, enums.InterpMode.Discrete),
+            np.array([3.0, 1.0, 4.0]),
+        )
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 4, enums.InterpMode.Discrete),
+            np.array([3.0, 2.0, 1.0, 4.0]),
+        )
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 5, enums.InterpMode.Discrete),
+            np.array([3.0, 2.0, np.nan, 1.0, 4.0]),
+        )
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 6, enums.InterpMode.Discrete),
+            np.array([3.0, np.nan, 2.0, 1.0, np.nan, 4.0]),
+        )
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 7, enums.InterpMode.Discrete),
+            np.array([3.0, np.nan, 2.0, np.nan, 1.0, np.nan, 4.0]),
+        )
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 8, enums.InterpMode.Discrete),
+            np.array([3.0, np.nan, 2.0, np.nan, np.nan, 1.0, np.nan, 4.0]),
+        )
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 9, enums.InterpMode.Discrete),
+            np.array([3.0, np.nan, np.nan, 2.0, np.nan, 1.0, np.nan, np.nan, 4.0]),
+        )
+        np.testing.assert_array_equal(
+            nb.interp_resize_1d_nb(pattern_arr, 10, enums.InterpMode.Discrete),
+            np.array([3.0,  np.nan, np.nan, 2.0, np.nan, np.nan, 1.0, np.nan, np.nan, 4.0]),
+        )
+
+    def test_pattern_similarity_nb(self):
+        assert np.isnan(vbt.nb.pattern_similarity_nb(
+            np.array([]),
+            np.array([1, 2, 3])),
+        )
+        assert np.isnan(vbt.nb.pattern_similarity_nb(
+            np.array([1, 2, 3]),
+            np.array([])),
+        )
+        assert np.isnan(vbt.nb.pattern_similarity_nb(
+            np.array([np.nan, np.nan, np.nan]),
+            np.array([1, 2, 3])),
+        )
+        assert np.isnan(vbt.nb.pattern_similarity_nb(
+            np.array([1, 2, 3]),
+            np.array([np.nan, np.nan, np.nan])),
+        )
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([1, 2, 3]),
+            np.array([1, 2, 3]),
+        ) == 1.0
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([3, 3, 1]),
+            np.array([1, 2, 3]),
+        ) == 0.0
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([1, 2, 3, np.nan]),
+            np.array([1, 2, 3, 100]),
+        ) == 0.5051020408163265
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([1, 2, 3, 100]),
+            np.array([1, 2, 3, np.nan]),
+        ) == 0.4121212121212121
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([1, 2, 3, np.nan]),
+            np.array([1, 2, 3, np.nan]),
+        ) == 1.0
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([1, 2, 3]),
+            np.array([1, 2, 3]),
+            vmin=0,
+        ) == 0.8
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([1, 2, 3]),
+            np.array([1, 2, 3]),
+            vmax=4,
+        ) == 0.7999999999999999
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([1, 2, 3]),
+            np.array([1, 2, 3]),
+            pmin=0,
+        ) == 0.7857142857142857
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([1, 2, 3]),
+            np.array([1, 2, 3]),
+            pmax=4,
+        ) == 0.7857142857142857
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([1, 2, 3]),
+            np.array([1, 2, 3]),
+            min_pct_change=2,
+        ) == 1.0
+        assert np.isnan(vbt.nb.pattern_similarity_nb(
+            np.array([1, 2, 3]),
+            np.array([1, 2, 3]),
+            min_pct_change=3,
+        ))
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([1, 2, 3]),
+            np.array([1, 2, 3]),
+            max_pct_change=2,
+        ) == 1.0
+        assert np.isnan(vbt.nb.pattern_similarity_nb(
+            np.array([1, 2, 3]),
+            np.array([1, 2, 3]),
+            max_pct_change=1,
+        ))
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([0, 2, 3]),
+            np.array([1, 2, 3]),
+            vmin=1,
+        ) == 1.0
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([1, 2, 4]),
+            np.array([1, 2, 3]),
+            vmax=3,
+        ) == 1.0
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([1, 2, 3]),
+            np.array([0, 2, 3]),
+            pmin=1,
+        ) == 1.0
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([1, 2, 3]),
+            np.array([1, 2, 4]),
+            pmax=3,
+        ) == 1.0
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([3, 1, 2]),
+            np.array([1, 2, 3]),
+            max_error=np.asarray(1.0),
+        ) == 0.19999999999999996
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([3, 1, 2]),
+            np.array([1, 2, 3]),
+            max_error=np.asarray(0.5),
+        ) == 0.0
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([3, 1, 2]),
+            np.array([1, 2, 3]),
+            max_error=np.asarray([0.5, 0.5, 0.5]),
+        ) == 0.0
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([3, 1, 2]),
+            np.array([1, 2, 3]),
+            max_error=np.asarray(1.0),
+            max_error_as_maxdist=True,
+        ) == 0.0
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([3, 1, 2]),
+            np.array([1, 2, 3]),
+            max_error=np.asarray(2.0),
+            max_error_as_maxdist=True,
+        ) == 0.33333333333333337
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([3, 1, 2]),
+            np.array([1, 2, 3]),
+            max_error=np.asarray([1.0, 2.0, 3.0]),
+            max_error_as_maxdist=True,
+        ) == 0.5
+        assert not np.isnan(vbt.nb.pattern_similarity_nb(
+            np.array([3, 1, 2]),
+            np.array([1, 2, 3]),
+            max_error=np.asarray(2.0),
+            max_error_strict=True,
+        ))
+        assert np.isnan(vbt.nb.pattern_similarity_nb(
+            np.array([3, 1, 2]),
+            np.array([1, 2, 3]),
+            max_error=np.asarray(1.0),
+            max_error_strict=True,
+        ))
+        for arr in permutations(np.array([1, 2, 3, 4, 5])):
+            sim = vbt.nb.pattern_similarity_nb(
+                np.asarray(arr),
+                np.array([1, 2, 3, 4, 5]),
+            )
+            assert vbt.nb.pattern_similarity_nb(
+                np.asarray(arr),
+                np.array([1, 2, 3, 4, 5]),
+                min_similarity=sim,
+            ) == sim
+            assert np.isnan(vbt.nb.pattern_similarity_nb(
+                np.asarray(arr),
+                np.array([1, 2, 3, 4, 5]),
+                min_similarity=sim + 0.1,
+            ))
+        for arr in permutations(np.array([1, 2, 3, 4, np.nan])):
+            sim = vbt.nb.pattern_similarity_nb(
+                np.asarray(arr),
+                np.array([1, 2, 3, 4, 5]),
+            )
+            assert vbt.nb.pattern_similarity_nb(
+                np.asarray(arr),
+                np.array([1, 2, 3, 4, 5]),
+                min_similarity=sim,
+            ) == sim
+            assert vbt.nb.pattern_similarity_nb(
+                np.asarray(arr),
+                np.array([1, 2, 3, 4, 5]),
+                min_similarity=sim - 0.1,
+            ) == sim
+        for arr in permutations(np.array([1, 2, 3, 4, 5])):
+            sim = vbt.nb.pattern_similarity_nb(
+                np.asarray(arr),
+                np.array([1, 2, 3, 4, 5]),
+                max_error=np.asarray(2.0),
+            )
+            assert vbt.nb.pattern_similarity_nb(
+                np.asarray(arr),
+                np.array([1, 2, 3, 4, 5]),
+                max_error=np.asarray(2.0),
+                min_similarity=sim,
+            ) == sim
+            assert np.isnan(vbt.nb.pattern_similarity_nb(
+                np.asarray(arr),
+                np.array([1, 2, 3, 4, 5]),
+                max_error=np.asarray(2.0),
+                min_similarity=sim + 0.1,
+            ))
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([1, 2, 3]),
+            np.array([1, 2, 3]),
+            rescale_mode=enums.RescaleMode.Rebase,
+        ) == 1.0
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([1, 2, 3]),
+            np.array([3, 2, 1]),
+            rescale_mode=enums.RescaleMode.Rebase,
+        ) == 0.4
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([3, 2, 1]),
+            np.array([1, 2, 3]),
+            rescale_mode=enums.RescaleMode.Rebase,
+            max_error=np.asarray(1.0),
+        ) == 0.4
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([3, 2, 1]),
+            np.array([1, 2, 3]),
+            rescale_mode=enums.RescaleMode.Rebase,
+            max_error=np.asarray(0.5),
+        ) == 0.4
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([3, 2, 1]),
+            np.array([1, 2, 3]),
+            rescale_mode=enums.RescaleMode.Rebase,
+            max_error=np.asarray(1.0),
+            max_error_as_maxdist=True,
+        ) == 0.33333333333333337
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([3, 2, 1]),
+            np.array([1, 2, 3]),
+            rescale_mode=enums.RescaleMode.Rebase,
+            max_error=np.asarray(0.5),
+            max_error_as_maxdist=True,
+        ) == 0.16666666666666663
+        assert np.isnan(vbt.nb.pattern_similarity_nb(
+            np.array([3, 2, 1]),
+            np.array([1, 2, 3]),
+            rescale_mode=enums.RescaleMode.Rebase,
+            max_error=np.asarray(0.5),
+            max_error_strict=True,
+        ))
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([3, 2, 1]),
+            np.array([1, 2, 3]),
+            rescale_mode=enums.RescaleMode.Rebase,
+            max_error=np.asarray(0.5),
+            min_similarity=0.4,
+        ) == 0.4
+        assert np.isnan(vbt.nb.pattern_similarity_nb(
+            np.array([3, 2, 1]),
+            np.array([1, 2, 3]),
+            rescale_mode=enums.RescaleMode.Rebase,
+            max_error=np.asarray(0.5),
+            min_similarity=0.41,
+        ))
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([1, 2, 3]),
+            np.array([1, 2, 3]),
+            rescale_mode=enums.RescaleMode.Disable,
+        ) == 1.0
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([3, 2, 1]),
+            np.array([1, 2, 3]),
+            rescale_mode=enums.RescaleMode.Disable,
+            max_error=np.asarray(1.0),
+        ) == 0.19999999999999996
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([3, 2, 1]),
+            np.array([1, 2, 3]),
+            rescale_mode=enums.RescaleMode.Disable,
+            max_error=np.asarray(0.5),
+        ) == 0.19999999999999996
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([3, 2, 1]),
+            np.array([3, 2, 1]),
+            rescale_mode=enums.RescaleMode.Disable,
+            max_error=np.asarray(0.0),
+        ) == 1.0
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([3, 2, 1]),
+            np.array([1, 2, 3]),
+            rescale_mode=enums.RescaleMode.Disable,
+            max_error=np.asarray(1.0),
+            max_error_as_maxdist=True,
+        ) == 0.33333333333333337
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([3, 2, 1]),
+            np.array([1, 2, 3]),
+            rescale_mode=enums.RescaleMode.Disable,
+            max_error=np.asarray(0.5),
+            max_error_as_maxdist=True,
+        ) == 0.33333333333333337
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([3, 2, 1]),
+            np.array([3, 2, 1]),
+            rescale_mode=enums.RescaleMode.Disable,
+            max_error=np.asarray(0.0),
+            max_error_as_maxdist=True,
+        ) == 1.0
+        assert np.isnan(vbt.nb.pattern_similarity_nb(
+            np.array([3, 2, 1]),
+            np.array([3, 2, 2]),
+            rescale_mode=enums.RescaleMode.Disable,
+            max_error=np.asarray(0.0),
+            max_error_as_maxdist=True,
+        ))
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([1, 2, 3, 4, 5]),
+            np.array([1, 2, 3]),
+        ) == 1.0
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([1, 2, 3]),
+            np.array([1, 2, 3, 4, 5]),
+        ) == 1.0
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([1, 2, 3, 4, 5]),
+            np.array([1, 2, 3]),
+            interp_mode=enums.InterpMode.Nearest,
+        ) == 0.8888888888888888
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([1, 2, 3]),
+            np.array([1, 2, 3, 4, 5]),
+            interp_mode=enums.InterpMode.Nearest,
+        ) == 0.875
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([1, 2, 3, 4, 5]),
+            np.array([1, 2, 3]),
+            interp_mode=enums.InterpMode.Discrete,
+        ) == 1.0
+        assert vbt.nb.pattern_similarity_nb(
+            np.array([1, 2, 3]),
+            np.array([1, 2, 3, 4, 5]),
+            interp_mode=enums.InterpMode.Discrete,
+        ) == 1.0
+
+
 # ############# plotting.py ############# #
 
 
@@ -4238,17 +4830,17 @@ class TestPlotting:
     def test_bar(self):
         vbt.Bar(
             data=[[1, 2], [3, 4]],
-            trace_names=['a', 'b'],
-            x_labels=['x', 'y'],
-            make_figure_kwargs = dict(
+            trace_names=["a", "b"],
+            x_labels=["x", "y"],
+            make_figure_kwargs=dict(
                 use_widgets=False,
                 use_resampler=False,
             ),
         )
         vbt.Bar(
             data=[[1, 2], [3, 4]],
-            trace_names=['a', 'b'],
-            x_labels=['x', 'y'],
+            trace_names=["a", "b"],
+            x_labels=["x", "y"],
             make_figure_kwargs=dict(
                 use_widgets=True,
                 use_resampler=False,
@@ -4257,8 +4849,8 @@ class TestPlotting:
         if plotly_resampler_available:
             vbt.Bar(
                 data=[[1, 2], [3, 4]],
-                trace_names=['a', 'b'],
-                x_labels=['x', 'y'],
+                trace_names=["a", "b"],
+                x_labels=["x", "y"],
                 make_figure_kwargs=dict(
                     use_widgets=False,
                     use_resampler=True,
@@ -4266,8 +4858,8 @@ class TestPlotting:
             )
             vbt.Bar(
                 data=[[1, 2], [3, 4]],
-                trace_names=['a', 'b'],
-                x_labels=['x', 'y'],
+                trace_names=["a", "b"],
+                x_labels=["x", "y"],
                 make_figure_kwargs=dict(
                     use_widgets=True,
                     use_resampler=True,
@@ -4277,8 +4869,8 @@ class TestPlotting:
     def test_scatter(self):
         vbt.Scatter(
             data=[[1, 2], [3, 4]],
-            trace_names=['a', 'b'],
-            x_labels=['x', 'y'],
+            trace_names=["a", "b"],
+            x_labels=["x", "y"],
             make_figure_kwargs=dict(
                 use_widgets=False,
                 use_resampler=False,
@@ -4286,8 +4878,8 @@ class TestPlotting:
         )
         vbt.Scatter(
             data=[[1, 2], [3, 4]],
-            trace_names=['a', 'b'],
-            x_labels=['x', 'y'],
+            trace_names=["a", "b"],
+            x_labels=["x", "y"],
             make_figure_kwargs=dict(
                 use_widgets=True,
                 use_resampler=False,
@@ -4296,8 +4888,8 @@ class TestPlotting:
         if plotly_resampler_available:
             vbt.Scatter(
                 data=[[1, 2], [3, 4]],
-                trace_names=['a', 'b'],
-                x_labels=['x', 'y'],
+                trace_names=["a", "b"],
+                x_labels=["x", "y"],
                 make_figure_kwargs=dict(
                     use_widgets=False,
                     use_resampler=True,
@@ -4305,8 +4897,8 @@ class TestPlotting:
             )
             vbt.Scatter(
                 data=[[1, 2], [3, 4]],
-                trace_names=['a', 'b'],
-                x_labels=['x', 'y'],
+                trace_names=["a", "b"],
+                x_labels=["x", "y"],
                 make_figure_kwargs=dict(
                     use_widgets=True,
                     use_resampler=True,
@@ -4316,7 +4908,7 @@ class TestPlotting:
     def test_histogram(self):
         vbt.Histogram(
             data=[[1, 2], [3, 4], [2, 1]],
-            trace_names=['a', 'b'],
+            trace_names=["a", "b"],
             make_figure_kwargs=dict(
                 use_widgets=False,
                 use_resampler=False,
@@ -4324,7 +4916,7 @@ class TestPlotting:
         )
         vbt.Histogram(
             data=[[1, 2], [3, 4], [2, 1]],
-            trace_names=['a', 'b'],
+            trace_names=["a", "b"],
             make_figure_kwargs=dict(
                 use_widgets=True,
                 use_resampler=False,
@@ -4333,7 +4925,7 @@ class TestPlotting:
         if plotly_resampler_available:
             vbt.Histogram(
                 data=[[1, 2], [3, 4], [2, 1]],
-                trace_names=['a', 'b'],
+                trace_names=["a", "b"],
                 make_figure_kwargs=dict(
                     use_widgets=False,
                     use_resampler=True,
@@ -4341,7 +4933,7 @@ class TestPlotting:
             )
             vbt.Histogram(
                 data=[[1, 2], [3, 4], [2, 1]],
-                trace_names=['a', 'b'],
+                trace_names=["a", "b"],
                 make_figure_kwargs=dict(
                     use_widgets=True,
                     use_resampler=True,
@@ -4351,7 +4943,7 @@ class TestPlotting:
     def test_box(self):
         vbt.Box(
             data=[[1, 2], [3, 4], [2, 1]],
-            trace_names=['a', 'b'],
+            trace_names=["a", "b"],
             make_figure_kwargs=dict(
                 use_widgets=False,
                 use_resampler=False,
@@ -4359,7 +4951,7 @@ class TestPlotting:
         )
         vbt.Box(
             data=[[1, 2], [3, 4], [2, 1]],
-            trace_names=['a', 'b'],
+            trace_names=["a", "b"],
             make_figure_kwargs=dict(
                 use_widgets=True,
                 use_resampler=False,
@@ -4369,7 +4961,7 @@ class TestPlotting:
             with pytest.raises(Exception):
                 vbt.Box(
                     data=[[1, 2], [3, 4], [2, 1]],
-                    trace_names=['a', 'b'],
+                    trace_names=["a", "b"],
                     make_figure_kwargs=dict(
                         use_widgets=False,
                         use_resampler=True,
@@ -4378,7 +4970,7 @@ class TestPlotting:
             with pytest.raises(Exception):
                 vbt.Box(
                     data=[[1, 2], [3, 4], [2, 1]],
-                    trace_names=['a', 'b'],
+                    trace_names=["a", "b"],
                     make_figure_kwargs=dict(
                         use_widgets=True,
                         use_resampler=True,
@@ -4388,8 +4980,8 @@ class TestPlotting:
     def test_heatmap(self):
         vbt.Heatmap(
             data=[[1, 2], [3, 4]],
-            x_labels=['a', 'b'],
-            y_labels=['x', 'y'],
+            x_labels=["a", "b"],
+            y_labels=["x", "y"],
             make_figure_kwargs=dict(
                 use_widgets=False,
                 use_resampler=False,
@@ -4397,8 +4989,8 @@ class TestPlotting:
         )
         vbt.Heatmap(
             data=[[1, 2], [3, 4]],
-            x_labels=['a', 'b'],
-            y_labels=['x', 'y'],
+            x_labels=["a", "b"],
+            y_labels=["x", "y"],
             make_figure_kwargs=dict(
                 use_widgets=True,
                 use_resampler=False,
@@ -4407,8 +4999,8 @@ class TestPlotting:
         if plotly_resampler_available:
             vbt.Heatmap(
                 data=[[1, 2], [3, 4]],
-                x_labels=['a', 'b'],
-                y_labels=['x', 'y'],
+                x_labels=["a", "b"],
+                y_labels=["x", "y"],
                 make_figure_kwargs=dict(
                     use_widgets=False,
                     use_resampler=True,
@@ -4416,8 +5008,8 @@ class TestPlotting:
             )
             vbt.Heatmap(
                 data=[[1, 2], [3, 4]],
-                x_labels=['a', 'b'],
-                y_labels=['x', 'y'],
+                x_labels=["a", "b"],
+                y_labels=["x", "y"],
                 make_figure_kwargs=dict(
                     use_widgets=True,
                     use_resampler=True,
@@ -4427,9 +5019,9 @@ class TestPlotting:
     def test_volume(self):
         vbt.Volume(
             data=np.random.randint(1, 10, size=(3, 3, 3)),
-            x_labels=['a', 'b', 'c'],
-            y_labels=['d', 'e', 'f'],
-            z_labels=['g', 'h', 'i'],
+            x_labels=["a", "b", "c"],
+            y_labels=["d", "e", "f"],
+            z_labels=["g", "h", "i"],
             make_figure_kwargs=dict(
                 use_widgets=False,
                 use_resampler=False,
@@ -4437,9 +5029,9 @@ class TestPlotting:
         )
         vbt.Volume(
             data=np.random.randint(1, 10, size=(3, 3, 3)),
-            x_labels=['a', 'b', 'c'],
-            y_labels=['d', 'e', 'f'],
-            z_labels=['g', 'h', 'i'],
+            x_labels=["a", "b", "c"],
+            y_labels=["d", "e", "f"],
+            z_labels=["g", "h", "i"],
             make_figure_kwargs=dict(
                 use_widgets=True,
                 use_resampler=False,
@@ -4448,9 +5040,9 @@ class TestPlotting:
         if plotly_resampler_available:
             vbt.Volume(
                 data=np.random.randint(1, 10, size=(3, 3, 3)),
-                x_labels=['a', 'b', 'c'],
-                y_labels=['d', 'e', 'f'],
-                z_labels=['g', 'h', 'i'],
+                x_labels=["a", "b", "c"],
+                y_labels=["d", "e", "f"],
+                z_labels=["g", "h", "i"],
                 make_figure_kwargs=dict(
                     use_widgets=False,
                     use_resampler=True,
@@ -4458,9 +5050,9 @@ class TestPlotting:
             )
             vbt.Volume(
                 data=np.random.randint(1, 10, size=(3, 3, 3)),
-                x_labels=['a', 'b', 'c'],
-                y_labels=['d', 'e', 'f'],
-                z_labels=['g', 'h', 'i'],
+                x_labels=["a", "b", "c"],
+                y_labels=["d", "e", "f"],
+                z_labels=["g", "h", "i"],
                 make_figure_kwargs=dict(
                     use_widgets=True,
                     use_resampler=True,

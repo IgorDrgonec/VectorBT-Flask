@@ -45,14 +45,22 @@ def get_index(arg: tp.SeriesFrame, axis: int) -> tp.Index:
             return arg.columns
 
 
-def index_from_values(values: tp.Sequence, name: tp.Optional[str] = None) -> tp.Index:
+def index_from_values(
+    values: tp.Sequence,
+    single_value: bool = False,
+    name: tp.Optional[tp.Hashable] = None,
+) -> tp.Index:
     """Create a new `pd.Index` with `name` by parsing an iterable `values`.
 
     Each in `values` will correspond to an element in the new index."""
     scalar_types = (int, float, complex, str, bool, datetime, timedelta, np.generic)
     counts = defaultdict(int)
     value_names = []
+    if len(values) == 1:
+        single_value = True
     for i in range(len(values)):
+        if i > 0 and single_value:
+            break
         v = values[i]
         if v is None or isinstance(v, scalar_types):
             value_names.append(v)
@@ -61,18 +69,29 @@ def index_from_values(values: tp.Sequence, name: tp.Optional[str] = None) -> tp.
                 if np.isclose(v, v.item(0), equal_nan=True).all():
                     value_names.append(v.item(0))
                 else:
-                    value_names.append("array_%d" % counts["array"])
-                    counts["array"] += 1
+                    if single_value:
+                        value_names.append("array")
+                    else:
+                        value_names.append("array_%d" % counts["array"])
+                        counts["array"] += 1
             else:
                 if np.equal(v, v.item(0)).all():
                     value_names.append(v.item(0))
                 else:
-                    value_names.append("array_%d" % counts["array"])
-                    counts["array"] += 1
+                    if single_value:
+                        value_names.append("array")
+                    else:
+                        value_names.append("array_%d" % counts["array"])
+                        counts["array"] += 1
         else:
             type_name = str(type(v).__name__)
-            value_names.append("%s_%d" % (type_name, counts[type_name]))
-            counts[type_name] += 1
+            if single_value:
+                value_names.append("%s" % type_name)
+            else:
+                value_names.append("%s_%d" % (type_name, counts[type_name]))
+                counts[type_name] += 1
+    if single_value and len(values) > 1:
+        value_names *= len(values)
     return pd.Index(value_names, name=name)
 
 
@@ -88,6 +107,8 @@ def repeat_index(index: tp.IndexLike, n: int, ignore_ranges: tp.Optional[bool] =
         ignore_ranges = broadcasting_cfg["ignore_ranges"]
 
     index = to_any_index(index)
+    if n == 1:
+        return index
     if checks.is_default_index(index) and ignore_ranges:  # ignore simple ranges without name
         return pd.RangeIndex(start=0, stop=len(index) * n, step=1)
     return index.repeat(n)
@@ -105,6 +126,8 @@ def tile_index(index: tp.IndexLike, n: int, ignore_ranges: tp.Optional[bool] = N
         ignore_ranges = broadcasting_cfg["ignore_ranges"]
 
     index = to_any_index(index)
+    if n == 1:
+        return index
     if checks.is_default_index(index) and ignore_ranges:  # ignore simple ranges without name
         return pd.RangeIndex(start=0, stop=len(index) * n, step=1)
     if isinstance(index, pd.MultiIndex):
@@ -163,7 +186,11 @@ def stack_indexes(
     return new_index
 
 
-def combine_indexes(*indexes: tp.MaybeTuple[tp.IndexLike], ignore_ranges: tp.Optional[bool] = None, **kwargs) -> tp.Index:
+def combine_indexes(
+    *indexes: tp.MaybeTuple[tp.IndexLike],
+    ignore_ranges: tp.Optional[bool] = None,
+    **kwargs,
+) -> tp.Index:
     """Combine each index in `indexes` using Cartesian product.
 
     Keyword arguments will be passed to `stack_indexes`."""

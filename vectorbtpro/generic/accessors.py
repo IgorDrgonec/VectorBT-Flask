@@ -233,7 +233,7 @@ from vectorbtpro.generic.plots_builder import PlotsBuilderMixin
 from vectorbtpro.generic.ranges import Ranges, PatternRanges
 from vectorbtpro.generic.splitters import SplitterT, RangeSplitter, RollingSplitter, ExpandingSplitter
 from vectorbtpro.generic.stats_builder import StatsBuilderMixin
-from vectorbtpro.generic.enums import InterpMode, RescaleMode
+from vectorbtpro.generic.enums import WType, InterpMode, RescaleMode
 from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
@@ -548,6 +548,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         self,
         period: int,
         minp: tp.Optional[int] = 0,
+        adjust: bool = True,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
@@ -555,13 +556,14 @@ class GenericAccessor(BaseAccessor, Analyzable):
         """See `vectorbtpro.generic.nb.rolling.wwm_mean_nb`."""
         func = jit_reg.resolve_option(nb.wwm_mean_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        out = func(self.to_2d_array(), period, minp=minp)
+        out = func(self.to_2d_array(), period, minp=minp, adjust=adjust)
         return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
     def wwm_std(
         self,
         period: int,
         minp: tp.Optional[int] = 0,
+        adjust: bool = True,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
@@ -569,7 +571,44 @@ class GenericAccessor(BaseAccessor, Analyzable):
         """See `vectorbtpro.generic.nb.rolling.wwm_std_nb`."""
         func = jit_reg.resolve_option(nb.wwm_std_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        out = func(self.to_2d_array(), period, minp=minp)
+        out = func(self.to_2d_array(), period, minp=minp, adjust=adjust)
+        return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
+
+    def ma(
+        self,
+        window: int,
+        wtype: tp.Union[int, str] = "simple",
+        minp: tp.Optional[int] = 0,
+        adjust: bool = True,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """See `vectorbtpro.generic.nb.rolling.ma_nb`."""
+        if isinstance(wtype, str):
+            wtype = map_enum_fields(wtype, WType)
+        func = jit_reg.resolve_option(nb.ma_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        out = func(self.to_2d_array(), window, wtype=wtype, minp=minp, adjust=adjust)
+        return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
+
+    def msd(
+        self,
+        window: int,
+        wtype: tp.Union[int, str] = "simple",
+        minp: tp.Optional[int] = 0,
+        adjust: bool = True,
+        ddof: int = 1,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """See `vectorbtpro.generic.nb.rolling.msd_nb`."""
+        if isinstance(wtype, str):
+            wtype = map_enum_fields(wtype, WType)
+        func = jit_reg.resolve_option(nb.msd_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        out = func(self.to_2d_array(), window, wtype=wtype, minp=minp, adjust=adjust, ddof=ddof)
         return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
     def rolling_cov(

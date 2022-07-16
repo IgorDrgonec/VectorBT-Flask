@@ -652,6 +652,9 @@ plotting = ChildDict(
     color_schema=Config(
         increasing="#26a69a",
         decreasing="#ee534f",
+        lightblue="#6ca6cd",
+        lightpurple="#6c76cd",
+        lightpink="#cd6ca6",
     ),
     contrast_color_schema=Config(
         blue="#4285F4",

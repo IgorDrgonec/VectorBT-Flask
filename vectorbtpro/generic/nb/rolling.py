@@ -717,46 +717,128 @@ def ewm_std_nb(arr: tp.Array2d, span: int, minp: tp.Optional[int] = None, adjust
 
 
 @register_jitted(cache=True)
-def wwm_mean_1d_nb(arr: tp.Array1d, period: int, minp: tp.Optional[int] = None) -> tp.Array1d:
+def wwm_mean_1d_nb(arr: tp.Array1d, period: int, minp: tp.Optional[int] = None, adjust: bool = False) -> tp.Array1d:
     """Compute Wilder's exponential weighted moving average."""
     if minp is None:
         minp = period
-    return ewm_mean_1d_nb(arr, 2 * period - 1, minp=minp, adjust=False)
+    return ewm_mean_1d_nb(arr, 2 * period - 1, minp=minp, adjust=adjust)
 
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
-    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), period=None, minp=None),
+    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), period=None, minp=None, adjust=None),
     merge_func=base_ch.column_stack,
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def wwm_mean_nb(arr: tp.Array2d, period: int, minp: tp.Optional[int] = None) -> tp.Array2d:
+def wwm_mean_nb(arr: tp.Array2d, period: int, minp: tp.Optional[int] = None, adjust: bool = False) -> tp.Array2d:
     """2-dim version of `wwm_mean_1d_nb`."""
     out = np.empty_like(arr, dtype=np.float_)
     for col in prange(arr.shape[1]):
-        out[:, col] = wwm_mean_1d_nb(arr[:, col], period, minp=minp)
+        out[:, col] = wwm_mean_1d_nb(arr[:, col], period, minp=minp, adjust=adjust)
     return out
 
 
 @register_jitted(cache=True)
-def wwm_std_1d_nb(arr: tp.Array1d, period: int, minp: tp.Optional[int] = None) -> tp.Array1d:
+def wwm_std_1d_nb(arr: tp.Array1d, period: int, minp: tp.Optional[int] = None, adjust: bool = False) -> tp.Array1d:
     """Compute Wilder's exponential weighted moving standard deviation."""
     if minp is None:
         minp = period
-    return ewm_std_1d_nb(arr, 2 * period - 1, minp=minp, adjust=False)
+    return ewm_std_1d_nb(arr, 2 * period - 1, minp=minp, adjust=adjust)
 
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
-    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), period=None, minp=None),
+    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), period=None, minp=None, adjust=None),
     merge_func=base_ch.column_stack,
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def wwm_std_nb(arr: tp.Array2d, period: int, minp: tp.Optional[int] = None) -> tp.Array2d:
+def wwm_std_nb(arr: tp.Array2d, period: int, minp: tp.Optional[int] = None, adjust: bool = False) -> tp.Array2d:
     """2-dim version of `wwm_std_1d_nb`."""
     out = np.empty_like(arr, dtype=np.float_)
     for col in prange(arr.shape[1]):
-        out[:, col] = wwm_std_1d_nb(arr[:, col], period, minp=minp)
+        out[:, col] = wwm_std_1d_nb(arr[:, col], period, minp=minp, adjust=adjust)
+    return out
+
+
+@register_jitted(cache=True)
+def ma_1d_nb(
+    arr: tp.Array1d,
+    window: int,
+    wtype: int = WType.Simple,
+    minp: tp.Optional[int] = None,
+    adjust: bool = False,
+) -> tp.Array1d:
+    """Compute a moving average based on the mode of the type `vectorbtpro.generic.enums.WType`."""
+    if wtype == WType.Simple:
+        return rolling_mean_1d_nb(arr, window, minp=minp)
+    if wtype == WType.Weighted:
+        return wm_mean_1d_nb(arr, window, minp=minp)
+    if wtype == WType.Exp:
+        return ewm_mean_1d_nb(arr, window, minp=minp, adjust=adjust)
+    if wtype == WType.Wilder:
+        return wwm_mean_1d_nb(arr, window, minp=minp, adjust=adjust)
+    raise ValueError("Invalid rolling mode")
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="arr", axis=1),
+    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None, wtype=None, minp=None, adjust=None),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def ma_nb(
+    arr: tp.Array2d,
+    window: int,
+    wtype: int = WType.Simple,
+    minp: tp.Optional[int] = None,
+    adjust: bool = False,
+) -> tp.Array2d:
+    """2-dim version of `ma_1d_nb`."""
+    out = np.empty_like(arr, dtype=np.float_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = ma_1d_nb(arr[:, col], window, wtype=wtype, minp=minp, adjust=adjust)
+    return out
+
+
+@register_jitted(cache=True)
+def msd_1d_nb(
+    arr: tp.Array1d,
+    window: int,
+    wtype: int = WType.Simple,
+    minp: tp.Optional[int] = None,
+    adjust: bool = False,
+    ddof: int = 0,
+) -> tp.Array1d:
+    """Compute a moving standard deviation based on the mode of the type `vectorbtpro.generic.enums.WType`."""
+    if wtype == WType.Simple:
+        return rolling_std_1d_nb(arr, window, minp=minp, ddof=ddof)
+    if wtype == WType.Weighted:
+        raise ValueError("Weighted mode is not supported for standard deviations")
+    if wtype == WType.Exp:
+        return ewm_std_1d_nb(arr, window, minp=minp, adjust=adjust)
+    if wtype == WType.Wilder:
+        return wwm_std_1d_nb(arr, window, minp=minp, adjust=adjust)
+    raise ValueError("Invalid rolling mode")
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="arr", axis=1),
+    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None, wtype=None, minp=None, adjust=None, ddof=None),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def msd_nb(
+    arr: tp.Array2d,
+    window: int,
+    wtype: int = WType.Simple,
+    minp: tp.Optional[int] = None,
+    adjust: bool = False,
+    ddof: int = 0,
+) -> tp.Array2d:
+    """2-dim version of `msd_1d_nb`."""
+    out = np.empty_like(arr, dtype=np.float_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = msd_1d_nb(arr[:, col], window, wtype=wtype, minp=minp, adjust=adjust, ddof=ddof)
     return out
 
 

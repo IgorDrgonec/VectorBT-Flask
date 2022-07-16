@@ -10,6 +10,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.utils.formatting import prettify
 
 __all__ = [
+    "WType",
     "RangeStatus",
     "RescaleMode",
     "InterpMode",
@@ -43,6 +44,26 @@ __pdoc__ = {}
 
 
 # ############# Enums ############# #
+
+
+class WTypeT(tp.NamedTuple):
+    Simple: int = 0
+    Weighted: int = 1
+    Exp: int = 2
+    Wilder: int = 3
+
+
+WType = WTypeT()
+"""_"""
+
+__pdoc__[
+    "WType"
+] = f"""Rolling window type.
+
+```python
+{prettify(WType)}
+```
+"""
 
 
 class RangeStatusT(tp.NamedTuple):

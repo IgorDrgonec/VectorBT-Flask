@@ -649,6 +649,8 @@ class ArrayWrapper(Configured, PandasIndexer):
                 if return_none_slices and arr[0] == 0 and arr[-1] == n - 1:
                     return slice(None, None, None), False
                 return slice(arr[0], arr[-1] + 1, None), True
+            if isinstance(arr, np.integer):
+                return arr.item(), True
             return arr, True
 
         if column_only_select:

@@ -11,11 +11,10 @@ You can access all the indicators either by `vbt.*` or `vbt.indicators.*`.
 
 >>> # vectorbtpro.indicators.custom.MA
 >>> vbt.MA.run(pd.Series([1, 2, 3]), [2, 3]).ma
-ma_window     2     3
-ma_ewm    False False
-0           NaN   NaN
-1           1.5   NaN
-2           2.5   2.0
+ma_window    2    3
+0          NaN  NaN
+1          1.5  NaN
+2          2.5  2.0
 ```
 
 The advantage of these indicators over TA-Lib's is that they work primarily on 2-dimensional arrays
@@ -72,7 +71,7 @@ from vectorbtpro.indicators.factory import IndicatorFactory
 from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.config import merge_dicts
 
-__all__ = ["MA", "MSTD", "BBANDS", "RSI", "STOCH", "MACD", "ATR", "OBV", "OLS", "OLSS", "PATSIM"]
+__all__ = ["MA", "MSD", "BBANDS", "RSI", "STOCH", "MACD", "ATR", "OBV", "OLS", "OLSS", "PATSIM"]
 
 # ############# MA ############# #
 
@@ -82,14 +81,21 @@ MA = IndicatorFactory(
     module_name=__name__,
     short_name="ma",
     input_names=["close"],
-    param_names=["window", "ewm"],
+    param_names=["window", "wtype"],
     output_names=["ma"],
 ).with_apply_func(
     nb.ma_apply_nb,
     cache_func=nb.ma_cache_nb,
     cache_pass_per_column=True,
     kwargs_as_args=["adjust", "minp"],
-    ewm=False,
+    param_settings=dict(
+        wtype=dict(
+            dtype=generic_enums.WType,
+            post_index_func=lambda index: index.str.lower(),
+        )
+    ),
+    window=10,
+    wtype="simple",
     adjust=False,
     minp=None,
 )
@@ -126,7 +132,7 @@ class _MA(MA):
 
         Usage:
             ```pycon
-            >>> vbt.MA.run(ohlcv['Close'], 10).plot()
+            >>> vbt.MA.run(ohlcv['Close']).plot()
             ```
 
             ![](/assets/images/MA.svg)
@@ -150,7 +156,10 @@ class _MA(MA):
             dict(name="Close", line=dict(color=plotting_cfg["color_schema"]["blue"])),
             close_trace_kwargs,
         )
-        ma_trace_kwargs = merge_dicts(dict(name="MA"), ma_trace_kwargs)
+        ma_trace_kwargs = merge_dicts(
+            dict(name="MA", line=dict(color=plotting_cfg["color_schema"]["lightblue"])),
+            ma_trace_kwargs,
+        )
 
         if plot_close:
             fig = self_col.close.vbt.lineplot(
@@ -170,30 +179,37 @@ class _MA(MA):
 setattr(MA, "__doc__", _MA.__doc__)
 setattr(MA, "plot", _MA.plot)
 
-# ############# MSTD ############# #
+# ############# MSD ############# #
 
 
-MSTD = IndicatorFactory(
-    class_name="MSTD",
+MSD = IndicatorFactory(
+    class_name="MSD",
     module_name=__name__,
-    short_name="mstd",
+    short_name="msd",
     input_names=["close"],
-    param_names=["window", "ewm"],
-    output_names=["mstd"],
+    param_names=["window", "wtype"],
+    output_names=["msd"],
 ).with_apply_func(
-    nb.mstd_apply_nb,
-    cache_func=nb.mstd_cache_nb,
+    nb.msd_apply_nb,
+    cache_func=nb.msd_cache_nb,
     cache_pass_per_column=True,
     kwargs_as_args=["adjust", "ddof", "minp"],
-    ewm=False,
+    param_settings=dict(
+        wtype=dict(
+            dtype=generic_enums.WType,
+            post_index_func=lambda index: index.str.lower(),
+        )
+    ),
+    window=10,
+    wtype="simple",
     adjust=False,
     ddof=0,
     minp=None,
 )
 
 
-class _MSTD(MSTD):
-    """Moving Standard Deviation (MSTD).
+class _MSD(MSD):
+    """Moving Standard Deviation (MSD).
 
     Standard deviation is an indicator that measures the size of an assets recent price moves
     in order to predict how volatile the price may be in the future."""
@@ -201,28 +217,31 @@ class _MSTD(MSTD):
     def plot(
         self,
         column: tp.Optional[tp.Label] = None,
-        mstd_trace_kwargs: tp.KwargsLike = None,
+        msd_trace_kwargs: tp.KwargsLike = None,
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs
     ) -> tp.BaseFigure:  # pragma: no cover
-        """Plot `MSTD.mstd`.
+        """Plot `MSD.msd`.
 
         Args:
             column (str): Name of the column to plot.
-            mstd_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MSTD.mstd`.
+            msd_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MSD.msd`.
             add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments passed to `fig.update_layout`.
 
         Usage:
             ```pycon
-            >>> vbt.MSTD.run(ohlcv['Close'], 10).plot()
+            >>> vbt.MSD.run(ohlcv['Close']).plot()
             ```
 
-            ![](/assets/images/MSTD.svg)
+            ![](/assets/images/MSD.svg)
         """
         from vectorbtpro.utils.figure import make_figure
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
 
         self_col = self.select_col(column=column)
 
@@ -230,12 +249,15 @@ class _MSTD(MSTD):
             fig = make_figure()
         fig.update_layout(**layout_kwargs)
 
-        if mstd_trace_kwargs is None:
-            mstd_trace_kwargs = {}
-        mstd_trace_kwargs = merge_dicts(dict(name="MSTD"), mstd_trace_kwargs)
+        if msd_trace_kwargs is None:
+            msd_trace_kwargs = {}
+        msd_trace_kwargs = merge_dicts(
+            dict(name="MSD", line=dict(color=plotting_cfg["color_schema"]["lightblue"])),
+            msd_trace_kwargs,
+        )
 
-        fig = self_col.mstd.vbt.lineplot(
-            trace_kwargs=mstd_trace_kwargs,
+        fig = self_col.msd.vbt.lineplot(
+            trace_kwargs=msd_trace_kwargs,
             add_trace_kwargs=add_trace_kwargs,
             fig=fig,
         )
@@ -243,8 +265,8 @@ class _MSTD(MSTD):
         return fig
 
 
-setattr(MSTD, "__doc__", _MSTD.__doc__)
-setattr(MSTD, "plot", _MSTD.plot)
+setattr(MSD, "__doc__", _MSD.__doc__)
+setattr(MSD, "plot", _MSD.plot)
 
 # ############# BBANDS ############# #
 
@@ -254,7 +276,7 @@ BBANDS = IndicatorFactory(
     module_name=__name__,
     short_name="bb",
     input_names=["close"],
-    param_names=["window", "ewm", "alpha"],
+    param_names=["window", "wtype", "alpha"],
     output_names=["middle", "upper", "lower"],
     lazy_outputs=dict(
         percent_b=lambda self: self.wrapper.wrap(
@@ -267,8 +289,14 @@ BBANDS = IndicatorFactory(
     cache_func=nb.bb_cache_nb,
     cache_pass_per_column=True,
     kwargs_as_args=["adjust", "ddof", "minp"],
+    param_settings=dict(
+        wtype=dict(
+            dtype=generic_enums.WType,
+            post_index_func=lambda index: index.str.lower(),
+        )
+    ),
     window=20,
-    ewm=False,
+    wtype="simple",
     alpha=2,
     adjust=False,
     ddof=0,
@@ -340,20 +368,23 @@ class _BBANDS(BBANDS):
         lower_trace_kwargs = merge_dicts(
             dict(
                 name="Lower band",
-                line=dict(color=adjust_opacity(plotting_cfg["color_schema"]["gray"], 0.75)),
+                line=dict(color=adjust_opacity(plotting_cfg["color_schema"]["gray"], 0.5)),
             ),
             lower_trace_kwargs,
         )
         upper_trace_kwargs = merge_dicts(
             dict(
                 name="Upper band",
-                line=dict(color=adjust_opacity(plotting_cfg["color_schema"]["gray"], 0.75)),
+                line=dict(color=adjust_opacity(plotting_cfg["color_schema"]["gray"], 0.5)),
                 fill="tonexty",
                 fillcolor="rgba(128, 128, 128, 0.2)",
             ),
             upper_trace_kwargs,
         )  # default kwargs
-        middle_trace_kwargs = merge_dicts(dict(name="Middle band"), middle_trace_kwargs)
+        middle_trace_kwargs = merge_dicts(
+            dict(name="Middle band", line=dict(color=plotting_cfg["color_schema"]["lightblue"])),
+            middle_trace_kwargs
+        )
         close_trace_kwargs = merge_dicts(
             dict(name="Close", line=dict(color=plotting_cfg["color_schema"]["blue"])),
             close_trace_kwargs,
@@ -395,15 +426,21 @@ RSI = IndicatorFactory(
     module_name=__name__,
     short_name="rsi",
     input_names=["close"],
-    param_names=["window", "ewm"],
+    param_names=["window", "wtype"],
     output_names=["rsi"],
 ).with_apply_func(
     nb.rsi_apply_nb,
     cache_func=nb.rsi_cache_nb,
     cache_pass_per_column=True,
     kwargs_as_args=["adjust", "minp"],
+    param_settings=dict(
+        wtype=dict(
+            dtype=generic_enums.WType,
+            post_index_func=lambda index: index.str.lower(),
+        )
+    ),
     window=14,
-    ewm=False,
+    wtype="wilder",
     adjust=False,
     minp=None,
 )
@@ -448,6 +485,9 @@ class _RSI(RSI):
             ![](/assets/images/RSI.svg)
         """
         from vectorbtpro.utils.figure import make_figure
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
 
         self_col = self.select_col(column=column)
 
@@ -456,7 +496,10 @@ class _RSI(RSI):
 
         if rsi_trace_kwargs is None:
             rsi_trace_kwargs = {}
-        rsi_trace_kwargs = merge_dicts(dict(name="RSI"), rsi_trace_kwargs)
+        rsi_trace_kwargs = merge_dicts(
+            dict(name="RSI", line=dict(color=plotting_cfg["color_schema"]["lightblue"])),
+            rsi_trace_kwargs,
+        )
 
         fig = self_col.rsi.vbt.lineplot(
             trace_kwargs=rsi_trace_kwargs,
@@ -485,7 +528,7 @@ class _RSI(RSI):
                 y0=limits[0],
                 x1=self_col.wrapper.index[-1],
                 y1=limits[1],
-                fillcolor="purple",
+                fillcolor="mediumslateblue",
                 opacity=0.2,
                 layer="below",
                 line_width=0,
@@ -508,16 +551,23 @@ STOCH = IndicatorFactory(
     module_name=__name__,
     short_name="stoch",
     input_names=["high", "low", "close"],
-    param_names=["k_window", "d_window", "d_ewm"],
-    output_names=["percent_k", "percent_d"],
+    param_names=["fast_k_window", "slow_k_window", "slow_d_window", "wtype"],
+    output_names=["fast_k", "slow_k", "slow_d"],
 ).with_apply_func(
     nb.stoch_apply_nb,
     cache_func=nb.stoch_cache_nb,
     cache_pass_per_column=True,
     kwargs_as_args=["adjust", "minp"],
-    k_window=14,
-    d_window=3,
-    d_ewm=False,
+    param_settings=dict(
+        wtype=dict(
+            dtype=generic_enums.WType,
+            post_index_func=lambda index: index.str.lower(),
+        )
+    ),
+    fast_k_window=14,
+    slow_k_window=3,
+    slow_d_window=3,
+    wtype="simple",
     adjust=False,
     minp=None,
 )
@@ -537,20 +587,22 @@ class _STOCH(STOCH):
         column: tp.Optional[tp.Label] = None,
         limits: tp.Tuple[float, float] = (20, 80),
         add_shape_kwargs: tp.KwargsLike = None,
-        percent_k_trace_kwargs: tp.KwargsLike = None,
-        percent_d_trace_kwargs: tp.KwargsLike = None,
+        fast_k_trace_kwargs: tp.KwargsLike = None,
+        slow_k_trace_kwargs: tp.KwargsLike = None,
+        slow_d_trace_kwargs: tp.KwargsLike = None,
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs
     ) -> tp.BaseFigure:  # pragma: no cover
-        """Plot `STOCH.percent_k` and `STOCH.percent_d`.
+        """Plot `STOCH.slow_k` and `STOCH.slow_d`.
 
         Args:
             column (str): Name of the column to plot.
             limits (tuple of float): Tuple of the lower and upper limit.
             add_shape_kwargs (dict): Keyword arguments passed to `fig.add_shape` when adding the range between both limits.
-            percent_k_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `STOCH.percent_k`.
-            percent_d_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `STOCH.percent_d`.
+            fast_k_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `STOCH.fast_k`.
+            slow_k_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `STOCH.slow_k`.
+            slow_d_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `STOCH.slow_d`.
             add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments passed to `fig.update_layout`.
@@ -563,26 +615,46 @@ class _STOCH(STOCH):
             ![](/assets/images/STOCH.svg)
         """
         from vectorbtpro.utils.figure import make_figure
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
 
         self_col = self.select_col(column=column)
 
         if fig is None:
             fig = make_figure()
 
-        if percent_k_trace_kwargs is None:
-            percent_k_trace_kwargs = {}
-        if percent_d_trace_kwargs is None:
-            percent_d_trace_kwargs = {}
-        percent_k_trace_kwargs = merge_dicts(dict(name="%K"), percent_k_trace_kwargs)
-        percent_d_trace_kwargs = merge_dicts(dict(name="%D"), percent_d_trace_kwargs)
+        if fast_k_trace_kwargs is None:
+            fast_k_trace_kwargs = {}
+        if slow_k_trace_kwargs is None:
+            slow_k_trace_kwargs = {}
+        if slow_d_trace_kwargs is None:
+            slow_d_trace_kwargs = {}
+        fast_k_trace_kwargs = merge_dicts(
+            dict(name="Fast %K", line=dict(color=plotting_cfg["color_schema"]["lightblue"])),
+            fast_k_trace_kwargs,
+        )
+        slow_k_trace_kwargs = merge_dicts(
+            dict(name="Slow %K", line=dict(color=plotting_cfg["color_schema"]["lightpurple"])),
+            slow_k_trace_kwargs,
+        )
+        slow_d_trace_kwargs = merge_dicts(
+            dict(name="Slow %D", line=dict(color=plotting_cfg["color_schema"]["lightpink"])),
+            slow_d_trace_kwargs,
+        )
 
-        fig = self_col.percent_k.vbt.lineplot(
-            trace_kwargs=percent_k_trace_kwargs,
+        fig = self_col.fast_k.vbt.lineplot(
+            trace_kwargs=fast_k_trace_kwargs,
             add_trace_kwargs=add_trace_kwargs,
             fig=fig,
         )
-        fig = self_col.percent_d.vbt.lineplot(
-            trace_kwargs=percent_d_trace_kwargs,
+        fig = self_col.slow_k.vbt.lineplot(
+            trace_kwargs=slow_k_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+        )
+        fig = self_col.slow_d.vbt.lineplot(
+            trace_kwargs=slow_d_trace_kwargs,
             add_trace_kwargs=add_trace_kwargs,
             fig=fig,
         )
@@ -608,7 +680,7 @@ class _STOCH(STOCH):
                 y0=limits[0],
                 x1=self_col.wrapper.index[-1],
                 y1=limits[1],
-                fillcolor="purple",
+                fillcolor="mediumslateblue",
                 opacity=0.2,
                 layer="below",
                 line_width=0,
@@ -631,7 +703,7 @@ MACD = IndicatorFactory(
     module_name=__name__,
     short_name="macd",
     input_names=["close"],
-    param_names=["fast_window", "slow_window", "signal_window", "macd_ewm", "signal_ewm"],
+    param_names=["fast_window", "slow_window", "signal_window", "macd_wtype", "signal_wtype"],
     output_names=["macd", "signal"],
     lazy_outputs=dict(
         hist=lambda self: self.wrapper.wrap(self.macd.values - self.signal.values),
@@ -641,11 +713,21 @@ MACD = IndicatorFactory(
     cache_func=nb.macd_cache_nb,
     cache_pass_per_column=True,
     kwargs_as_args=["adjust", "minp"],
+    param_settings=dict(
+        macd_wtype=dict(
+            dtype=generic_enums.WType,
+            post_index_func=lambda index: index.str.lower(),
+        ),
+        signal_wtype=dict(
+            dtype=generic_enums.WType,
+            post_index_func=lambda index: index.str.lower(),
+        ),
+    ),
     fast_window=12,
     slow_window=26,
     signal_window=9,
-    macd_ewm=False,
-    signal_ewm=False,
+    macd_wtype="exp",
+    signal_wtype="exp",
     adjust=False,
     minp=None,
 )
@@ -688,6 +770,9 @@ class _MACD(MACD):
             ![](/assets/images/MACD.svg)
         """
         from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
 
         assert_can_import("plotly")
         import plotly.graph_objects as go
@@ -706,8 +791,14 @@ class _MACD(MACD):
             signal_trace_kwargs = {}
         if hist_trace_kwargs is None:
             hist_trace_kwargs = {}
-        macd_trace_kwargs = merge_dicts(dict(name="MACD"), macd_trace_kwargs)
-        signal_trace_kwargs = merge_dicts(dict(name="Signal"), signal_trace_kwargs)
+        macd_trace_kwargs = merge_dicts(
+            dict(name="MACD", line=dict(color=plotting_cfg["color_schema"]["lightblue"])),
+            macd_trace_kwargs
+        )
+        signal_trace_kwargs = merge_dicts(
+            dict(name="Signal", line=dict(color=plotting_cfg["color_schema"]["lightpurple"])),
+            signal_trace_kwargs
+        )
 
         fig = self_col.macd.vbt.lineplot(
             trace_kwargs=macd_trace_kwargs,
@@ -755,15 +846,21 @@ ATR = IndicatorFactory(
     module_name=__name__,
     short_name="atr",
     input_names=["high", "low", "close"],
-    param_names=["window", "ewm"],
+    param_names=["window", "wtype"],
     output_names=["tr", "atr"],
 ).with_apply_func(
     nb.atr_apply_nb,
     cache_func=nb.atr_cache_nb,
     cache_pass_per_column=True,
     kwargs_as_args=["adjust", "minp"],
+    param_settings=dict(
+        wtype=dict(
+            dtype=generic_enums.WType,
+            post_index_func=lambda index: index.str.lower(),
+        )
+    ),
     window=14,
-    ewm=True,
+    wtype="wilder",
     adjust=False,
     minp=None,
 )
@@ -800,12 +897,15 @@ class _ATR(ATR):
 
         Usage:
             ```pycon
-            >>> vbt.ATR.run(ohlcv['High'], ohlcv['Low'], ohlcv['Close'], 10).plot()
+            >>> vbt.ATR.run(ohlcv['High'], ohlcv['Low'], ohlcv['Close']).plot()
             ```
 
             ![](/assets/images/ATR.svg)
         """
         from vectorbtpro.utils.figure import make_figure
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
 
         self_col = self.select_col(column=column)
 
@@ -817,8 +917,14 @@ class _ATR(ATR):
             tr_trace_kwargs = {}
         if atr_trace_kwargs is None:
             atr_trace_kwargs = {}
-        tr_trace_kwargs = merge_dicts(dict(name="TR"), tr_trace_kwargs)
-        atr_trace_kwargs = merge_dicts(dict(name="ATR"), atr_trace_kwargs)
+        tr_trace_kwargs = merge_dicts(
+            dict(name="TR", line=dict(color=plotting_cfg["color_schema"]["lightblue"])),
+            tr_trace_kwargs,
+        )
+        atr_trace_kwargs = merge_dicts(
+            dict(name="ATR", line=dict(color=plotting_cfg["color_schema"]["lightpurple"])),
+            atr_trace_kwargs,
+        )
 
         fig = self_col.tr.vbt.lineplot(
             trace_kwargs=tr_trace_kwargs,
@@ -882,6 +988,9 @@ class _OBV(OBV):
             ![](/assets/images/OBV.svg)
         """
         from vectorbtpro.utils.figure import make_figure
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
 
         self_col = self.select_col(column=column)
 
@@ -891,7 +1000,10 @@ class _OBV(OBV):
 
         if obv_trace_kwargs is None:
             obv_trace_kwargs = {}
-        obv_trace_kwargs = merge_dicts(dict(name="OBV"), obv_trace_kwargs)
+        obv_trace_kwargs = merge_dicts(
+            dict(name="OBV", line=dict(color=plotting_cfg["color_schema"]["lightblue"])),
+            obv_trace_kwargs,
+        )
 
         fig = self_col.obv.vbt.lineplot(
             trace_kwargs=obv_trace_kwargs,
@@ -962,7 +1074,7 @@ class _OLS(OLS):
 
         Usage:
             ```pycon
-            >>> vbt.OLS.run(np.arange(len(ohlcv)), ohlcv['Close'], 10).plot()
+            >>> vbt.OLS.run(np.arange(len(ohlcv)), ohlcv['Close']).plot()
             ```
 
             ![](/assets/images/OLS.svg)
@@ -983,10 +1095,13 @@ class _OLS(OLS):
         if pred_trace_kwargs is None:
             pred_trace_kwargs = {}
         y_trace_kwargs = merge_dicts(
-            dict(name="Y", line=dict(color=plotting_cfg["color_schema"]["blue"])),
+            dict(name="Y", line=dict(color=plotting_cfg["color_schema"]["lightblue"])),
             y_trace_kwargs,
         )
-        pred_trace_kwargs = merge_dicts(dict(name="Pred"), pred_trace_kwargs)
+        pred_trace_kwargs = merge_dicts(
+            dict(name="Pred", line=dict(color=plotting_cfg["color_schema"]["lightpurple"])),
+            pred_trace_kwargs,
+        )
 
         if plot_y:
             fig = self_col.y.vbt.lineplot(
@@ -1057,12 +1172,15 @@ class _OLSS(OLSS):
 
         Usage:
             ```pycon
-            >>> vbt.OLSS.run(np.arange(len(ohlcv)), ohlcv['Close'], 10).plot()
+            >>> vbt.OLSS.run(np.arange(len(ohlcv)), ohlcv['Close']).plot()
             ```
 
             ![](/assets/images/OLSS.svg)
         """
         from vectorbtpro.utils.figure import make_figure
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
 
         self_col = self.select_col(column=column)
 
@@ -1070,7 +1188,10 @@ class _OLSS(OLSS):
             fig = make_figure()
         fig.update_layout(**layout_kwargs)
 
-        zscore_trace_kwargs = merge_dicts(dict(name="Z-score"), zscore_trace_kwargs)
+        zscore_trace_kwargs = merge_dicts(
+            dict(name="Z-score", line=dict(color=plotting_cfg["color_schema"]["lightblue"])),
+            zscore_trace_kwargs,
+        )
         fig = self_col.zscore.vbt.lineplot(
             trace_kwargs=zscore_trace_kwargs,
             add_trace_kwargs=add_trace_kwargs,
@@ -1093,7 +1214,7 @@ class _OLSS(OLSS):
                 y0=st.norm.ppf(1 - alpha / 2),
                 x1=self_col.wrapper.index[-1],
                 y1=st.norm.ppf(alpha / 2),
-                fillcolor="purple",
+                fillcolor="mediumslateblue",
                 opacity=0.2,
                 layer="below",
                 line_width=0,
@@ -1139,10 +1260,19 @@ PATSIM = IndicatorFactory(
     generic_nb.rolling_pattern_similarity_nb,
     param_settings=dict(
         pattern=dict(is_array_like=True),
-        interp_mode=dict(dtype=generic_enums.InterpMode),
-        rescale_mode=dict(dtype=generic_enums.RescaleMode),
+        interp_mode=dict(
+            dtype=generic_enums.InterpMode,
+            post_index_func=lambda index: index.str.lower(),
+        ),
+        rescale_mode=dict(
+            dtype=generic_enums.RescaleMode,
+            post_index_func=lambda index: index.str.lower(),
+        ),
         max_error=dict(is_array_like=True),
-        max_error_interp_mode=dict(dtype=generic_enums.InterpMode),
+        max_error_interp_mode=dict(
+            dtype=generic_enums.InterpMode,
+            post_index_func=lambda index: index.str.lower(),
+        ),
     ),
     window=None,
     interp_mode="linear",
@@ -1191,6 +1321,9 @@ class _PATSIM(PATSIM):
             ![](/assets/images/PATSIM.svg)
         """
         from vectorbtpro.utils.figure import make_figure
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
 
         self_col = self.select_col(column=column)
 
@@ -1198,7 +1331,10 @@ class _PATSIM(PATSIM):
             fig = make_figure()
         fig.update_layout(**layout_kwargs)
 
-        similarity_trace_kwargs = merge_dicts(dict(name="Similarity"), similarity_trace_kwargs)
+        similarity_trace_kwargs = merge_dicts(
+            dict(name="Similarity", line=dict(color=plotting_cfg["color_schema"]["lightblue"])),
+            similarity_trace_kwargs,
+        )
 
         fig = self_col.similarity.vbt.lineplot(
             trace_kwargs=similarity_trace_kwargs,

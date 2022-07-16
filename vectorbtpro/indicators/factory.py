@@ -60,7 +60,7 @@ from vectorbtpro.utils.array_ import build_nan_mask, squeeze_nan, unsqueeze_nan
 from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config, Configured
 from vectorbtpro.utils.decorators import classproperty, cacheable_property, class_or_instancemethod
-from vectorbtpro.utils.enum_ import map_enum_fields
+from vectorbtpro.utils.enum_ import to_mapping, map_enum_fields
 from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.formatting import prettify
 from vectorbtpro.utils.mapping import to_mapping, apply_mapping
@@ -181,6 +181,13 @@ def build_columns(
         if single_value is not None:
             _single_value = single_value[i]
         _param_settings = resolve_dict(param_settings, i=i)
+        dtype = _param_settings.get("dtype", None)
+        if checks.is_mapping_like(dtype):
+            if checks.is_namedtuple(dtype):
+                dtype = to_mapping(dtype, reverse=False)
+            else:
+                dtype = to_mapping(dtype, reverse=True)
+            p_values = apply_mapping(p_values, dtype)
         _per_column = _param_settings.get("per_column", False)
         _post_index_func = _param_settings.get("post_index_func", None)
         if per_column:
@@ -2912,7 +2919,7 @@ Other keyword arguments are passed to `{0}.run`.
                         y0=limits[0],
                         x1=self_col.wrapper.index[-1],
                         y1=limits[1],
-                        fillcolor="purple",
+                        fillcolor="mediumslateblue",
                         opacity=0.2,
                         layer="below",
                         line_width=0,
@@ -3016,6 +3023,7 @@ Args:
 
         # Test if the produced array has the same index length
         if not pd.Index.equals(result.index, test_df.index):
+            print(result.index, test_df.index)
             raise ValueError("Couldn't parse the output: mismatching index")
 
         # Standardize output names: remove numbers, remove hyphens, and bring to lower case

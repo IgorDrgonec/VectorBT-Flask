@@ -2927,7 +2927,7 @@ volume_ts = pd.Series([4, 3, 2, 1, 2, 3, 4], index=close_ts.index)
 class TestBasic:
     def test_MA(self):
         assert_frame_equal(
-            vbt.MA.run(close_ts, window=(2, 3), ewm=(False, True), param_product=True).ma,
+            vbt.MA.run(close_ts, window=(2, 3), wtype=("simple", "exp"), param_product=True).ma,
             pd.DataFrame(
                 np.array(
                     [
@@ -2942,19 +2942,21 @@ class TestBasic:
                 ),
                 index=close_ts.index,
                 columns=pd.MultiIndex.from_tuples(
-                    [(2, False), (2, True), (3, False), (3, True)],
-                    names=["ma_window", "ma_ewm"],
+                    [(2, "simple"), (2, "exp"), (3, "simple"), (3, "exp")],
+                    names=["ma_window", "ma_wtype"],
                 ),
             ),
         )
         assert_frame_equal(
-            vbt.MA.run(close_ts.vbt.tile(4), window=(2, 3), ewm=(False, True), param_product=True, per_column=True).ma,
-            vbt.MA.run(close_ts, window=(2, 3), ewm=(False, True), param_product=True, per_column=False).ma,
+            vbt.MA.run(
+                close_ts.vbt.tile(4), window=(2, 3), wtype=("simple", "exp"), param_product=True, per_column=True
+            ).ma,
+            vbt.MA.run(close_ts, window=(2, 3), wtype=("simple", "exp"), param_product=True, per_column=False).ma,
         )
 
-    def test_MSTD(self):
+    def test_MSD(self):
         assert_frame_equal(
-            vbt.MSTD.run(close_ts, window=(2, 3), ewm=(False, True), param_product=True).mstd,
+            vbt.MSD.run(close_ts, window=(2, 3), wtype=("simple", "exp"), param_product=True).msd,
             pd.DataFrame(
                 np.array(
                     [
@@ -2969,37 +2971,37 @@ class TestBasic:
                 ),
                 index=close_ts.index,
                 columns=pd.MultiIndex.from_tuples(
-                    [(2, False), (2, True), (3, False), (3, True)],
-                    names=["mstd_window", "mstd_ewm"],
+                    [(2, "simple"), (2, "exp"), (3, "simple"), (3, "exp")],
+                    names=["msd_window", "msd_wtype"],
                 ),
             ),
         )
         assert_frame_equal(
-            vbt.MSTD.run(
+            vbt.MSD.run(
                 close_ts.vbt.tile(4),
                 window=(2, 3),
-                ewm=(False, True),
+                wtype=("simple", "exp"),
                 param_product=True,
                 per_column=True,
-            ).mstd,
-            vbt.MSTD.run(close_ts, window=(2, 3), ewm=(False, True), param_product=True, per_column=False).mstd,
+            ).msd,
+            vbt.MSD.run(close_ts, window=(2, 3), wtype=("simple", "exp"), param_product=True, per_column=False).msd,
         )
 
     def test_BBANDS(self):
         columns = pd.MultiIndex.from_tuples(
             [
-                (2, False, 2.0),
-                (2, False, 3.0),
-                (2, True, 2.0),
-                (2, True, 3.0),
-                (3, False, 2.0),
-                (3, False, 3.0),
-                (3, True, 2.0),
-                (3, True, 3.0),
+                (2, "simple", 2.0),
+                (2, "simple", 3.0),
+                (2, "exp", 2.0),
+                (2, "exp", 3.0),
+                (3, "simple", 2.0),
+                (3, "simple", 3.0),
+                (3, "exp", 2.0),
+                (3, "exp", 3.0),
             ],
-            names=["bb_window", "bb_ewm", "bb_alpha"],
+            names=["bb_window", "bb_wtype", "bb_alpha"],
         )
-        bbands = vbt.BBANDS.run(close_ts, window=(2, 3), alpha=(2.0, 3.0), ewm=(False, True), param_product=True)
+        bbands = vbt.BBANDS.run(close_ts, window=(2, 3), alpha=(2.0, 3.0), wtype=("simple", "exp"), param_product=True)
         assert_frame_equal(
             bbands.middle,
             pd.DataFrame(
@@ -3104,7 +3106,7 @@ class TestBasic:
                 close_ts.vbt.tile(8),
                 window=(2, 3),
                 alpha=(2.0, 3.0),
-                ewm=(False, True),
+                wtype=("simple", "exp"),
                 param_product=True,
                 per_column=True,
             ).middle,
@@ -3115,7 +3117,7 @@ class TestBasic:
                 close_ts.vbt.tile(8),
                 window=(2, 3),
                 alpha=(2.0, 3.0),
-                ewm=(False, True),
+                wtype=("simple", "exp"),
                 param_product=True,
                 per_column=True,
             ).upper,
@@ -3126,7 +3128,7 @@ class TestBasic:
                 close_ts.vbt.tile(8),
                 window=(2, 3),
                 alpha=(2.0, 3.0),
-                ewm=(False, True),
+                wtype=("simple", "exp"),
                 param_product=True,
                 per_column=True,
             ).lower,
@@ -3137,7 +3139,7 @@ class TestBasic:
                 close_ts.vbt.tile(8),
                 window=(2, 3),
                 alpha=(2.0, 3.0),
-                ewm=(False, True),
+                wtype=("simple", "exp"),
                 param_product=True,
                 per_column=True,
             ).percent_b,
@@ -3148,7 +3150,7 @@ class TestBasic:
                 close_ts.vbt.tile(8),
                 window=(2, 3),
                 alpha=(2.0, 3.0),
-                ewm=(False, True),
+                wtype=("simple", "exp"),
                 param_product=True,
                 per_column=True,
             ).bandwidth,
@@ -3157,7 +3159,7 @@ class TestBasic:
 
     def test_RSI(self):
         assert_frame_equal(
-            vbt.RSI.run(close_ts, window=(2, 3), ewm=(False, True), param_product=True).rsi,
+            vbt.RSI.run(close_ts, window=(2, 3), wtype=("simple", "exp"), param_product=True).rsi,
             pd.DataFrame(
                 np.array(
                     [
@@ -3172,8 +3174,8 @@ class TestBasic:
                 ),
                 index=close_ts.index,
                 columns=pd.MultiIndex.from_tuples(
-                    [(2, False), (2, True), (3, False), (3, True)],
-                    names=["rsi_window", "rsi_ewm"],
+                    [(2, "simple"), (2, "exp"), (3, "simple"), (3, "exp")],
+                    names=["rsi_window", "rsi_wtype"],
                 ),
             ),
         )
@@ -3181,38 +3183,38 @@ class TestBasic:
             vbt.RSI.run(
                 close_ts.vbt.tile(4),
                 window=(2, 3),
-                ewm=(False, True),
+                wtype=("simple", "exp"),
                 param_product=True,
                 per_column=True,
             ).rsi,
-            vbt.RSI.run(close_ts, window=(2, 3), ewm=(False, True), param_product=True, per_column=False).rsi,
+            vbt.RSI.run(close_ts, window=(2, 3), wtype=("simple", "exp"), param_product=True, per_column=False).rsi,
         )
 
     def test_STOCH(self):
         columns = pd.MultiIndex.from_tuples(
             [
-                (2, 2, False),
-                (2, 2, True),
-                (2, 3, False),
-                (2, 3, True),
-                (3, 2, False),
-                (3, 2, True),
-                (3, 3, False),
-                (3, 3, True),
+                (2, 2, "simple"),
+                (2, 2, "exp"),
+                (2, 3, "simple"),
+                (2, 3, "exp"),
+                (3, 2, "simple"),
+                (3, 2, "exp"),
+                (3, 3, "simple"),
+                (3, 3, "exp"),
             ],
-            names=["stoch_k_window", "stoch_d_window", "stoch_d_ewm"],
+            names=["stoch_fast_k_window", "stoch_slow_d_window", "stoch_wtype"],
         )
         stoch = vbt.STOCH.run(
             high_ts,
             low_ts,
             close_ts,
-            k_window=(2, 3),
-            d_window=(2, 3),
-            d_ewm=(False, True),
+            fast_k_window=(2, 3),
+            slow_d_window=(2, 3),
+            wtype=("simple", "exp"),
             param_product=True,
         )
         assert_frame_equal(
-            stoch.percent_k,
+            stoch.fast_k,
             pd.DataFrame(
                 np.array(
                     [
@@ -3266,43 +3268,34 @@ class TestBasic:
             ),
         )
         assert_frame_equal(
-            stoch.percent_d,
+            stoch.slow_d,
             pd.DataFrame(
                 np.array(
                     [
                         [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
                         [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-                        [82.30769231, 81.53846154, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-                        [78.23529412, 78.15987934, 80.36199095, 79.38914027, 86.05769231, 85.57692308, np.nan, np.nan],
+                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
+                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
+                        [69.20060331825036, 58.80844645550526, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
                         [
-                            47.05882353,
-                            37.81799899,
-                            58.03921569,
-                            48.51809955,
-                            51.13122172,
-                            40.29034691,
-                            63.25414781,
-                            51.85237557,
+                            46.92810457516338,
+                            40.2199597787833,
+                            58.072733366851,
+                            47.43966817496228,
+                            49.952865761689274,
+                            37.132352941176464,
+                            np.nan,
+                            np.nan,
                         ],
                         [
-                            15.49019608,
-                            21.49488855,
-                            35.81699346,
-                            30.92571644,
-                            12.66968326,
-                            18.55832076,
-                            36.65158371,
-                            29.77234163,
-                        ],
-                        [
-                            10.51282051,
-                            12.29316798,
-                            12.89089995,
-                            19.30901207,
-                            5.92948718,
-                            8.9638847,
-                            9.83534439,
-                            16.96950415,
+                            24.35394670688788,
+                            26.279327970504433,
+                            35.58236970001674,
+                            33.37434012066364,
+                            23.243464052287564,
+                            23.6904537456008,
+                            36.58035863918215,
+                            28.890931372549012,
                         ],
                     ]
                 ),
@@ -3315,65 +3308,71 @@ class TestBasic:
                 high_ts.vbt.tile(8),
                 low_ts.vbt.tile(8),
                 close_ts.vbt.tile(8),
-                k_window=(2, 3),
-                d_window=(2, 3),
-                d_ewm=(False, True),
+                fast_k_window=(2, 3),
+                slow_d_window=(2, 3),
+                wtype=("simple", "exp"),
                 param_product=True,
                 per_column=True,
-            ).percent_k,
-            stoch.percent_k,
+            ).fast_k,
+            stoch.fast_k,
         )
         assert_frame_equal(
             vbt.STOCH.run(
                 high_ts.vbt.tile(8),
                 low_ts.vbt.tile(8),
                 close_ts.vbt.tile(8),
-                k_window=(2, 3),
-                d_window=(2, 3),
-                d_ewm=(False, True),
+                fast_k_window=(2, 3),
+                slow_d_window=(2, 3),
+                wtype=("simple", "exp"),
                 param_product=True,
                 per_column=True,
-            ).percent_d,
-            stoch.percent_d,
+            ).slow_d,
+            stoch.slow_d,
         )
 
     def test_MACD(self):
         columns = pd.MultiIndex.from_tuples(
             [
-                (2, 3, 2, False, False),
-                (2, 3, 2, False, True),
-                (2, 3, 2, True, False),
-                (2, 3, 2, True, True),
-                (2, 3, 3, False, False),
-                (2, 3, 3, False, True),
-                (2, 3, 3, True, False),
-                (2, 3, 3, True, True),
-                (2, 4, 2, False, False),
-                (2, 4, 2, False, True),
-                (2, 4, 2, True, False),
-                (2, 4, 2, True, True),
-                (2, 4, 3, False, False),
-                (2, 4, 3, False, True),
-                (2, 4, 3, True, False),
-                (2, 4, 3, True, True),
-                (3, 3, 2, False, False),
-                (3, 3, 2, False, True),
-                (3, 3, 2, True, False),
-                (3, 3, 2, True, True),
-                (3, 3, 3, False, False),
-                (3, 3, 3, False, True),
-                (3, 3, 3, True, False),
-                (3, 3, 3, True, True),
-                (3, 4, 2, False, False),
-                (3, 4, 2, False, True),
-                (3, 4, 2, True, False),
-                (3, 4, 2, True, True),
-                (3, 4, 3, False, False),
-                (3, 4, 3, False, True),
-                (3, 4, 3, True, False),
-                (3, 4, 3, True, True),
+                (2, 3, 2, "simple", "simple"),
+                (2, 3, 2, "simple", "exp"),
+                (2, 3, 2, "exp", "simple"),
+                (2, 3, 2, "exp", "exp"),
+                (2, 3, 3, "simple", "simple"),
+                (2, 3, 3, "simple", "exp"),
+                (2, 3, 3, "exp", "simple"),
+                (2, 3, 3, "exp", "exp"),
+                (2, 4, 2, "simple", "simple"),
+                (2, 4, 2, "simple", "exp"),
+                (2, 4, 2, "exp", "simple"),
+                (2, 4, 2, "exp", "exp"),
+                (2, 4, 3, "simple", "simple"),
+                (2, 4, 3, "simple", "exp"),
+                (2, 4, 3, "exp", "simple"),
+                (2, 4, 3, "exp", "exp"),
+                (3, 3, 2, "simple", "simple"),
+                (3, 3, 2, "simple", "exp"),
+                (3, 3, 2, "exp", "simple"),
+                (3, 3, 2, "exp", "exp"),
+                (3, 3, 3, "simple", "simple"),
+                (3, 3, 3, "simple", "exp"),
+                (3, 3, 3, "exp", "simple"),
+                (3, 3, 3, "exp", "exp"),
+                (3, 4, 2, "simple", "simple"),
+                (3, 4, 2, "simple", "exp"),
+                (3, 4, 2, "exp", "simple"),
+                (3, 4, 2, "exp", "exp"),
+                (3, 4, 3, "simple", "simple"),
+                (3, 4, 3, "simple", "exp"),
+                (3, 4, 3, "exp", "simple"),
+                (3, 4, 3, "exp", "exp"),
             ],
-            names=["macd_fast_window", "macd_slow_window", "macd_signal_window", "macd_macd_ewm", "macd_signal_ewm"],
+            names=[
+                "macd_fast_window",
+                "macd_slow_window",
+                "macd_signal_window",
+                "macd_macd_wtype",
+                "macd_signal_wtype",
+            ],
         )
 
         macd = vbt.MACD.run(
@@ -3381,9 +3380,9 @@ class TestBasic:
             fast_window=(2, 3),
             slow_window=(3, 4),
             signal_window=(2, 3),
-            macd_ewm=(False, True),
-            signal_ewm=(False, True),
-            param_product=True,
+            macd_wtype=("simple", "exp"),
+            signal_wtype=("simple", "exp"),
+            param_product="exp",
         )
         assert_frame_equal(
             macd.macd,
@@ -4138,8 +4137,8 @@ class TestBasic:
                 fast_window=(2, 3),
                 slow_window=(3, 4),
                 signal_window=(2, 3),
-                macd_ewm=(False, True),
-                signal_ewm=(False, True),
+                macd_wtype=("simple", "exp"),
+                signal_wtype=("simple", "exp"),
                 param_product=True,
                 per_column=True,
             ).macd,
@@ -4151,8 +4150,8 @@ class TestBasic:
                 fast_window=(2, 3),
                 slow_window=(3, 4),
                 signal_window=(2, 3),
-                macd_ewm=(False, True),
-                signal_ewm=(False, True),
+                macd_wtype=("simple", "exp"),
+                signal_wtype=("simple", "exp"),
                 param_product=True,
                 per_column=True,
             ).signal,
@@ -4164,8 +4163,8 @@ class TestBasic:
                 fast_window=(2, 3),
                 slow_window=(3, 4),
                 signal_window=(2, 3),
-                macd_ewm=(False, True),
-                signal_ewm=(False, True),
+                macd_wtype=("simple", "exp"),
+                signal_wtype=("simple", "exp"),
                 param_product=True,
                 per_column=True,
             ).hist,
@@ -4174,10 +4173,10 @@ class TestBasic:
 
     def test_ATR(self):
         columns = pd.MultiIndex.from_tuples(
-            [(2, False), (2, True), (3, False), (3, True)],
-            names=["atr_window", "atr_ewm"],
+            [(2, "simple"), (2, "exp"), (3, "simple"), (3, "exp")],
+            names=["atr_window", "atr_wtype"],
         )
-        atr = vbt.ATR.run(high_ts, low_ts, close_ts, window=(2, 3), ewm=(False, True), param_product=True)
+        atr = vbt.ATR.run(high_ts, low_ts, close_ts, window=(2, 3), wtype=("simple", "exp"), param_product=True)
         assert_frame_equal(
             atr.tr,
             pd.DataFrame(
@@ -4220,7 +4219,7 @@ class TestBasic:
                 low_ts.vbt.tile(4),
                 close_ts.vbt.tile(4),
                 window=(2, 3),
-                ewm=(False, True),
+                wtype=("simple", "exp"),
                 param_product=True,
                 per_column=True,
             ).tr,
@@ -4232,7 +4231,7 @@ class TestBasic:
                 low_ts.vbt.tile(4),
                 close_ts.vbt.tile(4),
                 window=(2, 3),
-                ewm=(False, True),
+                wtype=("simple", "exp"),
                 param_product=True,
                 per_column=True,
             ).atr,
@@ -4377,4 +4376,51 @@ class TestBasic:
                 window=(2, 3),
                 per_column=False,
             ).zscore,
+        )
+
+    def test_PATSIM(self):
+        assert_frame_equal(
+            vbt.PATSIM.run(
+                close_ts,
+                [np.array([1, 2, 1]), np.array([1, 2, 1, 2])],
+                rescale_mode=["minmax", "rebase"],
+                max_error=[np.nan, 0.1],
+                max_error_interp_mode=[None, "discrete"],
+            ).similarity,
+            pd.DataFrame(
+                np.array(
+                    [
+                        [np.nan, np.nan],
+                        [np.nan, np.nan],
+                        [0.5, np.nan],
+                        [0.5, 0.5],
+                        [1.0, 0.25],
+                        [0.5, 0.5],
+                        [0.5, 0.25],
+                    ]
+                ),
+                index=close_ts.index,
+                columns=pd.MultiIndex.from_tuples(
+                    [("array_0", "minmax", np.nan, None), ("array_1", "rebase", 0.1, "discrete")],
+                    names=["patsim_pattern", "patsim_rescale_mode", "patsim_max_error", "patsim_max_error_interp_mode"],
+                ),
+            ),
+        )
+        assert_frame_equal(
+            vbt.PATSIM.run(
+                close_ts.vbt.tile(2),
+                [np.array([1, 2, 1]), np.array([1, 2, 1, 2])],
+                rescale_mode=["minmax", "rebase"],
+                max_error=[np.nan, 0.1],
+                max_error_interp_mode=[None, "discrete"],
+                per_column=True,
+            ).similarity,
+            vbt.PATSIM.run(
+                close_ts,
+                [np.array([1, 2, 1]), np.array([1, 2, 1, 2])],
+                rescale_mode=["minmax", "rebase"],
+                max_error=[np.nan, 0.1],
+                max_error_interp_mode=[None, "discrete"],
+                per_column=False,
+            ).similarity,
         )
