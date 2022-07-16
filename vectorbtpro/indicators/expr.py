@@ -27,7 +27,7 @@ from vectorbtpro.generic.nb import (
     rolling_corr_nb,
     demean_nb,
 )
-from vectorbtpro.ohlcv.nb import vwap_nb
+from vectorbtpro.indicators.nb import vwap_apply_nb
 from vectorbtpro.returns.nb import returns_nb
 from vectorbtpro.utils.config import HybridConfig
 
@@ -146,7 +146,7 @@ def vwap(context: tp.KwargsLike = None) -> tp.Array2d:
         group_lens = context["wrapper"].create_index_grouper("D").get_group_lens()
     else:
         group_lens = np.array([context["wrapper"].shape[0]])
-    return vwap_nb(context["high"], context["low"], context["close"], context["volume"], group_lens)
+    return vwap_apply_nb(context["high"], context["low"], context["close"], context["volume"], group_lens)
 
 
 def cap(context: tp.KwargsLike = None) -> tp.Array2d:

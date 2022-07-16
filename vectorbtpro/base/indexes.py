@@ -8,7 +8,6 @@ They perform operations on index objects, such as stacking, combining, and clean
     "Index" in pandas context is referred to both index and columns."""
 
 from datetime import datetime, timedelta
-from collections import defaultdict
 
 import numpy as np
 import pandas as pd
@@ -54,7 +53,7 @@ def index_from_values(
 
     Each in `values` will correspond to an element in the new index."""
     scalar_types = (int, float, complex, str, bool, datetime, timedelta, np.generic)
-    counts = defaultdict(int)
+    type_id_counts = {}
     value_names = []
     if len(values) == 1:
         single_value = True
@@ -65,31 +64,40 @@ def index_from_values(
         if v is None or isinstance(v, scalar_types):
             value_names.append(v)
         elif isinstance(v, np.ndarray):
+            all_same = False
             if np.issubdtype(v.dtype, np.floating):
                 if np.isclose(v, v.item(0), equal_nan=True).all():
-                    value_names.append(v.item(0))
-                else:
-                    if single_value:
-                        value_names.append("array")
-                    else:
-                        value_names.append("array_%d" % counts["array"])
-                        counts["array"] += 1
+                    all_same = True
             else:
                 if np.equal(v, v.item(0)).all():
-                    value_names.append(v.item(0))
+                    all_same = True
+            if all_same:
+                value_names.append(v.item(0))
+            else:
+                if single_value:
+                    value_names.append("array")
                 else:
-                    if single_value:
-                        value_names.append("array")
+                    if "array" not in type_id_counts:
+                        type_id_counts["array"] = {}
+                    if id(v) not in type_id_counts["array"]:
+                        value_names.append("array_%d" % (len(type_id_counts["array"])))
+                        type_id_counts["array"][id(v)] = 0
                     else:
-                        value_names.append("array_%d" % counts["array"])
-                        counts["array"] += 1
+                        value_names.append("array_%d" % (type_id_counts["array"][id(v)]))
+                    type_id_counts["array"][id(v)] += 1
         else:
             type_name = str(type(v).__name__)
             if single_value:
                 value_names.append("%s" % type_name)
             else:
-                value_names.append("%s_%d" % (type_name, counts[type_name]))
-                counts[type_name] += 1
+                if type_name not in type_id_counts:
+                    type_id_counts[type_name] = {}
+                if id(v) not in type_id_counts[type_name]:
+                    value_names.append("%s_%d" % (type_name, len(type_id_counts[type_name])))
+                    type_id_counts[type_name][id(v)] = 0
+                else:
+                    value_names.append("%s_%d" % (type_name, type_id_counts[type_name][id(v)]))
+                type_id_counts[type_name][id(v)] += 1
     if single_value and len(values) > 1:
         value_names *= len(values)
     return pd.Index(value_names, name=name)

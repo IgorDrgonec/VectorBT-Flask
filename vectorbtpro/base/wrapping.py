@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from pandas.core.groupby import GroupBy as PandasGroupBy
 from pandas.core.resample import Resampler as PandasResampler
+from pandas.tseries.frequencies import to_offset
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import indexes, reshaping
@@ -1111,7 +1112,9 @@ class ArrayWrapper(Configured, PandasIndexer):
             pass
         if isinstance(self.index, pd.DatetimeIndex):
             try:
-                return Grouper(index=self.index, group_by=self.index.to_period(by))
+                by = to_offset(by)
+                if by.n == 1:
+                    return Grouper(index=self.index, group_by=self.index.to_period(by))
             except Exception as e:
                 pass
             try:

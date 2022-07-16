@@ -82,11 +82,14 @@ def prepare_params(
     param_settings: tp.Sequence[tp.KwargsLike],
     input_shape: tp.Optional[tp.Shape] = None,
     to_2d: bool = False,
+    context: tp.KwargsLike = None,
 ) -> tp.List[tp.Params]:
     """Prepare parameters.
 
     Resolves references and performs broadcasting to the input shape."""
     # Resolve references
+    if context is None:
+        context = {}
     pool = dict(zip(param_names, param_list))
     for k in pool:
         pool[k] = resolve_ref(pool, k)
@@ -109,8 +112,14 @@ def prepare_params(
             dict(require_kwargs=dict(requirements="W")),
             _param_settings.get("broadcast_kwargs", None),
         )
+        template = _param_settings.get("template", None)
 
         new_p_values = params_to_list(p_values, is_tuple, is_array_like)
+        if template is not None:
+            new_p_values = [
+                template.substitute(context={param_names[i]: new_p_values[j], **context})
+                for j in range(len(new_p_values))
+            ]
         if not bc_to_input:
             if is_array_like:
                 new_p_values = list(map(np.asarray, new_p_values))
@@ -197,7 +206,7 @@ def build_columns(
                 param_index = None
                 for p in p_values:
                     bc_param = np.broadcast_to(p, (len(input_columns),))
-                    _param_index = indexes.index_from_values(bc_param, single_value=_single_value, name=level_name)
+                    _param_index = indexes.index_from_values(bc_param, single_value=False, name=level_name)
                     if param_index is None:
                         param_index = _param_index
                     else:
@@ -330,6 +339,7 @@ def run_pipeline(
                 To treat it as multiple values, pack it into a list.
             * `is_array_like`: If array-like object was passed, it will be considered as a single value.
                 To treat it as multiple values, pack it into a list.
+            * `template`: Template to substitute each parameter value with, before broadcasting to input.
             * `bc_to_input`: Whether to broadcast parameter to input size. You can also broadcast
                 parameter to an axis by passing an integer.
             * `broadcast_kwargs`: Keyword arguments passed to `vectorbtpro.base.reshaping.broadcast`.
@@ -440,6 +450,7 @@ def run_pipeline(
                     "dtype",
                     "is_tuple",
                     "is_array_like",
+                    "template",
                     "bc_to_input",
                     "broadcast_kwargs",
                     "per_column",
@@ -494,11 +505,46 @@ def run_pipeline(
     if to_2d:
         if input_shape is not None:
             input_shape_ready = input_shape_2d  # ready for custom_func
+    if wrapper is not None:
+        wrapper_ready = wrapper
+    elif input_index is not None and input_columns is not None and input_shape_ready is not None:
+        wrapper_ready = ArrayWrapper(input_index, input_columns, len(input_shape_ready))
+    else:
+        wrapper_ready = None
+
+    # Prepare inputs
+    input_list_ready = []
+    for input in input_list:
+        new_input = input
+        if to_2d:
+            new_input = reshaping.to_2d(input)
+        if keep_pd and isinstance(new_input, np.ndarray):
+            # Keep as pandas object
+            new_input = ArrayWrapper(input_index, input_columns, new_input.ndim).wrap(new_input)
+        input_list_ready.append(new_input)
 
     # Prepare parameters
     # NOTE: input_shape instead of input_shape_ready since parameters should
     # broadcast by the same rules as inputs
-    param_list = prepare_params(param_list, param_names, param_settings, input_shape=input_shape, to_2d=to_2d)
+    param_context = merge_dicts(
+        broadcast_named_args,
+        dict(
+            input_shape=input_shape_ready,
+            wrapper=wrapper_ready,
+            **dict(zip(input_names, input_list_ready)),
+            pre_sub_args=args,
+            pre_sub_kwargs=kwargs,
+        ),
+        template_context,
+    )
+    param_list = prepare_params(
+        param_list,
+        param_names,
+        param_settings,
+        input_shape=input_shape,
+        to_2d=to_2d,
+        context=param_context,
+    )
     single_value = list(map(lambda x: len(x) == 1, param_list))
     if len(param_list) > 1:
         if level_names is not None:
@@ -538,17 +584,6 @@ def run_pipeline(
     else:
         param_list_ready = param_list_unique
     n_unique_param_values = len(param_list_unique[0]) if len(param_list_unique) > 0 else 1
-
-    # Prepare inputs
-    input_list_ready = []
-    for input in input_list:
-        new_input = input
-        if to_2d:
-            new_input = reshaping.to_2d(input)
-        if keep_pd and isinstance(new_input, np.ndarray):
-            # Keep as pandas object
-            new_input = ArrayWrapper(input_index, input_columns, new_input.ndim).wrap(new_input)
-        input_list_ready.append(new_input)
 
     # Prepare in-place outputs
     in_output_list_ready = []
@@ -619,10 +654,7 @@ def run_pipeline(
                 raise ValueError("Cannot determine flex_2d without inputs")
             func_kwargs["flex_2d"] = len(input_shape) == 2
         if pass_wrapper:
-            if wrapper is not None:
-                func_kwargs["wrapper"] = wrapper
-            else:
-                func_kwargs["wrapper"] = ArrayWrapper(input_index, input_columns, len(input_shape_ready))
+            func_kwargs["wrapper"] = wrapper_ready
         if pass_per_column:
             func_kwargs["per_column"] = per_column
 
@@ -636,6 +668,7 @@ def run_pipeline(
                 broadcast_named_args,
                 dict(
                     input_shape=input_shape_ready,
+                    wrapper=wrapper_ready,
                     **dict(zip(input_names, input_list_ready)),
                     **dict(zip(in_output_names, in_output_list_ready)),
                     **dict(zip(param_names, param_list_ready)),

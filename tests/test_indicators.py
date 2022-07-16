@@ -806,9 +806,9 @@ class TestFactory:
             index=ts.index,
             columns=pd.MultiIndex.from_tuples(
                 [
-                    ("array_0", "a"),
-                    ("array_0", "b"),
-                    ("array_0", "c"),
+                    ("array", "a"),
+                    ("array", "b"),
+                    ("array", "c"),
                 ],
                 names=["custom_p", None],
             ),
@@ -870,9 +870,9 @@ class TestFactory:
             index=ts.index,
             columns=pd.MultiIndex.from_tuples(
                 [
-                    ("array_0", "a"),
-                    ("array_0", "b"),
-                    ("array_0", "c"),
+                    ("array", "a"),
+                    ("array", "b"),
+                    ("array", "c"),
                 ],
                 names=["custom_p", None],
             ),
@@ -902,9 +902,9 @@ class TestFactory:
             index=ts.index,
             columns=pd.MultiIndex.from_tuples(
                 [
-                    ("tuple_0", "a"),
-                    ("tuple_0", "b"),
-                    ("tuple_0", "c"),
+                    ("tuple", "a"),
+                    ("tuple", "b"),
+                    ("tuple", "c"),
                 ],
                 names=["custom_p", None],
             ),

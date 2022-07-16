@@ -468,3 +468,56 @@ def ols_spread_apply_nb(
         h = hash(window)
         return cache_dict[h]
     return ols_spread_nb(x, y, window, ddof=ddof, minp=minp)
+
+
+
+@register_jitted(cache=True)
+def vwap_1d_nb(
+    high: tp.Array1d,
+    low: tp.Array1d,
+    close: tp.Array1d,
+    volume: tp.Array1d,
+    group_lens: tp.GroupLens,
+) -> tp.Array1d:
+    """Compute the volume-weighted average price (VWAP)."""
+    out = np.empty_like(volume, dtype=np.float_)
+
+    group_end_idxs = np.cumsum(group_lens)
+    group_start_idxs = group_end_idxs - group_lens
+    for group in range(len(group_lens)):
+        from_i = group_start_idxs[group]
+        to_i = group_end_idxs[group]
+        nom_cumsum = 0
+        denum_cumsum = 0
+        for i in range(from_i, to_i):
+            nom_cumsum += volume[i] * (high[i] + low[i] + close[i]) / 3
+            denum_cumsum += volume[i]
+            out[i] = nom_cumsum / denum_cumsum
+    return out
+
+
+@register_jitted(cache=True)
+def vwap_apply_nb(
+    high: tp.Array2d,
+    low: tp.Array2d,
+    close: tp.Array2d,
+    volume: tp.Array2d,
+    group_lens: tp.GroupLens,
+) -> tp.Array2d:
+    """Apply function for `vectorbtpro.indicators.custom.VWAP`."""
+    out = np.empty_like(volume, dtype=np.float_)
+
+    group_end_idxs = np.cumsum(group_lens)
+    group_start_idxs = group_end_idxs - group_lens
+    for group in range(len(group_lens)):
+        from_i = group_start_idxs[group]
+        to_i = group_end_idxs[group]
+        for col in range(volume.shape[1]):
+            nom_cumsum = 0
+            denum_cumsum = 0
+            for i in range(from_i, to_i):
+                typical_price = (high[i, col] + low[i, col] + close[i, col]) / 3
+                nom_cumsum += volume[i, col] * typical_price
+                denum_cumsum += volume[i, col]
+                out[i, col] = nom_cumsum / denum_cumsum
+    return out

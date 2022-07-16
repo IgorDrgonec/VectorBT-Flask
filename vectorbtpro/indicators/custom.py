@@ -62,16 +62,19 @@ Date
 ![](/assets/images/custom_price.svg)"""
 
 import numpy as np
+import pandas as pd
 import scipy.stats as st
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic import nb as generic_nb, enums as generic_enums
 from vectorbtpro.indicators import nb
 from vectorbtpro.indicators.factory import IndicatorFactory
 from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.config import merge_dicts
+from vectorbtpro.utils.template import RepFunc
 
-__all__ = ["MA", "MSD", "BBANDS", "RSI", "STOCH", "MACD", "ATR", "OBV", "OLS", "OLSS", "PATSIM"]
+__all__ = ["MA", "MSD", "BBANDS", "RSI", "STOCH", "MACD", "ATR", "OBV", "OLS", "OLSS", "PATSIM", "VWAP"]
 
 # ############# MA ############# #
 
@@ -238,16 +241,11 @@ class _MSD(MSD):
 
             ![](/assets/images/MSD.svg)
         """
-        from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
 
         plotting_cfg = settings["plotting"]
 
         self_col = self.select_col(column=column)
-
-        if fig is None:
-            fig = make_figure()
-        fig.update_layout(**layout_kwargs)
 
         if msd_trace_kwargs is None:
             msd_trace_kwargs = {}
@@ -260,6 +258,7 @@ class _MSD(MSD):
             trace_kwargs=msd_trace_kwargs,
             add_trace_kwargs=add_trace_kwargs,
             fig=fig,
+            **layout_kwargs,
         )
 
         return fig
@@ -382,8 +381,7 @@ class _BBANDS(BBANDS):
             upper_trace_kwargs,
         )  # default kwargs
         middle_trace_kwargs = merge_dicts(
-            dict(name="Middle band", line=dict(color=plotting_cfg["color_schema"]["lightblue"])),
-            middle_trace_kwargs
+            dict(name="Middle band", line=dict(color=plotting_cfg["color_schema"]["lightblue"])), middle_trace_kwargs
         )
         close_trace_kwargs = merge_dicts(
             dict(name="Close", line=dict(color=plotting_cfg["color_schema"]["blue"])),
@@ -484,15 +482,11 @@ class _RSI(RSI):
 
             ![](/assets/images/RSI.svg)
         """
-        from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
 
         plotting_cfg = settings["plotting"]
 
         self_col = self.select_col(column=column)
-
-        if fig is None:
-            fig = make_figure()
 
         if rsi_trace_kwargs is None:
             rsi_trace_kwargs = {}
@@ -614,15 +608,11 @@ class _STOCH(STOCH):
 
             ![](/assets/images/STOCH.svg)
         """
-        from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
 
         plotting_cfg = settings["plotting"]
 
         self_col = self.select_col(column=column)
-
-        if fig is None:
-            fig = make_figure()
 
         if fast_k_trace_kwargs is None:
             fast_k_trace_kwargs = {}
@@ -792,12 +782,10 @@ class _MACD(MACD):
         if hist_trace_kwargs is None:
             hist_trace_kwargs = {}
         macd_trace_kwargs = merge_dicts(
-            dict(name="MACD", line=dict(color=plotting_cfg["color_schema"]["lightblue"])),
-            macd_trace_kwargs
+            dict(name="MACD", line=dict(color=plotting_cfg["color_schema"]["lightblue"])), macd_trace_kwargs
         )
         signal_trace_kwargs = merge_dicts(
-            dict(name="Signal", line=dict(color=plotting_cfg["color_schema"]["lightpurple"])),
-            signal_trace_kwargs
+            dict(name="Signal", line=dict(color=plotting_cfg["color_schema"]["lightpurple"])), signal_trace_kwargs
         )
 
         fig = self_col.macd.vbt.lineplot(
@@ -820,13 +808,16 @@ class _MACD(MACD):
         marker_colors[(hist < 0) & (hist_diff < 0)] = adjust_opacity("red", 0.75)
         marker_colors[(hist < 0) & (hist_diff >= 0)] = adjust_opacity("lightcoral", 0.75)
 
-        _hist_trace_kwargs = merge_dicts(dict(
-            name="Histogram",
-            x=self_col.hist.index,
-            y=self_col.hist.values,
-            marker_color=marker_colors,
-            marker_line_width=0,
-        ), hist_trace_kwargs)
+        _hist_trace_kwargs = merge_dicts(
+            dict(
+                name="Histogram",
+                x=self_col.hist.index,
+                y=self_col.hist.values,
+                marker_color=marker_colors,
+                marker_line_width=0,
+            ),
+            hist_trace_kwargs,
+        )
         hist_bar = go.Bar(**_hist_trace_kwargs)
         if add_trace_kwargs is None:
             add_trace_kwargs = {}
@@ -1320,6 +1311,163 @@ class _PATSIM(PATSIM):
 
             ![](/assets/images/PATSIM.svg)
         """
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
+
+        self_col = self.select_col(column=column)
+
+        similarity_trace_kwargs = merge_dicts(
+            dict(name="Similarity", line=dict(color=plotting_cfg["color_schema"]["lightblue"])),
+            similarity_trace_kwargs,
+        )
+
+        fig = self_col.similarity.vbt.lineplot(
+            trace_kwargs=similarity_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+            **layout_kwargs,
+        )
+
+        return fig
+
+    def plot_heatmap(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        close_trace_kwargs: tp.KwargsLike = None,
+        similarity_trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs
+    ) -> tp.BaseFigure:  # pragma: no cover
+        """Overlay `PATSIM.similarity` as a heatmap on top of `PATSIM.close`.
+
+        Args:
+            column (str): Name of the column to plot.
+            close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `PATSIM.close`.
+            similarity_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Heatmap` for `PATSIM.similarity`.
+            add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
+            fig (Figure or FigureWidget): Figure to add traces to.
+            **layout_kwargs: Keyword arguments passed to `fig.update_layout`.
+
+        Usage:
+            ```pycon
+            >>> vbt.PATSIM.run(ohlcv['Close'], np.array([1, 2, 3, 2, 1]), 30).plot_heatmap()
+            ```
+
+            ![](/assets/images/PATSIM_heatmap.svg)
+        """
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
+
+        self_col = self.select_col(column=column)
+
+        if close_trace_kwargs is None:
+            close_trace_kwargs = {}
+        if similarity_trace_kwargs is None:
+            similarity_trace_kwargs = {}
+        close_trace_kwargs = merge_dicts(
+            dict(name="Close", line=dict(color=plotting_cfg["color_schema"]["blue"])),
+            close_trace_kwargs,
+        )
+        similarity_trace_kwargs = merge_dicts(
+            dict(
+                colorscale=[
+                    [0.0, "rgba(0, 0, 0, 0)"],
+                    [1.0, plotting_cfg["color_schema"]["lightpurple"]],
+                ],
+                zmin=0,
+                zmax=1,
+            ),
+            similarity_trace_kwargs,
+        )
+
+        fig = self_col.close.vbt.overlay_with_heatmap(
+            self_col.similarity,
+            trace_kwargs=close_trace_kwargs,
+            heatmap_kwargs=dict(y_labels=["Similarity"], trace_kwargs=similarity_trace_kwargs),
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+            **layout_kwargs,
+        )
+
+        return fig
+
+
+setattr(PATSIM, "__doc__", _PATSIM.__doc__)
+setattr(PATSIM, "plot", _PATSIM.plot)
+setattr(PATSIM, "plot_heatmap", _PATSIM.plot_heatmap)
+
+
+# ############# VWAP ############# #
+
+
+def substitute_anchor(wrapper: ArrayWrapper, anchor: tp.Optional[tp.FrequencyLike]) -> tp.Array1d:
+    """Substitute reset frequency by group lens."""
+    if anchor is None:
+        return np.array([wrapper.shape[0]])
+    return wrapper.create_index_grouper(anchor).get_group_lens()
+
+
+VWAP = IndicatorFactory(
+    class_name="VWAP",
+    module_name=__name__,
+    short_name="vwap",
+    input_names=["high", "low", "close", "volume"],
+    param_names=["anchor"],
+    output_names=["vwap"],
+).with_apply_func(
+    nb.vwap_apply_nb,
+    param_settings=dict(
+        anchor=dict(template=RepFunc(substitute_anchor)),
+    ),
+    anchor="D",
+)
+
+
+class _VWAP(VWAP):
+    """Volume-Weighted Average Price (VWAP).
+
+    VWAP is a technical analysis indicator used on intraday charts that resets at the start
+    of every new trading session.
+
+    See [Volume-Weighted Average Price (VWAP)](https://www.investopedia.com/terms/v/vwap.asp)."""
+
+    def plot(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        plot_close: bool = True,
+        close_trace_kwargs: tp.KwargsLike = None,
+        vwap_trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs
+    ) -> tp.BaseFigure:  # pragma: no cover
+        """Plot `VWAP.vwap` against `VWAP.close`.
+
+        Args:
+            column (str): Name of the column to plot.
+            plot_close (bool): Whether to plot `VWAP.close`.
+            close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `VWAP.close`.
+            vwap_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `VWAP.vwap`.
+            add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
+            fig (Figure or FigureWidget): Figure to add traces to.
+            **layout_kwargs: Keyword arguments passed to `fig.update_layout`.
+
+        Usage:
+            ```pycon
+            >>> vbt.VWAP.run(
+            ...    ohlcv['High'],
+            ...    ohlcv['Low'],
+            ...    ohlcv['Close'],
+            ...    ohlcv['Volume'],
+            ...    anchor="W"
+            ... ).plot()
+            ```
+
+            ![](/assets/images/VWAP.svg)
+        """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
 
@@ -1331,13 +1479,27 @@ class _PATSIM(PATSIM):
             fig = make_figure()
         fig.update_layout(**layout_kwargs)
 
-        similarity_trace_kwargs = merge_dicts(
-            dict(name="Similarity", line=dict(color=plotting_cfg["color_schema"]["lightblue"])),
-            similarity_trace_kwargs,
+        if close_trace_kwargs is None:
+            close_trace_kwargs = {}
+        if vwap_trace_kwargs is None:
+            vwap_trace_kwargs = {}
+        close_trace_kwargs = merge_dicts(
+            dict(name="Close", line=dict(color=plotting_cfg["color_schema"]["blue"])),
+            close_trace_kwargs,
+        )
+        vwap_trace_kwargs = merge_dicts(
+            dict(name="VWAP", line=dict(color=plotting_cfg["color_schema"]["lightblue"])),
+            vwap_trace_kwargs,
         )
 
-        fig = self_col.similarity.vbt.lineplot(
-            trace_kwargs=similarity_trace_kwargs,
+        if plot_close:
+            fig = self_col.close.vbt.lineplot(
+                trace_kwargs=close_trace_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                fig=fig,
+            )
+        fig = self_col.vwap.vbt.lineplot(
+            trace_kwargs=vwap_trace_kwargs,
             add_trace_kwargs=add_trace_kwargs,
             fig=fig,
         )
@@ -1345,5 +1507,5 @@ class _PATSIM(PATSIM):
         return fig
 
 
-setattr(PATSIM, "__doc__", _PATSIM.__doc__)
-setattr(PATSIM, "plot", _PATSIM.plot)
+setattr(VWAP, "__doc__", _VWAP.__doc__)
+setattr(VWAP, "plot", _VWAP.plot)
