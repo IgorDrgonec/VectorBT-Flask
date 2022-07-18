@@ -890,13 +890,13 @@ class Configured(Cacheable, Pickleable, Prettified):
         if check_expected_keys_:
             if isinstance(check_expected_keys_, bool):
                 check_expected_keys_ = "raise"
-            keys_diff = set(config.keys()).difference(self._expected_keys)
+            keys_diff = list(set(config.keys()).difference(self._expected_keys))
             if len(keys_diff) > 0:
                 checks.assert_in(check_expected_keys_, ("warn", "raise"))
                 if check_expected_keys_ == "warn":
-                    warnings.warn(f"{type(self).__name__} doesn't expect keys {keys_diff}", stacklevel=2)
+                    warnings.warn(f"{type(self).__name__} doesn't expect arguments {keys_diff}", stacklevel=2)
                 else:
-                    raise ValueError(f"{type(self).__name__} doesn't expect keys {keys_diff}")
+                    raise ValueError(f"{type(self).__name__} doesn't expect arguments {keys_diff}")
 
         self._config = Config(**merge_dicts(configured_cfg["config"], config))
 

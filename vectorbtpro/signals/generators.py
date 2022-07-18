@@ -575,7 +575,7 @@ def _bind_ohlcstx_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pra
             fig = ohlc_df.vbt.ohlcv.plot(fig=fig, **ohlc_kwargs)
         else:
             entry_price_kwargs = merge_dicts(layout_kwargs, entry_price_kwargs)
-            fig = self_col.entry_price.rename("Entry price").vbt.plot(fig=fig, **entry_price_kwargs)
+            fig = self_col.entry_price.rename("Entry price").vbt.lineplot(fig=fig, **entry_price_kwargs)
 
         # Plot entry and exit markers
         _base_cls_plot(

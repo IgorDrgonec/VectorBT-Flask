@@ -24,9 +24,9 @@ from plotly.basedatatypes import BaseTraceType
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import reshaping
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.array_ import renormalize
+from vectorbtpro.utils.array_ import rescale
 from vectorbtpro.utils.colors import map_value_to_cmap
-from vectorbtpro.utils.config import Configured, resolve_dict
+from vectorbtpro.utils.config import Configured, resolve_dict, merge_dicts
 from vectorbtpro.utils.figure import make_figure, FigureResampler, FigureWidgetResampler
 
 __all__ = ["TraceUpdater", "Gauge", "Bar", "Scatter", "Histogram", "Box", "Heatmap", "Volume"]
@@ -140,8 +140,15 @@ class Gauge(Configured, TraceUpdater):
                 fig.update_layout(width=layout_cfg["width"] * 0.7, height=layout_cfg["width"] * 0.5, margin=dict(t=80))
         fig.update_layout(**layout_kwargs)
 
-        trace = go.Indicator(domain=dict(x=[0, 1], y=[0, 1]), mode="gauge+number+delta", title=dict(text=label))
-        trace.update(**trace_kwargs)
+        _trace_kwargs = merge_dicts(
+            dict(
+                domain=dict(x=[0, 1], y=[0, 1]),
+                mode="gauge+number+delta",
+                title=dict(text=label),
+            ),
+            trace_kwargs,
+        )
+        trace = go.Indicator(**_trace_kwargs)
         if value is not None:
             self.update_trace(trace, value, value_range=value_range, cmap_name=cmap_name)
         fig.add_trace(trace, **add_trace_kwargs)
@@ -271,8 +278,11 @@ class Bar(Configured, TraceUpdater):
             trace_name = _trace_kwargs.pop("name", trace_name)
             if trace_name is not None:
                 trace_name = str(trace_name)
-            trace = go.Bar(x=x_labels, name=trace_name, showlegend=trace_name is not None)
-            trace.update(**_trace_kwargs)
+            _trace_kwargs = merge_dicts(
+                dict(x=x_labels, name=trace_name, showlegend=trace_name is not None),
+                _trace_kwargs,
+            )
+            trace = go.Bar(**_trace_kwargs)
             if data is not None:
                 self.update_trace(trace, data, i)
             fig.add_trace(trace, **add_trace_kwargs)
@@ -404,11 +414,18 @@ class Scatter(Configured, TraceUpdater):
             if use_resampler:
                 if data is None:
                     raise ValueError("Cannot create empty scatter traces when using plotly-resampler")
-                trace = scatter_obj(name=trace_name, showlegend=trace_name is not None)
+                _trace_kwargs = merge_dicts(
+                    dict(name=trace_name, showlegend=trace_name is not None),
+                    _trace_kwargs,
+                )
+                trace = scatter_obj(**_trace_kwargs)
                 fig.add_trace(trace, hf_x=x_labels, hf_y=data[:, i], **add_trace_kwargs)
             else:
-                trace = scatter_obj(x=x_labels, name=trace_name, showlegend=trace_name is not None)
-                trace.update(**_trace_kwargs)
+                _trace_kwargs = merge_dicts(
+                    dict(x=x_labels, name=trace_name, showlegend=trace_name is not None),
+                    _trace_kwargs,
+                )
+                trace = scatter_obj(**_trace_kwargs)
                 if data is not None:
                     self.update_trace(trace, data, i)
                 fig.add_trace(trace, **add_trace_kwargs)
@@ -521,12 +538,15 @@ class Histogram(Configured, TraceUpdater):
             trace_name = _trace_kwargs.pop("name", trace_name)
             if trace_name is not None:
                 trace_name = str(trace_name)
-            trace = go.Histogram(
-                opacity=0.75 if len(trace_names) > 1 else 1,
-                name=trace_name,
-                showlegend=trace_name is not None,
+            _trace_kwargs = merge_dicts(
+                dict(
+                    opacity=0.75 if len(trace_names) > 1 else 1,
+                    name=trace_name,
+                    showlegend=trace_name is not None,
+                ),
+                _trace_kwargs,
             )
-            trace.update(**_trace_kwargs)
+            trace = go.Histogram(**_trace_kwargs)
             if data is not None:
                 self.update_trace(
                     trace,
@@ -682,8 +702,11 @@ class Box(Configured, TraceUpdater):
             trace_name = _trace_kwargs.pop("name", trace_name)
             if trace_name is not None:
                 trace_name = str(trace_name)
-            trace = go.Box(name=trace_name, showlegend=trace_name is not None)
-            trace.update(**_trace_kwargs)
+            _trace_kwargs = merge_dicts(
+                dict(name=trace_name, showlegend=trace_name is not None),
+                _trace_kwargs,
+            )
+            trace = go.Box(**_trace_kwargs)
             if data is not None:
                 self.update_trace(
                     trace,
@@ -856,14 +879,17 @@ class Heatmap(Configured, TraceUpdater):
                 else:
                     x_len = len(x_labels)
                     y_len = len(y_labels)
-                width = math.ceil(renormalize(x_len / (x_len + y_len), (0, 1), (0.3 * max_width, max_width)))
+                width = math.ceil(rescale(x_len / (x_len + y_len), (0, 1), (0.3 * max_width, max_width)))
                 width = min(width + 150, max_width)  # account for colorbar
-                height = math.ceil(renormalize(y_len / (x_len + y_len), (0, 1), (0.3 * max_width, max_width)))
+                height = math.ceil(rescale(y_len / (x_len + y_len), (0, 1), (0.3 * max_width, max_width)))
                 height = min(height, max_width * 0.7)  # limit height
                 fig.update_layout(width=width, height=height)
 
-        trace = go.Heatmap(hoverongaps=False, colorscale="Plasma", x=x_labels, y=y_labels)
-        trace.update(**trace_kwargs)
+        _trace_kwargs = merge_dicts(
+            dict(hoverongaps=False, colorscale="Plasma", x=x_labels, y=y_labels),
+            trace_kwargs,
+        )
+        trace = go.Heatmap(**_trace_kwargs)
         if data is not None:
             self.update_trace(trace, data)
         fig.add_trace(trace, **add_trace_kwargs)
@@ -1027,8 +1053,11 @@ class Volume(Configured, TraceUpdater):
         y = np.tile(np.repeat(y_labels, len(z_labels)), len(x_labels))
         z = np.tile(z_labels, len(x_labels) * len(y_labels))
 
-        trace = go.Volume(x=x, y=y, z=z, opacity=0.2, surface_count=15, colorscale="Plasma")  # keep low for big data
-        trace.update(**trace_kwargs)
+        _trace_kwargs = merge_dicts(
+            dict(x=x, y=y, z=z, opacity=0.2, surface_count=15, colorscale="Plasma"),
+            trace_kwargs,
+        )
+        trace = go.Volume(**_trace_kwargs)
         if data is not None:
             self.update_trace(trace, data)
         fig.add_trace(trace, **add_trace_kwargs)

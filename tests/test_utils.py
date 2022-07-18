@@ -1578,15 +1578,15 @@ class TestArray:
         )
         assert np.sum(array_.uniform_summing_to_one_nb(10)) == 1
 
-    def test_renormalize(self):
-        assert array_.renormalize(0, (0, 10), (0, 1)) == 0
-        assert array_.renormalize(10, (0, 10), (0, 1)) == 1
+    def test_rescale(self):
+        assert array_.rescale(0, (0, 10), (0, 1)) == 0
+        assert array_.rescale(10, (0, 10), (0, 1)) == 1
         np.testing.assert_array_equal(
-            array_.renormalize(np.array([0, 2, 4, 6, 8, 10]), (0, 10), (0, 1)),
+            array_.rescale(np.array([0, 2, 4, 6, 8, 10]), (0, 10), (0, 1)),
             np.array([0.0, 0.2, 0.4, 0.6, 0.8, 1.0]),
         )
         np.testing.assert_array_equal(
-            array_.renormalize_nb(np.array([0, 2, 4, 6, 8, 10]), (0, 10), (0, 1)),
+            array_.rescale_nb(np.array([0, 2, 4, 6, 8, 10]), (0, 10), (0, 1)),
             np.array([0.0, 0.2, 0.4, 0.6, 0.8, 1.0]),
         )
 

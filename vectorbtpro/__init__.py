@@ -27,7 +27,8 @@ from vectorbtpro.px import *
 from vectorbtpro import _typing as tp
 from vectorbtpro._settings import settings
 from vectorbtpro.accessors import Vbt_Accessor as pd_acc, Vbt_SRAccessor as sr_acc, Vbt_DFAccessor as df_acc
-from vectorbtpro.generic import nb
+from vectorbtpro.generic import nb, enums
+from vectorbtpro.portfolio import nb as pf_nb, enums as pf_enums
 
 # Import all submodules
 from vectorbtpro.utils.module_ import import_submodules

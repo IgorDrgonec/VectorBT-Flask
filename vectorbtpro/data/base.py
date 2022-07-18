@@ -390,7 +390,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                     elif missing == "raise":
                         raise ValueError("Symbols have mismatching index")
                     else:
-                        raise ValueError(f"missing='{missing}' is not recognized")
+                        raise ValueError(f"Invalid option missing='{missing}'")
 
         # reindex
         new_data = symbol_dict({symbol: obj.reindex(index=index) for symbol, obj in data.items()})
@@ -450,7 +450,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                     elif missing == "raise":
                         raise ValueError("Symbols have mismatching columns")
                     else:
-                        raise ValueError(f"missing='{missing}' is not recognized")
+                        raise ValueError(f"Invalid option missing='{missing}'")
 
         # reindex
         new_data = symbol_dict()
@@ -468,10 +468,12 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
     @staticmethod
     def select_symbol_kwargs(symbol: tp.Symbol, kwargs: tp.DictLike) -> dict:
         """Select keyword arguments belonging to `symbol`."""
-        if isinstance(kwargs, symbol_dict):
-            kwargs = kwargs[symbol]
         if kwargs is None:
-            kwargs = {}
+            return {}
+        if isinstance(kwargs, symbol_dict):
+            if symbol not in kwargs:
+                return {}
+            kwargs = kwargs[symbol]
         _kwargs = {}
         for k, v in kwargs.items():
             if isinstance(v, symbol_dict):
@@ -1147,9 +1149,12 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                 else:
                     new_s = rename[s]
                 data[new_s] = instance.data[s]
-                fetch_kwargs[new_s] = instance.fetch_kwargs[s]
-                returned_kwargs[new_s] = instance.returned_kwargs[s]
-                last_index[new_s] = instance.last_index[s]
+                if s in instance.fetch_kwargs:
+                    fetch_kwargs[new_s] = instance.fetch_kwargs[s]
+                if s in instance.returned_kwargs:
+                    returned_kwargs[new_s] = instance.returned_kwargs[s]
+                if s in instance.last_index:
+                    last_index[new_s] = instance.last_index[s]
 
         return cls.from_data(
             data=data,
@@ -1612,7 +1617,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         data = self_col.get()
         if base is not None:
             data = data.vbt.rebase(base)
-        return data.vbt.plot(**kwargs)
+        return data.vbt.lineplot(**kwargs)
 
     @property
     def plots_defaults(self) -> tp.Kwargs:

@@ -86,7 +86,7 @@ def uniform_summing_to_one_nb(n: int) -> tp.Array1d:
     return rand_floats
 
 
-def renormalize(
+def rescale(
     arr: tp.MaybeArray[float],
     from_range: tp.Tuple[float, float],
     to_range: tp.Tuple[float, float],
@@ -98,12 +98,12 @@ def renormalize(
 
 
 @register_jitted(cache=True)
-def renormalize_nb(
+def rescale_nb(
     arr: tp.MaybeArray[float],
     from_range: tp.Tuple[float, float],
     to_range: tp.Tuple[float, float],
 ) -> tp.MaybeArray[float]:
-    """Numba-compiled version of `renormalize`."""
+    """Numba-compiled version of `rescale`."""
     from_delta = from_range[1] - from_range[0]
     to_delta = to_range[1] - to_range[0]
     return (to_delta * (arr - from_range[0]) / from_delta) + to_range[0]
@@ -124,7 +124,7 @@ def min_rel_rescale(arr: tp.Array, to_range: tp.Tuple[float, float]) -> tp.Array
     to_range_ratio = to_range[1] / to_range[0]
     if from_range_ratio < to_range_ratio:
         to_range = (to_range[0], to_range[0] * from_range_ratio)
-    return renormalize(arr, from_range, to_range)
+    return rescale(arr, from_range, to_range)
 
 
 def max_rel_rescale(arr: tp.Array, to_range: tp.Tuple[float, float]) -> tp.Array:
@@ -142,13 +142,13 @@ def max_rel_rescale(arr: tp.Array, to_range: tp.Tuple[float, float]) -> tp.Array
     to_range_ratio = to_range[1] / to_range[0]
     if from_range_ratio < to_range_ratio:
         to_range = (to_range[1] / from_range_ratio, to_range[1])
-    return renormalize(arr, from_range, to_range)
+    return rescale(arr, from_range, to_range)
 
 
 @register_jitted(cache=True)
 def rescale_float_to_int_nb(floats: tp.Array, int_range: tp.Tuple[float, float], total: float) -> tp.Array:
     """Rescale a float array into an int array."""
-    ints = np.floor(renormalize_nb(floats, [0.0, 1.0], int_range))
+    ints = np.floor(rescale_nb(floats, [0.0, 1.0], int_range))
     leftover = int(total - ints.sum())
     for i in range(leftover):
         ints[np.random.choice(len(ints))] += 1

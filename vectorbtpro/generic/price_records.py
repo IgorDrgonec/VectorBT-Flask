@@ -152,8 +152,8 @@ class PriceRecords(Records):
         self._low = low
         self._close = close
 
-    def indexing_func(self: PriceRecordsT, *args, records_meta: tp.DictLike = None, **kwargs) -> PriceRecordsT:
-        """Perform indexing on `PriceRecords`."""
+    def indexing_func_meta(self, *args, records_meta: tp.DictLike = None, **kwargs) -> dict:
+        """Perform indexing on `PriceRecords` and also return metadata."""
         if records_meta is None:
             records_meta = Records.indexing_func_meta(self, *args, **kwargs)
         prices = {}
@@ -167,13 +167,19 @@ class PriceRecords(Records):
             else:
                 new_price = None
             prices[price_name] = new_price
+        return {"records_meta": records_meta, **prices}
+
+    def indexing_func(self: PriceRecordsT, *args, price_records_meta: tp.DictLike = None, **kwargs) -> PriceRecordsT:
+        """Perform indexing on `PriceRecords`."""
+        if price_records_meta is None:
+            price_records_meta = self.indexing_func_meta(*args, **kwargs)
         return self.replace(
-            wrapper=records_meta["wrapper_meta"]["new_wrapper"],
-            records_arr=records_meta["new_records_arr"],
-            open=prices["open"],
-            high=prices["high"],
-            low=prices["low"],
-            close=prices["close"],
+            wrapper=price_records_meta["records_meta"]["wrapper_meta"]["new_wrapper"],
+            records_arr=price_records_meta["records_meta"]["new_records_arr"],
+            open=price_records_meta["open"],
+            high=price_records_meta["high"],
+            low=price_records_meta["low"],
+            close=price_records_meta["close"],
         )
 
     def resample(

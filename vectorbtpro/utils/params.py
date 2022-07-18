@@ -172,14 +172,21 @@ def combine_params(
         if product_idx > max_idx:
             max_idx = product_idx
 
-        product_idx_values[product_idx][k] = list(p.value)
+        if checks.is_iterable(p.value):
+            values = list(p.value)
+        else:
+            values = [p.value]
+        product_idx_values[product_idx][k] = values
         if p.keys is not None:
             if isinstance(p.keys, pd.Index):
                 product_indexes[k] = p.keys
             else:
                 product_indexes[k] = pd.Index(p.keys, name=k)
         else:
-            product_indexes[k] = indexes.index_from_values(p.value, name=k)
+            if isinstance(p.value, pd.Index):
+                product_indexes[k] = p.value
+            else:
+                product_indexes[k] = indexes.index_from_values(values, name=k)
         curr_idx += 1
 
     # Build an operation tree and parameter index

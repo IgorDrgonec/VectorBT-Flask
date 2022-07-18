@@ -336,7 +336,7 @@ def execute(
             engine_cfg = engines_cfg[engine]
             engine = engines_cfg[engine]["cls"]
         else:
-            raise ValueError(f"Engine with name '{engine}' is unknown")
+            raise ValueError(f"Invalid engine name '{engine}'")
     if isinstance(engine, type) and issubclass(engine, ExecutionEngine):
         for k, v in engines_cfg.items():
             if v["cls"] is engine:

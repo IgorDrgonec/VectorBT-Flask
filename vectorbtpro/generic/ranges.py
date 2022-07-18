@@ -30,7 +30,7 @@ are 0 and 20 (not 19!) respectively.
 >>> slow_ma = vbt.MA.run(price, 50)
 >>> fast_below_slow = fast_ma.ma_above(slow_ma)
 
->>> ranges = vbt.Ranges.from_pd(fast_below_slow, wrapper_kwargs=dict(freq='d'))
+>>> ranges = vbt.Ranges.from_array(fast_below_slow, wrapper_kwargs=dict(freq='d'))
 
 >>> ranges.records_readable
    Range Id  Column           Start Timestamp             End Timestamp  \\
@@ -79,8 +79,6 @@ Overlap Coverage                0.0
 Duration: Min       2 days 00:00:00
 Duration: Median    2 days 00:00:00
 Duration: Max       2 days 00:00:00
-Duration: Mean      2 days 00:00:00
-Duration: Std       0 days 00:00:00
 Name: a, dtype: object
 ```
 
@@ -97,8 +95,6 @@ Overlap Coverage                          0.4
 Duration: Min                 1 days 00:00:00
 Duration: Median              1 days 00:00:00
 Duration: Max                 2 days 00:00:00
-Duration: Mean                1 days 09:36:00
-Duration: Std       0 days 13:08:43.228968446
 Name: group, dtype: object
 ```
 
@@ -116,28 +112,38 @@ Name: group, dtype: object
 ![](/assets/images/ranges_plots.svg)
 """
 
+import attr
 import warnings
 
 import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.reshaping import to_pd_array, to_2d_array, broadcast_to
+from vectorbtpro.base.reshaping import to_pd_array, to_1d_array, to_2d_array
 from vectorbtpro.base.wrapping import ArrayWrapper
-from vectorbtpro.base.indexes import stack_indexes
+from vectorbtpro.base.indexes import stack_indexes, combine_indexes, tile_index
 from vectorbtpro.generic import nb
-from vectorbtpro.generic.enums import RangeStatus, range_dt
+from vectorbtpro.generic.enums import RangeStatus, range_dt, pattern_range_dt, InterpMode, RescaleMode
 from vectorbtpro.generic.price_records import PriceRecords
 from vectorbtpro.records.base import Records
 from vectorbtpro.records.decorators import override_field_config, attach_fields, attach_shortcut_properties
 from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
+from vectorbtpro.utils import checks
 from vectorbtpro.utils.colors import adjust_lightness, adjust_opacity
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig
 from vectorbtpro.utils.datetime_ import freq_to_timedelta, freq_to_timedelta64
+from vectorbtpro.utils.array_ import rescale
+from vectorbtpro.utils.enum_ import map_enum_fields
+from vectorbtpro.utils.execution import execute
+from vectorbtpro.utils.params import combine_params, Param
+from vectorbtpro.utils.random_ import set_seed
+from vectorbtpro.utils.parsing import get_func_kwargs
 
 __pdoc__ = {}
+
+# ############# Ranges ############# #
 
 ranges_field_config = ReadonlyConfig(
     dict(
@@ -213,9 +219,9 @@ class Ranges(PriceRecords):
         return self._field_config
 
     @classmethod
-    def from_pd(
+    def from_array(
         cls: tp.Type[RangesT],
-        generic: tp.ArrayLike,
+        arr: tp.ArrayLike,
         gap_value: tp.Optional[tp.Scalar] = None,
         attach_as_close: bool = True,
         jitted: tp.JittedOption = None,
@@ -223,7 +229,7 @@ class Ranges(PriceRecords):
         wrapper_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> RangesT:
-        """Build `Ranges` from Series/DataFrame.
+        """Build `Ranges` from an array.
 
         Searches for sequences of
 
@@ -231,45 +237,48 @@ class Ranges(PriceRecords):
         * positive values in integer data (-1 acts as a gap), and
         * non-NaN values in any other data (NaN acts as a gap).
 
-        If `attach_as_close` is True, will attach `generic` as `close`.
+        If `attach_as_close` is True, will attach `arr` as `close`.
 
         `**kwargs` will be passed to `Ranges.__init__`."""
         if wrapper_kwargs is None:
             wrapper_kwargs = {}
+        wrapper = ArrayWrapper.from_obj(arr, **wrapper_kwargs)
 
-        generic_arr = to_2d_array(generic)
+        arr = to_2d_array(arr)
         if gap_value is None:
-            if np.issubdtype(generic_arr.dtype, np.bool_):
+            if np.issubdtype(arr.dtype, np.bool_):
                 gap_value = False
-            elif np.issubdtype(generic_arr.dtype, np.integer):
+            elif np.issubdtype(arr.dtype, np.integer):
                 gap_value = -1
             else:
                 gap_value = np.nan
         func = jit_reg.resolve_option(nb.get_ranges_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        records_arr = func(generic_arr, gap_value)
-        wrapper = ArrayWrapper.from_obj(generic, **wrapper_kwargs)
+        records_arr = func(arr, gap_value)
         if attach_as_close:
-            return cls(wrapper, records_arr, close=generic_arr, **kwargs)
+            return cls(wrapper, records_arr, close=arr, **kwargs)
         return cls(wrapper, records_arr, **kwargs)
 
     @classmethod
     def from_delta(
-        self,
+        cls: tp.Type[RangesT],
         records_or_mapped: tp.Union[Records, MappedArray],
         delta: tp.Union[str, int, tp.FrequencyLike],
+        shift: tp.Optional[int] = None,
         idx_field_or_arr: tp.Union[None, str, tp.Array1d] = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         **kwargs,
-    ) -> "Ranges":
+    ) -> RangesT:
         """Build `Ranges` from a record/mapped array with a timedelta applied on its index field.
 
         See `vectorbtpro.generic.nb.records.get_ranges_from_delta_nb`.
 
         Set `delta` to an integer to wait a certain amount of rows. Set it to anything else to
         wait a timedelta. The conversion is done using `vectorbtpro.utils.datetime_.freq_to_timedelta64`.
-        The second option requires the index to be datetime-like, or at least the frequency to be set."""
+        The second option requires the index to be datetime-like, or at least the frequency to be set.
+
+        `**kwargs` will be passed to `Ranges.__init__`."""
         from vectorbtpro.generic.ranges import Ranges
 
         if idx_field_or_arr is None:
@@ -297,6 +306,8 @@ class Ranges(PriceRecords):
                 freq = freq_to_timedelta64(records_or_mapped.wrapper.freq).astype(np.int_)
                 index = np.arange(records_or_mapped.wrapper.shape[0]) * freq
             delta_use_index = True
+        if shift is None:
+            shift = 0
         col_map = records_or_mapped.col_mapper.get_col_map(group_by=False)
         func = jit_reg.resolve_option(nb.get_ranges_from_delta_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -308,6 +319,7 @@ class Ranges(PriceRecords):
             index=index,
             delta=delta,
             delta_use_index=delta_use_index,
+            shift=shift,
         )
         if isinstance(records_or_mapped, PriceRecords):
             kwargs = merge_dicts(
@@ -320,6 +332,40 @@ class Ranges(PriceRecords):
                 kwargs,
             )
         return Ranges.from_records(records_or_mapped.wrapper, new_records_arr, **kwargs)
+
+    def with_delta(self, *args, **kwargs):
+        """Pass self to `Ranges.from_delta`."""
+        return Ranges.from_delta(self, *args, **kwargs)
+
+    # ############# Filtering ############# #
+
+    def filter_min_duration(
+        self: RangesT,
+        min_duration: tp.Union[str, int, tp.FrequencyLike],
+        real: bool = False,
+        **kwargs,
+    ) -> RangesT:
+        """Filter out ranges that last less than a minimum duration."""
+        if isinstance(min_duration, int):
+            return self.apply_mask(self.duration.values >= min_duration, **kwargs)
+        min_duration = freq_to_timedelta64(min_duration)
+        if real:
+            return self.apply_mask(self.real_duration.values >= min_duration, **kwargs)
+        return self.apply_mask(self.duration.values * self.wrapper.freq >= min_duration, **kwargs)
+
+    def filter_max_duration(
+        self: RangesT,
+        max_duration: tp.Union[str, int, tp.FrequencyLike],
+        real: bool = False,
+        **kwargs,
+    ) -> RangesT:
+        """Filter out ranges that last more than a maximum duration."""
+        if isinstance(max_duration, int):
+            return self.apply_mask(self.duration.values <= max_duration, **kwargs)
+        max_duration = freq_to_timedelta64(max_duration)
+        if real:
+            return self.apply_mask(self.real_duration.values <= max_duration, **kwargs)
+        return self.apply_mask(self.duration.values * self.wrapper.freq <= max_duration, **kwargs)
 
     # ############# Stats ############# #
 
@@ -415,34 +461,6 @@ class Ranges(PriceRecords):
             wrap_kwargs = merge_dicts(dict(to_timedelta=True, name_or_index="max_duration"), wrap_kwargs)
         return duration.max(group_by=group_by, jitted=jitted, chunked=chunked, wrap_kwargs=wrap_kwargs, **kwargs)
 
-    def filter_min_duration(
-        self: RangesT,
-        min_duration: tp.Union[str, int, tp.FrequencyLike],
-        real: bool = False,
-        **kwargs,
-    ) -> RangesT:
-        """Filter out ranges that last less than a minimum duration."""
-        if isinstance(min_duration, int):
-            return self.apply_mask(self.duration.values >= min_duration, **kwargs)
-        min_duration = freq_to_timedelta64(min_duration)
-        if real:
-            return self.apply_mask(self.real_duration.values >= min_duration, **kwargs)
-        return self.apply_mask(self.duration.values * self.wrapper.freq >= min_duration, **kwargs)
-
-    def filter_max_duration(
-        self: RangesT,
-        max_duration: tp.Union[str, int, tp.FrequencyLike],
-        real: bool = False,
-        **kwargs,
-    ) -> RangesT:
-        """Filter out ranges that last more than a maximum duration."""
-        if isinstance(max_duration, int):
-            return self.apply_mask(self.duration.values <= max_duration, **kwargs)
-        max_duration = freq_to_timedelta64(max_duration)
-        if real:
-            return self.apply_mask(self.real_duration.values <= max_duration, **kwargs)
-        return self.apply_mask(self.duration.values * self.wrapper.freq <= max_duration, **kwargs)
-
     def get_coverage(
         self,
         overlapping: bool = False,
@@ -484,7 +502,7 @@ class Ranges(PriceRecords):
         return_raw: bool = False,
         jitted: tp.JittedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
-        stack_indexes_kwargs: tp.KwargsLike = None,
+        stack_kwargs: tp.KwargsLike = None,
     ) -> tp.Union[tp.Tuple[tp.Array1d, tp.Array2d], tp.Frame]:
         """Generate a projection for each range record.
 
@@ -582,7 +600,7 @@ class Ranges(PriceRecords):
                 columns=stack_indexes(
                     self.wrapper.columns[self.col_arr[ridxs]],
                     pd.Index(self.id_arr[ridxs], name="range_id"),
-                    **resolve_dict(stack_indexes_kwargs),
+                    **resolve_dict(stack_kwargs),
                 ),
             ),
             wrap_kwargs,
@@ -632,8 +650,6 @@ class Ranges(PriceRecords):
                     "Min": out.loc["min"],
                     "Median": out.loc["50%"],
                     "Max": out.loc["max"],
-                    "Mean": out.loc["mean"],
-                    "Std": out.loc["std"],
                 },
                 apply_to_timedelta=True,
                 tags=["ranges", "duration"],
@@ -664,9 +680,11 @@ class Ranges(PriceRecords):
         plot_ohlc: tp.Union[bool, tp.Frame] = True,
         plot_close: tp.Union[bool, tp.Series] = True,
         plot_projections: bool = True,
+        plot_bands: bool = True,
         plot_lower: tp.Union[bool, str, tp.Callable] = True,
         plot_middle: tp.Union[bool, str, tp.Callable] = True,
         plot_upper: tp.Union[bool, str, tp.Callable] = True,
+        plot_aux_middle: tp.Union[bool, str, tp.Callable] = True,
         plot_fill: bool = True,
         colorize: bool = True,
         ohlc_type: tp.Union[None, str, tp.BaseTraceType] = None,
@@ -676,6 +694,7 @@ class Ranges(PriceRecords):
         lower_trace_kwargs: tp.KwargsLike = None,
         middle_trace_kwargs: tp.KwargsLike = None,
         upper_trace_kwargs: tp.KwargsLike = None,
+        aux_middle_trace_kwargs: tp.KwargsLike = None,
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs,
@@ -710,9 +729,11 @@ class Ranges(PriceRecords):
             plot_ohlc (bool): Whether to plot OHLC.
             plot_close (bool): Whether to plot close.
             plot_projections (bool): See `vectorbtpro.generic.accessors.GenericDFAccessor.plot_projections`.
+            plot_bands (bool): See `vectorbtpro.generic.accessors.GenericDFAccessor.plot_projections`.
             plot_lower (bool, str, or callable): See `vectorbtpro.generic.accessors.GenericDFAccessor.plot_projections`.
             plot_middle (bool, str, or callable): See `vectorbtpro.generic.accessors.GenericDFAccessor.plot_projections`.
             plot_upper (bool, str, or callable): See `vectorbtpro.generic.accessors.GenericDFAccessor.plot_projections`.
+            plot_aux_middle (bool, str, or callable): See `vectorbtpro.generic.accessors.GenericDFAccessor.plot_projections`.
             plot_fill (bool): See `vectorbtpro.generic.accessors.GenericDFAccessor.plot_projections`.
             colorize (bool, str, or callable): See `vectorbtpro.generic.accessors.GenericDFAccessor.plot_projections`.
             ohlc_type: Either 'OHLC', 'Candlestick' or Plotly trace.
@@ -724,6 +745,7 @@ class Ranges(PriceRecords):
             lower_trace_kwargs (dict): Keyword arguments passed to `plotly.plotly.graph_objects.Scatter` for lower band.
             middle_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for middle band.
             upper_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for upper band.
+            aux_middle_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for auxiliary middle band.
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
@@ -735,7 +757,7 @@ class Ranges(PriceRecords):
             ...     index=pd.date_range("2020", periods=10),
             ...     name='Price'
             ... )
-            >>> vbt.Ranges.from_pd(
+            >>> vbt.Ranges.from_array(
             ...     price >= 12,
             ...     attach_as_close=False,
             ...     close=price,
@@ -752,8 +774,7 @@ class Ranges(PriceRecords):
         from vectorbtpro.utils.opt_packages import assert_can_import
 
         assert_can_import("plotly")
-        import plotly.graph_objects as go
-        from vectorbtpro.utils.figure import make_figure, get_domain
+        from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
 
         plotting_cfg = settings["plotting"]
@@ -788,7 +809,8 @@ class Ranges(PriceRecords):
         if close_trace_kwargs is None:
             close_trace_kwargs = {}
         close_trace_kwargs = merge_dicts(
-            dict(line=dict(color=plotting_cfg["color_schema"]["blue"])), close_trace_kwargs
+            dict(line=dict(color=plotting_cfg["color_schema"]["blue"]), name="Close"),
+            close_trace_kwargs,
         )
         if isinstance(plot_ohlc, bool):
             if (
@@ -827,7 +849,7 @@ class Ranges(PriceRecords):
                 period = None
             if period is not None:
                 if isinstance(period, str):
-                    period = period.lower().strip()
+                    period = period.lower().replace(" ", "")
                     if period == "median":
                         period = "50%"
                     if "%" in period:
@@ -858,7 +880,7 @@ class Ranges(PriceRecords):
             warnings.warn("Projection period is zero. Setting to maximum.")
             proj_period = int(np.max(self_col.duration.values))
         if plot_past_period is not None and isinstance(plot_past_period, str):
-            plot_past_period = plot_past_period.lower().strip()
+            plot_past_period = plot_past_period.lower().replace(" ", "")
             if plot_past_period == "proj_period":
                 plot_past_period = proj_period
             elif plot_past_period == "current_or_proj_period":
@@ -904,7 +926,7 @@ class Ranges(PriceRecords):
             else:
                 _close = close
             if _close.size > 0:
-                fig = _close.vbt.plot(
+                fig = _close.vbt.lineplot(
                     trace_kwargs=close_trace_kwargs,
                     add_trace_kwargs=add_trace_kwargs,
                     fig=fig,
@@ -929,9 +951,11 @@ class Ranges(PriceRecords):
                 rename_levels = dict(range_id=self_col.get_field_title("id"))
                 fig = projections.vbt.plot_projections(
                     plot_projections=plot_projections,
+                    plot_bands=plot_bands,
                     plot_lower=plot_lower,
                     plot_middle=plot_middle,
                     plot_upper=plot_upper,
+                    plot_aux_middle=plot_aux_middle,
                     plot_fill=plot_fill,
                     colorize=colorize,
                     rename_levels=rename_levels,
@@ -939,6 +963,7 @@ class Ranges(PriceRecords):
                     upper_trace_kwargs=upper_trace_kwargs,
                     middle_trace_kwargs=middle_trace_kwargs,
                     lower_trace_kwargs=lower_trace_kwargs,
+                    aux_middle_trace_kwargs=aux_middle_trace_kwargs,
                     add_trace_kwargs=add_trace_kwargs,
                     fig=fig,
                 )
@@ -964,8 +989,9 @@ class Ranges(PriceRecords):
         xref: str = "x",
         yref: str = "y",
         fig: tp.Optional[tp.BaseFigure] = None,
+        return_close: bool = False,
         **layout_kwargs,
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.Union[tp.BaseFigure, tp.Tuple[tp.BaseFigure, tp.Series]]:  # pragma: no cover
         """Plot ranges.
 
         Args:
@@ -988,6 +1014,7 @@ class Ranges(PriceRecords):
             xref (str): X coordinate axis.
             yref (str): Y coordinate axis.
             fig (Figure or FigureWidget): Figure to add traces to.
+            return_close (bool): Whether to return the close series along with the figure.
             **layout_kwargs: Keyword arguments for layout.
 
         Usage:
@@ -997,7 +1024,7 @@ class Ranges(PriceRecords):
             ...     index=pd.date_range("2020", periods=8),
             ...     name='Price'
             ... )
-            >>> vbt.Ranges.from_pd(price >= 2).plot()
+            >>> vbt.Ranges.from_array(price >= 2).plot()
             ```
 
             ![](/assets/images/ranges_plot.svg)
@@ -1020,7 +1047,8 @@ class Ranges(PriceRecords):
         if close_trace_kwargs is None:
             close_trace_kwargs = {}
         close_trace_kwargs = merge_dicts(
-            dict(line=dict(color=plotting_cfg["color_schema"]["blue"])), close_trace_kwargs
+            dict(line=dict(color=plotting_cfg["color_schema"]["blue"]), name="Close"),
+            close_trace_kwargs,
         )
         if start_trace_kwargs is None:
             start_trace_kwargs = {}
@@ -1088,7 +1116,7 @@ class Ranges(PriceRecords):
             )
             plotting_ohlc = True
         elif plot_close and close is not None:
-            fig = close.vbt.plot(
+            fig = close.vbt.lineplot(
                 trace_kwargs=close_trace_kwargs,
                 add_trace_kwargs=add_trace_kwargs,
                 fig=fig,
@@ -1097,72 +1125,68 @@ class Ranges(PriceRecords):
         if self_col.count() > 0:
             # Extract information
             id_ = self_col.get_field_arr("id")
-            id_title = self_col.get_field_title("id")
-
             start_idx = self_col.get_map_field_to_index("start_idx")
-            start_idx_title = self_col.get_field_title("start_idx")
             if plotting_ohlc and self_col.open is not None:
                 start_val = self_col.open.loc[start_idx]
             elif close is not None:
                 start_val = close.loc[start_idx]
             else:
                 start_val = np.full(len(start_idx), 0)
-
             end_idx = self_col.get_map_field_to_index("end_idx")
-            end_idx_title = self_col.get_field_title("end_idx")
             if close is not None:
                 end_val = close.loc[end_idx]
             else:
                 end_val = np.full(len(end_idx), 0)
-
-            duration = np.vectorize(str)(
-                self_col.wrapper.to_timedelta(self_col.duration.values, to_pd=True, silence_warnings=True)
-            )
-
             status = self_col.get_field_arr("status")
 
             if plot_markers:
                 # Plot start markers
-                start_customdata = id_[:, None]
-                start_scatter = go.Scatter(
-                    x=start_idx,
-                    y=start_val,
-                    mode="markers",
-                    marker=dict(
-                        symbol="diamond",
-                        color=plotting_cfg["contrast_color_schema"]["blue"],
-                        size=7,
-                        line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["blue"])),
+                start_customdata, start_hovertemplate = self_col.prepare_customdata(incl_fields=["id", "start_idx"])
+                _start_trace_kwargs = merge_dicts(
+                    dict(
+                        x=start_idx,
+                        y=start_val,
+                        mode="markers",
+                        marker=dict(
+                            symbol="diamond",
+                            color=plotting_cfg["contrast_color_schema"]["blue"],
+                            size=7,
+                            line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["blue"])),
+                        ),
+                        name="Start",
+                        customdata=start_customdata,
+                        hovertemplate=start_hovertemplate,
                     ),
-                    name="Start",
-                    customdata=start_customdata,
-                    hovertemplate=f"{id_title}: %{{customdata[0]}}<br>{start_idx_title}: %{{x}}",
+                    start_trace_kwargs,
                 )
-                start_scatter.update(**start_trace_kwargs)
+                start_scatter = go.Scatter(**_start_trace_kwargs)
                 fig.add_trace(start_scatter, **add_trace_kwargs)
 
             closed_mask = status == RangeStatus.Closed
             if closed_mask.any():
                 if plot_markers:
                     # Plot end markers
-                    closed_end_customdata = np.stack((id_[closed_mask], duration[closed_mask]), axis=1)
-                    closed_end_scatter = go.Scatter(
-                        x=end_idx[closed_mask],
-                        y=end_val[closed_mask],
-                        mode="markers",
-                        marker=dict(
-                            symbol="diamond",
-                            color=plotting_cfg["contrast_color_schema"]["green"],
-                            size=7,
-                            line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["green"])),
+                    closed_end_customdata, closed_end_hovertemplate = self_col.prepare_customdata(mask=closed_mask)
+                    _end_trace_kwargs = merge_dicts(
+                        dict(
+                            x=end_idx[closed_mask],
+                            y=end_val[closed_mask],
+                            mode="markers",
+                            marker=dict(
+                                symbol="diamond",
+                                color=plotting_cfg["contrast_color_schema"]["green"],
+                                size=7,
+                                line=dict(
+                                    width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["green"])
+                                ),
+                            ),
+                            name="Closed",
+                            customdata=closed_end_customdata,
+                            hovertemplate=closed_end_hovertemplate,
                         ),
-                        name="Closed",
-                        customdata=closed_end_customdata,
-                        hovertemplate=(
-                            f"{id_title}: %{{customdata[0]}}<br>{end_idx_title}: %{{x}}<br>Duration: %{{customdata[1]}}"
-                        ),
+                        end_trace_kwargs,
                     )
-                    closed_end_scatter.update(**end_trace_kwargs)
+                    closed_end_scatter = go.Scatter(**_end_trace_kwargs)
                     fig.add_trace(closed_end_scatter, **add_trace_kwargs)
 
                 if plot_zones:
@@ -1191,24 +1215,29 @@ class Ranges(PriceRecords):
             if open_mask.any():
                 if plot_markers:
                     # Plot end markers
-                    open_end_customdata = np.stack((id_[open_mask], duration[open_mask]), axis=1)
-                    open_end_scatter = go.Scatter(
-                        x=end_idx[open_mask],
-                        y=end_val[open_mask],
-                        mode="markers",
-                        marker=dict(
-                            symbol="diamond",
-                            color=plotting_cfg["contrast_color_schema"]["orange"],
-                            size=7,
-                            line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["orange"])),
-                        ),
-                        name="Open",
-                        customdata=open_end_customdata,
-                        hovertemplate=(
-                            f"{id_title}: %{{customdata[0]}}<br>{end_idx_title}: %{{x}}<br>Duration: %{{customdata[1]}}"
-                        ),
+                    open_end_customdata, open_end_hovertemplate = self_col.prepare_customdata(
+                        excl_fields=["end_idx"], mask=open_mask
                     )
-                    open_end_scatter.update(**end_trace_kwargs)
+                    _end_trace_kwargs = merge_dicts(
+                        dict(
+                            x=end_idx[open_mask],
+                            y=end_val[open_mask],
+                            mode="markers",
+                            marker=dict(
+                                symbol="diamond",
+                                color=plotting_cfg["contrast_color_schema"]["orange"],
+                                size=7,
+                                line=dict(
+                                    width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["orange"])
+                                ),
+                            ),
+                            name="Open",
+                            customdata=open_end_customdata,
+                            hovertemplate=open_end_hovertemplate,
+                        ),
+                        end_trace_kwargs,
+                    )
+                    open_end_scatter = go.Scatter(**_end_trace_kwargs)
                     fig.add_trace(open_end_scatter, **add_trace_kwargs)
 
                 if plot_zones:
@@ -1233,6 +1262,8 @@ class Ranges(PriceRecords):
                             )
                         )
 
+        if return_close:
+            return fig, close
         return fig
 
     @property
@@ -1259,3 +1290,726 @@ class Ranges(PriceRecords):
 Ranges.override_field_config_doc(__pdoc__)
 Ranges.override_metrics_doc(__pdoc__)
 Ranges.override_subplots_doc(__pdoc__)
+
+
+# ############# Pattern ranges ############# #
+
+
+PatternRangesT = tp.TypeVar("PatternRangesT", bound="PatternRanges")
+
+
+class _DEF(object):
+    """Class for `PSC` that will be substituted by the respective argument in `PatternRanges.from_pattern_search`."""
+    pass
+
+
+@attr.s(frozen=True, eq=False)
+class PSC:
+    """Class that represents a pattern search config.
+
+    Every field will be resolved into the format suitable for Numba."""
+
+    pattern: tp.Union[_DEF, tp.ArrayLike] = attr.ib(default=_DEF)
+    """Flexible pattern array.
+    
+    Can be smaller or bigger than the source array; in such a case, the values of the smaller array
+    will be "stretched" by interpolation of the type in `PSC.interp_mode`."""
+
+    window: tp.Union[_DEF, None, int] = attr.ib(default=_DEF)
+    """Minimum window.
+    
+    Defaults to the length of `PSC.pattern`."""
+
+    max_window: tp.Union[_DEF, None, int] = attr.ib(default=_DEF)
+    """Maximum window (including)."""
+
+    window_select_prob: tp.Union[_DEF, float] = attr.ib(default=_DEF)
+    """Window selection probability."""
+
+    row_select_prob: tp.Union[_DEF, float] = attr.ib(default=_DEF)
+    """Row selection probability."""
+
+    interp_mode: tp.Union[_DEF, int, str] = attr.ib(default=_DEF)
+    """Interpolation mode. See `vectorbtpro.generic.enums.InterpMode`."""
+
+    rescale_mode: tp.Union[_DEF, int, str] = attr.ib(default=_DEF)
+    """Rescaling mode. See `vectorbtpro.generic.enums.RescaleMode`."""
+
+    vmin: tp.Union[_DEF, float] = attr.ib(default=_DEF)
+    """Minimum value of any window. Should only be used when the array has fixed bounds.
+    
+    Used in rescaling using `RescaleMode.MinMax` and checking against `PSC.min_pct_change` and `PSC.max_pct_change`.
+    
+    If `np.nan`, gets calculated dynamically."""
+
+    vmax: tp.Union[_DEF, float] = attr.ib(default=_DEF)
+    """Maximum value of any window. Should only be used when the array has fixed bounds.
+    
+    Used in rescaling using `RescaleMode.MinMax` and checking against `PSC.min_pct_change` and `PSC.max_pct_change`.
+    
+    If `np.nan`, gets calculated dynamically."""
+
+    pmin: tp.Union[_DEF, float] = attr.ib(default=_DEF)
+    """Value to be considered as the minimum of `PSC.pattern`.
+    
+    Used in rescaling using `RescaleMode.MinMax` and calculating the maximum distance at each point 
+    if `PSC.max_error_as_maxdist` is disabled.
+    
+    If `np.nan`, gets calculated dynamically."""
+
+    pmax: tp.Union[_DEF, float] = attr.ib(default=_DEF)
+    """Value to be considered as the maximum of `PSC.pattern`.
+    
+    Used in rescaling using `RescaleMode.MinMax` and calculating the maximum distance at each point 
+    if `PSC.max_error_as_maxdist` is disabled.
+    
+    If `np.nan`, gets calculated dynamically."""
+
+    min_pct_change: tp.Union[_DEF, float] = attr.ib(default=_DEF)
+    """Minimum percentage change of the window to stay a candidate for search.
+    
+    If any window doesn't cross this mark, its similarity becomes `np.nan`."""
+
+    max_pct_change: tp.Union[_DEF, float] = attr.ib(default=_DEF)
+    """Maximum percentage change of the window to stay a candidate for search.
+    
+    If any window crosses this mark, its similarity becomes `np.nan`."""
+
+    max_error: tp.Union[_DEF, tp.ArrayLike] = attr.ib(default=_DEF)
+    """Maximum error at each point. Can be provided as a flexible array.
+    
+    If `max_error` is an array, it must be of the same size as the pattern array.
+    It also should be provided within the same scale as the pattern."""
+
+    max_error_interp_mode: tp.Union[_DEF, None, int, str] = attr.ib(default=_DEF)
+    """Interpolation mode for `PSC.max_error`. See `vectorbtpro.generic.enums.InterpMode`.
+    
+    If None, defaults to `PSC.interp_mode`."""
+
+    max_error_as_maxdist: tp.Union[_DEF, bool] = attr.ib(default=_DEF)
+    """Whether `PSC.max_error` should be used as the maximum distance at each point.
+    
+    If False, crossing `PSC.max_error` will set the distance to the maximum distance
+    based on `PSC.pmin`, `PSC.pmax`, and the pattern value at that point.
+    
+    If True and any of the points in a window is `np.nan`, the point will be skipped."""
+
+    max_error_strict: tp.Union[_DEF, bool] = attr.ib(default=_DEF)
+    """Whether crossing `PSC.max_error` even once should yield the similarity of `np.nan`."""
+
+    min_similarity: tp.Union[_DEF, float] = attr.ib(default=_DEF)
+    """Minimum similarity.
+    
+    If any window doesn't cross this mark, its similarity becomes `np.nan`."""
+
+    max_overlap: tp.Union[_DEF, None, int] = attr.ib(default=_DEF)
+    """Check whether the intersection of each two consecutive ranges is bigger than a specific number 
+    of rows, and if so, select the range with the highest similarity. 
+    
+    If None, will treat all ranges as unique and fill each record.
+    If 0, will keep only one range out of all overlapping."""
+
+    max_records: tp.Union[_DEF, None, int] = attr.ib(default=_DEF)
+    """Maximum number of records expected to be filled.
+    
+    Set to avoid creating empty arrays larger than needed."""
+
+    name: tp.Union[None, str] = attr.ib(default=None)
+    """Name of the config."""
+
+    def __eq__(self, other):
+        return checks.is_deep_equal(self, other)
+
+    def __hash__(self):
+        dct = attr.asdict(self)
+        if isinstance(dct["pattern"], np.ndarray):
+            dct["pattern"] = tuple(dct["pattern"])
+        else:
+            dct["pattern"] = (dct["pattern"],)
+        if isinstance(dct["max_error"], np.ndarray):
+            dct["max_error"] = tuple(dct["max_error"])
+        else:
+            dct["max_error"] = (dct["max_error"],)
+        return hash(tuple(dct.items()))
+
+
+pattern_ranges_field_config = ReadonlyConfig(
+    dict(
+        dtype=pattern_range_dt,
+        settings=dict(
+            id=dict(title="Pattern Range Id"),
+            similarity=dict(title="Similarity"),
+        ),
+    )
+)
+"""_"""
+
+__pdoc__[
+    "pattern_ranges_field_config"
+] = f"""Field config for `PatternRanges`.
+
+```python
+{pattern_ranges_field_config.prettify()}
+```
+"""
+
+
+@attach_fields
+@override_field_config(pattern_ranges_field_config)
+class PatternRanges(Ranges):
+    """Extends `Ranges` for working with range records generated from pattern search."""
+
+    @property
+    def field_config(self) -> Config:
+        return self._field_config
+
+    @classmethod
+    def resolve_search_config(cls, search_config: tp.Optional[PSC] = None, **kwargs) -> PSC:
+        """Resolve search config for `PatternRanges.from_pattern_search`.
+
+        Converts array-like objects into arrays and enums into integers."""
+        if search_config is None:
+            search_config = PSC()
+        search_config = attr.asdict(search_config)
+        defaults = {}
+        for k, v in get_func_kwargs(cls.from_pattern_search).items():
+            if k in search_config:
+                defaults[k] = v
+        defaults = merge_dicts(defaults, kwargs)
+        for k, v in search_config.items():
+            if v is _DEF:
+                v = defaults[k]
+            if k == "pattern":
+                if v is None:
+                    raise ValueError("Pattern must be provided")
+                v = to_1d_array(v)
+            elif k == "max_error":
+                v = to_1d_array(v)
+            elif k == "interp_mode":
+                v = map_enum_fields(v, InterpMode)
+            elif k == "rescale_mode":
+                v = map_enum_fields(v, RescaleMode)
+            elif k == "max_error_interp_mode":
+                if v is None:
+                    v = search_config["interp_mode"]
+                else:
+                    v = map_enum_fields(v, InterpMode)
+            search_config[k] = v
+        return PSC(**search_config)
+
+    @classmethod
+    def from_pattern_search(
+        cls: tp.Type[PatternRangesT],
+        arr: tp.ArrayLike,
+        pattern: tp.Union[Param, tp.ArrayLike] = None,
+        window: tp.Union[Param, None, int] = None,
+        max_window: tp.Union[Param, None, int] = None,
+        window_select_prob: tp.Union[Param, float] = 1.0,
+        row_select_prob: tp.Union[Param, float] = 1.0,
+        interp_mode: tp.Union[Param, int, str] = "linear",
+        rescale_mode: tp.Union[Param, int, str] = "minmax",
+        vmin: tp.Union[Param, float] = np.nan,
+        vmax: tp.Union[Param, float] = np.nan,
+        pmin: tp.Union[Param, float] = np.nan,
+        pmax: tp.Union[Param, float] = np.nan,
+        min_pct_change: tp.Union[Param, float] = np.nan,
+        max_pct_change: tp.Union[Param, float] = np.nan,
+        max_error: tp.Union[Param, tp.ArrayLike] = np.nan,
+        max_error_interp_mode: tp.Union[Param, None, int, str] = None,
+        max_error_as_maxdist: tp.Union[Param, bool] = False,
+        max_error_strict: tp.Union[Param, bool] = False,
+        min_similarity: tp.Union[Param, float] = 0.85,
+        max_overlap: tp.Union[Param, None, int] = 0,
+        max_records: tp.Union[Param, None, int] = None,
+        random_subset: tp.Optional[int] = None,
+        seed: tp.Optional[int] = None,
+        search_configs: tp.Optional[tp.Sequence[tp.MaybeSequence[PSC]]] = None,
+        jitted: tp.JittedOption = None,
+        execute_kwargs: tp.KwargsLike = None,
+        attach_as_close: bool = True,
+        stack_kwargs: tp.KwargsLike = None,
+        wrapper_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> PatternRangesT:
+        """Build `PatternRanges` from all occurrences of a pattern in an array.
+
+        Uses `vectorbtpro.generic.nb.records.search_for_pattern_nb`.
+
+        If `attach_as_close` is True, will attach `arr` as `close`.
+
+        `**kwargs` will be passed to `PatternRanges.__init__`."""
+        if seed is not None:
+            set_seed(seed)
+        if stack_kwargs is None:
+            stack_kwargs = {}
+        arr = to_pd_array(arr)
+        arr_wrapper = ArrayWrapper.from_obj(arr)
+        psc_keys = [a.name for a in PSC.__attrs_attrs__ if a.name != "name"]
+        method_locals = {k: v for k, v in locals().items() if k in psc_keys}
+
+        param_dct = {}
+        for k, v in method_locals.items():
+            if k in psc_keys and isinstance(v, Param):
+                param_dct[k] = v
+        param_columns = None
+        if len(param_dct) > 0:
+            if search_configs is not None and len(search_configs) > 0:
+                raise ValueError("Search parameters and configs cannot be used together")
+            param_product, param_columns = combine_params(
+                param_dct,
+                random_subset=random_subset,
+                stack_kwargs=stack_kwargs,
+            )
+            search_configs = []
+            for i in range(len(param_columns)):
+                search_config = dict()
+                for k, v in param_product.items():
+                    search_config[k] = v[i]
+                search_configs.append(PSC(**search_config))
+
+        if search_configs is None:
+            search_configs = [PSC()]
+
+        arr_2d = to_2d_array(arr)
+        col_arrs = []
+        new_search_configs = []
+        for maybe_search_config in search_configs:
+            if isinstance(maybe_search_config, PSC):
+                res_config = cls.resolve_search_config(maybe_search_config, **method_locals)
+                for col in range(arr_2d.shape[1]):
+                    col_arrs.append(arr_2d[:, col])
+                    new_search_configs.append(res_config)
+            else:
+                if len(maybe_search_config) != arr_2d.shape[1]:
+                    raise ValueError("Sub-list with PSC instances must match the number of columns")
+                for col, search_config in enumerate(maybe_search_config):
+                    col_arrs.append(arr_2d[:, col])
+                    new_search_configs.append(cls.resolve_search_config(search_config, **method_locals))
+
+        funcs_args = []
+        psc_names = []
+        func = jit_reg.resolve_option(nb.find_pattern_1d_nb, jitted)
+        any_name_set = False
+        for col in range(len(col_arrs)):
+            func_kwargs = {
+                "col": col,
+                "arr": col_arrs[col],
+                **attr.asdict(new_search_configs[col]),
+            }
+            del func_kwargs["name"]
+            for k, v in func_kwargs.items():
+                if isinstance(v, Param):
+                    raise TypeError(f"Cannot use Param inside search configs")
+            funcs_args.append((func, (), func_kwargs))
+            if new_search_configs[col].name is None:
+                psc_names.append(col)
+            else:
+                any_name_set = True
+                psc_names.append(new_search_configs[col].name)
+
+        execute_kwargs = merge_dicts(
+            dict(show_progress=len(new_search_configs) > 1),
+            execute_kwargs,
+        )
+        result_list = execute(funcs_args, **execute_kwargs)
+        records_arr = np.concatenate(result_list)
+
+        if param_columns is not None:
+            new_columns = combine_indexes((param_columns, arr_wrapper.columns), **stack_kwargs)
+        else:
+            n_params = len(psc_names) // arr_2d.shape[1]
+            if n_params == 1 and not any_name_set:
+                new_columns = arr_wrapper.columns
+            else:
+                search_config_index = pd.Index(psc_names, name="search_config")
+                new_columns = stack_indexes(
+                    (search_config_index, tile_index(arr_wrapper.columns, n_params)),
+                    **stack_kwargs,
+                )
+        wrapper = ArrayWrapper(
+            **merge_dicts(
+                dict(
+                    index=arr_wrapper.index,
+                    columns=new_columns,
+                ),
+                wrapper_kwargs,
+            )
+        )
+        if attach_as_close:
+            kwargs["close"] = arr
+        return cls(wrapper, records_arr, new_search_configs, **kwargs)
+
+    @classmethod
+    def resolve_row_stack_kwargs(
+        cls: tp.Type[PatternRangesT],
+        *objs: tp.MaybeTuple[PatternRangesT],
+        **kwargs,
+    ) -> tp.Kwargs:
+        """Resolve keyword arguments for initializing `PatternRanges` after stacking along columns."""
+        kwargs = Ranges.resolve_row_stack_kwargs(*objs, **kwargs)
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        for obj in objs:
+            if not checks.is_instance_of(obj, PatternRanges):
+                raise TypeError("Each object to be merged must be an instance of PatternRanges")
+        new_search_configs = []
+        for obj in objs:
+            if len(obj.search_configs) == 1:
+                new_search_configs.append(obj.search_configs * len(kwargs["wrapper"].columns))
+            else:
+                new_search_configs.append(obj.search_configs)
+            if len(new_search_configs) >= 2:
+                if new_search_configs[-1] != new_search_configs[0]:
+                    raise ValueError(f"Objects to be merged must have compatible PSC instances. Pass to override.")
+        kwargs["search_configs"] = new_search_configs[0]
+        return kwargs
+
+    @classmethod
+    def resolve_column_stack_kwargs(
+        cls: tp.Type[PatternRangesT],
+        *objs: tp.MaybeTuple[PatternRangesT],
+        **kwargs,
+    ) -> tp.Kwargs:
+        """Resolve keyword arguments for initializing `PatternRanges` after stacking along columns."""
+        kwargs = Ranges.resolve_column_stack_kwargs(*objs, **kwargs)
+        kwargs.pop("reindex_kwargs", None)
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        for obj in objs:
+            if not checks.is_instance_of(obj, PatternRanges):
+                raise TypeError("Each object to be merged must be an instance of PatternRanges")
+        kwargs["search_configs"] = [search_config for obj in objs for search_config in obj.search_configs]
+        return kwargs
+
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Ranges._expected_keys or set()) | {
+        "search_configs",
+    }
+
+    def __init__(
+        self,
+        wrapper: ArrayWrapper,
+        records_arr: tp.RecordArray,
+        search_configs: tp.List[PSC],
+        **kwargs,
+    ) -> None:
+        Ranges.__init__(
+            self,
+            wrapper,
+            records_arr,
+            search_configs=search_configs,
+            **kwargs,
+        )
+
+        self._search_configs = search_configs
+
+    def indexing_func(self: PatternRangesT, *args, ranges_meta: tp.DictLike = None, **kwargs) -> PatternRangesT:
+        """Perform indexing on `PatternRanges`."""
+        if ranges_meta is None:
+            ranges_meta = Ranges.indexing_func_meta(self, *args, **kwargs)
+        col_idxs = ranges_meta["records_meta"]["wrapper_meta"]["col_idxs"]
+        if not isinstance(col_idxs, slice):
+            col_idxs = to_1d_array(col_idxs)
+        col_idxs = np.arange(self.wrapper.shape_2d[1])[col_idxs]
+        new_search_configs = []
+        for i in col_idxs:
+            new_search_configs.append(self.search_configs[i])
+        return self.replace(
+            wrapper=ranges_meta["records_meta"]["wrapper_meta"]["new_wrapper"],
+            records_arr=ranges_meta["records_meta"]["new_records_arr"],
+            search_configs=new_search_configs,
+            open=ranges_meta["open"],
+            high=ranges_meta["high"],
+            low=ranges_meta["low"],
+            close=ranges_meta["close"],
+        )
+
+    @property
+    def search_configs(self) -> tp.List[PSC]:
+        """List of `PSC` instances, one per column."""
+        return self._search_configs
+
+    # ############# Stats ############# #
+
+    _metrics: tp.ClassVar[Config] = HybridConfig({
+        **Ranges.metrics,
+        "similarity": dict(
+            title="Similarity",
+            calc_func="similarity.describe",
+            post_calc_func=lambda self, out, settings: {
+                "Min": out.loc["min"],
+                "Median": out.loc["50%"],
+                "Max": out.loc["max"],
+            },
+            tags=["pattern_ranges", "similarity"],
+        )
+    })
+
+    @property
+    def metrics(self) -> Config:
+        return self._metrics
+
+    # ############# Plots ############# #
+
+    def plot(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        top_n: tp.Optional[int] = None,
+        plot_pattern: bool = True,
+        plot_max_error: bool = True,
+        pattern_trace_kwargs: tp.KwargsLike = None,
+        lower_max_error_trace_kwargs: tp.KwargsLike = None,
+        upper_max_error_trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        xref: str = "x",
+        yref: str = "y",
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **kwargs,
+    ) -> tp.BaseFigure:  # pragma: no cover
+        """Plot pattern ranges.
+
+        Based on `Ranges.plot`.
+
+        Args:
+            column (str): Name of the column to plot.
+            top_n (int): Filter top N range records by maximum duration.
+            plot_pattern (bool or array_like): Whether to plot `PatternRanges.pattern`.
+            plot_max_error (array_like): Whether to plot `PatternRanges.max_error`.
+            pattern_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for pattern.
+            lower_max_error_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for lower max error.
+            upper_max_error_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for upper max error.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
+            xref (str): X coordinate axis.
+            yref (str): Y coordinate axis.
+            fig (Figure or FigureWidget): Figure to add traces to.
+            **kwargs: Keyword arguments passed to `Ranges.plot`.
+        """
+        from vectorbtpro.utils.opt_packages import assert_can_import
+
+        assert_can_import("plotly")
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
+
+        self_col = self.select_col(column=column, group_by=False)
+        if top_n is not None:
+            self_col = self_col.apply_mask(self_col.duration.top_n_mask(top_n))
+        search_config = self_col.search_configs[0]
+
+        if pattern_trace_kwargs is None:
+            pattern_trace_kwargs = {}
+        if lower_max_error_trace_kwargs is None:
+            lower_max_error_trace_kwargs = {}
+        if upper_max_error_trace_kwargs is None:
+            upper_max_error_trace_kwargs = {}
+
+        fig, close = Ranges.plot(
+            self_col,
+            return_close=True,
+            add_trace_kwargs=add_trace_kwargs,
+            xref=xref,
+            yref=yref,
+            fig=fig,
+            **kwargs,
+        )
+
+        if self_col.count() > 0:
+            # Extract information
+            start_idx = self_col.get_map_field_to_index("start_idx")
+            end_idx = self_col.get_map_field_to_index("end_idx")
+            status = self_col.get_field_arr("status")
+
+            if plot_pattern:
+                # Plot pattern
+                for r in range(len(start_idx)):
+                    _start_idx = start_idx[r]
+                    _end_idx = end_idx[r]
+                    if close is None:
+                        raise ValueError("Must provide close to overlay patterns")
+                    arr_sr = close.loc[_start_idx:_end_idx]
+                    if status[r] == RangeStatus.Closed:
+                        arr_sr = arr_sr.iloc[:-1]
+                    arr = arr_sr.values
+                    arr_index = arr_sr.index
+
+                    # Reconstruct pattern and max error bands
+                    # Must do the same and in the same order as in the pattern similarity function!
+                    pattern = np.asarray(search_config.pattern)
+                    max_error = np.asarray(search_config.max_error)
+                    # Rescale for calculations
+                    if arr.shape[0] < pattern.shape[0]:
+                        arr = nb.interp_resize_1d_nb(
+                            arr,
+                            len(pattern),
+                            search_config.interp_mode,
+                        )
+                    elif pattern.shape[0] < arr.shape[0]:
+                        pattern = nb.interp_resize_1d_nb(
+                            pattern,
+                            len(arr),
+                            search_config.interp_mode,
+                        )
+                        max_error = nb.interp_resize_1d_nb(
+                            max_error,
+                            len(arr),
+                            search_config.max_error_interp_mode,
+                        )
+                    if np.isnan(search_config.vmin):
+                        vmin = np.nanmin(arr)
+                    else:
+                        vmin = search_config.vmin
+                    if np.isnan(search_config.vmax):
+                        vmax = np.nanmax(arr)
+                    else:
+                        vmax = search_config.vmax
+                    if np.isnan(search_config.pmin):
+                        pmin = np.nanmin(pattern)
+                    else:
+                        pmin = search_config.pmin
+                    if np.isnan(search_config.pmax):
+                        pmax = np.nanmax(pattern)
+                    else:
+                        pmax = search_config.pmax
+                    if search_config.rescale_mode == RescaleMode.Rebase:
+                        if not np.isnan(pmin):
+                            pmin = pmin / pattern[0] * arr[0]
+                        if not np.isnan(pmax):
+                            pmax = pmax / pattern[0] * arr[0]
+                    if search_config.rescale_mode == RescaleMode.Rebase:
+                        pattern = pattern / pattern[0] * arr[0]
+                        max_error = max_error * pattern
+                    pattern = np.clip(pattern, pmin, pmax)
+                    if search_config.rescale_mode == RescaleMode.MinMax:
+                        pattern = rescale(pattern, (pmin, pmax), (vmin, vmax))
+                        max_error = max_error / (pmax - pmin) * pattern
+                    if search_config.max_error_as_maxdist:
+                        lower_max_error = max_error
+                        upper_max_error = max_error
+                    else:
+                        lower_max_error = np.where(np.isnan(max_error), pattern - np.nanmin(pattern), max_error)
+                        upper_max_error = np.where(np.isnan(max_error), np.nanmax(pattern) - pattern, max_error)
+                    if pattern.shape[0] != len(arr_index):
+                        # Rescale for plotting
+                        pattern = nb.interp_resize_1d_nb(
+                            pattern,
+                            len(arr_index),
+                            InterpMode.Linear,
+                        )
+                        lower_max_error = nb.interp_resize_1d_nb(
+                            lower_max_error,
+                            len(arr_index),
+                            InterpMode.Linear,
+                        )
+                        upper_max_error = nb.interp_resize_1d_nb(
+                            upper_max_error,
+                            len(arr_index),
+                            InterpMode.Linear,
+                        )
+                    pattern_sr = pd.Series(pattern, index=arr_index)
+                    lower_max_error_sr = pd.Series(lower_max_error, index=arr_index)
+                    upper_max_error_sr = pd.Series(upper_max_error, index=arr_index)
+
+                    def_pattern_trace_kwargs = dict(
+                        name=f"Pattern",
+                        legendgroup="pattern",
+                        showlegend=r == 0,
+                        connectgaps=True,
+                    )
+                    if search_config.interp_mode == InterpMode.Discrete:
+                        _pattern_trace_kwargs = merge_dicts(
+                            def_pattern_trace_kwargs,
+                            dict(
+                                mode="lines+markers",
+                                marker=dict(color=adjust_opacity(plotting_cfg["color_schema"]["cyan"], 0.75)),
+                                line=dict(color=adjust_opacity(plotting_cfg["color_schema"]["gray"], 0.75), dash="dot"),
+                            ),
+                            pattern_trace_kwargs,
+                        )
+                    else:
+                        _pattern_trace_kwargs = merge_dicts(
+                            def_pattern_trace_kwargs,
+                            dict(
+                                mode="lines",
+                                line=dict(color=adjust_opacity(plotting_cfg["color_schema"]["cyan"], 0.75), dash="dot"),
+                            ),
+                            pattern_trace_kwargs,
+                        )
+                    pattern_sr.rename(None).vbt.plot(
+                        trace_kwargs=_pattern_trace_kwargs,
+                        add_trace_kwargs=add_trace_kwargs,
+                        fig=fig,
+                    )
+
+                    if plot_max_error is not None:
+                        # Plot max error bounds
+                        def_max_error_trace_kwargs = dict(
+                            name="Max error",
+                            legendgroup="max_error",
+                            showlegend=r == 0,
+                            connectgaps=True,
+                        )
+                        if search_config.max_error_interp_mode == InterpMode.Discrete:
+                            _lower_max_error_trace_kwargs = merge_dicts(
+                                def_max_error_trace_kwargs,
+                                dict(
+                                    mode="markers+lines",
+                                    marker=dict(color=adjust_opacity(plotting_cfg["color_schema"]["pink"], 0.5)),
+                                    line=dict(
+                                        color=adjust_opacity(plotting_cfg["color_schema"]["gray"], 0.5), dash="dot"
+                                    ),
+                                ),
+                                lower_max_error_trace_kwargs,
+                            )
+                            _upper_max_error_trace_kwargs = merge_dicts(
+                                def_max_error_trace_kwargs,
+                                dict(
+                                    mode="markers+lines",
+                                    marker=dict(color=adjust_opacity(plotting_cfg["color_schema"]["pink"], 0.5)),
+                                    line=dict(
+                                        color=adjust_opacity(plotting_cfg["color_schema"]["gray"], 0.5), dash="dot"
+                                    ),
+                                    showlegend=False,
+                                ),
+                                upper_max_error_trace_kwargs,
+                            )
+                        else:
+                            _lower_max_error_trace_kwargs = merge_dicts(
+                                def_max_error_trace_kwargs,
+                                dict(
+                                    mode="lines",
+                                    line=dict(
+                                        color=adjust_opacity(plotting_cfg["color_schema"]["pink"], 0.5), dash="dot"
+                                    ),
+                                ),
+                                lower_max_error_trace_kwargs,
+                            )
+                            _upper_max_error_trace_kwargs = merge_dicts(
+                                def_max_error_trace_kwargs,
+                                dict(
+                                    mode="lines",
+                                    line=dict(
+                                        color=adjust_opacity(plotting_cfg["color_schema"]["pink"], 0.5), dash="dot"
+                                    ),
+                                    fillcolor=adjust_opacity(plotting_cfg["color_schema"]["pink"], 0.1),
+                                    fill="tonexty",
+                                    showlegend=False,
+                                ),
+                                upper_max_error_trace_kwargs,
+                            )
+                        (pattern_sr - lower_max_error_sr).rename(None).vbt.plot(
+                            trace_kwargs=_lower_max_error_trace_kwargs,
+                            add_trace_kwargs=add_trace_kwargs,
+                            fig=fig,
+                        )
+                        (pattern_sr + upper_max_error_sr).rename(None).vbt.plot(
+                            trace_kwargs=_upper_max_error_trace_kwargs,
+                            add_trace_kwargs=add_trace_kwargs,
+                            fig=fig,
+                        )
+
+        return fig
+
+
+PatternRanges.override_field_config_doc(__pdoc__)
+PatternRanges.override_metrics_doc(__pdoc__)

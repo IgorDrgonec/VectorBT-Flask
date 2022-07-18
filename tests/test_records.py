@@ -4,7 +4,7 @@ import pytest
 from numba import njit
 
 import vectorbtpro as vbt
-from vectorbtpro.generic.enums import range_dt, drawdown_dt
+from vectorbtpro.generic.enums import range_dt, pattern_range_dt, drawdown_dt
 from vectorbtpro.portfolio.enums import order_dt, trade_dt, log_dt
 from vectorbtpro.records.base import Records
 
@@ -2343,16 +2343,16 @@ ts = pd.DataFrame(
     ],
 )
 
-ranges = vbt.Ranges.from_pd(ts, wrapper_kwargs=dict(freq="1 days"))
-ranges_grouped = vbt.Ranges.from_pd(ts, wrapper_kwargs=dict(freq="1 days", group_by=group_by))
+ranges = vbt.Ranges.from_array(ts, wrapper_kwargs=dict(freq="1 days"))
+ranges_grouped = vbt.Ranges.from_array(ts, wrapper_kwargs=dict(freq="1 days", group_by=group_by))
 
 
 class TestRanges:
     def test_row_stack(self):
         ts2 = ts * 2
         ts2.index = pd.date_range("2020-01-09", "2020-01-14")
-        ranges1 = vbt.Ranges.from_pd(ts, wrapper_kwargs=dict(freq="1 days"))
-        ranges2 = vbt.Ranges.from_pd(ts2, wrapper_kwargs=dict(freq="1 days"))
+        ranges1 = vbt.Ranges.from_array(ts, wrapper_kwargs=dict(freq="1 days"))
+        ranges2 = vbt.Ranges.from_array(ts2, wrapper_kwargs=dict(freq="1 days"))
         new_ranges = vbt.Ranges.row_stack(ranges1, ranges2)
         assert_frame_equal(new_ranges.close, pd.concat((ts, ts2)))
         with pytest.raises(Exception):
@@ -2365,8 +2365,8 @@ class TestRanges:
     def test_column_stack(self):
         ts2 = ts * 2
         ts2.columns = ["e", "f", "g", "h"]
-        ranges1 = vbt.Ranges.from_pd(ts, wrapper_kwargs=dict(freq="1 days"))
-        ranges2 = vbt.Ranges.from_pd(ts2, wrapper_kwargs=dict(freq="1 days"))
+        ranges1 = vbt.Ranges.from_array(ts, wrapper_kwargs=dict(freq="1 days"))
+        ranges2 = vbt.Ranges.from_array(ts2, wrapper_kwargs=dict(freq="1 days"))
         new_ranges = vbt.Ranges.column_stack(ranges1, ranges2)
         assert_frame_equal(new_ranges.close, pd.concat((ts, ts2), axis=1))
         with pytest.raises(Exception):
@@ -2393,7 +2393,7 @@ class TestRanges:
         for name in range_dt.names:
             np.testing.assert_array_equal(getattr(ranges, name).values, ranges.values[name])
 
-    def test_from_pd(self):
+    def test_from_array(self):
         assert_records_close(
             ranges.values,
             np.array(
@@ -2404,12 +2404,12 @@ class TestRanges:
         assert ranges.wrapper.freq == day_dt
         assert_index_equal(ranges_grouped.wrapper.grouper.group_by, group_by)
         assert_records_close(
-            vbt.Ranges.from_pd(ts, jitted=dict(parallel=True)).values,
-            vbt.Ranges.from_pd(ts, jitted=dict(parallel=False)).values,
+            vbt.Ranges.from_array(ts, jitted=dict(parallel=True)).values,
+            vbt.Ranges.from_array(ts, jitted=dict(parallel=False)).values,
         )
         assert_records_close(
-            vbt.Ranges.from_pd(ts, chunked=True).values,
-            vbt.Ranges.from_pd(ts, chunked=False).values,
+            vbt.Ranges.from_array(ts, chunked=True).values,
+            vbt.Ranges.from_array(ts, chunked=False).values,
         )
 
     def test_from_delta(self):
@@ -3031,8 +3031,6 @@ class TestRanges:
                 "Duration: Min",
                 "Duration: Median",
                 "Duration: Max",
-                "Duration: Mean",
-                "Duration: Std",
             ],
             dtype="object",
         )
@@ -3049,8 +3047,6 @@ class TestRanges:
                     pd.Timedelta("2 days 08:00:00"),
                     pd.Timedelta("2 days 08:00:00"),
                     pd.Timedelta("2 days 08:00:00"),
-                    pd.Timedelta("2 days 08:00:00"),
-                    pd.Timedelta("0 days 00:00:00"),
                 ],
                 index=stats_index,
                 name="agg_stats",
@@ -3069,8 +3065,6 @@ class TestRanges:
                     pd.Timedelta("1 days 00:00:00"),
                     pd.Timedelta("1 days 00:00:00"),
                     pd.Timedelta("1 days 00:00:00"),
-                    pd.Timedelta("1 days 00:00:00"),
-                    pd.Timedelta("0 days 00:00:00"),
                 ],
                 index=stats_index,
                 name="a",
@@ -3089,8 +3083,6 @@ class TestRanges:
                     pd.Timedelta("1 days 00:00:00"),
                     pd.Timedelta("1 days 00:00:00"),
                     pd.Timedelta("3 days 00:00:00"),
-                    pd.Timedelta("1 days 12:00:00"),
-                    pd.Timedelta("1 days 00:00:00"),
                 ],
                 index=stats_index,
                 name="g1",
@@ -3101,7 +3093,7 @@ class TestRanges:
         assert_series_equal(ranges_grouped["g2"].stats(), ranges_grouped.stats(column="g2"))
         assert_series_equal(ranges_grouped["g2"].stats(), ranges.stats(column="g2", group_by=group_by))
         stats_df = ranges.stats(agg_func=None)
-        assert stats_df.shape == (4, 11)
+        assert stats_df.shape == (4, 9)
         assert_index_equal(stats_df.index, ranges.wrapper.columns)
         assert_index_equal(stats_df.columns, stats_index)
 
@@ -3168,13 +3160,1137 @@ class TestRanges:
         )
 
 
-# ############# drawdowns.py ############# #
-
-
 ts2 = pd.DataFrame(
     {"a": [2, 1, 3, 1, 4, 1], "b": [1, 2, 1, 3, 1, 4], "c": [1, 2, 3, 2, 1, 2], "d": [1, 2, 3, 4, 5, 6]},
     index=pd.date_range("2020", periods=6),
 )
+
+pattern_ranges = vbt.PatternRanges.from_pattern_search(
+    ts2,
+    [1, 2, 1],
+    min_similarity=0,
+    max_overlap=None,
+)
+pattern_ranges_grouped = vbt.PatternRanges.from_pattern_search(
+    ts2,
+    [1, 2, 1],
+    min_similarity=0,
+    max_overlap=None,
+    wrapper_kwargs=dict(group_by=group_by),
+)
+
+
+class TestPatternRanges:
+    def test_row_stack(self):
+        sr = pd.Series([1, 2, 3, 2, 3, 4, 3], index=pd.date_range("2020-01-01", periods=7))
+        df = pd.DataFrame(
+            {"a": [1, 2, 3, 2, 3, 4, 3], "b": [4, 3, 2, 3, 2, 1, 2]}, index=pd.date_range("2020-01-08", periods=7)
+        )
+        pattern_ranges1 = vbt.PatternRanges.from_pattern_search(sr, [1, 2, 1], min_similarity=0, max_overlap=None)
+        pattern_ranges2 = vbt.PatternRanges.from_pattern_search(df, [1, 2, 1], min_similarity=0, max_overlap=None)
+        new_pattern_ranges = vbt.PatternRanges.row_stack(pattern_ranges1, pattern_ranges2)
+        assert_records_close(
+            new_pattern_ranges.values,
+            np.array(
+                [
+                    (0, 0, 0, 3, 1, 0.5),
+                    (1, 0, 1, 4, 1, 1.0),
+                    (2, 0, 2, 5, 1, 0.0),
+                    (3, 0, 3, 6, 1, 0.5),
+                    (4, 0, 4, 6, 0, 1.0),
+                    (5, 0, 7, 10, 1, 0.5),
+                    (6, 0, 8, 11, 1, 1.0),
+                    (7, 0, 9, 12, 1, 0.0),
+                    (8, 0, 10, 13, 1, 0.5),
+                    (9, 0, 11, 13, 0, 1.0),
+                    (0, 1, 0, 3, 1, 0.5),
+                    (1, 1, 1, 4, 1, 1.0),
+                    (2, 1, 2, 5, 1, 0.0),
+                    (3, 1, 3, 6, 1, 0.5),
+                    (4, 1, 4, 6, 0, 1.0),
+                    (5, 1, 7, 10, 1, 0.5),
+                    (6, 1, 8, 11, 1, 0.0),
+                    (7, 1, 9, 12, 1, 1.0),
+                    (8, 1, 10, 13, 1, 0.5),
+                    (9, 1, 11, 13, 0, 0.0),
+                ],
+                dtype=pattern_range_dt,
+            ),
+        )
+        pd.testing.assert_frame_equal(new_pattern_ranges.close, pd.concat((sr.vbt.tile(2, keys=["a", "b"]), df)))
+        assert new_pattern_ranges.search_configs == [
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0,
+                max_overlap=None,
+            ),
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0,
+                max_overlap=None,
+            ),
+        ]
+        pattern_ranges3 = vbt.PatternRanges.from_pattern_search(df, [1, 2, 1], min_similarity=0.5, max_overlap=None)
+        with pytest.raises(Exception):
+            vbt.PatternRanges.row_stack(pattern_ranges1, pattern_ranges3)
+
+    def test_column_stack(self):
+        sr = pd.Series([1, 2, 3, 2, 3, 4, 3], index=pd.date_range("2020-01-01", periods=7), name="a")
+        df = pd.DataFrame(
+            {"b": [1, 2, 3, 2, 3, 4, 3], "c": [4, 3, 2, 3, 2, 1, 2]}, index=pd.date_range("2020-01-03", periods=7)
+        )
+        pattern_ranges1 = vbt.PatternRanges.from_pattern_search(sr, [1, 2, 1], min_similarity=0, max_overlap=None)
+        pattern_ranges2 = vbt.PatternRanges.from_pattern_search(df, [1, 2, 1], min_similarity=0.5, max_overlap=None)
+        new_pattern_ranges = vbt.PatternRanges.column_stack(pattern_ranges1, pattern_ranges2)
+        assert_records_close(
+            new_pattern_ranges.values,
+            np.array(
+                [
+                    (0, 0, 0, 3, 1, 0.5),
+                    (1, 0, 1, 4, 1, 1.0),
+                    (2, 0, 2, 5, 1, 0.0),
+                    (3, 0, 3, 6, 1, 0.5),
+                    (4, 0, 4, 6, 0, 1.0),
+                    (0, 1, 2, 5, 1, 0.5),
+                    (1, 1, 3, 6, 1, 1.0),
+                    (2, 1, 5, 8, 1, 0.5),
+                    (3, 1, 6, 8, 0, 1.0),
+                    (0, 2, 2, 5, 1, 0.5),
+                    (1, 2, 4, 7, 1, 1.0),
+                    (2, 2, 5, 8, 1, 0.5),
+                ],
+                dtype=pattern_range_dt,
+            ),
+        )
+        pd.testing.assert_frame_equal(new_pattern_ranges.close, pd.concat((sr, df), axis=1))
+        assert new_pattern_ranges.search_configs == [
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0,
+                max_overlap=None,
+            ),
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0.5,
+                max_overlap=None,
+            ),
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0.5,
+                max_overlap=None,
+            ),
+        ]
+
+    def test_indexing(self):
+        new_pattern_ranges = pattern_ranges.loc["2020-01-02":"2020-01-05", ["a", "c"]]
+        assert_index_equal(
+            new_pattern_ranges.wrapper.index,
+            pd.DatetimeIndex(
+                ["2020-01-02", "2020-01-03", "2020-01-04", "2020-01-05"], dtype="datetime64[ns]", freq=None
+            ),
+        )
+        assert_index_equal(new_pattern_ranges.wrapper.columns, pattern_ranges.wrapper.columns[[0, 2]])
+        assert_frame_equal(new_pattern_ranges.close, pattern_ranges.close.loc["2020-01-02":"2020-01-05", ["a", "c"]])
+        assert_records_close(
+            new_pattern_ranges.values,
+            np.array([(1, 0, 0, 3, 1, 1.0), (1, 1, 0, 3, 1, 1.0)], dtype=pattern_range_dt),
+        )
+        assert new_pattern_ranges.search_configs == [
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0,
+                max_overlap=None,
+            ),
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0,
+                max_overlap=None,
+            ),
+        ]
+
+    def test_from_pattern_search(self):
+        assert_records_close(
+            vbt.PatternRanges.from_pattern_search(
+                ts2,
+                [1, 2, 1],
+                min_similarity=0,
+                max_overlap=None,
+                max_records=20,
+            ).values,
+            np.array(
+                [
+                    (0, 0, 0, 3, 1, 0.16666666666666663),
+                    (1, 0, 1, 4, 1, 1.0),
+                    (2, 0, 2, 5, 1, 0.11111111111111116),
+                    (3, 0, 3, 5, 0, 1.0),
+                    (0, 1, 0, 3, 1, 1.0),
+                    (1, 1, 1, 4, 1, 0.16666666666666663),
+                    (2, 1, 2, 5, 1, 1.0),
+                    (3, 1, 3, 5, 0, 0.11111111111111116),
+                    (0, 2, 0, 3, 1, 0.5),
+                    (1, 2, 1, 4, 1, 1.0),
+                    (2, 2, 2, 5, 1, 0.5),
+                    (3, 2, 3, 5, 0, 0.0),
+                    (0, 3, 0, 3, 1, 0.5),
+                    (1, 3, 1, 4, 1, 0.5),
+                    (2, 3, 2, 5, 1, 0.5),
+                    (3, 3, 3, 5, 0, 0.5),
+                ],
+                dtype=pattern_range_dt,
+            ),
+        )
+        assert_records_close(
+            vbt.PatternRanges.from_pattern_search(
+                ts2,
+                [1, 2, 1],
+                window=2,
+                max_window=4,
+                min_similarity=0,
+                max_overlap=None,
+                max_records=20,
+            ).values,
+            np.array(
+                [
+                    (0, 0, 0, 2, 1, 0.5),
+                    (1, 0, 0, 3, 1, 0.16666666666666663),
+                    (2, 0, 0, 4, 1, 0.55),
+                    (3, 0, 1, 3, 1, 0.5),
+                    (4, 0, 1, 4, 1, 1.0),
+                    (5, 0, 1, 5, 1, 0.4999999999999999),
+                    (6, 0, 2, 4, 1, 0.5),
+                    (7, 0, 2, 5, 1, 0.11111111111111116),
+                    (8, 0, 2, 5, 0, 0.5),
+                    (9, 0, 3, 5, 1, 0.5),
+                    (10, 0, 3, 5, 0, 1.0),
+                    (11, 0, 4, 5, 0, 0.5),
+                    (0, 1, 0, 2, 1, 0.5),
+                    (1, 1, 0, 3, 1, 1.0),
+                    (2, 1, 0, 4, 1, 0.44999999999999996),
+                    (3, 1, 1, 3, 1, 0.5),
+                    (4, 1, 1, 4, 1, 0.16666666666666663),
+                    (5, 1, 1, 5, 1, 0.55),
+                    (6, 1, 2, 4, 1, 0.5),
+                    (7, 1, 2, 5, 1, 1.0),
+                    (8, 1, 2, 5, 0, 0.4999999999999999),
+                    (9, 1, 3, 5, 1, 0.5),
+                    (10, 1, 3, 5, 0, 0.11111111111111116),
+                    (11, 1, 4, 5, 0, 0.5),
+                    (0, 2, 0, 2, 1, 0.5),
+                    (1, 2, 0, 3, 1, 0.5),
+                    (2, 2, 0, 4, 1, 0.7000000000000001),
+                    (3, 2, 1, 3, 1, 0.5),
+                    (4, 2, 1, 4, 1, 1.0),
+                    (5, 2, 1, 5, 1, 0.7),
+                    (6, 2, 2, 4, 1, 0.5),
+                    (7, 2, 2, 5, 1, 0.5),
+                    (8, 2, 2, 5, 0, 0.30000000000000004),
+                    (9, 2, 3, 5, 1, 0.5),
+                    (10, 2, 3, 5, 0, 0.0),
+                    (11, 2, 4, 5, 0, 0.5),
+                    (0, 3, 0, 2, 1, 0.5),
+                    (1, 3, 0, 3, 1, 0.5),
+                    (2, 3, 0, 4, 1, 0.5999999999999999),
+                    (3, 3, 1, 3, 1, 0.5),
+                    (4, 3, 1, 4, 1, 0.5),
+                    (5, 3, 1, 5, 1, 0.5999999999999999),
+                    (6, 3, 2, 4, 1, 0.5),
+                    (7, 3, 2, 5, 1, 0.5),
+                    (8, 3, 2, 5, 0, 0.5999999999999999),
+                    (9, 3, 3, 5, 1, 0.5),
+                    (10, 3, 3, 5, 0, 0.5),
+                    (11, 3, 4, 5, 0, 0.5),
+                ],
+                dtype=pattern_range_dt,
+            ),
+        )
+        assert_records_close(
+            vbt.PatternRanges.from_pattern_search(
+                ts2,
+                [1, 2, 1],
+                window=2,
+                max_window=4,
+                min_similarity=0,
+                max_overlap=None,
+                max_records=20,
+                window_select_prob=0.5,
+                seed=42,
+            ).values,
+            np.array(
+                [
+                    (0, 0, 1, 3, 1, 0.5),
+                    (1, 0, 1, 4, 1, 1.0),
+                    (2, 0, 2, 5, 1, 0.11111111111111116),
+                    (3, 0, 3, 5, 1, 0.5),
+                    (4, 0, 3, 5, 0, 1.0),
+                    (5, 0, 4, 5, 0, 0.5),
+                    (0, 1, 0, 2, 1, 0.5),
+                    (1, 1, 0, 3, 1, 1.0),
+                    (2, 1, 1, 3, 1, 0.5),
+                    (3, 1, 1, 4, 1, 0.16666666666666663),
+                    (4, 1, 1, 5, 1, 0.55),
+                    (5, 1, 2, 4, 1, 0.5),
+                    (6, 1, 3, 5, 0, 0.11111111111111116),
+                    (0, 2, 0, 3, 1, 0.5),
+                    (1, 2, 0, 4, 1, 0.7000000000000001),
+                    (2, 2, 1, 3, 1, 0.5),
+                    (3, 2, 1, 4, 1, 1.0),
+                    (4, 2, 1, 5, 1, 0.7),
+                    (5, 2, 2, 5, 1, 0.5),
+                    (0, 3, 1, 3, 1, 0.5),
+                    (1, 3, 1, 4, 1, 0.5),
+                    (2, 3, 1, 5, 1, 0.5999999999999999),
+                    (3, 3, 2, 4, 1, 0.5),
+                    (4, 3, 2, 5, 1, 0.5),
+                    (5, 3, 3, 5, 1, 0.5),
+                ],
+                dtype=pattern_range_dt,
+            ),
+        )
+        assert_records_close(
+            vbt.PatternRanges.from_pattern_search(
+                ts2,
+                [1, 2, 1],
+                window=2,
+                max_window=4,
+                min_similarity=0,
+                max_overlap=None,
+                max_records=20,
+                row_select_prob=0.5,
+                seed=42,
+            ).values,
+            np.array(
+                [
+                    (0, 0, 0, 2, 1, 0.5),
+                    (1, 0, 0, 3, 1, 0.16666666666666663),
+                    (2, 0, 0, 4, 1, 0.55),
+                    (3, 0, 1, 3, 1, 0.5),
+                    (4, 0, 1, 4, 1, 1.0),
+                    (5, 0, 1, 5, 1, 0.4999999999999999),
+                    (6, 0, 4, 5, 0, 0.5),
+                    (0, 1, 1, 3, 1, 0.5),
+                    (1, 1, 1, 4, 1, 0.16666666666666663),
+                    (2, 1, 1, 5, 1, 0.55),
+                    (3, 1, 3, 5, 1, 0.5),
+                    (4, 1, 3, 5, 0, 0.11111111111111116),
+                    (5, 1, 4, 5, 0, 0.5),
+                    (0, 2, 0, 2, 1, 0.5),
+                    (1, 2, 0, 3, 1, 0.5),
+                    (2, 2, 0, 4, 1, 0.7000000000000001),
+                    (3, 2, 3, 5, 1, 0.5),
+                    (4, 2, 3, 5, 0, 0.0),
+                    (5, 2, 4, 5, 0, 0.5),
+                    (0, 3, 2, 4, 1, 0.5),
+                    (1, 3, 2, 5, 1, 0.5),
+                    (2, 3, 2, 5, 0, 0.5999999999999999),
+                    (3, 3, 3, 5, 1, 0.5),
+                    (4, 3, 3, 5, 0, 0.5),
+                ],
+                dtype=pattern_range_dt,
+            ),
+        )
+        assert_records_close(
+            vbt.PatternRanges.from_pattern_search(
+                ts2,
+                [1, 2, 1],
+                min_similarity=0,
+                max_overlap=None,
+                max_records=20,
+                jitted=dict(parallel=True),
+            ).values,
+            vbt.PatternRanges.from_pattern_search(
+                ts2,
+                [1, 2, 1],
+                min_similarity=0,
+                max_overlap=None,
+                max_records=20,
+                jitted=dict(parallel=True),
+            ).values,
+        )
+
+        new_pattern_ranges = vbt.PatternRanges.from_pattern_search(
+            ts2["a"],
+            [1, 2, 1],
+            min_similarity=0,
+            max_overlap=None,
+            max_records=20,
+        )
+        assert_records_close(
+            new_pattern_ranges.values,
+            np.array(
+                [
+                    (0, 0, 0, 3, 1, 0.16666666666666663),
+                    (1, 0, 1, 4, 1, 1.0),
+                    (2, 0, 2, 5, 1, 0.11111111111111116),
+                    (3, 0, 3, 5, 0, 1.0),
+                ],
+                dtype=pattern_range_dt,
+            ),
+        )
+        pd.testing.assert_index_equal(
+            new_pattern_ranges.wrapper.columns,
+            pd.Index(["a"], dtype="object"),
+        )
+        assert new_pattern_ranges.search_configs == [
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0,
+                max_overlap=None,
+                max_records=20,
+            )
+        ]
+        new_pattern_ranges = vbt.PatternRanges.from_pattern_search(
+            ts2["a"],
+            [1, 2, 1],
+            min_similarity=vbt.Param(0),
+            max_overlap=None,
+            max_records=20,
+        )
+        assert_records_close(
+            new_pattern_ranges.values,
+            np.array(
+                [
+                    (0, 0, 0, 3, 1, 0.16666666666666663),
+                    (1, 0, 1, 4, 1, 1.0),
+                    (2, 0, 2, 5, 1, 0.11111111111111116),
+                    (3, 0, 3, 5, 0, 1.0),
+                ],
+                dtype=pattern_range_dt,
+            ),
+        )
+        pd.testing.assert_index_equal(
+            new_pattern_ranges.wrapper.columns,
+            pd.MultiIndex.from_tuples([(0, "a")], names=["min_similarity", None]),
+        )
+        assert new_pattern_ranges.search_configs == [
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0,
+                max_overlap=None,
+                max_records=20,
+            )
+        ]
+        new_pattern_ranges = vbt.PatternRanges.from_pattern_search(
+            ts2["a"],
+            [1, 2, 1],
+            min_similarity=vbt.Param([0, 0.5]),
+            max_overlap=None,
+            max_records=20,
+        )
+        assert_records_close(
+            new_pattern_ranges.values,
+            np.array(
+                [
+                    (0, 0, 0, 3, 1, 0.16666666666666663),
+                    (1, 0, 1, 4, 1, 1.0),
+                    (2, 0, 2, 5, 1, 0.11111111111111116),
+                    (3, 0, 3, 5, 0, 1.0),
+                    (0, 1, 1, 4, 1, 1.0),
+                    (1, 1, 3, 5, 0, 1.0),
+                ],
+                dtype=pattern_range_dt,
+            ),
+        )
+        pd.testing.assert_index_equal(
+            new_pattern_ranges.wrapper.columns,
+            pd.Float64Index([0.0, 0.5], dtype="float64", name="min_similarity"),
+        )
+        assert new_pattern_ranges.search_configs == [
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0,
+                max_overlap=None,
+                max_records=20,
+            ),
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0.5,
+                max_overlap=None,
+                max_records=20,
+            ),
+        ]
+        new_pattern_ranges = vbt.PatternRanges.from_pattern_search(
+            ts2[["a", "b"]],
+            [1, 2, 1],
+            min_similarity=vbt.Param(0),
+            max_overlap=None,
+            max_records=20,
+        )
+        assert_records_close(
+            new_pattern_ranges.values,
+            np.array(
+                [
+                    (0, 0, 0, 3, 1, 0.16666666666666663),
+                    (1, 0, 1, 4, 1, 1.0),
+                    (2, 0, 2, 5, 1, 0.11111111111111116),
+                    (3, 0, 3, 5, 0, 1.0),
+                    (0, 1, 0, 3, 1, 1.0),
+                    (1, 1, 1, 4, 1, 0.16666666666666663),
+                    (2, 1, 2, 5, 1, 1.0),
+                    (3, 1, 3, 5, 0, 0.11111111111111116),
+                ],
+                dtype=pattern_range_dt,
+            ),
+        )
+        pd.testing.assert_index_equal(
+            new_pattern_ranges.wrapper.columns,
+            pd.MultiIndex.from_tuples([(0, "a"), (0, "b")], names=["min_similarity", None]),
+        )
+        assert new_pattern_ranges.search_configs == [
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0,
+                max_overlap=None,
+                max_records=20,
+            ),
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0,
+                max_overlap=None,
+                max_records=20,
+            ),
+        ]
+        new_pattern_ranges = vbt.PatternRanges.from_pattern_search(
+            ts2[["a", "b"]],
+            [1, 2, 1],
+            min_similarity=vbt.Param([0, 0.5]),
+            max_overlap=None,
+            max_records=20,
+        )
+        assert_records_close(
+            new_pattern_ranges.values,
+            np.array(
+                [
+                    (0, 0, 0, 3, 1, 0.16666666666666663),
+                    (1, 0, 1, 4, 1, 1.0),
+                    (2, 0, 2, 5, 1, 0.11111111111111116),
+                    (3, 0, 3, 5, 0, 1.0),
+                    (0, 1, 0, 3, 1, 1.0),
+                    (1, 1, 1, 4, 1, 0.16666666666666663),
+                    (2, 1, 2, 5, 1, 1.0),
+                    (3, 1, 3, 5, 0, 0.11111111111111116),
+                    (0, 2, 1, 4, 1, 1.0),
+                    (1, 2, 3, 5, 0, 1.0),
+                    (0, 3, 0, 3, 1, 1.0),
+                    (1, 3, 2, 5, 1, 1.0),
+                ],
+                dtype=pattern_range_dt,
+            ),
+        )
+        pd.testing.assert_index_equal(
+            new_pattern_ranges.wrapper.columns,
+            pd.MultiIndex.from_tuples([(0, "a"), (0, "b"), (0.5, "a"), (0.5, "b")], names=["min_similarity", None]),
+        )
+        assert new_pattern_ranges.search_configs == [
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0,
+                max_overlap=None,
+                max_records=20,
+            ),
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0,
+                max_overlap=None,
+                max_records=20,
+            ),
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0.5,
+                max_overlap=None,
+                max_records=20,
+            ),
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0.5,
+                max_overlap=None,
+                max_records=20,
+            ),
+        ]
+        new_pattern_ranges = vbt.PatternRanges.from_pattern_search(
+            ts2["a"],
+            search_configs=[
+                vbt.PSC(
+                    pattern=[1, 2, 1],
+                    min_similarity=0,
+                    max_overlap=None,
+                    max_records=20,
+                )
+            ],
+        )
+        assert_records_close(
+            new_pattern_ranges.values,
+            np.array(
+                [
+                    (0, 0, 0, 3, 1, 0.16666666666666663),
+                    (1, 0, 1, 4, 1, 1.0),
+                    (2, 0, 2, 5, 1, 0.11111111111111116),
+                    (3, 0, 3, 5, 0, 1.0),
+                ],
+                dtype=pattern_range_dt,
+            ),
+        )
+        pd.testing.assert_index_equal(
+            new_pattern_ranges.wrapper.columns,
+            pd.Index(["a"], dtype="object"),
+        )
+        assert new_pattern_ranges.search_configs == [
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0,
+                max_overlap=None,
+                max_records=20,
+            )
+        ]
+        new_pattern_ranges = vbt.PatternRanges.from_pattern_search(
+            ts2["a"],
+            search_configs=[
+                [
+                    vbt.PSC(
+                        pattern=[1, 2, 1],
+                        min_similarity=0,
+                        max_overlap=None,
+                        max_records=20,
+                    )
+                ]
+            ],
+        )
+        assert_records_close(
+            new_pattern_ranges.values,
+            np.array(
+                [
+                    (0, 0, 0, 3, 1, 0.16666666666666663),
+                    (1, 0, 1, 4, 1, 1.0),
+                    (2, 0, 2, 5, 1, 0.11111111111111116),
+                    (3, 0, 3, 5, 0, 1.0),
+                ],
+                dtype=pattern_range_dt,
+            ),
+        )
+        pd.testing.assert_index_equal(
+            new_pattern_ranges.wrapper.columns,
+            pd.Index(["a"], dtype="object"),
+        )
+        assert new_pattern_ranges.search_configs == [
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0,
+                max_overlap=None,
+                max_records=20,
+            )
+        ]
+        new_pattern_ranges = vbt.PatternRanges.from_pattern_search(
+            ts2["a"],
+            search_configs=[
+                [
+                    vbt.PSC(
+                        pattern=[1, 2, 1],
+                        min_similarity=0,
+                        max_overlap=None,
+                        max_records=20,
+                    )
+                ],
+                [
+                    vbt.PSC(
+                        pattern=[1, 2, 1],
+                        min_similarity=0.5,
+                        max_overlap=None,
+                        max_records=20,
+                    )
+                ],
+            ],
+        )
+        assert_records_close(
+            new_pattern_ranges.values,
+            np.array(
+                [
+                    (0, 0, 0, 3, 1, 0.16666666666666663),
+                    (1, 0, 1, 4, 1, 1.0),
+                    (2, 0, 2, 5, 1, 0.11111111111111116),
+                    (3, 0, 3, 5, 0, 1.0),
+                    (0, 1, 1, 4, 1, 1.0),
+                    (1, 1, 3, 5, 0, 1.0),
+                ],
+                dtype=pattern_range_dt,
+            ),
+        )
+        pd.testing.assert_index_equal(
+            new_pattern_ranges.wrapper.columns,
+            pd.Index([0, 1], dtype="int64", name="search_config"),
+        )
+        assert new_pattern_ranges.search_configs == [
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0,
+                max_overlap=None,
+                max_records=20,
+            ),
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0.5,
+                max_overlap=None,
+                max_records=20,
+            ),
+        ]
+        new_pattern_ranges = vbt.PatternRanges.from_pattern_search(
+            ts2[["a", "b"]],
+            search_configs=[
+                vbt.PSC(
+                    pattern=[1, 2, 1],
+                    min_similarity=0,
+                    max_overlap=None,
+                    max_records=20,
+                )
+            ],
+        )
+        assert_records_close(
+            new_pattern_ranges.values,
+            np.array(
+                [
+                    (0, 0, 0, 3, 1, 0.16666666666666663),
+                    (1, 0, 1, 4, 1, 1.0),
+                    (2, 0, 2, 5, 1, 0.11111111111111116),
+                    (3, 0, 3, 5, 0, 1.0),
+                    (0, 1, 0, 3, 1, 1.0),
+                    (1, 1, 1, 4, 1, 0.16666666666666663),
+                    (2, 1, 2, 5, 1, 1.0),
+                    (3, 1, 3, 5, 0, 0.11111111111111116),
+                ],
+                dtype=pattern_range_dt,
+            ),
+        )
+        pd.testing.assert_index_equal(
+            new_pattern_ranges.wrapper.columns,
+            pd.Index(["a", "b"], dtype="object"),
+        )
+        assert new_pattern_ranges.search_configs == [
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0,
+                max_overlap=None,
+                max_records=20,
+            ),
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0,
+                max_overlap=None,
+                max_records=20,
+            ),
+        ]
+        new_pattern_ranges = vbt.PatternRanges.from_pattern_search(
+            ts2[["a", "b"]],
+            search_configs=[
+                vbt.PSC(
+                    pattern=[1, 2, 1],
+                    min_similarity=0,
+                    max_overlap=None,
+                    max_records=20,
+                ),
+                vbt.PSC(
+                    pattern=[1, 2, 1],
+                    min_similarity=0.5,
+                    max_overlap=None,
+                    max_records=20,
+                ),
+            ],
+        )
+        assert_records_close(
+            new_pattern_ranges.values,
+            np.array(
+                [
+                    (0, 0, 0, 3, 1, 0.16666666666666663),
+                    (1, 0, 1, 4, 1, 1.0),
+                    (2, 0, 2, 5, 1, 0.11111111111111116),
+                    (3, 0, 3, 5, 0, 1.0),
+                    (0, 1, 0, 3, 1, 1.0),
+                    (1, 1, 1, 4, 1, 0.16666666666666663),
+                    (2, 1, 2, 5, 1, 1.0),
+                    (3, 1, 3, 5, 0, 0.11111111111111116),
+                    (0, 2, 1, 4, 1, 1.0),
+                    (1, 2, 3, 5, 0, 1.0),
+                    (0, 3, 0, 3, 1, 1.0),
+                    (1, 3, 2, 5, 1, 1.0),
+                ],
+                dtype=pattern_range_dt,
+            ),
+        )
+        pd.testing.assert_index_equal(
+            new_pattern_ranges.wrapper.columns,
+            pd.MultiIndex.from_tuples(
+                [
+                    (0, "a"),
+                    (1, "b"),
+                    (2, "a"),
+                    (3, "b"),
+                ],
+                names=["search_config", None],
+            ),
+        )
+        assert new_pattern_ranges.search_configs == [
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0,
+                max_overlap=None,
+                max_records=20,
+            ),
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0,
+                max_overlap=None,
+                max_records=20,
+            ),
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0.5,
+                max_overlap=None,
+                max_records=20,
+            ),
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0.5,
+                max_overlap=None,
+                max_records=20,
+            ),
+        ]
+        new_pattern_ranges = vbt.PatternRanges.from_pattern_search(
+            ts2[["a", "b"]],
+            search_configs=[
+                [
+                    vbt.PSC(
+                        pattern=[1, 2, 1],
+                        min_similarity=0,
+                        max_overlap=None,
+                        max_records=20,
+                    ),
+                    vbt.PSC(
+                        pattern=[1, 2, 1],
+                        min_similarity=0.5,
+                        max_overlap=None,
+                        max_records=20,
+                    ),
+                ]
+            ],
+        )
+        assert_records_close(
+            new_pattern_ranges.values,
+            np.array(
+                [
+                    (0, 0, 0, 3, 1, 0.16666666666666663),
+                    (1, 0, 1, 4, 1, 1.0),
+                    (2, 0, 2, 5, 1, 0.11111111111111116),
+                    (3, 0, 3, 5, 0, 1.0),
+                    (0, 1, 0, 3, 1, 1.0),
+                    (1, 1, 2, 5, 1, 1.0),
+                ],
+                dtype=pattern_range_dt,
+            ),
+        )
+        pd.testing.assert_index_equal(
+            new_pattern_ranges.wrapper.columns,
+            pd.Index(["a", "b"], dtype="object"),
+        )
+        assert new_pattern_ranges.search_configs == [
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0,
+                max_overlap=None,
+                max_records=20,
+            ),
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0.5,
+                max_overlap=None,
+                max_records=20,
+            ),
+        ]
+        new_pattern_ranges = vbt.PatternRanges.from_pattern_search(
+            ts2[["a", "b"]],
+            search_configs=[
+                [
+                    vbt.PSC(
+                        pattern=[1, 2, 1],
+                        min_similarity=0,
+                        max_overlap=None,
+                        max_records=20,
+                    ),
+                    vbt.PSC(
+                        pattern=[1, 2, 1],
+                        min_similarity=0.5,
+                        max_overlap=None,
+                        max_records=20,
+                    ),
+                ],
+                [
+                    vbt.PSC(
+                        pattern=[1, 2, 1],
+                        min_similarity=0,
+                        max_overlap=None,
+                        max_records=20,
+                    ),
+                    vbt.PSC(
+                        pattern=[1, 2, 1],
+                        min_similarity=0.5,
+                        max_overlap=None,
+                        max_records=20,
+                    ),
+                ],
+            ],
+        )
+        assert_records_close(
+            new_pattern_ranges.values,
+            np.array(
+                [
+                    (0, 0, 0, 3, 1, 0.16666666666666663),
+                    (1, 0, 1, 4, 1, 1.0),
+                    (2, 0, 2, 5, 1, 0.11111111111111116),
+                    (3, 0, 3, 5, 0, 1.0),
+                    (0, 1, 0, 3, 1, 1.0),
+                    (1, 1, 2, 5, 1, 1.0),
+                    (0, 2, 0, 3, 1, 0.16666666666666663),
+                    (1, 2, 1, 4, 1, 1.0),
+                    (2, 2, 2, 5, 1, 0.11111111111111116),
+                    (3, 2, 3, 5, 0, 1.0),
+                    (0, 3, 0, 3, 1, 1.0),
+                    (1, 3, 2, 5, 1, 1.0),
+                ],
+                dtype=pattern_range_dt,
+            ),
+        )
+        pd.testing.assert_index_equal(
+            new_pattern_ranges.wrapper.columns,
+            pd.MultiIndex.from_tuples(
+                [
+                    (0, "a"),
+                    (1, "b"),
+                    (2, "a"),
+                    (3, "b"),
+                ],
+                names=["search_config", None],
+            ),
+        )
+        assert new_pattern_ranges.search_configs == [
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0,
+                max_overlap=None,
+                max_records=20,
+            ),
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0.5,
+                max_overlap=None,
+                max_records=20,
+            ),
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0,
+                max_overlap=None,
+                max_records=20,
+            ),
+            vbt.PatternRanges.resolve_search_config(
+                pattern=np.array([1, 2, 1]),
+                min_similarity=0.5,
+                max_overlap=None,
+                max_records=20,
+            ),
+        ]
+
+    def test_records_readable(self):
+        records_readable = pattern_ranges.records_readable
+
+        np.testing.assert_array_equal(
+            records_readable["Pattern Range Id"].values, np.array([0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3])
+        )
+        np.testing.assert_array_equal(
+            records_readable["Column"].values,
+            np.array(["a", "a", "a", "a", "b", "b", "b", "b", "c", "c", "c", "c", "d", "d", "d", "d"]),
+        )
+        np.testing.assert_array_equal(
+            records_readable["Start Timestamp"].values,
+            np.array(
+                [
+                    "2020-01-01T00:00:00.000000000",
+                    "2020-01-02T00:00:00.000000000",
+                    "2020-01-03T00:00:00.000000000",
+                    "2020-01-04T00:00:00.000000000",
+                    "2020-01-01T00:00:00.000000000",
+                    "2020-01-02T00:00:00.000000000",
+                    "2020-01-03T00:00:00.000000000",
+                    "2020-01-04T00:00:00.000000000",
+                    "2020-01-01T00:00:00.000000000",
+                    "2020-01-02T00:00:00.000000000",
+                    "2020-01-03T00:00:00.000000000",
+                    "2020-01-04T00:00:00.000000000",
+                    "2020-01-01T00:00:00.000000000",
+                    "2020-01-02T00:00:00.000000000",
+                    "2020-01-03T00:00:00.000000000",
+                    "2020-01-04T00:00:00.000000000",
+                ],
+                dtype="datetime64[ns]",
+            ),
+        )
+        np.testing.assert_array_equal(
+            records_readable["End Timestamp"].values,
+            np.array(
+                [
+                    "2020-01-04T00:00:00.000000000",
+                    "2020-01-05T00:00:00.000000000",
+                    "2020-01-06T00:00:00.000000000",
+                    "2020-01-06T00:00:00.000000000",
+                    "2020-01-04T00:00:00.000000000",
+                    "2020-01-05T00:00:00.000000000",
+                    "2020-01-06T00:00:00.000000000",
+                    "2020-01-06T00:00:00.000000000",
+                    "2020-01-04T00:00:00.000000000",
+                    "2020-01-05T00:00:00.000000000",
+                    "2020-01-06T00:00:00.000000000",
+                    "2020-01-06T00:00:00.000000000",
+                    "2020-01-04T00:00:00.000000000",
+                    "2020-01-05T00:00:00.000000000",
+                    "2020-01-06T00:00:00.000000000",
+                    "2020-01-06T00:00:00.000000000",
+                ],
+                dtype="datetime64[ns]",
+            ),
+        )
+        np.testing.assert_array_equal(
+            records_readable["Status"].values,
+            np.array(
+                [
+                    "Closed",
+                    "Closed",
+                    "Closed",
+                    "Open",
+                    "Closed",
+                    "Closed",
+                    "Closed",
+                    "Open",
+                    "Closed",
+                    "Closed",
+                    "Closed",
+                    "Open",
+                    "Closed",
+                    "Closed",
+                    "Closed",
+                    "Open",
+                ]
+            ),
+        )
+        np.testing.assert_array_equal(
+            records_readable["Similarity"].values,
+            np.array(
+                [
+                    0.16666666666666663,
+                    1.0,
+                    0.11111111111111116,
+                    1.0,
+                    1.0,
+                    0.16666666666666663,
+                    1.0,
+                    0.11111111111111116,
+                    0.5,
+                    1.0,
+                    0.5,
+                    0.0,
+                    0.5,
+                    0.5,
+                    0.5,
+                    0.5,
+                ]
+            ),
+        )
+
+    def test_stats(self):
+        stats_index = pd.Index(
+            [
+                "Start",
+                "End",
+                "Period",
+                "Total Records",
+                "Coverage",
+                "Overlap Coverage",
+                "Duration: Min",
+                "Duration: Median",
+                "Duration: Max",
+                "Similarity: Min",
+                "Similarity: Median",
+                "Similarity: Max",
+            ],
+            dtype="object",
+        )
+        assert_series_equal(
+            pattern_ranges.stats(),
+            pd.Series(
+                [
+                    pd.Timestamp('2020-01-01 00:00:00', freq='D'),
+                    pd.Timestamp('2020-01-06 00:00:00', freq='D'),
+                    pd.Timedelta('6 days 00:00:00'),
+                    4.0,
+                    1.0,
+                    0.6666666666666666,
+                    pd.Timedelta('3 days 00:00:00'),
+                    pd.Timedelta('3 days 00:00:00'),
+                    pd.Timedelta('3 days 00:00:00'),
+                    0.18055555555555558,
+                    0.5416666666666666,
+                    0.875
+                ],
+                index=stats_index,
+                name="agg_stats",
+            ),
+        )
+        assert_series_equal(
+            pattern_ranges.stats(column="a"),
+            pd.Series(
+                [
+                    pd.Timestamp('2020-01-01 00:00:00', freq='D'),
+                    pd.Timestamp('2020-01-06 00:00:00', freq='D'),
+                    pd.Timedelta('6 days 00:00:00'),
+                    4,
+                    1.0,
+                    0.6666666666666666,
+                    pd.Timedelta('3 days 00:00:00'),
+                    pd.Timedelta('3 days 00:00:00'),
+                    pd.Timedelta('3 days 00:00:00'),
+                    0.11111111111111116,
+                    0.5833333333333333,
+                    1.0,
+                ],
+                index=stats_index,
+                name="a",
+            ),
+        )
+        assert_series_equal(
+            pattern_ranges.stats(column="g1", group_by=group_by),
+            pd.Series(
+                [
+                    pd.Timestamp('2020-01-01 00:00:00', freq='D'),
+                    pd.Timestamp('2020-01-06 00:00:00', freq='D'),
+                    pd.Timedelta('6 days 00:00:00'),
+                    8,
+                    0.5,
+                    1.0,
+                    pd.Timedelta('3 days 00:00:00'),
+                    pd.Timedelta('3 days 00:00:00'),
+                    pd.Timedelta('3 days 00:00:00'),
+                    0.11111111111111116,
+                    0.5833333333333333,
+                    1.0,
+                ],
+                index=stats_index,
+                name="g1",
+            ),
+        )
+        assert_series_equal(pattern_ranges["c"].stats(), pattern_ranges.stats(column="c"))
+        assert_series_equal(pattern_ranges["c"].stats(), pattern_ranges.stats(column="c", group_by=False))
+        assert_series_equal(pattern_ranges_grouped["g2"].stats(), pattern_ranges_grouped.stats(column="g2"))
+        assert_series_equal(pattern_ranges_grouped["g2"].stats(), pattern_ranges.stats(column="g2", group_by=group_by))
+        stats_df = pattern_ranges.stats(agg_func=None)
+        assert stats_df.shape == (4, 12)
+        assert_index_equal(stats_df.index, pattern_ranges.wrapper.columns)
+        assert_index_equal(stats_df.columns, stats_index)
+
+
+# ############# drawdowns.py ############# #
 
 drawdowns = vbt.Drawdowns.from_price(ts2, wrapper_kwargs=dict(freq="1 days"))
 drawdowns_grouped = vbt.Drawdowns.from_price(ts2, wrapper_kwargs=dict(freq="1 days", group_by=group_by))

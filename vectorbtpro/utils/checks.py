@@ -2,7 +2,7 @@
 
 """Utilities for validation during runtime."""
 
-import os
+import attr
 from collections.abc import Hashable, Mapping
 from inspect import signature, getmro
 from keyword import iskeyword
@@ -202,7 +202,12 @@ def is_deep_equal(arg1: tp.Any, arg2: tp.Any, check_exact: bool = False, **kwarg
             assert_method(arg1, arg2, **__kwargs)
 
     try:
-        safe_assert(type(arg1) == type(arg2))
+        if id(arg1) == id(arg2):
+            return True
+        if type(arg1) != type(arg2):
+            return False
+        if attr.has(type(arg1)):
+            return is_deep_equal(attr.asdict(arg1), attr.asdict(arg2), check_exact=check_exact, **kwargs)
         if isinstance(arg1, pd.Series):
             _kwargs = _select_kwargs(pd.testing.assert_series_equal, kwargs)
             pd.testing.assert_series_equal(arg1, arg2, check_exact=check_exact, **_kwargs)
@@ -222,10 +227,10 @@ def is_deep_equal(arg1: tp.Any, arg2: tp.Any, check_exact: bool = False, **kwarg
         else:
             if isinstance(arg1, (tuple, list)):
                 for i in range(len(arg1)):
-                    safe_assert(is_deep_equal(arg1[i], arg2[i], **kwargs))
+                    safe_assert(is_deep_equal(arg1[i], arg2[i], check_exact=check_exact, **kwargs))
             elif isinstance(arg1, dict):
                 for k in arg1.keys():
-                    safe_assert(is_deep_equal(arg1[k], arg2[k], **kwargs))
+                    safe_assert(is_deep_equal(arg1[k], arg2[k], check_exact=check_exact, **kwargs))
             else:
                 try:
                     if arg1 == arg2:
@@ -524,7 +529,7 @@ def assert_dict_valid(arg: tp.DictLike, lvl_keys: tp.Sequence[tp.MaybeSequence[s
     set1 = set(arg.keys())
     set2 = set(lvl_keys[0])
     if not set1.issubset(set2):
-        raise AssertionError(f"Keys {set1.difference(set2)} are not recognized. Possible keys are {set2}.")
+        raise AssertionError(f"Invalid keys {list(set1.difference(set2))}. Possible keys are {list(set2)}.")
     for k, v in arg.items():
         if isinstance(v, dict):
             assert_dict_valid(v, lvl_keys[1:])

@@ -35,7 +35,7 @@ from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.signals.enums import *
 from vectorbtpro.utils import chunking as ch
-from vectorbtpro.utils.array_ import uniform_summing_to_one_nb, rescale_float_to_int_nb, renormalize_nb
+from vectorbtpro.utils.array_ import uniform_summing_to_one_nb, rescale_float_to_int_nb, rescale_nb
 from vectorbtpro.utils.template import Rep
 
 
@@ -1177,7 +1177,7 @@ def nth_index_nb(mask: tp.Array2d, n: int) -> tp.Array1d:
 def norm_avg_index_1d_nb(mask: tp.Array1d) -> float:
     """Get mean index normalized to (-1, 1)."""
     mean_index = np.mean(np.flatnonzero(mask))
-    return renormalize_nb(mean_index, (0, len(mask) - 1), (-1, 1))
+    return rescale_nb(mean_index, (0, len(mask) - 1), (-1, 1))
 
 
 @register_chunkable(
@@ -1219,5 +1219,5 @@ def norm_avg_index_grouped_nb(mask, group_lens):
                 if mask[i, col]:
                     temp_sum += i
                     temp_cnt += 1
-        out[group] = renormalize_nb(temp_sum / temp_cnt, (0, mask.shape[0] - 1), (-1, 1))
+        out[group] = rescale_nb(temp_sum / temp_cnt, (0, mask.shape[0] - 1), (-1, 1))
     return out

@@ -432,6 +432,7 @@ from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.decorators import cached_method, class_or_instancemethod
 from vectorbtpro.utils.random_ import set_seed_nb
+from vectorbtpro.utils.template import Sub
 
 __pdoc__ = {}
 
@@ -495,7 +496,7 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
             dtype=None,
             settings=dict(
                 id=dict(name="id", title="Id", mapping="ids"),
-                col=dict(name="col", title="Column", mapping="columns"),
+                col=dict(name="col", title="Column", mapping="columns", as_customdata=False),
                 idx=dict(name="idx", title="Timestamp", mapping="index"),
             ),
         )
@@ -1196,6 +1197,79 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
         return self._metrics
 
     # ############# Plotting ############# #
+
+    def prepare_customdata(
+        self,
+        incl_fields: tp.Optional[tp.Sequence[str]] = None,
+        excl_fields: tp.Optional[tp.Sequence[str]] = None,
+        append_info: tp.Optional[tp.Sequence[tp.Tuple]] = None,
+        mask: tp.Optional[tp.Array1d] = None,
+    ) -> tp.Tuple[tp.Array2d, str]:
+        """Prepare customdata and hoverinfo for Plotly.
+
+        Will display all fields in the data type or only those in `incl_fields`, unless any of them has
+        the field config setting `as_customdata` disabled, or it's listed in `excl_fields`.
+        Additionally, you can define `hovertemplate` in the field config such as by using
+        `vectorbtpro.utils.template.Sub` where `title` is substituted by the title and `index` is
+        substituted by (final) index in the customdata. If provided as a string, will be wrapped with
+        `vectorbtpro.utils.template.Sub`. Defaults to "$title: %{{customdata[$index]}}". Mapped fields
+        will be stringified automatically.
+
+        To append one or more custom arrays, provide `append_info` as a list of tuples, each consisting
+        of a 1-dim NumPy array, title, and optionally hoverinfo. If the array's data type is `object`,
+        will treat it as strings, otherwise as numbers."""
+        customdata_info = []
+        if incl_fields is not None:
+            iterate_over_names = incl_fields
+        else:
+            iterate_over_names = self.field_config.get("dtype").names
+        for field in iterate_over_names:
+            if excl_fields is not None and field in excl_fields:
+                continue
+            field_as_customdata = self.get_field_setting(field, "as_customdata", True)
+            if field_as_customdata:
+                numeric_customdata = self.get_field_setting(field, "mapping", None)
+                if numeric_customdata is not None:
+                    field_arr = self.get_apply_mapping_str_arr(field)
+                    field_hovertemplate = self.get_field_setting(
+                        field,
+                        "hovertemplate",
+                        "$title: %{customdata[$index]}",
+                    )
+                else:
+                    field_arr = self.get_apply_mapping_arr(field)
+                    field_hovertemplate = self.get_field_setting(
+                        field,
+                        "hovertemplate",
+                        "$title: %{customdata[$index]:,}",
+                    )
+                if isinstance(field_hovertemplate, str):
+                    field_hovertemplate = Sub(field_hovertemplate)
+                field_title = self.get_field_title(field)
+                customdata_info.append((field_arr, field_title, field_hovertemplate))
+        if append_info is not None:
+            for info in append_info:
+                checks.assert_instance_of(info, tuple)
+                if len(info) == 2:
+                    if info[0].dtype == object:
+                        info += ("$title: %{customdata[$index]}",)
+                    else:
+                        info += ("$title: %{customdata[$index]:,}",)
+                if isinstance(info[2], str):
+                    info = (info[0], info[1], Sub(info[2]))
+                customdata_info.append(info)
+        customdata = []
+        hovertemplate = []
+        for i in range(len(customdata_info)):
+            if mask is not None:
+                customdata.append(customdata_info[i][0][mask])
+            else:
+                customdata.append(customdata_info[i][0])
+            _hovertemplate = customdata_info[i][2].substitute(dict(title=customdata_info[i][1], index=i))
+            if not _hovertemplate.startswith("<br>"):
+                _hovertemplate = "<br>" + _hovertemplate
+            hovertemplate.append(_hovertemplate)
+        return np.stack(customdata, axis=1), "\n".join(hovertemplate)
 
     @property
     def plots_defaults(self) -> tp.Kwargs:

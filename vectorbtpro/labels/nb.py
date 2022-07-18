@@ -371,7 +371,7 @@ def trend_labels_nb(
         return pct_trend_labels_nb(close, local_extrema, False)
     if mode == TrendMode.PctChangeNorm:
         return pct_trend_labels_nb(close, local_extrema, True)
-    raise ValueError("Trend mode is not recognized")
+    raise ValueError("Invalid trend mode")
 
 
 @register_chunkable(

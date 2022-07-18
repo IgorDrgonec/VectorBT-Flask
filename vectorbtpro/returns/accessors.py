@@ -1737,7 +1737,7 @@ class ReturnsAccessor(GenericAccessor):
                 bm_kwargs,
             )
             bm_cumrets = bm_returns.vbt.returns.cumulative(start_value=start_value)
-            bm_cumrets.vbt.plot(**bm_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+            bm_cumrets.vbt.lineplot(**bm_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
         else:
             bm_cumrets = None
 
