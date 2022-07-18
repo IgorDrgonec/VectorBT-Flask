@@ -429,7 +429,7 @@ from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import get_dict_attr
-from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
+from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.decorators import cached_method, class_or_instancemethod
 from vectorbtpro.utils.random_ import set_seed_nb
 from vectorbtpro.utils.template import Sub
@@ -1139,6 +1139,32 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
             mapped_arr = func(cls_or_self.values, col_map, apply_func_nb, *args)
             mapped_arr = np.asarray(mapped_arr, dtype=dtype)
             return cls_or_self.map_array(mapped_arr, group_by=group_by, **kwargs)
+
+    # ############# Masking ############# #
+
+    def get_pd_mask(
+        self,
+        idx_arr: tp.Union[None, str, tp.Array1d] = None,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """Get mask in form of a Series/DataFrame from row and column indices."""
+        if idx_arr is None:
+            if self.idx_arr is None:
+                raise ValueError("Must pass idx_arr")
+            idx_arr = self.idx_arr
+        elif isinstance(idx_arr, str):
+            idx_arr = self.get_field_arr(idx_arr)
+        col_arr = self.col_mapper.get_col_arr(group_by=group_by)
+        target_shape = self.wrapper.get_shape_2d(group_by=group_by)
+        out_arr = np.full(target_shape, False)
+        out_arr[idx_arr, col_arr] = True
+        return self.wrapper.wrap(out_arr, group_by=group_by, **resolve_dict(wrap_kwargs))
+
+    @property
+    def mask(self) -> tp.SeriesFrame:
+        """`MappedArray.get_pd_mask` with default arguments."""
+        return self.get_pd_mask()
 
     # ############# Reducing ############# #
 

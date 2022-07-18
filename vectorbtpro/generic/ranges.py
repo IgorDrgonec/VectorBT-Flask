@@ -182,7 +182,11 @@ __pdoc__[
 
 ranges_shortcut_config = ReadonlyConfig(
     dict(
-        mask=dict(obj_type="array"),
+        first_pd_mask=dict(obj_type="array"),
+        last_pd_mask=dict(obj_type="array"),
+        ranges_pd_mask=dict(obj_type="array"),
+        first_idx=dict(obj_type="mapped_array"),
+        last_idx=dict(obj_type="mapped_array"),
         duration=dict(obj_type="mapped_array"),
         real_duration=dict(obj_type="mapped_array"),
         avg_duration=dict(obj_type="red_array"),
@@ -279,8 +283,6 @@ class Ranges(PriceRecords):
         The second option requires the index to be datetime-like, or at least the frequency to be set.
 
         `**kwargs` will be passed to `Ranges.__init__`."""
-        from vectorbtpro.generic.ranges import Ranges
-
         if idx_field_or_arr is None:
             if isinstance(records_or_mapped, Records):
                 idx_field_or_arr = records_or_mapped.get_field_arr("idx")
@@ -367,9 +369,17 @@ class Ranges(PriceRecords):
             return self.apply_mask(self.real_duration.values <= max_duration, **kwargs)
         return self.apply_mask(self.duration.values * self.wrapper.freq <= max_duration, **kwargs)
 
-    # ############# Stats ############# #
+    # ############# Masking ############# #
 
-    def get_mask(
+    def get_first_pd_mask(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.SeriesFrame:
+        """Get mask from `Ranges.get_first_idx`."""
+        return self.get_pd_mask(idx_arr=self.first_idx.values, group_by=group_by, **kwargs)
+
+    def get_last_pd_mask(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.SeriesFrame:
+        """Get mask from `Ranges.get_last_idx`."""
+        return self.get_pd_mask(idx_arr=self.last_idx.values, group_by=group_by, **kwargs)
+
+    def get_ranges_pd_mask(
         self,
         group_by: tp.GroupByLike = None,
         jitted: tp.JittedOption = None,
@@ -390,6 +400,19 @@ class Ranges(PriceRecords):
             len(self.wrapper.index),
         )
         return self.wrapper.wrap(mask, group_by=group_by, **resolve_dict(wrap_kwargs))
+
+    # ############# Stats ############# #
+
+    def get_first_idx(self, **kwargs):
+        """Get the first index in each range."""
+        return self.map_field("start_idx", **kwargs)
+
+    def get_last_idx(self, **kwargs):
+        """Get the last index in each range."""
+        last_idx = self.get_field_arr("end_idx")
+        status = self.get_field_arr("status")
+        last_idx[status == RangeStatus.Closed] -= 1
+        return self.map_array(last_idx, **kwargs)
 
     def get_duration(
         self,

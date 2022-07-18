@@ -1699,6 +1699,30 @@ class MappedArray(Analyzable):
             out = func(self.values, col_arr, idx_arr, target_shape, fill_value)
             return self.wrapper.wrap(out, group_by=group_by, **resolve_dict(wrap_kwargs))
 
+    # ############# Masking ############# #
+
+    def get_pd_mask(
+        self,
+        idx_arr: tp.Optional[tp.Array1d] = None,
+        group_by: tp.GroupByLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """Get mask in form of a Series/DataFrame from row and column indices."""
+        if idx_arr is None:
+            if self.idx_arr is None:
+                raise ValueError("Must pass idx_arr")
+            idx_arr = self.idx_arr
+        col_arr = self.col_mapper.get_col_arr(group_by=group_by)
+        target_shape = self.wrapper.get_shape_2d(group_by=group_by)
+        out_arr = np.full(target_shape, False)
+        out_arr[idx_arr, col_arr] = True
+        return self.wrapper.wrap(out_arr, group_by=group_by, **resolve_dict(wrap_kwargs))
+
+    @property
+    def mask(self) -> tp.SeriesFrame:
+        """`MappedArray.get_pd_mask` with default arguments."""
+        return self.get_pd_mask()
+
     # ############# Stats ############# #
 
     @property

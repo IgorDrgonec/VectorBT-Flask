@@ -2565,11 +2565,61 @@ class TestRanges:
             np.array(["Closed", "Closed", "Closed", "Open", "Closed"]),
         )
 
-    def test_mask(self):
-        assert_series_equal(ranges["a"].mask, ts["a"] != -1)
-        assert_frame_equal(ranges.mask, ts != -1)
+    def test_first_pd_mask(self):
+        assert_series_equal(
+            ranges["a"].first_pd_mask,
+            pd.Series([True, False, True, False, True, False], index=ts.index, name="a")
+        )
         assert_frame_equal(
-            ranges_grouped.mask,
+            ranges.first_pd_mask,
+            pd.DataFrame([
+                [True, False, True, False],
+                [False, False, False, False],
+                [True, False, False, False],
+                [False, True, False, False],
+                [True, False, False, False],
+                [False, False, False, False],
+            ], index=ts.index, columns=ts.columns)
+        )
+        assert_frame_equal(
+            ranges_grouped.first_pd_mask,
+            pd.DataFrame(
+                [[True, True], [False, False], [True, False], [True, False], [True, False], [False, False]],
+                index=ts.index,
+                columns=pd.Index(["g1", "g2"], dtype="object"),
+            ),
+        )
+
+    def test_last_pd_mask(self):
+        assert_series_equal(
+            ranges["a"].last_pd_mask,
+            pd.Series([True, False, True, False, True, False], index=ts.index, name="a")
+        )
+        assert_frame_equal(
+            ranges.last_pd_mask,
+            pd.DataFrame([
+                [True, False, False, False],
+                [False, False, False, False],
+                [True, False, True, False],
+                [False, False, False, False],
+                [True, False, False, False],
+                [False, True, False, False],
+            ], index=ts.index, columns=ts.columns)
+        )
+        assert_frame_equal(
+            ranges_grouped.last_pd_mask,
+            pd.DataFrame(
+                [[True, False], [False, False], [True, True], [False, False], [True, False], [True, False]],
+                index=ts.index,
+                columns=pd.Index(["g1", "g2"], dtype="object"),
+            ),
+        )
+
+    def test_ranges_pd_mask(self):
+        assert_series_equal(ranges["a"].ranges_pd_mask, ts["a"] != -1)
+        assert_frame_equal(ranges.ranges_pd_mask, ts != -1)
+        assert_frame_equal(
+            ranges_grouped.ranges_pd_mask,
             pd.DataFrame(
                 [[True, True], [False, True], [True, True], [True, False], [True, False], [True, False]],
                 index=ts.index,
@@ -2577,10 +2627,10 @@ class TestRanges:
             ),
         )
         assert_frame_equal(
-            ranges.get_mask(jitted=dict(parallel=True)),
-            ranges.get_mask(jitted=dict(parallel=False)),
+            ranges.get_ranges_pd_mask(jitted=dict(parallel=True)),
+            ranges.get_ranges_pd_mask(jitted=dict(parallel=False)),
         )
-        assert_frame_equal(ranges.get_mask(chunked=True), ranges.get_mask(chunked=False))
+        assert_frame_equal(ranges.get_ranges_pd_mask(chunked=True), ranges.get_ranges_pd_mask(chunked=False))
 
     def test_duration(self):
         np.testing.assert_array_equal(ranges["a"].duration.values, np.array([1, 1, 1]))
@@ -4221,18 +4271,18 @@ class TestPatternRanges:
             pattern_ranges.stats(),
             pd.Series(
                 [
-                    pd.Timestamp('2020-01-01 00:00:00', freq='D'),
-                    pd.Timestamp('2020-01-06 00:00:00', freq='D'),
-                    pd.Timedelta('6 days 00:00:00'),
+                    pd.Timestamp("2020-01-01 00:00:00", freq="D"),
+                    pd.Timestamp("2020-01-06 00:00:00", freq="D"),
+                    pd.Timedelta("6 days 00:00:00"),
                     4.0,
                     1.0,
                     0.6666666666666666,
-                    pd.Timedelta('3 days 00:00:00'),
-                    pd.Timedelta('3 days 00:00:00'),
-                    pd.Timedelta('3 days 00:00:00'),
+                    pd.Timedelta("3 days 00:00:00"),
+                    pd.Timedelta("3 days 00:00:00"),
+                    pd.Timedelta("3 days 00:00:00"),
                     0.18055555555555558,
                     0.5416666666666666,
-                    0.875
+                    0.875,
                 ],
                 index=stats_index,
                 name="agg_stats",
@@ -4242,15 +4292,15 @@ class TestPatternRanges:
             pattern_ranges.stats(column="a"),
             pd.Series(
                 [
-                    pd.Timestamp('2020-01-01 00:00:00', freq='D'),
-                    pd.Timestamp('2020-01-06 00:00:00', freq='D'),
-                    pd.Timedelta('6 days 00:00:00'),
+                    pd.Timestamp("2020-01-01 00:00:00", freq="D"),
+                    pd.Timestamp("2020-01-06 00:00:00", freq="D"),
+                    pd.Timedelta("6 days 00:00:00"),
                     4,
                     1.0,
                     0.6666666666666666,
-                    pd.Timedelta('3 days 00:00:00'),
-                    pd.Timedelta('3 days 00:00:00'),
-                    pd.Timedelta('3 days 00:00:00'),
+                    pd.Timedelta("3 days 00:00:00"),
+                    pd.Timedelta("3 days 00:00:00"),
+                    pd.Timedelta("3 days 00:00:00"),
                     0.11111111111111116,
                     0.5833333333333333,
                     1.0,
@@ -4263,15 +4313,15 @@ class TestPatternRanges:
             pattern_ranges.stats(column="g1", group_by=group_by),
             pd.Series(
                 [
-                    pd.Timestamp('2020-01-01 00:00:00', freq='D'),
-                    pd.Timestamp('2020-01-06 00:00:00', freq='D'),
-                    pd.Timedelta('6 days 00:00:00'),
+                    pd.Timestamp("2020-01-01 00:00:00", freq="D"),
+                    pd.Timestamp("2020-01-06 00:00:00", freq="D"),
+                    pd.Timedelta("6 days 00:00:00"),
                     8,
                     0.5,
                     1.0,
-                    pd.Timedelta('3 days 00:00:00'),
-                    pd.Timedelta('3 days 00:00:00'),
-                    pd.Timedelta('3 days 00:00:00'),
+                    pd.Timedelta("3 days 00:00:00"),
+                    pd.Timedelta("3 days 00:00:00"),
+                    pd.Timedelta("3 days 00:00:00"),
                     0.11111111111111116,
                     0.5833333333333333,
                     1.0,
