@@ -721,7 +721,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         self,
         pattern: tp.ArrayLike,
         window: tp.Optional[int] = None,
-        interp_mode: tp.Union[int, str] = "linear",
+        interp_mode: tp.Union[int, str] = "mixed",
         rescale_mode: tp.Union[int, str] = "minmax",
         vmin: float = np.nan,
         vmax: float = np.nan,

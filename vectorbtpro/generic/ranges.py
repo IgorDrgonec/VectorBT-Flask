@@ -377,7 +377,8 @@ class Ranges(PriceRecords):
 
     def get_last_pd_mask(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.SeriesFrame:
         """Get mask from `Ranges.get_last_idx`."""
-        return self.get_pd_mask(idx_arr=self.last_idx.values, group_by=group_by, **kwargs)
+        out = self.get_pd_mask(idx_arr=self.last_idx.values, group_by=group_by, **kwargs)
+        return out
 
     def get_ranges_pd_mask(
         self,
@@ -409,7 +410,7 @@ class Ranges(PriceRecords):
 
     def get_last_idx(self, **kwargs):
         """Get the last index in each range."""
-        last_idx = self.get_field_arr("end_idx")
+        last_idx = self.get_field_arr("end_idx", copy=True)
         status = self.get_field_arr("status")
         last_idx[status == RangeStatus.Closed] -= 1
         return self.map_array(last_idx, **kwargs)
@@ -1529,7 +1530,7 @@ class PatternRanges(Ranges):
         max_window: tp.Union[Param, None, int] = None,
         window_select_prob: tp.Union[Param, float] = 1.0,
         row_select_prob: tp.Union[Param, float] = 1.0,
-        interp_mode: tp.Union[Param, int, str] = "linear",
+        interp_mode: tp.Union[Param, int, str] = "mixed",
         rescale_mode: tp.Union[Param, int, str] = "minmax",
         vmin: tp.Union[Param, float] = np.nan,
         vmax: tp.Union[Param, float] = np.nan,

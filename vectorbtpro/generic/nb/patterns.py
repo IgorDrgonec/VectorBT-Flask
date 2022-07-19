@@ -72,6 +72,18 @@ def discrete_interp_nb(arr: tp.FlexArray, i: int, source_size: int, target_size:
 
 
 @register_jitted(cache=True)
+def mixed_interp_nb(arr: tp.FlexArray, i: int, source_size: int, target_size: int) -> float:
+    """Get the value at a specific position in a target size using mixed interpolation.
+
+    Mixed interpolation is based on the discrete interpolation, while filling resulting NaN values
+    using the linear interpolation. This way, the vertical scale of the pattern array is respected."""
+    value = discrete_interp_nb(arr, i, source_size, target_size)
+    if np.isnan(value):
+        value = linear_interp_nb(arr, i, source_size, target_size)
+    return value
+
+
+@register_jitted(cache=True)
 def interp_nb(arr: tp.FlexArray, i: int, source_size: int, target_size: int, interp_mode: int) -> float:
     """Get the value at a specific position in a target size using an interpolation mode.
 
@@ -82,6 +94,8 @@ def interp_nb(arr: tp.FlexArray, i: int, source_size: int, target_size: int, int
         return nearest_interp_nb(arr, i, source_size, target_size)
     if interp_mode == InterpMode.Discrete:
         return discrete_interp_nb(arr, i, source_size, target_size)
+    if interp_mode == InterpMode.Mixed:
+        return mixed_interp_nb(arr, i, source_size, target_size)
     raise ValueError("Invalid interpolation mode")
 
 
@@ -98,7 +112,7 @@ def interp_resize_1d_nb(arr: tp.Array1d, target_size: int, interp_mode: int) -> 
 def pattern_similarity_nb(
     arr: tp.Array1d,
     pattern: tp.Array1d,
-    interp_mode: int = InterpMode.Linear,
+    interp_mode: int = InterpMode.Mixed,
     rescale_mode: int = RescaleMode.MinMax,
     vmin: float = np.nan,
     vmax: float = np.nan,

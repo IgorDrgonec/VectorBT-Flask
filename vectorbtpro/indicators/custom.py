@@ -1266,7 +1266,7 @@ PATSIM = IndicatorFactory(
         ),
     ),
     window=None,
-    interp_mode="linear",
+    interp_mode="mixed",
     rescale_mode="minmax",
     vmin=np.nan,
     vmax=np.nan,

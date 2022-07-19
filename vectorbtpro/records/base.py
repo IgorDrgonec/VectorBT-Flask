@@ -914,9 +914,12 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
         """Get the mapping of the field. Uses `Records.field_config`."""
         return self.get_field_setting(field, "mapping", None)
 
-    def get_field_arr(self, field: str) -> tp.Array1d:
+    def get_field_arr(self, field: str, copy: bool = False) -> tp.Array1d:
         """Get the array of the field. Uses `Records.field_config`."""
-        return self.values[self.get_field_name(field)]
+        out = self.values[self.get_field_name(field)]
+        if copy:
+            out = out.copy()
+        return out
 
     def get_map_field(self, field: str, **kwargs) -> MappedArray:
         """Get the mapped array of the field. Uses `Records.field_config`."""

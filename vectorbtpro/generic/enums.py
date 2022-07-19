@@ -124,6 +124,7 @@ class InterpModeT(tp.NamedTuple):
     Linear: int = 0
     Nearest: int = 1
     Discrete: int = 2
+    Mixed: int = 3
 
 
 InterpMode = InterpModeT()
@@ -144,9 +145,12 @@ Attributes:
     Nearest: Nearest-neighbor interpolation.
     
         For example: `[1.0, 2.0, 3.0]` -> `[1.0, 1.0, 2.0, 3.0, 3.0]`
-    Point: Discrete interpolation.
+    Discrete: Discrete interpolation.
     
         For example: `[1.0, 2.0, 3.0]` -> `[1.0, np.nan, 2.0, np.nan, 3.0]`
+    Mixed: Mixed interpolation.
+    
+        For example: `[1.0, 2.0, 3.0]` -> `[1.0, 1.5, 2.0, 2.5, 3.0]`
 """
 
 
