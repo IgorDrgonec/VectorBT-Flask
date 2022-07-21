@@ -4987,6 +4987,30 @@ class TestPatterns:
             )
             == 1.0
         )
+        assert (
+            vbt.nb.pattern_similarity_nb(
+                np.array([1, 3, 2]),
+                np.array([1, 2, 3]),
+                distance_mode=enums.DistanceMode.MAE,
+            )
+            == 0.6
+        )
+        assert (
+            vbt.nb.pattern_similarity_nb(
+                np.array([1, 3, 2]),
+                np.array([1, 2, 3]),
+                distance_mode=enums.DistanceMode.MSE,
+            )
+            == 0.7777777777777778
+        )
+        assert (
+            vbt.nb.pattern_similarity_nb(
+                np.array([1, 3, 2]),
+                np.array([1, 2, 3]),
+                distance_mode=enums.DistanceMode.RMSE,
+            )
+            == 0.5285954792089682
+        )
 
 
 # ############# plotting.py ############# #

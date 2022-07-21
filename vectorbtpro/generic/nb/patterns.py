@@ -6,7 +6,7 @@ import numpy as np
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.registries.jit_registry import register_jitted
-from vectorbtpro.generic.enums import RescaleMode, InterpMode
+from vectorbtpro.generic.enums import RescaleMode, InterpMode, DistanceMode
 from vectorbtpro.base.indexing import flex_select_auto_nb
 
 
@@ -120,6 +120,7 @@ def pattern_similarity_nb(
     pmax: float = np.nan,
     min_pct_change: float = np.nan,
     max_pct_change: float = np.nan,
+    distance_mode: int = DistanceMode.MAE,
     max_error: tp.FlexArray = np.asarray(np.nan),
     max_error_interp_mode: tp.Optional[int] = None,
     max_error_as_maxdist: bool = False,
@@ -146,6 +147,8 @@ def pattern_similarity_nb(
     else:
         _max_error_interp_mode = max_error_interp_mode
     max_size = max(arr.shape[0], pattern.shape[0])
+    if distance_mode != DistanceMode.MAE and distance_mode != DistanceMode.MSE and distance_mode != DistanceMode.RMSE:
+        raise ValueError("Invalid distance mode")
 
     min_max_required = False
     if rescale_mode == RescaleMode.MinMax:
@@ -231,13 +234,19 @@ def pattern_similarity_nb(
             if rescale_mode == RescaleMode.MinMax:
                 arr_elem = (arr_elem - vmin) / (vmax - vmin) * (pmax - pmin) + pmin
 
-            dist = abs(arr_elem - pattern_elem)
+            if distance_mode == DistanceMode.MAE:
+                dist = abs(arr_elem - pattern_elem)
+            else:
+                dist = (arr_elem - pattern_elem) ** 2
             if max_error_as_maxdist:
                 if np.isnan(_max_error):
                     continue
                 maxdist = _max_error
             else:
-                maxdist = max(pattern_elem - pmin, pmax - pattern_elem)
+                if distance_mode == DistanceMode.MAE:
+                    maxdist = max(pattern_elem - pmin, pmax - pattern_elem)
+                else:
+                    maxdist = max(pattern_elem - pmin, pmax - pattern_elem) ** 2
             if dist > 0 and maxdist == 0:
                 return np.nan
             if not np.isnan(_max_error) and dist > _max_error:
@@ -256,11 +265,17 @@ def pattern_similarity_nb(
                             return np.nan
                         worst_maxdist = _max_error
                     else:
-                        worst_maxdist = pmax - pmin
+                        if distance_mode == DistanceMode.MAE:
+                            worst_maxdist = pmax - pmin
+                        else:
+                            worst_maxdist = (pmax - pmin) ** 2
                     worst_maxdistance_sum = maxdistance_sum + worst_maxdist * (max_size - i - 1)
                     if worst_maxdistance_sum == 0:
                         return np.nan
-                    best_similarity = 1 - distance_sum / worst_maxdistance_sum
+                    if distance_mode == DistanceMode.RMSE:
+                        best_similarity = 1 - np.sqrt(distance_sum) / np.sqrt(worst_maxdistance_sum)
+                    else:
+                        best_similarity = 1 - distance_sum / worst_maxdistance_sum
                     if best_similarity < min_similarity:
                         return np.nan
 
@@ -268,7 +283,10 @@ def pattern_similarity_nb(
         return 1.0
     if maxdistance_sum == 0:
         return np.nan
-    similarity = 1 - distance_sum / maxdistance_sum
+    if distance_mode == DistanceMode.RMSE:
+        similarity = 1 - np.sqrt(distance_sum) / np.sqrt(maxdistance_sum)
+    else:
+        similarity = 1 - distance_sum / maxdistance_sum
     if not np.isnan(min_similarity):
         if similarity < min_similarity:
             return np.nan

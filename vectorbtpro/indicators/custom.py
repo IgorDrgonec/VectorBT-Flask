@@ -1240,6 +1240,7 @@ PATSIM = IndicatorFactory(
         "pmax",
         "min_pct_change",
         "max_pct_change",
+        "distance_mode",
         "max_error",
         "max_error_interp_mode",
         "max_error_as_maxdist",
@@ -1259,6 +1260,10 @@ PATSIM = IndicatorFactory(
             dtype=generic_enums.RescaleMode,
             post_index_func=lambda index: index.str.lower(),
         ),
+        distance_mode=dict(
+            dtype=generic_enums.DistanceMode,
+            post_index_func=lambda index: index.str.lower(),
+        ),
         max_error=dict(is_array_like=True),
         max_error_interp_mode=dict(
             dtype=generic_enums.InterpMode,
@@ -1274,6 +1279,7 @@ PATSIM = IndicatorFactory(
     pmax=np.nan,
     min_pct_change=np.nan,
     max_pct_change=np.nan,
+    distance_mode="mae",
     max_error=np.nan,
     max_error_interp_mode=None,
     max_error_as_maxdist=False,

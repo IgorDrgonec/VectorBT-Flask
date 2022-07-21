@@ -123,7 +123,7 @@ from vectorbtpro.base.reshaping import to_pd_array, to_1d_array, to_2d_array
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.indexes import stack_indexes, combine_indexes, tile_index
 from vectorbtpro.generic import nb
-from vectorbtpro.generic.enums import RangeStatus, range_dt, pattern_range_dt, InterpMode, RescaleMode
+from vectorbtpro.generic.enums import RangeStatus, range_dt, pattern_range_dt, InterpMode, RescaleMode, DistanceMode
 from vectorbtpro.generic.price_records import PriceRecords
 from vectorbtpro.records.base import Records
 from vectorbtpro.records.decorators import override_field_config, attach_fields, attach_shortcut_properties
@@ -1399,6 +1399,9 @@ class PSC:
     
     If any window crosses this mark, its similarity becomes `np.nan`."""
 
+    distance_mode: tp.Union[_DEF, int, str] = attr.ib(default=_DEF)
+    """Distance mode. See `vectorbtpro.generic.enums.DistanceMode`."""
+
     max_error: tp.Union[_DEF, tp.ArrayLike] = attr.ib(default=_DEF)
     """Maximum error at each point. Can be provided as a flexible array.
     
@@ -1513,6 +1516,8 @@ class PatternRanges(Ranges):
                 v = map_enum_fields(v, InterpMode)
             elif k == "rescale_mode":
                 v = map_enum_fields(v, RescaleMode)
+            elif k == "distance_mode":
+                v = map_enum_fields(v, DistanceMode)
             elif k == "max_error_interp_mode":
                 if v is None:
                     v = search_config["interp_mode"]
@@ -1538,6 +1543,7 @@ class PatternRanges(Ranges):
         pmax: tp.Union[Param, float] = np.nan,
         min_pct_change: tp.Union[Param, float] = np.nan,
         max_pct_change: tp.Union[Param, float] = np.nan,
+        distance_mode: tp.Union[Param, int, str] = "mae",
         max_error: tp.Union[Param, tp.ArrayLike] = np.nan,
         max_error_interp_mode: tp.Union[Param, None, int, str] = None,
         max_error_as_maxdist: tp.Union[Param, bool] = False,

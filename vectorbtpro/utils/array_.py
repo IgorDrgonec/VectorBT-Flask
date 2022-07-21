@@ -92,9 +92,11 @@ def rescale(
     to_range: tp.Tuple[float, float],
 ) -> tp.MaybeArray[float]:
     """Renormalize `arr` from one range to another."""
-    from_delta = from_range[1] - from_range[0]
-    to_delta = to_range[1] - to_range[0]
-    return (to_delta * (arr - from_range[0]) / from_delta) + to_range[0]
+    from_min, from_max = from_range
+    to_min, to_max = to_range
+    from_delta = from_max - from_min
+    to_delta = to_max - to_min
+    return (to_delta * (arr - from_min) / from_delta) + to_min
 
 
 @register_jitted(cache=True)
@@ -104,9 +106,11 @@ def rescale_nb(
     to_range: tp.Tuple[float, float],
 ) -> tp.MaybeArray[float]:
     """Numba-compiled version of `rescale`."""
-    from_delta = from_range[1] - from_range[0]
-    to_delta = to_range[1] - to_range[0]
-    return (to_delta * (arr - from_range[0]) / from_delta) + to_range[0]
+    from_min, from_max = from_range
+    to_min, to_max = to_range
+    from_delta = from_max - from_min
+    to_delta = to_max - to_min
+    return (to_delta * (arr - from_min) / from_delta) + to_min
 
 
 def min_rel_rescale(arr: tp.Array, to_range: tp.Tuple[float, float]) -> tp.Array:

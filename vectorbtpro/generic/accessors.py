@@ -233,7 +233,7 @@ from vectorbtpro.generic.plots_builder import PlotsBuilderMixin
 from vectorbtpro.generic.ranges import Ranges, PatternRanges
 from vectorbtpro.generic.splitters import SplitterT, RangeSplitter, RollingSplitter, ExpandingSplitter
 from vectorbtpro.generic.stats_builder import StatsBuilderMixin
-from vectorbtpro.generic.enums import WType, InterpMode, RescaleMode
+from vectorbtpro.generic.enums import WType, InterpMode, RescaleMode, DistanceMode
 from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
@@ -729,6 +729,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         pmax: float = np.nan,
         min_pct_change: float = np.nan,
         max_pct_change: float = np.nan,
+        distance_mode: tp.Union[int, str] = "mae",
         max_error: tp.ArrayLike = np.nan,
         max_error_interp_mode: tp.Union[None, int, str] = None,
         max_error_as_maxdist: bool = False,
@@ -743,6 +744,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
             interp_mode = map_enum_fields(interp_mode, InterpMode)
         if isinstance(rescale_mode, str):
             rescale_mode = map_enum_fields(rescale_mode, RescaleMode)
+        if isinstance(distance_mode, str):
+            distance_mode = map_enum_fields(distance_mode, DistanceMode)
         if max_error_interp_mode is not None and isinstance(max_error_interp_mode, str):
             max_error_interp_mode = map_enum_fields(max_error_interp_mode, InterpMode)
         func = jit_reg.resolve_option(nb.rolling_pattern_similarity_nb, jitted)
@@ -759,6 +762,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             pmax=pmax,
             min_pct_change=min_pct_change,
             max_pct_change=max_pct_change,
+            distance_mode=distance_mode,
             max_error=reshaping.to_1d_array(max_error),
             max_error_interp_mode=max_error_interp_mode,
             max_error_as_maxdist=max_error_as_maxdist,

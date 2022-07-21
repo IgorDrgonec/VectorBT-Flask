@@ -12,8 +12,9 @@ from vectorbtpro.utils.formatting import prettify
 __all__ = [
     "WType",
     "RangeStatus",
-    "RescaleMode",
     "InterpMode",
+    "RescaleMode",
+    "DistanceMode",
     "DrawdownStatus",
     "range_dt",
     "pattern_range_dt",
@@ -84,6 +85,40 @@ __pdoc__[
 """
 
 
+class InterpModeT(tp.NamedTuple):
+    Linear: int = 0
+    Nearest: int = 1
+    Discrete: int = 2
+    Mixed: int = 3
+
+
+InterpMode = InterpModeT()
+"""_"""
+
+__pdoc__[
+    "InterpMode"
+] = f"""Interpolation mode.
+
+```python
+{prettify(InterpMode)}
+```
+
+Attributes:
+    Line: Linear interpolation.
+
+        For example: `[1.0, 2.0, 3.0]` -> `[1.0, 1.5, 2.0, 2.5, 3.0]`
+    Nearest: Nearest-neighbor interpolation.
+
+        For example: `[1.0, 2.0, 3.0]` -> `[1.0, 1.0, 2.0, 3.0, 3.0]`
+    Discrete: Discrete interpolation.
+
+        For example: `[1.0, 2.0, 3.0]` -> `[1.0, np.nan, 2.0, np.nan, 3.0]`
+    Mixed: Mixed interpolation.
+
+        For example: `[1.0, 2.0, 3.0]` -> `[1.0, 1.5, 2.0, 2.5, 3.0]`
+"""
+
+
 class RescaleModeT(tp.NamedTuple):
     MinMax: int = 0
     Rebase: int = 1
@@ -120,37 +155,27 @@ Attributes:
 """
 
 
-class InterpModeT(tp.NamedTuple):
-    Linear: int = 0
-    Nearest: int = 1
-    Discrete: int = 2
-    Mixed: int = 3
+class DistanceModeT(tp.NamedTuple):
+    MAE: int = 0
+    MSE: int = 1
+    RMSE: int = 2
 
 
-InterpMode = InterpModeT()
+DistanceMode = DistanceModeT()
 """_"""
 
 __pdoc__[
-    "InterpMode"
-] = f"""Interpolation mode.
+    "DistanceMode"
+] = f"""Distance mode.
 
 ```python
-{prettify(InterpMode)}
+{prettify(DistanceMode)}
 ```
 
 Attributes:
-    Line: Linear interpolation.
-    
-        For example: `[1.0, 2.0, 3.0]` -> `[1.0, 1.5, 2.0, 2.5, 3.0]`
-    Nearest: Nearest-neighbor interpolation.
-    
-        For example: `[1.0, 2.0, 3.0]` -> `[1.0, 1.0, 2.0, 3.0, 3.0]`
-    Discrete: Discrete interpolation.
-    
-        For example: `[1.0, 2.0, 3.0]` -> `[1.0, np.nan, 2.0, np.nan, 3.0]`
-    Mixed: Mixed interpolation.
-    
-        For example: `[1.0, 2.0, 3.0]` -> `[1.0, 1.5, 2.0, 2.5, 3.0]`
+    MAE: Mean absolute error.
+    MSE: Mean squared error.
+    RMSE: Root mean squared error.
 """
 
 
