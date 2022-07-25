@@ -22,7 +22,9 @@ def to_mapping(mapping_like: tp.MappingLike, reverse: bool = False) -> dict:
     """Convert mapping-like object to a mapping.
 
     Enable `reverse` to apply `reverse_mapping` on the result dict."""
-    if checks.is_namedtuple(mapping_like):
+    if isinstance(mapping_like, tp.EnumMeta):
+        mapping = {i.value: i.name for i in mapping_like}
+    elif checks.is_namedtuple(mapping_like):
         mapping = {v: k for k, v in mapping_like._asdict().items()}
         if -1 not in mapping_like:
             mapping[-1] = None

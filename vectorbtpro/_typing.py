@@ -2,6 +2,7 @@
 
 """General types used across vectorbtpro."""
 
+from enum import EnumMeta
 from datetime import datetime, timedelta, tzinfo, time
 from pathlib import Path
 from typing import *
@@ -186,8 +187,7 @@ Param = Any
 Params = Sequence[Param]
 
 # Mappings
-Enum = NamedTuple
-MappingLike = Union[str, Mapping, Enum, IndexLike]
+MappingLike = Union[str, Mapping, NamedTuple, EnumMeta, IndexLike]
 
 # Parsing
 AnnArgs = Dict[str, Kwargs]

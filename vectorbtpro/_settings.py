@@ -519,6 +519,7 @@ data = ChildDict(
             start=0,
             end="now UTC",
             timeframe="1d",
+            klines_type="spot",
             limit=1000,
             delay=500,
             show_progress=True,

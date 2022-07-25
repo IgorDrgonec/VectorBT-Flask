@@ -20,7 +20,6 @@ import re
 import requests
 import urllib.parse
 
-import numpy as np
 import pandas as pd
 from pandas.io.parsers import TextFileReader
 from pandas.io.pytables import TableIterator
@@ -40,6 +39,7 @@ from vectorbtpro.utils.datetime_ import (
 )
 from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.random_ import set_seed
+from vectorbtpro.utils.enum_ import map_enum_fields
 
 try:
     from binance.client import Client as BinanceClientT
@@ -960,6 +960,7 @@ class BinanceData(RemoteData):  # pragma: no cover
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
         timeframe: tp.Optional[str] = None,
+        klines_type: tp.Union[None, int, str] = None,
         limit: tp.Optional[int] = None,
         delay: tp.Optional[float] = None,
         show_progress: tp.Optional[bool] = None,
@@ -983,6 +984,9 @@ class BinanceData(RemoteData):  # pragma: no cover
             timeframe (str): Kline timeframe.
 
                 See [Binance Constants](https://python-binance.readthedocs.io/en/latest/constants.html).
+            klines_type (int or str): Kline type.
+
+                See `binance.enums.HistoricalKlinesType`. Supports strings.
             limit (int): The maximum number of returned items.
             delay (float): Time to sleep after each request (in milliseconds).
             show_progress (bool): Whether to show the progress bar.
@@ -992,6 +996,7 @@ class BinanceData(RemoteData):  # pragma: no cover
 
         For defaults, see `custom.binance` in `vectorbtpro._settings.data`.
         """
+        from binance.enums import HistoricalKlinesType
         from vectorbtpro._settings import settings
 
         binance_cfg = settings["data"]["custom"]["binance"]
@@ -1006,6 +1011,12 @@ class BinanceData(RemoteData):  # pragma: no cover
             end = binance_cfg["end"]
         if timeframe is None:
             timeframe = binance_cfg["timeframe"]
+        if klines_type is None:
+            klines_type = binance_cfg["klines_type"]
+        if isinstance(klines_type, str):
+            klines_type = map_enum_fields(klines_type, HistoricalKlinesType)
+        if isinstance(klines_type, int):
+            klines_type = {i.value: i for i in HistoricalKlinesType}[klines_type]
         if limit is None:
             limit = binance_cfg["limit"]
         if delay is None:
@@ -1017,34 +1028,37 @@ class BinanceData(RemoteData):  # pragma: no cover
             silence_warnings = binance_cfg["silence_warnings"]
         get_klines_kwargs = merge_dicts(binance_cfg["get_klines_kwargs"], get_klines_kwargs)
 
-        # Establish the timestamps
-        start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
-        try:
-            first_data = client.get_klines(
-                symbol=symbol, interval=timeframe, limit=1, startTime=0, endTime=None, **get_klines_kwargs
-            )
-            first_valid_ts = first_data[0][0]
+        # Prepare parameters
+        if start is not None:
+            start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
+            first_valid_ts = client._get_earliest_valid_timestamp(symbol, timeframe, klines_type)
             next_start_ts = start_ts = max(start_ts, first_valid_ts)
-        except Exception as e:
-            next_start_ts = start_ts
-        end_ts = datetime_to_ms(to_tzaware_datetime(end, tz=get_utc_tz()))
+        else:
+            next_start_ts = start_ts = None
+        if end is not None:
+            end_ts = datetime_to_ms(to_tzaware_datetime(end, tz=get_utc_tz()))
+        else:
+            end_ts = None
 
-        def _ts_to_str(ts: tp.DatetimeLike) -> str:
+        def _ts_to_str(ts: tp.Optional[tp.DatetimeLike]) -> str:
+            if ts is None:
+                return "None"
             return str(pd.Timestamp(to_tzaware_datetime(ts, tz=get_utc_tz())))
 
         # Iteratively collect the data
         data = []
         try:
             with get_pbar(show_progress=show_progress, **pbar_kwargs) as pbar:
-                pbar.set_description(_ts_to_str(start_ts))
+                pbar.set_description(_ts_to_str(next_start_ts))
                 while True:
                     # Fetch the klines for the next timeframe
-                    next_data = client.get_klines(
+                    next_data = client._klines(
                         symbol=symbol,
                         interval=timeframe,
                         limit=limit,
                         startTime=next_start_ts,
                         endTime=end_ts,
+                        klines_type=klines_type,
                         **get_klines_kwargs,
                     )
                     if len(data) > 0:
@@ -1056,6 +1070,8 @@ class BinanceData(RemoteData):  # pragma: no cover
                     if not len(next_data):
                         break
                     data += next_data
+                    if start_ts is None:
+                        start_ts = next_data[0][0]
                     pbar.set_description(
                         "{} - {}".format(
                             _ts_to_str(start_ts),
