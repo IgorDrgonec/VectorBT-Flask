@@ -52,6 +52,7 @@ __all__ = [
     "Order",
     "NoOrder",
     "OrderResult",
+    "SignalSegmentContext",
     "SignalContext",
     "FSInOutputs",
     "FOInOutputs",
@@ -783,9 +784,10 @@ __pdoc__[
 
 
 class TradesTypeT(tp.NamedTuple):
-    EntryTrades: int = 0
-    ExitTrades: int = 1
-    Positions: int = 2
+    Trades: int = 0
+    EntryTrades: int = 1
+    ExitTrades: int = 2
+    Positions: int = 3
 
 
 TradesType = TradesTypeT()
@@ -2144,6 +2146,107 @@ __pdoc__["OrderResult.status"] = "See `OrderStatus`."
 __pdoc__["OrderResult.status_info"] = "See `OrderStatusInfo`."
 
 
+class SignalSegmentContext(tp.NamedTuple):
+    target_shape: tp.Shape
+    group_lens: tp.Array1d
+    cash_sharing: bool
+    index: tp.Optional[tp.Array1d]
+    freq: tp.Optional[int]
+    open: tp.FlexArray
+    high: tp.FlexArray
+    low: tp.FlexArray
+    close: tp.FlexArray
+    flex_2d: bool
+
+    order_records: tp.RecordArray2d
+    order_counts: tp.Array1d
+    log_records: tp.RecordArray2d
+    log_counts: tp.Array1d
+
+    track_cash_deposits: bool
+    cash_deposits_out: tp.Array2d
+    track_cash_earnings: bool
+    cash_earnings_out: tp.Array2d
+    in_outputs: tp.Optional[tp.NamedTuple]
+
+    last_cash: tp.Array1d
+    last_position: tp.Array1d
+    last_debt: tp.Array1d
+    last_free_cash: tp.Array1d
+    last_val_price: tp.Array1d
+    last_value: tp.Array1d
+    last_return: tp.Array1d
+
+    last_limit_info: tp.Array1d
+    last_sl_info: tp.Array1d
+    last_tsl_info: tp.Array1d
+    last_tp_info: tp.Array1d
+
+    group: int
+    group_len: int
+    from_col: int
+    to_col: int
+    i: int
+    
+
+__pdoc__[
+    "SignalSegmentContext"
+] = """A named tuple representing the context of a segment in a from-signals simulation.
+
+Contains information related to the cascade of the simulation, such as OHLC, but also
+internal information that is not passed by the user but created at the beginning of the simulation.
+To make use of other information, such as order size, use templates.
+
+Passed to `post_segment_func_nb`."""
+__pdoc__["SignalSegmentContext.target_shape"] = "See `SimulationContext.target_shape`."
+__pdoc__["SignalSegmentContext.group_lens"] = "See `SimulationContext.group_lens`."
+__pdoc__["SignalSegmentContext.cash_sharing"] = "See `SimulationContext.cash_sharing`."
+__pdoc__["SignalSegmentContext.index"] = "See `SimulationContext.index`."
+__pdoc__["SignalSegmentContext.freq"] = "See `SimulationContext.freq`."
+__pdoc__["SignalSegmentContext.open"] = "See `SimulationContext.open`."
+__pdoc__["SignalSegmentContext.high"] = "See `SimulationContext.high`."
+__pdoc__["SignalSegmentContext.low"] = "See `SimulationContext.low`."
+__pdoc__["SignalSegmentContext.close"] = "See `SimulationContext.close`."
+__pdoc__["SignalSegmentContext.flex_2d"] = "See `SimulationContext.flex_2d`."
+__pdoc__["SignalSegmentContext.order_records"] = "See `SimulationContext.order_records`."
+__pdoc__["SignalSegmentContext.order_counts"] = "See `SimulationContext.order_counts`."
+__pdoc__["SignalSegmentContext.log_records"] = "See `SimulationContext.log_records`."
+__pdoc__["SignalSegmentContext.log_counts"] = "See `SimulationContext.log_counts`."
+__pdoc__["SignalSegmentContext.track_cash_deposits"] = """Whether to track cash deposits.
+
+Becomes True if any value in `cash_deposits` is not zero."""
+__pdoc__["SignalSegmentContext.cash_deposits_out"] = "See `SimulationOutput.cash_deposits`."
+__pdoc__["SignalSegmentContext.track_cash_earnings"] = """Whether to track cash earnings.
+
+Becomes True if any value in `cash_earnings` is not zero."""
+__pdoc__["SignalSegmentContext.cash_earnings_out"] = "See `SimulationOutput.cash_earnings`."
+__pdoc__["SignalSegmentContext.in_outputs"] = "See `FSInOutputs`."
+__pdoc__["SignalSegmentContext.last_cash"] = "See `SimulationContext.last_cash`."
+__pdoc__["SignalSegmentContext.last_position"] = "See `SimulationContext.last_position`."
+__pdoc__["SignalSegmentContext.last_debt"] = "See `SimulationContext.last_debt`."
+__pdoc__["SignalSegmentContext.last_free_cash"] = "See `SimulationContext.last_free_cash`."
+__pdoc__["SignalSegmentContext.last_val_price"] = "See `SimulationContext.last_val_price`."
+__pdoc__["SignalSegmentContext.last_value"] = "See `SimulationContext.last_value`."
+__pdoc__["SignalSegmentContext.last_return"] = "See `SimulationContext.last_return`."
+__pdoc__["SignalSegmentContext.last_limit_info"] = """Record of type `limit_info_dt` per column.
+
+Accessible via `c.limit_info_dt[field][col]`."""
+__pdoc__["SignalSegmentContext.last_sl_info"] = """Record of type `sl_info_dt` per column.
+
+Accessible via `c.last_sl_info[field][col]`."""
+__pdoc__["SignalSegmentContext.last_tsl_info"] = """Record of type `tsl_info_dt` per column.
+
+Accessible via `c.last_tsl_info[field][col]`."""
+__pdoc__["SignalSegmentContext.last_tp_info"] = """Record of type `tp_info_dt` per column.
+
+Accessible via `c.last_tp_info[field][col]`."""
+__pdoc__["SignalSegmentContext.group"] = "See `GroupContext.group`."
+__pdoc__["SignalSegmentContext.group_len"] = "See `GroupContext.group_len`."
+__pdoc__["SignalSegmentContext.from_col"] = "See `GroupContext.from_col`."
+__pdoc__["SignalSegmentContext.to_col"] = "See `GroupContext.to_col`."
+__pdoc__["SignalSegmentContext.i"] = "See `RowContext.i`."
+
+
 class SignalContext(tp.NamedTuple):
     target_shape: tp.Shape
     group_lens: tp.Array1d
@@ -2190,60 +2293,15 @@ class SignalContext(tp.NamedTuple):
 
 __pdoc__[
     "SignalContext"
-] = """A named tuple representing the context of a simulation from signals.
+] = """A named tuple representing the context of an element in a from-signals simulation.
 
-Contains information related to the cascade of the simulation, such as OHLC, but also
-internal information that is not passed by the user but created at the beginning of the simulation.
-To make use of other information, such as order size, use templates.
+Contains all fields from `SignalSegmentContext` plus the column field.
 
-Passed to `signal_func_nb` and `adjust_func_nb`."""
-__pdoc__["SignalContext.target_shape"] = "See `SimulationContext.target_shape`."
-__pdoc__["SignalContext.group_lens"] = "See `SimulationContext.group_lens`."
-__pdoc__["SignalContext.cash_sharing"] = "See `SimulationContext.cash_sharing`."
-__pdoc__["SignalContext.index"] = "See `SimulationContext.index`."
-__pdoc__["SignalContext.freq"] = "See `SimulationContext.freq`."
-__pdoc__["SignalContext.open"] = "See `SimulationContext.open`."
-__pdoc__["SignalContext.high"] = "See `SimulationContext.high`."
-__pdoc__["SignalContext.low"] = "See `SimulationContext.low`."
-__pdoc__["SignalContext.close"] = "See `SimulationContext.close`."
-__pdoc__["SignalContext.flex_2d"] = "See `SimulationContext.flex_2d`."
-__pdoc__["SignalContext.order_records"] = "See `SimulationContext.order_records`."
-__pdoc__["SignalContext.order_counts"] = "See `SimulationContext.order_counts`."
-__pdoc__["SignalContext.log_records"] = "See `SimulationContext.log_records`."
-__pdoc__["SignalContext.log_counts"] = "See `SimulationContext.log_counts`."
-__pdoc__["SignalContext.track_cash_deposits"] = """Whether to track cash deposits.
-
-Becomes True if any value in `cash_deposits` is not zero."""
-__pdoc__["SignalContext.cash_deposits_out"] = "See `SimulationOutput.cash_deposits`."
-__pdoc__["SignalContext.track_cash_earnings"] = """Whether to track cash earnings.
-
-Becomes True if any value in `cash_earnings` is not zero."""
-__pdoc__["SignalContext.cash_earnings_out"] = "See `SimulationOutput.cash_earnings`."
-__pdoc__["SignalContext.in_outputs"] = "See `FSInOutputs`."
-__pdoc__["SignalContext.last_cash"] = "See `SimulationContext.last_cash`."
-__pdoc__["SignalContext.last_position"] = "See `SimulationContext.last_position`."
-__pdoc__["SignalContext.last_debt"] = "See `SimulationContext.last_debt`."
-__pdoc__["SignalContext.last_free_cash"] = "See `SimulationContext.last_free_cash`."
-__pdoc__["SignalContext.last_val_price"] = "See `SimulationContext.last_val_price`."
-__pdoc__["SignalContext.last_value"] = "See `SimulationContext.last_value`."
-__pdoc__["SignalContext.last_return"] = "See `SimulationContext.last_return`."
-__pdoc__["SignalContext.last_limit_info"] = """Record of type `limit_info_dt` per column.
-
-Accessible via `c.limit_info_dt[field][col]`."""
-__pdoc__["SignalContext.last_sl_info"] = """Record of type `sl_info_dt` per column.
-
-Accessible via `c.last_sl_info[field][col]`."""
-__pdoc__["SignalContext.last_tsl_info"] = """Record of type `tsl_info_dt` per column.
-
-Accessible via `c.last_tsl_info[field][col]`."""
-__pdoc__["SignalContext.last_tp_info"] = """Record of type `tp_info_dt` per column.
-
-Accessible via `c.last_tp_info[field][col]`."""
-__pdoc__["SignalContext.group"] = "See `GroupContext.group`."
-__pdoc__["SignalContext.group_len"] = "See `GroupContext.group_len`."
-__pdoc__["SignalContext.from_col"] = "See `GroupContext.from_col`."
-__pdoc__["SignalContext.to_col"] = "See `GroupContext.to_col`."
-__pdoc__["SignalContext.i"] = "See `RowContext.i`."
+Passed to `signal_func_nb` and `adjust_func_nb`.
+"""
+for field in SignalContext._fields:
+    if field in SignalSegmentContext._fields:
+        __pdoc__["SignalContext." + field] = f"See `SignalSegmentContext.{field}`."
 __pdoc__["SignalContext.col"] = "See `OrderContext.col`."
 
 
@@ -2501,12 +2559,12 @@ limit_info_dt = np.dtype(
         ("init_size_type", np.int_),
         ("init_direction", np.int_),
         ("init_stop_type", np.int_),
-        ("reverse", np.float_),
         ("delta", np.float_),
         ("delta_format", np.int_),
         ("tif", int),
         ("expiry", int),
         ("time_delta_format", np.int_),
+        ("reverse", np.float_),
     ],
     align=True,
 )
@@ -2529,12 +2587,12 @@ Attributes:
     init_size_type: Type of the requested size. See `SizeType`.
     init_direction: Direction of the requested size. See `Direction`.
     init_stop_type: Stop type. See `vectorbtpro.signals.enums.StopType`.
-    reverse: Whether to reverse the price hit detection.
     delta: Delta from the initial price.
     delta_format: Format of the delta value. See `DeltaFormat`.
     tif: Time in force in integer format. Set to `-1` to disable.
     expiry: Expiry time in integer format. Set to `-1` to disable.
     time_delta_format: Format of the time-in-force and expire-time values. See `TimeDeltaFormat`.
+    reverse: Whether to reverse the price hit detection.
 """
 
 sl_info_dt = np.dtype(

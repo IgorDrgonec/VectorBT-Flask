@@ -1806,6 +1806,20 @@ shortcut_config = ReadonlyConfig(
             indexing_func=partial(records_indexing_func, cls="logs_cls"),
             resample_func=partial(records_resample_func, cls="logs_cls"),
         ),
+        "trades": dict(
+            obj_type="records",
+            field_aliases=("trade_records",),
+            wrap_func=lambda pf, obj, **kwargs: pf.trades_cls.from_records(
+                pf.orders.wrapper,
+                obj,
+                open=pf._open,
+                high=pf._high,
+                low=pf._low,
+                close=pf._close,
+            ),
+            indexing_func=partial(records_indexing_func, cls="trades_cls"),
+            resample_func=partial(records_resample_func, cls="trades_cls"),
+        ),
         "entry_trades": dict(
             obj_type="records",
             field_aliases=("entry_trade_records",),
@@ -1847,20 +1861,6 @@ shortcut_config = ReadonlyConfig(
             ),
             indexing_func=partial(records_indexing_func, cls="positions_cls"),
             resample_func=partial(records_resample_func, cls="positions_cls"),
-        ),
-        "trades": dict(
-            obj_type="records",
-            field_aliases=("trade_records",),
-            wrap_func=lambda pf, obj, **kwargs: pf.trades_cls.from_records(
-                pf.orders.wrapper,
-                obj,
-                open=pf._open,
-                high=pf._high,
-                low=pf._low,
-                close=pf._close,
-            ),
-            indexing_func=partial(records_indexing_func, cls="trades_cls"),
-            resample_func=partial(records_resample_func, cls="trades_cls"),
         ),
         "drawdowns": dict(
             obj_type="records",
@@ -2063,9 +2063,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             See `vectorbtpro.portfolio.enums.TradesType`.
         orders_cls (type): Class for wrapping order records.
         logs_cls (type): Class for wrapping log records.
+        trades_cls (type): Class for wrapping trade records.
         entry_trades_cls (type): Class for wrapping entry trade records.
         exit_trades_cls (type): Class for wrapping exit trade records.
-        trades_cls (type): Class for wrapping trade records.
         positions_cls (type): Class for wrapping position records.
         drawdowns_cls (type): Class for wrapping drawdown records.
 
@@ -2851,9 +2851,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         "trades_type",
         "orders_cls",
         "logs_cls",
+        "trades_cls",
         "entry_trades_cls",
         "exit_trades_cls",
-        "trades_cls",
         "positions_cls",
         "drawdowns_cls",
     }
@@ -2881,9 +2881,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         trades_type: tp.Optional[tp.Union[int, str]] = None,
         orders_cls: type = Orders,
         logs_cls: type = Logs,
+        trades_cls: type = Trades,
         entry_trades_cls: type = EntryTrades,
         exit_trades_cls: type = ExitTrades,
-        trades_cls: type = Trades,
         positions_cls: type = Positions,
         drawdowns_cls: type = Drawdowns,
         **kwargs,
@@ -2930,9 +2930,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             trades_type=trades_type,
             orders_cls=orders_cls,
             logs_cls=logs_cls,
+            trades_cls=trades_cls,
             entry_trades_cls=entry_trades_cls,
             exit_trades_cls=exit_trades_cls,
-            trades_cls=trades_cls,
             positions_cls=positions_cls,
             drawdowns_cls=drawdowns_cls,
             **kwargs,
@@ -2958,9 +2958,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         self._trades_type = trades_type
         self._orders_cls = orders_cls
         self._logs_cls = logs_cls
+        self._trades_cls = trades_cls
         self._entry_trades_cls = entry_trades_cls
         self._exit_trades_cls = exit_trades_cls
-        self._trades_cls = trades_cls
         self._positions_cls = positions_cls
         self._drawdowns_cls = drawdowns_cls
 
@@ -3524,33 +3524,41 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         group_idxs = wrapper_meta["group_idxs"]
         groups_changed = wrapper_meta["groups_changed"]
 
-        new_close = to_2d_array(self._close)
-        if rows_changed and new_close.shape[0] > 1:
-            new_close = new_close[row_idxs, :]
-        if columns_changed and new_close.shape[1] > 1:
-            new_close = new_close[:, col_idxs]
+        new_close = ArrayWrapper.select_from_flex_array(
+            self._close,
+            row_idxs=row_idxs,
+            col_idxs=col_idxs,
+            rows_changed=rows_changed,
+            columns_changed=columns_changed,
+        )
         if self._open is not None:
-            new_open = to_2d_array(self._open)
-            if rows_changed and new_open.shape[0] > 1:
-                new_open = new_open[row_idxs, :]
-            if columns_changed and new_open.shape[1] > 1:
-                new_open = new_open[:, col_idxs]
+            new_open = ArrayWrapper.select_from_flex_array(
+                self._open,
+                row_idxs=row_idxs,
+                col_idxs=col_idxs,
+                rows_changed=rows_changed,
+                columns_changed=columns_changed,
+            )
         else:
             new_open = self._open
         if self._high is not None:
-            new_high = to_2d_array(self._high)
-            if rows_changed and new_high.shape[0] > 1:
-                new_high = new_high[row_idxs, :]
-            if columns_changed and new_high.shape[1] > 1:
-                new_high = new_high[:, col_idxs]
+            new_high = ArrayWrapper.select_from_flex_array(
+                self._high,
+                row_idxs=row_idxs,
+                col_idxs=col_idxs,
+                rows_changed=rows_changed,
+                columns_changed=columns_changed,
+            )
         else:
             new_high = self._high
         if self._low is not None:
-            new_low = to_2d_array(self._low)
-            if rows_changed and new_low.shape[0] > 1:
-                new_low = new_low[row_idxs, :]
-            if columns_changed and new_low.shape[1] > 1:
-                new_low = new_low[:, col_idxs]
+            new_low = ArrayWrapper.select_from_flex_array(
+                self._low,
+                row_idxs=row_idxs,
+                col_idxs=col_idxs,
+                rows_changed=rows_changed,
+                columns_changed=columns_changed,
+            )
         else:
             new_low = self._low
         new_order_records = self.orders.indexing_func_meta(wrapper_meta=wrapper_meta)["new_records_arr"]
@@ -3579,29 +3587,38 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             new_init_price = to_1d_array(self.close.iloc[: row_idxs.start].ffill().iloc[-1])
         if columns_changed and new_init_price.shape[0] > 1:
             new_init_price = new_init_price[col_idxs]
-        new_cash_deposits = to_2d_array(self._cash_deposits)
-        if rows_changed and new_cash_deposits.shape[0] > 1:
-            new_cash_deposits = new_cash_deposits[row_idxs, :]
-        if columns_changed and new_cash_deposits.shape[1] > 1:
-            if self.cash_sharing:
-                new_cash_deposits = new_cash_deposits[:, group_idxs]
-            else:
-                new_cash_deposits = new_cash_deposits[:, col_idxs]
-        new_cash_earnings = to_2d_array(self._cash_earnings)
-        if rows_changed and new_cash_earnings.shape[0] > 1:
-            new_cash_earnings = new_cash_earnings[row_idxs, :]
-        if columns_changed and new_cash_earnings.shape[1] > 1:
-            new_cash_earnings = new_cash_earnings[:, col_idxs]
+        new_cash_deposits = ArrayWrapper.select_from_flex_array(
+            self._cash_deposits,
+            row_idxs=row_idxs,
+            col_idxs=group_idxs if self.cash_sharing else col_idxs,
+            rows_changed=rows_changed,
+            columns_changed=columns_changed,
+        )
+        new_cash_earnings = ArrayWrapper.select_from_flex_array(
+            self._cash_earnings,
+            row_idxs=row_idxs,
+            col_idxs=col_idxs,
+            rows_changed=rows_changed,
+            columns_changed=columns_changed,
+        )
         if self._call_seq is not None:
-            new_call_seq = to_2d_array(self._call_seq)[row_idxs, :][:, col_idxs]
+            new_call_seq = ArrayWrapper.select_from_flex_array(
+                self._call_seq,
+                row_idxs=row_idxs,
+                col_idxs=col_idxs,
+                rows_changed=rows_changed,
+                columns_changed=columns_changed,
+            )
         else:
             new_call_seq = None
         if self._bm_close is not None and not isinstance(self._bm_close, bool):
-            new_bm_close = to_2d_array(self._bm_close)
-            if rows_changed and new_bm_close.shape[0] > 1:
-                new_bm_close = new_bm_close[row_idxs, :]
-            if columns_changed and new_bm_close.shape[1] > 1:
-                new_bm_close = new_bm_close[:, col_idxs]
+            new_bm_close = ArrayWrapper.select_from_flex_array(
+                self._bm_close,
+                row_idxs=row_idxs,
+                col_idxs=col_idxs,
+                rows_changed=rows_changed,
+                columns_changed=columns_changed,
+            )
         else:
             new_bm_close = self._bm_close
         new_in_outputs = self.in_outputs_indexing_func(wrapper_meta, **resolve_dict(in_output_kwargs))
@@ -4647,6 +4664,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         adjust_args: tp.Args = (),
         signal_func_nb: nb.SignalFuncT = nb.no_signal_func_nb,
         signal_args: tp.ArgsLike = (),
+        post_segment_func_nb: nb.SignalFuncT = nb.no_post_func_nb,
+        post_segment_args: tp.ArgsLike = (),
         size: tp.Optional[tp.ArrayLike] = None,
         size_type: tp.Optional[tp.ArrayLike] = None,
         price: tp.Optional[tp.ArrayLike] = None,
@@ -4669,10 +4688,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         upon_dir_conflict: tp.Optional[tp.ArrayLike] = None,
         upon_opposite_entry: tp.Optional[tp.ArrayLike] = None,
         order_type: tp.Optional[tp.ArrayLike] = None,
-        limit_reverse: tp.Optional[tp.ArrayLike] = None,
         limit_delta: tp.Optional[tp.ArrayLike] = None,
         limit_tif: tp.Optional[tp.ArrayLike] = None,
         limit_expiry: tp.Optional[tp.ArrayLike] = None,
+        limit_reverse: tp.Optional[tp.ArrayLike] = None,
         upon_adj_limit_conflict: tp.Optional[tp.ArrayLike] = None,
         upon_opp_limit_conflict: tp.Optional[tp.ArrayLike] = None,
         use_stops: tp.Optional[bool] = None,
@@ -4765,6 +4784,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 See `vectorbtpro.portfolio.nb.from_signals.simulate_from_signal_func_nb`.
             signal_args (tuple): Packed arguments passed to `signal_func_nb`.
                 Defaults to `()`.
+            post_segment_func_nb (callable): Post-segment function.
+
+                See `vectorbtpro.portfolio.nb.from_signals.simulate_from_signal_func_nb`.
+            post_segment_args (tuple): Packed arguments passed to `post_segment_func_nb`.
+                Defaults to `()`.
             size (float or array_like): See `Portfolio.from_orders`.
 
                 !!! note
@@ -4812,11 +4836,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             order_type (OrderType or array_like): See `vectorbtpro.portfolio.enums.OrderType`.
 
                 Only one active limit order is allowed at a time.
-            limit_reverse (bool or array_like): Whether to reverse the price hit detection.
-                Will broadcast.
-
-                If True, a buy/sell limit price will be checked against high/low (not low/high).
-                Also, the limit delta will be applied above/below (not below/above) the initial price.
             limit_delta (float or array_like): Delta from `price` to build the limit price.
                 Will broadcast.
 
@@ -4855,6 +4874,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 Behaves in a similar way as `limit_tif`.
 
                 Set an element to `-1` or `pd.Timestamp.max` to disable. Use `time_delta_format` to specify the format.
+            limit_reverse (bool or array_like): Whether to reverse the price hit detection.
+                Will broadcast.
+
+                If True, a buy/sell limit price will be checked against high/low (not low/high).
+                Also, the limit delta will be applied above/below (not below/above) the initial price.
             upon_adj_limit_conflict (PendingConflictMode or array_like): Conflict mode for limit and user-defined
                 signals of adjacent sign. See `vectorbtpro.portfolio.enums.PendingConflictMode`. Will broadcast.
             upon_opp_limit_conflict (PendingConflictMode or array_like): Conflict mode for limit and user-defined
@@ -5434,15 +5458,17 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         else:
             low_none = False
 
+        flexible_mode = (
+            (adjust_func_nb is not nb.no_adjust_func_nb)
+            or (signal_func_nb is not nb.no_signal_func_nb)
+            or (post_segment_func_nb is not nb.no_post_func_nb)
+        )
         ls_mode = short_entries is not None or short_exits is not None
         signal_func_mode = signal_func_nb is not nb.no_signal_func_nb
         if (entries is not None or exits is not None or ls_mode) and signal_func_mode:
             raise ValueError("Either any of the signal arrays or signal_func_nb must be provided, not both")
         if entries is None:
-            if exits is None and not ls_mode:
-                entries = True
-            else:
-                entries = False
+            entries = False
         if exits is None:
             exits = False
         if short_entries is None:
@@ -5513,8 +5539,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             upon_opposite_entry = portfolio_cfg["upon_opposite_entry"]
         if order_type is None:
             order_type = portfolio_cfg["order_type"]
-        if limit_reverse is None:
-            limit_reverse = portfolio_cfg["limit_reverse"]
         if limit_delta is None:
             limit_delta = portfolio_cfg["limit_delta"]
         if limit_tif is None:
@@ -5562,6 +5586,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                             limit_expiry_col = pd.to_datetime(limit_expiry_arr[:, col]).tz_localize(None)
                             limit_expiry_cols.append(limit_expiry_col.values)
                         limit_expiry = np.column_stack(limit_expiry_cols)
+        if limit_reverse is None:
+            limit_reverse = portfolio_cfg["limit_reverse"]
         if upon_adj_limit_conflict is None:
             upon_adj_limit_conflict = portfolio_cfg["upon_adj_limit_conflict"]
         if upon_opp_limit_conflict is None:
@@ -5681,10 +5707,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             upon_dir_conflict=upon_dir_conflict,
             upon_opposite_entry=upon_opposite_entry,
             order_type=order_type,
-            limit_reverse=limit_reverse,
             limit_delta=limit_delta,
             limit_tif=limit_tif,
             limit_expiry=limit_expiry,
+            limit_reverse=limit_reverse,
             upon_adj_limit_conflict=upon_adj_limit_conflict,
             upon_opp_limit_conflict=upon_opp_limit_conflict,
             sl_stop=sl_stop,
@@ -5755,10 +5781,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     upon_dir_conflict=dict(fill_value=DirectionConflictMode.Ignore),
                     upon_opposite_entry=dict(fill_value=OppositeEntryMode.ReverseReduce),
                     order_type=dict(fill_value=OrderType.Market),
-                    limit_reverse=dict(fill_value=False),
                     limit_delta=dict(fill_value=np.nan),
                     limit_tif=dict(fill_value=-1),
                     limit_expiry=dict(fill_value=-1),
+                    limit_reverse=dict(fill_value=False),
                     upon_adj_limit_conflict=dict(fill_value=PendingConflictMode.KeepIgnore),
                     upon_opp_limit_conflict=dict(fill_value=PendingConflictMode.CancelExecute),
                     sl_stop=dict(fill_value=np.nan),
@@ -5945,10 +5971,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         checks.assert_subdtype(broadcasted_args["upon_dir_conflict"], np.integer)
         checks.assert_subdtype(broadcasted_args["upon_opposite_entry"], np.integer)
         checks.assert_subdtype(broadcasted_args["order_type"], np.integer)
-        checks.assert_subdtype(broadcasted_args["limit_reverse"], np.bool_)
         checks.assert_subdtype(broadcasted_args["limit_delta"], np.number)
         checks.assert_subdtype(broadcasted_args["limit_tif"], np.integer)
         checks.assert_subdtype(broadcasted_args["limit_expiry"], np.integer)
+        checks.assert_subdtype(broadcasted_args["limit_reverse"], np.bool_)
         checks.assert_subdtype(broadcasted_args["upon_adj_limit_conflict"], np.integer)
         checks.assert_subdtype(broadcasted_args["upon_opp_limit_conflict"], np.integer)
         checks.assert_subdtype(broadcasted_args["sl_stop"], np.number)
@@ -6011,87 +6037,159 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ),
             template_context,
         )
-        if signal_func_mode:
-            signal_args = deep_substitute(signal_args, template_context, sub_id="signal_args")
-        else:
-            adjust_args = deep_substitute(adjust_args, template_context, sub_id="adjust_args")
-            if ls_mode:
-                signal_args = (
-                    broadcasted_args.pop("entries"),
-                    broadcasted_args.pop("exits"),
-                    broadcasted_args.pop("short_entries"),
-                    broadcasted_args.pop("short_exits"),
-                    broadcasted_args["from_ago"],
-                    adjust_func_nb,
-                    adjust_args,
-                )
-                chunked = ch.specialize_chunked_option(
-                    chunked,
-                    arg_take_spec=dict(
-                        signal_args=ch.ArgsTaker(
-                            portfolio_ch.flex_array_gl_slicer,
-                            portfolio_ch.flex_array_gl_slicer,
-                            portfolio_ch.flex_array_gl_slicer,
-                            portfolio_ch.flex_array_gl_slicer,
-                            portfolio_ch.flex_array_gl_slicer,
-                            None,
-                            ArgsTaker(),
-                        )
-                    ),
-                )
+        if flexible_mode:
+            if signal_func_mode:
+                signal_args = deep_substitute(signal_args, template_context, sub_id="signal_args")
             else:
-                signal_args = (
-                    broadcasted_args.pop("entries"),
-                    broadcasted_args.pop("exits"),
-                    broadcasted_args.pop("direction"),
-                    broadcasted_args["from_ago"],
-                    adjust_func_nb,
-                    adjust_args,
-                )
-                chunked = ch.specialize_chunked_option(
-                    chunked,
-                    arg_take_spec=dict(
-                        signal_args=ch.ArgsTaker(
-                            portfolio_ch.flex_array_gl_slicer,
-                            portfolio_ch.flex_array_gl_slicer,
-                            portfolio_ch.flex_array_gl_slicer,
-                            portfolio_ch.flex_array_gl_slicer,
-                            None,
-                            ArgsTaker(),
-                        )
-                    ),
-                )
-        for k in broadcast_named_args:
-            broadcasted_args.pop(k)
-        bm_close = broadcasted_args.pop("bm_close", None)
+                adjust_args = deep_substitute(adjust_args, template_context, sub_id="adjust_args")
+                if ls_mode:
+                    signal_args = (
+                        broadcasted_args.pop("entries"),
+                        broadcasted_args.pop("exits"),
+                        broadcasted_args.pop("short_entries"),
+                        broadcasted_args.pop("short_exits"),
+                        broadcasted_args["from_ago"],
+                        adjust_func_nb,
+                        adjust_args,
+                    )
+                    chunked = ch.specialize_chunked_option(
+                        chunked,
+                        arg_take_spec=dict(
+                            signal_args=ch.ArgsTaker(
+                                portfolio_ch.flex_array_gl_slicer,
+                                portfolio_ch.flex_array_gl_slicer,
+                                portfolio_ch.flex_array_gl_slicer,
+                                portfolio_ch.flex_array_gl_slicer,
+                                portfolio_ch.flex_array_gl_slicer,
+                                None,
+                                ArgsTaker(),
+                            )
+                        ),
+                    )
+                else:
+                    signal_args = (
+                        broadcasted_args.pop("entries"),
+                        broadcasted_args.pop("exits"),
+                        broadcasted_args.pop("direction"),
+                        broadcasted_args["from_ago"],
+                        adjust_func_nb,
+                        adjust_args,
+                    )
+                    chunked = ch.specialize_chunked_option(
+                        chunked,
+                        arg_take_spec=dict(
+                            signal_args=ch.ArgsTaker(
+                                portfolio_ch.flex_array_gl_slicer,
+                                portfolio_ch.flex_array_gl_slicer,
+                                portfolio_ch.flex_array_gl_slicer,
+                                portfolio_ch.flex_array_gl_slicer,
+                                None,
+                                ArgsTaker(),
+                            )
+                        ),
+                    )
+            for k in broadcast_named_args:
+                broadcasted_args.pop(k)
+            bm_close = broadcasted_args.pop("bm_close", None)
 
-        # Perform the simulation
-        func = jit_reg.resolve_option(nb.simulate_from_signal_func_nb, jitted)
-        func = ch_reg.resolve_option(func, chunked)
-        sim_out = func(
-            target_shape=target_shape_2d,
-            group_lens=cs_group_lens,  # group only if cash sharing is enabled to speed up
-            index=index,
-            freq=freq,
-            init_cash=init_cash,
-            init_position=init_position,
-            init_price=init_price,
-            cash_deposits=cash_deposits,
-            cash_earnings=cash_earnings,
-            cash_dividends=cash_dividends,
-            signal_func_nb=signal_func_nb,
-            signal_args=signal_args,
-            use_stops=use_stops,
-            call_seq=call_seq,
-            auto_call_seq=auto_call_seq,
-            ffill_val_price=ffill_val_price,
-            update_value=update_value,
-            fill_returns=fill_returns,
-            max_orders=max_orders,
-            max_logs=max_logs,
-            flex_2d=flex_2d,
-            **broadcasted_args,
-        )
+            # Perform the simulation
+            func = jit_reg.resolve_option(nb.simulate_from_signal_func_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
+            sim_out = func(
+                target_shape=target_shape_2d,
+                group_lens=cs_group_lens,  # group only if cash sharing is enabled to speed up
+                index=index,
+                freq=freq,
+                init_cash=init_cash,
+                init_position=init_position,
+                init_price=init_price,
+                cash_deposits=cash_deposits,
+                cash_earnings=cash_earnings,
+                cash_dividends=cash_dividends,
+                signal_func_nb=signal_func_nb,
+                signal_args=signal_args,
+                post_segment_func_nb=post_segment_func_nb,
+                post_segment_args=post_segment_args,
+                use_stops=use_stops,
+                call_seq=call_seq,
+                auto_call_seq=auto_call_seq,
+                ffill_val_price=ffill_val_price,
+                update_value=update_value,
+                fill_returns=fill_returns,
+                max_orders=max_orders,
+                max_logs=max_logs,
+                flex_2d=flex_2d,
+                **broadcasted_args,
+            )
+        else:
+            entries = broadcasted_args.pop("entries")
+            exits = broadcasted_args.pop("exits")
+            if ls_mode:
+                long_entries = entries
+                long_exits = exits
+                short_entries = broadcasted_args.pop("short_entries")
+                short_exits = broadcasted_args.pop("short_exits")
+            else:
+                direction = broadcasted_args.pop("direction")
+                if direction.size == 1:
+                    _direction = direction.item(0)
+                    if _direction == Direction.LongOnly:
+                        long_entries = entries
+                        long_exits = exits
+                        short_entries = np.asarray([False])
+                        short_exits = np.asarray([False])
+                    elif _direction == Direction.ShortOnly:
+                        long_entries = np.asarray([False])
+                        long_exits = np.asarray([False])
+                        short_entries = entries
+                        short_exits = exits
+                    else:
+                        long_entries = entries
+                        long_exits = np.asarray([False])
+                        short_entries = exits
+                        short_exits = np.asarray([False])
+                else:
+                    long_entries, long_exits, short_entries, short_exits = nb.dir_to_ls_signals_nb(
+                        target_shape=target_shape,
+                        entries=entries,
+                        exits=exits,
+                        direction=direction,
+                        flex_2d=flex_2d,
+                    )
+
+            for k in broadcast_named_args:
+                broadcasted_args.pop(k)
+            bm_close = broadcasted_args.pop("bm_close", None)
+
+            # Perform the simulation
+            func = jit_reg.resolve_option(nb.simulate_from_signals_nb, jitted)
+            func = ch_reg.resolve_option(func, chunked)
+            sim_out = func(
+                target_shape=target_shape_2d,
+                group_lens=cs_group_lens,  # group only if cash sharing is enabled to speed up
+                index=index,
+                freq=freq,
+                init_cash=init_cash,
+                init_position=init_position,
+                init_price=init_price,
+                cash_deposits=cash_deposits,
+                cash_earnings=cash_earnings,
+                cash_dividends=cash_dividends,
+                long_entries=long_entries,
+                long_exits=long_exits,
+                short_entries=short_entries,
+                short_exits=short_exits,
+                use_stops=use_stops,
+                call_seq=call_seq,
+                auto_call_seq=auto_call_seq,
+                ffill_val_price=ffill_val_price,
+                update_value=update_value,
+                fill_returns=fill_returns,
+                max_orders=max_orders,
+                max_logs=max_logs,
+                flex_2d=flex_2d,
+                **broadcasted_args,
+            )
 
         # Create an instance
         if "orders_cls" not in kwargs:
@@ -7779,6 +7877,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         return self._logs_cls
 
     @property
+    def trades_cls(self) -> type:
+        """Class for wrapping trade records."""
+        return self._trades_cls
+
+    @property
     def entry_trades_cls(self) -> type:
         """Class for wrapping entry trade records."""
         return self._entry_trades_cls
@@ -7787,11 +7890,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     def exit_trades_cls(self) -> type:
         """Class for wrapping exit trade records."""
         return self._exit_trades_cls
-
-    @property
-    def trades_cls(self) -> type:
-        """Class for wrapping trade records."""
-        return self._trades_cls
 
     @property
     def positions_cls(self) -> type:
@@ -8132,9 +8230,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
     def get_trades(self, group_by: tp.GroupByLike = None, **kwargs) -> Trades:
         """Get trade/position records depending upon `Portfolio.trades_type`."""
+        if self.trades_type == TradesType.Trades:
+            raise NotImplementedError
         if self.trades_type == TradesType.EntryTrades:
             return self.resolve_shortcut_attr("entry_trades", group_by=group_by, **kwargs)
-        elif self.trades_type == TradesType.ExitTrades:
+        if self.trades_type == TradesType.ExitTrades:
             return self.resolve_shortcut_attr("exit_trades", group_by=group_by, **kwargs)
         return self.resolve_shortcut_attr("positions", group_by=group_by, **kwargs)
 
@@ -9978,7 +10078,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             dict(trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["brown"]), name="Assets")),
             kwargs,
         )
-        fig = asset_flow.vbt.plot(**kwargs)
+        fig = asset_flow.vbt.lineplot(**kwargs)
         x_domain = get_domain(xref, fig)
         fig.add_shape(
             **merge_dicts(
@@ -10032,7 +10132,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             dict(trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["green"]), name="Cash")),
             kwargs,
         )
-        fig = cash_flow.vbt.plot(**kwargs)
+        fig = cash_flow.vbt.lineplot(**kwargs)
         x_domain = get_domain(xref, fig)
         fig.add_shape(
             **merge_dicts(
@@ -10394,7 +10494,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ),
             kwargs,
         )
-        fig = drawdown.vbt.plot(**kwargs)
+        fig = drawdown.vbt.lineplot(**kwargs)
         x_domain = get_domain(xref, fig)
         fig.add_shape(
             **merge_dicts(

@@ -3077,7 +3077,6 @@ Args:
 
         # Test if the produced array has the same index length
         if not pd.Index.equals(result.index, test_df.index):
-            print(result.index, test_df.index)
             raise ValueError("Couldn't parse the output: mismatching index")
 
         # Standardize output names: remove numbers, remove hyphens, and bring to lower case
