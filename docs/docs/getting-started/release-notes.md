@@ -19,11 +19,11 @@ which prepares custom data to be showed when hovering over a Plotly trace, given
 in the field config. This method is utilized in all record classes, such as [Trades](/api/portfolio/trades/#vectorbtpro.portfolio.trades.Trades),
 so the user can subclass them, define their own custom fields, and they will be displayed on hover automatically.
 - Implemented numerous functions and classes for pattern detection:
-    - NB function [interp_resize_1d_nb](/api/generic/nb/records/#vectorbtpro.generic.nb.patterns.interp_resize_1d_nb)
+    - NB function [interp_resize_1d_nb](/api/generic/nb/patterns/#vectorbtpro.generic.nb.patterns.interp_resize_1d_nb)
     for interpolating values of an array
-    - NB function [pattern_similarity_nb](/api/generic/nb/records/#vectorbtpro.generic.nb.patterns.pattern_similarity_nb) 
+    - NB function [pattern_similarity_nb](/api/generic/nb/patterns/#vectorbtpro.generic.nb.patterns.pattern_similarity_nb) 
       for calculating the similarity score between two arrays
-    - NB function [rolling_pattern_similarity_nb](/api/generic/nb/records/#vectorbtpro.generic.nb.rolling.rolling_pattern_similarity_nb)
+    - NB function [rolling_pattern_similarity_nb](/api/generic/nb/rolling/#vectorbtpro.generic.nb.rolling.rolling_pattern_similarity_nb)
     and accessor method [GenericAccessor.rolling_pattern_similarity](/api/generic/accessors/#vectorbtpro.generic.accessors.GenericAccessor.rolling_pattern_similarity)
     for calculating the rolling similarity score between two arrays
     - NB function [find_pattern_nb](/api/generic/nb/records/#vectorbtpro.generic.nb.records.find_pattern_nb) 
@@ -35,7 +35,7 @@ so the user can subclass them, define their own custom fields, and they will be 
     that wraps the filled range records with [PatternRanges](/api/generic/ranges/#vectorbtpro.generic.ranges.PatternRanges).
     Works similarly to an indicator.
     - Indicator [PATSIM](/api/indicators/custom/#vectorbtpro.indicators.custom.PATSIM)
-    based on [rolling_pattern_similarity_nb](/api/generic/nb/records/#vectorbtpro.generic.nb.rolling.rolling_pattern_similarity_nb)
+    based on [rolling_pattern_similarity_nb](/api/generic/nb/rolling/#vectorbtpro.generic.nb.rolling.rolling_pattern_similarity_nb)
 - Implemented numerous functions for projections:
     - NB function [map_ranges_to_projections_nb](/api/generic/nb/records/#vectorbtpro.generic.nb.records.map_ranges_to_projections_nb) 
     and method [Ranges.get_projections](/api/generic/ranges/#vectorbtpro.generic.ranges.Ranges.get_projections)
