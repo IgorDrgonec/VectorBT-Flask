@@ -678,7 +678,7 @@ Let's simulate a simple crossover strategy on `H1` data:
 >>> pf.plot()
 ```
 
-![](/assets/images/tutorials/mtf_analysis_h1_pf.svg)
+![](/assets/images/tutorials/mtf-analysis/h1_pf.svg)
 
 Computing the returns of a portfolio involves reconstructing many attributes, including 
 the cash flow, cash, asset flow, asset value, value, and finally returns. This cascade of 
@@ -692,7 +692,7 @@ possible and logically justifiable). Here, we are resampling the portfolio to th
 >>> ms_pf.plot()
 ```
 
-![](/assets/images/tutorials/mtf_analysis_ms_pf.svg)
+![](/assets/images/tutorials/mtf-analysis/ms_pf.svg)
 
 The main artifacts of a simulation are the close price, order records, and additional inputs such as
 cash deposits and earnings. Whenever we trigger a resampling job, the close price and those additional

@@ -13,6 +13,7 @@ locked_notebooks = {
     Path("../notebooks/MTFAnalysis.ipynb"): "MTF analysis",
     Path("../notebooks/PortfolioOptimization.ipynb"): "Portfolio optimization",
     Path("../notebooks/SignalDevelopment.ipynb"): "Signal development",
+    Path("../notebooks/PatternsProjections.ipynb"): "Patterns and projections",
 }
 
 

@@ -88,10 +88,32 @@
     padding: 0 20px 20px 20px;
 }
 
+.feature-column.appreciation {
+    text-align: center;
+    border: 1px solid #dc2d44;
+    -webkit-border-radius: 15px;
+    -moz-border-radius: 15px;
+    border-radius: 15px;
+    padding: 15px;
+}
+
+.feature-column-dummy {
+    width: 25%;
+    float: left;
+    padding: 0 20px 20px 20px;
+}
 
 @media screen and (max-width:29.9375em) {
     .feature-column {
         width: 100%;
+    }
+
+    .feature-column.appreciation {
+        text-align: initial;
+    }
+
+    .feature-column-dummy {
+        display: none;
     }
 }
 

@@ -140,7 +140,7 @@ Let's plot the first 16 points of both time series for validation:
 >>> h4_h1_close.rename("H4_H1").iloc[:16].vbt.plot(fig=fig).show_svg()
 ```
 
-![](/assets/images/tutorials/mtf_analysis_h4_h1.svg)
+![](/assets/images/tutorials/mtf-analysis/h4_h1.svg)
 
 As we see, at each hour, `H4_H1` contains the latest available information from the previous 4 hours.
 We can now compare both time frames safely:
@@ -757,7 +757,7 @@ Finally, as usually, compare the new time series to produce entries and exits:
 >>> plot_date_range(slice("2020-02-01", "2020-03-01"))
 ```
 
-![](/assets/images/tutorials/mtf_analysis_d1_h4.svg)
+![](/assets/images/tutorials/mtf-analysis/d1_h4.svg)
 
 In case any calculation was performed on the open price, we can account for that by directly using 
 [GenericAccessor.latest_at_index](/api/generic/accessors/#vectorbtpro.generic.accessors.GenericAccessor.latest_at_index)
@@ -860,7 +860,7 @@ We can then plot the entire thing as a heatmap:
 1. Reverse the order of columns such that the lowest frequency appears on top, and plot a heatmap
 using [GenericDFAccessor.ts_heatmap](/api/generic/accessors/#vectorbtpro.generic.accessors.GenericDFAccessor.ts_heatmap)
 
-![](/assets/images/tutorials/mtf_analysis_heatmap.svg)
+![](/assets/images/tutorials/mtf-analysis/heatmap.svg)
 
 We just created such a badass visualization in 10 lines of code! :guitar:
 
@@ -977,7 +977,7 @@ a separate column level to indicate which column belongs to which time frame
 the array to daily frequency, since Plotly doesn't like plotting too much data. 
 Display everything as a time-series heatmap.
 
-![](/assets/images/tutorials/mtf_analysis_bi_signals.svg)
+![](/assets/images/tutorials/mtf-analysis/bi_signals.svg)
 
 ```pycon
 >>> pf = vbt.Portfolio.from_signals(

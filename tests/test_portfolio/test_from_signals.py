@@ -5391,7 +5391,7 @@ class TestFromSignals:
         assert_records_close(pf.log_records, pf2.log_records)
 
     def test_cash_earnings(self):
-        pf = vbt.Portfolio.from_signals(1, cash_earnings=[0, 1, 2, 3], accumulate=True)
+        pf = vbt.Portfolio.from_signals(1, entries=True, cash_earnings=[0, 1, 2, 3], accumulate=True)
         assert_series_equal(pf.cash_earnings, pd.Series([0.0, 1.0, 2.0, 3.0]))
         assert_records_close(
             pf.order_records,
@@ -5406,7 +5406,7 @@ class TestFromSignals:
         )
 
     def test_cash_dividends(self):
-        pf = vbt.Portfolio.from_signals(1, size=np.inf, cash_dividends=[0, 1, 2, 3], accumulate=True)
+        pf = vbt.Portfolio.from_signals(1, entries=True, size=np.inf, cash_dividends=[0, 1, 2, 3], accumulate=True)
         assert_series_equal(pf.cash_earnings, pd.Series([0.0, 100.0, 400.0, 1800.0]))
         assert_records_close(
             pf.order_records,

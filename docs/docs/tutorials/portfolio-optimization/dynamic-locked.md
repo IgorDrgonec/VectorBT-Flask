@@ -193,7 +193,7 @@ in `broadcast_named_args`.
 thus broadcast price together with `close`
 5. Group by everything except assets such that each group contains only assets
 
-![](/assets/images/tutorials/pf_opt_dynamic.svg)
+![](/assets/images/tutorials/pf-opt/dynamic.svg)
 
 We see that threshold rebalancing makes asset allocations to repeatedly jump to their target levels. 
 
@@ -467,7 +467,7 @@ max     0.288493  0.248507  0.231013  0.423879  0.336853
 >>> pf_opt.plot(column=0.1)
 ```
 
-![](/assets/images/tutorials/pf_opt_dynamic_01.svg)
+![](/assets/images/tutorials/pf-opt/dynamic_01.svg)
 
 Here's how the target allocation picture changes with a lower threshold:
 
@@ -475,7 +475,7 @@ Here's how the target allocation picture changes with a lower threshold:
 >>> pf_opt.plot(column=0.03)
 ```
 
-![](/assets/images/tutorials/pf_opt_dynamic_003.svg)
+![](/assets/images/tutorials/pf-opt/dynamic_003.svg)
 
 And here's what actually happened:
 
@@ -488,7 +488,7 @@ And here's what actually happened:
 ... )
 ```
 
-![](/assets/images/tutorials/pf_opt_dynamic_003_sim.svg)
+![](/assets/images/tutorials/pf-opt/dynamic_003_sim.svg)
 
 Want the cool part? If we feed our manually-constructed optimizer instance to 
 [Portfolio.from_optimizer](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_optimizer),
@@ -788,7 +788,7 @@ We can now analyze the portfolio as we usually do!
 ... )
 ```
 
-![](/assets/images/tutorials/pf_opt_mvo.svg)
+![](/assets/images/tutorials/pf-opt/mvo.svg)
 
 In contrast to all the examples above, our pipeline can process only one parameter combination
 at once. This means that we should test all the parameter combinations in a loop, which can be

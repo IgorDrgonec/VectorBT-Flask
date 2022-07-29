@@ -6,6 +6,96 @@ title: Release notes
 
 All notable changes in reverse chronological order.
 
+## Version 1.5.0 (29 Jul, 2022)
+
+- Implemented [simulate_from_signals_nb](/api/portfolio/nb/from_signals/#vectorbtpro.portfolio.nb.from_signals.simulate_from_signals_nb), 
+which is a cached version that gets used automatically by [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_signals)
+if none of the `adjust_func_nb`, `signal_func_nb`, and `post_segment_func_nb` were provided.
+This way, we can avoid repeated compilation in each new runtime.
+- Added a post-segment function to [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_signals).
+It can be used, for example, for pre-computing custom metrics during the simulation.
+- Created the method [Records.prepare_customdata](/api/records/base/#vectorbtpro.records.base.Records.prepare_customdata),
+which prepares custom data to be showed when hovering over a Plotly trace, given only the options specified 
+in the field config. This method is utilized in all record classes, such as [Trades](/api/portfolio/trades/#vectorbtpro.portfolio.trades.Trades),
+so the user can subclass them, define their own custom fields, and they will be displayed on hover automatically.
+- Implemented numerous functions and classes for pattern detection:
+    - NB function [interp_resize_1d_nb](/api/generic/nb/records/#vectorbtpro.generic.nb.patterns.interp_resize_1d_nb)
+    for interpolating values of an array
+    - NB function [pattern_similarity_nb](/api/generic/nb/records/#vectorbtpro.generic.nb.patterns.pattern_similarity_nb) 
+      for calculating the similarity score between two arrays
+    - NB function [rolling_pattern_similarity_nb](/api/generic/nb/records/#vectorbtpro.generic.nb.rolling.rolling_pattern_similarity_nb)
+    and accessor method [GenericAccessor.rolling_pattern_similarity](/api/generic/accessors/#vectorbtpro.generic.accessors.GenericAccessor.rolling_pattern_similarity)
+    for calculating the rolling similarity score between two arrays
+    - NB function [find_pattern_nb](/api/generic/nb/records/#vectorbtpro.generic.nb.records.find_pattern_nb) 
+    for searching and storing patterns as range records
+    - Class [PatternRanges](/api/generic/ranges/#vectorbtpro.generic.ranges.PatternRanges) for holding,
+    analyzing, and plotting the results of one to multiple pattern searches
+    - Method [PatternRanges.from_pattern_search](/api/generic/ranges/#vectorbtpro.generic.ranges.PatternRanges.from_pattern_search)
+    as a parameterizable interface to [find_pattern_nb](/api/generic/nb/records/#vectorbtpro.generic.nb.records.find_pattern_nb) 
+    that wraps the filled range records with [PatternRanges](/api/generic/ranges/#vectorbtpro.generic.ranges.PatternRanges).
+    Works similarly to an indicator.
+    - Indicator [PATSIM](/api/indicators/custom/#vectorbtpro.indicators.custom.PATSIM)
+    based on [rolling_pattern_similarity_nb](/api/generic/nb/records/#vectorbtpro.generic.nb.rolling.rolling_pattern_similarity_nb)
+- Implemented numerous functions for projections:
+    - NB function [map_ranges_to_projections_nb](/api/generic/nb/records/#vectorbtpro.generic.nb.records.map_ranges_to_projections_nb) 
+    and method [Ranges.get_projections](/api/generic/ranges/#vectorbtpro.generic.ranges.Ranges.get_projections)
+    for mapping (the price during) ranges of any type to projections
+    - Accessor method [GenericDFAccessor.plot_projections](/api/generic/accessors/#vectorbtpro.generic.accessors.GenericDFAccessor.plot_projections)
+    for plotting projections from any DataFrame
+    - Method [Ranges.plot_projections](/api/generic/ranges/#vectorbtpro.generic.ranges.Ranges.plot_projections)
+    for generating and plotting projections using the two methods above
+- Implemented the NB function [get_ranges_from_delta_nb](/api/generic/nb/records/#vectorbtpro.generic.nb.records.get_ranges_from_delta_nb), 
+the class method [Ranges.from_delta](/api/generic/ranges/#vectorbtpro.generic.ranges.Ranges.from_delta),
+and the instance method [Ranges.with_delta](/api/generic/ranges/#vectorbtpro.generic.ranges.Ranges.with_delta)
+to map records/mapped arrays/index arrays to ranges of the type [Ranges](/api/generic/ranges/#vectorbtpro.generic.ranges.Ranges) 
+that start at a specific index and last a specific duration. Useful for converting pattern ranges 
+to be able to build projections.
+- Added the argument `klines_type` to [BinanceData](/api/data/custom/#vectorbtpro.data.custom.BinanceData)
+to be able to fetch futures data
+- Implemented the indicator [VWAP](/api/indicators/custom/#vectorbtpro.indicators.custom.VWAP)
+for calculating VWAP with any frequency-like anchor (daily by default)
+- Refactored custom indicators and their plotting methods:
+    - Removed the argument `ewm` in favor of the enumerated argument `wtype` (window type) of the type 
+    [WType](/api/generic/enums/#vectorbtpro.generic.enums.WType), which allows the moving average and 
+    standard deviation to be computed using the new NB functions 
+    [ma_nb](/api/generic/nb/#vectorbtpro.generic.nb.rolling.ma_nb) and 
+    [msd_nb](/api/generic/nb/#vectorbtpro.generic.nb.rolling.msd_nb) respectively
+    - Renamed `MSTD` to `MSD` (Moving Standard Deviation)
+    - Enumerated types are displayed in the column hierarchy using their field names
+    - Switched [RSI](/api/indicators/custom/#vectorbtpro.indicators.custom.RSI) to the Wilder's moving average by default
+    and reimplemented its NB function to be SP
+    - Reimplemented [STOCH](/api/indicators/custom/#vectorbtpro.indicators.custom.STOCH) to return fast %K, slow %K, and slow %D
+    - Switched [MACD](/api/indicators/custom/#vectorbtpro.indicators.custom.MACD) to the exponential moving average by default
+- The functionality to combine parameters has been outsourced from [broadcast](/api/base/reshaping/#vectorbtpro.base.reshaping.broadcast) 
+to [combine_params](/api/utils/params/#vectorbtpro.utils.params.combine_params), and generalized.
+It can be used by the user to parameterize any function by accepting instances of 
+[Param](/api/utils/params/#vectorbtpro.utils.params.Param), as it's done by 
+[PatternRanges.from_pattern_search](/api/generic/ranges/#vectorbtpro.generic.ranges.PatternRanges.from_pattern_search).
+Additionally, [Param](/api/utils/params/#vectorbtpro.utils.params.Param) instances can now be passed to 
+[broadcast](/api/base/reshaping/#vectorbtpro.base.reshaping.broadcast).
+- Implemented the method [Data.run](/api/data/base/#vectorbtpro.data.base.Data.run),
+which takes a function or the name of an indicator (all third-party indicators supported), 
+automatically recognizes what features the function accepts (for example, `close` and `volume`), and 
+runs the indicator on that features. This way we can run indicators quickly, as there is no need more 
+to manually search for input names.
+- Drawdowns can now be built from OHLC data, not only close
+- [ArrayWrapper.wrap](/api/base/wrapping/#vectorbtpro.base.wrapping.ArrayWrapper.wrap) supports 
+complex broadcasting
+- Disabled Plotly resampler globally (can be enabled in settings) as it doesn't fit all graphs
+- Enabled bound checking globally (can be disabled in settings) as it makes finding indexing errors 
+easier for the user while making the execution just a bit slower
+- Various record classes allow to be converted into [Ranges](/api/generic/ranges/#vectorbtpro.generic.ranges.Ranges)
+for range analysis. For example, the class [Drawdowns](/api/generic/drawdowns/#vectorbtpro.generic.drawdowns.Drawdowns)
+has the method [Drawdowns.get_recovery_ranges](/api/generic/drawdowns/#vectorbtpro.generic.drawdowns.Drawdowns.get_recovery_ranges)
+and the auto-generated property `recovery_ranges` to build ranges between the valley point and the recovery point.
+- Created methods for getting a number of the first ([Records.first_n](/api/records/base/#vectorbtpro.records.base.Records.first_n)), 
+last ([Records.last_n](/api/records/base/#vectorbtpro.records.base.Records.last_n)), and 
+random ([Records.random_n](/api/records/base/#vectorbtpro.records.base.Records.random_n)) records
+- Improved formatting of dicts and configs in the API documentation
+- Added flags such as `plot_close` to disable plotting of various traces in ranges, 
+drawdowns, orders, and trades
+- Wrote [Patterns and projections](/tutorials/patterns-and-projections) :notebook_with_decorative_cover:
+
 ## Version 1.4.2 (28 Jun, 2022)
 
 - Integrated [plotly-resampler](https://predict-idlab.github.io/plotly-resampler/). If installed,
@@ -209,7 +299,7 @@ and "all" ([GenericAccessor.rolling_all](/api/generic/accessors/#vectorbtpro.gen
 - Indicator parameters can now be manually mapped to an index level using `post_index_func`
 specified in `param_settings`
 - Complex objects are now counted per type rather than based on their position in 
-[index_from_values](/api/base/indexes/#vectorbtpro.base.indexes.index_from_values)
+[param_to_index](/api/base/indexes/#vectorbtpro.utils.params.param_to_index)
 - Implemented an entire module [datetime_nb](/api/utils/datetime_nb/) with Numba-compiled
 functions for operations on (mostly integer-formatted) date and time
 - Added contexts [GenEnContext](/api/signals/enums/#vectorbtpro.signals.enums.GenEnContext), 
@@ -623,14 +713,14 @@ to passing to the method.
 
 ## Version 1.0.2 (31 Dec, 2021)
 
-- Added Alpaca data source (#31). In contrast to the community version, additionally 
+- Added Alpaca data source (#31). In contrast to the open-source version, additionally 
 allows passing a pre-configured REST object to the 
 [AlpacaData.fetch](/api/data/custom/#vectorbtpro.data.custom.AlpacaData.fetch) method.
 - Changed the default index field of 
 [EntryTrades](/api/portfolio/trades/#vectorbtpro.portfolio.trades.EntryTrades) from `exit_idx` to `entry_idx`
 - Dropped JSON and implemented a custom formatting engine that represents objects in Python format.
 This perfectly aligns with the switch to dataclasses vectorbt PRO has made. Here's a comparison of 
-a wrapper being printed out by the community version and JSON, and vectorbt PRO with the new engine:
+a wrapper being printed out by the open-source version and JSON, and vectorbt PRO with the new engine:
 
 ```plaintext
 ArrayWrapper(**Config({
@@ -677,7 +767,7 @@ resides in a private repository of @polakowo.
 ## Version 1.0.0 (13 Dec, 2021)
 
 !!! info
-    This section briefly describes major changes made to the community version. For more details, see commits.
+    This section briefly describes major changes made to the open-source version. For more details, see commits.
 
 ### Execution
 

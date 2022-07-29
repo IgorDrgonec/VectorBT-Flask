@@ -6,7 +6,7 @@ hide:
 
 # Features :zap:
 
-On top of the [features](https://vectorbt.dev/getting-started/features/) offered by the community 
+On top of the [features](https://vectorbt.dev/getting-started/features/) offered by the open-source 
 version of vectorbt, vectorbt PRO implements the following major enhancements:
 
 ## Performance

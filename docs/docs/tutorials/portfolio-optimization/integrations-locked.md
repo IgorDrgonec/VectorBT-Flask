@@ -675,7 +675,7 @@ as `optimize_func`. Optimize for the maximum Sharpe in the previous week:
 1. Use an evaluation template to select the current week from the close price
 2. Ignore optimization errors
 
-![](/assets/images/tutorials/pf_opt_pypfopt.svg)
+![](/assets/images/tutorials/pf-opt/pypfopt.svg)
 
 And here's how easy it's to test multiple combinations of the argument `target`:
 
@@ -704,7 +704,7 @@ instance is always grouped
 
 [=100% "Group 3/3"]{: .candystripe}
 
-![](/assets/images/tutorials/pf_opt_pypfopt_groups.svg)
+![](/assets/images/tutorials/pf-opt/pypfopt_groups.svg)
 
 ```pycon
 >>> pf = vbt.Portfolio.from_optimizer(pf_opt, data.get("Close"), freq="1h")
@@ -851,7 +851,7 @@ We will also test multiple value combinations for `n`:
 
 [=100% "Group 4/4"]{: .candystripe}
 
-![](/assets/images/tutorials/pf_opt_universal.svg)
+![](/assets/images/tutorials/pf-opt/universal.svg)
 
 We can then upsample the optimizer back to the original time frame by constructing 
 an instance of [Resampler](/api/base/resampling/base/#vectorbtpro.base.resampling.base.Resampler) and 
@@ -924,7 +924,7 @@ performing stocks will revert to its mean and have higher returns than those abo
 2. Window length (in days)
 3. Pick an allocation at the beginning of each week
 
-![](/assets/images/tutorials/pf_opt_universal_custom.svg)
+![](/assets/images/tutorials/pf-opt/universal_custom.svg)
 
 Now it's your turn: create and implement a simple optimization strategy that would make sense in 
 the real world - you'd be amazed how complex and interesting some strategies can become after 

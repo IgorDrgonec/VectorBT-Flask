@@ -5,7 +5,7 @@ title: Installation
 # Installation
 
 !!! info
-    vectorbt PRO is a totally different beast compared to the community version. 
+    vectorbt PRO is a totally different beast compared to the open-source version. 
     In fact, the PRO version redesigns the underlying core to enable groundbreaking features. 
     
     To avoid using an outdated code, make sure to only import **vectorbtpro**!
@@ -30,6 +30,10 @@ your GitHub account in order to access the PRO repository programmatically
     [Generate a new token]: https://github.com/settings/tokens/new
     [scopes]: https://docs.github.com/en/developers/apps/scopes-for-oauth-apps#available-scopes
 
+!!! important
+    After a few months you may get an email from GitHub stating that your personal access token has expired.
+    If so, please go over the steps above and generate a new token.
+
 ### TA-Lib
 
 To use TA-Lib for Python, you need to have the [TA-Lib](https://github.com/mrjbq7/ta-lib#dependencies) 
@@ -51,20 +55,20 @@ To install the TA-Lib in Google Colab, run the following:
 
 The PRO version can be installed with `pip`.
 
-Uninstall the community version if installed:
+!!! hint
+    It's highly recommended creating a new virtual environment solely for vectorbtpro, such as with 
+    [Anaconda](https://www.anaconda.com/).
+
+Uninstall the open-source version if installed:
 
 ```shell
 pip uninstall vectorbt
 ```
 
-Install the base PRO version (with recommended dependencies):
+Install the base PRO version (with recommended dependencies) using `git+https`:
 
 ```shell
-# if you're using Git/HTTPS authentication
 pip install -U "vectorbtpro[base] @ git+https://github.com/polakowo/vectorbt.pro.git"
-
-# if you are connecting to GitHub with SSH
-pip install -U "vectorbtpro[base] @ git+ssh://github.com/polakowo/vectorbt.pro.git"
 ```
 
 !!! info
@@ -77,6 +81,12 @@ pip install -U "vectorbtpro[base] @ git+ssh://github.com/polakowo/vectorbt.pro.g
     ```shell
     pip install -U "vectorbtpro[base] @ git+https://${GH_TOKEN}@github.com/polakowo/vectorbt.pro.git"
     ```
+
+Same using `git+ssh` (see [Connecting to GitHub with SSH](https://docs.github.com/en/authentication/connecting-to-github-with-ssh)):
+
+```shell
+pip install -U "vectorbtpro[base] @ git+ssh://github.com/polakowo/vectorbt.pro.git"
+```
 
 Lightweight version (with only required dependencies):
 
@@ -138,12 +148,11 @@ pip install -e vectorbtpro
 
 ## With Docker
 
-[Docker](https://www.docker.com/) containers package all the dependencies needed to run a piece of software. 
-Each container can be thought of its own machine with its own OS and file system, while being lightweight 
-and taking only seconds to run. What this means is that we don't mind installing packages "globally" anymore, 
-because the container will only be used for one specific application - vectorbtpro.
+Using [Docker](https://www.docker.com/) is a great way to get up and running in a few minutes, as it 
+comes with all dependencies pre-installed.
 
-Docker image of vectorbtpro is based on [Jupyter Docker Stacks](https://jupyter-docker-stacks.readthedocs.io/en/latest/) -
+[Docker image of vectorbtpro](https://github.com/polakowo/vectorbt.pro/blob/main/Dockerfile) is based on 
+[Jupyter Docker Stacks](https://jupyter-docker-stacks.readthedocs.io/en/latest/) -
 a set of ready-to-run Docker images containing Jupyter applications and interactive computing tools.
 Particularly, the image is based on [jupyter/scipy-notebook](https://jupyter-docker-stacks.readthedocs.io/en/latest/using/selecting.html#jupyter-scipy-notebook),
 which includes a minimally-functional JupyterLab server and preinstalled popular packages from the scientific 
@@ -170,7 +179,7 @@ Go into the directory:
 cd vectorbtpro
 ```
 
-Build the image (this can take some time):
+Build the image (can take some time):
 
 ```shell
 docker build . -t vectorbtpro

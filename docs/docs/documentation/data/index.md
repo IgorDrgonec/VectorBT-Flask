@@ -31,6 +31,7 @@ flowchart TD;
     id9["Querying"]
     id10["Resampling"]
     id11["Transforming"]
+    id12["Running"]
     
     id1 --> id2;
     id2 --> id5;
@@ -45,6 +46,7 @@ flowchart TD;
     id11 -->|"creates new"| id7;
     id8 --> id5;
     id7 --> id9;
+    id9 --> id12;
 ```
 
 (Reload the page if the diagram doesn't show up)
@@ -95,6 +97,13 @@ Date
 ```
 
 1. Convert to datetime using [to_tzaware_datetime](/api/utils/datetime_/#vectorbtpro.utils.datetime_.to_tzaware_datetime)
+
+!!! info
+    Why the returned data starts from `2019-12-31` and not from `2020-01-01`? The provided
+    start and end dates are defined in the local timezone and then converted into UTC.
+    In the Europe/Berlin timezone, depending upon the time of the year, `2020-01-01` gets translated 
+    into `2019-12-31 22:00:00`, which is the date Yahoo Finance actually receives. To provide
+    any date directly as a UTC date, append "UTC": `2020-01-01 UTC`.
 
 Managing data in a Pandas format is acceptable when we are dealing with one symbol, but what about 
 multiple symbols? Remember how vectorbt wants us to provide each of the open price, high price, and other 
@@ -616,6 +625,70 @@ Date
 
     For example, running `yf_data.get(columns='Close')` when there is only one symbol will produce a Series 
     instead of a DataFrame. To force vectorbt to always return a DataFrame, pass `columns=['Close']`.
+
+### Magnet columns
+
+Magnet columns are columns with case-insensitive names that the [Data](/api/data/base/#vectorbtpro.data.base.Data) 
+class knows how to detect and query. Those include the columns from OHLCV, but also those representing 
+the trade count, VWAP, HLC/3, and OHLC/4. Each column is also associated with an instance property 
+that returns that column for all symbols in a data instance. For example, to get the close price:
+
+```pycon
+>>> yf_data.close
+symbol                         BTC-USD     ETH-USD
+Date                                              
+2019-12-31 00:00:00+00:00  7193.599121  129.610855
+2020-01-01 00:00:00+00:00  7200.174316  130.802002
+2020-01-02 00:00:00+00:00  6985.470215  127.410179
+2020-01-03 00:00:00+00:00  7344.884277  134.171707
+2020-01-04 00:00:00+00:00  7410.656738  135.069366
+```
+
+## Running
+
+Thanks to the unambiguous nature of magnet columns, we can use them in feeding many functions across
+vectorbt, and since most functions don't accept `data` directly but expect columns such as `close` to be 
+provided separately, there is an urgent need for a method that can recognize what a function wants and 
+pass the data to it accordingly. Such a method is [Data.run](/api/data/base/#vectorbtpro.data.base.Data.run): 
+it accepts a function, parses its arguments, and upon recognition of a magnet column, simply forwards it.
+This is especially useful for quickly running indicators, which are recognized automatically by their names:
+
+```pycon
+>>> yf_data.run("sma", 3)
+<vectorbtpro.indicators.factory.talib.SMA at 0x7f864d75cd30>
+```
+
+If there are multiple third-party libraries that have the same indicator name, it's advisable
+to also provide a prefix with the name of the library to avoid any confusion:
+
+```pycon
+>>> yf_data.run("talib_sma", 3)
+<vectorbtpro.indicators.factory.talib.SMA at 0x7f864b9d9070>
+```
+
+This method also accepts names of all the simulation methods available in 
+[Portfolio](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio), such as 
+[Portfolio.from_holding](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_holding):
+
+```pycon
+>>> yf_data.run("from_holding")
+<vectorbtpro.portfolio.base.Portfolio at 0x7fe8e89733d0>
+```
+
+We can also quickly filter the dates and symbols of the passed data:
+
+```pycon
+>>> yf_data.run(
+...     "from_holding", 
+...     on_dates=slice("2020-01-02", None, None),
+...     on_symbols="ETH-USD"
+... ).returns
+Date
+2020-01-02 00:00:00+00:00    0.000000
+2020-01-03 00:00:00+00:00    0.053069
+2020-01-04 00:00:00+00:00    0.006690
+Freq: D, dtype: float64
+```
 
 ## Symbols
 

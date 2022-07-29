@@ -4,7 +4,7 @@
 # package[version_required]: tag1, tag2, ...
 
 yfinance>=0.1.63:           data, base
-python-binance:             data
+python-binance>=1.0.16:     data
 alpaca_trade_api:           data
 ccxt>=1.89.14:              data
 tables:                     data
@@ -19,7 +19,7 @@ Bottleneck:                 compute
 numexpr:                    compute, base
 ray>=1.4.1:                 distribute
 dask:                       distribute, base
-matplotlib:                 plot, base
+matplotlib>=3.2.0:          plot, base
 plotly>=5.0.0:              plot, base
 ipywidgets>=7.0.0:          plot, base
 plotly-resampler:           plot

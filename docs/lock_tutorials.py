@@ -18,6 +18,7 @@ locked_tutorials = {
     Path("tutorials/portfolio-optimization/integrations-locked"): "Portfolio optimization - Integrations",
     Path("tutorials/portfolio-optimization/dynamic-locked"): "Portfolio optimization - Dynamic",
     Path("tutorials/signal-development/index-locked"): "Signal development",
+    Path("tutorials/patterns-and-projections/index-locked"): "Patterns and projections",
 }
 
 

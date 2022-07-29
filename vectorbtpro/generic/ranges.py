@@ -1615,14 +1615,13 @@ class PatternRanges(Ranges):
     ) -> PatternRangesT:
         """Build `PatternRanges` from all occurrences of a pattern in an array.
 
-        Searches for parameters of the type `vectorbtpro.generic.utils.params.Param`,
-        and if found, broadcasts and combines them using `vectorbtpro.generic.utils.params.combine_params`.
-        Then, converts them into a list of search configurations. If none of such parameters was found
-        among the passed arguments, builds one search configuration using the passed arguments.
-        If `search_configs` is not None, uses it instead. In all cases, it uses the defaults
-        defined in the signature of this method to augment search configurations.
-        For example, passing `min_similarity` of 95% will use it in all search configurations
-        except where it was explicitly overridden.
+        Searches for parameters of the type `vectorbtpro.utils.params.Param`, and if found, broadcasts
+        and combines them using `vectorbtpro.utils.params.combine_params`. Then, converts them
+        into a list of search configurations. If none of such parameters was found among the passed arguments,
+        builds one search configuration using the passed arguments. If `search_configs` is not None, uses it
+        instead. In all cases, it uses the defaults defined in the signature of this method to augment
+        search configurations. For example, passing `min_similarity` of 95% will use it in all search
+        configurations except where it was explicitly overridden.
 
         Argument `search_configs` must be provided as a sequence of `PSC` instances.
         If any element is a list of `PSC` instances itself, it will be used per column in `arr`,
@@ -1630,7 +1629,7 @@ class PatternRanges(Ranges):
         to prepare arguments for the use in Numba.
 
         After all the search configurations have been resolved, uses `vectorbtpro.utils.execution.execute`
-        to loop over each configuration and execute it using `vectorbtpro.generic.nb.records.search_for_pattern_1d_nb`.
+        to loop over each configuration and execute it using `vectorbtpro.generic.nb.records.find_pattern_1d_nb`.
         The results are then concatenated into a single records array and wrapped with `PatternRanges`.
 
         If `attach_as_close` is True, will attach `arr` as `close`.
@@ -1929,8 +1928,8 @@ class PatternRanges(Ranges):
         Args:
             column (str): Name of the column to plot.
             top_n (int): Filter top N range records by maximum duration.
-            plot_patterns (bool or array_like): Whether to plot `PatternRanges.pattern`.
-            plot_max_error (array_like): Whether to plot `PatternRanges.max_error`.
+            plot_patterns (bool or array_like): Whether to plot `PSC.pattern`.
+            plot_max_error (array_like): Whether to plot `PSC.max_error`.
             fill_distance (bool): Whether to fill the space between close and pattern.
 
                 Visible for every interpolation mode except discrete.

@@ -50,7 +50,7 @@ Let's pull the DataFrame and use the accessor
 >>> data.data['BTCUSDT'].vbt.ohlcv.plot()
 ```
 
-![](/assets/images/tutorials/rsi_ohlcv.svg)
+![](/assets/images/tutorials/rsi/ohlcv.svg)
 
 Another way to describe the data is by using the Pandas' 
 [info](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.info.html) method. 
@@ -240,7 +240,7 @@ did everything right:
 2. Using [SignalsSRAccessor.plot_as_entries](/api/signals/accessors/#vectorbtpro.signals.accessors.SignalsSRAccessor.plot_as_entries)
 3. Using [SignalsSRAccessor.plot_as_exits](/api/signals/accessors/#vectorbtpro.signals.accessors.SignalsSRAccessor.plot_as_exits)
 
-![](/assets/images/tutorials/rsi_rsi.svg)
+![](/assets/images/tutorials/rsi/rsi.svg)
 
 The graph looks legit. But notice how there are multiple entries between two exits and vice versa?
 How does vectorbt handle it? When using [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_signals),
@@ -256,7 +256,7 @@ let's keep each first signal:
 
 1. Using [SignalsAccessor.clean](/api/signals/accessors/#vectorbtpro.signals.accessors.SignalsAccessor.clean)
 
-![](/assets/images/tutorials/rsi_rsi2.svg)
+![](/assets/images/tutorials/rsi/rsi2.svg)
 
 We can immediately see the difference. But what other methods exist to analyze the distribution 
 of signals? How to *quantify* such analysis? That's what vectorbt is all about. Let's
@@ -358,7 +358,7 @@ for confirmation:
 >>> pf.plot(settings=dict(bm_returns=False))
 ```
 
-![](/assets/images/tutorials/rsi_pf.svg)
+![](/assets/images/tutorials/rsi/pf.svg)
 
 !!! hint
     A benefit of an interactive plot like above is that you can use tools from the Plotly toolbar
@@ -508,7 +508,7 @@ and the color bar reflecting the expectancy:
 >>> comb_stats_df['Expectancy'].vbt.heatmap()
 ```
 
-![](/assets/images/tutorials/rsi_heatmap.svg)
+![](/assets/images/tutorials/rsi/heatmap.svg)
 
 We can observe entire regions of parameter combinations that yield positive results.
 
@@ -744,7 +744,7 @@ of the most successful combination:
 >>> pf[(24, 74, 20, True)].plot_value()
 ```
 
-![](/assets/images/tutorials/rsi_value.svg)
+![](/assets/images/tutorials/rsi/value.svg)
 
 !!! hint
     Instead of selecting a column from a portfolio, which will create a new portfolio with only 
@@ -803,7 +803,7 @@ Let's visualize the distribution of the expectancy across both assets:
 
 1. Using [GenericAccessor.histplot](/api/generic/accessors/#vectorbtpro.generic.accessors.GenericAccessor.histplot)
 
-![](/assets/images/tutorials/rsi_histplot.svg)
+![](/assets/images/tutorials/rsi/histplot.svg)
 
 ETH seems to react better to our strategy on average than BTC, maybe due to the market's 
 higher volatility, a different structure, or just pure randomness.

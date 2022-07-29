@@ -1315,7 +1315,7 @@ class _PATSIM(PATSIM):
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs
     ) -> tp.BaseFigure:  # pragma: no cover
-        """Plot `PATSIM.ma` against `PATSIM.close`.
+        """Plot `PATSIM.sim` against `PATSIM.close`.
 
         Args:
             column (str): Name of the column to plot.

@@ -133,6 +133,10 @@ nav:
       - Dynamic: tutorials/portfolio-optimization/dynamic.md
     - Signal development:
       - tutorials/signal-development/index.md
+    - Patterns and projections:
+      - tutorials/patterns-and-projections/index.md
+      - tutorials/patterns-and-projections/patterns.md
+      - tutorials/patterns-and-projections/projections.md
     - To be continued...: tutorials/to-be-continued.md
   - Documentation:
     - Fundamentals: documentation/fundamentals.md
@@ -151,6 +155,7 @@ nav:
     - Portfolio:
       - documentation/portfolio/index.md
       - From orders: documentation/portfolio/from-orders.md
+      - From signals: documentation/portfolio/from-signals.md
     - To be continued...: documentation/to-be-continued.md
   - API:
     - api/index.md
@@ -191,6 +196,7 @@ nav:
         - api/generic/nb/index.md
         - apply_reduce: api/generic/nb/apply_reduce.md
         - base: api/generic/nb/base.md
+        - patterns: api/generic/nb/patterns.md
         - records: api/generic/nb/records.md
         - rolling: api/generic/nb/rolling.md
       - plots_builder: api/generic/plots_builder.md

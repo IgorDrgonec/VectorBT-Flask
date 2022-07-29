@@ -1197,19 +1197,12 @@ Name: a, dtype: object
 
 Thanks to [ColumnMapper](/api/records/col_mapper/#vectorbtpro.records.col_mapper.ColumnMapper) and 
 [Analyzable](/api/generic/analyzable/#vectorbtpro.generic.analyzable.Analyzable), we can select 
-columns from a mapped array the same way as from records or any regular Pandas object:
+rows and columns from a mapped array the same way as from records or any regular Pandas object:
 
 ```pycon
 >>> dd_ma['b'].values
 array([-0.21428571])
 ```
-
-!!! note
-    Classes that analyze path-dependent data, such as 
-    [Portfolio](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio), 
-    [Records](/api/records/base/#vectorbtpro.records.base.Records), and
-    [MappedArray](/api/records/mapped_array/#vectorbtpro.records.mapped_array.MappedArray),
-    prevent selection of rows.
 
 ## Summary
 

@@ -1332,7 +1332,7 @@ to the GIF file:
 
 [=100% "Heatmap 100/100"]{: .candystripe}
 
-![](/assets/images/tutorials/raw_pipeline.gif){: style="width:650px"}
+![](/assets/images/tutorials/supertrend/raw_pipeline.gif){: style="width:650px"}
 
 Everything bluer than yellow beats the market. Just don't pick any value at the bottom :wink:
 

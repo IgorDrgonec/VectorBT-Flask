@@ -281,7 +281,7 @@ We can then extract and plot the actual allocations produced by the simulation:
 ... )
 ```
 
-![](/assets/images/tutorials/pf_opt_actual_allocations.svg)
+![](/assets/images/tutorials/pf-opt/actual_allocations.svg)
 
 Without transaction costs such as commission and slippage, the source and target allocations should 
 closely match at the allocation points:
@@ -410,7 +410,7 @@ The allocations can be plotted very easily using
 >>> pf_opt.plot()
 ```
 
-![](/assets/images/tutorials/pf_opt_optimizer.svg)
+![](/assets/images/tutorials/pf-opt/optimizer.svg)
 
 Since [PortfolioOptimizer](/api/portfolio/pfopt/base/#vectorbtpro.portfolio.pfopt.base.PortfolioOptimizer)
 is a subclass of [Analyzable](/api/generic/analyzable/#vectorbtpro.generic.analyzable.Analyzable), 
@@ -463,7 +463,7 @@ to allocate at the first timestamp in the index:
 >>> pf_opt.plot()
 ```
 
-![](/assets/images/tutorials/pf_opt_once.svg)
+![](/assets/images/tutorials/pf-opt/once.svg)
 
 !!! note
     Even if the lines look straight on the chart, it doesn't mean that rebalancing takes
@@ -588,7 +588,7 @@ To make our example more interesting, let's allocate 100% to one asset at a time
 
 1. Replace the first and second variable argument by the wrapper and iteration index respectively
 
-![](/assets/images/tutorials/pf_opt_templates.svg)
+![](/assets/images/tutorials/pf-opt/templates.svg)
 
 The same can be done using evaluation templates:
 
@@ -1096,7 +1096,7 @@ Let's validate the allocation that was generated based on the first month of dat
 [GenericAccessor.rebase](/api/generic/accessors/#vectorbtpro.generic.accessors.GenericAccessor.rebase)
 and plot them using [GenericAccessor.plot](/api/generic/accessors/#vectorbtpro.generic.accessors.GenericAccessor.plot)
 
-![](/assets/images/tutorials/pf_opt_close_period.svg)
+![](/assets/images/tutorials/pf-opt/close_period.svg)
 
 We see that `ADAUSDT` recorded the highest return and `XRPUSDT` the lowest, which has been
 correctly translated into the allocation of only 6% to the former and 33% to the latter.
@@ -1123,7 +1123,7 @@ Name: group, dtype: object
 >>> pf_opt.plots()
 ```
 
-![](/assets/images/tutorials/pf_opt_plots.svg)
+![](/assets/images/tutorials/pf-opt/plots.svg)
 
 In the graph above we see not only when each re-allocation takes place, but also which 
 index range that re-allocation is based upon.
