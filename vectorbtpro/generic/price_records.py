@@ -159,23 +159,25 @@ class PriceRecords(Records):
         prices = {}
         for price_name in ("open", "high", "low", "close"):
             if getattr(self, "_" + price_name) is not None:
-                new_price = to_2d_array(getattr(self, "_" + price_name))
-                if new_price.shape[0] > 1:
-                    new_price = new_price[records_meta["wrapper_meta"]["row_idxs"], :]
-                if new_price.shape[1] > 1:
-                    new_price = new_price[:, records_meta["wrapper_meta"]["col_idxs"]]
+                new_price = ArrayWrapper.select_from_flex_array(
+                    getattr(self, "_" + price_name),
+                    row_idxs=records_meta["wrapper_meta"]["row_idxs"],
+                    col_idxs=records_meta["wrapper_meta"]["col_idxs"],
+                    rows_changed=records_meta["wrapper_meta"]["rows_changed"],
+                    columns_changed=records_meta["wrapper_meta"]["columns_changed"],
+                )
             else:
                 new_price = None
             prices[price_name] = new_price
-        return {"records_meta": records_meta, **prices}
+        return {**records_meta, **prices}
 
     def indexing_func(self: PriceRecordsT, *args, price_records_meta: tp.DictLike = None, **kwargs) -> PriceRecordsT:
         """Perform indexing on `PriceRecords`."""
         if price_records_meta is None:
             price_records_meta = self.indexing_func_meta(*args, **kwargs)
         return self.replace(
-            wrapper=price_records_meta["records_meta"]["wrapper_meta"]["new_wrapper"],
-            records_arr=price_records_meta["records_meta"]["new_records_arr"],
+            wrapper=price_records_meta["wrapper_meta"]["new_wrapper"],
+            records_arr=price_records_meta["new_records_arr"],
             open=price_records_meta["open"],
             high=price_records_meta["high"],
             low=price_records_meta["low"],

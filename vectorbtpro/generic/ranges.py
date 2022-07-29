@@ -123,7 +123,16 @@ from vectorbtpro.base.reshaping import to_pd_array, to_1d_array, to_2d_array
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.indexes import stack_indexes, combine_indexes, tile_index
 from vectorbtpro.generic import nb
-from vectorbtpro.generic.enums import RangeStatus, range_dt, pattern_range_dt, InterpMode, RescaleMode, DistanceMode
+from vectorbtpro.generic.enums import (
+    RangeStatus,
+    range_dt,
+    pattern_range_dt,
+    InterpMode,
+    RescaleMode,
+    ErrorType,
+    DistanceMeasure,
+    OverlapMode,
+)
 from vectorbtpro.generic.price_records import PriceRecords
 from vectorbtpro.records.base import Records
 from vectorbtpro.records.decorators import override_field_config, attach_fields, attach_shortcut_properties
@@ -131,10 +140,9 @@ from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.colors import adjust_lightness, adjust_opacity
+from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig
 from vectorbtpro.utils.datetime_ import freq_to_timedelta, freq_to_timedelta64
-from vectorbtpro.utils.array_ import rescale
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.params import combine_params, Param
@@ -151,8 +159,8 @@ ranges_field_config = ReadonlyConfig(
         settings=dict(
             id=dict(title="Range Id"),
             idx=dict(name="end_idx"),  # remap field of Records
-            start_idx=dict(title="Start Timestamp", mapping="index"),
-            end_idx=dict(title="End Timestamp", mapping="index"),
+            start_idx=dict(title="Start Index", mapping="index"),
+            end_idx=dict(title="End Index", mapping="index"),
             status=dict(title="Status", mapping=RangeStatus),
         ),
     )
@@ -259,8 +267,8 @@ class Ranges(PriceRecords):
         func = jit_reg.resolve_option(nb.get_ranges_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         records_arr = func(arr, gap_value)
-        if attach_as_close:
-            return cls(wrapper, records_arr, close=arr, **kwargs)
+        if attach_as_close and "close" not in kwargs:
+            kwargs["close"] = arr
         return cls(wrapper, records_arr, **kwargs)
 
     @classmethod
@@ -488,7 +496,7 @@ class Ranges(PriceRecords):
     def get_coverage(
         self,
         overlapping: bool = False,
-        normalize: bool = True,
+            normalize: bool = True,
         group_by: tp.GroupByLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -518,12 +526,15 @@ class Ranges(PriceRecords):
         close: tp.Optional[tp.ArrayLike] = None,
         proj_start: tp.Union[None, str, int, tp.FrequencyLike] = None,
         proj_period: tp.Union[None, str, int, tp.FrequencyLike] = None,
+        incl_end_idx: bool = True,
         stretch: bool = False,
-        normalize: bool = True,
-        start_value: float = 1.0,
+        rebase: bool = True,
+        start_value: tp.ArrayLike = 1.0,
         ffill: bool = False,
         remove_empty: bool = True,
         return_raw: bool = False,
+        start_index: tp.Optional[pd.Timestamp] = None,
+        id_level: tp.Union[None, str, tp.IndexLike] = None,
         jitted: tp.JittedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
         stack_kwargs: tp.KwargsLike = None,
@@ -544,9 +555,10 @@ class Ranges(PriceRecords):
         The stretching period is taken from the longest range duration if `proj_period` is None,
         and from the longest `proj_period` if it's not None.
 
-        Set `normalize` to True to make each projection start with 1, otherwise, each projection
+        Set `rebase` to True to make each projection start with 1, otherwise, each projection
         will consist of original `close` values during the projected period. Use `start_value`
-        to replace 1 with another start value.
+        to replace 1 with another start value. It can also be a flexible array with elements per column.
+        If `start_value` is -1, will set it to the latest row in `close`.
 
         Set `ffill` to True to forward fill NaN values, even if they are NaN in `close` itself.
 
@@ -561,6 +573,7 @@ class Ranges(PriceRecords):
         """
         if close is None:
             close = self.close
+            checks.assert_not_none(close)
         else:
             close = self.wrapper.wrap(close, group_by=False)
         if proj_start is None:
@@ -603,9 +616,10 @@ class Ranges(PriceRecords):
             proj_start_use_index=proj_start_use_index,
             proj_period=proj_period,
             proj_period_use_index=proj_period_use_index,
+            incl_end_idx=incl_end_idx,
             stretch=stretch,
-            normalize=normalize,
-            start_value=start_value,
+            rebase=rebase,
+            start_value=to_1d_array(start_value),
             ffill=ffill,
             remove_empty=remove_empty,
         )
@@ -614,16 +628,29 @@ class Ranges(PriceRecords):
         projections = projections.T
         freq = self.wrapper.get_freq(allow_numeric=False)
         wrapper = ArrayWrapper.from_obj(projections, freq=freq)
+        if id_level is None:
+            id_level = pd.Index(self.id_arr, name="range_id")
+        elif isinstance(id_level, str):
+            mapping = self.get_field_mapping(id_level)
+            if isinstance(mapping, str) and mapping == "index":
+                id_level = self.get_map_field_to_index(id_level).rename(id_level)
+            else:
+                id_level = pd.Index(self.get_apply_mapping_arr(id_level), name=id_level)
+        else:
+            if not isinstance(id_level, pd.Index):
+                id_level = pd.Index(id_level, name="range_id")
+        if start_index is None:
+            start_index = close.index[-1]
         wrap_kwargs = merge_dicts(
             dict(
                 index=pd.date_range(
-                    start=close.index[-1],
+                    start=start_index,
                     periods=projections.shape[0],
                     freq=freq,
                 ),
                 columns=stack_indexes(
                     self.wrapper.columns[self.col_arr[ridxs]],
-                    pd.Index(self.id_arr[ridxs], name="range_id"),
+                    id_level[ridxs],
                     **resolve_dict(stack_kwargs),
                 ),
             ),
@@ -698,6 +725,7 @@ class Ranges(PriceRecords):
         seed: tp.Optional[int] = None,
         proj_start: tp.Union[None, str, int, tp.FrequencyLike] = "current_or_0",
         proj_period: tp.Union[None, str, int, tp.FrequencyLike] = "max",
+        incl_end_idx: bool = True,
         stretch: bool = False,
         ffill: bool = False,
         plot_past_period: tp.Union[None, str, int, tp.FrequencyLike] = "current_or_proj_period",
@@ -745,6 +773,7 @@ class Ranges(PriceRecords):
                 Allows additional options "current_or_{option}", "mean", "min", "max", "median", or
                 a percentage such as "50%" representing a quantile. All of those options are based
                 on the duration of all the closed ranges filtered by the arguments above.
+            incl_end_idx (bool): See `Ranges.get_projections`.
             stretch (bool): See `Ranges.get_projections`.
             ffill (bool): See `Ranges.get_projections`.
             plot_past_period (str, int, or frequency_like): Past period to plot.
@@ -808,13 +837,14 @@ class Ranges(PriceRecords):
         self_col = self_col.status_closed
         if proj_start is not None:
             if isinstance(proj_start, str) and proj_start.startswith("current_or_"):
-                proj_start = proj_start.replace("current_or_", "")
-                if proj_start.isnumeric():
-                    proj_start = int(proj_start)
                 if self_col_open.count() > 0:
                     if self_col_open.count() > 1:
                         raise ValueError("Only one open range is allowed")
                     proj_start = int(self_col_open.duration.values[0])
+                else:
+                    proj_start = proj_start.replace("current_or_", "")
+                    if proj_start.isnumeric():
+                        proj_start = int(proj_start)
             if proj_start != 0:
                 self_col = self_col.filter_min_duration(proj_start, real=True)
         if min_duration is not None:
@@ -827,6 +857,8 @@ class Ranges(PriceRecords):
             self_col = self_col.apply_mask(self_col.duration.top_n_mask(top_n))
         if random_n is not None:
             self_col = self_col.random_n(random_n, seed=seed)
+        if self_col.count() == 0:
+            warnings.warn("No ranges to plot. Relax the requirements.")
 
         if ohlc_trace_kwargs is None:
             ohlc_trace_kwargs = {}
@@ -962,8 +994,9 @@ class Ranges(PriceRecords):
                 close=close,
                 proj_start=proj_start,
                 proj_period=proj_period,
+                incl_end_idx=incl_end_idx,
                 stretch=stretch,
-                normalize=True,
+                rebase=True,
                 start_value=close.iloc[-1],
                 ffill=ffill,
                 remove_empty=True,
@@ -1324,6 +1357,7 @@ PatternRangesT = tp.TypeVar("PatternRangesT", bound="PatternRanges")
 
 class _DEF(object):
     """Class for `PSC` that will be substituted by the respective argument in `PatternRanges.from_pattern_search`."""
+
     pass
 
 
@@ -1347,11 +1381,14 @@ class PSC:
     max_window: tp.Union[_DEF, None, int] = attr.ib(default=_DEF)
     """Maximum window (including)."""
 
+    row_select_prob: tp.Union[_DEF, float] = attr.ib(default=_DEF)
+    """Row selection probability."""
+
     window_select_prob: tp.Union[_DEF, float] = attr.ib(default=_DEF)
     """Window selection probability."""
 
-    row_select_prob: tp.Union[_DEF, float] = attr.ib(default=_DEF)
-    """Row selection probability."""
+    roll_forward: tp.Union[_DEF, bool] = attr.ib(default=_DEF)
+    """Whether to roll windows to the left of the current row, otherwise to the right."""
 
     interp_mode: tp.Union[_DEF, int, str] = attr.ib(default=_DEF)
     """Interpolation mode. See `vectorbtpro.generic.enums.InterpMode`."""
@@ -1389,18 +1426,14 @@ class PSC:
     
     If `np.nan`, gets calculated dynamically."""
 
-    min_pct_change: tp.Union[_DEF, float] = attr.ib(default=_DEF)
-    """Minimum percentage change of the window to stay a candidate for search.
-    
-    If any window doesn't cross this mark, its similarity becomes `np.nan`."""
+    invert: tp.Union[_DEF, bool] = attr.ib(default=_DEF)
+    """Whether to invert the pattern vertically."""
 
-    max_pct_change: tp.Union[_DEF, float] = attr.ib(default=_DEF)
-    """Maximum percentage change of the window to stay a candidate for search.
-    
-    If any window crosses this mark, its similarity becomes `np.nan`."""
+    error_type: tp.Union[_DEF, int, str] = attr.ib(default=_DEF)
+    """Error type. See `vectorbtpro.generic.enums.ErrorType`."""
 
-    distance_mode: tp.Union[_DEF, int, str] = attr.ib(default=_DEF)
-    """Distance mode. See `vectorbtpro.generic.enums.DistanceMode`."""
+    distance_measure: tp.Union[_DEF, int, str] = attr.ib(default=_DEF)
+    """Distance measure. See `vectorbtpro.generic.enums.DistanceMeasure`."""
 
     max_error: tp.Union[_DEF, tp.ArrayLike] = attr.ib(default=_DEF)
     """Maximum error at each point. Can be provided as a flexible array.
@@ -1424,17 +1457,26 @@ class PSC:
     max_error_strict: tp.Union[_DEF, bool] = attr.ib(default=_DEF)
     """Whether crossing `PSC.max_error` even once should yield the similarity of `np.nan`."""
 
+    min_pct_change: tp.Union[_DEF, float] = attr.ib(default=_DEF)
+    """Minimum percentage change of the window to stay a candidate for search.
+
+    If any window doesn't cross this mark, its similarity becomes `np.nan`."""
+
+    max_pct_change: tp.Union[_DEF, float] = attr.ib(default=_DEF)
+    """Maximum percentage change of the window to stay a candidate for search.
+
+    If any window crosses this mark, its similarity becomes `np.nan`."""
+
     min_similarity: tp.Union[_DEF, float] = attr.ib(default=_DEF)
     """Minimum similarity.
     
     If any window doesn't cross this mark, its similarity becomes `np.nan`."""
 
-    max_overlap: tp.Union[_DEF, None, int] = attr.ib(default=_DEF)
-    """Check whether the intersection of each two consecutive ranges is bigger than a specific number 
-    of rows, and if so, select the range with the highest similarity. 
-    
-    If None, will treat all ranges as unique and fill each record.
-    If 0, will keep only one range out of all overlapping."""
+    minp: tp.Union[_DEF, None, int] = attr.ib(default=_DEF)
+    """Minimum number of observations in price window required to have a value."""
+
+    overlap_mode: tp.Union[_DEF, int, str] = attr.ib(default=_DEF)
+    """Overlapping mode. See `vectorbtpro.generic.enums.OverlapMode`."""
 
     max_records: tp.Union[_DEF, None, int] = attr.ib(default=_DEF)
     """Maximum number of records expected to be filled.
@@ -1491,12 +1533,14 @@ class PatternRanges(Ranges):
         return self._field_config
 
     @classmethod
-    def resolve_search_config(cls, search_config: tp.Optional[PSC] = None, **kwargs) -> PSC:
+    def resolve_search_config(cls, search_config: tp.Union[None, dict, PSC] = None, **kwargs) -> PSC:
         """Resolve search config for `PatternRanges.from_pattern_search`.
 
         Converts array-like objects into arrays and enums into integers."""
         if search_config is None:
-            search_config = PSC()
+            search_config = dict()
+        if isinstance(search_config, dict):
+            search_config = PSC(**search_config)
         search_config = attr.asdict(search_config)
         defaults = {}
         for k, v in get_func_kwargs(cls.from_pattern_search).items():
@@ -1516,13 +1560,17 @@ class PatternRanges(Ranges):
                 v = map_enum_fields(v, InterpMode)
             elif k == "rescale_mode":
                 v = map_enum_fields(v, RescaleMode)
-            elif k == "distance_mode":
-                v = map_enum_fields(v, DistanceMode)
+            elif k == "error_type":
+                v = map_enum_fields(v, ErrorType)
+            elif k == "distance_measure":
+                v = map_enum_fields(v, DistanceMeasure)
             elif k == "max_error_interp_mode":
                 if v is None:
                     v = search_config["interp_mode"]
                 else:
                     v = map_enum_fields(v, InterpMode)
+            elif k == "overlap_mode":
+                v = map_enum_fields(v, OverlapMode)
             search_config[k] = v
         return PSC(**search_config)
 
@@ -1533,23 +1581,27 @@ class PatternRanges(Ranges):
         pattern: tp.Union[Param, tp.ArrayLike] = None,
         window: tp.Union[Param, None, int] = None,
         max_window: tp.Union[Param, None, int] = None,
-        window_select_prob: tp.Union[Param, float] = 1.0,
         row_select_prob: tp.Union[Param, float] = 1.0,
+        window_select_prob: tp.Union[Param, float] = 1.0,
+        roll_forward: tp.Union[Param, bool] = False,
         interp_mode: tp.Union[Param, int, str] = "mixed",
         rescale_mode: tp.Union[Param, int, str] = "minmax",
         vmin: tp.Union[Param, float] = np.nan,
         vmax: tp.Union[Param, float] = np.nan,
         pmin: tp.Union[Param, float] = np.nan,
         pmax: tp.Union[Param, float] = np.nan,
-        min_pct_change: tp.Union[Param, float] = np.nan,
-        max_pct_change: tp.Union[Param, float] = np.nan,
-        distance_mode: tp.Union[Param, int, str] = "mae",
+        invert: bool = False,
+        error_type: tp.Union[Param, int, str] = "absolute",
+        distance_measure: tp.Union[Param, int, str] = "mae",
         max_error: tp.Union[Param, tp.ArrayLike] = np.nan,
         max_error_interp_mode: tp.Union[Param, None, int, str] = None,
         max_error_as_maxdist: tp.Union[Param, bool] = False,
         max_error_strict: tp.Union[Param, bool] = False,
+        min_pct_change: tp.Union[Param, float] = np.nan,
+        max_pct_change: tp.Union[Param, float] = np.nan,
         min_similarity: tp.Union[Param, float] = 0.85,
-        max_overlap: tp.Union[Param, None, int] = 0,
+        minp: tp.Union[Param, None, int] = None,
+        overlap_mode: tp.Union[Param, int, str] = "disallow",
         max_records: tp.Union[Param, None, int] = None,
         random_subset: tp.Optional[int] = None,
         seed: tp.Optional[int] = None,
@@ -1563,7 +1615,23 @@ class PatternRanges(Ranges):
     ) -> PatternRangesT:
         """Build `PatternRanges` from all occurrences of a pattern in an array.
 
-        Uses `vectorbtpro.generic.nb.records.search_for_pattern_nb`.
+        Searches for parameters of the type `vectorbtpro.generic.utils.params.Param`,
+        and if found, broadcasts and combines them using `vectorbtpro.generic.utils.params.combine_params`.
+        Then, converts them into a list of search configurations. If none of such parameters was found
+        among the passed arguments, builds one search configuration using the passed arguments.
+        If `search_configs` is not None, uses it instead. In all cases, it uses the defaults
+        defined in the signature of this method to augment search configurations.
+        For example, passing `min_similarity` of 95% will use it in all search configurations
+        except where it was explicitly overridden.
+
+        Argument `search_configs` must be provided as a sequence of `PSC` instances.
+        If any element is a list of `PSC` instances itself, it will be used per column in `arr`,
+        otherwise per entire `arr`. Each configuration will be resolved using `PatternRanges.resolve_search_config`
+        to prepare arguments for the use in Numba.
+
+        After all the search configurations have been resolved, uses `vectorbtpro.utils.execution.execute`
+        to loop over each configuration and execute it using `vectorbtpro.generic.nb.records.search_for_pattern_1d_nb`.
+        The results are then concatenated into a single records array and wrapped with `PatternRanges`.
 
         If `attach_as_close` is True, will attach `arr` as `close`.
 
@@ -1573,89 +1641,137 @@ class PatternRanges(Ranges):
         if stack_kwargs is None:
             stack_kwargs = {}
         arr = to_pd_array(arr)
+        arr_2d = to_2d_array(arr)
         arr_wrapper = ArrayWrapper.from_obj(arr)
         psc_keys = [a.name for a in PSC.__attrs_attrs__ if a.name != "name"]
         method_locals = {k: v for k, v in locals().items() if k in psc_keys}
 
+        # Flatten search configs
+        flat_search_configs = []
+        psc_names = []
+        psc_names_none = True
+        n_configs = 0
+        if search_configs is not None:
+            for maybe_search_config in search_configs:
+                if isinstance(maybe_search_config, dict):
+                    maybe_search_config = PSC(**maybe_search_config)
+                if isinstance(maybe_search_config, PSC):
+                    for col in range(arr_2d.shape[1]):
+                        flat_search_configs.append(maybe_search_config)
+                        if maybe_search_config.name is not None:
+                            psc_names.append(maybe_search_config.name)
+                            psc_names_none = False
+                        else:
+                            psc_names.append(n_configs)
+                    n_configs += 1
+                else:
+                    if len(maybe_search_config) != arr_2d.shape[1]:
+                        raise ValueError("Sub-list with PSC instances must match the number of columns")
+                    for col, search_config in enumerate(maybe_search_config):
+                        if isinstance(search_config, dict):
+                            search_config = PSC(**search_config)
+                        flat_search_configs.append(search_config)
+                        if search_config.name is not None:
+                            psc_names.append(search_config.name)
+                            psc_names_none = False
+                        else:
+                            psc_names.append(n_configs)
+                        n_configs += 1
+
+        # Combine parameters
         param_dct = {}
         for k, v in method_locals.items():
             if k in psc_keys and isinstance(v, Param):
                 param_dct[k] = v
         param_columns = None
         if len(param_dct) > 0:
-            if search_configs is not None and len(search_configs) > 0:
-                raise ValueError("Search parameters and configs cannot be used together")
             param_product, param_columns = combine_params(
                 param_dct,
                 random_subset=random_subset,
                 stack_kwargs=stack_kwargs,
             )
-            search_configs = []
-            for i in range(len(param_columns)):
-                search_config = dict()
-                for k, v in param_product.items():
-                    search_config[k] = v[i]
-                search_configs.append(PSC(**search_config))
-
-        if search_configs is None:
-            search_configs = [PSC()]
-
-        arr_2d = to_2d_array(arr)
-        col_arrs = []
-        new_search_configs = []
-        for maybe_search_config in search_configs:
-            if isinstance(maybe_search_config, PSC):
-                res_config = cls.resolve_search_config(maybe_search_config, **method_locals)
-                for col in range(arr_2d.shape[1]):
-                    col_arrs.append(arr_2d[:, col])
-                    new_search_configs.append(res_config)
+            if len(flat_search_configs) == 0:
+                flat_search_configs = []
+                for i in range(len(param_columns)):
+                    search_config = dict()
+                    for k, v in param_product.items():
+                        search_config[k] = v[i]
+                    for col in range(arr_2d.shape[1]):
+                        flat_search_configs.append(PSC(**search_config))
             else:
-                if len(maybe_search_config) != arr_2d.shape[1]:
-                    raise ValueError("Sub-list with PSC instances must match the number of columns")
-                for col, search_config in enumerate(maybe_search_config):
-                    col_arrs.append(arr_2d[:, col])
-                    new_search_configs.append(cls.resolve_search_config(search_config, **method_locals))
+                new_flat_search_configs = []
+                for i in range(len(param_columns)):
+                    for search_config in flat_search_configs:
+                        new_search_config = dict()
+                        for k, v in attr.asdict(search_config).items():
+                            if v is not _DEF:
+                                if k in param_product:
+                                    raise ValueError(f"Parameter '{k}' is re-defined in a search configuration")
+                                new_search_config[k] = v
+                            if k in param_product:
+                                new_search_config[k] = param_product[k][i]
+                        new_flat_search_configs.append(PSC(**new_search_config))
+                flat_search_configs = new_flat_search_configs
 
+        # Create config from arguments if empty
+        if len(flat_search_configs) == 0:
+            for col in range(arr_2d.shape[1]):
+                flat_search_configs.append(PSC())
+
+        # Prepare function and arguments
         funcs_args = []
-        psc_names = []
         func = jit_reg.resolve_option(nb.find_pattern_1d_nb, jitted)
-        any_name_set = False
-        for col in range(len(col_arrs)):
+        def_func_kwargs = get_func_kwargs(func)
+        new_search_configs = []
+        for c in range(len(flat_search_configs)):
             func_kwargs = {
-                "col": col,
-                "arr": col_arrs[col],
-                **attr.asdict(new_search_configs[col]),
+                "col": c,
+                "arr": arr_2d[:, c % arr_2d.shape[1]],
             }
-            del func_kwargs["name"]
-            for k, v in func_kwargs.items():
+            new_search_config = cls.resolve_search_config(flat_search_configs[c], **method_locals)
+            for k, v in attr.asdict(new_search_config).items():
+                if k == "name":
+                    continue
                 if isinstance(v, Param):
                     raise TypeError(f"Cannot use Param inside search configs")
+                if k in def_func_kwargs:
+                    if v is not def_func_kwargs[k]:
+                        func_kwargs[k] = v
+                else:
+                    func_kwargs[k] = v
             funcs_args.append((func, (), func_kwargs))
-            if new_search_configs[col].name is None:
-                psc_names.append(col)
-            else:
-                any_name_set = True
-                psc_names.append(new_search_configs[col].name)
+            new_search_configs.append(new_search_config)
 
+        # Execute each configuration
         execute_kwargs = merge_dicts(
-            dict(show_progress=len(new_search_configs) > 1),
+            dict(show_progress=len(flat_search_configs) > 1),
             execute_kwargs,
         )
         result_list = execute(funcs_args, **execute_kwargs)
         records_arr = np.concatenate(result_list)
 
+        # Build column hierarchy
+        n_config_params = len(psc_names) // arr_2d.shape[1]
         if param_columns is not None:
-            new_columns = combine_indexes((param_columns, arr_wrapper.columns), **stack_kwargs)
+            if n_config_params == 0 or (n_config_params == 1 and psc_names_none):
+                new_columns = combine_indexes((param_columns, arr_wrapper.columns), **stack_kwargs)
+            else:
+                search_config_index = pd.Index(psc_names, name="search_config")
+                base_columns = stack_indexes(
+                    (search_config_index, tile_index(arr_wrapper.columns, n_config_params)), **stack_kwargs
+                )
+                new_columns = combine_indexes((param_columns, base_columns), **stack_kwargs)
         else:
-            n_params = len(psc_names) // arr_2d.shape[1]
-            if n_params == 1 and not any_name_set:
+            if n_config_params == 0 or (n_config_params == 1 and psc_names_none):
                 new_columns = arr_wrapper.columns
             else:
                 search_config_index = pd.Index(psc_names, name="search_config")
                 new_columns = stack_indexes(
-                    (search_config_index, tile_index(arr_wrapper.columns, n_params)),
+                    (search_config_index, tile_index(arr_wrapper.columns, n_config_params)),
                     **stack_kwargs,
                 )
+
+        # Wrap with class
         wrapper = ArrayWrapper(
             **merge_dicts(
                 dict(
@@ -1665,9 +1781,15 @@ class PatternRanges(Ranges):
                 wrapper_kwargs,
             )
         )
-        if attach_as_close:
+        if attach_as_close and "close" not in kwargs:
             kwargs["close"] = arr
         return cls(wrapper, records_arr, new_search_configs, **kwargs)
+
+    def with_delta(self, *args, **kwargs):
+        """Pass self to `Ranges.from_delta` but with the index set to the last index."""
+        if "idx_field_or_arr" not in kwargs:
+            kwargs["idx_field_or_arr"] = self.last_idx.values
+        return Ranges.from_delta(self, *args, **kwargs)
 
     @classmethod
     def resolve_row_stack_kwargs(
@@ -1738,7 +1860,7 @@ class PatternRanges(Ranges):
         """Perform indexing on `PatternRanges`."""
         if ranges_meta is None:
             ranges_meta = Ranges.indexing_func_meta(self, *args, **kwargs)
-        col_idxs = ranges_meta["records_meta"]["wrapper_meta"]["col_idxs"]
+        col_idxs = ranges_meta["wrapper_meta"]["col_idxs"]
         if not isinstance(col_idxs, slice):
             col_idxs = to_1d_array(col_idxs)
         col_idxs = np.arange(self.wrapper.shape_2d[1])[col_idxs]
@@ -1746,8 +1868,8 @@ class PatternRanges(Ranges):
         for i in col_idxs:
             new_search_configs.append(self.search_configs[i])
         return self.replace(
-            wrapper=ranges_meta["records_meta"]["wrapper_meta"]["new_wrapper"],
-            records_arr=ranges_meta["records_meta"]["new_records_arr"],
+            wrapper=ranges_meta["wrapper_meta"]["new_wrapper"],
+            records_arr=ranges_meta["new_records_arr"],
             search_configs=new_search_configs,
             open=ranges_meta["open"],
             high=ranges_meta["high"],
@@ -1762,19 +1884,21 @@ class PatternRanges(Ranges):
 
     # ############# Stats ############# #
 
-    _metrics: tp.ClassVar[Config] = HybridConfig({
-        **Ranges.metrics,
-        "similarity": dict(
-            title="Similarity",
-            calc_func="similarity.describe",
-            post_calc_func=lambda self, out, settings: {
-                "Min": out.loc["min"],
-                "Median": out.loc["50%"],
-                "Max": out.loc["max"],
-            },
-            tags=["pattern_ranges", "similarity"],
-        )
-    })
+    _metrics: tp.ClassVar[Config] = HybridConfig(
+        {
+            **Ranges.metrics,
+            "similarity": dict(
+                title="Similarity",
+                calc_func="similarity.describe",
+                post_calc_func=lambda self, out, settings: {
+                    "Min": out.loc["min"],
+                    "Median": out.loc["50%"],
+                    "Max": out.loc["max"],
+                },
+                tags=["pattern_ranges", "similarity"],
+            ),
+        }
+    )
 
     @property
     def metrics(self) -> Config:
@@ -1786,8 +1910,9 @@ class PatternRanges(Ranges):
         self,
         column: tp.Optional[tp.Label] = None,
         top_n: tp.Optional[int] = None,
-        plot_pattern: bool = True,
-        plot_max_error: bool = True,
+        plot_patterns: bool = True,
+        plot_max_error: bool = False,
+        fill_distance: bool = True,
         pattern_trace_kwargs: tp.KwargsLike = None,
         lower_max_error_trace_kwargs: tp.KwargsLike = None,
         upper_max_error_trace_kwargs: tp.KwargsLike = None,
@@ -1799,13 +1924,16 @@ class PatternRanges(Ranges):
     ) -> tp.BaseFigure:  # pragma: no cover
         """Plot pattern ranges.
 
-        Based on `Ranges.plot`.
+        Based on `Ranges.plot` and `vectorbtpro.generic.accessors.GenericSRAccessor.plot_pattern`.
 
         Args:
             column (str): Name of the column to plot.
             top_n (int): Filter top N range records by maximum duration.
-            plot_pattern (bool or array_like): Whether to plot `PatternRanges.pattern`.
+            plot_patterns (bool or array_like): Whether to plot `PatternRanges.pattern`.
             plot_max_error (array_like): Whether to plot `PatternRanges.max_error`.
+            fill_distance (bool): Whether to fill the space between close and pattern.
+
+                Visible for every interpolation mode except discrete.
             pattern_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for pattern.
             lower_max_error_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for lower max error.
             upper_max_error_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for upper max error.
@@ -1815,13 +1943,6 @@ class PatternRanges(Ranges):
             fig (Figure or FigureWidget): Figure to add traces to.
             **kwargs: Keyword arguments passed to `Ranges.plot`.
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
-
-        assert_can_import("plotly")
-        from vectorbtpro._settings import settings
-
-        plotting_cfg = settings["plotting"]
-
         self_col = self.select_col(column=column, group_by=False)
         if top_n is not None:
             self_col = self_col.apply_mask(self_col.duration.top_n_mask(top_n))
@@ -1850,7 +1971,7 @@ class PatternRanges(Ranges):
             end_idx = self_col.get_map_field_to_index("end_idx")
             status = self_col.get_field_arr("status")
 
-            if plot_pattern:
+            if plot_patterns:
                 # Plot pattern
                 for r in range(len(start_idx)):
                     _start_idx = start_idx[r]
@@ -1860,183 +1981,59 @@ class PatternRanges(Ranges):
                     arr_sr = close.loc[_start_idx:_end_idx]
                     if status[r] == RangeStatus.Closed:
                         arr_sr = arr_sr.iloc[:-1]
-                    arr = arr_sr.values
-                    arr_index = arr_sr.index
-
-                    # Reconstruct pattern and max error bands
-                    # Must do the same and in the same order as in the pattern similarity function!
-                    pattern = np.asarray(search_config.pattern)
-                    max_error = np.asarray(search_config.max_error)
-                    # Rescale for calculations
-                    if arr.shape[0] < pattern.shape[0]:
-                        arr = nb.interp_resize_1d_nb(
-                            arr,
-                            len(pattern),
-                            search_config.interp_mode,
+                    if fill_distance:
+                        obj_trace_kwargs = dict(
+                            line=dict(color="rgba(0, 0, 0, 0)", width=0),
+                            opacity=0,
+                            hoverinfo="skip",
+                            showlegend=False,
+                            name=None,
                         )
-                    elif pattern.shape[0] < arr.shape[0]:
-                        pattern = nb.interp_resize_1d_nb(
-                            pattern,
-                            len(arr),
-                            search_config.interp_mode,
-                        )
-                        max_error = nb.interp_resize_1d_nb(
-                            max_error,
-                            len(arr),
-                            search_config.max_error_interp_mode,
-                        )
-                    if np.isnan(search_config.vmin):
-                        vmin = np.nanmin(arr)
                     else:
-                        vmin = search_config.vmin
-                    if np.isnan(search_config.vmax):
-                        vmax = np.nanmax(arr)
-                    else:
-                        vmax = search_config.vmax
-                    if np.isnan(search_config.pmin):
-                        pmin = np.nanmin(pattern)
-                    else:
-                        pmin = search_config.pmin
-                    if np.isnan(search_config.pmax):
-                        pmax = np.nanmax(pattern)
-                    else:
-                        pmax = search_config.pmax
-                    if search_config.rescale_mode == RescaleMode.Rebase:
-                        if not np.isnan(pmin):
-                            pmin = pmin / pattern[0] * arr[0]
-                        if not np.isnan(pmax):
-                            pmax = pmax / pattern[0] * arr[0]
-                    if search_config.rescale_mode == RescaleMode.Rebase:
-                        pattern = pattern / pattern[0] * arr[0]
-                        max_error = max_error * pattern
-                    pattern = np.clip(pattern, pmin, pmax)
-                    if search_config.rescale_mode == RescaleMode.MinMax:
-                        pattern = rescale(pattern, (pmin, pmax), (vmin, vmax))
-                        max_error = max_error / (pmax - pmin) * pattern
-                    if search_config.max_error_as_maxdist:
-                        lower_max_error = max_error
-                        upper_max_error = max_error
-                    else:
-                        lower_max_error = np.where(np.isnan(max_error), pattern - np.nanmin(pattern), max_error)
-                        upper_max_error = np.where(np.isnan(max_error), np.nanmax(pattern) - pattern, max_error)
-                    if pattern.shape[0] != len(arr_index):
-                        # Rescale for plotting
-                        pattern = nb.interp_resize_1d_nb(
-                            pattern,
-                            len(arr_index),
-                            InterpMode.Linear,
-                        )
-                        lower_max_error = nb.interp_resize_1d_nb(
-                            lower_max_error,
-                            len(arr_index),
-                            InterpMode.Linear,
-                        )
-                        upper_max_error = nb.interp_resize_1d_nb(
-                            upper_max_error,
-                            len(arr_index),
-                            InterpMode.Linear,
-                        )
-                    pattern_sr = pd.Series(pattern, index=arr_index)
-                    lower_max_error_sr = pd.Series(lower_max_error, index=arr_index)
-                    upper_max_error_sr = pd.Series(upper_max_error, index=arr_index)
-
-                    def_pattern_trace_kwargs = dict(
-                        name=f"Pattern",
-                        legendgroup="pattern",
-                        showlegend=r == 0,
-                        connectgaps=True,
+                        obj_trace_kwargs = None
+                    _pattern_trace_kwargs = merge_dicts(
+                        dict(
+                            legendgroup="pattern",
+                            showlegend=r == 0,
+                        ),
+                        pattern_trace_kwargs,
                     )
-                    if search_config.interp_mode == InterpMode.Discrete:
-                        _pattern_trace_kwargs = merge_dicts(
-                            def_pattern_trace_kwargs,
-                            dict(
-                                mode="lines+markers",
-                                marker=dict(color=adjust_opacity(plotting_cfg["color_schema"]["cyan"], 0.75)),
-                                line=dict(color=adjust_opacity(plotting_cfg["color_schema"]["gray"], 0.75), dash="dot"),
-                            ),
-                            pattern_trace_kwargs,
-                        )
-                    else:
-                        _pattern_trace_kwargs = merge_dicts(
-                            def_pattern_trace_kwargs,
-                            dict(
-                                mode="lines",
-                                line=dict(color=adjust_opacity(plotting_cfg["color_schema"]["cyan"], 0.75), dash="dot"),
-                            ),
-                            pattern_trace_kwargs,
-                        )
-                    pattern_sr.rename(None).vbt.plot(
-                        trace_kwargs=_pattern_trace_kwargs,
+                    _lower_max_error_trace_kwargs = merge_dicts(
+                        dict(
+                            legendgroup="max_error",
+                            showlegend=r == 0,
+                        ),
+                        lower_max_error_trace_kwargs,
+                    )
+                    _upper_max_error_trace_kwargs = merge_dicts(
+                        dict(
+                            legendgroup="max_error",
+                            showlegend=False,
+                        ),
+                        upper_max_error_trace_kwargs,
+                    )
+
+                    fig = arr_sr.vbt.plot_pattern(
+                        pattern=search_config.pattern,
+                        interp_mode=search_config.interp_mode,
+                        rescale_mode=search_config.rescale_mode,
+                        vmin=search_config.vmin,
+                        vmax=search_config.vmax,
+                        pmin=search_config.pmin,
+                        pmax=search_config.pmax,
+                        invert=search_config.invert,
+                        error_type=search_config.error_type,
+                        max_error=search_config.max_error if plot_max_error else np.nan,
+                        max_error_interp_mode=search_config.max_error_interp_mode,
+                        plot_obj=fill_distance,
+                        fill_distance=fill_distance,
+                        obj_trace_kwargs=obj_trace_kwargs,
+                        pattern_trace_kwargs=_pattern_trace_kwargs,
+                        lower_max_error_trace_kwargs=_lower_max_error_trace_kwargs,
+                        upper_max_error_trace_kwargs=_upper_max_error_trace_kwargs,
                         add_trace_kwargs=add_trace_kwargs,
                         fig=fig,
                     )
-
-                    if plot_max_error is not None:
-                        # Plot max error bounds
-                        def_max_error_trace_kwargs = dict(
-                            name="Max error",
-                            legendgroup="max_error",
-                            showlegend=r == 0,
-                            connectgaps=True,
-                        )
-                        if search_config.max_error_interp_mode == InterpMode.Discrete:
-                            _lower_max_error_trace_kwargs = merge_dicts(
-                                def_max_error_trace_kwargs,
-                                dict(
-                                    mode="markers+lines",
-                                    marker=dict(color=adjust_opacity(plotting_cfg["color_schema"]["pink"], 0.5)),
-                                    line=dict(
-                                        color=adjust_opacity(plotting_cfg["color_schema"]["gray"], 0.5), dash="dot"
-                                    ),
-                                ),
-                                lower_max_error_trace_kwargs,
-                            )
-                            _upper_max_error_trace_kwargs = merge_dicts(
-                                def_max_error_trace_kwargs,
-                                dict(
-                                    mode="markers+lines",
-                                    marker=dict(color=adjust_opacity(plotting_cfg["color_schema"]["pink"], 0.5)),
-                                    line=dict(
-                                        color=adjust_opacity(plotting_cfg["color_schema"]["gray"], 0.5), dash="dot"
-                                    ),
-                                    showlegend=False,
-                                ),
-                                upper_max_error_trace_kwargs,
-                            )
-                        else:
-                            _lower_max_error_trace_kwargs = merge_dicts(
-                                def_max_error_trace_kwargs,
-                                dict(
-                                    mode="lines",
-                                    line=dict(
-                                        color=adjust_opacity(plotting_cfg["color_schema"]["pink"], 0.5), dash="dot"
-                                    ),
-                                ),
-                                lower_max_error_trace_kwargs,
-                            )
-                            _upper_max_error_trace_kwargs = merge_dicts(
-                                def_max_error_trace_kwargs,
-                                dict(
-                                    mode="lines",
-                                    line=dict(
-                                        color=adjust_opacity(plotting_cfg["color_schema"]["pink"], 0.5), dash="dot"
-                                    ),
-                                    fillcolor=adjust_opacity(plotting_cfg["color_schema"]["pink"], 0.1),
-                                    fill="tonexty",
-                                    showlegend=False,
-                                ),
-                                upper_max_error_trace_kwargs,
-                            )
-                        (pattern_sr - lower_max_error_sr).rename(None).vbt.plot(
-                            trace_kwargs=_lower_max_error_trace_kwargs,
-                            add_trace_kwargs=add_trace_kwargs,
-                            fig=fig,
-                        )
-                        (pattern_sr + upper_max_error_sr).rename(None).vbt.plot(
-                            trace_kwargs=_upper_max_error_trace_kwargs,
-                            add_trace_kwargs=add_trace_kwargs,
-                            fig=fig,
-                        )
 
         return fig
 

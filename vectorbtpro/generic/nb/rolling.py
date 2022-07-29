@@ -1522,61 +1522,109 @@ def rolling_pattern_similarity_1d_nb(
     arr: tp.Array1d,
     pattern: tp.Array1d,
     window: tp.Optional[int] = None,
+    max_window: tp.Optional[int] = None,
+    row_select_prob: float = 1.0,
+    window_select_prob: float = 1.0,
     interp_mode: int = InterpMode.Mixed,
     rescale_mode: int = RescaleMode.MinMax,
     vmin: float = np.nan,
     vmax: float = np.nan,
     pmin: float = np.nan,
     pmax: float = np.nan,
-    min_pct_change: float = np.nan,
-    max_pct_change: float = np.nan,
-    distance_mode: int = DistanceMode.MAE,
+    invert: bool = False,
+    error_type: int = ErrorType.Absolute,
+    distance_measure: int = DistanceMeasure.MAE,
     max_error: tp.FlexArray = np.asarray(np.nan),
     max_error_interp_mode: tp.Optional[int] = None,
     max_error_as_maxdist: bool = False,
     max_error_strict: bool = False,
-    min_similarity: float = np.nan,
+    min_pct_change: float = np.nan,
+    max_pct_change: float = np.nan,
+    min_similarity: float = 0.85,
+    minp: tp.Optional[int] = None,
 ) -> tp.Array1d:
     """Compute rolling pattern similarity.
 
     Uses `vectorbtpro.generic.nb.patterns.pattern_similarity_nb`."""
     if window is None:
         window = pattern.shape[0]
-    out = np.empty_like(arr, dtype=np.float_)
-    nancnt = 0
+    if max_window is None:
+        max_window = window
+    out = np.full(arr.shape, np.nan, dtype=np.float_)
+    min_max_required = False
+    if rescale_mode == RescaleMode.MinMax:
+        min_max_required = True
+    if not np.isnan(min_pct_change):
+        min_max_required = True
+    if not np.isnan(max_pct_change):
+        min_max_required = True
+    if not max_error_as_maxdist:
+        min_max_required = True
+    if min_max_required:
+        if np.isnan(pmin):
+            pmin = np.nanmin(pattern)
+        if np.isnan(pmax):
+            pmax = np.nanmax(pattern)
+
     for i in range(arr.shape[0]):
-        if np.isnan(arr[i]):
-            nancnt = nancnt + 1
-        if i < window:
-            valid_cnt = i + 1 - nancnt
-        else:
-            if np.isnan(arr[i - window]):
-                nancnt = nancnt - 1
-            valid_cnt = window - nancnt
-        if valid_cnt < window:
-            out[i] = np.nan
-        else:
-            from_i = max(0, i + 1 - window)
-            to_i = i + 1
-            arr_window = arr[from_i:to_i]
-            out[i] = pattern_similarity_nb(
-                arr_window,
-                pattern,
-                interp_mode=interp_mode,
-                rescale_mode=rescale_mode,
-                vmin=vmin,
-                vmax=vmax,
-                pmin=pmin,
-                pmax=pmax,
-                min_pct_change=min_pct_change,
-                max_pct_change=max_pct_change,
-                distance_mode=distance_mode,
-                max_error=max_error,
-                max_error_interp_mode=max_error_interp_mode,
-                max_error_strict=max_error_strict,
-                max_error_as_maxdist=max_error_as_maxdist,
-                min_similarity=min_similarity,
-            )
+        from_i = i - window + 1
+        to_i = i + 1
+        if from_i < 0:
+            continue
+
+        if np.random.uniform(0, 1) < row_select_prob:
+            _vmin = vmin
+            _vmax = vmax
+            if min_max_required:
+                if np.isnan(_vmin) or np.isnan(_vmax):
+                    for j in range(from_i, to_i):
+                        if np.isnan(_vmin) or arr[j] < _vmin:
+                            _vmin = arr[j]
+                        if np.isnan(_vmax) or arr[j] > _vmax:
+                            _vmax = arr[j]
+
+            for w in range(window, max_window + 1):
+                from_i = i - w + 1
+                to_i = i + 1
+                if from_i < 0:
+                    continue
+                if min_max_required:
+                    if w > window:
+                        if arr[from_i] < _vmin:
+                            _vmin = arr[from_i]
+                        if arr[from_i] > _vmax:
+                            _vmax = arr[from_i]
+
+                if np.random.uniform(0, 1) < window_select_prob:
+                    arr_window = arr[from_i:to_i]
+                    similarity = pattern_similarity_nb(
+                        arr_window,
+                        pattern,
+                        interp_mode=interp_mode,
+                        rescale_mode=rescale_mode,
+                        vmin=_vmin,
+                        vmax=_vmax,
+                        pmin=pmin,
+                        pmax=pmax,
+                        invert=invert,
+                        error_type=error_type,
+                        distance_measure=distance_measure,
+                        max_error=max_error,
+                        max_error_interp_mode=max_error_interp_mode,
+                        max_error_as_maxdist=max_error_as_maxdist,
+                        max_error_strict=max_error_strict,
+                        min_pct_change=min_pct_change,
+                        max_pct_change=max_pct_change,
+                        min_similarity=min_similarity,
+                        minp=minp,
+                    )
+                    if not np.isnan(similarity):
+                        if not np.isnan(out[i]):
+                            if similarity > out[i]:
+                                out[i] = similarity
+                        else:
+                            out[i] = similarity
+
     return out
 
 
@@ -1586,20 +1634,26 @@ def rolling_pattern_similarity_1d_nb(
         arr=ch.ArraySlicer(axis=1),
         pattern=None,
         window=None,
+        max_window=None,
+        row_select_prob=None,
+        window_select_prob=None,
         interp_mode=None,
         rescale_mode=None,
         vmin=None,
         vmax=None,
         pmin=None,
         pmax=None,
-        min_pct_change=None,
-        max_pct_change=None,
-        distance_mode=None,
+        invert=None,
+        error_type=None,
+        distance_measure=None,
         max_error=None,
         max_error_interp_mode=None,
         max_error_as_maxdist=None,
         max_error_strict=None,
+        min_pct_change=None,
+        max_pct_change=None,
         min_similarity=None,
+        minp=None,
     ),
     merge_func=base_ch.column_stack,
 )
@@ -1608,42 +1662,58 @@ def rolling_pattern_similarity_nb(
     arr: tp.Array2d,
     pattern: tp.Array1d,
     window: tp.Optional[int] = None,
+    max_window: tp.Optional[int] = None,
+    row_select_prob: float = 1.0,
+    window_select_prob: float = 1.0,
     interp_mode: int = InterpMode.Mixed,
     rescale_mode: int = RescaleMode.MinMax,
     vmin: float = np.nan,
     vmax: float = np.nan,
     pmin: float = np.nan,
     pmax: float = np.nan,
-    min_pct_change: float = np.nan,
-    max_pct_change: float = np.nan,
-    distance_mode: int = DistanceMode.MAE,
+    invert: bool = False,
+    error_type: int = ErrorType.Absolute,
+    distance_measure: int = DistanceMeasure.MAE,
     max_error: tp.FlexArray = np.asarray(np.nan),
     max_error_interp_mode: tp.Optional[int] = None,
     max_error_as_maxdist: bool = False,
     max_error_strict: bool = False,
-    min_similarity: float = np.nan,
+    min_pct_change: float = np.nan,
+    max_pct_change: float = np.nan,
+    min_similarity: float = 0.85,
+    minp: tp.Optional[int] = None,
 ) -> tp.Array2d:
     """2-dim version of `rolling_pattern_similarity_1d_nb`."""
-    out = np.empty_like(arr, dtype=np.float_)
+    if window is None:
+        window = pattern.shape[0]
+    if max_window is None:
+        max_window = window
+    out = np.full(arr.shape, np.nan, dtype=np.float_)
     for col in prange(arr.shape[1]):
         out[:, col] = rolling_pattern_similarity_1d_nb(
             arr[:, col],
             pattern,
             window=window,
+            max_window=max_window,
+            row_select_prob=row_select_prob,
+            window_select_prob=window_select_prob,
             interp_mode=interp_mode,
             rescale_mode=rescale_mode,
             vmin=vmin,
             vmax=vmax,
             pmin=pmin,
             pmax=pmax,
-            min_pct_change=min_pct_change,
-            max_pct_change=max_pct_change,
-            distance_mode=distance_mode,
+            invert=invert,
+            error_type=error_type,
+            distance_measure=distance_measure,
             max_error=max_error,
             max_error_interp_mode=max_error_interp_mode,
             max_error_as_maxdist=max_error_as_maxdist,
             max_error_strict=max_error_strict,
+            min_pct_change=min_pct_change,
+            max_pct_change=max_pct_change,
             min_similarity=min_similarity,
+            minp=minp,
         )
     return out
 

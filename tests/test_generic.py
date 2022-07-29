@@ -4543,8 +4543,15 @@ class TestPatterns:
             vbt.nb.pattern_similarity_nb(
                 np.array([1, 2, 3, np.nan]),
                 np.array([1, 2, 3, 100]),
+                minp=1,
             )
             == 0.5051020408163265
+        )
+        assert np.isnan(
+            vbt.nb.pattern_similarity_nb(
+                np.array([1, 2, 3, np.nan]),
+                np.array([1, 2, 3, 100]),
+            )
         )
         assert (
             vbt.nb.pattern_similarity_nb(
@@ -4557,6 +4564,7 @@ class TestPatterns:
             vbt.nb.pattern_similarity_nb(
                 np.array([1, 2, 3, np.nan]),
                 np.array([1, 2, 3, np.nan]),
+                minp=1,
             )
             == 1.0
         )
@@ -4574,7 +4582,7 @@ class TestPatterns:
                 np.array([1, 2, 3]),
                 vmax=4,
             )
-            == 0.7999999999999999
+            == 0.8
         )
         assert (
             vbt.nb.pattern_similarity_nb(
@@ -4582,7 +4590,7 @@ class TestPatterns:
                 np.array([1, 2, 3]),
                 pmin=0,
             )
-            == 0.7857142857142857
+            == 0.7857142857142858
         )
         assert (
             vbt.nb.pattern_similarity_nb(
@@ -4590,7 +4598,7 @@ class TestPatterns:
                 np.array([1, 2, 3]),
                 pmax=4,
             )
-            == 0.7857142857142857
+            == 0.7857142857142856
         )
         assert (
             vbt.nb.pattern_similarity_nb(
@@ -4745,12 +4753,14 @@ class TestPatterns:
             sim = vbt.nb.pattern_similarity_nb(
                 np.asarray(arr),
                 np.array([1, 2, 3, 4, 5]),
+                minp=1,
             )
             assert (
                 vbt.nb.pattern_similarity_nb(
                     np.asarray(arr),
                     np.array([1, 2, 3, 4, 5]),
                     min_similarity=sim,
+                    minp=1,
                 )
                 == sim
             )
@@ -4759,6 +4769,7 @@ class TestPatterns:
                     np.asarray(arr),
                     np.array([1, 2, 3, 4, 5]),
                     min_similarity=sim - 0.1,
+                    minp=1,
                 )
                 == sim
             )
@@ -4799,7 +4810,7 @@ class TestPatterns:
                 np.array([3, 2, 1]),
                 rescale_mode=enums.RescaleMode.Rebase,
             )
-            == 0.4
+            == 0.4285714285714286
         )
         assert (
             vbt.nb.pattern_similarity_nb(
@@ -4808,7 +4819,7 @@ class TestPatterns:
                 rescale_mode=enums.RescaleMode.Rebase,
                 max_error=np.asarray(1.0),
             )
-            == 0.4
+            == 0.368421052631579
         )
         assert (
             vbt.nb.pattern_similarity_nb(
@@ -4817,7 +4828,7 @@ class TestPatterns:
                 rescale_mode=enums.RescaleMode.Rebase,
                 max_error=np.asarray(0.5),
             )
-            == 0.4
+            == 0.3157894736842105
         )
         assert (
             vbt.nb.pattern_similarity_nb(
@@ -4854,9 +4865,9 @@ class TestPatterns:
                 np.array([1, 2, 3]),
                 rescale_mode=enums.RescaleMode.Rebase,
                 max_error=np.asarray(0.5),
-                min_similarity=0.4,
+                min_similarity=0.31,
             )
-            == 0.4
+            == 0.3157894736842105
         )
         assert np.isnan(
             vbt.nb.pattern_similarity_nb(
@@ -4864,7 +4875,7 @@ class TestPatterns:
                 np.array([1, 2, 3]),
                 rescale_mode=enums.RescaleMode.Rebase,
                 max_error=np.asarray(0.5),
-                min_similarity=0.41,
+                min_similarity=0.32,
             )
         )
         assert (
@@ -4989,28 +5000,112 @@ class TestPatterns:
         )
         assert (
             vbt.nb.pattern_similarity_nb(
-                np.array([1, 3, 2]),
                 np.array([1, 2, 3]),
-                distance_mode=enums.DistanceMode.MAE,
+                np.array([1, 2, 3]),
+                distance_measure=enums.DistanceMeasure.MAE,
             )
-            == 0.6
+            == 1.0
         )
         assert (
             vbt.nb.pattern_similarity_nb(
-                np.array([1, 3, 2]),
+                np.array([3, 3, 1]),
                 np.array([1, 2, 3]),
-                distance_mode=enums.DistanceMode.MSE,
+                distance_measure=enums.DistanceMeasure.MAE,
             )
-            == 0.7777777777777778
+            == 0.0
         )
         assert (
             vbt.nb.pattern_similarity_nb(
-                np.array([1, 3, 2]),
+                np.array([3, 2, 1]),
                 np.array([1, 2, 3]),
-                distance_mode=enums.DistanceMode.RMSE,
+                distance_measure=enums.DistanceMeasure.MAE,
             )
-            == 0.5285954792089682
+            == 0.19999999999999996
         )
+        assert (
+            vbt.nb.pattern_similarity_nb(
+                np.array([1, 2, 3]),
+                np.array([1, 2, 3]),
+                distance_measure=enums.DistanceMeasure.MSE,
+            )
+            == 1.0
+        )
+        assert (
+            vbt.nb.pattern_similarity_nb(
+                np.array([3, 3, 1]),
+                np.array([1, 2, 3]),
+                distance_measure=enums.DistanceMeasure.MSE,
+            )
+            == 0.0
+        )
+        assert (
+            vbt.nb.pattern_similarity_nb(
+                np.array([3, 2, 1]),
+                np.array([1, 2, 3]),
+                distance_measure=enums.DistanceMeasure.MSE,
+            )
+            == 0.11111111111111116
+        )
+        assert (
+            vbt.nb.pattern_similarity_nb(
+                np.array([1, 2, 3]),
+                np.array([1, 2, 3]),
+                distance_measure=enums.DistanceMeasure.RMSE,
+            )
+            == 1.0
+        )
+        assert (
+            vbt.nb.pattern_similarity_nb(
+                np.array([3, 3, 1]),
+                np.array([1, 2, 3]),
+                distance_measure=enums.DistanceMeasure.RMSE,
+            )
+            == 0.0
+        )
+        assert (
+            vbt.nb.pattern_similarity_nb(
+                np.array([3, 2, 1]),
+                np.array([1, 2, 3]),
+                distance_measure=enums.DistanceMeasure.RMSE,
+            )
+            == 0.05719095841793653
+        )
+        assert (
+            vbt.nb.pattern_similarity_nb(
+                np.array([1, 2, 3]),
+                np.array([1, 2, 3]),
+                error_type=enums.ErrorType.Relative,
+            )
+            == 1.0
+        )
+        assert (
+            vbt.nb.pattern_similarity_nb(
+                np.array([3, 3, 1]),
+                np.array([1, 2, 3]),
+                error_type=enums.ErrorType.Relative,
+            )
+            == 0.0
+        )
+        assert (
+            vbt.nb.pattern_similarity_nb(
+                np.array([3, 2, 1]),
+                np.array([1, 2, 3]),
+                error_type=enums.ErrorType.Relative,
+            )
+            == 0.1578947368421053
+        )
+        for arr in permutations(np.array([1, 2, 3, 4, 5])):
+            assert (
+                vbt.nb.pattern_similarity_nb(
+                    np.array([1, 2, 3, 4, 5]),
+                    np.asarray(arr),
+                    invert=True,
+                )
+                == vbt.nb.pattern_similarity_nb(
+                    np.array([1, 2, 3, 4, 5]),
+                    np.max(arr) + np.min(arr) - np.asarray(arr),
+                )
+            )
 
 
 # ############# plotting.py ############# #

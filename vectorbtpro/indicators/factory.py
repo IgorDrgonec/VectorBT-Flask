@@ -1069,6 +1069,8 @@ class IndicatorBase(Analyzable):
             wrapper_meta = self.wrapper.indexing_func_meta(*args, **kwargs)
         row_idxs = wrapper_meta["row_idxs"]
         col_idxs = wrapper_meta["col_idxs"]
+        rows_changed = wrapper_meta["rows_changed"]
+        columns_changed = wrapper_meta["columns_changed"]
         if not isinstance(row_idxs, slice):
             row_idxs = reshaping.to_1d_array(row_idxs)
         if not isinstance(col_idxs, slice):
@@ -1079,13 +1081,32 @@ class IndicatorBase(Analyzable):
             input_mapper = input_mapper[col_idxs]
         input_list = []
         for input_name in self.input_names:
-            input_list.append(getattr(self, f"_{input_name}")[row_idxs])
+            new_input = ArrayWrapper.select_from_flex_array(
+                getattr(self, f"_{input_name}"),
+                row_idxs=row_idxs,
+                rows_changed=rows_changed,
+            )
+            input_list.append(new_input)
         in_output_list = []
         for in_output_name in self.in_output_names:
-            in_output_list.append(getattr(self, f"_{in_output_name}")[row_idxs, :][:, col_idxs])
+            new_in_output = ArrayWrapper.select_from_flex_array(
+                getattr(self, f"_{in_output_name}"),
+                row_idxs=row_idxs,
+                col_idxs=col_idxs,
+                rows_changed=rows_changed,
+                columns_changed=columns_changed,
+            )
+            in_output_list.append(new_in_output)
         output_list = []
         for output_name in self.output_names:
-            output_list.append(getattr(self, f"_{output_name}")[row_idxs, :][:, col_idxs])
+            new_output = ArrayWrapper.select_from_flex_array(
+                getattr(self, f"_{output_name}"),
+                row_idxs=row_idxs,
+                col_idxs=col_idxs,
+                rows_changed=rows_changed,
+                columns_changed=columns_changed,
+            )
+            output_list.append(new_output)
         param_list = []
         for param_name in self.param_names:
             param_list.append(getattr(self, f"_{param_name}_list"))

@@ -124,10 +124,11 @@ orders_field_config = ReadonlyConfig(
         dtype=order_dt,
         settings=dict(
             id=dict(title="Order Id"),
+            idx=dict(),
             size=dict(title="Size"),
             price=dict(title="Price"),
             fees=dict(title="Fees"),
-            side=dict(title="Side", mapping=OrderSide),
+            side=dict(title="Side", mapping=OrderSide, as_customdata=False),
         ),
     )
 )
@@ -310,13 +311,6 @@ class Orders(PriceRecords):
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
-        To display additional field on hover, define `customdata_index` as a key for a field in the field config
-        and specify the index where to insert the data as a value. Additionally, you can define `hover_template`
-        such as using `vectorbtpro.utils.template.Sub` where `title` is substituted by the title and
-        `index` is substituted by (final) index in the customdata. If provided as a string, will be wrapped
-        with `vectorbtpro.utils.template.Sub`. Defaults to "$title: %{{customdata[$index]}}". Enable
-        `customdata_as_str` to stringify the data.
-
         Usage:
             ```pycon
             >>> price = pd.Series([1., 2., 3., 2., 1.], name='Price')
@@ -385,7 +379,7 @@ class Orders(PriceRecords):
                 fig=fig,
             )
         elif plot_close and self_col._close is not None:
-            fig = self_col.close.vbt.plot(
+            fig = self_col.close.vbt.lineplot(
                 trace_kwargs=close_trace_kwargs,
                 add_trace_kwargs=add_trace_kwargs,
                 fig=fig,
@@ -393,138 +387,56 @@ class Orders(PriceRecords):
 
         if self_col.count() > 0:
             # Extract information
-            id_ = self_col.get_field_arr("id")
-            id_title = self_col.get_field_title("id")
-            id_hover_template = self_col.get_field_setting(
-                "id",
-                "hover_template",
-                "$title: %{customdata[$index]}",
-            )
-            if isinstance(id_hover_template, str):
-                id_hover_template = Sub(id_hover_template)
-
             idx = self_col.get_map_field_to_index("idx")
-            idx_title = self_col.get_field_title("idx")
-            idx_hover_template = self_col.get_field_setting(
-                "idx",
-                "hover_template",
-                "$title: %{customdata[$index]}",
-            )
-            if isinstance(idx_hover_template, str):
-                idx_hover_template = Sub(idx_hover_template)
-
-            size = self_col.get_field_arr("size")
-            size_title = self_col.get_field_title("size")
-            size_hover_template = self_col.get_field_setting(
-                "size",
-                "hover_template",
-                "$title: %{customdata[$index]:,}",
-            )
-            if isinstance(size_hover_template, str):
-                size_hover_template = Sub(size_hover_template)
-
-            fees = self_col.get_field_arr("fees")
-            fees_title = self_col.get_field_title("fees")
-            fees_hover_template = self_col.get_field_setting(
-                "fees",
-                "hover_template",
-                "$title: %{customdata[$index]:,}",
-            )
-            if isinstance(fees_hover_template, str):
-                fees_hover_template = Sub(fees_hover_template)
-
             price = self_col.get_field_arr("price")
-            price_title = self_col.get_field_title("price")
-            price_hover_template = self_col.get_field_setting(
-                "price",
-                "hover_template",
-                "$title: %{customdata[$index]:,}",
-            )
-            if isinstance(price_hover_template, str):
-                price_hover_template = Sub(price_hover_template)
-
             side = self_col.get_field_arr("side")
-
-            def _prepare_customdata(mask):
-                customdata_info = [
-                    (id_, id_title, id_hover_template),
-                    (idx.astype(str).values, idx_title, idx_hover_template),
-                    (price, price_title, price_hover_template),
-                    (size, size_title, size_hover_template),
-                    (fees, fees_title, fees_hover_template),
-                ]
-                dtype = self.field_config.get("dtype")
-                for field in dtype.names:
-                    field_customdata_index = self_col.get_field_setting(field, "customdata_index", None)
-                    if field_customdata_index is not None:
-                        if not isinstance(field_customdata_index, int):
-                            raise ValueError("Setting customdata_index must be an integer or None")
-                        if field_customdata_index < 0:
-                            field_customdata_index = len(customdata_info) + field_customdata_index + 1
-                        field_hover_template = self_col.get_field_setting(
-                            field,
-                            "hover_template",
-                            "$title: %{customdata[$index]}",
-                        )
-                        if isinstance(field_hover_template, str):
-                            field_hover_template = Sub(field_hover_template)
-                        field_title = self_col.get_field_title(field)
-                        customdata_as_str = self_col.get_field_setting(field, "customdata_as_str", False)
-                        if customdata_as_str:
-                            field_arr = self_col.get_apply_mapping_str_arr(field)
-                        else:
-                            field_arr = self_col.get_apply_mapping_arr(field)
-                        customdata_info.insert(field_customdata_index, (field_arr, field_title, field_hover_template))
-                customdata = []
-                hovertemplate = []
-                for i in range(len(customdata_info)):
-                    customdata.append(customdata_info[i][0][mask])
-                    _hovertemplate = customdata_info[i][2].substitute(dict(title=customdata_info[i][1], index=i))
-                    if not _hovertemplate.startswith("<br>"):
-                        _hovertemplate = "<br>" + _hovertemplate
-                    hovertemplate.append(_hovertemplate)
-                return np.stack(customdata, axis=1), "\n".join(hovertemplate)
 
             buy_mask = side == OrderSide.Buy
             if buy_mask.any():
                 # Plot buy markers
-                buy_customdata, buy_hovertemplate = _prepare_customdata(buy_mask)
-                buy_scatter = go.Scatter(
-                    x=idx[buy_mask],
-                    y=price[buy_mask],
-                    mode="markers",
-                    marker=dict(
-                        symbol="triangle-up",
-                        color=plotting_cfg["contrast_color_schema"]["green"],
-                        size=8,
-                        line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["green"])),
+                buy_customdata, buy_hovertemplate = self_col.prepare_customdata(mask=buy_mask)
+                _buy_trace_kwargs = merge_dicts(
+                    dict(
+                        x=idx[buy_mask],
+                        y=price[buy_mask],
+                        mode="markers",
+                        marker=dict(
+                            symbol="triangle-up",
+                            color=plotting_cfg["contrast_color_schema"]["green"],
+                            size=8,
+                            line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["green"])),
+                        ),
+                        name="Buy",
+                        customdata=buy_customdata,
+                        hovertemplate=buy_hovertemplate,
                     ),
-                    name="Buy",
-                    customdata=buy_customdata,
-                    hovertemplate=buy_hovertemplate,
+                    buy_trace_kwargs,
                 )
-                buy_scatter.update(**buy_trace_kwargs)
+                buy_scatter = go.Scatter(**_buy_trace_kwargs)
                 fig.add_trace(buy_scatter, **add_trace_kwargs)
 
             sell_mask = side == OrderSide.Sell
             if sell_mask.any():
                 # Plot sell markers
-                sell_customdata, sell_hovertemplate = _prepare_customdata(sell_mask)
-                sell_scatter = go.Scatter(
-                    x=idx[sell_mask],
-                    y=price[sell_mask],
-                    mode="markers",
-                    marker=dict(
-                        symbol="triangle-down",
-                        color=plotting_cfg["contrast_color_schema"]["red"],
-                        size=8,
-                        line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["red"])),
+                sell_customdata, sell_hovertemplate = self_col.prepare_customdata(mask=sell_mask)
+                _sell_trace_kwargs = merge_dicts(
+                    dict(
+                        x=idx[sell_mask],
+                        y=price[sell_mask],
+                        mode="markers",
+                        marker=dict(
+                            symbol="triangle-down",
+                            color=plotting_cfg["contrast_color_schema"]["red"],
+                            size=8,
+                            line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["red"])),
+                        ),
+                        name="Sell",
+                        customdata=sell_customdata,
+                        hovertemplate=sell_hovertemplate,
                     ),
-                    name="Sell",
-                    customdata=sell_customdata,
-                    hovertemplate=sell_hovertemplate,
+                    sell_trace_kwargs,
                 )
-                sell_scatter.update(**sell_trace_kwargs)
+                sell_scatter = go.Scatter(**_sell_trace_kwargs)
                 fig.add_trace(sell_scatter, **add_trace_kwargs)
 
         return fig
@@ -567,32 +479,24 @@ fs_orders_field_config = ReadonlyConfig(
     dict(
         dtype=fs_order_dt,
         settings=dict(
-            idx=dict(title="Fill Timestamp"),
+            idx=dict(title="Fill Index"),
             signal_idx=dict(
-                title="Signal Timestamp",
+                title="Signal Index",
                 mapping="index",
                 noindex=True,
-                customdata_as_str=True,
-                customdata_index=1,
             ),
             creation_idx=dict(
-                title="Creation Timestamp",
+                title="Creation Index",
                 mapping="index",
                 noindex=True,
-                customdata_as_str=True,
-                customdata_index=2,
             ),
             type=dict(
                 title="Type",
                 mapping=OrderType,
-                customdata_index=-1,
-                customdata_as_str=True,
             ),
             stop_type=dict(
                 title="Stop Type",
                 mapping=StopType,
-                customdata_index=-1,
-                customdata_as_str=True,
             ),
         ),
     )

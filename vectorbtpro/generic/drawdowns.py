@@ -193,8 +193,8 @@ dd_field_config = ReadonlyConfig(
         dtype=drawdown_dt,
         settings=dict(
             id=dict(title="Drawdown Id"),
-            peak_idx=dict(title="Peak Timestamp", mapping="index"),
-            valley_idx=dict(title="Valley Timestamp", mapping="index"),
+            peak_idx=dict(title="Peak Index", mapping="index"),
+            valley_idx=dict(title="Valley Index", mapping="index"),
             peak_val=dict(
                 title="Peak Value",
             ),

@@ -1861,6 +1861,11 @@ class TestAccessors:
         ranges = mask.vbt.signals.between_ranges()
         assert_records_close(ranges.values, np.array([(0, 0, 0, 3, 1), (0, 1, 1, 4, 1)], dtype=range_dt))
         assert ranges.wrapper == mask.vbt.wrapper
+        ranges = mask.vbt.signals.between_ranges(incl_open=True)
+        assert_records_close(ranges.values, np.array([
+            (0, 0, 0, 3, 1), (1, 0, 3, 4, 0), (0, 1, 1, 4, 1), (0, 2, 2, 4, 0)
+        ], dtype=range_dt))
+        assert ranges.wrapper == mask.vbt.wrapper
 
         mask2 = pd.DataFrame(
             [
@@ -3387,11 +3392,11 @@ class TestGenerators:
         )
         assert_series_equal(
             rprobnx.entries,
-            pd.Series(np.array([True, False, True, False, True]), name=("array_0", "array_0")),
+            pd.Series(np.array([True, False, True, False, True]), name=("array", "array")),
         )
         assert_series_equal(
             rprobnx.exits,
-            pd.Series(np.array([False, True, False, True, False]), name=("array_0", "array_0")),
+            pd.Series(np.array([False, True, False, True, False]), name=("array", "array")),
         )
         rprobnx = vbt.RPROBNX.run(entry_prob=[0.5, 1.0], exit_prob=[1.0, 0.5], input_shape=(5,), seed=seed)
         assert_frame_equal(
@@ -3464,7 +3469,7 @@ class TestGenerators:
                 ),
                 index=mask.index,
                 columns=pd.MultiIndex.from_tuples(
-                    [("array_0", "a"), ("array_0", "b"), ("array_0", "c")],
+                    [("array", "a"), ("array", "b"), ("array", "c")],
                     names=["stx_stop", None],
                 ),
             ),

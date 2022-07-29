@@ -7,6 +7,7 @@ from numba import prange
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import chunking as base_ch
+from vectorbtpro.base.indexing import flex_select_auto_nb
 from vectorbtpro.generic.enums import *
 from vectorbtpro.generic.nb.base import repartition_nb
 from vectorbtpro.generic.nb.patterns import pattern_similarity_nb
@@ -330,9 +331,10 @@ def map_ranges_to_projections_nb(
     proj_start_use_index: bool = False,
     proj_period: tp.Optional[int] = None,
     proj_period_use_index: bool = False,
+    incl_end_idx: bool = True,
     stretch: bool = False,
-    normalize: bool = True,
-    start_value: float = 1.0,
+    rebase: bool = True,
+    start_value: tp.FlexArray = np.asarray(1.0),
     ffill: bool = False,
     remove_empty: bool = False,
 ) -> tp.Tuple[tp.Array1d, tp.Array2d]:
@@ -358,9 +360,15 @@ def map_ranges_to_projections_nb(
         else:
             r_start_idx = start_idx_arr[r] + proj_start
         if status_arr[r] == RangeStatus.Open:
-            r_duration = end_idx_arr[r] - start_idx_arr[r] + 1
+            if incl_end_idx:
+                r_duration = end_idx_arr[r] - start_idx_arr[r] + 1
+            else:
+                r_duration = end_idx_arr[r] - start_idx_arr[r]
         else:
-            r_duration = end_idx_arr[r] - start_idx_arr[r]
+            if incl_end_idx:
+                r_duration = end_idx_arr[r] - start_idx_arr[r]
+            else:
+                r_duration = end_idx_arr[r] - start_idx_arr[r] - 1
         if proj_period is None:
             r_end_idx = start_idx_arr[r] + r_duration
         else:
@@ -406,9 +414,13 @@ def map_ranges_to_projections_nb(
             if i >= r_close.shape[0]:
                 proj_out[k, i] = np.nan
             else:
-                if normalize:
+                if rebase:
                     if i == 0:
-                        proj_out[k, i] = start_value
+                        _start_value = flex_select_auto_nb(start_value, col_arr[r])
+                        if _start_value == -1:
+                            proj_out[k, i] = close[-1, col_arr[r]]
+                        else:
+                            proj_out[k, i] = _start_value
                     else:
                         proj_out[k, i] = proj_out[k, i - 1] * r_close[i] / r_close[i - 1]
                 else:
@@ -427,29 +439,33 @@ def map_ranges_to_projections_nb(
 
 @register_jitted(cache=True)
 def find_pattern_1d_nb(
-    col: int,
     arr: tp.Array1d,
     pattern: tp.Array1d,
     window: tp.Optional[int] = None,
     max_window: tp.Optional[int] = None,
-    window_select_prob: float = 1.0,
     row_select_prob: float = 1.0,
+    window_select_prob: float = 1.0,
+    roll_forward: bool = False,
     interp_mode: int = InterpMode.Mixed,
     rescale_mode: int = RescaleMode.MinMax,
     vmin: float = np.nan,
     vmax: float = np.nan,
     pmin: float = np.nan,
     pmax: float = np.nan,
-    min_pct_change: float = np.nan,
-    max_pct_change: float = np.nan,
-    distance_mode: int = DistanceMode.MAE,
+    invert: bool = False,
+    error_type: int = ErrorType.Absolute,
+    distance_measure: int = DistanceMeasure.MAE,
     max_error: tp.FlexArray = np.asarray(np.nan),
     max_error_interp_mode: tp.Optional[int] = None,
     max_error_as_maxdist: bool = False,
     max_error_strict: bool = False,
+    min_pct_change: float = np.nan,
+    max_pct_change: float = np.nan,
     min_similarity: float = 0.85,
-    max_overlap: tp.Optional[int] = 0,
+    minp: tp.Optional[int] = None,
+    overlap_mode: int = OverlapMode.Disallow,
     max_records: tp.Optional[int] = None,
+    col: int = 0,
 ) -> tp.RecordArray:
     """Find all occurrences of a pattern in an array.
 
@@ -461,13 +477,11 @@ def find_pattern_1d_nb(
     range to the output array. If `window_select_prob` is set, decides whether to test a window based on
     the given probability. The same for `row_select_prob` but on rows.
 
-    By default, creates an empty record array of the same size as the number of rows in `arr`.
-    This can be increased or decreased using `max_records`.
+    If `roll_forward`, windows are rolled forward (`start_idx` is guaranteed to be sorted), otherwise
+    backward (`end_idx` is guaranteed to be sorted).
 
-    !!! note
-        If `max_overlap` is non-zero, there is a possibility that the end index of a previous range
-        is higher than the end index of the range next to it. The start indices are guaranteed to be
-        sorted though (as opposed to other record filling algorithms in vectorbt)."""
+    By default, creates an empty record array of the same size as the number of rows in `arr`.
+    This can be increased or decreased using `max_records`."""
     if window is None:
         window = pattern.shape[0]
     if max_window is None:
@@ -491,29 +505,55 @@ def find_pattern_1d_nb(
             pmin = np.nanmin(pattern)
         if np.isnan(pmax):
             pmax = np.nanmax(pattern)
+
     for i in range(arr.shape[0]):
-        if i + window > arr.shape[0]:
-            break
+        if roll_forward:
+            from_i = i
+            to_i = i + window
+            if to_i > arr.shape[0]:
+                break
+        else:
+            from_i = i - window + 1
+            to_i = i + 1
+            if from_i < 0:
+                continue
+
         if np.random.uniform(0, 1) < row_select_prob:
             _vmin = vmin
             _vmax = vmax
             if min_max_required:
-                if np.isnan(_vmin):
-                    _vmin = np.nanmin(arr[i:i + window])
-                if np.isnan(_vmax):
-                    _vmax = np.nanmax(arr[i:i + window])
+                if np.isnan(_vmin) or np.isnan(_vmax):
+                    for j in range(from_i, to_i):
+                        if np.isnan(_vmin) or arr[j] < _vmin:
+                            _vmin = arr[j]
+                        if np.isnan(_vmax) or arr[j] > _vmax:
+                            _vmax = arr[j]
+
             for w in range(window, max_window + 1):
-                if i + w > arr.shape[0]:
-                    break
-                if min_max_required:
-                    if w > window:
-                        if arr[i + w - 1] < _vmin:
-                            _vmin = arr[i + w - 1]
-                        if arr[i + w - 1] > _vmax:
-                            _vmax = arr[i + w - 1]
-                if np.random.uniform(0, 1) < window_select_prob:
+                if roll_forward:
                     from_i = i
                     to_i = i + w
+                    if to_i > arr.shape[0]:
+                        break
+                    if min_max_required:
+                        if w > window:
+                            if arr[to_i - 1] < _vmin:
+                                _vmin = arr[to_i - 1]
+                            if arr[to_i - 1] > _vmax:
+                                _vmax = arr[to_i - 1]
+                else:
+                    from_i = i - w + 1
+                    to_i = i + 1
+                    if from_i < 0:
+                        continue
+                    if min_max_required:
+                        if w > window:
+                            if arr[from_i] < _vmin:
+                                _vmin = arr[from_i]
+                            if arr[from_i] > _vmax:
+                                _vmax = arr[from_i]
+
+                if np.random.uniform(0, 1) < window_select_prob:
                     arr_window = arr[from_i:to_i]
                     similarity = pattern_similarity_nb(
                         arr_window,
@@ -524,24 +564,45 @@ def find_pattern_1d_nb(
                         vmax=_vmax,
                         pmin=pmin,
                         pmax=pmax,
-                        min_pct_change=min_pct_change,
-                        max_pct_change=max_pct_change,
-                        distance_mode=distance_mode,
+                        invert=invert,
+                        error_type=error_type,
+                        distance_measure=distance_measure,
                         max_error=max_error,
                         max_error_interp_mode=max_error_interp_mode,
                         max_error_as_maxdist=max_error_as_maxdist,
                         max_error_strict=max_error_strict,
+                        min_pct_change=min_pct_change,
+                        max_pct_change=max_pct_change,
                         min_similarity=min_similarity,
+                        minp=minp,
                     )
                     if not np.isnan(similarity):
-                        if r > 0:
-                            overlap = records_out["end_idx"][r - 1] - from_i
-                            if overlap > 0:
-                                if max_overlap is not None and overlap > max_overlap:
+                        skip = False
+                        while True:
+                            if r > 0:
+                                if roll_forward:
+                                    prev_same_row = records_out["start_idx"][r - 1] == from_i
+                                else:
+                                    prev_same_row = records_out["end_idx"][r - 1] == to_i
+                                if overlap_mode != OverlapMode.AllowAll and prev_same_row:
                                     if similarity > records_out["similarity"][r - 1]:
                                         r -= 1
-                                    else:
                                         continue
+                                    else:
+                                        skip = True
+                                        break
+                                elif overlap_mode >= 0:
+                                    overlap = records_out["end_idx"][r - 1] - from_i
+                                    if overlap > overlap_mode:
+                                        if similarity > records_out["similarity"][r - 1]:
+                                            r -= 1
+                                            continue
+                                        else:
+                                            skip = True
+                                            break
+                            break
+                        if skip:
+                            continue
                         if r >= records_out.shape[0]:
                             raise IndexError("Records index out of range. Set a higher max_records.")
                         records_out["id"][r] = r
@@ -555,6 +616,7 @@ def find_pattern_1d_nb(
                             records_out["status"][r] = RangeStatus.Open
                         records_out["similarity"][r] = similarity
                         r += 1
+
     return records_out[:r]
 
 
@@ -565,23 +627,27 @@ def find_pattern_1d_nb(
         pattern=None,
         window=None,
         max_window=None,
-        window_select_prob=None,
         row_select_prob=None,
+        window_select_prob=None,
+        roll_forward=None,
         interp_mode=None,
         rescale_mode=None,
         vmin=None,
         vmax=None,
         pmin=None,
         pmax=None,
-        min_pct_change=None,
-        max_pct_change=None,
-        distance_mode=None,
+        invert=None,
+        error_type=None,
+        distance_measure=None,
         max_error=None,
         max_error_interp_mode=None,
         max_error_as_maxdist=None,
         max_error_strict=None,
+        min_pct_change=None,
+        max_pct_change=None,
         min_similarity=None,
-        max_overlap=None,
+        minp=None,
+        overlap_mode=None,
         max_records=None,
     ),
     merge_func=records_ch.merge_records,
@@ -592,23 +658,27 @@ def find_pattern_nb(
     pattern: tp.Array1d,
     window: tp.Optional[int] = None,
     max_window: tp.Optional[int] = None,
-    window_select_prob: float = 1.0,
     row_select_prob: float = 1.0,
+    window_select_prob: float = 1.0,
+    roll_forward: bool = False,
     interp_mode: int = InterpMode.Mixed,
     rescale_mode: int = RescaleMode.MinMax,
     vmin: float = np.nan,
     vmax: float = np.nan,
     pmin: float = np.nan,
     pmax: float = np.nan,
-    min_pct_change: float = np.nan,
-    max_pct_change: float = np.nan,
-    distance_mode: int = DistanceMode.MAE,
+    invert: bool = False,
+    error_type: int = ErrorType.Absolute,
+    distance_measure: int = DistanceMeasure.MAE,
     max_error: tp.FlexArray = np.asarray(np.nan),
     max_error_interp_mode: tp.Optional[int] = None,
     max_error_as_maxdist: bool = False,
     max_error_strict: bool = False,
+    min_pct_change: float = np.nan,
+    max_pct_change: float = np.nan,
     min_similarity: float = 0.85,
-    max_overlap: tp.Optional[int] = 0,
+    minp: tp.Optional[int] = None,
+    overlap_mode: int = OverlapMode.Disallow,
     max_records: tp.Optional[int] = None,
 ) -> tp.RecordArray:
     """2-dim version of `find_pattern_1d_nb`."""
@@ -623,29 +693,33 @@ def find_pattern_nb(
     record_counts = np.full(arr.shape[1], 0, dtype=np.int_)
     for col in prange(arr.shape[1]):
         records = find_pattern_1d_nb(
-            col,
             arr[:, col],
             pattern,
             window=window,
             max_window=max_window,
-            window_select_prob=window_select_prob,
             row_select_prob=row_select_prob,
+            window_select_prob=window_select_prob,
+            roll_forward=roll_forward,
             interp_mode=interp_mode,
             rescale_mode=rescale_mode,
             vmin=vmin,
             vmax=vmax,
             pmin=pmin,
             pmax=pmax,
-            min_pct_change=min_pct_change,
-            max_pct_change=max_pct_change,
-            distance_mode=distance_mode,
+            invert=invert,
+            error_type=error_type,
+            distance_measure=distance_measure,
             max_error=max_error,
             max_error_interp_mode=max_error_interp_mode,
             max_error_as_maxdist=max_error_as_maxdist,
             max_error_strict=max_error_strict,
+            min_pct_change=min_pct_change,
+            max_pct_change=max_pct_change,
             min_similarity=min_similarity,
-            max_overlap=max_overlap,
+            minp=minp,
+            overlap_mode=overlap_mode,
             max_records=max_records,
+            col=col,
         )
         record_counts[col] = records.shape[0]
         records_out[: records.shape[0], col] = records

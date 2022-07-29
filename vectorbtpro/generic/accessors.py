@@ -233,7 +233,7 @@ from vectorbtpro.generic.plots_builder import PlotsBuilderMixin
 from vectorbtpro.generic.ranges import Ranges, PatternRanges
 from vectorbtpro.generic.splitters import SplitterT, RangeSplitter, RollingSplitter, ExpandingSplitter
 from vectorbtpro.generic.stats_builder import StatsBuilderMixin
-from vectorbtpro.generic.enums import WType, InterpMode, RescaleMode, DistanceMode
+from vectorbtpro.generic.enums import WType, InterpMode, RescaleMode, ErrorType, DistanceMeasure
 from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
@@ -246,6 +246,7 @@ from vectorbtpro.utils.template import deep_substitute
 from vectorbtpro.utils.datetime_ import freq_to_timedelta64, try_to_datetime_index
 from vectorbtpro.utils.colors import adjust_opacity, map_value_to_cmap
 from vectorbtpro.utils.enum_ import map_enum_fields
+from vectorbtpro.utils.array_ import rescale
 
 try:  # pragma: no cover
     import bottleneck as bn
@@ -721,20 +722,26 @@ class GenericAccessor(BaseAccessor, Analyzable):
         self,
         pattern: tp.ArrayLike,
         window: tp.Optional[int] = None,
+        max_window: tp.Optional[int] = None,
+        row_select_prob: float = 1.0,
+        window_select_prob: float = 1.0,
         interp_mode: tp.Union[int, str] = "mixed",
         rescale_mode: tp.Union[int, str] = "minmax",
         vmin: float = np.nan,
         vmax: float = np.nan,
         pmin: float = np.nan,
         pmax: float = np.nan,
-        min_pct_change: float = np.nan,
-        max_pct_change: float = np.nan,
-        distance_mode: tp.Union[int, str] = "mae",
+        invert: bool = False,
+        error_type: tp.Union[int, str] = "absolute",
+        distance_measure: tp.Union[int, str] = "mae",
         max_error: tp.ArrayLike = np.nan,
         max_error_interp_mode: tp.Union[None, int, str] = None,
         max_error_as_maxdist: bool = False,
         max_error_strict: bool = False,
+        min_pct_change: float = np.nan,
+        max_pct_change: float = np.nan,
         min_similarity: float = np.nan,
+        minp: tp.Optional[int] = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
@@ -744,30 +751,41 @@ class GenericAccessor(BaseAccessor, Analyzable):
             interp_mode = map_enum_fields(interp_mode, InterpMode)
         if isinstance(rescale_mode, str):
             rescale_mode = map_enum_fields(rescale_mode, RescaleMode)
-        if isinstance(distance_mode, str):
-            distance_mode = map_enum_fields(distance_mode, DistanceMode)
+        if isinstance(error_type, str):
+            error_type = map_enum_fields(error_type, ErrorType)
+        if isinstance(distance_measure, str):
+            distance_measure = map_enum_fields(distance_measure, DistanceMeasure)
         if max_error_interp_mode is not None and isinstance(max_error_interp_mode, str):
             max_error_interp_mode = map_enum_fields(max_error_interp_mode, InterpMode)
+        if max_error_interp_mode is None:
+            max_error_interp_mode = interp_mode
+
         func = jit_reg.resolve_option(nb.rolling_pattern_similarity_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         out = func(
             self.to_2d_array(),
             reshaping.to_1d_array(pattern),
             window=window,
+            max_window=max_window,
+            row_select_prob=row_select_prob,
+            window_select_prob=window_select_prob,
             interp_mode=interp_mode,
             rescale_mode=rescale_mode,
             vmin=vmin,
             vmax=vmax,
             pmin=pmin,
             pmax=pmax,
-            min_pct_change=min_pct_change,
-            max_pct_change=max_pct_change,
-            distance_mode=distance_mode,
+            invert=invert,
+            error_type=error_type,
+            distance_measure=distance_measure,
             max_error=reshaping.to_1d_array(max_error),
             max_error_interp_mode=max_error_interp_mode,
             max_error_as_maxdist=max_error_as_maxdist,
             max_error_strict=max_error_strict,
+            min_pct_change=min_pct_change,
+            max_pct_change=max_pct_change,
             min_similarity=min_similarity,
+            minp=minp,
         )
         return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
@@ -4148,7 +4166,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             pos_obj.vbt.lineplot(
                 trace_kwargs=merge_dicts(
                     dict(
-                        fillcolor="rgba(0, 128, 0, 0.3)",
+                        fillcolor="rgba(0, 128, 0, 0.25)",
                         line=dict(color="rgba(0, 0, 0, 0)", width=0),
                         opacity=0,
                         fill="tonexty",
@@ -4185,7 +4203,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
                 trace_kwargs=merge_dicts(
                     dict(
                         line=dict(color="rgba(0, 0, 0, 0)", width=0),
-                        fillcolor="rgba(255, 0, 0, 0.3)",
+                        fillcolor="rgba(255, 0, 0, 0.25)",
                         opacity=0,
                         fill="tonexty",
                         connectgaps=False,
@@ -4577,6 +4595,256 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
 
         return fig
 
+    def plot_pattern(
+        self,
+        pattern: tp.ArrayLike,
+        interp_mode: tp.Union[int, str] = "mixed",
+        rescale_mode: tp.Union[int, str] = "minmax",
+        vmin: float = np.nan,
+        vmax: float = np.nan,
+        pmin: float = np.nan,
+        pmax: float = np.nan,
+        invert: bool = False,
+        error_type: tp.Union[int, str] = "absolute",
+        max_error: tp.ArrayLike = np.nan,
+        max_error_interp_mode: tp.Union[None, int, str] = None,
+        plot_obj: bool = True,
+        fill_distance: bool = False,
+        obj_trace_kwargs: tp.KwargsLike = None,
+        pattern_trace_kwargs: tp.KwargsLike = None,
+        lower_max_error_trace_kwargs: tp.KwargsLike = None,
+        upper_max_error_trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+    ) -> tp.BaseFigure:  # pragma: no cover
+        """Plot pattern.
+
+        Mimics the same similarity calculation procedure as implemented in
+        `vectorbtpro.generic.nb.patterns.pattern_similarity_nb`.
+
+        Usage:
+            ```pycon
+            >>> sr = pd.Series([10, 11, 12, 13, 12, 13, 14, 15, 13, 14, 11])
+            >>> df.vbt.plot_projections()
+            ```
+
+            ![](/assets/images/sr_plot_pattern.svg)"""
+        from vectorbtpro.utils.opt_packages import assert_can_import
+
+        assert_can_import("plotly")
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
+
+        if isinstance(interp_mode, str):
+            interp_mode = map_enum_fields(interp_mode, InterpMode)
+        if isinstance(rescale_mode, str):
+            rescale_mode = map_enum_fields(rescale_mode, RescaleMode)
+        if isinstance(error_type, str):
+            error_type = map_enum_fields(error_type, ErrorType)
+        if max_error_interp_mode is not None and isinstance(max_error_interp_mode, str):
+            max_error_interp_mode = map_enum_fields(max_error_interp_mode, InterpMode)
+        if max_error_interp_mode is None:
+            max_error_interp_mode = interp_mode
+
+        obj_trace_kwargs = merge_dicts(
+            dict(line=dict(color=plotting_cfg["color_schema"]["blue"])),
+            obj_trace_kwargs,
+        )
+        if pattern_trace_kwargs is None:
+            pattern_trace_kwargs = {}
+        if lower_max_error_trace_kwargs is None:
+            lower_max_error_trace_kwargs = {}
+        if upper_max_error_trace_kwargs is None:
+            upper_max_error_trace_kwargs = {}
+
+        obj = self.obj
+        if plot_obj:
+            # Plot object
+            fig = self.lineplot(
+                trace_kwargs=obj_trace_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                fig=fig,
+            )
+
+        # Reconstruct pattern and max error bands
+        # Must do the same and in the same order as in the pattern similarity function!
+        pattern = reshaping.to_1d_array(pattern)
+        max_error = np.broadcast_to(max_error, (len(pattern),))
+        # Rescale for calculations
+        if obj.shape[0] < pattern.shape[0]:
+            obj = nb.interp_resize_1d_nb(
+                obj,
+                len(pattern),
+                interp_mode,
+            )
+        elif pattern.shape[0] < obj.shape[0]:
+            pattern = nb.interp_resize_1d_nb(
+                pattern,
+                len(obj),
+                interp_mode,
+            )
+            max_error = nb.interp_resize_1d_nb(
+                max_error,
+                len(obj),
+                max_error_interp_mode,
+            )
+        if np.isnan(vmin):
+            vmin = np.nanmin(obj)
+        else:
+            vmin = vmin
+        if np.isnan(vmax):
+            vmax = np.nanmax(obj)
+        else:
+            vmax = vmax
+        if np.isnan(pmin):
+            pmin = np.nanmin(pattern)
+        else:
+            pmin = pmin
+        if np.isnan(pmax):
+            pmax = np.nanmax(pattern)
+        else:
+            pmax = pmax
+        if invert:
+            pattern = pmax + pmin - pattern
+        if rescale_mode == RescaleMode.Rebase:
+            if not np.isnan(pmin):
+                pmin = pmin / pattern[0] * obj.values[0]
+            if not np.isnan(pmax):
+                pmax = pmax / pattern[0] * obj.values[0]
+        if rescale_mode == RescaleMode.Rebase:
+            pattern = pattern / pattern[0] * obj.values[0]
+            max_error = max_error * pattern
+        pattern = np.clip(pattern, pmin, pmax)
+        if rescale_mode == RescaleMode.MinMax:
+            pattern = rescale(pattern, (pmin, pmax), (vmin, vmax))
+            if error_type == ErrorType.Absolute:
+                max_error = max_error / (pmax - pmin) * (vmax - vmin)
+            else:
+                max_error = max_error * pattern
+        if pattern.shape[0] != len(obj):
+            # Rescale for plotting
+            pattern = nb.interp_resize_1d_nb(
+                pattern,
+                len(obj),
+                InterpMode.Linear,
+            )
+            max_error = nb.interp_resize_1d_nb(
+                max_error,
+                len(obj),
+                InterpMode.Linear,
+            )
+        pattern_sr = pd.Series(pattern, index=obj.index)
+        max_error_sr = pd.Series(max_error, index=obj.index)
+
+        def_pattern_trace_kwargs = dict(
+            name=f"Pattern",
+            connectgaps=True,
+        )
+        if interp_mode == InterpMode.Discrete:
+            _pattern_trace_kwargs = merge_dicts(
+                def_pattern_trace_kwargs,
+                dict(
+                    mode="lines+markers",
+                    marker=dict(color=adjust_opacity(plotting_cfg["color_schema"]["cyan"], 0.75)),
+                    line=dict(color=adjust_opacity(plotting_cfg["color_schema"]["gray"], 0.75), dash="dot"),
+                ),
+                pattern_trace_kwargs,
+            )
+        else:
+            if fill_distance:
+                _pattern_trace_kwargs = merge_dicts(
+                    def_pattern_trace_kwargs,
+                    dict(
+                        mode="lines",
+                        line=dict(color=adjust_opacity(plotting_cfg["color_schema"]["cyan"], 0.75)),
+                        fill="tonexty",
+                        fillcolor=adjust_opacity(plotting_cfg["color_schema"]["cyan"], 0.25),
+                    ),
+                    pattern_trace_kwargs,
+                )
+            else:
+                _pattern_trace_kwargs = merge_dicts(
+                    def_pattern_trace_kwargs,
+                    dict(
+                        mode="lines",
+                        line=dict(color=adjust_opacity(plotting_cfg["color_schema"]["cyan"], 0.75), dash="dot"),
+                    ),
+                    pattern_trace_kwargs,
+                )
+        fig = pattern_sr.rename(None).vbt.plot(
+            trace_kwargs=_pattern_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+        )
+
+        # Plot max error bounds
+        if not np.isnan(max_error).all():
+            def_max_error_trace_kwargs = dict(
+                name="Max error",
+                connectgaps=True,
+            )
+            if max_error_interp_mode == InterpMode.Discrete:
+                _lower_max_error_trace_kwargs = merge_dicts(
+                    def_max_error_trace_kwargs,
+                    dict(
+                        mode="markers+lines",
+                        marker=dict(color=adjust_opacity(plotting_cfg["color_schema"]["pink"], 0.5)),
+                        line=dict(
+                            color=adjust_opacity(plotting_cfg["color_schema"]["gray"], 0.5), dash="dot"
+                        ),
+                    ),
+                    lower_max_error_trace_kwargs,
+                )
+                _upper_max_error_trace_kwargs = merge_dicts(
+                    def_max_error_trace_kwargs,
+                    dict(
+                        mode="markers+lines",
+                        marker=dict(color=adjust_opacity(plotting_cfg["color_schema"]["pink"], 0.5)),
+                        line=dict(
+                            color=adjust_opacity(plotting_cfg["color_schema"]["gray"], 0.5), dash="dot"
+                        ),
+                        showlegend=False,
+                    ),
+                    upper_max_error_trace_kwargs,
+                )
+            else:
+                _lower_max_error_trace_kwargs = merge_dicts(
+                    def_max_error_trace_kwargs,
+                    dict(
+                        mode="lines",
+                        line=dict(
+                            color=adjust_opacity(plotting_cfg["color_schema"]["pink"], 0.5), dash="dot"
+                        ),
+                    ),
+                    lower_max_error_trace_kwargs,
+                )
+                _upper_max_error_trace_kwargs = merge_dicts(
+                    def_max_error_trace_kwargs,
+                    dict(
+                        mode="lines",
+                        line=dict(
+                            color=adjust_opacity(plotting_cfg["color_schema"]["pink"], 0.5), dash="dot"
+                        ),
+                        fillcolor=adjust_opacity(plotting_cfg["color_schema"]["pink"], 0.1),
+                        fill="tonexty",
+                        showlegend=False,
+                    ),
+                    upper_max_error_trace_kwargs,
+                )
+            fig = (pattern_sr - max_error_sr).rename(None).vbt.plot(
+                trace_kwargs=_lower_max_error_trace_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                fig=fig,
+            )
+            fig = (pattern_sr + max_error_sr).rename(None).vbt.plot(
+                trace_kwargs=_upper_max_error_trace_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                fig=fig,
+            )
+
+        return fig
+
 
 class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
     """Accessor on top of data of any type. For DataFrames only.
@@ -4660,8 +4928,8 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
         * "Q=50%": 50th quantile
         * "Q=0.5": 50th quantile
         * "Z=1.96": Z-score of 1.96
-        * "P=95%": One-tailed p-value of 0.95 (translated into z-score)
-        * "P=0.95": One-tailed p-value of 0.95 (translated into z-score)
+        * "P=95%": One-tailed significance level of 0.95 (translated into z-score)
+        * "P=0.95": One-tailed significance level of 0.95 (translated into z-score)
         * "median": Median (50th quantile)
         * "mean": Mean across all projections
         * "min": Min across all projections
@@ -4672,7 +4940,7 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
 
         !!! note
             When providing z-scores, the upper should be positive, the middle should be "mean", and
-            the lower should be negative. When providing p-values, the middle should be "mean", while
+            the lower should be negative. When providing significance levels, the middle should be "mean", while
             the lower should be positive and lower than the upper, for example, 25% and 75%.
 
         Argument `colorize` allows the following values:
@@ -4682,7 +4950,8 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
         * "median": Median
         * "mean": Mean
         * "last": Last value
-        * callable: Custom function that accepts (normalized to 0) Series/DataFrame and reduces it across rows
+        * callable: Custom function that accepts (rebased to 0) Series/DataFrame with
+            nans already dropped and reduces it across rows
 
         Colorization is performed by mapping the metric value of the band to the range between the
         minimum and maximum value across all projections where 0 is always the middle point.
@@ -4852,7 +5121,7 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
             if plot_projections:
                 # Plot projections
                 for col in range(self.wrapper.shape[1]):
-                    proj_sr = self.obj.iloc[:, col]
+                    proj_sr = self.obj.iloc[:, col].dropna()
                     hovertemplate = f"(%{{x}}, %{{y}})"
                     if not checks.is_default_index(self.wrapper.columns):
                         level_names = []
@@ -4894,13 +5163,14 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
                     else:
                         proj_color = plotting_cfg["color_schema"]["gray"]
                     if not plot_bands:
-                        proj_color = adjust_opacity(proj_color, 0.5)
+                        proj_opacity = 0.5
                     else:
-                        proj_color = adjust_opacity(proj_color, 0.1)
+                        proj_opacity = 0.1
                     _projection_trace_kwargs = merge_dicts(
                         dict(
                             name=f"proj ({self.obj.shape[1]})",
                             line=dict(color=proj_color),
+                            opacity=proj_opacity,
                             legendgroup="proj",
                             showlegend=col == 0,
                             hovertemplate=hovertemplate,
@@ -4916,19 +5186,19 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
         if plot_bands and len(self.obj.columns) > 1:
             # Calculate bands
             if plot_lower is not None:
-                lower_band = plot_lower(self.obj)
+                lower_band = plot_lower(self.obj).dropna()
             else:
                 lower_band = None
             if plot_middle is not None:
-                middle_band = plot_middle(self.obj)
+                middle_band = plot_middle(self.obj).dropna()
             else:
                 middle_band = None
             if plot_upper is not None:
-                upper_band = plot_upper(self.obj)
+                upper_band = plot_upper(self.obj).dropna()
             else:
                 upper_band = None
             if plot_aux_middle is not None:
-                aux_middle_band = plot_aux_middle(self.obj)
+                aux_middle_band = plot_aux_middle(self.obj).dropna()
             else:
                 aux_middle_band = None
 

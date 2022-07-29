@@ -1805,12 +1805,13 @@ class SignalsAccessor(GenericAccessor):
     ) -> Ranges:
         """Build a record array of the type `vectorbtpro.generic.ranges.Ranges`
         from a delta applied after each signal (or before if delta is negative)."""
-        return Ranges.from_delta(self.to_mapped(), delta, **kwargs).regroup(group_by)
+        return Ranges.from_delta(self.to_mapped(), delta=delta, **kwargs).regroup(group_by)
 
     def between_ranges(
         self,
         other: tp.Optional[tp.ArrayLike] = None,
         from_other: bool = False,
+        incl_open: bool = False,
         broadcast_kwargs: tp.KwargsLike = None,
         group_by: tp.GroupByLike = None,
         attach_other: bool = False,
@@ -1885,7 +1886,7 @@ class SignalsAccessor(GenericAccessor):
             # One input array
             func = jit_reg.resolve_option(nb.between_ranges_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
-            range_records = func(self.to_2d_array())
+            range_records = func(self.to_2d_array(), incl_open=incl_open)
             wrapper = self.wrapper
             to_attach = self.obj
         else:
@@ -1895,7 +1896,12 @@ class SignalsAccessor(GenericAccessor):
             other = broadcasted_args["other"]
             func = jit_reg.resolve_option(nb.between_two_ranges_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
-            range_records = func(reshaping.to_2d_array(obj), reshaping.to_2d_array(other), from_other=from_other)
+            range_records = func(
+                reshaping.to_2d_array(obj),
+                reshaping.to_2d_array(other),
+                from_other=from_other,
+                incl_open=incl_open,
+            )
             wrapper = ArrayWrapper.from_obj(obj)
             to_attach = other if attach_other else obj
         kwargs = merge_dicts(dict(close=to_attach), kwargs)

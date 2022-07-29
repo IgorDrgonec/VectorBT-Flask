@@ -4386,7 +4386,7 @@ class TestBasic:
                 rescale_mode=["minmax", "rebase"],
                 max_error=[np.nan, 0.1],
                 max_error_interp_mode=[None, "discrete"],
-            ).similarity,
+            ).sim,
             pd.DataFrame(
                 np.array(
                     [
@@ -4395,8 +4395,8 @@ class TestBasic:
                         [0.5, np.nan],
                         [0.5, 0.5],
                         [1.0, 0.25],
-                        [0.5, 0.5],
-                        [0.5, 0.25],
+                        [0.5, 0.4285714285714286],
+                        [0.5, 0.18181818181818177],
                     ]
                 ),
                 index=close_ts.index,
@@ -4414,7 +4414,7 @@ class TestBasic:
                 max_error=[np.nan, 0.1],
                 max_error_interp_mode=[None, "discrete"],
                 per_column=True,
-            ).similarity,
+            ).sim,
             vbt.PATSIM.run(
                 close_ts,
                 [np.array([1, 2, 1]), np.array([1, 2, 1, 2])],
@@ -4422,5 +4422,5 @@ class TestBasic:
                 max_error=[np.nan, 0.1],
                 max_error_interp_mode=[None, "discrete"],
                 per_column=False,
-            ).similarity,
+            ).sim,
         )

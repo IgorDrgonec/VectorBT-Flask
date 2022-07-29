@@ -14,7 +14,9 @@ __all__ = [
     "RangeStatus",
     "InterpMode",
     "RescaleMode",
-    "DistanceMode",
+    "ErrorType",
+    "DistanceMeasure",
+    "OverlapMode",
     "DrawdownStatus",
     "range_dt",
     "pattern_range_dt",
@@ -155,27 +157,76 @@ Attributes:
 """
 
 
-class DistanceModeT(tp.NamedTuple):
+class ErrorTypeT(tp.NamedTuple):
+    Absolute: int = 0
+    Relative: int = 1
+
+
+ErrorType = ErrorTypeT()
+"""_"""
+
+__pdoc__[
+    "ErrorType"
+] = f"""Error type.
+
+```python
+{prettify(ErrorType)}
+```
+
+Attributes:
+    Absolute: Absolute error, that is, `x1 - x0`.
+    Relative: Relative error, that is, `(x1 - x0) / x0`.
+"""
+
+
+class DistanceMeasureT(tp.NamedTuple):
     MAE: int = 0
     MSE: int = 1
     RMSE: int = 2
 
 
-DistanceMode = DistanceModeT()
+DistanceMeasure = DistanceMeasureT()
 """_"""
 
 __pdoc__[
-    "DistanceMode"
-] = f"""Distance mode.
+    "DistanceMeasure"
+] = f"""Distance measure.
 
 ```python
-{prettify(DistanceMode)}
+{prettify(DistanceMeasure)}
 ```
 
 Attributes:
     MAE: Mean absolute error.
     MSE: Mean squared error.
     RMSE: Root mean squared error.
+"""
+
+
+class OverlapModeT(tp.NamedTuple):
+    AllowAll: int = -2
+    Allow: int = -1
+    Disallow: int = 0
+
+
+OverlapMode = OverlapModeT()
+"""_"""
+
+__pdoc__[
+    "OverlapMode"
+] = f"""Overlapping mode.
+
+```python
+{prettify(OverlapMode)}
+```
+
+Attributes:
+    AllowAll: Allow any overlapping ranges, even if they start at the same row.
+    Allow: Allow overlapping ranges, but only if they do not start at the same row.
+    Disallow: Disallow any overlapping ranges.
+    
+Any other positive number will check whether the intersection of each two consecutive ranges is 
+bigger than that number of rows, and if so, the range with the highest similarity will be selected.
 """
 
 

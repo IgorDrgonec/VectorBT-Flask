@@ -1232,22 +1232,27 @@ PATSIM = IndicatorFactory(
     param_names=[
         "pattern",
         "window",
+        "max_window",
+        "row_select_prob",
+        "window_select_prob",
         "interp_mode",
         "rescale_mode",
         "vmin",
         "vmax",
         "pmin",
         "pmax",
-        "min_pct_change",
-        "max_pct_change",
-        "distance_mode",
+        "invert",
+        "error_type",
+        "distance_measure",
         "max_error",
         "max_error_interp_mode",
         "max_error_as_maxdist",
         "max_error_strict",
+        "min_pct_change",
+        "max_pct_change",
         "min_similarity",
     ],
-    output_names=["similarity"],
+    output_names=["sim"],
 ).with_apply_func(
     generic_nb.rolling_pattern_similarity_nb,
     param_settings=dict(
@@ -1260,8 +1265,12 @@ PATSIM = IndicatorFactory(
             dtype=generic_enums.RescaleMode,
             post_index_func=lambda index: index.str.lower(),
         ),
-        distance_mode=dict(
-            dtype=generic_enums.DistanceMode,
+        error_type=dict(
+            dtype=generic_enums.ErrorType,
+            post_index_func=lambda index: index.str.lower(),
+        ),
+        distance_measure=dict(
+            dtype=generic_enums.DistanceMeasure,
             post_index_func=lambda index: index.str.lower(),
         ),
         max_error=dict(is_array_like=True),
@@ -1271,19 +1280,24 @@ PATSIM = IndicatorFactory(
         ),
     ),
     window=None,
+    max_window=None,
+    row_select_prob=1.0,
+    window_select_prob=1.0,
     interp_mode="mixed",
     rescale_mode="minmax",
     vmin=np.nan,
     vmax=np.nan,
     pmin=np.nan,
     pmax=np.nan,
-    min_pct_change=np.nan,
-    max_pct_change=np.nan,
-    distance_mode="mae",
+    invert=False,
+    error_type="absolute",
+    distance_measure="mae",
     max_error=np.nan,
     max_error_interp_mode=None,
     max_error_as_maxdist=False,
     max_error_strict=False,
+    min_pct_change=np.nan,
+    max_pct_change=np.nan,
     min_similarity=np.nan,
 )
 
@@ -1296,7 +1310,7 @@ class _PATSIM(PATSIM):
     def plot(
         self,
         column: tp.Optional[tp.Label] = None,
-        similarity_trace_kwargs: tp.KwargsLike = None,
+        sim_trace_kwargs: tp.KwargsLike = None,
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs
@@ -1305,7 +1319,7 @@ class _PATSIM(PATSIM):
 
         Args:
             column (str): Name of the column to plot.
-            similarity_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `PATSIM.similarity`.
+            sim_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `PATSIM.sim`.
             add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments passed to `fig.update_layout`.
@@ -1323,42 +1337,48 @@ class _PATSIM(PATSIM):
 
         self_col = self.select_col(column=column)
 
-        similarity_trace_kwargs = merge_dicts(
+        sim_trace_kwargs = merge_dicts(
             dict(name="Similarity", line=dict(color=plotting_cfg["color_schema"]["lightblue"])),
-            similarity_trace_kwargs,
+            sim_trace_kwargs,
         )
-
-        fig = self_col.similarity.vbt.lineplot(
-            trace_kwargs=similarity_trace_kwargs,
+        fig = self_col.sim.vbt.lineplot(
+            trace_kwargs=sim_trace_kwargs,
             add_trace_kwargs=add_trace_kwargs,
             fig=fig,
-            **layout_kwargs,
         )
+
+        yaxis = getattr(fig.data[-1], "yaxis", None)
+        if yaxis is None:
+            yaxis = "y"
+        default_layout = dict()
+        default_layout[yaxis.replace("y", "yaxis")] = dict(tickformat=",.0%")
+        fig.update_layout(**default_layout)
+        fig.update_layout(**layout_kwargs)
 
         return fig
 
-    def plot_heatmap(
+    def overlay_with_heatmap(
         self,
         column: tp.Optional[tp.Label] = None,
         close_trace_kwargs: tp.KwargsLike = None,
-        similarity_trace_kwargs: tp.KwargsLike = None,
+        sim_trace_kwargs: tp.KwargsLike = None,
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs
     ) -> tp.BaseFigure:  # pragma: no cover
-        """Overlay `PATSIM.similarity` as a heatmap on top of `PATSIM.close`.
+        """Overlay `PATSIM.sim` as a heatmap on top of `PATSIM.close`.
 
         Args:
             column (str): Name of the column to plot.
             close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `PATSIM.close`.
-            similarity_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Heatmap` for `PATSIM.similarity`.
+            sim_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Heatmap` for `PATSIM.sim`.
             add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments passed to `fig.update_layout`.
 
         Usage:
             ```pycon
-            >>> vbt.PATSIM.run(ohlcv['Close'], np.array([1, 2, 3, 2, 1]), 30).plot_heatmap()
+            >>> vbt.PATSIM.run(ohlcv['Close'], np.array([1, 2, 3, 2, 1]), 30).overlay_with_heatmap()
             ```
 
             ![](/assets/images/PATSIM_heatmap.svg)
@@ -1371,14 +1391,15 @@ class _PATSIM(PATSIM):
 
         if close_trace_kwargs is None:
             close_trace_kwargs = {}
-        if similarity_trace_kwargs is None:
-            similarity_trace_kwargs = {}
+        if sim_trace_kwargs is None:
+            sim_trace_kwargs = {}
         close_trace_kwargs = merge_dicts(
             dict(name="Close", line=dict(color=plotting_cfg["color_schema"]["blue"])),
             close_trace_kwargs,
         )
-        similarity_trace_kwargs = merge_dicts(
+        sim_trace_kwargs = merge_dicts(
             dict(
+                colorbar=dict(tickformat=",.0%"),
                 colorscale=[
                     [0.0, "rgba(0, 0, 0, 0)"],
                     [1.0, plotting_cfg["color_schema"]["lightpurple"]],
@@ -1386,13 +1407,12 @@ class _PATSIM(PATSIM):
                 zmin=0,
                 zmax=1,
             ),
-            similarity_trace_kwargs,
+            sim_trace_kwargs,
         )
-
         fig = self_col.close.vbt.overlay_with_heatmap(
-            self_col.similarity,
+            self_col.sim,
             trace_kwargs=close_trace_kwargs,
-            heatmap_kwargs=dict(y_labels=["Similarity"], trace_kwargs=similarity_trace_kwargs),
+            heatmap_kwargs=dict(y_labels=["Similarity"], trace_kwargs=sim_trace_kwargs),
             add_trace_kwargs=add_trace_kwargs,
             fig=fig,
             **layout_kwargs,
@@ -1403,7 +1423,7 @@ class _PATSIM(PATSIM):
 
 setattr(PATSIM, "__doc__", _PATSIM.__doc__)
 setattr(PATSIM, "plot", _PATSIM.plot)
-setattr(PATSIM, "plot_heatmap", _PATSIM.plot_heatmap)
+setattr(PATSIM, "overlay_with_heatmap", _PATSIM.overlay_with_heatmap)
 
 
 # ############# VWAP ############# #

@@ -2252,7 +2252,7 @@ class PortfolioOptimizer(Analyzable):
         else:
             colors = px.colors.qualitative.Alphabet
 
-        fig = filled_alloc_df.droplevel(level=0, axis=1).vbt.plot(
+        fig = filled_alloc_df.droplevel(level=0, axis=1).vbt.lineplot(
             trace_kwargs=[
                 merge_dicts(
                     dict(

@@ -497,7 +497,7 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
             settings=dict(
                 id=dict(name="id", title="Id", mapping="ids"),
                 col=dict(name="col", title="Column", mapping="columns", as_customdata=False),
-                idx=dict(name="idx", title="Timestamp", mapping="index"),
+                idx=dict(name="idx", title="Index", mapping="index"),
             ),
         )
     )
@@ -932,11 +932,17 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
         """Get the mapped array on the field, with index applied. Uses `Records.field_config`."""
         return self.get_map_field(field, **kwargs).to_index(minus_one_to_zero=minus_one_to_zero)
 
+    def get_map_field_to_columns(self, field: str, **kwargs) -> tp.Index:
+        """Get the mapped array on the field, with columns applied. Uses `Records.field_config`."""
+        return self.get_map_field(field, **kwargs).to_columns()
+
     def get_apply_mapping_arr(self, field: str, mapping_kwargs: tp.KwargsLike = None, **kwargs) -> tp.Array1d:
         """Get the mapped array on the field, with mapping applied. Uses `Records.field_config`."""
         mapping = self.get_field_mapping(field)
         if isinstance(mapping, str) and mapping == "index":
             return self.get_map_field_to_index(field, **kwargs).values
+        if isinstance(mapping, str) and mapping == "columns":
+            return self.get_map_field_to_columns(field, **kwargs).values
         return self.get_map_field(field, **kwargs).apply_mapping(mapping_kwargs=mapping_kwargs).values
 
     def get_apply_mapping_str_arr(self, field: str, mapping_kwargs: tp.KwargsLike = None, **kwargs) -> tp.Array1d:
@@ -944,6 +950,8 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
         mapping = self.get_field_mapping(field)
         if isinstance(mapping, str) and mapping == "index":
             return self.get_map_field_to_index(field, **kwargs).astype(str).values
+        if isinstance(mapping, str) and mapping == "columns":
+            return self.get_map_field_to_columns(field, **kwargs).astype(str).values
         return self.get_map_field(field, **kwargs).apply_mapping(mapping_kwargs=mapping_kwargs).values.astype(str)
 
     @property

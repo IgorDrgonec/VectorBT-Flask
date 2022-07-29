@@ -975,13 +975,30 @@ class MappedArray(Analyzable):
 
         If `minus_one_to_zero` is True, index -1 will automatically become 0.
         Otherwise, will throw an error."""
-        if -1 in self.values:
-            if not minus_one_to_zero:
-                raise ValueError("Cannot get index at position -1")
+        if np.isin(-1, self.values):
+            nan_mask = self.values == -1
             values = self.values.copy()
-            values[-1] = 0
-            return self.wrapper.index[values]
+            values[nan_mask] = 0
+            if minus_one_to_zero:
+                return self.wrapper.index[values]
+            if self.wrapper.index.is_integer():
+                new_values = self.wrapper.index.values[values]
+                new_values[nan_mask] = -1
+                return pd.Index(new_values, name=self.wrapper.index.name)
+            if isinstance(self.wrapper.index, pd.DatetimeIndex):
+                new_values = self.wrapper.index.values[values]
+                new_values[nan_mask] = np.datetime64('NaT')
+                return pd.Index(new_values, name=self.wrapper.index.name)
+            new_values = self.wrapper.index.values[values]
+            new_values[nan_mask] = np.nan
+            return pd.Index(new_values, name=self.wrapper.index.name)
         return self.wrapper.index[self.values]
+
+    def to_columns(self) -> tp.Index:
+        """Convert to columns."""
+        if np.isin(-1, self.values):
+            raise ValueError("Cannot get index at position -1")
+        return self.wrapper.columns[self.values]
 
     @class_or_instancemethod
     def apply(

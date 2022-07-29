@@ -101,7 +101,7 @@ logs_field_config = ReadonlyConfig(
         settings=dict(
             id=dict(title=("Meta", "Log Id")),
             col=dict(title=("Meta", "Column")),
-            idx=dict(title=("Meta", "Timestamp")),
+            idx=dict(title=("Meta", "Index")),
             group=dict(title=("Meta", "Group")),
             price_area_open=dict(title=("Price Area", "Open")),
             price_area_high=dict(title=("Price Area", "High")),

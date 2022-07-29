@@ -385,10 +385,6 @@ class Scatter(Configured, TraceUpdater):
             trace_names = [trace_names]
         if x_labels is not None:
             x_labels = clean_labels(x_labels)
-        if use_gl is None:
-            use_gl = plotting_cfg["use_gl"]
-        if use_gl is None:
-            use_gl = use_gl is None and data is not None and data.size >= 10000
 
         if fig is None:
             fig = make_figure(**resolve_dict(make_figure_kwargs))
@@ -396,10 +392,15 @@ class Scatter(Configured, TraceUpdater):
 
         for i, trace_name in enumerate(trace_names):
             _trace_kwargs = resolve_dict(trace_kwargs, i=i)
+            _use_gl = _trace_kwargs.pop("use_gl", use_gl)
+            if _use_gl is None:
+                _use_gl = plotting_cfg["use_gl"]
+            if _use_gl is None:
+                _use_gl = _use_gl is None and data is not None and data.size >= 10000
             trace_name = _trace_kwargs.pop("name", trace_name)
             if trace_name is not None:
                 trace_name = str(trace_name)
-            if use_gl:
+            if _use_gl:
                 scatter_obj = go.Scattergl
             else:
                 scatter_obj = go.Scatter

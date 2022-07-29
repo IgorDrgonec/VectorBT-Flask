@@ -1268,7 +1268,13 @@ def broadcast(
                 value = value[None]
             elif value.ndim > 1:
                 raise ValueError(f"Product parameter '{k}' cannot be multi-dimensional")
-            param_dct[k] = Param(value, product_idx=bco_obj.product_idx, keys=bco_obj.keys)
+            param_dct[k] = Param(
+                value,
+                is_tuple=False,
+                is_array_like=False,
+                product_idx=bco_obj.product_idx,
+                keys=bco_obj.keys
+            )
         param_product, param_columns = combine_params(
             param_dct,
             random_subset=random_subset,

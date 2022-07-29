@@ -1909,7 +1909,7 @@ class TestRecords:
                     [1, "c", "y", 11.0, 20.0],
                     [2, "c", "z", 10.0, 21.0],
                 ],
-                columns=pd.Index(["Id", "Column", "Timestamp", "some_field1", "some_field2"], dtype="object"),
+                columns=pd.Index(["Id", "Column", "Index", "some_field1", "some_field2"], dtype="object"),
             ),
         )
 
@@ -2535,7 +2535,7 @@ class TestRanges:
         np.testing.assert_array_equal(records_readable["Range Id"].values, np.array([0, 1, 2, 0, 0]))
         np.testing.assert_array_equal(records_readable["Column"].values, np.array(["a", "a", "a", "b", "c"]))
         np.testing.assert_array_equal(
-            records_readable["Start Timestamp"].values,
+            records_readable["Start Index"].values,
             np.array(
                 [
                     "2020-01-01T00:00:00.000000000",
@@ -2548,7 +2548,7 @@ class TestRanges:
             ),
         )
         np.testing.assert_array_equal(
-            records_readable["End Timestamp"].values,
+            records_readable["End Index"].values,
             np.array(
                 [
                     "2020-01-02T00:00:00.000000000",
@@ -2935,7 +2935,7 @@ class TestRanges:
             ),
         )
         assert_frame_equal(
-            ranges.get_projections(normalize=False),
+            ranges.get_projections(rebase=False),
             pd.DataFrame(
                 [
                     [1.0, 3.0, 5.0, 4.0, 1.0],
@@ -3226,14 +3226,14 @@ pattern_ranges = vbt.PatternRanges.from_pattern_search(
     [1, 2, 1],
     interp_mode="linear",
     min_similarity=0,
-    max_overlap=None,
+    overlap_mode="allowall",
 )
 pattern_ranges_grouped = vbt.PatternRanges.from_pattern_search(
     ts2,
     [1, 2, 1],
     interp_mode="linear",
     min_similarity=0,
-    max_overlap=None,
+    overlap_mode="allowall",
     wrapper_kwargs=dict(group_by=group_by),
 )
 
@@ -3245,10 +3245,10 @@ class TestPatternRanges:
             {"a": [1, 2, 3, 2, 3, 4, 3], "b": [4, 3, 2, 3, 2, 1, 2]}, index=pd.date_range("2020-01-08", periods=7)
         )
         pattern_ranges1 = vbt.PatternRanges.from_pattern_search(
-            sr, [1, 2, 1], interp_mode="linear", min_similarity=0, max_overlap=None
+            sr, [1, 2, 1], interp_mode="linear", min_similarity=0, overlap_mode="allowall"
         )
         pattern_ranges2 = vbt.PatternRanges.from_pattern_search(
-            df, [1, 2, 1], interp_mode="linear", min_similarity=0, max_overlap=None
+            df, [1, 2, 1], interp_mode="linear", min_similarity=0, overlap_mode="allowall"
         )
         new_pattern_ranges = vbt.PatternRanges.row_stack(pattern_ranges1, pattern_ranges2)
         assert_records_close(
@@ -3285,17 +3285,17 @@ class TestPatternRanges:
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
             ),
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
             ),
         ]
         pattern_ranges3 = vbt.PatternRanges.from_pattern_search(
-            df, [1, 2, 1], interp_mode="linear", min_similarity=0.5, max_overlap=None
+            df, [1, 2, 1], interp_mode="linear", min_similarity=0.5, overlap_mode="allowall"
         )
         with pytest.raises(Exception):
             vbt.PatternRanges.row_stack(pattern_ranges1, pattern_ranges3)
@@ -3306,10 +3306,10 @@ class TestPatternRanges:
             {"b": [1, 2, 3, 2, 3, 4, 3], "c": [4, 3, 2, 3, 2, 1, 2]}, index=pd.date_range("2020-01-03", periods=7)
         )
         pattern_ranges1 = vbt.PatternRanges.from_pattern_search(
-            sr, [1, 2, 1], interp_mode="linear", min_similarity=0, max_overlap=None
+            sr, [1, 2, 1], interp_mode="linear", min_similarity=0, overlap_mode="allowall"
         )
         pattern_ranges2 = vbt.PatternRanges.from_pattern_search(
-            df, [1, 2, 1], interp_mode="linear", min_similarity=0.5, max_overlap=None
+            df, [1, 2, 1], interp_mode="linear", min_similarity=0.5, overlap_mode="allowall"
         )
         new_pattern_ranges = vbt.PatternRanges.column_stack(pattern_ranges1, pattern_ranges2)
         assert_records_close(
@@ -3338,19 +3338,19 @@ class TestPatternRanges:
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
             ),
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
                 min_similarity=0.5,
-                max_overlap=None,
+                overlap_mode="allowall",
             ),
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
                 min_similarity=0.5,
-                max_overlap=None,
+                overlap_mode="allowall",
             ),
         ]
 
@@ -3373,13 +3373,13 @@ class TestPatternRanges:
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
             ),
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
             ),
         ]
 
@@ -3389,8 +3389,9 @@ class TestPatternRanges:
                 ts2,
                 [1, 2, 1],
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             ).values,
             np.array(
@@ -3422,8 +3423,9 @@ class TestPatternRanges:
                 window=2,
                 max_window=4,
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             ).values,
             np.array(
@@ -3487,8 +3489,9 @@ class TestPatternRanges:
                 window=2,
                 max_window=4,
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
                 window_select_prob=0.5,
                 seed=42,
@@ -3531,8 +3534,9 @@ class TestPatternRanges:
                 window=2,
                 max_window=4,
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
                 row_select_prob=0.5,
                 seed=42,
@@ -3572,8 +3576,9 @@ class TestPatternRanges:
                 ts2,
                 [1, 2, 1],
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
                 jitted=dict(parallel=True),
             ).values,
@@ -3581,8 +3586,9 @@ class TestPatternRanges:
                 ts2,
                 [1, 2, 1],
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
                 jitted=dict(parallel=True),
             ).values,
@@ -3592,8 +3598,9 @@ class TestPatternRanges:
             ts2["a"],
             [1, 2, 1],
             interp_mode="linear",
+            roll_forward=True,
             min_similarity=0,
-            max_overlap=None,
+            overlap_mode="allowall",
             max_records=20,
         )
         assert_records_close(
@@ -3616,8 +3623,9 @@ class TestPatternRanges:
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             )
         ]
@@ -3625,8 +3633,9 @@ class TestPatternRanges:
             ts2["a"],
             [1, 2, 1],
             interp_mode="linear",
+            roll_forward=True,
             min_similarity=vbt.Param(0),
-            max_overlap=None,
+            overlap_mode="allowall",
             max_records=20,
         )
         assert_records_close(
@@ -3649,8 +3658,9 @@ class TestPatternRanges:
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             )
         ]
@@ -3658,8 +3668,9 @@ class TestPatternRanges:
             ts2["a"],
             [1, 2, 1],
             interp_mode="linear",
+            roll_forward=True,
             min_similarity=vbt.Param([0, 0.5]),
-            max_overlap=None,
+            overlap_mode="allowall",
             max_records=20,
         )
         assert_records_close(
@@ -3684,15 +3695,17 @@ class TestPatternRanges:
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             ),
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0.5,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             ),
         ]
@@ -3700,8 +3713,9 @@ class TestPatternRanges:
             ts2[["a", "b"]],
             [1, 2, 1],
             interp_mode="linear",
+            roll_forward=True,
             min_similarity=vbt.Param(0),
-            max_overlap=None,
+            overlap_mode="allowall",
             max_records=20,
         )
         assert_records_close(
@@ -3728,15 +3742,17 @@ class TestPatternRanges:
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             ),
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             ),
         ]
@@ -3744,8 +3760,9 @@ class TestPatternRanges:
             ts2[["a", "b"]],
             [1, 2, 1],
             interp_mode="linear",
+            roll_forward=True,
             min_similarity=vbt.Param([0, 0.5]),
-            max_overlap=None,
+            overlap_mode="allowall",
             max_records=20,
         )
         assert_records_close(
@@ -3776,29 +3793,33 @@ class TestPatternRanges:
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             ),
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             ),
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0.5,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             ),
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0.5,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             ),
         ]
@@ -3808,8 +3829,9 @@ class TestPatternRanges:
                 vbt.PSC(
                     pattern=[1, 2, 1],
                     interp_mode="linear",
+                    roll_forward=True,
                     min_similarity=0,
-                    max_overlap=None,
+                    overlap_mode="allowall",
                     max_records=20,
                 )
             ],
@@ -3834,8 +3856,9 @@ class TestPatternRanges:
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             )
         ]
@@ -3846,8 +3869,9 @@ class TestPatternRanges:
                     vbt.PSC(
                         pattern=[1, 2, 1],
                         interp_mode="linear",
+                        roll_forward=True,
                         min_similarity=0,
-                        max_overlap=None,
+                        overlap_mode="allowall",
                         max_records=20,
                     )
                 ]
@@ -3873,8 +3897,9 @@ class TestPatternRanges:
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             )
         ]
@@ -3885,8 +3910,9 @@ class TestPatternRanges:
                     vbt.PSC(
                         pattern=[1, 2, 1],
                         interp_mode="linear",
+                        roll_forward=True,
                         min_similarity=0,
-                        max_overlap=None,
+                        overlap_mode="allowall",
                         max_records=20,
                     )
                 ],
@@ -3894,8 +3920,9 @@ class TestPatternRanges:
                     vbt.PSC(
                         pattern=[1, 2, 1],
                         interp_mode="linear",
+                        roll_forward=True,
                         min_similarity=0.5,
-                        max_overlap=None,
+                        overlap_mode="allowall",
                         max_records=20,
                     )
                 ],
@@ -3923,15 +3950,17 @@ class TestPatternRanges:
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             ),
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0.5,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             ),
         ]
@@ -3941,8 +3970,9 @@ class TestPatternRanges:
                 vbt.PSC(
                     pattern=[1, 2, 1],
                     interp_mode="linear",
+                    roll_forward=True,
                     min_similarity=0,
-                    max_overlap=None,
+                    overlap_mode="allowall",
                     max_records=20,
                 )
             ],
@@ -3971,15 +4001,17 @@ class TestPatternRanges:
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             ),
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             ),
         ]
@@ -3989,15 +4021,17 @@ class TestPatternRanges:
                 vbt.PSC(
                     pattern=[1, 2, 1],
                     interp_mode="linear",
+                    roll_forward=True,
                     min_similarity=0,
-                    max_overlap=None,
+                    overlap_mode="allowall",
                     max_records=20,
                 ),
                 vbt.PSC(
                     pattern=[1, 2, 1],
                     interp_mode="linear",
+                    roll_forward=True,
                     min_similarity=0.5,
-                    max_overlap=None,
+                    overlap_mode="allowall",
                     max_records=20,
                 ),
             ],
@@ -4027,9 +4061,9 @@ class TestPatternRanges:
             pd.MultiIndex.from_tuples(
                 [
                     (0, "a"),
+                    (0, "b"),
+                    (1, "a"),
                     (1, "b"),
-                    (2, "a"),
-                    (3, "b"),
                 ],
                 names=["search_config", None],
             ),
@@ -4038,29 +4072,33 @@ class TestPatternRanges:
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             ),
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             ),
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0.5,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             ),
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0.5,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             ),
         ]
@@ -4071,15 +4109,17 @@ class TestPatternRanges:
                     vbt.PSC(
                         pattern=[1, 2, 1],
                         interp_mode="linear",
+                        roll_forward=True,
                         min_similarity=0,
-                        max_overlap=None,
+                        overlap_mode="allowall",
                         max_records=20,
                     ),
                     vbt.PSC(
                         pattern=[1, 2, 1],
                         interp_mode="linear",
+                        roll_forward=True,
                         min_similarity=0.5,
-                        max_overlap=None,
+                        overlap_mode="allowall",
                         max_records=20,
                     ),
                 ]
@@ -4107,15 +4147,17 @@ class TestPatternRanges:
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             ),
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0.5,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             ),
         ]
@@ -4126,15 +4168,17 @@ class TestPatternRanges:
                     vbt.PSC(
                         pattern=[1, 2, 1],
                         interp_mode="linear",
+                        roll_forward=True,
                         min_similarity=0,
-                        max_overlap=None,
+                        overlap_mode="allowall",
                         max_records=20,
                     ),
                     vbt.PSC(
                         pattern=[1, 2, 1],
                         interp_mode="linear",
+                        roll_forward=True,
                         min_similarity=0.5,
-                        max_overlap=None,
+                        overlap_mode="allowall",
                         max_records=20,
                     ),
                 ],
@@ -4142,15 +4186,17 @@ class TestPatternRanges:
                     vbt.PSC(
                         pattern=[1, 2, 1],
                         interp_mode="linear",
+                        roll_forward=True,
                         min_similarity=0,
-                        max_overlap=None,
+                        overlap_mode="allowall",
                         max_records=20,
                     ),
                     vbt.PSC(
                         pattern=[1, 2, 1],
                         interp_mode="linear",
+                        roll_forward=True,
                         min_similarity=0.5,
-                        max_overlap=None,
+                        overlap_mode="allowall",
                         max_records=20,
                     ),
                 ],
@@ -4192,29 +4238,33 @@ class TestPatternRanges:
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             ),
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0.5,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             ),
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             ),
             vbt.PatternRanges.resolve_search_config(
                 pattern=np.array([1, 2, 1]),
                 interp_mode="linear",
+                roll_forward=True,
                 min_similarity=0.5,
-                max_overlap=None,
+                overlap_mode="allowall",
                 max_records=20,
             ),
         ]
@@ -4230,7 +4280,7 @@ class TestPatternRanges:
             np.array(["a", "a", "a", "a", "b", "b", "b", "b", "c", "c", "c", "c", "d", "d", "d", "d"]),
         )
         np.testing.assert_array_equal(
-            records_readable["Start Timestamp"].values,
+            records_readable["Start Index"].values,
             np.array(
                 [
                     "2020-01-01T00:00:00.000000000",
@@ -4254,7 +4304,7 @@ class TestPatternRanges:
             ),
         )
         np.testing.assert_array_equal(
-            records_readable["End Timestamp"].values,
+            records_readable["End Index"].values,
             np.array(
                 [
                     "2020-01-04T00:00:00.000000000",
@@ -4474,7 +4524,7 @@ class TestDrawdowns:
         np.testing.assert_array_equal(records_readable["Drawdown Id"].values, np.array([0, 1, 2, 0, 1, 0]))
         np.testing.assert_array_equal(records_readable["Column"].values, np.array(["a", "a", "a", "b", "b", "c"]))
         np.testing.assert_array_equal(
-            records_readable["Peak Timestamp"].values,
+            records_readable["Peak Index"].values,
             np.array(
                 [
                     "2020-01-01T00:00:00.000000000",
@@ -4488,7 +4538,7 @@ class TestDrawdowns:
             ),
         )
         np.testing.assert_array_equal(
-            records_readable["Start Timestamp"].values,
+            records_readable["Start Index"].values,
             np.array(
                 [
                     "2020-01-02T00:00:00.000000000",
@@ -4502,7 +4552,7 @@ class TestDrawdowns:
             ),
         )
         np.testing.assert_array_equal(
-            records_readable["Valley Timestamp"].values,
+            records_readable["Valley Index"].values,
             np.array(
                 [
                     "2020-01-02T00:00:00.000000000",
@@ -4516,7 +4566,7 @@ class TestDrawdowns:
             ),
         )
         np.testing.assert_array_equal(
-            records_readable["End Timestamp"].values,
+            records_readable["End Index"].values,
             np.array(
                 [
                     "2020-01-03T00:00:00.000000000",
@@ -5268,7 +5318,7 @@ class TestOrders:
             np.array([0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4, 5, 6]),
         )
         np.testing.assert_array_equal(
-            records_readable["Timestamp"].values,
+            records_readable["Index"].values,
             np.array(
                 [
                     "2020-01-01T00:00:00.000000000",
@@ -5693,7 +5743,7 @@ class TestFSOrders:
             np.array([0, 1, 0, 1, 0, 1]),
         )
         np.testing.assert_array_equal(
-            records_readable["Signal Timestamp"].values,
+            records_readable["Signal Index"].values,
             np.array(
                 [
                     "2020-01-03T00:00:00.000000000",
@@ -5707,7 +5757,7 @@ class TestFSOrders:
             ),
         )
         np.testing.assert_array_equal(
-            records_readable["Creation Timestamp"].values,
+            records_readable["Creation Index"].values,
             np.array(
                 [
                     "2020-01-03T00:00:00.000000000",
@@ -5721,7 +5771,7 @@ class TestFSOrders:
             ),
         )
         np.testing.assert_array_equal(
-            records_readable["Fill Timestamp"].values,
+            records_readable["Fill Index"].values,
             np.array(
                 [
                     "2020-01-04T00:00:00.000000000",
@@ -6069,7 +6119,7 @@ class TestExitTrades:
             ),
         )
         np.testing.assert_array_equal(
-            records_readable["Entry Timestamp"].values,
+            records_readable["Entry Index"].values,
             np.array(
                 [
                     "2020-01-01T00:00:00.000000000",
@@ -6130,7 +6180,7 @@ class TestExitTrades:
             ),
         )
         np.testing.assert_array_equal(
-            records_readable["Exit Timestamp"].values,
+            records_readable["Exit Index"].values,
             np.array(
                 [
                     "2020-01-03T00:00:00.000000000",
@@ -7401,7 +7451,7 @@ class TestLogs:
             np.array([0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7]),
         )
         np.testing.assert_array_equal(
-            records_readable[("Meta", "Timestamp")].values,
+            records_readable[("Meta", "Index")].values,
             np.array(
                 [
                     "2020-01-01T00:00:00.000000000",

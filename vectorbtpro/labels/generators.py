@@ -168,7 +168,10 @@ TRENDLB = IndicatorFactory(
     param_settings=dict(
         pos_th=flex_elem_param_config,
         neg_th=flex_elem_param_config,
-        mode=dict(dtype=TrendMode),
+        mode=dict(
+            dtype=TrendMode,
+            post_index_func=lambda index: index.str.lower(),
+        ),
     ),
     pass_flex_2d=True,
     mode=TrendMode.Binary,

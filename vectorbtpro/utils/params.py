@@ -121,6 +121,16 @@ class Param:
     value: tp.MaybeSequence[tp.Param] = attr.ib()
     """One or more parameter values."""
 
+    is_tuple: bool = attr.ib(default=False)
+    """Whether `Param.value` is a tuple.
+    
+    If so, providing a tuple will be considered as a single value."""
+
+    is_array_like: bool = attr.ib(default=False)
+    """Whether `Param.value` is array-like.
+    
+    If so, providing a NumPy array will be considered as a single value."""
+
     product_idx: tp.Optional[int] = attr.ib(default=None)
     """Index of the product the parameter takes part in.
 
@@ -172,14 +182,14 @@ def combine_params(
         if product_idx > max_idx:
             max_idx = product_idx
 
-        if checks.is_iterable(p.value):
-            values = list(p.value)
-        else:
-            values = [p.value]
+        values = params_to_list(p.value, is_tuple=p.is_tuple, is_array_like=p.is_array_like)
         product_idx_values[product_idx][k] = values
         if p.keys is not None:
             if isinstance(p.keys, pd.Index):
-                product_indexes[k] = p.keys
+                if p.keys.name is None:
+                    product_indexes[k] = p.keys.rename(k)
+                else:
+                    product_indexes[k] = p.keys
             else:
                 product_indexes[k] = pd.Index(p.keys, name=k)
         else:

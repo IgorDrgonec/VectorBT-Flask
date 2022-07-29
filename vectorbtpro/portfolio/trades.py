@@ -520,14 +520,14 @@ trades_field_config = ReadonlyConfig(
             "start_idx": dict(name="entry_idx"),  # remap field of Ranges
             "end_idx": dict(name="exit_idx"),  # remap field of Ranges
             "size": dict(title="Size"),
-            "entry_idx": dict(title="Entry Timestamp", mapping="index"),
+            "entry_idx": dict(title="Entry Index", mapping="index"),
             "entry_price": dict(title="Avg Entry Price"),
             "entry_fees": dict(title="Entry Fees"),
-            "exit_idx": dict(title="Exit Timestamp", mapping="index"),
+            "exit_idx": dict(title="Exit Index", mapping="index"),
             "exit_price": dict(title="Avg Exit Price"),
             "exit_fees": dict(title="Exit Fees"),
             "pnl": dict(title="PnL"),
-            "return": dict(title="Return"),
+            "return": dict(title="Return", hovertemplate="$title: %{customdata[$index]:,%}"),
             "direction": dict(title="Direction", mapping=TradeDirection),
             "status": dict(title="Status", mapping=TradeStatus),
             "parent_id": dict(title="Position Id", mapping="ids"),
@@ -1058,18 +1058,9 @@ class Trades(Ranges):
 
         if self_col.count() > 0:
             # Extract information
-            id_ = self_col.get_field_arr("id")
-            id_title = self_col.get_field_title("id")
-
             exit_idx = self_col.get_map_field_to_index("exit_idx")
-            exit_idx_title = self_col.get_field_title("exit_idx")
-
             pnl = self_col.get_field_arr("pnl")
-            pnl_title = self_col.get_field_title("pnl")
-
             returns = self_col.get_field_arr("return")
-            return_title = self_col.get_field_title("return")
-
             status = self_col.get_field_arr("status")
 
             valid_mask = ~np.isnan(returns)
@@ -1088,40 +1079,32 @@ class Trades(Ranges):
             def _plot_scatter(mask: tp.Array1d, name: tp.TraceName, color: tp.Any, kwargs: tp.Kwargs) -> None:
                 if np.any(mask):
                     if self_col.get_field_setting("parent_id", "ignore", False):
-                        customdata = np.stack((id_[mask], pnl[mask], returns[mask]), axis=1)
-                        hovertemplate = (
-                            f"{id_title}: %{{customdata[0]}}"
-                            f"<br>{exit_idx_title}: %{{x}}"
-                            f"<br>{pnl_title}: %{{customdata[1]:.6f}}"
-                            f"<br>{return_title}: %{{customdata[2]:.2%}}"
+                        customdata, hovertemplate = self_col.prepare_customdata(
+                            incl_fields=["id", "exit_idx", "pnl", "return"], mask=mask
                         )
                     else:
-                        parent_id = self_col.get_field_arr("parent_id")
-                        parent_id_title = self_col.get_field_title("parent_id")
-                        customdata = np.stack((id_[mask], parent_id[mask], pnl[mask], returns[mask]), axis=1)
-                        hovertemplate = (
-                            f"{id_title}: %{{customdata[0]}}"
-                            f"<br>{parent_id_title}: %{{customdata[1]}}"
-                            f"<br>{exit_idx_title}: %{{x}}"
-                            f"<br>{pnl_title}: %{{customdata[2]:.6f}}"
-                            f"<br>{return_title}: %{{customdata[3]:.2%}}"
+                        customdata, hovertemplate = self_col.prepare_customdata(
+                            incl_fields=["id", "parent_id", "exit_idx", "pnl", "return"], mask=mask
                         )
-                    scatter = go.Scatter(
-                        x=exit_idx[mask],
-                        y=returns[mask] if pct_scale else pnl[mask],
-                        mode="markers",
-                        marker=dict(
-                            symbol="circle",
-                            color=color,
-                            size=marker_size[mask],
-                            opacity=opacity[mask],
-                            line=dict(width=1, color=adjust_lightness(color)),
+                    _kwargs = merge_dicts(
+                        dict(
+                            x=exit_idx[mask],
+                            y=returns[mask] if pct_scale else pnl[mask],
+                            mode="markers",
+                            marker=dict(
+                                symbol="circle",
+                                color=color,
+                                size=marker_size[mask],
+                                opacity=opacity[mask],
+                                line=dict(width=1, color=adjust_lightness(color)),
+                            ),
+                            name=name,
+                            customdata=customdata,
+                            hovertemplate=hovertemplate,
                         ),
-                        name=name,
-                        customdata=customdata,
-                        hovertemplate=hovertemplate,
+                        kwargs,
                     )
-                    scatter.update(**kwargs)
+                    scatter = go.Scatter(**_kwargs)
                     fig.add_trace(scatter, **add_trace_kwargs)
 
             # Plot Closed - Neutral scatter
@@ -1274,15 +1257,8 @@ class Trades(Ranges):
 
         if self_col.count() > 0:
             # Extract information
-            id_ = self_col.get_field_arr("id")
-            id_title = self_col.get_field_title("id")
-
             pnl = self_col.get_field_arr("pnl")
-            pnl_title = self_col.get_field_title("pnl")
-
             returns = self_col.get_field_arr("return")
-            return_title = self_col.get_field_title("return")
-
             status = self_col.get_field_arr("status")
 
             valid_mask = ~np.isnan(returns)
@@ -1298,39 +1274,31 @@ class Trades(Ranges):
             def _plot_scatter(mask: tp.Array1d, name: tp.TraceName, color: tp.Any, kwargs: tp.Kwargs) -> None:
                 if np.any(mask):
                     if self_col.get_field_setting("parent_id", "ignore", False):
-                        customdata = np.stack((id_[mask], pnl[mask], returns[mask]), axis=1)
-                        hovertemplate = (
-                            f"{id_title}: %{{customdata[0]}}"
-                            f"<br>{field_label}: %{{y}}"
-                            f"<br>{pnl_title}: %{{customdata[1]:.6f}}"
-                            f"<br>{return_title}: %{{customdata[2]:.2%}}"
+                        customdata, hovertemplate = self_col.prepare_customdata(
+                            incl_fields=["id", "exit_idx", "pnl", "return"], mask=mask
                         )
                     else:
-                        parent_id = self_col.get_field_arr("parent_id")
-                        parent_id_title = self_col.get_field_title("parent_id")
-                        customdata = np.stack((id_[mask], parent_id[mask], pnl[mask], returns[mask]), axis=1)
-                        hovertemplate = (
-                            f"{id_title}: %{{customdata[0]}}"
-                            f"<br>{parent_id_title}: %{{customdata[1]}}"
-                            f"<br>{field_label}: %{{y}}"
-                            f"<br>{pnl_title}: %{{customdata[2]:.6f}}"
-                            f"<br>{return_title}: %{{customdata[3]:.2%}}"
+                        customdata, hovertemplate = self_col.prepare_customdata(
+                            incl_fields=["id", "parent_id", "exit_idx", "pnl", "return"], mask=mask
                         )
-                    scatter = go.Scatter(
-                        x=returns[mask] if pct_scale else pnl[mask],
-                        y=field[mask],
-                        mode="markers",
-                        marker=dict(
-                            symbol="circle",
-                            color=color,
-                            size=7,
-                            line=dict(width=1, color=adjust_lightness(color)),
+                    _kwargs = merge_dicts(
+                        dict(
+                            x=returns[mask] if pct_scale else pnl[mask],
+                            y=field[mask],
+                            mode="markers",
+                            marker=dict(
+                                symbol="circle",
+                                color=color,
+                                size=7,
+                                line=dict(width=1, color=adjust_lightness(color)),
+                            ),
+                            name=name,
+                            customdata=customdata,
+                            hovertemplate=hovertemplate,
                         ),
-                        name=name,
-                        customdata=customdata,
-                        hovertemplate=hovertemplate,
+                        kwargs,
                     )
-                    scatter.update(**kwargs)
+                    scatter = go.Scatter(**_kwargs)
                     fig.add_trace(scatter, **add_trace_kwargs)
 
             # Plot Closed - Neutral scatter
@@ -1558,7 +1526,7 @@ class Trades(Ranges):
                 fig=fig,
             )
         elif plot_close and self_col._close is not None:
-            fig = self_col.close.vbt.plot(
+            fig = self_col.close.vbt.lineplot(
                 trace_kwargs=close_trace_kwargs,
                 add_trace_kwargs=add_trace_kwargs,
                 fig=fig,
@@ -1566,157 +1534,101 @@ class Trades(Ranges):
 
         if self_col.count() > 0:
             # Extract information
-            id_ = self_col.get_field_arr("id")
-            id_title = self_col.get_field_title("id")
-
-            size = self_col.get_field_arr("size")
-            size_title = self_col.get_field_title("size")
-
             entry_idx = self_col.get_map_field_to_index("entry_idx", minus_one_to_zero=True)
-            entry_idx_title = self_col.get_field_title("entry_idx")
-
             entry_price = self_col.get_field_arr("entry_price")
-            entry_price_title = self_col.get_field_title("entry_price")
-
-            entry_fees = self_col.get_field_arr("entry_fees")
-            entry_fees_title = self_col.get_field_title("entry_fees")
-
             exit_idx = self_col.get_map_field_to_index("exit_idx")
-            exit_idx_title = self_col.get_field_title("exit_idx")
-
             exit_price = self_col.get_field_arr("exit_price")
-            exit_price_title = self_col.get_field_title("exit_price")
-
-            exit_fees = self_col.get_field_arr("exit_fees")
-            exit_fees_title = self_col.get_field_title("exit_fees")
-
-            direction = self_col.get_apply_mapping_arr("direction")
-            direction_title = self_col.get_field_title("direction")
-
             pnl = self_col.get_field_arr("pnl")
-            pnl_title = self_col.get_field_title("pnl")
-
-            returns = self_col.get_field_arr("return")
-            return_title = self_col.get_field_title("return")
-
             status = self_col.get_field_arr("status")
 
-            duration = np.vectorize(str)(
+            duration = (
                 self_col.wrapper.to_timedelta(self_col.duration.values, to_pd=True, silence_warnings=True)
+                .astype(str)
+                .values
             )
 
             if plot_markers:
                 # Plot Entry markers
                 if self_col.get_field_setting("parent_id", "ignore", False):
-                    entry_customdata = np.stack((id_, size, entry_fees, direction), axis=1)
-                    entry_hovertemplate = (
-                        f"{id_title}: %{{customdata[0]}}"
-                        f"<br>{size_title}: %{{customdata[1]:.6f}}"
-                        f"<br>{entry_idx_title}: %{{x}}"
-                        f"<br>{entry_price_title}: %{{y}}"
-                        f"<br>{entry_fees_title}: %{{customdata[2]:.6f}}"
-                        f"<br>{direction_title}: %{{customdata[3]}}"
+                    entry_customdata, entry_hovertemplate = self_col.prepare_customdata(
+                        incl_fields=["id", "entry_idx", "size", "entry_price", "entry_fees", "direction"]
                     )
                 else:
-                    parent_id = self_col.get_field_arr("parent_id")
-                    parent_id_title = self_col.get_field_title("parent_id")
-                    entry_customdata = np.stack((id_, parent_id, size, entry_fees, direction), axis=1)
-                    entry_hovertemplate = (
-                        f"{id_title}: %{{customdata[0]}}"
-                        f"<br>{parent_id_title}: %{{customdata[1]}}"
-                        f"<br>{size_title}: %{{customdata[2]:.6f}}"
-                        f"<br>{entry_idx_title}: %{{x}}"
-                        f"<br>{entry_price_title}: %{{y}}"
-                        f"<br>{entry_fees_title}: %{{customdata[3]:.6f}}"
-                        f"<br>{direction_title}: %{{customdata[4]}}"
+                    entry_customdata, entry_hovertemplate = self_col.prepare_customdata(
+                        incl_fields=["id", "parent_id", "entry_idx", "size", "entry_price", "entry_fees", "direction"]
                     )
-                entry_scatter = go.Scatter(
-                    x=entry_idx,
-                    y=entry_price,
-                    mode="markers",
-                    marker=dict(
-                        symbol="square",
-                        color=plotting_cfg["contrast_color_schema"]["blue"],
-                        size=7,
-                        line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["blue"])),
+                _entry_trace_kwargs = merge_dicts(
+                    dict(
+                        x=entry_idx,
+                        y=entry_price,
+                        mode="markers",
+                        marker=dict(
+                            symbol="square",
+                            color=plotting_cfg["contrast_color_schema"]["blue"],
+                            size=7,
+                            line=dict(width=1, color=adjust_lightness(plotting_cfg["contrast_color_schema"]["blue"])),
+                        ),
+                        name="Entry",
+                        customdata=entry_customdata,
+                        hovertemplate=entry_hovertemplate,
                     ),
-                    name="Entry",
-                    customdata=entry_customdata,
-                    hovertemplate=entry_hovertemplate,
+                    entry_trace_kwargs,
                 )
-                entry_scatter.update(**entry_trace_kwargs)
+                entry_scatter = go.Scatter(**_entry_trace_kwargs)
                 fig.add_trace(entry_scatter, **add_trace_kwargs)
 
                 # Plot end markers
                 def _plot_end_markers(mask: tp.Array1d, name: tp.TraceName, color: tp.Any, kwargs: tp.Kwargs) -> None:
                     if np.any(mask):
                         if self_col.get_field_setting("parent_id", "ignore", False):
-                            exit_customdata = np.stack(
-                                (
-                                    id_[mask],
-                                    size[mask],
-                                    exit_fees[mask],
-                                    pnl[mask],
-                                    returns[mask],
-                                    direction[mask],
-                                    duration[mask],
-                                ),
-                                axis=1,
-                            )
-                            exit_hovertemplate = (
-                                f"{id_title}: %{{customdata[0]}}"
-                                f"<br>{size_title}: %{{customdata[1]:.6f}}"
-                                f"<br>{exit_idx_title}: %{{x}}"
-                                f"<br>{exit_price_title}: %{{y}}"
-                                f"<br>{exit_fees_title}: %{{customdata[2]:.6f}}"
-                                f"<br>{pnl_title}: %{{customdata[3]:.6f}}"
-                                f"<br>{return_title}: %{{customdata[4]:.2%}}"
-                                f"<br>{direction_title}: %{{customdata[5]}}"
-                                "<br>Duration: %{customdata[6]}"
+                            exit_customdata, exit_hovertemplate = self_col.prepare_customdata(
+                                incl_fields=[
+                                    "id",
+                                    "exit_idx",
+                                    "size",
+                                    "exit_price",
+                                    "exit_fees",
+                                    "pnl",
+                                    "return",
+                                    "direction",
+                                ],
+                                append_info=[(duration, "Duration")],
+                                mask=mask,
                             )
                         else:
-                            parent_id = self_col.get_field_arr("parent_id")
-                            parent_id_title = self_col.get_field_title("parent_id")
-                            exit_customdata = np.stack(
-                                (
-                                    id_[mask],
-                                    parent_id[mask],
-                                    size[mask],
-                                    exit_fees[mask],
-                                    pnl[mask],
-                                    returns[mask],
-                                    direction[mask],
-                                    duration[mask],
+                            exit_customdata, exit_hovertemplate = self_col.prepare_customdata(
+                                incl_fields=[
+                                    "id",
+                                    "parent_id",
+                                    "exit_idx",
+                                    "size",
+                                    "exit_price",
+                                    "exit_fees",
+                                    "pnl",
+                                    "return",
+                                    "direction",
+                                ],
+                                append_info=[(duration, "Duration")],
+                                mask=mask,
+                            )
+                        _kwargs = merge_dicts(
+                            dict(
+                                x=exit_idx[mask],
+                                y=exit_price[mask],
+                                mode="markers",
+                                marker=dict(
+                                    symbol="square",
+                                    color=color,
+                                    size=7,
+                                    line=dict(width=1, color=adjust_lightness(color)),
                                 ),
-                                axis=1,
-                            )
-                            exit_hovertemplate = (
-                                f"{id_title}: %{{customdata[0]}}"
-                                f"<br>{parent_id_title}: %{{customdata[1]}}"
-                                f"<br>{size_title}: %{{customdata[2]:.6f}}"
-                                f"<br>{exit_idx_title}: %{{x}}"
-                                f"<br>{exit_price_title}: %{{y}}"
-                                f"<br>{exit_fees_title}: %{{customdata[3]:.6f}}"
-                                f"<br>{pnl_title}: %{{customdata[4]:.6f}}"
-                                f"<br>{return_title}: %{{customdata[5]:.2%}}"
-                                f"<br>{direction_title}: %{{customdata[6]}}"
-                                "<br>Duration: %{customdata[7]}"
-                            )
-                        scatter = go.Scatter(
-                            x=exit_idx[mask],
-                            y=exit_price[mask],
-                            mode="markers",
-                            marker=dict(
-                                symbol="square",
-                                color=color,
-                                size=7,
-                                line=dict(width=1, color=adjust_lightness(color)),
+                                name=name,
+                                customdata=exit_customdata,
+                                hovertemplate=exit_hovertemplate,
                             ),
-                            name=name,
-                            customdata=exit_customdata,
-                            hovertemplate=exit_hovertemplate,
+                            kwargs,
                         )
-                        scatter.update(**kwargs)
+                        scatter = go.Scatter(**_kwargs)
                         fig.add_trace(scatter, **add_trace_kwargs)
 
                 # Plot Exit markers

@@ -834,6 +834,50 @@ class ArrayWrapper(Configured, PandasIndexer):
         """Perform indexing on `ArrayWrapper`"""
         return self.indexing_func_meta(*args, **kwargs)["new_wrapper"]
 
+    @staticmethod
+    def select_from_flex_array(
+        arr: tp.ArrayLike,
+        row_idxs: tp.Union[int, tp.Array1d, slice] = None,
+        col_idxs: tp.Union[int, tp.Array1d, slice] = None,
+        rows_changed: bool = True,
+        columns_changed: bool = True,
+        rotate_rows: bool = False,
+        rotate_cols: bool = True,
+    ) -> tp.Array2d:
+        """Select rows and columns from a flexible array.
+
+        Always returns a 2-dim NumPy array."""
+        new_arr = arr_2d = reshaping.to_2d_array(arr)
+        if row_idxs is not None and rows_changed:
+            if arr_2d.shape[0] > 1:
+                if isinstance(row_idxs, slice):
+                    max_idx = row_idxs.stop - 1
+                else:
+                    row_idxs = reshaping.to_1d_array(row_idxs)
+                    max_idx = np.max(row_idxs)
+                if arr_2d.shape[0] <= max_idx:
+                    if rotate_rows:
+                        new_arr = new_arr[row_idxs % arr_2d.shape[0], :]
+                    else:
+                        new_arr = new_arr[row_idxs, :]
+                else:
+                    new_arr = new_arr[row_idxs, :]
+        if col_idxs is not None and columns_changed:
+            if arr_2d.shape[1] > 1:
+                if isinstance(col_idxs, slice):
+                    max_idx = col_idxs.stop - 1
+                else:
+                    col_idxs = reshaping.to_1d_array(col_idxs)
+                    max_idx = np.max(col_idxs)
+                if arr_2d.shape[1] <= max_idx:
+                    if rotate_cols:
+                        new_arr = new_arr[:, col_idxs % arr_2d.shape[1]]
+                    else:
+                        new_arr = new_arr[:, col_idxs]
+                else:
+                    new_arr = new_arr[:, col_idxs]
+        return new_arr
+
     def create_resampler(
         self,
         rule: tp.Union[Resampler, tp.PandasResampler, tp.PandasFrequencyLike],

@@ -19,7 +19,7 @@ alloc_ranges_field_config = ReadonlyConfig(
         settings={
             "idx": dict(name="alloc_idx"),  # remap field of Records
             "col": dict(title="Group", mapping="groups", group_indexing=True),  # remap field of Records
-            "alloc_idx": dict(title="Allocation Timestamp", mapping="index"),
+            "alloc_idx": dict(title="Allocation Index", mapping="index"),
         },
     )
 )
@@ -57,7 +57,7 @@ alloc_points_field_config = ReadonlyConfig(
         settings={
             "idx": dict(name="alloc_idx"),  # remap field of Records
             "col": dict(title="Group", mapping="groups", group_indexing=True),  # remap field of Records
-            "alloc_idx": dict(title="Allocation Timestamp", mapping="index"),
+            "alloc_idx": dict(title="Allocation Index", mapping="index"),
         },
     )
 )

@@ -975,18 +975,19 @@ def clean_enex_nb(
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="mask", axis=1),
-    arg_take_spec=dict(mask=ch.ArraySlicer(axis=1)),
+    arg_take_spec=dict(mask=ch.ArraySlicer(axis=1), incl_open=None),
     merge_func=records_ch.merge_records,
     merge_kwargs=dict(chunk_meta=Rep("chunk_meta")),
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def between_ranges_nb(mask: tp.Array2d) -> tp.RecordArray:
+def between_ranges_nb(mask: tp.Array2d, incl_open: bool = False) -> tp.RecordArray:
     """Create a record of type `vectorbtpro.generic.enums.range_dt` for each range between two signals in `mask`."""
     new_records = np.empty(mask.shape, dtype=range_dt)
     counts = np.full(mask.shape[1], 0, dtype=np.int_)
 
     for col in prange(mask.shape[1]):
         from_i = -1
+        to_i = -1
         for i in range(mask.shape[0]):
             if mask[i, col]:
                 if from_i > -1:
@@ -999,18 +1000,31 @@ def between_ranges_nb(mask: tp.Array2d) -> tp.RecordArray:
                     new_records["status"][r, col] = RangeStatus.Closed
                     counts[col] += 1
                 from_i = i
+        if incl_open and from_i < mask.shape[0] - 1:
+            r = counts[col]
+            new_records["id"][r, col] = r
+            new_records["col"][r, col] = col
+            new_records["start_idx"][r, col] = from_i
+            new_records["end_idx"][r, col] = mask.shape[0] - 1
+            new_records["status"][r, col] = RangeStatus.Open
+            counts[col] += 1
 
     return generic_nb.repartition_nb(new_records, counts)
 
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="mask", axis=1),
-    arg_take_spec=dict(mask=ch.ArraySlicer(axis=1), other_mask=ch.ArraySlicer(axis=1), from_other=None),
+    arg_take_spec=dict(mask=ch.ArraySlicer(axis=1), other_mask=ch.ArraySlicer(axis=1), from_other=None, incl_open=None),
     merge_func=records_ch.merge_records,
     merge_kwargs=dict(chunk_meta=Rep("chunk_meta")),
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def between_two_ranges_nb(mask: tp.Array2d, other_mask: tp.Array2d, from_other: bool = False) -> tp.RecordArray:
+def between_two_ranges_nb(
+    mask: tp.Array2d,
+    other_mask: tp.Array2d,
+    from_other: bool = False,
+    incl_open: bool = False,
+) -> tp.RecordArray:
     """Create a record of type `vectorbtpro.generic.enums.range_dt` for each range between two
     signals in `mask` and `other_mask`.
 
@@ -1023,22 +1037,31 @@ def between_two_ranges_nb(mask: tp.Array2d, other_mask: tp.Array2d, from_other: 
     counts = np.full(mask.shape[1], 0, dtype=np.int_)
 
     for col in prange(mask.shape[1]):
+        from_i = -1
+        to_i = -1
         if from_other:
-            to_i = -1
             for i in range(mask.shape[0] - 1, -1, -1):
                 if other_mask[i, col]:
                     to_i = i
-                if mask[i, col] and to_i != -1:
-                    from_i = i
-                    r = counts[col]
-                    new_records["id"][r, col] = r
-                    new_records["col"][r, col] = col
-                    new_records["start_idx"][r, col] = from_i
-                    new_records["end_idx"][r, col] = to_i
-                    new_records["status"][r, col] = RangeStatus.Closed
-                    counts[col] += 1
+                if mask[i, col]:
+                    if to_i != -1:
+                        from_i = i
+                        r = counts[col]
+                        new_records["id"][r, col] = r
+                        new_records["col"][r, col] = col
+                        new_records["start_idx"][r, col] = from_i
+                        new_records["end_idx"][r, col] = to_i
+                        new_records["status"][r, col] = RangeStatus.Closed
+                        counts[col] += 1
+                    elif incl_open:
+                        r = counts[col]
+                        new_records["id"][r, col] = r
+                        new_records["col"][r, col] = col
+                        new_records["start_idx"][r, col] = from_i
+                        new_records["end_idx"][r, col] = mask.shape[0] - 1
+                        new_records["status"][r, col] = RangeStatus.Open
+                        counts[col] += 1
         else:
-            from_i = -1
             for i in range(mask.shape[0]):
                 if mask[i, col]:
                     from_i = i
@@ -1051,6 +1074,14 @@ def between_two_ranges_nb(mask: tp.Array2d, other_mask: tp.Array2d, from_other: 
                     new_records["end_idx"][r, col] = to_i
                     new_records["status"][r, col] = RangeStatus.Closed
                     counts[col] += 1
+            if incl_open and to_i < from_i:
+                r = counts[col]
+                new_records["id"][r, col] = r
+                new_records["col"][r, col] = col
+                new_records["start_idx"][r, col] = from_i
+                new_records["end_idx"][r, col] = mask.shape[0] - 1
+                new_records["status"][r, col] = RangeStatus.Open
+                counts[col] += 1
 
     return generic_nb.repartition_nb(new_records, counts)
 
