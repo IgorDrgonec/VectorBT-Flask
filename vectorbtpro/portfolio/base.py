@@ -5566,7 +5566,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             limit_expiry = portfolio_cfg["limit_expiry"]
         if isinstance(limit_expiry, (str, timedelta, pd.DateOffset, pd.Timedelta)):
             limit_expiry = RepEval(
-                "wrapper.index.to_period(limit_expiry).shift().to_timestamp().astype(np.int_)",
+                "wrapper.index.to_period(limit_expiry).shift().to_timestamp().astype(np.int64)",
                 context=dict(limit_expiry=limit_expiry),
             )
         else:
@@ -5809,8 +5809,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     from_ago=dict(fill_value=0),
                 ),
                 post_func=dict(
-                    limit_tif=lambda x: x.astype(np.int_),
-                    limit_expiry=lambda x: x.astype(np.int_),
+                    limit_tif=lambda x: x.astype(np.int64),
+                    limit_expiry=lambda x: x.astype(np.int64),
                 ),
                 wrapper_kwargs=dict(
                     freq=freq,
@@ -5829,10 +5829,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         index = wrapper.index
         if isinstance(index, pd.DatetimeIndex):
             index = index.tz_localize(None).tz_localize("utc")
-        index = index.values.astype(np.int_)
+        index = index.values.astype(np.int64)
         freq = wrapper.freq
         if freq is not None:
-            freq = freq_to_timedelta64(freq).astype(np.int_)
+            freq = freq_to_timedelta64(freq).astype(np.int64)
 
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
         init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)
@@ -7163,10 +7163,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         index = wrapper.index
         if isinstance(index, pd.DatetimeIndex):
             index = index.tz_localize(None).tz_localize("utc")
-        index = index.values.astype(np.int_)
+        index = index.values.astype(np.int64)
         freq = wrapper.freq
         if freq is not None:
-            freq = freq_to_timedelta64(freq).astype(np.int_)
+            freq = freq_to_timedelta64(freq).astype(np.int64)
 
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
         init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)

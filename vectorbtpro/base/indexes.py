@@ -53,7 +53,7 @@ def index_from_values(
 
     Each in `values` will correspond to an element in the new index."""
     scalar_types = (int, float, complex, str, bool, datetime, timedelta, np.generic)
-    type_id_counts = {}
+    type_id_number = {}
     value_names = []
     if len(values) == 1:
         single_value = True
@@ -77,27 +77,21 @@ def index_from_values(
                 if single_value:
                     value_names.append("array")
                 else:
-                    if "array" not in type_id_counts:
-                        type_id_counts["array"] = {}
-                    if id(v) not in type_id_counts["array"]:
-                        value_names.append("array_%d" % (len(type_id_counts["array"])))
-                        type_id_counts["array"][id(v)] = 0
-                    else:
-                        value_names.append("array_%d" % (type_id_counts["array"][id(v)]))
-                    type_id_counts["array"][id(v)] += 1
+                    if "array" not in type_id_number:
+                        type_id_number["array"] = {}
+                    if id(v) not in type_id_number["array"]:
+                        type_id_number["array"][id(v)] = len(type_id_number["array"])
+                    value_names.append("array_%d" % (type_id_number["array"][id(v)]))
         else:
             type_name = str(type(v).__name__)
             if single_value:
                 value_names.append("%s" % type_name)
             else:
-                if type_name not in type_id_counts:
-                    type_id_counts[type_name] = {}
-                if id(v) not in type_id_counts[type_name]:
-                    value_names.append("%s_%d" % (type_name, len(type_id_counts[type_name])))
-                    type_id_counts[type_name][id(v)] = 0
-                else:
-                    value_names.append("%s_%d" % (type_name, type_id_counts[type_name][id(v)]))
-                type_id_counts[type_name][id(v)] += 1
+                if type_name not in type_id_number:
+                    type_id_number[type_name] = {}
+                if id(v) not in type_id_number[type_name]:
+                    type_id_number[type_name][id(v)] = len(type_id_number[type_name])
+                value_names.append("%s_%d" % (type_name, type_id_number[type_name][id(v)]))
     if single_value and len(values) > 1:
         value_names *= len(values)
     return pd.Index(value_names, name=name)

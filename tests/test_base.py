@@ -2253,8 +2253,26 @@ class TestIndexFns:
             pd.Index([1, 2, 3], dtype="int64", name="b"),
         )
         assert_index_equal(
-            indexes.index_from_values(np.random.uniform(size=(3, 3, 3)), name="c"),
+            indexes.index_from_values([
+                np.random.uniform(size=(3, 3)),
+                np.random.uniform(size=(3, 3)),
+                np.random.uniform(size=(3, 3)),
+            ], name="c"),
             pd.Index(["array_0", "array_1", "array_2"], dtype="object", name="c"),
+        )
+        rand_arr = np.random.uniform(size=(3, 3))
+        assert_index_equal(
+            indexes.index_from_values([rand_arr, rand_arr, rand_arr], name="c"),
+            pd.Index(["array_0", "array_0", "array_0"], dtype="object", name="c"),
+        )
+        assert_index_equal(
+            indexes.index_from_values([
+                rand_arr,
+                np.random.uniform(size=(3, 3)),
+                rand_arr,
+                np.random.uniform(size=(3, 3)),
+            ], name="c"),
+            pd.Index(["array_0", "array_1", "array_0", "array_2"], dtype="object", name="c"),
         )
         assert_index_equal(
             indexes.index_from_values([(1, 2), (3, 4), (5, 6)], name="c"),
@@ -2273,6 +2291,13 @@ class TestIndexFns:
         assert_index_equal(
             indexes.index_from_values([A(), B(), B(), C()], name="c"),
             pd.Index(["A_0", "B_0", "B_1", "C_0"], dtype="object", name="c"),
+        )
+        a = A()
+        b = B()
+        c = C()
+        assert_index_equal(
+            indexes.index_from_values([a, b, b, c], name="c"),
+            pd.Index(["A_0", "B_0", "B_0", "C_0"], dtype="object", name="c"),
         )
 
     def test_repeat_index(self):

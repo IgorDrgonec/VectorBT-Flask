@@ -309,11 +309,11 @@ class Ranges(PriceRecords):
             delta_use_index = False
             index = None
         else:
-            delta = freq_to_timedelta64(delta).astype(np.int_)
+            delta = freq_to_timedelta64(delta).astype(np.int64)
             if isinstance(records_or_mapped.wrapper.index, pd.DatetimeIndex):
-                index = records_or_mapped.wrapper.index.values.astype(np.int_)
+                index = records_or_mapped.wrapper.index.values.astype(np.int64)
             else:
-                freq = freq_to_timedelta64(records_or_mapped.wrapper.freq).astype(np.int_)
+                freq = freq_to_timedelta64(records_or_mapped.wrapper.freq).astype(np.int64)
                 index = np.arange(records_or_mapped.wrapper.shape[0]) * freq
             delta_use_index = True
         if shift is None:
@@ -450,10 +450,10 @@ class Ranges(PriceRecords):
         func = jit_reg.resolve_option(nb.range_duration_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         duration = func(
-            self.get_map_field_to_index("start_idx").values.astype(np.int_),
-            self.get_map_field_to_index("end_idx").values.astype(np.int_),
+            self.get_map_field_to_index("start_idx").values.astype(np.int64),
+            self.get_map_field_to_index("end_idx").values.astype(np.int64),
             self.get_field_arr("status"),
-            freq=freq_to_timedelta64(self.wrapper.freq).astype(np.int_),
+            freq=freq_to_timedelta64(self.wrapper.freq).astype(np.int64),
         ).astype("timedelta64[ns]")
         return self.map_array(duration, **kwargs)
 
@@ -582,23 +582,23 @@ class Ranges(PriceRecords):
             proj_start_use_index = False
             index = None
         else:
-            proj_start = freq_to_timedelta64(proj_start).astype(np.int_)
+            proj_start = freq_to_timedelta64(proj_start).astype(np.int64)
             if isinstance(self.wrapper.index, pd.DatetimeIndex):
-                index = self.wrapper.index.values.astype(np.int_)
+                index = self.wrapper.index.values.astype(np.int64)
             else:
-                freq = freq_to_timedelta64(self.wrapper.freq).astype(np.int_)
+                freq = freq_to_timedelta64(self.wrapper.freq).astype(np.int64)
                 index = np.arange(self.wrapper.shape[0]) * freq
             proj_start_use_index = True
         if proj_period is not None:
             if isinstance(proj_period, int):
                 proj_period_use_index = False
             else:
-                proj_period = freq_to_timedelta64(proj_period).astype(np.int_)
+                proj_period = freq_to_timedelta64(proj_period).astype(np.int64)
                 if index is None:
                     if isinstance(self.wrapper.index, pd.DatetimeIndex):
-                        index = self.wrapper.index.values.astype(np.int_)
+                        index = self.wrapper.index.values.astype(np.int64)
                     else:
-                        freq = freq_to_timedelta64(self.wrapper.freq).astype(np.int_)
+                        freq = freq_to_timedelta64(self.wrapper.freq).astype(np.int64)
                         index = np.arange(self.wrapper.shape[0]) * freq
                 proj_period_use_index = True
         else:
