@@ -4616,6 +4616,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         upper_max_error_trace_kwargs: tp.KwargsLike = None,
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs,
     ) -> tp.BaseFigure:  # pragma: no cover
         """Plot pattern.
 
@@ -4625,10 +4626,11 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         Usage:
             ```pycon
             >>> sr = pd.Series([10, 11, 12, 13, 12, 13, 14, 15, 13, 14, 11])
-            >>> df.vbt.plot_projections()
+            >>> sr.vbt.plot_pattern([1, 2, 3, 2, 1])
             ```
 
             ![](/assets/images/sr_plot_pattern.svg)"""
+        from vectorbtpro.utils.figure import make_figure
         from vectorbtpro.utils.opt_packages import assert_can_import
 
         assert_can_import("plotly")
@@ -4657,6 +4659,10 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             lower_max_error_trace_kwargs = {}
         if upper_max_error_trace_kwargs is None:
             upper_max_error_trace_kwargs = {}
+
+        if fig is None:
+            fig = make_figure()
+        fig.update_layout(**layout_kwargs)
 
         obj = self.obj
         if plot_obj:
