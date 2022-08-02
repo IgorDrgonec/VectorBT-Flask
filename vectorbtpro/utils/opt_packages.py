@@ -29,7 +29,7 @@ opt_package_config = ReadonlyConfig(
         telegram=dict(name="Python Telegram Bot", link="https://github.com/python-telegram-bot/python-telegram-bot"),
         quantstats=dict(name="QuantStats", link="https://github.com/ranaroussi/quantstats"),
         dill=dict(name="dill", link="https://github.com/uqfoundation/dill"),
-        alpaca_trade_api=dict(name="Alpaca Trade API", link="https://github.com/alpacahq/alpaca-trade-api-python"),
+        alpaca=dict(name="Python SDK for Alpaca API", link="https://github.com/alpacahq/alpaca-py"),
         polygon=dict(name="Polygon API Client", link="https://github.com/polygon-io/client-python"),
         bs4=dict(name="Beautiful Soup", link="https://www.crummy.com/software/BeautifulSoup/bs4/doc/"),
         nasdaqdatalink=dict(name="Nasdaq Data Link", link="https://github.com/Nasdaq/data-link-python"),

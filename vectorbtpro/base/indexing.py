@@ -20,6 +20,7 @@ from vectorbtpro.utils.datetime_ import (
     try_align_to_datetime_index,
     time_to_timedelta,
     infer_index_freq,
+    prepare_freq,
 )
 
 
@@ -808,6 +809,7 @@ def get_index_points(
 
     if add_delta is not None:
         if isinstance(add_delta, str):
+            add_delta = prepare_freq(add_delta)
             try:
                 add_delta = to_offset(add_delta)
             except Exception as e:
@@ -1034,6 +1036,7 @@ def get_index_ranges(
 
     if add_start_delta is not None:
         if isinstance(add_start_delta, str):
+            add_start_delta = prepare_freq(add_start_delta)
             try:
                 add_start_delta = to_offset(add_start_delta)
             except Exception as e:
@@ -1041,6 +1044,7 @@ def get_index_ranges(
         start += add_start_delta
     if add_end_delta is not None:
         if isinstance(add_end_delta, str):
+            add_end_delta = prepare_freq(add_end_delta)
             try:
                 add_end_delta = to_offset(add_end_delta)
             except Exception as e:

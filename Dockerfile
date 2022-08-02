@@ -40,7 +40,7 @@ RUN pip install --quiet --no-cache-dir \
     'attrs>=19.2.0' \
     'yfinance>=0.1.63' \
     'python-binance>=1.0.16' \
-    'alpaca_trade_api' \
+    'alpaca-py' \
     'ccxt>=1.89.14' \
     'polygon-api-client>=1.0.0' \
     'nasdaq-data-link' \

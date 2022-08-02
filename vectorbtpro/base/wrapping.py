@@ -27,7 +27,7 @@ from vectorbtpro.base.indexes import repeat_index, stack_indexes
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import AttrResolverMixin, AttrResolverMixinT
 from vectorbtpro.utils.config import Configured, merge_dicts, resolve_dict
-from vectorbtpro.utils.datetime_ import infer_index_freq, try_to_datetime_index
+from vectorbtpro.utils.datetime_ import infer_index_freq, try_to_datetime_index, prepare_freq
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.decorators import class_or_instancemethod, cached_method
 from vectorbtpro.utils.array_ import is_range
@@ -891,7 +891,10 @@ class ArrayWrapper(Configured, PandasIndexer):
                     dict(closed="left", label="left"),
                     resample_kwargs,
                 )
-                rule = pd.Series(index=self.index, dtype=object).resample(rule, **resolve_dict(resample_kwargs))
+                rule = pd.Series(index=self.index, dtype=object).resample(
+                    prepare_freq(rule),
+                    **resolve_dict(resample_kwargs)
+                )
             if return_pd_resampler:
                 return rule
             rule = Resampler.from_pd_resampler(rule)
@@ -1156,13 +1159,13 @@ class ArrayWrapper(Configured, PandasIndexer):
             pass
         if isinstance(self.index, pd.DatetimeIndex):
             try:
-                by = to_offset(by)
+                by = to_offset(prepare_freq(by))
                 if by.n == 1:
                     return Grouper(index=self.index, group_by=self.index.to_period(by))
             except Exception as e:
                 pass
             try:
-                pd_group_by = pd.Series(index=self.index, dtype=object).resample(by, **kwargs)
+                pd_group_by = pd.Series(index=self.index, dtype=object).resample(prepare_freq(by), **kwargs)
                 return Grouper.from_pd_group_by(pd_group_by)
             except Exception as e:
                 pass

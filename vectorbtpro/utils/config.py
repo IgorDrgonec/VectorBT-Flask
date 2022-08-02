@@ -3,7 +3,6 @@
 """Utilities for configuration."""
 
 import warnings
-import functools
 import inspect
 from collections import namedtuple
 from copy import copy, deepcopy
@@ -58,6 +57,21 @@ def convert_to_dict(dct: InConfigLikeT, nested: bool = True) -> dict:
         else:
             dct[k] = v
     return dct
+
+
+def get_dict_item(dct: dict, k: tp.Hashable) -> tp.Any:
+    """Get dict item under the key `k`.
+
+    The key can be nested using the dot notation or tuple, and must be hashable."""
+    if k in dct:
+        return dct[k]
+    if isinstance(k, str) and '.' in k:
+        k = tuple(k.split('.'))
+    if isinstance(k, tuple):
+        if len(k) == 1:
+            return dct[k[0]]
+        return get_dict_item(dct[k[0]], k[1:])
+    return dct[k]
 
 
 def set_dict_item(dct: dict, k: tp.Any, v: tp.Any, force: bool = False) -> None:
@@ -871,6 +885,11 @@ class Configured(Cacheable, Pickleable, Prettified):
         their values won't be copied over. Make sure to pass them explicitly to
         make that the saved & loaded / copied instance is resilient to any changes in globals."""
 
+    _settings_key: tp.ClassVar[tp.Optional[str]] = None
+    """Key corresponding to this class in `vectorbtpro._settings`. 
+    
+    Multiple levels can be defined using the dot notation."""
+
     _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = None
     """Set of expected keys."""
 
@@ -1012,6 +1031,46 @@ class Configured(Cacheable, Pickleable, Prettified):
     def update_config(self, *args, **kwargs) -> None:
         """Force-update the config."""
         self.config.update(*args, **kwargs, force=True)
+
+    @classmethod
+    def get_settings(cls) -> dict:
+        """Get class-related settings from `vectorbtpro._settings`."""
+        from vectorbtpro._settings import settings
+
+        final_cls_cfg = None
+        for c in cls.__mro__[::-1]:
+            if hasattr(c, "_settings_key"):
+                c_settings_key = getattr(c, "_settings_key")
+                if c_settings_key is not None:
+                    c_cfg = get_dict_item(settings, c_settings_key)
+                    final_cls_cfg = merge_dicts(final_cls_cfg, c_cfg)
+        return final_cls_cfg
+
+    @classmethod
+    def set_settings(cls, **kwargs) -> None:
+        """Set class-related settings in `vectorbtpro._settings`."""
+        from vectorbtpro._settings import settings
+
+        if cls._settings_key is None:
+            raise ValueError(f"No settings associated with the class {cls.__name__}")
+        cls_cfg = get_dict_item(settings, cls._settings_key)
+        for k, v in kwargs.items():
+            if k not in cls_cfg:
+                raise KeyError(f"Invalid key '{k}'")
+            if isinstance(cls_cfg[k], dict) and isinstance(v, dict):
+                cls_cfg[k] = merge_dicts(cls_cfg[k], v)
+            else:
+                cls_cfg[k] = v
+
+    @classmethod
+    def reset_settings(cls) -> None:
+        """Reset class-related settings in `vectorbtpro._settings`."""
+        from vectorbtpro._settings import settings
+
+        if cls._settings_key is None:
+            raise ValueError(f"No settings associated with the class {cls.__name__}")
+        cls_cfg = get_dict_item(settings, cls._settings_key)
+        cls_cfg.reset(force=True)
 
     def prettify(self, **kwargs) -> str:
         return "%s(%s)" % (

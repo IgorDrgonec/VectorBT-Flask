@@ -13,7 +13,7 @@
 import time
 import traceback
 import warnings
-from functools import wraps, lru_cache
+from functools import wraps, lru_cache, partial
 from pathlib import Path, PurePath
 from glob import glob
 import re
@@ -36,6 +36,8 @@ from vectorbtpro.utils.datetime_ import (
     get_local_tz,
     to_tzaware_datetime,
     datetime_to_ms,
+    split_freq_str,
+    prepare_freq,
 )
 from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.random_ import set_seed
@@ -50,7 +52,7 @@ try:
 except ImportError:
     CCXTExchangeT = tp.Any
 try:
-    from alpaca_trade_api.rest import REST as AlpacaClientT
+    from alpaca.common.rest import RESTClient as AlpacaClientT
 except ImportError:
     AlpacaClientT = tp.Any
 try:
@@ -97,6 +99,8 @@ class SyntheticData(Data):
     Exposes an abstract class method `SyntheticData.generate_symbol`.
     Everything else is taken care of."""
 
+    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.synthetic"
+
     @classmethod
     def generate_symbol(cls, symbol: tp.Symbol, index: tp.Index, **kwargs) -> tp.SeriesFrame:
         """Abstract method to generate data of a symbol."""
@@ -118,9 +122,7 @@ class SyntheticData(Data):
         the Series/DataFrame with generated data.
 
         For defaults, see `custom.synthetic` in `vectorbtpro._settings.data`."""
-        from vectorbtpro._settings import settings
-
-        synthetic_cfg = settings["data"]["custom"]["synthetic"]
+        synthetic_cfg = cls.get_settings()
 
         if start is None:
             start = synthetic_cfg["start"]
@@ -128,6 +130,7 @@ class SyntheticData(Data):
             end = synthetic_cfg["end"]
         if freq is None:
             freq = synthetic_cfg["freq"]
+        freq = prepare_freq(freq)
         date_range_kwargs = merge_dicts(synthetic_cfg["date_range_kwargs"], date_range_kwargs)
 
         index = pd.date_range(
@@ -150,6 +153,8 @@ class SyntheticData(Data):
 class RandomData(SyntheticData):
     """`SyntheticData` for data generated using `vectorbtpro.data.nb.generate_random_data_nb`."""
 
+    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.random"
+
     @classmethod
     def generate_symbol(
         cls,
@@ -162,6 +167,7 @@ class RandomData(SyntheticData):
         symmetric: tp.Optional[bool] = None,
         seed: tp.Optional[int] = None,
         jitted: tp.JittedOption = None,
+        columns: tp.Optional[tp.IndexLike] = None,
     ) -> tp.SeriesFrame:
         """Generate a symbol.
 
@@ -177,15 +183,14 @@ class RandomData(SyntheticData):
             symmetric (bool): Whether to diminish negative returns and make them symmetric to positive ones.
             seed (int): Set seed to make output deterministic.
             jitted (any): See `vectorbtpro.utils.jitting.resolve_jitted_option`.
+            columns (index_like): Column labels.
 
         For defaults, see `custom.random` in `vectorbtpro._settings.data`.
 
         !!! note
             When setting a seed, remember to pass a seed per symbol using `vectorbtpro.data.base.symbol_dict`.
         """
-        from vectorbtpro._settings import settings
-
-        random_cfg = settings["data"]["custom"]["random"]
+        random_cfg = cls.get_settings()
 
         if num_paths is None:
             num_paths = random_cfg["num_paths"]
@@ -208,9 +213,15 @@ class RandomData(SyntheticData):
         out = func((len(index), num_paths), start_value, mean, std, symmetric=symmetric)
 
         if out.shape[1] == 1:
-            out = pd.Series(out[:, 0], index=index)
+            if columns is None:
+                out = pd.Series(out[:, 0], index=index)
+            else:
+                if not isinstance(columns, pd.Index):
+                    columns = pd.index(columns)
+                out = pd.Series(out[:, 0], index=index, name=columns[0])
         else:
-            columns = pd.RangeIndex(stop=out.shape[1], name="path")
+            if columns is None:
+                columns = pd.RangeIndex(stop=out.shape[1], name="path")
             out = pd.DataFrame(out, index=index, columns=columns)
         return out
 
@@ -227,6 +238,8 @@ class RandomData(SyntheticData):
 class RandomOHLCData(RandomData):
     """`RandomData` resampled to OHLC."""
 
+    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.random_ohlc"
+
     @classmethod
     def generate_symbol(
         cls,
@@ -235,12 +248,11 @@ class RandomOHLCData(RandomData):
         **kwargs,
     ) -> tp.SeriesFrame:
         """Generate a symbol."""
-        from vectorbtpro._settings import settings
-
-        random_ohlc_cfg = settings["data"]["custom"]["random_ohlc"]
+        random_ohlc_cfg = cls.get_settings()
 
         if ohlc_freq is None:
             ohlc_freq = random_ohlc_cfg["ohlc_freq"]
+        ohlc_freq = prepare_freq(ohlc_freq)
 
         out = RandomData.generate_symbol(*args, num_paths=1, **kwargs)
         out = out.resample(ohlc_freq).ohlc()
@@ -260,6 +272,8 @@ class RandomOHLCData(RandomData):
 class GBMData(RandomData):
     """`RandomData` for data generated using `vectorbtpro.data.nb.generate_gbm_data_nb`."""
 
+    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.gbm"
+
     @classmethod
     def generate_symbol(
         cls,
@@ -272,6 +286,7 @@ class GBMData(RandomData):
         dt: tp.Optional[float] = None,
         seed: tp.Optional[int] = None,
         jitted: tp.JittedOption = None,
+        columns: tp.Optional[tp.IndexLike] = None,
     ) -> tp.SeriesFrame:
         """Generate a symbol.
 
@@ -287,15 +302,14 @@ class GBMData(RandomData):
             dt (float): Time change (one period of time).
             seed (int): Set seed to make output deterministic.
             jitted (any): See `vectorbtpro.utils.jitting.resolve_jitted_option`.
+            columns (index_like): Column labels.
 
         For defaults, see `custom.gbm` in `vectorbtpro._settings.data`.
 
         !!! note
             When setting a seed, remember to pass a seed per symbol using `vectorbtpro.data.base.symbol_dict`.
         """
-        from vectorbtpro._settings import settings
-
-        gbm_cfg = settings["data"]["custom"]["gbm"]
+        gbm_cfg = cls.get_settings()
 
         if num_paths is None:
             num_paths = gbm_cfg["num_paths"]
@@ -318,15 +332,23 @@ class GBMData(RandomData):
         out = func((len(index), num_paths), start_value, mean, std, dt)
 
         if out.shape[1] == 1:
-            out = pd.Series(out[:, 0], index=index)
+            if columns is None:
+                out = pd.Series(out[:, 0], index=index)
+            else:
+                if not isinstance(columns, pd.Index):
+                    columns = pd.index(columns)
+                out = pd.Series(out[:, 0], index=index, name=columns[0])
         else:
-            columns = pd.RangeIndex(stop=out.shape[1], name="path")
+            if columns is None:
+                columns = pd.RangeIndex(stop=out.shape[1], name="path")
             out = pd.DataFrame(out, index=index, columns=columns)
         return out
 
 
 class GBMOHLCData(GBMData):
     """`GBMData` resampled to OHLC."""
+
+    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.gbm_ohlc"
 
     @classmethod
     def generate_symbol(
@@ -336,12 +358,11 @@ class GBMOHLCData(GBMData):
         **kwargs,
     ) -> tp.SeriesFrame:
         """Generate a symbol."""
-        from vectorbtpro._settings import settings
-
-        gbm_ohlc_cfg = settings["data"]["custom"]["gbm_ohlc"]
+        gbm_ohlc_cfg = cls.get_settings()
 
         if ohlc_freq is None:
             ohlc_freq = gbm_ohlc_cfg["ohlc_freq"]
+        ohlc_freq = prepare_freq(ohlc_freq)
 
         out = GBMData.generate_symbol(*args, num_paths=1, **kwargs)
         out = out.resample(ohlc_freq).ohlc()
@@ -365,6 +386,8 @@ LocalDataT = tp.TypeVar("LocalDataT", bound="LocalData")
 
 class LocalData(Data):
     """Subclass of `vectorbtpro.data.base.Data` for local data."""
+
+    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.local"
 
     @classmethod
     def match_path(
@@ -417,9 +440,7 @@ class LocalData(Data):
 
         For defaults, see `custom.local` in `vectorbtpro._settings.data`.
         """
-        from vectorbtpro._settings import settings
-
-        local_cfg = settings["data"]["custom"]["local"]
+        local_cfg = cls.get_settings()
 
         if match_paths is None:
             match_paths = local_cfg["match_paths"]
@@ -507,6 +528,8 @@ CSVDataT = tp.TypeVar("CSVDataT", bound="CSVData")
 class CSVData(LocalData):
     """Subclass of `vectorbtpro.data.base.Data` for data that can be fetched and updated using `pd.read_csv`."""
 
+    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.csv"
+
     @classmethod
     def fetch_symbol(
         cls,
@@ -537,9 +560,7 @@ class CSVData(LocalData):
 
         For defaults, see `custom.csv` in `vectorbtpro._settings.data`.
         """
-        from vectorbtpro._settings import settings
-
-        csv_cfg = settings["data"]["custom"]["csv"]
+        csv_cfg = cls.get_settings()
 
         if start_row is None:
             start_row = csv_cfg["start_row"]
@@ -630,6 +651,8 @@ HDFDataT = tp.TypeVar("HDFDataT", bound="HDFData")
 
 class HDFData(LocalData):
     """Subclass of `vectorbtpro.data.base.Data` for data that can be fetched and updated using `pd.read_hdf`."""
+
+    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.hdf"
 
     @classmethod
     def split_hdf_path(
@@ -743,9 +766,7 @@ class HDFData(LocalData):
 
         For defaults, see `custom.hdf` in `vectorbtpro._settings.data`.
         """
-        from vectorbtpro._settings import settings
-
-        hdf_cfg = settings["data"]["custom"]["hdf"]
+        hdf_cfg = cls.get_settings()
 
         if start_row is None:
             start_row = hdf_cfg["start_row"]
@@ -798,7 +819,27 @@ class RemoteData(Data):
 class YFData(RemoteData):  # pragma: no cover
     """Subclass of `vectorbtpro.data.base.Data` for `yfinance`.
 
-    See https://github.com/ranaroussi/yfinance"""
+    See https://github.com/ranaroussi/yfinance for API.
+
+    See `YFData.fetch_symbol` for arguments.
+
+    !!! note
+        Stocks are usually in the timezone "-0400" and cryptocurrencies in UTC.
+
+    Usage:
+        ```pycon
+        >>> import vectorbtpro as vbt
+
+        >>> data = vbt.YFData.fetch(
+        ...     "BTC-USD",
+        ...     start="2020-01-01 UTC",
+        ...     end="2021-01-01 UTC",
+        ...     timeframe="1 day"
+        ... )
+        ```
+    """
+
+    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.yf"
 
     _column_config: tp.ClassVar[Config] = HybridConfig(
         {
@@ -842,7 +883,9 @@ class YFData(RemoteData):  # pragma: no cover
             end (any): End datetime.
 
                 See `vectorbtpro.utils.datetime_.to_tzaware_datetime`.
-            timeframe (str): Interval.
+            timeframe (str): Timeframe.
+
+                Allows human-readable strings such as "15 minutes".
             **history_kwargs: Keyword arguments passed to `yfinance.base.TickerBase.history`.
 
         For defaults, see `custom.yf` in `vectorbtpro._settings.data`.
@@ -859,9 +902,7 @@ class YFData(RemoteData):  # pragma: no cover
         assert_can_import("yfinance")
         import yfinance as yf
 
-        from vectorbtpro._settings import settings
-
-        yf_cfg = settings["data"]["custom"]["yf"]
+        yf_cfg = cls.get_settings()
 
         if period is None:
             period = yf_cfg["period"]
@@ -878,8 +919,33 @@ class YFData(RemoteData):  # pragma: no cover
             start = to_tzaware_datetime(start, tz=get_local_tz())
         if end is not None:
             end = to_tzaware_datetime(end, tz=get_local_tz())
+        split = split_freq_str(timeframe)
+        if split is not None:
+            multiplier, unit = split
+            if unit == "t":
+                unit = "m"
+            elif unit == "W":
+                unit = "wk"
+            elif unit == "M":
+                unit = "mo"
+            timeframe = str(multiplier) + unit
 
-        return yf.Ticker(symbol).history(period=period, start=start, end=end, interval=timeframe, **history_kwargs)
+        df = yf.Ticker(symbol).history(period=period, start=start, end=end, interval=timeframe, **history_kwargs)
+        if start is not None:
+            if df.index.tzinfo is None:
+                if df.index[0] < start.astimezone(get_utc_tz()).replace(tzinfo=None):
+                    df = df[df.index >= start.astimezone(get_utc_tz()).replace(tzinfo=None)]
+            else:
+                if df.index[0] < start.astimezone(df.index.tzinfo):
+                    df = df[df.index >= start.astimezone(df.index.tzinfo)]
+        if end is not None:
+            if df.index.tzinfo is None:
+                if df.index[-1] >= end.astimezone(get_utc_tz()).replace(tzinfo=None):
+                    df = df[df.index < end.astimezone(get_utc_tz()).replace(tzinfo=None)]
+            else:
+                if df.index[-1] >= end.astimezone(df.index.tzinfo):
+                    df = df[df.index < end.astimezone(df.index.tzinfo)]
+        return df
 
 
 YFData.override_column_config_doc(__pdoc__)
@@ -890,7 +956,37 @@ BinanceDataT = tp.TypeVar("BinanceDataT", bound="BinanceData")
 class BinanceData(RemoteData):  # pragma: no cover
     """Subclass of `vectorbtpro.data.base.Data` for `python-binance`.
 
-    See https://github.com/sammchardy/python-binance"""
+    See https://github.com/sammchardy/python-binance for API.
+
+    See `BinanceData.fetch_symbol` for arguments.
+
+    Usage:
+        * Set up the API key globally (optional):
+
+        ```pycon
+        >>> import vectorbtpro as vbt
+
+        >>> vbt.BinanceData.set_settings(
+        ...     client_config=dict(
+        ...         api_key="YOUR_KEY",
+        ...         api_secret="YOUR_SECRET"
+        ...     )
+        ... )
+        ```
+
+        * Fetch data:
+
+        ```pycon
+        >>> data = vbt.BinanceData.fetch(
+        ...     "BTCUSDT",
+        ...     start="2020-01-01 UTC",
+        ...     end="2021-01-01 UTC",
+        ...     timeframe="1 day"
+        ... )
+        ```
+    """
+
+    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.binance"
 
     _column_config: tp.ClassVar[Config] = HybridConfig(
         {
@@ -920,43 +1016,36 @@ class BinanceData(RemoteData):  # pragma: no cover
         return self._column_config
 
     @classmethod
-    def fetch(
-        cls: tp.Type[BinanceDataT],
-        symbols: tp.Union[tp.Symbol, tp.Symbols] = None,
-        *,
-        client: tp.Optional[BinanceClientT] = None,
-        client_kwargs: tp.KwargsLike = None,
-        **kwargs,
-    ) -> BinanceDataT:
-        """Override `vectorbtpro.data.base.Data.fetch` to instantiate a Binance client.
+    def resolve_client(cls, client: tp.Optional[BinanceClientT] = None, **client_config) -> BinanceClientT:
+        """Resolve the client.
 
-        For defaults, see `custom.binance` in `vectorbtpro._settings.data`."""
+        If provided, must be of the type `binance.client.Client`.
+        Otherwise, will be created using `client_config`."""
         from vectorbtpro.utils.opt_packages import assert_can_import
 
         assert_can_import("binance")
         from binance.client import Client
 
-        from vectorbtpro._settings import settings
-
-        binance_cfg = settings["data"]["custom"]["binance"]
+        binance_cfg = cls.get_settings()
 
         if client is None:
             client = binance_cfg["client"]
-        if client_kwargs is None:
-            client_kwargs = {}
-        has_client_kwargs = len(client_kwargs) > 0
-        client_kwargs = merge_dicts(binance_cfg["client_kwargs"], client_kwargs)
+        if client_config is None:
+            client_config = {}
+        has_client_config = len(client_config) > 0
+        client_config = merge_dicts(binance_cfg["client_config"], client_config)
         if client is None:
-            client = Client(**client_kwargs)
-        elif has_client_kwargs:
-            raise ValueError("Cannot apply config after instantiation of the client")
-        return super(BinanceData, cls).fetch(symbols, client=client, **kwargs)
+            client = Client(**client_config)
+        elif has_client_config:
+            raise ValueError("Cannot apply client_config on already created client")
+        return client
 
     @classmethod
     def fetch_symbol(
         cls,
         symbol: str,
         client: tp.Optional[BinanceClientT] = None,
+        client_config: tp.KwargsLike = None,
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
         timeframe: tp.Optional[str] = None,
@@ -972,18 +1061,21 @@ class BinanceData(RemoteData):  # pragma: no cover
 
         Args:
             symbol (str): Symbol.
-            client (binance.client.Client): Client of type `binance.client.Client`.
+            client (binance.client.Client): Client.
 
-                Must be provided.
+                See `BinanceData.resolve_client`.
+            client_config (dict): Client config.
+
+                See `BinanceData.resolve_client`.
             start (any): Start datetime.
 
                 See `vectorbtpro.utils.datetime_.to_tzaware_datetime`.
             end (any): End datetime.
 
                 See `vectorbtpro.utils.datetime_.to_tzaware_datetime`.
-            timeframe (str): Kline timeframe.
+            timeframe (str): Timeframe.
 
-                See [Binance Constants](https://python-binance.readthedocs.io/en/latest/constants.html).
+                Allows human-readable strings such as "15 minutes".
             klines_type (int or str): Kline type.
 
                 See `binance.enums.HistoricalKlinesType`. Supports strings.
@@ -997,14 +1089,12 @@ class BinanceData(RemoteData):  # pragma: no cover
         For defaults, see `custom.binance` in `vectorbtpro._settings.data`.
         """
         from binance.enums import HistoricalKlinesType
-        from vectorbtpro._settings import settings
 
-        binance_cfg = settings["data"]["custom"]["binance"]
+        binance_cfg = cls.get_settings()
 
-        if client is None:
-            client = binance_cfg["client"]
-        if client is None:
-            raise ValueError("Client must be provided")
+        if client_config is None:
+            client_config = {}
+        client = cls.resolve_client(client=client, **client_config)
         if start is None:
             start = binance_cfg["start"]
         if end is None:
@@ -1029,12 +1119,21 @@ class BinanceData(RemoteData):  # pragma: no cover
         get_klines_kwargs = merge_dicts(binance_cfg["get_klines_kwargs"], get_klines_kwargs)
 
         # Prepare parameters
+        split = split_freq_str(timeframe)
+        if split is not None:
+            multiplier, unit = split
+            if unit == "t":
+                unit = "m"
+            elif unit == "W":
+                unit = "w"
+            timeframe = str(multiplier) + unit
         if start is not None:
             start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
             first_valid_ts = client._get_earliest_valid_timestamp(symbol, timeframe, klines_type)
-            next_start_ts = start_ts = max(start_ts, first_valid_ts)
+            start_ts = max(start_ts, first_valid_ts)
         else:
-            next_start_ts = start_ts = None
+            start_ts = None
+        prev_end_ts = None
         if end is not None:
             end_ts = datetime_to_ms(to_tzaware_datetime(end, tz=get_utc_tz()))
         else:
@@ -1045,26 +1144,35 @@ class BinanceData(RemoteData):  # pragma: no cover
                 return "None"
             return str(pd.Timestamp(to_tzaware_datetime(ts, tz=get_utc_tz())))
 
+        def _filter_func(d: tp.Sequence, _prev_end_ts: tp.Optional[int] = None) -> bool:
+            if start_ts is not None:
+                if d[0] < start_ts:
+                    return False
+            if _prev_end_ts is not None:
+                if d[0] <= _prev_end_ts:
+                    return False
+            if end_ts is not None:
+                if d[0] >= end_ts:
+                    return False
+            return True
+
         # Iteratively collect the data
         data = []
         try:
             with get_pbar(show_progress=show_progress, **pbar_kwargs) as pbar:
-                pbar.set_description(_ts_to_str(next_start_ts))
+                pbar.set_description(_ts_to_str(start_ts if prev_end_ts is None else prev_end_ts))
                 while True:
                     # Fetch the klines for the next timeframe
                     next_data = client._klines(
                         symbol=symbol,
                         interval=timeframe,
                         limit=limit,
-                        startTime=next_start_ts,
+                        startTime=start_ts if prev_end_ts is None else prev_end_ts,
                         endTime=end_ts,
                         klines_type=klines_type,
                         **get_klines_kwargs,
                     )
-                    if len(data) > 0:
-                        next_data = list(filter(lambda d: next_start_ts < d[0] < end_ts, next_data))
-                    else:
-                        next_data = list(filter(lambda d: d[0] < end_ts, next_data))
+                    next_data = list(filter(partial(_filter_func, _prev_end_ts=prev_end_ts), next_data))
 
                     # Update the timestamps and the progress bar
                     if not len(next_data):
@@ -1079,7 +1187,7 @@ class BinanceData(RemoteData):  # pragma: no cover
                         )
                     )
                     pbar.update(1)
-                    next_start_ts = next_data[-1][0]
+                    prev_end_ts = next_data[-1][0]
                     if delay is not None:
                         time.sleep(delay / 1000)  # be kind to api
         except Exception as e:
@@ -1132,20 +1240,97 @@ BinanceData.override_column_config_doc(__pdoc__)
 class CCXTData(RemoteData):  # pragma: no cover
     """Subclass of `vectorbtpro.data.base.Data` for `ccxt`.
 
-    See https://github.com/ccxt/ccxt"""
+    See https://github.com/ccxt/ccxt for API.
+
+    See `CCXTData.fetch_symbol` for arguments.
+
+    Usage:
+        * Set up the API key globally (optional):
+
+        ```pycon
+        >>> import vectorbtpro as vbt
+
+        >>> vbt.CCXTData.set_settings(
+        ...     exchanges=dict(
+        ...         binance=dict(
+        ...             exchange_config=dict(
+        ...                 apiKey="YOUR_KEY",
+        ...                 secret="YOUR_SECRET"
+        ...             )
+        ...         )
+        ...     )
+        ... )
+        ```
+
+        * Fetch data:
+
+        ```pycon
+        >>> data = vbt.CCXTData.fetch(
+        ...     "BTCUSDT",
+        ...     exchange="binance",
+        ...     start="2020-01-01 UTC",
+        ...     end="2021-01-01 UTC",
+        ...     timeframe="1 day"
+        ... )
+        ```
+    """
+
+    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.ccxt"
+
+    @classmethod
+    def resolve_exchange(
+        cls,
+        exchange: tp.Optional[tp.Union[str, CCXTExchangeT]] = None,
+        **exchange_config,
+    ) -> CCXTExchangeT:
+        """Resolve the exchange.
+
+        If provided, must be of the type `ccxt.base.exchange.Exchange`.
+        Otherwise, will be created using `exchange_config`."""
+        from vectorbtpro.utils.opt_packages import assert_can_import
+
+        assert_can_import("ccxt")
+        import ccxt
+
+        ccxt_cfg = cls.get_settings()
+
+        if exchange is None:
+            exchange = ccxt_cfg["exchange"]
+        if isinstance(exchange, str):
+            exchange_name = exchange
+        elif isinstance(exchange, ccxt.Exchange):
+            exchange_name = type(exchange).__name__
+        else:
+            raise ValueError(f"Unknown exchange of type {type(exchange)}")
+        if exchange_config is None:
+            exchange_config = {}
+        has_exchange_config = len(exchange_config) > 0
+        exchange_config = merge_dicts(
+            ccxt_cfg["exchange_config"],
+            ccxt_cfg["exchanges"].get(exchange_name, {}).get("exchange_config", {}),
+            exchange_config,
+        )
+        if isinstance(exchange, str):
+            if not hasattr(ccxt, exchange):
+                raise ValueError(f"Exchange '{exchange}' not found in CCXT")
+            exchange = getattr(ccxt, exchange)(exchange_config)
+        else:
+            if has_exchange_config:
+                raise ValueError("Cannot apply config after instantiation of the exchange")
+        return exchange
 
     @classmethod
     def fetch_symbol(
         cls,
         symbol: str,
         exchange: tp.Optional[tp.Union[str, CCXTExchangeT]] = None,
+        exchange_config: tp.Optional[tp.KwargsLike] = None,
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
         timeframe: tp.Optional[str] = None,
         limit: tp.Optional[int] = None,
         delay: tp.Optional[float] = None,
         retries: tp.Optional[int] = None,
-        exchange_config: tp.Optional[tp.KwargsLike] = None,
         fetch_params: tp.Optional[tp.KwargsLike] = None,
         show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
@@ -1155,24 +1340,27 @@ class CCXTData(RemoteData):  # pragma: no cover
 
         Args:
             symbol (str): Symbol.
-            exchange (str or object): Exchange identifier or an exchange object of type
-                `ccxt.base.exchange.Exchange`.
+            exchange (str or object): Exchange identifier or an exchange object.
+
+                See `CCXTData.resolve_exchange`.
+            exchange_config (dict): Exchange config.
+
+                See `CCXTData.resolve_exchange`.
             start (any): Start datetime.
 
                 See `vectorbtpro.utils.datetime_.to_tzaware_datetime`.
             end (any): End datetime.
 
                 See `vectorbtpro.utils.datetime_.to_tzaware_datetime`.
-            timeframe (str): Timeframe supported by the exchange.
+            timeframe (str): Timeframe.
+
+                Allows human-readable strings such as "15 minutes".
             limit (int): The maximum number of returned items.
             delay (float): Time to sleep after each request (in milliseconds).
 
                 !!! note
                     Use only if `enableRateLimit` is not set.
             retries (int): The number of retries on failure to fetch data.
-            exchange_config (dict): Keyword arguments passed to the exchange upon instantiation.
-
-                Will raise an exception if exchange has been already instantiated.
             fetch_params (dict): Exchange-specific keyword arguments passed to `fetch_ohlcv`.
             show_progress (bool): Whether to show the progress bar.
             pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`.
@@ -1186,18 +1374,16 @@ class CCXTData(RemoteData):  # pragma: no cover
         assert_can_import("ccxt")
         import ccxt
 
-        from vectorbtpro._settings import settings
+        ccxt_cfg = cls.get_settings()
 
-        ccxt_cfg = settings["data"]["custom"]["ccxt"]
+        if exchange_config is None:
+            exchange_config = {}
+        exchange = cls.resolve_exchange(exchange=exchange, **exchange_config)
+        if exchange.has["fetchOHLCV"] == "emulated":
+            if not silence_warnings:
+                warnings.warn("Using emulated OHLCV candles", stacklevel=2)
+        exchange_name = type(exchange).__name__
 
-        if exchange is None:
-            exchange = ccxt_cfg["exchange"]
-        if isinstance(exchange, str):
-            exchange_name = exchange
-        elif isinstance(exchange, ccxt.Exchange):
-            exchange_name = exchange.__name__
-        else:
-            raise ValueError(f"Unknown exchange of type {type(exchange)}")
         if start is None:
             start = ccxt_cfg["exchanges"].get(exchange_name, {}).get("start", ccxt_cfg["start"])
         if end is None:
@@ -1210,14 +1396,6 @@ class CCXTData(RemoteData):  # pragma: no cover
             delay = ccxt_cfg["exchanges"].get(exchange_name, {}).get("delay", ccxt_cfg["delay"])
         if retries is None:
             retries = ccxt_cfg["exchanges"].get(exchange_name, {}).get("retries", ccxt_cfg["retries"])
-        if exchange_config is None:
-            exchange_config = {}
-        has_exchange_config = len(exchange_config) > 0
-        exchange_config = merge_dicts(
-            ccxt_cfg["exchange_config"],
-            ccxt_cfg["exchanges"].get(exchange_name, {}).get("exchange_config", {}),
-            exchange_config,
-        )
         fetch_params = merge_dicts(
             ccxt_cfg["fetch_params"],
             ccxt_cfg["exchanges"].get(exchange_name, {}).get("fetch_params", {}),
@@ -1235,20 +1413,20 @@ class CCXTData(RemoteData):  # pragma: no cover
                 ccxt_cfg["exchanges"].get(exchange_name, {}).get("silence_warnings", ccxt_cfg["silence_warnings"])
             )
 
-        if isinstance(exchange, str):
-            if not hasattr(ccxt, exchange):
-                raise ValueError(f"Exchange '{exchange}' not found in CCXT")
-            exchange = getattr(ccxt, exchange)(exchange_config)
-        else:
-            if has_exchange_config:
-                raise ValueError("Cannot apply config after instantiation of the exchange")
         if not exchange.has["fetchOHLCV"]:
             raise ValueError(f"Exchange {exchange} does not support OHLCV")
+        split = split_freq_str(timeframe)
+        if split is not None:
+            multiplier, unit = split
+            if unit == "t":
+                unit = "m"
+            elif unit == "W":
+                unit = "w"
+            elif unit == "Y":
+                unit = "y"
+            timeframe = str(multiplier) + unit
         if timeframe not in exchange.timeframes:
             raise ValueError(f"Exchange {exchange} does not support {timeframe} timeframe")
-        if exchange.has["fetchOHLCV"] == "emulated":
-            if not silence_warnings:
-                warnings.warn("Using emulated OHLCV candles", stacklevel=2)
 
         def _retry(method):
             @wraps(method)
@@ -1281,26 +1459,36 @@ class CCXTData(RemoteData):  # pragma: no cover
         try:
             first_data = _fetch(0, 1)
             first_valid_ts = first_data[0][0]
-            next_start_ts = start_ts = max(start_ts, first_valid_ts)
+            start_ts = max(start_ts, first_valid_ts)
         except Exception as e:
-            next_start_ts = start_ts
+            pass
+        prev_end_ts = None
         end_ts = datetime_to_ms(to_tzaware_datetime(end, tz=get_utc_tz()))
 
         def _ts_to_str(ts):
             return str(pd.Timestamp(to_tzaware_datetime(ts, tz=get_utc_tz())))
 
+        def _filter_func(d: tp.Sequence, _prev_end_ts: tp.Optional[int] = None) -> bool:
+            if start_ts is not None:
+                if d[0] < start_ts:
+                    return False
+            if _prev_end_ts is not None:
+                if d[0] <= _prev_end_ts:
+                    return False
+            if end_ts is not None:
+                if d[0] >= end_ts:
+                    return False
+            return True
+
         # Iteratively collect the data
         data = []
         try:
             with get_pbar(show_progress=show_progress, **pbar_kwargs) as pbar:
-                pbar.set_description(_ts_to_str(start_ts))
+                pbar.set_description(_ts_to_str(start_ts if prev_end_ts is None else prev_end_ts))
                 while True:
                     # Fetch the klines for the next timeframe
-                    next_data = _fetch(next_start_ts, limit)
-                    if len(data) > 0:
-                        next_data = list(filter(lambda d: next_start_ts < d[0] < end_ts, next_data))
-                    else:
-                        next_data = list(filter(lambda d: d[0] < end_ts, next_data))
+                    next_data = _fetch(start_ts if prev_end_ts is None else prev_end_ts, limit)
+                    next_data = list(filter(partial(_filter_func, _prev_end_ts=prev_end_ts), next_data))
 
                     # Update the timestamps and the progress bar
                     if not len(next_data):
@@ -1313,7 +1501,7 @@ class CCXTData(RemoteData):  # pragma: no cover
                         )
                     )
                     pbar.update(1)
-                    next_start_ts = next_data[-1][0]
+                    prev_end_ts = next_data[-1][0]
                     if delay is not None:
                         time.sleep(delay / 1000)  # be kind to api
         except Exception as e:
@@ -1347,167 +1535,206 @@ AlpacaDataT = tp.TypeVar("AlpacaDataT", bound="AlpacaData")
 
 
 class AlpacaData(RemoteData):  # pragma: no cover
-    """Subclass of `vectorbtpro.data.base.Data` for `alpaca-trade-api`.
+    """Subclass of `vectorbtpro.data.base.Data` for `alpaca-py`.
 
-    See https://github.com/alpacahq/alpaca-trade-api-python
+    See https://github.com/alpacahq/alpaca-py for API.
 
-    Sign up for Alpaca API keys under https://app.alpaca.markets/signup
+    See `AlpacaData.fetch_symbol` for arguments.
 
-    Contributed to vectorbt by @haxdds. Licensed under Apache 2.0 with Commons Clause license.
-    Adapted to vectorbtpro by @polakowo."""
+    Usage:
+        * Set up the API key globally (optional for crypto):
+
+        ```pycon
+        >>> import vectorbtpro as vbt
+
+        >>> vbt.AlpacaData.set_settings(
+        ...     client_config=dict(
+        ...         api_key="YOUR_KEY",
+        ...         secret_key="YOUR_SECRET"
+        ...     )
+        ... )
+        ```
+
+        * Fetch data:
+
+        ```pycon
+        >>> data = vbt.AlpacaData.fetch(
+        ...     "AAPL",
+        ...     start="2021-01-01 UTC",
+        ...     end="2022-01-01 UTC",
+        ...     timeframe="1 day"
+        ... )
+        ```
+    """
+
+    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.alpaca"
 
     @classmethod
-    def fetch(
-        cls: tp.Type[AlpacaDataT],
-        symbols: tp.Union[tp.Symbol, tp.Symbols] = None,
-        *,
+    def resolve_client(
+        cls,
         client: tp.Optional[AlpacaClientT] = None,
-        client_kwargs: tp.KwargsLike = None,
-        **kwargs,
-    ) -> AlpacaDataT:
-        """Override `vectorbtpro.data.base.Data.fetch` to instantiate an Alpaca client.
+        client_type: tp.Optional[str] = None,
+        **client_config,
+    ) -> AlpacaClientT:
+        """Resolve the client.
 
-        For defaults, see `custom.alpaca` in `vectorbtpro._settings.data`."""
+        If provided, must be of the type `alpaca.data.historical.CryptoHistoricalDataClient`
+        for `client_type="crypto"` and `alpaca.data.historical.StockHistoricalDataClient` for
+        `client_type="stocks"`. Otherwise, will be created using `client_config`."""
         from vectorbtpro.utils.opt_packages import assert_can_import
 
-        assert_can_import("alpaca_trade_api")
-        from alpaca_trade_api.rest import REST
+        assert_can_import("alpaca")
+        from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
 
-        from vectorbtpro._settings import settings
-
-        alpaca_cfg = settings["data"]["custom"]["alpaca"]
+        alpaca_cfg = cls.get_settings()
 
         if client is None:
             client = alpaca_cfg["client"]
-        if client_kwargs is None:
-            client_kwargs = {}
-        has_client_kwargs = len(client_kwargs) > 0
-        client_kwargs = merge_dicts(alpaca_cfg["client_kwargs"], client_kwargs)
+        if client_type is None:
+            client_type = alpaca_cfg["client_type"]
+        if client_config is None:
+            client_config = {}
+        has_client_config = len(client_config) > 0
+        client_config = merge_dicts(alpaca_cfg["client_config"], client_config)
         if client is None:
-            client = REST(**client_kwargs)
-        elif has_client_kwargs:
-            raise ValueError("Cannot apply config after instantiation of the client")
-        return super(AlpacaData, cls).fetch(symbols, client=client, **kwargs)
+            if client_type == "crypto":
+                client = CryptoHistoricalDataClient(**client_config)
+            elif client_type == "stocks":
+                client = StockHistoricalDataClient(**client_config)
+            else:
+                raise ValueError(f"Invalid client type '{client_type}'")
+        elif has_client_config:
+            raise ValueError("Cannot apply client_config on already created client")
+        return client
 
     @classmethod
     def fetch_symbol(
         cls,
         symbol: str,
         client: tp.Optional[AlpacaClientT] = None,
+        client_type: tp.Optional[str] = None,
+        client_config: tp.KwargsLike = None,
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
         timeframe: tp.Optional[str] = None,
         adjustment: tp.Optional[str] = None,
+        feed: tp.Optional[str] = None,
         limit: tp.Optional[int] = None,
-        exchange: tp.Optional[str] = None,
     ) -> tp.Frame:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Alpaca.
 
         Args:
             symbol (str): Symbol.
-            client (alpaca_trade_api.rest.REST): Client of type `alpaca_trade_api.rest.REST`.
+            client (alpaca.common.rest.RESTClient): Client.
 
-                Must be provided.
+                See `AlpacaData.resolve_client`.
+            client_type (str): Client type.
+
+                See `AlpacaData.resolve_client`.
+            client_config (dict): Client config.
+
+                See `AlpacaData.resolve_client`.
             start (any): Start datetime.
 
                 See `vectorbt.utils.datetime_.to_tzaware_datetime`.
             end (any): End datetime.
 
                 See `vectorbt.utils.datetime_.to_tzaware_datetime`.
-            timeframe (str): Timeframe of data.
+            timeframe (str): Timeframe.
 
-                Must be integer multiple of 'm' (minute), 'h' (hour) or 'd' (day). i.e. '15m'.
-                See https://alpaca.markets/data
+                Allows human-readable strings such as "15 minutes".
+            adjustment (str): Specifies the corporate action adjustment for the returned bars.
 
-                !!! note
-                    Data from the latest 15 minutes is not available with a free data plan.
-            adjustment (str): Specifies the corporate action adjustment for the stocks.
+                Options are: "raw", "split", "dividend" or "all". Default is "raw".
+            feed (str): The feed to pull market data from.
 
-                Allowed are `raw`, `split`, `dividend`, and `all`.
+                This is either "iex", "otc", or "sip". Feeds "sip" and "otc" are only available to
+                those with a subscription. Default is "iex" for free plans and "sip" for paid.
             limit (int): The maximum number of returned items.
-            exchange (str): For crypto symbols. Which exchange you wish to retrieve data from.
-
-                Allowed are `FTX`, `ERSX`, and `CBSE`.
 
         For defaults, see `custom.alpaca` in `vectorbtpro._settings.data`.
         Global settings can be provided per exchange id using the `exchanges` dictionary.
         """
         from vectorbtpro.utils.opt_packages import assert_can_import
 
-        assert_can_import("alpaca_trade_api")
-        from alpaca_trade_api.rest import TimeFrameUnit, TimeFrame
+        assert_can_import("alpaca")
+        from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
+        from alpaca.data.requests import CryptoBarsRequest, StockBarsRequest
+        from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 
-        from vectorbtpro._settings import settings
+        alpaca_cfg = cls.get_settings()
 
-        alpaca_cfg = settings["data"]["custom"]["alpaca"]
-
-        if exchange is None:
-            exchange = alpaca_cfg["exchange"]
-        if isinstance(exchange, str):
-            exchange_name = exchange
-        else:
-            raise ValueError(f"Unknown exchange of type {type(exchange)}")
-        if client is None:
-            client = alpaca_cfg["client"]
-        if client is None:
-            raise ValueError("Client must be provided")
+        if client_config is None:
+            client_config = {}
+        client = cls.resolve_client(client=client, client_type=client_type, **client_config)
         if start is None:
-            start = alpaca_cfg["exchanges"].get(exchange_name, {}).get("start", alpaca_cfg["start"])
+            start = alpaca_cfg["start"]
         if end is None:
-            end = alpaca_cfg["exchanges"].get(exchange_name, {}).get("end", alpaca_cfg["end"])
+            end = alpaca_cfg["end"]
         if timeframe is None:
-            timeframe = alpaca_cfg["exchanges"].get(exchange_name, {}).get("timeframe", alpaca_cfg["timeframe"])
+            timeframe = alpaca_cfg["timeframe"]
         if adjustment is None:
-            adjustment = alpaca_cfg["exchanges"].get(exchange_name, {}).get("adjustment", alpaca_cfg["adjustment"])
+            adjustment = alpaca_cfg["adjustment"]
+        if feed is None:
+            feed = alpaca_cfg["feed"]
         if limit is None:
-            limit = alpaca_cfg["exchanges"].get(exchange_name, {}).get("limit", alpaca_cfg["limit"])
+            limit = alpaca_cfg["limit"]
 
-        _timeframe_units = {
-            "d": TimeFrameUnit.Day,
-            "h": TimeFrameUnit.Hour,
-            "m": TimeFrameUnit.Minute,
-        }
-
-        if len(timeframe) < 2:
-            raise ValueError(f"Invalid timeframe '{timeframe}'")
-
-        amount_str = timeframe[:-1]
-        unit_str = timeframe[-1]
-
-        if not amount_str.isnumeric() or unit_str not in _timeframe_units:
-            raise ValueError(f"Invalid timeframe '{timeframe}'")
-
-        amount = int(amount_str)
-        unit = _timeframe_units[unit_str]
-
-        _timeframe = TimeFrame(amount, unit)
-
-        start_ts = to_tzaware_datetime(start, tz=get_utc_tz()).isoformat()
-        end_ts = to_tzaware_datetime(end, tz=get_utc_tz()).isoformat()
-
-        def _is_crypto_symbol(symbol):
-            return len(symbol) == 6 and "USD" in symbol
-
-        if _is_crypto_symbol(symbol):
-            df = client.get_crypto_bars(
-                symbol=symbol,
-                timeframe=_timeframe,
-                start=start_ts,
-                end=end_ts,
-                limit=limit,
-                exchanges=[exchange],
-            ).df
+        split = split_freq_str(timeframe)
+        if split is not None:
+            multiplier, unit = split
+            if unit == "t":
+                unit = TimeFrameUnit.Minute
+            elif unit == "h":
+                unit = TimeFrameUnit.Hour
+            elif unit == "d":
+                unit = TimeFrameUnit.Day
+            elif unit == "W":
+                unit = TimeFrameUnit.Week
+            elif unit == "M":
+                unit = TimeFrameUnit.Month
+            else:
+                raise ValueError(f"Invalid timeframe '{timeframe}'")
         else:
-            df = client.get_bars(
-                symbol=symbol,
-                timeframe=_timeframe,
-                start=start_ts,
-                end=end_ts,
-                adjustment=adjustment,
-                limit=limit,
-            ).df
+            raise ValueError(f"Invalid timeframe '{timeframe}'")
+        timeframe = TimeFrame(multiplier, unit)
 
-        df.drop(["exchange"], axis=1, errors="ignore", inplace=True)
+        if start is not None:
+            start = to_tzaware_datetime(start, tz=get_utc_tz())
+            start_str = start.replace(tzinfo=None).isoformat("T")
+        else:
+            start_str = None
+        if end is not None:
+            end = to_tzaware_datetime(end, tz=get_utc_tz())
+            end_str = end.replace(tzinfo=None).isoformat("T")
+        else:
+            end_str = None
+
+        if isinstance(client, CryptoHistoricalDataClient):
+            request = CryptoBarsRequest(
+                symbol_or_symbols=symbol,
+                timeframe=timeframe,
+                start=start_str,
+                end=end_str,
+                limit=limit,
+            )
+            df = client.get_crypto_bars(request).df
+        elif isinstance(client, StockHistoricalDataClient):
+            request = StockBarsRequest(
+                symbol_or_symbols=symbol,
+                timeframe=timeframe,
+                start=start_str,
+                end=end_str,
+                limit=limit,
+                adjustment=adjustment,
+                feed=feed,
+            )
+            df = client.get_stock_bars(request).df
+        else:
+            raise TypeError(f"Invalid client of type {type(client)}")
+
+        df = df.droplevel("symbol", axis=0)
+        df.index = df.index.rename("Open time")
         df.rename(
             columns={
                 "open": "Open",
@@ -1536,6 +1763,20 @@ class AlpacaData(RemoteData):  # pragma: no cover
         if "VWAP" in df.columns:
             df["VWAP"] = df["VWAP"].astype(float)
 
+        if start is not None:
+            if df.index.tzinfo is None:
+                if df.index[0] < start.replace(tzinfo=None):
+                    df = df[df.index >= start.replace(tzinfo=None)]
+            else:
+                if df.index[0] < start.astimezone(df.index.tzinfo):
+                    df = df[df.index >= start.astimezone(df.index.tzinfo)]
+        if end is not None:
+            if df.index.tzinfo is None:
+                if df.index[-1] >= end.replace(tzinfo=None):
+                    df = df[df.index < end.replace(tzinfo=None)]
+            else:
+                if df.index[-1] >= end.astimezone(df.index.tzinfo):
+                    df = df[df.index < end.astimezone(df.index.tzinfo)]
         return df
 
 
@@ -1547,46 +1788,68 @@ PolygonDataT = tp.TypeVar("PolygonDataT", bound="PolygonData")
 class PolygonData(RemoteData):  # pragma: no cover
     """Subclass of `vectorbtpro.data.base.Data` for `polygon-api-client`.
 
-    See https://github.com/polygon-io/client-python"""
+    See https://github.com/polygon-io/client-python" for API.
+
+    See `PolygonData.fetch_symbol` for arguments.
+
+    Usage:
+        * Set up the API key globally:
+
+        ```pycon
+        >>> import vectorbtpro as vbt
+
+        >>> vbt.PolygonData.set_settings(
+        ...     client_config=dict(
+        ...         api_key="YOUR_KEY"
+        ...     )
+        ... )
+        ```
+
+        * Fetch data:
+
+        ```pycon
+        >>> data = vbt.PolygonData.fetch(
+        ...     "AAPL",
+        ...     start="2021-01-01 UTC",
+        ...     end="2022-01-01 UTC",
+        ...     timeframe="1 day"
+        ... )
+        ```
+    """
+
+    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.polygon"
 
     @classmethod
-    def fetch(
-        cls: tp.Type[PolygonDataT],
-        symbols: tp.Union[tp.Symbol, tp.Symbols] = None,
-        *,
-        client: tp.Optional[PolygonClientT] = None,
-        client_kwargs: tp.KwargsLike = None,
-        **kwargs,
-    ) -> PolygonDataT:
-        """Override `vectorbtpro.data.base.Data.fetch` to instantiate a Polygon REST client.
+    def resolve_client(cls, client: tp.Optional[PolygonClientT] = None, **client_config) -> PolygonClientT:
+        """Resolve the client.
 
-        For defaults, see `custom.polygon` in `vectorbtpro._settings.data`."""
+        If provided, must be of the type `polygon.rest.RESTClient`.
+        Otherwise, will be created using `client_config`."""
         from vectorbtpro.utils.opt_packages import assert_can_import
 
         assert_can_import("polygon")
         from polygon import RESTClient
 
-        from vectorbtpro._settings import settings
-
-        polygon_cfg = settings["data"]["custom"]["polygon"]
+        polygon_cfg = cls.get_settings()
 
         if client is None:
             client = polygon_cfg["client"]
-        if client_kwargs is None:
-            client_kwargs = {}
-        has_client_kwargs = len(client_kwargs) > 0
-        client_kwargs = merge_dicts(polygon_cfg["client_kwargs"], client_kwargs)
+        if client_config is None:
+            client_config = {}
+        has_client_config = len(client_config) > 0
+        client_config = merge_dicts(polygon_cfg["client_config"], client_config)
         if client is None:
-            client = RESTClient(**client_kwargs)
-        elif has_client_kwargs:
-            raise ValueError("Cannot apply config after instantiation of the client")
-        return super(PolygonData, cls).fetch(symbols, client=client, **kwargs)
+            client = RESTClient(**client_config)
+        elif has_client_config:
+            raise ValueError("Cannot apply client_config on already created client")
+        return client
 
     @classmethod
     def fetch_symbol(
         cls,
         symbol: str,
         client: tp.Optional[PolygonClientT] = None,
+        client_config: tp.DictLike = None,
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
         timeframe: tp.Optional[str] = None,
@@ -1609,28 +1872,21 @@ class PolygonData(RemoteData):  # pragma: no cover
                 * Stocks and equities
                 * Currencies - symbol must have the prefix `C:`
                 * Crypto - symbol must have the prefix `X:`
-            client (polygon.rest.RESTClient): Client of type `polygon.rest.RESTClient`.
+            client (polygon.rest.RESTClient): Client.
 
-                Must be provided.
+                See `PolygonData.resolve_client`.
+            client_config (dict): Client config.
+
+                See `PolygonData.resolve_client`.
             start (any): The start of the aggregate time window.
 
                 See `vectorbt.utils.datetime_.to_tzaware_datetime`.
             end (any): The end of the aggregate time window.
 
                 See `vectorbt.utils.datetime_.to_tzaware_datetime`.
-            timeframe (str): Time interval between two consecutive data points in the time series, i.e. '15m'.
+            timeframe (str): Timeframe.
 
-                If the multiplier not provided, defaults to 1.
-
-                Supported intervals:
-
-                * 'm', 'min', or 'minute(s)'
-                * 'h', 'hour(s)', or 'hourly'
-                * 'd', 'day(s)', or 'daily'
-                * 'w', 'week(s)', or 'weekly'
-                * 'M', 'mo', 'month(s)', or 'monthly'
-                * 'q', 'quarter(s)', or 'quarterly'
-                * 'y', 'year(s)', 'yearly', 'annual', or 'annually'
+                Allows human-readable strings such as "15 minutes".
             adjusted (str): Whether the results are adjusted for splits.
 
                 By default, results are adjusted.
@@ -1651,14 +1907,11 @@ class PolygonData(RemoteData):  # pragma: no cover
             If you're using a free plan that has an API rate limit of several requests per minute,
             make sure to set `delay` to a higher number, such as 12000 (which makes 5 requests per minute).
         """
-        from vectorbtpro._settings import settings
+        polygon_cfg = cls.get_settings()
 
-        polygon_cfg = settings["data"]["custom"]["polygon"]
-
-        if client is None:
-            client = polygon_cfg["client"]
-        if client is None:
-            raise ValueError("Client must be provided")
+        if client_config is None:
+            client_config = {}
+        client = cls.resolve_client(client=client, **client_config)
         if start is None:
             start = polygon_cfg["start"]
         if end is None:
@@ -1680,37 +1933,27 @@ class PolygonData(RemoteData):  # pragma: no cover
         if silence_warnings is None:
             silence_warnings = polygon_cfg["silence_warnings"]
 
-        start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
-        end_ts = datetime_to_ms(to_tzaware_datetime(end, tz=get_utc_tz()))
-
         # Resolve the timeframe
         if not isinstance(timeframe, str):
             raise ValueError(f"Invalid timeframe '{timeframe}'")
-        timeframe = timeframe.strip().lower()
-        match = re.match(r"^(\d*)\s*(\w+)$", timeframe)
-        if not match:
+        split = split_freq_str(timeframe)
+        if split is None:
             raise ValueError(f"Invalid timeframe '{timeframe}'")
-        multiplier = match.group(1).strip()
-        if len(multiplier) == 0:
-            multiplier = 1
-        else:
-            multiplier = int(multiplier)
-        timespan = match.group(2).strip()
-
-        if timespan in ("m", "min", "minute", "minutes"):
-            timespan = "minute"
-        if timespan in ("h", "hour", "hours", "hourly"):
-            timespan = "hour"
-        if timespan in ("d", "day", "days", "daily"):
-            timespan = "day"
-        if timespan in ("w", "week", "weeks", "weekly"):
-            timespan = "week"
-        if timespan in ("M", "mo", "month", "months", "monthly"):
-            timespan = "month"
-        if timespan in ("q", "quarter", "quarters", "quarterly"):
-            timespan = "quarter"
-        if timespan in ("y", "year", "years", "yearly", "annual", "annually"):
-            timespan = "year"
+        multiplier, unit = split
+        if unit == "t":
+            unit = "minute"
+        elif unit == "h":
+            unit = "hour"
+        elif unit == "d":
+            unit = "day"
+        elif unit == "W":
+            unit = "week"
+        elif unit == "M":
+            unit = "month"
+        elif unit == "Q":
+            unit = "quarter"
+        elif unit == "Y":
+            unit = "year"
 
         def _retry(method):
             @wraps(method)
@@ -1757,7 +2000,7 @@ class PolygonData(RemoteData):  # pragma: no cover
                     client.get_aggs(
                         ticker=symbol,
                         multiplier=multiplier,
-                        timespan=timespan,
+                        timespan=unit,
                         from_=_start_ts,
                         to=end_ts,
                         adjusted=adjusted,
@@ -1770,28 +2013,46 @@ class PolygonData(RemoteData):  # pragma: no cover
             )
 
         # Establish the timestamps
-        try:
-            first_data = _fetch(0, 1)
-            first_valid_ts = first_data[0]["t"]
-            next_start_ts = start_ts = max(start_ts, first_valid_ts)
-        except Exception as e:
-            next_start_ts = start_ts
+        if start is not None:
+            start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
+            try:
+                first_data = _fetch(0, 1)
+                first_valid_ts = first_data[0]["t"]
+                start_ts = max(start_ts, first_valid_ts)
+            except Exception as e:
+                pass
+        else:
+            start_ts = None
+        prev_end_ts = None
+        if end is not None:
+            end_ts = datetime_to_ms(to_tzaware_datetime(end, tz=get_utc_tz()))
+        else:
+            end_ts = None
 
         def _ts_to_str(ts):
             return str(pd.Timestamp(to_tzaware_datetime(ts, tz=get_utc_tz())))
+
+        def _filter_func(d: tp.Dict, _prev_end_ts: tp.Optional[int] = None) -> bool:
+            if start_ts is not None:
+                if d["t"] < start_ts:
+                    return False
+            if _prev_end_ts is not None:
+                if d["t"] <= _prev_end_ts:
+                    return False
+            if end_ts is not None:
+                if d["t"] >= end_ts:
+                    return False
+            return True
 
         # Iteratively collect the data
         data = []
         try:
             with get_pbar(show_progress=show_progress, **pbar_kwargs) as pbar:
-                pbar.set_description(_ts_to_str(start_ts))
+                pbar.set_description(_ts_to_str(start_ts if prev_end_ts is None else prev_end_ts))
                 while True:
                     # Fetch the klines for the next timeframe
-                    next_data = _fetch(next_start_ts, limit)
-                    if len(data) > 0:
-                        next_data = list(filter(lambda d: next_start_ts < d["t"] < end_ts, next_data))
-                    else:
-                        next_data = list(filter(lambda d: d["t"] < end_ts, next_data))
+                    next_data = _fetch(start_ts if prev_end_ts is None else prev_end_ts, limit)
+                    next_data = list(filter(partial(_filter_func, _prev_end_ts=prev_end_ts), next_data))
 
                     # Update the timestamps and the progress bar
                     if not len(next_data):
@@ -1804,7 +2065,7 @@ class PolygonData(RemoteData):  # pragma: no cover
                         )
                     )
                     pbar.update(1)
-                    next_start_ts = next_data[-1]["t"]
+                    prev_end_ts = next_data[-1]["t"]
                     if delay is not None:
                         time.sleep(delay / 1000)  # be kind to api
         except Exception as e:
@@ -1869,7 +2130,50 @@ class AlphaVantageData(RemoteData):  # pragma: no cover
     procedure by overriding `AlphaVantageData.parse_api_meta`.
 
     If parser still fails, you can disable parsing entirely and specify all information manually
-    by setting `function` and disabling `match_params`."""
+    by setting `function` and disabling `match_params`
+
+    See `AlphaVantageData.fetch_symbol` for arguments.
+
+    Usage:
+        * Set up the API key globally (optional):
+
+        ```pycon
+        >>> import vectorbtpro as vbt
+
+        >>> vbt.AlphaVantageData.set_settings(
+        ...     api_key="YOUR_KEY"
+        ... )
+        ```
+
+        * Fetch data:
+
+        ```pycon
+        >>> data = vbt.AlphaVantageData.fetch(
+        ...     "GOOGL",
+        ...     timeframe="1 day"
+        ... )
+
+        >>> data = vbt.AlphaVantageData.fetch(
+        ...     "BTC_USD",
+        ...     timeframe="30 minutes",
+        ...     category="digital-currency",
+        ...     outputsize="full"
+        ... )
+
+        >>> data = vbt.AlphaVantageData.fetch(
+        ...     "REAL_GDP",
+        ...     category="economic-indicators"
+        ... )
+
+        >>> data = vbt.AlphaVantageData.fetch(
+        ...     "IBM",
+        ...     category="technical-indicators",
+        ...     function="STOCH",
+        ...     params=dict(fastkperiod=14)
+        ... )
+        ```."""
+
+    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.alpha_vantage"
 
     @classmethod
     @lru_cache()
@@ -1920,7 +2224,7 @@ class AlphaVantageData(RemoteData):  # pragma: no cover
     def fetch_symbol(
         cls,
         symbol: str,
-        apikey: tp.Optional[str] = None,
+        api_key: tp.Optional[str] = None,
         api_meta: tp.Optional[dict] = None,
         category: tp.Optional[str] = None,
         function: tp.Optional[str] = None,
@@ -1947,9 +2251,7 @@ class AlphaVantageData(RemoteData):  # pragma: no cover
             symbol (str): Symbol.
 
                 May combine symbol/from_currency and market/to_currency using an underscore.
-            apikey (str): API key.
-
-                Required.
+            api_key (str): API key.
             api_meta (dict): API meta.
 
                 If None, will use `AlphaVantageData.parse_api_meta` if `function` is not provided
@@ -1960,12 +2262,12 @@ class AlphaVantageData(RemoteData):  # pragma: no cover
 
                 Supported are:
 
-                * 'time-series-data'
-                * 'fundamentals'
-                * 'fx'
-                * 'digital-currency'
-                * 'economic-indicators'
-                * 'technical-indicators'
+                * "time-series-data"
+                * "fundamentals"
+                * "fx"
+                * "digital-currency"
+                * "economic-indicators"
+                * "technical-indicators"
             function (str): API function of your choice.
 
                 If None, will try to resolve it based on other arguments, such as `timeframe`,
@@ -1973,22 +2275,12 @@ class AlphaVantageData(RemoteData):  # pragma: no cover
                 and fundamental data.
 
                 See the keys in sub-dictionaries returned by `AlphaVantageData.parse_api_meta`.
-            timeframe (str): Time interval between two consecutive data points in the time series, i.e. '15m'.
+            timeframe (str): Timeframe.
 
-                If the multiplier not provided, defaults to 1.
-
-                Supported interval types and intervals:
-
-                * INTRADAY: 'm', 'min', or 'minute(s)'
-                * INTRADAY: 'h', 'hour(s)', or 'hourly'
-                * DAILY: 'd', 'day(s)', or 'daily'
-                * WEEKLY: 'w', 'week(s)', or 'weekly'
-                * MONTHLY: 'M', 'mo', 'month(s)', or 'monthly'
-                * QUARTERLY: 'q', 'quarter(s)', or 'quarterly'
-                * ANNUAL: 'y', 'year(s)', 'yearly', 'annual', or 'annually'
+                Allows human-readable strings such as "15 minutes".
 
                 For time series, forex, and crypto, looks for interval type in the function's name.
-                Defaults to '60min' if extended, otherwise to 'daily'.
+                Defaults to "60min" if extended, otherwise to "daily".
             adjusted (bool): Whether to return time series adjusted by historical split and dividend events.
             extended (bool): Whether to return historical intraday time series for the trailing 2 years.
             slice (str): Slice of the trailing 2 years.
@@ -1998,25 +2290,21 @@ class AlphaVantageData(RemoteData):  # pragma: no cover
 
                 Supported are
 
-                * 'compact' that returns only the latest 100 data points
-                * 'full' that returns the full-length time series
+                * "compact" that returns only the latest 100 data points
+                * "full" that returns the full-length time series
             match_params (bool): Whether to match parameters with the ones required by the endpoint.
 
-                Otherwise, uses only (resolved) `function`, `apikey`, `datatype='csv'`, and `params`.
+                Otherwise, uses only (resolved) `function`, `api_key`, `datatype="csv"`, and `params`.
             params: Additional keyword arguments passed as key/value pairs in the URL.
             read_csv_kwargs (dict): Keyword arguments passed to `pd.read_csv`.
             silence_warnings (bool): Whether to silence all warnings.
 
         For defaults, see `custom.alpha_vantage` in `vectorbtpro._settings.data`.
         """
-        from vectorbtpro._settings import settings
+        alpha_vantage_cfg = cls.get_settings()
 
-        alpha_vantage_cfg = settings["data"]["custom"]["alpha_vantage"]
-
-        if apikey is None:
-            apikey = alpha_vantage_cfg["apikey"]
-        if apikey is None:
-            raise ValueError("API key is required")
+        if api_key is None:
+            api_key = alpha_vantage_cfg["api_key"]
         if api_meta is None:
             api_meta = alpha_vantage_cfg["api_meta"]
         if category is None:
@@ -2058,42 +2346,33 @@ class AlphaVantageData(RemoteData):  # pragma: no cover
         if timeframe is not None:
             if not isinstance(timeframe, str):
                 raise ValueError(f"Invalid timeframe '{timeframe}'")
-            timeframe = timeframe.strip().lower()
-            match = re.match(r"^(\d*)\s*(\w+)$", timeframe)
-            if not match:
+            split = split_freq_str(timeframe)
+            if split is None:
                 raise ValueError(f"Invalid timeframe '{timeframe}'")
-            multiplier = match.group(1).strip()
-            if len(multiplier) == 0:
-                multiplier = 1
-            else:
-                multiplier = int(multiplier)
-            timespan = match.group(2).strip()
-
-            if timespan in ("h", "hour", "hours", "hourly"):
-                timespan = "min"
-                multiplier *= 60
-            if timespan in ("m", "min", "minute", "minutes"):
+            multiplier, unit = split
+            if unit == "t":
                 interval = str(multiplier) + "min"
-                if interval not in ("1min", "5min", "15min", "30min", "60min"):
-                    raise ValueError("Supported intraday intervals: 1min, 5min, 15min, 30min, 60min")
                 interval_type = "INTRADAY"
-            if timespan in ("d", "day", "days", "daily"):
-                interval_type = "DAILY"
+            elif unit == "h":
+                interval = str(60 * multiplier) + "min"
+                interval_type = "INTRADAY"
+            elif unit == "d":
                 interval = "daily"
-            if timespan in ("w", "week", "weeks", "weekly"):
-                interval_type = "WEEKLY"
+                interval_type = "DAILY"
+            elif unit == "W":
                 interval = "weekly"
-            if timespan in ("M", "mo", "month", "months", "monthly"):
-                interval_type = "MONTHLY"
+                interval_type = "WEEKLY"
+            elif unit == "M":
                 interval = "monthly"
-            if timespan in ("q", "quarter", "quarters", "quarterly"):
-                interval_type = "QUARTERLY"
+                interval_type = "MONTHLY"
+            elif unit == "Q":
                 interval = "quarterly"
-            if timespan in ("y", "year", "years", "yearly", "annual", "annually"):
-                interval_type = "ANNUAL"
+                interval_type = "QUARTERLY"
+            elif unit == "Y":
                 interval = "annual"
+                interval_type = "ANNUAL"
             if interval is None and multiplier > 1:
-                raise ValueError("Multipliers are supported only for intraday intervals")
+                raise ValueError("Multipliers are supported only for intraday timeframes")
         else:
             if extended:
                 interval_type = "INTRADAY"
@@ -2103,10 +2382,12 @@ class AlphaVantageData(RemoteData):  # pragma: no cover
                 interval = "daily"
 
         # Resolve the function
+        if function is None and category is not None and category == "economic-indicators":
+            function = symbol
         if function is None:
             if category is None:
                 category = "time-series-data"
-            if category in ("technical-indicators", "economic-indicators", "fundamentals"):
+            if category in ("technical-indicators", "fundamentals"):
                 raise ValueError("Function is required")
             adjusted_in_functions = False
             extended_in_functions = False
@@ -2154,7 +2435,7 @@ class AlphaVantageData(RemoteData):  # pragma: no cover
             matched_params = dict()
             matched_params["function"] = function
             matched_params["datatype"] = "csv"
-            matched_params["apikey"] = apikey
+            matched_params["apikey"] = api_key
             if "symbol" in args and "market" in args:
                 matched_params["symbol"] = symbol.split("_")[0]
                 matched_params["market"] = symbol.split("_")[1]
@@ -2191,7 +2472,7 @@ class AlphaVantageData(RemoteData):  # pragma: no cover
         else:
             matched_params = dict(params)
             matched_params["function"] = function
-            matched_params["apikey"] = apikey
+            matched_params["apikey"] = api_key
             matched_params["datatype"] = "csv"
 
         # Collect and format the data
@@ -2219,7 +2500,33 @@ NDLDataT = tp.TypeVar("NDLDataT", bound="NDLData")
 class NDLData(RemoteData):  # pragma: no cover
     """Subclass of `vectorbtpro.data.base.Data` for `nasdaqdatalink`.
 
-    See https://github.com/Nasdaq/data-link-python"""
+    See https://github.com/Nasdaq/data-link-python for API.
+
+    See `NDLData.fetch_symbol` for arguments.
+
+    Usage:
+        * Set up the API key globally (optional):
+
+        ```pycon
+        >>> import vectorbtpro as vbt
+
+        >>> vbt.NDLData.set_settings(
+        ...     api_key="YOUR_KEY"
+        ... )
+        ```
+
+        * Fetch data:
+
+        ```pycon
+        >>> data = vbt.NDLData.fetch(
+        ...     "EIA/PET_RWTC_D",
+        ...     start="2020-01-01",
+        ...     end="2021-01-01"
+        ... )
+        ```
+    """
+
+    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.ndl"
 
     @classmethod
     def fetch_symbol(
@@ -2238,8 +2545,6 @@ class NDLData(RemoteData):  # pragma: no cover
         Args:
             symbol (str): Symbol.
             api_key (str): API key.
-
-                Required if not set globally.
             start (any): Retrieve data rows on and after the specified start date.
 
                 See `vectorbtpro.utils.datetime_.to_tzaware_datetime`.
@@ -2250,7 +2555,11 @@ class NDLData(RemoteData):  # pragma: no cover
 
                 Column 0 is the date column and is always returned. Data begins at column 1.
             collapse (str): Change the sampling frequency of the returned data.
+
+                Options are "daily", "weekly", "monthly", "quarterly", and "annual".
             transform (str): Perform elementary calculations on the data prior to downloading.
+
+                Options are "diff", "rdiff", "cumul", and "normalize".
             **params: Keyword arguments sent as field/value params to Nasdaq Data Link with no interference.
 
         For defaults, see `custom.ndl` in `vectorbtpro._settings.data`.
@@ -2261,9 +2570,7 @@ class NDLData(RemoteData):  # pragma: no cover
 
         import nasdaqdatalink
 
-        from vectorbtpro._settings import settings
-
-        ndl_cfg = settings["data"]["custom"]["ndl"]
+        ndl_cfg = cls.get_settings()
 
         if api_key is None:
             api_key = ndl_cfg["api_key"]
@@ -2288,11 +2595,13 @@ class NDLData(RemoteData):  # pragma: no cover
 
         # Establish the timestamps
         if start is not None:
-            start_date = pd.Timestamp(to_tzaware_datetime(start, tz=get_utc_tz())).isoformat()
+            start = to_tzaware_datetime(start, tz=get_utc_tz())
+            start_date = pd.Timestamp(start).isoformat()
         else:
             start_date = None
         if end is not None:
-            end_date = pd.Timestamp(to_tzaware_datetime(end, tz=get_utc_tz())).isoformat()
+            end = to_tzaware_datetime(end, tz=get_utc_tz())
+            end_date = pd.Timestamp(end).isoformat()
         else:
             end_date = None
 
@@ -2316,6 +2625,20 @@ class NDLData(RemoteData):  # pragma: no cover
             new_columns.append(new_c)
         df = df.rename(columns=dict(zip(df.columns, new_columns)))
 
+        if start is not None:
+            if df.index.tzinfo is None:
+                if df.index[0] < start.replace(tzinfo=None):
+                    df = df[df.index >= start.replace(tzinfo=None)]
+            else:
+                if df.index[0] < start.astimezone(df.index.tzinfo):
+                    df = df[df.index >= start.astimezone(df.index.tzinfo)]
+        if end is not None:
+            if df.index.tzinfo is None:
+                if df.index[-1] >= end.replace(tzinfo=None):
+                    df = df[df.index < end.replace(tzinfo=None)]
+            else:
+                if df.index[-1] >= end.astimezone(df.index.tzinfo):
+                    df = df[df.index < end.astimezone(df.index.tzinfo)]
         return df
 
 
@@ -2325,46 +2648,71 @@ TVDataT = tp.TypeVar("TVDataT", bound="TVData")
 class TVData(RemoteData):  # pragma: no cover
     """Subclass of `vectorbtpro.data.base.Data` for `tvdatafeed`.
 
-    See https://github.com/StreamAlpha/tvdatafeed"""
+    See https://github.com/StreamAlpha/tvdatafeed for API.
+
+    See `NDLData.fetch_symbol` for arguments.
+
+    Usage:
+        * Set up the credentials globally (optional):
+
+        ```pycon
+        >>> import vectorbtpro as vbt
+
+        >>> vbt.TVData.set_settings(
+        ...     client_config=dict(
+        ...         username="YOUR_USERNAME",
+        ...         password="YOUR_PASSWORD"
+        ...     )
+        ... )
+        ```
+
+        * Fetch data:
+
+        ```pycon
+        >>> data = vbt.TVData.fetch(
+        ...     "NASDAQ:AAPL",
+        ...     timeframe="1 hour"
+        ... )
+        ```
+
+        !!! note
+            API is quite unstable. Doesn't return an error if exchange + symbol combination wasn't found.
+            Instead, the download just hangs. If it takes longer than usual, restart the kernel.
+    """
+
+    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.tv"
 
     @classmethod
-    def fetch(
-        cls: tp.Type[TVDataT],
-        symbols: tp.Union[tp.Symbol, tp.Symbols] = None,
-        *,
-        client: tp.Optional[TvDatafeedT] = None,
-        client_kwargs: tp.KwargsLike = None,
-        **kwargs,
-    ) -> TVDataT:
-        """Override `vectorbtpro.data.base.Data.fetch` to instantiate a `TvDatafeed` client.
+    def resolve_client(cls, client: tp.Optional[TvDatafeedT] = None, **client_config) -> TvDatafeedT:
+        """Resolve the client.
 
-        For defaults, see `custom.tv` in `vectorbtpro._settings.data`."""
+        If provided, must be of the type `tvDatafeed.main.TvDatafeed`.
+        Otherwise, will be created using `client_config`."""
         from vectorbtpro.utils.opt_packages import assert_can_import
 
         assert_can_import("tvDatafeed")
         from tvDatafeed import TvDatafeed
 
-        from vectorbtpro._settings import settings
-
-        tv_cfg = settings["data"]["custom"]["tv"]
+        tv_cfg = cls.get_settings()
 
         if client is None:
             client = tv_cfg["client"]
-        if client_kwargs is None:
-            client_kwargs = {}
-        has_client_kwargs = len(client_kwargs) > 0
-        client_kwargs = merge_dicts(tv_cfg["client_kwargs"], client_kwargs)
+        if client_config is None:
+            client_config = {}
+        has_client_config = len(client_config) > 0
+        client_config = merge_dicts(tv_cfg["client_config"], client_config)
         if client is None:
-            client = TvDatafeed(**client_kwargs)
-        elif has_client_kwargs:
-            raise ValueError("Cannot apply config after instantiation of the client")
-        return super(TVData, cls).fetch(symbols, client=client, **kwargs)
+            client = TvDatafeed(**client_config)
+        elif has_client_config:
+            raise ValueError("Cannot apply client_config on already created client")
+        return client
 
     @classmethod
     def fetch_symbol(
         cls,
         symbol: str,
         client: tp.Optional[TvDatafeedT] = None,
+        client_config: tp.KwargsLike = None,
         timeframe: tp.Optional[str] = None,
         limit: tp.Optional[int] = None,
         fut_contract: tp.Optional[int] = None,
@@ -2374,18 +2722,15 @@ class TVData(RemoteData):  # pragma: no cover
 
         Args:
             symbol (str): Symbol in format `EXCHANGE:SYMBOL`.
-            client (TvDatafeed): Client of type `tvDatafeed.main.TvDatafeed`.
-            timeframe (str): Time interval between two consecutive data points in the time series, i.e. '15m'.
+            client (tvDatafeed.main.TvDatafeed): Client.
 
-                If the multiplier not provided, defaults to 1.
+                See `TVData.resolve_client`.
+            client_config (dict): Client config.
 
-                Supported intervals:
+                See `TVData.resolve_client`.
+            timeframe (str): Timeframe.
 
-                * 'm', 'min', or 'minute(s)'
-                * 'h', 'hour(s)', or 'hourly'
-                * 'd', 'day(s)', or 'daily' (only multiplier of 1)
-                * 'w', 'week(s)', or 'weekly' (only multiplier of 1)
-                * 'M', 'mo', 'month(s)', or 'monthly' (only multiplier of 1)
+                Allows human-readable strings such as "15 minutes".
             limit (int): The maximum number of returned items.
             fut_contract (int): None for cash, 1 for continuous current contract in front,
                 2 for continuous next contract in front.
@@ -2398,10 +2743,11 @@ class TVData(RemoteData):  # pragma: no cover
         assert_can_import("tvDatafeed")
         from tvDatafeed import Interval
 
-        from vectorbtpro._settings import settings
+        tv_cfg = cls.get_settings()
 
-        tv_cfg = settings["data"]["custom"]["tv"]
-
+        if client_config is None:
+            client_config = {}
+        client = cls.resolve_client(client=client, **client_config)
         if timeframe is None:
             timeframe = tv_cfg["timeframe"]
         if limit is None:
@@ -2416,30 +2762,23 @@ class TVData(RemoteData):  # pragma: no cover
 
         if not isinstance(timeframe, str):
             raise ValueError(f"Invalid timeframe '{timeframe}'")
-        timeframe = timeframe.strip().lower()
-        match = re.match(r"^(\d*)\s*(\w+)$", timeframe)
-        if not match:
+        split = split_freq_str(timeframe)
+        if split is None:
             raise ValueError(f"Invalid timeframe '{timeframe}'")
-        multiplier = match.group(1).strip()
-        if len(multiplier) == 0:
-            multiplier = 1
-        else:
-            multiplier = int(multiplier)
-        timespan = match.group(2).strip()
-
-        if timespan in ("m", "min", "minute", "minutes"):
+        multiplier, unit = split
+        if unit == "t":
             interval = getattr(Interval, f"in_{str(multiplier)}_minute")
-        elif timespan in ("h", "hour", "hours", "hourly"):
+        elif unit == "h":
             interval = getattr(Interval, f"in_{str(multiplier)}_hour")
-        elif timespan in ("d", "day", "days", "daily"):
+        elif unit == "d":
             if multiplier > 1:
                 raise ValueError("Multiplier cannot be greater than 1 for daily")
             interval = getattr(Interval, "in_daily")
-        elif timespan in ("w", "week", "weeks", "weekly"):
+        elif unit == "W":
             if multiplier > 1:
                 raise ValueError("Multiplier cannot be greater than 1 for weekly")
             interval = getattr(Interval, "in_weekly")
-        elif timespan in ("M", "mo", "month", "months", "monthly"):
+        elif unit == "M":
             if multiplier > 1:
                 raise ValueError("Multiplier cannot be greater than 1 for monthly")
             interval = getattr(Interval, "in_monthly")

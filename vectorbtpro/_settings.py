@@ -512,7 +512,7 @@ data = ChildDict(
         ),
         binance=FrozenConfig(
             client=None,
-            client_kwargs=dict(
+            client_config=dict(
                 api_key=None,
                 api_secret=None,
             ),
@@ -546,21 +546,22 @@ data = ChildDict(
         ),
         alpaca=FrozenConfig(
             client=None,
-            client_kwargs=dict(
-                key_id=None,
+            client_type="stocks",
+            client_config=dict(
+                api_key=None,
                 secret_key=None,
+                oauth_token=None,
             ),
             start=0,
             end="now UTC",
             timeframe="1d",
-            adjustment="all",
+            adjustment="raw",
+            feed=None,
             limit=10000,
-            exchange="CBSE",
-            exchanges=dict(),
         ),
         polygon=FrozenConfig(
             client=None,
-            client_kwargs=dict(
+            client_config=dict(
                 api_key=None,
             ),
             start=0,
@@ -576,7 +577,7 @@ data = ChildDict(
             silence_warnings=False,
         ),
         alpha_vantage=FrozenConfig(
-            apikey=None,
+            api_key=None,
             api_meta=None,
             category=None,
             function=None,
@@ -607,7 +608,7 @@ data = ChildDict(
         ),
         tv=FrozenConfig(
             client=None,
-            client_kwargs=dict(
+            client_config=dict(
                 username=None,
                 password=None,
                 chromedriver_path=None,

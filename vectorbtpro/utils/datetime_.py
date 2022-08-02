@@ -21,8 +21,63 @@ from vectorbtpro import _typing as tp
 PandasDatetimeIndex = (pd.DatetimeIndex, pd.PeriodIndex)
 
 
+def split_freq_str(freq: str) -> tp.Optional[tp.Tuple[int, str]]:
+    """Split (human-readable) frequency into multiplier and unambiguous unit.
+
+    Can be used both as offset and timedelta.
+
+    The following units are returned:
+    * "s" for second
+    * "t" for minute
+    * "h" for hour
+    * "d" for day
+    * "W" for week
+    * "M" for month
+    * "Q" for quarter
+    * "Y" for year"""
+    freq = "".join(freq.strip().split())
+    match = re.match(r"^(\d*)\s*(\w+)$", freq)
+    if not match:
+        return None
+    if match.group(1) == "":
+        multiplier = 1
+    else:
+        multiplier = int(match.group(1))
+    if match.group(2) == "":
+        raise ValueError("Frequency must contain unit")
+    else:
+        unit = match.group(2)
+    if unit in ("S", "sec", "second", "seconds"):
+        unit = "s"
+    if unit in ("T", "m", "min", "minute", "minutes"):
+        unit = "t"
+    if unit in ("H", "hour", "hours", "hourly"):
+        unit = "h"
+    if unit in ("D", "day", "days", "daily"):
+        unit = "d"
+    if unit in ("w", "wk", "week", "weeks", "weekly"):
+        unit = "W"
+    if unit in ("mo", "month", "months", "monthly"):
+        unit = "M"
+    if unit in ("q", "quarter", "quarters", "quarterly"):
+        unit = "Q"
+    if unit in ("y", "year", "years", "yearly", "annual", "annually"):
+        unit = "Y"
+    return multiplier, unit
+
+
+def prepare_freq(freq: tp.FrequencyLike) -> tp.FrequencyLike:
+    """Prepare frequency using `split_freq_str`."""
+    if isinstance(freq, str):
+        split = split_freq_str(freq)
+        if split is not None:
+            freq = str(split[0]) + str(split[1])
+    return freq
+
+
 def freq_to_timedelta(freq: tp.FrequencyLike) -> pd.Timedelta:
     """Convert a frequency-like object to `pd.Timedelta`."""
+    freq = prepare_freq(freq)
     if isinstance(freq, pd.Timedelta):
         return freq
     if isinstance(freq, str) and freq.startswith("-"):
@@ -30,13 +85,6 @@ def freq_to_timedelta(freq: tp.FrequencyLike) -> pd.Timedelta:
         freq = freq[1:]
     else:
         neg_td = False
-    if isinstance(freq, str):
-        freq = "".join(freq.strip().split())
-        match = re.match(r"^(\d*)([m]?)$", freq)
-        if match:
-            freq = match.group(1) + match.group(2)
-        if re.match(r"^\d*[MyY]?$", freq):
-            raise ValueError("Units 'M', 'Y' and 'y' do not represent unambiguous timedelta values")
     if isinstance(freq, str) and not freq[0].isdigit():
         # Otherwise "ValueError: unit abbreviation w/o a number"
         td = pd.Timedelta(1, unit=freq)
@@ -138,6 +186,7 @@ def infer_index_freq(
     detect_via_diff: bool = False,
 ) -> tp.Union[None, float, tp.PandasFrequency]:
     """Infer frequency of a datetime index if `freq` is None, otherwise convert `freq`."""
+    freq = prepare_freq(freq)
     if freq is None and isinstance(index, pd.DatetimeIndex):
         if index.freqstr is not None:
             freq = to_offset(index.freqstr)
