@@ -69,6 +69,7 @@ except ImportError:
     TvDatafeedT = tp.Any
 
 __all__ = [
+    "CustomData",
     "SyntheticData",
     "RandomData",
     "RandomOHLCData",
@@ -90,16 +91,23 @@ __all__ = [
 
 __pdoc__ = {}
 
+
+class CustomData(Data):
+    """Subclass of `vectorbtpro.data.base.Data` for custom-generated data."""
+
+    _setting_keys: tp.SettingsKeys = dict(custom=None)
+
+
 # ############# Synthetic ############# #
 
 
-class SyntheticData(Data):
+class SyntheticData(CustomData):
     """Subclass of `vectorbtpro.data.base.Data` for synthetically generated data.
 
     Exposes an abstract class method `SyntheticData.generate_symbol`.
     Everything else is taken care of."""
 
-    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.synthetic"
+    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.synthetic")
 
     @classmethod
     def generate_symbol(cls, symbol: tp.Symbol, index: tp.Index, **kwargs) -> tp.SeriesFrame:
@@ -122,7 +130,7 @@ class SyntheticData(Data):
         the Series/DataFrame with generated data.
 
         For defaults, see `custom.synthetic` in `vectorbtpro._settings.data`."""
-        synthetic_cfg = cls.get_settings()
+        synthetic_cfg = cls.get_settings(key_id="custom")
 
         if start is None:
             start = synthetic_cfg["start"]
@@ -153,7 +161,7 @@ class SyntheticData(Data):
 class RandomData(SyntheticData):
     """`SyntheticData` for data generated using `vectorbtpro.data.nb.generate_random_data_nb`."""
 
-    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.random"
+    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.random")
 
     @classmethod
     def generate_symbol(
@@ -190,7 +198,7 @@ class RandomData(SyntheticData):
         !!! note
             When setting a seed, remember to pass a seed per symbol using `vectorbtpro.data.base.symbol_dict`.
         """
-        random_cfg = cls.get_settings()
+        random_cfg = cls.get_settings(key_id="custom")
 
         if num_paths is None:
             num_paths = random_cfg["num_paths"]
@@ -238,7 +246,7 @@ class RandomData(SyntheticData):
 class RandomOHLCData(RandomData):
     """`RandomData` resampled to OHLC."""
 
-    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.random_ohlc"
+    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.random_ohlc")
 
     @classmethod
     def generate_symbol(
@@ -248,7 +256,7 @@ class RandomOHLCData(RandomData):
         **kwargs,
     ) -> tp.SeriesFrame:
         """Generate a symbol."""
-        random_ohlc_cfg = cls.get_settings()
+        random_ohlc_cfg = cls.get_settings(key_id="custom")
 
         if ohlc_freq is None:
             ohlc_freq = random_ohlc_cfg["ohlc_freq"]
@@ -272,7 +280,7 @@ class RandomOHLCData(RandomData):
 class GBMData(RandomData):
     """`RandomData` for data generated using `vectorbtpro.data.nb.generate_gbm_data_nb`."""
 
-    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.gbm"
+    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.gbm")
 
     @classmethod
     def generate_symbol(
@@ -309,7 +317,7 @@ class GBMData(RandomData):
         !!! note
             When setting a seed, remember to pass a seed per symbol using `vectorbtpro.data.base.symbol_dict`.
         """
-        gbm_cfg = cls.get_settings()
+        gbm_cfg = cls.get_settings(key_id="custom")
 
         if num_paths is None:
             num_paths = gbm_cfg["num_paths"]
@@ -348,7 +356,7 @@ class GBMData(RandomData):
 class GBMOHLCData(GBMData):
     """`GBMData` resampled to OHLC."""
 
-    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.gbm_ohlc"
+    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.gbm_ohlc")
 
     @classmethod
     def generate_symbol(
@@ -358,7 +366,7 @@ class GBMOHLCData(GBMData):
         **kwargs,
     ) -> tp.SeriesFrame:
         """Generate a symbol."""
-        gbm_ohlc_cfg = cls.get_settings()
+        gbm_ohlc_cfg = cls.get_settings(key_id="custom")
 
         if ohlc_freq is None:
             ohlc_freq = gbm_ohlc_cfg["ohlc_freq"]
@@ -384,10 +392,10 @@ class GBMOHLCData(GBMData):
 LocalDataT = tp.TypeVar("LocalDataT", bound="LocalData")
 
 
-class LocalData(Data):
+class LocalData(CustomData):
     """Subclass of `vectorbtpro.data.base.Data` for local data."""
 
-    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.local"
+    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.local")
 
     @classmethod
     def match_path(
@@ -440,7 +448,7 @@ class LocalData(Data):
 
         For defaults, see `custom.local` in `vectorbtpro._settings.data`.
         """
-        local_cfg = cls.get_settings()
+        local_cfg = cls.get_settings(key_id="custom")
 
         if match_paths is None:
             match_paths = local_cfg["match_paths"]
@@ -528,7 +536,7 @@ CSVDataT = tp.TypeVar("CSVDataT", bound="CSVData")
 class CSVData(LocalData):
     """Subclass of `vectorbtpro.data.base.Data` for data that can be fetched and updated using `pd.read_csv`."""
 
-    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.csv"
+    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.csv")
 
     @classmethod
     def fetch_symbol(
@@ -560,7 +568,7 @@ class CSVData(LocalData):
 
         For defaults, see `custom.csv` in `vectorbtpro._settings.data`.
         """
-        csv_cfg = cls.get_settings()
+        csv_cfg = cls.get_settings(key_id="custom")
 
         if start_row is None:
             start_row = csv_cfg["start_row"]
@@ -652,7 +660,7 @@ HDFDataT = tp.TypeVar("HDFDataT", bound="HDFData")
 class HDFData(LocalData):
     """Subclass of `vectorbtpro.data.base.Data` for data that can be fetched and updated using `pd.read_hdf`."""
 
-    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.hdf"
+    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.hdf")
 
     @classmethod
     def split_hdf_path(
@@ -766,7 +774,7 @@ class HDFData(LocalData):
 
         For defaults, see `custom.hdf` in `vectorbtpro._settings.data`.
         """
-        hdf_cfg = cls.get_settings()
+        hdf_cfg = cls.get_settings(key_id="custom")
 
         if start_row is None:
             start_row = hdf_cfg["start_row"]
@@ -802,12 +810,14 @@ class HDFData(LocalData):
 # ############# Remote ############# #
 
 
-class RemoteData(Data):
+class RemoteData(CustomData):
     """Subclass of `vectorbtpro.data.base.Data` for remote data.
 
     Remote data usually has arguments such as `start`, `end`, and `timeframe`.
 
     Overrides `vectorbtpro.data.base.Data.update_symbol` to update data based on the `start` argument."""
+
+    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.remote")
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.Frame:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
@@ -839,7 +849,7 @@ class YFData(RemoteData):  # pragma: no cover
         ```
     """
 
-    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.yf"
+    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.yf")
 
     _column_config: tp.ClassVar[Config] = HybridConfig(
         {
@@ -902,7 +912,7 @@ class YFData(RemoteData):  # pragma: no cover
         assert_can_import("yfinance")
         import yfinance as yf
 
-        yf_cfg = cls.get_settings()
+        yf_cfg = cls.get_settings(key_id="custom")
 
         if period is None:
             period = yf_cfg["period"]
@@ -967,6 +977,7 @@ class BinanceData(RemoteData):  # pragma: no cover
         >>> import vectorbtpro as vbt
 
         >>> vbt.BinanceData.set_settings(
+        ...     key_id="custom",
         ...     client_config=dict(
         ...         api_key="YOUR_KEY",
         ...         api_secret="YOUR_SECRET"
@@ -986,7 +997,7 @@ class BinanceData(RemoteData):  # pragma: no cover
         ```
     """
 
-    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.binance"
+    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.binance")
 
     _column_config: tp.ClassVar[Config] = HybridConfig(
         {
@@ -1026,7 +1037,7 @@ class BinanceData(RemoteData):  # pragma: no cover
         assert_can_import("binance")
         from binance.client import Client
 
-        binance_cfg = cls.get_settings()
+        binance_cfg = cls.get_settings(key_id="custom")
 
         if client is None:
             client = binance_cfg["client"]
@@ -1090,7 +1101,7 @@ class BinanceData(RemoteData):  # pragma: no cover
         """
         from binance.enums import HistoricalKlinesType
 
-        binance_cfg = cls.get_settings()
+        binance_cfg = cls.get_settings(key_id="custom")
 
         if client_config is None:
             client_config = {}
@@ -1251,6 +1262,7 @@ class CCXTData(RemoteData):  # pragma: no cover
         >>> import vectorbtpro as vbt
 
         >>> vbt.CCXTData.set_settings(
+        ...     key_id="custom",
         ...     exchanges=dict(
         ...         binance=dict(
         ...             exchange_config=dict(
@@ -1275,7 +1287,7 @@ class CCXTData(RemoteData):  # pragma: no cover
         ```
     """
 
-    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.ccxt"
+    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.ccxt")
 
     @classmethod
     def resolve_exchange(
@@ -1292,7 +1304,7 @@ class CCXTData(RemoteData):  # pragma: no cover
         assert_can_import("ccxt")
         import ccxt
 
-        ccxt_cfg = cls.get_settings()
+        ccxt_cfg = cls.get_settings(key_id="custom")
 
         if exchange is None:
             exchange = ccxt_cfg["exchange"]
@@ -1374,7 +1386,7 @@ class CCXTData(RemoteData):  # pragma: no cover
         assert_can_import("ccxt")
         import ccxt
 
-        ccxt_cfg = cls.get_settings()
+        ccxt_cfg = cls.get_settings(key_id="custom")
 
         if exchange_config is None:
             exchange_config = {}
@@ -1548,6 +1560,7 @@ class AlpacaData(RemoteData):  # pragma: no cover
         >>> import vectorbtpro as vbt
 
         >>> vbt.AlpacaData.set_settings(
+        ...     key_id="custom",
         ...     client_config=dict(
         ...         api_key="YOUR_KEY",
         ...         secret_key="YOUR_SECRET"
@@ -1567,7 +1580,7 @@ class AlpacaData(RemoteData):  # pragma: no cover
         ```
     """
 
-    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.alpaca"
+    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.alpaca")
 
     @classmethod
     def resolve_client(
@@ -1586,7 +1599,7 @@ class AlpacaData(RemoteData):  # pragma: no cover
         assert_can_import("alpaca")
         from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
 
-        alpaca_cfg = cls.get_settings()
+        alpaca_cfg = cls.get_settings(key_id="custom")
 
         if client is None:
             client = alpaca_cfg["client"]
@@ -1662,7 +1675,7 @@ class AlpacaData(RemoteData):  # pragma: no cover
         from alpaca.data.requests import CryptoBarsRequest, StockBarsRequest
         from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 
-        alpaca_cfg = cls.get_settings()
+        alpaca_cfg = cls.get_settings(key_id="custom")
 
         if client_config is None:
             client_config = {}
@@ -1799,6 +1812,7 @@ class PolygonData(RemoteData):  # pragma: no cover
         >>> import vectorbtpro as vbt
 
         >>> vbt.PolygonData.set_settings(
+        ...     key_id="custom",
         ...     client_config=dict(
         ...         api_key="YOUR_KEY"
         ...     )
@@ -1817,7 +1831,7 @@ class PolygonData(RemoteData):  # pragma: no cover
         ```
     """
 
-    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.polygon"
+    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.polygon")
 
     @classmethod
     def resolve_client(cls, client: tp.Optional[PolygonClientT] = None, **client_config) -> PolygonClientT:
@@ -1830,7 +1844,7 @@ class PolygonData(RemoteData):  # pragma: no cover
         assert_can_import("polygon")
         from polygon import RESTClient
 
-        polygon_cfg = cls.get_settings()
+        polygon_cfg = cls.get_settings(key_id="custom")
 
         if client is None:
             client = polygon_cfg["client"]
@@ -1907,7 +1921,7 @@ class PolygonData(RemoteData):  # pragma: no cover
             If you're using a free plan that has an API rate limit of several requests per minute,
             make sure to set `delay` to a higher number, such as 12000 (which makes 5 requests per minute).
         """
-        polygon_cfg = cls.get_settings()
+        polygon_cfg = cls.get_settings(key_id="custom")
 
         if client_config is None:
             client_config = {}
@@ -2141,6 +2155,7 @@ class AlphaVantageData(RemoteData):  # pragma: no cover
         >>> import vectorbtpro as vbt
 
         >>> vbt.AlphaVantageData.set_settings(
+        ...     key_id="custom",
         ...     api_key="YOUR_KEY"
         ... )
         ```
@@ -2173,7 +2188,7 @@ class AlphaVantageData(RemoteData):  # pragma: no cover
         ... )
         ```."""
 
-    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.alpha_vantage"
+    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.alpha_vantage")
 
     @classmethod
     @lru_cache()
@@ -2301,7 +2316,7 @@ class AlphaVantageData(RemoteData):  # pragma: no cover
 
         For defaults, see `custom.alpha_vantage` in `vectorbtpro._settings.data`.
         """
-        alpha_vantage_cfg = cls.get_settings()
+        alpha_vantage_cfg = cls.get_settings(key_id="custom")
 
         if api_key is None:
             api_key = alpha_vantage_cfg["api_key"]
@@ -2511,6 +2526,7 @@ class NDLData(RemoteData):  # pragma: no cover
         >>> import vectorbtpro as vbt
 
         >>> vbt.NDLData.set_settings(
+        ...     key_id="custom",
         ...     api_key="YOUR_KEY"
         ... )
         ```
@@ -2526,7 +2542,7 @@ class NDLData(RemoteData):  # pragma: no cover
         ```
     """
 
-    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.ndl"
+    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.ndl")
 
     @classmethod
     def fetch_symbol(
@@ -2570,7 +2586,7 @@ class NDLData(RemoteData):  # pragma: no cover
 
         import nasdaqdatalink
 
-        ndl_cfg = cls.get_settings()
+        ndl_cfg = cls.get_settings(key_id="custom")
 
         if api_key is None:
             api_key = ndl_cfg["api_key"]
@@ -2659,6 +2675,7 @@ class TVData(RemoteData):  # pragma: no cover
         >>> import vectorbtpro as vbt
 
         >>> vbt.TVData.set_settings(
+        ...     key_id="custom",
         ...     client_config=dict(
         ...         username="YOUR_USERNAME",
         ...         password="YOUR_PASSWORD"
@@ -2680,7 +2697,7 @@ class TVData(RemoteData):  # pragma: no cover
             Instead, the download just hangs. If it takes longer than usual, restart the kernel.
     """
 
-    _settings_key: tp.ClassVar[tp.Optional[str]] = "data.custom.tv"
+    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.tv")
 
     @classmethod
     def resolve_client(cls, client: tp.Optional[TvDatafeedT] = None, **client_config) -> TvDatafeedT:
@@ -2693,7 +2710,7 @@ class TVData(RemoteData):  # pragma: no cover
         assert_can_import("tvDatafeed")
         from tvDatafeed import TvDatafeed
 
-        tv_cfg = cls.get_settings()
+        tv_cfg = cls.get_settings(key_id="custom")
 
         if client is None:
             client = tv_cfg["client"]
@@ -2743,7 +2760,7 @@ class TVData(RemoteData):  # pragma: no cover
         assert_can_import("tvDatafeed")
         from tvDatafeed import Interval
 
-        tv_cfg = cls.get_settings()
+        tv_cfg = cls.get_settings(key_id="custom")
 
         if client_config is None:
             client_config = {}

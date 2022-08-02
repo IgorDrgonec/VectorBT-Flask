@@ -146,6 +146,7 @@ Kwargs = Dict[str, Any]
 KwargsLike = Union[None, Kwargs]
 KwargsLikeSequence = MaybeSequence[KwargsLike]
 PathLike = Union[str, Path]
+SettingsKeys = ClassVar[Union[None, Hashable, Dict[Hashable, Hashable]]]
 
 # Data
 Symbol = Hashable

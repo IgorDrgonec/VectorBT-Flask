@@ -503,6 +503,7 @@ data = ChildDict(
             read_hdf_kwargs=dict(),
         ),
         # Remote
+        remote=FrozenConfig(),
         yf=FrozenConfig(
             period="max",
             start=None,

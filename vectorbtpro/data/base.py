@@ -71,6 +71,8 @@ class MetaData(type(Analyzable), type(DataWithColumns)):
 class Data(Analyzable, DataWithColumns, metaclass=MetaData):
     """Class that downloads, updates, and manages data coming from a data source."""
 
+    _setting_keys: tp.SettingsKeys = dict(base="data")
+
     _writeable_attrs: tp.ClassVar[tp.Optional[tp.Set[str]]] = {"_column_config"}
 
     _column_config: tp.ClassVar[Config] = HybridConfig()
@@ -323,9 +325,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         See `vectorbtpro.utils.datetime_.to_timezone`.
 
         For defaults, see `vectorbtpro._settings.data`."""
-        from vectorbtpro._settings import settings
-
-        data_cfg = settings["data"]
+        data_cfg = cls.get_settings(key_id="base")
 
         if tz_localize is None:
             tz_localize = data_cfg["tz_localize"]
@@ -357,9 +357,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         * 'raise': raise an error
 
         For defaults, see `vectorbtpro._settings.data`."""
-        from vectorbtpro._settings import settings
-
-        data_cfg = settings["data"]
+        data_cfg = cls.get_settings(key_id="base")
 
         if missing is None:
             missing = data_cfg["missing_index"]
@@ -409,9 +407,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         if len(data) == 1:
             return data
 
-        from vectorbtpro._settings import settings
-
-        data_cfg = settings["data"]
+        data_cfg = cls.get_settings(key_id="base")
 
         if missing is None:
             missing = data_cfg["missing_columns"]
@@ -516,9 +512,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             **kwargs: Keyword arguments passed to the `__init__` method.
 
         For defaults, see `vectorbtpro._settings.data`."""
-        from vectorbtpro._settings import settings
-
-        data_cfg = settings["data"]
+        data_cfg = cls.get_settings(key_id="base")
 
         if tz_localize is None:
             tz_localize = data_cfg["tz_localize"]
@@ -632,9 +626,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
         For defaults, see `vectorbtpro._settings.data`.
         """
-        from vectorbtpro._settings import settings
-
-        data_cfg = settings["data"]
+        data_cfg = cls.get_settings(key_id="base")
 
         if checks.is_hashable(symbols):
             single_symbol = True
@@ -770,9 +762,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
         !!! note
             Returns a new `Data` instance instead of changing the data in place."""
-        from vectorbtpro._settings import settings
-
-        data_cfg = settings["data"]
+        data_cfg = self.get_settings(key_id="base")
 
         pbar_kwargs = merge_dicts(data_cfg["pbar_kwargs"], pbar_kwargs)
         if skip_on_error is None:
@@ -1476,9 +1466,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
         Merges `vectorbtpro.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
         `stats` from `vectorbtpro._settings.data`."""
-        from vectorbtpro._settings import settings
-
-        data_stats_cfg = settings["data"]["stats"]
+        data_stats_cfg = self.get_settings(key_id="base")["stats"]
 
         return merge_dicts(Analyzable.stats_defaults.__get__(self), data_stats_cfg)
 
@@ -1625,9 +1613,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
         Merges `vectorbtpro.generic.plots_builder.PlotsBuilderMixin.plots_defaults` and
         `plots` from `vectorbtpro._settings.data`."""
-        from vectorbtpro._settings import settings
-
-        data_plots_cfg = settings["data"]["plots"]
+        data_plots_cfg = self.get_settings(key_id="base")["plots"]
 
         return merge_dicts(Analyzable.plots_defaults.__get__(self), data_plots_cfg)
 
