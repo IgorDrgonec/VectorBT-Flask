@@ -51,20 +51,20 @@ def teardown_module():
 
 @njit
 def order_func_nb(c, size):
-    _size = nb.get_elem_nb(c, size)
+    _size = nb.select_nb(c, size)
     return nb.order_nb(_size if c.i % 2 == 0 else -_size)
 
 
 @njit
 def log_order_func_nb(c, size):
-    _size = nb.get_elem_nb(c, size)
+    _size = nb.select_nb(c, size)
     return nb.order_nb(_size if c.i % 2 == 0 else -_size, log=True)
 
 
 @njit
 def flex_order_func_nb(c, size):
     if c.call_idx < c.group_len:
-        _size = nb.get_col_elem_nb(c, c.from_col + c.call_idx, size)
+        _size = nb.select_from_col_nb(c, c.from_col + c.call_idx, size)
         return c.from_col + c.call_idx, nb.order_nb(_size if c.i % 2 == 0 else -_size)
     return -1, nb.order_nothing_nb()
 
@@ -72,7 +72,7 @@ def flex_order_func_nb(c, size):
 @njit
 def log_flex_order_func_nb(c, size):
     if c.call_idx < c.group_len:
-        _size = nb.get_col_elem_nb(c, c.from_col + c.call_idx, size)
+        _size = nb.select_from_col_nb(c, c.from_col + c.call_idx, size)
         return c.from_col + c.call_idx, nb.order_nb(_size if c.i % 2 == 0 else -_size, log=True)
     return -1, nb.order_nothing_nb()
 
@@ -218,8 +218,8 @@ class TestFromOrderFunc:
     def test_price_area(self, test_row_wise, test_flexible):
         @njit
         def order_func2_nb(c, price, price_area_vio_mode):
-            _price = nb.get_elem_nb(c, price)
-            _price_area_vio_mode = nb.get_elem_nb(c, price_area_vio_mode)
+            _price = nb.select_nb(c, price)
+            _price_area_vio_mode = nb.select_nb(c, price_area_vio_mode)
             return nb.order_nb(
                 1 if c.i % 2 == 0 else -1,
                 _price,
@@ -230,8 +230,8 @@ class TestFromOrderFunc:
         @njit
         def flex_order_func2_nb(c, price, price_area_vio_mode):
             if c.call_idx < c.group_len:
-                _price = nb.get_col_elem_nb(c, c.from_col + c.call_idx, price)
-                _price_area_vio_mode = nb.get_col_elem_nb(c, c.from_col + c.call_idx, price_area_vio_mode)
+                _price = nb.select_from_col_nb(c, c.from_col + c.call_idx, price)
+                _price_area_vio_mode = nb.select_from_col_nb(c, c.from_col + c.call_idx, price_area_vio_mode)
                 return c.from_col + c.call_idx, nb.order_nb(
                     1 if c.i % 2 == 0 else -1,
                     _price,
@@ -571,14 +571,14 @@ class TestFromOrderFunc:
             def target_val_order_func_nb(c):
                 col = c.from_col + c.call_idx
                 if c.call_idx < c.group_len:
-                    return col, nb.order_nb(50.0, nb.get_col_elem_nb(c, col, c.close), size_type=SizeType.TargetValue)
+                    return col, nb.order_nb(50.0, nb.select_from_col_nb(c, col, c.close), size_type=SizeType.TargetValue)
                 return -1, nb.order_nothing_nb()
 
         else:
 
             @njit
             def target_val_order_func_nb(c):
-                return nb.order_nb(50.0, nb.get_elem_nb(c, c.close), size_type=SizeType.TargetValue)
+                return nb.order_nb(50.0, nb.select_nb(c, c.close), size_type=SizeType.TargetValue)
 
         pf = vbt.Portfolio.from_order_func(
             price.iloc[1:],
@@ -632,14 +632,14 @@ class TestFromOrderFunc:
             def target_pct_order_func_nb(c):
                 col = c.from_col + c.call_idx
                 if c.call_idx < c.group_len:
-                    return col, nb.order_nb(0.5, nb.get_col_elem_nb(c, col, c.close), size_type=SizeType.TargetPercent)
+                    return col, nb.order_nb(0.5, nb.select_from_col_nb(c, col, c.close), size_type=SizeType.TargetPercent)
                 return -1, nb.order_nothing_nb()
 
         else:
 
             @njit
             def target_pct_order_func_nb(c):
-                return nb.order_nb(0.5, nb.get_elem_nb(c, c.close), size_type=SizeType.TargetPercent)
+                return nb.order_nb(0.5, nb.select_nb(c, c.close), size_type=SizeType.TargetPercent)
 
         pf = vbt.Portfolio.from_order_func(
             price.iloc[1:],
@@ -685,7 +685,7 @@ class TestFromOrderFunc:
                 if c.call_idx < c.group_len:
                     return col, nb.order_nb(
                         np.inf if c.i % 2 == 0 else -np.inf,
-                        nb.get_col_elem_nb(c, col, c.close),
+                        nb.select_from_col_nb(c, col, c.close),
                         fees=0.01,
                         fixed_fees=1.0,
                         slippage=0.01,
@@ -698,7 +698,7 @@ class TestFromOrderFunc:
             def order_func_nb(c):
                 return nb.order_nb(
                     np.inf if c.i % 2 == 0 else -np.inf,
-                    nb.get_elem_nb(c, c.close),
+                    nb.select_nb(c, c.close),
                     fees=0.01,
                     fixed_fees=1.0,
                     slippage=0.01,
@@ -996,7 +996,7 @@ class TestFromOrderFunc:
                 if c.call_idx < c.group_len:
                     return col, nb.order_nb(
                         1.0,
-                        nb.get_col_elem_nb(c, col, c.close),
+                        nb.select_from_col_nb(c, col, c.close),
                         fees=0.01,
                         fixed_fees=1.0,
                         slippage=0.01,
@@ -1007,7 +1007,7 @@ class TestFromOrderFunc:
         else:
 
             def order_func(c):
-                return nb.order_nb(1.0, nb.get_elem_nb(c, c.close), fees=0.01, fixed_fees=1.0, slippage=0.01, log=True)
+                return nb.order_nb(1.0, nb.select_nb(c, c.close), fees=0.01, fixed_fees=1.0, slippage=0.01, log=True)
 
         def post_sim_func(c, lst):
             lst.append(deepcopy(c))
@@ -1773,7 +1773,7 @@ class TestFromOrderFunc:
                 if c.call_idx < c.group_len:
                     return col, nb.order_nb(
                         size[c.i, col],
-                        nb.get_col_elem_nb(c, col, c.close),
+                        nb.select_from_col_nb(c, col, c.close),
                         fees=0.01,
                         fixed_fees=1.0,
                         slippage=0.01,
@@ -1785,7 +1785,7 @@ class TestFromOrderFunc:
             def order_func(c, size):
                 return nb.order_nb(
                     size[c.i, c.col],
-                    nb.get_elem_nb(c, c.close),
+                    nb.select_nb(c, c.close),
                     fees=0.01,
                     fixed_fees=1.0,
                     slippage=0.01,

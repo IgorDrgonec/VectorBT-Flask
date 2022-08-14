@@ -143,7 +143,7 @@ jitting = ChildDict(
         nb=FrozenConfig(
             cls=NumbaJitter,
             aliases={"numba"},
-            options=dict(boundscheck=True),
+            options=dict(),
             override_options=dict(),
             resolve_kwargs=dict(),
             tasks=dict(),
@@ -197,8 +197,8 @@ _settings["numba"] = numba
 
 math = ChildDict(
     use_tol=True,
-    rel_tol=1e-9,
-    abs_tol=1e-12,  # 1,000,000,000 == 1,000,000,001  # 0.000000000001 == 0.000000000002,
+    rel_tol=1e-9,  # 1,000,000,000 == 1,000,000,001
+    abs_tol=1e-12,  # 0.000000000001 == 0.000000000002
 )
 """_"""
 
@@ -951,7 +951,7 @@ returns = ChildDict(
     year_freq="365 days",
     bm_returns=None,
     defaults=Config(
-        start_value=0.0,
+        start_value=1.0,
         window=10,
         minp=None,
         ddof=1,
@@ -1147,7 +1147,7 @@ portfolio = ChildDict(
     stop_exit_price="stop",
     stop_order_type="market",
     stop_limit_delta=np.nan,
-    upon_stop_exit="close",
+    stop_exit_type="close",
     upon_stop_update="override",
     upon_adj_stop_conflict="keepexecute",
     upon_opp_stop_conflict="keepexecute",

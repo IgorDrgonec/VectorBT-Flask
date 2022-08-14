@@ -1828,7 +1828,7 @@ class TestArrayWrapper:
             indexing.index_dict(
                 {
                     vbt.RowIdx(0): 100,
-                    "_default": 0,
+                    "_def": 0,
                 }
             )
         )
@@ -1840,7 +1840,7 @@ class TestArrayWrapper:
             indexing.index_dict(
                 {
                     vbt.ElemIdx(1, 1): 100,
-                    "_default": 1,
+                    "_def": 1,
                 }
             )
         )
@@ -3124,9 +3124,9 @@ class TestReshapeFns:
     def test_broadcast_individual(self):
         result = reshaping.broadcast(
             dict(zero=0, a2=a2, sr2=sr2),
-            keep_flex={"_default": True, "sr2": False},
+            keep_flex={"_def": True, "sr2": False},
             min_one_dim={"a2": False},
-            require_kwargs={"_default": dict(dtype=float), "a2": dict(dtype=int)},
+            require_kwargs={"_def": dict(dtype=float), "a2": dict(dtype=int)},
         )
         np.testing.assert_array_equal(result["zero"], np.array([0.0]))
         np.testing.assert_array_equal(result["a2"], np.array([1, 2, 3]))
@@ -3147,9 +3147,9 @@ class TestReshapeFns:
             0,
             a2,
             sr2,
-            keep_flex={"_default": True, 2: False},
+            keep_flex={"_def": True, 2: False},
             min_one_dim={1: False},
-            require_kwargs={"_default": dict(dtype=float), 1: dict(dtype=int)},
+            require_kwargs={"_def": dict(dtype=float), 1: dict(dtype=int)},
         )
         np.testing.assert_array_equal(result[0], np.array([0.0]))
         np.testing.assert_array_equal(result[1], np.array([1, 2, 3]))
@@ -3895,7 +3895,7 @@ class TestReshapeFns:
             indexing.index_dict(
                 {
                     vbt.RowIdx(0): 100,
-                    "_default": 0,
+                    "_def": 0,
                 }
             ),
         )
@@ -3908,7 +3908,7 @@ class TestReshapeFns:
             indexing.index_dict(
                 {
                     vbt.ElemIdx(1, 1): 100,
-                    "_default": 1,
+                    "_def": 1,
                 }
             ),
         )
@@ -3931,7 +3931,7 @@ class TestReshapeFns:
             indexing.index_dict(
                 {
                     vbt.ElemIdx(1, 1): 100,
-                    "_default": 1,
+                    "_def": 1,
                 }
             ),
             keep_flex=True,

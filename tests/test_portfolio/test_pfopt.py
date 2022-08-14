@@ -713,11 +713,11 @@ class TestPortfolioOptimizer:
     def test_find_pfopt_groups(self):
         assert pfopt.find_pfopt_groups(
             vbt.pfopt_group_dict({"a": (1, 2, 3), "d": (4, 5, 6)}),
-            vbt.pfopt_group_dict({"b": (7, 8, 9), "_default": (10, 11, 12)}),
+            vbt.pfopt_group_dict({"b": (7, 8, 9), "_def": (10, 11, 12)}),
         ) == ["a", "d", "b"]
         assert pfopt.find_pfopt_groups(
             vbt.pfopt_group_dict({"a": (1, 2, 3), "d": (4, 5, 6)}),
-            vbt.pfopt_group_dict({"b": (7, 8, 9), "_default": (10, 11, 12)}),
+            vbt.pfopt_group_dict({"b": (7, 8, 9), "_def": (10, 11, 12)}),
             sort_groups=True,
         ) == ["a", "b", "d"]
         assert pfopt.find_pfopt_groups(
@@ -727,7 +727,7 @@ class TestPortfolioOptimizer:
             ),
             {
                 "x": vbt.pfopt_group_dict({"c": (7, 8, 9)}),
-                "y": vbt.pfopt_group_dict({"_default": (10, 11, 12)}),
+                "y": vbt.pfopt_group_dict({"_def": (10, 11, 12)}),
              },
         ) == ["a", "b", "c"]
 
@@ -754,20 +754,20 @@ class TestPortfolioOptimizer:
         ) == ((), {})
         assert pfopt.select_pfopt_group_args(
             "a",
-            vbt.pfopt_group_dict({"_default": (1, 2, 3)}),
-            vbt.pfopt_group_dict({"_default": {"k": (4, 5, 6)}}),
+            vbt.pfopt_group_dict({"_def": (1, 2, 3)}),
+            vbt.pfopt_group_dict({"_def": {"k": (4, 5, 6)}}),
         ) == ((1, 2, 3), {"k": (4, 5, 6)})
         assert pfopt.select_pfopt_group_args(
             "a",
             (
                 vbt.pfopt_group_dict({"a": 1}),
                 vbt.pfopt_group_dict({"b": 2}),
-                vbt.pfopt_group_dict({"_default": 3}),
+                vbt.pfopt_group_dict({"_def": 3}),
             ),
             {
                 "k1": vbt.pfopt_group_dict({"a": 4}),
                 "k2": vbt.pfopt_group_dict({"b": 5}),
-                "k3": vbt.pfopt_group_dict({"_default": 6}),
+                "k3": vbt.pfopt_group_dict({"_def": 6}),
             }
         ) == ((1, 3), {"k1": 4, "k3": 6})
         assert pfopt.select_pfopt_group_args(
@@ -775,12 +775,12 @@ class TestPortfolioOptimizer:
             (
                 vbt.pfopt_group_dict({"a": 1}),
                 vbt.pfopt_group_dict({"b": 2}),
-                vbt.pfopt_group_dict({"_default": 3}),
+                vbt.pfopt_group_dict({"_def": 3}),
             ),
             {
                 "k1": vbt.pfopt_group_dict({"a": 4}),
                 "k2": vbt.pfopt_group_dict({"b": 5}),
-                "k3": vbt.pfopt_group_dict({"_default": 6}),
+                "k3": vbt.pfopt_group_dict({"_def": 6}),
             }
         ) == ((2, 3), {"k2": 5, "k3": 6})
         assert pfopt.select_pfopt_group_args(
@@ -788,12 +788,12 @@ class TestPortfolioOptimizer:
             (
                 vbt.pfopt_group_dict({"a": 1}),
                 vbt.pfopt_group_dict({"b": 2}),
-                vbt.pfopt_group_dict({"_default": 3}),
+                vbt.pfopt_group_dict({"_def": 3}),
             ),
             {
                 "k1": vbt.pfopt_group_dict({"a": 4}),
                 "k2": vbt.pfopt_group_dict({"b": 5}),
-                "k3": vbt.pfopt_group_dict({"_default": 6}),
+                "k3": vbt.pfopt_group_dict({"_def": 6}),
             }
         ) == ((3,), {"k3": 6})
 

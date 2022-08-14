@@ -24,7 +24,7 @@ __all__ = [
     "TimeDeltaFormat",
     "StopEntryPrice",
     "StopExitPrice",
-    "StopExitMode",
+    "StopExitType",
     "StopUpdateMode",
     "SizeType",
     "Direction",
@@ -247,7 +247,7 @@ Attributes:
     but won't enter the opposite one, while opposite entries reduce the position by the same amount,
     but as soon as this position is closed, they begin to increase the opposite position.
 
-    The behavior for opposite entries can be changed by `OppositeEntryMode` and for stop orders by `StopExitMode`.
+    The behavior for opposite entries can be changed by `OppositeEntryMode` and for stop orders by `StopExitType`.
 """
 
 
@@ -407,9 +407,9 @@ Attributes:
 
 class StopEntryPriceT(tp.NamedTuple):
     ValPrice: int = -1
-    Price: int = -2
-    FillPrice: int = -3
-    Open: int = -4
+    Open: int = -2
+    Price: int = -3
+    FillPrice: int = -4
     Close: int = -5
 
 
@@ -428,9 +428,9 @@ Which price to use as an initial stop price?
 
 Attributes:
     ValPrice: Asset valuation price.
+    Open: Opening price.
     Price: Order price.
     FillPrice: Filled order price (that is, slippage is already applied).
-    Open: Opening price.
     Close: Closing price.
     
 !!! note
@@ -439,8 +439,8 @@ Attributes:
 
 
 class StopExitPriceT(tp.NamedTuple):
-    Stop: int = 0
-    Close: int = 1
+    Stop: int = -1
+    Close: int = -2
 
 
 StopExitPrice = StopExitPriceT()
@@ -461,25 +461,28 @@ Attributes:
     
         If the stop was hit before, the opening price at the next bar is used.
     Close: Closing price.
+    
+!!! note
+    Each flag is negative, thus if a positive value is provided, it's used directly as price.
 """
 
 
-class StopExitModeT(tp.NamedTuple):
+class StopExitTypeT(tp.NamedTuple):
     Close: int = 0
     CloseReduce: int = 1
     Reverse: int = 2
     ReverseReduce: int = 3
 
 
-StopExitMode = StopExitModeT()
+StopExitType = StopExitTypeT()
 """_"""
 
 __pdoc__[
-    "StopExitMode"
-] = f"""Stop exit mode.
+    "StopExitType"
+] = f"""Stop exit type.
 
 ```python
-{prettify(StopExitMode)}
+{prettify(StopExitType)}
 ```
 
 How to exit the current position upon a stop signal?
@@ -2156,6 +2159,9 @@ class SignalSegmentContext(tp.NamedTuple):
     high: tp.FlexArray
     low: tp.FlexArray
     close: tp.FlexArray
+    init_cash: tp.FlexArray
+    init_position: tp.FlexArray
+    init_price: tp.FlexArray
     flex_2d: bool
 
     order_records: tp.RecordArray2d
@@ -2187,7 +2193,7 @@ class SignalSegmentContext(tp.NamedTuple):
     from_col: int
     to_col: int
     i: int
-    
+
 
 __pdoc__[
     "SignalSegmentContext"
@@ -2207,6 +2213,9 @@ __pdoc__["SignalSegmentContext.open"] = "See `SimulationContext.open`."
 __pdoc__["SignalSegmentContext.high"] = "See `SimulationContext.high`."
 __pdoc__["SignalSegmentContext.low"] = "See `SimulationContext.low`."
 __pdoc__["SignalSegmentContext.close"] = "See `SimulationContext.close`."
+__pdoc__["SignalSegmentContext.init_cash"] = "See `SimulationContext.init_cash`."
+__pdoc__["SignalSegmentContext.init_position"] = "See `SimulationContext.init_position`."
+__pdoc__["SignalSegmentContext.init_price"] = "See `SimulationContext.init_price`."
 __pdoc__["SignalSegmentContext.flex_2d"] = "See `SimulationContext.flex_2d`."
 __pdoc__["SignalSegmentContext.order_records"] = "See `SimulationContext.order_records`."
 __pdoc__["SignalSegmentContext.order_counts"] = "See `SimulationContext.order_counts`."
@@ -2257,6 +2266,9 @@ class SignalContext(tp.NamedTuple):
     high: tp.FlexArray
     low: tp.FlexArray
     close: tp.FlexArray
+    init_cash: tp.FlexArray
+    init_position: tp.FlexArray
+    init_price: tp.FlexArray
     flex_2d: bool
 
     order_records: tp.RecordArray2d
@@ -2515,9 +2527,11 @@ __pdoc__[
 
 main_info_dt = np.dtype(
     [
-        ("signal_i", np.int_),
-        ("creation_i", np.int_),
-        ("i", np.int_),
+        ("bar_zone", np.int_),
+        ("signal_idx", np.int_),
+        ("creation_idx", np.int_),
+        ("idx", np.int_),
+        ("val_price", np.float_),
         ("price", np.float_),
         ("size", np.float_),
         ("size_type", np.int_),
@@ -2538,9 +2552,11 @@ __pdoc__[
 ```
 
 Attributes:
-    signal_i: Row where signal was placed.
-    creation_i: Row where order was created.
+    bar_zone: Bar zone. See `vectorbtpro.generic.enums.BarZone`.
+    signal_idx: Row where signal was placed.
+    creation_idx: Row where order was created.
     i: Row from where order information was taken.
+    val_price: Valuation price.
     price: Requested price.
     size: Order size.
     size_type: Order size type. See `SizeType`.
@@ -2551,9 +2567,9 @@ Attributes:
 
 limit_info_dt = np.dtype(
     [
-        ("signal_i", np.int_),
-        ("creation_i", np.int_),
-        ("init_i", np.int_),
+        ("signal_idx", np.int_),
+        ("creation_idx", np.int_),
+        ("init_idx", np.int_),
         ("init_price", np.float_),
         ("init_size", np.float_),
         ("init_size_type", np.int_),
@@ -2579,9 +2595,9 @@ __pdoc__[
 ```
 
 Attributes:
-    signal_i: Signal row.
-    creation_i: Limit creation row.
-    init_i: Initial row from where order information is taken.
+    signal_idx: Signal row.
+    creation_idx: Limit creation row.
+    init_idx: Initial row from where order information is taken.
     init_price: Initial price.
     init_size: Requested size.
     init_size_type: Type of the requested size. See `SizeType`.
@@ -2597,9 +2613,12 @@ Attributes:
 
 sl_info_dt = np.dtype(
     [
-        ("init_i", np.int_),
+        ("init_idx", np.int_),
         ("init_price", np.float_),
         ("stop", np.float_),
+        ("exit_price", np.int_),
+        ("exit_type", np.int_),
+        ("order_type", np.int_),
         ("limit_delta", np.float_),
         ("delta_format", np.int_),
     ],
@@ -2616,21 +2635,27 @@ __pdoc__[
 ```
 
 Attributes:
-    init_i: Initial row.
+    init_idx: Initial row.
     init_price: Initial price.
     stop: Latest updated stop value.
+    exit_price: Exit price. See `StopExitPrice`.
+    exit_type: Exit type. See `StopExitType`.
+    order_type: Order type. See `OrderType`.
     limit_delta: Delta from the hit price. Only for `StopType.Limit`.
     delta_format: Format of the stop value. See `DeltaFormat`.
 """
 
 tsl_info_dt = np.dtype(
     [
-        ("init_i", np.int_),
+        ("init_idx", np.int_),
         ("init_price", np.float_),
-        ("peak_i", np.int_),
+        ("peak_idx", np.int_),
         ("peak_price", np.float_),
-        ("th", np.float_),
         ("stop", np.float_),
+        ("th", np.float_),
+        ("exit_price", np.int_),
+        ("exit_type", np.int_),
+        ("order_type", np.int_),
         ("limit_delta", np.float_),
         ("delta_format", np.int_),
     ],
@@ -2647,21 +2672,27 @@ __pdoc__[
 ```
 
 Attributes:
-    init_i: Initial row.
+    init_idx: Initial row.
     init_price: Initial price.
-    peak_i: Row of the highest/lowest price.
+    peak_idx: Row of the highest/lowest price.
     peak_price: Highest/lowest price.
-    th: Latest updated threshold value.
     stop: Latest updated stop value.
+    th: Latest updated threshold value.
+    exit_price: Exit price. See `StopExitPrice`.
+    exit_type: Exit type. See `StopExitType`.
+    order_type: Order type. See `OrderType`.
     limit_delta: Delta from the hit price. Only for `StopType.Limit`.
     delta_format: Format of the threshold and stop values. See `DeltaFormat`.
 """
 
 tp_info_dt = np.dtype(
     [
-        ("init_i", np.int_),
+        ("init_idx", np.int_),
         ("init_price", np.float_),
         ("stop", np.float_),
+        ("exit_price", np.int_),
+        ("exit_type", np.int_),
+        ("order_type", np.int_),
         ("limit_delta", np.float_),
         ("delta_format", np.int_),
     ],
@@ -2678,9 +2709,12 @@ __pdoc__[
 ```
 
 Attributes:
-    init_i: Initial row.
+    init_idx: Initial row.
     init_price: Initial price.
     stop: Latest updated stop value.
+    exit_price: Exit price. See `StopExitPrice`.
+    exit_type: Exit type. See `StopExitType`.
+    order_type: Order type. See `OrderType`.
     limit_delta: Delta from the hit price. Only for `StopType.Limit`.
     delta_format: Format of the stop value. See `DeltaFormat`.
 """

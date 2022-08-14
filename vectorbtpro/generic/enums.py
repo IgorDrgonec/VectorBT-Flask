@@ -10,6 +10,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.utils.formatting import prettify
 
 __all__ = [
+    "BarZone",
     "WType",
     "RangeStatus",
     "InterpMode",
@@ -47,6 +48,25 @@ __pdoc__ = {}
 
 
 # ############# Enums ############# #
+
+
+class BarZoneT(tp.NamedTuple):
+    Open: int = 0
+    Middle: int = 1
+    Close: int = 2
+
+
+BarZone = BarZoneT()
+"""_"""
+
+__pdoc__[
+    "BarZone"
+] = f"""Bar zone.
+
+```python
+{prettify(BarZone)}
+```
+"""
 
 
 class WTypeT(tp.NamedTuple):

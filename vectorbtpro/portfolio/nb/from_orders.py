@@ -1,7 +1,7 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
 """Numba-compiled functions for portfolio modeling based on orders."""
-import numpy as np
+
 from numba import prange
 
 from vectorbtpro.base import chunking as base_ch

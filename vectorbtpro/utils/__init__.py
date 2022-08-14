@@ -37,7 +37,6 @@ from vectorbtpro.utils.config import (
     Configured,
     AtomicConfig,
 )
-from vectorbtpro.utils.datetime_ import to_tzaware_datetime
 from vectorbtpro.utils.decorators import (
     cacheable_property,
     cached_property,

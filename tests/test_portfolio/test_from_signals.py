@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from functools import partial
 
 import pytest
 from numba import njit
@@ -14,10 +14,7 @@ seed = 42
 
 day_dt = np.timedelta64(86400000000000)
 
-price = pd.Series(
-    [1.0, 2.0, 3.0, 4.0, 5.0],
-    index=pd.date_range("2020", periods=5)
-)
+price = pd.Series([1.0, 2.0, 3.0, 4.0, 5.0], index=pd.date_range("2020", periods=5))
 price_wide = price.vbt.tile(3, keys=["a", "b", "c"])
 
 
@@ -69,6 +66,11 @@ def from_ls_signals_shortonly(close=price, entries=entries, exits=exits, **kwarg
     return vbt.Portfolio.from_signals(close, False, False, entries, exits, **kwargs)
 
 
+@njit
+def adjust_func_nb(c):
+    pass
+
+
 class TestFromSignals:
     def test_data(self):
         data = vbt.RandomOHLCData.fetch(
@@ -105,14 +107,27 @@ class TestFromSignals:
         assert pf.low is None
         assert pf.close is not None
 
-    @pytest.mark.parametrize(
-        "test_ls",
-        [False, True],
-    )
-    def test_one_column(self, test_ls):
-        _from_signals_both = from_ls_signals_both if test_ls else from_signals_both
-        _from_signals_longonly = from_ls_signals_longonly if test_ls else from_signals_longonly
-        _from_signals_shortonly = from_ls_signals_shortonly if test_ls else from_signals_shortonly
+    @pytest.mark.parametrize("test_ls", [False, True])
+    @pytest.mark.parametrize("test_flexible", [False, True])
+    def test_one_column(self, test_ls, test_flexible):
+        if test_ls:
+            if test_flexible:
+                _from_signals_both = partial(from_ls_signals_both, adjust_func_nb=adjust_func_nb)
+                _from_signals_longonly = partial(from_ls_signals_longonly, adjust_func_nb=adjust_func_nb)
+                _from_signals_shortonly = partial(from_ls_signals_shortonly, adjust_func_nb=adjust_func_nb)
+            else:
+                _from_signals_both = from_ls_signals_both
+                _from_signals_longonly = from_ls_signals_longonly
+                _from_signals_shortonly = from_ls_signals_shortonly
+        else:
+            if test_flexible:
+                _from_signals_both = partial(from_signals_both, adjust_func_nb=adjust_func_nb)
+                _from_signals_longonly = partial(from_signals_longonly, adjust_func_nb=adjust_func_nb)
+                _from_signals_shortonly = partial(from_signals_shortonly, adjust_func_nb=adjust_func_nb)
+            else:
+                _from_signals_both = from_signals_both
+                _from_signals_longonly = from_signals_longonly
+                _from_signals_shortonly = from_signals_shortonly
         assert_records_close(
             _from_signals_both().order_records,
             np.array(
@@ -144,14 +159,27 @@ class TestFromSignals:
         assert pf.wrapper.freq == day_dt
         assert pf.wrapper.grouper.group_by is None
 
-    @pytest.mark.parametrize(
-        "test_ls",
-        [False, True],
-    )
-    def test_multiple_columns(self, test_ls):
-        _from_signals_both = from_ls_signals_both if test_ls else from_signals_both
-        _from_signals_longonly = from_ls_signals_longonly if test_ls else from_signals_longonly
-        _from_signals_shortonly = from_ls_signals_shortonly if test_ls else from_signals_shortonly
+    @pytest.mark.parametrize("test_ls", [False, True])
+    @pytest.mark.parametrize("test_flexible", [False, True])
+    def test_multiple_columns(self, test_ls, test_flexible):
+        if test_ls:
+            if test_flexible:
+                _from_signals_both = partial(from_ls_signals_both, adjust_func_nb=adjust_func_nb)
+                _from_signals_longonly = partial(from_ls_signals_longonly, adjust_func_nb=adjust_func_nb)
+                _from_signals_shortonly = partial(from_ls_signals_shortonly, adjust_func_nb=adjust_func_nb)
+            else:
+                _from_signals_both = from_ls_signals_both
+                _from_signals_longonly = from_ls_signals_longonly
+                _from_signals_shortonly = from_ls_signals_shortonly
+        else:
+            if test_flexible:
+                _from_signals_both = partial(from_signals_both, adjust_func_nb=adjust_func_nb)
+                _from_signals_longonly = partial(from_signals_longonly, adjust_func_nb=adjust_func_nb)
+                _from_signals_shortonly = partial(from_signals_shortonly, adjust_func_nb=adjust_func_nb)
+            else:
+                _from_signals_both = from_signals_both
+                _from_signals_longonly = from_signals_longonly
+                _from_signals_shortonly = from_signals_shortonly
         assert_records_close(
             _from_signals_both(close=price_wide).order_records,
             np.array(
@@ -207,8 +235,8 @@ class TestFromSignals:
     def test_custom_signal_func(self):
         @njit
         def signal_func_nb(c, long_num_arr, short_num_arr):
-            long_num = nb.get_elem_nb(c, long_num_arr)
-            short_num = nb.get_elem_nb(c, short_num_arr)
+            long_num = nb.select_nb(c, long_num_arr)
+            short_num = nb.select_nb(c, short_num_arr)
             is_long_entry = long_num > 0
             is_long_exit = long_num < 0
             is_short_entry = short_num > 0
@@ -399,7 +427,7 @@ class TestFromSignals:
         assert_records_close(
             from_signals_both(size=0.5, size_type="valuepercent").order_records,
             np.array(
-                [(0, 0, 0, 0, 0, 50.0, 1.0, 0.0, 0, 0, -1), (1, 0, 3, 3, 3, 81.25, 4.0, 0.0, 1, 0, -1)],
+                [(0, 0, 0, 0, 0, 50.0, 1.0, 0.0, 0, 0, -1), (1, 0, 3, 3, 3, 75.0, 4.0, 0.0, 1, 0, -1)],
                 dtype=fs_order_dt,
             ),
         )
@@ -1319,7 +1347,7 @@ class TestFromSignals:
                         0.0,
                         0.0,
                         4.0,
-                        400.0,
+                        300.0,
                         -np.inf,
                         np.inf,
                         0,
@@ -1341,7 +1369,7 @@ class TestFromSignals:
                         400.0,
                         0.0,
                         4.0,
-                        400.0,
+                        300.0,
                         200.0,
                         4.0,
                         0.0,
@@ -1789,8 +1817,17 @@ class TestFromSignals:
             _from_signals_both(from_ago=1, price=np.inf).order_records,
         )
 
-    def test_call_seq(self):
-        pf = from_signals_both(close=price_wide, group_by=np.array([0, 0, 1]), cash_sharing=True)
+    @pytest.mark.parametrize("test_flexible", [False, True])
+    def test_call_seq(self, test_flexible):
+        if test_flexible:
+            _from_signals_both = partial(from_signals_both, adjust_func_nb=adjust_func_nb)
+            _from_signals_longonly = partial(from_signals_longonly, adjust_func_nb=adjust_func_nb)
+            _from_signals_shortonly = partial(from_signals_shortonly, adjust_func_nb=adjust_func_nb)
+        else:
+            _from_signals_both = from_signals_both
+            _from_signals_longonly = from_signals_longonly
+            _from_signals_shortonly = from_signals_shortonly
+        pf = _from_signals_both(close=price_wide, group_by=np.array([0, 0, 1]), cash_sharing=True)
         assert_records_close(
             pf.order_records,
             np.array(
@@ -1807,7 +1844,7 @@ class TestFromSignals:
             pf.call_seq.values,
             np.array([[0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0]]),
         )
-        pf = from_signals_both(close=price_wide, group_by=np.array([0, 0, 1]), cash_sharing=True, call_seq="reversed")
+        pf = _from_signals_both(close=price_wide, group_by=np.array([0, 0, 1]), cash_sharing=True, call_seq="reversed")
         assert_records_close(
             pf.order_records,
             np.array(
@@ -1824,7 +1861,7 @@ class TestFromSignals:
             pf.call_seq.values,
             np.array([[1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0]]),
         )
-        pf = from_signals_both(
+        pf = _from_signals_both(
             close=price_wide,
             group_by=np.array([0, 0, 1]),
             cash_sharing=True,
@@ -1871,7 +1908,7 @@ class TestFromSignals:
             cash_sharing=True,
             call_seq="auto",
         )
-        pf = from_signals_both(**kwargs)
+        pf = _from_signals_both(**kwargs)
         assert_records_close(
             pf.order_records,
             np.array(
@@ -1893,7 +1930,7 @@ class TestFromSignals:
             pf.call_seq.values,
             np.array([[0, 1, 2], [2, 0, 1], [1, 2, 0], [0, 1, 2], [2, 0, 1]]),
         )
-        pf = from_signals_longonly(**kwargs)
+        pf = _from_signals_longonly(**kwargs)
         assert_records_close(
             pf.order_records,
             np.array(
@@ -1915,7 +1952,7 @@ class TestFromSignals:
             pf.call_seq.values,
             np.array([[0, 1, 2], [2, 0, 1], [1, 2, 0], [0, 1, 2], [2, 0, 1]]),
         )
-        pf = from_signals_shortonly(**kwargs)
+        pf = _from_signals_shortonly(**kwargs)
         assert_records_close(
             pf.order_records,
             np.array(
@@ -1933,7 +1970,7 @@ class TestFromSignals:
             pf.call_seq.values,
             np.array([[2, 0, 1], [1, 0, 2], [0, 1, 2], [2, 1, 0], [1, 0, 2]]),
         )
-        pf = from_signals_longonly(**kwargs, size=1.0, size_type="percent")
+        pf = _from_signals_longonly(**kwargs, size=1.0, size_type="percent")
         assert_records_close(
             pf.order_records,
             np.array(
@@ -1955,11 +1992,20 @@ class TestFromSignals:
             pf.call_seq.values,
             np.array([[0, 1, 2], [2, 0, 1], [1, 0, 2], [0, 1, 2], [2, 0, 1]]),
         )
-        _ = from_signals_both(attach_call_seq=False, **kwargs)
-        _ = from_signals_longonly(attach_call_seq=False, **kwargs)
-        _ = from_signals_shortonly(attach_call_seq=False, **kwargs)
+        _ = _from_signals_both(attach_call_seq=False, **kwargs)
+        _ = _from_signals_longonly(attach_call_seq=False, **kwargs)
+        _ = _from_signals_shortonly(attach_call_seq=False, **kwargs)
 
-    def test_limit_order_type(self):
+    @pytest.mark.parametrize("test_flexible", [False, True])
+    def test_limit_order_type(self, test_flexible):
+        if test_flexible:
+            _from_signals_both = partial(from_signals_both, adjust_func_nb=adjust_func_nb)
+            _from_signals_longonly = partial(from_signals_longonly, adjust_func_nb=adjust_func_nb)
+            _from_signals_shortonly = partial(from_signals_shortonly, adjust_func_nb=adjust_func_nb)
+        else:
+            _from_signals_both = from_signals_both
+            _from_signals_longonly = from_signals_longonly
+            _from_signals_shortonly = from_signals_shortonly
         entries = pd.Series([True, False, False, False, False], index=price.index)
         exits = pd.Series([False, False, False, False, False], index=price.index)
 
@@ -1968,7 +2014,7 @@ class TestFromSignals:
         high = close + 0.5
         low = close - 0.5
         assert_records_close(
-            from_signals_longonly(
+            _from_signals_longonly(
                 close=close,
                 entries=entries,
                 exits=exits,
@@ -1988,7 +2034,7 @@ class TestFromSignals:
             ),
         )
         assert_records_close(
-            from_signals_longonly(
+            _from_signals_longonly(
                 close=close,
                 entries=entries,
                 exits=exits,
@@ -2008,7 +2054,7 @@ class TestFromSignals:
             ),
         )
         assert_records_close(
-            from_signals_longonly(
+            _from_signals_longonly(
                 close=close,
                 entries=entries,
                 exits=exits,
@@ -2029,7 +2075,7 @@ class TestFromSignals:
             ),
         )
         assert_records_close(
-            from_signals_longonly(
+            _from_signals_longonly(
                 close=close,
                 entries=entries,
                 exits=exits,
@@ -2038,7 +2084,7 @@ class TestFromSignals:
                 limit_delta=[[-np.inf, 0.0, -1 / 2, 1 / 6, 2 / 3, np.inf]],
                 delta_format="percent",
             ).order_records,
-            from_signals_longonly(
+            _from_signals_longonly(
                 close=close,
                 entries=entries,
                 exits=exits,
@@ -2049,7 +2095,7 @@ class TestFromSignals:
             ).order_records,
         )
         assert_records_close(
-            from_signals_longonly(
+            _from_signals_longonly(
                 open=open,
                 high=high,
                 low=low,
@@ -2072,7 +2118,7 @@ class TestFromSignals:
             ),
         )
         assert_records_close(
-            from_signals_longonly(
+            _from_signals_longonly(
                 open=open,
                 high=high,
                 low=low,
@@ -2095,7 +2141,7 @@ class TestFromSignals:
             ),
         )
         assert_records_close(
-            from_signals_longonly(
+            _from_signals_longonly(
                 open=open,
                 high=high,
                 low=low,
@@ -2119,7 +2165,7 @@ class TestFromSignals:
             ),
         )
         assert_records_close(
-            from_signals_shortonly(
+            _from_signals_shortonly(
                 close=close,
                 entries=entries,
                 exits=exits,
@@ -2139,7 +2185,7 @@ class TestFromSignals:
             ),
         )
         assert_records_close(
-            from_signals_shortonly(
+            _from_signals_shortonly(
                 close=close,
                 entries=entries,
                 exits=exits,
@@ -2159,7 +2205,7 @@ class TestFromSignals:
             ),
         )
         assert_records_close(
-            from_signals_shortonly(
+            _from_signals_shortonly(
                 close=close,
                 entries=entries,
                 exits=exits,
@@ -2180,7 +2226,7 @@ class TestFromSignals:
             ),
         )
         assert_records_close(
-            from_signals_shortonly(
+            _from_signals_shortonly(
                 close=close,
                 entries=entries,
                 exits=exits,
@@ -2189,7 +2235,7 @@ class TestFromSignals:
                 limit_delta=[[-np.inf, 0.0, -1 / 2, 1 / 6, 2 / 3, np.inf]],
                 delta_format="percent",
             ).order_records,
-            from_signals_shortonly(
+            _from_signals_shortonly(
                 close=close,
                 entries=entries,
                 exits=exits,
@@ -2200,7 +2246,7 @@ class TestFromSignals:
             ).order_records,
         )
         assert_records_close(
-            from_signals_shortonly(
+            _from_signals_shortonly(
                 open=open,
                 high=high,
                 low=low,
@@ -2223,7 +2269,7 @@ class TestFromSignals:
             ),
         )
         assert_records_close(
-            from_signals_shortonly(
+            _from_signals_shortonly(
                 open=open,
                 high=high,
                 low=low,
@@ -2246,7 +2292,7 @@ class TestFromSignals:
             ),
         )
         assert_records_close(
-            from_signals_shortonly(
+            _from_signals_shortonly(
                 open=open,
                 high=high,
                 low=low,
@@ -3134,7 +3180,16 @@ class TestFromSignals:
             ),
         )
 
-    def test_sl_stop(self):
+    @pytest.mark.parametrize("test_flexible", [False, True])
+    def test_sl_stop(self, test_flexible):
+        if test_flexible:
+            _from_signals_both = partial(from_signals_both, adjust_func_nb=adjust_func_nb)
+            _from_signals_longonly = partial(from_signals_longonly, adjust_func_nb=adjust_func_nb)
+            _from_signals_shortonly = partial(from_signals_shortonly, adjust_func_nb=adjust_func_nb)
+        else:
+            _from_signals_both = from_signals_both
+            _from_signals_longonly = from_signals_longonly
+            _from_signals_shortonly = from_signals_shortonly
         entries = pd.Series([True, False, False, False, False], index=price.index)
         exits = pd.Series([False, False, False, False, False], index=price.index)
 
@@ -3143,7 +3198,7 @@ class TestFromSignals:
         high = close + 0.5
         low = close - 0.5
         assert_records_close(
-            from_signals_longonly(
+            _from_signals_longonly(
                 close=close,
                 entries=entries,
                 exits=exits,
@@ -3162,7 +3217,7 @@ class TestFromSignals:
             ),
         )
         assert_records_close(
-            from_signals_shortonly(
+            _from_signals_shortonly(
                 close=close,
                 entries=entries,
                 exits=exits,
@@ -3179,13 +3234,13 @@ class TestFromSignals:
             ),
         )
         assert_records_close(
-            from_signals_both(
+            _from_signals_both(
                 close=close,
                 entries=entries,
                 exits=exits,
                 sl_stop=[[np.nan, 0.1, 0.5, np.inf]],
             ).order_records,
-            from_signals_longonly(
+            _from_signals_longonly(
                 close=close,
                 entries=entries,
                 exits=exits,
@@ -3193,13 +3248,13 @@ class TestFromSignals:
             ).order_records,
         )
         assert_records_close(
-            from_signals_both(
+            _from_signals_both(
                 close=close,
                 entries=exits,
                 exits=entries,
                 sl_stop=[[np.nan, 0.1, 0.5, np.inf]],
             ).order_records,
-            from_signals_shortonly(
+            _from_signals_shortonly(
                 close=close,
                 entries=entries,
                 exits=exits,
@@ -3207,7 +3262,7 @@ class TestFromSignals:
             ).order_records,
         )
         assert_records_close(
-            from_signals_longonly(
+            _from_signals_longonly(
                 close=close,
                 entries=entries,
                 exits=exits,
@@ -3231,7 +3286,7 @@ class TestFromSignals:
             ),
         )
         assert_records_close(
-            from_signals_shortonly(
+            _from_signals_shortonly(
                 close=close,
                 entries=entries,
                 exits=exits,
@@ -3252,7 +3307,7 @@ class TestFromSignals:
             ),
         )
         assert_records_close(
-            from_signals_longonly(
+            _from_signals_longonly(
                 close=close,
                 entries=entries,
                 exits=exits,
@@ -3262,7 +3317,7 @@ class TestFromSignals:
                 sl_stop=[[np.nan, 0.5, 0.75, 1.0, np.inf]],
                 delta_format="percent",
             ).order_records,
-            from_signals_longonly(
+            _from_signals_longonly(
                 close=close,
                 entries=entries,
                 exits=exits,
@@ -3279,7 +3334,7 @@ class TestFromSignals:
         high = close + 0.5
         low = close - 0.5
         assert_records_close(
-            from_signals_longonly(
+            _from_signals_longonly(
                 close=close,
                 entries=entries,
                 exits=exits,
@@ -3296,7 +3351,7 @@ class TestFromSignals:
             ),
         )
         assert_records_close(
-            from_signals_shortonly(
+            _from_signals_shortonly(
                 close=close,
                 entries=entries,
                 exits=exits,
@@ -3315,13 +3370,13 @@ class TestFromSignals:
             ),
         )
         assert_records_close(
-            from_signals_both(
+            _from_signals_both(
                 close=close,
                 entries=entries,
                 exits=exits,
                 sl_stop=[[np.nan, 0.5, 3.0, np.inf]],
             ).order_records,
-            from_signals_longonly(
+            _from_signals_longonly(
                 close=close,
                 entries=entries,
                 exits=exits,
@@ -3329,13 +3384,13 @@ class TestFromSignals:
             ).order_records,
         )
         assert_records_close(
-            from_signals_both(
+            _from_signals_both(
                 close=close,
                 entries=exits,
                 exits=entries,
                 sl_stop=[[np.nan, 0.5, 3.0, np.inf]],
             ).order_records,
-            from_signals_shortonly(
+            _from_signals_shortonly(
                 close=close,
                 entries=entries,
                 exits=exits,
@@ -3343,7 +3398,7 @@ class TestFromSignals:
             ).order_records,
         )
         assert_records_close(
-            from_signals_longonly(
+            _from_signals_longonly(
                 close=close,
                 entries=entries,
                 exits=exits,
@@ -3364,7 +3419,7 @@ class TestFromSignals:
             ),
         )
         assert_records_close(
-            from_signals_shortonly(
+            _from_signals_shortonly(
                 close=close,
                 entries=entries,
                 exits=exits,
@@ -3638,11 +3693,11 @@ class TestFromSignals:
                 [
                     (0, 0, 0, 0, 0, 50.0, 2.0, 0.0, 1, 0, -1),
                     (0, 1, 0, 0, 0, 50.0, 2.0, 0.0, 1, 0, -1),
-                    (1, 1, 0, 1, 1, 50.0, 0.75, 0.0, 0, 0, 1),
+                    (1, 1, 0, 1, 1, 50.0, 1.125, 0.0, 0, 0, 1),
                     (0, 2, 0, 0, 0, 50.0, 2.0, 0.0, 1, 0, -1),
-                    (1, 2, 0, 1, 1, 50.0, 0.875, 0.0, 0, 0, 1),
+                    (1, 2, 0, 1, 1, 50.0, 1.3125, 0.0, 0, 0, 1),
                     (0, 3, 0, 0, 0, 50.0, 2.0, 0.0, 1, 0, -1),
-                    (1, 3, 0, 1, 1, 50.0, 1.0, 0.0, 0, 0, 1),
+                    (1, 3, 0, 1, 1, 50.0, 1.5, 0.0, 0, 0, 1),
                     (0, 4, 0, 0, 0, 50.0, 2.0, 0.0, 1, 0, -1),
                 ],
                 dtype=fs_order_dt,
@@ -3795,7 +3850,7 @@ class TestFromSignals:
                 [
                     (0, 0, 0, 0, 0, 25.0, 4.0, 0.0, 0, 0, -1),
                     (0, 1, 0, 0, 0, 25.0, 4.0, 0.0, 0, 0, -1),
-                    (1, 1, 0, 3, 3, 25.0, 4.25, 0.0, 1, 0, 2),
+                    (1, 1, 0, 2, 2, 25.0, 4.7250000000000005, 0.0, 1, 0, 2),
                     (0, 2, 0, 0, 0, 25.0, 4.0, 0.0, 0, 0, -1),
                     (0, 3, 0, 0, 0, 25.0, 4.0, 0.0, 0, 0, -1),
                     (1, 3, 0, 4, 4, 25.0, 2.25, 0.0, 1, 0, 2),
@@ -3820,13 +3875,12 @@ class TestFromSignals:
                 [
                     (0, 0, 0, 0, 0, 25.0, 4.0, 0.0, 1, 0, -1),
                     (0, 1, 0, 0, 0, 25.0, 4.0, 0.0, 1, 0, -1),
-                    (1, 1, 0, 1, 1, 25.0, 3.25, 0.0, 0, 0, 2),
+                    (1, 1, 0, 1, 1, 25.0, 2.75, 0.0, 0, 0, 2),
                     (0, 2, 0, 0, 0, 25.0, 4.0, 0.0, 1, 0, -1),
-                    (1, 2, 0, 4, 4, 25.0, 2.25, 0.0, 0, 0, 2),
+                    (1, 2, 0, 4, 4, 25.0, 1.6500000000000001, 0.0, 0, 0, 2),
                     (0, 3, 0, 0, 0, 25.0, 4.0, 0.0, 1, 0, -1),
                     (1, 3, 0, 2, 2, 25.0, 5.25, 0.0, 0, 0, 2),
                     (0, 4, 0, 0, 0, 25.0, 4.0, 0.0, 1, 0, -1),
-                    (1, 4, 0, 4, 4, 25.0, 2.25, 0.0, 0, 0, 2),
                     (0, 5, 0, 0, 0, 25.0, 4.0, 0.0, 1, 0, -1),
                 ],
                 dtype=fs_order_dt,
@@ -3851,8 +3905,8 @@ class TestFromSignals:
                 open=open,
                 high=high,
                 low=low,
-                tsl_th=[[np.nan, 5.5 * 0.1, 5.5 * 0.5, 5.5 * 0.1, 5.5 * 0.5, np.inf]],
-                tsl_stop=[[np.nan, 5.5 * 0.1, 5.5 * 0.1, 5.5 * 0.5, 5.5 * 0.5, np.inf]],
+                tsl_th=[[np.nan, 4 * 0.1, 4 * 0.5, 4 * 0.1, 4 * 0.5, np.inf]],
+                tsl_stop=[[np.nan, 5.25 * 0.1, 5.5 * 0.1, 5.5 * 0.5, 5.5 * 0.5, np.inf]],
                 delta_format="absolute",
             ).order_records,
         )
@@ -3952,9 +4006,9 @@ class TestFromSignals:
                 [
                     (0, 0, 0, 0, 0, 33.333333333333336, 3.0, 0.0, 0, 0, -1),
                     (0, 1, 0, 0, 0, 33.333333333333336, 3.0, 0.0, 0, 0, -1),
-                    (1, 1, 0, 1, 1, 33.333333333333336, 3.75, 0.0, 1, 0, 2),
+                    (1, 1, 0, 1, 1, 33.333333333333336, 4.05, 0.0, 1, 0, 2),
                     (0, 2, 0, 0, 0, 33.333333333333336, 3.0, 0.0, 0, 0, -1),
-                    (1, 2, 0, 1, 1, 33.333333333333336, 3.75, 0.0, 1, 0, 2),
+                    (1, 2, 0, 1, 1, 33.333333333333336, 4.05, 0.0, 1, 0, 2),
                     (0, 3, 0, 0, 0, 33.333333333333336, 3.0, 0.0, 0, 0, -1),
                     (1, 3, 0, 2, 2, 33.333333333333336, 1.75, 0.0, 1, 0, 2),
                     (0, 4, 0, 0, 0, 33.333333333333336, 3.0, 0.0, 0, 0, -1),
@@ -3979,9 +4033,9 @@ class TestFromSignals:
                 [
                     (0, 0, 0, 0, 0, 33.333333333333336, 3.0, 0.0, 1, 0, -1),
                     (0, 1, 0, 0, 0, 33.333333333333336, 3.0, 0.0, 1, 0, -1),
-                    (1, 1, 0, 2, 2, 33.333333333333336, 1.75, 0.0, 0, 0, 2),
+                    (1, 1, 0, 2, 2, 33.333333333333336, 1.9250000000000003, 0.0, 0, 0, 2),
                     (0, 2, 0, 0, 0, 33.333333333333336, 3.0, 0.0, 1, 0, -1),
-                    (1, 2, 0, 2, 2, 33.333333333333336, 1.75, 0.0, 0, 0, 2),
+                    (1, 2, 0, 2, 2, 33.333333333333336, 1.6500000000000001, 0.0, 0, 0, 2),
                     (0, 3, 0, 0, 0, 33.333333333333336, 3.0, 0.0, 1, 0, -1),
                     (1, 3, 0, 3, 3, 33.333333333333336, 2.75, 0.0, 0, 0, 2),
                     (0, 4, 0, 0, 0, 33.333333333333336, 3.0, 0.0, 1, 0, -1),
@@ -4544,7 +4598,7 @@ class TestFromSignals:
             np.array(
                 [
                     (0, 0, 0, 0, 0, 16.52892561983471, 6.050000000000001, 0.0, 0, 0, -1),
-                    (1, 0, 0, 1, 3, 16.52892561983471, 4.25, 0.0, 1, 1, 0),
+                    (1, 0, 0, 1, 1, 16.52892561983471, 4.25, 0.0, 1, 1, 0),
                     (0, 1, 0, 0, 0, 16.52892561983471, 6.050000000000001, 0.0, 0, 0, -1),
                     (1, 1, 0, 2, 2, 16.52892561983471, 2.5, 0.0, 1, 1, 0),
                     (0, 2, 0, 0, 0, 16.52892561983471, 6.050000000000001, 0.0, 0, 0, -1),
@@ -4578,7 +4632,7 @@ class TestFromSignals:
             ),
         )
 
-    def test_upon_stop_exit(self):
+    def test_stop_exit_type(self):
         entries = pd.Series([True, False, False, False, False], index=price.index)
         exits = pd.Series([False, False, False, False, False], index=price.index)
         close = pd.Series([5.0, 4.0, 3.0, 2.0, 1.0], index=price.index)
@@ -4589,7 +4643,7 @@ class TestFromSignals:
                 exits=exits,
                 size=1,
                 sl_stop=0.1,
-                upon_stop_exit=[["close", "closereduce", "reverse", "reversereduce"]],
+                stop_exit_type=[["close", "closereduce", "reverse", "reversereduce"]],
                 accumulate=True,
             ).order_records,
             np.array(
@@ -4613,7 +4667,7 @@ class TestFromSignals:
                 exits=exits,
                 size=1,
                 sl_stop=0.1,
-                upon_stop_exit=[["close", "closereduce", "reverse", "reversereduce"]],
+                stop_exit_type=[["close", "closereduce", "reverse", "reversereduce"]],
             ).order_records,
             np.array(
                 [
@@ -4981,7 +5035,7 @@ class TestFromSignals:
                     (0, 1, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
                     (1, 1, 0, 3, 3, 20.0, 2.0, 0.0, 1, 0, 0),
                     (0, 2, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
-                    (0, 3, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1)
+                    (0, 3, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
                 ],
                 dtype=fs_order_dt,
             ),
@@ -5004,7 +5058,7 @@ class TestFromSignals:
                     (0, 1, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
                     (1, 1, 0, 4, 4, 20.0, 1.1, 0.0, 1, 0, 0),
                     (0, 2, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
-                    (0, 3, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1)
+                    (0, 3, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
                 ],
                 dtype=fs_order_dt,
             ),
@@ -5224,7 +5278,7 @@ class TestFromSignals:
 
         @njit
         def adjust_sl_func_nb(c, dur):
-            if c.i - c.last_sl_info["init_i"][c.col] >= dur:
+            if c.i - c.last_sl_info["init_idx"][c.col] >= dur:
                 c.last_sl_info["stop"][c.col] = 0.0
 
         assert_records_close(
@@ -5248,7 +5302,7 @@ class TestFromSignals:
 
         @njit
         def adjust_tp_func_nb(c, dur):
-            if c.i - c.last_tp_info["init_i"][c.col] >= dur:
+            if c.i - c.last_tp_info["init_idx"][c.col] >= dur:
                 c.last_tp_info["stop"][c.col] = 0.0
 
         assert_records_close(

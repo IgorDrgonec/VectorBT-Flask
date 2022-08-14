@@ -2,10 +2,10 @@
 
 """Numba-compiled functions for portfolio modeling based on signals."""
 
-import numpy as np
 from numba import prange
 
 from vectorbtpro.base import chunking as base_ch
+from vectorbtpro.generic.enums import BarZone
 from vectorbtpro.portfolio import chunking as portfolio_ch
 from vectorbtpro.portfolio.nb.core import *
 from vectorbtpro.portfolio.nb.from_order_func import no_post_func_nb
@@ -15,6 +15,7 @@ from vectorbtpro.returns import nb as returns_nb_
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.array_ import insert_argsort_nb
 from vectorbtpro.utils.math_ import is_less_nb
+from vectorbtpro.utils.template import RepFunc
 
 
 @register_jitted(cache=True)
@@ -47,8 +48,8 @@ def resolve_pending_conflict_nb(
 @register_jitted(cache=True)
 def generate_stop_signal_nb(
     position_now: float,
-    upon_stop_exit: int,
-    accumulate: int,
+    stop_exit_type: int,
+    accumulate: int = False,
 ) -> tp.Tuple[bool, bool, bool, bool, int]:
     """Generate stop signal and change accumulation if needed."""
     is_long_entry = False
@@ -56,23 +57,23 @@ def generate_stop_signal_nb(
     is_short_entry = False
     is_short_exit = False
     if position_now > 0:
-        if upon_stop_exit == StopExitMode.Close:
+        if stop_exit_type == StopExitType.Close:
             is_long_exit = True
             accumulate = AccumulationMode.Disabled
-        elif upon_stop_exit == StopExitMode.CloseReduce:
+        elif stop_exit_type == StopExitType.CloseReduce:
             is_long_exit = True
-        elif upon_stop_exit == StopExitMode.Reverse:
+        elif stop_exit_type == StopExitType.Reverse:
             is_short_entry = True
             accumulate = AccumulationMode.Disabled
         else:
             is_short_entry = True
     elif position_now < 0:
-        if upon_stop_exit == StopExitMode.Close:
+        if stop_exit_type == StopExitType.Close:
             is_short_exit = True
             accumulate = AccumulationMode.Disabled
-        elif upon_stop_exit == StopExitMode.CloseReduce:
+        elif stop_exit_type == StopExitType.CloseReduce:
             is_short_exit = True
-        elif upon_stop_exit == StopExitMode.Reverse:
+        elif stop_exit_type == StopExitType.Reverse:
             is_long_entry = True
             accumulate = AccumulationMode.Disabled
         else:
@@ -84,12 +85,14 @@ def generate_stop_signal_nb(
 def resolve_stop_exit_price_nb(
     stop_price: float,
     close: float,
-    stop_exit_price: int,
+    stop_exit_price: float,
 ) -> float:
     """Resolve the exit price of a stop order."""
-    if stop_exit_price == StopExitPrice.Close:
-        return close
-    return stop_price
+    if stop_exit_price == StopExitPrice.Stop:
+        return float(stop_price)
+    elif stop_exit_price == StopExitPrice.Close:
+        return float(close)
+    return float(stop_exit_price)
 
 
 @register_jitted(cache=True)
@@ -231,14 +234,12 @@ def signal_to_size_nb(
 ) -> tp.Tuple[float, int, int]:
     """Translate direction-aware signals into size, size type, and direction."""
     if (
-        size_type != SizeType.Amount
-        and size_type != SizeType.Value
-        and size_type != SizeType.Percent
-        and size_type != SizeType.Percent100
-        and size_type != SizeType.ValuePercent
-        and size_type != SizeType.ValuePercent100
+        size_type == SizeType.TargetAmount
+        or size_type == SizeType.TargetValue
+        or size_type == SizeType.TargetPercent
+        or size_type == SizeType.TargetPercent100
     ):
-        raise ValueError("Only Amount, Value, Percent(100), and ValuePercent(100) are supported as size type")
+        raise ValueError("Target size types are not supported")
     if is_less_nb(size, 0):
         raise ValueError("Negative size is not allowed. Please express direction using signals.")
     if size_type == SizeType.Percent100:
@@ -265,7 +266,7 @@ def signal_to_size_nb(
                 order_size = -abs_position_now
                 if not np.isnan(size):
                     if size_type == SizeType.Percent:
-                        raise ValueError("SizeType.Percent does not support position reversal using signals")
+                        raise ValueError("SizeType.Percent does not support position reversal")
                     if size_type == SizeType.Value:
                         order_size -= size / val_price_now
                     else:
@@ -296,7 +297,7 @@ def signal_to_size_nb(
                 order_size = abs_position_now
                 if not np.isnan(size):
                     if size_type == SizeType.Percent:
-                        raise ValueError("SizeType.Percent does not support position reversal using signals")
+                        raise ValueError("SizeType.Percent does not support position reversal")
                     if size_type == SizeType.Value:
                         order_size += size / val_price_now
                     else:
@@ -330,10 +331,10 @@ def signal_to_size_nb(
 
 
 @register_jitted(cache=True)
-def should_update_stop_nb(stop: float, upon_stop_update: int) -> bool:
+def should_update_stop_nb(new_stop: float, upon_stop_update: int) -> bool:
     """Whether to update stop."""
     if upon_stop_update == StopUpdateMode.Override or upon_stop_update == StopUpdateMode.OverrideNaN:
-        if not np.isnan(stop) or upon_stop_update == StopUpdateMode.OverrideNaN:
+        if not np.isnan(new_stop) or upon_stop_update == StopUpdateMode.OverrideNaN:
             return True
     return False
 
@@ -360,7 +361,7 @@ def resolve_hl_nb(open, high, low, close):
 
 @register_jitted(cache=True)
 def check_limit_expired_nb(
-    creation_i: int,
+    creation_idx: int,
     i: int,
     tif: int = -1,
     expiry: int = -1,
@@ -377,10 +378,10 @@ def check_limit_expired_nb(
         is_expired_on_open = False
         is_expired = False
         if tif != -1:
-            if creation_i + tif <= i:
+            if creation_idx + tif <= i:
                 is_expired_on_open = True
                 is_expired = True
-            elif i < creation_i + tif < i + 1:
+            elif i < creation_idx + tif < i + 1:
                 is_expired = True
         if expiry != -1:
             if expiry <= i:
@@ -398,10 +399,10 @@ def check_limit_expired_nb(
             is_expired_on_open = False
             is_expired = False
             if tif != -1:
-                if index[creation_i] + tif <= index[i]:
+                if index[creation_idx] + tif <= index[i]:
                     is_expired_on_open = True
                     is_expired = True
-                elif index[i] < index[creation_i] + tif < index[i] + freq:
+                elif index[i] < index[creation_idx] + tif < index[i] + freq:
                     is_expired = True
             if expiry != -1:
                 if expiry <= index[i]:
@@ -432,7 +433,7 @@ def check_limit_hit_nb(
 
     Returns the limit price, whether it has been hit before open, and whether it has been hit during this bar.
 
-    If `check_open` is True and hit before open, returns open."""
+    If `can_use_ohlc` and `check_open` is True and the stop is hit before open, returns open."""
     if size == 0:
         raise ValueError("Limit order size cannot be zero")
     _size = get_diraware_size_nb(size, direction)
@@ -503,19 +504,21 @@ def check_limit_hit_nb(
 
 @register_jitted(cache=True)
 def check_stop_hit_nb(
-    is_position_long: bool,
-    stop_price: float,
-    stop: float,
-    delta_format: int,
     open: float,
     high: float,
     low: float,
     close: float,
-    hit_below: bool,
+    is_position_long: bool,
+    stop_price: float,
+    stop: float,
+    delta_format: int = DeltaFormat.Percent,
+    hit_below: bool = True,
+    can_use_ohlc: bool = True,
+    check_open: bool = True,
 ) -> tp.Tuple[float, bool, bool]:
     """Resolve the stop price and check whether it has been hit.
 
-    If hit before open, returns open.
+    If `can_use_ohlc` and `check_open` is True and the stop is hit before open, returns open.
 
     Returns the stop price, whether it has been hit before open, and whether it has been hit during this bar."""
     high, low = resolve_hl_nb(
@@ -531,18 +534,18 @@ def check_stop_hit_nb(
             stop_price = stop_price - abs(stop)
         else:
             stop_price = stop_price * (1 - abs(stop))
-        if open <= stop_price:
+        if can_use_ohlc and check_open and open <= stop_price:
             return open, True, True
-        if low <= stop_price:
+        if close <= stop_price or (can_use_ohlc and low <= stop_price):
             return stop_price, False, True
         return stop_price, False, False
     if delta_format == DeltaFormat.Absolute:
         stop_price = stop_price + abs(stop)
     else:
         stop_price = stop_price * (1 + abs(stop))
-    if open >= stop_price:
+    if can_use_ohlc and check_open and open >= stop_price:
         return open, True, True
-    if high >= stop_price:
+    if close >= stop_price or (can_use_ohlc and high >= stop_price):
         return stop_price, False, True
     return stop_price, False, False
 
@@ -573,6 +576,48 @@ def check_tsl_th_hit_nb(
             if price / init_price - 1 <= -abs(threshold):
                 return True
     return False
+
+
+@register_jitted(cache=True)
+def resolve_dyn_limit_price_nb(val_price: float, price: float, limit_price: float) -> float:
+    """Resolve price dynamically.
+
+    Uses the valuation price as the left bound and order price as the right bound."""
+    if np.isinf(limit_price):
+        if limit_price < 0:
+            return float(val_price)
+        return float(price)
+    return float(limit_price)
+
+
+@register_jitted(cache=True)
+def resolve_dyn_stop_entry_price_nb(val_price: float, price: float, stop_entry_price: float) -> float:
+    """Resolve stop entry price dynamically.
+
+    Uses the valuation/open price as the left bound and order price as the right bound."""
+    if stop_entry_price < 0:
+        if stop_entry_price == StopEntryPrice.ValPrice:
+            return float(val_price)
+        if stop_entry_price == StopEntryPrice.Price:
+            return float(price)
+        raise ValueError("Only valuation and order price are supported when setting stop entry price dynamically")
+    if np.isinf(stop_entry_price):
+        if stop_entry_price < 0:
+            return float(val_price)
+        return float(price)
+    return float(stop_entry_price)
+
+
+@register_jitted(cache=True)
+def is_limit_active_nb(limit_info: tp.Record) -> bool:
+    """Return whether the limit information is active."""
+    return limit_info["init_idx"] != -1
+
+
+@register_jitted(cache=True)
+def is_stop_active_nb(stop_info: tp.Record) -> bool:
+    """Return whether the stop information is active."""
+    return not np.isnan(stop_info["stop"])
 
 
 @register_chunkable(
@@ -626,14 +671,14 @@ def check_tsl_th_hit_nb(
         upon_opp_limit_conflict=portfolio_ch.flex_array_gl_slicer,
         use_stops=None,
         sl_stop=portfolio_ch.flex_array_gl_slicer,
-        tsl_th=portfolio_ch.flex_array_gl_slicer,
         tsl_stop=portfolio_ch.flex_array_gl_slicer,
+        tsl_th=portfolio_ch.flex_array_gl_slicer,
         tp_stop=portfolio_ch.flex_array_gl_slicer,
         stop_entry_price=portfolio_ch.flex_array_gl_slicer,
         stop_exit_price=portfolio_ch.flex_array_gl_slicer,
+        stop_exit_type=portfolio_ch.flex_array_gl_slicer,
         stop_order_type=portfolio_ch.flex_array_gl_slicer,
         stop_limit_delta=portfolio_ch.flex_array_gl_slicer,
-        upon_stop_exit=portfolio_ch.flex_array_gl_slicer,
         upon_stop_update=portfolio_ch.flex_array_gl_slicer,
         upon_adj_stop_conflict=portfolio_ch.flex_array_gl_slicer,
         upon_opp_stop_conflict=portfolio_ch.flex_array_gl_slicer,
@@ -701,14 +746,14 @@ def simulate_from_signals_nb(
     upon_opp_limit_conflict: tp.FlexArray = np.asarray(PendingConflictMode.CancelExecute),
     use_stops: bool = True,
     sl_stop: tp.FlexArray = np.asarray(np.nan),
-    tsl_th: tp.FlexArray = np.asarray(np.nan),
     tsl_stop: tp.FlexArray = np.asarray(np.nan),
+    tsl_th: tp.FlexArray = np.asarray(np.nan),
     tp_stop: tp.FlexArray = np.asarray(np.nan),
     stop_entry_price: tp.FlexArray = np.asarray(StopEntryPrice.Close),
     stop_exit_price: tp.FlexArray = np.asarray(StopExitPrice.Stop),
+    stop_exit_type: tp.FlexArray = np.asarray(StopExitType.Close),
     stop_order_type: tp.FlexArray = np.asarray(OrderType.Market),
     stop_limit_delta: tp.FlexArray = np.asarray(np.nan),
-    upon_stop_exit: tp.FlexArray = np.asarray(StopExitMode.Close),
     upon_stop_update: tp.FlexArray = np.asarray(StopUpdateMode.Keep),
     upon_adj_stop_conflict: tp.FlexArray = np.asarray(PendingConflictMode.KeepExecute),
     upon_opp_stop_conflict: tp.FlexArray = np.asarray(PendingConflictMode.KeepExecute),
@@ -788,9 +833,9 @@ def simulate_from_signals_nb(
     in_outputs = FSInOutputs(returns=returns_out)
 
     last_limit_info = np.empty(target_shape[1], dtype=limit_info_dt)
-    last_limit_info["signal_i"][:] = -1
-    last_limit_info["creation_i"][:] = -1
-    last_limit_info["init_i"][:] = -1
+    last_limit_info["signal_idx"][:] = -1
+    last_limit_info["creation_idx"][:] = -1
+    last_limit_info["init_idx"][:] = -1
     last_limit_info["init_price"][:] = np.nan
     last_limit_info["init_size"][:] = np.nan
     last_limit_info["init_size_type"][:] = -1
@@ -805,26 +850,35 @@ def simulate_from_signals_nb(
 
     if use_stops:
         last_sl_info = np.empty(target_shape[1], dtype=sl_info_dt)
-        last_sl_info["init_i"][:] = -1
+        last_sl_info["init_idx"][:] = -1
         last_sl_info["init_price"][:] = np.nan
         last_sl_info["stop"][:] = np.nan
+        last_sl_info["exit_price"][:] = -1
+        last_sl_info["exit_type"][:] = -1
+        last_sl_info["order_type"][:] = -1
         last_sl_info["limit_delta"][:] = np.nan
         last_sl_info["delta_format"][:] = -1
 
         last_tsl_info = np.empty(target_shape[1], dtype=tsl_info_dt)
-        last_tsl_info["init_i"][:] = -1
+        last_tsl_info["init_idx"][:] = -1
         last_tsl_info["init_price"][:] = np.nan
-        last_tsl_info["peak_i"][:] = -1
+        last_tsl_info["peak_idx"][:] = -1
         last_tsl_info["peak_price"][:] = np.nan
-        last_tsl_info["th"][:] = np.nan
         last_tsl_info["stop"][:] = np.nan
+        last_tsl_info["th"][:] = np.nan
+        last_tsl_info["exit_price"][:] = -1
+        last_tsl_info["exit_type"][:] = -1
+        last_tsl_info["order_type"][:] = -1
         last_tsl_info["limit_delta"][:] = np.nan
         last_tsl_info["delta_format"][:] = -1
 
         last_tp_info = np.empty(target_shape[1], dtype=tp_info_dt)
-        last_tp_info["init_i"][:] = -1
+        last_tp_info["init_idx"][:] = -1
         last_tp_info["init_price"][:] = np.nan
         last_tp_info["stop"][:] = np.nan
+        last_tp_info["exit_price"][:] = -1
+        last_tp_info["exit_type"][:] = -1
+        last_tp_info["order_type"][:] = -1
         last_tp_info["limit_delta"][:] = np.nan
         last_tp_info["delta_format"][:] = -1
     else:
@@ -835,7 +889,7 @@ def simulate_from_signals_nb(
     main_info = np.empty(target_shape[1], dtype=main_info_dt)
 
     temp_call_seq = np.empty(target_shape[1], dtype=np.int_)
-    temp_order_value = np.empty(target_shape[1], dtype=np.float_)
+    temp_sort_by = np.empty(target_shape[1], dtype=np.float_)
 
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
@@ -864,26 +918,6 @@ def simulate_from_signals_nb(
                 if not np.isnan(_open) or not ffill_val_price:
                     last_val_price[col] = _open
 
-                # Resolve valuation price
-                _val_price = flex_select_auto_nb(val_price, i, col, flex_2d)
-                if np.isinf(_val_price):
-                    if _val_price > 0:
-                        _i = i - abs(flex_select_auto_nb(from_ago, i, col, flex_2d))
-                        if _i < 0:
-                            _price = np.nan
-                        else:
-                            _price = flex_select_auto_nb(price, _i, col, flex_2d)
-                        if np.isinf(_price):
-                            if _price > 0:
-                                _price = flex_select_auto_nb(close, i, col, flex_2d)
-                            else:
-                                _price = _open
-                        _val_price = _price
-                    else:
-                        _val_price = last_val_price[col]
-                if not np.isnan(_val_price) or not ffill_val_price:
-                    last_val_price[col] = _val_price
-
             # Update value and return
             group_value = last_cash[group]
             for col in range(from_col, to_col):
@@ -899,18 +933,6 @@ def simulate_from_signals_nb(
             for c in range(group_len):
                 col = from_col + c  # order doesn't matter
 
-                # Set defaults
-                main_info["signal_i"][col] = -1
-                main_info["creation_i"][col] = -1
-                main_info["i"][col] = i
-                main_info["price"][col] = np.nan
-                main_info["size"][col] = np.nan
-                main_info["size_type"][col] = -1
-                main_info["direction"][col] = -1
-                main_info["type"][col] = -1
-                main_info["stop_type"][col] = -1
-                temp_order_value[col] = 0.0
-
                 # Get signals
                 _i = i - abs(flex_select_auto_nb(from_ago, i, col, flex_2d))
                 if _i < 0:
@@ -924,8 +946,22 @@ def simulate_from_signals_nb(
                     is_short_entry = flex_select_auto_nb(short_entries, _i, col, flex_2d)
                     is_short_exit = flex_select_auto_nb(short_exits, _i, col, flex_2d)
 
+                # Set defaults
+                main_info["bar_zone"][col] = -1
+                main_info["signal_idx"][col] = -1
+                main_info["creation_idx"][col] = -1
+                main_info["idx"][col] = i
+                main_info["val_price"][col] = np.nan
+                main_info["price"][col] = np.nan
+                main_info["size"][col] = np.nan
+                main_info["size_type"][col] = -1
+                main_info["direction"][col] = -1
+                main_info["type"][col] = -1
+                main_info["stop_type"][col] = -1
+                temp_sort_by[col] = 0.0
+
                 # Shortcut
-                any_limit_signal = last_limit_info["init_i"][col] != -1
+                any_limit_signal = last_limit_info["init_idx"][col] != -1
                 any_stop_signal = use_stops and (
                     not np.isnan(last_sl_info["stop"][col])
                     or not np.isnan(last_tsl_info["stop"][col])
@@ -941,16 +977,19 @@ def simulate_from_signals_nb(
                 exec_limit_signal_i = -1
                 exec_limit_creation_i = -1
                 exec_limit_init_i = -1
+                exec_limit_val_price = np.nan
                 exec_limit_price = np.nan
                 exec_limit_size = np.nan
                 exec_limit_size_type = -1
                 exec_limit_direction = -1
                 exec_limit_stop_type = -1
+                exec_limit_bar_zone = -1
 
                 exec_stop_set = False
                 exec_stop_set_on_open = False
                 exec_stop_set_on_close = False
                 exec_stop_init_i = -1
+                exec_stop_val_price = np.nan
                 exec_stop_price = np.nan
                 exec_stop_size = np.nan
                 exec_stop_size_type = -1
@@ -960,10 +999,12 @@ def simulate_from_signals_nb(
                 exec_stop_delta = np.nan
                 exec_stop_delta_format = -1
                 exec_stop_make_limit = False
+                exec_stop_bar_zone = -1
 
                 user_on_open = False
                 user_on_close = False
                 exec_user_set = False
+                exec_user_val_price = np.nan
                 exec_user_price = np.nan
                 exec_user_size = np.nan
                 exec_user_size_type = -1
@@ -971,6 +1012,7 @@ def simulate_from_signals_nb(
                 exec_user_type = -1
                 exec_user_stop_type = -1
                 exec_user_make_limit = False
+                exec_user_bar_zone = -1
 
                 # Resolve the current bar
                 _open = flex_select_auto_nb(open, i, col, flex_2d)
@@ -987,9 +1029,9 @@ def simulate_from_signals_nb(
                 # Process the limit signal
                 if any_limit_signal:
                     # Check whether the limit price has been hit
-                    _signal_i = last_limit_info["signal_i"][col]
-                    _creation_i = last_limit_info["creation_i"][col]
-                    _init_i = last_limit_info["init_i"][col]
+                    _signal_i = last_limit_info["signal_idx"][col]
+                    _creation_i = last_limit_info["creation_idx"][col]
+                    _init_i = last_limit_info["init_idx"][col]
                     _price = last_limit_info["init_price"][col]
                     _size = last_limit_info["init_size"][col]
                     _size_type = last_limit_info["init_size_type"][col]
@@ -1003,7 +1045,7 @@ def simulate_from_signals_nb(
                     _reverse = last_limit_info["reverse"][col]
 
                     limit_expired_on_open, limit_expired = check_limit_expired_nb(
-                        creation_i=_creation_i,
+                        creation_idx=_creation_i,
                         i=i,
                         tif=_tif,
                         expiry=_expiry,
@@ -1029,9 +1071,9 @@ def simulate_from_signals_nb(
                         # Expired limit signal
                         any_limit_signal = False
 
-                        last_limit_info["signal_i"][col] = -1
-                        last_limit_info["creation_i"][col] = -1
-                        last_limit_info["init_i"][col] = -1
+                        last_limit_info["signal_idx"][col] = -1
+                        last_limit_info["creation_idx"][col] = -1
+                        last_limit_info["init_idx"][col] = -1
                         last_limit_info["init_price"][col] = np.nan
                         last_limit_info["init_size"][col] = np.nan
                         last_limit_info["init_size_type"][col] = -1
@@ -1051,6 +1093,12 @@ def simulate_from_signals_nb(
                             exec_limit_signal_i = _signal_i
                             exec_limit_creation_i = _creation_i
                             exec_limit_init_i = _init_i
+                            if np.isinf(limit_price) and limit_price > 0:
+                                exec_limit_val_price = _close
+                            elif np.isinf(limit_price) and limit_price < 0:
+                                exec_limit_val_price = _open
+                            else:
+                                exec_limit_val_price = limit_price
                             exec_limit_price = limit_price
                             exec_limit_size = _size
                             exec_limit_size_type = _size_type
@@ -1068,85 +1116,103 @@ def simulate_from_signals_nb(
                     if not np.isnan(last_sl_info["stop"][col]):
                         # Check against high and low
                         stop_price, stop_hit_on_open, stop_hit = check_stop_hit_nb(
-                            is_position_long=last_position[col] > 0,
-                            stop_price=last_sl_info["init_price"][col],
-                            stop=last_sl_info["stop"][col],
-                            delta_format=last_sl_info["delta_format"][col],
                             open=_open,
                             high=_high,
                             low=_low,
                             close=_close,
+                            is_position_long=last_position[col] > 0,
+                            stop_price=last_sl_info["init_price"][col],
+                            stop=last_sl_info["stop"][col],
+                            delta_format=last_sl_info["delta_format"][col],
                             hit_below=True,
                         )
                         if stop_hit:
                             _stop_type = StopType.SL
-                            _init_i = last_sl_info["init_i"][col]
+                            _init_i = last_sl_info["init_idx"][col]
+                            _stop_exit_price = last_sl_info["exit_price"][col]
+                            _stop_exit_type = last_sl_info["exit_type"][col]
+                            _stop_order_type = last_sl_info["order_type"][col]
                             _limit_delta = last_sl_info["limit_delta"][col]
                             _delta_format = last_sl_info["delta_format"][col]
 
                     # Check TSL and TTP
                     if not stop_hit and not np.isnan(last_tsl_info["stop"][col]):
-                        # Check against high and low
+                        # Update peak price using open
+                        if last_position[col] > 0:
+                            if _open > last_tsl_info["peak_price"][col]:
+                                last_tsl_info["peak_idx"][col] = i
+                                last_tsl_info["peak_price"][col] = _open
+                        elif last_position[col] < 0:
+                            if _open < last_tsl_info["peak_price"][col]:
+                                last_tsl_info["peak_idx"][col] = i
+                                last_tsl_info["peak_price"][col] = _open
+                        # Check threshold against previous bars and open
                         if np.isnan(last_tsl_info["th"][col]):
-                            delta_hit = True
+                            th_hit = True
                         else:
-                            delta_hit = check_tsl_th_hit_nb(
+                            th_hit = check_tsl_th_hit_nb(
                                 is_position_long=last_position[col] > 0,
                                 init_price=last_tsl_info["init_price"][col],
                                 price=last_tsl_info["peak_price"][col],
                                 threshold=last_tsl_info["th"][col],
                                 delta_format=last_tsl_info["delta_format"][col],
                             )
-                        if delta_hit:
+                        if th_hit:
                             stop_price, stop_hit_on_open, stop_hit = check_stop_hit_nb(
-                                is_position_long=last_position[col] > 0,
-                                stop_price=last_tsl_info["peak_price"][col],
-                                stop=last_tsl_info["stop"][col],
-                                delta_format=last_tsl_info["delta_format"][col],
                                 open=_open,
                                 high=_high,
                                 low=_low,
                                 close=_close,
+                                is_position_long=last_position[col] > 0,
+                                stop_price=last_tsl_info["peak_price"][col],
+                                stop=last_tsl_info["stop"][col],
+                                delta_format=last_tsl_info["delta_format"][col],
                                 hit_below=True,
                             )
+                        # Update peak price using full bar
                         if last_position[col] > 0:
                             if _high > last_tsl_info["peak_price"][col]:
-                                last_tsl_info["peak_i"][col] = i
+                                last_tsl_info["peak_idx"][col] = i
                                 last_tsl_info["peak_price"][col] = _high
                         elif last_position[col] < 0:
                             if _low < last_tsl_info["peak_price"][col]:
-                                last_tsl_info["peak_i"][col] = i
+                                last_tsl_info["peak_idx"][col] = i
                                 last_tsl_info["peak_price"][col] = _low
                         if not stop_hit:
-                            # After update, check one more time against close
-                            if np.isnan(last_tsl_info["th"][col]):
-                                delta_hit = True
-                            else:
-                                delta_hit = check_tsl_th_hit_nb(
-                                    is_position_long=last_position[col] > 0,
-                                    init_price=last_tsl_info["init_price"][col],
-                                    price=last_tsl_info["peak_price"][col],
-                                    threshold=last_tsl_info["th"][col],
-                                    delta_format=last_tsl_info["delta_format"][col],
-                                )
-                            if delta_hit:
+                            # Check threshold against full bar
+                            if not th_hit:
+                                if np.isnan(last_tsl_info["th"][col]):
+                                    th_hit = True
+                                else:
+                                    th_hit = check_tsl_th_hit_nb(
+                                        is_position_long=last_position[col] > 0,
+                                        init_price=last_tsl_info["init_price"][col],
+                                        price=last_tsl_info["peak_price"][col],
+                                        threshold=last_tsl_info["th"][col],
+                                        delta_format=last_tsl_info["delta_format"][col],
+                                    )
+                            if th_hit:
                                 stop_price, stop_hit_on_open, stop_hit = check_stop_hit_nb(
+                                    open=_open,
+                                    high=_high,
+                                    low=_low,
+                                    close=_close,
                                     is_position_long=last_position[col] > 0,
                                     stop_price=last_tsl_info["peak_price"][col],
                                     stop=last_tsl_info["stop"][col],
                                     delta_format=last_tsl_info["delta_format"][col],
-                                    open=_open,
-                                    high=_close,
-                                    low=_close,
-                                    close=_close,
                                     hit_below=True,
+                                    can_use_ohlc=False,
                                 )
                         if stop_hit:
                             if np.isnan(last_tsl_info["th"][col]):
                                 _stop_type = StopType.TSL
                             else:
                                 _stop_type = StopType.TTP
-                            _init_i = last_tsl_info["init_i"][col]
+                            _init_i = last_tsl_info["init_idx"][col]
+                            _stop_exit_price = last_tsl_info["exit_price"][col]
+                            _stop_exit_type = last_tsl_info["exit_type"][col]
+                            _stop_order_type = last_tsl_info["order_type"][col]
                             _limit_delta = last_tsl_info["limit_delta"][col]
                             _delta_format = last_tsl_info["delta_format"][col]
 
@@ -1154,19 +1220,22 @@ def simulate_from_signals_nb(
                     if not stop_hit and not np.isnan(last_tp_info["stop"][col]):
                         # Check against high and low
                         stop_price, stop_hit_on_open, stop_hit = check_stop_hit_nb(
-                            is_position_long=last_position[col] > 0,
-                            stop_price=last_tp_info["init_price"][col],
-                            stop=last_tp_info["stop"][col],
-                            delta_format=last_tp_info["delta_format"][col],
                             open=_open,
                             high=_high,
                             low=_low,
                             close=_close,
+                            is_position_long=last_position[col] > 0,
+                            stop_price=last_tp_info["init_price"][col],
+                            stop=last_tp_info["stop"][col],
+                            delta_format=last_tp_info["delta_format"][col],
                             hit_below=False,
                         )
                         if stop_hit:
                             _stop_type = StopType.TP
-                            _init_i = last_tp_info["init_i"][col]
+                            _init_i = last_tp_info["init_idx"][col]
+                            _stop_exit_price = last_tp_info["exit_price"][col]
+                            _stop_exit_type = last_tp_info["exit_type"][col]
+                            _stop_order_type = last_tp_info["order_type"][col]
                             _limit_delta = last_tp_info["limit_delta"][col]
                             _delta_format = last_tp_info["delta_format"][col]
 
@@ -1174,7 +1243,6 @@ def simulate_from_signals_nb(
                         # Stop price has been hit
                         # Resolve the final stop signal
                         _accumulate = flex_select_auto_nb(accumulate, i, col, flex_2d)
-                        _upon_stop_exit = flex_select_auto_nb(upon_stop_exit, i, col, flex_2d)
                         (
                             stop_is_long_entry,
                             stop_is_long_exit,
@@ -1183,12 +1251,11 @@ def simulate_from_signals_nb(
                             _accumulate,
                         ) = generate_stop_signal_nb(
                             position_now=last_position[col],
-                            upon_stop_exit=_upon_stop_exit,
+                            stop_exit_type=_stop_exit_type,
                             accumulate=_accumulate,
                         )
 
                         # Resolve the price
-                        _stop_exit_price = flex_select_auto_nb(stop_exit_price, i, col, flex_2d)
                         _price = resolve_stop_exit_price_nb(
                             stop_price=stop_price,
                             close=_close,
@@ -1198,7 +1265,7 @@ def simulate_from_signals_nb(
                         # Convert both signals to size (direction-aware), size type, and direction
                         _size, _size_type, _direction = signal_to_size_nb(
                             position_now=last_position[col],
-                            val_price_now=last_val_price[col],
+                            val_price_now=_price,
                             value_now=last_value[group],
                             is_long_entry=stop_is_long_entry,
                             is_long_exit=stop_is_long_exit,
@@ -1212,7 +1279,6 @@ def simulate_from_signals_nb(
                         if not np.isnan(_size):
                             # Executable stop signal
                             can_execute = True
-                            _stop_order_type = flex_select_auto_nb(stop_order_type, i, col, flex_2d)
                             if _stop_order_type == OrderType.Limit:
                                 # Use close to check whether the limit price has been hit
                                 limit_price, _, can_execute = check_limit_hit_nb(
@@ -1226,7 +1292,7 @@ def simulate_from_signals_nb(
                                     limit_delta=_limit_delta,
                                     delta_format=_delta_format,
                                     limit_reverse=False,
-                                    can_use_ohlc=False,
+                                    can_use_ohlc=stop_hit_on_open,
                                     check_open=False,
                                 )
                                 if can_execute:
@@ -1237,6 +1303,12 @@ def simulate_from_signals_nb(
                             exec_stop_set_on_open = stop_hit_on_open
                             exec_stop_set_on_close = _stop_exit_price == StopExitPrice.Close
                             exec_stop_init_i = _init_i
+                            if np.isinf(_price) and _price > 0:
+                                exec_stop_val_price = _close
+                            elif np.isinf(_price) and _price < 0:
+                                exec_stop_val_price = _open
+                            else:
+                                exec_stop_val_price = _price
                             exec_stop_price = _price
                             exec_stop_size = _size
                             exec_stop_size_type = _size_type
@@ -1306,9 +1378,19 @@ def simulate_from_signals_nb(
                         _price = flex_select_auto_nb(price, _i, col, flex_2d)
 
                         # Convert both signals to size (direction-aware), size type, and direction
+                        _val_price = flex_select_auto_nb(val_price, i, col, flex_2d)
+                        if np.isinf(_val_price) and _val_price > 0:
+                            if np.isinf(_price) and _price > 0:
+                                _val_price = _close
+                            elif np.isinf(_price) and _price < 0:
+                                _val_price = _open
+                            else:
+                                _val_price = _price
+                        elif np.isnan(_val_price) or (np.isinf(_val_price) and _val_price < 0):
+                            _val_price = last_val_price[col]
                         _size, _size_type, _direction = signal_to_size_nb(
                             position_now=last_position[col],
-                            val_price_now=last_val_price[col],
+                            val_price_now=_val_price,
                             value_now=last_value[group],
                             is_long_entry=is_long_entry,
                             is_long_exit=is_long_exit,
@@ -1362,6 +1444,7 @@ def simulate_from_signals_nb(
 
                         # Save info
                         exec_user_set = True
+                        exec_user_val_price = _val_price
                         exec_user_price = _price
                         exec_user_size = _size
                         exec_user_size_type = _size_type
@@ -1389,10 +1472,12 @@ def simulate_from_signals_nb(
                         keep_limit = False
                         keep_stop = False
                         execute_limit = True
+                        exec_limit_bar_zone = BarZone.Open
                     elif exec_stop_set_on_open:
                         keep_limit = False
                         keep_stop = False
                         execute_stop = True
+                        exec_stop_bar_zone = BarZone.Open
                     elif any_user_signal and user_on_open:
                         execute_user = True
                         if any_limit_signal and (execute_user or not exec_user_set):
@@ -1415,16 +1500,20 @@ def simulate_from_signals_nb(
                             )
                         if not exec_user_set:
                             execute_user = False
+                        if execute_user:
+                            exec_user_bar_zone = BarZone.Open
                     if not execute_limit and not execute_stop and not execute_user:
                         # Check whether the main signal comes in the middle of the bar
                         if exec_limit_set and not exec_limit_set_on_open and keep_limit:
                             keep_limit = False
                             keep_stop = False
                             execute_limit = True
+                            exec_limit_bar_zone = BarZone.Middle
                         elif exec_stop_set and not exec_stop_set_on_open and not exec_stop_set_on_close and keep_stop:
                             keep_limit = False
                             keep_stop = False
                             execute_stop = True
+                            exec_stop_bar_zone = BarZone.Middle
                         elif any_user_signal and not user_on_open and not user_on_close:
                             execute_user = True
                             if any_limit_signal and keep_limit and (execute_user or not exec_user_set):
@@ -1447,12 +1536,15 @@ def simulate_from_signals_nb(
                                 )
                             if not exec_user_set:
                                 execute_user = False
+                            if execute_user:
+                                exec_user_bar_zone = BarZone.Middle
                         if not execute_limit and not execute_stop and not execute_user:
                             # Check whether the main signal comes on close
                             if exec_stop_set_on_close and keep_stop:
                                 keep_limit = False
                                 keep_stop = False
                                 execute_stop = True
+                                exec_stop_bar_zone = BarZone.Close
                             elif any_user_signal and user_on_close:
                                 execute_user = True
                                 if any_limit_signal and keep_limit and (execute_user or not exec_user_set):
@@ -1475,13 +1567,17 @@ def simulate_from_signals_nb(
                                     )
                                 if not exec_user_set:
                                     execute_user = False
+                                if execute_user:
+                                    exec_user_bar_zone = BarZone.Close
 
                     # Process the limit signal
                     if execute_limit:
                         # Execute the signal
-                        main_info["signal_i"][col] = exec_limit_signal_i
-                        main_info["creation_i"][col] = exec_limit_creation_i
-                        main_info["i"][col] = exec_limit_init_i
+                        main_info["bar_zone"][col] = exec_limit_bar_zone
+                        main_info["signal_idx"][col] = exec_limit_signal_i
+                        main_info["creation_idx"][col] = exec_limit_creation_i
+                        main_info["idx"][col] = exec_limit_init_i
+                        main_info["val_price"][col] = exec_limit_val_price
                         main_info["price"][col] = exec_limit_price
                         main_info["size"][col] = exec_limit_size
                         main_info["size_type"][col] = exec_limit_size_type
@@ -1492,9 +1588,9 @@ def simulate_from_signals_nb(
                         # Clear the pending info
                         any_limit_signal = False
 
-                        last_limit_info["signal_i"][col] = -1
-                        last_limit_info["creation_i"][col] = -1
-                        last_limit_info["init_i"][col] = -1
+                        last_limit_info["signal_idx"][col] = -1
+                        last_limit_info["creation_idx"][col] = -1
+                        last_limit_info["init_idx"][col] = -1
                         last_limit_info["init_price"][col] = np.nan
                         last_limit_info["init_size"][col] = np.nan
                         last_limit_info["init_size_type"][col] = -1
@@ -1517,9 +1613,9 @@ def simulate_from_signals_nb(
                             _limit_tif = flex_select_auto_nb(limit_tif, i, col, flex_2d)
                             _limit_expiry = flex_select_auto_nb(limit_expiry, i, col, flex_2d)
                             _time_delta_format = flex_select_auto_nb(time_delta_format, i, col, flex_2d)
-                            last_limit_info["signal_i"][col] = exec_stop_init_i
-                            last_limit_info["creation_i"][col] = i
-                            last_limit_info["init_i"][col] = i
+                            last_limit_info["signal_idx"][col] = exec_stop_init_i
+                            last_limit_info["creation_idx"][col] = i
+                            last_limit_info["init_idx"][col] = i
                             last_limit_info["init_price"][col] = exec_stop_price
                             last_limit_info["init_size"][col] = exec_stop_size
                             last_limit_info["init_size_type"][col] = exec_stop_size_type
@@ -1532,9 +1628,11 @@ def simulate_from_signals_nb(
                             last_limit_info["time_delta_format"][col] = _time_delta_format
                             last_limit_info["reverse"][col] = False
                         else:
-                            main_info["signal_i"][col] = exec_stop_init_i
-                            main_info["creation_i"][col] = i
-                            main_info["i"][col] = i
+                            main_info["bar_zone"][col] = exec_stop_bar_zone
+                            main_info["signal_idx"][col] = exec_stop_init_i
+                            main_info["creation_idx"][col] = i
+                            main_info["idx"][col] = i
+                            main_info["val_price"][col] = exec_stop_val_price
                             main_info["price"][col] = exec_stop_price
                             main_info["size"][col] = exec_stop_size
                             main_info["size_type"][col] = exec_stop_size_type
@@ -1545,24 +1643,33 @@ def simulate_from_signals_nb(
                         # Clear the pending info
                         any_stop_signal = False
 
-                        last_sl_info["init_i"][col] = -1
+                        last_sl_info["init_idx"][col] = -1
                         last_sl_info["init_price"][col] = np.nan
                         last_sl_info["stop"][col] = np.nan
+                        last_sl_info["exit_price"][col] = -1
+                        last_sl_info["exit_type"][col] = -1
+                        last_sl_info["order_type"][col] = -1
                         last_sl_info["limit_delta"][col] = np.nan
                         last_sl_info["delta_format"][col] = -1
 
-                        last_tsl_info["init_i"][col] = -1
+                        last_tsl_info["init_idx"][col] = -1
                         last_tsl_info["init_price"][col] = np.nan
-                        last_tsl_info["peak_i"][col] = -1
+                        last_tsl_info["peak_idx"][col] = -1
                         last_tsl_info["peak_price"][col] = np.nan
-                        last_tsl_info["th"][col] = np.nan
                         last_tsl_info["stop"][col] = np.nan
+                        last_tsl_info["th"][col] = np.nan
+                        last_tsl_info["exit_price"][col] = -1
+                        last_tsl_info["exit_type"][col] = -1
+                        last_tsl_info["order_type"][col] = -1
                         last_tsl_info["limit_delta"][col] = np.nan
                         last_tsl_info["delta_format"][col] = -1
 
-                        last_tp_info["init_i"][col] = -1
+                        last_tp_info["init_idx"][col] = -1
                         last_tp_info["init_price"][col] = np.nan
                         last_tp_info["stop"][col] = np.nan
+                        last_tp_info["exit_price"][col] = -1
+                        last_tp_info["exit_type"][col] = -1
+                        last_tp_info["order_type"][col] = -1
                         last_tp_info["limit_delta"][col] = np.nan
                         last_tp_info["delta_format"][col] = -1
 
@@ -1580,9 +1687,9 @@ def simulate_from_signals_nb(
                                 _limit_expiry = flex_select_auto_nb(limit_expiry, _i, col, flex_2d)
                                 _time_delta_format = flex_select_auto_nb(time_delta_format, _i, col, flex_2d)
                                 _limit_reverse = flex_select_auto_nb(limit_reverse, _i, col, flex_2d)
-                                last_limit_info["signal_i"][col] = _i
-                                last_limit_info["creation_i"][col] = i
-                                last_limit_info["init_i"][col] = _i
+                                last_limit_info["signal_idx"][col] = _i
+                                last_limit_info["creation_idx"][col] = i
+                                last_limit_info["init_idx"][col] = _i
                                 last_limit_info["init_price"][col] = exec_user_price
                                 last_limit_info["init_size"][col] = exec_user_size
                                 last_limit_info["init_size_type"][col] = exec_user_size_type
@@ -1595,9 +1702,11 @@ def simulate_from_signals_nb(
                                 last_limit_info["time_delta_format"][col] = _time_delta_format
                                 last_limit_info["reverse"][col] = _limit_reverse
                             else:
-                                main_info["signal_i"][col] = _i
-                                main_info["creation_i"][col] = i
-                                main_info["i"][col] = _i
+                                main_info["bar_zone"][col] = exec_user_bar_zone
+                                main_info["signal_idx"][col] = _i
+                                main_info["creation_idx"][col] = i
+                                main_info["idx"][col] = _i
+                                main_info["val_price"][col] = exec_user_val_price
                                 main_info["price"][col] = exec_user_price
                                 main_info["size"][col] = exec_user_size
                                 main_info["size_type"][col] = exec_user_size_type
@@ -1605,29 +1714,31 @@ def simulate_from_signals_nb(
                                 main_info["type"][col] = exec_user_type
                                 main_info["stop_type"][col] = exec_user_stop_type
 
-                if cash_sharing and auto_call_seq and not np.isnan(main_info["size"][col]):
-                    # Approximate order value
-                    exec_state = ExecState(
-                        cash=last_cash[group],
-                        position=last_position[col],
-                        debt=last_debt[col],
-                        free_cash=last_free_cash[group],
-                        val_price=last_val_price[col],
-                        value=last_value[group],
-                    )
-                    temp_order_value[c] = approx_order_value_nb(
-                        exec_state=exec_state,
-                        size=main_info["size"][col],
-                        size_type=main_info["size_type"][col],
-                        direction=main_info["direction"][col],
-                    )
-
             any_signal_set = False
             for col in range(from_col, to_col):
                 if not np.isnan(main_info["size"][col]):
                     any_signal_set = True
                     break
             if any_signal_set:
+                # Check bar zone and update valuation price
+                bar_zone = -1
+                same_bar_zone = True
+                same_timing = True
+                for c in range(group_len):
+                    col = from_col + c
+                    if np.isnan(main_info["size"][col]):
+                        continue
+                    if bar_zone == -1:
+                        bar_zone = main_info["bar_zone"][col]
+                    if main_info["bar_zone"][col] != bar_zone:
+                        same_bar_zone = False
+                        same_timing = False
+                    if main_info["bar_zone"][col] == BarZone.Middle:
+                        same_timing = False
+                    _val_price = main_info["val_price"][col]
+                    if not np.isnan(_val_price) or not ffill_val_price:
+                        last_val_price[col] = _val_price
+
                 if cash_sharing:
                     # Dynamically sort by order value -> selling comes first to release funds early
                     if call_seq is None:
@@ -1637,10 +1748,42 @@ def simulate_from_signals_nb(
                     else:
                         call_seq_now = call_seq[i, from_col:to_col]
                     if auto_call_seq:
+                        # Sort by order value
+                        if not same_timing:
+                            raise ValueError("Cannot sort orders by value if they are executed at different times")
                         for c in range(group_len):
                             if call_seq_now[c] != c:
                                 raise ValueError("Call sequence must follow CallSeqType.Default")
-                        insert_argsort_nb(temp_order_value[:group_len], call_seq_now)
+                            col = from_col + c
+                            if np.isnan(main_info["size"][col]):
+                                continue
+                            # Approximate order value
+                            exec_state = ExecState(
+                                cash=last_cash[group] if cash_sharing else last_cash[col],
+                                position=last_position[col],
+                                debt=last_debt[col],
+                                free_cash=last_free_cash[group] if cash_sharing else last_free_cash[col],
+                                val_price=last_val_price[col],
+                                value=last_value[group] if cash_sharing else last_value[col],
+                            )
+                            temp_sort_by[c] = approx_order_value_nb(
+                                exec_state=exec_state,
+                                size=main_info["size"][col],
+                                size_type=main_info["size_type"][col],
+                                direction=main_info["direction"][col],
+                            )
+                        insert_argsort_nb(temp_sort_by[:group_len], call_seq_now)
+                    else:
+                        if not same_bar_zone:
+                            # Sort by bar zone
+                            for c in range(group_len):
+                                if call_seq_now[c] != c:
+                                    raise ValueError("Call sequence must follow CallSeqType.Default")
+                                col = from_col + c
+                                if np.isnan(main_info["size"][col]):
+                                    continue
+                                temp_sort_by[c] = main_info["bar_zone"][col]
+                            insert_argsort_nb(temp_sort_by[:group_len], call_seq_now)
 
                 for k in range(group_len):
                     if cash_sharing:
@@ -1663,7 +1806,7 @@ def simulate_from_signals_nb(
                     return_now = last_return[group]
 
                     # Generate the next order
-                    _i = main_info["i"][col]
+                    _i = main_info["idx"][col]
                     if main_info["type"][col] == OrderType.Limit:
                         _slippage = 0.0
                     else:
@@ -1719,8 +1862,8 @@ def simulate_from_signals_nb(
                     # Append more order information
                     if order_result.status == OrderStatus.Filled:
                         if order_counts[col] >= 1:
-                            order_records["signal_idx"][order_counts[col] - 1, col] = main_info["signal_i"][col]
-                            order_records["creation_idx"][order_counts[col] - 1, col] = main_info["creation_i"][col]
+                            order_records["signal_idx"][order_counts[col] - 1, col] = main_info["signal_idx"][col]
+                            order_records["creation_idx"][order_counts[col] - 1, col] = main_info["creation_idx"][col]
                             order_records["type"][order_counts[col] - 1, col] = main_info["type"][col]
                             order_records["stop_type"][order_counts[col] - 1, col] = main_info["stop_type"][col]
 
@@ -1736,24 +1879,33 @@ def simulate_from_signals_nb(
                         # Update stop price
                         if position_now == 0:
                             # Not in position anymore -> clear stops (irrespective of order success)
-                            last_sl_info["init_i"][col] = -1
+                            last_sl_info["init_idx"][col] = -1
                             last_sl_info["init_price"][col] = np.nan
                             last_sl_info["stop"][col] = np.nan
+                            last_sl_info["exit_price"][col] = -1
+                            last_sl_info["exit_type"][col] = -1
+                            last_sl_info["order_type"][col] = -1
                             last_sl_info["limit_delta"][col] = np.nan
                             last_sl_info["delta_format"][col] = -1
 
-                            last_tsl_info["init_i"][col] = -1
+                            last_tsl_info["init_idx"][col] = -1
                             last_tsl_info["init_price"][col] = np.nan
-                            last_tsl_info["peak_i"][col] = -1
+                            last_tsl_info["peak_idx"][col] = -1
                             last_tsl_info["peak_price"][col] = np.nan
-                            last_tsl_info["th"][col] = np.nan
                             last_tsl_info["stop"][col] = np.nan
+                            last_tsl_info["th"][col] = np.nan
+                            last_tsl_info["exit_price"][col] = -1
+                            last_tsl_info["exit_type"][col] = -1
+                            last_tsl_info["order_type"][col] = -1
                             last_tsl_info["limit_delta"][col] = np.nan
                             last_tsl_info["delta_format"][col] = -1
 
-                            last_tp_info["init_i"][col] = -1
+                            last_tp_info["init_idx"][col] = -1
                             last_tp_info["init_price"][col] = np.nan
                             last_tp_info["stop"][col] = np.nan
+                            last_tp_info["exit_price"][col] = -1
+                            last_tp_info["exit_type"][col] = -1
+                            last_tp_info["order_type"][col] = -1
                             last_tp_info["limit_delta"][col] = np.nan
                             last_tp_info["delta_format"][col] = -1
 
@@ -1790,61 +1942,82 @@ def simulate_from_signals_nb(
                             _tsl_th = abs(flex_select_auto_nb(tsl_th, i, col, flex_2d))
                             _tsl_stop = abs(flex_select_auto_nb(tsl_stop, i, col, flex_2d))
                             _tp_stop = abs(flex_select_auto_nb(tp_stop, i, col, flex_2d))
-                            _stop_limit_delta = abs(flex_select_auto_nb(stop_limit_delta, i, col, flex_2d))
-                            _delta_format = abs(flex_select_auto_nb(delta_format, i, col, flex_2d))
+                            _stop_exit_price = flex_select_auto_nb(stop_exit_price, i, col, flex_2d)
+                            _stop_exit_type = flex_select_auto_nb(stop_exit_type, i, col, flex_2d)
+                            _stop_order_type = flex_select_auto_nb(stop_order_type, i, col, flex_2d)
+                            _stop_limit_delta = flex_select_auto_nb(stop_limit_delta, i, col, flex_2d)
+                            _delta_format = flex_select_auto_nb(delta_format, i, col, flex_2d)
 
                             sl_updated = tsl_updated = tp_updated = False
                             if exec_state.position == 0 or np.sign(position_now) != np.sign(exec_state.position):
                                 # Position opened/reversed -> set stops
                                 sl_updated = True
-                                last_sl_info["init_i"][col] = i
+                                last_sl_info["init_idx"][col] = i
                                 last_sl_info["init_price"][col] = new_init_price
                                 last_sl_info["stop"][col] = _sl_stop
+                                last_sl_info["exit_price"][col] = _stop_exit_price
+                                last_sl_info["exit_type"][col] = _stop_exit_type
+                                last_sl_info["order_type"][col] = _stop_order_type
                                 last_sl_info["limit_delta"][col] = _stop_limit_delta
                                 last_sl_info["delta_format"][col] = _delta_format
 
                                 tsl_updated = True
-                                last_tsl_info["init_i"][col] = i
+                                last_tsl_info["init_idx"][col] = i
                                 last_tsl_info["init_price"][col] = new_init_price
-                                last_tsl_info["peak_i"][col] = i
+                                last_tsl_info["peak_idx"][col] = i
                                 last_tsl_info["peak_price"][col] = new_init_price
-                                last_tsl_info["th"][col] = _tsl_th
                                 last_tsl_info["stop"][col] = _tsl_stop
+                                last_tsl_info["th"][col] = _tsl_th
+                                last_tsl_info["exit_price"][col] = _stop_exit_price
+                                last_tsl_info["exit_type"][col] = _stop_exit_type
+                                last_tsl_info["order_type"][col] = _stop_order_type
                                 last_tsl_info["limit_delta"][col] = _stop_limit_delta
                                 last_tsl_info["delta_format"][col] = _delta_format
 
                                 tp_updated = True
-                                last_tp_info["init_i"][col] = i
+                                last_tp_info["init_idx"][col] = i
                                 last_tp_info["init_price"][col] = new_init_price
                                 last_tp_info["stop"][col] = _tp_stop
+                                last_tp_info["exit_price"][col] = _stop_exit_price
+                                last_tp_info["exit_type"][col] = _stop_exit_type
+                                last_tp_info["order_type"][col] = _stop_order_type
                                 last_tp_info["limit_delta"][col] = _stop_limit_delta
                                 last_tp_info["delta_format"][col] = _delta_format
 
                             elif abs(position_now) > abs(exec_state.position):
                                 # Position increased -> keep/override stops
                                 _upon_stop_update = flex_select_auto_nb(upon_stop_update, i, col, flex_2d)
-                                if should_update_stop_nb(stop=_sl_stop, upon_stop_update=_upon_stop_update):
+                                if should_update_stop_nb(new_stop=_sl_stop, upon_stop_update=_upon_stop_update):
                                     sl_updated = True
-                                    last_sl_info["init_i"][col] = i
+                                    last_sl_info["init_idx"][col] = i
                                     last_sl_info["init_price"][col] = new_init_price
                                     last_sl_info["stop"][col] = _sl_stop
+                                    last_sl_info["exit_price"][col] = _stop_exit_price
+                                    last_sl_info["exit_type"][col] = _stop_exit_type
+                                    last_sl_info["order_type"][col] = _stop_order_type
                                     last_sl_info["limit_delta"][col] = _stop_limit_delta
                                     last_sl_info["delta_format"][col] = _delta_format
-                                if should_update_stop_nb(stop=_tsl_stop, upon_stop_update=_upon_stop_update):
+                                if should_update_stop_nb(new_stop=_tsl_stop, upon_stop_update=_upon_stop_update):
                                     tsl_updated = True
-                                    last_tsl_info["init_i"][col] = i
+                                    last_tsl_info["init_idx"][col] = i
                                     last_tsl_info["init_price"][col] = new_init_price
-                                    last_tsl_info["peak_i"][col] = i
+                                    last_tsl_info["peak_idx"][col] = i
                                     last_tsl_info["peak_price"][col] = new_init_price
-                                    last_tsl_info["th"][col] = _tsl_th
                                     last_tsl_info["stop"][col] = _tsl_stop
+                                    last_tsl_info["th"][col] = _tsl_th
+                                    last_tsl_info["exit_price"][col] = _stop_exit_price
+                                    last_tsl_info["exit_type"][col] = _stop_exit_type
+                                    last_tsl_info["order_type"][col] = _stop_order_type
                                     last_tsl_info["limit_delta"][col] = _stop_limit_delta
                                     last_tsl_info["delta_format"][col] = _delta_format
-                                if should_update_stop_nb(stop=_tp_stop, upon_stop_update=_upon_stop_update):
+                                if should_update_stop_nb(new_stop=_tp_stop, upon_stop_update=_upon_stop_update):
                                     tp_updated = True
-                                    last_tp_info["init_i"][col] = i
+                                    last_tp_info["init_idx"][col] = i
                                     last_tp_info["init_price"][col] = new_init_price
                                     last_tp_info["stop"][col] = _tp_stop
+                                    last_tp_info["exit_price"][col] = _stop_exit_price
+                                    last_tp_info["exit_type"][col] = _stop_exit_type
+                                    last_tp_info["order_type"][col] = _stop_order_type
                                     last_tp_info["limit_delta"][col] = _stop_limit_delta
                                     last_tp_info["delta_format"][col] = _delta_format
 
@@ -1868,11 +2041,11 @@ def simulate_from_signals_nb(
                                     if tsl_updated:
                                         if position_now > 0:
                                             if _high > last_tsl_info["peak_price"][col]:
-                                                last_tsl_info["peak_i"][col] = i
+                                                last_tsl_info["peak_idx"][col] = i
                                                 last_tsl_info["peak_price"][col] = _high
                                         elif position_now < 0:
                                             if _low < last_tsl_info["peak_price"][col]:
-                                                last_tsl_info["peak_i"][col] = i
+                                                last_tsl_info["peak_idx"][col] = i
                                                 last_tsl_info["peak_price"][col] = _low
 
                     # Now becomes last
@@ -1927,6 +2100,185 @@ def simulate_from_signals_nb(
     )
 
 
+@register_jitted(cache=True)
+def set_limit_info_nb(
+    limit_info: tp.Record,
+    signal_idx: int,
+    creation_idx: tp.Optional[int] = None,
+    init_idx: tp.Optional[int] = None,
+    init_price: float = -np.inf,
+    init_size: float = np.inf,
+    init_size_type: int = SizeType.Amount,
+    init_direction: int = Direction.Both,
+    init_stop_type: int = -1,
+    delta: float = np.nan,
+    delta_format: int = DeltaFormat.Percent,
+    tif: int = -1,
+    expiry: int = -1,
+    time_delta_format: int = TimeDeltaFormat.Index,
+    reverse: bool = False,
+) -> None:
+    """Set limit order information.
+
+    See `vectorbtpro.generic.enums.limit_info_dt`."""
+    limit_info["signal_idx"] = signal_idx
+    limit_info["creation_idx"] = creation_idx if creation_idx is not None else signal_idx
+    limit_info["init_idx"] = init_idx if init_idx is not None else signal_idx
+    limit_info["init_price"] = init_price
+    limit_info["init_size"] = init_size
+    limit_info["init_size_type"] = init_size_type
+    limit_info["init_direction"] = init_direction
+    limit_info["init_stop_type"] = init_stop_type
+    limit_info["delta"] = delta
+    limit_info["delta_format"] = delta_format
+    limit_info["tif"] = tif
+    limit_info["expiry"] = expiry
+    limit_info["time_delta_format"] = time_delta_format
+    limit_info["reverse"] = reverse
+
+
+@register_jitted(cache=True)
+def clear_limit_info_nb(limit_info: tp.Record) -> None:
+    """Clear limit order information."""
+    limit_info["signal_idx"] = -1
+    limit_info["creation_idx"] = -1
+    limit_info["init_idx"] = -1
+    limit_info["init_price"] = np.nan
+    limit_info["init_size"] = np.nan
+    limit_info["init_size_type"] = -1
+    limit_info["init_direction"] = -1
+    limit_info["init_stop_type"] = -1
+    limit_info["delta"] = np.nan
+    limit_info["delta_format"] = -1
+    limit_info["tif"] = -1
+    limit_info["expiry"] = -1
+    limit_info["time_delta_format"] = -1
+    limit_info["reverse"] = False
+
+
+@register_jitted(cache=True)
+def set_sl_info_nb(
+    sl_info: tp.Record,
+    init_idx: int,
+    init_price: float = -np.inf,
+    stop: float = np.nan,
+    exit_price: float = StopExitPrice.Stop,
+    exit_type: int = StopExitType.Close,
+    order_type: int = OrderType.Market,
+    limit_delta: float = np.nan,
+    delta_format: int = DeltaFormat.Percent,
+) -> None:
+    """Set SL order information.
+
+    See `vectorbtpro.generic.enums.sl_info_dt`."""
+    sl_info["init_idx"] = init_idx
+    sl_info["init_price"] = init_price
+    sl_info["stop"] = stop
+    sl_info["exit_price"] = exit_price
+    sl_info["exit_type"] = exit_type
+    sl_info["order_type"] = order_type
+    sl_info["limit_delta"] = limit_delta
+    sl_info["delta_format"] = delta_format
+
+
+@register_jitted(cache=True)
+def clear_sl_info_nb(sl_info: tp.Record) -> None:
+    """Clear SL order information."""
+    sl_info["init_idx"] = -1
+    sl_info["init_price"] = np.nan
+    sl_info["stop"] = np.nan
+    sl_info["exit_price"] = -1
+    sl_info["exit_type"] = -1
+    sl_info["order_type"] = -1
+    sl_info["limit_delta"] = np.nan
+    sl_info["delta_format"] = -1
+
+
+@register_jitted(cache=True)
+def set_tsl_info_nb(
+    tsl_info: tp.Record,
+    init_idx: int,
+    init_price: float = -np.inf,
+    peak_idx: tp.Optional[int] = None,
+    peak_price: tp.Optional[float] = None,
+    stop: float = np.nan,
+    th: float = np.nan,
+    exit_price: float = StopExitPrice.Stop,
+    exit_type: int = StopExitType.Close,
+    order_type: int = OrderType.Market,
+    limit_delta: float = np.nan,
+    delta_format: int = DeltaFormat.Percent,
+) -> None:
+    """Set TSL order information.
+
+    See `vectorbtpro.generic.enums.tsl_info_dt`."""
+    tsl_info["init_idx"] = init_idx
+    tsl_info["init_price"] = init_price
+    tsl_info["peak_idx"] = peak_idx if peak_idx is not None else init_idx
+    tsl_info["peak_price"] = peak_price if peak_price is not None else init_price
+    tsl_info["stop"] = stop
+    tsl_info["th"] = th
+    tsl_info["exit_price"] = exit_price
+    tsl_info["exit_type"] = exit_type
+    tsl_info["order_type"] = order_type
+    tsl_info["limit_delta"] = limit_delta
+    tsl_info["delta_format"] = delta_format
+
+
+@register_jitted(cache=True)
+def clear_tsl_info_nb(tsl_info: tp.Record) -> None:
+    """Clear TSL order information."""
+    tsl_info["init_idx"] = -1
+    tsl_info["init_price"] = np.nan
+    tsl_info["peak_idx"] = -1
+    tsl_info["peak_price"] = np.nan
+    tsl_info["stop"] = np.nan
+    tsl_info["th"] = np.nan
+    tsl_info["exit_price"] = -1
+    tsl_info["exit_type"] = -1
+    tsl_info["order_type"] = -1
+    tsl_info["limit_delta"] = np.nan
+    tsl_info["delta_format"] = -1
+
+
+@register_jitted(cache=True)
+def set_tp_info_nb(
+    tp_info: tp.Record,
+    init_idx: int,
+    init_price: float = -np.inf,
+    stop: float = np.nan,
+    exit_price: float = StopExitPrice.Stop,
+    exit_type: int = StopExitType.Close,
+    order_type: int = OrderType.Market,
+    limit_delta: float = np.nan,
+    delta_format: int = DeltaFormat.Percent,
+) -> None:
+    """Set TP order information.
+
+    See `vectorbtpro.generic.enums.tp_info_dt`."""
+    tp_info["init_idx"] = init_idx
+    tp_info["init_price"] = init_price
+    tp_info["stop"] = stop
+    tp_info["exit_price"] = exit_price
+    tp_info["exit_type"] = exit_type
+    tp_info["order_type"] = order_type
+    tp_info["limit_delta"] = limit_delta
+    tp_info["delta_format"] = delta_format
+
+
+@register_jitted(cache=True)
+def clear_tp_info_nb(tp_info: tp.Record) -> None:
+    """Clear TP order information."""
+    tp_info["init_idx"] = -1
+    tp_info["init_price"] = np.nan
+    tp_info["stop"] = np.nan
+    tp_info["exit_price"] = -1
+    tp_info["exit_type"] = -1
+    tp_info["order_type"] = -1
+    tp_info["limit_delta"] = np.nan
+    tp_info["delta_format"] = -1
+
+
 @register_jitted
 def no_signal_func_nb(c: SignalContext, *args) -> tp.Tuple[bool, bool, bool, bool]:
     """Placeholder signal function that returns no signal."""
@@ -1942,16 +2294,17 @@ PostSegmentFuncT = tp.Callable[[SignalSegmentContext, tp.VarArg()], None]
     arg_take_spec=dict(
         target_shape=ch.ShapeSlicer(axis=1, mapper=base_ch.group_lens_mapper),
         group_lens=ch.ArraySlicer(axis=0),
+        cash_sharing=None,
         index=None,
         freq=None,
         open=portfolio_ch.flex_array_gl_slicer,
         high=portfolio_ch.flex_array_gl_slicer,
         low=portfolio_ch.flex_array_gl_slicer,
         close=portfolio_ch.flex_array_gl_slicer,
-        init_cash=base_ch.FlexArraySlicer(axis=1, flex_2d=True),
+        init_cash=RepFunc(portfolio_ch.get_init_cash_slicer),
         init_position=portfolio_ch.flex_1d_array_gl_slicer,
         init_price=portfolio_ch.flex_1d_array_gl_slicer,
-        cash_deposits=base_ch.FlexArraySlicer(axis=1),
+        cash_deposits=RepFunc(portfolio_ch.get_cash_deposits_slicer),
         cash_earnings=base_ch.FlexArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
         cash_dividends=base_ch.FlexArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
         signal_func_nb=None,
@@ -1988,14 +2341,14 @@ PostSegmentFuncT = tp.Callable[[SignalSegmentContext, tp.VarArg()], None]
         upon_opp_limit_conflict=portfolio_ch.flex_array_gl_slicer,
         use_stops=None,
         sl_stop=portfolio_ch.flex_array_gl_slicer,
-        tsl_th=portfolio_ch.flex_array_gl_slicer,
         tsl_stop=portfolio_ch.flex_array_gl_slicer,
+        tsl_th=portfolio_ch.flex_array_gl_slicer,
         tp_stop=portfolio_ch.flex_array_gl_slicer,
         stop_entry_price=portfolio_ch.flex_array_gl_slicer,
         stop_exit_price=portfolio_ch.flex_array_gl_slicer,
+        stop_exit_type=portfolio_ch.flex_array_gl_slicer,
         stop_order_type=portfolio_ch.flex_array_gl_slicer,
         stop_limit_delta=portfolio_ch.flex_array_gl_slicer,
-        upon_stop_exit=portfolio_ch.flex_array_gl_slicer,
         upon_stop_update=portfolio_ch.flex_array_gl_slicer,
         upon_adj_stop_conflict=portfolio_ch.flex_array_gl_slicer,
         upon_opp_stop_conflict=portfolio_ch.flex_array_gl_slicer,
@@ -2006,10 +2359,10 @@ PostSegmentFuncT = tp.Callable[[SignalSegmentContext, tp.VarArg()], None]
         auto_call_seq=None,
         ffill_val_price=None,
         update_value=None,
-        fill_returns=None,
         max_orders=None,
         max_logs=None,
         flex_2d=None,
+        in_outputs=ch.ArgsTaker(),
     ),
     **portfolio_ch.merge_sim_outs_config,
 )
@@ -2017,6 +2370,7 @@ PostSegmentFuncT = tp.Callable[[SignalSegmentContext, tp.VarArg()], None]
 def simulate_from_signal_func_nb(
     target_shape: tp.Shape,
     group_lens: tp.Array1d,
+    cash_sharing: bool,
     index: tp.Optional[tp.Array1d] = None,
     freq: tp.Optional[int] = None,
     open: tp.FlexArray = np.asarray(np.nan),
@@ -2063,14 +2417,14 @@ def simulate_from_signal_func_nb(
     upon_opp_limit_conflict: tp.FlexArray = np.asarray(PendingConflictMode.CancelExecute),
     use_stops: bool = True,
     sl_stop: tp.FlexArray = np.asarray(np.nan),
-    tsl_th: tp.FlexArray = np.asarray(np.nan),
     tsl_stop: tp.FlexArray = np.asarray(np.nan),
+    tsl_th: tp.FlexArray = np.asarray(np.nan),
     tp_stop: tp.FlexArray = np.asarray(np.nan),
     stop_entry_price: tp.FlexArray = np.asarray(StopEntryPrice.Close),
     stop_exit_price: tp.FlexArray = np.asarray(StopExitPrice.Stop),
+    stop_exit_type: tp.FlexArray = np.asarray(StopExitType.Close),
     stop_order_type: tp.FlexArray = np.asarray(OrderType.Market),
     stop_limit_delta: tp.FlexArray = np.asarray(np.nan),
-    upon_stop_exit: tp.FlexArray = np.asarray(StopExitMode.Close),
     upon_stop_update: tp.FlexArray = np.asarray(StopUpdateMode.Keep),
     upon_adj_stop_conflict: tp.FlexArray = np.asarray(PendingConflictMode.KeepExecute),
     upon_opp_stop_conflict: tp.FlexArray = np.asarray(PendingConflictMode.KeepExecute),
@@ -2081,10 +2435,10 @@ def simulate_from_signal_func_nb(
     auto_call_seq: bool = False,
     ffill_val_price: bool = True,
     update_value: bool = False,
-    fill_returns: bool = False,
     max_orders: tp.Optional[int] = None,
     max_logs: tp.Optional[int] = 0,
     flex_2d: bool = False,
+    in_outputs: tp.Optional[tp.NamedTuple] = None,
 ) -> SimulationOutput:
     """Simulate given a signal function.
 
@@ -2104,7 +2458,6 @@ def simulate_from_signal_func_nb(
         Single value must be passed as a 0-dim array (for example, by using `np.asarray(value)`).
     """
     check_group_lens_nb(group_lens, target_shape[1])
-    cash_sharing = is_grouped_nb(group_lens)
 
     if max_orders is None:
         order_records = np.empty((target_shape[0], target_shape[1]), dtype=fs_order_dt)
@@ -2151,16 +2504,16 @@ def simulate_from_signal_func_nb(
         cash_earnings_out = np.full(target_shape, 0.0, dtype=np.float_)
     else:
         cash_earnings_out = np.full((1, 1), 0.0, dtype=np.float_)
-    if fill_returns:
-        returns_out = np.empty((target_shape[0], len(group_lens)), dtype=np.float_)
-    else:
-        returns_out = np.empty((0, 0), dtype=np.float_)
-    in_outputs = FSInOutputs(returns=returns_out)
+
+    long_entries = np.full(target_shape[1], False, dtype=np.bool_)
+    long_exits = np.full(target_shape[1], False, dtype=np.bool_)
+    short_entries = np.full(target_shape[1], False, dtype=np.bool_)
+    short_exits = np.full(target_shape[1], False, dtype=np.bool_)
 
     last_limit_info = np.empty(target_shape[1], dtype=limit_info_dt)
-    last_limit_info["signal_i"][:] = -1
-    last_limit_info["creation_i"][:] = -1
-    last_limit_info["init_i"][:] = -1
+    last_limit_info["signal_idx"][:] = -1
+    last_limit_info["creation_idx"][:] = -1
+    last_limit_info["init_idx"][:] = -1
     last_limit_info["init_price"][:] = np.nan
     last_limit_info["init_size"][:] = np.nan
     last_limit_info["init_size_type"][:] = -1
@@ -2175,26 +2528,35 @@ def simulate_from_signal_func_nb(
 
     if use_stops:
         last_sl_info = np.empty(target_shape[1], dtype=sl_info_dt)
-        last_sl_info["init_i"][:] = -1
+        last_sl_info["init_idx"][:] = -1
         last_sl_info["init_price"][:] = np.nan
         last_sl_info["stop"][:] = np.nan
+        last_sl_info["exit_price"][:] = -1
+        last_sl_info["exit_type"][:] = -1
+        last_sl_info["order_type"][:] = -1
         last_sl_info["limit_delta"][:] = np.nan
         last_sl_info["delta_format"][:] = -1
 
         last_tsl_info = np.empty(target_shape[1], dtype=tsl_info_dt)
-        last_tsl_info["init_i"][:] = -1
+        last_tsl_info["init_idx"][:] = -1
         last_tsl_info["init_price"][:] = np.nan
-        last_tsl_info["peak_i"][:] = -1
+        last_tsl_info["peak_idx"][:] = -1
         last_tsl_info["peak_price"][:] = np.nan
-        last_tsl_info["th"][:] = np.nan
         last_tsl_info["stop"][:] = np.nan
+        last_tsl_info["th"][:] = np.nan
+        last_tsl_info["exit_price"][:] = -1
+        last_tsl_info["exit_type"][:] = -1
+        last_tsl_info["order_type"][:] = -1
         last_tsl_info["limit_delta"][:] = np.nan
         last_tsl_info["delta_format"][:] = -1
 
         last_tp_info = np.empty(target_shape[1], dtype=tp_info_dt)
-        last_tp_info["init_i"][:] = -1
+        last_tp_info["init_idx"][:] = -1
         last_tp_info["init_price"][:] = np.nan
         last_tp_info["stop"][:] = np.nan
+        last_tp_info["exit_price"][:] = -1
+        last_tp_info["exit_type"][:] = -1
+        last_tp_info["order_type"][:] = -1
         last_tp_info["limit_delta"][:] = np.nan
         last_tp_info["delta_format"][:] = -1
     else:
@@ -2205,7 +2567,7 @@ def simulate_from_signal_func_nb(
     main_info = np.empty(target_shape[1], dtype=main_info_dt)
 
     temp_call_seq = np.empty(target_shape[1], dtype=np.int_)
-    temp_order_value = np.empty(target_shape[1], dtype=np.float_)
+    temp_sort_by = np.empty(target_shape[1], dtype=np.float_)
 
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
@@ -2217,71 +2579,58 @@ def simulate_from_signal_func_nb(
 
         for i in range(target_shape[0]):
             # Add cash
-            _cash_deposits = flex_select_auto_nb(cash_deposits, i, group, flex_2d)
-            if _cash_deposits < 0:
-                _cash_deposits = max(_cash_deposits, -last_cash[group])
-            last_cash[group] += _cash_deposits
-            last_free_cash[group] += _cash_deposits
-            last_cash_deposits[group] = _cash_deposits
-            if track_cash_deposits:
-                cash_deposits_out[i, group] += _cash_deposits
+            if cash_sharing:
+                _cash_deposits = flex_select_auto_nb(cash_deposits, i, group, flex_2d)
+                if _cash_deposits < 0:
+                    _cash_deposits = max(_cash_deposits, -last_cash[group])
+                last_cash[group] += _cash_deposits
+                last_free_cash[group] += _cash_deposits
+                last_cash_deposits[group] = _cash_deposits
+                if track_cash_deposits:
+                    cash_deposits_out[i, group] += _cash_deposits
+            else:
+                for col in range(from_col, to_col):
+                    _cash_deposits = flex_select_auto_nb(cash_deposits, i, col, flex_2d)
+                    if _cash_deposits < 0:
+                        _cash_deposits = max(_cash_deposits, -last_cash[col])
+                    last_cash[col] += _cash_deposits
+                    last_free_cash[col] += _cash_deposits
+                    last_cash_deposits[col] = _cash_deposits
+                    if track_cash_deposits:
+                        cash_deposits_out[i, col] += _cash_deposits
 
+            # Update valuation price using current open
             for c in range(group_len):
                 col = from_col + c
-
-                # Update valuation price using current open
                 _open = flex_select_auto_nb(open, i, col, flex_2d)
                 if not np.isnan(_open) or not ffill_val_price:
                     last_val_price[col] = _open
 
-                # Resolve valuation price
-                _val_price = flex_select_auto_nb(val_price, i, col, flex_2d)
-                if np.isinf(_val_price):
-                    if _val_price > 0:
-                        _i = i - abs(flex_select_auto_nb(from_ago, i, col, flex_2d))
-                        if _i < 0:
-                            _price = np.nan
-                        else:
-                            _price = flex_select_auto_nb(price, _i, col, flex_2d)
-                        if np.isinf(_price):
-                            if _price > 0:
-                                _price = flex_select_auto_nb(close, i, col, flex_2d)
-                            else:
-                                _price = _open
-                        _val_price = _price
-                    else:
-                        _val_price = last_val_price[col]
-                if not np.isnan(_val_price) or not ffill_val_price:
-                    last_val_price[col] = _val_price
-
             # Update value and return
-            group_value = last_cash[group]
-            for col in range(from_col, to_col):
-                if last_position[col] != 0:
-                    group_value += last_position[col] * last_val_price[col]
-            last_value[group] = group_value
-            last_return[group] = returns_nb_.get_return_nb(
-                input_value=prev_close_value[group],
-                output_value=last_value[group] - _cash_deposits,
-            )
+            if cash_sharing:
+                group_value = last_cash[group]
+                for col in range(from_col, to_col):
+                    if last_position[col] != 0:
+                        group_value += last_position[col] * last_val_price[col]
+                last_value[group] = group_value
+                last_return[group] = returns_nb_.get_return_nb(
+                    input_value=prev_close_value[group],
+                    output_value=last_value[group] - last_cash_deposits[group],
+                )
+            else:
+                for col in range(from_col, to_col):
+                    group_value = last_cash[col]
+                    if last_position[col] != 0:
+                        group_value += last_position[col] * last_val_price[col]
+                    last_value[col] = group_value
+                    last_return[col] = returns_nb_.get_return_nb(
+                        input_value=prev_close_value[col], output_value=last_value[col] - last_cash_deposits[col]
+                    )
 
-            # Get size and value of each order
+            # Get signals
             for c in range(group_len):
                 col = from_col + c  # order doesn't matter
 
-                # Set defaults
-                main_info["signal_i"][col] = -1
-                main_info["creation_i"][col] = -1
-                main_info["i"][col] = i
-                main_info["price"][col] = np.nan
-                main_info["size"][col] = np.nan
-                main_info["size_type"][col] = -1
-                main_info["direction"][col] = -1
-                main_info["type"][col] = -1
-                main_info["stop_type"][col] = -1
-                temp_order_value[col] = 0.0
-
-                # Get signals
                 signal_ctx = SignalContext(
                     target_shape=target_shape,
                     group_lens=group_lens,
@@ -2292,6 +2641,9 @@ def simulate_from_signal_func_nb(
                     high=high,
                     low=low,
                     close=close,
+                    init_cash=init_cash,
+                    init_position=init_position,
+                    init_price=init_price,
                     flex_2d=flex_2d,
                     order_records=order_records,
                     order_counts=order_counts,
@@ -2321,9 +2673,90 @@ def simulate_from_signal_func_nb(
                     col=col,
                 )
                 is_long_entry, is_long_exit, is_short_entry, is_short_exit = signal_func_nb(signal_ctx, *signal_args)
+                long_entries[col] = is_long_entry
+                long_exits[col] = is_long_exit
+                short_entries[col] = is_short_entry
+                short_exits[col] = is_short_exit
+
+                # Update limit and stop prices
+                _i = i - abs(flex_select_auto_nb(from_ago, i, col, flex_2d))
+                if _i < 0:
+                    _price = np.nan
+                else:
+                    _price = flex_select_auto_nb(price, _i, col, flex_2d)
+                last_limit_info["init_price"][col] = resolve_dyn_limit_price_nb(
+                    val_price=last_val_price[col],
+                    price=_price,
+                    limit_price=last_limit_info["init_price"][col],
+                )
+                last_sl_info["init_price"][col] = resolve_dyn_stop_entry_price_nb(
+                    val_price=last_val_price[col],
+                    price=_price,
+                    stop_entry_price=last_sl_info["init_price"][col],
+                )
+                last_tsl_info["init_price"][col] = resolve_dyn_stop_entry_price_nb(
+                    val_price=last_val_price[col],
+                    price=_price,
+                    stop_entry_price=last_tsl_info["init_price"][col],
+                )
+                last_tsl_info["peak_price"][col] = resolve_dyn_stop_entry_price_nb(
+                    val_price=last_val_price[col],
+                    price=_price,
+                    stop_entry_price=last_tsl_info["peak_price"][col],
+                )
+                last_tp_info["init_price"][col] = resolve_dyn_stop_entry_price_nb(
+                    val_price=last_val_price[col],
+                    price=_price,
+                    stop_entry_price=last_tp_info["init_price"][col],
+                )
+
+            # Update value and return
+            if cash_sharing:
+                group_value = last_cash[group]
+                for col in range(from_col, to_col):
+                    if last_position[col] != 0:
+                        group_value += last_position[col] * last_val_price[col]
+                last_value[group] = group_value
+                last_return[group] = returns_nb_.get_return_nb(
+                    input_value=prev_close_value[group],
+                    output_value=last_value[group] - last_cash_deposits[group],
+                )
+            else:
+                for col in range(from_col, to_col):
+                    group_value = last_cash[col]
+                    if last_position[col] != 0:
+                        group_value += last_position[col] * last_val_price[col]
+                    last_value[col] = group_value
+                    last_return[col] = returns_nb_.get_return_nb(
+                        input_value=prev_close_value[col], output_value=last_value[col] - last_cash_deposits[col]
+                    )
+
+            # Get size and value of each order
+            for c in range(group_len):
+                col = from_col + c  # order doesn't matter
+
+                # Get signals
+                is_long_entry = long_entries[col]
+                is_long_exit = long_exits[col]
+                is_short_entry = short_entries[col]
+                is_short_exit = short_exits[col]
+
+                # Set defaults
+                main_info["bar_zone"][col] = -1
+                main_info["signal_idx"][col] = -1
+                main_info["creation_idx"][col] = -1
+                main_info["idx"][col] = i
+                main_info["val_price"][col] = np.nan
+                main_info["price"][col] = np.nan
+                main_info["size"][col] = np.nan
+                main_info["size_type"][col] = -1
+                main_info["direction"][col] = -1
+                main_info["type"][col] = -1
+                main_info["stop_type"][col] = -1
+                temp_sort_by[col] = 0.0
 
                 # Shortcut
-                any_limit_signal = last_limit_info["init_i"][col] != -1
+                any_limit_signal = last_limit_info["init_idx"][col] != -1
                 any_stop_signal = use_stops and (
                     not np.isnan(last_sl_info["stop"][col])
                     or not np.isnan(last_tsl_info["stop"][col])
@@ -2339,16 +2772,19 @@ def simulate_from_signal_func_nb(
                 exec_limit_signal_i = -1
                 exec_limit_creation_i = -1
                 exec_limit_init_i = -1
+                exec_limit_val_price = np.nan
                 exec_limit_price = np.nan
                 exec_limit_size = np.nan
                 exec_limit_size_type = -1
                 exec_limit_direction = -1
                 exec_limit_stop_type = -1
+                exec_limit_bar_zone = -1
 
                 exec_stop_set = False
                 exec_stop_set_on_open = False
                 exec_stop_set_on_close = False
                 exec_stop_init_i = -1
+                exec_stop_val_price = np.nan
                 exec_stop_price = np.nan
                 exec_stop_size = np.nan
                 exec_stop_size_type = -1
@@ -2358,10 +2794,12 @@ def simulate_from_signal_func_nb(
                 exec_stop_delta = np.nan
                 exec_stop_delta_format = -1
                 exec_stop_make_limit = False
+                exec_stop_bar_zone = -1
 
                 user_on_open = False
                 user_on_close = False
                 exec_user_set = False
+                exec_user_val_price = np.nan
                 exec_user_price = np.nan
                 exec_user_size = np.nan
                 exec_user_size_type = -1
@@ -2369,6 +2807,7 @@ def simulate_from_signal_func_nb(
                 exec_user_type = -1
                 exec_user_stop_type = -1
                 exec_user_make_limit = False
+                exec_user_bar_zone = -1
 
                 # Resolve the current bar
                 _open = flex_select_auto_nb(open, i, col, flex_2d)
@@ -2385,9 +2824,9 @@ def simulate_from_signal_func_nb(
                 # Process the limit signal
                 if any_limit_signal:
                     # Check whether the limit price has been hit
-                    _signal_i = last_limit_info["signal_i"][col]
-                    _creation_i = last_limit_info["creation_i"][col]
-                    _init_i = last_limit_info["init_i"][col]
+                    _signal_i = last_limit_info["signal_idx"][col]
+                    _creation_i = last_limit_info["creation_idx"][col]
+                    _init_i = last_limit_info["init_idx"][col]
                     _price = last_limit_info["init_price"][col]
                     _size = last_limit_info["init_size"][col]
                     _size_type = last_limit_info["init_size_type"][col]
@@ -2401,7 +2840,7 @@ def simulate_from_signal_func_nb(
                     _reverse = last_limit_info["reverse"][col]
 
                     limit_expired_on_open, limit_expired = check_limit_expired_nb(
-                        creation_i=_creation_i,
+                        creation_idx=_creation_i,
                         i=i,
                         tif=_tif,
                         expiry=_expiry,
@@ -2427,9 +2866,9 @@ def simulate_from_signal_func_nb(
                         # Expired limit signal
                         any_limit_signal = False
 
-                        last_limit_info["signal_i"][col] = -1
-                        last_limit_info["creation_i"][col] = -1
-                        last_limit_info["init_i"][col] = -1
+                        last_limit_info["signal_idx"][col] = -1
+                        last_limit_info["creation_idx"][col] = -1
+                        last_limit_info["init_idx"][col] = -1
                         last_limit_info["init_price"][col] = np.nan
                         last_limit_info["init_size"][col] = np.nan
                         last_limit_info["init_size_type"][col] = -1
@@ -2449,6 +2888,12 @@ def simulate_from_signal_func_nb(
                             exec_limit_signal_i = _signal_i
                             exec_limit_creation_i = _creation_i
                             exec_limit_init_i = _init_i
+                            if np.isinf(limit_price) and limit_price > 0:
+                                exec_limit_val_price = _close
+                            elif np.isinf(limit_price) and limit_price < 0:
+                                exec_limit_val_price = _open
+                            else:
+                                exec_limit_val_price = limit_price
                             exec_limit_price = limit_price
                             exec_limit_size = _size
                             exec_limit_size_type = _size_type
@@ -2466,85 +2911,103 @@ def simulate_from_signal_func_nb(
                     if not np.isnan(last_sl_info["stop"][col]):
                         # Check against high and low
                         stop_price, stop_hit_on_open, stop_hit = check_stop_hit_nb(
-                            is_position_long=last_position[col] > 0,
-                            stop_price=last_sl_info["init_price"][col],
-                            stop=last_sl_info["stop"][col],
-                            delta_format=last_sl_info["delta_format"][col],
                             open=_open,
                             high=_high,
                             low=_low,
                             close=_close,
+                            is_position_long=last_position[col] > 0,
+                            stop_price=last_sl_info["init_price"][col],
+                            stop=last_sl_info["stop"][col],
+                            delta_format=last_sl_info["delta_format"][col],
                             hit_below=True,
                         )
                         if stop_hit:
                             _stop_type = StopType.SL
-                            _init_i = last_sl_info["init_i"][col]
+                            _init_i = last_sl_info["init_idx"][col]
+                            _stop_exit_price = last_sl_info["exit_price"][col]
+                            _stop_exit_type = last_sl_info["exit_type"][col]
+                            _stop_order_type = last_sl_info["order_type"][col]
                             _limit_delta = last_sl_info["limit_delta"][col]
                             _delta_format = last_sl_info["delta_format"][col]
 
                     # Check TSL and TTP
                     if not stop_hit and not np.isnan(last_tsl_info["stop"][col]):
-                        # Check against high and low
+                        # Update peak price using open
+                        if last_position[col] > 0:
+                            if _open > last_tsl_info["peak_price"][col]:
+                                last_tsl_info["peak_idx"][col] = i
+                                last_tsl_info["peak_price"][col] = _open
+                        elif last_position[col] < 0:
+                            if _open < last_tsl_info["peak_price"][col]:
+                                last_tsl_info["peak_idx"][col] = i
+                                last_tsl_info["peak_price"][col] = _open
+                        # Check threshold against previous bars and open
                         if np.isnan(last_tsl_info["th"][col]):
-                            delta_hit = True
+                            th_hit = True
                         else:
-                            delta_hit = check_tsl_th_hit_nb(
+                            th_hit = check_tsl_th_hit_nb(
                                 is_position_long=last_position[col] > 0,
                                 init_price=last_tsl_info["init_price"][col],
                                 price=last_tsl_info["peak_price"][col],
                                 threshold=last_tsl_info["th"][col],
                                 delta_format=last_tsl_info["delta_format"][col],
                             )
-                        if delta_hit:
+                        if th_hit:
                             stop_price, stop_hit_on_open, stop_hit = check_stop_hit_nb(
-                                is_position_long=last_position[col] > 0,
-                                stop_price=last_tsl_info["peak_price"][col],
-                                stop=last_tsl_info["stop"][col],
-                                delta_format=last_tsl_info["delta_format"][col],
                                 open=_open,
                                 high=_high,
                                 low=_low,
                                 close=_close,
+                                is_position_long=last_position[col] > 0,
+                                stop_price=last_tsl_info["peak_price"][col],
+                                stop=last_tsl_info["stop"][col],
+                                delta_format=last_tsl_info["delta_format"][col],
                                 hit_below=True,
                             )
+                        # Update peak price using full bar
                         if last_position[col] > 0:
                             if _high > last_tsl_info["peak_price"][col]:
-                                last_tsl_info["peak_i"][col] = i
+                                last_tsl_info["peak_idx"][col] = i
                                 last_tsl_info["peak_price"][col] = _high
                         elif last_position[col] < 0:
                             if _low < last_tsl_info["peak_price"][col]:
-                                last_tsl_info["peak_i"][col] = i
+                                last_tsl_info["peak_idx"][col] = i
                                 last_tsl_info["peak_price"][col] = _low
                         if not stop_hit:
-                            # After update, check one more time against close
-                            if np.isnan(last_tsl_info["th"][col]):
-                                delta_hit = True
-                            else:
-                                delta_hit = check_tsl_th_hit_nb(
-                                    is_position_long=last_position[col] > 0,
-                                    init_price=last_tsl_info["init_price"][col],
-                                    price=last_tsl_info["peak_price"][col],
-                                    threshold=last_tsl_info["th"][col],
-                                    delta_format=last_tsl_info["delta_format"][col],
-                                )
-                            if delta_hit:
+                            # Check threshold against full bar
+                            if not th_hit:
+                                if np.isnan(last_tsl_info["th"][col]):
+                                    th_hit = True
+                                else:
+                                    th_hit = check_tsl_th_hit_nb(
+                                        is_position_long=last_position[col] > 0,
+                                        init_price=last_tsl_info["init_price"][col],
+                                        price=last_tsl_info["peak_price"][col],
+                                        threshold=last_tsl_info["th"][col],
+                                        delta_format=last_tsl_info["delta_format"][col],
+                                    )
+                            if th_hit:
                                 stop_price, stop_hit_on_open, stop_hit = check_stop_hit_nb(
+                                    open=_open,
+                                    high=_high,
+                                    low=_low,
+                                    close=_close,
                                     is_position_long=last_position[col] > 0,
                                     stop_price=last_tsl_info["peak_price"][col],
                                     stop=last_tsl_info["stop"][col],
                                     delta_format=last_tsl_info["delta_format"][col],
-                                    open=_open,
-                                    high=_close,
-                                    low=_close,
-                                    close=_close,
                                     hit_below=True,
+                                    can_use_ohlc=False,
                                 )
                         if stop_hit:
                             if np.isnan(last_tsl_info["th"][col]):
                                 _stop_type = StopType.TSL
                             else:
                                 _stop_type = StopType.TTP
-                            _init_i = last_tsl_info["init_i"][col]
+                            _init_i = last_tsl_info["init_idx"][col]
+                            _stop_exit_price = last_tsl_info["exit_price"][col]
+                            _stop_exit_type = last_tsl_info["exit_type"][col]
+                            _stop_order_type = last_tsl_info["order_type"][col]
                             _limit_delta = last_tsl_info["limit_delta"][col]
                             _delta_format = last_tsl_info["delta_format"][col]
 
@@ -2552,19 +3015,22 @@ def simulate_from_signal_func_nb(
                     if not stop_hit and not np.isnan(last_tp_info["stop"][col]):
                         # Check against high and low
                         stop_price, stop_hit_on_open, stop_hit = check_stop_hit_nb(
-                            is_position_long=last_position[col] > 0,
-                            stop_price=last_tp_info["init_price"][col],
-                            stop=last_tp_info["stop"][col],
-                            delta_format=last_tp_info["delta_format"][col],
                             open=_open,
                             high=_high,
                             low=_low,
                             close=_close,
+                            is_position_long=last_position[col] > 0,
+                            stop_price=last_tp_info["init_price"][col],
+                            stop=last_tp_info["stop"][col],
+                            delta_format=last_tp_info["delta_format"][col],
                             hit_below=False,
                         )
                         if stop_hit:
                             _stop_type = StopType.TP
-                            _init_i = last_tp_info["init_i"][col]
+                            _init_i = last_tp_info["init_idx"][col]
+                            _stop_exit_price = last_tp_info["exit_price"][col]
+                            _stop_exit_type = last_tp_info["exit_type"][col]
+                            _stop_order_type = last_tp_info["order_type"][col]
                             _limit_delta = last_tp_info["limit_delta"][col]
                             _delta_format = last_tp_info["delta_format"][col]
 
@@ -2572,7 +3038,6 @@ def simulate_from_signal_func_nb(
                         # Stop price has been hit
                         # Resolve the final stop signal
                         _accumulate = flex_select_auto_nb(accumulate, i, col, flex_2d)
-                        _upon_stop_exit = flex_select_auto_nb(upon_stop_exit, i, col, flex_2d)
                         (
                             stop_is_long_entry,
                             stop_is_long_exit,
@@ -2581,12 +3046,11 @@ def simulate_from_signal_func_nb(
                             _accumulate,
                         ) = generate_stop_signal_nb(
                             position_now=last_position[col],
-                            upon_stop_exit=_upon_stop_exit,
+                            stop_exit_type=_stop_exit_type,
                             accumulate=_accumulate,
                         )
 
                         # Resolve the price
-                        _stop_exit_price = flex_select_auto_nb(stop_exit_price, i, col, flex_2d)
                         _price = resolve_stop_exit_price_nb(
                             stop_price=stop_price,
                             close=_close,
@@ -2596,7 +3060,7 @@ def simulate_from_signal_func_nb(
                         # Convert both signals to size (direction-aware), size type, and direction
                         _size, _size_type, _direction = signal_to_size_nb(
                             position_now=last_position[col],
-                            val_price_now=last_val_price[col],
+                            val_price_now=_price,
                             value_now=last_value[group],
                             is_long_entry=stop_is_long_entry,
                             is_long_exit=stop_is_long_exit,
@@ -2610,7 +3074,6 @@ def simulate_from_signal_func_nb(
                         if not np.isnan(_size):
                             # Executable stop signal
                             can_execute = True
-                            _stop_order_type = flex_select_auto_nb(stop_order_type, i, col, flex_2d)
                             if _stop_order_type == OrderType.Limit:
                                 # Use close to check whether the limit price has been hit
                                 limit_price, _, can_execute = check_limit_hit_nb(
@@ -2624,7 +3087,7 @@ def simulate_from_signal_func_nb(
                                     limit_delta=_limit_delta,
                                     delta_format=_delta_format,
                                     limit_reverse=False,
-                                    can_use_ohlc=False,
+                                    can_use_ohlc=stop_hit_on_open,
                                     check_open=False,
                                 )
                                 if can_execute:
@@ -2635,6 +3098,12 @@ def simulate_from_signal_func_nb(
                             exec_stop_set_on_open = stop_hit_on_open
                             exec_stop_set_on_close = _stop_exit_price == StopExitPrice.Close
                             exec_stop_init_i = _init_i
+                            if np.isinf(_price) and _price > 0:
+                                exec_stop_val_price = _close
+                            elif np.isinf(_price) and _price < 0:
+                                exec_stop_val_price = _open
+                            else:
+                                exec_stop_val_price = _price
                             exec_stop_price = _price
                             exec_stop_size = _size
                             exec_stop_size_type = _size_type
@@ -2647,7 +3116,6 @@ def simulate_from_signal_func_nb(
 
                 # Process user signal
                 if any_user_signal:
-                    _i = i - abs(flex_select_auto_nb(from_ago, i, col, flex_2d))
                     if _i < 0:
                         _price = np.nan
                         _size = np.nan
@@ -2705,9 +3173,19 @@ def simulate_from_signal_func_nb(
                         _price = flex_select_auto_nb(price, _i, col, flex_2d)
 
                         # Convert both signals to size (direction-aware), size type, and direction
+                        _val_price = flex_select_auto_nb(val_price, i, col, flex_2d)
+                        if np.isinf(_val_price) and _val_price > 0:
+                            if np.isinf(_price) and _price > 0:
+                                _val_price = _close
+                            elif np.isinf(_price) and _price < 0:
+                                _val_price = _open
+                            else:
+                                _val_price = _price
+                        elif np.isnan(_val_price) or (np.isinf(_val_price) and _val_price < 0):
+                            _val_price = last_val_price[col]
                         _size, _size_type, _direction = signal_to_size_nb(
                             position_now=last_position[col],
-                            val_price_now=last_val_price[col],
+                            val_price_now=_val_price,
                             value_now=last_value[group],
                             is_long_entry=is_long_entry,
                             is_long_exit=is_long_exit,
@@ -2761,6 +3239,7 @@ def simulate_from_signal_func_nb(
 
                         # Save info
                         exec_user_set = True
+                        exec_user_val_price = _val_price
                         exec_user_price = _price
                         exec_user_size = _size
                         exec_user_size_type = _size_type
@@ -2788,10 +3267,12 @@ def simulate_from_signal_func_nb(
                         keep_limit = False
                         keep_stop = False
                         execute_limit = True
+                        exec_limit_bar_zone = BarZone.Open
                     elif exec_stop_set_on_open:
                         keep_limit = False
                         keep_stop = False
                         execute_stop = True
+                        exec_stop_bar_zone = BarZone.Open
                     elif any_user_signal and user_on_open:
                         execute_user = True
                         if any_limit_signal and (execute_user or not exec_user_set):
@@ -2814,16 +3295,20 @@ def simulate_from_signal_func_nb(
                             )
                         if not exec_user_set:
                             execute_user = False
+                        if execute_user:
+                            exec_user_bar_zone = BarZone.Open
                     if not execute_limit and not execute_stop and not execute_user:
                         # Check whether the main signal comes in the middle of the bar
                         if exec_limit_set and not exec_limit_set_on_open and keep_limit:
                             keep_limit = False
                             keep_stop = False
                             execute_limit = True
+                            exec_limit_bar_zone = BarZone.Middle
                         elif exec_stop_set and not exec_stop_set_on_open and not exec_stop_set_on_close and keep_stop:
                             keep_limit = False
                             keep_stop = False
                             execute_stop = True
+                            exec_stop_bar_zone = BarZone.Middle
                         elif any_user_signal and not user_on_open and not user_on_close:
                             execute_user = True
                             if any_limit_signal and keep_limit and (execute_user or not exec_user_set):
@@ -2846,12 +3331,15 @@ def simulate_from_signal_func_nb(
                                 )
                             if not exec_user_set:
                                 execute_user = False
+                            if execute_user:
+                                exec_user_bar_zone = BarZone.Middle
                         if not execute_limit and not execute_stop and not execute_user:
                             # Check whether the main signal comes on close
                             if exec_stop_set_on_close and keep_stop:
                                 keep_limit = False
                                 keep_stop = False
                                 execute_stop = True
+                                exec_stop_bar_zone = BarZone.Close
                             elif any_user_signal and user_on_close:
                                 execute_user = True
                                 if any_limit_signal and keep_limit and (execute_user or not exec_user_set):
@@ -2874,13 +3362,17 @@ def simulate_from_signal_func_nb(
                                     )
                                 if not exec_user_set:
                                     execute_user = False
+                                if execute_user:
+                                    exec_user_bar_zone = BarZone.Close
 
                     # Process the limit signal
                     if execute_limit:
                         # Execute the signal
-                        main_info["signal_i"][col] = exec_limit_signal_i
-                        main_info["creation_i"][col] = exec_limit_creation_i
-                        main_info["i"][col] = exec_limit_init_i
+                        main_info["bar_zone"][col] = exec_limit_bar_zone
+                        main_info["signal_idx"][col] = exec_limit_signal_i
+                        main_info["creation_idx"][col] = exec_limit_creation_i
+                        main_info["idx"][col] = exec_limit_init_i
+                        main_info["val_price"][col] = exec_limit_val_price
                         main_info["price"][col] = exec_limit_price
                         main_info["size"][col] = exec_limit_size
                         main_info["size_type"][col] = exec_limit_size_type
@@ -2891,9 +3383,9 @@ def simulate_from_signal_func_nb(
                         # Clear the pending info
                         any_limit_signal = False
 
-                        last_limit_info["signal_i"][col] = -1
-                        last_limit_info["creation_i"][col] = -1
-                        last_limit_info["init_i"][col] = -1
+                        last_limit_info["signal_idx"][col] = -1
+                        last_limit_info["creation_idx"][col] = -1
+                        last_limit_info["init_idx"][col] = -1
                         last_limit_info["init_price"][col] = np.nan
                         last_limit_info["init_size"][col] = np.nan
                         last_limit_info["init_size_type"][col] = -1
@@ -2916,9 +3408,9 @@ def simulate_from_signal_func_nb(
                             _limit_tif = flex_select_auto_nb(limit_tif, i, col, flex_2d)
                             _limit_expiry = flex_select_auto_nb(limit_expiry, i, col, flex_2d)
                             _time_delta_format = flex_select_auto_nb(time_delta_format, i, col, flex_2d)
-                            last_limit_info["signal_i"][col] = exec_stop_init_i
-                            last_limit_info["creation_i"][col] = i
-                            last_limit_info["init_i"][col] = i
+                            last_limit_info["signal_idx"][col] = exec_stop_init_i
+                            last_limit_info["creation_idx"][col] = i
+                            last_limit_info["init_idx"][col] = i
                             last_limit_info["init_price"][col] = exec_stop_price
                             last_limit_info["init_size"][col] = exec_stop_size
                             last_limit_info["init_size_type"][col] = exec_stop_size_type
@@ -2931,9 +3423,11 @@ def simulate_from_signal_func_nb(
                             last_limit_info["time_delta_format"][col] = _time_delta_format
                             last_limit_info["reverse"][col] = False
                         else:
-                            main_info["signal_i"][col] = exec_stop_init_i
-                            main_info["creation_i"][col] = i
-                            main_info["i"][col] = i
+                            main_info["bar_zone"][col] = exec_stop_bar_zone
+                            main_info["signal_idx"][col] = exec_stop_init_i
+                            main_info["creation_idx"][col] = i
+                            main_info["idx"][col] = i
+                            main_info["val_price"][col] = exec_stop_val_price
                             main_info["price"][col] = exec_stop_price
                             main_info["size"][col] = exec_stop_size
                             main_info["size_type"][col] = exec_stop_size_type
@@ -2944,31 +3438,39 @@ def simulate_from_signal_func_nb(
                         # Clear the pending info
                         any_stop_signal = False
 
-                        last_sl_info["init_i"][col] = -1
+                        last_sl_info["init_idx"][col] = -1
                         last_sl_info["init_price"][col] = np.nan
                         last_sl_info["stop"][col] = np.nan
+                        last_sl_info["exit_price"][col] = -1
+                        last_sl_info["exit_type"][col] = -1
+                        last_sl_info["order_type"][col] = -1
                         last_sl_info["limit_delta"][col] = np.nan
                         last_sl_info["delta_format"][col] = -1
 
-                        last_tsl_info["init_i"][col] = -1
+                        last_tsl_info["init_idx"][col] = -1
                         last_tsl_info["init_price"][col] = np.nan
-                        last_tsl_info["peak_i"][col] = -1
+                        last_tsl_info["peak_idx"][col] = -1
                         last_tsl_info["peak_price"][col] = np.nan
-                        last_tsl_info["th"][col] = np.nan
                         last_tsl_info["stop"][col] = np.nan
+                        last_tsl_info["th"][col] = np.nan
+                        last_tsl_info["exit_price"][col] = -1
+                        last_tsl_info["exit_type"][col] = -1
+                        last_tsl_info["order_type"][col] = -1
                         last_tsl_info["limit_delta"][col] = np.nan
                         last_tsl_info["delta_format"][col] = -1
 
-                        last_tp_info["init_i"][col] = -1
+                        last_tp_info["init_idx"][col] = -1
                         last_tp_info["init_price"][col] = np.nan
                         last_tp_info["stop"][col] = np.nan
+                        last_tp_info["exit_price"][col] = -1
+                        last_tp_info["exit_type"][col] = -1
+                        last_tp_info["order_type"][col] = -1
                         last_tp_info["limit_delta"][col] = np.nan
                         last_tp_info["delta_format"][col] = -1
 
                     # Process the user signal
                     if execute_user:
                         # Execute the signal
-                        _i = i - abs(flex_select_auto_nb(from_ago, i, col, flex_2d))
                         if _i >= 0:
                             if exec_user_make_limit:
                                 if any_limit_signal:
@@ -2980,9 +3482,9 @@ def simulate_from_signal_func_nb(
                                 _limit_expiry = flex_select_auto_nb(limit_expiry, _i, col, flex_2d)
                                 _time_delta_format = flex_select_auto_nb(time_delta_format, _i, col, flex_2d)
                                 _limit_reverse = flex_select_auto_nb(limit_reverse, _i, col, flex_2d)
-                                last_limit_info["signal_i"][col] = _i
-                                last_limit_info["creation_i"][col] = i
-                                last_limit_info["init_i"][col] = _i
+                                last_limit_info["signal_idx"][col] = _i
+                                last_limit_info["creation_idx"][col] = i
+                                last_limit_info["init_idx"][col] = _i
                                 last_limit_info["init_price"][col] = exec_user_price
                                 last_limit_info["init_size"][col] = exec_user_size
                                 last_limit_info["init_size_type"][col] = exec_user_size_type
@@ -2995,9 +3497,11 @@ def simulate_from_signal_func_nb(
                                 last_limit_info["time_delta_format"][col] = _time_delta_format
                                 last_limit_info["reverse"][col] = _limit_reverse
                             else:
-                                main_info["signal_i"][col] = _i
-                                main_info["creation_i"][col] = i
-                                main_info["i"][col] = _i
+                                main_info["bar_zone"][col] = exec_user_bar_zone
+                                main_info["signal_idx"][col] = _i
+                                main_info["creation_idx"][col] = i
+                                main_info["idx"][col] = _i
+                                main_info["val_price"][col] = exec_user_val_price
                                 main_info["price"][col] = exec_user_price
                                 main_info["size"][col] = exec_user_size
                                 main_info["size_type"][col] = exec_user_size_type
@@ -3005,29 +3509,31 @@ def simulate_from_signal_func_nb(
                                 main_info["type"][col] = exec_user_type
                                 main_info["stop_type"][col] = exec_user_stop_type
 
-                if cash_sharing and auto_call_seq and not np.isnan(main_info["size"][col]):
-                    # Approximate order value
-                    exec_state = ExecState(
-                        cash=last_cash[group],
-                        position=last_position[col],
-                        debt=last_debt[col],
-                        free_cash=last_free_cash[group],
-                        val_price=last_val_price[col],
-                        value=last_value[group],
-                    )
-                    temp_order_value[c] = approx_order_value_nb(
-                        exec_state=exec_state,
-                        size=main_info["size"][col],
-                        size_type=main_info["size_type"][col],
-                        direction=main_info["direction"][col],
-                    )
-
             any_signal_set = False
             for col in range(from_col, to_col):
                 if not np.isnan(main_info["size"][col]):
                     any_signal_set = True
                     break
             if any_signal_set:
+                # Check bar zone and update valuation price
+                bar_zone = -1
+                same_bar_zone = True
+                same_timing = True
+                for c in range(group_len):
+                    col = from_col + c
+                    if np.isnan(main_info["size"][col]):
+                        continue
+                    if bar_zone == -1:
+                        bar_zone = main_info["bar_zone"][col]
+                    if main_info["bar_zone"][col] != bar_zone:
+                        same_bar_zone = False
+                        same_timing = False
+                    if main_info["bar_zone"][col] == BarZone.Middle:
+                        same_timing = False
+                    _val_price = main_info["val_price"][col]
+                    if not np.isnan(_val_price) or not ffill_val_price:
+                        last_val_price[col] = _val_price
+
                 if cash_sharing:
                     # Dynamically sort by order value -> selling comes first to release funds early
                     if call_seq is None:
@@ -3037,10 +3543,42 @@ def simulate_from_signal_func_nb(
                     else:
                         call_seq_now = call_seq[i, from_col:to_col]
                     if auto_call_seq:
+                        # Sort by order value
+                        if not same_timing:
+                            raise ValueError("Cannot sort orders by value if they are executed at different times")
                         for c in range(group_len):
                             if call_seq_now[c] != c:
                                 raise ValueError("Call sequence must follow CallSeqType.Default")
-                        insert_argsort_nb(temp_order_value[:group_len], call_seq_now)
+                            col = from_col + c
+                            if np.isnan(main_info["size"][col]):
+                                continue
+                            # Approximate order value
+                            exec_state = ExecState(
+                                cash=last_cash[group] if cash_sharing else last_cash[col],
+                                position=last_position[col],
+                                debt=last_debt[col],
+                                free_cash=last_free_cash[group] if cash_sharing else last_free_cash[col],
+                                val_price=last_val_price[col],
+                                value=last_value[group] if cash_sharing else last_value[col],
+                            )
+                            temp_sort_by[c] = approx_order_value_nb(
+                                exec_state=exec_state,
+                                size=main_info["size"][col],
+                                size_type=main_info["size_type"][col],
+                                direction=main_info["direction"][col],
+                            )
+                        insert_argsort_nb(temp_sort_by[:group_len], call_seq_now)
+                    else:
+                        if not same_bar_zone:
+                            # Sort by bar zone
+                            for c in range(group_len):
+                                if call_seq_now[c] != c:
+                                    raise ValueError("Call sequence must follow CallSeqType.Default")
+                                col = from_col + c
+                                if np.isnan(main_info["size"][col]):
+                                    continue
+                                temp_sort_by[c] = main_info["bar_zone"][col]
+                            insert_argsort_nb(temp_sort_by[:group_len], call_seq_now)
 
                 for k in range(group_len):
                     if cash_sharing:
@@ -3057,13 +3595,13 @@ def simulate_from_signal_func_nb(
                     position_now = last_position[col]
                     debt_now = last_debt[col]
                     val_price_now = last_val_price[col]
-                    cash_now = last_cash[group]
-                    free_cash_now = last_free_cash[group]
-                    value_now = last_value[group]
-                    return_now = last_return[group]
+                    cash_now = last_cash[group] if cash_sharing else last_cash[col]
+                    free_cash_now = last_free_cash[group] if cash_sharing else last_free_cash[col]
+                    value_now = last_value[group] if cash_sharing else last_value[col]
+                    return_now = last_return[group] if cash_sharing else last_return[col]
 
                     # Generate the next order
-                    _i = main_info["i"][col]
+                    _i = main_info["idx"][col]
                     if main_info["type"][col] == OrderType.Limit:
                         _slippage = 0.0
                     else:
@@ -3119,8 +3657,8 @@ def simulate_from_signal_func_nb(
                     # Append more order information
                     if order_result.status == OrderStatus.Filled:
                         if order_counts[col] >= 1:
-                            order_records["signal_idx"][order_counts[col] - 1, col] = main_info["signal_i"][col]
-                            order_records["creation_idx"][order_counts[col] - 1, col] = main_info["creation_i"][col]
+                            order_records["signal_idx"][order_counts[col] - 1, col] = main_info["signal_idx"][col]
+                            order_records["creation_idx"][order_counts[col] - 1, col] = main_info["creation_idx"][col]
                             order_records["type"][order_counts[col] - 1, col] = main_info["type"][col]
                             order_records["stop_type"][order_counts[col] - 1, col] = main_info["stop_type"][col]
 
@@ -3136,24 +3674,33 @@ def simulate_from_signal_func_nb(
                         # Update stop price
                         if position_now == 0:
                             # Not in position anymore -> clear stops (irrespective of order success)
-                            last_sl_info["init_i"][col] = -1
+                            last_sl_info["init_idx"][col] = -1
                             last_sl_info["init_price"][col] = np.nan
                             last_sl_info["stop"][col] = np.nan
+                            last_sl_info["exit_price"][col] = -1
+                            last_sl_info["exit_type"][col] = -1
+                            last_sl_info["order_type"][col] = -1
                             last_sl_info["limit_delta"][col] = np.nan
                             last_sl_info["delta_format"][col] = -1
 
-                            last_tsl_info["init_i"][col] = -1
+                            last_tsl_info["init_idx"][col] = -1
                             last_tsl_info["init_price"][col] = np.nan
-                            last_tsl_info["peak_i"][col] = -1
+                            last_tsl_info["peak_idx"][col] = -1
                             last_tsl_info["peak_price"][col] = np.nan
-                            last_tsl_info["th"][col] = np.nan
                             last_tsl_info["stop"][col] = np.nan
+                            last_tsl_info["th"][col] = np.nan
+                            last_tsl_info["exit_price"][col] = -1
+                            last_tsl_info["exit_type"][col] = -1
+                            last_tsl_info["order_type"][col] = -1
                             last_tsl_info["limit_delta"][col] = np.nan
                             last_tsl_info["delta_format"][col] = -1
 
-                            last_tp_info["init_i"][col] = -1
+                            last_tp_info["init_idx"][col] = -1
                             last_tp_info["init_price"][col] = np.nan
                             last_tp_info["stop"][col] = np.nan
+                            last_tp_info["exit_price"][col] = -1
+                            last_tp_info["exit_type"][col] = -1
+                            last_tp_info["order_type"][col] = -1
                             last_tp_info["limit_delta"][col] = np.nan
                             last_tp_info["delta_format"][col] = -1
 
@@ -3190,61 +3737,82 @@ def simulate_from_signal_func_nb(
                             _tsl_th = abs(flex_select_auto_nb(tsl_th, i, col, flex_2d))
                             _tsl_stop = abs(flex_select_auto_nb(tsl_stop, i, col, flex_2d))
                             _tp_stop = abs(flex_select_auto_nb(tp_stop, i, col, flex_2d))
-                            _stop_limit_delta = abs(flex_select_auto_nb(stop_limit_delta, i, col, flex_2d))
-                            _delta_format = abs(flex_select_auto_nb(delta_format, i, col, flex_2d))
+                            _stop_exit_price = flex_select_auto_nb(stop_exit_price, i, col, flex_2d)
+                            _stop_exit_type = flex_select_auto_nb(stop_exit_type, i, col, flex_2d)
+                            _stop_order_type = flex_select_auto_nb(stop_order_type, i, col, flex_2d)
+                            _stop_limit_delta = flex_select_auto_nb(stop_limit_delta, i, col, flex_2d)
+                            _delta_format = flex_select_auto_nb(delta_format, i, col, flex_2d)
 
                             sl_updated = tsl_updated = tp_updated = False
                             if exec_state.position == 0 or np.sign(position_now) != np.sign(exec_state.position):
                                 # Position opened/reversed -> set stops
                                 sl_updated = True
-                                last_sl_info["init_i"][col] = i
+                                last_sl_info["init_idx"][col] = i
                                 last_sl_info["init_price"][col] = new_init_price
                                 last_sl_info["stop"][col] = _sl_stop
+                                last_sl_info["exit_price"][col] = _stop_exit_price
+                                last_sl_info["exit_type"][col] = _stop_exit_type
+                                last_sl_info["order_type"][col] = _stop_order_type
                                 last_sl_info["limit_delta"][col] = _stop_limit_delta
                                 last_sl_info["delta_format"][col] = _delta_format
 
                                 tsl_updated = True
-                                last_tsl_info["init_i"][col] = i
+                                last_tsl_info["init_idx"][col] = i
                                 last_tsl_info["init_price"][col] = new_init_price
-                                last_tsl_info["peak_i"][col] = i
+                                last_tsl_info["peak_idx"][col] = i
                                 last_tsl_info["peak_price"][col] = new_init_price
-                                last_tsl_info["th"][col] = _tsl_th
                                 last_tsl_info["stop"][col] = _tsl_stop
+                                last_tsl_info["th"][col] = _tsl_th
+                                last_tsl_info["exit_price"][col] = _stop_exit_price
+                                last_tsl_info["exit_type"][col] = _stop_exit_type
+                                last_tsl_info["order_type"][col] = _stop_order_type
                                 last_tsl_info["limit_delta"][col] = _stop_limit_delta
                                 last_tsl_info["delta_format"][col] = _delta_format
 
                                 tp_updated = True
-                                last_tp_info["init_i"][col] = i
+                                last_tp_info["init_idx"][col] = i
                                 last_tp_info["init_price"][col] = new_init_price
                                 last_tp_info["stop"][col] = _tp_stop
+                                last_tp_info["exit_price"][col] = _stop_exit_price
+                                last_tp_info["exit_type"][col] = _stop_exit_type
+                                last_tp_info["order_type"][col] = _stop_order_type
                                 last_tp_info["limit_delta"][col] = _stop_limit_delta
                                 last_tp_info["delta_format"][col] = _delta_format
 
                             elif abs(position_now) > abs(exec_state.position):
                                 # Position increased -> keep/override stops
                                 _upon_stop_update = flex_select_auto_nb(upon_stop_update, i, col, flex_2d)
-                                if should_update_stop_nb(stop=_sl_stop, upon_stop_update=_upon_stop_update):
+                                if should_update_stop_nb(new_stop=_sl_stop, upon_stop_update=_upon_stop_update):
                                     sl_updated = True
-                                    last_sl_info["init_i"][col] = i
+                                    last_sl_info["init_idx"][col] = i
                                     last_sl_info["init_price"][col] = new_init_price
                                     last_sl_info["stop"][col] = _sl_stop
+                                    last_sl_info["exit_price"][col] = _stop_exit_price
+                                    last_sl_info["exit_type"][col] = _stop_exit_type
+                                    last_sl_info["order_type"][col] = _stop_order_type
                                     last_sl_info["limit_delta"][col] = _stop_limit_delta
                                     last_sl_info["delta_format"][col] = _delta_format
-                                if should_update_stop_nb(stop=_tsl_stop, upon_stop_update=_upon_stop_update):
+                                if should_update_stop_nb(new_stop=_tsl_stop, upon_stop_update=_upon_stop_update):
                                     tsl_updated = True
-                                    last_tsl_info["init_i"][col] = i
+                                    last_tsl_info["init_idx"][col] = i
                                     last_tsl_info["init_price"][col] = new_init_price
-                                    last_tsl_info["peak_i"][col] = i
+                                    last_tsl_info["peak_idx"][col] = i
                                     last_tsl_info["peak_price"][col] = new_init_price
-                                    last_tsl_info["th"][col] = _tsl_th
                                     last_tsl_info["stop"][col] = _tsl_stop
+                                    last_tsl_info["th"][col] = _tsl_th
+                                    last_tsl_info["exit_price"][col] = _stop_exit_price
+                                    last_tsl_info["exit_type"][col] = _stop_exit_type
+                                    last_tsl_info["order_type"][col] = _stop_order_type
                                     last_tsl_info["limit_delta"][col] = _stop_limit_delta
                                     last_tsl_info["delta_format"][col] = _delta_format
-                                if should_update_stop_nb(stop=_tp_stop, upon_stop_update=_upon_stop_update):
+                                if should_update_stop_nb(new_stop=_tp_stop, upon_stop_update=_upon_stop_update):
                                     tp_updated = True
-                                    last_tp_info["init_i"][col] = i
+                                    last_tp_info["init_idx"][col] = i
                                     last_tp_info["init_price"][col] = new_init_price
                                     last_tp_info["stop"][col] = _tp_stop
+                                    last_tp_info["exit_price"][col] = _stop_exit_price
+                                    last_tp_info["exit_type"][col] = _stop_exit_type
+                                    last_tp_info["order_type"][col] = _stop_order_type
                                     last_tp_info["limit_delta"][col] = _stop_limit_delta
                                     last_tp_info["delta_format"][col] = _delta_format
 
@@ -3268,11 +3836,11 @@ def simulate_from_signal_func_nb(
                                     if tsl_updated:
                                         if position_now > 0:
                                             if _high > last_tsl_info["peak_price"][col]:
-                                                last_tsl_info["peak_i"][col] = i
+                                                last_tsl_info["peak_idx"][col] = i
                                                 last_tsl_info["peak_price"][col] = _high
                                         elif position_now < 0:
                                             if _low < last_tsl_info["peak_price"][col]:
-                                                last_tsl_info["peak_i"][col] = i
+                                                last_tsl_info["peak_idx"][col] = i
                                                 last_tsl_info["peak_price"][col] = _low
 
                     # Now becomes last
@@ -3280,10 +3848,16 @@ def simulate_from_signal_func_nb(
                     last_debt[col] = debt_now
                     if not np.isnan(val_price_now) or not ffill_val_price:
                         last_val_price[col] = val_price_now
-                    last_cash[group] = cash_now
-                    last_free_cash[group] = free_cash_now
-                    last_value[group] = value_now
-                    last_return[group] = return_now
+                    if cash_sharing:
+                        last_cash[group] = cash_now
+                        last_free_cash[group] = free_cash_now
+                        last_value[group] = value_now
+                        last_return[group] = return_now
+                    else:
+                        last_cash[col] = cash_now
+                        last_free_cash[col] = free_cash_now
+                        last_value[col] = value_now
+                        last_return[col] = return_now
 
             for col in range(from_col, to_col):
                 # Update valuation price using current close
@@ -3294,26 +3868,41 @@ def simulate_from_signal_func_nb(
                 _cash_earnings = flex_select_auto_nb(cash_earnings, i, col, flex_2d)
                 _cash_dividends = flex_select_auto_nb(cash_dividends, i, col, flex_2d)
                 _cash_earnings += _cash_dividends * last_position[col]
-                if _cash_earnings < 0:
-                    _cash_earnings = max(_cash_earnings, -last_cash[group])
-                last_cash[group] += _cash_earnings
-                last_free_cash[group] += _cash_earnings
+                if cash_sharing:
+                    if _cash_earnings < 0:
+                        _cash_earnings = max(_cash_earnings, -last_cash[group])
+                    last_cash[group] += _cash_earnings
+                    last_free_cash[group] += _cash_earnings
+                else:
+                    if _cash_earnings < 0:
+                        _cash_earnings = max(_cash_earnings, -last_cash[col])
+                    last_cash[col] += _cash_earnings
+                    last_free_cash[col] += _cash_earnings
                 if track_cash_earnings:
                     cash_earnings_out[i, col] += _cash_earnings
 
             # Update value and return
-            group_value = last_cash[group]
-            for col in range(from_col, to_col):
-                if last_position[col] != 0:
-                    group_value += last_position[col] * last_val_price[col]
-            last_value[group] = group_value
-            last_return[group] = returns_nb_.get_return_nb(
-                input_value=prev_close_value[group],
-                output_value=last_value[group] - _cash_deposits,
-            )
-            prev_close_value[group] = last_value[group]
-            if fill_returns:
-                in_outputs.returns[i, group] = last_return[group]
+            if cash_sharing:
+                group_value = last_cash[group]
+                for col in range(from_col, to_col):
+                    if last_position[col] != 0:
+                        group_value += last_position[col] * last_val_price[col]
+                last_value[group] = group_value
+                last_return[group] = returns_nb_.get_return_nb(
+                    input_value=prev_close_value[group],
+                    output_value=last_value[group] - last_cash_deposits[group],
+                )
+                prev_close_value[group] = last_value[group]
+            else:
+                for col in range(from_col, to_col):
+                    group_value = last_cash[col]
+                    if last_position[col] != 0:
+                        group_value += last_position[col] * last_val_price[col]
+                    last_value[col] = group_value
+                    last_return[col] = returns_nb_.get_return_nb(
+                        input_value=prev_close_value[col], output_value=last_value[col] - last_cash_deposits[col]
+                    )
+                    prev_close_value[col] = last_value[col]
 
             # Call post-segment function
             post_segment_ctx = SignalSegmentContext(
@@ -3326,6 +3915,9 @@ def simulate_from_signal_func_nb(
                 high=high,
                 low=low,
                 close=close,
+                init_cash=init_cash,
+                init_position=init_position,
+                init_price=init_price,
                 flex_2d=flex_2d,
                 order_records=order_records,
                 order_counts=order_counts,

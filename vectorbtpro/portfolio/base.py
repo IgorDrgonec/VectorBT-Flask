@@ -575,10 +575,10 @@ Name: sharpe_ratio, dtype: float64
 >>> @njit
 ... def order_func_nb(c, size, price, fees, slippage):
 ...     return pf_nb.order_nb(
-...         size=pf_nb.get_elem_nb(c, size),
-...         price=pf_nb.get_elem_nb(c, price),
-...         fees=pf_nb.get_elem_nb(c, fees),
-...         slippage=pf_nb.get_elem_nb(c, slippage),
+...         size=pf_nb.select_nb(c, size),
+...         price=pf_nb.select_nb(c, price),
+...         fees=pf_nb.select_nb(c, fees),
+...         slippage=pf_nb.select_nb(c, slippage),
 ...     )
 
 >>> @njit
@@ -4505,7 +4505,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cash_earnings = broadcasted_args.pop("cash_earnings")
         cash_dividends = broadcasted_args.pop("cash_dividends")
         flex_2d = wrapper.ndim == 2
-        target_shape_2d = (wrapper.shape[0], wrapper.shape_2d[1])
+        target_shape_2d = wrapper.shape_2d
 
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
         init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)
@@ -4696,14 +4696,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         upon_opp_limit_conflict: tp.Optional[tp.ArrayLike] = None,
         use_stops: tp.Optional[bool] = None,
         sl_stop: tp.Optional[tp.ArrayLike] = None,
-        tsl_th: tp.Optional[tp.ArrayLike] = None,
         tsl_stop: tp.Optional[tp.ArrayLike] = None,
+        tsl_th: tp.Optional[tp.ArrayLike] = None,
         tp_stop: tp.Optional[tp.ArrayLike] = None,
         stop_entry_price: tp.Optional[tp.ArrayLike] = None,
         stop_exit_price: tp.Optional[tp.ArrayLike] = None,
+        stop_exit_type: tp.Optional[tp.ArrayLike] = None,
         stop_order_type: tp.Optional[tp.ArrayLike] = None,
         stop_limit_delta: tp.Optional[tp.ArrayLike] = None,
-        upon_stop_exit: tp.Optional[tp.ArrayLike] = None,
         upon_stop_update: tp.Optional[tp.ArrayLike] = None,
         upon_adj_stop_conflict: tp.Optional[tp.ArrayLike] = None,
         upon_opp_stop_conflict: tp.Optional[tp.ArrayLike] = None,
@@ -4727,6 +4727,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         fill_returns: tp.Optional[bool] = None,
         max_orders: tp.Optional[int] = None,
         max_logs: tp.Optional[int] = None,
+        in_outputs: tp.Optional[tp.MappingLike] = None,
         seed: tp.Optional[int] = None,
         group_by: tp.GroupByLike = None,
         broadcast_named_args: tp.KwargsLike = None,
@@ -4892,11 +4893,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 Will broadcast.
 
                 Set an element to `np.nan` to disable. Use `delta_format` to specify the format.
-            tsl_th (array_like of float): Take profit threshold for the trailing stop loss.
+            tsl_stop (array_like of float): Trailing stop loss for the trailing stop loss.
                 Will broadcast.
 
                 Set an element to `np.nan` to disable. Use `delta_format` to specify the format.
-            tsl_stop (array_like of float): Trailing stop loss for the trailing stop loss.
+            tsl_th (array_like of float): Take profit threshold for the trailing stop loss.
                 Will broadcast.
 
                 Set an element to `np.nan` to disable. Use `delta_format` to specify the format.
@@ -4912,17 +4913,18 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             stop_exit_price (StopExitPrice or array_like): See `vectorbtpro.portfolio.enums.StopExitPrice`.
                 Will broadcast.
 
-                If provided on per-element basis, gets applied upon exit.
+                If provided on per-element basis, gets applied upon entry. If a positive value is provided,
+                used directly as a price, otherwise used as an enumerated value.
+            stop_exit_type (StopExitType or array_like): See `vectorbtpro.portfolio.enums.StopExitType`.
+                Will broadcast.
+
+                If provided on per-element basis, gets applied upon entry.
             stop_order_type (OrderType or array_like): Similar to `order_type` but for stop orders.
                 Will broadcast.
 
-                If provided on per-element basis, gets applied upon exit.
+                If provided on per-element basis, gets applied upon entry.
             stop_limit_delta (float or array_like): Similar to `limit_delta` but for stop orders.
                 Will broadcast.
-            upon_stop_exit (StopExitMode or array_like): See `vectorbtpro.portfolio.enums.StopExitMode`.
-                Will broadcast.
-
-                If provided on per-element basis, gets applied upon exit.
             upon_stop_update (StopUpdateMode or array_like): See `vectorbtpro.portfolio.enums.StopUpdateMode`.
                 Will broadcast.
 
@@ -4963,6 +4965,20 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             fill_returns (bool): See `Portfolio.from_orders`.
             max_orders (int): See `Portfolio.from_orders`.
             max_logs (int): See `Portfolio.from_orders`.
+            in_outputs (mapping_like): Mapping with in-output objects. Only for flexible mode.
+
+                Will be available via `Portfolio.in_outputs` as a named tuple.
+
+                To substitute `Portfolio` attributes, provide already broadcasted and grouped objects,
+                for example, by using `broadcast_named_args` and templates. Also see
+                `Portfolio.in_outputs_indexing_func` on how in-output objects are indexed.
+
+                When chunking, make sure to provide the chunk taking specification and the merging function.
+                See `vectorbtpro.portfolio.chunking.merge_sim_outs`.
+
+                !!! note
+                    When using Numba below 0.54, `in_outputs` cannot be a mapping, but must be a named tuple
+                    defined globally so Numba can introspect its attributes for pickling.
             seed (int): See `Portfolio.from_orders`.
             group_by (any): See `Portfolio.from_orders`.
             broadcast_named_args (dict): Dictionary with named arguments to broadcast.
@@ -5395,8 +5411,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ```pycon
             >>> @njit
             ... def signal_func_nb(c, long_num_arr, short_num_arr):
-            ...     long_num = pf_nb.get_elem_nb(c, long_num_arr)
-            ...     short_num = pf_nb.get_elem_nb(c, short_num_arr)
+            ...     long_num = pf_nb.select_nb(c, long_num_arr)
+            ...     short_num = pf_nb.select_nb(c, short_num_arr)
             ...     is_long_entry = long_num > 0
             ...     is_long_exit = long_num < 0
             ...     is_short_entry = short_num > 0
@@ -5545,47 +5561,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             limit_tif = portfolio_cfg["limit_tif"]
         if isinstance(limit_tif, (str, timedelta, pd.DateOffset, pd.Timedelta)):
             limit_tif = freq_to_timedelta64(limit_tif)
-        else:
-            # NumPy doesn't like pd.Timedelta
-            if not isinstance(limit_tif, int):
-                limit_tif_arr = np.asarray(limit_tif)
-                if limit_tif_arr.dtype == object:
-                    if limit_tif_arr.ndim in (0, 1):
-                        limit_tif = pd.to_timedelta(limit_tif)
-                        if isinstance(limit_tif, pd.Timedelta):
-                            limit_tif = limit_tif.to_timedelta64()
-                        else:
-                            limit_tif = limit_tif.values
-                    else:
-                        limit_tif_cols = []
-                        for col in range(limit_tif_arr.shape[1]):
-                            limit_tif_col = pd.to_timedelta(limit_tif_arr[:, col])
-                            limit_tif_cols.append(limit_tif_col.values)
-                        limit_tif = np.column_stack(limit_tif_cols)
         if limit_expiry is None:
             limit_expiry = portfolio_cfg["limit_expiry"]
         if isinstance(limit_expiry, (str, timedelta, pd.DateOffset, pd.Timedelta)):
             limit_expiry = RepEval(
-                "wrapper.index.to_period(limit_expiry).shift().to_timestamp().astype(np.int64)",
+                "wrapper.get_period_ns_index(limit_expiry)",
                 context=dict(limit_expiry=limit_expiry),
             )
-        else:
-            # NumPy doesn't like pd.Timestamp
-            if not isinstance(limit_expiry, int):
-                limit_expiry_arr = np.asarray(limit_expiry)
-                if limit_expiry_arr.dtype == object:
-                    if limit_expiry_arr.ndim in (0, 1):
-                        limit_expiry = pd.to_datetime(limit_expiry).tz_localize(None)
-                        if isinstance(limit_expiry, pd.Timestamp):
-                            limit_expiry = limit_expiry.to_datetime64()
-                        else:
-                            limit_expiry = limit_expiry.values
-                    else:
-                        limit_expiry_cols = []
-                        for col in range(limit_expiry_arr.shape[1]):
-                            limit_expiry_col = pd.to_datetime(limit_expiry_arr[:, col]).tz_localize(None)
-                            limit_expiry_cols.append(limit_expiry_col.values)
-                        limit_expiry = np.column_stack(limit_expiry_cols)
         if limit_reverse is None:
             limit_reverse = portfolio_cfg["limit_reverse"]
         if upon_adj_limit_conflict is None:
@@ -5594,10 +5576,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             upon_opp_limit_conflict = portfolio_cfg["upon_opp_limit_conflict"]
         if sl_stop is None:
             sl_stop = portfolio_cfg["sl_stop"]
-        if tsl_th is None:
-            tsl_th = portfolio_cfg["tsl_th"]
         if tsl_stop is None:
             tsl_stop = portfolio_cfg["tsl_stop"]
+        if tsl_th is None:
+            tsl_th = portfolio_cfg["tsl_th"]
         if tp_stop is None:
             tp_stop = portfolio_cfg["tp_stop"]
         if use_stops is None:
@@ -5606,12 +5588,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             stop_entry_price = portfolio_cfg["stop_entry_price"]
         if stop_exit_price is None:
             stop_exit_price = portfolio_cfg["stop_exit_price"]
+        if stop_exit_type is None:
+            stop_exit_type = portfolio_cfg["stop_exit_type"]
         if stop_order_type is None:
             stop_order_type = portfolio_cfg["stop_order_type"]
         if stop_limit_delta is None:
             stop_limit_delta = portfolio_cfg["stop_limit_delta"]
-        if upon_stop_exit is None:
-            upon_stop_exit = portfolio_cfg["upon_stop_exit"]
         if upon_stop_update is None:
             upon_stop_update = portfolio_cfg["upon_stop_update"]
         if upon_adj_stop_conflict is None:
@@ -5669,6 +5651,15 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             seed = portfolio_cfg["seed"]
         if seed is not None:
             set_seed(seed)
+        if flexible_mode:
+            if fill_returns:
+                raise ValueError("Argument fill_returns cannot be used in flexible mode")
+            if in_outputs is not None and not checks.is_namedtuple(in_outputs):
+                in_outputs = to_mapping(in_outputs)
+                in_outputs = namedtuple("InOutputs", in_outputs)(**in_outputs)
+        else:
+            if in_outputs is not None:
+                raise ValueError("Argument in_outputs cannot be used in fixed mode")
         if group_by is None:
             group_by = portfolio_cfg["group_by"]
         if freq is None:
@@ -5714,14 +5705,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             upon_adj_limit_conflict=upon_adj_limit_conflict,
             upon_opp_limit_conflict=upon_opp_limit_conflict,
             sl_stop=sl_stop,
-            tsl_th=tsl_th,
             tsl_stop=tsl_stop,
+            tsl_th=tsl_th,
             tp_stop=tp_stop,
             stop_entry_price=stop_entry_price,
             stop_exit_price=stop_exit_price,
+            stop_exit_type=stop_exit_type,
             stop_order_type=stop_order_type,
             stop_limit_delta=stop_limit_delta,
-            upon_stop_exit=upon_stop_exit,
             upon_stop_update=upon_stop_update,
             upon_adj_stop_conflict=upon_adj_stop_conflict,
             upon_opp_stop_conflict=upon_opp_stop_conflict,
@@ -5788,14 +5779,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     upon_adj_limit_conflict=dict(fill_value=PendingConflictMode.KeepIgnore),
                     upon_opp_limit_conflict=dict(fill_value=PendingConflictMode.CancelExecute),
                     sl_stop=dict(fill_value=np.nan),
-                    tsl_th=dict(fill_value=np.nan),
                     tsl_stop=dict(fill_value=np.nan),
+                    tsl_th=dict(fill_value=np.nan),
                     tp_stop=dict(fill_value=np.nan),
                     stop_entry_price=dict(fill_value=StopEntryPrice.Close),
                     stop_exit_price=dict(fill_value=StopExitPrice.Stop),
+                    stop_exit_type=dict(fill_value=StopExitType.Close),
                     stop_order_type=dict(fill_value=OrderType.Market),
                     stop_limit_delta=dict(fill_value=np.nan),
-                    upon_stop_exit=dict(fill_value=StopExitMode.Close),
                     upon_stop_update=dict(fill_value=StopUpdateMode.Override),
                     upon_adj_stop_conflict=dict(fill_value=PendingConflictMode.KeepExecute),
                     upon_opp_stop_conflict=dict(fill_value=PendingConflictMode.KeepExecute),
@@ -5807,10 +5798,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     close=dict(fill_value=np.nan),
                     bm_close=dict(fill_value=np.nan),
                     from_ago=dict(fill_value=0),
-                ),
-                post_func=dict(
-                    limit_tif=lambda x: x.astype(np.int64),
-                    limit_expiry=lambda x: x.astype(np.int64),
                 ),
                 wrapper_kwargs=dict(
                     freq=freq,
@@ -5825,14 +5812,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cash_earnings = broadcasted_args.pop("cash_earnings")
         cash_dividends = broadcasted_args.pop("cash_dividends")
         flex_2d = wrapper.ndim == 2
-        target_shape_2d = (wrapper.shape[0], wrapper.shape_2d[1])
-        index = wrapper.index
-        if isinstance(index, pd.DatetimeIndex):
-            index = index.tz_localize(None).tz_localize("utc")
-        index = index.values.astype(np.int64)
-        freq = wrapper.freq
-        if freq is not None:
-            freq = freq_to_timedelta64(freq).astype(np.int64)
+        target_shape_2d = wrapper.shape_2d
+        index = wrapper.ns_index
+        freq = wrapper.ns_freq
 
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
         init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)
@@ -5870,15 +5852,17 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 else:
                     max_logs = int(np.max(np.sum(_log, axis=0)))
         if use_stops is None:
-            if (
-                not np.any(broadcasted_args["sl_stop"])
-                and not np.any(broadcasted_args["tsl_stop"])
-                and not np.any(broadcasted_args["tp_stop"])
-                and adjust_func_nb == nb.no_adjust_func_nb
-            ):
-                use_stops = False
-            else:
+            if flexible_mode:
                 use_stops = True
+            else:
+                if (
+                    not np.any(broadcasted_args["sl_stop"])
+                    and not np.any(broadcasted_args["tsl_stop"])
+                    and not np.any(broadcasted_args["tp_stop"])
+                ):
+                    use_stops = False
+                else:
+                    use_stops = True
 
         # Convert strings to numbers
         if "direction" in broadcasted_args:
@@ -5910,6 +5894,36 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             OppositeEntryMode,
         )
         broadcasted_args["order_type"] = map_enum_fields(broadcasted_args["order_type"], OrderType)
+        limit_tif = broadcasted_args["limit_tif"]
+        if limit_tif.dtype == object:
+            if limit_tif.ndim in (0, 1):
+                limit_tif = pd.to_timedelta(limit_tif)
+                if isinstance(limit_tif, pd.Timedelta):
+                    limit_tif = limit_tif.to_timedelta64()
+                else:
+                    limit_tif = limit_tif.values
+            else:
+                limit_tif_cols = []
+                for col in range(limit_tif.shape[1]):
+                    limit_tif_col = pd.to_timedelta(limit_tif[:, col])
+                    limit_tif_cols.append(limit_tif_col.values)
+                limit_tif = np.column_stack(limit_tif_cols)
+        broadcasted_args["limit_tif"] = limit_tif.astype(np.int64)
+        limit_expiry = broadcasted_args["limit_expiry"]
+        if limit_expiry.dtype == object:
+            if limit_expiry.ndim in (0, 1):
+                limit_expiry = pd.to_datetime(limit_expiry).tz_localize(None)
+                if isinstance(limit_expiry, pd.Timestamp):
+                    limit_expiry = limit_expiry.to_datetime64()
+                else:
+                    limit_expiry = limit_expiry.values
+            else:
+                limit_expiry_cols = []
+                for col in range(limit_expiry.shape[1]):
+                    limit_expiry_col = pd.to_datetime(limit_expiry[:, col]).tz_localize(None)
+                    limit_expiry_cols.append(limit_expiry_col.values)
+                limit_expiry = np.column_stack(limit_expiry_cols)
+        broadcasted_args["limit_expiry"] = limit_expiry.astype(np.int64)
         broadcasted_args["upon_adj_limit_conflict"] = map_enum_fields(
             broadcasted_args["upon_adj_limit_conflict"],
             PendingConflictMode,
@@ -5923,9 +5937,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             StopEntryPrice,
             ignore_type=(int, float),
         )
-        broadcasted_args["stop_exit_price"] = map_enum_fields(broadcasted_args["stop_exit_price"], StopExitPrice)
+        broadcasted_args["stop_exit_price"] = map_enum_fields(
+            broadcasted_args["stop_exit_price"],
+            StopExitPrice,
+            ignore_type=(int, float),
+        )
+        broadcasted_args["stop_exit_type"] = map_enum_fields(broadcasted_args["stop_exit_type"], StopExitType)
         broadcasted_args["stop_order_type"] = map_enum_fields(broadcasted_args["stop_order_type"], OrderType)
-        broadcasted_args["upon_stop_exit"] = map_enum_fields(broadcasted_args["upon_stop_exit"], StopExitMode)
         broadcasted_args["upon_stop_update"] = map_enum_fields(broadcasted_args["upon_stop_update"], StopUpdateMode)
         broadcasted_args["upon_adj_stop_conflict"] = map_enum_fields(
             broadcasted_args["upon_adj_stop_conflict"],
@@ -5978,14 +5996,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         checks.assert_subdtype(broadcasted_args["upon_adj_limit_conflict"], np.integer)
         checks.assert_subdtype(broadcasted_args["upon_opp_limit_conflict"], np.integer)
         checks.assert_subdtype(broadcasted_args["sl_stop"], np.number)
-        checks.assert_subdtype(broadcasted_args["tsl_th"], np.number)
         checks.assert_subdtype(broadcasted_args["tsl_stop"], np.number)
+        checks.assert_subdtype(broadcasted_args["tsl_th"], np.number)
         checks.assert_subdtype(broadcasted_args["tp_stop"], np.number)
         checks.assert_subdtype(broadcasted_args["stop_entry_price"], np.number)
-        checks.assert_subdtype(broadcasted_args["stop_exit_price"], np.integer)
+        checks.assert_subdtype(broadcasted_args["stop_exit_price"], np.number)
+        checks.assert_subdtype(broadcasted_args["stop_exit_type"], np.integer)
         checks.assert_subdtype(broadcasted_args["stop_order_type"], np.integer)
         checks.assert_subdtype(broadcasted_args["stop_limit_delta"], np.number)
-        checks.assert_subdtype(broadcasted_args["upon_stop_exit"], np.integer)
         checks.assert_subdtype(broadcasted_args["upon_stop_update"], np.integer)
         checks.assert_subdtype(broadcasted_args["upon_adj_stop_conflict"], np.integer)
         checks.assert_subdtype(broadcasted_args["upon_opp_stop_conflict"], np.integer)
@@ -6015,7 +6033,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 target_shape=target_shape_2d,
                 index=index,
                 freq=freq,
-                group_lens=cs_group_lens,
+                group_lens=group_lens if flexible_mode else cs_group_lens,
+                cs_group_lens=cs_group_lens,
                 call_seq=call_seq,
                 init_cash=init_cash,
                 init_position=init_position,
@@ -6033,11 +6052,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 max_orders=max_orders,
                 max_logs=max_logs,
                 flex_2d=flex_2d,
+                in_outputs=in_outputs,
                 wrapper=wrapper,
             ),
             template_context,
         )
         if flexible_mode:
+            in_outputs = deep_substitute(in_outputs, template_context, sub_id="in_outputs")
+            post_segment_args = deep_substitute(post_segment_args, template_context, sub_id="post_segment_args")
             if signal_func_mode:
                 signal_args = deep_substitute(signal_args, template_context, sub_id="signal_args")
             else:
@@ -6097,7 +6119,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             func = ch_reg.resolve_option(func, chunked)
             sim_out = func(
                 target_shape=target_shape_2d,
-                group_lens=cs_group_lens,  # group only if cash sharing is enabled to speed up
+                group_lens=group_lens,
+                cash_sharing=cash_sharing,
                 index=index,
                 freq=freq,
                 init_cash=init_cash,
@@ -6115,10 +6138,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 auto_call_seq=auto_call_seq,
                 ffill_val_price=ffill_val_price,
                 update_value=update_value,
-                fill_returns=fill_returns,
                 max_orders=max_orders,
                 max_logs=max_logs,
                 flex_2d=flex_2d,
+                in_outputs=in_outputs,
                 **broadcasted_args,
             )
         else:
@@ -6150,7 +6173,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                         short_exits = np.asarray([False])
                 else:
                     long_entries, long_exits, short_entries, short_exits = nb.dir_to_ls_signals_nb(
-                        target_shape=target_shape,
+                        target_shape=target_shape_2d,
                         entries=entries,
                         exits=exits,
                         direction=direction,
@@ -6653,7 +6676,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 !!! note
                     When using Numba below 0.54, `in_outputs` cannot be a mapping, but must be a named tuple
                     defined globally so Numba can introspect its attributes for pickling.
-
             seed (int): See `Portfolio.from_orders`.
             group_by (any): See `Portfolio.from_orders`.
             broadcast_named_args (dict): See `Portfolio.from_signals`.
@@ -6776,20 +6798,20 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> @njit
             ... def pre_segment_func_nb(c, order_value_out, size, price, size_type, direction):
             ...     for col in range(c.from_col, c.to_col):
-            ...         c.last_val_price[col] = pf_nb.get_col_elem_nb(c, col, price)
+            ...         c.last_val_price[col] = pf_nb.select_from_col_nb(c, col, price)
             ...     pf_nb.sort_call_seq_nb(c, size, size_type, direction, order_value_out)
             ...     return ()
 
             >>> @njit
             ... def order_func_nb(c, size, price, size_type, direction, fees, fixed_fees, slippage):
             ...     return pf_nb.order_nb(
-            ...         size=pf_nb.get_elem_nb(c, size),
-            ...         price=pf_nb.get_elem_nb(c, price),
-            ...         size_type=pf_nb.get_elem_nb(c, size_type),
-            ...         direction=pf_nb.get_elem_nb(c, direction),
-            ...         fees=pf_nb.get_elem_nb(c, fees),
-            ...         fixed_fees=pf_nb.get_elem_nb(c, fixed_fees),
-            ...         slippage=pf_nb.get_elem_nb(c, slippage)
+            ...         size=pf_nb.select_nb(c, size),
+            ...         price=pf_nb.select_nb(c, price),
+            ...         size_type=pf_nb.select_nb(c, size_type),
+            ...         direction=pf_nb.select_nb(c, direction),
+            ...         fees=pf_nb.select_nb(c, fees),
+            ...         fixed_fees=pf_nb.select_nb(c, fixed_fees),
+            ...         slippage=pf_nb.select_nb(c, slippage)
             ...     )
 
             >>> np.random.seed(42)
@@ -6867,10 +6889,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> @njit
             ... def order_func_nb(c, stop_price, entries, exits, size):
             ...     # Select info related to this order
-            ...     entry_now = pf_nb.get_elem_nb(c, entries)
-            ...     exit_now = pf_nb.get_elem_nb(c, exits)
-            ...     size_now = pf_nb.get_elem_nb(c, size)
-            ...     price_now = pf_nb.get_elem_nb(c, c.close)
+            ...     entry_now = pf_nb.select_nb(c, entries)
+            ...     exit_now = pf_nb.select_nb(c, exits)
+            ...     size_now = pf_nb.select_nb(c, size)
+            ...     price_now = pf_nb.select_nb(c, c.close)
             ...     stop_price_now = stop_price[c.col]
             ...
             ...     # Our logic
@@ -6891,7 +6913,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> @njit
             ... def post_order_func_nb(c, stop_price, stop):
             ...     # Same broadcasting as for size
-            ...     stop_now = pf_nb.get_elem_nb(c, stop)
+            ...     stop_now = pf_nb.select_nb(c, stop)
             ...
             ...     if c.order_result.status == OrderStatus.Filled:
             ...         if c.order_result.side == OrderSide.Buy:
@@ -7159,14 +7181,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
         cash_earnings = broadcasted_args.pop("cash_earnings")
         flex_2d = wrapper.ndim == 2
-        target_shape_2d = (wrapper.shape[0], wrapper.shape_2d[1])
-        index = wrapper.index
-        if isinstance(index, pd.DatetimeIndex):
-            index = index.tz_localize(None).tz_localize("utc")
-        index = index.values.astype(np.int64)
-        freq = wrapper.freq
-        if freq is not None:
-            freq = freq_to_timedelta64(freq).astype(np.int64)
+        target_shape_2d = wrapper.shape_2d
+        index = wrapper.ns_index
+        freq = wrapper.ns_freq
 
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
         init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)
@@ -7238,8 +7255,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 target_shape=target_shape_2d,
                 index=index,
                 freq=freq,
-                cs_group_lens=cs_group_lens,
                 group_lens=group_lens,
+                cs_group_lens=cs_group_lens,
                 cash_sharing=cash_sharing,
                 init_cash=init_cash,
                 init_position=init_position,
@@ -7276,6 +7293,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 max_orders=max_orders,
                 max_logs=max_logs,
                 flex_2d=flex_2d,
+                in_outputs=in_outputs,
                 wrapper=wrapper,
             ),
             template_context,

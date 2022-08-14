@@ -5784,7 +5784,7 @@ class TestPortfolio:
                         [-0.0071035628576462395, 0.017082199999999936],
                         [-0.010592514017524146, 0.017082199999999936],
                     ]
-                ),
+                ) + 1,
                 index=close_na.index,
                 columns=pd.Index(["first", "second"], dtype="object", name="group"),
             ),
@@ -5800,7 +5800,7 @@ class TestPortfolio:
                         [0.004120158305503052, -0.011316069423691677, 0.017082199999999936],
                         [0.003620376930300262, -0.014313952156949417, 0.017082199999999936],
                     ]
-                ),
+                ) + 1,
                 index=close_na.index,
                 columns=close_na.columns,
             ),
