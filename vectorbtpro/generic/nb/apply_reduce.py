@@ -1046,8 +1046,30 @@ def last_reduce_nb(arr: tp.Array1d) -> float:
 
 
 @register_jitted(cache=True)
+def first_index_reduce_nb(arr: tp.Array1d) -> int:
+    """Get index of first non-NA element."""
+    if arr.shape[0] == 0:
+        raise ValueError("index is out of bounds")
+    for i in range(len(arr)):
+        if not np.isnan(arr[i]):
+            return i
+    return -1
+
+
+@register_jitted(cache=True)
+def last_index_reduce_nb(arr: tp.Array1d) -> int:
+    """Get index of last non-NA element."""
+    if arr.shape[0] == 0:
+        raise ValueError("index is out of bounds")
+    for i in range(len(arr) - 1, -1, -1):
+        if not np.isnan(arr[i]):
+            return i
+    return -1
+
+
+@register_jitted(cache=True)
 def nth_index_reduce_nb(arr: tp.Array1d, n: int) -> int:
-    """Get index of n-th element."""
+    """Get index of n-th element including NA elements."""
     if (n < 0 and abs(n) > arr.shape[0]) or n >= arr.shape[0]:
         raise ValueError("index is out of bounds")
     if n >= 0:
