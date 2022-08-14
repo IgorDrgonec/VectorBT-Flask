@@ -7,7 +7,6 @@ from collections.abc import Hashable, Mapping
 from inspect import signature, getmro
 from keyword import iskeyword
 
-import dill
 import numpy as np
 import pandas as pd
 from pandas.api.types import is_datetime64_any_dtype as is_datetime
@@ -238,6 +237,8 @@ def is_deep_equal(arg1: tp.Any, arg2: tp.Any, check_exact: bool = False, **kwarg
                 except:
                     pass
                 try:
+                    import dill
+
                     _kwargs = _select_kwargs(dill.dumps, kwargs)
                     if dill.dumps(arg1, **_kwargs) == dill.dumps(arg2, **_kwargs):
                         return True
