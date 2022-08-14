@@ -943,12 +943,11 @@ class MappedArray(Analyzable):
         """Resolve mapping.
 
         Set `mapping` to False to disable mapping completely."""
-        if mapping is None:
+        if mapping is None or mapping is True:
             mapping = self.mapping
         if isinstance(mapping, bool):
             if not mapping:
                 return None
-            raise ValueError("Mapping cannot be True")
         if isinstance(mapping, str):
             if mapping.lower() == "index":
                 mapping = self.wrapper.index
@@ -1656,6 +1655,8 @@ class MappedArray(Analyzable):
         ignore_index: bool = False,
         repeat_index: bool = False,
         fill_value: float = np.nan,
+        mapping: tp.Union[None, bool, tp.MappingLike] = False,
+        mapping_kwargs: tp.KwargsLike = None,
         group_by: tp.GroupByLike = None,
         jitted: tp.JittedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
@@ -1688,6 +1689,8 @@ class MappedArray(Analyzable):
             col_map = self.col_mapper.get_col_map(group_by=group_by)
             func = jit_reg.resolve_option(nb.ignore_unstack_mapped_nb, jitted)
             out = func(self.values, col_map, fill_value)
+            mapping = self.resolve_mapping(mapping)
+            out = apply_mapping(out, mapping, **resolve_dict(mapping_kwargs))
             return self.wrapper.wrap(out, index=np.arange(out.shape[0]), group_by=group_by, **resolve_dict(wrap_kwargs))
         if idx_arr is None:
             if self.idx_arr is None:
@@ -1704,6 +1707,8 @@ class MappedArray(Analyzable):
             unstacked_index = self.wrapper.index[func(repeat_cnt_arr)]
             func = jit_reg.resolve_option(nb.repeat_unstack_mapped_nb, jitted)
             out = func(self.values, col_arr, idx_arr, repeat_cnt_arr, target_shape[1], fill_value)
+            mapping = self.resolve_mapping(mapping)
+            out = apply_mapping(out, mapping, **resolve_dict(mapping_kwargs))
             wrap_kwargs = merge_dicts(dict(index=unstacked_index), wrap_kwargs)
             return self.wrapper.wrap(out, group_by=group_by, **wrap_kwargs)
         else:
@@ -1714,6 +1719,8 @@ class MappedArray(Analyzable):
                 )
             func = jit_reg.resolve_option(nb.unstack_mapped_nb, jitted)
             out = func(self.values, col_arr, idx_arr, target_shape, fill_value)
+            mapping = self.resolve_mapping(mapping)
+            out = apply_mapping(out, mapping, **resolve_dict(mapping_kwargs))
             return self.wrapper.wrap(out, group_by=group_by, **resolve_dict(wrap_kwargs))
 
     # ############# Masking ############# #
