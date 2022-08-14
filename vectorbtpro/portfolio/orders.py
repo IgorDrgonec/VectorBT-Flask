@@ -157,6 +157,8 @@ __pdoc__[
 
 orders_shortcut_config = ReadonlyConfig(
     dict(
+        signed_size=dict(obj_type="mapped"),
+        value=dict(obj_type="mapped"),
         weighted_price=dict(obj_type="red_array"),
     )
 )
@@ -185,6 +187,16 @@ class Orders(PriceRecords):
         return self._field_config
 
     # ############# Stats ############# #
+
+    def get_signed_size(self, **kwargs) -> tp.MaybeSeries:
+        """Get signed size."""
+        size = self.get_field_arr("size").copy()
+        size[self.get_field_arr("side") == OrderSide.Sell] *= -1
+        return self.map_array(size, **kwargs)
+
+    def get_value(self, **kwargs) -> tp.MaybeSeries:
+        """Get value."""
+        return self.map_array(self.signed_size.values * self.price.values, **kwargs)
 
     def get_weighted_price(
         self,
