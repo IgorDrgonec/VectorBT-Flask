@@ -173,7 +173,7 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.reshaping import to_2d_array
+from vectorbtpro.base.reshaping import to_1d_array, to_2d_array
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic import nb
 from vectorbtpro.generic.enums import DrawdownStatus, drawdown_dt
@@ -917,21 +917,21 @@ class Drawdowns(Ranges):
             recovery_return = self_col.recovery_return.values
             status = self_col.get_field_arr("status")
 
-            decline_duration = (
-                self_col.wrapper.to_timedelta(self_col.decline_duration.values, to_pd=True, silence_warnings=True)
-                .astype(str)
-                .values
-            )
-            recovery_duration = (
-                self_col.wrapper.to_timedelta(self_col.recovery_duration.values, to_pd=True, silence_warnings=True)
-                .astype(str)
-                .values
-            )
-            duration = (
-                self_col.wrapper.to_timedelta(self_col.duration.values, to_pd=True, silence_warnings=True)
-                .astype(str)
-                .values
-            )
+            decline_duration = to_1d_array(self_col.wrapper.to_timedelta(
+                self_col.decline_duration.values,
+                to_pd=True,
+                silence_warnings=True
+            ).astype(str))
+            recovery_duration = to_1d_array(self_col.wrapper.to_timedelta(
+                self_col.recovery_duration.values,
+                to_pd=True,
+                silence_warnings=True
+            ).astype(str))
+            duration = to_1d_array(self_col.wrapper.to_timedelta(
+                self_col.duration.values,
+                to_pd=True,
+                silence_warnings=True
+            ).astype(str))
 
             # Peak and recovery at same time -> recovery wins
             peak_mask = (peak_val != np.roll(end_val, 1)) | (peak_idx != np.roll(end_idx, 1))

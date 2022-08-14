@@ -1541,11 +1541,11 @@ class Trades(Ranges):
             pnl = self_col.get_field_arr("pnl")
             status = self_col.get_field_arr("status")
 
-            duration = (
-                self_col.wrapper.to_timedelta(self_col.duration.values, to_pd=True, silence_warnings=True)
-                .astype(str)
-                .values
-            )
+            duration = to_1d_array(self_col.wrapper.to_timedelta(
+                self_col.duration.values,
+                to_pd=True,
+                silence_warnings=True
+            ).astype(str))
 
             if plot_markers:
                 # Plot Entry markers
