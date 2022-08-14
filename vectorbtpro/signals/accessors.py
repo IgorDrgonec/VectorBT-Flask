@@ -996,7 +996,7 @@ class SignalsAccessor(GenericAccessor):
         )
         broadcast_kwargs = merge_dicts(
             dict(
-                keep_flex=dict(entries=False, stop_ts=False, _default=True),
+                keep_flex=dict(entries=False, stop_ts=False, _def=True),
                 require_kwargs=dict(requirements="W"),
             ),
             broadcast_kwargs,
@@ -1335,7 +1335,7 @@ class SignalsAccessor(GenericAccessor):
         )
         broadcast_kwargs = merge_dicts(
             dict(
-                keep_flex=dict(entries=False, stop_price=False, stop_type=False, _default=True),
+                keep_flex=dict(entries=False, stop_price=False, stop_type=False, _def=True),
                 require_kwargs=dict(requirements="W"),
             ),
             broadcast_kwargs,

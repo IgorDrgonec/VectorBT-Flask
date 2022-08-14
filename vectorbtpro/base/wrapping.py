@@ -27,7 +27,7 @@ from vectorbtpro.base.indexes import repeat_index, stack_indexes
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import AttrResolverMixin, AttrResolverMixinT
 from vectorbtpro.utils.config import Configured, merge_dicts, resolve_dict
-from vectorbtpro.utils.datetime_ import infer_index_freq, try_to_datetime_index, prepare_freq
+from vectorbtpro.utils.datetime_ import infer_index_freq, try_to_datetime_index, prepare_freq, freq_to_timedelta64
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.decorators import class_or_instancemethod, cached_method
 from vectorbtpro.utils.array_ import is_range
@@ -932,6 +932,27 @@ class ArrayWrapper(Configured, PandasIndexer):
         return self._index
 
     @property
+    def ns_index(self) -> tp.Array1d:
+        """Convert index to an 64-bit integer array.
+
+        Timestamps will be converted to nanoseconds."""
+        index = self.index
+        if isinstance(index, pd.DatetimeIndex):
+            index = index.tz_localize(None).tz_localize("utc")
+        return index.values.astype(np.int64)
+
+    def get_period_ns_index(self, freq: tp.FrequencyLike, shift: bool = True) -> tp.Array1d:
+        """Convert index to period and then to an 64-bit integer array.
+
+        Timestamps will be converted to nanoseconds."""
+        index = self.index
+        if isinstance(index, pd.DatetimeIndex):
+            index = index.tz_localize(None).to_period(freq)
+            if shift:
+                index = index.shift()
+        return index.to_timestamp().values.astype(np.int64)
+
+    @property
     def columns(self) -> tp.Index:
         """Columns."""
         return self._columns
@@ -1009,6 +1030,16 @@ class ArrayWrapper(Configured, PandasIndexer):
         return self.get_freq(allow_date_offset=False, allow_numeric=False)
 
     @property
+    def ns_freq(self) -> tp.Optional[int]:
+        """Convert frequency to a 64-bit integer.
+
+        Timedelta will be converted to nanoseconds."""
+        freq = self.get_freq(allow_date_offset=False, allow_numeric=True)
+        if freq is not None:
+            freq = freq_to_timedelta64(freq).astype(np.int64)
+        return freq
+
+    @property
     def any_freq(self) -> tp.Union[None, float, tp.PandasFrequency]:
         """Index frequency of any type."""
         return self.get_freq()
@@ -1042,10 +1073,10 @@ class ArrayWrapper(Configured, PandasIndexer):
 
     def to_timedelta(
         self,
-        a: tp.MaybeArray[float],
+        a: tp.MaybeArray,
         to_pd: bool = False,
         silence_warnings: tp.Optional[bool] = None,
-    ) -> tp.Union[pd.Timedelta, np.timedelta64, tp.Array]:
+    ) -> tp.Union[pd.Index, tp.MaybeArray]:
         """Convert array to duration using `ArrayWrapper.freq`."""
         from vectorbtpro._settings import settings
 
@@ -1966,10 +1997,10 @@ class ArrayWrapper(Configured, PandasIndexer):
         changed_rows = False
         changed_cols = False
         set_ops = []
-        if "_default" in index_dct:
-            fill_value = index_dct["_default"]
+        if "_def" in index_dct:
+            fill_value = index_dct["_def"]
         for indexer, set_v in index_dct.items():
-            if indexer == "_default":
+            if indexer == "_def":
                 continue
             row_indices, col_indices = get_indices(
                 self.index,
@@ -2085,14 +2116,18 @@ class ArrayWrapper(Configured, PandasIndexer):
                             if set_v.shape[1] > 1:
                                 changed_cols = True
 
-        if keep_flex and not changed_cols and not changed_rows:
-            new_obj = np.full((1,) if len(self.shape) == 1 else (1, 1), fill_value)
-        elif keep_flex and not changed_cols:
-            new_obj = np.full(self.shape if len(self.shape) == 1 else (self.shape[0], 1), fill_value)
-        elif keep_flex and not changed_rows:
-            new_obj = np.full((1, self.shape[1]), fill_value)
+        if isinstance(fill_value, str):
+            dtype = object
         else:
-            new_obj = np.full(self.shape, fill_value)
+            dtype = None
+        if keep_flex and not changed_cols and not changed_rows:
+            new_obj = np.full((1,) if len(self.shape) == 1 else (1, 1), fill_value, dtype=dtype)
+        elif keep_flex and not changed_cols:
+            new_obj = np.full(self.shape if len(self.shape) == 1 else (self.shape[0], 1), fill_value, dtype=dtype)
+        elif keep_flex and not changed_rows:
+            new_obj = np.full((1, self.shape[1]), fill_value, dtype=dtype)
+        else:
+            new_obj = np.full(self.shape, fill_value, dtype=dtype)
         for set_op in set_ops:
             set_op(new_obj)
 

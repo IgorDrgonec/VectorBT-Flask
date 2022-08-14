@@ -56,7 +56,7 @@ __pdoc__ = {}
 class pypfopt_func_dict(dict):
     """Dict that contains optimization functions as keys.
 
-    Keys can be functions themselves, their names, or `_default` for the default value."""
+    Keys can be functions themselves, their names, or `_def` for the default value."""
 
     pass
 
@@ -71,8 +71,8 @@ def select_pypfopt_func_kwargs(
             _kwargs = kwargs[pypfopt_func]
         elif pypfopt_func.__name__ in kwargs:
             _kwargs = kwargs[pypfopt_func.__name__]
-        elif "_default" in kwargs:
-            _kwargs = kwargs["_default"]
+        elif "_def" in kwargs:
+            _kwargs = kwargs["_def"]
         else:
             _kwargs = {}
     else:
@@ -83,8 +83,8 @@ def select_pypfopt_func_kwargs(
                     _kwargs[k] = v[pypfopt_func]
                 elif pypfopt_func.__name__ in v:
                     _kwargs[k] = v[pypfopt_func.__name__]
-                elif "_default" in v:
-                    _kwargs[k] = v["_default"]
+                elif "_def" in v:
+                    _kwargs[k] = v["_def"]
             else:
                 _kwargs[k] = v
     return _kwargs
@@ -752,7 +752,7 @@ def pypfopt_optimize(
 class pfopt_group_dict(dict):
     """Dict that contains optimization groups as keys.
 
-    Keys can be group identifiers or `_default` for the default value."""
+    Keys can be group identifiers or `_def` for the default value."""
 
     pass
 
@@ -766,23 +766,23 @@ def find_pfopt_groups(
     groups = []
     if isinstance(args, pfopt_group_dict):
         for group in args:
-            if group not in groups and group != "_default":
+            if group not in groups and group != "_def":
                 groups.append(group)
     else:
         for arg in args:
             if isinstance(arg, pfopt_group_dict):
                 for group in arg:
-                    if group not in groups and group != "_default":
+                    if group not in groups and group != "_def":
                         groups.append(group)
     if isinstance(kwargs, pfopt_group_dict):
         for group in kwargs:
-            if group not in groups and group != "_default":
+            if group not in groups and group != "_def":
                 groups.append(group)
     else:
         for k, v in kwargs.items():
             if isinstance(v, pfopt_group_dict):
                 for group in v:
-                    if group not in groups and group != "_default":
+                    if group not in groups and group != "_def":
                         groups.append(group)
     if sort_groups:
         return sorted(groups)
@@ -796,13 +796,13 @@ def select_pfopt_group_args(
 ) -> tp.Tuple[tp.Args, tp.Kwargs]:
     """Select arguments and keyword arguments belonging to `group`.
 
-    If an instance of `pfopt_group_dict` was found and neither the group nor the default (`_default`)
+    If an instance of `pfopt_group_dict` was found and neither the group nor the default (`_def`)
     are present, ignores the argument."""
     if isinstance(args, pfopt_group_dict):
         if group in args:
             _args = args[group]
-        elif "_default" in args:
-            _args = args["_default"]
+        elif "_def" in args:
+            _args = args["_def"]
         else:
             _args = ()
     else:
@@ -811,15 +811,15 @@ def select_pfopt_group_args(
             if isinstance(v, pfopt_group_dict):
                 if group in v:
                     _args += (v[group],)
-                elif "_default" in v:
-                    _args += (v["_default"],)
+                elif "_def" in v:
+                    _args += (v["_def"],)
             else:
                 _args += (v,)
     if isinstance(kwargs, pfopt_group_dict):
         if group in kwargs:
             _kwargs = kwargs[group]
-        elif "_default" in kwargs:
-            _kwargs = kwargs["_default"]
+        elif "_def" in kwargs:
+            _kwargs = kwargs["_def"]
         else:
             _kwargs = {}
     else:
@@ -828,8 +828,8 @@ def select_pfopt_group_args(
             if isinstance(v, pfopt_group_dict):
                 if group in v:
                     _kwargs[k] = v[group]
-                elif "_default" in v:
-                    _kwargs[k] = v["_default"]
+                elif "_def" in v:
+                    _kwargs[k] = v["_def"]
             else:
                 _kwargs[k] = v
     return _args, _kwargs
@@ -1687,7 +1687,7 @@ class PortfolioOptimizer(Analyzable):
             ...     df_arg,
             ...     every=vbt.pfopt_group_dict({
             ...         1: "MS",
-            ...         "_default": "AS-JAN"
+            ...         "_def": "AS-JAN"
             ...     }),
             ...     start=vbt.pfopt_group_dict({
             ...         0: "2015-01-01",

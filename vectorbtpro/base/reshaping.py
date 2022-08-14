@@ -680,7 +680,7 @@ def broadcast(
 
     * a const that is applied on all objects,
     * a sequence with value per object, and
-    * a mapping with value per object name and the special key `_default` denoting the default value.
+    * a mapping with value per object name and the special key `_def` denoting the default value.
 
     Additionally, any object can be passed wrapped with `BCO`, which attributes will override
     any of the above arguments if not None.
@@ -833,7 +833,7 @@ def broadcast(
         >>> vbt.broadcast(
         ...     dict(v=v, a=a, sr=sr, df=df),
         ...     index_from='stack',
-        ...     keep_flex=dict(_default=True, df=False),
+        ...     keep_flex=dict(_def=True, df=False),
         ...     require_kwargs=dict(df=dict(dtype=float))
         ... )
         {'v': array([0]),
@@ -996,7 +996,7 @@ def broadcast(
         if isinstance(obj, BCO) and getattr(obj, arg_name) is not None:
             return getattr(obj, arg_name)
         if checks.is_mapping(global_value):
-            return global_value.get(k, global_value.get("_default", default_value))
+            return global_value.get(k, global_value.get("_def", default_value))
         if checks.is_sequence(global_value):
             return global_value[i]
         return global_value
@@ -1054,7 +1054,7 @@ def broadcast(
             _require_kwargs = None
         if checks.is_mapping(require_kwargs) and require_kwargs_per_obj:
             _require_kwargs = merge_dicts(
-                require_kwargs.get("_default", None),
+                require_kwargs.get("_def", None),
                 require_kwargs.get(k, None),
                 _require_kwargs,
             )
@@ -1069,7 +1069,7 @@ def broadcast(
             _reindex_kwargs = None
         if checks.is_mapping(reindex_kwargs) and reindex_kwargs_per_obj:
             _reindex_kwargs = merge_dicts(
-                reindex_kwargs.get("_default", None),
+                reindex_kwargs.get("_def", None),
                 reindex_kwargs.get(k, None),
                 _reindex_kwargs,
             )
