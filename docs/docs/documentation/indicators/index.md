@@ -1,5 +1,6 @@
 ---
 title: Indicators
+description: Documentation on indicators
 icon: material/chart-timeline-variant
 ---
 
@@ -59,11 +60,8 @@ as parameter combinations to take advantage of broadcasting:
 ...
 ...     return ts1_ma.vbt - ts2_ma  # (6)!
 
->>> def generate_index(n):  # (6)!
-...     return [
-...         datetime(2020, 1, 1) + timedelta(days=i) 
-...         for i in range(n)
-...     ]
+>>> def generate_index(n):  # (7)!
+...     return pd.date_range("2020-01-01", periods=n)
 
 >>> ts1 = pd.Series([1, 2, 3, 4, 5, 6, 7], index=generate_index(7))
 >>> ts2 = pd.DataFrame({

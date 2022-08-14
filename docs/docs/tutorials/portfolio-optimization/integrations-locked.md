@@ -1,5 +1,6 @@
 ---
 title: Integrations
+description: Learn about various integrations in portfolio optimization. Not for sharing.
 ---
 
 # :material-lock-open: Portfolio optimization - Integrations
@@ -630,7 +631,7 @@ Other than that, it behaves the same way as [pfopt_group_dict](/api/portfolio/pf
 ...     target="min_volatility",
 ...     cov_matrix=vbt.pypfopt_func_dict({
 ...         "EfficientFrontier": "sample_cov",  # (1)!
-...         "_default": "ledoit_wolf"  # (2)!
+...         "_def": "ledoit_wolf"  # (2)!
 ...     })
 ... )
 OrderedDict([('ADAUSDT', 0.0),

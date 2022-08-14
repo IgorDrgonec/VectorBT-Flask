@@ -1,5 +1,6 @@
 ---
 title: Scheduling
+description: Documentation on scheduling data updates and saves
 icon: material/timer-outline
 ---
 

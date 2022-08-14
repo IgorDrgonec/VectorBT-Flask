@@ -90,7 +90,7 @@
 
 .feature-column.appreciation {
     text-align: center;
-    border: 1px solid #dc2d44;
+    border: 1px solid var(--md-primary-fg-color);
     -webkit-border-radius: 15px;
     -moz-border-radius: 15px;
     border-radius: 15px;

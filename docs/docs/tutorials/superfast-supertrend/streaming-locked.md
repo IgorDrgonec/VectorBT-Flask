@@ -1,5 +1,6 @@
 ---
 title: Streaming
+description: Learn about building a streaming SuperTrend indicator. Not for sharing.
 ---
 
 # :material-lock-open: SuperFast SuperTrend - Streaming

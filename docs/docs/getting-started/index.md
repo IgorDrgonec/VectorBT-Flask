@@ -1,5 +1,6 @@
 ---
 title: Getting started
+description: What is vectorbt PRO and how to get exclusive access
 ---
 
 # Getting started
@@ -51,7 +52,7 @@ algorithmic trading accessible to everyone. Join us!
             <span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 3C6.5 3 2 6.6 2 11c0 2.1 1 4.1 2.8 5.5 0 .6-.4 2.2-2.8 4.5 0 0 3.5 0 6.5-2.5 1.1.3 2.3.5 3.5.5 5.5 0 10-3.6 10-8s-4.5-8-10-8m1 12h-2v-2h2v2m1.8-5c-.3.4-.7.6-1.1.8-.3.2-.4.3-.5.5-.2.2-.2.4-.2.7h-2c0-.5.1-.8.3-1.1.2-.2.6-.5 1.1-.8.3-.1.5-.3.6-.5.1-.2.2-.5.2-.7 0-.3-.1-.5-.3-.7-.2-.2-.5-.3-.8-.3-.3 0-.5.1-.7.2-.2.1-.3.3-.3.6h-2c.1-.7.4-1.3.9-1.7.5-.4 1.2-.5 2.1-.5.9 0 1.7.2 2.2.6.5.4.8 1 .8 1.7.1.4 0 .8-.3 1.2z"></path></svg></span>
         </span>
         <b>Private community</b>
-        <p>Join a Discord server with 100+ members to share ideas and help each other out. Get assistance faster and in more detail.</p>
+        <p>Join a Discord server with 200+ members to share ideas and help each other out. Get assistance faster and in more detail.</p>
     </div>
 </div>
 <div class="feature-row">
@@ -204,11 +205,15 @@ All new features are developed as part of this fork, which means that they are i
 and exclusively available to all eligible sponsors, as they are made collaborators of this repository.
 
 !!! note
-    vectorbt PRO is a closed-source successor to the open-source version of vectorbt. The entire functionality
-    of this package is proprietary and will never be open-sourced.
+    vectorbt PRO is a proprietary successor to the open-source version of vectorbt. 
+    The source code of this package is protected and will never be released to the public. 
+    Only sponsors have exclusive access rights.
 
-Sponsorships start as low as [__$25 a month or $500 one time__](#how-to-become-a-sponsor).[^1]
+Sponsorships start as low as [__$25 a month__](https://github.com/sponsors/polakowo/sponsorships?pay_prorated=false&tier_id=124816) 
+or [__$500 one time__](https://github.com/sponsors/polakowo/sponsorships?tier_id=124837).[^1]
 One-time payments can also be made in :material-bitcoin: and :material-ethereum: - please [contact me](emailto:olegpolakow@gmail.com).
+
+You can cancel your sponsorship anytime.[^2]
 
 !!! info
     With each new milestone, the price will steadily increase to match that of competitors. By subscribing now, 
@@ -218,19 +223,6 @@ One-time payments can also be made in :material-bitcoin: and :material-ethereum:
     This rate applies to individuals only. To grant access for an organization, please 
     [contact me](emailto:olegpolakow@gmail.com).
 
-## What sponsorships achieve?
-
-Sponsorships make this project sustainable, as they buy the maintainers of this
-project time – a very scarce resource – which is spent on the development of new
-features, bug fixing, stability improvement, issue triage and general support.
-
-## How to become a sponsor?
-
-In order to become an eligible sponsor with your GitHub account, visit @polakowo, 
-and complete a sponsorship of __$25 a month or more__.
-
-You can cancel your sponsorship anytime.[^2]
-
 [^2]:
     If you cancel your sponsorship, GitHub schedules a cancellation request
     which will become effective at the end of the billing cycle. This means
@@ -239,6 +231,12 @@ You can cancel your sponsorship anytime.[^2]
     All charges are processed by GitHub through Stripe. As we don't receive any 
     information regarding your payment, and GitHub doesn't offer refunds, 
     sponsorships are non-refundable.
+
+## What sponsorships achieve?
+
+Sponsorships make this project sustainable, as they buy the maintainers of this
+project time – a very scarce resource – which is spent on the development of new
+features, bug fixing, stability improvement, issue triage and general support.
 
 ## Paid sessions
 

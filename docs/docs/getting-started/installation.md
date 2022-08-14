@@ -1,5 +1,6 @@
 ---
 title: Installation
+description: How to install vectorbt PRO
 ---
 
 # Installation

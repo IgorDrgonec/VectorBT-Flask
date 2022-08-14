@@ -1,5 +1,6 @@
 ---
 title: Local
+description: Documentation on handling local data
 icon: material/folder-open
 ---
 

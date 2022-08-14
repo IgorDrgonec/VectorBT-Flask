@@ -1,5 +1,6 @@
 ---
 title: Patterns
+description: Learn about patterns. Not for sharing.
 ---
 
 # :material-lock-open: Patterns and projections - Patterns
@@ -696,7 +697,7 @@ Sometimes we may want to define patterns as "corridors" within which the price s
 If any of the corridor points were violated, we can either set the distance at that point
 to the maximum distance (`max_error_strict=False`), or set the entire similarity to NaN 
 (`max_error_strict=True`). Such a corridor is referred to as "maximum error". This error
-can be provided thorugh the array-like argument `max_error`, which should be defined in the same 
+can be provided through the array-like argument `max_error`, which should be defined in the same 
 way as the pattern; that is, it mostly needs to have the same length and scale as the pattern.
 
 For example, if we chose the min-max rescaling and the pattern was defined from `1` to `6`,
@@ -961,7 +962,7 @@ The highest score sits at around 84%. Let's visualize the best match:
 >>> fig = data.iloc[start_row:end_row].plot(plot_volume=False)
 >>> price.iloc[start_row:end_row].vbt.plot_pattern(
 ...     pattern, 
-...     error_type="relative",  # (1)!
+...     error_type="relative",  # (2)!
 ...     max_error=0.05,
 ...     max_error_interp_mode="discrete",
 ...     plot_obj=False, 
@@ -1096,7 +1097,7 @@ to a threshold to derive signals. For our example above, let's set a threshold o
 to build the exit signals:
 
 ```pycon
->>> exits = patsim.sim >= 0.9
+>>> exits = patsim.sim >= 0.8
 >>> exits.sum()
 patsim_window
 30     6
@@ -1540,7 +1541,7 @@ plot the number of filled records:
 ![](/assets/images/tutorials/patterns/random_selection.svg)
 
 !!! hint
-    The lower are the selection probabilities, the less likely you will detect all patterns
+    The lower the selection probabilities are, the less likely you will detect all patterns
     in a single call, thus always make sure to run the same search multiple times to assess 
     the stability of the detection accuracy.
 
@@ -1972,3 +1973,5 @@ the threshold during the last 10 bars, and not necessarily at the same time:
 ![](/assets/images/tutorials/patterns/macd_divergence_exits.svg)
 
 Fore more ideas, take a look into [Signal Development](/tutorials/signal-development).
+
+[:material-lock: Notebook](https://github.com/polakowo/vectorbt.pro/blob/main/locked-notebooks.md){ .md-button target="blank_" }

@@ -1,5 +1,6 @@
 ---
 title: Release notes
+description: All notable changes introduced in each release
 ---
 
 # Release notes

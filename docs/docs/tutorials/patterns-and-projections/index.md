@@ -1,5 +1,6 @@
 ---
 title: Patterns and projections
+description: Learn about patterns and projections
 icon: material/lock
 ---
 

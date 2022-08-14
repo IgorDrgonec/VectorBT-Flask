@@ -1,5 +1,6 @@
 ---
 title: Synthetic
+description: Documentation on synthetic data generation
 icon: material/creation
 ---
 

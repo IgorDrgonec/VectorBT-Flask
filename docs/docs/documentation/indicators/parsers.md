@@ -1,5 +1,6 @@
 ---
 title: Parsers
+description: Documentation on indicator parsing
 icon: material/code-tags
 ---
 

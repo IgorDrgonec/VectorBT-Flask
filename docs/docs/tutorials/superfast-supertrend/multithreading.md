@@ -1,5 +1,6 @@
 ---
 title: Multithreading
+description: Learn about parallelizing a SuperTrend indicator
 icon: material/lock
 ---
 

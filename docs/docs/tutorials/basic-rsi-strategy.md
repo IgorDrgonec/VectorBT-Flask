@@ -1,5 +1,6 @@
 ---
 title: Basic RSI strategy
+description: Learn about backtesting a basic RSI strategy
 ---
 
 # Basic RSI strategy
@@ -126,7 +127,7 @@ To run any indicator, use the method `run`. To see what arguments the method acc
 RSI.run(
     close,
     window=Default(value=14),
-    ewm=Default(value=False),
+    wtype=Default(value='wilder'),
     short_name='rsi',
     hide_params=None,
     hide_default=True,
@@ -135,7 +136,7 @@ RSI.run(
     Run `RSI` indicator.
     
     * Inputs: `close`
-    * Parameters: `window`, `ewm`
+    * Parameters: `window`, `wtype`
     * Outputs: `rsi`
     
     Pass a list of parameter names as `hide_params` to hide their column levels.
@@ -144,8 +145,8 @@ RSI.run(
     Other keyword arguments are passed to `vectorbtpro.indicators.factory.run_pipeline`.
 ```
 
-As we see above, we need to at least provide `close`, which can be any numeric time series. 
-Also, by default, the rolling window is 14 days long and not exponential.
+As we can see above, we need to at least provide `close`, which can be any numeric time series. 
+Also, by default, the rolling window is 14 bars long and uses the Wilder's smoothed moving average.
 Since we want to make decisions using the opening price, we will pass `open_price` as `close`:
 
 ```pycon
@@ -155,7 +156,7 @@ Since we want to make decisions using the opening price, we will pass `open_pric
 ```
 
 That's all! By executing the method [RSI.run](/api/indicators/custom/#vectorbtpro.indicators.custom.RSI.run), 
-we calculated the RSI values and received an instance with various methods and properties for their 
+we calculated the RSI values and have received an instance with various methods and properties for their 
 analysis. To retrieve the resulting Pandas object, we need to query the `rsi` attribute (see "Outputs" 
 in the output of `format_func`).
 
@@ -165,18 +166,16 @@ Open time
 2017-08-17 00:00:00+00:00          NaN
 2017-08-18 00:00:00+00:00          NaN
 2017-08-19 00:00:00+00:00          NaN
+2017-08-20 00:00:00+00:00          NaN
+2017-08-21 00:00:00+00:00          NaN
 ...                                ...
-2022-01-16 00:00:00+00:00    27.800150
-2022-01-17 00:00:00+00:00    28.975756
-2022-01-18 00:00:00+00:00    28.889430
-Freq: D, Name: Open, Length: 1616, dtype: float64
+2022-07-30 00:00:00+00:00    60.541637
+2022-07-31 00:00:00+00:00    59.503179
+2022-08-01 00:00:00+00:00    56.750576
+2022-08-02 00:00:00+00:00    56.512434
+2022-08-03 00:00:00+00:00    54.177385
+Freq: D, Name: Open, Length: 1813, dtype: float64
 ```
-
-!!! note
-    If you compare RSI values of vectorbt and TA-Lib, you will notice that they differ.
-    There are [different smoothing methods](https://www.macroption.com/atr-calculation/): 
-    vectorbt uses SMA and EMA, while other libraries and TradingView use the original Wilder's method. 
-    There is no right or wrong method. If you want to use the Wilder's method, use `vbt.talib('RSI')`.
 
 Having the RSI array, we now want to generate an entry signal whenever any RSI value crosses below 30
 and an exit signal whenever any RSI value crosses above 70:
@@ -188,11 +187,15 @@ Open time
 2017-08-17 00:00:00+00:00    False
 2017-08-18 00:00:00+00:00    False
 2017-08-19 00:00:00+00:00    False
+2017-08-20 00:00:00+00:00    False
+2017-08-21 00:00:00+00:00    False
 ...                            ...
-2022-01-16 00:00:00+00:00    False
-2022-01-17 00:00:00+00:00    False
-2022-01-18 00:00:00+00:00    False
-Freq: D, Name: Open, Length: 1616, dtype: bool
+2022-07-30 00:00:00+00:00    False
+2022-07-31 00:00:00+00:00    False
+2022-08-01 00:00:00+00:00    False
+2022-08-02 00:00:00+00:00    False
+2022-08-03 00:00:00+00:00    False
+Freq: D, Name: Open, Length: 1813, dtype: bool
 
 >>> exits = rsi.rsi.vbt.crossed_above(70)  # (2)!
 >>> exits
@@ -200,11 +203,15 @@ Open time
 2017-08-17 00:00:00+00:00    False
 2017-08-18 00:00:00+00:00    False
 2017-08-19 00:00:00+00:00    False
+2017-08-20 00:00:00+00:00    False
+2017-08-21 00:00:00+00:00    False
 ...                            ...
-2022-01-16 00:00:00+00:00    False
-2022-01-17 00:00:00+00:00    False
-2022-01-18 00:00:00+00:00    False
-Freq: D, Name: Open, Length: 1616, dtype: bool
+2022-07-30 00:00:00+00:00    False
+2022-07-31 00:00:00+00:00    False
+2022-08-01 00:00:00+00:00    False
+2022-08-02 00:00:00+00:00    False
+2022-08-03 00:00:00+00:00    False
+Freq: D, Name: Open, Length: 1813, dtype: bool
 ```
 
 1. Using [GenericAccessor.crossed_below](/api/generic/accessors/#vectorbtpro.generic.accessors.GenericAccessor.crossed_below)
@@ -265,14 +272,14 @@ compute various statistics of `clean_entries` and `clean_exits` using
 
 ```pycon
 >>> clean_entries.vbt.signals.total()  # (1)!
-16
+8
 
 >>> clean_exits.vbt.signals.total()  # (2)!
-15
+7
 
 >>> ranges = clean_entries.vbt.signals.between_ranges(other=clean_exits)  # (3)!
 >>> ranges.duration.mean(wrap_kwargs=dict(to_timedelta=True))  # (4)!
-Timedelta('40 days 01:36:00')
+Timedelta('86 days 10:17:08.571428572')
 ```
 
 1. Get the total number of entry signals
@@ -281,8 +288,7 @@ Timedelta('40 days 01:36:00')
 between each entry and exit
 4. Get the average duration between each entry and exit
 
-We are ready for modeling! We will be using 
-the class method [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_signals),
+We are ready for modeling! We will be using the class method [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_signals),
 which will receive the signal arrays, process each signal one by one, and generate orders. 
 It will then create an instance of [Portfolio](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio) 
 that can be used to assess the performance of the strategy.
@@ -303,9 +309,14 @@ an exit signal. Start with an infinite capital to not limit our buying power at 
 <vectorbtpro.portfolio.base.Portfolio at 0x7f9c40eea438>
 ```
 
+!!! info
+    Running the method above for the first time may take some time as it must be compiled first.
+    Compilation will take place each time a new combination of data types is discovered.
+    But don't worry: Numba caches most compiled functions and re-uses them in each new runtime.
+
 !!! hint
     If you look into the API of [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_signals),
-    you will find many arguments to be set to None. `None` has a special meaning that instructs
+    you will find many arguments to be set to None. The value `None` has a special meaning that instructs
     vectorbt to pull the default value from the global settings. You can discover all the default 
     values for the `Portfolio` class [here](/api/_settings/#vectorbtpro._settings.portfolio).
 
@@ -314,45 +325,57 @@ Let's print the statistics of our portfolio:
 ```pycon
 >>> pf.stats()
 Start                         2017-08-17 00:00:00+00:00
-End                           2022-01-18 00:00:00+00:00
-Period                               1616 days 00:00:00
-Start Value                                  157.043476
-End Value                                     110.98007
-Total Return [%]                             -29.331627
-Benchmark Return [%]                         877.704734
+End                           2022-08-03 00:00:00+00:00
+Period                               1813 days 00:00:00
+Start Value                                       100.0
+Min Value                                     97.185676
+Max Value                                    203.182943
+End Value                                    171.335425
+Total Return [%]                              71.335425
+Benchmark Return [%]                         446.481746
+Total Time Exposure [%]                       38.113624
 Max Gross Exposure [%]                            100.0
+Max Drawdown [%]                              46.385941
+Max Drawdown Duration                1613 days 00:00:00
+Total Orders                                         15
 Total Fees Paid                                     0.0
-Max Drawdown [%]                               58.04434
-Max Drawdown Duration                1473 days 00:00:00
-Total Trades                                         16
-Total Closed Trades                                  15
-Total Open Trades                                     1
-Open Trade PnL                               -27.190641
-Win Rate [%]                                  53.333333
-Best Trade [%]                                35.794383
-Worst Trade [%]                              -37.951988
-Avg Winning Trade [%]                         12.256316
-Avg Losing Trade [%]                         -16.703328
-Avg Winning Trade Duration             19 days 03:00:00
-Avg Losing Trade Duration              64 days 00:00:00
-Profit Factor                                  0.838588
-Expectancy                                    -1.258184
-Sharpe Ratio                                  -0.014499
-Calmar Ratio                                  -0.129933
-Omega Ratio                                    0.996355
-Sortino Ratio                                 -0.019584
+Total Trades                                          8
+Win Rate [%]                                  71.428571
+Best Trade [%]                                54.519055
+Worst Trade [%]                              -32.078597
+Avg Winning Trade [%]                         26.905709
+Avg Losing Trade [%]                         -19.345383
+Avg Winning Trade Duration             87 days 09:36:00
+Avg Losing Trade Duration              84 days 00:00:00
+Profit Factor                                  3.477019
+Expectancy                                    13.691111
+Sharpe Ratio                                   0.505486
+Calmar Ratio                                   0.246836
+Omega Ratio                                    1.132505
+Sortino Ratio                                  0.796701
 dtype: object
 ```
 
 !!! hint
-    That's a lot of statistics, right? If you are looking for the way they are implemented,
+    That are lots of statistics, right? If you're looking for the way they are implemented,
     print `pf.metrics` and look for the `calc_func` argument of the metric of interest.
-    If some function is a lambda, look at the source code to reveal its contents.
+    If some function is a lambda, look into the source code to reveal its contents.
 
-As you might have guessed, our strategy is great... at losing money (which is fascinating
-given that Bitcoin increased 10x in value in the same timeframe). Even though the majority of the 
-trades are profitable, we are losing much more on average than winning. Let's get some visuals 
-for confirmation:
+Our strategy is not too bad: the portfolio has gained over 71% in profit over the last years, but holding 
+Bitcoin is still better - staggering 450%. Despite the Bitcoin's high volatility, the minimum recorded
+portfolio value sits at $97 from $100 initially invested. The total time exposure of 38% means that 
+we were in the market 38% of the time. The maximum gross exposure of 100% means that we invested 100% of 
+our available cash balance, each single trade. The maximum drawdown (MDD) of 46% is the maximum distance
+our portfolio value fell after recording a new high (stop loss to the rescue?). 
+
+The total number of orders matches the total number of (cleaned) signals, but why is the total number 
+of trades suddenly 8 instead of 15? By default, a trade in the vectorbt's universe is a sell order; 
+as soon as an exit order has been filled (by reducing or closing the current position), the profit 
+and loss (PnL) based on the weighted average entry and exit price is calculated. The win rate of 70% 
+means that 70% of the trades (sell orders) generated a profit, with the best trade bringing 54% in profit
+and the worst one bringing 32% in loss. Since the average winning trade generating more profit
+than the average losing trade generating loss, we can see various metrics being positive, such as 
+the profit factor and the expectancy.
 
 ```pycon
 >>> pf.plot(settings=dict(bm_returns=False))
@@ -382,8 +405,8 @@ To make our analysis as flexible as possible, we will write a function that lets
 specify all of that information, and return a subset of statistics:
 
 ```pycon
->>> def test_rsi(window=14, ewm=False, lower_th=30, upper_th=70):
-...     rsi = vbt.RSI.run(open_price, window=window, ewm=ewm)
+>>> def test_rsi(window=14, wtype="wilder", lower_th=30, upper_th=70):
+...     rsi = vbt.RSI.run(open_price, window=window, wtype=wtype)
 ...     entries = rsi.rsi_crossed_below(lower_th)
 ...     exits = rsi.rsi_crossed_above(upper_th)
 ...     pf = vbt.Portfolio.from_signals(
@@ -401,17 +424,17 @@ specify all of that information, and return a subset of statistics:
 ...     ])
 
 >>> test_rsi()
-Total Return [%]   -29.331627
-Total Trades               16
-Win Rate [%]        53.333333
-Expectancy          -1.258184
+Total Return [%]    71.335425
+Total Trades                8
+Win Rate [%]        71.428571
+Expectancy          13.691111
 dtype: object
 
 >>> test_rsi(lower_th=20, upper_th=80)
-Total Return [%]    59.691762
-Total Trades                8
-Win Rate [%]        71.428571
-Expectancy           9.492297
+Total Return [%]    6.652287
+Total Trades               2
+Win Rate [%]            50.0
+Expectancy          3.737274
 dtype: object
 ```
 
@@ -420,9 +443,11 @@ dtype: object
     passed to [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_signals) 
     (which cleans the signals automatically anyway).
 
-Bingo! The 80/20 configuration has done the trick. But how do we actually know whether this 
-positive result indicates alpha and not because of a pure luck? Testing one parameter 
-combination from a huge space usually means making a wild guess.
+By raising the upper threshold to 80% and lowering the lower threshold to 20%, the number
+of trades has decreased to just 2 because it becomes more difficult to cross the thresholds.
+We can also observe how the total return fell to roughly 7% - not a good sign. But how do we actually 
+know whether this negative result indicates that our strategy is trash and not because of a pure luck? 
+Testing one parameter combination from a huge space usually means making a wild guess.
 
 Let's generate multiple parameter combinations for thresholds, simulate them, and 
 concatenate their statistics for further analysis:
@@ -458,17 +483,17 @@ we need to convert it to a DataFrame first, with metrics arranged as columns:
 >>> comb_stats_df = pd.DataFrame(comb_stats)
 >>> comb_stats_df
      Total Return [%]  Total Trades  Win Rate [%]  Expectancy
-0           -7.493795             9     50.000000   -1.399830
-1           -5.727722             9     62.500000   -1.074616
-2           14.667515             9     75.000000    1.955225
-3           48.225119             9     62.500000    6.774067
-4           58.286605             9     62.500000    8.141884
+0           24.369550             3     66.666667   10.606342
+1           37.380341             3     66.666667   16.203667
+2           34.560194             3     66.666667   14.981187
+3           31.090080             3     66.666667   13.833710
+4           31.090080             3     66.666667   13.833710
 ..                ...           ...           ...         ...
-116         30.188204            14     53.846154    4.688153
-117         14.869720            13     50.000000    3.717156
-118          9.517970            12     45.454545    3.698104
-119         19.771377            12     54.545455    4.790308
-120         22.317752            12     54.545455    5.088901
+116         51.074571             6     80.000000   18.978193
+117         62.853840             6     80.000000   21.334047
+118         40.685579             5     75.000000   21.125494
+119         -5.990835             4     66.666667   13.119897
+120        -10.315159             4     66.666667   11.678455
 
 [121 rows x 4 columns]
 ```
@@ -484,17 +509,17 @@ with two levels, `lower_th` and `upper_th`, and make it the index of `comb_stats
 >>> comb_stats_df
                    Total Return [%]  Total Trades  Win Rate [%]  Expectancy
 lower_th upper_th                                                          
-20       70               -7.493795             9     50.000000   -1.399830
-         71               -5.727722             9     62.500000   -1.074616
-         72               14.667515             9     75.000000    1.955225
-         73               48.225119             9     62.500000    6.774067
-         74               58.286605             9     62.500000    8.141884
+20       70               24.369550             3     66.666667   10.606342
+         71               37.380341             3     66.666667   16.203667
+         72               34.560194             3     66.666667   14.981187
+         73               31.090080             3     66.666667   13.833710
+         74               31.090080             3     66.666667   13.833710
 ...                             ...           ...           ...         ...
-30       76               30.188204            14     53.846154    4.688153
-         77               14.869720            13     50.000000    3.717156
-         78                9.517970            12     45.454545    3.698104
-         79               19.771377            12     54.545455    4.790308
-         80               22.317752            12     54.545455    5.088901
+30       76               51.074571             6     80.000000   18.978193
+         77               62.853840             6     80.000000   21.334047
+         78               40.685579             5     75.000000   21.125494
+         79               -5.990835             4     66.666667   13.119897
+         80              -10.315159             4     66.666667   11.678455
 
 [121 rows x 4 columns]
 ```
@@ -510,11 +535,11 @@ and the color bar reflecting the expectancy:
 
 ![](/assets/images/tutorials/rsi/heatmap.svg)
 
-We can observe entire regions of parameter combinations that yield positive results.
+We can explore entire regions of parameter combinations that yield positive or negative results.
 
 ### Using columns
 
-As you might have read in the documentation, vectorbt loves processing multi-dimensional data. 
+As you might have read in the documentation, vectorbt loves processing multidimensional data. 
 In particular, it's built around the idea that you can represent each asset, period, parameter 
 combination, and a backtest in general, as a column in a two-dimensional array.
 
@@ -528,7 +553,7 @@ First, define the parameters that we would like to test:
 
 ```pycon
 >>> windows = list(range(8, 21))
->>> ewms = [False, True]
+>>> wtypes = ["simple", "exp", "wilder"]
 >>> lower_ths = list(range(20, 31))
 >>> upper_ths = list(range(70, 81))
 ```
@@ -536,32 +561,30 @@ First, define the parameters that we would like to test:
 Instead of applying `itertools.product`, we will instruct various parts of our pipeline to build 
 a product instead, so we can observe how each part affects the column hierarchy.
 
-The RSI part is easy: we can pass `param_product=True` to build a product of `windows` and `ewms` 
+The RSI part is easy: we can pass `param_product=True` to build a product of `windows` and `wtypes` 
 and run the calculation over each column in `open_price`:
 
 ```pycon
 >>> rsi = vbt.RSI.run(
 ...     open_price, 
 ...     window=windows, 
-...     ewm=ewms, 
+...     wtype=wtypes, 
 ...     param_product=True)
 >>> rsi.rsi.columns
-MultiIndex([( 8, False),
-            ( 8,  True),
-            ( 9, False),
-            ( 9,  True),
+MultiIndex([( 8, 'simple'),
+            ( 8,    'exp'),
+            ( 8, 'wilder'),
             ...
-            (19, False),
-            (19,  True),
-            (20, False),
-            (20,  True)],
-           names=['rsi_window', 'rsi_ewm'], length=26)
+            (20, 'simple'),
+            (20,    'exp'),
+            (20, 'wilder')],
+           names=['rsi_window', 'rsi_wtype'])
 ```
 
 We see that [RSI](/api/indicators/custom/#vectorbtpro.indicators.custom.RSI) appended
-two levels to the column hierarchy: `rsi_window` and `rsi_ewm`. Those are similar to the ones
-we created manually for thresholds in [Using for-loop](#using-for-loop). There are now 26
-columns in total, which is just `len(open_price.columns)` x `len(windows)` x `len(ewms)`.
+two levels to the column hierarchy: `rsi_window` and `rsi_wtype`. Those are similar to the ones
+we created manually for thresholds in [Using for-loop](#using-for-loop). There are now 39
+columns in total, which is just `len(open_price.columns)` x `len(windows)` x `len(wtypes)`.
 
 The next part are crossovers. In contrast to indicators, they are regular functions that take
 any array-like object, broadcast it to the `rsi` array, and search for crossovers.
@@ -584,30 +607,26 @@ crossover function to combine them with every column in `rsi`:
 >>> lower_th_index = pd.Index(lower_ths_prod, name='lower_th')  # (2)!
 >>> entries = rsi.rsi_crossed_below(lower_th_index)
 >>> entries.columns
-MultiIndex([(20,  8, False),
-            (20,  8,  True),
-            (20,  9, False),
-            (20,  9,  True),
+MultiIndex([(20,  8, 'simple'),
+            (20,  8,    'exp'),
+            (20,  8, 'wilder'),
             ...
-            (30, 19, False),
-            (30, 19,  True),
-            (30, 20, False),
-            (30, 20,  True)],
-           names=['lower_th', 'rsi_window', 'rsi_ewm'], length=3146)
+            (30, 20, 'simple'),
+            (30, 20,    'exp'),
+            (30, 20, 'wilder')],
+           names=['lower_th', 'rsi_window', 'rsi_wtype'], length=4719)
 
 >>> upper_th_index = pd.Index(upper_ths_prod, name='upper_th')
 >>> exits = rsi.rsi_crossed_above(upper_th_index)
 >>> exits.columns
-MultiIndex([(70,  8, False),
-            (70,  8,  True),
-            (70,  9, False),
-            (70,  9,  True),
+MultiIndex([(70,  8, 'simple'),
+            (70,  8,    'exp'),
+            (70,  8, 'wilder'),
             ...
-            (80, 19, False),
-            (80, 19,  True),
-            (80, 20, False),
-            (80, 20,  True)],
-           names=['upper_th', 'rsi_window', 'rsi_ewm'], length=3146)
+            (80, 20, 'simple'),
+            (80, 20,    'exp'),
+            (80, 20, 'wilder')],
+           names=['upper_th', 'rsi_window', 'rsi_wtype'], length=4719)
 ```
 
 1. The first value in `lower_ths_prod` builds a combination with the first value in `upper_ths_prod`,
@@ -615,7 +634,7 @@ the second with the second, and so on - 121 combinations in total.
 2. Convert thresholds to `pd.Index` to instruct [broadcast](/api/base/reshaping/#vectorbtpro.base.reshaping.broadcast)
 that we want to build a product with the columns in `rsi`
 
-We have produced over 3146 columns - madness! But did you notice that `entries` and `exits` 
+We have produced over 4719 columns - madness! But did you notice that `entries` and `exits` 
 have different columns now? The first one has `lower_th` as one of the column levels, the second one
 has `upper_th`. How are we supposed to pass differently labeled arrays (including `close_price` with 
 one column) to [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_signals)?
@@ -641,42 +660,34 @@ No worries, vectorbt knows exactly how to merge this information. Let's see:
 ...     'expectancy'
 ... ], agg_func=None)  # (1)!
 >>> stats_df
-                                      Total Return [%]  Total Trades  \\
-lower_th upper_th rsi_window rsi_ewm                                   
-20       70       8          False          -19.280788            27   
-                             True             1.618221            26   
-                  9          False          -44.746787            22   
-                             True            -1.752696            22   
-                  10         False          -47.868781            16   
-...                                                ...           ...   
-30       80       18         True            29.819008             8   
-                  19         False           -0.786254             5   
-                             True            51.376108             8   
-                  20         False          -37.263640             4   
-                             True            33.669485             8   
+                                        Total Return [%]  Total Trades  \\
+lower_th upper_th rsi_window rsi_wtype                                   
+20       70       8          simple           -25.285842            31   
+                             exp               -7.939736            29   
+                             wilder            61.979801            11   
+...                                                  ...           ...   
+                  20         simple           -59.159157             4   
+                             exp               -3.331163             8   
+                             wilder            31.479482             3   
 
-                                      Win Rate [%]  Expectancy  
-lower_th upper_th rsi_window rsi_ewm                            
-20       70       8          False       53.846154   -0.512684  
-                             True        64.000000    0.182982  
-                  9          False       52.380952   -3.810420  
-                             True        66.666667    0.043674  
-                  10         False       60.000000   -5.769271  
-...                                            ...         ...  
-30       80       18         True        57.142857    6.865879  
-                  19         False       75.000000    6.385719  
-                             True        57.142857    9.508749  
-                  20         False       33.333333  -16.159733  
-                             True        57.142857    7.032204  
+                                        Win Rate [%]  Expectancy  
+lower_th upper_th rsi_window rsi_wtype                            
+20       70       8          simple        51.612903   -1.224523  
+                             exp           58.620690   -0.307862  
+                             wilder        72.727273    5.634527  
+...                                              ...         ...  
+                  20         simple        33.333333  -16.159733  
+                             exp           57.142857    7.032204  
+                             wilder        50.000000   38.861607  
 
-[3146 rows x 4 columns]
+[4719 rows x 4 columns]
 ```
 
 1. By default, [StatsBuilderMixin.stats](/api/generic/stats_builder/#vectorbtpro.generic.stats_builder.StatsBuilderMixin.stats) 
 takes the mean out of all columns and returns a Series. We, on the other hand, 
 want to disable the aggregation function and stack all Series into one big DataFrame.
 
-Congrats! We just backtested 3146 parameter combinations in a quarter of a second :zap:
+Congrats! We just backtested 4719 parameter combinations in less than a second :zap:
 
 !!! important
     Even though we gained some unreal performance, we need to be careful to not occupy the entire RAM
@@ -686,10 +697,19 @@ Congrats! We just backtested 3146 parameter combinations in a quarter of a secon
 
     ```pycon
     >>> print(pf.getsize())
-    45.1 MB
+    9.4 MB
     ```
 
-    We are still far away from the limit!
+    Even though the portfolio holds about 10 MB of compressed data, it must generate many arrays,
+    such as the portfolio value, that have the same shape as the number of timestamps x parameter combinations:
+
+    ```pycon
+    >>> np.product(pf.wrapper.shape) * 8 / 1024 / 1024
+    65.27364349365234
+    ```
+
+    We can see that each floating array occupies 65 MB of memory. By creating a dozen of such arrays 
+    (which is often the worst case), the memory consumption may jump to 1 GB very quickly.
 
 One option is to use Pandas itself to analyze the produced statistics. For example, 
 calculate the mean expectancy of each `rsi_window`:
@@ -697,19 +717,19 @@ calculate the mean expectancy of each `rsi_window`:
 ```pycon
 >>> stats_df['Expectancy'].groupby('rsi_window').mean()
 rsi_window
-8     0.559154
-9    -0.874399
-10   -2.544668
-11   -2.014821
-12   -2.104681
-13    1.824517
-14    0.933219
-15    3.287030
-16    3.350205
-17    6.763109
-18    4.374821
-19    3.515993
-20    4.419658
+8      0.154425
+9      0.064130
+10    -0.915478
+11    -0.523294
+12     0.742266
+13     3.898482
+14     4.414367
+15     6.916872
+16     8.915225
+17    12.204188
+18    12.897135
+19    14.508950
+20    16.429515
 Name: Expectancy, dtype: float64
 ```
 
@@ -719,21 +739,21 @@ Display the top 5 parameter combinations:
 
 ```pycon
 >>> stats_df.sort_values(by='Expectancy', ascending=False).head()
-                                      Total Return [%]  Total Trades  \\
-lower_th upper_th rsi_window rsi_ewm                                   
-24       74       20         True           136.770984             7   
-23       74       20         True           136.770984             7   
-24       77       17         False          115.904286             7   
-         78       17         False          115.229435             7   
-23       75       19         True           133.213236             7   
+                                        Total Return [%]  Total Trades  \\
+lower_th upper_th rsi_window rsi_wtype                                   
+22       80       20         wilder           187.478208             2   
+21       80       20         wilder           187.478208             2   
+26       80       20         wilder           152.087039             3   
+23       80       20         wilder           187.478208             2   
+25       80       20         wilder           201.297495             3   
 
-                                      Win Rate [%]  Expectancy  
-lower_th upper_th rsi_window rsi_ewm                            
-24       74       20         True        71.428571   19.538712  
-23       74       20         True        71.428571   19.538712  
-24       77       17         False       83.333333   19.288314  
-         78       17         False       83.333333   19.175839  
-23       75       19         True        71.428571   19.030462 
+                                        Win Rate [%]  Expectancy  
+lower_th upper_th rsi_window rsi_wtype                            
+22       80       20         wilder            100.0   93.739104  
+21       80       20         wilder            100.0   93.739104  
+26       80       20         wilder            100.0   93.739104  
+23       80       20         wilder            100.0   93.739104  
+25       80       20         wilder            100.0   93.739104  
 ```
 
 To analyze any particular combination using vectorbt, we can select it from the portfolio 
@@ -741,7 +761,7 @@ the same way as we selected a column in a regular Pandas DataFrame. Let's plot t
 of the most successful combination:
 
 ```pycon
->>> pf[(24, 74, 20, True)].plot_value()
+>>> pf[(22, 80, 20, "wilder")].plot_value()
 ```
 
 ![](/assets/images/tutorials/rsi/value.svg)
@@ -750,7 +770,7 @@ of the most successful combination:
     Instead of selecting a column from a portfolio, which will create a new portfolio with only 
     that column, you can also check whether the method you want to call supports the argument `column`
     and pass your column using this argument. For instance, we could have also used 
-    `pf.plot_value(column=(24, 74, 20, True))`.
+    `pf.plot_value(column=(22, 80, 20, "wilder"))`.
 
 Even though, in theory, the best found setting doubles our money, it's still inferior to 
 simply holding Bitcoin - our basic RSI strategy cannot beat the market :anger:
@@ -771,22 +791,14 @@ Your homework is to run the examples on this data.
 The final columns should become as follows:
 
 ```pycon
-MultiIndex([(20, 70,  8, False, 'BTCUSDT'),
-            (20, 70,  8, False, 'ETHUSDT'),
-            (20, 70,  8,  True, 'BTCUSDT'),
-            (20, 70,  8,  True, 'ETHUSDT'),
+MultiIndex([(20, 70,  8, 'simple', 'BTCUSDT'),
+            (20, 70,  8, 'simple', 'ETHUSDT'),
+            (20, 70,  8,    'exp', 'BTCUSDT'),
             ...
-            (30, 80, 20, False, 'BTCUSDT'),
-            (30, 80, 20, False, 'ETHUSDT'),
-            (30, 80, 20,  True, 'BTCUSDT'),
-            (30, 80, 20,  True, 'ETHUSDT')],
-           names=[
-                'lower_th', 
-                'upper_th', 
-                'rsi_window', 
-                'rsi_ewm', 
-                'symbol'
-           ], length=6292)
+            (30, 80, 20,    'exp', 'ETHUSDT'),
+            (30, 80, 20, 'wilder', 'BTCUSDT'),
+            (30, 80, 20, 'wilder', 'ETHUSDT')],
+           names=['lower_th', 'upper_th', 'rsi_window', 'rsi_wtype', 'symbol'], length=9438)
 ```
 
 We see that the column hierarchy now contains another level - `symbol` - denoting the asset. 
@@ -805,7 +817,7 @@ Let's visualize the distribution of the expectancy across both assets:
 
 ![](/assets/images/tutorials/rsi/histplot.svg)
 
-ETH seems to react better to our strategy on average than BTC, maybe due to the market's 
+ETH seems to react more aggressively to our strategy on average than BTC, maybe due to the market's 
 higher volatility, a different structure, or just pure randomness.
 
 And here's one of the main takeaways of such analysis: using strategies with simple and 

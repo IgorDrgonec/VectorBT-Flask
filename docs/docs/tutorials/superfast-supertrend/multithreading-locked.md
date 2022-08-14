@@ -1,5 +1,6 @@
 ---
 title: Multithreading
+description: Learn about parallelizing a SuperTrend indicator. Not for sharing.
 ---
 
 # :material-lock-open: SuperFast SuperTrend - Multithreading

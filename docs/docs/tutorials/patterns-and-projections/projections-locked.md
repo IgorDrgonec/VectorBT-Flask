@@ -1,5 +1,6 @@
 ---
 title: Projections
+description: Learn about projections. Not for sharing.
 ---
 
 # :material-lock-open: Patterns and projections - Projections
@@ -1019,3 +1020,5 @@ a position at one point and exited it at another. But still, having a pool of se
 is not enough: as with everything in statistics, we need a sample of events big enough
 to derive their impact with a certain confidence. Otherwise, we can easily get fooled 
 by astonishing results.
+
+[:material-lock: Notebook](https://github.com/polakowo/vectorbt.pro/blob/main/locked-notebooks.md){ .md-button target="blank_" }

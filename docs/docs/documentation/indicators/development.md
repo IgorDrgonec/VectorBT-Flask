@@ -1,5 +1,6 @@
 ---
 title: Development
+description: Documentation on indicator development
 icon: material/order-bool-descending-variant
 ---
 
@@ -59,7 +60,6 @@ returns 1 when the rolling mean is above an upper bound, -1 if it's below a lowe
 ```pycon
 >>> import pandas as pd
 >>> import numpy as np
->>> from datetime import datetime, timedelta
 
 >>> def apply_func(ts, window, lower, upper):
 ...     out = np.full_like(ts, np.nan, dtype=np.float_)
@@ -77,10 +77,7 @@ returns 1 when the rolling mean is above an upper bound, -1 if it's below a lowe
 ... ).with_apply_func(apply_func)
 
 >>> def generate_index(n):
-...     return [
-...         datetime(2020, 1, 1) + timedelta(days=i) 
-...         for i in range(n)
-...     ]
+...     return pd.date_range("2020-01-01", periods=n)
 
 >>> ts = pd.DataFrame({
 ...     'a': [5, 4, 3, 2, 3, 4, 5],
@@ -1257,7 +1254,7 @@ and setting `return_raw` to True:
 >>> raw = vbt.MA.run(
 ...     ts2, 
 ...     window=[2, 2, 3], 
-...     ewm=[False, False, True],  # (1)!
+...     wtype=["simple", "simple", "exp"],  # (1)!
 ...     return_raw=True)
 >>> raw
 ([array([[     nan,      nan,      nan,      nan,      nan,      nan],
@@ -1267,7 +1264,7 @@ and setting `return_raw` to True:
          [1.5     , 2.5     , 1.5     , 2.5     , 1.5625  , 2.4375  ],
          [1.5     , 2.5     , 1.5     , 2.5     , 1.78125 , 2.21875 ],
          [2.5     , 1.5     , 2.5     , 1.5     , 2.390625, 1.609375]])],
- [(2, False), (2, False), (3, True)],
+ [(2, 0), (2, 0), (3, 2)],
  2,
  [])
 ```
@@ -1295,7 +1292,7 @@ to run the indicator on unique parameter combinations only by passing `run_uniqu
 >>> raw = vbt.MA.run(
 ...     ts2, 
 ...     window=[2, 2, 3], 
-...     ewm=[False, False, True], 
+...     wtype=["simple", "simple", "exp"], 
 ...     return_raw=True, 
 ...     run_unique=True, 
 ...     silence_warnings=True)  # (1)!
@@ -1307,7 +1304,7 @@ to run the indicator on unique parameter combinations only by passing `run_uniqu
          [1.5     , 2.5     , 1.5625  , 2.4375  ],
          [1.5     , 2.5     , 1.78125 , 2.21875 ],
          [2.5     , 1.5     , 2.390625, 1.609375]])],
- [(2, False), (3, True)],
+ [(2, 0), (3, 2)],
  2,
  [])
 ```
@@ -1356,22 +1353,22 @@ combinations cannot be found in `use_raw`, it will throw an error:
 >>> raw = vbt.MA.run(
 ...     ts2, 
 ...     window=[2, 3], 
-...     ewm=[False, True],
+...     wtype=["simple", "exp"],
 ...     return_raw=True)
->>> vbt.MA.run(ts2, 2, False, use_raw=raw).ma
-ma_window             2
-ma_ewm            False
-               a      b
-2020-01-01   NaN    NaN
-2020-01-02   1.5    2.5
-2020-01-03   2.5    1.5
-2020-01-04   2.5    1.5
-2020-01-05   1.5    2.5
-2020-01-06   1.5    2.5
-2020-01-07   2.5    1.5
+>>> vbt.MA.run(ts2, 2, "simple", use_raw=raw).ma
+ma_window            2     
+ma_wtype        simple     
+                a    b
+2020-01-01    NaN  NaN
+2020-01-02    1.5  2.5
+2020-01-03    2.5  1.5
+2020-01-04    2.5  1.5
+2020-01-05    1.5  2.5
+2020-01-06    1.5  2.5
+2020-01-07    2.5  1.5
 
->>> vbt.MA.run(ts2, 2, True, use_raw=raw).ma
-ValueError: (2, True) is not in list
+>>> vbt.MA.run(ts2, 2, "exp", use_raw=raw).ma
+ValueError: (2, 2) is not in list
 ```
 
 This way, we can pre-compute indicators.

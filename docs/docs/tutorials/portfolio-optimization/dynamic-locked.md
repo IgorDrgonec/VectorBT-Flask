@@ -1,5 +1,6 @@
 ---
 title: Dynamic
+description: Learn about dynamic portfolio optimization. Not for sharing.
 ---
 
 # :material-lock-open: Portfolio optimization - Dynamic
@@ -68,7 +69,7 @@ Here's a general template:
 ...                 curr_position = c.last_position[col]
 ...                 curr_price = c.last_val_price[col]
 ...                 curr_alloc = curr_position * curr_price / curr_value
-...                 curr_threshold = pf_nb.get_col_elem_nb(c, col, threshold)
+...                 curr_threshold = pf_nb.select_from_col_nb(c, col, threshold)
 ...                 alloc_diff = curr_alloc - group_memory.target_alloc[group_col]
 ...                 
 ...                 if abs(alloc_diff) >= curr_threshold:
@@ -102,10 +103,10 @@ Here's a general template:
 ...     group_col = c.col - c.from_col  # (16)!
 ...     return pf_nb.order_nb(
 ...         size=group_memory.target_alloc[group_col], 
-...         price=pf_nb.get_elem_nb(c, price),
+...         price=pf_nb.select_nb(c, price),
 ...         size_type=group_memory.size_type[group_col],
 ...         direction=group_memory.direction[group_col],
-...         fees=pf_nb.get_elem_nb(c, fees)
+...         fees=pf_nb.select_nb(c, fees)
 ...     )
 ```
 

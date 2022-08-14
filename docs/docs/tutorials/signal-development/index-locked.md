@@ -1,5 +1,6 @@
 ---
 title: Signal development
+description: Learn about signal development. Not for sharing.
 ---
 
 # :material-lock-open: Signal development
@@ -911,7 +912,7 @@ array([  0,  31,  59,  90, 120, 151, 181, 212, 243, 273, 304, 334])
 
 >>> left_bound = np.full(len(data.wrapper.index), np.nan)  # (3)!
 >>> left_bound[anchor_points] = anchor_points
->>> left_bound = vbt.nb.ffill_1d_nb(left_bound).astype(int)
+>>> left_bound = vbt.nb.ffill_1d_nb(left_bound).astype(np.int64)
 >>> left_bound = bandwidth.index[left_bound]
 >>> left_bound
 DatetimeIndex(['2021-01-01 00:00:00+00:00', '2021-01-01 00:00:00+00:00',
@@ -1528,7 +1529,7 @@ datetime/timedelta data. But gladly, datetimee/timedelta data can be safely conv
 data outside Numba, and many functions will continue to work just as before:
 
 ```pycon
->>> any_in_var_window_1d_nb(arr, index.astype(int), freq.astype(int))
+>>> any_in_var_window_1d_nb(arr, index.astype(np.int64), freq.astype(np.int64))
 array([False, True, True, True, False])
 ```
 
@@ -1538,18 +1539,18 @@ number of nanoseconds after the [Unix Epoch](https://en.wikipedia.org/wiki/Unix_
 is 00:00:00 UTC on 1 January 1970:
 
 ```pycon
->>> index.astype(int)  # (1)!
+>>> index.astype(np.int64)  # (1)!
 array([1577836800000000000, 1577837100000000000, 1577837400000000000,
        1577837700000000000, 1577838000000000000])
        
->>> (index - np.datetime64(0, "ns")).astype(int) # (2)!
+>>> (index - np.datetime64(0, "ns")).astype(np.int64) # (2)!
 array([1577836800000000000, 1577837100000000000, 1577837400000000000,
        1577837700000000000, 1577838000000000000])
 
->>> freq.astype(int)  # (3)!
+>>> freq.astype(np.int64)  # (3)!
 600000000000
 
->>> freq.astype(int) / 1000 / 1000 / 1000 / 60  # (4)!
+>>> freq.astype(np.int64) / 1000 / 1000 / 1000 / 60  # (4)!
 10.0
 ```
 
@@ -1597,7 +1598,7 @@ Let's place a signal at 17:00 (UTC) of each Tuesday:
 >>> mask = vbt.pd_acc.signals.generate(  # (9)!
 ...     symbol_wrapper.shape,  # (10)!
 ...     place_func_nb,
-...     symbol_wrapper.index.values.astype(int),  # (11)!
+...     symbol_wrapper.index.values.astype(np.int64),  # (11)!
 ...     wrapper=symbol_wrapper  # (12)!
 ... )
 >>> mask.sum()
@@ -1653,7 +1654,7 @@ at the next possible timestamp:
 >>> mask = vbt.pd_acc.signals.generate(
 ...     symbol_wrapper.shape,
 ...     place_func_nb,
-...     symbol_wrapper.index.values.astype(int),
+...     symbol_wrapper.index.values.astype(np.int64),
 ...     wrapper=symbol_wrapper
 ... )
 >>> mask.sum()
@@ -1727,7 +1728,7 @@ Let's parametrize our exact-match placement function with two parameters: weekda
 ...     symbol_wrapper.shape,  # (5)!
 ...     2, 
 ...     [0, 17],  # (6)!
-...     symbol_wrapper.index.values.astype(int),  # (7)!
+...     symbol_wrapper.index.values.astype(np.int64),  # (7)!
 ...     input_index=symbol_wrapper.index,  # (8)!
 ...     input_columns=symbol_wrapper.columns
 ... )
@@ -1848,7 +1849,7 @@ before placing an exit:
 
 >>> exits = entries.vbt.signals.generate_exits(
 ...     exit_place_func_nb,
-...     entries.index.values.astype(int),  # (2)!
+...     entries.index.values.astype(np.int64),  # (2)!
 ...     pd.Timedelta("7d").value,
 ...     wait=0
 ... )
@@ -1870,7 +1871,7 @@ Will the exit still be placed? No!
 >>> entries.vbt.set(True, every="5d", inplace=True)
 >>> exits = entries.vbt.signals.generate_exits(
 ...     exit_place_func_nb,
-...     entries.index.values.astype(int),
+...     entries.index.values.astype(np.int64),
 ...     pd.Timedelta("7d").value,
 ...     wait=0
 ... )
@@ -1884,7 +1885,7 @@ we can disable `until_next`:
 ```pycon
 >>> exits = entries.vbt.signals.generate_exits(
 ...     exit_place_func_nb,
-...     entries.index.values.astype(int),
+...     entries.index.values.astype(np.int64),
 ...     pd.Timedelta("7d").value,
 ...     wait=0,
 ...     until_next=False
@@ -1915,7 +1916,7 @@ that comes before an exit for any past entry signal. This would match the simula
 ```pycon
 >>> exits = entries.vbt.signals.generate_exits(
 ...     exit_place_func_nb,
-...     entries.index.values.astype(int),
+...     entries.index.values.astype(np.int64),
 ...     pd.Timedelta("7d").value,
 ...     wait=0,
 ...     until_next=False,
@@ -3167,7 +3168,7 @@ Let's map each pair of neighboring signals in `entries` into a range:
 ```pycon
 >>> ranges = entries.vbt.signals.between_ranges()
 >>> ranges.records
-    id  col  start_idx  end_idx  status
+    id  col  start_row  end_row  status
 0    0    0         99      100       1
 1    1    0        100      101       1
 2    2    0        101      102       1
@@ -3180,7 +3181,7 @@ Let's map each pair of neighboring signals in `entries` into a range:
 !!! hint
     To print the records in a human-readable format, use `records_readable`.
 
-Here, `col` is the column index, `start_idx` is the index of the left signal, `end_idx`
+Here, `col` is the column index, `start_idx` is the index of the left signal, `end_row`
 is the index of the right signal, and `status` of type 
 [RangeStatus](/api/generic/enums/#vectorbtpro.generic.enums.RangeStatus) is always `RangeStatus.Closed`.
 We can access each of those fields as regular attributes and get an analyzable mapped array in return.
@@ -3437,3 +3438,5 @@ that our strategy produces, but also to assess the effectiveness of the question
 Instead of treating our trading strategy like a black box and relying exclusively on simulation metrics 
 such as Sharpe, we're able to analyze each logical component of our strategy even before
 passing the entire thing to the backtester - the ultimate portal to the world of data science :mirror:
+
+[:material-lock: Notebook](https://github.com/polakowo/vectorbt.pro/blob/main/locked-notebooks.md){ .md-button target="blank_" }

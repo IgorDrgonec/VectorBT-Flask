@@ -1,5 +1,6 @@
 ---
 title: Portfolio
+description: Documentation on portfolio simulation
 icon: material/chart-areaspline
 ---
 

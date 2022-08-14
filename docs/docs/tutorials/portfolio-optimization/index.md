@@ -1,5 +1,6 @@
 ---
 title: Portfolio optimization
+description: Learn about portfolio optimization
 icon: material/lock
 ---
 

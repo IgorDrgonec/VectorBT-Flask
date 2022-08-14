@@ -1,5 +1,6 @@
 ---
 title: Terms
+description: Terms of using vectorbt PRO
 ---
 
 # Terms

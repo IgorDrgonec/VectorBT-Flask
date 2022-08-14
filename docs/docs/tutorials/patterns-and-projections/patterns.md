@@ -1,5 +1,6 @@
 ---
 title: Patterns
+description: Learn about patterns
 icon: material/lock
 ---
 

@@ -1,5 +1,6 @@
 ---
 title: Pipelines
+description: Learn about backtesting a SuperTrend indicator. Not for sharing.
 ---
 
 # :material-lock-open: SuperFast SuperTrend - Pipelines

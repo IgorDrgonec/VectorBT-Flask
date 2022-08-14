@@ -1,5 +1,6 @@
 ---
 title: SuperFast SuperTrend
+description: Learn about building an ultrafast SuperTrend indicator
 ---
 
 # SuperFast SuperTrend

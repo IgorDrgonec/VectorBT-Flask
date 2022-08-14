@@ -1,5 +1,6 @@
 ---
 title: Projections
+description: Learn about projections
 icon: material/lock
 ---
 

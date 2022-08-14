@@ -1,5 +1,6 @@
 ---
 title: Aggregation
+description: Learn about aggregation in multiple time frame analysis
 icon: material/lock
 ---
 

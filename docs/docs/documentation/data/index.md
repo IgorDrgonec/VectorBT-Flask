@@ -1,5 +1,6 @@
 ---
 title: Data
+description: Documentation on data
 icon: material/database
 ---
 

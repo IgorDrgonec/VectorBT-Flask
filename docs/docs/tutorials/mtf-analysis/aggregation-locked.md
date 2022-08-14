@@ -1,5 +1,6 @@
 ---
 title: Aggregation
+description: Learn about aggregation in multiple time frame analysis. Not for sharing.
 ---
 
 # :material-lock-open: MTF analysis - Aggregation

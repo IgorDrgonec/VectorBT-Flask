@@ -1,5 +1,6 @@
 ---
 title: MTF analysis
+description: Learn about multiple time frame analysis. Not for sharing.
 ---
 
 # :material-lock-open: MTF analysis

@@ -1,5 +1,6 @@
 ---
 title: Alignment
+description: Learn about alignment in multiple time frame analysis
 icon: material/lock
 ---
 

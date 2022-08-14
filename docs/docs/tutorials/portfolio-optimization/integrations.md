@@ -1,5 +1,6 @@
 ---
 title: Integrations
+description: Learn about various integrations in portfolio optimization
 icon: material/lock
 ---
 

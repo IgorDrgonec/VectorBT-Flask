@@ -1,5 +1,6 @@
 ---
 title: Analysis
+description: Documentation on indicator analysis
 icon: material/chart-timeline-variant-shimmer
 ---
 
@@ -53,10 +54,7 @@ the data type of each array in the `attr_settings` dictionary:
 ... ).with_apply_func(apply_func)
 
 >>> def generate_index(n):
-...     return [
-...         datetime(2020, 1, 1) + timedelta(days=i) 
-...         for i in range(n)
-...     ]
+...     return pd.date_range("2020-01-01", periods=n)
 
 >>> ts = pd.DataFrame({
 ...     'a': [1, 2, 3, 2, 1, 2, 3],

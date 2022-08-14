@@ -1,5 +1,6 @@
 ---
 title: Remote
+description: Documentation on handling remote data
 icon: material/web
 ---
 
@@ -10,60 +11,85 @@ in pulling (mostly OHLCV) data from remote data sources. In contrast to the clas
 they communicate with remote API endpoints and are subject to authentication, authorization, throttling, 
 and other mechanisms that must be taken into account. Also, the amount of data to be fetched is
 usually not known in advance, and because most data providers have API rate limits and can return only
-a limited amount of data for each incoming request, there is often a need to manually iterate over
-smaller bunches of data and properly concatenate them.
+a limited amount of data for each incoming request, there is often a need to iterate over smaller bunches 
+of data and properly concatenate them. Fortunately, vectorbt implements a number of preset data classes 
+that can do all the jobs above automatically.
 
-## Preset classes
+## Arguments
 
-Fortunately, vectorbt implements a number of preset data classes that can do all the jobs above automatically.
+Most remote data classes have the following arguments in common:
+
+| Argument           | Description                                                                                                                                                                                                                                                                                                                                                       |
+|--------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `client`           | Client object required to make a request. Usually, the data class implements an additional class method `resolve_client` to instantiate the client based on the keyword arguments in `client_config` if the client is `None`. If the client has been provided, this step is omitted. You don't need to call the method `resolve_client`, it's done automatically. |
+| `client_config`    | Keyword arguments used to instantiate the client.                                                                                                                                                                                                                                                                                                                 |
+| `start`            | Start datetime. Will be converted into a `datetime.datetime` using [to_tzaware_datetime](/api/utils/datetime_/#vectorbtpro.utils.datetime_.to_tzaware_datetime) and may be further post-processed to fit the format accepted by the data provider.                                                                                                                |
+| `end`              | End datetime. Will be converted into a `datetime.datetime` using [to_tzaware_datetime](/api/utils/datetime_/#vectorbtpro.utils.datetime_.to_tzaware_datetime) and may be further post-processed to fit the format accepted by the data provider.                                                                                                                  |
+| `timeframe`        | Timeframe supplied as a human-readable string (such as `1 day`) consisting of a multiplier (`1`) and a unit (`day`). Will be parsed into a standardized format using [split_freq_str](/api/utils/datetime_/#vectorbtpro.utils.datetime_.split_freq_str).                                                                                                          |
+| `limit`            | Maximum number of data items to return per request.                                                                                                                                                                                                                                                                                                               |
+| `delay`            | Delay in milliseconds between requests. Helps to deal with API rate limits.                                                                                                                                                                                                                                                                                       | 
+| `retries`          | Number of retries in case of connectivity and other request-specific issues. Usually, only applied if the data class is capable of collecting data in bunches.                                                                                                                                                                                                    |
+| `show_progress`    | Whether to shop the progress bar using [get_pbar](/api/utils/pbar/#vectorbtpro.utils.pbar.get_pbar). Usually, only applied if the data class is capable of collecting data in bunches.                                                                                                                                                                            | 
+| `pbar_kwargs`      | Keyword arguments used for setting up the progress bar.                                                                                                                                                                                                                                                                                                           |
+| `silence_warnings` | Whether to silence all warnings to avoid being overflooded with messages such as in case of timeouts.                                                                                                                                                                                                                                                             |
+| `exchange`         | Exchange to fetch from in case the data class supports multiple. If the data class supports multiple exchanges, settings can also be defined per exchange!                                                                                                                                                                                                        |
+
 To get the list of arguments accepted by the fetcher of a remote data class, we can look into the API 
 reference, use the Python's `help` command, or the vectorbt's own helper function
 [format_func](https://vectorbt.pro/api/utils/formatting/#vectorbtpro.utils.formatting.format_func) 
-on the class method [Data.fetch_symbol](/api/data/base/#vectorbtpro.data.base.Data.fetch_symbol):
+on the class method [Data.fetch_symbol](/api/data/base/#vectorbtpro.data.base.Data.fetch_symbol),
+which creates a query for just one symbol and returns a Series/DataFrame:
 
 ```pycon
 >>> import vectorbtpro as vbt
+>>> import pandas as pd
+>>> import numpy as np
 
 >>> print(vbt.format_func(vbt.CCXTData.fetch_symbol))
 CCXTData.fetch_symbol(
     symbol,
     exchange=None,
-    timeframe=None,
+    exchange_config=None,
     start=None,
     end=None,
-    delay=None,
+    timeframe=None,
     limit=None,
+    delay=None,
     retries=None,
-    exchange_config=None,
     fetch_params=None,
     show_progress=None,
-    pbar_kwargs=None
+    pbar_kwargs=None,
+    silence_warnings=None
 ):
     Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from CCXT.
     
     Args:
         symbol (str): Symbol.
-        exchange (str or object): Exchange identifier or an exchange object of type
-            `ccxt.base.exchange.Exchange`.
-        timeframe (str): Timeframe supported by the exchange.
+        exchange (str or object): Exchange identifier or an exchange object.
+    
+            See `CCXTData.resolve_exchange`.
+        exchange_config (dict): Exchange config.
+    
+            See `CCXTData.resolve_exchange`.
         start (any): Start datetime.
     
             See `vectorbtpro.utils.datetime_.to_tzaware_datetime`.
         end (any): End datetime.
     
             See `vectorbtpro.utils.datetime_.to_tzaware_datetime`.
+        timeframe (str): Timeframe.
+    
+            Allows human-readable strings such as "15 minutes".
+        limit (int): The maximum number of returned items.
         delay (float): Time to sleep after each request (in milliseconds).
     
             !!! note
                 Use only if `enableRateLimit` is not set.
-        limit (int): The maximum number of returned items.
         retries (int): The number of retries on failure to fetch data.
-        exchange_config (dict): Keyword arguments passed to the exchange upon instantiation.
-    
-            Will raise an exception if exchange has been already instantiated.
         fetch_params (dict): Exchange-specific keyword arguments passed to `fetch_ohlcv`.
         show_progress (bool): Whether to show the progress bar.
         pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`.
+        silence_warnings (bool): Whether to silence all warnings.
     
     For defaults, see `custom.ccxt` in `vectorbtpro._settings.data`.
     Global settings can be provided per exchange id using the `exchanges` dictionary.
@@ -72,37 +98,105 @@ CCXTData.fetch_symbol(
 !!! hint
 
     The class method [Data.fetch](/api/data/base/#vectorbtpro.data.base.Data.fetch) usually takes the 
-    same arguments as [Data.fetch_symbol](/api/data/base/#vectorbtpro.data.base.Data.fetch_symbol),
-    but some classes override this method to initialize their clients or for other pre-processing tasks,
-    so it's worth looking at its signature too.
+    same arguments as [Data.fetch_symbol](/api/data/base/#vectorbtpro.data.base.Data.fetch_symbol).
 
-As we can see, [CCXTData](/api/data/custom/#vectorbtpro.data.custom.CCXTData) takes the exchange, the 
-timeframe, the start date, the end date, and other keyword arguments. But why are all argument values `None`? 
-Remember that `None` has a special meaning and instructs vectorbt to pull the argument's default value from the 
-[global settings](/api/_settings/). Particularly, we should look into the settings defined for CCXT, 
-which are located in the dictionary under `custom.ccxt` in [settings.data](/api/_settings/#vectorbtpro._settings.data):
+As we can see, the class [CCXTData](/api/data/custom/#vectorbtpro.data.custom.CCXTData) takes 
+the exchange object, the timeframe, the start date, the end date, and other keyword arguments. 
+
+### Settings
+
+But why are all argument values `None`? Remember that `None` has a special meaning and instructs 
+vectorbt to pull the argument's default value from the [global settings](/api/_settings/). 
+Particularly, we should look into the settings defined for CCXT, which are located in the dictionary 
+under `custom.ccxt` in [settings.data](/api/_settings/#vectorbtpro._settings.data):
 
 ```pycon
 >>> print(vbt.prettify(vbt.settings.data['custom']['ccxt']))
-{
-    'exchange': 'binance',
-    'exchange_config': {
-        'enableRateLimit': True
-    },
-    'timeframe': '1d',
-    'start': 0,
-    'end': 'now UTC',
-    'delay': None,
-    'limit': 500,
-    'retries': 3,
-    'show_progress': True,
-    'pbar_kwargs': {},
-    'fetch_params': {},
-    'exchanges': {}
-}
+FrozenConfig(
+    exchange='binance',
+    exchange_config=dict(
+        enableRateLimit=True
+    ),
+    start=0,
+    end='now UTC',
+    timeframe='1d',
+    limit=1000,
+    delay=None,
+    retries=3,
+    show_progress=True,
+    pbar_kwargs=dict(),
+    fetch_params=dict(),
+    exchanges=dict(),
+    silence_warnings=False
+)
 ```
 
-Using the default arguments will pull the symbol's entire daily data from Binance.
+Another way to get the settings is by using the method 
+[Data.get_settings](/api/data/base/#vectorbtpro.data.base.Data.get_settings):
+
+```pycon
+>>> print(vbt.prettify(vbt.CCXTData.get_settings(key_id="custom")))
+dict(
+    exchange='binance',
+    exchange_config=dict(
+        enableRateLimit=True
+    ),
+    start=0,
+    end='now UTC',
+    timeframe='1d',
+    limit=1000,
+    delay=None,
+    retries=3,
+    show_progress=True,
+    pbar_kwargs=dict(),
+    fetch_params=dict(),
+    exchanges=dict(),
+    silence_warnings=False
+)
+```
+
+!!! hint
+    Data classes register two key ids: `base` and `custom`. The id `base` manipulates the settings
+    for the base class [Data](/api/data/base/#vectorbtpro.data.base.Data), while the id `custom` 
+    manipulates the settings for any subclass of the class [CustomData](/api/data/custom/#vectorbtpro.data.custom.CustomData).
+
+Using the default arguments will pull the symbol's entire daily history from Binance.
+
+To set any default, we can change the config directly. Let's change the exchange to BitMEX:
+
+```pycon
+>>> vbt.settings.data["custom"]["ccxt"]["exchange"] = "bitmex"
+```
+
+Even simpler: similarly to how we used the method 
+[Data.get_settings](/api/data/base/#vectorbtpro.data.base.Data.get_settings)
+to get the settings dictionary, let's use the method 
+[Data.set_settings](/api/data/base/#vectorbtpro.data.base.Data.set_settings)
+to set them:
+
+```pycon
+>>> vbt.CCXTData.set_settings(key_id="custom", exchange="bitmex")
+>>> vbt.settings.data["custom"]["ccxt"]["exchange"]
+'bitmex'
+```
+
+!!! note
+    Overriding keys in the dictionary returned by 
+    [Data.get_settings](/api/data/base/#vectorbtpro.data.base.Data.get_settings)
+    will have no effect.
+
+What if we messed up? No need to panic! We can reset the settings at any time:
+
+```pycon
+>>> vbt.CCXTData.reset_settings(key_id="custom")
+>>> vbt.settings.data["custom"]["ccxt"]["exchange"]
+'binance'
+```
+
+!!! hint
+    This won't reset all settings in vectorbt, only those corresponding to this particular class.
+
+### Start and end
 
 Specifying dates and times is usually very easy thanks to the built-in datetime parser 
 [to_tzaware_datetime](/api/utils/datetime_/#vectorbtpro.utils.datetime_.to_tzaware_datetime), which can 
@@ -122,7 +216,8 @@ Let's illustrate this by fetching the last 10 minutes of the symbols `BTC/USDT` 
 ...     ['BTC/USDT', 'ETH/USDT'],
 ...     start='10 minutes ago UTC', 
 ...     end='now UTC', 
-...     timeframe='1m')
+...     timeframe='1m'
+... )
 ```
 
 !!! note
@@ -154,107 +249,294 @@ Open time
     otherwise, by the time the first symbol has been fetched, the resolved times for the next symbol
     may have already been changed.
 
-Let's make this configuration the default one:
+### Timeframe
+
+The timeframe format has been standardized across the entire vectorbt codebase, including the preset data 
+classes. This is done by the function [split_freq_str](/api/utils/datetime_/#vectorbtpro.utils.datetime_.split_freq_str),
+which splits a timeframe string into a multiplier and a unit:
 
 ```pycon
->>> vbt.settings.data['custom']['ccxt']['start'] = '10 minutes ago UTC'
->>> vbt.settings.data['custom']['ccxt']['end'] = 'now UTC'
->>> vbt.settings.data['custom']['ccxt']['timeframe'] = '1m'
+>>> from vectorbtpro.utils.datetime_ import split_freq_str
 
->>> ccxt_data = vbt.CCXTData.fetch(['BTC/USDT', 'ETH/USDT'])
+>>> split_freq_str("15 minutes")
+(15, 't')
+
+>>> split_freq_str("daily")
+(1, 'd')
+
+>>> split_freq_str("1wk")
+(1, 'W')
+
+>>> split_freq_str("annually")
+(1, 'Y')
 ```
 
-[=100% "Symbol 2/2"]{: .candystripe}
-
-To define any argument per exchange:
+After the split, each preset data class transforms the resulting multiplier and the unit into a 
+format acceptable by its API. For example, in the class [PolygonData](/api/data/custom/#vectorbtpro.data.custom.PolygonData),
+the unit `t` is getting translated into `minute`, while in the class [CCXTData](/api/data/custom/#vectorbtpro.data.custom.CCXTData)
+it's getting translated into `m`. But why is the unit `t` instead of `m` in the first place?
+This has something to do with date offsets: since timeframes are not only used in data classes
+but also to resample and group data, we require the unit to be accepted as both a date offset
+and a timedelta, unambiguously. For example, using `m` to construct a date offset (for the use in 
+[pandas.DataFrame.resample](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.resample.html))
+would yield a month end, while using it to construct a timedelta would yield a minute:
 
 ```pycon
->>> vbt.settings.data['custom']['ccxt']['exchanges']['binance'] = dict(retries=4)
+>>> from pandas.tseries.frequencies import to_offset
+
+>>> to_offset("1m")
+<MonthEnd>
+
+>>> pd.Timedelta("1m")
+Timedelta('0 days 00:01:00')
 ```
 
-This will override the universal default of `3`.
-
-That's about CCXT, but what about other data providers? Their API is not much different.
-Take the data class for communicating with [Alpaca](https://alpaca.markets/) for example:
-it takes the same arguments `start`, `end`, `timeframe`, `limit`, and `exchange` but with a slightly
-different behavior. Additionally, [AlpacaData](/api/data/custom/#vectorbtpro.data.custom.AlpacaData) 
-overrides [Data.fetch](/api/data/base/#vectorbtpro.data.base.Data.fetch) to instantiate the client
-(if not already supplied) based on keyword arguments in `client_kwargs`, such as `key_id` and `secret_key`.
-Why not doing this inside [Data.fetch_symbol](/api/data/base/#vectorbtpro.data.base.Data.fetch_symbol)? 
-Very simple: we don't want to repeat this for every single symbol.
+The unit `t`, on the other hand, is understood as a minute by both:
 
 ```pycon
->>> alpaca_data = vbt.AlpacaData.fetch(
-...     ['BTCUSD', 'ETHUSD'],
-...     start='10 minutes ago UTC', 
-...     end='now UTC', 
-...     timeframe='1m',
-...     client_kwargs=dict(
-...         key_id="{API Key ID}",  # (1)!
-...         secret_key="{Secret Key}",
-...     )    
+>>> to_offset("1t")
+<Minute>
+
+>>> pd.Timedelta("1t")
+Timedelta('0 days 00:01:00')
+```
+
+Let's pull the 30-minute `BTC/USDT` data of the current day:
+
+```pycon
+>>> ccxt_data = vbt.CCXTData.fetch(
+...     'BTC/USDT',
+...     start="today midnight UTC", 
+...     timeframe='30 minutes'
+... )
+>>> ccxt_data.get()
+                               Open      High       Low     Close      Volume
+Open time                                                                    
+2022-08-03 00:00:00+00:00  22985.93  23079.39  22784.80  22816.58  3817.29442
+2022-08-03 00:30:00+00:00  22817.93  22881.22  22727.00  22793.56  3404.20062
+2022-08-03 01:00:00+00:00  22793.57  22796.76  22681.22  22761.79  3097.42224
+...                             ...       ...       ...       ...         ...
+2022-08-03 09:00:00+00:00  23293.27  23399.99  23286.24  23326.36  4365.28629
+2022-08-03 09:30:00+00:00  23326.36  23400.00  23316.86  23383.55  2637.23450
+2022-08-03 10:00:00+00:00  23385.48  23453.35  23351.42  23409.76  2988.63481
+```
+
+### Client
+
+Many APIs require a client to make a request. Data classes based on such APIs usually have a 
+class method with the name `resolve_client` for resolving the client, which is called before 
+pulling each symbol. If the client hasn't been provided by the user (`None`), this method creates one 
+automatically based on the config `client_config`. Such a config can contain various things: from API 
+keys to connection parameters. For example, let's take a look at the default client of 
+[BinanceData](/api/data/custom/#vectorbtpro.data.custom.BinanceData):
+
+```pycon
+>>> binance_client = vbt.BinanceData.resolve_client()
+>>> binance_client
+<binance.client.Client at 0x7f893a193af0>
+```
+
+To supply information to this client, we can provide keyword arguments directly:
+
+```pycon
+>>> binance_client = vbt.BinanceData.resolve_client(
+...     api_key="YOUR_KEY",
+...     api_secret="YOUR_SECRET"
+... )
+>>> binance_client
+<binance.client.Client at 0x7f89183512e0>
+```
+
+Since the client is getting created automatically, we can pass all the client-related
+information using the argument `client_config` during fetching:
+
+```pycon
+>>> binance_data = vbt.BinanceData.fetch(
+...     "BTCUSDT",
+...     client_config=dict(
+...         api_key="YOUR_KEY",
+...         api_secret="YOUR_SECRET"
+...     )
+... )
+>>> binance_data.get()
+                               Open      High       Low     Close  \\
+Open time                                                           
+2017-08-17 00:00:00+00:00   4261.48   4485.39   4200.74   4285.08   
+2017-08-18 00:00:00+00:00   4285.08   4371.52   3938.77   4108.37   
+2017-08-19 00:00:00+00:00   4108.37   4184.69   3850.00   4139.98   
+...                             ...       ...       ...       ...   
+2022-08-01 00:00:00+00:00  23296.36  23509.68  22850.00  23268.01   
+2022-08-02 00:00:00+00:00  23266.90  23459.89  22654.37  22987.79   
+2022-08-03 00:00:00+00:00  22985.93  23453.35  22681.22  23429.08   
+                                ...
+                           Taker base volume  Taker quote volume  
+Open time                                                         
+2017-08-17 00:00:00+00:00         616.248541        2.678216e+06  
+2017-08-18 00:00:00+00:00         972.868710        4.129123e+06  
+2017-08-19 00:00:00+00:00         274.336042        1.118002e+06  
+...                                      ...                 ...  
+2022-08-01 00:00:00+00:00       71458.395830        1.658446e+09  
+2022-08-02 00:00:00+00:00       78122.085010        1.794828e+09  
+2022-08-03 00:00:00+00:00       28391.646330        6.536598e+08  
+
+[1813 rows x 9 columns]
+```
+
+But if you run [BinanceData.resolve_client](/api/data/custom/#vectorbtpro.data.custom.BinanceData.resolve_client),
+you'd know that it takes time to instantiate a client, and we don't want to wait that long for every
+single symbol we're attempting to fetch. Thus, a better decision would be instantiating a
+client manually only once and then passing it via the argument `client`, which will reuse the client
+and make fetching noticeably faster:
+
+```pycon
+>>> binance_data = vbt.BinanceData.fetch(
+...     "BTCUSDT",
+...     client=binance_client
 ... )
 ```
 
-1. Both parameters can also be defined globally in [settings.data](/api/_settings/#vectorbtpro._settings.data), 
-or you can instantiate your own client and either pass it as `client` or define it globally as well
+!!! info
+    This will also enable re-using the client or the client config during updating since passing any 
+    argument to the fetcher will store it inside the dictionary 
+    [Data.fetch_kwargs](/api/data/base/#vectorbtpro.data.base.Data.fetch_kwargs),
+    which is used by the updater.
 
 !!! warning
-    After fetching, the secrets are kept in [Data.fetch_kwargs](/api/data/base/#vectorbtpro.data.base.Data.fetch_kwargs)
-    for use in updating. Be careful when pickling the data instance and making the file accessible to others! 
-    A far better approach is to define them in [settings.data](/api/_settings/#vectorbtpro._settings.data).
+    But this also means that sharing the data object with anyone may expose your credentials!
 
-[=100% "Symbol 2/2"]{: .candystripe}
+To not compromise the security, the recommended approach is to set any credentials and clients
+globally, as we discussed previously. This won't store them inside the data instance.
 
 ```pycon
->>> alpaca_data.data['BTCUSD']
-                               Open      High       Low     Close     Volume  \\
-timestamp                                                                      
-2022-02-18 20:51:00+00:00  40076.93  40076.93  40004.96  40025.08  13.476127   
-2022-02-18 20:52:00+00:00  40023.43  40023.46  39974.53  39992.62  20.641257   
-2022-02-18 20:53:00+00:00  39989.30  40014.10  39975.01  39980.05  23.642147   
-2022-02-18 20:54:00+00:00  39980.05  40054.64  39975.00  40004.14  25.785768   
-2022-02-18 20:55:00+00:00  40004.14  40019.96  39983.61  39991.00  14.626027   
-2022-02-18 20:56:00+00:00  39991.00  39991.00  39943.00  39982.76  20.511136   
-2022-02-18 20:57:00+00:00  39981.37  39989.68  39925.67  39960.16  45.210278   
-2022-02-18 20:58:00+00:00  39960.17  39991.62  39955.94  39966.99  21.146296   
-2022-02-18 20:59:00+00:00  39967.00  40031.30  39957.65  40031.30  34.908979   
-
-                           Trade count          VWAP  
-timestamp                                             
-2022-02-18 20:51:00+00:00          433  40032.038743  
-2022-02-18 20:52:00+00:00          487  39992.018190  
-2022-02-18 20:53:00+00:00          470  39988.574341  
-2022-02-18 20:54:00+00:00          537  40013.240065  
-2022-02-18 20:55:00+00:00          479  40003.483027  
-2022-02-18 20:56:00+00:00          485  39965.798564  
-2022-02-18 20:57:00+00:00          602  39957.348959  
-2022-02-18 20:58:00+00:00          568  39973.988031  
-2022-02-18 20:59:00+00:00          709  39979.397976 
+>>> vbt.BinanceData.set_settings(
+...     key_id="custom",
+...     client_config=dict(
+...         api_key="YOUR_KEY",
+...         api_secret="YOUR_SECRET"
+...     )
+... )
 ```
 
-### Common arguments
+!!! hint
+    See the API documentation of the particular data class for examples.
 
-Most remote data classes have the following arguments in common:
+### Saving
 
-| Argument           | Description                                                                                                                                                                                                                                                                                                                                                                                             |
-|--------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `client`           | Client required to make a request. Usually, the data class overrides the method [Data.fetch](/api/data/base/#vectorbtpro.data.base.Data.fetch) to instantiate the client only once based on keyword arguments in `client_kwargs`. If `client` has been provided, this step is omitted and the client is forwarded down to [Data.fetch_symbol](/api/data/base/#vectorbtpro.data.base.Data.fetch_symbol). |
-| `start`            | Start datetime. Will be converted into a `datetime.datetime` using [to_tzaware_datetime](/api/utils/datetime_/#vectorbtpro.utils.datetime_.to_tzaware_datetime) and may be further post-processed to fit the format accepted by the data provider.                                                                                                                                                      |
-| `end`              | End datetime. Will be converted into a `datetime.datetime` using [to_tzaware_datetime](/api/utils/datetime_/#vectorbtpro.utils.datetime_.to_tzaware_datetime) and may be further post-processed to fit the format accepted by the data provider.                                                                                                                                                        |
-| `timeframe`        | Timeframe supplied as a string (such as `1d`) consisting of a multiplier (`1`) and a timespan (`d`).                                                                                                                                                                                                                                                                                                    |
-| `limit`            | Maximum number of data items to return per request.                                                                                                                                                                                                                                                                                                                                                     |
-| `delay`            | Delay in milliseconds between requests. Helps to deal with API rate limits.                                                                                                                                                                                                                                                                                                                             | 
-| `retries`          | Number of retries in case of connectivity and other request-specific issues. Usually, only applied if the data class is capable of collecting data in bunches.                                                                                                                                                                                                                                          |
-| `show_progress`    | Whether to shop the progress bar using [get_pbar](/api/utils/pbar/#vectorbtpro.utils.pbar.get_pbar). Usually, only applied if the data class is capable of collecting data in bunches.                                                                                                                                                                                                                  | 
-| `pbar_kwargs`      | Keyword arguments used for setting up the progress bar.                                                                                                                                                                                                                                                                                                                                                 |
-| `silence_warnings` | Whether to silence all warnings to avoid being overflooded with messages such as in case of timeouts.                                                                                                                                                                                                                                                                                                   |
-| `exchange`         | Exchange to fetch from in case the data class supports multiple.                                                                                                                                                                                                                                                                                                                                        |
+To save any remote data instance, see [this documentation](/documentation/data/local/). In short:
+pickling is preferred because it also saves all the arguments that were passed to the fetcher, 
+such as the selected timeframe. Those arguments are important when updating - without them,
+you'd have to provide them manually every time you attempt to update the data.
 
-All of these arguments can be set globally in [settings.data](/api/_settings/#vectorbtpro._settings.data).
-When the data class supports multiple exchanges, they can also be set per exchange!
+```pycon
+>>> binance_data = vbt.BinanceData.fetch(
+...     "BTCUSDT",
+...     start="today midnight UTC",
+...     timeframe="1 hour"
+... )
+>>> binance_data.save("binance_data")
 
-## CSV
+>>> binance_data = vbt.BinanceData.load("binance_data")
+>>> print(vbt.prettify(binance_data.fetch_kwargs))
+symbol_dict(
+    BTCUSDT=dict(
+        start='today midnight UTC',
+        timeframe='1 hour',
+        show_progress=True,
+        pbar_kwargs=dict(),
+        silence_warnings=False
+    )
+)
+```
+
+As we can see, all the arguments were saved along with the data instance. But in a case
+where we don't plan on updating the data, we can save the arrays themselves across one or
+multiple CSV files/HDF keys, one per symbol:
+
+```pycon
+>>> binance_data.to_csv()
+
+>>> csv_data = vbt.CSVData.fetch("BTCUSDT.csv")
+>>> print(vbt.prettify(csv_data.fetch_kwargs))
+symbol_dict(
+    BTCUSDT=dict(
+        path=PosixPath('BTCUSDT.csv')
+    )
+)
+```
+
+The fetching-related keyword arguments do not include the timeframe and other parameters anymore,
+they include only those that are important for the current data class holding the data - 
+[CSVData](/api/data/custom/#vectorbtpro.data.custom.CSVData).
+But we can still switch the class of our data instance back to the original data class 
+[BinanceData](/api/data/custom/#vectorbtpro.data.custom.BinanceData) using the method
+[Data.switch_class](/api/data/base/#vectorbtpro.data.base.Data.switch_class). We will also
+clear the fetching-related and returned keyword arguments since they are class-specific:
+
+```pycon
+>>> binance_data = csv_data.switch_class(
+...     new_cls=vbt.BinanceData, 
+...     clear_fetch_kwargs=True,
+...     clear_returned_kwargs=True
+... )
+>>> type(binance_data)
+vectorbtpro.data.custom.BinanceData
+```
+
+Finally, let's use [Data.update_fetch_kwargs](/api/data/base/#vectorbtpro.data.base.Data.update_fetch_kwargs)
+to update the fetching-related keyword arguments with the timeframe to avoid repeatedly 
+setting it when updating:
+
+```pycon
+>>> binance_data = binance_data.update_fetch_kwargs(timeframe="1 hour")
+>>> print(vbt.prettify(binance_data.fetch_kwargs))
+symbol_dict(
+    BTCUSDT=dict(
+        timeframe='1 hour'
+    )
+)
+```
+
+All of this could have been avoided if we used pickling.
+
+### Updating
+
+Updating a data instance is generally easy:
+
+```pycon
+>>> binance_data = binance_data.update()
+```
+
+!!! note
+    Updating the current data instance always returns a new data instance.
+
+Under the hood, the updater first overrides the start date with the latest date in the index,
+and then calls the fetcher. That's why we can specify or override any argument originally
+used in fetching. Also note that it will only pull new data if the end date is not fixed:
+if we used the end date `2022-01-01` when fetching, it will be used again when updating,
+thus make sure to set `end` to `"now"` or `"now UTC"`. Let's first fetch the history
+for the year 2020, and then append the history for the year 2021:
+
+```pycon
+>>> binance_data = vbt.BinanceData.fetch(
+...     "BTCUSDT", 
+...     start="2020-01-01", 
+...     end="2021-01-01"
+... )
+>>> binance_data = binance_data.update(end="2022-01-01")  # (1)!
+>>> binance_data.wrapper.index
+DatetimeIndex(['2020-01-01 00:00:00+00:00', '2020-01-02 00:00:00+00:00',
+               '2020-01-03 00:00:00+00:00', '2020-01-04 00:00:00+00:00',
+               '2020-01-05 00:00:00+00:00', '2020-01-06 00:00:00+00:00',
+               ...
+               '2021-12-26 00:00:00+00:00', '2021-12-27 00:00:00+00:00',
+               '2021-12-28 00:00:00+00:00', '2021-12-29 00:00:00+00:00',
+               '2021-12-30 00:00:00+00:00', '2021-12-31 00:00:00+00:00'],
+              dtype='datetime64[ns, UTC]', name='Open time', length=731, freq='D')
+```
+
+1. Without overriding, the argument `end` will default to the value passed to the fetcher - `2021-01-01`
+
+## From URL
 
 Even though [CSVData](/api/data/custom/#vectorbtpro.data.custom.CSVData) was designed for the local
 file system, we can apply a couple of tricks to pull remote data with it as well! Remember how
@@ -300,6 +582,8 @@ Date
 
 [1768 rows x 9 columns]
 ```
+
+### AWS S3
 
 Here's another example for AWS S3:
 

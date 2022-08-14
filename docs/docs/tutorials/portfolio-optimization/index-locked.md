@@ -1,5 +1,6 @@
 ---
 title: Portfolio optimization
+description: Learn about portfolio optimization. Not for sharing.
 ---
 
 # :material-lock-open: Portfolio optimization
@@ -674,7 +675,7 @@ Name: total_return, dtype: float64
     where the key is not present won't be passed for that group. If an argument is not wrapped with 
     [find_pfopt_groups](/api/portfolio/pfopt/base/#vectorbtpro.portfolio.pfopt.base.find_pfopt_groups),
     it will be passed for all groups. To specify the value for a particular group and the default value
-    for all other groups, you can use the `_default` key.
+    for all other groups, you can use the `_def` key.
 
 #### Numba
 

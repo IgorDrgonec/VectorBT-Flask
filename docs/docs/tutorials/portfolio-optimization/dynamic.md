@@ -1,5 +1,6 @@
 ---
 title: Dynamic optimization
+description: Learn about dynamic portfolio optimization
 icon: material/lock
 ---
 

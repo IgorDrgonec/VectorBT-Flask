@@ -1,5 +1,6 @@
 ---
 title: Features
+description: Some of the features of vectorbt PRO
 hide:
   - navigation
 ---
@@ -1102,6 +1103,40 @@ without the need of re-simulation!
 ```
 
 ![](/assets/images/features/mfe_with_tp.svg)
+
+### Patterns
+
+- [x] vectorbt PRO has designated functions and classes for detecting patterns of any complexity
+in any time series data. Thanks to Numba, hundreds of thousands of data sections can be checked 
+against a pattern per second.
+
+```pycon title="Find and plot a descending triangle pattern"
+>>> data = vbt.YFData.fetch('BTC-USD')
+
+>>> data.hlc3.vbt.find_pattern(
+...     pattern=[5, 1, 3, 1, 2, 1],
+...     window=100,
+...     max_window=700,
+... ).loc["2017":"2019"].plot()
+```
+
+![](/assets/images/features/descending_triangle.svg)
+
+### Projections
+
+- [x] There are better ways of analyzing events and their impact on the price than conventional backtesting.
+Meet projections! Not only do they allow assessing the performance of events both visually and quantitatively,
+but they also enable projecting them into the future for assistance in trading.
+
+```pycon title="Project the Golden Cross 30 days into the future"
+>>> data = vbt.YFData.fetch('BTC-USD')
+>>> fast_sma = data.run("sma", 50, short_name='fast_sma')
+>>> slow_sma = data.run("sma", 200, short_name='slow_sma')
+>>> signals = fast_sma.real_crossed_above(slow_sma)
+>>> signals.vbt.signals.delta_ranges("30d", close=data.close).plot_projections()
+```
+
+![](/assets/images/features/golden_cross_projections.svg)
 
 ## And many more...
 

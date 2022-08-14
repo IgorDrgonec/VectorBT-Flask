@@ -1,5 +1,6 @@
 ---
 title: Signal development
+description: Learn about signal development
 icon: material/lock
 ---
 

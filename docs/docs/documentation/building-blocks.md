@@ -1,5 +1,6 @@
 ---
 title: Building blocks
+description: Documentation on main building blocks of vectorbt
 icon: material/cube-outline
 ---
 

@@ -1,5 +1,6 @@
 ---
 title: Pipelines
+description: Learn about backtesting a SuperTrend indicator
 icon: material/lock
 ---
 

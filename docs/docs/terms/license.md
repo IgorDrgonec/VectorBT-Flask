@@ -1,5 +1,6 @@
 ---
 title: License
+description: License of vectorbt PRO
 ---
 
 # License
