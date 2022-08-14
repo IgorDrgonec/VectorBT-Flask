@@ -9,6 +9,7 @@ from vectorbtpro.indicators.configs import flex_elem_param_config
 from vectorbtpro.indicators.factory import IndicatorFactory
 from vectorbtpro.labels import nb
 from vectorbtpro.labels.enums import TrendMode
+from vectorbtpro.generic import enums as generic_enums
 
 __all__ = ["FMEAN", "FSTD", "FMIN", "FMAX", "FIXLB", "MEANLB", "LEXLB", "TRENDLB", "BOLB"]
 
@@ -18,12 +19,18 @@ FMEAN = IndicatorFactory(
     class_name="FMEAN",
     module_name=__name__,
     input_names=["close"],
-    param_names=["window", "ewm"],
+    param_names=["window", "wtype"],
     output_names=["fmean"],
 ).with_apply_func(
     nb.future_mean_nb,
     kwargs_as_args=["wait", "adjust"],
-    ewm=False,
+    param_settings=dict(
+        wtype=dict(
+            dtype=generic_enums.WType,
+            post_index_func=lambda index: index.str.lower(),
+        )
+    ),
+    wtype="simple",
     wait=1,
     adjust=False,
 )
@@ -34,12 +41,18 @@ FSTD = IndicatorFactory(
     class_name="FSTD",
     module_name=__name__,
     input_names=["close"],
-    param_names=["window", "ewm"],
+    param_names=["window", "wtype"],
     output_names=["fstd"],
 ).with_apply_func(
     nb.future_std_nb,
     kwargs_as_args=["wait", "adjust", "ddof"],
-    ewm=False,
+    param_settings=dict(
+        wtype=dict(
+            dtype=generic_enums.WType,
+            post_index_func=lambda index: index.str.lower(),
+        )
+    ),
+    wtype="simple",
     wait=1,
     adjust=False,
     ddof=0,
@@ -112,12 +125,18 @@ MEANLB = IndicatorFactory(
     class_name="MEANLB",
     module_name=__name__,
     input_names=["close"],
-    param_names=["window", "ewm"],
+    param_names=["window", "wtype"],
     output_names=["labels"],
 ).with_apply_func(
     nb.mean_labels_nb,
     kwargs_as_args=["wait", "adjust"],
-    ewm=False,
+    param_settings=dict(
+        wtype=dict(
+            dtype=generic_enums.WType,
+            post_index_func=lambda index: index.str.lower(),
+        )
+    ),
+    wtype="simple",
     wait=1,
     adjust=False,
 )

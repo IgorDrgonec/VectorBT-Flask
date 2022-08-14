@@ -43,7 +43,7 @@ def teardown_module():
 class TestGenerators:
     def test_FMEAN(self):
         assert_frame_equal(
-            vbt.FMEAN.run(close_ts, window=(2, 3), ewm=False).fmean,
+            vbt.FMEAN.run(close_ts, window=(2, 3), wtype="simple").fmean,
             pd.DataFrame(
                 np.array(
                     [
@@ -58,17 +58,17 @@ class TestGenerators:
                 index=close_ts.index,
                 columns=pd.MultiIndex.from_tuples(
                     [
-                        (2, False, "a"),
-                        (2, False, "b"),
-                        (3, False, "a"),
-                        (3, False, "b"),
+                        (2, "simple", "a"),
+                        (2, "simple", "b"),
+                        (3, "simple", "a"),
+                        (3, "simple", "b"),
                     ],
-                    names=["fmean_window", "fmean_ewm", None],
+                    names=["fmean_window", "fmean_wtype", None],
                 ),
             ),
         )
         assert_frame_equal(
-            vbt.FMEAN.run(close_ts, window=(2, 3), ewm=True).fmean,
+            vbt.FMEAN.run(close_ts, window=(2, 3), wtype="exp").fmean,
             pd.DataFrame(
                 np.array(
                     [
@@ -83,19 +83,19 @@ class TestGenerators:
                 index=close_ts.index,
                 columns=pd.MultiIndex.from_tuples(
                     [
-                        (2, True, "a"),
-                        (2, True, "b"),
-                        (3, True, "a"),
-                        (3, True, "b"),
+                        (2, "exp", "a"),
+                        (2, "exp", "b"),
+                        (3, "exp", "a"),
+                        (3, "exp", "b"),
                     ],
-                    names=["fmean_window", "fmean_ewm", None],
+                    names=["fmean_window", "fmean_wtype", None],
                 ),
             ),
         )
 
     def test_FSTD(self):
         assert_frame_equal(
-            vbt.FSTD.run(close_ts, window=(2, 3), ewm=False).fstd,
+            vbt.FSTD.run(close_ts, window=(2, 3), wtype="simple").fstd,
             pd.DataFrame(
                 np.array(
                     [
@@ -110,17 +110,17 @@ class TestGenerators:
                 index=close_ts.index,
                 columns=pd.MultiIndex.from_tuples(
                     [
-                        (2, False, "a"),
-                        (2, False, "b"),
-                        (3, False, "a"),
-                        (3, False, "b"),
+                        (2, "simple", "a"),
+                        (2, "simple", "b"),
+                        (3, "simple", "a"),
+                        (3, "simple", "b"),
                     ],
-                    names=["fstd_window", "fstd_ewm", None],
+                    names=["fstd_window", "fstd_wtype", None],
                 ),
             ),
         )
         assert_frame_equal(
-            vbt.FSTD.run(close_ts, window=(2, 3), ewm=True).fstd,
+            vbt.FSTD.run(close_ts, window=(2, 3), wtype="exp").fstd,
             pd.DataFrame(
                 np.array(
                     [
@@ -135,12 +135,12 @@ class TestGenerators:
                 index=close_ts.index,
                 columns=pd.MultiIndex.from_tuples(
                     [
-                        (2, True, "a"),
-                        (2, True, "b"),
-                        (3, True, "a"),
-                        (3, True, "b"),
+                        (2, "exp", "a"),
+                        (2, "exp", "b"),
+                        (3, "exp", "a"),
+                        (3, "exp", "b"),
                     ],
-                    names=["fstd_window", "fstd_ewm", None],
+                    names=["fstd_window", "fstd_wtype", None],
                 ),
             ),
         )
@@ -228,7 +228,7 @@ class TestGenerators:
 
     def test_MEANLB(self):
         assert_frame_equal(
-            vbt.MEANLB.run(close_ts, window=(2, 3), ewm=False).labels,
+            vbt.MEANLB.run(close_ts, window=(2, 3), wtype="simple").labels,
             pd.DataFrame(
                 np.array(
                     [
@@ -243,17 +243,17 @@ class TestGenerators:
                 index=close_ts.index,
                 columns=pd.MultiIndex.from_tuples(
                     [
-                        (2, False, "a"),
-                        (2, False, "b"),
-                        (3, False, "a"),
-                        (3, False, "b"),
+                        (2, "simple", "a"),
+                        (2, "simple", "b"),
+                        (3, "simple", "a"),
+                        (3, "simple", "b"),
                     ],
-                    names=["meanlb_window", "meanlb_ewm", None],
+                    names=["meanlb_window", "meanlb_wtype", None],
                 ),
             ),
         )
         assert_frame_equal(
-            vbt.MEANLB.run(close_ts, window=(2, 3), ewm=True).labels,
+            vbt.MEANLB.run(close_ts, window=(2, 3), wtype="exp").labels,
             pd.DataFrame(
                 np.array(
                     [
@@ -268,12 +268,12 @@ class TestGenerators:
                 index=close_ts.index,
                 columns=pd.MultiIndex.from_tuples(
                     [
-                        (2, True, "a"),
-                        (2, True, "b"),
-                        (3, True, "a"),
-                        (3, True, "b"),
+                        (2, "exp", "a"),
+                        (2, "exp", "b"),
+                        (3, "exp", "a"),
+                        (3, "exp", "b"),
                     ],
-                    names=["meanlb_window", "meanlb_ewm", None],
+                    names=["meanlb_window", "meanlb_wtype", None],
                 ),
             ),
         )

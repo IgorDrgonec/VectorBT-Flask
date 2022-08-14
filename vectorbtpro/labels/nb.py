@@ -24,16 +24,13 @@ from vectorbtpro.utils import chunking as ch
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="close", axis=1),
-    arg_take_spec=dict(close=ch.ArraySlicer(axis=1), window=None, ewm=None, wait=None, adjust=None),
+    arg_take_spec=dict(close=ch.ArraySlicer(axis=1), window=None, wtype=None, wait=None, adjust=None),
     merge_func=base_ch.column_stack,
 )
 @register_jitted(cache=True)
-def future_mean_nb(close: tp.Array2d, window: int, ewm: bool, wait: int = 1, adjust: bool = False) -> tp.Array2d:
+def future_mean_nb(close: tp.Array2d, window: int, wtype: int, wait: int = 1, adjust: bool = False) -> tp.Array2d:
     """Get the mean of the next period."""
-    if ewm:
-        out = generic_nb.ewm_mean_nb(close[::-1], window, minp=window, adjust=adjust)[::-1]
-    else:
-        out = generic_nb.rolling_mean_nb(close[::-1], window, minp=window)[::-1]
+    out = generic_nb.ma_nb(close[::-1], window, wtype=wtype, minp=window, adjust=adjust)[::-1]
     if wait > 0:
         return generic_nb.bshift_nb(out, wait)
     return out
@@ -41,23 +38,20 @@ def future_mean_nb(close: tp.Array2d, window: int, ewm: bool, wait: int = 1, adj
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="close", axis=1),
-    arg_take_spec=dict(close=ch.ArraySlicer(axis=1), window=None, ewm=None, wait=None, adjust=None, ddof=None),
+    arg_take_spec=dict(close=ch.ArraySlicer(axis=1), window=None, wtype=None, wait=None, adjust=None, ddof=None),
     merge_func=base_ch.column_stack,
 )
 @register_jitted(cache=True)
 def future_std_nb(
     close: tp.Array2d,
     window: int,
-    ewm: bool,
+    wtype: int,
     wait: int = 1,
     adjust: bool = False,
     ddof: int = 0,
 ) -> tp.Array2d:
     """Get the standard deviation of the next period."""
-    if ewm:
-        out = generic_nb.ewm_std_nb(close[::-1], window, minp=window, adjust=adjust)[::-1]
-    else:
-        out = generic_nb.rolling_std_nb(close[::-1], window, minp=window, ddof=ddof)[::-1]
+    out = generic_nb.msd_nb(close[::-1], window, wtype=wtype, minp=window, adjust=adjust, ddof=ddof)[::-1]
     if wait > 0:
         return generic_nb.bshift_nb(out, wait)
     return out
@@ -104,13 +98,13 @@ def fixed_labels_nb(close: tp.Array2d, n: int) -> tp.Array2d:
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="close", axis=1),
-    arg_take_spec=dict(close=ch.ArraySlicer(axis=1), window=None, ewm=None, wait=None, adjust=None),
+    arg_take_spec=dict(close=ch.ArraySlicer(axis=1), window=None, wtype=None, wait=None, adjust=None),
     merge_func=base_ch.column_stack,
 )
 @register_jitted(cache=True)
-def mean_labels_nb(close: tp.Array2d, window: int, ewm: bool, wait: int = 1, adjust: bool = False) -> tp.Array2d:
+def mean_labels_nb(close: tp.Array2d, window: int, wtype: int, wait: int = 1, adjust: bool = False) -> tp.Array2d:
     """Get the percentage change from the current value to the average of the next period."""
-    return (future_mean_nb(close, window, ewm, wait, adjust) - close) / close
+    return (future_mean_nb(close, window, wtype, wait, adjust) - close) / close
 
 
 @register_jitted(cache=True)
