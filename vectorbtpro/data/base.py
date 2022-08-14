@@ -22,7 +22,7 @@ from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import get_dict_attr
-from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
+from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig, copy_dict
 from vectorbtpro.utils.datetime_ import is_tz_aware, to_timezone, try_to_datetime_index
 from vectorbtpro.utils.parsing import get_func_arg_names, extend_args
 from vectorbtpro.utils.path_ import check_mkdir
@@ -478,6 +478,41 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             else:
                 _kwargs[k] = v
         return _kwargs
+
+    def switch_class(
+        self,
+        new_cls: tp.Type[DataT],
+        clear_fetch_kwargs: bool = False,
+        clear_returned_kwargs: bool = False,
+        **kwargs,
+    ) -> DataT:
+        """Switch the class of the data instance."""
+        if clear_fetch_kwargs:
+            new_fetch_kwargs = symbol_dict({k: dict() for k in self.symbols})
+        else:
+            new_fetch_kwargs = copy_dict(self.fetch_kwargs)
+        if clear_returned_kwargs:
+            new_returned_kwargs = symbol_dict({k: dict() for k in self.symbols})
+        else:
+            new_returned_kwargs = copy_dict(self.returned_kwargs)
+        return self.replace(cls_=new_cls, fetch_kwargs=new_fetch_kwargs, returned_kwargs=new_returned_kwargs, **kwargs)
+
+    def update_fetch_kwargs(self: DataT, **kwargs) -> DataT:
+        """Update `Data.fetch_kwargs`.
+
+        Returns a new instance."""
+        new_fetch_kwargs = copy_dict(self.fetch_kwargs)
+        for s in self.symbols:
+            if s not in new_fetch_kwargs:
+                new_fetch_kwargs[s] = dict()
+        for k, v in kwargs.items():
+            if isinstance(v, symbol_dict):
+                for s, _v in v.items():
+                    new_fetch_kwargs[s][k] = _v
+            else:
+                for s in new_fetch_kwargs:
+                    new_fetch_kwargs[s][k] = v
+        return self.replace(fetch_kwargs=new_fetch_kwargs)
 
     @classmethod
     def from_data(
