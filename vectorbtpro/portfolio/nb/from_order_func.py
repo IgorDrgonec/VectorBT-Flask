@@ -7,36 +7,12 @@ from numba import prange
 from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.portfolio import chunking as portfolio_ch
 from vectorbtpro.portfolio.nb.core import *
+from vectorbtpro.portfolio.nb.iter_ import *
 from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.returns import nb as returns_nb_
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.array_ import insert_argsort_nb
 from vectorbtpro.utils.template import RepFunc
-
-
-@register_jitted
-def get_elem_nb(ctx: tp.Union[OrderContext, PostOrderContext, SignalContext], arr: tp.FlexArray) -> tp.Scalar:
-    """Get the current element using flexible indexing given the context's `i` and `col`."""
-    return flex_select_auto_nb(arr, ctx.i, ctx.col, ctx.flex_2d)
-
-
-@register_jitted
-def get_grouped_elem_nb(
-    ctx: tp.Union[SegmentContext, OrderContext, PostOrderContext, FlexOrderContext],
-    arr: tp.FlexArray,
-) -> tp.Scalar:
-    """Get the current element using flexible indexing given the context's `i` and `group`."""
-    return flex_select_auto_nb(arr, ctx.i, ctx.group, ctx.flex_2d)
-
-
-@register_jitted
-def get_col_elem_nb(
-    ctx: tp.Union[RowContext, SegmentContext, OrderContext, FlexOrderContext, PostOrderContext, SignalContext],
-    col_or_group: int,
-    arr: tp.FlexArray,
-) -> tp.Scalar:
-    """Get the current element using flexible indexing given a column/group and the context's `i`."""
-    return flex_select_auto_nb(arr, ctx.i, col_or_group, ctx.flex_2d)
 
 
 @register_jitted
@@ -78,7 +54,7 @@ def sort_call_seq_out_nb(
 
     Arrays `size`, `size_type`, and `direction` utilize flexible indexing and must have at least 0 dimensions.
     If `ctx_select` is True, selects the elements of each `size`, `size_type`, and `direction`
-    using `get_col_elem_nb` assuming that each array can broadcast to `target_shape`.
+    using `select_from_col_nb` assuming that each array can broadcast to `target_shape`.
     Otherwise, selects using `vectorbtpro.base.indexing.flex_select_auto_nb` assuming that each array
     can broadcast to `group_len`.
 
@@ -103,9 +79,9 @@ def sort_call_seq_out_nb(
             raise ValueError("call_seq_out must follow CallSeqType.Default")
         col = ctx.from_col + c
         if ctx_select:
-            _size = get_col_elem_nb(ctx, col, size)
-            _size_type = get_col_elem_nb(ctx, col, size_type)
-            _direction = get_col_elem_nb(ctx, col, direction)
+            _size = select_from_col_nb(ctx, col, size)
+            _size_type = select_from_col_nb(ctx, col, size_type)
+            _direction = select_from_col_nb(ctx, col, direction)
         else:
             _size = flex_select_auto_nb(size, c, 0, False)
             _size_type = flex_select_auto_nb(size_type, c, 0, False)
@@ -199,15 +175,15 @@ def set_val_price_nb(c: SegmentContext, val_price: tp.FlexArray, price: tp.FlexA
     Allows specifying a valuation price of positive infinity (takes the current price)
     and negative infinity (takes the latest valuation price)."""
     for col in range(c.from_col, c.to_col):
-        _val_price = get_col_elem_nb(c, col, val_price)
+        _val_price = select_from_col_nb(c, col, val_price)
         if np.isinf(_val_price):
             if _val_price > 0:
-                _price = get_col_elem_nb(c, col, price)
+                _price = select_from_col_nb(c, col, price)
                 if np.isinf(_price):
                     if _price > 0:
-                        _price = get_col_elem_nb(c, col, c.close)
+                        _price = select_from_col_nb(c, col, c.close)
                     else:
-                        _price = get_col_elem_nb(c, col, c.open)
+                        _price = select_from_col_nb(c, col, c.open)
                 _val_price = _price
             else:
                 _val_price = c.last_val_price[col]
@@ -255,22 +231,22 @@ def def_order_func_nb(
 ) -> tp.Tuple[int, Order]:
     """Order function that creates an order based on default information."""
     return order_nb(
-        size=get_elem_nb(c, size),
-        price=get_elem_nb(c, price),
-        size_type=get_elem_nb(c, size_type),
-        direction=get_elem_nb(c, direction),
-        fees=get_elem_nb(c, fees),
-        fixed_fees=get_elem_nb(c, fixed_fees),
-        slippage=get_elem_nb(c, slippage),
-        min_size=get_elem_nb(c, min_size),
-        max_size=get_elem_nb(c, max_size),
-        size_granularity=get_elem_nb(c, size_granularity),
-        reject_prob=get_elem_nb(c, reject_prob),
-        price_area_vio_mode=get_elem_nb(c, price_area_vio_mode),
-        lock_cash=get_elem_nb(c, lock_cash),
-        allow_partial=get_elem_nb(c, allow_partial),
-        raise_reject=get_elem_nb(c, raise_reject),
-        log=get_elem_nb(c, log),
+        size=select_nb(c, size),
+        price=select_nb(c, price),
+        size_type=select_nb(c, size_type),
+        direction=select_nb(c, direction),
+        fees=select_nb(c, fees),
+        fixed_fees=select_nb(c, fixed_fees),
+        slippage=select_nb(c, slippage),
+        min_size=select_nb(c, min_size),
+        max_size=select_nb(c, max_size),
+        size_granularity=select_nb(c, size_granularity),
+        reject_prob=select_nb(c, reject_prob),
+        price_area_vio_mode=select_nb(c, price_area_vio_mode),
+        lock_cash=select_nb(c, lock_cash),
+        allow_partial=select_nb(c, allow_partial),
+        raise_reject=select_nb(c, raise_reject),
+        log=select_nb(c, log),
     )
 
 
@@ -578,8 +554,8 @@ def simulate_nb(
         >>> from vectorbtpro.portfolio.enums import SizeType, Direction
         >>> from vectorbtpro.portfolio.call_seq import build_call_seq
         >>> from vectorbtpro.portfolio.nb import (
-        ...     get_col_elem_nb,
-        ...     get_elem_nb,
+        ...     select_from_col_nb,
+        ...     select_nb,
         ...     order_nb,
         ...     simulate_nb,
         ...     simulate_row_wise_nb,
@@ -607,11 +583,11 @@ def simulate_nb(
         ...     print('\\t\\tbefore segment', c.i)
         ...     for col in range(c.from_col, c.to_col):
         ...         # Here we use order price for group valuation
-        ...         c.last_val_price[col] = get_col_elem_nb(c, col, price)
+        ...         c.last_val_price[col] = select_from_col_nb(c, col, price)
         ...
         ...     # Reorder call sequence of this segment such that selling orders come first and buying last
         ...     # Rearranges c.call_seq_now based on order value (size, size_type, direction, and val_price)
-        ...     # Utilizes flexible indexing using get_col_elem_nb (as we did above)
+        ...     # Utilizes flexible indexing using select_from_col_nb (as we did above)
         ...     sort_call_seq_nb(c, size, size_type, direction, order_value_out[c.from_col:c.to_col])
         ...     # Forward nothing
         ...     return ()
@@ -621,13 +597,13 @@ def simulate_nb(
         ...     print('\\t\\t\\tcreating order', c.call_idx, 'at column', c.col)
         ...     # Create and return an order
         ...     return order_nb(
-        ...         size=get_elem_nb(c, size),
-        ...         price=get_elem_nb(c, price),
-        ...         size_type=get_elem_nb(c, size_type),
-        ...         direction=get_elem_nb(c, direction),
-        ...         fees=get_elem_nb(c, fees),
-        ...         fixed_fees=get_elem_nb(c, fixed_fees),
-        ...         slippage=get_elem_nb(c, slippage)
+        ...         size=select_nb(c, size),
+        ...         price=select_nb(c, price),
+        ...         size_type=select_nb(c, size_type),
+        ...         direction=select_nb(c, direction),
+        ...         fees=select_nb(c, fees),
+        ...         fixed_fees=select_nb(c, fixed_fees),
+        ...         slippage=select_nb(c, slippage)
         ...     )
 
         >>> @njit
@@ -2366,22 +2342,22 @@ def def_flex_order_func_nb(
     if c.call_idx < c.group_len:
         col = c.from_col + call_seq_now[c.call_idx]
         order = order_nb(
-            size=get_col_elem_nb(c, col, size),
-            price=get_col_elem_nb(c, col, price),
-            size_type=get_col_elem_nb(c, col, size_type),
-            direction=get_col_elem_nb(c, col, direction),
-            fees=get_col_elem_nb(c, col, fees),
-            fixed_fees=get_col_elem_nb(c, col, fixed_fees),
-            slippage=get_col_elem_nb(c, col, slippage),
-            min_size=get_col_elem_nb(c, col, min_size),
-            max_size=get_col_elem_nb(c, col, max_size),
-            size_granularity=get_col_elem_nb(c, col, size_granularity),
-            reject_prob=get_col_elem_nb(c, col, reject_prob),
-            price_area_vio_mode=get_col_elem_nb(c, col, price_area_vio_mode),
-            lock_cash=get_col_elem_nb(c, col, lock_cash),
-            allow_partial=get_col_elem_nb(c, col, allow_partial),
-            raise_reject=get_col_elem_nb(c, col, raise_reject),
-            log=get_col_elem_nb(c, col, log),
+            size=select_from_col_nb(c, col, size),
+            price=select_from_col_nb(c, col, price),
+            size_type=select_from_col_nb(c, col, size_type),
+            direction=select_from_col_nb(c, col, direction),
+            fees=select_from_col_nb(c, col, fees),
+            fixed_fees=select_from_col_nb(c, col, fixed_fees),
+            slippage=select_from_col_nb(c, col, slippage),
+            min_size=select_from_col_nb(c, col, min_size),
+            max_size=select_from_col_nb(c, col, max_size),
+            size_granularity=select_from_col_nb(c, col, size_granularity),
+            reject_prob=select_from_col_nb(c, col, reject_prob),
+            price_area_vio_mode=select_from_col_nb(c, col, price_area_vio_mode),
+            lock_cash=select_from_col_nb(c, col, lock_cash),
+            allow_partial=select_from_col_nb(c, col, allow_partial),
+            raise_reject=select_from_col_nb(c, col, raise_reject),
+            log=select_from_col_nb(c, col, log),
         )
         return col, order
     return -1, order_nothing_nb()
@@ -2526,7 +2502,7 @@ def flex_simulate_nb(
         >>> from numba import njit
         >>> from vectorbtpro.portfolio.enums import SizeType, Direction
         >>> from vectorbtpro.portfolio.nb import (
-        ...     get_col_elem_nb,
+        ...     select_from_col_nb,
         ...     order_nb,
         ...     order_nothing_nb,
         ...     flex_simulate_nb,
@@ -2553,7 +2529,7 @@ def flex_simulate_nb(
         ...     print('\\t\\tbefore segment', c.i)
         ...     for col in range(c.from_col, c.to_col):
         ...         # Here we use order price for group valuation
-        ...         c.last_val_price[col] = get_col_elem_nb(c, col, price)
+        ...         c.last_val_price[col] = select_from_col_nb(c, col, price)
         ...
         ...     # Same as for simulate_nb, but since we don't have a predefined c.call_seq_now anymore,
         ...     # we need to store our new call sequence somewhere else
@@ -2570,13 +2546,13 @@ def flex_simulate_nb(
         ...         print('\\t\\t\\tcreating order', c.call_idx, 'at column', col)
         ...         # # Create and return an order
         ...         return col, order_nb(
-        ...             size=get_col_elem_nb(c, col, size),
-        ...             price=get_col_elem_nb(c, col, price),
-        ...             size_type=get_col_elem_nb(c, col, size_type),
-        ...             direction=get_col_elem_nb(c, col, direction),
-        ...             fees=get_col_elem_nb(c, col, fees),
-        ...             fixed_fees=get_col_elem_nb(c, col, fixed_fees),
-        ...             slippage=get_col_elem_nb(c, col, slippage)
+        ...             size=select_from_col_nb(c, col, size),
+        ...             price=select_from_col_nb(c, col, price),
+        ...             size_type=select_from_col_nb(c, col, size_type),
+        ...             direction=select_from_col_nb(c, col, direction),
+        ...             fees=select_from_col_nb(c, col, fees),
+        ...             fixed_fees=select_from_col_nb(c, col, fixed_fees),
+        ...             slippage=select_from_col_nb(c, col, slippage)
         ...         )
         ...     # All columns already processed -> break the loop
         ...     print('\\t\\t\\tbreaking out of the loop')

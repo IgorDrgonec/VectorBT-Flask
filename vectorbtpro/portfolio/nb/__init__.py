@@ -53,3 +53,4 @@ from vectorbtpro.portfolio.nb.from_order_func import *
 from vectorbtpro.portfolio.nb.from_orders import *
 from vectorbtpro.portfolio.nb.from_signals import *
 from vectorbtpro.portfolio.nb.records import *
+from vectorbtpro.portfolio.nb.iter_ import *

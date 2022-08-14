@@ -968,7 +968,7 @@ def prepare_last_value_nb(
     group_lens: tp.Array1d,
     cash_sharing: bool,
     init_cash: tp.FlexArray,
-    init_position: tp.FlexArray = np.asarray(0.),
+    init_position: tp.FlexArray = np.asarray(0.0),
     init_price: tp.FlexArray = np.asarray(np.nan),
 ) -> tp.Array1d:
     """Prepare `last_value`."""
@@ -1001,7 +1001,7 @@ def prepare_last_value_nb(
 @register_jitted(cache=True)
 def prepare_last_pos_record_nb(
     target_shape: tp.Shape,
-    init_position: tp.FlexArray = np.asarray(0.),
+    init_position: tp.FlexArray = np.asarray(0.0),
     init_price: tp.FlexArray = np.asarray(np.nan),
     fill_pos_record: bool = True,
 ) -> tp.RecordArray:
