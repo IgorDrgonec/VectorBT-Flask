@@ -157,6 +157,14 @@ def from_civil_nb(y: int, m: int, d: int) -> int:
 
 
 @register_jitted(cache=True)
+def matches_date_nb(ts: int, y: int, m: int, d: int) -> int:
+    """Check whether the timestamp match the date provided in the civil format."""
+    midnight_ts1 = midnight_nb(ts)
+    midnight_ts2 = from_civil_nb(y, m, d)
+    return midnight_ts1 == midnight_ts2
+
+
+@register_jitted(cache=True)
 def day_nb(ts: int) -> int:
     """Get the day of the month."""
     y, m, d = to_civil_nb(ts)

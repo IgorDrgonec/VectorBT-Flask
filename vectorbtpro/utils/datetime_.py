@@ -37,6 +37,8 @@ def split_freq_str(freq: str) -> tp.Optional[tp.Tuple[int, str]]:
     * "Y" for year"""
     freq = "".join(freq.strip().split())
     match = re.match(r"^(\d*)\s*(\w+)$", freq)
+    if match.group(1) == "" and match.group(2).isnumeric():
+        raise ValueError("Frequency must contain unit")
     if not match:
         return None
     if match.group(1) == "":
@@ -77,7 +79,6 @@ def prepare_freq(freq: tp.FrequencyLike) -> tp.FrequencyLike:
 
 def freq_to_timedelta(freq: tp.FrequencyLike) -> pd.Timedelta:
     """Convert a frequency-like object to `pd.Timedelta`."""
-    freq = prepare_freq(freq)
     if isinstance(freq, pd.Timedelta):
         return freq
     if isinstance(freq, str) and freq.startswith("-"):
@@ -85,6 +86,7 @@ def freq_to_timedelta(freq: tp.FrequencyLike) -> pd.Timedelta:
         freq = freq[1:]
     else:
         neg_td = False
+    freq = prepare_freq(freq)
     if isinstance(freq, str) and not freq[0].isdigit():
         # Otherwise "ValueError: unit abbreviation w/o a number"
         td = pd.Timedelta(1, unit=freq)
@@ -186,7 +188,6 @@ def infer_index_freq(
     detect_via_diff: bool = False,
 ) -> tp.Union[None, float, tp.PandasFrequency]:
     """Infer frequency of a datetime index if `freq` is None, otherwise convert `freq`."""
-    freq = prepare_freq(freq)
     if freq is None and isinstance(index, pd.DatetimeIndex):
         if index.freqstr is not None:
             freq = to_offset(index.freqstr)
