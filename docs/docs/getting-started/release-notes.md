@@ -7,6 +7,62 @@ description: All notable changes introduced in each release
 
 All notable changes in reverse chronological order.
 
+## Version 1.6.0 (15 Aug, 2022)
+
+- Fixed conversion of datetime indexes into nanosecond format on Windows by replacing `np.int_` to `np.int64`. 
+In addition, implemented the methods [Wrapping.ns_index](/api/base/wrapping/#vectorbtpro.base.wrapping.Wrapping.ns_index),
+[Wrapping.get_period_ns_index](/api/base/wrapping/#vectorbtpro.base.wrapping.Wrapping.get_period_ns_index),
+and [Wrapping.ns_freq](/api/base/wrapping/#vectorbtpro.base.wrapping.Wrapping.ns_freq) that do this automatically.
+- Added missing layout keyword arguments to [GenericSRAccessor.plot_pattern](/api/generic/accessors/#vectorbtpro.generic.accessors.GenericSRAccessor.plot_pattern)
+- Unified the timeframe format across the entire codebase, including custom data classes.
+This allows for passing human-readable strings such as "15 minutes".
+- Switched the third-party package of [AlpacaData](/api/data/custom/#vectorbtpro.data.custom.AlpacaData) 
+from the outdated `alpaca-trade-api-python` to the newest `alpaca-py`
+- Added configuration examples under the API documentation of each custom data class
+- Added functionality for the configured classes to talk to their globally defined settings,
+which includes the methods [Configured.get_settings](/api/utils/config/#vectorbtpro.utils.config.Configured.get_settings),
+[Configured.set_settings](/api/utils/config/#vectorbtpro.utils.config.Configured.set_settings), and 
+[Configured.reset_settings](/api/utils/config/#vectorbtpro.utils.config.Configured.reset_settings). The
+key pointing towards the global settings is stored in the class variable `_settings_key`. This allows
+to seamlessly change the settings of custom data classes, for example.
+- Fixed forced import of dill
+- Enabled using mappings in [MappedArray.to_pd](/api/records/mapped_array/#vectorbtpro.records.mapped_array.MappedArray.to_pd)
+- Renamed the default key `_default` to `_def` everywhere ([BCO](/api/base/reshaping/#vectorbtpro.base.reshaping.BCO)
+instances, index dictionaries, etc.)
+- Fixed getting the duration of range-like records when the index is not datetime-like
+- [Orders](/api/portfolio/trades/#vectorbtpro.portfolio.orders.Orders) has got two new fields: `signed_size` and `value`
+- Refactored iterative helper functions for portfolio. For instance, `get_elem_nb` has been renamed
+to `select_nb`. Added iterative above and crossover functions. All such functions have been put into 
+the module [iter_](/api/portfolio/nb/iter_/).
+- Implemented iterative above and crossover functions in [iter_](/api/generic/nb/iter_/)
+- Added methods [Data.switch_class](/api/data/base/#vectorbtpro.data.base.Data.switch_class)
+and [Data.update_fetch_kwargs](/api/data/base/#vectorbtpro.data.base.Data.update_fetch_kwargs) 
+to switch between data classes more easily
+- Fixed the Basic RSI tutorial, documentation, and label generators to use the newest `wtype` argument
+- Changed the default start value for cumulative returns from 0 to 1
+- Refactored [Portfolio.from_signals](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_signals)
+once again:
+    - Renamed `StopExitMode` and `upon_stop_exit` to `StopExitType` and `stop_exit_type` respectively
+    - Renamed the suffix of index fields in limit and stop order records from `i` to `idx`
+    - Added exit price, exit type, and order type to stop order records. The information is now being
+    pulled from the entry point rather than exit point!
+    - Disabled bound checking globally as the vectorbt's functionality has been thoroughly tested.
+    You can still add `boundscheck=True` to the `@njit` decorator to enable bound checking in your function.
+    - In-outputs in the flexible mode are now being handled the same as in [Portfolio.from_order_func](/api/portfolio/base/#vectorbtpro.portfolio.base.Portfolio.from_order_func).
+    Argument `fill_returns` has been disabled for that mode.
+    - Delayed the resolution of the arguments `limit_tif` and `limit_expiry` to after broadcasting
+    - Simulation iterates in the group-major order in the flexible mode regardless of cash sharing
+    - Argument `stop_exit_price` can take a custom price
+    - In a group with cash sharing, orders are additionally sorted by bar zone if automatic call sequence is disabled
+    - Added a variety of convenient functions for working in callbacks, such as 
+    [set_limit_info_nb](/api/portfolio/nb/from_signals/#vectorbtpro.portfolio.nb.from_signals.set_limit_info_nb)
+    - Groups are now being valuated strictly using the valuation price (which is mostly the opening price)
+    to avoid the look-ahead bias when working with limit and stop orders
+    - Fixed the scenario where the valuation price was set to the order price in limit and stop orders
+- Added a convenient function `vbt.clear_pycache()` to clear the cache of the entire package
+- Added Python 3.10 support :partying_face:
+- Wrote documentation on [From signals](/documentation/portfolio/from-signals/) :notebook_with_decorative_cover:
+
 ## Version 1.5.0 (29 Jul, 2022)
 
 - Implemented [simulate_from_signals_nb](/api/portfolio/nb/from_signals/#vectorbtpro.portfolio.nb.from_signals.simulate_from_signals_nb), 
