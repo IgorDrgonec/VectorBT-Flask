@@ -2186,7 +2186,8 @@ class AlphaVantageData(RemoteData):  # pragma: no cover
         ...     function="STOCH",
         ...     params=dict(fastkperiod=14)
         ... )
-        ```."""
+        ```
+    """
 
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.alpha_vantage")
 
