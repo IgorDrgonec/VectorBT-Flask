@@ -59,6 +59,7 @@ markdown_extensions:
   - toc:
       permalink: true
   - abbr
+  - pymdownx.tilde
   - pymdownx.keys
   - pymdownx.details
   - pymdownx.inlinehilite

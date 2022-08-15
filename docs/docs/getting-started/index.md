@@ -210,7 +210,7 @@ and exclusively available to all eligible sponsors, as they are made collaborato
     Only sponsors have exclusive access rights.
 
 Sponsorships start as low as [__$25 a month__](https://github.com/sponsors/polakowo/sponsorships?pay_prorated=false&tier_id=124816) 
-or [__$500 one time__](https://github.com/sponsors/polakowo/sponsorships?tier_id=124837).[^1]
+or ~~$700~~ [__$500 one time__](https://github.com/sponsors/polakowo/sponsorships?tier_id=124837).[^1]
 One-time payments can also be made in :material-bitcoin: and :material-ethereum: - please [contact me](emailto:olegpolakow@gmail.com).
 
 You can cancel your sponsorship anytime.[^2]

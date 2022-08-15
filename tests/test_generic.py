@@ -5,7 +5,6 @@ from itertools import permutations
 import pytest
 from numba import njit
 from sklearn.model_selection import TimeSeriesSplit
-from statsmodels.regression.rolling import RollingOLS
 
 import vectorbtpro as vbt
 from vectorbtpro.generic import nb
@@ -652,6 +651,8 @@ class TestAccessors:
     @pytest.mark.parametrize("test_window", [2, 3, 4, 5])
     def test_rolling_ols(self, test_window):
         def sr_ols(x, y):
+            from statsmodels.regression.rolling import RollingOLS
+
             intercept_slope = (
                 RollingOLS(
                     y, np.column_stack((np.broadcast_to(1, x.shape), x)), window=test_window, min_nobs=test_window
@@ -713,6 +714,8 @@ class TestAccessors:
 
     def test_expanding_ols(self):
         def sr_ols(x, y):
+            from statsmodels.regression.rolling import RollingOLS
+
             intercept_slope = (
                 RollingOLS(y, np.column_stack((np.broadcast_to(1, x.shape), x)), expanding=True).fit().params
             )
