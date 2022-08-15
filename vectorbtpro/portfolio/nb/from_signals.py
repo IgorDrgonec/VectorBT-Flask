@@ -2120,7 +2120,7 @@ def set_limit_info_nb(
 ) -> None:
     """Set limit order information.
 
-    See `vectorbtpro.generic.enums.limit_info_dt`."""
+    See `vectorbtpro.portfolio.enums.limit_info_dt`."""
     limit_info["signal_idx"] = signal_idx
     limit_info["creation_idx"] = creation_idx if creation_idx is not None else signal_idx
     limit_info["init_idx"] = init_idx if init_idx is not None else signal_idx
@@ -2170,7 +2170,7 @@ def set_sl_info_nb(
 ) -> None:
     """Set SL order information.
 
-    See `vectorbtpro.generic.enums.sl_info_dt`."""
+    See `vectorbtpro.portfolio.enums.sl_info_dt`."""
     sl_info["init_idx"] = init_idx
     sl_info["init_price"] = init_price
     sl_info["stop"] = stop
@@ -2211,7 +2211,7 @@ def set_tsl_info_nb(
 ) -> None:
     """Set TSL order information.
 
-    See `vectorbtpro.generic.enums.tsl_info_dt`."""
+    See `vectorbtpro.portfolio.enums.tsl_info_dt`."""
     tsl_info["init_idx"] = init_idx
     tsl_info["init_price"] = init_price
     tsl_info["peak_idx"] = peak_idx if peak_idx is not None else init_idx
@@ -2255,7 +2255,7 @@ def set_tp_info_nb(
 ) -> None:
     """Set TP order information.
 
-    See `vectorbtpro.generic.enums.tp_info_dt`."""
+    See `vectorbtpro.portfolio.enums.tp_info_dt`."""
     tp_info["init_idx"] = init_idx
     tp_info["init_price"] = init_price
     tp_info["stop"] = stop

@@ -197,6 +197,7 @@ nav:
         - api/generic/nb/index.md
         - apply_reduce: api/generic/nb/apply_reduce.md
         - base: api/generic/nb/base.md
+        - iter_: api/generic/nb/iter_.md
         - patterns: api/generic/nb/patterns.md
         - records: api/generic/nb/records.md
         - rolling: api/generic/nb/rolling.md
@@ -240,6 +241,7 @@ nav:
         - from_order_func: api/portfolio/nb/from_order_func.md
         - from_orders: api/portfolio/nb/from_orders.md
         - from_signals: api/portfolio/nb/from_signals.md
+        - iter_: api/portfolio/nb/iter_.md
         - records: api/portfolio/nb/records.md
       - orders: api/portfolio/orders.md
       - pfopt:
