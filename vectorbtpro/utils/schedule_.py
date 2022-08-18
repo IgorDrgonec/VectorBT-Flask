@@ -143,6 +143,12 @@ class ScheduleManager:
 
             >>> my_manager.every('10:30').do(job_func)
             Every 1 day at 10:30:00 do job_func() (last run: [never], next run: 2021-03-19 10:30:00)
+            
+            >>> my_manager.every('hour', '00:00').do(job_func)
+            Every 1 hour at 00:00:00 do job_func() (last run: [never], next run: 2021-03-19 10:30:00)
+
+            >>> my_manager.every(4, 'hour', '00:00').do(job_func)
+            Every 4 hours at 00:00:00 do job_func() (last run: [never], next run: 2021-03-19 10:30:00)
 
             >>> my_manager.every('day', '10:30').do(job_func)
             Every 1 day at 10:30:00 do job_func() (last run: [never], next run: 2021-03-19 10:30:00)
