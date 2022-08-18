@@ -17,17 +17,61 @@ from vectorbtpro.utils.datetime_ import tzaware_to_naive_time
 logger = logging.getLogger(__name__)
 
 
+class CustomScheduler(Scheduler):
+    def __init__(self):
+        super(CustomScheduler, self).__init__()
+
+
+class CustomJob(Job):
+    def __init__(self, interval, scheduler=None):
+        super(CustomJob, self).__init__(interval, scheduler)
+        self._zero_offset = False
+        self._force_missed_run = False
+        self.future_run = None
+
+    @property
+    def zero_offset(self):
+        self._zero_offset = True
+        return self
+
+    @property
+    def force_missed_run(self):
+        self._force_missed_run = True
+        return self
+
+    @property
+    def modulo(self):
+        if self.unit == "minutes":
+            return self.next_run.minute % self.interval
+        if self.unit == "hours":
+            return self.next_run.hour % self.interval
+        if self.unit == "days":
+            return self.next_run.day % self.interval
+
+    def _schedule_next_run(self):
+        super(CustomJob, self)._schedule_next_run()
+
+        if self.latest is None and self._zero_offset:
+            if self.modulo != 0:
+                self.next_run -= timedelta(**{self.unit: self.modulo})
+
+        if self.future_run and self.future_run < self.next_run and self._force_missed_run:
+            self.next_run, self.future_run = self.future_run, self.next_run
+        else:
+            self.future_run = self.next_run + self.period
+
+
 class CancelledError(asyncio.CancelledError):
     """Thrown for the operation to be cancelled."""
 
     pass
 
 
-class AsyncJob(Job):
-    """Async `schedule.Job`."""
+class AsyncJob(CustomJob):
+    """Async `CustomJob`."""
 
     async def async_run(self) -> tp.Any:
-        """Async `Job.run`."""
+        """Async `CustomJob.run`."""
         logger.info("Running job %s", self)
         ret = self.job_func()
         if inspect.isawaitable(ret):
@@ -37,23 +81,23 @@ class AsyncJob(Job):
         return ret
 
 
-class AsyncScheduler(Scheduler):
-    """Async `schedule.Scheduler`."""
+class AsyncScheduler(CustomScheduler):
+    """Async `CustomScheduler`."""
 
     async def async_run_pending(self) -> None:
-        """Async `Scheduler.run_pending`."""
+        """Async `CustomScheduler.run_pending`."""
         runnable_jobs = (job for job in self.jobs if job.should_run)
         await asyncio.gather(*[self._async_run_job(job) for job in runnable_jobs])
 
     async def async_run_all(self, delay_seconds: int = 0) -> None:
-        """Async `Scheduler.run_all`."""
+        """Async `CustomScheduler.run_all`."""
         logger.info("Running *all* %i jobs with %is delay in-between", len(self.jobs), delay_seconds)
         for job in self.jobs[:]:
             await self._async_run_job(job)
             await asyncio.sleep(delay_seconds)
 
     async def _async_run_job(self, job: AsyncJob) -> None:
-        """Async `Scheduler.run_job`."""
+        """Async `CustomScheduler.run_job`."""
         ret = await job.async_run()
         if isinstance(ret, CancelJob) or ret is CancelJob:
             self.cancel_job(job)
@@ -65,7 +109,7 @@ class AsyncScheduler(Scheduler):
 
 
 class ScheduleManager:
-    """Class that manages `schedule.Scheduler`."""
+    """Class that manages `CustomScheduler`."""
 
     units: tp.ClassVar[tp.Tuple[str, ...]] = (
         "second",
@@ -108,7 +152,14 @@ class ScheduleManager:
         """Current async task."""
         return self._async_task
 
-    def every(self, *args, to: tp.Optional[int] = None, tags: tp.Optional[tp.Iterable[tp.Hashable]] = None) -> AsyncJob:
+    def every(
+        self,
+        *args,
+        to: tp.Optional[int] = None,
+        zero_offset: bool = False,
+        force_missed_run: bool = False,
+        tags: tp.Optional[tp.Iterable[tp.Hashable]] = None,
+    ) -> AsyncJob:
         """Create a new job that runs every `interval` units of time.
 
         `*args` can include at most four different arguments: `interval`, `unit`, `start_day`, and `at`,
@@ -138,8 +189,17 @@ class ScheduleManager:
             >>> my_manager.every(10, 'minutes').do(job_func)
             Every 10 minutes do job_func() (last run: [never], next run: 2021-03-18 19:16:46)
 
+            >>> my_manager.every(10, 'minutes', ':00', zero_offset=True).do(job_func)
+            Every 10 minutes at 00:00:00 do job_func() (last run: [never], next run: 2022-08-18 16:10:00)
+
             >>> my_manager.every('hour').do(job_func)
             Every 1 hour do job_func() (last run: [never], next run: 2021-03-18 20:06:46)
+
+            >>> my_manager.every('hour', '00:00').do(job_func)
+            Every 1 hour at 00:00:00 do job_func() (last run: [never], next run: 2021-03-18 20:00:00)
+
+            >>> my_manager.every(4, 'hours', '00:00').do(job_func)
+            Every 4 hours at 00:00:00 do job_func() (last run: [never], next run: 2021-03-19 00:00:00)
 
             >>> my_manager.every('10:30').do(job_func)
             Every 1 day at 10:30:00 do job_func() (last run: [never], next run: 2021-03-19 10:30:00)
@@ -241,6 +301,10 @@ class ScheduleManager:
             if not isinstance(tags, tuple):
                 tags = (tags,)
             job = job.tag(*tags)
+        if zero_offset:
+            job = job.zero_offset
+        if force_missed_run:
+            job = job.force_missed_run
 
         return job
 
