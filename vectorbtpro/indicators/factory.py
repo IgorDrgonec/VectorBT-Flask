@@ -2878,7 +2878,7 @@ Other keyword arguments are passed to `{0}.run`.
             add_trace_kwargs: tp.KwargsLike = None,
             fig: tp.Optional[tp.BaseFigure] = None,
             **kwargs,
-        ) -> tp.BaseFigure:  # pragma: no cover
+        ) -> tp.BaseFigure:
             from vectorbtpro._settings import settings
 
             plotting_cfg = settings["plotting"]

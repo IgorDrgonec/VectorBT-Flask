@@ -2218,7 +2218,7 @@ class SignalsAccessor(GenericAccessor):
 
     # ############# Plotting ############# #
 
-    def plot(self, yref: str = "y", **kwargs) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:  # pragma: no cover
+    def plot(self, yref: str = "y", **kwargs) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
         """Plot signals.
 
         Args:
@@ -2271,7 +2271,7 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
         self,
         y: tp.Optional[tp.ArrayLike] = None,
         **kwargs,
-    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:  # pragma: no cover
+    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
         """Plot Series as markers.
 
         Args:
@@ -2332,7 +2332,7 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
         self,
         y: tp.Optional[tp.ArrayLike] = None,
         **kwargs,
-    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:  # pragma: no cover
+    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
         """Plot signals as entry markers.
 
         See `SignalsSRAccessor.plot_as_markers`."""
@@ -2361,7 +2361,7 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
         self,
         y: tp.Optional[tp.ArrayLike] = None,
         **kwargs,
-    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:  # pragma: no cover
+    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
         """Plot signals as exit markers.
 
         See `SignalsSRAccessor.plot_as_markers`."""
@@ -2390,7 +2390,7 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
         self,
         y: tp.Optional[tp.ArrayLike] = None,
         **kwargs,
-    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:  # pragma: no cover
+    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
         """Plot signals as marked entry markers.
 
         See `SignalsSRAccessor.plot_as_markers`."""
@@ -2423,7 +2423,7 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
         self,
         y: tp.Optional[tp.ArrayLike] = None,
         **kwargs,
-    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:  # pragma: no cover
+    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
         """Plot signals as marked exit markers.
 
         See `SignalsSRAccessor.plot_as_markers`."""

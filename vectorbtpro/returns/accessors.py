@@ -1682,7 +1682,7 @@ class ReturnsAccessor(GenericAccessor):
         yref: str = "y",
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs,
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot cumulative returns.
 
         Args:

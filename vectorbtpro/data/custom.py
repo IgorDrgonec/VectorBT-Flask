@@ -826,7 +826,7 @@ class RemoteData(CustomData):
         return self.fetch_symbol(symbol, **kwargs)
 
 
-class YFData(RemoteData):  # pragma: no cover
+class YFData(RemoteData):
     """Subclass of `vectorbtpro.data.base.Data` for `yfinance`.
 
     See https://github.com/ranaroussi/yfinance for API.
@@ -963,7 +963,7 @@ YFData.override_column_config_doc(__pdoc__)
 BinanceDataT = tp.TypeVar("BinanceDataT", bound="BinanceData")
 
 
-class BinanceData(RemoteData):  # pragma: no cover
+class BinanceData(RemoteData):
     """Subclass of `vectorbtpro.data.base.Data` for `python-binance`.
 
     See https://github.com/sammchardy/python-binance for API.
@@ -1248,7 +1248,7 @@ class BinanceData(RemoteData):  # pragma: no cover
 BinanceData.override_column_config_doc(__pdoc__)
 
 
-class CCXTData(RemoteData):  # pragma: no cover
+class CCXTData(RemoteData):
     """Subclass of `vectorbtpro.data.base.Data` for `ccxt`.
 
     See https://github.com/ccxt/ccxt for API.
@@ -1546,7 +1546,7 @@ class CCXTData(RemoteData):  # pragma: no cover
 AlpacaDataT = tp.TypeVar("AlpacaDataT", bound="AlpacaData")
 
 
-class AlpacaData(RemoteData):  # pragma: no cover
+class AlpacaData(RemoteData):
     """Subclass of `vectorbtpro.data.base.Data` for `alpaca-py`.
 
     See https://github.com/alpacahq/alpaca-py for API.
@@ -1798,7 +1798,7 @@ AlpacaData.override_column_config_doc(__pdoc__)
 PolygonDataT = tp.TypeVar("PolygonDataT", bound="PolygonData")
 
 
-class PolygonData(RemoteData):  # pragma: no cover
+class PolygonData(RemoteData):
     """Subclass of `vectorbtpro.data.base.Data` for `polygon-api-client`.
 
     See https://github.com/polygon-io/client-python" for API.
@@ -2130,7 +2130,7 @@ PolygonData.override_column_config_doc(__pdoc__)
 AlphaVantageDataT = tp.TypeVar("AlphaVantageDataT", bound="AlphaVantageData")
 
 
-class AlphaVantageData(RemoteData):  # pragma: no cover
+class AlphaVantageData(RemoteData):
     """Subclass of `vectorbtpro.data.base.Data` for `alpha_vantage`.
 
     Instead of using https://github.com/RomelTorres/alpha_vantage package, which is stale and has
@@ -2513,7 +2513,7 @@ class AlphaVantageData(RemoteData):  # pragma: no cover
 NDLDataT = tp.TypeVar("NDLDataT", bound="NDLData")
 
 
-class NDLData(RemoteData):  # pragma: no cover
+class NDLData(RemoteData):
     """Subclass of `vectorbtpro.data.base.Data` for `nasdaqdatalink`.
 
     See https://github.com/Nasdaq/data-link-python for API.
@@ -2662,7 +2662,7 @@ class NDLData(RemoteData):  # pragma: no cover
 TVDataT = tp.TypeVar("TVDataT", bound="TVData")
 
 
-class TVData(RemoteData):  # pragma: no cover
+class TVData(RemoteData):
     """Subclass of `vectorbtpro.data.base.Data` for `tvdatafeed`.
 
     See https://github.com/StreamAlpha/tvdatafeed for API.

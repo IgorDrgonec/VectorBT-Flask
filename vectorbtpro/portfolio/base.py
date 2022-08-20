@@ -10046,27 +10046,27 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
     # ############# Plotting ############# #
 
-    def plot_orders(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_orders(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
         """Plot one column/group of orders."""
         kwargs = merge_dicts(dict(close_trace_kwargs=dict(name="Close")), kwargs)
         return self.orders.regroup(False).plot(column=column, **kwargs)
 
-    def plot_trades(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_trades(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
         """Plot one column/group of trades."""
         kwargs = merge_dicts(dict(close_trace_kwargs=dict(name="Close")), kwargs)
         return self.trades.regroup(False).plot(column=column, **kwargs)
 
-    def plot_trade_pnl(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_trade_pnl(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
         """Plot one column/group of trade PnL."""
         kwargs = merge_dicts(dict(close_trace_kwargs=dict(name="Close")), kwargs)
         return self.trades.regroup(False).plot_pnl(column=column, **kwargs)
 
-    def plot_positions(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_positions(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
         """Plot one column/group of positions."""
         kwargs = merge_dicts(dict(close_trace_kwargs=dict(name="Close")), kwargs)
         return self.positions.regroup(False).plot(column=column, **kwargs)
 
-    def plot_position_pnl(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_position_pnl(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
         """Plot one column/group of position PnL."""
         kwargs = merge_dicts(dict(close_trace_kwargs=dict(name="Close")), kwargs)
         return self.positions.regroup(False).plot_pnl(column=column, **kwargs)
@@ -10081,7 +10081,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         yref: str = "y",
         hline_shape_kwargs: tp.KwargsLike = None,
         **kwargs,
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot one column of asset flow.
 
         `**kwargs` are passed to `vectorbtpro.generic.accessors.GenericAccessor.plot`."""
@@ -10129,7 +10129,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         yref: str = "y",
         hline_shape_kwargs: tp.KwargsLike = None,
         **kwargs,
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot one column/group of cash flow.
 
         `**kwargs` are passed to `vectorbtpro.generic.accessors.GenericAccessor.plot`."""
@@ -10182,7 +10182,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         yref: str = "y",
         hline_shape_kwargs: tp.KwargsLike = None,
         **kwargs,
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot one column of assets.
 
         `**kwargs` are passed to `vectorbtpro.generic.accessors.GenericSRAccessor.plot_against`."""
@@ -10235,7 +10235,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         yref: str = "y",
         hline_shape_kwargs: tp.KwargsLike = None,
         **kwargs,
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot one column/group of cash balance.
 
         `**kwargs` are passed to `vectorbtpro.generic.accessors.GenericSRAccessor.plot_against`."""
@@ -10290,7 +10290,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         yref: str = "y",
         hline_shape_kwargs: tp.KwargsLike = None,
         **kwargs,
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot one column/group of asset value.
 
         `**kwargs` are passed to `vectorbtpro.generic.accessors.GenericSRAccessor.plot_against`."""
@@ -10348,7 +10348,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         yref: str = "y",
         hline_shape_kwargs: tp.KwargsLike = None,
         **kwargs,
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot one column/group of value.
 
         `**kwargs` are passed to `vectorbtpro.generic.accessors.GenericSRAccessor.plot_against`."""
@@ -10400,7 +10400,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         **kwargs,
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot one column/group of cumulative returns.
 
         If `bm_returns` is None, will use `Portfolio.get_market_returns`.
@@ -10466,7 +10466,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         column: tp.Optional[tp.Label] = None,
         group_by: tp.GroupByLike = None,
         **kwargs,
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot one column/group of drawdowns.
 
         `**kwargs` are passed to `vectorbtpro.generic.drawdowns.Drawdowns.plot`."""
@@ -10490,7 +10490,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         yref: str = "y",
         hline_shape_kwargs: tp.KwargsLike = None,
         **kwargs,
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot one column/group of underwater.
 
         `**kwargs` are passed to `vectorbtpro.generic.accessors.GenericAccessor.plot`."""
@@ -10547,7 +10547,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         yref: str = "y",
         hline_shape_kwargs: tp.KwargsLike = None,
         **kwargs,
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot one column/group of gross exposure.
 
         `**kwargs` are passed to `vectorbtpro.generic.accessors.GenericSRAccessor.plot_against`."""
@@ -10605,7 +10605,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         yref: str = "y",
         hline_shape_kwargs: tp.KwargsLike = None,
         **kwargs,
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot one column/group of net exposure.
 
         `**kwargs` are passed to `vectorbtpro.generic.accessors.GenericSRAccessor.plot_against`."""

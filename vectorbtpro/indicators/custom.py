@@ -121,7 +121,7 @@ class _MA(MA):
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot `MA.ma` against `MA.close`.
 
         Args:
@@ -224,7 +224,7 @@ class _MSD(MSD):
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot `MSD.msd`.
 
         Args:
@@ -323,7 +323,7 @@ class _BBANDS(BBANDS):
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot `BBANDS.middle`, `BBANDS.upper` and `BBANDS.lower` against
         `BBANDS.close`.
 
@@ -463,7 +463,7 @@ class _RSI(RSI):
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot `RSI.rsi`.
 
         Args:
@@ -587,7 +587,7 @@ class _STOCH(STOCH):
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot `STOCH.slow_k` and `STOCH.slow_d`.
 
         Args:
@@ -740,7 +740,7 @@ class _MACD(MACD):
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot `MACD.macd`, `MACD.signal` and `MACD.hist`.
 
         Args:
@@ -875,7 +875,7 @@ class _ATR(ATR):
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot `ATR.tr` and `ATR.atr`.
 
         Args:
@@ -961,7 +961,7 @@ class _OBV(OBV):
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot `OBV.obv`.
 
         Args:
@@ -1051,7 +1051,7 @@ class _OLS(OLS):
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot `OLS.pred` against `OLS.y`.
 
         Args:
@@ -1146,7 +1146,7 @@ class _OLSS(OLSS):
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot `OLSS.zscore` with confidence intervals.
 
         Args:
@@ -1314,7 +1314,7 @@ class _PATSIM(PATSIM):
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot `PATSIM.sim` against `PATSIM.close`.
 
         Args:
@@ -1365,7 +1365,7 @@ class _PATSIM(PATSIM):
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Overlay `PATSIM.sim` as a heatmap on top of `PATSIM.close`.
 
         Args:
@@ -1469,7 +1469,7 @@ class _VWAP(VWAP):
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot `VWAP.vwap` against `VWAP.close`.
 
         Args:

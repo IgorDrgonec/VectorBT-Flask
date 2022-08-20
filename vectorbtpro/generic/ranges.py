@@ -750,7 +750,7 @@ class Ranges(PriceRecords):
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs,
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot projections.
 
         Combines generation of projections using `Ranges.get_projections` and
@@ -1048,7 +1048,7 @@ class Ranges(PriceRecords):
         fig: tp.Optional[tp.BaseFigure] = None,
         return_close: bool = False,
         **layout_kwargs,
-    ) -> tp.Union[tp.BaseFigure, tp.Tuple[tp.BaseFigure, tp.Series]]:  # pragma: no cover
+    ) -> tp.Union[tp.BaseFigure, tp.Tuple[tp.BaseFigure, tp.Series]]:
         """Plot ranges.
 
         Args:
@@ -1920,7 +1920,7 @@ class PatternRanges(Ranges):
         yref: str = "y",
         fig: tp.Optional[tp.BaseFigure] = None,
         **kwargs,
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot pattern ranges.
 
         Based on `Ranges.plot` and `vectorbtpro.generic.accessors.GenericSRAccessor.plot_pattern`.

@@ -98,7 +98,7 @@ class SignalFactory(IndicatorFactory):
             exit_trace_kwargs: tp.KwargsLike = None,
             fig: tp.Optional[tp.BaseFigure] = None,
             **kwargs
-        ) -> tp.BaseFigure:  # pragma: no cover
+        ) -> tp.BaseFigure:
             self_col = _self.select_col(column=column, group_by=False)
             if entry_y is not None and isinstance(entry_y, str):
                 entry_y = getattr(self_col, entry_y)

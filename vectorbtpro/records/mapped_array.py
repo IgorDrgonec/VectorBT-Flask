@@ -1813,11 +1813,11 @@ class MappedArray(Analyzable):
 
     # ############# Plotting ############# #
 
-    def histplot(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def histplot(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.BaseFigure:
         """Plot histogram by column/group."""
         return self.to_pd(group_by=group_by, ignore_index=True).vbt.histplot(**kwargs)
 
-    def boxplot(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def boxplot(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.BaseFigure:
         """Plot box plot by column/group."""
         return self.to_pd(group_by=group_by, ignore_index=True).vbt.boxplot(**kwargs)
 

@@ -1564,7 +1564,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         plot_volume: tp.Optional[bool] = None,
         base: tp.Optional[float] = None,
         **kwargs,
-    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:  # pragma: no cover
+    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
         """Plot either one column of multiple symbols, or OHLC(V) of one symbol.
 
         Args:

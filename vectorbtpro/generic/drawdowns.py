@@ -781,7 +781,7 @@ class Drawdowns(Ranges):
         yref: str = "y",
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs,
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot drawdowns.
 
         Args:

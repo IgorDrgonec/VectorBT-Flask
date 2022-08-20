@@ -986,7 +986,7 @@ class Trades(Ranges):
         yref: str = "y",
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs,
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot trade PnL or returns.
 
         Args:
@@ -1171,7 +1171,7 @@ class Trades(Ranges):
         yref: str = "y",
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs,
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot a field against PnL or returns.
 
         Args:
@@ -1418,7 +1418,7 @@ class Trades(Ranges):
         yref: str = "y",
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs,
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot orders.
 
         Args:

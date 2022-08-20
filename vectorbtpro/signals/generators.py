@@ -534,7 +534,7 @@ ohlcstx_func_config = ReadonlyConfig(
 OHLCSTX = SignalFactory(**ohlcstx_config).with_place_func(**ohlcstx_func_config)
 
 
-def _bind_ohlcstx_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pragma: no cover
+def _bind_ohlcstx_plot(base_cls: type, entries_attr: str) -> tp.Callable:
 
     base_cls_plot = base_cls.plot
 
@@ -549,7 +549,7 @@ def _bind_ohlcstx_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pra
         fig: tp.Optional[tp.BaseFigure] = None,
         _base_cls_plot: tp.Callable = base_cls_plot,
         **layout_kwargs
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         self_col = self.select_col(column=column, group_by=False)
 
         if ohlc_kwargs is None:

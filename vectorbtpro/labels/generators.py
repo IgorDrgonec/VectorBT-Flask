@@ -92,7 +92,7 @@ FMAX.__doc__ = """Look-ahead indicator based on `vectorbtpro.labels.nb.future_ma
 # ############# Label generators ############# #
 
 
-def _plot(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
+def _plot(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
     """Plot `close` and overlay it with the heatmap of `labels`.
 
     `**kwargs` are passed to `vectorbtpro.generic.accessors.GenericSRAccessor.overlay_with_heatmap`."""

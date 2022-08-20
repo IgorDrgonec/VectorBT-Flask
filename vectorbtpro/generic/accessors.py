@@ -248,7 +248,7 @@ from vectorbtpro.utils.colors import adjust_opacity, map_value_to_cmap
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.array_ import rescale
 
-try:  # pragma: no cover
+try:
     import bottleneck as bn
 
     nanmean = bn.nanmean
@@ -3497,7 +3497,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             set_df = set_df.vbt.stack_index(split_columns, **stack_kwargs)
             results.append((set_df, split_indexes))
 
-        if plot:  # pragma: no cover
+        if plot:
             if trace_names is None:
                 trace_names = list(range(len(results)))
             if isinstance(trace_names, str):
@@ -3925,7 +3925,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         x_labels: tp.Optional[tp.Labels] = None,
         return_fig: bool = True,
         **kwargs,
-    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:  # pragma: no cover
+    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
         """Create `vectorbtpro.generic.plotting.Scatter` and return the figure.
 
         Usage:
@@ -3947,7 +3947,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             return scatter.fig
         return scatter
 
-    def lineplot(self, **kwargs) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:  # pragma: no cover
+    def lineplot(self, **kwargs) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
         """`GenericAccessor.plot` with 'lines' mode.
 
         Usage:
@@ -3959,7 +3959,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         """
         return self.plot(**merge_dicts(dict(trace_kwargs=dict(mode="lines")), kwargs))
 
-    def scatterplot(self, **kwargs) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:  # pragma: no cover
+    def scatterplot(self, **kwargs) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
         """`GenericAccessor.plot` with 'markers' mode.
 
         Usage:
@@ -3977,7 +3977,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         x_labels: tp.Optional[tp.Labels] = None,
         return_fig: bool = True,
         **kwargs,
-    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:  # pragma: no cover
+    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
         """Create `vectorbtpro.generic.plotting.Bar` and return the figure.
 
         Usage:
@@ -4005,7 +4005,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         group_by: tp.GroupByLike = None,
         return_fig: bool = True,
         **kwargs,
-    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:  # pragma: no cover
+    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
         """Create `vectorbtpro.generic.plotting.Histogram` and return the figure.
 
         Usage:
@@ -4034,7 +4034,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         group_by: tp.GroupByLike = None,
         return_fig: bool = True,
         **kwargs,
-    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:  # pragma: no cover
+    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
         """Create `vectorbtpro.generic.plotting.Box` and return the figure.
 
         Usage:
@@ -4102,7 +4102,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs,
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot Series as a line against another line.
 
         Args:
@@ -4238,7 +4238,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs,
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot Series as a line and overlays it with a heatmap.
 
         Args:
@@ -4298,7 +4298,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         return_fig: bool = True,
         fig: tp.Optional[tp.BaseFigure] = None,
         **kwargs,
-    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:  # pragma: no cover
+    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
         """Create a heatmap figure based on object's multi-index and values.
 
         If index is not a multi-index, converts Series into a DataFrame and calls `GenericDFAccessor.heatmap`.
@@ -4410,7 +4410,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         fig.update_layout(sliders=sliders)
         return fig
 
-    def ts_heatmap(self, **kwargs) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:  # pragma: no cover
+    def ts_heatmap(self, **kwargs) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
         """Heatmap of time-series data."""
         return self.obj.to_frame().vbt.ts_heatmap(**kwargs)
 
@@ -4430,7 +4430,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         fig: tp.Optional[tp.BaseFigure] = None,
         return_fig: bool = True,
         **kwargs,
-    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:  # pragma: no cover
+    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
         """Create a 3D volume figure based on object's multi-index and values.
 
         If multi-index contains more than three levels or you want them in specific order, pass
@@ -4566,7 +4566,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         yref: str = "y",
         fig: tp.Optional[tp.BaseFigure] = None,
         **kwargs,
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot probability plot using `scipy.stats.probplot`.
 
         `**kwargs` are passed to `GenericAccessor.scatterplot`.
@@ -4617,7 +4617,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs,
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot pattern.
 
         Mimics the same similarity calculation procedure as implemented in
@@ -4867,7 +4867,7 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
         y_labels: tp.Optional[tp.Labels] = None,
         return_fig: bool = True,
         **kwargs,
-    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:  # pragma: no cover
+    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
         """Create `vectorbtpro.generic.plotting.Heatmap` and return the figure.
 
         Usage:
@@ -4897,7 +4897,7 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
         self,
         is_y_category: bool = True,
         **kwargs,
-    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:  # pragma: no cover
+    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
         """Heatmap of time-series data."""
         return self.obj.transpose().iloc[::-1].vbt.heatmap(is_y_category=is_y_category, **kwargs)
 
@@ -4920,7 +4920,7 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs,
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot a DataFrame where each column is a projection.
 
         If `plot_projections` is True, will plot each projection as a semi-transparent line.

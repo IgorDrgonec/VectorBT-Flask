@@ -112,7 +112,7 @@ OHLCVDFAccessorT = tp.TypeVar("OHLCVDFAccessorT", bound="OHLCVDFAccessor")
 
 
 @register_df_vbt_accessor("ohlcv")
-class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
+class OHLCVDFAccessor(GenericDFAccessor):
     """Accessor on top of OHLCV data. For DataFrames only.
 
     Accessible via `pd.DataFrame.vbt.ohlcv`."""
@@ -361,7 +361,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
         volume_add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs,
-    ) -> tp.BaseFigure:  # pragma: no cover
+    ) -> tp.BaseFigure:
         """Plot OHLCV data.
 
         Args:
