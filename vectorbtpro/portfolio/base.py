@@ -260,7 +260,7 @@ Date
 >>> pf.value.vbt.plot()
 ```
 
-![](/assets/images/portfolio_value.svg)
+![](/assets/images/api/portfolio_value.svg)
 
 ## Broadcasting
 
@@ -1475,7 +1475,7 @@ Plot a single column of a portfolio:
 >>> pf.plot(column=10)
 ```
 
-![](/assets/images/portfolio_col_plot.svg)
+![](/assets/images/api/portfolio_col_plot.svg)
 
 To plot a single column of a grouped portfolio:
 
@@ -1495,7 +1495,7 @@ UserWarning: Subplot 'orders' does not support grouped data
 UserWarning: Subplot 'trade_pnl' does not support grouped data
 ```
 
-![](/assets/images/portfolio_group_plot.svg)
+![](/assets/images/api/portfolio_group_plot.svg)
 
 !!! note
     Some subplots do not support plotting grouped data.
@@ -1520,7 +1520,7 @@ control their appearance using keyword arguments:
 ... )
 ```
 
-![](/assets/images/portfolio_plot_drawdowns.svg)
+![](/assets/images/api/portfolio_plot_drawdowns.svg)
 
 ### Custom subplots
 
@@ -1567,7 +1567,7 @@ Alternatively, you can create a placeholder and overwrite it manually later:
 ... )
 ```
 
-![](/assets/images/portfolio_plot_custom.svg)
+![](/assets/images/api/portfolio_plot_custom.svg)
 
 If a plotting function can in any way be accessed from the current portfolio, you can pass
 the path to this function (see `vectorbtpro.utils.attr_.deep_getattr` for the path format).
@@ -1616,7 +1616,7 @@ You can also replace templates across all subplots by using the global template 
 >>> pf.plot(subplots, column=10, template_context=dict(window=10))
 ```
 
-![](/assets/images/portfolio_plot_path.svg)
+![](/assets/images/api/portfolio_plot_path.svg)
 """
 
 import string
@@ -4225,7 +4225,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> pf.get_asset_value(group_by=False).vbt.plot()
             ```
 
-            ![](/assets/images/simulate_nb_example.svg)
+            ![](/assets/images/api/simulate_nb_example.svg)
 
             * Test 10 random weight combinations:
 
@@ -6852,7 +6852,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> pf.get_asset_value(group_by=False).vbt.plot()
             ```
 
-            ![](/assets/images/simulate_nb_example.svg)
+            ![](/assets/images/api/simulate_nb_example.svg)
 
             Templates are a very powerful tool to prepare any custom arguments after they are broadcast and
             before they are passed to the simulation function. In the example above, we use `broadcast_named_args`
@@ -6873,9 +6873,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> pf['g2'].get_asset_value(group_by=False).vbt.plot()
             ```
 
-            ![](/assets/images/from_order_func_g1.svg)
+            ![](/assets/images/api/from_order_func_g1.svg)
 
-            ![](/assets/images/from_order_func_g2.svg)
+            ![](/assets/images/api/from_order_func_g2.svg)
 
             * Combine multiple exit conditions. Exit early if the price hits some threshold before an actual exit:
 
@@ -7637,7 +7637,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> asset_value.vbt.plot()
             ```
 
-            ![](/assets/images/simulate_nb_example.svg)
+            ![](/assets/images/api/simulate_nb_example.svg)
         """
         # Get defaults
         from vectorbtpro._settings import settings

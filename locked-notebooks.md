@@ -1,6 +1,0 @@
-* [Basic RSI strategy](https://nbviewer.org/gist/polakowo/44f06d8ee737787d7404c10e3d7b6ed9)
-* [SuperFast SuperTrend](https://nbviewer.org/gist/polakowo/6534e5c0c9e309b8eea24482de6c69aa)
-* [MTF analysis](https://nbviewer.org/gist/polakowo/00364c411dcfa557cebfbb983d7ac32a)
-* [Portfolio optimization](https://nbviewer.org/gist/polakowo/d2920e6607d124b98e3a8c62b4696590)
-* [Signal development](https://nbviewer.org/gist/polakowo/31333ae43557fc2b2cf2555129812471)
-* [Patterns and projections](https://nbviewer.org/gist/polakowo/417425986b134a8aa3edb7e4eb23b5bb)

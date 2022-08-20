@@ -30,6 +30,7 @@ from vectorbtpro.accessors import Vbt_Accessor as pd_acc, Vbt_SRAccessor as sr_a
 from vectorbtpro.generic import nb, enums
 from vectorbtpro.portfolio import nb as pf_nb, enums as pf_enums
 from vectorbtpro.utils import datetime_ as dt, datetime_nb as dt_nb
+from vectorbtpro.utils.caching import clear_pycache
 
 # Import all submodules
 from vectorbtpro.utils.module_ import import_submodules
@@ -46,26 +47,6 @@ try:
     import plotly
 except ImportError:
     __blacklist__.append("px_accessors")
-
-
-def delete_dir(p):
-    """Delete directory with files."""
-    for sub in p.iterdir():
-        if sub.is_dir():
-            delete_dir(sub)
-        else:
-            sub.unlink()
-    p.rmdir()
-
-
-def clear_pycache():
-    """Clear __pycache__ folders and .pyc files."""
-    import pathlib
-
-    for p in pathlib.Path(__file__).parent.rglob('__pycache__'):
-        delete_dir(p)
-    for p in pathlib.Path(__file__).parent.rglob('*.py[co]'):
-        p.unlink()
 
 
 import_submodules(__name__)

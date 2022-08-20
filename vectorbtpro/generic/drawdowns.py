@@ -166,7 +166,7 @@ Name: group, dtype: object
 >>> drawdowns['a'].plots()
 ```
 
-![](/assets/images/drawdowns_plots.svg)
+![](/assets/images/api/drawdowns_plots.svg)
 """
 
 import numpy as np
@@ -816,7 +816,7 @@ class Drawdowns(Ranges):
             >>> vbt.Drawdowns.from_price(price, wrapper_kwargs=dict(freq='1 day')).plot()
             ```
 
-            ![](/assets/images/drawdowns_plot.svg)
+            ![](/assets/images/api/drawdowns_plot.svg)
         """
         from vectorbtpro.utils.opt_packages import assert_can_import
 

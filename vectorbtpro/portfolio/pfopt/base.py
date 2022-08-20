@@ -2237,7 +2237,7 @@ class PortfolioOptimizer(Analyzable):
             >>> pf_opt.plot()
             ```
 
-            ![](/assets/images/pfopt_plot.svg)
+            ![](/assets/images/api/pfopt_plot.svg)
         """
         from vectorbtpro.utils.opt_packages import assert_can_import
 

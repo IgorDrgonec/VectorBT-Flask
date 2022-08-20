@@ -97,7 +97,7 @@ Name: group, dtype: object
 >>> pf.orders['a'].plots()
 ```
 
-![](/assets/images/orders_plots.svg)
+![](/assets/images/api/orders_plots.svg)
 """
 
 import numpy as np
@@ -333,7 +333,7 @@ class Orders(PriceRecords):
             >>> orders.plot()
             ```
 
-            ![](/assets/images/orders_plot.svg)
+            ![](/assets/images/api/orders_plot.svg)
         """
         from vectorbtpro.utils.opt_packages import assert_can_import
 

@@ -59,7 +59,7 @@ Date
 >>> ohlcv.vbt.ohlcv.plot()
 ```
 
-![](/assets/images/custom_price.svg)"""
+![](/assets/images/api/custom_price.svg)"""
 
 import numpy as np
 import pandas as pd
@@ -138,7 +138,7 @@ class _MA(MA):
             >>> vbt.MA.run(ohlcv['Close']).plot()
             ```
 
-            ![](/assets/images/MA.svg)
+            ![](/assets/images/api/MA.svg)
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
@@ -239,7 +239,7 @@ class _MSD(MSD):
             >>> vbt.MSD.run(ohlcv['Close']).plot()
             ```
 
-            ![](/assets/images/MSD.svg)
+            ![](/assets/images/api/MSD.svg)
         """
         from vectorbtpro._settings import settings
 
@@ -343,7 +343,7 @@ class _BBANDS(BBANDS):
             >>> vbt.BBANDS.run(ohlcv['Close']).plot()
             ```
 
-            ![](/assets/images/BBANDS.svg)
+            ![](/assets/images/api/BBANDS.svg)
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
@@ -480,7 +480,7 @@ class _RSI(RSI):
             >>> vbt.RSI.run(ohlcv['Close']).plot()
             ```
 
-            ![](/assets/images/RSI.svg)
+            ![](/assets/images/api/RSI.svg)
         """
         from vectorbtpro._settings import settings
 
@@ -606,7 +606,7 @@ class _STOCH(STOCH):
             >>> vbt.STOCH.run(ohlcv['High'], ohlcv['Low'], ohlcv['Close']).plot()
             ```
 
-            ![](/assets/images/STOCH.svg)
+            ![](/assets/images/api/STOCH.svg)
         """
         from vectorbtpro._settings import settings
 
@@ -757,7 +757,7 @@ class _MACD(MACD):
             >>> vbt.MACD.run(ohlcv['Close']).plot()
             ```
 
-            ![](/assets/images/MACD.svg)
+            ![](/assets/images/api/MACD.svg)
         """
         from vectorbtpro.utils.opt_packages import assert_can_import
         from vectorbtpro._settings import settings
@@ -891,7 +891,7 @@ class _ATR(ATR):
             >>> vbt.ATR.run(ohlcv['High'], ohlcv['Low'], ohlcv['Close']).plot()
             ```
 
-            ![](/assets/images/ATR.svg)
+            ![](/assets/images/api/ATR.svg)
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
@@ -976,7 +976,7 @@ class _OBV(OBV):
             >>> vbt.OBV.run(ohlcv['Close'], ohlcv['Volume']).plot()
             ```
 
-            ![](/assets/images/OBV.svg)
+            ![](/assets/images/api/OBV.svg)
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
@@ -1068,7 +1068,7 @@ class _OLS(OLS):
             >>> vbt.OLS.run(np.arange(len(ohlcv)), ohlcv['Close']).plot()
             ```
 
-            ![](/assets/images/OLS.svg)
+            ![](/assets/images/api/OLS.svg)
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
@@ -1166,7 +1166,7 @@ class _OLSS(OLSS):
             >>> vbt.OLSS.run(np.arange(len(ohlcv)), ohlcv['Close']).plot()
             ```
 
-            ![](/assets/images/OLSS.svg)
+            ![](/assets/images/api/OLSS.svg)
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
@@ -1329,7 +1329,7 @@ class _PATSIM(PATSIM):
             >>> vbt.PATSIM.run(ohlcv['Close'], np.array([1, 2, 3, 2, 1]), 30).plot()
             ```
 
-            ![](/assets/images/PATSIM.svg)
+            ![](/assets/images/api/PATSIM.svg)
         """
         from vectorbtpro._settings import settings
 
@@ -1381,7 +1381,7 @@ class _PATSIM(PATSIM):
             >>> vbt.PATSIM.run(ohlcv['Close'], np.array([1, 2, 3, 2, 1]), 30).overlay_with_heatmap()
             ```
 
-            ![](/assets/images/PATSIM_heatmap.svg)
+            ![](/assets/images/api/PATSIM_heatmap.svg)
         """
         from vectorbtpro._settings import settings
 
@@ -1492,7 +1492,7 @@ class _VWAP(VWAP):
             ... ).plot()
             ```
 
-            ![](/assets/images/VWAP.svg)
+            ![](/assets/images/api/VWAP.svg)
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings

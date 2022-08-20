@@ -114,7 +114,7 @@ dtype: object
 >>> ret_acc.plots()
 ```
 
-![](/assets/images/returns_plots.svg)
+![](/assets/images/api/returns_plots.svg)
 """
 
 import warnings
@@ -1711,7 +1711,7 @@ class ReturnsAccessor(GenericAccessor):
             >>> rets.vbt.returns.plot_cumulative(bm_returns=bm_returns)
             ```
 
-            ![](/assets/images/plot_cumulative.svg)
+            ![](/assets/images/api/plot_cumulative.svg)
         """
         from vectorbtpro.utils.figure import make_figure, get_domain
         from vectorbtpro._settings import settings

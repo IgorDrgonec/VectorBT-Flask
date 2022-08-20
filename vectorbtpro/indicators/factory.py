@@ -2746,7 +2746,7 @@ Other keyword arguments are passed to `{0}.run`.
             >>> sma.plot(column=(2, 'a'))
             ```
 
-            ![](/assets/images/talib_plot.svg)
+            ![](/assets/images/api/talib_plot.svg)
         """
         from vectorbtpro.utils.opt_packages import assert_can_import
 

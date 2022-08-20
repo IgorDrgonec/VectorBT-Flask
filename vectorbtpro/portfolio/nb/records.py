@@ -205,13 +205,11 @@ def get_entry_trades_nb(
         >>> target_shape = close.shape
         >>> group_lens = np.full(target_shape[1], 1)
         >>> init_cash = np.full(target_shape[1], 100)
-        >>> call_seq = np.full(target_shape, 0)
 
         >>> sim_out = simulate_from_orders_nb(
         ...     target_shape,
         ...     group_lens,
-        ...     init_cash,
-        ...     call_seq,
+        ...     init_cash=init_cash,
         ...     size=size,
         ...     price=close,
         ...     fees=np.asarray(0.01),
@@ -244,7 +242,7 @@ def get_entry_trades_nb(
     """
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
-    max_records = np.max(col_lens) + int((init_position != 0).any())
+    max_records = np.max(col_lens) + 1
     new_records = np.empty((max_records, len(col_lens)), dtype=trade_dt)
     counts = np.full(len(col_lens), 0, dtype=np.int_)
 
@@ -494,7 +492,7 @@ def get_exit_trades_nb(
     """
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
-    max_records = np.max(col_lens) + int((init_position != 0).any())
+    max_records = np.max(col_lens) + 1
     new_records = np.empty((max_records, len(col_lens)), dtype=trade_dt)
     counts = np.full(len(col_lens), 0, dtype=np.int_)
 

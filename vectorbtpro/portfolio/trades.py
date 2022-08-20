@@ -483,7 +483,7 @@ Name: group, dtype: object
 >>> pf.trades['a'].plots(settings=dict(plot_zones=False)).show()
 ```
 
-![](/assets/images/trades_plots.svg)
+![](/assets/images/api/trades_plots.svg)
 """
 
 from functools import partialmethod
@@ -1014,7 +1014,7 @@ class Trades(Ranges):
             >>> pf.trades.plot_pnl()
             ```
 
-            ![](/assets/images/trades_plot_pnl.svg)
+            ![](/assets/images/api/trades_plot_pnl.svg)
         """
         from vectorbtpro.utils.opt_packages import assert_can_import
 
@@ -1202,7 +1202,7 @@ class Trades(Ranges):
             >>> trades.plot_against_pnl("MFE")
             ```
 
-            ![](/assets/images/trades_plot_against_pnl.svg)
+            ![](/assets/images/api/trades_plot_against_pnl.svg)
         """
         from vectorbtpro.utils.opt_packages import assert_can_import
 
@@ -1458,7 +1458,7 @@ class Trades(Ranges):
             >>> pf.trades.plot()
             ```
 
-            ![](/assets/images/trades_plot.svg)
+            ![](/assets/images/api/trades_plot.svg)
         """
         from vectorbtpro.utils.opt_packages import assert_can_import
 

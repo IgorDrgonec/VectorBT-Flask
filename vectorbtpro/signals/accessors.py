@@ -2230,7 +2230,7 @@ class SignalsAccessor(GenericAccessor):
             >>> mask[['a', 'c']].vbt.signals.plot()
             ```
 
-            ![](/assets/images/signals_df_plot.svg)
+            ![](/assets/images/api/signals_df_plot.svg)
         """
         default_layout = dict()
         default_layout["yaxis" + yref[1:]] = dict(tickmode="array", tickvals=[0, 1], ticktext=["false", "true"])
@@ -2286,7 +2286,7 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
             >>> (~mask['b']).vbt.signals.plot_as_exits(y=ts, fig=fig)
             ```
 
-            ![](/assets/images/signals_plot_as_markers.svg)
+            ![](/assets/images/api/signals_plot_as_markers.svg)
         """
         from vectorbtpro._settings import settings
 

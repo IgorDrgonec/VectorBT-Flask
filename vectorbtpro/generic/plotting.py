@@ -109,7 +109,7 @@ class Gauge(Configured, TraceUpdater):
             >>> gauge.fig
             ```
 
-            ![](/assets/images/Gauge.svg)
+            ![](/assets/images/api/Gauge.svg)
         """
         Configured.__init__(
             self,
@@ -237,7 +237,7 @@ class Bar(Configured, TraceUpdater):
             >>> bar.fig
             ```
 
-            ![](/assets/images/Bar.svg)
+            ![](/assets/images/api/Bar.svg)
         """
         Configured.__init__(
             self,
@@ -350,7 +350,7 @@ class Scatter(Configured, TraceUpdater):
             >>> scatter.fig
             ```
 
-            ![](/assets/images/Scatter.svg)
+            ![](/assets/images/api/Scatter.svg)
         """
         Configured.__init__(
             self,
@@ -496,7 +496,7 @@ class Histogram(Configured, TraceUpdater):
             >>> hist.fig
             ```
 
-            ![](/assets/images/Histogram.svg)
+            ![](/assets/images/api/Histogram.svg)
         """
         Configured.__init__(
             self,
@@ -661,7 +661,7 @@ class Box(Configured, TraceUpdater):
             >>> box.fig
             ```
 
-            ![](/assets/images/Box.svg)
+            ![](/assets/images/api/Box.svg)
         """
         Configured.__init__(
             self,
@@ -833,7 +833,7 @@ class Heatmap(Configured, TraceUpdater):
             >>> heatmap.fig
             ```
 
-            ![](/assets/images/Heatmap.svg)
+            ![](/assets/images/api/Heatmap.svg)
         """
         Configured.__init__(
             self,
@@ -968,7 +968,7 @@ class Volume(Configured, TraceUpdater):
             >>> volume.fig
             ```
 
-            ![](/assets/images/Volume.svg)
+            ![](/assets/images/api/Volume.svg)
         """
         Configured.__init__(
             self,

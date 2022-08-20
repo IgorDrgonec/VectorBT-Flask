@@ -534,11 +534,11 @@ def simulate_nb(
                [1, 0, 0]])
         ```
 
-        ![](/assets/images/simulate_nb.svg)
+        ![](/assets/images/api/simulate_nb.svg)
 
         And here is the context information available at each step:
 
-        ![](/assets/images/context_info.svg)
+        ![](/assets/images/api/context_info.svg)
 
     Usage:
         * Create a group of three assets together sharing 100$ and simulate an equal-weighted portfolio
@@ -713,7 +713,7 @@ def simulate_nb(
         >>> Scatter(data=asset_value).fig.show()
         ```
 
-        ![](/assets/images/simulate_nb_example.svg)
+        ![](/assets/images/api/simulate_nb_example.svg)
 
         Note that the last order in a group with cash sharing is always disadvantaged
         as it has a bit less funds than the previous orders due to costs, which are not
@@ -1536,7 +1536,7 @@ def simulate_row_wise_nb(
 
         Let's illustrate the same example as in `simulate_nb` but adapted for this function:
 
-        ![](/assets/images/simulate_row_wise_nb.svg)
+        ![](/assets/images/api/simulate_row_wise_nb.svg)
 
     Usage:
         * Running the same example as in `simulate_nb` but adapted for this function:
@@ -2492,7 +2492,7 @@ def flex_simulate_nb(
 
         Let's illustrate the same example as in `simulate_nb` but adapted for this function:
 
-        ![](/assets/images/flex_simulate_nb.svg)
+        ![](/assets/images/api/flex_simulate_nb.svg)
 
     Usage:
         * The same example as in `simulate_nb`:
@@ -3435,7 +3435,7 @@ def flex_simulate_row_wise_nb(
 
         Let's illustrate the same example as in `simulate_nb` but adapted for this function:
 
-        ![](/assets/images/flex_simulate_row_wise_nb.svg)
+        ![](/assets/images/api/flex_simulate_row_wise_nb.svg)
     """
 
     check_group_lens_nb(group_lens, target_shape[1])

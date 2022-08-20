@@ -195,7 +195,7 @@ Name: 0, dtype: object
 >>> df2.vbt.plots()
 ```
 
-![](/assets/images/generic_plots.svg)
+![](/assets/images/api/generic_plots.svg)
 """
 
 import warnings
@@ -3464,7 +3464,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> sr.vbt.split(splitter, plot=True, trace_names=['train', 'test'])
             ```
 
-            ![](/assets/images/split_plot.svg)
+            ![](/assets/images/api/split_plot.svg)
         """
         total_range_sr = pd.Series(np.arange(len(self.wrapper.index)), index=self.wrapper.index)
         set_ranges = list(splitter.split(total_range_sr, **kwargs))
@@ -3608,7 +3608,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
              ... )
             ```
 
-            ![](/assets/images/range_split_plot.svg)
+            ![](/assets/images/api/range_split_plot.svg)
         """
         return self.split(RangeSplitter(), **kwargs)
 
@@ -3636,7 +3636,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             ...     plot=True, trace_names=['train', 'valid', 'test'])
             ```
 
-            ![](/assets/images/rolling_split_plot.svg)
+            ![](/assets/images/api/rolling_split_plot.svg)
         """
         return self.split(RollingSplitter(), **kwargs)
 
@@ -3669,7 +3669,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             ...     plot=True, trace_names=['train', 'valid', 'test'])
             ```
 
-            ![](/assets/images/expanding_split_plot.svg)
+            ![](/assets/images/api/expanding_split_plot.svg)
         """
         return self.split(ExpandingSplitter(), **kwargs)
 
@@ -3933,7 +3933,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.plot()
             ```
 
-            ![](/assets/images/df_plot.svg)
+            ![](/assets/images/api/df_plot.svg)
         """
         from vectorbtpro.generic.plotting import Scatter
 
@@ -3955,7 +3955,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.lineplot()
             ```
 
-            ![](/assets/images/df_lineplot.svg)
+            ![](/assets/images/api/df_lineplot.svg)
         """
         return self.plot(**merge_dicts(dict(trace_kwargs=dict(mode="lines")), kwargs))
 
@@ -3967,7 +3967,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.scatterplot()
             ```
 
-            ![](/assets/images/df_scatterplot.svg)
+            ![](/assets/images/api/df_scatterplot.svg)
         """
         return self.plot(**merge_dicts(dict(trace_kwargs=dict(mode="markers")), kwargs))
 
@@ -3985,7 +3985,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.barplot()
             ```
 
-            ![](/assets/images/df_barplot.svg)
+            ![](/assets/images/api/df_barplot.svg)
         """
         from vectorbtpro.generic.plotting import Bar
 
@@ -4013,7 +4013,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.histplot()
             ```
 
-            ![](/assets/images/df_histplot.svg)
+            ![](/assets/images/api/df_histplot.svg)
         """
         from vectorbtpro.generic.plotting import Histogram
 
@@ -4042,7 +4042,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.boxplot()
             ```
 
-            ![](/assets/images/df_boxplot.svg)
+            ![](/assets/images/api/df_boxplot.svg)
         """
         from vectorbtpro.generic.plotting import Box
 
@@ -4123,7 +4123,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             >>> df['a'].vbt.plot_against(df['b'])
             ```
 
-            ![](/assets/images/sr_plot_against.svg)
+            ![](/assets/images/api/sr_plot_against.svg)
         """
         from vectorbtpro.utils.figure import make_figure
 
@@ -4254,7 +4254,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             >>> df['a'].vbt.overlay_with_heatmap(df['b'])
             ```
 
-            ![](/assets/images/sr_overlay_with_heatmap.svg)
+            ![](/assets/images/api/sr_overlay_with_heatmap.svg)
         """
         from vectorbtpro.utils.figure import make_subplots
         from vectorbtpro._settings import settings
@@ -4328,7 +4328,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             >>> sr.vbt.heatmap()
             ```
 
-            ![](/assets/images/sr_heatmap.svg)
+            ![](/assets/images/api/sr_heatmap.svg)
         """
         from vectorbtpro.generic.plotting import Heatmap
 
@@ -4456,7 +4456,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             >>> sr.vbt.volume().show()
             ```
 
-            ![](/assets/images/sr_volume.svg)
+            ![](/assets/images/api/sr_volume.svg)
         """
         from vectorbtpro.generic.plotting import Volume
 
@@ -4576,7 +4576,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             >>> pd.Series(np.random.standard_normal(100)).vbt.qqplot()
             ```
 
-            ![](/assets/images/sr_qqplot.svg)
+            ![](/assets/images/api/sr_qqplot.svg)
         """
         qq = stats.probplot(self.obj, sparams=sparams, dist=dist)
         fig = pd.Series(qq[0][1], index=qq[0][0]).vbt.scatterplot(fig=fig, **kwargs)
@@ -4629,7 +4629,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             >>> sr.vbt.plot_pattern([1, 2, 3, 2, 1])
             ```
 
-            ![](/assets/images/sr_plot_pattern.svg)"""
+            ![](/assets/images/api/sr_plot_pattern.svg)"""
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro.utils.opt_packages import assert_can_import
 
@@ -4880,7 +4880,7 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
             >>> df.vbt.heatmap()
             ```
 
-            ![](/assets/images/df_heatmap.svg)
+            ![](/assets/images/api/df_heatmap.svg)
         """
         from vectorbtpro.generic.plotting import Heatmap
 
@@ -4975,7 +4975,7 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
             >>> df.vbt.plot_projections()
             ```
 
-            ![](/assets/images/df_plot_projections.svg)
+            ![](/assets/images/api/df_plot_projections.svg)
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings

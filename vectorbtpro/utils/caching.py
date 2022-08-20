@@ -6,6 +6,26 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.utils.decorators import class_or_instancemethod
 
 
+def delete_dir(p):
+    """Delete directory with files."""
+    for sub in p.iterdir():
+        if sub.is_dir():
+            delete_dir(sub)
+        else:
+            sub.unlink()
+    p.rmdir()
+
+
+def clear_pycache():
+    """Clear __pycache__ folders and .pyc files."""
+    import pathlib
+
+    for p in pathlib.Path(__file__).parent.rglob("__pycache__"):
+        delete_dir(p)
+    for p in pathlib.Path(__file__).parent.rglob("*.py[co]"):
+        p.unlink()
+
+
 class Cacheable:
     """Class that contains cacheable properties and methods.
 
