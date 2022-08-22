@@ -1,6 +1,6 @@
 ## Getting Started
 
-Visit the private website (see the URL above) and follow the installation guide. 
+Visit [the private website](https://github.com/polakowo/vectorbt.pro/blob/pvt-links/README.md) and follow the guide.
 
 Also make sure to join our private [Discord server](https://discord.gg/eQ9sVr5vb9)!
 
