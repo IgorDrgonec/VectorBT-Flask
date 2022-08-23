@@ -1493,7 +1493,7 @@ class TestPortfolioOptimizer:
         )
         pf_opt = vbt.PortfolioOptimizer.from_filled_allocations(
             filled_allocations,
-            notna_only=False,
+            valid_only=False,
             unique_only=False,
         )
         assert_records_close(
@@ -1559,7 +1559,7 @@ class TestPortfolioOptimizer:
             pf_opt = vbt.PortfolioOptimizer.from_universal_algo(
                 "CRP",
                 prices,
-                notna_only=False,
+                valid_only=False,
                 unique_only=False
             )
             assert_records_close(

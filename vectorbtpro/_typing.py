@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     from vectorbtpro.utils.execution import ExecutionEngine
     from vectorbtpro.utils.chunking import Sizer, ChunkTaker, ChunkMeta, ChunkMetaGenerator
     from vectorbtpro.utils.jitting import Jitter
+    from vectorbtpro.utils.template import CustomTemplate
 else:
     Regex = "Regex"
     ExecutionEngine = "ExecutionEngine"
@@ -43,6 +44,7 @@ else:
     ChunkMetaGenerator = "ChunkMetaGenerator"
     TraceUpdater = "TraceUpdater"
     Jitter = "Jitter"
+    CustomTemplate = "CustomTemplate"
 
 # Generic types
 T = TypeVar("T")
@@ -129,7 +131,7 @@ class SupportsTZInfo(Protocol):
 PandasIndexingFunc = Callable[[SeriesFrame], MaybeSeriesFrame]
 
 # Grouping
-GroupByLike = Union[None, bool, MaybeLevelSequence, IndexLike]
+GroupByLike = Union[None, bool, MaybeLevelSequence, IndexLike, CustomTemplate]
 GroupIdxs = Array1d
 GroupLens = Array1d
 GroupMap = Tuple[GroupIdxs, GroupLens]

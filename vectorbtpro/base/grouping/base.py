@@ -17,10 +17,10 @@ from pandas.core.resample import Resampler as PandasResampler
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import indexes
 from vectorbtpro.registries.jit_registry import jit_reg
-from vectorbtpro.utils import checks
 from vectorbtpro.utils.array_ import is_sorted
 from vectorbtpro.utils.config import Configured
 from vectorbtpro.utils.decorators import cached_method
+from vectorbtpro.utils.template import CustomTemplate
 from vectorbtpro.base.grouping import nb
 
 GroupByT = tp.Union[None, bool, tp.Index]
@@ -41,6 +41,8 @@ def group_by_to_index(index: tp.Index, group_by: tp.GroupByLike) -> GroupByT:
         Index and mapper must have the same length."""
     if group_by is None or group_by is False:
         return group_by
+    if isinstance(group_by, CustomTemplate):
+        group_by = group_by.substitute(context=dict(index=index), strict=True, sub_id="group_by")
     if group_by is True:
         group_by = pd.Index(["group"] * len(index))  # one group
     elif isinstance(group_by, ExceptLevel):

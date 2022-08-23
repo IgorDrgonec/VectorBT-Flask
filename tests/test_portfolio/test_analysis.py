@@ -5118,6 +5118,68 @@ class TestPortfolio:
         )
         assert_frame_equal(pf.get_value(chunked=True), pf.get_value(chunked=False))
 
+    def test_allocations(self):
+        with pytest.raises(Exception):
+            pf.get_allocations()
+        with pytest.raises(Exception):
+            pf.get_allocations(direction="longonly")
+        with pytest.raises(Exception):
+            pf.get_allocations(direction="shortonly")
+        assert_frame_equal(
+            pf_grouped.allocations,
+            pd.DataFrame([
+                [0.009950248756218905, -0.004975124378109453, 0.010012024441354066],
+                [0.011011451909986387, -0.011011451909986387, 0.021830620581035857],
+                [0.0007486294466405633, -0.0054899492753641265, 0.002949383274126105],
+                [0.0, -0.010039749879711245, 0.0],
+                [0.012593941357067706, -0.025187882714135412, 0.0],
+            ], index=close_na.index, columns=close_na.columns)
+        )
+        assert_frame_equal(
+            pf_grouped.get_allocations(direction="longonly"),
+            pd.DataFrame([
+                [0.009950248756218905, 0.0, 0.010012024441354066],
+                [0.011011451909986387, 0.0, 0.021830620581035857],
+                [0.0007486294466405633, 0.0, 0.002949383274126105],
+                [0.0, 0.0, 0.0],
+                [0.012593941357067706, 0.0, 0.0],
+            ], index=close_na.index, columns=close_na.columns)
+        )
+        assert_frame_equal(
+            pf_grouped.get_allocations(direction="shortonly"),
+            pd.DataFrame([
+                [0.0, 0.004975124378109453, 0.0],
+                [0.0, 0.011011451909986387, 0.0],
+                [0.0, 0.0054899492753641265, 0.0],
+                [0.0, 0.010039749879711245, 0.0],
+                [0.0, 0.025187882714135412, 0.0],
+            ], index=close_na.index, columns=close_na.columns)
+        )
+        assert_frame_equal(
+            pf_grouped.allocations,
+            vbt.Portfolio.get_allocations(
+                asset_value=pf_grouped.get_asset_value(group_by=False),
+                value=pf_grouped.value,
+                wrapper=pf_grouped.wrapper,
+            ),
+        )
+        assert_frame_equal(
+            pf_shared.allocations,
+            vbt.Portfolio.get_allocations(
+                asset_value=pf_grouped.get_asset_value(group_by=False),
+                value=pf_shared.value,
+                wrapper=pf_shared.wrapper,
+            ),
+        )
+        assert_frame_equal(
+            pf_shared.get_allocations(jitted=dict(parallel=True)),
+            pf_shared.get_allocations(jitted=dict(parallel=False)),
+        )
+        assert_frame_equal(
+            pf_shared.get_allocations(chunked=False),
+            pf_shared.get_allocations(chunked=True),
+        )
+
     def test_total_profit(self):
         assert_series_equal(pf.total_profit, (pf.value.iloc[-1] - pf.input_value).rename("total_profit"))
         assert_series_equal(

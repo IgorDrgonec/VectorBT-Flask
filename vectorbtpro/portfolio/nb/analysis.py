@@ -588,6 +588,37 @@ def value_nb(cash: tp.Array2d, asset_value: tp.Array2d) -> tp.Array2d:
 
 
 @register_chunkable(
+    size=ch.ArraySizer(arg_query="group_lens", axis=0),
+    arg_take_spec=dict(
+        asset_value=ch.ArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
+        value=ch.ArraySlicer(axis=1),
+        group_lens=ch.ArraySlicer(axis=0),
+    ),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def allocations_nb(
+    asset_value: tp.Array2d,
+    value: tp.Array2d,
+    group_lens: tp.Array1d,
+) -> tp.Array2d:
+    """Get allocations per column."""
+    check_group_lens_nb(group_lens, asset_value.shape[1])
+    out = np.empty(asset_value.shape, dtype=np.float_)
+    group_end_idxs = np.cumsum(group_lens)
+    group_start_idxs = group_end_idxs - group_lens
+
+    for group in prange(len(group_lens)):
+        from_col = group_start_idxs[group]
+        to_col = group_end_idxs[group]
+
+        for i in range(asset_value.shape[0]):
+            for col in range(from_col, to_col):
+                out[i, col] = asset_value[i, col] / value[i, group]
+    return out
+
+
+@register_chunkable(
     size=base_ch.GroupLensSizer(arg_query="col_map"),
     arg_take_spec=dict(
         target_shape=ch.ShapeSlicer(axis=1),

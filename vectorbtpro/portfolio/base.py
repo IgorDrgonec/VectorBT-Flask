@@ -1633,6 +1633,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, broadcast, broadcast_to, to_pd_array, shape_to_2d, BCO
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
+from vectorbtpro.base.grouping.base import ExceptLevel
 from vectorbtpro.data.base import Data
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.analyzable import Analyzable
@@ -1938,6 +1939,9 @@ shortcut_config = ReadonlyConfig(
         "shortonly_gross_exposure": dict(method_name="get_gross_exposure", method_kwargs=dict(direction="shortonly")),
         "net_exposure": dict(),
         "value": dict(),
+        "allocations": dict(group_by_aware=False),
+        "longonly_allocations": dict(group_by_aware=False, method_kwargs=dict(direction="longonly")),
+        "shortonly_allocations": dict(group_by_aware=False, method_kwargs=dict(direction="shortonly")),
         "total_profit": dict(obj_type="red_array"),
         "final_value": dict(obj_type="red_array"),
         "total_return": dict(obj_type="red_array"),
@@ -6400,11 +6404,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_optimizer(
         cls: tp.Type[PortfolioT],
-        optimizer: PortfolioOptimizer,
         close: tp.Union[tp.ArrayLike, Data],
+        optimizer: PortfolioOptimizer,
+        squeeze_groups: bool = True,
         dropna: tp.Optional[str] = None,
         fill_value: tp.Scalar = np.nan,
-        size_type: tp.Optional[tp.ArrayLike] = None,
+        size_type: tp.ArrayLike = "targetpercent",
         direction: tp.Optional[tp.ArrayLike] = None,
         cash_sharing: tp.Optional[bool] = True,
         call_seq: tp.Optional[tp.ArrayLike] = "auto",
@@ -6416,15 +6421,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         Uses `Portfolio.from_orders` as the base simulation method.
 
-        If any allocation is bigger than 1, the whole array is considered to contain discrete
-        allocations and 'amount' as size type is used, otherwise 'targetpercent'. Also, if there
-        are any negative values, direction is automatically set to 'both', otherwise to 'longonly'.
-        The cash sharing is set to True, the call sequence is set to 'auto', and the grouper is set
-        to the grouper of the optimizer.
-
-        If filled allocations have a different count than there are elements in `close`,
-        uses `vectorbtpro.generic.accessors.GenericAccessor.latest_at_index` to align the size
-        array to the index in `close`.
+        The size type is 'targetpercent'. If there are positive and negative values, the direction
+        is automatically set to 'both', otherwise to 'longonly' for positive-only and `shortonly`
+        for negative-only values. Also, the cash sharing is set to True, the call sequence is set
+        to 'auto', and the grouper is set to the grouper of the optimizer by default.
 
         Usage:
             ```pycon
@@ -6447,7 +6447,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             2020-01-04        NaN       NaN       NaN
             2020-01-05   0.038078  0.567845  0.394077
 
-            >>> pf = vbt.Portfolio.from_optimizer(pf_opt, close)
+            >>> pf = vbt.Portfolio.from_optimizer(close, pf_opt)
             >>> pf.get_asset_value(group_by=False).vbt / pf.value
             alloc_group                         group
                              MSFT      GOOG      AAPL
@@ -6458,21 +6458,30 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             2020-01-05   0.038078  0.567845  0.394077  << rebalanced
             ```
         """
-        size = optimizer.fill_allocations(squeeze_groups=False, dropna=dropna, fill_value=fill_value)
-        if size_type is None:
-            if (np.abs(size.values) > 1).any():
-                if not silence_warnings:
-                    warnings.warn("Some allocations are greater than 1. Using SizeType.Amount.", stacklevel=2)
-                size_type = "amount"
-            else:
-                size_type = "targetpercent"
+        size = optimizer.fill_allocations(squeeze_groups=squeeze_groups, dropna=dropna, fill_value=fill_value)
         if direction is None:
-            if (size.values < 0).any():
+            pos_size_any = (size.values > 0).any()
+            neg_size_any = (size.values < 0).any()
+            if pos_size_any and neg_size_any:
                 direction = "both"
-            else:
+            elif pos_size_any:
                 direction = "longonly"
+            else:
+                direction = "shortonly"
+                size = size.abs()
         if group_by is None:
-            group_by = optimizer.wrapper.grouper.group_by.name
+
+            def _substitute_group_by(index):
+                columns = optimizer.wrapper.columns
+                if squeeze_groups and optimizer.wrapper.grouped_ndim == 1:
+                    columns = columns.droplevel(level=0)
+                if not index.equals(columns):
+                    if "symbol" in index.names:
+                        return ExceptLevel("symbol")
+                    raise ValueError("Column hierarchy has changed. Disable squeeze_groups and provide group_by.")
+                return optimizer.wrapper.grouper.group_by
+
+            group_by = RepFunc(_substitute_group_by)
         return cls.from_orders(
             close,
             size=size,
@@ -9098,6 +9107,45 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         return wrapper.wrap(value, group_by=group_by, **resolve_dict(wrap_kwargs))
 
     @class_or_instancemethod
+    def get_allocations(
+        cls_or_self,
+        direction: tp.Union[str, int] = "both",
+        group_by: tp.GroupByLike = None,
+        asset_value: tp.Optional[tp.SeriesFrame] = None,
+        value: tp.Optional[tp.SeriesFrame] = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """Get portfolio allocation series per column."""
+        if not isinstance(cls_or_self, type):
+            if asset_value is None:
+                asset_value = cls_or_self.resolve_shortcut_attr(
+                    "asset_value",
+                    direction=direction,
+                    group_by=False,
+                    jitted=jitted,
+                    chunked=chunked,
+                )
+            if value is None:
+                value = cls_or_self.resolve_shortcut_attr("value", group_by=group_by, jitted=jitted, chunked=chunked)
+            if wrapper is None:
+                wrapper = cls_or_self.wrapper
+        else:
+            checks.assert_not_none(asset_value)
+            checks.assert_not_none(value)
+            checks.assert_not_none(wrapper)
+
+        if not wrapper.grouper.is_grouped(group_by=group_by):
+            raise ValueError("Portfolio must be grouped. Provide group_by.")
+        group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
+        func = jit_reg.resolve_option(nb.allocations_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        allocations = func(to_2d_array(asset_value), to_2d_array(value), group_lens)
+        return wrapper.wrap(allocations, group_by=False, **resolve_dict(wrap_kwargs))
+
+    @class_or_instancemethod
     def get_total_profit(
         cls_or_self,
         group_by: tp.GroupByLike = None,
@@ -10388,6 +10436,26 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 hline_shape_kwargs,
             )
         )
+        return fig
+
+    def plot_allocations(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        line_shape: str = "hv",
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        **kwargs,
+    ) -> tp.BaseFigure:
+        """Plot one group of allocations."""
+        filled_allocations = self.resolve_shortcut_attr(
+            "allocations",
+            group_by=group_by,
+            jitted=jitted,
+            chunked=chunked,
+        )
+        filled_allocations = self.select_col_from_obj(filled_allocations, column, obj_ungrouped=True)
+        fig = filled_allocations.vbt.areaplot(line_shape=line_shape, **kwargs)
         return fig
 
     def plot_cum_returns(

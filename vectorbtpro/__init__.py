@@ -40,6 +40,9 @@ import warnings
 from numba.core.errors import NumbaExperimentalFeatureWarning
 
 warnings.filterwarnings("ignore", category=NumbaExperimentalFeatureWarning)
+warnings.filterwarnings(
+    "ignore", message="The localize method is no longer necessary, as this time zone supports the fold attribute"
+)
 
 __blacklist__ = []
 

@@ -10,31 +10,39 @@ from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import chunking as ch
+from vectorbtpro.portfolio.enums import Direction
 
 
 @register_jitted(cache=True)
 def get_alloc_points_nb(
     filled_allocations: tp.Array2d,
-    notna_only: bool = True,
+    valid_only: bool = True,
+    nonzero_only: bool = True,
     unique_only: bool = True,
 ) -> tp.Array1d:
     """Get allocation points from filled allocations.
 
-    Set `notna_only` to False to not register a new allocation when all points are NaN.
-    Set `unique_only` to False to not register a new allocation when it's the same as the last one."""
+    If `valid_only` is True, does not register a new allocation when all points are NaN.v
+    If `nonzero_only` is True, does not register a new allocation when all points are zero.
+    If `unique_only` is True, does not register a new allocation when it's the same as the last one."""
     out = np.empty(len(filled_allocations), dtype=np.int_)
     k = 0
     for i in range(filled_allocations.shape[0]):
+        all_nan = True
         all_zeros = True
-        all_unique = True
+        all_same = True
         for col in range(filled_allocations.shape[1]):
+            if not np.isnan(filled_allocations[i, col]):
+                all_nan = False
             if abs(filled_allocations[i, col]) > 0:
                 all_zeros = False
             if k == 0 or (k > 0 and filled_allocations[i, col] != filled_allocations[out[k - 1], col]):
-                all_unique = False
-        if notna_only and all_zeros:
+                all_same = False
+        if valid_only and all_nan:
             continue
-        if unique_only and all_unique:
+        if nonzero_only and all_zeros:
+            continue
+        if unique_only and all_same:
             continue
         out[k] = i
         k += 1
@@ -98,19 +106,64 @@ def allocate_meta_nb(
 
 
 @register_jitted(cache=True)
-def pick_idx_allocate_func_nb(i, index_point, allocations):
+def pick_idx_allocate_func_nb(i: int, index_point: int, allocations: tp.Array2d) -> tp.Array1d:
     """Pick the allocation at an absolute position in an array."""
     return allocations[i]
 
 
 @register_jitted(cache=True)
-def pick_point_allocate_func_nb(i, index_point, allocations):
+def pick_point_allocate_func_nb(i: int, index_point: int, allocations: tp.Array2d) -> tp.Array1d:
     """Pick the allocation at an index point in an array."""
     return allocations[index_point]
 
 
 @register_jitted(cache=True)
-def random_allocate_func_nb(i, index_point, n_cols):
+def random_allocate_func_nb(
+    i: int,
+    index_point: int,
+    n_cols: int,
+    direction: int = Direction.LongOnly,
+    n: tp.Optional[int] = None,
+) -> tp.Array1d:
     """Generate a random allocation."""
-    weights = np.random.uniform(0, 1, n_cols)
-    return weights / weights.sum()
+    weights = np.full(n_cols, np.nan, dtype=np.float_)
+    pos_sum = 0
+    neg_sum = 0
+    if n is None:
+        for c in range(n_cols):
+            w = np.random.uniform(0, 1)
+            if direction == Direction.ShortOnly:
+                w = -w
+            elif direction == Direction.Both:
+                if np.random.randint(0, 2) == 0:
+                    w = -w
+            if w >= 0:
+                pos_sum += w
+            else:
+                neg_sum += abs(w)
+            weights[c] = w
+    else:
+        rand_indices = np.random.choice(n_cols, size=n, replace=False)
+        for k in range(len(rand_indices)):
+            w = np.random.uniform(0, 1)
+            if direction == Direction.ShortOnly:
+                w = -w
+            elif direction == Direction.Both:
+                if np.random.randint(0, 2) == 0:
+                    w = -w
+            if w >= 0:
+                pos_sum += w
+            else:
+                neg_sum += abs(w)
+            weights[rand_indices[k]] = w
+    for c in range(n_cols):
+        if not np.isnan(weights[c]):
+            if weights[c] >= 0:
+                if pos_sum > 0:
+                    weights[c] = weights[c] / pos_sum
+            else:
+                if neg_sum > 0:
+                    weights[c] = weights[c] / neg_sum
+        else:
+            weights[c] = 0.0
+    return weights

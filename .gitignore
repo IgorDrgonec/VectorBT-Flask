@@ -139,3 +139,4 @@ dmypy.json
 .github_gist_token
 /venvs/
 /work/
+/*.ipynb

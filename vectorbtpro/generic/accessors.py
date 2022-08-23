@@ -4861,6 +4861,101 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
         BaseDFAccessor.__init__(self, obj, **kwargs)
         GenericAccessor.__init__(self, obj, mapping=mapping, **kwargs)
 
+    def areaplot(
+        self,
+        line_shape: str = "spline",
+        trace_kwargs: tp.KwargsLikeSequence = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs,
+    ) -> tp.BaseFigure:
+        """Plot stacked area.
+
+        Args:
+            line_shape (str): Line shape.
+            trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter`.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
+            fig (Figure or FigureWidget): Figure to add traces to.
+            **layout_kwargs: Keyword arguments for layout.
+
+        Usage:
+            ```pycon
+            >>> df.vbt.areaplot()
+            ```
+
+            ![](/assets/images/api/df_areaplot.svg)
+        """
+        from vectorbtpro.utils.opt_packages import assert_can_import
+
+        assert_can_import("plotly")
+        from vectorbtpro.utils.figure import make_figure
+        import plotly.express as px
+
+        if fig is None:
+            fig = make_figure()
+        fig.update_layout(**layout_kwargs)
+
+        if len(self.wrapper.columns) <= len(px.colors.qualitative.D3):
+            colors = px.colors.qualitative.D3
+        else:
+            colors = px.colors.qualitative.Alphabet
+
+        pos_mask = self.obj.values > 0
+        pos_mask_any = pos_mask.any()
+        neg_mask = self.obj.values < 0
+        neg_mask_any = neg_mask.any()
+        pos_showlegend = False
+        neg_showlegend = False
+        if pos_mask_any:
+            pos_showlegend = True
+        elif neg_mask_any:
+            neg_showlegend = True
+        if pos_mask_any:
+            pos_df = self.obj.copy()
+            pos_df[neg_mask] = 0.0
+            fig = pos_df.vbt.lineplot(
+                trace_kwargs=[
+                    merge_dicts(
+                        dict(
+                            legendgroup="pfopt_" + str(c),
+                            stackgroup="one",
+                            line=dict(width=0, shape=line_shape),
+                            fillcolor=adjust_opacity(colors[c % len(colors)], 0.8),
+                            showlegend=pos_showlegend,
+                        ),
+                        resolve_dict(trace_kwargs, i=c),
+                    )
+                    for c in range(len(self.wrapper.columns))
+                ],
+                add_trace_kwargs=add_trace_kwargs,
+                use_gl=False,
+                fig=fig,
+                **layout_kwargs,
+            )
+        if neg_mask_any:
+            neg_df = self.obj.copy()
+            neg_df[pos_mask] = 0.0
+            fig = neg_df.vbt.lineplot(
+                trace_kwargs=[
+                    merge_dicts(
+                        dict(
+                            legendgroup="pfopt_" + str(c),
+                            stackgroup="two",
+                            line=dict(width=0, shape=line_shape),
+                            fillcolor=adjust_opacity(colors[c % len(colors)], 0.8),
+                            showlegend=neg_showlegend,
+                        ),
+                        resolve_dict(trace_kwargs, i=c),
+                    )
+                    for c in range(len(self.wrapper.columns))
+                ],
+                add_trace_kwargs=add_trace_kwargs,
+                use_gl=False,
+                fig=fig,
+                **layout_kwargs,
+            )
+        return fig
+
     def heatmap(
         self,
         x_labels: tp.Optional[tp.Labels] = None,

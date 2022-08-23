@@ -18,13 +18,14 @@ from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.random_ import set_seed_nb
+from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.base.indexes import combine_indexes, stack_indexes
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, to_dict
 from vectorbtpro.base.indexing import row_points_defaults, row_ranges_defaults
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic.enums import RangeStatus
-from vectorbtpro.portfolio.enums import alloc_range_dt, alloc_point_dt
+from vectorbtpro.portfolio.enums import alloc_range_dt, alloc_point_dt, Direction
 from vectorbtpro.portfolio.pfopt import nb
 from vectorbtpro.portfolio.pfopt.records import AllocRanges, AllocPoints
 from vectorbtpro.registries.ch_registry import ch_reg
@@ -1370,7 +1371,8 @@ class PortfolioOptimizer(Analyzable):
     def from_filled_allocations(
         cls: tp.Type[PortfolioOptimizerT],
         allocations: tp.AnyArray2d,
-        notna_only: bool = True,
+        valid_only: bool = True,
+        nonzero_only: bool = True,
         unique_only: bool = True,
         wrapper: tp.Optional[ArrayWrapper] = None,
         **kwargs,
@@ -1390,7 +1392,12 @@ class PortfolioOptimizer(Analyzable):
         allocations = to_2d_array(allocations, expand_axis=0)
         if allocations.shape != wrapper.shape_2d:
             raise ValueError("Allocation array must have the same shape as wrapper")
-        on = nb.get_alloc_points_nb(allocations, notna_only=notna_only, unique_only=unique_only)
+        on = nb.get_alloc_points_nb(
+            allocations,
+            valid_only=valid_only,
+            nonzero_only=nonzero_only,
+            unique_only=unique_only,
+        )
         kwargs = merge_dicts(dict(on=on), kwargs)
         return cls.from_allocate_func(
             wrapper,
@@ -1415,6 +1422,8 @@ class PortfolioOptimizer(Analyzable):
     def from_random(
         cls: tp.Type[PortfolioOptimizerT],
         wrapper: ArrayWrapper,
+        direction: tp.Union[str, int] = "longonly",
+        n: tp.Optional[int] = None,
         seed: tp.Optional[int] = None,
         **kwargs,
     ) -> PortfolioOptimizerT:
@@ -1423,12 +1432,16 @@ class PortfolioOptimizer(Analyzable):
         Uses `PortfolioOptimizer.from_allocate_func`.
 
         Uses `vectorbtpro.portfolio.pfopt.nb.random_allocate_func_nb` and a Numba-compiled loop."""
+        if isinstance(direction, str):
+            direction = map_enum_fields(direction, Direction)
         if seed is not None:
             set_seed_nb(seed)
         return cls.from_allocate_func(
             wrapper,
             nb.random_allocate_func_nb,
             wrapper.shape_2d[1],
+            direction,
+            n,
             jitted_loop=True,
             **kwargs,
         )
@@ -1440,7 +1453,8 @@ class PortfolioOptimizer(Analyzable):
         S: tp.Optional[tp.AnyArray2d] = None,
         n_jobs: int = 1,
         log_progress: bool = False,
-        notna_only: bool = True,
+        valid_only: bool = True,
+        nonzero_only: bool = True,
         unique_only: bool = True,
         wrapper: tp.Optional[ArrayWrapper] = None,
         **kwargs,
@@ -1484,7 +1498,12 @@ class PortfolioOptimizer(Analyzable):
             else:
                 raise TypeError(f"Algo {_algo} not supported")
             if "on" not in kwargs:
-                _kwargs["on"] = nb.get_alloc_points_nb(weights, notna_only=notna_only, unique_only=unique_only)
+                _kwargs["on"] = nb.get_alloc_points_nb(
+                    weights,
+                    valid_only=valid_only,
+                    nonzero_only=nonzero_only,
+                    unique_only=unique_only
+                )
             return (weights,), _kwargs
 
         return cls.from_allocate_func(
@@ -2197,6 +2216,7 @@ class PortfolioOptimizer(Analyzable):
         self,
         column: tp.Optional[tp.Label] = None,
         dropna: tp.Optional[str] = "head",
+        line_shape: str = "hv",
         plot_rb_dates: tp.Optional[bool] = None,
         trace_kwargs: tp.KwargsLikeSequence = None,
         add_shape_kwargs: tp.KwargsLike = None,
@@ -2209,6 +2229,7 @@ class PortfolioOptimizer(Analyzable):
         Args:
             column (str): Name of the allocation group to plot.
             dropna (int): See `PortfolioOptimizer.fill_allocations`.
+            line_shape (str): Line shape.
             plot_rb_dates (bool): Whether to plot rebalancing dates.
 
                 Defaults to True if there are no more than 20 rebalancing dates.
@@ -2242,56 +2263,51 @@ class PortfolioOptimizer(Analyzable):
         from vectorbtpro.utils.opt_packages import assert_can_import
 
         assert_can_import("plotly")
-        import plotly.express as px
+        from vectorbtpro.utils.figure import make_figure
 
         self_group = self.select_col(column=column)
-        filled_alloc_df = self_group.fill_allocations(squeeze_groups=False, dropna=dropna).ffill()
-        columns = self_group.wrapper.columns.unique(level=1)
-        if len(columns) <= len(px.colors.qualitative.D3):
-            colors = px.colors.qualitative.D3
-        else:
-            colors = px.colors.qualitative.Alphabet
 
-        fig = filled_alloc_df.droplevel(level=0, axis=1).vbt.lineplot(
-            trace_kwargs=[
-                merge_dicts(
-                    dict(
-                        stackgroup="one",
-                        line=dict(width=0),
-                        fillcolor=adjust_opacity(colors[c % len(colors)], 0.8),
-                    ),
-                    resolve_dict(trace_kwargs, i=c),
-                )
-                for c in range(len(columns))
-            ],
-            add_trace_kwargs=add_trace_kwargs,
-            use_gl=False,
-            fig=fig,
-            **layout_kwargs,
-        )
+        if fig is None:
+            fig = make_figure()
+        fig.update_layout(**layout_kwargs)
 
-        if plot_rb_dates is None or (isinstance(plot_rb_dates, bool) and plot_rb_dates):
-            rb_dates = self_group.get_allocations(squeeze_groups=False).index.get_level_values(level=1)
-            if plot_rb_dates is None:
-                plot_rb_dates = len(rb_dates) <= 20
-            if plot_rb_dates:
-                add_shape_kwargs = merge_dicts(
-                    dict(
-                        type="line",
-                        line=dict(
-                            color=fig.layout.template.layout.plot_bgcolor,
-                            dash="dot",
-                            width=1,
+        if self_group.alloc_records.count() > 0:
+            filled_allocations = self_group.fill_allocations(squeeze_groups=True, dropna=dropna).ffill()
+            idx_arr = self_group.alloc_records.get_field_arr("idx")
+            if isinstance(self_group.alloc_records, AllocRanges):
+                closed_mask = self_group.alloc_records.get_field_arr("status") == RangeStatus.Closed
+                idx_arr = idx_arr[closed_mask]
+            idx_arr = idx_arr[idx_arr > 0]
+            rb_dates = filled_allocations.index[idx_arr]
+
+            fig = filled_allocations.vbt.areaplot(
+                line_shape=line_shape,
+                trace_kwargs=trace_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                fig=fig,
+            )
+
+            if plot_rb_dates is None or (isinstance(plot_rb_dates, bool) and plot_rb_dates):
+                if plot_rb_dates is None:
+                    plot_rb_dates = len(rb_dates) <= 20
+                if plot_rb_dates:
+                    add_shape_kwargs = merge_dicts(
+                        dict(
+                            type="line",
+                            line=dict(
+                                color=fig.layout.template.layout.plot_bgcolor,
+                                dash="dot",
+                                width=1,
+                            ),
+                            xref="x",
+                            yref="paper",
+                            y0=0,
+                            y1=1,
                         ),
-                        xref="x",
-                        yref="paper",
-                        y0=0,
-                        y1=1,
-                    ),
-                    add_shape_kwargs,
-                )
-                for rb_date in rb_dates:
-                    fig.add_shape(x0=rb_date, x1=rb_date, **add_shape_kwargs)
+                        add_shape_kwargs,
+                    )
+                    for rb_date in rb_dates:
+                        fig.add_shape(x0=rb_date, x1=rb_date, **add_shape_kwargs)
         return fig
 
     @property

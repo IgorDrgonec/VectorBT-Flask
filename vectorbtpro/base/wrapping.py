@@ -2364,6 +2364,7 @@ class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
         cls_or_self,
         obj: tp.Optional[tp.SeriesFrame],
         column: tp.Any = None,
+        obj_ungrouped: bool = False,
         wrapper: tp.Optional[ArrayWrapper] = None,
     ) -> tp.MaybeSeries:
         """Select one column/group from a pandas object.
@@ -2377,16 +2378,26 @@ class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
             if wrapper.get_ndim() == 2 and wrapper.get_shape_2d()[1] == 1:
                 column = 0
         if column is not None:
-            if wrapper.ndim == 1:
-                raise TypeError("This object already contains one column of data")
             if wrapper.grouper.is_grouped():
-                if column not in wrapper.get_columns():
-                    if isinstance(column, int):
-                        if isinstance(obj, pd.DataFrame):
-                            return obj.iloc[:, column]
-                        return obj.iloc[column]
-                    raise KeyError(f"Group '{column}' not found")
+                if wrapper.grouped_ndim == 1:
+                    raise TypeError("This object already contains one group of data")
+                if obj_ungrouped:
+                    mask = wrapper.grouper.group_by == column
+                    if not mask.any():
+                        raise KeyError(f"Group '{column}' not found")
+                    if isinstance(obj, pd.DataFrame):
+                        return obj.loc[:, mask]
+                    return obj.loc[mask]
+                else:
+                    if column not in wrapper.get_columns():
+                        if isinstance(column, int):
+                            if isinstance(obj, pd.DataFrame):
+                                return obj.iloc[:, column]
+                            return obj.iloc[column]
+                        raise KeyError(f"Group '{column}' not found")
             else:
+                if wrapper.ndim == 1:
+                    raise TypeError("This object already contains one column of data")
                 if column not in wrapper.columns:
                     if isinstance(column, int):
                         if isinstance(obj, pd.DataFrame):
