@@ -761,6 +761,127 @@ def wwm_std_nb(arr: tp.Array2d, period: int, minp: tp.Optional[int] = None, adju
 
 
 @register_jitted(cache=True)
+def vidya_acc_nb(in_state: VidyaAIS) -> VidyaAOS:
+    """Accumulator of `vidya_1d_nb`.
+
+    Takes a state of type `vectorbtpro.generic.enums.VidyaAIS` and returns
+    a state of type `vectorbtpro.generic.enums.VidyaAOS`."""
+    i = in_state.i
+    prev_value = in_state.prev_value
+    value = in_state.value
+    pre_window_prev_value = in_state.pre_window_prev_value
+    pre_window_value = in_state.pre_window_value
+    pos_cumsum = in_state.pos_cumsum
+    neg_cumsum = in_state.neg_cumsum
+    prev_vidya = in_state.prev_vidya
+    nancnt = in_state.nancnt
+    window = in_state.window
+    minp = in_state.minp
+    alpha = 2 / (window + 1)
+
+    diff = value - prev_value
+    if np.isnan(diff):
+        nancnt = nancnt + 1
+    else:
+        if diff > 0:
+            pos_value = diff
+            neg_value = 0.0
+        else:
+            pos_value = 0.0
+            neg_value = abs(diff)
+        pos_cumsum = pos_cumsum + pos_value
+        neg_cumsum = neg_cumsum + neg_value
+    if i < window:
+        window_len = i + 1 - nancnt
+    else:
+        pre_window_diff = pre_window_value - pre_window_prev_value
+        if np.isnan(pre_window_diff):
+            nancnt = nancnt - 1
+        else:
+            if pre_window_diff > 0:
+                pre_window_pos_value = pre_window_diff
+                pre_window_neg_value = 0.0
+            else:
+                pre_window_pos_value = 0.0
+                pre_window_neg_value = abs(pre_window_diff)
+            pos_cumsum = pos_cumsum - pre_window_pos_value
+            neg_cumsum = neg_cumsum - pre_window_neg_value
+        window_len = window - nancnt
+    window_pos_cumsum = pos_cumsum
+    window_neg_cumsum = neg_cumsum
+    if window_len < minp:
+        cmo = np.nan
+        vidya = np.nan
+    else:
+        sh = window_pos_cumsum
+        sl = window_neg_cumsum
+        cmo = np.abs((sh - sl) / (sh + sl))
+        if np.isnan(prev_vidya):
+            prev_vidya = 0.0
+        vidya = alpha * cmo * value + prev_vidya * (1 - alpha * cmo)
+
+    return VidyaAOS(
+        pos_cumsum=pos_cumsum,
+        neg_cumsum=neg_cumsum,
+        nancnt=nancnt,
+        window_len=window_len,
+        cmo=cmo,
+        vidya=vidya,
+    )
+
+
+@register_jitted(cache=True)
+def vidya_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None) -> tp.Array1d:
+    """Compute VIDYA.
+
+    Uses `vidya_acc_nb` at each iteration."""
+    if minp is None:
+        minp = window
+    if minp > window:
+        raise ValueError("minp must be <= window")
+    out = np.empty_like(arr, dtype=np.float_)
+    pos_cumsum = 0.0
+    neg_cumsum = 0.0
+    nancnt = 0
+
+    for i in range(arr.shape[0]):
+        in_state = VidyaAIS(
+            i=i,
+            prev_value=arr[i - 1] if i - 1 >= 0 else np.nan,
+            value=arr[i],
+            pre_window_prev_value=arr[i - window - 1] if i - window - 1 >= 0 else np.nan,
+            pre_window_value=arr[i - window] if i - window >= 0 else np.nan,
+            pos_cumsum=pos_cumsum,
+            neg_cumsum=neg_cumsum,
+            prev_vidya=out[i - 1] if i - 1 >= 0 else np.nan,
+            nancnt=nancnt,
+            window=window,
+            minp=minp,
+        )
+        out_state = vidya_acc_nb(in_state)
+        pos_cumsum = out_state.pos_cumsum
+        neg_cumsum = out_state.neg_cumsum
+        nancnt = out_state.nancnt
+        out[i] = out_state.vidya
+
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="arr", axis=1),
+    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None, minp=None),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def vidya_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None) -> tp.Array2d:
+    """2-dim version of `vidya_1d_nb`."""
+    out = np.empty_like(arr, dtype=np.float_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = vidya_1d_nb(arr[:, col], window, minp=minp)
+    return out
+
+
+@register_jitted(cache=True)
 def ma_1d_nb(
     arr: tp.Array1d,
     window: int,
@@ -777,6 +898,8 @@ def ma_1d_nb(
         return ewm_mean_1d_nb(arr, window, minp=minp, adjust=adjust)
     if wtype == WType.Wilder:
         return wwm_mean_1d_nb(arr, window, minp=minp, adjust=adjust)
+    if wtype == WType.Vidya:
+        return vidya_1d_nb(arr, window, minp=minp)
     raise ValueError("Invalid rolling mode")
 
 

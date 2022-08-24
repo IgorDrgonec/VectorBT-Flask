@@ -36,6 +36,8 @@ __all__ = [
     "EWMMeanAOS",
     "EWMStdAIS",
     "EWMStdAOS",
+    "VidyaAIS",
+    "VidyaAOS",
     "RollCovAIS",
     "RollCovAOS",
     "RollCorrAIS",
@@ -74,6 +76,7 @@ class WTypeT(tp.NamedTuple):
     Weighted: int = 1
     Exp: int = 2
     Wilder: int = 3
+    Vidya: int = 4
 
 
 WType = WTypeT()
@@ -561,6 +564,41 @@ __pdoc__[
     "EWMStdAOS"
 ] = """A named tuple representing the output state of 
 `vectorbtpro.generic.nb.rolling.ewm_std_acc_nb`."""
+
+
+class VidyaAIS(tp.NamedTuple):
+    i: int
+    prev_value: float
+    value: float
+    pre_window_prev_value: float
+    pre_window_value: float
+    pos_cumsum: float
+    neg_cumsum: float
+    prev_vidya: float
+    nancnt: int
+    window: int
+    minp: tp.Optional[int]
+
+
+__pdoc__[
+    "VidyaAIS"
+] = """A named tuple representing the input state of 
+`vectorbtpro.generic.nb.rolling.vidya_acc_nb`."""
+
+
+class VidyaAOS(tp.NamedTuple):
+    pos_cumsum: float
+    neg_cumsum: float
+    nancnt: int
+    window_len: int
+    cmo: float
+    vidya: float
+
+
+__pdoc__[
+    "VidyaAOS"
+] = """A named tuple representing the output state of 
+`vectorbtpro.generic.nb.rolling.vidya_acc_nb`."""
 
 
 class RollCovAIS(tp.NamedTuple):

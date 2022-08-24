@@ -575,6 +575,20 @@ class GenericAccessor(BaseAccessor, Analyzable):
         out = func(self.to_2d_array(), period, minp=minp, adjust=adjust)
         return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
+    def vidya(
+        self,
+        window: int,
+        minp: tp.Optional[int] = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """See `vectorbtpro.generic.nb.rolling.vidya_nb`."""
+        func = jit_reg.resolve_option(nb.vidya_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        out = func(self.to_2d_array(), window, minp=minp)
+        return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
+
     def ma(
         self,
         window: int,

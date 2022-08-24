@@ -483,6 +483,40 @@ class TestAccessors:
             df.vbt.wwm_std(test_window, minp=test_minp, chunked=False),
         )
 
+    def test_vidya(self):
+        assert_series_equal(
+            df["a"].vbt.vidya(3),
+            pd.Series([np.nan, np.nan, np.nan, 2.0, np.nan], index=df.index, name="a"),
+        )
+        assert_frame_equal(
+            df.vbt.vidya(3),
+            pd.DataFrame([
+                [np.nan, np.nan, np.nan],
+                [np.nan, np.nan, np.nan],
+                [np.nan, np.nan, np.nan],
+                [2.0, np.nan, np.nan],
+                [np.nan, 0.5, np.nan],
+            ], index=df.index, columns=df.columns),
+        )
+        assert_frame_equal(
+            df.vbt.vidya(3, minp=1),
+            pd.DataFrame([
+                [np.nan, np.nan, np.nan],
+                [1.0, np.nan, 1.0],
+                [2.0, 1.5, np.nan],
+                [3.0, 1.75, 1.0],
+                [np.nan, 1.375, 1.0],
+            ], index=df.index, columns=df.columns),
+        )
+        assert_frame_equal(
+            df.vbt.vidya(3, jitted=dict(parallel=True)),
+            df.vbt.vidya(3, jitted=dict(parallel=False)),
+        )
+        assert_frame_equal(
+            df.vbt.vidya(3, chunked=True),
+            df.vbt.vidya(3,  chunked=False),
+        )
+
     @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
     @pytest.mark.parametrize("test_minp", [1, None])
     def test_ma(self, test_window, test_minp):
@@ -507,6 +541,10 @@ class TestAccessors:
         assert_frame_equal(
             df.vbt.ma(test_window, wtype="wilder", minp=test_minp),
             df.vbt.wwm_mean(test_window, minp=test_minp),
+        )
+        assert_frame_equal(
+            df.vbt.ma(test_window, wtype="vidya", minp=test_minp),
+            df.vbt.vidya(test_window, minp=test_minp),
         )
         assert_frame_equal(
             df.vbt.ma(test_window, minp=test_minp, jitted=dict(parallel=True)),
