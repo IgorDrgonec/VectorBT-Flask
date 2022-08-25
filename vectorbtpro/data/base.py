@@ -220,6 +220,8 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         checks.assert_instance_of(last_index, dict)
         for symbol, obj in data.items():
             checks.assert_meta_equal(obj, data[list(data.keys())[0]])
+        if len(data) > 1:
+            single_symbol = False
 
         Analyzable.__init__(
             self,
@@ -518,7 +520,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
     def from_data(
         cls: tp.Type[DataT],
         data: symbol_dict,
-        single_symbol: bool = False,
+        single_symbol: bool = True,
         tz_localize: tp.Optional[tp.TimezoneLike] = None,
         tz_convert: tp.Optional[tp.TimezoneLike] = None,
         missing_index: tp.Optional[str] = None,
@@ -590,7 +592,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         return cls(
             wrapper,
             data,
-            single_symbol,
+            single_symbol=single_symbol,
             fetch_kwargs=fetch_kwargs,
             returned_kwargs=returned_kwargs,
             last_index=last_index,
@@ -1156,24 +1158,31 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         rename: tp.Optional[tp.Dict[tp.Hashable, tp.Hashable]] = None,
         **kwargs,
     ) -> DataT:
-        """Merge multiple `Data` instances."""
+        """Merge multiple `Data` instances.
+
+        Can merge both different symbols and different data across overlapping symbols.
+        Data is overridden in the order as provided in `datas`."""
         if len(datas) == 1:
             datas = datas[0]
         datas = list(datas)
 
         data = symbol_dict()
+        single_symbol = True
         fetch_kwargs = symbol_dict()
         returned_kwargs = symbol_dict()
         last_index = symbol_dict()
         for instance in datas:
+            if not instance.single_symbol:
+                single_symbol = False
             for s in instance.symbols:
-                if s in data:
-                    raise ValueError(f"Found a duplicate symbol '{s}'")
                 if rename is None:
                     new_s = s
                 else:
                     new_s = rename[s]
-                data[new_s] = instance.data[s]
+                if new_s in data:
+                    data[new_s] = instance.data[s].combine_first(data[new_s])
+                else:
+                    data[new_s] = instance.data[s]
                 if s in instance.fetch_kwargs:
                     fetch_kwargs[new_s] = instance.fetch_kwargs[s]
                 if s in instance.returned_kwargs:
@@ -1183,7 +1192,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
         return cls.from_data(
             data=data,
-            single_symbol=False,
+            single_symbol=single_symbol,
             fetch_kwargs=fetch_kwargs,
             returned_kwargs=returned_kwargs,
             last_index=last_index,

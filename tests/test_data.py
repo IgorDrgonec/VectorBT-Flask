@@ -1400,9 +1400,61 @@ class TestData:
 
     def test_merge(self):
         data = MyData.fetch([0, 1, 2], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
-        data0 = MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
-        data12 = MyData.fetch([2], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
-        assert MyData.merge(data0, data12) == data
+        data01 = MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
+        data2 = MyData.fetch([2], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
+        assert MyData.merge(data01, data2) == data
+        data12 = MyData.fetch([1, 2], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
+        assert MyData.merge(data01, data12) == data
+        data12 = MyData.fetch([1, 2], shape=(3, 2), start_date=datetime(2020, 1, 3), columns=["feat2", "feat3"])
+        merged_data = MyData.merge(data01, data12, missing_columns="nan")
+        assert_frame_equal(
+            merged_data.data[0],
+            pd.DataFrame([
+                ['0_0_0', '0_1_0', '0_2_0', np.nan],
+                ['0_0_1', '0_1_1', '0_2_1', np.nan],
+                ['0_0_2', '0_1_2', '0_2_2', np.nan],
+                ['0_0_3', '0_1_3', '0_2_3', np.nan],
+                ['0_0_4', '0_1_4', '0_2_4', np.nan],
+            ], index=pd.DatetimeIndex([
+                '2020-01-01 00:00:00+00:00',
+                '2020-01-02 00:00:00+00:00',
+                '2020-01-03 00:00:00+00:00',
+                '2020-01-04 00:00:00+00:00',
+                '2020-01-05 00:00:00+00:00',
+            ], freq="d"), columns=pd.Index(['feat0', 'feat1', 'feat2', 'feat3'], dtype='object'))
+        )
+        assert_frame_equal(
+            merged_data.data[1],
+            pd.DataFrame([
+                ['1_0_0', '1_1_0', '1_2_0', np.nan],
+                ['1_0_1', '1_1_1', '1_2_1', np.nan],
+                ['1_0_2', '1_1_2', '1_0_0', '1_1_0'],
+                ['1_0_3', '1_1_3', '1_0_1', '1_1_1'],
+                ['1_0_4', '1_1_4', '1_0_2', '1_1_2'],
+            ], index=pd.DatetimeIndex([
+                '2020-01-01 00:00:00+00:00',
+                '2020-01-02 00:00:00+00:00',
+                '2020-01-03 00:00:00+00:00',
+                '2020-01-04 00:00:00+00:00',
+                '2020-01-05 00:00:00+00:00',
+            ], freq="d"), columns=pd.Index(['feat0', 'feat1', 'feat2', 'feat3'], dtype='object'))
+        )
+        assert_frame_equal(
+            merged_data.data[2],
+            pd.DataFrame([
+                [np.nan, np.nan, np.nan, np.nan],
+                [np.nan, np.nan, np.nan, np.nan],
+                [np.nan, np.nan, '2_0_0', '2_1_0'],
+                [np.nan, np.nan, '2_0_1', '2_1_1'],
+                [np.nan, np.nan, '2_0_2', '2_1_2'],
+            ], index=pd.DatetimeIndex([
+                '2020-01-01 00:00:00+00:00',
+                '2020-01-02 00:00:00+00:00',
+                '2020-01-03 00:00:00+00:00',
+                '2020-01-04 00:00:00+00:00',
+                '2020-01-05 00:00:00+00:00',
+            ], freq="d"), columns=pd.Index(['feat0', 'feat1', 'feat2', 'feat3'], dtype='object'))
+        )
 
     def test_to_csv(self, tmp_path):
         data = MyData.fetch(["S1", "S2"], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
