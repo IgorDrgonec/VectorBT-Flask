@@ -13,7 +13,7 @@
 import time
 import traceback
 import warnings
-from functools import wraps, lru_cache, partial
+from functools import wraps, lru_cache, partial, partialmethod
 from pathlib import Path, PurePath
 from glob import glob
 import re
@@ -96,6 +96,21 @@ class CustomData(Data):
     """Subclass of `vectorbtpro.data.base.Data` for custom-generated data."""
 
     _setting_keys: tp.SettingsKeys = dict(custom=None)
+
+    @classmethod
+    def get_custom_settings(cls) -> dict:
+        """`CustomData.get_settings` with `key_id="custom"`."""
+        return cls.get_settings(key_id="custom")
+
+    @classmethod
+    def set_custom_settings(cls, **kwargs) -> None:
+        """`CustomData.set_settings` with `key_id="custom"`."""
+        cls.set_settings(key_id="custom", **kwargs)
+
+    @classmethod
+    def reset_custom_settings(cls) -> None:
+        """`CustomData.reset_settings` with `key_id="custom"`."""
+        cls.reset_settings(key_id="custom")
 
 
 # ############# Synthetic ############# #
@@ -810,6 +825,9 @@ class HDFData(LocalData):
 # ############# Remote ############# #
 
 
+RemoteDataT = tp.TypeVar("RemoteDataT", bound="RemoteData")
+
+
 class RemoteData(CustomData):
     """Subclass of `vectorbtpro.data.base.Data` for remote data.
 
@@ -824,6 +842,30 @@ class RemoteData(CustomData):
         fetch_kwargs["start"] = self.last_index[symbol]
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         return self.fetch_symbol(symbol, **kwargs)
+
+    @classmethod
+    def from_csv(cls: tp.Type[RemoteDataT], *args, fetch_kwargs: tp.KwargsLike = None, **kwargs) -> RemoteDataT:
+        """Use `CSVData` to load data from CSV and switch the class back to this class.
+
+        Use `fetch_kwargs` to provide keyword arguments that were originally used in fetching."""
+        if fetch_kwargs is None:
+            fetch_kwargs = {}
+        data = CSVData.fetch(*args, **kwargs)
+        data = data.switch_class(cls, clear_fetch_kwargs=True, clear_returned_kwargs=True)
+        data = data.update_fetch_kwargs(**fetch_kwargs)
+        return data
+
+    @classmethod
+    def from_hdf(cls: tp.Type[RemoteDataT], *args, fetch_kwargs: tp.KwargsLike = None, **kwargs) -> RemoteDataT:
+        """Use `HDFData` to load data from HDF and switch the class back to this class.
+
+        Use `fetch_kwargs` to provide keyword arguments that were originally used in fetching."""
+        if fetch_kwargs is None:
+            fetch_kwargs = {}
+        data = HDFData.fetch(*args, **kwargs)
+        data = data.switch_class(cls, clear_fetch_kwargs=True, clear_returned_kwargs=True)
+        data = data.update_fetch_kwargs(**fetch_kwargs)
+        return data
 
 
 class YFData(RemoteData):
@@ -976,8 +1018,7 @@ class BinanceData(RemoteData):
         ```pycon
         >>> import vectorbtpro as vbt
 
-        >>> vbt.BinanceData.set_settings(
-        ...     key_id="custom",
+        >>> vbt.BinanceData.set_custom_settings(
         ...     client_config=dict(
         ...         api_key="YOUR_KEY",
         ...         api_secret="YOUR_SECRET"
@@ -1261,8 +1302,7 @@ class CCXTData(RemoteData):
         ```pycon
         >>> import vectorbtpro as vbt
 
-        >>> vbt.CCXTData.set_settings(
-        ...     key_id="custom",
+        >>> vbt.CCXTData.set_custom_settings(
         ...     exchanges=dict(
         ...         binance=dict(
         ...             exchange_config=dict(
@@ -1623,8 +1663,7 @@ class AlpacaData(RemoteData):
         ```pycon
         >>> import vectorbtpro as vbt
 
-        >>> vbt.AlpacaData.set_settings(
-        ...     key_id="custom",
+        >>> vbt.AlpacaData.set_custom_settings(
         ...     client_config=dict(
         ...         api_key="YOUR_KEY",
         ...         secret_key="YOUR_SECRET"
@@ -1875,8 +1914,7 @@ class PolygonData(RemoteData):
         ```pycon
         >>> import vectorbtpro as vbt
 
-        >>> vbt.PolygonData.set_settings(
-        ...     key_id="custom",
+        >>> vbt.PolygonData.set_custom_settings(
         ...     client_config=dict(
         ...         api_key="YOUR_KEY"
         ...     )
@@ -2221,8 +2259,7 @@ class AlphaVantageData(RemoteData):
         ```pycon
         >>> import vectorbtpro as vbt
 
-        >>> vbt.AlphaVantageData.set_settings(
-        ...     key_id="custom",
+        >>> vbt.AlphaVantageData.set_custom_settings(
         ...     api_key="YOUR_KEY"
         ... )
         ```
@@ -2593,8 +2630,7 @@ class NDLData(RemoteData):
         ```pycon
         >>> import vectorbtpro as vbt
 
-        >>> vbt.NDLData.set_settings(
-        ...     key_id="custom",
+        >>> vbt.NDLData.set_custom_settings(
         ...     api_key="YOUR_KEY"
         ... )
         ```
@@ -2742,8 +2778,7 @@ class TVData(RemoteData):
         ```pycon
         >>> import vectorbtpro as vbt
 
-        >>> vbt.TVData.set_settings(
-        ...     key_id="custom",
+        >>> vbt.TVData.set_custom_settings(
         ...     client_config=dict(
         ...         username="YOUR_USERNAME",
         ...         password="YOUR_PASSWORD"
