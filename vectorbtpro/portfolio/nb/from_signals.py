@@ -129,9 +129,12 @@ def resolve_signal_conflict_nb(
         elif conflict_mode == ConflictMode.Opposite:
             # Take the signal opposite to the position we are in
             if position_now == 0:
-                # Cannot decide -> ignore
-                is_entry = False
-                is_exit = False
+                if direction == Direction.Both:
+                    # Cannot decide -> ignore
+                    is_entry = False
+                    is_exit = False
+                else:
+                    is_exit = False
             else:
                 if direction == Direction.Both:
                     if position_now > 0:
