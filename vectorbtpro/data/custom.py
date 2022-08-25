@@ -1150,10 +1150,10 @@ class BinanceData(RemoteData):
         else:
             end_ts = None
 
-        def _ts_to_str(ts: tp.Optional[tp.DatetimeLike]) -> str:
+        def _ts_to_str(ts: tp.Optional[int]) -> str:
             if ts is None:
                 return "None"
-            return str(pd.Timestamp(to_tzaware_datetime(ts, tz=get_utc_tz())))
+            return str(pd.Timestamp(ts, unit="ms", tz="utc"))
 
         def _filter_func(d: tp.Sequence, _prev_end_ts: tp.Optional[int] = None) -> bool:
             if start_ts is not None:
@@ -1331,6 +1331,55 @@ class CCXTData(RemoteData):
                 raise ValueError("Cannot apply config after instantiation of the exchange")
         return exchange
 
+    @staticmethod
+    def _find_earliest_date(
+        fetch_func: tp.Callable,
+        start: tp.DatetimeLike = 0,
+        end: tp.DatetimeLike = "now UTC",
+    ) -> tp.Optional[pd.Timestamp]:
+        """Find the earliest date using binary search."""
+        if start is not None:
+            start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
+            fetched_data = fetch_func(start_ts, 1)
+        else:
+            fetched_data = []
+        if len(fetched_data) == 0 and start != 0:
+            fetched_data = fetch_func(0, 1)
+        if len(fetched_data) == 0:
+            if start is not None:
+                start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
+            else:
+                start_ts = datetime_to_ms(to_tzaware_datetime(0, tz=get_utc_tz()))
+            start_ts = start_ts - start_ts % 86400000
+            if end is not None:
+                end_ts = datetime_to_ms(to_tzaware_datetime(end, tz=get_utc_tz()))
+            else:
+                end_ts = datetime_to_ms(to_tzaware_datetime("now UTC", tz=get_utc_tz()))
+            end_ts = end_ts - end_ts % 86400000 + 86400000
+            start_time = start_ts
+            end_time = end_ts
+            while True:
+                mid_time = (start_time + end_time) // 2
+                mid_time = mid_time - mid_time % 86400000
+                if mid_time == start_time:
+                    break
+                _fetched_data = fetch_func(mid_time, 1)
+                if len(_fetched_data) == 0:
+                    start_time = mid_time
+                else:
+                    end_time = mid_time
+                    fetched_data = _fetched_data
+        if len(fetched_data) > 0:
+            return pd.Timestamp(fetched_data[0][0], unit="ms", tz="utc")
+        return None
+
+    @classmethod
+    def find_earliest_date(cls, symbol: str, **kwargs) -> tp.Optional[pd.Timestamp]:
+        """Find the earliest date using binary search.
+
+        See `CCXTData.fetch_symbol` for arguments."""
+        return cls._find_earliest_date(*cls.fetch_symbol(symbol, return_fetch_method=True, **kwargs))
+
     @classmethod
     def fetch_symbol(
         cls,
@@ -1340,6 +1389,7 @@ class CCXTData(RemoteData):
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
         timeframe: tp.Optional[str] = None,
+        find_earliest_date: tp.Optional[bool] = None,
         limit: tp.Optional[int] = None,
         delay: tp.Optional[float] = None,
         retries: tp.Optional[int] = None,
@@ -1347,7 +1397,8 @@ class CCXTData(RemoteData):
         show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
         silence_warnings: tp.Optional[bool] = None,
-    ) -> tp.Frame:
+        return_fetch_method: bool = False,
+    ) -> tp.Union[tp.Frame, tp.Tuple[tp.Callable, int, int]]:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from CCXT.
 
         Args:
@@ -1367,6 +1418,7 @@ class CCXTData(RemoteData):
             timeframe (str): Timeframe.
 
                 Allows human-readable strings such as "15 minutes".
+            find_earliest_date (bool): Whether to find the earliest date using `CCXTData.find_earliest_date`.
             limit (int): The maximum number of returned items.
             delay (float): Time to sleep after each request (in milliseconds).
 
@@ -1377,6 +1429,7 @@ class CCXTData(RemoteData):
             show_progress (bool): Whether to show the progress bar.
             pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`.
             silence_warnings (bool): Whether to silence all warnings.
+            return_fetch_method (bool): Required by `CCXTData.find_earliest_date`.
 
         For defaults, see `custom.ccxt` in `vectorbtpro._settings.data`.
         Global settings can be provided per exchange id using the `exchanges` dictionary.
@@ -1391,9 +1444,6 @@ class CCXTData(RemoteData):
         if exchange_config is None:
             exchange_config = {}
         exchange = cls.resolve_exchange(exchange=exchange, **exchange_config)
-        if exchange.has["fetchOHLCV"] == "emulated":
-            if not silence_warnings:
-                warnings.warn("Using emulated OHLCV candles", stacklevel=2)
         exchange_name = type(exchange).__name__
 
         if start is None:
@@ -1402,6 +1452,10 @@ class CCXTData(RemoteData):
             end = ccxt_cfg["exchanges"].get(exchange_name, {}).get("end", ccxt_cfg["end"])
         if timeframe is None:
             timeframe = ccxt_cfg["exchanges"].get(exchange_name, {}).get("timeframe", ccxt_cfg["timeframe"])
+        if find_earliest_date is None:
+            find_earliest_date = (
+                ccxt_cfg["exchanges"].get(exchange_name, {}).get("find_earliest_date", ccxt_cfg["find_earliest_date"])
+            )
         if limit is None:
             limit = ccxt_cfg["exchanges"].get(exchange_name, {}).get("limit", ccxt_cfg["limit"])
         if delay is None:
@@ -1424,9 +1478,12 @@ class CCXTData(RemoteData):
             silence_warnings = (
                 ccxt_cfg["exchanges"].get(exchange_name, {}).get("silence_warnings", ccxt_cfg["silence_warnings"])
             )
-
         if not exchange.has["fetchOHLCV"]:
             raise ValueError(f"Exchange {exchange} does not support OHLCV")
+        if exchange.has["fetchOHLCV"] == "emulated":
+            if not silence_warnings:
+                warnings.warn("Using emulated OHLCV candles", stacklevel=2)
+
         split = split_freq_str(timeframe)
         if split is not None:
             multiplier, unit = split
@@ -1466,19 +1523,26 @@ class CCXTData(RemoteData):
                 params=fetch_params,
             )
 
-        # Establish the timestamps
-        start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
-        try:
-            first_data = _fetch(0, 1)
-            first_valid_ts = first_data[0][0]
-            start_ts = max(start_ts, first_valid_ts)
-        except Exception as e:
-            pass
-        prev_end_ts = None
-        end_ts = datetime_to_ms(to_tzaware_datetime(end, tz=get_utc_tz()))
+        if return_fetch_method:
+            return _fetch, start, end
 
-        def _ts_to_str(ts):
-            return str(pd.Timestamp(to_tzaware_datetime(ts, tz=get_utc_tz())))
+        # Establish the timestamps
+        if find_earliest_date and start is not None:
+            start = cls._find_earliest_date(_fetch, start, end)
+        if start is not None:
+            start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
+        else:
+            start_ts = None
+        if end is not None:
+            end_ts = datetime_to_ms(to_tzaware_datetime(end, tz=get_utc_tz()))
+        else:
+            end_ts = None
+        prev_end_ts = None
+
+        def _ts_to_str(ts: tp.Optional[int]) -> str:
+            if ts is None:
+                return "None"
+            return str(pd.Timestamp(ts, unit="ms", tz="utc"))
 
         def _filter_func(d: tp.Sequence, _prev_end_ts: tp.Optional[int] = None) -> bool:
             if start_ts is not None:
@@ -2029,12 +2093,13 @@ class PolygonData(RemoteData):
         # Establish the timestamps
         if start is not None:
             start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
-            try:
+            first_data = _fetch(start_ts, 1)
+            if len(first_data) == 0:
                 first_data = _fetch(0, 1)
-                first_valid_ts = first_data[0]["t"]
-                start_ts = max(start_ts, first_valid_ts)
-            except Exception as e:
-                pass
+            if len(first_data) > 0:
+                start_ts = first_data[0]["t"]
+            else:
+                start_ts = 0
         else:
             start_ts = None
         prev_end_ts = None
@@ -2043,8 +2108,10 @@ class PolygonData(RemoteData):
         else:
             end_ts = None
 
-        def _ts_to_str(ts):
-            return str(pd.Timestamp(to_tzaware_datetime(ts, tz=get_utc_tz())))
+        def _ts_to_str(ts: tp.Optional[int]) -> str:
+            if ts is None:
+                return "None"
+            return str(pd.Timestamp(ts, unit="ms", tz="utc"))
 
         def _filter_func(d: tp.Dict, _prev_end_ts: tp.Optional[int] = None) -> bool:
             if start_ts is not None:

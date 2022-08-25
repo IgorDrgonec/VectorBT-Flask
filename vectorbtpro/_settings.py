@@ -536,6 +536,7 @@ data = ChildDict(
             start=0,
             end="now UTC",
             timeframe="1d",
+            find_earliest_date=True,
             limit=1000,
             delay=None,
             retries=3,
