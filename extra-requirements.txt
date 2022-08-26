@@ -14,6 +14,7 @@ nasdaq-data-link:           data
 tvdatafeed:                 data
 ta:                         ta
 pandas_ta:                  ta
+technical:                  ta
 TA-Lib:                     ta, base
 Bottleneck:                 compute
 numexpr:                    compute, base

@@ -74,6 +74,10 @@ try:
     from ta.utils import IndicatorMixin as IndicatorMixinT
 except ImportError:
     IndicatorMixinT = tp.Any
+try:
+    from technical.consensus import Consensus as ConsensusT
+except ImportError:
+    ConsensusT = tp.Any
 
 
 def prepare_params(
@@ -907,9 +911,7 @@ class IndicatorBase(Analyzable):
             if wrapper_kwargs is None:
                 wrapper_kwargs = {}
             kwargs["wrapper"] = ArrayWrapper.row_stack(
-                *[obj.wrapper for obj in objs],
-                stack_columns=False,
-                **wrapper_kwargs
+                *[obj.wrapper for obj in objs], stack_columns=False, **wrapper_kwargs
             )
 
         if "input_list" not in kwargs:
@@ -3476,6 +3478,124 @@ Args:
             **kwargs,
         )
         return TAIndicator
+
+    @classmethod
+    def from_custom_techcon(
+        cls,
+        consensus_cls: tp.Type[ConsensusT],
+        factory_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.Type[IndicatorBase]:
+        """Create an indicator based on a technical consensus class subclassing
+        `technical.consensus.consensus.Consensus`.
+
+        Requires Technical library: https://github.com/freqtrade/technical"""
+        from vectorbtpro.utils.opt_packages import assert_can_import
+
+        assert_can_import("technical")
+        from technical.consensus.consensus import Consensus
+
+        checks.assert_subclass_of(consensus_cls, Consensus)
+
+        def apply_func(
+            open: tp.Series,
+            high: tp.Series,
+            low: tp.Series,
+            close: tp.Series,
+            volume: tp.Series,
+            smooth: tp.Optional[int] = None,
+            _consensus_cls: tp.Type[ConsensusT] = consensus_cls,
+        ) -> tp.Tuple[tp.Array1d, tp.Array1d, tp.Array1d, tp.Array1d, tp.Array1d, tp.Array1d]:
+            """Apply function for `technical.consensus.movingaverage.MovingAverageConsensus`."""
+            dataframe = pd.DataFrame(
+                {
+                    "open": open,
+                    "high": high,
+                    "low": low,
+                    "close": close,
+                    "volume": volume,
+                }
+            )
+            consensus = _consensus_cls(dataframe)
+            score = consensus.score(smooth=smooth)
+            return (
+                score["buy"].values,
+                score["sell"].values,
+                score["buy_agreement"].values,
+                score["sell_agreement"].values,
+                score["buy_disagreement"].values,
+                score["sell_disagreement"].values,
+            )
+
+        if factory_kwargs is None:
+            factory_kwargs = {}
+        factory_kwargs = merge_dicts(
+            dict(
+                class_name="CON",
+                module_name=__name__,
+                short_name=None,
+                input_names=["open", "high", "low", "close", "volume"],
+                param_names=["smooth"],
+                output_names=[
+                    "buy",
+                    "sell",
+                    "buy_agreement",
+                    "sell_agreement",
+                    "buy_disagreement",
+                    "sell_disagreement",
+                ],
+            ),
+            factory_kwargs,
+        )
+        CONIndicator = cls(**factory_kwargs).with_apply_func(
+            apply_func,
+            takes_1d=True,
+            keep_pd=True,
+            smooth=None,
+            **kwargs,
+        )
+        return CONIndicator
+
+    @classmethod
+    def from_techcon(cls, cls_name: str, **kwargs) -> tp.Type[IndicatorBase]:
+        """Create an indicator from a preset technical consensus.
+
+        Supported are case-insensitive values `MACON` (or `MovingAverageConsensus`),
+        `OSCCON` (or `OscillatorConsensus`), and `SUMCON` (or `SummaryConsensus`)."""
+        from vectorbtpro.utils.opt_packages import assert_can_import
+
+        assert_can_import("technical")
+
+        if cls_name.lower() in ("MACON".lower(), "MovingAverageConsensus".lower()):
+            from technical.consensus.movingaverage import MovingAverageConsensus
+
+            return IndicatorFactory.from_custom_techcon(
+                MovingAverageConsensus,
+                factory_kwargs=dict(class_name="MACON"),
+                **kwargs,
+            )
+        if cls_name.lower() in ("OSCCON".lower(), "OscillatorConsensus".lower()):
+            from technical.consensus.oscillator import OscillatorConsensus
+
+            return IndicatorFactory.from_custom_techcon(
+                OscillatorConsensus,
+                factory_kwargs=dict(class_name="OSCCON"),
+                **kwargs,
+            )
+        if cls_name.lower() in ("SUMCON".lower(), "SummaryConsensus".lower()):
+            from technical.consensus.summary import SummaryConsensus
+
+            return IndicatorFactory.from_custom_techcon(
+                SummaryConsensus,
+                factory_kwargs=dict(class_name="SUMCON"),
+                **kwargs,
+            )
+        raise ValueError(f"Unknown technical consensus class '{cls_name}'")
+
+    @classmethod
+    def get_techcon_indicators(cls) -> tp.Set[str]:
+        """Get all technical consensus indicators."""
+        return {"MACON", "OSCCON", "SUMCON"}
 
     # ############# Expressions ############# #
 

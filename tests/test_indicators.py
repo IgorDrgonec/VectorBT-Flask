@@ -28,6 +28,12 @@ try:
 except:
     talib_available = False
 
+technical_available = True
+try:
+    import technical
+except:
+    technical_available = False
+
 seed = 42
 
 
@@ -2906,6 +2912,43 @@ class TestFactory:
             assert_frame_equal(BollingerBands.run(ts, window=2, window_dev=2).bollinger_mavg, target - 1)
             assert_frame_equal(BollingerBands.run(ts, window=2, window_dev=2).bollinger_lband, target - 2)
 
+    def test_from_custom_techcon(self):
+        if technical_available:
+            from technical.consensus.consensus import Consensus
+
+            class CustomConsensus(Consensus):
+                def __init__(self, dataframe):
+                    super().__init__(dataframe)
+
+                    self.evaluate_sma(period=2)
+                    self.evaluate_sma(period=3)
+
+            consensus = vbt.IF.from_custom_techcon(CustomConsensus).run(open_ts, high_ts, low_ts, close_ts, volume_ts)
+            assert_series_equal(
+                consensus.buy,
+                pd.Series([0.0, 50.0, 100.0, 100.0, 0.0, 0.0, 0.0], index=close_ts.index)
+            )
+            assert_series_equal(
+                consensus.sell,
+                pd.Series([0.0, 0.0, 0.0, 0.0, 100.0, 100.0, 100.0], index=close_ts.index)
+            )
+            assert_series_equal(
+                consensus.buy_agreement,
+                pd.Series([0.0, 1.0, 2.0, 2.0, 0.0, 0.0, 0.0], index=close_ts.index)
+            )
+            assert_series_equal(
+                consensus.sell_agreement,
+                pd.Series([0.0, 0.0, 0.0, 0.0, 2.0, 2.0, 2.0], index=close_ts.index)
+            )
+            assert_series_equal(
+                consensus.buy_disagreement,
+                pd.Series([2.0, 1.0, 0.0, 0.0, 2.0, 2.0, 2.0], index=close_ts.index)
+            )
+            assert_series_equal(
+                consensus.sell_disagreement,
+                pd.Series([2.0, 2.0, 2.0, 2.0, 0.0, 0.0, 0.0], index=close_ts.index)
+            )
+
 
 # ############# custom.py ############# #
 
@@ -2923,6 +2966,7 @@ close_ts = pd.Series(
         ]
     ),
 )
+open_ts = close_ts
 high_ts = close_ts * 1.1
 low_ts = close_ts * 0.9
 volume_ts = pd.Series([4, 3, 2, 1, 2, 3, 4], index=close_ts.index)

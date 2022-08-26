@@ -48,6 +48,7 @@ RUN pip install --quiet --no-cache-dir \
     'ta' \
     'pandas_ta' \
     'TA-Lib' \
+    'technical' \
     'plotly-resampler' \
     'quantstats>=0.0.37' \
     'PyPortfolioOpt>=1.5.1' \

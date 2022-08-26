@@ -74,7 +74,20 @@ from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.template import RepFunc
 
-__all__ = ["MA", "MSD", "BBANDS", "RSI", "STOCH", "MACD", "ATR", "OBV", "OLS", "OLSS", "PATSIM", "VWAP"]
+__all__ = [
+    "MA",
+    "MSD",
+    "BBANDS",
+    "RSI",
+    "STOCH",
+    "MACD",
+    "ATR",
+    "OBV",
+    "OLS",
+    "OLSS",
+    "PATSIM",
+    "VWAP",
+]
 
 # ############# MA ############# #
 

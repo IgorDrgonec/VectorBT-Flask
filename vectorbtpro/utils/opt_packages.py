@@ -37,6 +37,7 @@ opt_package_config = ReadonlyConfig(
         universal=dict(name="Universal Portfolios", link="https://github.com/Marigold/universal-portfolios"),
         tvDatafeed=dict(name="TradingView Data Feed", link="https://github.com/StreamAlpha/tvdatafeed"),
         plotly_resampler=dict(name="Plotly Resampler", link="https://github.com/predict-idlab/plotly-resampler"),
+        technical=dict(name="Technical", link="https://github.com/freqtrade/technical"),
     )
 )
 """_"""

@@ -1419,6 +1419,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         * "pandas_ta_{name}": Name of a Pandas TA indicator
         * "ta_{name}": Name of a TA indicator
         * "wqa101_{number}": Number of a WQA indicator
+        * "techcon_{number}": Number of a technical consensus indicator
         * "{name}": Name of a custom indicator, otherwise of the above if found
         * "from_{mode}": Name of the simulation mode in `vectorbtpro.portfolio.base.Portfolio`
         * Indicator: Any indicator class built with the indicator factory
@@ -1462,6 +1463,10 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                 func = IndicatorFactory.from_ta(func.replace("ta_", ""))
             elif func.startswith("wqa101_"):
                 func = IndicatorFactory.from_wqa101(int(func.replace("wqa101_", "")))
+            elif func.startswith("techcon_"):
+                func = IndicatorFactory.from_techcon(func.replace("techcon_", ""))
+            elif check_installed("technical") and func.upper() in IndicatorFactory.get_techcon_indicators():
+                func = IndicatorFactory.from_techcon(func)
             elif check_installed("talib") and func.upper() in IndicatorFactory.get_talib_indicators():
                 func = IndicatorFactory.from_talib(func)
             elif check_installed("pandas_ta") and func.upper() in IndicatorFactory.get_pandas_ta_indicators():

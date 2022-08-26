@@ -32,9 +32,14 @@ def wqa101(*args, **kwargs) -> tp.Type[IndicatorBase]:
     return IndicatorFactory.from_wqa101(*args, **kwargs)
 
 
+def techcon(*args, **kwargs) -> tp.Type[IndicatorBase]:
+    """Shortcut for `vectorbtpro.indicators.factory.IndicatorFactory.from_techcon`."""
+    return IndicatorFactory.from_techcon(*args, **kwargs)
+
+
 IF = IndicatorFactory
 """Shortcut for `vectorbtpro.indicators.factory.IndicatorFactory`."""
 
-__whitelist__ = ["talib", "pandas_ta", "ta", "wqa101"]
+__whitelist__ = ["talib", "pandas_ta", "ta", "wqa101", "techcon"]
 __all__ = create__all__(__name__)
 __pdoc__ = {k: k in __whitelist__ for k in __all__}
