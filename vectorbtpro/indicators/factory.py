@@ -60,7 +60,7 @@ from vectorbtpro.utils.array_ import build_nan_mask, squeeze_nan, unsqueeze_nan
 from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config, Configured
 from vectorbtpro.utils.decorators import classproperty, cacheable_property, class_or_instancemethod
-from vectorbtpro.utils.enum_ import to_mapping, map_enum_fields
+from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.formatting import prettify
 from vectorbtpro.utils.mapping import to_mapping, apply_mapping
@@ -262,6 +262,7 @@ def run_pipeline(
     template_context: tp.Optional[tp.Mapping] = None,
     params: tp.Optional[tp.MappingSequence[tp.Params]] = None,
     param_product: bool = False,
+    random_subset: tp.Optional[int] = None,
     param_settings: tp.Optional[tp.MappingSequence[tp.KwargsLike]] = None,
     run_unique: bool = False,
     silence_warnings: bool = False,
@@ -327,6 +328,7 @@ def run_pipeline(
 
             Each element is either an array-like object or a single value of any type.
         param_product (bool): Whether to build a Cartesian product out of all parameters.
+        random_subset (int): Number of parameter combinations to pick randomly.
         param_settings (dict or sequence of dict): Settings corresponding to each parameter.
 
             If mapping, should contain keys from `params`.
@@ -468,6 +470,10 @@ def run_pipeline(
     if keep_pd and checks.is_numba_func(custom_func):
         raise ValueError("Cannot pass pandas objects to a Numba-compiled custom_func. Set keep_pd to False.")
 
+    # Set seed
+    if seed is not None:
+        set_seed(seed)
+
     if input_shape is not None:
         input_shape = reshaping.shape_to_tuple(input_shape)
     if len(inputs) > 0 or len(in_outputs) > 0 or len(broadcast_named_args) > 0:
@@ -565,6 +571,12 @@ def run_pipeline(
             param_list = broadcast_params(param_list, to_n=input_shape_2d[1])
         else:
             param_list = broadcast_params(param_list)
+    if random_subset is not None:
+        # Pick combinations randomly
+        if per_column:
+            raise ValueError("Cannot select random subset when per_column=True")
+        random_indices = np.sort(np.random.permutation(np.arange(len(param_list[0])))[:random_subset])
+        param_list = [[params[i] for i in random_indices] for params in param_list]
     n_param_values = len(param_list[0]) if len(param_list) > 0 else 1
     use_run_unique = False
     param_list_unique = param_list
@@ -657,10 +669,6 @@ def run_pipeline(
             func_kwargs["wrapper"] = wrapper_ready
         if pass_per_column:
             func_kwargs["per_column"] = per_column
-
-        # Set seed
-        if seed is not None:
-            set_seed(seed)
 
         # Substitute templates
         if has_templates(func_args) or has_templates(func_kwargs):
