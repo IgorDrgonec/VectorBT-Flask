@@ -211,7 +211,7 @@ def tile(
         raise ValueError("Only axis 0 and 1 are supported")
 
 
-def column_stack(*arrs: tp.MaybeTuple[tp.AnyArray]) -> tp.Array2d:
+def column_stack(*arrs: tp.MaybeSequence[tp.AnyArray]) -> tp.Array2d:
     """Stack arrays along columns."""
     if len(arrs) == 1:
         arrs = arrs[0]

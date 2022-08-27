@@ -6,6 +6,8 @@ import ast
 import inspect
 import re
 import sys
+import os
+import contextlib
 
 import attr
 
@@ -249,3 +251,14 @@ def get_context_vars(
         if clear_local_dict:
             local_dict.clear()
     return args
+
+
+def supress_stdout(func: tp.Callable) -> tp.Callable:
+    """Supress output from a function."""
+
+    def wrapper(*a, **ka):
+        with open(os.devnull, "w") as devnull:
+            with contextlib.redirect_stdout(devnull):
+                return func(*a, **ka)
+
+    return wrapper

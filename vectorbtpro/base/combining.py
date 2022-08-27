@@ -122,6 +122,8 @@ def apply_and_concat(
     if n_outputs == 0:
         return None
     if n_outputs == 1:
+        if isinstance(out[0], (tuple, list, List)) and len(out[0]) == 1:
+            out = list(map(lambda x: x[0], out))
         return column_stack(out)
     return list(map(column_stack, zip(*out)))
 

@@ -6,7 +6,7 @@ import importlib
 import inspect
 import pkgutil
 import sys
-from types import ModuleType
+from types import ModuleType, FunctionType
 
 from vectorbtpro import _typing as tp
 
@@ -71,3 +71,31 @@ def create__all__(module_name: str) -> tp.List[str]:
         for name, obj in inspect.getmembers(sys.modules[module_name])
         if not inspect.ismodule(obj) and not name.startswith("__") and name != "create__all__"
     ]
+
+
+def search_package_for_funcs(
+    package: tp.Union[str, ModuleType],
+    blacklist: tp.Optional[tp.Sequence[str]] = None,
+) -> tp.Dict[str, FunctionType]:
+    """Search a package for all functions."""
+    if blacklist is None:
+        blacklist = []
+    if isinstance(package, str):
+        package = importlib.import_module(package)
+    results = {}
+    for _, name, is_pkg in pkgutil.walk_packages(package.__path__, package.__name__ + "."):
+        if ".".join(name.split(".")[:-1]) != package.__name__:
+            continue
+        try:
+            if name in blacklist:
+                continue
+            module = importlib.import_module(name)
+            for attr in dir(module):
+                if not attr.startswith("_") and isinstance(getattr(module, attr), FunctionType):
+                    results[attr] = getattr(module, attr)
+            if is_pkg:
+                results.update(search_package_for_funcs(name, blacklist=blacklist))
+        except ModuleNotFoundError as e:
+            pass
+    return results
+

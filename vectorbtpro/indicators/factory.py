@@ -65,10 +65,11 @@ from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.formatting import prettify
 from vectorbtpro.utils.mapping import to_mapping, apply_mapping
 from vectorbtpro.utils.params import to_typed_list, broadcast_params, create_param_product, params_to_list
-from vectorbtpro.utils.parsing import get_expr_var_names, get_func_arg_names, get_func_kwargs
+from vectorbtpro.utils.parsing import get_expr_var_names, get_func_arg_names, get_func_kwargs, supress_stdout
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.template import has_templates, deep_substitute
 from vectorbtpro.utils.datetime_ import freq_to_timedelta64, infer_index_freq
+from vectorbtpro.utils.module_ import search_package_for_funcs
 
 try:
     from ta.utils import IndicatorMixin as IndicatorMixinT
@@ -1194,7 +1195,7 @@ class IndicatorFactory(Configured):
     def __init__(
         self,
         class_name: tp.Optional[str] = None,
-        class_docstring: str = "",
+        class_docstring: tp.Optional[str] = None,
         module_name: tp.Optional[str] = __name__,
         short_name: tp.Optional[str] = None,
         prepend_name: bool = True,
@@ -1294,6 +1295,8 @@ class IndicatorFactory(Configured):
         if class_name is None:
             class_name = "Indicator"
         checks.assert_instance_of(class_name, str)
+        if class_docstring is None:
+            class_docstring = ""
         checks.assert_instance_of(class_docstring, str)
         if module_name is not None:
             checks.assert_instance_of(module_name, str)
@@ -2687,7 +2690,7 @@ Other keyword arguments are passed to `{0}.run`.
 
     @classmethod
     def get_talib_indicators(cls) -> tp.Set[str]:
-        """Get all TA-Lib indicators."""
+        """Get all parseable indicators in `talib`."""
         from vectorbtpro.utils.opt_packages import assert_can_import
 
         assert_can_import("talib")
@@ -2697,7 +2700,7 @@ Other keyword arguments are passed to `{0}.run`.
 
     @classmethod
     def from_talib(cls, func_name: str, factory_kwargs: tp.KwargsLike = None, **kwargs) -> tp.Type[IndicatorBase]:
-        """Build an indicator class around a TA-Lib function.
+        """Build an indicator class around a `talib` function.
 
         Requires [TA-Lib](https://github.com/mrjbq7/ta-lib) installed.
 
@@ -2706,7 +2709,7 @@ Other keyword arguments are passed to `{0}.run`.
         Args:
             func_name (str): Function name.
             factory_kwargs (dict): Keyword arguments passed to `IndicatorFactory`.
-            **kwargs: Keyword arguments passed to `IndicatorFactory.with_custom_func`.
+            **kwargs: Keyword arguments passed to `IndicatorFactory.with_apply_func`.
 
         Returns:
             Indicator
@@ -2865,7 +2868,7 @@ Other keyword arguments are passed to `{0}.run`.
             return outputs
 
         kwargs = merge_dicts({k: Default(v) for k, v in info["parameters"].items()}, dict(timeframe=None), kwargs)
-        TALibIndicator = cls(
+        Indicator = cls(
             **merge_dicts(
                 dict(
                     class_name=class_name,
@@ -3023,9 +3026,9 @@ Args:
     {output_trace_kwargs_docstring}
     fig (Figure or FigureWidget): Figure to add the traces to.
     **layout_kwargs: Keyword arguments passed to `fig.update_layout`."""
-        setattr(TALibIndicator, "plot", plot)
+        setattr(Indicator, "plot", plot)
 
-        return TALibIndicator
+        return Indicator
 
     @classmethod
     def parse_pandas_ta_config(
@@ -3035,7 +3038,7 @@ Args:
         test_index_len: int = 100,
         **kwargs,
     ) -> tp.Kwargs:
-        """Get the config of a pandas-ta indicator."""
+        """Get the config of a `pandas_ta` indicator."""
         if test_input_names is None:
             test_input_names = {"open_", "open", "high", "low", "close", "adj_close", "volume", "dividends", "split"}
 
@@ -3066,7 +3069,7 @@ Args:
         )
         new_args = merge_dicts({c: test_df[c] for c in input_names}, kwargs)
         try:
-            result = func(**new_args)
+            result = supress_stdout(func)(**new_args)
         except Exception as e:
             raise ValueError("Couldn't parse the indicator: " + str(e))
 
@@ -3074,7 +3077,7 @@ Args:
         if isinstance(result, tuple):
             results = []
             for i, r in enumerate(result):
-                if not pd.Index.equals(r.index, test_df.index):
+                if len(r.index) != len(test_df.index):
                     warnings.warn(f"Couldn't parse the output at index {i}: mismatching index", stacklevel=2)
                 else:
                     results.append(r)
@@ -3086,7 +3089,7 @@ Args:
                 raise ValueError("Couldn't parse the output")
 
         # Test if the produced array has the same index length
-        if not pd.Index.equals(result.index, test_df.index):
+        if len(result.index) != len(test_df.index):
             raise ValueError("Couldn't parse the output: mismatching index")
 
         # Standardize output names: remove numbers, remove hyphens, and bring to lower case
@@ -3122,7 +3125,7 @@ Args:
 
     @classmethod
     def get_pandas_ta_indicators(cls, silence_warnings: bool = True, **kwargs) -> tp.Set[str]:
-        """Get all pandas-ta indicators.
+        """Get all parseable indicators in `pandas_ta`.
 
         !!! note
             Returns only the indicators that have been successfully parsed."""
@@ -3149,7 +3152,7 @@ Args:
         factory_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> tp.Type[IndicatorBase]:
-        """Build an indicator class around a pandas-ta function.
+        """Build an indicator class around a `pandas_ta` function.
 
         Requires [pandas-ta](https://github.com/twopirllc/pandas-ta) installed.
 
@@ -3157,7 +3160,7 @@ Args:
             func_name (str): Function name.
             parse_kwargs (dict): Keyword arguments passed to `IndicatorFactory.parse_pandas_ta_config`.
             factory_kwargs (dict): Keyword arguments passed to `IndicatorFactory`.
-            **kwargs: Keyword arguments passed to `IndicatorFactory.with_custom_func`.
+            **kwargs: Keyword arguments passed to `IndicatorFactory.with_apply_func`.
 
         Returns:
             Indicator
@@ -3241,11 +3244,11 @@ Args:
         import pandas_ta
 
         func_name = func_name.lower()
-        pandas_ta_func = getattr(pandas_ta, func_name)
+        func = getattr(pandas_ta, func_name)
 
         if parse_kwargs is None:
             parse_kwargs = {}
-        config = cls.parse_pandas_ta_config(pandas_ta_func, **parse_kwargs)
+        config = cls.parse_pandas_ta_config(func, **parse_kwargs)
 
         def apply_func(
             input_tuple: tp.Tuple[tp.AnyArray, ...],
@@ -3257,7 +3260,7 @@ Args:
             n_input_cols = 1 if is_series else len(input_tuple[0].columns)
             outputs = []
             for col in range(n_input_cols):
-                output = pandas_ta_func(
+                output = supress_stdout(func)(
                     **{
                         name: input_tuple[i] if is_series else input_tuple[i].iloc[:, col]
                         for i, name in enumerate(config["input_names"])
@@ -3285,14 +3288,14 @@ Args:
             return column_stack(outputs)
 
         kwargs = merge_dicts({k: Default(v) for k, v in config.pop("defaults").items()}, kwargs)
-        PTAIndicator = cls(
+        Indicator = cls(
             **merge_dicts(dict(module_name=__name__ + ".pandas_ta"), config, factory_kwargs),
         ).with_apply_func(apply_func, pass_packed=True, keep_pd=True, to_2d=False, **kwargs)
-        return PTAIndicator
+        return Indicator
 
     @classmethod
     def get_ta_indicators(cls) -> tp.Set[str]:
-        """Get all ta indicators."""
+        """Get all parseable indicators in `ta`."""
         from vectorbtpro.utils.opt_packages import assert_can_import
 
         assert_can_import("ta")
@@ -3314,7 +3317,7 @@ Args:
 
     @classmethod
     def find_ta_indicator(cls, cls_name: str) -> IndicatorMixinT:
-        """Get ta indicator class by its name."""
+        """Get `ta` indicator class by its name."""
         from vectorbtpro.utils.opt_packages import assert_can_import
 
         assert_can_import("ta")
@@ -3323,13 +3326,14 @@ Args:
         ta_module_names = [k for k in dir(ta) if isinstance(getattr(ta, k), ModuleType)]
         for module_name in ta_module_names:
             module = getattr(ta, module_name)
-            if cls_name in dir(module):
-                return getattr(module, cls_name)
-        raise ValueError(f'Indicator "{cls_name}" not found')
+            for attr in dir(module):
+                if cls_name.upper() == attr.upper():
+                    return getattr(module, attr)
+        raise AttributeError(f"Indicator '{cls_name}' not found")
 
     @classmethod
     def parse_ta_config(cls, ind_cls: IndicatorMixinT) -> tp.Kwargs:
-        """Get the config of a ta indicator."""
+        """Get the config of a `ta` indicator."""
         input_names = []
         param_names = []
         defaults = {}
@@ -3367,14 +3371,14 @@ Args:
 
     @classmethod
     def from_ta(cls, cls_name: str, factory_kwargs: tp.KwargsLike = None, **kwargs) -> tp.Type[IndicatorBase]:
-        """Build an indicator class around a ta class.
+        """Build an indicator class around a `ta` class.
 
         Requires [ta](https://github.com/bukosabino/ta) installed.
 
         Args:
             cls_name (str): Class name.
             factory_kwargs (dict): Keyword arguments passed to `IndicatorFactory`.
-            **kwargs: Keyword arguments passed to `IndicatorFactory.with_custom_func`.
+            **kwargs: Keyword arguments passed to `IndicatorFactory.with_apply_func`.
 
         Returns:
             Indicator
@@ -3470,14 +3474,248 @@ Args:
             return column_stack(outputs)
 
         kwargs = merge_dicts({k: Default(v) for k, v in config.pop("defaults").items()}, kwargs)
-        TAIndicator = cls(**merge_dicts(dict(module_name=__name__ + ".ta"), config, factory_kwargs)).with_apply_func(
+        Indicator = cls(**merge_dicts(dict(module_name=__name__ + ".ta"), config, factory_kwargs)).with_apply_func(
             apply_func,
             pass_packed=True,
             keep_pd=True,
             to_2d=False,
             **kwargs,
         )
-        return TAIndicator
+        return Indicator
+
+    @classmethod
+    def parse_technical_config(cls, func: tp.Callable, test_index_len: int = 100) -> tp.Kwargs:
+        """Get the config of a `technical` indicator."""
+        df = pd.DataFrame(
+            np.random.randint(1, 10, size=(test_index_len, 5)),
+            index=pd.date_range("2020", periods=test_index_len),
+            columns=["open", "high", "low", "close", "volume"]
+        )
+
+        func_arg_names = get_func_arg_names(func)
+        func_kwargs = get_func_kwargs(func)
+        args = ()
+        input_names = []
+        param_names = []
+        output_names = []
+        defaults = {}
+
+        for arg_name in func_arg_names:
+            if arg_name in ("dataframe", "df", "bars"):
+                args += (df,)
+                input_names.extend(["open", "high", "low", "close", "volume"])
+            elif arg_name in ("series", "sr"):
+                args += (df["close"],)
+                input_names.append("close")
+            elif arg_name in ("open", "high", "low", "close", "volume"):
+                args += (df["close"],)
+                input_names.append(arg_name)
+            else:
+                if arg_name not in func_kwargs:
+                    args += (5,)
+                else:
+                    defaults[arg_name] = func_kwargs[arg_name]
+                param_names.append(arg_name)
+        if len(input_names) == 0:
+            raise ValueError("Couldn't parse the output: unknown input arguments")
+
+        def _validate_series(sr, name: tp.Optional[str] = None):
+            if not isinstance(sr, pd.Series):
+                raise TypeError("Couldn't parse the output: wrong output type")
+            if len(sr.index) != len(df.index):
+                raise ValueError("Couldn't parse the output: mismatching index")
+            if np.issubdtype(sr.dtype, object):
+                raise ValueError("Couldn't parse the output: wrong output data type")
+            if name is None and sr.name is None:
+                raise ValueError("Couldn't parse the output: missing output name")
+
+        out = supress_stdout(func)(*args)
+        if isinstance(out, list):
+            out = np.asarray(out)
+        if isinstance(out, np.ndarray):
+            out = pd.Series(out)
+        if isinstance(out, dict):
+            out = pd.DataFrame(out)
+        if isinstance(out, tuple):
+            out = pd.concat(out, axis=1)
+        if isinstance(out, (pd.Series, pd.DataFrame)):
+            if isinstance(out, pd.DataFrame):
+                for c in out.columns:
+                    _validate_series(out[c], name=c)
+                    output_names.append(c)
+            else:
+                if out.name is not None:
+                    out_name = out.name
+                else:
+                    out_name = func.__name__.lower()
+                _validate_series(out, name=out_name)
+                output_names.append(out_name)
+        else:
+            raise TypeError("Couldn't parse the output: wrong output type")
+
+        new_output_names = []
+        for name in output_names:
+            name = name.replace(" ", "").lower()
+            if len(output_names) == 1 and name == "close":
+                new_output_names.append(func.__name__.lower())
+                continue
+            if name in ("open", "high", "low", "close", "volume", "data"):
+                continue
+            new_output_names.append(name)
+        return dict(
+            class_name=func.__name__.upper(),
+            class_docstring=func.__doc__,
+            input_names=input_names,
+            param_names=param_names,
+            output_names=new_output_names,
+            defaults=defaults,
+        )
+
+    @classmethod
+    def get_technical_indicators(cls, silence_warnings: bool = True, **kwargs) -> tp.Set[str]:
+        """Get all parseable indicators in `technical`."""
+        from vectorbtpro.utils.opt_packages import assert_can_import
+
+        assert_can_import("technical")
+        import technical
+
+        funcs = search_package_for_funcs(technical, blacklist=["technical.util"])
+        indicators = set()
+        for func_name, func in funcs.items():
+            try:
+                cls.parse_technical_config(func, **kwargs)
+                indicators.add(func_name.upper())
+            except Exception as e:
+                if not silence_warnings:
+                    warnings.warn(f"Function {func_name}: " + str(e), stacklevel=2)
+        return indicators
+
+    @classmethod
+    def find_technical_indicator(cls, func_name: str) -> IndicatorMixinT:
+        """Get `technical` indicator function by its name."""
+        from vectorbtpro.utils.opt_packages import assert_can_import
+
+        assert_can_import("technical")
+        import technical
+
+        funcs = search_package_for_funcs(technical, blacklist=["technical.util"])
+        for k, v in funcs.items():
+            if func_name.upper() == k.upper():
+                return v
+        raise AttributeError(f"Indicator '{func_name}' not found")
+
+    @classmethod
+    def from_technical(
+        cls,
+        func_name: str,
+        parse_kwargs: tp.KwargsLike = None,
+        factory_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.Type[IndicatorBase]:
+        """Build an indicator class around a `technical` function.
+
+        Requires [technical](https://github.com/freqtrade/technical) installed.
+
+        Args:
+            func_name (str): Function name.
+            parse_kwargs (dict): Keyword arguments passed to `IndicatorFactory.parse_technical_config`.
+            factory_kwargs (dict): Keyword arguments passed to `IndicatorFactory`.
+            **kwargs: Keyword arguments passed to `IndicatorFactory.with_apply_func`.
+
+        Returns:
+            Indicator
+
+        Usage:
+            ```pycon
+            >>> ROLLING_MEAN = vbt.IF.from_technical("ROLLING_MEAN")
+
+            >>> rolling_mean = ROLLING_MEAN.run(price, window=[3, 4])
+            >>> rolling_mean.rolling_mean
+            rolling_mean_window         3         4
+                                   a    b    a    b
+            2020-01-01           NaN  NaN  NaN  NaN
+            2020-01-02           NaN  NaN  NaN  NaN
+            2020-01-03           2.0  4.0  NaN  NaN
+            2020-01-04           3.0  3.0  2.5  3.5
+            2020-01-05           4.0  2.0  3.5  2.5
+            ```
+
+            * To get help on running the indicator, use `vectorbtpro.utils.formatting.format_func`:
+
+            ```pycon
+            >>> print(vbt.format_func(ROLLING_MEAN.run))
+            ROLLING_MEAN.run(
+                close,
+                window=Default(value=200),
+                min_periods=Default(value=None),
+                short_name='rolling_mean',
+                hide_params=None,
+                hide_default=True,
+                **kwargs
+            ):
+                Run `ROLLING_MEAN` indicator.
+
+                * Inputs: `close`
+                * Parameters: `window`, `min_periods`
+                * Outputs: `rolling_mean`
+
+                Pass a list of parameter names as `hide_params` to hide their column levels.
+                Set `hide_default` to False to show the column levels of the parameters with a default value.
+
+                Other keyword arguments are passed to `vectorbtpro.indicators.factory.run_pipeline`.
+            ```
+        """
+        func = cls.find_technical_indicator(func_name)
+        func_arg_names = get_func_arg_names(func)
+
+        if parse_kwargs is None:
+            parse_kwargs = {}
+        config = cls.parse_technical_config(func, **parse_kwargs)
+
+        def apply_func(
+            input_tuple: tp.Tuple[tp.Series, ...],
+            in_output_tuple: tp.Tuple[tp.Series, ...],
+            param_tuple: tp.Tuple[tp.Param, ...],
+            *_args,
+            **_kwargs,
+        ) -> tp.Union[tp.Array1d, tp.List[tp.Array1d]]:
+            input_series = {name: input_tuple[i] for i, name in enumerate(config["input_names"])}
+            _kwargs = {**{name: param_tuple[i] for i, name in enumerate(config["param_names"])}, **_kwargs}
+            __args = ()
+            for arg_name in func_arg_names:
+                if arg_name in ("dataframe", "df", "bars"):
+                    __args += (pd.DataFrame(input_series),)
+                elif arg_name in ("series", "sr"):
+                    __args += (input_series["close"],)
+                elif arg_name in ("open", "high", "low", "close", "volume"):
+                    __args += (input_series["close"],)
+                else:
+                    break
+
+            out = supress_stdout(func)(*__args, *_args, **_kwargs)
+            if isinstance(out, list):
+                out = np.asarray(out)
+            if isinstance(out, np.ndarray):
+                out = pd.Series(out)
+            if isinstance(out, dict):
+                out = pd.DataFrame(out)
+            if isinstance(out, tuple):
+                out = pd.concat(out, axis=1)
+            if isinstance(out, pd.DataFrame):
+                outputs = []
+                for c in out.columns:
+                    if len(out.columns) == len(config["output_names"]):
+                        outputs.append(out[c].values)
+                    elif c not in ("open", "high", "low", "close", "volume", "data"):
+                        outputs.append(out[c].values)
+                return outputs
+            return out.values
+
+        kwargs = merge_dicts({k: Default(v) for k, v in config.pop("defaults").items()}, kwargs)
+        Indicator = cls(
+            **merge_dicts(dict(module_name=__name__ + ".technical"), config, factory_kwargs),
+        ).with_apply_func(apply_func, pass_packed=True, keep_pd=True, takes_1d=True, **kwargs)
+        return Indicator
 
     @classmethod
     def from_custom_techcon(
@@ -3547,14 +3785,72 @@ Args:
             ),
             factory_kwargs,
         )
-        CONIndicator = cls(**factory_kwargs).with_apply_func(
+        Indicator = cls(**factory_kwargs).with_apply_func(
             apply_func,
             takes_1d=True,
             keep_pd=True,
             smooth=None,
             **kwargs,
         )
-        return CONIndicator
+
+        def plot(
+            self,
+            column: tp.Optional[tp.Label] = None,
+            buy_trace_kwargs: tp.KwargsLike = None,
+            sell_trace_kwargs: tp.KwargsLike = None,
+            add_trace_kwargs: tp.KwargsLike = None,
+            fig: tp.Optional[tp.BaseFigure] = None,
+            **layout_kwargs
+        ) -> tp.BaseFigure:
+            """Plot `MA.ma` against `MA.close`.
+
+            Args:
+                column (str): Name of the column to plot.
+                buy_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `buy`.
+                sell_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `sell`.
+                add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
+                fig (Figure or FigureWidget): Figure to add traces to.
+                **layout_kwargs: Keyword arguments passed to `fig.update_layout`.
+            """
+            from vectorbtpro.utils.figure import make_figure
+            from vectorbtpro._settings import settings
+
+            plotting_cfg = settings["plotting"]
+
+            self_col = self.select_col(column=column)
+
+            if fig is None:
+                fig = make_figure()
+            fig.update_layout(**layout_kwargs)
+
+            if buy_trace_kwargs is None:
+                buy_trace_kwargs = {}
+            if sell_trace_kwargs is None:
+                sell_trace_kwargs = {}
+            buy_trace_kwargs = merge_dicts(
+                dict(name="Buy", line=dict(color=plotting_cfg["color_schema"]["green"])),
+                buy_trace_kwargs,
+            )
+            sell_trace_kwargs = merge_dicts(
+                dict(name="Sell", line=dict(color=plotting_cfg["color_schema"]["red"])),
+                sell_trace_kwargs,
+            )
+
+            fig = self_col.buy.vbt.lineplot(
+                trace_kwargs=buy_trace_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                fig=fig,
+            )
+            fig = self_col.sell.vbt.lineplot(
+                trace_kwargs=sell_trace_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                fig=fig,
+            )
+
+            return fig
+
+        Indicator.plot = plot
+        return Indicator
 
     @classmethod
     def from_techcon(cls, cls_name: str, **kwargs) -> tp.Type[IndicatorBase]:
@@ -3594,7 +3890,7 @@ Args:
 
     @classmethod
     def get_techcon_indicators(cls) -> tp.Set[str]:
-        """Get all technical consensus indicators."""
+        """Get all consensus indicators in `technical`."""
         return {"MACON", "OSCCON", "SUMCON"}
 
     # ############# Expressions ############# #

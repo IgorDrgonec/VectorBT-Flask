@@ -1463,16 +1463,20 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                 func = IndicatorFactory.from_ta(func.replace("ta_", ""))
             elif func.startswith("wqa101_"):
                 func = IndicatorFactory.from_wqa101(int(func.replace("wqa101_", "")))
+            elif func.startswith("technical_"):
+                func = IndicatorFactory.from_technical(func.replace("technical_", ""))
             elif func.startswith("techcon_"):
                 func = IndicatorFactory.from_techcon(func.replace("techcon_", ""))
             elif check_installed("technical") and func.upper() in IndicatorFactory.get_techcon_indicators():
                 func = IndicatorFactory.from_techcon(func)
             elif check_installed("talib") and func.upper() in IndicatorFactory.get_talib_indicators():
                 func = IndicatorFactory.from_talib(func)
-            elif check_installed("pandas_ta") and func.upper() in IndicatorFactory.get_pandas_ta_indicators():
-                func = IndicatorFactory.from_pandas_ta(func)
             elif check_installed("ta") and func.upper() in IndicatorFactory.get_ta_indicators():
                 func = IndicatorFactory.from_ta(func)
+            elif check_installed("pandas_ta") and func.upper() in IndicatorFactory.get_pandas_ta_indicators():
+                func = IndicatorFactory.from_pandas_ta(func)
+            elif check_installed("technical") and func.upper() in IndicatorFactory.get_technical_indicators():
+                func = IndicatorFactory.from_technical(func)
             else:
                 raise ValueError(f"Could not find indicator with name '{func}'")
         if isinstance(func, type) and issubclass(func, IndicatorBase):
