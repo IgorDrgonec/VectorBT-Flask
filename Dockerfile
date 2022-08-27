@@ -21,7 +21,8 @@ USER ${NB_UID}
 
 RUN pip install --quiet --no-cache-dir \
     'jupyter-dash' \
-    'plotly>=5.0.0' && \
+    'plotly>=5.0.0' \
+    'kaleido' && \
     fix-permissions "${CONDA_DIR}" && \
     fix-permissions "/home/${NB_USER}" && \
     jupyter lab build --minimize=False

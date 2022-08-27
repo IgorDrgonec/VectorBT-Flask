@@ -23,9 +23,10 @@ dask:                       distribute, base
 matplotlib>=3.2.0:          plot, base
 plotly>=5.0.0:              plot, base
 ipywidgets>=7.0.0:          plot, base
+kaleido:                    plot, base
 plotly-resampler:           plot
 quantstats>=0.0.37:         stats, base
-PyPortfolioOpt>=1.5.1:      stats, base
+PyPortfolioOpt>=1.5.1:      stats
 universal-portfolios:       stats
 python-telegram-bot>=13.4:  notify
 dill:                       io, base
