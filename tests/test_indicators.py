@@ -4501,3 +4501,16 @@ class TestBasic:
                 per_column=False,
             ).sim,
         )
+
+    def test_ZIGZAG(self):
+        assert_frame_equal(
+            vbt.ZIGZAG.run(close_ts, up_thresh=[1, np.array([1])], down_thresh=0.5).pivots,
+            pd.DataFrame(
+                np.array([[-1, -1], [1, 1], [0, 0], [0, 0], [0, 0], [0, 0], [-1, -1]]),
+                index=close_ts.index,
+                columns=pd.MultiIndex.from_tuples([
+                    (1, 0.5),
+                    (1, 0.5)
+                ], names=['zigzag_up_thresh', 'zigzag_down_thresh']),
+            ),
+        )

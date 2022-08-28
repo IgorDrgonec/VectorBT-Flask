@@ -1752,10 +1752,10 @@ class AlpacaData(RemoteData):
                 See `AlpacaData.resolve_client`.
             start (any): Start datetime.
 
-                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
+                See `vectorbtpro.utils.datetime_.to_tzaware_datetime`.
             end (any): End datetime.
 
-                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
+                See `vectorbtpro.utils.datetime_.to_tzaware_datetime`.
             timeframe (str): Timeframe.
 
                 Allows human-readable strings such as "15 minutes".
@@ -1996,10 +1996,10 @@ class PolygonData(RemoteData):
                 See `PolygonData.resolve_client`.
             start (any): The start of the aggregate time window.
 
-                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
+                See `vectorbtpro.utils.datetime_.to_tzaware_datetime`.
             end (any): The end of the aggregate time window.
 
-                See `vectorbt.utils.datetime_.to_tzaware_datetime`.
+                See `vectorbtpro.utils.datetime_.to_tzaware_datetime`.
             timeframe (str): Timeframe.
 
                 Allows human-readable strings such as "15 minutes".

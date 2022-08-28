@@ -16,8 +16,10 @@ import numpy as np
 from numba import prange
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.base.indexing import flex_select_auto_nb
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.registries.jit_registry import register_jitted
+from vectorbtpro.indicators.enums import Pivot
 
 
 @register_jitted(cache=True)
@@ -470,7 +472,6 @@ def ols_spread_apply_nb(
     return ols_spread_nb(x, y, window, ddof=ddof, minp=minp)
 
 
-
 @register_jitted(cache=True)
 def vwap_1d_nb(
     high: tp.Array1d,
@@ -521,3 +522,131 @@ def vwap_apply_nb(
                 denum_cumsum += volume[i, col]
                 out[i, col] = nom_cumsum / denum_cumsum
     return out
+
+
+@register_jitted(cache=True)
+def initial_pivots_nb(
+    arr: tp.Array2d,
+    up_thresh: tp.FlexArray,
+    down_thresh: tp.FlexArray,
+    flex_2d: bool = False,
+) -> tp.Array1d:
+    """Find the initial pivot in each column."""
+    initial_pivots = np.empty(arr.shape[1], dtype=np.int_)
+    for col in range(arr.shape[1]):
+        minv = arr[0, col]
+        maxv = arr[0, col]
+        min_i = 0
+        max_i = 0
+        found_pivot = Pivot.Valley if arr[0, col] < arr[-1, col] else Pivot.Peak
+
+        for i in range(1, arr.shape[0]):
+            _up_thresh = 1 + abs(flex_select_auto_nb(up_thresh, 0, col, flex_2d))
+            _down_thresh = 1 + abs(flex_select_auto_nb(down_thresh, 0, col, flex_2d))
+            if arr[i, col] / minv >= _up_thresh:
+                found_pivot = Pivot.Valley if min_i == 0 else Pivot.Peak
+                break
+            if arr[i, col] / maxv <= _down_thresh:
+                found_pivot = Pivot.Peak if max_i == 0 else Pivot.Valley
+                break
+            if arr[i, col] > maxv:
+                maxv = arr[i, col]
+                max_i = i
+            if arr[i, col] < minv:
+                minv = arr[i, col]
+                min_i = i
+
+        initial_pivots[col] = found_pivot
+
+    return initial_pivots
+
+
+@register_jitted(cache=True)
+def zigzag_apply_nb(
+    arr: tp.Array2d,
+    up_thresh: tp.FlexArray,
+    down_thresh: tp.FlexArray,
+    finalized_only: bool = True,
+    eager_switching: bool = False,
+    flex_2d: bool = False,
+) -> tp.Array2d:
+    """
+    Find the peaks and valleys of a series.
+
+    Based on https://github.com/jbn/ZigZag
+
+    Specify `up_thresh` and `down_thresh` to set the minimum and maximum relative change
+    necessary to define a peak and a valley respectively.
+
+    The first and last elements are guaranteed to be annotated as peak or
+    valley even if the segments formed do not have the necessary relative
+    changes. This is a tradeoff between technical correctness and the
+    propensity to make mistakes in data analysis. The possible mistake is
+    ignoring data outside the fully realized segments, which may bias
+    analysis.
+    """
+    initial_pivots = initial_pivots_nb(arr, up_thresh, down_thresh)
+    pivots = np.zeros(arr.shape, dtype=np.int_)
+
+    for col in range(arr.shape[1]):
+        _up_thresh = 1 + abs(flex_select_auto_nb(up_thresh, 0, col, flex_2d))
+        _down_thresh = 1 + abs(flex_select_auto_nb(down_thresh, 0, col, flex_2d))
+        trend = -initial_pivots[col]
+        last_pivot_i = 0
+        last_pivot = arr[0, col]
+        pivots[0, col] = initial_pivots[col]
+
+        for i in range(1, arr.shape[0]):
+            r = arr[i, col] / last_pivot
+
+            if trend == -1:
+                if r >= _up_thresh:
+                    pivots[last_pivot_i, col] = trend
+                    trend = Pivot.Peak
+                    last_pivot = arr[i, col]
+                    last_pivot_i = i
+                elif arr[i, col] < last_pivot:
+                    last_pivot = arr[i, col]
+                    last_pivot_i = i
+            else:
+                if r <= _down_thresh:
+                    pivots[last_pivot_i, col] = trend
+                    trend = Pivot.Valley
+                    last_pivot = arr[i, col]
+                    last_pivot_i = i
+                elif arr[i, col] > last_pivot:
+                    last_pivot = arr[i, col]
+                    last_pivot_i = i
+
+        if finalized_only:
+            if eager_switching:
+                if 0 < last_pivot_i < arr.shape[0] - 1:
+                    pivots[last_pivot_i, col] = trend
+                    pivots[-1, col] = -trend
+                else:
+                    pivots[-1, col] = trend
+            else:
+                if last_pivot_i == arr.shape[0] - 1:
+                    pivots[last_pivot_i, col] = trend
+                elif pivots[-1, col] == 0:
+                    pivots[-1, col] = -trend
+
+    return pivots
+
+
+@register_jitted(cache=True)
+def pivots_to_modes_nb(pivots: tp.Array2d) -> tp.Array2d:
+    """Translate pivots into trend modes."""
+    modes = np.zeros(pivots.shape, dtype=np.int_)
+
+    for col in range(pivots.shape[1]):
+        mode = -pivots[0, col]
+        modes[0, col] = pivots[0, col]
+        for i in range(1, pivots.shape[0]):
+            if pivots[i, col] != 0:
+                modes[i, col] = mode
+                mode = -pivots[i, col]
+            else:
+                modes[i, col] = mode
+
+    return modes

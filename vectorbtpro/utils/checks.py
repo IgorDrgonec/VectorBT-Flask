@@ -530,7 +530,7 @@ def assert_dict_valid(arg: tp.DictLike, lvl_keys: tp.Sequence[tp.MaybeSequence[s
     set1 = set(arg.keys())
     set2 = set(lvl_keys[0])
     if not set1.issubset(set2):
-        raise AssertionError(f"Invalid keys {list(set1.difference(set2))}. Possible keys are {list(set2)}.")
+        raise AssertionError(f"Invalid keys {list(set1.difference(set2))}, possible keys are {list(set2)}")
     for k, v in arg.items():
         if isinstance(v, dict):
             assert_dict_valid(v, lvl_keys[1:])

@@ -67,9 +67,11 @@ import scipy.stats as st
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.wrapping import ArrayWrapper
+from vectorbtpro.base.reshaping import to_2d_array
 from vectorbtpro.generic import nb as generic_nb, enums as generic_enums
 from vectorbtpro.indicators import nb
 from vectorbtpro.indicators.factory import IndicatorFactory
+from vectorbtpro.indicators.configs import flex_elem_param_config
 from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.template import RepFunc
@@ -87,6 +89,7 @@ __all__ = [
     "OLSS",
     "PATSIM",
     "VWAP",
+    "ZIGZAG",
 ]
 
 # ############# MA ############# #
@@ -1548,3 +1551,108 @@ class _VWAP(VWAP):
 
 setattr(VWAP, "__doc__", _VWAP.__doc__)
 setattr(VWAP, "plot", _VWAP.plot)
+
+
+# ############# ZIGZAG ############# #
+
+
+ZIGZAG = IndicatorFactory(
+    class_name="ZIGZAG",
+    module_name=__name__,
+    short_name="zigzag",
+    input_names=["close"],
+    param_names=["up_thresh", "down_thresh"],
+    output_names=["pivots"],
+    lazy_outputs=dict(
+        modes=lambda self: self.wrapper.wrap(nb.pivots_to_modes_nb(to_2d_array(self.pivots))),
+    ),
+).with_apply_func(
+    nb.zigzag_apply_nb,
+    kwargs_as_args=["finalized_only", "eager_switching"],
+    param_settings=dict(
+        up_thresh=flex_elem_param_config,
+        down_thresh=flex_elem_param_config,
+    ),
+    pass_flex_2d=True,
+    finalized_only=True,
+    eager_switching=False,
+)
+
+
+class _ZIGZAG(ZIGZAG):
+    """Zig Zag Indicator.
+
+    The Zig Zag indicator lowers the impact of random price fluctuations and is used to help
+    identify price trends and changes in price trends.
+
+    See [Zig Zag Indicator](https://www.investopedia.com/terms/z/zig_zag_indicator.asp)."""
+
+    def plot(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        plot_close: bool = True,
+        close_trace_kwargs: tp.KwargsLike = None,
+        zigzag_trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs
+    ) -> tp.BaseFigure:
+        """Plot `MA.ma` against `MA.close`.
+
+        Args:
+            column (str): Name of the column to plot.
+            plot_close (bool): Whether to plot `MA.close`.
+            close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MA.close`.
+            zigzag_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for zig-zag line.
+            add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
+            fig (Figure or FigureWidget): Figure to add traces to.
+            **layout_kwargs: Keyword arguments passed to `fig.update_layout`.
+
+        Usage:
+            ```pycon
+            >>> vbt.ZIGZAG.run(ohlcv['Close'], 0.1, 0.1).plot()
+            ```
+
+            ![](/assets/images/api/ZIGZAG.svg)
+        """
+        from vectorbtpro.utils.figure import make_figure
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
+
+        self_col = self.select_col(column=column)
+
+        if fig is None:
+            fig = make_figure()
+        fig.update_layout(**layout_kwargs)
+
+        if close_trace_kwargs is None:
+            close_trace_kwargs = {}
+        if zigzag_trace_kwargs is None:
+            zigzag_trace_kwargs = {}
+        close_trace_kwargs = merge_dicts(
+            dict(name="Close", line=dict(color=plotting_cfg["color_schema"]["blue"])),
+            close_trace_kwargs,
+        )
+        zigzag_trace_kwargs = merge_dicts(
+            dict(name="ZigZag", line=dict(color=plotting_cfg["color_schema"]["lightblue"])),
+            zigzag_trace_kwargs,
+        )
+
+        if plot_close:
+            fig = self_col.close.vbt.lineplot(
+                trace_kwargs=close_trace_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                fig=fig,
+            )
+        fig = self_col.close[self_col.pivots != 0].vbt.lineplot(
+            trace_kwargs=zigzag_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+        )
+
+        return fig
+
+
+setattr(ZIGZAG, "__doc__", _ZIGZAG.__doc__)
+setattr(ZIGZAG, "plot", _ZIGZAG.plot)
