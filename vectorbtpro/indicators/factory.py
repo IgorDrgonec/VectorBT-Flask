@@ -3501,9 +3501,14 @@ Args:
         defaults = {}
 
         for arg_name in func_arg_names:
+            if arg_name == "field":
+                continue
             if arg_name in ("dataframe", "df", "bars"):
                 args += (df,)
-                input_names.extend(["open", "high", "low", "close", "volume"])
+                if "field" in func_kwargs:
+                    input_names.append(func_kwargs["field"])
+                else:
+                    input_names.extend(["open", "high", "low", "close", "volume"])
             elif arg_name in ("series", "sr"):
                 args += (df["close"],)
                 input_names.append("close")
