@@ -152,7 +152,7 @@ def max_rel_rescale(arr: tp.Array, to_range: tp.Tuple[float, float]) -> tp.Array
 @register_jitted(cache=True)
 def rescale_float_to_int_nb(floats: tp.Array, int_range: tp.Tuple[float, float], total: float) -> tp.Array:
     """Rescale a float array into an int array."""
-    ints = np.floor(rescale_nb(floats, [0.0, 1.0], int_range))
+    ints = np.floor(rescale_nb(floats, (0.0, 1.0), int_range))
     leftover = int(total - ints.sum())
     for i in range(leftover):
         ints[np.random.choice(len(ints))] += 1
@@ -239,3 +239,86 @@ def unsqueeze_nan(*arrs: tp.Array, nan_mask: tp.Optional[tp.Array1d] = None) -> 
         new_arr[~nan_mask] = arr
         new_arrs += (new_arr,)
     return new_arrs
+
+
+def cast_to_min_precision(
+    arr: tp.Array,
+    min_precision: tp.Union[int, str],
+    float_only: bool = True,
+) -> tp.Array:
+    """Cast an array to a minimum integer/floating precision.
+
+    Argument must be either an integer denoting the number of bits,
+    or one of 'half', 'single', and 'double'."""
+    if min_precision is None:
+        return arr
+    if float_only and np.issubdtype(arr.dtype, np.integer):
+        return arr
+    if np.issubdtype(arr.dtype, np.integer) or np.issubdtype(arr.dtype, np.floating):
+        if isinstance(min_precision, str):
+            if min_precision == "half":
+                min_precision = 16
+            elif min_precision == "single":
+                min_precision = 32
+            elif min_precision == "double":
+                min_precision = 64
+            else:
+                raise ValueError(f"Only 'half', 'single', and 'double' max precisions are supported")
+        if isinstance(min_precision, int):
+            if np.issubdtype(arr.dtype, np.integer):
+                prefix = "int"
+            else:
+                prefix = "float"
+            target_dtype = np.dtype(prefix + str(min_precision))
+        else:
+            raise TypeError("Minimum precision must be either integer or string")
+        if arr.dtype < target_dtype:
+            return arr.astype(target_dtype)
+    return arr
+
+
+def cast_to_max_precision(
+    arr: tp.Array,
+    max_precision: tp.Union[int, str],
+    float_only: bool = True,
+    check_bounds: bool = True,
+    strict: bool = True,
+) -> tp.Array:
+    """Cast an array to a maximum integer/floating precision.
+
+    Argument must be either an integer denoting the number of bits,
+    or one of 'half', 'single', and 'double'."""
+    if max_precision is None:
+        return arr
+    if float_only and np.issubdtype(arr.dtype, np.integer):
+        return arr
+    if np.issubdtype(arr.dtype, np.integer) or np.issubdtype(arr.dtype, np.floating):
+        if isinstance(max_precision, str):
+            if max_precision == "half":
+                max_precision = 16
+            elif max_precision == "single":
+                max_precision = 32
+            elif max_precision == "double":
+                max_precision = 64
+            else:
+                raise ValueError(f"Only 'half', 'single', and 'double' max precisions are supported")
+        if isinstance(max_precision, int):
+            if np.issubdtype(arr.dtype, np.integer):
+                prefix = "int"
+                dtype_info = np.iinfo
+            else:
+                prefix = "float"
+                dtype_info = np.finfo
+            target_dtype = np.dtype(prefix + str(max_precision))
+        else:
+            raise TypeError("Maximum precision must be either integer or string")
+        if arr.dtype > target_dtype:
+            if check_bounds:
+                min_overflow = np.min(arr) < dtype_info(target_dtype).min
+                max_overflow = np.max(arr) > dtype_info(target_dtype).max
+                if min_overflow or max_overflow:
+                    if strict:
+                        raise ValueError(f"Cannot lower dtype to {target_dtype}: values out of bounds")
+                    return arr
+            return arr.astype(target_dtype)
+    return arr

@@ -30,7 +30,7 @@ from vectorbtpro.utils.config import Configured, merge_dicts, resolve_dict
 from vectorbtpro.utils.datetime_ import infer_index_freq, try_to_datetime_index, prepare_freq, freq_to_timedelta64
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.decorators import class_or_instancemethod, cached_method
-from vectorbtpro.utils.array_ import is_range
+from vectorbtpro.utils.array_ import is_range, cast_to_min_precision, cast_to_max_precision
 from vectorbtpro.utils.template import CustomTemplate
 
 ArrayWrapperT = tp.TypeVar("ArrayWrapperT", bound="ArrayWrapper")
@@ -892,8 +892,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                     resample_kwargs,
                 )
                 rule = pd.Series(index=self.index, dtype=object).resample(
-                    prepare_freq(rule),
-                    **resolve_dict(resample_kwargs)
+                    prepare_freq(rule), **resolve_dict(resample_kwargs)
                 )
             if return_pd_resampler:
                 return rule
@@ -1211,6 +1210,11 @@ class ArrayWrapper(Configured, PandasIndexer):
         columns: tp.Optional[tp.IndexLike] = None,
         fillna: tp.Optional[tp.Scalar] = None,
         dtype: tp.Optional[tp.PandasDTypeLike] = None,
+        min_precision: tp.Union[None, int, str] = None,
+        max_precision: tp.Union[None, int, str] = None,
+        prec_float_only: tp.Optional[bool] = None,
+        prec_check_bounds: tp.Optional[bool] = None,
+        prec_strict: tp.Optional[bool] = None,
         to_timedelta: bool = False,
         to_index: bool = False,
         silence_warnings: tp.Optional[bool] = None,
@@ -1228,6 +1232,16 @@ class ArrayWrapper(Configured, PandasIndexer):
 
         wrapping_cfg = settings["wrapping"]
 
+        if min_precision is None:
+            min_precision = wrapping_cfg["min_precision"]
+        if max_precision is None:
+            max_precision = wrapping_cfg["max_precision"]
+        if prec_float_only is None:
+            prec_float_only = wrapping_cfg["prec_float_only"]
+        if prec_check_bounds is None:
+            prec_check_bounds = wrapping_cfg["prec_check_bounds"]
+        if prec_strict is None:
+            prec_strict = wrapping_cfg["prec_strict"]
         if silence_warnings is None:
             silence_warnings = wrapping_cfg["silence_warnings"]
 
@@ -1267,6 +1281,20 @@ class ArrayWrapper(Configured, PandasIndexer):
                     arr = arr[:, None]
                 arr = np.broadcast_to(arr, target_shape_2d)
             arr = reshaping.soft_to_ndim(arr, self.ndim)
+            if min_precision is not None:
+                arr = cast_to_min_precision(
+                    arr,
+                    min_precision,
+                    float_only=prec_float_only,
+                )
+            if max_precision is not None:
+                arr = cast_to_max_precision(
+                    arr,
+                    max_precision,
+                    float_only=prec_float_only,
+                    check_bounds=prec_check_bounds,
+                    strict=prec_strict,
+                )
             if arr.ndim == 1:
                 return _apply_dtype(pd.Series(arr, index=index, name=name))
             if arr.ndim == 2:

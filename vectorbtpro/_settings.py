@@ -396,6 +396,11 @@ wrapping = ChildDict(
     group_select=True,
     freq=None,
     silence_warnings=False,
+    min_precision=None,
+    max_precision=None,
+    prec_float_only=True,
+    prec_check_bounds=True,
+    prec_strict=True,
 )
 """_"""
 
@@ -404,7 +409,10 @@ __pdoc__["wrapping"] = Sub(
 
 ```python
 ${config_doc}
-```"""
+```
+
+When enabling `max_precision` and running your code for the first time, make sure to enable 
+`prec_check_bounds`. After that, you can safely disable it to slightly increase performance."""
 )
 
 _settings["wrapping"] = wrapping
