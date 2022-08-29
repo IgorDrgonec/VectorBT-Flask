@@ -1208,6 +1208,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         group_by: tp.GroupByLike = None,
         index: tp.Optional[tp.IndexLike] = None,
         columns: tp.Optional[tp.IndexLike] = None,
+        zero_to_none: tp.Optional[bool] = None,
         fillna: tp.Optional[tp.Scalar] = None,
         dtype: tp.Optional[tp.PandasDTypeLike] = None,
         min_precision: tp.Union[None, int, str] = None,
@@ -1232,6 +1233,8 @@ class ArrayWrapper(Configured, PandasIndexer):
 
         wrapping_cfg = settings["wrapping"]
 
+        if zero_to_none is None:
+            zero_to_none = wrapping_cfg["zero_to_none"]
         if min_precision is None:
             min_precision = wrapping_cfg["min_precision"]
         if max_precision is None:
@@ -1257,7 +1260,7 @@ class ArrayWrapper(Configured, PandasIndexer):
             columns = pd.Index(columns)
         if len(columns) == 1:
             name = columns[0]
-            if name == 0:  # was a Series before
+            if zero_to_none and name == 0:  # was a Series before
                 name = None
         else:
             name = None

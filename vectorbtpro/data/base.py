@@ -13,6 +13,7 @@ import traceback
 import inspect
 import string
 
+import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
@@ -983,11 +984,25 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
     # ############# Getting ############# #
 
-    def get_symbol_wrapper(self, level_name: str = "symbol", **kwargs) -> ArrayWrapper:
+    def get_symbol_wrapper(
+        self,
+        symbols: tp.Optional[tp.Symbols] = None,
+        level_name: str = "symbol",
+        **kwargs,
+    ) -> ArrayWrapper:
         """Get wrapper where columns are symbols."""
+        if symbols is None:
+            symbols = self.symbols
+            ndim = 1 if self.single_symbol else 2
+        else:
+            if isinstance(symbols, list):
+                ndim = 2
+            else:
+                symbols = [symbols]
+                ndim = 1
         return self.wrapper.replace(
-            columns=pd.Index(self.symbols, name=level_name),
-            ndim=1 if self.single_symbol else 2,
+            columns=pd.Index(symbols, name=level_name),
+            ndim=ndim,
             grouper=None,
             **kwargs,
         )
@@ -999,6 +1014,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
     def concat(self, symbols: tp.Optional[tp.Symbols] = None, level_name: str = "symbol") -> dict:
         """Return a dict of Series/DataFrames with symbols as columns, keyed by column name."""
+        symbol_wrapper = self.get_symbol_wrapper(symbols=symbols, level_name=level_name)
         if symbols is None:
             symbols = self.symbols
 
@@ -1006,10 +1022,10 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         first_data = self.data[symbols[0]]
         if self.single_symbol:
             if checks.is_series(first_data):
-                new_data[first_data.name] = first_data.rename(symbols[0])
+                new_data[first_data.name] = symbol_wrapper.wrap(first_data.values, zero_to_none=False)
             else:
                 for c in first_data.columns:
-                    new_data[c] = first_data[c].rename(symbols[0])
+                    new_data[c] = symbol_wrapper.wrap(first_data[c].values, zero_to_none=False)
         else:
             if checks.is_series(first_data):
                 columns = pd.Index([first_data.name])
@@ -1019,10 +1035,10 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                 col_data = []
                 for s in symbols:
                     if checks.is_series(self.data[s]):
-                        col_data.append(self.data[s].rename(None))
+                        col_data.append(self.data[s].values)
                     else:
-                        col_data.append(self.data[s][c].rename(None))
-                new_data[c] = pd.concat(col_data, keys=pd.Index(symbols, name=level_name), axis=1)
+                        col_data.append(self.data[s][c].values)
+                new_data[c] = symbol_wrapper.wrap(np.column_stack(col_data), zero_to_none=False)
 
         return new_data
 

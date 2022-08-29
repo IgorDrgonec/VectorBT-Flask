@@ -396,6 +396,7 @@ wrapping = ChildDict(
     group_select=True,
     freq=None,
     silence_warnings=False,
+    zero_to_none=True,
     min_precision=None,
     max_precision=None,
     prec_float_only=True,

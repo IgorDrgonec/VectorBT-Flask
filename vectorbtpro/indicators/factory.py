@@ -3271,7 +3271,7 @@ Args:
                 if isinstance(output, tuple):
                     _outputs = []
                     for o in output:
-                        if pd.Index.equals(input_tuple[0].index, o.index):
+                        if len(input_tuple[0].index) == len(o.index):
                             _outputs.append(o)
                     if len(_outputs) > 1:
                         output = pd.concat(_outputs, axis=1)
