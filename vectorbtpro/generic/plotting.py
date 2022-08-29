@@ -704,7 +704,7 @@ class Box(Configured, TraceUpdater):
             if trace_name is not None:
                 trace_name = str(trace_name)
             _trace_kwargs = merge_dicts(
-                dict(name=trace_name, showlegend=trace_name is not None),
+                dict(name=trace_name, showlegend=trace_name is not None, boxmean="sd"),
                 _trace_kwargs,
             )
             trace = go.Box(**_trace_kwargs)
