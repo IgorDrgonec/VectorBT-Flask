@@ -9,19 +9,31 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.utils.mapping import to_mapping, apply_mapping
 
 
-def map_enum_fields(field: tp.Any, enum: tp.Union[tp.NamedTuple, tp.EnumMeta], ignore_type=int, **kwargs) -> tp.Any:
+def map_enum_fields(
+    field: tp.Any,
+    enum: tp.Union[tp.NamedTuple, tp.EnumMeta],
+    enum_unkval: tp.Any = -1,
+    ignore_type=int,
+    **kwargs
+) -> tp.Any:
     """Map fields to values.
 
     See `vectorbtpro.utils.mapping.apply_mapping`."""
-    mapping = to_mapping(enum, reverse=True)
+    mapping = to_mapping(enum, reverse=True, enum_unkval=enum_unkval)
 
     return apply_mapping(field, mapping, ignore_type=ignore_type, **kwargs)
 
 
-def map_enum_values(value: tp.Any, enum: tp.Union[tp.NamedTuple, tp.EnumMeta], ignore_type=str, **kwargs) -> tp.Any:
+def map_enum_values(
+    value: tp.Any,
+    enum: tp.Union[tp.NamedTuple, tp.EnumMeta],
+    enum_unkval: tp.Any = -1,
+    ignore_type=str,
+    **kwargs
+) -> tp.Any:
     """Map values to fields.
 
     See `vectorbtpro.utils.mapping.apply_mapping`."""
-    mapping = to_mapping(enum, reverse=False)
+    mapping = to_mapping(enum, reverse=False, enum_unkval=enum_unkval)
 
     return apply_mapping(value, mapping, ignore_type=ignore_type, **kwargs)

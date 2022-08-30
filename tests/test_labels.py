@@ -19,8 +19,8 @@ close_ts = pd.DataFrame(
     ),
 )
 
-pos_ths = [np.array([1, 1 / 2]), np.array([2, 1 / 2]), np.array([3, 1 / 2])]
-neg_ths = [np.array([1 / 2, 1 / 3]), np.array([1 / 2, 2 / 3]), np.array([1 / 2, 3 / 4])]
+up_ths = [np.array([1, 1 / 2]), np.array([2, 1 / 2]), np.array([3, 1 / 2])]
+down_ths = [np.array([1 / 2, 1 / 3]), np.array([1 / 2, 2 / 3]), np.array([1 / 2, 3 / 4])]
 
 
 # ############# Global ############# #
@@ -280,7 +280,7 @@ class TestGenerators:
 
     def test_LEXLB(self):
         assert_frame_equal(
-            vbt.LEXLB.run(close_ts, pos_th=pos_ths, neg_th=neg_ths).labels,
+            vbt.LEXLB.run(close_ts, up_th=up_ths, down_th=down_ths).labels,
             pd.DataFrame(
                 np.array(
                     [
@@ -302,14 +302,14 @@ class TestGenerators:
                         ("array_2", "array_2", "a"),
                         ("array_2", "array_2", "b"),
                     ],
-                    names=["lexlb_pos_th", "lexlb_neg_th", None],
+                    names=["lexlb_up_th", "lexlb_down_th", None],
                 ),
             ),
         )
 
     def test_TRENDLB(self):
         assert_frame_equal(
-            vbt.TRENDLB.run(close_ts, pos_th=pos_ths, neg_th=neg_ths, mode="Binary").labels,
+            vbt.TRENDLB.run(close_ts, up_th=up_ths, down_th=down_ths, mode="Binary").labels,
             pd.DataFrame(
                 np.array(
                     [
@@ -331,12 +331,12 @@ class TestGenerators:
                         ("array_2", "array_2", 'binary', "a"),
                         ("array_2", "array_2", 'binary', "b"),
                     ],
-                    names=["trendlb_pos_th", "trendlb_neg_th", "trendlb_mode", None],
+                    names=["trendlb_up_th", "trendlb_down_th", "trendlb_mode", None],
                 ),
             ),
         )
         assert_frame_equal(
-            vbt.TRENDLB.run(close_ts, pos_th=pos_ths, neg_th=neg_ths, mode="BinaryCont").labels,
+            vbt.TRENDLB.run(close_ts, up_th=up_ths, down_th=down_ths, mode="BinaryCont").labels,
             pd.DataFrame(
                 np.array(
                     [
@@ -358,12 +358,12 @@ class TestGenerators:
                         ("array_2", "array_2", 'binarycont', "a"),
                         ("array_2", "array_2", 'binarycont', "b"),
                     ],
-                    names=["trendlb_pos_th", "trendlb_neg_th", "trendlb_mode", None],
+                    names=["trendlb_up_th", "trendlb_down_th", "trendlb_mode", None],
                 ),
             ),
         )
         assert_frame_equal(
-            vbt.TRENDLB.run(close_ts, pos_th=pos_ths, neg_th=neg_ths, mode="BinaryContSat").labels,
+            vbt.TRENDLB.run(close_ts, up_th=up_ths, down_th=down_ths, mode="BinaryContSat").labels,
             pd.DataFrame(
                 np.array(
                     [
@@ -385,12 +385,12 @@ class TestGenerators:
                         ("array_2", "array_2", "binarycontsat", "a"),
                         ("array_2", "array_2", "binarycontsat", "b"),
                     ],
-                    names=["trendlb_pos_th", "trendlb_neg_th", "trendlb_mode", None],
+                    names=["trendlb_up_th", "trendlb_down_th", "trendlb_mode", None],
                 ),
             ),
         )
         assert_frame_equal(
-            vbt.TRENDLB.run(close_ts, pos_th=pos_ths, neg_th=neg_ths, mode="PctChange").labels,
+            vbt.TRENDLB.run(close_ts, up_th=up_ths, down_th=down_ths, mode="PctChange").labels,
             pd.DataFrame(
                 np.array(
                     [
@@ -412,12 +412,12 @@ class TestGenerators:
                         ("array_2", "array_2", "pctchange", "a"),
                         ("array_2", "array_2", "pctchange", "b"),
                     ],
-                    names=["trendlb_pos_th", "trendlb_neg_th", "trendlb_mode", None],
+                    names=["trendlb_up_th", "trendlb_down_th", "trendlb_mode", None],
                 ),
             ),
         )
         assert_frame_equal(
-            vbt.TRENDLB.run(close_ts, pos_th=pos_ths, neg_th=neg_ths, mode="PctChangeNorm").labels,
+            vbt.TRENDLB.run(close_ts, up_th=up_ths, down_th=down_ths, mode="PctChangeNorm").labels,
             pd.DataFrame(
                 np.array(
                     [
@@ -446,14 +446,14 @@ class TestGenerators:
                         ("array_2", "array_2", "pctchangenorm", "a"),
                         ("array_2", "array_2", "pctchangenorm", "b"),
                     ],
-                    names=["trendlb_pos_th", "trendlb_neg_th", "trendlb_mode", None],
+                    names=["trendlb_up_th", "trendlb_down_th", "trendlb_mode", None],
                 ),
             ),
         )
 
     def test_BOLB(self):
         assert_frame_equal(
-            vbt.BOLB.run(close_ts, window=1, pos_th=pos_ths, neg_th=neg_ths).labels,
+            vbt.BOLB.run(close_ts, window=1, up_th=up_ths, down_th=down_ths).labels,
             pd.DataFrame(
                 np.array(
                     [
@@ -475,12 +475,12 @@ class TestGenerators:
                         (1, "array_2", "array_2", "a"),
                         (1, "array_2", "array_2", "b"),
                     ],
-                    names=["bolb_window", "bolb_pos_th", "bolb_neg_th", None],
+                    names=["bolb_window", "bolb_up_th", "bolb_down_th", None],
                 ),
             ),
         )
         assert_frame_equal(
-            vbt.BOLB.run(close_ts, window=2, pos_th=pos_ths, neg_th=neg_ths).labels,
+            vbt.BOLB.run(close_ts, window=2, up_th=up_ths, down_th=down_ths).labels,
             pd.DataFrame(
                 np.array(
                     [
@@ -502,7 +502,7 @@ class TestGenerators:
                         (2, "array_2", "array_2", "a"),
                         (2, "array_2", "array_2", "b"),
                     ],
-                    names=["bolb_window", "bolb_pos_th", "bolb_neg_th", None],
+                    names=["bolb_window", "bolb_up_th", "bolb_down_th", None],
                 ),
             ),
         )

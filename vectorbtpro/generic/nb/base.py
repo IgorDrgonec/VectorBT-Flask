@@ -14,6 +14,61 @@ from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import chunking as ch
 
 
+@register_jitted(cache=True, is_generated_jit=True)
+def select_indices_1d_nb(arr: tp.Array1d, indices: tp.Array1d, fill_value: tp.Scalar) -> tp.Array1d:
+    """Set each element to a value by boolean mask."""
+    nb_enabled = not isinstance(arr, np.ndarray)
+    if nb_enabled:
+        a_dtype = as_dtype(arr.dtype)
+        value_dtype = as_dtype(fill_value)
+    else:
+        a_dtype = arr.dtype
+        value_dtype = np.array(fill_value).dtype
+    dtype = np.promote_types(a_dtype, value_dtype)
+
+    def _select_indices_1d_nb(arr, indices, fill_value):
+        out = np.empty(indices.shape, dtype=dtype)
+        for i in range(indices.shape[0]):
+            if 0 <= indices[i] <= arr.shape[0] - 1:
+                out[i] = arr[indices[i]]
+            else:
+                out[i] = fill_value
+        return out
+
+    if not nb_enabled:
+        return _select_indices_1d_nb(arr, indices, fill_value)
+
+    return _select_indices_1d_nb
+
+
+@register_jitted(cache=True, is_generated_jit=True)
+def select_indices_nb(arr: tp.Array2d, indices: tp.Array2d, fill_value: tp.Scalar) -> tp.Array2d:
+    """Set each element to a value by boolean mask."""
+    nb_enabled = not isinstance(arr, np.ndarray)
+    if nb_enabled:
+        a_dtype = as_dtype(arr.dtype)
+        value_dtype = as_dtype(fill_value)
+    else:
+        a_dtype = arr.dtype
+        value_dtype = np.array(fill_value).dtype
+    dtype = np.promote_types(a_dtype, value_dtype)
+
+    def _select_indices_nb(arr, indices, fill_value):
+        out = np.empty(indices.shape, dtype=dtype)
+        for col in range(indices.shape[1]):
+            for i in range(indices.shape[0]):
+                if 0 <= indices[i, col] <= arr.shape[0] - 1:
+                    out[i, col] = arr[indices[i, col], col]
+                else:
+                    out[i, col] = fill_value
+        return out
+
+    if not nb_enabled:
+        return _select_indices_nb(arr, indices, fill_value)
+
+    return _select_indices_nb
+
+
 @register_jitted(cache=True)
 def shuffle_1d_nb(arr: tp.Array1d, seed: tp.Optional[int] = None) -> tp.Array1d:
     """Shuffle each column in the array.

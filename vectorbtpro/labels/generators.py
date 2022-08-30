@@ -155,13 +155,13 @@ LEXLB = IndicatorFactory(
     class_name="LEXLB",
     module_name=__name__,
     input_names=["close"],
-    param_names=["pos_th", "neg_th"],
+    param_names=["up_th", "down_th"],
     output_names=["labels"],
 ).with_apply_func(
     nb.local_extrema_nb,
     param_settings=dict(
-        pos_th=flex_elem_param_config,
-        neg_th=flex_elem_param_config,
+        up_th=flex_elem_param_config,
+        down_th=flex_elem_param_config,
     ),
     pass_flex_2d=True,
 )
@@ -180,13 +180,13 @@ TRENDLB = IndicatorFactory(
     class_name="TRENDLB",
     module_name=__name__,
     input_names=["close"],
-    param_names=["pos_th", "neg_th", "mode"],
+    param_names=["up_th", "down_th", "mode"],
     output_names=["labels"],
 ).with_apply_func(
     nb.trend_labels_nb,
     param_settings=dict(
-        pos_th=flex_elem_param_config,
-        neg_th=flex_elem_param_config,
+        up_th=flex_elem_param_config,
+        down_th=flex_elem_param_config,
         mode=dict(
             dtype=TrendMode,
             post_index_func=lambda index: index.str.lower(),
@@ -210,18 +210,18 @@ BOLB = IndicatorFactory(
     class_name="BOLB",
     module_name=__name__,
     input_names=["close"],
-    param_names=["window", "pos_th", "neg_th"],
+    param_names=["window", "up_th", "down_th"],
     output_names=["labels"],
 ).with_apply_func(
     nb.breakout_labels_nb,
     param_settings=dict(
-        pos_th=flex_elem_param_config,
-        neg_th=flex_elem_param_config,
+        up_th=flex_elem_param_config,
+        down_th=flex_elem_param_config,
     ),
     pass_flex_2d=True,
     kwargs_as_args=["wait"],
-    pos_th=0.0,
-    neg_th=0.0,
+    up_th=0.0,
+    down_th=0.0,
     wait=1,
 )
 

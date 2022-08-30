@@ -5,7 +5,7 @@
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.formatting import prettify
 
-__all__ = ["Pivot"]
+__all__ = ["Pivot", "TrendMode"]
 
 __pdoc__ = {}
 
@@ -27,5 +27,23 @@ __pdoc__[
 
 ```python
 {prettify(Pivot)}
+```
+"""
+
+
+class TrendModeT(tp.NamedTuple):
+    Downward: int = -1
+    Upward: int = 1
+
+
+TrendMode = TrendModeT()
+"""_"""
+
+__pdoc__[
+    "TrendMode"
+] = f"""Trend mode.
+
+```python
+{prettify(TrendMode)}
 ```
 """

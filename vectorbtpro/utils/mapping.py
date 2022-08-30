@@ -18,7 +18,7 @@ def reverse_mapping(mapping: tp.Mapping) -> dict:
     return {v: k for k, v in mapping.items()}
 
 
-def to_mapping(mapping_like: tp.MappingLike, reverse: bool = False) -> dict:
+def to_mapping(mapping_like: tp.MappingLike, reverse: bool = False, enum_unkval: tp.Any = -1) -> dict:
     """Convert mapping-like object to a mapping.
 
     Enable `reverse` to apply `reverse_mapping` on the result dict."""
@@ -26,8 +26,8 @@ def to_mapping(mapping_like: tp.MappingLike, reverse: bool = False) -> dict:
         mapping = {i.value: i.name for i in mapping_like}
     elif checks.is_namedtuple(mapping_like):
         mapping = {v: k for k, v in mapping_like._asdict().items()}
-        if -1 not in mapping_like:
-            mapping[-1] = None
+        if enum_unkval not in mapping_like:
+            mapping[enum_unkval] = None
     elif not checks.is_mapping(mapping_like):
         if checks.is_index(mapping_like):
             mapping_like = mapping_like.to_series().reset_index(drop=True)
@@ -45,6 +45,7 @@ def to_mapping(mapping_like: tp.MappingLike, reverse: bool = False) -> dict:
 def apply_mapping(
     obj: tp.Any,
     mapping_like: tp.Optional[tp.MappingLike] = None,
+    enum_unkval: tp.Any = -1,
     reverse: bool = False,
     ignore_case: bool = True,
     ignore_underscores: bool = True,
@@ -62,6 +63,7 @@ def apply_mapping(
         mapping_like (mapping_like): Any mapping-like object.
 
             See `to_mapping`.
+        enum_unkval (any): Missing value for enumerated types.
         reverse (bool): See `reverse` in `to_mapping`.
         ignore_case (bool): Whether to ignore the case if the key is a string.
         ignore_underscores (bool): Whether to ignore underscores if the key is a string.
@@ -85,7 +87,7 @@ def apply_mapping(
     if not isinstance(ignore_type, tuple):
         ignore_type = (ignore_type,)
 
-    mapping = to_mapping(mapping_like, reverse=reverse)
+    mapping = to_mapping(mapping_like, enum_unkval=enum_unkval, reverse=reverse)
 
     new_mapping = dict()
     for k, v in mapping.items():

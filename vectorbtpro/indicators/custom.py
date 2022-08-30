@@ -72,6 +72,7 @@ from vectorbtpro.generic import nb as generic_nb, enums as generic_enums
 from vectorbtpro.indicators import nb
 from vectorbtpro.indicators.factory import IndicatorFactory
 from vectorbtpro.indicators.configs import flex_elem_param_config
+from vectorbtpro.indicators.enums import Pivot, TrendMode
 from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.template import RepFunc
@@ -90,6 +91,7 @@ __all__ = [
     "PATSIM",
     "VWAP",
     "ZIGZAG",
+    "PIVOTINFO",
 ]
 
 # ############# MA ############# #
@@ -345,7 +347,7 @@ class _BBANDS(BBANDS):
 
         Args:
             column (str): Name of the column to plot.
-            plot_close (bool): Whether to plot `MA.close`.
+            plot_close (bool): Whether to plot `BBANDS.close`.
             close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.close`.
             middle_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.middle`.
             upper_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.upper`.
@@ -1561,17 +1563,21 @@ ZIGZAG = IndicatorFactory(
     module_name=__name__,
     short_name="zigzag",
     input_names=["close"],
-    param_names=["up_thresh", "down_thresh"],
+    param_names=["up_th", "down_th"],
     output_names=["pivots"],
     lazy_outputs=dict(
         modes=lambda self: self.wrapper.wrap(nb.pivots_to_modes_nb(to_2d_array(self.pivots))),
+    ),
+    attr_settings=dict(
+        pivots=dict(dtype=Pivot, enum_unkval=0),
+        modes=dict(dtype=TrendMode, enum_unkval=0),
     ),
 ).with_apply_func(
     nb.zigzag_apply_nb,
     kwargs_as_args=["finalized_only", "eager_switching"],
     param_settings=dict(
-        up_thresh=flex_elem_param_config,
-        down_thresh=flex_elem_param_config,
+        up_th=flex_elem_param_config,
+        down_th=flex_elem_param_config,
     ),
     pass_flex_2d=True,
     finalized_only=True,
@@ -1597,12 +1603,12 @@ class _ZIGZAG(ZIGZAG):
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs
     ) -> tp.BaseFigure:
-        """Plot `MA.ma` against `MA.close`.
+        """Plot zig-zag line against `ZIGZAG.close`.
 
         Args:
             column (str): Name of the column to plot.
-            plot_close (bool): Whether to plot `MA.close`.
-            close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MA.close`.
+            plot_close (bool): Whether to plot `ZIGZAG.close`.
+            close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `ZIGZAG.close`.
             zigzag_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for zig-zag line.
             add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
             fig (Figure or FigureWidget): Figure to add traces to.
@@ -1656,3 +1662,126 @@ class _ZIGZAG(ZIGZAG):
 
 setattr(ZIGZAG, "__doc__", _ZIGZAG.__doc__)
 setattr(ZIGZAG, "plot", _ZIGZAG.plot)
+
+
+# ############# PIVOTINFO ############# #
+
+
+PIVOTINFO = IndicatorFactory(
+    class_name="PIVOTINFO",
+    module_name=__name__,
+    short_name="pivotinfo",
+    input_names=["close"],
+    param_names=["up_th", "down_th"],
+    output_names=["conf_pivot", "conf_idx", "last_pivot", "last_idx"],
+    lazy_outputs=dict(
+        conf_value=lambda self: self.wrapper.wrap(generic_nb.select_indices_nb(
+            to_2d_array(self.close),
+            to_2d_array(self.conf_idx),
+            np.nan,
+        )),
+        last_value=lambda self: self.wrapper.wrap(generic_nb.select_indices_nb(
+            to_2d_array(self.close),
+            to_2d_array(self.last_idx),
+            np.nan,
+        )),
+    ),
+    attr_settings=dict(
+        conf_pivot=dict(dtype=Pivot, enum_unkval=0),
+        last_pivot=dict(dtype=Pivot, enum_unkval=0),
+    ),
+).with_apply_func(
+    nb.pivot_info_apply_nb,
+    param_settings=dict(
+        up_th=flex_elem_param_config,
+        down_th=flex_elem_param_config,
+    ),
+    pass_flex_2d=True,
+)
+
+
+class _PIVOTINFO(PIVOTINFO):
+    """Indicator that returns information on the confirmed and latest pivot point."""
+
+    def plot(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        plot_close: bool = True,
+        close_trace_kwargs: tp.KwargsLike = None,
+        conf_value_trace_kwargs: tp.KwargsLike = None,
+        last_value_trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs
+    ) -> tp.BaseFigure:
+        """Plot `PIVOTINFO.conf_value` and `PIVOTINFO.last_value` against `PIVOTINFO.close`.
+
+        Args:
+            column (str): Name of the column to plot.
+            plot_close (bool): Whether to plot `PIVOTINFO.close`.
+            close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `PIVOTINFO.close`.
+            conf_value_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `PIVOTINFO.conf_value` line.
+            last_value_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `PIVOTINFO.last_value` line.
+            add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
+            fig (Figure or FigureWidget): Figure to add traces to.
+            **layout_kwargs: Keyword arguments passed to `fig.update_layout`.
+
+        Usage:
+            ```pycon
+            >>> vbt.PIVOTINFO.run(ohlcv['Close'], 0.1, 0.1).plot()
+            ```
+
+            ![](/assets/images/api/PIVOTINFO.svg)
+        """
+        from vectorbtpro.utils.figure import make_figure
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
+
+        self_col = self.select_col(column=column)
+
+        if fig is None:
+            fig = make_figure()
+        fig.update_layout(**layout_kwargs)
+
+        if close_trace_kwargs is None:
+            close_trace_kwargs = {}
+        if conf_value_trace_kwargs is None:
+            conf_value_trace_kwargs = {}
+        if last_value_trace_kwargs is None:
+            last_value_trace_kwargs = {}
+        close_trace_kwargs = merge_dicts(
+            dict(name="Close", line=dict(color=plotting_cfg["color_schema"]["blue"])),
+            close_trace_kwargs,
+        )
+        conf_value_trace_kwargs = merge_dicts(
+            dict(name="Confirmed value", line=dict(color=plotting_cfg["color_schema"]["lightblue"])),
+            conf_value_trace_kwargs,
+        )
+        last_value_trace_kwargs = merge_dicts(
+            dict(name="Last value", line=dict(color=plotting_cfg["color_schema"]["lightpurple"])),
+            last_value_trace_kwargs,
+        )
+
+        if plot_close:
+            fig = self_col.close.vbt.lineplot(
+                trace_kwargs=close_trace_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                fig=fig,
+            )
+        fig = self_col.conf_value.vbt.lineplot(
+            trace_kwargs=conf_value_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+        )
+        fig = self_col.last_value.vbt.lineplot(
+            trace_kwargs=last_value_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+        )
+
+        return fig
+
+
+setattr(PIVOTINFO, "__doc__", _PIVOTINFO.__doc__)
+setattr(PIVOTINFO, "plot", _PIVOTINFO.plot)

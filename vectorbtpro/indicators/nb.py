@@ -527,8 +527,8 @@ def vwap_apply_nb(
 @register_jitted(cache=True)
 def initial_pivots_nb(
     arr: tp.Array2d,
-    up_thresh: tp.FlexArray,
-    down_thresh: tp.FlexArray,
+    up_th: tp.FlexArray,
+    down_th: tp.FlexArray,
     flex_2d: bool = False,
 ) -> tp.Array1d:
     """Find the initial pivot in each column."""
@@ -541,12 +541,12 @@ def initial_pivots_nb(
         found_pivot = Pivot.Valley if arr[0, col] < arr[-1, col] else Pivot.Peak
 
         for i in range(1, arr.shape[0]):
-            _up_thresh = 1 + abs(flex_select_auto_nb(up_thresh, 0, col, flex_2d))
-            _down_thresh = 1 + abs(flex_select_auto_nb(down_thresh, 0, col, flex_2d))
-            if arr[i, col] / minv >= _up_thresh:
+            _up_th = 1 + abs(flex_select_auto_nb(up_th, 0, col, flex_2d))
+            _down_th = 1 + abs(flex_select_auto_nb(down_th, 0, col, flex_2d))
+            if arr[i, col] / minv >= _up_th:
                 found_pivot = Pivot.Valley if min_i == 0 else Pivot.Peak
                 break
-            if arr[i, col] / maxv <= _down_thresh:
+            if arr[i, col] / maxv <= _down_th:
                 found_pivot = Pivot.Peak if max_i == 0 else Pivot.Valley
                 break
             if arr[i, col] > maxv:
@@ -564,18 +564,17 @@ def initial_pivots_nb(
 @register_jitted(cache=True)
 def zigzag_apply_nb(
     arr: tp.Array2d,
-    up_thresh: tp.FlexArray,
-    down_thresh: tp.FlexArray,
+    up_th: tp.FlexArray,
+    down_th: tp.FlexArray,
     finalized_only: bool = True,
     eager_switching: bool = False,
     flex_2d: bool = False,
 ) -> tp.Array2d:
-    """
-    Find the peaks and valleys of a series.
+    """Apply function for `vectorbtpro.indicators.custom.ZIGZAG`.
 
     Based on https://github.com/jbn/ZigZag
 
-    Specify `up_thresh` and `down_thresh` to set the minimum and maximum relative change
+    Specify `up_th` and `down_th` to set the minimum and maximum relative change
     necessary to define a peak and a valley respectively.
 
     The first and last elements are guaranteed to be annotated as peak or
@@ -585,12 +584,12 @@ def zigzag_apply_nb(
     ignoring data outside the fully realized segments, which may bias
     analysis.
     """
-    initial_pivots = initial_pivots_nb(arr, up_thresh, down_thresh)
+    initial_pivots = initial_pivots_nb(arr, up_th, down_th)
     pivots = np.zeros(arr.shape, dtype=np.int_)
 
     for col in range(arr.shape[1]):
-        _up_thresh = 1 + abs(flex_select_auto_nb(up_thresh, 0, col, flex_2d))
-        _down_thresh = 1 + abs(flex_select_auto_nb(down_thresh, 0, col, flex_2d))
+        _up_th = 1 + abs(flex_select_auto_nb(up_th, 0, col, flex_2d))
+        _down_th = 1 + abs(flex_select_auto_nb(down_th, 0, col, flex_2d))
         trend = -initial_pivots[col]
         last_pivot_i = 0
         last_pivot = arr[0, col]
@@ -600,7 +599,7 @@ def zigzag_apply_nb(
             r = arr[i, col] / last_pivot
 
             if trend == -1:
-                if r >= _up_thresh:
+                if r >= _up_th:
                     pivots[last_pivot_i, col] = trend
                     trend = Pivot.Peak
                     last_pivot = arr[i, col]
@@ -609,7 +608,7 @@ def zigzag_apply_nb(
                     last_pivot = arr[i, col]
                     last_pivot_i = i
             else:
-                if r <= _down_thresh:
+                if r <= _down_th:
                     pivots[last_pivot_i, col] = trend
                     trend = Pivot.Valley
                     last_pivot = arr[i, col]
@@ -640,7 +639,10 @@ def pivots_to_modes_nb(pivots: tp.Array2d) -> tp.Array2d:
     modes = np.zeros(pivots.shape, dtype=np.int_)
 
     for col in range(pivots.shape[1]):
-        mode = -pivots[0, col]
+        if pivots[0, col] != 0:
+            mode = -pivots[0, col]
+        else:
+            mode = 0
         modes[0, col] = pivots[0, col]
         for i in range(1, pivots.shape[0]):
             if pivots[i, col] != 0:
@@ -650,3 +652,68 @@ def pivots_to_modes_nb(pivots: tp.Array2d) -> tp.Array2d:
                 modes[i, col] = mode
 
     return modes
+
+
+@register_jitted(cache=True)
+def pivot_info_apply_nb(
+    arr: tp.Array2d,
+    up_th: tp.FlexArray,
+    down_th: tp.FlexArray,
+    flex_2d: bool = False,
+) -> tp.Tuple[tp.Array2d, tp.Array2d, tp.Array2d, tp.Array2d]:
+    """Apply function for `vectorbtpro.indicators.custom.PIVOTINFO`."""
+    conf_pivot = np.empty(arr.shape, dtype=np.int_)
+    conf_idx = np.empty(arr.shape, dtype=np.int_)
+    last_pivot = np.empty(arr.shape, dtype=np.int_)
+    last_idx = np.empty(arr.shape, dtype=np.int_)
+
+    for col in range(arr.shape[1]):
+        _up_th = 1 + abs(flex_select_auto_nb(up_th, 0, col, flex_2d))
+        _down_th = 1 - abs(flex_select_auto_nb(down_th, 0, col, flex_2d))
+        _conf_pivot = 0
+        _conf_idx = -1
+        _conf_value = np.nan
+        _last_pivot = 0
+        _last_idx = -1
+        _last_value = np.nan
+
+        for i in range(arr.shape[0]):
+            if _last_pivot == Pivot.Valley:
+                if arr[i, col] >= _last_value * _up_th:
+                    _conf_pivot = _last_pivot
+                    _conf_idx = _last_idx
+                    _conf_value = _last_value
+                    _last_pivot = Pivot.Peak
+                    _last_idx = i
+                    _last_value = arr[i, col]
+                elif arr[i, col] < _last_value:
+                    _last_idx = i
+                    _last_value = arr[i, col]
+            elif _last_pivot == Pivot.Peak:
+                _last_value = arr[_last_idx, col]
+                if arr[i, col] <= _last_value * _down_th:
+                    _conf_pivot = _last_pivot
+                    _conf_idx = _last_idx
+                    _conf_value = _last_value
+                    _last_pivot = Pivot.Valley
+                    _last_idx = i
+                    _last_value = arr[i, col]
+                elif arr[i, col] > _last_value:
+                    _last_idx = i
+                    _last_value = arr[i, col]
+            else:
+                if arr[i, col] >= arr[0, col] * _up_th:
+                    _last_pivot = Pivot.Peak
+                    _last_idx = i
+                    _last_value = arr[i, col]
+                if arr[i, col] <= arr[0, col] * _down_th:
+                    _last_pivot = Pivot.Valley
+                    _last_idx = i
+                    _last_value = arr[i, col]
+
+            conf_pivot[i, col] = _conf_pivot
+            conf_idx[i, col] = _conf_idx
+            last_pivot[i, col] = _last_pivot
+            last_idx[i, col] = _last_idx
+
+    return conf_pivot, conf_idx, last_pivot, last_idx

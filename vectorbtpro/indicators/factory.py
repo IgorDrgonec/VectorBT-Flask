@@ -1501,8 +1501,9 @@ class IndicatorFactory(Configured):
 
         for attr_name in all_attr_names:
             _attr_settings = attr_settings.get(attr_name, {})
-            checks.assert_dict_valid(_attr_settings, ["dtype"])
+            checks.assert_dict_valid(_attr_settings, ["dtype", "enum_unkval"])
             dtype = _attr_settings.get("dtype", np.float_)
+            enum_unkval = _attr_settings.get("enum_unkval", -1)
 
             if checks.is_mapping_like(dtype):
 
@@ -1510,8 +1511,9 @@ class IndicatorFactory(Configured):
                     self,
                     _attr_name: str = attr_name,
                     _mapping: tp.MappingLike = dtype,
+                    _enum_unkval: tp.Any = enum_unkval,
                 ) -> tp.SeriesFrame:
-                    return getattr(self, _attr_name).vbt(mapping=_mapping).apply_mapping()
+                    return getattr(self, _attr_name).vbt(mapping=_mapping).apply_mapping(enum_unkval=_enum_unkval)
 
                 attr_readable.__qualname__ = f"{Indicator.__name__}.{attr_name}_readable"
                 attr_readable.__doc__ = inspect.cleandoc(
@@ -1520,7 +1522,7 @@ class IndicatorFactory(Configured):
                     ```python
                     {dtype}
                     ```"""
-                ).format(attr_name=attr_name, dtype=prettify(to_mapping(dtype)))
+                ).format(attr_name=attr_name, dtype=prettify(to_mapping(dtype, enum_unkval=enum_unkval)))
                 setattr(Indicator, f"{attr_name}_readable", property(attr_readable))
 
                 def attr_stats(
