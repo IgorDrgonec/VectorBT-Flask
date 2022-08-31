@@ -1987,8 +1987,8 @@ class Order(tp.NamedTuple):
     fees: float = 0.0
     fixed_fees: float = 0.0
     slippage: float = 0.0
-    min_size: float = 0.0
-    max_size: float = np.inf
+    min_size: float = np.nan
+    max_size: float = np.nan
     size_granularity: float = np.nan
     reject_prob: float = 0.0
     price_area_vio_mode: int = PriceAreaVioMode.Ignore

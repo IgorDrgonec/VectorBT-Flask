@@ -20,9 +20,9 @@ def clear_pycache():
     """Clear __pycache__ folders and .pyc files."""
     import pathlib
 
-    for p in pathlib.Path(__file__).parent.rglob("__pycache__"):
+    for p in pathlib.Path(__file__).parent.parent.rglob("__pycache__"):
         delete_dir(p)
-    for p in pathlib.Path(__file__).parent.rglob("*.py[co]"):
+    for p in pathlib.Path(__file__).parent.parent.rglob("*.py[co]"):
         p.unlink()
 
 

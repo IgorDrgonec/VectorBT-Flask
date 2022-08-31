@@ -306,7 +306,7 @@ def test_execute_order_nb():
     assert account_state == ExecState(100.0, 100.0, 0.0, 100.0, 10.0, 1100.0)
     assert_same_tuple(
         order_result,
-        OrderResult(size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=12),
+        OrderResult(size=np.nan, price=np.nan, fees=np.nan, side=-1, status=1, status_info=12),
     )
     account_state, order_result = nb.execute_order_nb(
         ExecState(100.0, 100.0, 0.0, 100.0, 10.0, 1100.0),
@@ -324,7 +324,7 @@ def test_execute_order_nb():
     assert account_state == ExecState(100.0, 100.0, 0.0, 100.0, 10.0, 1100.0)
     assert_same_tuple(
         order_result,
-        OrderResult(size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=12),
+        OrderResult(size=np.nan, price=np.nan, fees=np.nan, side=-1, status=1, status_info=12),
     )
     account_state, order_result = nb.execute_order_nb(
         ExecState(100.0, 100.0, 0.0, 100.0, 10.0, 1100.0),

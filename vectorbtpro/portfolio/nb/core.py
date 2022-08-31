@@ -55,8 +55,8 @@ def buy_nb(
     fees: float = 0.0,
     fixed_fees: float = 0.0,
     slippage: float = 0.0,
-    min_size: float = 0.0,
-    max_size: float = np.inf,
+    min_size: float = np.nan,
+    max_size: float = np.nan,
     size_granularity: float = np.nan,
     price_area_vio_mode: int = PriceAreaVioMode.Ignore,
     lock_cash: bool = False,
@@ -112,7 +112,7 @@ def buy_nb(
     if np.isinf(adj_size) and np.isinf(cash_limit):
         raise ValueError("Attempt to go in long direction infinitely")
 
-    if adj_size > max_size:
+    if not np.isnan(max_size) and adj_size > max_size:
         if not allow_partial:
             return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.MaxSizeExceeded)
 
@@ -163,8 +163,8 @@ def buy_nb(
         return account_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.SizeZero)
 
     # Check against minimum size
-    if is_less_nb(final_size, min_size):
-        return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.MinSizeNotReached)
+    if not np.isnan(min_size) and is_less_nb(final_size, min_size):
+        return account_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.MinSizeNotReached)
 
     # Check against partial fill (np.inf doesn't count)
     if np.isfinite(size) and is_less_nb(final_size, size) and not allow_partial:
@@ -203,8 +203,8 @@ def sell_nb(
     fees: float = 0.0,
     fixed_fees: float = 0.0,
     slippage: float = 0.0,
-    min_size: float = 0.0,
-    max_size: float = np.inf,
+    min_size: float = np.nan,
+    max_size: float = np.nan,
     size_granularity: float = np.nan,
     price_area_vio_mode: int = PriceAreaVioMode.Ignore,
     lock_cash: bool = False,
@@ -263,7 +263,7 @@ def sell_nb(
         # Apply percentage
         size_limit = percent * size_limit
 
-    if size_limit > max_size:
+    if not np.isnan(max_size) and size_limit > max_size:
         if not allow_partial:
             return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.MaxSizeExceeded)
 
@@ -284,8 +284,8 @@ def sell_nb(
         return account_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.SizeZero)
 
     # Check against minimum size
-    if is_less_nb(size_limit, min_size):
-        return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.MinSizeNotReached)
+    if not np.isnan(min_size) and is_less_nb(size_limit, min_size):
+        return account_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.MinSizeNotReached)
 
     # Check against partial fill
     if np.isfinite(size) and is_less_nb(size_limit, size) and not allow_partial:  # np.inf doesn't count
@@ -358,6 +358,68 @@ def get_diraware_size_nb(size: float, direction: int) -> float:
     if direction == Direction.ShortOnly:
         return size * -1
     return size
+
+
+@register_jitted(cache=True)
+def resolve_size_nb(
+    size: float,
+    size_type: int,
+    direction: int,
+    position: float,
+    val_price: float,
+    value: float,
+    as_requirement: bool = False,
+) -> tp.Tuple[float, float]:
+    """Resolve size into an absolute amount of assets and percentage of resources.
+
+    Percentage is only set if the option `SizeType.Percent(100)` is used."""
+    if size_type == SizeType.ValuePercent100:
+        size /= 100
+        size_type = SizeType.ValuePercent
+    if size_type == SizeType.TargetPercent100:
+        size /= 100
+        size_type = SizeType.TargetPercent
+    if size_type == SizeType.ValuePercent or size_type == SizeType.TargetPercent:
+        # Percentage or target percentage of the current value
+        size *= value
+        if size_type == SizeType.ValuePercent:
+            size_type = SizeType.Value
+        else:
+            size_type = SizeType.TargetValue
+
+    if size_type == SizeType.Value or size_type == SizeType.TargetValue:
+        # Value or target value
+        size /= val_price
+        if size_type == SizeType.Value:
+            size_type = SizeType.Amount
+        else:
+            size_type = SizeType.TargetAmount
+
+    if size_type == SizeType.TargetAmount:
+        # Target amount
+        if not as_requirement:
+            size -= position
+        size_type = SizeType.Amount
+
+    if size_type == SizeType.Amount:
+        if direction == Direction.ShortOnly or direction == Direction.Both:
+            if size < 0 and np.isinf(size):
+                # Infinite negative size has a special meaning: 100% to short
+                size = -1.0
+                size_type = SizeType.Percent
+
+    percent = np.nan
+    if size_type == SizeType.Percent100:
+        size /= 100
+        size_type = SizeType.Percent
+    if size_type == SizeType.Percent:
+        # Percentage of resources
+        percent = abs(size)
+        size = np.sign(size) * np.inf
+
+    if as_requirement:
+        size = abs(size)
+    return size, percent
 
 
 @register_jitted(cache=True)
@@ -451,10 +513,10 @@ def execute_order_nb(
         raise ValueError("order.fixed_fees must be finite")
     if not np.isfinite(order.slippage) or order.slippage < 0:
         raise ValueError("order.slippage must be finite and 0 or greater")
-    if not np.isfinite(order.min_size) or order.min_size < 0:
-        raise ValueError("order.min_size must be finite and 0 or greater")
-    if np.isnan(order.max_size) or order.max_size <= 0:
-        raise ValueError("order.max_size must be greater than 0")
+    if np.isinf(order.min_size) or order.min_size < 0:
+        raise ValueError("order.min_size must be either NaN, 0, or greater")
+    if order.max_size <= 0:
+        raise ValueError("order.max_size must be either NaN or greater than 0")
     if np.isinf(order.size_granularity) or order.size_granularity <= 0:
         raise ValueError("order.size_granularity must be either NaN, or finite and greater than 0")
     if not np.isfinite(order.reject_prob) or order.reject_prob < 0 or order.reject_prob > 1:
@@ -462,61 +524,65 @@ def execute_order_nb(
 
     # Positive/negative size in short direction should be treated as negative/positive
     order_size = get_diraware_size_nb(order.size, order.direction)
+    min_order_size = order.min_size
+    max_order_size = order.max_size
     order_size_type = order.size_type
 
-    if order_size_type == SizeType.ValuePercent100:
-        order_size /= 100
-        order_size_type = SizeType.ValuePercent
-    if order_size_type == SizeType.TargetPercent100:
-        order_size /= 100
-        order_size_type = SizeType.TargetPercent
-    if order_size_type == SizeType.ValuePercent or order_size_type == SizeType.TargetPercent:
-        # Percentage or target percentage of the current value
-        if np.isnan(value):
-            return exec_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.ValueNaN)
-        if value <= 0:
-            return exec_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.ValueZeroNeg)
-
-        order_size *= value
-        if order_size_type == SizeType.ValuePercent:
-            order_size_type = SizeType.Value
-        else:
-            order_size_type = SizeType.TargetValue
-
-    if order_size_type == SizeType.Value or order_size_type == SizeType.TargetValue:
-        # Value or target value
+    if (
+        order_size_type == SizeType.ValuePercent100
+        or order_size_type == SizeType.ValuePercent
+        or order_size_type == SizeType.TargetPercent100
+        or order_size_type == SizeType.TargetPercent
+        or order_size_type == SizeType.Value
+        or order_size_type == SizeType.TargetValue
+    ):
         if np.isinf(val_price) or val_price <= 0:
             raise ValueError("val_price_now must be finite and greater than 0")
         if np.isnan(val_price):
             return exec_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.ValPriceNaN)
+        if (
+            order_size_type == SizeType.ValuePercent100
+            or order_size_type == SizeType.ValuePercent
+            or order_size_type == SizeType.TargetPercent100
+            or order_size_type == SizeType.TargetPercent
+        ):
+            if np.isnan(value):
+                return exec_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.ValueNaN)
+            if value <= 0:
+                return exec_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.ValueZeroNeg)
 
-        order_size /= val_price
-        if order_size_type == SizeType.Value:
-            order_size_type = SizeType.Amount
-        else:
-            order_size_type = SizeType.TargetAmount
-
-    if order_size_type == SizeType.TargetAmount:
-        # Target amount
-        order_size -= position
-        order_size_type = SizeType.Amount
-
-    if order_size_type == SizeType.Amount:
-        if order.direction == Direction.ShortOnly or order.direction == Direction.Both:
-            if order_size < 0 and np.isinf(order_size):
-                # Infinite negative size has a special meaning: 100% to short
-                order_size = -1.0
-                order_size_type = SizeType.Percent
-
-    percent = np.nan
-    if order_size_type == SizeType.Percent100:
-        order_size /= 100
-        order_size_type = SizeType.Percent
-    if order_size_type == SizeType.Percent:
-        # Percentage of resources
-        percent = abs(order_size)
-        order_size = np.sign(order_size) * np.inf
-        order_size_type = SizeType.Amount
+    order_size, percent = resolve_size_nb(
+        size=order_size,
+        size_type=order_size_type,
+        direction=order.direction,
+        position=position,
+        val_price=val_price,
+        value=value,
+    )
+    if not np.isnan(min_order_size):
+        min_order_size, min_percent = resolve_size_nb(
+            size=min_order_size,
+            size_type=order_size_type,
+            direction=order.direction,
+            position=position,
+            val_price=val_price,
+            value=value,
+            as_requirement=True,
+        )
+        if is_less_nb(percent, min_percent):
+            return exec_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.MinSizeNotReached)
+    if not np.isnan(max_order_size):
+        max_order_size, max_percent = resolve_size_nb(
+            size=max_order_size,
+            size_type=order_size_type,
+            direction=order.direction,
+            position=position,
+            val_price=val_price,
+            value=value,
+            as_requirement=True,
+        )
+        if is_less_nb(max_percent, percent):
+            percent = max_percent
 
     if order_size >= 0:
         new_account_state, order_result = buy_nb(
@@ -527,8 +593,8 @@ def execute_order_nb(
             fees=order.fees,
             fixed_fees=order.fixed_fees,
             slippage=order.slippage,
-            min_size=order.min_size,
-            max_size=order.max_size,
+            min_size=min_order_size,
+            max_size=max_order_size,
             size_granularity=order.size_granularity,
             price_area_vio_mode=order.price_area_vio_mode,
             lock_cash=order.lock_cash,
@@ -546,8 +612,8 @@ def execute_order_nb(
             fees=order.fees,
             fixed_fees=order.fixed_fees,
             slippage=order.slippage,
-            min_size=order.min_size,
-            max_size=order.max_size,
+            min_size=min_order_size,
+            max_size=max_order_size,
             size_granularity=order.size_granularity,
             price_area_vio_mode=order.price_area_vio_mode,
             lock_cash=order.lock_cash,
@@ -765,8 +831,8 @@ def order_nb(
     fees: float = 0.0,
     fixed_fees: float = 0.0,
     slippage: float = 0.0,
-    min_size: float = 0.0,
-    max_size: float = np.inf,
+    min_size: float = np.nan,
+    max_size: float = np.nan,
     size_granularity: float = np.nan,
     reject_prob: float = 0.0,
     price_area_vio_mode: int = PriceAreaVioMode.Ignore,
@@ -805,8 +871,8 @@ def close_position_nb(
     fees: float = 0.0,
     fixed_fees: float = 0.0,
     slippage: float = 0.0,
-    min_size: float = 0.0,
-    max_size: float = np.inf,
+    min_size: float = np.nan,
+    max_size: float = np.nan,
     size_granularity: float = np.nan,
     reject_prob: float = 0.0,
     price_area_vio_mode: int = PriceAreaVioMode.Ignore,

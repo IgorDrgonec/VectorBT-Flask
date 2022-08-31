@@ -571,7 +571,9 @@ class TestFromOrderFunc:
             def target_val_order_func_nb(c):
                 col = c.from_col + c.call_idx
                 if c.call_idx < c.group_len:
-                    return col, nb.order_nb(50.0, nb.select_from_col_nb(c, col, c.close), size_type=SizeType.TargetValue)
+                    return col, nb.order_nb(
+                        50.0, nb.select_from_col_nb(c, col, c.close), size_type=SizeType.TargetValue
+                    )
                 return -1, nb.order_nothing_nb()
 
         else:
@@ -632,7 +634,9 @@ class TestFromOrderFunc:
             def target_pct_order_func_nb(c):
                 col = c.from_col + c.call_idx
                 if c.call_idx < c.group_len:
-                    return col, nb.order_nb(0.5, nb.select_from_col_nb(c, col, c.close), size_type=SizeType.TargetPercent)
+                    return col, nb.order_nb(
+                        0.5, nb.select_from_col_nb(c, col, c.close), size_type=SizeType.TargetPercent
+                    )
                 return -1, nb.order_nothing_nb()
 
         else:
@@ -1096,8 +1100,8 @@ class TestFromOrderFunc:
                         0.01,
                         1.0,
                         0.01,
-                        0.0,
-                        np.inf,
+                        np.nan,
+                        np.nan,
                         np.nan,
                         0.0,
                         0,
@@ -1141,8 +1145,8 @@ class TestFromOrderFunc:
                         0.01,
                         1.0,
                         0.01,
-                        0.0,
-                        np.inf,
+                        np.nan,
+                        np.nan,
                         np.nan,
                         0.0,
                         0,
@@ -1186,8 +1190,8 @@ class TestFromOrderFunc:
                         0.01,
                         1.0,
                         0.01,
-                        0.0,
-                        np.inf,
+                        np.nan,
+                        np.nan,
                         np.nan,
                         0.0,
                         0,
@@ -1231,8 +1235,8 @@ class TestFromOrderFunc:
                         0.01,
                         1.0,
                         0.01,
-                        0.0,
-                        np.inf,
+                        np.nan,
+                        np.nan,
                         np.nan,
                         0.0,
                         0,
@@ -1276,8 +1280,8 @@ class TestFromOrderFunc:
                         0.01,
                         1.0,
                         0.01,
-                        0.0,
-                        np.inf,
+                        np.nan,
+                        np.nan,
                         np.nan,
                         0.0,
                         0,
@@ -1321,8 +1325,8 @@ class TestFromOrderFunc:
                         0.01,
                         1.0,
                         0.01,
-                        0.0,
-                        np.inf,
+                        np.nan,
+                        np.nan,
                         np.nan,
                         0.0,
                         0,
@@ -1366,8 +1370,8 @@ class TestFromOrderFunc:
                         0.01,
                         1.0,
                         0.01,
-                        0.0,
-                        np.inf,
+                        np.nan,
+                        np.nan,
                         np.nan,
                         0.0,
                         0,
@@ -1411,8 +1415,8 @@ class TestFromOrderFunc:
                         0.01,
                         1.0,
                         0.01,
-                        0.0,
-                        np.inf,
+                        np.nan,
+                        np.nan,
                         np.nan,
                         0.0,
                         0,
@@ -1456,8 +1460,8 @@ class TestFromOrderFunc:
                         0.01,
                         1.0,
                         0.01,
-                        0.0,
-                        np.inf,
+                        np.nan,
+                        np.nan,
                         np.nan,
                         0.0,
                         0,
@@ -1501,8 +1505,8 @@ class TestFromOrderFunc:
                         0.01,
                         1.0,
                         0.01,
-                        0.0,
-                        np.inf,
+                        np.nan,
+                        np.nan,
                         np.nan,
                         0.0,
                         0,
@@ -1546,8 +1550,8 @@ class TestFromOrderFunc:
                         0.01,
                         1.0,
                         0.01,
-                        0.0,
-                        np.inf,
+                        np.nan,
+                        np.nan,
                         np.nan,
                         0.0,
                         0,
@@ -1591,8 +1595,8 @@ class TestFromOrderFunc:
                         0.01,
                         1.0,
                         0.01,
-                        0.0,
-                        np.inf,
+                        np.nan,
+                        np.nan,
                         np.nan,
                         0.0,
                         0,
@@ -1636,8 +1640,8 @@ class TestFromOrderFunc:
                         0.01,
                         1.0,
                         0.01,
-                        0.0,
-                        np.inf,
+                        np.nan,
+                        np.nan,
                         np.nan,
                         0.0,
                         0,
@@ -1681,8 +1685,8 @@ class TestFromOrderFunc:
                         0.01,
                         1.0,
                         0.01,
-                        0.0,
-                        np.inf,
+                        np.nan,
+                        np.nan,
                         np.nan,
                         0.0,
                         0,
@@ -1726,8 +1730,8 @@ class TestFromOrderFunc:
                         0.01,
                         1.0,
                         0.01,
-                        0.0,
-                        np.inf,
+                        np.nan,
+                        np.nan,
                         np.nan,
                         0.0,
                         0,
