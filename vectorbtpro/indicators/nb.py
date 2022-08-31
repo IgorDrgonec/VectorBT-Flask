@@ -541,8 +541,8 @@ def initial_pivots_nb(
         found_pivot = Pivot.Valley if arr[0, col] < arr[-1, col] else Pivot.Peak
 
         for i in range(1, arr.shape[0]):
-            _up_th = 1 + abs(flex_select_auto_nb(up_th, 0, col, flex_2d))
-            _down_th = 1 + abs(flex_select_auto_nb(down_th, 0, col, flex_2d))
+            _up_th = 1 + abs(flex_select_auto_nb(up_th, i, col, flex_2d))
+            _down_th = 1 + abs(flex_select_auto_nb(down_th, i, col, flex_2d))
             if arr[i, col] / minv >= _up_th:
                 found_pivot = Pivot.Valley if min_i == 0 else Pivot.Peak
                 break
@@ -588,14 +588,14 @@ def zigzag_apply_nb(
     pivots = np.zeros(arr.shape, dtype=np.int_)
 
     for col in range(arr.shape[1]):
-        _up_th = 1 + abs(flex_select_auto_nb(up_th, 0, col, flex_2d))
-        _down_th = 1 + abs(flex_select_auto_nb(down_th, 0, col, flex_2d))
         trend = -initial_pivots[col]
         last_pivot_i = 0
         last_pivot = arr[0, col]
         pivots[0, col] = initial_pivots[col]
 
         for i in range(1, arr.shape[0]):
+            _up_th = 1 + abs(flex_select_auto_nb(up_th, i, col, flex_2d))
+            _down_th = 1 + abs(flex_select_auto_nb(down_th, i, col, flex_2d))
             r = arr[i, col] / last_pivot
 
             if trend == -1:
@@ -668,8 +668,6 @@ def pivot_info_apply_nb(
     last_idx = np.empty(arr.shape, dtype=np.int_)
 
     for col in range(arr.shape[1]):
-        _up_th = 1 + abs(flex_select_auto_nb(up_th, 0, col, flex_2d))
-        _down_th = 1 - abs(flex_select_auto_nb(down_th, 0, col, flex_2d))
         _conf_pivot = 0
         _conf_idx = -1
         _conf_value = np.nan
@@ -678,6 +676,8 @@ def pivot_info_apply_nb(
         _last_value = np.nan
 
         for i in range(arr.shape[0]):
+            _up_th = 1 + abs(flex_select_auto_nb(up_th, i, col, flex_2d))
+            _down_th = 1 - abs(flex_select_auto_nb(down_th, i, col, flex_2d))
             if _last_pivot == Pivot.Valley:
                 if arr[i, col] >= _last_value * _up_th:
                     _conf_pivot = _last_pivot

@@ -9,6 +9,7 @@ from numba.np.numpy_support import as_dtype
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import chunking as base_ch
+from vectorbtpro.base.indexing import flex_select_auto_nb
 from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import chunking as ch
@@ -1177,6 +1178,75 @@ def demean_nb(arr: tp.Array2d, group_map: tp.GroupMap) -> tp.Array2d:
                 else:
                     out[i, col] = arr[i, col] - group_sum / group_cnt
     return out
+
+
+@register_jitted(cache=True)
+def to_renko_1d_nb(
+    arr: tp.Array1d,
+    brick_size: tp.FlexArray,
+    relative: tp.FlexArray = np.asarray(False),
+    start_value: tp.Optional[float] = None,
+    max_out_len: tp.Optional[int] = None
+) -> tp.Tuple[tp.Array1d, tp.Array1d, tp.Array1d]:
+    """Convert to Renko format."""
+    if max_out_len is None:
+        out_n = arr.shape[0]
+    else:
+        out_n = max_out_len
+    arr_out = np.empty(out_n, dtype=np.float_)
+    idx_out = np.empty(out_n, dtype=np.int_)
+    uptrend_out = np.empty(out_n, dtype=np.bool_)
+    prev_value = np.nan
+    k = 0
+    trend = 0
+
+    for i in range(arr.shape[0]):
+        _brick_size = abs(flex_select_auto_nb(brick_size, i, 0, False))
+        _relative = flex_select_auto_nb(relative, i, 0, False)
+        curr_value = arr[i]
+        if np.isnan(curr_value):
+            continue
+        if np.isnan(prev_value):
+            if start_value is None:
+                if not _relative:
+                    prev_value = curr_value - curr_value % _brick_size
+                else:
+                    prev_value = curr_value
+            else:
+                prev_value = start_value
+            continue
+        if _relative:
+            diff = (curr_value - prev_value) / prev_value
+        else:
+            diff = curr_value - prev_value
+        while abs(diff) >= _brick_size:
+            prev_trend = trend
+            if diff >= 0:
+                if _relative:
+                    prev_value *= 1 + _brick_size
+                else:
+                    prev_value += _brick_size
+                trend = 1
+            else:
+                if _relative:
+                    prev_value *= 1 - _brick_size
+                else:
+                    prev_value -= _brick_size
+                trend = -1
+            if _relative:
+                diff = (curr_value - prev_value) / prev_value
+            else:
+                diff = curr_value - prev_value
+            if trend == -prev_trend:
+                continue
+            if k >= len(arr_out):
+                raise IndexError("Index out of range. Set a higher max_out_len.")
+            arr_out[k] = prev_value
+            idx_out[k] = i
+            uptrend_out[k] = trend == 1
+            k += 1
+
+    return arr_out[:k], idx_out[:k], uptrend_out[:k]
 
 
 # ############# Resampling ############# #

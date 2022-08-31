@@ -4105,6 +4105,36 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         BaseSRAccessor.__init__(self, obj, **kwargs)
         GenericAccessor.__init__(self, obj, mapping=mapping, **kwargs)
 
+    def to_renko(
+        self,
+        brick_size: tp.ArrayLike,
+        relative: tp.ArrayLike = False,
+        start_value: tp.Optional[float] = None,
+        max_out_len: tp.Optional[int] = None,
+        return_uptrend: bool = False,
+        jitted: tp.JittedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.Union[tp.Series, tp.Tuple[tp.Series, tp.Series]]:
+        """See `vectorbtpro.generic.nb.base.to_renko_1d_nb`."""
+        func = jit_reg.resolve_option(nb.to_renko_1d_nb, jitted)
+        arr_out, idx_out, uptrend_out = func(
+            self.to_1d_array(),
+            np.broadcast_to(brick_size, (self.wrapper.shape[0],)),
+            relative=np.broadcast_to(relative, (self.wrapper.shape[0],)),
+            start_value=start_value,
+            max_out_len=max_out_len,
+        )
+        new_index = self.wrapper.index[idx_out]
+        wrap_kwargs = merge_dicts(
+            dict(index=new_index),
+            wrap_kwargs,
+        )
+        sr_out = self.wrapper.wrap(arr_out, group_by=False, **wrap_kwargs)
+        if return_uptrend:
+            uptrend_out = self.wrapper.wrap(uptrend_out, group_by=False, **wrap_kwargs)
+            return sr_out, uptrend_out
+        return sr_out
+
     def plot_against(
         self,
         other: tp.ArrayLike,

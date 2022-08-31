@@ -32,8 +32,8 @@ __pdoc__[
 
 
 class TrendModeT(tp.NamedTuple):
-    Downward: int = -1
-    Upward: int = 1
+    Downtrend: int = -1
+    Uptrend: int = 1
 
 
 TrendMode = TrendModeT()

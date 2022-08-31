@@ -490,23 +490,31 @@ class TestAccessors:
         )
         assert_frame_equal(
             df.vbt.vidya(3),
-            pd.DataFrame([
-                [np.nan, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-                [np.nan, np.nan, np.nan],
-                [2.0, np.nan, np.nan],
-                [np.nan, 0.5, np.nan],
-            ], index=df.index, columns=df.columns),
+            pd.DataFrame(
+                [
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [2.0, np.nan, np.nan],
+                    [np.nan, 0.5, np.nan],
+                ],
+                index=df.index,
+                columns=df.columns,
+            ),
         )
         assert_frame_equal(
             df.vbt.vidya(3, minp=1),
-            pd.DataFrame([
-                [np.nan, np.nan, np.nan],
-                [1.0, np.nan, 1.0],
-                [2.0, 1.5, np.nan],
-                [3.0, 1.75, 1.0],
-                [np.nan, 1.375, 1.0],
-            ], index=df.index, columns=df.columns),
+            pd.DataFrame(
+                [
+                    [np.nan, np.nan, np.nan],
+                    [1.0, np.nan, 1.0],
+                    [2.0, 1.5, np.nan],
+                    [3.0, 1.75, 1.0],
+                    [np.nan, 1.375, 1.0],
+                ],
+                index=df.index,
+                columns=df.columns,
+            ),
         )
         assert_frame_equal(
             df.vbt.vidya(3, jitted=dict(parallel=True)),
@@ -514,7 +522,7 @@ class TestAccessors:
         )
         assert_frame_equal(
             df.vbt.vidya(3, chunked=True),
-            df.vbt.vidya(3,  chunked=False),
+            df.vbt.vidya(3, chunked=False),
         )
 
     @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
@@ -3473,6 +3481,35 @@ class TestAccessors:
         )
         assert_frame_equal(df.vbt.demean(chunked=True), df.vbt.demean(chunked=False))
 
+    def test_to_renko(self):
+        sr = pd.Series([np.nan, 1, 2, 3, 2, 1, np.nan, 2, 3, 2])
+        sr.index = pd.date_range("2020", periods=len(sr))
+        assert_series_equal(
+            sr.vbt.to_renko(1),
+            pd.Series(
+                [2.0, 3.0, 1.0, 3.0],
+                pd.DatetimeIndex(
+                    ["2020-01-03", "2020-01-04", "2020-01-06", "2020-01-09"], dtype="datetime64[ns]", freq=None
+                ),
+            ),
+        )
+        assert_series_equal(
+            sr.vbt.to_renko(np.array([1])),
+            pd.Series(
+                [2.0, 3.0, 1.0, 3.0],
+                pd.DatetimeIndex(
+                    ["2020-01-03", "2020-01-04", "2020-01-06", "2020-01-09"], dtype="datetime64[ns]", freq=None
+                ),
+            ),
+        )
+        assert_series_equal(
+            sr.vbt.to_renko(0.5, relative=True),
+            pd.Series(
+                [1.5, 2.25, 2.53125],
+                pd.DatetimeIndex(["2020-01-03", "2020-01-04", "2020-01-09"], dtype="datetime64[ns]", freq=None),
+            ),
+        )
+
     def test_drawdown(self):
         assert_series_equal(df["a"].vbt.drawdown(), df["a"] / df["a"].expanding().max() - 1)
         assert_frame_equal(df.vbt.drawdown(), df / df.expanding().max() - 1)
@@ -5136,16 +5173,13 @@ class TestPatterns:
             == 0.1578947368421053
         )
         for arr in permutations(np.array([1, 2, 3, 4, 5])):
-            assert (
-                vbt.nb.pattern_similarity_nb(
-                    np.array([1, 2, 3, 4, 5]),
-                    np.asarray(arr),
-                    invert=True,
-                )
-                == vbt.nb.pattern_similarity_nb(
-                    np.array([1, 2, 3, 4, 5]),
-                    np.max(arr) + np.min(arr) - np.asarray(arr),
-                )
+            assert vbt.nb.pattern_similarity_nb(
+                np.array([1, 2, 3, 4, 5]),
+                np.asarray(arr),
+                invert=True,
+            ) == vbt.nb.pattern_similarity_nb(
+                np.array([1, 2, 3, 4, 5]),
+                np.max(arr) + np.min(arr) - np.asarray(arr),
             )
 
 
