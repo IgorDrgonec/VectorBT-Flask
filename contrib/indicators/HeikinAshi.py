@@ -3,7 +3,7 @@ import numpy as np
 import vectorbtpro as vbt
 
 
-@njit
+@njit(cache=True)
 def ha_apply_func(open, high, low, close, precision=None):
     ha_open = np.full(close.shape, np.nan)
     ha_high = np.full(close.shape, np.nan)
@@ -20,6 +20,7 @@ def ha_apply_func(open, high, low, close, precision=None):
             ha_high[i] = np.maximum(ha_open[i], ha_close[i], high[i])
             ha_low[i] = np.minimum(ha_open[i], ha_close[i], low[i])
 
+    print(precision)
     # Round to precision
     if precision is not None:
         for col in range(ha_close.shape[1]):
@@ -31,23 +32,24 @@ def ha_apply_func(open, high, low, close, precision=None):
     return ha_open, ha_high, ha_low, ha_close
 
 
-def HA(open, high, low, close, precision=None):
+def HA():
     """
     USAGE:
-    ha = HA(
+    ha = HA().run(
         data.get("Open"),
         data.get("High"),
         data.get("Low"),
         data.get("Close"),
-        precision,
+        precision=precision,
     )
 
     precision is optional.
     """
-    HA = vbt.IF(
+    return vbt.IF(
         input_names=["open", "high", "low", "close"],
         output_names=["ha_open", "ha_high", "ha_low", "ha_close"],
     ).with_apply_func(
         ha_apply_func,
+        kwargs_as_args=["precision"],
+        precision=None,
     )
-    return HA.run(open, high, low, close, precision)
