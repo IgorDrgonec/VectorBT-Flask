@@ -46,9 +46,8 @@ def HA(open, high, low, close, precision=None):
     """
     HA = vbt.IF(
         input_names=["open", "high", "low", "close"],
-        output_names=["open", "high", "low", "close"],
+        output_names=["ha_open", "ha_high", "ha_low", "ha_close"],
     ).with_apply_func(
         ha_apply_func,
-        var_args=True,
     )
     return HA.run(open, high, low, close, precision)
