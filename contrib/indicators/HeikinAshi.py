@@ -20,7 +20,6 @@ def ha_apply_func(open, high, low, close, precision=None):
             ha_high[i] = np.maximum(ha_open[i], ha_close[i], high[i])
             ha_low[i] = np.minimum(ha_open[i], ha_close[i], low[i])
 
-    print(precision)
     # Round to precision
     if precision is not None:
         for col in range(ha_close.shape[1]):
@@ -32,24 +31,23 @@ def ha_apply_func(open, high, low, close, precision=None):
     return ha_open, ha_high, ha_low, ha_close
 
 
-def HA():
-    """
-    USAGE:
-    ha = HA().run(
-        data.get("Open"),
-        data.get("High"),
-        data.get("Low"),
-        data.get("Close"),
-        precision=precision,
-    )
+"""
+USAGE:
+ha = HA().run(
+    data.get("Open"),
+    data.get("High"),
+    data.get("Low"),
+    data.get("Close"),
+    precision=precision,
+)
 
-    precision is optional.
-    """
-    return vbt.IF(
-        input_names=["open", "high", "low", "close"],
-        output_names=["ha_open", "ha_high", "ha_low", "ha_close"],
-    ).with_apply_func(
-        ha_apply_func,
-        kwargs_as_args=["precision"],
-        precision=None,
-    )
+precision is optional.
+"""
+vbt.IF(
+    input_names=["open", "high", "low", "close"],
+    output_names=["ha_open", "ha_high", "ha_low", "ha_close"],
+).with_apply_func(
+    ha_apply_func,
+    kwargs_as_args=["precision"],
+    precision=None,
+)
