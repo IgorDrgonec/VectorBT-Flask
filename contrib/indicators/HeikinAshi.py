@@ -29,8 +29,8 @@ def ha_apply_func(open, high, low, close, precision=None):
     for i in range(ha_open.shape[0]):
         if i > 0:
             ha_open[i] = (ha_open[i - 1] + ha_close[i - 1]) / 2
-            ha_high[i] = np.maximum(ha_open[i], ha_close[i], high[i])
-            ha_low[i] = np.minimum(ha_open[i], ha_close[i], low[i])
+            ha_high[i] = np.maximum(np.maximum(ha_open[i], ha_close[i]), high[i])
+            ha_low[i] = np.minimum(np.minimum(ha_open[i], ha_close[i]), low[i])
 
     # Round to precision
     if precision is not None:
