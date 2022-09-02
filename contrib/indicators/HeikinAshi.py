@@ -1,3 +1,15 @@
+"""
+USAGE:
+ha = HA.run(
+    data.get("Open"),
+    data.get("High"),
+    data.get("Low"),
+    data.get("Close"),
+    precision=precision,
+)
+
+precision is optional.
+"""
 from numba import njit
 import numpy as np
 import vectorbtpro as vbt
@@ -31,19 +43,7 @@ def ha_apply_func(open, high, low, close, precision=None):
     return ha_open, ha_high, ha_low, ha_close
 
 
-"""
-USAGE:
-ha = HA().run(
-    data.get("Open"),
-    data.get("High"),
-    data.get("Low"),
-    data.get("Close"),
-    precision=precision,
-)
-
-precision is optional.
-"""
-vbt.IF(
+HA = vbt.IF(
     input_names=["open", "high", "low", "close"],
     output_names=["ha_open", "ha_high", "ha_low", "ha_close"],
 ).with_apply_func(
