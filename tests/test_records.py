@@ -6414,6 +6414,13 @@ class TestExitTrades:
                 "profit_factor"
             ),
         )
+        assert_series_equal(
+            exit_trades.rel_profit_factor,
+            pd.Series(
+                np.array([447.75, 0.0, 25.6905737704918, np.nan]),
+                index=ts2.columns,
+            ).rename("rel_profit_factor"),
+        )
 
     def test_expectancy(self):
         assert exit_trades["a"].expectancy == 0.716
@@ -6425,6 +6432,13 @@ class TestExitTrades:
             exit_trades_grouped.expectancy,
             pd.Series(np.array([-0.084, 0.3588]), index=pd.Index(["g1", "g2"], dtype="object")).rename("expectancy"),
         )
+        assert_series_equal(
+            exit_trades.rel_expectancy,
+            pd.Series(
+                np.array([1.116875, -1.1747916666666667, 0.860642857142857, np.nan]),
+                index=ts2.columns,
+            ).rename("rel_expectancy"),
+        )
 
     def test_sqn(self):
         assert exit_trades["a"].sqn == 1.634155521947584
@@ -6435,6 +6449,13 @@ class TestExitTrades:
         assert_series_equal(
             exit_trades_grouped.sqn,
             pd.Series(np.array([-0.20404671, 0.71660403]), index=pd.Index(["g1", "g2"], dtype="object")).rename("sqn"),
+        )
+        assert_series_equal(
+            exit_trades.rel_sqn,
+            pd.Series(
+                np.array([1.7607073523274486, -1.8069510003568587, 1.5530869626255832, np.nan]),
+                index=ts2.columns,
+            ).rename("rel_sqn"),
         )
 
     def test_best_price(self):
@@ -8239,38 +8260,38 @@ class TestLogs:
             records_readable[("Request", "Max Size")].values,
             np.array(
                 [
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
-                    np.inf,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
                 ]
             ),
         )

@@ -571,9 +571,24 @@ trades_shortcut_config = ReadonlyConfig(
         winning_streak=dict(obj_type="mapped_array"),
         losing_streak=dict(obj_type="mapped_array"),
         win_rate=dict(obj_type="red_array"),
-        profit_factor=dict(obj_type="red_array"),
-        expectancy=dict(obj_type="red_array"),
-        sqn=dict(obj_type="red_array"),
+        profit_factor=dict(obj_type="red_array", method_kwargs=dict(use_returns=False)),
+        rel_profit_factor=dict(
+            obj_type="red_array",
+            method_name="get_profit_factor",
+            method_kwargs=dict(use_returns=True, wrap_kwargs=dict(name_or_index="rel_profit_factor")),
+        ),
+        expectancy=dict(obj_type="red_array", method_kwargs=dict(use_returns=False)),
+        rel_expectancy=dict(
+            obj_type="red_array",
+            method_name="get_expectancy",
+            method_kwargs=dict(use_returns=True, wrap_kwargs=dict(name_or_index="rel_expectancy")),
+        ),
+        sqn=dict(obj_type="red_array", method_kwargs=dict(use_returns=False)),
+        rel_sqn=dict(
+            obj_type="red_array",
+            method_name="get_sqn",
+            method_kwargs=dict(use_returns=True, wrap_kwargs=dict(name_or_index="rel_sqn")),
+        ),
         best_price=dict(obj_type="mapped_array"),
         worst_price=dict(obj_type="mapped_array"),
         mfe=dict(obj_type="mapped_array"),
@@ -581,12 +596,12 @@ trades_shortcut_config = ReadonlyConfig(
         mfe_returns=dict(
             obj_type="mapped_array",
             method_name="get_mfe",
-            method_kwargs=dict(as_returns=True),
+            method_kwargs=dict(use_returns=True),
         ),
         mae_returns=dict(
             obj_type="mapped_array",
             method_name="get_mae",
-            method_kwargs=dict(as_returns=True),
+            method_kwargs=dict(use_returns=True),
         ),
     )
 )
@@ -678,6 +693,7 @@ class Trades(Ranges):
 
     def get_profit_factor(
         self,
+        use_returns: bool = False,
         group_by: tp.GroupByLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -686,7 +702,11 @@ class Trades(Ranges):
     ) -> tp.MaybeSeries:
         """Get profit factor."""
         wrap_kwargs = merge_dicts(dict(name_or_index="profit_factor"), wrap_kwargs)
-        return self.get_map_field("pnl").reduce(
+        if use_returns:
+            mapped_arr = self.get_map_field("return")
+        else:
+            mapped_arr = self.get_map_field("pnl")
+        return mapped_arr.reduce(
             nb.profit_factor_reduce_nb,
             group_by=group_by,
             jitted=jitted,
@@ -697,6 +717,7 @@ class Trades(Ranges):
 
     def get_expectancy(
         self,
+        use_returns: bool = False,
         group_by: tp.GroupByLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -705,7 +726,11 @@ class Trades(Ranges):
     ) -> tp.MaybeSeries:
         """Get average profitability."""
         wrap_kwargs = merge_dicts(dict(name_or_index="expectancy"), wrap_kwargs)
-        return self.get_map_field("pnl").reduce(
+        if use_returns:
+            mapped_arr = self.get_map_field("return")
+        else:
+            mapped_arr = self.get_map_field("pnl")
+        return mapped_arr.reduce(
             nb.expectancy_reduce_nb,
             group_by=group_by,
             jitted=jitted,
@@ -717,6 +742,7 @@ class Trades(Ranges):
     def get_sqn(
         self,
         ddof: int = 1,
+        use_returns: bool = False,
         group_by: tp.GroupByLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -725,7 +751,11 @@ class Trades(Ranges):
     ) -> tp.MaybeSeries:
         """Get System Quality Number (SQN)."""
         wrap_kwargs = merge_dicts(dict(name_or_index="sqn"), wrap_kwargs)
-        return self.get_map_field("pnl").reduce(
+        if use_returns:
+            mapped_arr = self.get_map_field("return")
+        else:
+            mapped_arr = self.get_map_field("pnl")
+        return mapped_arr.reduce(
             nb.sqn_reduce_nb,
             ddof,
             group_by=group_by,
@@ -771,7 +801,7 @@ class Trades(Ranges):
         self,
         entry_price_open: bool = False,
         exit_price_close: bool = False,
-        as_returns: bool = False,
+        use_returns: bool = False,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         **kwargs,
@@ -793,7 +823,7 @@ class Trades(Ranges):
             self.get_field_arr("direction"),
             self.get_field_arr("entry_price"),
             best_price.values,
-            as_returns=as_returns,
+            use_returns=use_returns,
         )
         return self.map_array(drawdown, **kwargs)
 
@@ -801,7 +831,7 @@ class Trades(Ranges):
         self,
         entry_price_open: bool = False,
         exit_price_close: bool = False,
-        as_returns: bool = False,
+        use_returns: bool = False,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         **kwargs,
@@ -823,7 +853,7 @@ class Trades(Ranges):
             self.get_field_arr("direction"),
             self.get_field_arr("entry_price"),
             worst_price.values,
-            as_returns=as_returns,
+            use_returns=use_returns,
         )
         return self.map_array(drawdown, **kwargs)
 
