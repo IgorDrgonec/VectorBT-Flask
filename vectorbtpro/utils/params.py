@@ -469,8 +469,8 @@ def parameterized(
 
             # Annotate arguments
             ann_args = annotate_args(func, args, kwargs, allow_partial=True)
-            var_args_name = "args"
-            var_kwargs_name = "kwargs"
+            var_args_name = None
+            var_kwargs_name = None
             for k, v in ann_args.items():
                 if v["kind"] == inspect.Parameter.VAR_POSITIONAL:
                     var_args_name = k
@@ -492,10 +492,10 @@ def parameterized(
                 param_configs = list(param_configs)
             for i, param_config in enumerate(param_configs):
                 param_config = dict(param_config)
-                if var_args_name in param_config:
+                if var_args_name is not None and var_args_name in param_config:
                     for k, arg in enumerate(param_config.pop(var_args_name)):
                         param_config[f"arg_{k}"] = arg
-                if var_kwargs_name in param_config:
+                if var_kwargs_name is not None and var_kwargs_name in param_config:
                     for k, v in param_config.pop(var_kwargs_name).items():
                         param_config[k] = v
                 if "_name" in param_config and param_config["_name"] is not None:
@@ -579,17 +579,19 @@ def parameterized(
             new_param_configs = []
             for param_config in param_configs:
                 new_param_config = merge_dicts(paramable_kwargs, param_config)
-                _args = ()
-                while True:
-                    if f"arg_{len(_args)}" in new_param_config:
-                        _args += (new_param_config.pop(f"arg_{len(_args)}"),)
-                    else:
-                        break
-                new_param_config[var_args_name] = _args
-                new_param_config[var_kwargs_name] = {}
-                for k in list(new_param_config.keys()):
-                    if k not in ann_args:
-                        new_param_config[var_kwargs_name][k] = new_param_config.pop(k)
+                if var_args_name is not None:
+                    _args = ()
+                    while True:
+                        if f"arg_{len(_args)}" in new_param_config:
+                            _args += (new_param_config.pop(f"arg_{len(_args)}"),)
+                        else:
+                            break
+                    new_param_config[var_args_name] = _args
+                if var_kwargs_name is not None:
+                    new_param_config[var_kwargs_name] = {}
+                    for k in list(new_param_config.keys()):
+                        if k not in ann_args:
+                            new_param_config[var_kwargs_name][k] = new_param_config.pop(k)
                 new_param_configs.append(new_param_config)
             param_configs = new_param_configs
             template_context["param_configs"] = param_configs
