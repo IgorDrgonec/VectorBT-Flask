@@ -260,10 +260,16 @@ def combine_params(
 
 def row_stack_merge_func(results: tp.List[tp.AnyArray], param_index: tp.Index) -> tp.MaybeTuple[tp.SeriesFrame]:
     """Merge multiple Pandas objects along rows."""
+    from vectorbtpro.base.wrapping import Wrapping
+
     if isinstance(results[0], (tuple, list, List)):
         if len(results[0]) == 1:
             return row_stack_merge_func(list(map(lambda x: x[0], results)), param_index),
         return tuple(map(lambda x: row_stack_merge_func(x, param_index), zip(*results)))
+    if isinstance(results[0], Wrapping):
+        raise TypeError("Stacking wrapping instances along rows is not supported")
+    if not checks.is_iterable(results[0]) or isinstance(results[0], str):
+        return pd.Series(results, index=param_index)
     return pd.concat(results, axis=0, keys=param_index)
 
 
