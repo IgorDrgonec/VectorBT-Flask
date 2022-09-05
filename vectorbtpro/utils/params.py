@@ -137,14 +137,14 @@ class Param:
     
     If so, providing a NumPy array will be considered as a single value."""
 
-    product_idx: tp.Optional[int] = attr.ib(default=None)
-    """Index of the product the parameter takes part in.
+    level: tp.Optional[int] = attr.ib(default=None)
+    """Level of the product the parameter takes part in.
 
     Parameters in the same product are stacked together, not combined, 
     and appear in the index hierarchy next to each other.
 
-    Product index can be used to order index levels: the higher the product index, 
-    the lower the index level. Index levels with the same product index appear in the same 
+    Product index can be used to order index levels: the higher the level, 
+    the lower the index level. Index levels with the same level appear in the same 
     order as they are passed to the processor."""
 
     keys: tp.Optional[tp.IndexLike] = attr.ib(default=None)
@@ -170,23 +170,23 @@ def combine_params(
 
     # Build a product
     param_index = None
-    product_idx_values = defaultdict(OrderedDict)
+    level_values = defaultdict(OrderedDict)
     product_indexes = OrderedDict()
-    product_idx_seen = False
+    level_seen = False
     curr_idx = 0
     max_idx = 0
     for k, p in param_dct.items():
-        if p.product_idx is None:
-            if product_idx_seen:
-                raise ValueError("Please provide product index for all product parameters")
-            product_idx = curr_idx
+        if p.level is None:
+            if level_seen:
+                raise ValueError("Please provide level for all product parameters")
+            level = curr_idx
         else:
-            if curr_idx > 0 and not product_idx_seen:
-                raise ValueError("Please provide product index for all product parameters")
-            product_idx_seen = True
-            product_idx = p.product_idx
-        if product_idx > max_idx:
-            max_idx = product_idx
+            if curr_idx > 0 and not level_seen:
+                raise ValueError("Please provide level for all product parameters")
+            level_seen = True
+            level = p.level
+        if level > max_idx:
+            max_idx = level
 
         value = p.value
         keys = p.keys
@@ -198,7 +198,7 @@ def combine_params(
             if keys is None:
                 keys = value
         values = params_to_list(value, is_tuple=p.is_tuple, is_array_like=p.is_array_like)
-        product_idx_values[product_idx][k] = values
+        level_values[level][k] = values
         if keys is None:
             keys = indexes.index_from_values(values, name=k)
         else:
@@ -212,14 +212,14 @@ def combine_params(
     # Build an operation tree and parameter index
     op_tree_operands = []
     param_keys = []
-    for product_idx in range(max_idx + 1):
-        if product_idx not in product_idx_values:
+    for level in range(max_idx + 1):
+        if level not in level_values:
             raise ValueError("Group index must come in a strict order starting with 0 and without gaps")
-        for k in product_idx_values[product_idx].keys():
+        for k in level_values[level].keys():
             param_keys.append(k)
 
         # Broadcast parameter arrays
-        param_lists = tuple(product_idx_values[product_idx].values())
+        param_lists = tuple(level_values[level].values())
         if len(param_lists) > 1:
             op_tree_operands.append((zip, *broadcast_params(param_lists)))
         else:
@@ -227,7 +227,7 @@ def combine_params(
 
         # Stack or combine parameter indexes together
         levels = []
-        for k in product_idx_values[product_idx].keys():
+        for k in level_values[level].keys():
             levels.append(product_indexes[k])
         if len(levels) > 1:
             _param_index = indexes.stack_indexes(levels, **stack_kwargs)

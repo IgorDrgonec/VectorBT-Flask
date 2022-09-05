@@ -515,14 +515,14 @@ class BCO:
     
     Uses `vectorbtpro.utils.params.combine_params`."""
 
-    product_idx: tp.Optional[int] = attr.ib(default=None)
-    """Index of the product the parameter takes part in.
+    level: tp.Optional[int] = attr.ib(default=None)
+    """Level of the product the parameter takes part in.
     
     Parameters in the same product broadcast but are not combined together, 
     and appear in the column hierarchy next to each other.
     
-    Product index can be used to order column levels: the higher the product index, 
-    the lower the column level. Column levels with the same product index appear in the same 
+    Product index can be used to order column levels: the higher the level, 
+    the lower the column level. Column levels with the same level appear in the same 
     order as the parameters were passed to `broadcast`."""
 
     keys: tp.Optional[tp.IndexLike] = attr.ib(default=None)
@@ -596,7 +596,7 @@ def broadcast(
     reindex_kwargs: tp.MaybeMappingSequence[tp.Optional[tp.Kwargs]] = None,
     index_to_product: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
     product: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
-    product_idx: tp.MaybeMappingSequence[tp.Optional[int]] = None,
+    level: tp.MaybeMappingSequence[tp.Optional[int]] = None,
     keys: tp.MaybeMappingSequence[tp.Optional[tp.IndexLike]] = None,
     keys_from_sr_index: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
     repeat_product: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
@@ -657,7 +657,7 @@ def broadcast(
             `pd.DataFrame.reindex`, it will be applied on all objects.
         index_to_product (bool, sequence or mapping): See `BCO.index_to_product`.
         product (bool, sequence or mapping): See `BCO.product`.
-        product_idx (int, sequence or mapping): See `BCO.product_idx`.
+        level (int, sequence or mapping): See `BCO.level`.
         keys (index_like, sequence or mapping): See `BCO.keys`.
         keys_from_sr_index (bool, sequence or mapping): See `BCO.keys_from_sr_index`.
         repeat_product (bool, sequence or mapping): See `BCO.repeat_product`.
@@ -928,10 +928,10 @@ def broadcast(
         ```pycon
         >>> vbt.broadcast(
         ...     dict(
-        ...         a=vbt.BCO(pd.Index([1, 2, 3]), product_idx=0),
-        ...         b=vbt.BCO(pd.Index(['x', 'y']), product_idx=1),
-        ...         d=vbt.BCO(pd.Index([100., 200., 300.]), product_idx=0),
-        ...         c=vbt.BCO(pd.Index([False, True]), product_idx=1)
+        ...         a=vbt.BCO(pd.Index([1, 2, 3]), level=0),
+        ...         b=vbt.BCO(pd.Index(['x', 'y']), level=1),
+        ...         d=vbt.BCO(pd.Index([100., 200., 300.]), level=0),
+        ...         c=vbt.BCO(pd.Index([False, True]), level=1)
         ...     )
         ... )
         {'a': array([[1, 1, 2, 2, 3, 3]]),
@@ -1020,7 +1020,7 @@ def broadcast(
             obj = BCO(
                 value=obj.value,
                 product=True,
-                product_idx=obj.product_idx,
+                level=obj.level,
                 keys=obj.keys,
             )
         if isinstance(obj, BCO):
@@ -1090,7 +1090,7 @@ def broadcast(
                 reindex_kwargs=_reindex_kwargs,
                 index_to_product=None,
                 product=None,
-                product_idx=None,
+                level=None,
                 repeat_product=None,
                 keys_from_sr_index=None,
                 keys=None,
@@ -1109,7 +1109,7 @@ def broadcast(
             if _product:
                 product_keys.add(k)
 
-            _product_idx = _resolve_arg(obj, "product_idx", product_idx, None)
+            _level = _resolve_arg(obj, "level", level, None)
 
             _repeat_product = _resolve_arg(obj, "repeat_product", repeat_product, None)
             if _repeat_product is None:
@@ -1144,7 +1144,7 @@ def broadcast(
                 reindex_kwargs=_reindex_kwargs,
                 index_to_product=_index_to_product,
                 product=_product,
-                product_idx=_product_idx,
+                level=_level,
                 repeat_product=_repeat_product,
                 keys_from_sr_index=_keys_from_sr_index,
                 keys=_keys,
@@ -1272,7 +1272,7 @@ def broadcast(
                 value,
                 is_tuple=False,
                 is_array_like=False,
-                product_idx=bco_obj.product_idx,
+                level=bco_obj.level,
                 keys=bco_obj.keys
             )
         param_product, param_columns = combine_params(

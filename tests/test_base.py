@@ -3568,7 +3568,7 @@ class TestReshapeFns:
         np.testing.assert_array_equal(_p1.columns, _p2.columns)
         np.testing.assert_array_equal(_p3, _p4)
 
-    def test_broadcast_product_idx(self):
+    def test_broadcast_level(self):
         result, wrapper = reshaping.broadcast(
             dict(
                 a=vbt.Param([1, 2]),
@@ -3651,9 +3651,9 @@ class TestReshapeFns:
 
         result2, wrapper2 = reshaping.broadcast(
             dict(
-                a=vbt.BCO(1, product=True, product_idx=0),
-                b=vbt.BCO([False, True], product=True, product_idx=1),
-                c=vbt.BCO(["x", "y", "z"], product=True, product_idx=2),
+                a=vbt.BCO(1, product=True, level=0),
+                b=vbt.BCO([False, True], product=True, level=1),
+                c=vbt.BCO(["x", "y", "z"], product=True, level=2),
                 sr=pd.Series([1, 2, 3]),
             ),
             keep_flex=True,
@@ -3666,9 +3666,9 @@ class TestReshapeFns:
 
         result, wrapper = reshaping.broadcast(
             dict(
-                a=vbt.BCO(1, product=True, product_idx=0),
-                b=vbt.BCO([False, True], product=True, product_idx=1),
-                c=vbt.BCO(["x", "y", "z"], product=True, product_idx=0),
+                a=vbt.BCO(1, product=True, level=0),
+                b=vbt.BCO([False, True], product=True, level=1),
+                c=vbt.BCO(["x", "y", "z"], product=True, level=0),
                 sr=pd.Series([1, 2, 3]),
             ),
             keep_flex=True,
@@ -3689,32 +3689,32 @@ class TestReshapeFns:
             reshaping.broadcast(
                 dict(
                     a=vbt.BCO(1, product=True),
-                    b=vbt.BCO([False, True], product=True, product_idx=0),
-                    c=vbt.BCO(["x", "y", "z"], product=True, product_idx=1),
+                    b=vbt.BCO([False, True], product=True, level=0),
+                    c=vbt.BCO(["x", "y", "z"], product=True, level=1),
                 )
             )
         with pytest.raises(Exception):
             reshaping.broadcast(
                 dict(
-                    a=vbt.BCO(1, product=True, product_idx=0),
-                    b=vbt.BCO([False, True], product=True, product_idx=1),
+                    a=vbt.BCO(1, product=True, level=0),
+                    b=vbt.BCO([False, True], product=True, level=1),
                     c=vbt.BCO(["x", "y", "z"], product=True),
                 )
             )
         with pytest.raises(Exception):
             reshaping.broadcast(
                 dict(
-                    a=vbt.BCO(1, product=True, product_idx=-1),
-                    b=vbt.BCO([False, True], product=True, product_idx=0),
-                    c=vbt.BCO(["x", "y", "z"], product=True, product_idx=1),
+                    a=vbt.BCO(1, product=True, level=-1),
+                    b=vbt.BCO([False, True], product=True, level=0),
+                    c=vbt.BCO(["x", "y", "z"], product=True, level=1),
                 )
             )
         with pytest.raises(Exception):
             reshaping.broadcast(
                 dict(
-                    a=vbt.BCO(1, product=True, product_idx=0),
-                    b=vbt.BCO([False, True], product=True, product_idx=1),
-                    c=vbt.BCO(["x", "y", "z"], product=True, product_idx=3),
+                    a=vbt.BCO(1, product=True, level=0),
+                    b=vbt.BCO([False, True], product=True, level=1),
+                    c=vbt.BCO(["x", "y", "z"], product=True, level=3),
                 )
             )
 
