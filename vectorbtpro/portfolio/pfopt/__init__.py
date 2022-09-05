@@ -2,7 +2,7 @@
 
 """Modules with classes and utilities for portfolio optimization."""
 
-from vectorbtpro.portfolio.pfopt.base import pypfopt_func_dict, pfopt_group_dict, pypfopt_optimize, PortfolioOptimizer
+from vectorbtpro.portfolio.pfopt.base import pfopt_func_dict, pypfopt_optimize, PortfolioOptimizer
 from vectorbtpro.portfolio.pfopt.records import AllocRanges, AllocPoints
 from vectorbtpro.utils.module_ import create__all__
 

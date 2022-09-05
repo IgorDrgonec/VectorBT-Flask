@@ -37,7 +37,12 @@ class SequenceEngine(ExecutionEngine):
 
     For defaults, see `engines.sequence` in `vectorbtpro._settings.execution`."""
 
-    def __init__(self, show_progress: tp.Optional[bool] = None, pbar_kwargs: tp.KwargsLike = None) -> None:
+    def __init__(
+        self,
+        show_progress: tp.Optional[bool] = None,
+        progress_desc: tp.Optional[tp.Sequence] = None,
+        pbar_kwargs: tp.KwargsLike = None,
+    ) -> None:
         from vectorbtpro._settings import settings
 
         sequence_cfg = settings["execution"]["engines"]["sequence"]
@@ -47,14 +52,20 @@ class SequenceEngine(ExecutionEngine):
         pbar_kwargs = merge_dicts(pbar_kwargs, sequence_cfg["pbar_kwargs"])
 
         self._show_progress = show_progress
+        self._progress_desc = progress_desc
         self._pbar_kwargs = pbar_kwargs
 
-        ExecutionEngine.__init__(self, show_progress=show_progress, pbar_kwargs=pbar_kwargs)
+        ExecutionEngine.__init__(self, show_progress=show_progress, progress_desc=progress_desc, bar_kwargs=pbar_kwargs)
 
     @property
     def show_progress(self) -> bool:
         """Whether to show the progress bar using `vectorbtpro.utils.pbar.get_pbar`."""
         return self._show_progress
+
+    @property
+    def progress_desc(self) -> tp.Optional[tp.Sequence]:
+        """Sequence used to describe each iteration of the progress bar."""
+        return self._progress_desc
 
     @property
     def pbar_kwargs(self) -> tp.Kwargs:
@@ -66,7 +77,12 @@ class SequenceEngine(ExecutionEngine):
         if n_calls is None and hasattr(funcs_args, "__len__"):
             n_calls = len(funcs_args)
         with get_pbar(total=n_calls, show_progress=self.show_progress, **self.pbar_kwargs) as pbar:
-            for func, args, kwargs in funcs_args:
+            for i, (func, args, kwargs) in enumerate(funcs_args):
+                if self.progress_desc is not None:
+                    if isinstance(self.progress_desc, str):
+                        pbar.set_description(self.progress_desc)
+                    else:
+                        pbar.set_description(str(self.progress_desc[i]))
                 results.append(func(*args, **kwargs))
                 pbar.update(1)
         return results

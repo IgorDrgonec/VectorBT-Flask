@@ -66,7 +66,7 @@ class TestGrouper:
         assert grouping.base.group_by_to_index(grouped_index, group_by=None) is None
         assert_index_equal(
             grouping.base.group_by_to_index(grouped_index, group_by=True),
-            pd.Index(["group"] * len(grouped_index)),
+            pd.Index(["group"] * len(grouped_index), name="group"),
         )
         assert_index_equal(
             grouping.base.group_by_to_index(grouped_index, group_by=0),
@@ -92,7 +92,7 @@ class TestGrouper:
         )
         assert_index_equal(
             grouping.base.group_by_to_index(grouped_index, group_by=np.array([3, 2, 1, 1, 1, 0, 0, 0])),
-            pd.Index([3, 2, 1, 1, 1, 0, 0, 0], dtype="int64"),
+            pd.Index([3, 2, 1, 1, 1, 0, 0, 0], dtype="int64", name="group"),
         )
         assert_index_equal(
             grouping.base.group_by_to_index(
@@ -770,7 +770,7 @@ class TestArrayWrapper:
         wrapper_groups, wrapper_grouped_index = wrapper.grouper.get_groups_and_index()
         assert_index_equal(
             wrapper_grouped_index[wrapper_groups],
-            pd.Index(["group", "group"], dtype="object"),
+            pd.Index(["group", "group"], dtype="object", name="group"),
         )
         wrapper = vbt.ArrayWrapper.row_stack(
             vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2, group_by=[0, 1]),
@@ -779,7 +779,7 @@ class TestArrayWrapper:
         wrapper_groups, wrapper_grouped_index = wrapper.grouper.get_groups_and_index()
         assert_index_equal(
             wrapper_grouped_index[wrapper_groups],
-            pd.Index([0, 1], dtype="int64"),
+            pd.Index([0, 1], dtype="int64", name="group"),
         )
         with pytest.raises(Exception):
             vbt.ArrayWrapper.row_stack(
@@ -1378,7 +1378,10 @@ class TestArrayWrapper:
         assert_index_equal(sr2_grouped_wrapper.iloc[:2].columns, pd.Index(["a2"], dtype="object"))
         assert sr2_grouped_wrapper.iloc[:2].ndim == 1
         assert sr2_grouped_wrapper.iloc[:2].grouped_ndim == 1
-        assert_index_equal(sr2_grouped_wrapper.iloc[:2].grouper.group_by, pd.Index(["g1"], dtype="object"))
+        assert_index_equal(
+            sr2_grouped_wrapper.iloc[:2].grouper.group_by,
+            pd.Index(["g1"], dtype="object", name="group")
+        )
         assert_index_equal(
             df4_grouped_wrapper.iloc[:2, 0].index,
             pd.Index(["x6", "y6"], dtype="object", name="i6"),
@@ -1391,7 +1394,7 @@ class TestArrayWrapper:
         assert df4_grouped_wrapper.iloc[:2, 0].grouped_ndim == 1
         assert_index_equal(
             df4_grouped_wrapper.iloc[:2, 0].grouper.group_by,
-            pd.Index(["g1", "g1"], dtype="object"),
+            pd.Index(["g1", "g1"], dtype="object", name="group"),
         )
         assert_index_equal(
             df4_grouped_wrapper.iloc[:2, 1].index,
@@ -1405,7 +1408,7 @@ class TestArrayWrapper:
         assert df4_grouped_wrapper.iloc[:2, 1].grouped_ndim == 1
         assert_index_equal(
             df4_grouped_wrapper.iloc[:2, 1].grouper.group_by,
-            pd.Index(["g2"], dtype="object"),
+            pd.Index(["g2"], dtype="object", name="group"),
         )
         assert_index_equal(
             df4_grouped_wrapper.iloc[:2, [1]].index,
@@ -1419,7 +1422,7 @@ class TestArrayWrapper:
         assert df4_grouped_wrapper.iloc[:2, [1]].grouped_ndim == 2
         assert_index_equal(
             df4_grouped_wrapper.iloc[:2, [1]].grouper.group_by,
-            pd.Index(["g2"], dtype="object"),
+            pd.Index(["g2"], dtype="object", name="group"),
         )
         assert_index_equal(
             df4_grouped_wrapper.iloc[:2, :2].index,
@@ -1433,7 +1436,7 @@ class TestArrayWrapper:
         assert df4_grouped_wrapper.iloc[:2, :2].grouped_ndim == 2
         assert_index_equal(
             df4_grouped_wrapper.iloc[:2, :2].grouper.group_by,
-            pd.Index(["g1", "g1", "g2"], dtype="object"),
+            pd.Index(["g1", "g1", "g2"], dtype="object", name="group"),
         )
 
         # grouped, column only
@@ -1449,7 +1452,7 @@ class TestArrayWrapper:
         assert df4_grouped_wrapper_co.iloc[0].grouped_ndim == 1
         assert_index_equal(
             df4_grouped_wrapper_co.iloc[0].grouper.group_by,
-            pd.Index(["g1", "g1"], dtype="object"),
+            pd.Index(["g1", "g1"], dtype="object", name="group"),
         )
         assert_index_equal(
             df4_grouped_wrapper_co.iloc[1].index,
@@ -1461,7 +1464,10 @@ class TestArrayWrapper:
         )
         assert df4_grouped_wrapper_co.iloc[1].ndim == 1
         assert df4_grouped_wrapper_co.iloc[1].grouped_ndim == 1
-        assert_index_equal(df4_grouped_wrapper_co.iloc[1].grouper.group_by, pd.Index(["g2"], dtype="object"))
+        assert_index_equal(
+            df4_grouped_wrapper_co.iloc[1].grouper.group_by,
+            pd.Index(["g2"], dtype="object", name="group"),
+        )
         assert_index_equal(
             df4_grouped_wrapper_co.iloc[[1]].index,
             pd.Index(["x6", "y6", "z6"], dtype="object", name="i6"),
@@ -1474,7 +1480,7 @@ class TestArrayWrapper:
         assert df4_grouped_wrapper_co.iloc[[1]].grouped_ndim == 2
         assert_index_equal(
             df4_grouped_wrapper_co.iloc[[1]].grouper.group_by,
-            pd.Index(["g2"], dtype="object"),
+            pd.Index(["g2"], dtype="object", name="group"),
         )
         assert_index_equal(
             df4_grouped_wrapper_co.iloc[:2].index,
@@ -1488,7 +1494,7 @@ class TestArrayWrapper:
         assert df4_grouped_wrapper_co.iloc[:2].grouped_ndim == 2
         assert_index_equal(
             df4_grouped_wrapper_co.iloc[:2].grouper.group_by,
-            pd.Index(["g1", "g1", "g2"], dtype="object"),
+            pd.Index(["g1", "g1", "g2"], dtype="object", name="group"),
         )
 
     def test_from_obj(self):
@@ -1510,7 +1516,7 @@ class TestArrayWrapper:
     def test_columns(self):
         assert_index_equal(df4_wrapper.columns, df4.columns)
         assert_index_equal(df4_grouped_wrapper.columns, df4.columns)
-        assert_index_equal(df4_grouped_wrapper.get_columns(), pd.Index(["g1", "g2"], dtype="object"))
+        assert_index_equal(df4_grouped_wrapper.get_columns(), pd.Index(["g1", "g2"], dtype="object", name="group"))
 
     def test_name(self):
         assert sr2_wrapper.name == "a2"
@@ -1704,12 +1710,12 @@ class TestArrayWrapper:
             pd.DataFrame(
                 np.array([[1, 2], [3, 4], [5, 6]]),
                 index=df4.index,
-                columns=pd.Index(["g1", "g2"], dtype="object"),
+                columns=pd.Index(["g1", "g2"], dtype="object", name="group"),
             ),
         )
         assert_series_equal(
             df4_grouped_wrapper_co.wrap_reduced(np.array([1, 2])),
-            pd.Series(np.array([1, 2]), index=pd.Index(["g1", "g2"], dtype="object")),
+            pd.Series(np.array([1, 2]), index=pd.Index(["g1", "g2"], dtype="object", name="group")),
         )
         assert_frame_equal(
             df4_grouped_wrapper_co.wrap(np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]]), group_by=False),
@@ -1738,11 +1744,15 @@ class TestArrayWrapper:
         )
         assert_frame_equal(
             df4_grouped_wrapper_co.iloc[[0]].wrap(np.array([1, 2, 3])),
-            pd.DataFrame(np.array([[1], [2], [3]]), index=df4.index, columns=pd.Index(["g1"], dtype="object")),
+            pd.DataFrame(
+                np.array([[1], [2], [3]]),
+                index=df4.index,
+                columns=pd.Index(["g1"], dtype="object", name="group"),
+            ),
         )
         assert_series_equal(
             df4_grouped_wrapper_co.iloc[[0]].wrap_reduced(np.array([1])),
-            pd.Series(np.array([1]), index=pd.Index(["g1"], dtype="object")),
+            pd.Series(np.array([1]), index=pd.Index(["g1"], dtype="object", name="group")),
         )
         assert_frame_equal(
             df4_grouped_wrapper_co.iloc[[0]].wrap(np.array([[1, 2], [3, 4], [5, 6]]), group_by=False),
@@ -1764,11 +1774,15 @@ class TestArrayWrapper:
         assert df4_grouped_wrapper_co.iloc[1].wrap_reduced(np.array([1]), group_by=False) == 1
         assert_frame_equal(
             df4_grouped_wrapper_co.iloc[[1]].wrap(np.array([1, 2, 3])),
-            pd.DataFrame(np.array([[1], [2], [3]]), index=df4.index, columns=pd.Index(["g2"], dtype="object")),
+            pd.DataFrame(
+                np.array([[1], [2], [3]]),
+                index=df4.index,
+                columns=pd.Index(["g2"], dtype="object", name="group"),
+            ),
         )
         assert_series_equal(
             df4_grouped_wrapper_co.iloc[[1]].wrap_reduced(np.array([1])),
-            pd.Series(np.array([1]), index=pd.Index(["g2"], dtype="object")),
+            pd.Series(np.array([1]), index=pd.Index(["g2"], dtype="object", name="group")),
         )
         assert_frame_equal(
             df4_grouped_wrapper_co.iloc[[1]].wrap(np.array([1, 2, 3]), group_by=False),
@@ -1785,7 +1799,10 @@ class TestArrayWrapper:
         assert_index_equal(df4_wrapper.dummy().index, df4_wrapper.index)
         assert_index_equal(df4_wrapper.dummy().columns, df4_wrapper.columns)
         assert_index_equal(sr2_grouped_wrapper.dummy().index, sr2_grouped_wrapper.index)
-        assert_index_equal(sr2_grouped_wrapper.dummy().to_frame().columns, sr2_grouped_wrapper.get_columns())
+        assert_index_equal(
+            sr2_grouped_wrapper.dummy().to_frame().columns.rename("group"),
+            sr2_grouped_wrapper.get_columns(),
+        )
         assert_index_equal(df4_grouped_wrapper.dummy().index, df4_grouped_wrapper.index)
         assert_index_equal(df4_grouped_wrapper.dummy().columns, df4_grouped_wrapper.get_columns())
 
@@ -1798,14 +1815,17 @@ class TestArrayWrapper:
         )
         assert_frame_equal(
             df4_grouped_wrapper.fill(0),
-            pd.DataFrame(0, index=df4.index, columns=["g1", "g2"]),
+            pd.DataFrame(0, index=df4.index, columns=pd.Index(["g1", "g2"], name="group")),
         )
 
     def test_fill_reduced(self):
         assert sr2_wrapper.fill_reduced(0) == 0
         assert_series_equal(df4_wrapper.fill_reduced(0), pd.Series(0, index=df4.columns))
         assert sr2_grouped_wrapper.fill_reduced(0) == 0
-        assert_series_equal(df4_grouped_wrapper.fill_reduced(0), pd.Series(0, index=["g1", "g2"]))
+        assert_series_equal(
+            df4_grouped_wrapper.fill_reduced(0),
+            pd.Series(0, index=pd.Index(["g1", "g2"], name="group")),
+        )
 
     @pytest.mark.parametrize("test_freq", ["1h", "10h", "3d"])
     def test_resample(self, test_freq):
@@ -2224,7 +2244,7 @@ class TestWrapping:
         )
         assert_index_equal(
             df4_grouped_wrapping.select_col(column="g1").wrapper.get_columns(),
-            pd.Index(["g1"], dtype="object"),
+            pd.Index(["g1"], dtype="object", name="group"),
         )
         with pytest.raises(Exception):
             df4_wrapping.select_col()

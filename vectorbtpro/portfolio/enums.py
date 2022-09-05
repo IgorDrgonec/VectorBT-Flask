@@ -2063,12 +2063,12 @@ __pdoc__[
     "Order.min_size"
 ] = """Minimum size in both directions. 
 
-Lower than that will be rejected."""
+Depends on `Order.size_type`. Lower than that will be rejected."""
 __pdoc__[
     "Order.max_size"
 ] = """Maximum size in both directions. 
 
-Higher than that will be partly filled."""
+Depends on `Order.size_type`. Higher than that will be partly filled."""
 __pdoc__[
     "Order.size_granularity"
 ] = """Granularity of the size.

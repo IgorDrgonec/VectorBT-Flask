@@ -44,7 +44,7 @@ def group_by_to_index(index: tp.Index, group_by: tp.GroupByLike) -> GroupByT:
     if isinstance(group_by, CustomTemplate):
         group_by = group_by.substitute(context=dict(index=index), strict=True, sub_id="group_by")
     if group_by is True:
-        group_by = pd.Index(["group"] * len(index))  # one group
+        group_by = pd.Index(["group"] * len(index), name="group")  # one group
     elif isinstance(group_by, ExceptLevel):
         except_levels = group_by.level
         if isinstance(except_levels, (int, str)):
@@ -54,7 +54,7 @@ def group_by_to_index(index: tp.Index, group_by: tp.GroupByLike) -> GroupByT:
             if i not in except_levels and name not in except_levels:
                 new_group_by.append(name)
         if len(new_group_by) == 0:
-            group_by = pd.Index(["group"] * len(index))
+            group_by = pd.Index(["group"] * len(index), name="group")
         else:
             if len(new_group_by) == 1:
                 new_group_by = new_group_by[0]
@@ -67,7 +67,7 @@ def group_by_to_index(index: tp.Index, group_by: tp.GroupByLike) -> GroupByT:
         except (IndexError, KeyError):
             pass
     if not isinstance(group_by, pd.Index):
-        group_by = pd.Index(group_by)
+        group_by = pd.Index(group_by, name="group")
     if len(group_by) != len(index):
         raise ValueError("group_by and index must have the same length")
     return group_by
@@ -176,7 +176,7 @@ class Grouper(Configured):
         groups[group_start_idxs] = 1
         groups = np.cumsum(groups)
         index = pd.Index(np.concatenate(indices))
-        group_by = pd.Index(list(pd_group_by.indices.keys()))[groups]
+        group_by = pd.Index(list(pd_group_by.indices.keys()), name="group")[groups]
         return cls(
             index=index,
             group_by=group_by,

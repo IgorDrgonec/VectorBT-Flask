@@ -1304,7 +1304,7 @@ My Arg    400
 Name: 10, dtype: int64
 ```
 
-Here's an example of a parametrized metric. Let's get the number of trades with PnL over some amount:
+Here's an example of a parameterized metric. Let's get the number of trades with PnL over some amount:
 
 ```pycon
 >>> trade_min_pnl_cnt = (
@@ -10455,6 +10455,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             chunked=chunked,
         )
         filled_allocations = self.select_col_from_obj(filled_allocations, column, obj_ungrouped=True)
+        group_names = self.wrapper.grouper.get_index().names
+        filled_allocations = filled_allocations.vbt.drop_levels(group_names, strict=False)
         fig = filled_allocations.vbt.areaplot(line_shape=line_shape, **kwargs)
         return fig
 

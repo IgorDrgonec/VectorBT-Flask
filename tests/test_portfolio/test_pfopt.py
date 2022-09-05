@@ -691,7 +691,10 @@ class TestPortfolioOptimizer:
         pf_opt = vbt.PortfolioOptimizer.from_random(
             prices.vbt.wrapper,
             seed=42,
-            on=vbt.pfopt_group_dict({"g1": [1, 3], "g2": [2, 4]}),
+            group_configs=[
+                dict(on=[1, 3], _name="g1"),
+                dict(on=[2, 4], _name="g2"),
+            ]
         )
         pf_opt2 = pf_opt.loc["2020-01-03": "2020-01-04", "g2"]
         assert_index_equal(pf_opt2.wrapper.index, pf_opt.wrapper.index[2:4])
@@ -702,100 +705,16 @@ class TestPortfolioOptimizer:
             prices.vbt.wrapper,
             lambda index_slice: prices.iloc[index_slice].sum(),
             vbt.Rep("index_slice"),
-            index_ranges=vbt.pfopt_group_dict({"g1": [0, 1], "g2": [2, 3]}),
+            group_configs=[
+                dict(index_ranges=[0, 1], _name="g1"),
+                dict(index_ranges=[2, 3], _name="g2"),
+            ]
         )
         pf_opt2 = pf_opt.loc["2020-01-03":"2020-01-04", "g2"]
         assert_index_equal(pf_opt2.wrapper.index, pf_opt.wrapper.index[2:4])
         assert_index_equal(pf_opt2.wrapper.columns, pf_opt.wrapper.columns[5:])
         assert_records_close(pf_opt2.alloc_records.values, np.array([(0, 0, 0, 1, 1, 1)], dtype=alloc_range_dt))
         np.testing.assert_array_equal(pf_opt2._allocations, pf_opt._allocations[[1]])
-
-    def test_find_pfopt_groups(self):
-        assert pfopt.find_pfopt_groups(
-            vbt.pfopt_group_dict({"a": (1, 2, 3), "d": (4, 5, 6)}),
-            vbt.pfopt_group_dict({"b": (7, 8, 9), "_def": (10, 11, 12)}),
-        ) == ["a", "d", "b"]
-        assert pfopt.find_pfopt_groups(
-            vbt.pfopt_group_dict({"a": (1, 2, 3), "d": (4, 5, 6)}),
-            vbt.pfopt_group_dict({"b": (7, 8, 9), "_def": (10, 11, 12)}),
-            sort_groups=True,
-        ) == ["a", "b", "d"]
-        assert pfopt.find_pfopt_groups(
-            (
-                vbt.pfopt_group_dict({"a": (1, 2, 3)}),
-                vbt.pfopt_group_dict({"b": (4, 5, 6)}),
-            ),
-            {
-                "x": vbt.pfopt_group_dict({"c": (7, 8, 9)}),
-                "y": vbt.pfopt_group_dict({"_def": (10, 11, 12)}),
-             },
-        ) == ["a", "b", "c"]
-
-    def test_select_pfopt_group_args(self):
-        assert pfopt.select_pfopt_group_args(
-            "a",
-            (),
-            {},
-        ) == ((), {})
-        assert pfopt.select_pfopt_group_args(
-            "a",
-            (1, 2, 3),
-            {"k": (4, 5, 6)},
-        ) == ((1, 2, 3), {"k": (4, 5, 6)})
-        assert pfopt.select_pfopt_group_args(
-            "a",
-            vbt.pfopt_group_dict({"a": (1, 2, 3)}),
-            vbt.pfopt_group_dict({"a": {"k": (4, 5, 6)}}),
-        ) == ((1, 2, 3), {"k": (4, 5, 6)})
-        assert pfopt.select_pfopt_group_args(
-            "a",
-            vbt.pfopt_group_dict({"b": (1, 2, 3)}),
-            vbt.pfopt_group_dict({"b": {"k": (4, 5, 6)}}),
-        ) == ((), {})
-        assert pfopt.select_pfopt_group_args(
-            "a",
-            vbt.pfopt_group_dict({"_def": (1, 2, 3)}),
-            vbt.pfopt_group_dict({"_def": {"k": (4, 5, 6)}}),
-        ) == ((1, 2, 3), {"k": (4, 5, 6)})
-        assert pfopt.select_pfopt_group_args(
-            "a",
-            (
-                vbt.pfopt_group_dict({"a": 1}),
-                vbt.pfopt_group_dict({"b": 2}),
-                vbt.pfopt_group_dict({"_def": 3}),
-            ),
-            {
-                "k1": vbt.pfopt_group_dict({"a": 4}),
-                "k2": vbt.pfopt_group_dict({"b": 5}),
-                "k3": vbt.pfopt_group_dict({"_def": 6}),
-            }
-        ) == ((1, 3), {"k1": 4, "k3": 6})
-        assert pfopt.select_pfopt_group_args(
-            "b",
-            (
-                vbt.pfopt_group_dict({"a": 1}),
-                vbt.pfopt_group_dict({"b": 2}),
-                vbt.pfopt_group_dict({"_def": 3}),
-            ),
-            {
-                "k1": vbt.pfopt_group_dict({"a": 4}),
-                "k2": vbt.pfopt_group_dict({"b": 5}),
-                "k3": vbt.pfopt_group_dict({"_def": 6}),
-            }
-        ) == ((2, 3), {"k2": 5, "k3": 6})
-        assert pfopt.select_pfopt_group_args(
-            "c",
-            (
-                vbt.pfopt_group_dict({"a": 1}),
-                vbt.pfopt_group_dict({"b": 2}),
-                vbt.pfopt_group_dict({"_def": 3}),
-            ),
-            {
-                "k1": vbt.pfopt_group_dict({"a": 4}),
-                "k2": vbt.pfopt_group_dict({"b": 5}),
-                "k3": vbt.pfopt_group_dict({"_def": 6}),
-            }
-        ) == ((3,), {"k3": 6})
 
     def test_from_optimize_func(self):
         def get_allocations(pf_opt):
@@ -950,24 +869,8 @@ class TestPortfolioOptimizer:
             prices.vbt.wrapper,
             lambda i, index_ranges: prices.iloc[index_ranges[0][i]:index_ranges[1][i]].sum(),
             vbt.Rep("i"),
+            vbt.Rep("index_ranges"),
             every="2D",
-            forward_args=["index_ranges"],
-        )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocRanges)
-        assert_records_close(
-            pf_opt.alloc_records.values,
-            np.array([(0, 0, 0, 2, 2, 1), (1, 0, 2, 4, 4, 1)], dtype=alloc_range_dt),
-        )
-        np.testing.assert_array_equal(
-            pf_opt._allocations,
-            get_allocations(pf_opt),
-        )
-        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
-            prices.vbt.wrapper,
-            lambda i, index_ranges: prices.iloc[index_ranges[0][i]:index_ranges[1][i]].sum(),
-            vbt.Rep("i"),
-            every="2D",
-            forward_kwargs=["index_ranges"],
         )
         assert isinstance(pf_opt.alloc_records, vbt.AllocRanges)
         assert_records_close(
@@ -1043,7 +946,7 @@ class TestPortfolioOptimizer:
             prices.vbt.wrapper,
             lambda index_slice, mult: prices.iloc[index_slice].sum() * mult,
             vbt.Rep("index_slice"),
-            vbt.pfopt_group_dict({1: 1, 2: 2}),
+            vbt.Param([1, 2]),
         )
         assert isinstance(pf_opt.alloc_records, vbt.AllocRanges)
         assert_records_close(
@@ -1062,7 +965,7 @@ class TestPortfolioOptimizer:
         )
         assert_index_equal(
             pf_opt.wrapper.grouper.group_by,
-            pd.Index(['group', 'group', 'group', 'group', 'group'], name="alloc_group"),
+            pd.Index(['group', 'group', 'group', 'group', 'group'], name="group"),
         )
         assert_index_equal(
             pf_opt.wrapper.columns,
@@ -1072,45 +975,45 @@ class TestPortfolioOptimizer:
                 ('group', 'BBY'),
                 ('group',  'MA'),
                 ('group', 'PFE')],
-                names=['alloc_group', None]
+                names=['group', None]
             ),
         )
         assert pf_opt.wrapper.grouped_ndim == 1
         assert_index_equal(
             pf_opt.alloc_records.wrapper.columns,
-            pd.Index(["group"], name="alloc_group"),
+            pd.Index(["group"], name="group"),
         )
         assert pf_opt.alloc_records.wrapper.ndim == 1
         pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             lambda index_slice, mult: prices.iloc[index_slice].sum() * mult,
             vbt.Rep("index_slice"),
-            vbt.pfopt_group_dict({1: 1, 2: 2}),
+            group_configs=[{"arg_1": 1}, {"arg_1": 2}],
         )
         assert_index_equal(
             pf_opt.wrapper.grouper.group_by,
-            pd.Index([1, 1, 1, 1, 1, 2, 2, 2, 2, 2], name="alloc_group"),
+            pd.Index([0, 0, 0, 0, 0, 1, 1, 1, 1, 1], name="group_config"),
         )
         assert_index_equal(
             pf_opt.wrapper.columns,
             pd.MultiIndex.from_tuples([
+                (0, 'XOM'),
+                (0, 'RRC'),
+                (0, 'BBY'),
+                (0, 'MA'),
+                (0, 'PFE'),
                 (1, 'XOM'),
                 (1, 'RRC'),
                 (1, 'BBY'),
                 (1, 'MA'),
-                (1, 'PFE'),
-                (2, 'XOM'),
-                (2, 'RRC'),
-                (2, 'BBY'),
-                (2, 'MA'),
-                (2, 'PFE')],
-                names=['alloc_group', None]
+                (1, 'PFE')],
+                names=['group_config', None]
             ),
         )
         assert pf_opt.wrapper.grouped_ndim == 2
         assert_index_equal(
             pf_opt.alloc_records.wrapper.columns,
-            pd.Index([1, 2], name="alloc_group"),
+            pd.Index([0, 1], name="group_config"),
         )
         assert pf_opt.alloc_records.wrapper.ndim == 2
 
@@ -1262,24 +1165,8 @@ class TestPortfolioOptimizer:
             prices.vbt.wrapper,
             lambda i, index_points: prices.iloc[index_points[i]],
             vbt.Rep("i"),
+            vbt.Rep("index_points"),
             every="2D",
-            forward_args=["index_points"],
-        )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocPoints)
-        assert_records_close(
-            pf_opt.alloc_records.values,
-            np.array([(0, 0, 0), (1, 0, 2), (2, 0, 4)], dtype=alloc_point_dt),
-        )
-        np.testing.assert_array_equal(
-            pf_opt._allocations,
-            get_allocations(pf_opt),
-        )
-        pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
-            prices.vbt.wrapper,
-            lambda i, index_points: prices.iloc[index_points[i]],
-            vbt.Rep("i"),
-            every="2D",
-            forward_kwargs=["index_points"],
         )
         assert isinstance(pf_opt.alloc_records, vbt.AllocPoints)
         assert_records_close(
@@ -1363,7 +1250,7 @@ class TestPortfolioOptimizer:
             prices.vbt.wrapper,
             lambda index_point, mult: prices.iloc[index_point] * mult,
             vbt.Rep("index_point"),
-            vbt.pfopt_group_dict({1: 1, 2: 2}),
+            vbt.Param([1, 2]),
         )
         assert isinstance(pf_opt.alloc_records, vbt.AllocPoints)
         assert_records_close(
@@ -1382,7 +1269,7 @@ class TestPortfolioOptimizer:
         )
         assert_index_equal(
             pf_opt.wrapper.grouper.group_by,
-            pd.Index(['group', 'group', 'group', 'group', 'group'], name="alloc_group"),
+            pd.Index(['group', 'group', 'group', 'group', 'group'], name="group"),
         )
         assert_index_equal(
             pf_opt.wrapper.columns,
@@ -1392,45 +1279,45 @@ class TestPortfolioOptimizer:
                 ('group', 'BBY'),
                 ('group',  'MA'),
                 ('group', 'PFE')],
-                names=['alloc_group', None]
+                names=['group', None]
             ),
         )
         assert pf_opt.wrapper.grouped_ndim == 1
         assert_index_equal(
             pf_opt.alloc_records.wrapper.columns,
-            pd.Index(["group"], name="alloc_group"),
+            pd.Index(["group"], name="group"),
         )
         assert pf_opt.alloc_records.wrapper.ndim == 1
         pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
             prices.vbt.wrapper,
             lambda index_point, mult: prices.iloc[index_point] * mult,
             vbt.Rep("index_point"),
-            vbt.pfopt_group_dict({1: 1, 2: 2}),
+            group_configs=[dict(arg_1=1), dict(arg_1=2)]
         )
         assert_index_equal(
             pf_opt.wrapper.grouper.group_by,
-            pd.Index([1, 1, 1, 1, 1, 2, 2, 2, 2, 2], name="alloc_group"),
+            pd.Index([0, 0, 0, 0, 0, 1, 1, 1, 1, 1], name="group_config"),
         )
         assert_index_equal(
             pf_opt.wrapper.columns,
             pd.MultiIndex.from_tuples([
+                (0, 'XOM'),
+                (0, 'RRC'),
+                (0, 'BBY'),
+                (0, 'MA'),
+                (0, 'PFE'),
                 (1, 'XOM'),
                 (1, 'RRC'),
                 (1, 'BBY'),
                 (1, 'MA'),
-                (1, 'PFE'),
-                (2, 'XOM'),
-                (2, 'RRC'),
-                (2, 'BBY'),
-                (2, 'MA'),
-                (2, 'PFE')],
-                names=['alloc_group', None]
+                (1, 'PFE')],
+                names=['group_config', None]
             ),
         )
         assert pf_opt.wrapper.grouped_ndim == 2
         assert_index_equal(
             pf_opt.alloc_records.wrapper.columns,
-            pd.Index([1, 2], name="alloc_group"),
+            pd.Index([0, 1], name="group_config"),
         )
         assert pf_opt.alloc_records.wrapper.ndim == 2
 
@@ -1494,6 +1381,7 @@ class TestPortfolioOptimizer:
         pf_opt = vbt.PortfolioOptimizer.from_filled_allocations(
             filled_allocations,
             valid_only=False,
+            nonzero_only=False,
             unique_only=False,
         )
         assert_records_close(
@@ -1651,7 +1539,7 @@ class TestPortfolioOptimizer:
             pd.DataFrame(
                 target_arr,
                 index=pd.MultiIndex.from_arrays([
-                    pd.Index(["group", "group"], name="alloc_group"),
+                    pd.Index(["group", "group"], name="group"),
                     prices.index[[1, 3]],
                 ]),
                 columns=prices.columns,
@@ -1668,7 +1556,7 @@ class TestPortfolioOptimizer:
         pf_opt = vbt.PortfolioOptimizer.from_random(
             prices.vbt.wrapper,
             seed=42,
-            on=vbt.pfopt_group_dict({"g1": [1, 3], "g2": [2, 4]}),
+            group_configs=[dict(on=[1, 3], _name="g1"), dict(on=[2, 4], _name="g2")],
         )
         target_arr = np.array([
             [0.13319702814025883, 0.33810081711389406, 0.26031768763785473, 0.2128998389048247, 0.05548462820316767],
@@ -1681,7 +1569,7 @@ class TestPortfolioOptimizer:
             pd.DataFrame(
                 target_arr,
                 index=pd.MultiIndex.from_arrays([
-                    pd.Index(["g1", "g1", "g2", "g2"], name="alloc_group"),
+                    pd.Index(["g1", "g1", "g2", "g2"], name="group_config"),
                     prices.index[[1, 3, 2, 4]],
                 ]),
                 columns=prices.columns,
@@ -1692,7 +1580,7 @@ class TestPortfolioOptimizer:
             pd.DataFrame(
                 target_arr,
                 index=pd.MultiIndex.from_arrays([
-                    pd.Index(["g1", "g1", "g2", "g2"], name="alloc_group"),
+                    pd.Index(["g1", "g1", "g2", "g2"], name="group_config"),
                     prices.index[[1, 3, 2, 4]],
                 ]),
                 columns=prices.columns,
@@ -1709,7 +1597,7 @@ class TestPortfolioOptimizer:
             pd.DataFrame(
                 prices.sum().values[None],
                 index=pd.MultiIndex.from_arrays([
-                    pd.Index(["group"], name="alloc_group"),
+                    pd.Index(["group"], name="group"),
                     prices.index[[4]],
                 ]),
                 columns=prices.columns,
@@ -1747,7 +1635,7 @@ class TestPortfolioOptimizer:
             np.nan,
             index=prices.index,
             columns=pd.MultiIndex.from_arrays([
-                pd.Index(["group", "group", "group", "group", "group"], name="alloc_group"),
+                pd.Index(["group", "group", "group", "group", "group"], name="group"),
                 prices.columns,
             ]),
         )
@@ -1769,7 +1657,7 @@ class TestPortfolioOptimizer:
         pf_opt = vbt.PortfolioOptimizer.from_random(
             prices.vbt.wrapper,
             seed=42,
-            on=vbt.pfopt_group_dict({"g1": [1, 3], "g2": [2, 4]}),
+            group_configs=[dict(on=[1, 3], _name="g1"), dict(on=[2, 4], _name="g2")],
         )
         target_arr = np.array([
             [0.13319702814025883, 0.33810081711389406, 0.26031768763785473, 0.2128998389048247, 0.05548462820316767],
@@ -1781,7 +1669,7 @@ class TestPortfolioOptimizer:
             np.nan,
             index=prices.index,
             columns=pd.MultiIndex.from_arrays([
-                pd.Index(["g1", "g1", "g1", "g1", "g1", "g2", "g2", "g2", "g2", "g2"], name="alloc_group"),
+                pd.Index(["g1", "g1", "g1", "g1", "g1", "g2", "g2", "g2", "g2", "g2"], name="group_config"),
                 prices.columns.append(prices.columns),
             ]),
         )
@@ -1805,7 +1693,7 @@ class TestPortfolioOptimizer:
             np.nan,
             index=prices.index,
             columns=pd.MultiIndex.from_arrays([
-                pd.Index(["group", "group", "group", "group", "group"], name="alloc_group"),
+                pd.Index(["group", "group", "group", "group", "group"], name="group"),
                 prices.columns,
             ]),
         )
@@ -1829,7 +1717,7 @@ class TestPortfolioOptimizer:
         pf_opt = vbt.PortfolioOptimizer.from_random(
             prices.vbt.wrapper,
             seed=42,
-            on=vbt.pfopt_group_dict({"g1": [1, 3], "g2": [2, 4]}),
+            group_configs=[dict(on=[1, 3], _name="g1"), dict(on=[2, 4], _name="g2")],
         )
         stats_index = pd.Index([
             'Start',
@@ -1889,7 +1777,7 @@ class TestPortfolioOptimizer:
             prices.vbt.wrapper,
             lambda index_slice: prices.iloc[index_slice].sum(),
             vbt.Rep("index_slice"),
-            index_ranges=vbt.pfopt_group_dict({"g1": [0, 2], "g2": [1, 3]}),
+            group_configs=[dict(index_ranges=[0, 2], _name="g1"), dict(index_ranges=[1, 3], _name="g2")],
         )
         stats_index = pd.Index([
             'Start',
@@ -1954,7 +1842,7 @@ class TestPortfolioOptimizer:
         pf_opt = vbt.PortfolioOptimizer.from_random(
             prices.vbt.wrapper,
             seed=42,
-            on=vbt.pfopt_group_dict({"g1": [1, 3], "g2": [2, 4]}),
+            group_configs=[dict(on=[1, 3], _name="g1"), dict(on=[2, 4], _name="g2")],
         )
         pf_opt["g1"].plot()
         pf_opt[["g1"]].plot()
@@ -1964,7 +1852,7 @@ class TestPortfolioOptimizer:
             prices.vbt.wrapper,
             lambda index_slice: prices.iloc[index_slice].sum(),
             vbt.Rep("index_slice"),
-            index_ranges=vbt.pfopt_group_dict({"g1": [0, 2], "g2": [1, 3]}),
+            group_configs=[dict(index_ranges=[0, 2], _name="g1"), dict(index_ranges=[1, 3], _name="g2")],
         )
         pf_opt["g1"].plot()
         pf_opt[["g1"]].plot()
@@ -1978,9 +1866,9 @@ class TestPortfolio:
         pf_opt = vbt.PortfolioOptimizer.from_random(
             prices.vbt.wrapper,
             seed=42,
-            on=vbt.pfopt_group_dict({"g1": [1, 3], "g2": [2, 4]}),
+            group_configs=[dict(on=[1, 3], _name="g1"), dict(on=[2, 4], _name="g2")],
         )
-        pf = vbt.Portfolio.from_optimizer(pf_opt, prices)
+        pf = vbt.Portfolio.from_optimizer(prices, pf_opt)
         allocations = pf.get_asset_value(group_by=False).vbt / pf.value
         np.testing.assert_allclose(
             allocations.values[1][:5],
@@ -2002,9 +1890,9 @@ class TestPortfolio:
             prices.vbt.wrapper,
             lambda index_slice: prices.iloc[index_slice].sum() / prices.iloc[index_slice].sum().sum(),
             vbt.Rep("index_slice"),
-            index_ranges=vbt.pfopt_group_dict({"g1": [0, 2], "g2": [1, 3]}),
+            group_configs=[dict(index_ranges=[0, 2], _name="g1"), dict(index_ranges=[1, 3], _name="g2")],
         )
-        pf = vbt.Portfolio.from_optimizer(pf_opt, prices)
+        pf = vbt.Portfolio.from_optimizer(prices, pf_opt)
         allocations = pf.get_asset_value(group_by=False).vbt / pf.value
         np.testing.assert_allclose(
             allocations.values[2][:5],
@@ -2018,9 +1906,9 @@ class TestPortfolio:
             prices.vbt.wrapper,
             lambda index_slice: prices.iloc[index_slice].sum(),
             vbt.Rep("index_slice"),
-            index_ranges=vbt.pfopt_group_dict({"g1": [0, 2], "g2": [1, 3]}),
+            group_configs=[dict(index_ranges=[0, 2], _name="g1"), dict(index_ranges=[1, 3], _name="g2")],
         )
-        pf = vbt.Portfolio.from_optimizer(pf_opt, prices, init_cash="auto")
+        pf = vbt.Portfolio.from_optimizer(prices, pf_opt, init_cash="auto", size_type="amount")
         allocations = pf.asset_flow
         np.testing.assert_allclose(
             allocations.values[2][:5],
@@ -2034,9 +1922,9 @@ class TestPortfolio:
             prices.vbt.wrapper,
             lambda index_slice: -prices.iloc[index_slice].sum() / prices.iloc[index_slice].sum().sum(),
             vbt.Rep("index_slice"),
-            index_ranges=vbt.pfopt_group_dict({"g1": [0, 2], "g2": [1, 3]}),
+            group_configs=[dict(index_ranges=[0, 2], _name="g1"), dict(index_ranges=[1, 3], _name="g2")],
         )
-        pf = vbt.Portfolio.from_optimizer(pf_opt, prices)
+        pf = vbt.Portfolio.from_optimizer(prices, pf_opt)
         allocations = pf.get_asset_value(group_by=False).vbt / pf.value
         np.testing.assert_allclose(
             allocations.values[2][:5],

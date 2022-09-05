@@ -288,6 +288,26 @@ ${config_doc}
 
 _settings["chunking"] = chunking
 
+params = ChildDict(
+    skip_single_param=True,
+    template_context=Config(),
+    random_subset=None,
+    merge_func=None,
+    merge_kwargs=Config(),
+    execute_kwargs=Config(),
+)
+"""_"""
+
+__pdoc__["params"] = Sub(
+    """Sub-config with settings applied across `vectorbtpro.utils.params`.
+
+```python
+${config_doc}
+```"""
+)
+
+_settings["params"] = params
+
 template = ChildDict(
     strict=True,
     except_types=(list, set, frozenset),

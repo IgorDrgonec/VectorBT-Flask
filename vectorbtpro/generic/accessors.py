@@ -1461,7 +1461,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 wrap_kwargs=wrap_kwargs,
                 **kwargs,
             )
-            new_index = rule.count().index
+            new_index = rule.count().index.rename("group")
             if pd.Index.equals(out_obj.index, new_index):
                 if new_index.freq is not None:
                     try:

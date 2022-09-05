@@ -362,7 +362,8 @@ def atr_apply_nb(
     if cache_dict is not None:
         h = hash((window, wtype))
         return tr, cache_dict[h]
-    tr = true_range_nb(high, low, close)
+    if tr is None:
+        tr = true_range_nb(high, low, close)
     return tr, generic_nb.ma_nb(tr, window, wtype, adjust=adjust, minp=minp)
 
 

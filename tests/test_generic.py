@@ -1536,13 +1536,15 @@ class TestAccessors:
 
         assert_series_equal(
             df["a"].vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb),
-            df["a"].groupby(np.asarray([1, 1, 2, 2, 3])).apply(lambda x: mean_nb(x.values)),
+            df["a"].groupby(np.asarray([1, 1, 2, 2, 3])).apply(lambda x: mean_nb(x.values)).rename_axis("group"),
         )
         assert_frame_equal(
             df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb),
-            df.groupby(np.asarray([1, 1, 2, 2, 3])).agg(
-                {"a": lambda x: mean_nb(x.values), "b": lambda x: mean_nb(x.values), "c": lambda x: mean_nb(x.values)},
-            ),  # any clean way to do column-wise grouping in pandas?
+            df.groupby(np.asarray([1, 1, 2, 2, 3])).agg({
+                "a": lambda x: mean_nb(x.values),
+                "b": lambda x: mean_nb(x.values),
+                "c": lambda x: mean_nb(x.values)
+            }).rename_axis("group"),  # any clean way to do column-wise grouping in pandas?
         )
         assert_frame_equal(
             df.vbt.groupby_apply(df.groupby(np.asarray([1, 1, 2, 2, 3])), mean_nb),
@@ -1628,7 +1630,7 @@ class TestAccessors:
                     group_by_evenly_nb=vbt.base.grouping.nb.group_by_evenly_nb,
                 ),
             ),
-            pd.DataFrame([[2.0, 1.0, 0.6666666666666666], [4.5, 2.25, 1.5]], columns=df.columns),
+            pd.DataFrame([[2.0, 1.0, 0.6666666666666666], [4.5, 2.25, 1.5]], columns=df.columns).rename_axis("group"),
         )
 
     @pytest.mark.parametrize("test_freq", ["1h", "10h", "3d"])
@@ -1651,11 +1653,11 @@ class TestAccessors:
         )
         assert_frame_equal(
             df.vbt.resample_apply(test_freq, mean_nb, use_groupby_apply=True),
-            df.vbt.resample_apply(test_freq, mean_nb, use_groupby_apply=False),
+            df.vbt.resample_apply(test_freq, mean_nb, use_groupby_apply=False).rename_axis("group"),
         )
         assert_frame_equal(
             df.vbt.resample_apply(df.resample(test_freq), mean_nb, use_groupby_apply=True),
-            df.vbt.resample_apply(test_freq, mean_nb, use_groupby_apply=False),
+            df.vbt.resample_apply(test_freq, mean_nb, use_groupby_apply=False).rename_axis("group"),
         )
         with pytest.raises(Exception):
             df.vbt.resample_apply(
@@ -2456,7 +2458,7 @@ class TestAccessors:
         )
         assert_series_equal(
             df.vbt.reduce(sum_nb, group_by=group_by),
-            pd.Series([20.0, 6.0], index=["g1", "g2"]).rename("reduce"),
+            pd.Series([20.0, 6.0], index=pd.Index(["g1", "g2"], name="group")).rename("reduce"),
         )
         assert_series_equal(
             df.vbt.reduce(sum_nb, group_by=group_by, flatten=True, order="C"),
@@ -2549,7 +2551,7 @@ class TestAccessors:
                 template_context=dict(to_2d_array=vbt.base.reshaping.to_2d_array),
                 group_by=group_by,
             ),
-            pd.Series([45, 30], index=["g1", "g2"], name="reduce"),
+            pd.Series([45, 30], index=pd.Index(["g1", "g2"], name="group"), name="reduce"),
         )
 
     def test_reduce_to_idx(self):
@@ -2626,11 +2628,11 @@ class TestAccessors:
         )
         assert_series_equal(
             df.vbt.reduce(argmax_nb, returns_idx=True, group_by=group_by, flatten=True, order="C"),
-            pd.Series(["2018-01-02", "2018-01-02"], dtype="datetime64[ns]", index=["g1", "g2"]).rename("reduce"),
+            pd.Series(["2018-01-02", "2018-01-02"], dtype="datetime64[ns]", index=pd.Index(["g1", "g2"], name="group")).rename("reduce"),
         )
         assert_series_equal(
             df.vbt.reduce(argmax_nb, returns_idx=True, group_by=group_by, flatten=True, order="F"),
-            pd.Series(["2018-01-04", "2018-01-02"], dtype="datetime64[ns]", index=["g1", "g2"]).rename("reduce"),
+            pd.Series(["2018-01-04", "2018-01-02"], dtype="datetime64[ns]", index=pd.Index(["g1", "g2"], name="group")).rename("reduce"),
         )
         assert_series_equal(
             pd.DataFrame.vbt.reduce(
@@ -2783,7 +2785,7 @@ class TestAccessors:
                 group_by=group_by,
                 wrap_kwargs=dict(name_or_index=["min", "max"]),
             ),
-            pd.DataFrame([[1.0, 1.0], [4.0, 2.0]], index=["min", "max"], columns=["g1", "g2"]),
+            pd.DataFrame([[1.0, 1.0], [4.0, 2.0]], index=["min", "max"], columns=pd.Index(["g1", "g2"], name="group")),
         )
         assert_frame_equal(
             df.vbt.reduce(min_and_max_nb, returns_array=True, group_by=group_by, flatten=True, order="C"),
@@ -2977,7 +2979,7 @@ class TestAccessors:
                 [["2018-01-01", "2018-01-01"], ["2018-01-02", "2018-01-02"]],
                 dtype="datetime64[ns]",
                 index=["idxmin", "idxmax"],
-                columns=["g1", "g2"],
+                columns=pd.Index(["g1", "g2"], name="group"),
             ),
         )
         assert_frame_equal(
@@ -2994,7 +2996,7 @@ class TestAccessors:
                 [["2018-01-01", "2018-01-01"], ["2018-01-04", "2018-01-02"]],
                 dtype="datetime64[ns]",
                 index=["idxmin", "idxmax"],
-                columns=["g1", "g2"],
+                columns=pd.Index(["g1", "g2"], name="group"),
             ),
         )
         assert_frame_equal(
@@ -3070,7 +3072,7 @@ class TestAccessors:
             pd.DataFrame(
                 [[1.0, 1.0], [3.0, 2.0], [3.0, np.nan], [3.0, 2.0], [1.0, 1.0]],
                 index=df.index,
-                columns=["g1", "g2"],
+                columns=pd.Index(["g1", "g2"], name="group"),
             ),
         )
         assert_frame_equal(
@@ -3146,7 +3148,7 @@ class TestAccessors:
                 template_context=dict(to_2d_array=vbt.base.reshaping.to_2d_array),
                 group_by=group_by,
             ),
-            pd.DataFrame([[5, 4], [7, 5], [9, 6], [11, 7], [13, 8]], index=df.index, columns=["g1", "g2"]),
+            pd.DataFrame([[5, 4], [7, 5], [9, 6], [11, 7], [13, 8]], index=df.index, columns=pd.Index(["g1", "g2"], name="group")),
         )
 
     def test_flatten_grouped(self):
@@ -3166,7 +3168,7 @@ class TestAccessors:
                     [1.0, np.nan],
                 ],
                 index=np.repeat(df.index, 2),
-                columns=["g1", "g2"],
+                columns=pd.Index(["g1", "g2"], name="group"),
             ),
         )
         assert_frame_equal(
@@ -3185,7 +3187,7 @@ class TestAccessors:
                     [1.0, np.nan],
                 ],
                 index=np.tile(df.index, 2),
-                columns=["g1", "g2"],
+                columns=pd.Index(["g1", "g2"], name="group"),
             ),
         )
         assert_series_equal(
@@ -3215,7 +3217,7 @@ class TestAccessors:
         assert_series_equal(test_func(df.vbt), test_func(df).rename(test_name))
         assert_series_equal(
             test_func(df.vbt, group_by=group_by),
-            pd.Series([test_func(df[["a", "b"]].stack()), test_func(df["c"])], index=["g1", "g2"]).rename(test_name),
+            pd.Series([test_func(df[["a", "b"]].stack()), test_func(df["c"])], index=pd.Index(["g1", "g2"], name="group")).rename(test_name),
         )
         assert_series_equal(test_func(df.vbt, use_jitted=True), test_func(df.vbt, use_jitted=False))
         assert_series_equal(
@@ -3248,7 +3250,7 @@ class TestAccessors:
         flatten2 = pd.Series(df2[["a", "b"]].values.flatten())
         assert_series_equal(
             df.vbt.corr(df2, group_by=group_by),
-            pd.Series([flatten1.vbt.corr(flatten2), df["c"].vbt.corr(df2["c"])], index=["g1", "g2"]).rename("corr"),
+            pd.Series([flatten1.vbt.corr(flatten2), df["c"].vbt.corr(df2["c"])], index=pd.Index(["g1", "g2"], name="group")).rename("corr"),
         )
 
     @pytest.mark.parametrize("test_ddof", [0, 1])
@@ -3281,7 +3283,7 @@ class TestAccessors:
             df.vbt.cov(df2, ddof=test_ddof, group_by=group_by),
             pd.Series(
                 [flatten1.vbt.cov(flatten2, ddof=test_ddof), df["c"].vbt.cov(df2["c"], ddof=test_ddof)],
-                index=["g1", "g2"],
+                index=pd.Index(["g1", "g2"], name="group"),
             ).rename("cov"),
         )
 
@@ -3305,7 +3307,7 @@ class TestAccessors:
             test_func(df.vbt, group_by=group_by),
             pd.Series(
                 [test_func(df[["a", "b"]].stack())[0], test_func(df["c"])],
-                index=["g1", "g2"],
+                index=pd.Index(["g1", "g2"], name="group"),
                 dtype="datetime64[ns]",
             ).rename(test_name),
         )
@@ -3324,6 +3326,7 @@ class TestAccessors:
                     "g2": df["c"].describe(percentiles=np.arange(0, 1, 0.1)).values,
                 },
                 index=test_against.index,
+                columns=pd.Index(["g1", "g2"], name="group")
             ),
         )
         assert_frame_equal(
@@ -3404,7 +3407,7 @@ class TestAccessors:
             pd.DataFrame(
                 np.array([[2, 2], [2, 2], [2, 0], [2, 0], [2, 1]]),
                 index=pd.Index([1.0, 2.0, 3.0, 4.0, np.nan], dtype="float64"),
-                columns=pd.Index(["g1", "g2"], dtype="object"),
+                columns=pd.Index(["g1", "g2"], dtype="object", name="group"),
             ),
         )
         assert_frame_equal(

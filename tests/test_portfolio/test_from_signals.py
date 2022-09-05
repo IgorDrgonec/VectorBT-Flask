@@ -1756,10 +1756,13 @@ class TestFromSignals:
                 dtype=fs_order_dt,
             ),
         )
-        assert_index_equal(pf.wrapper.grouper.group_by, pd.Index([0, 0, 1], dtype="int64"))
+        assert_index_equal(
+            pf.wrapper.grouper.group_by,
+            pd.Index([0, 0, 1], dtype="int64", name="group")
+        )
         assert_series_equal(
             pf.init_cash,
-            pd.Series([200.0, 100.0], index=pd.Index([0, 1], dtype="int64")).rename("init_cash"),
+            pd.Series([200.0, 100.0], index=pd.Index([0, 1], dtype="int64")).rename("init_cash").rename_axis("group"),
         )
         assert not pf.cash_sharing
 
@@ -1777,10 +1780,13 @@ class TestFromSignals:
                 dtype=fs_order_dt,
             ),
         )
-        assert_index_equal(pf.wrapper.grouper.group_by, pd.Index([0, 0, 1], dtype="int64"))
+        assert_index_equal(
+            pf.wrapper.grouper.group_by,
+            pd.Index([0, 0, 1], dtype="int64", name="group"),
+        )
         assert_series_equal(
             pf.init_cash,
-            pd.Series([100.0, 100.0], index=pd.Index([0, 1], dtype="int64")).rename("init_cash"),
+            pd.Series([100.0, 100.0], index=pd.Index([0, 1], dtype="int64")).rename("init_cash").rename_axis("group"),
         )
         assert pf.cash_sharing
         with pytest.raises(Exception):

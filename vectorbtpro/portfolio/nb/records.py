@@ -1020,18 +1020,18 @@ def mfe_nb(
     direction: tp.Array1d,
     entry_price: tp.Array1d,
     best_price: tp.Array1d,
-    as_returns: bool = False,
+    use_returns: bool = False,
 ) -> tp.Array1d:
     """Compute Maximum Favorable Excursion (MFE)."""
     out = np.empty(size.shape[0], dtype=np.float_)
     for r in prange(size.shape[0]):
         if direction[r] == TradeDirection.Long:
-            if as_returns:
+            if use_returns:
                 out[r] = (best_price[r] - entry_price[r]) / entry_price[r]
             else:
                 out[r] = (best_price[r] - entry_price[r]) * size[r]
         else:
-            if as_returns:
+            if use_returns:
                 out[r] = (entry_price[r] - best_price[r]) / best_price[r]
             else:
                 out[r] = (entry_price[r] - best_price[r]) * size[r]
@@ -1054,18 +1054,18 @@ def mae_nb(
     direction: tp.Array1d,
     entry_price: tp.Array1d,
     worst_price: tp.Array1d,
-    as_returns: bool = False,
+    use_returns: bool = False,
 ) -> tp.Array1d:
     """Compute Maximum Adverse Excursion (MAE)."""
     out = np.empty(size.shape[0], dtype=np.float_)
     for r in prange(size.shape[0]):
         if direction[r] == TradeDirection.Long:
-            if as_returns:
+            if use_returns:
                 out[r] = (worst_price[r] - entry_price[r]) / entry_price[r]
             else:
                 out[r] = (worst_price[r] - entry_price[r]) * size[r]
         else:
-            if as_returns:
+            if use_returns:
                 out[r] = (entry_price[r] - worst_price[r]) / worst_price[r]
             else:
                 out[r] = (entry_price[r] - worst_price[r]) * size[r]

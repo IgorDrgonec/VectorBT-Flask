@@ -81,32 +81,54 @@ def extend_args(func: tp.Callable, args: tp.Args, kwargs: tp.Kwargs, **with_kwar
     return new_args + args, {**new_kwargs, **kwargs}
 
 
-def annotate_args(func: tp.Callable, args: tp.Args, kwargs: tp.Kwargs, only_passed: bool = False) -> tp.AnnArgs:
+def annotate_args(
+    func: tp.Callable,
+    args: tp.Args,
+    kwargs: tp.Kwargs,
+    only_passed: bool = False,
+    allow_partial: bool = False,
+) -> tp.AnnArgs:
     """Annotate arguments and keyword arguments using the function's signature."""
     kwargs = dict(kwargs)
     signature = inspect.signature(func)
-    signature.bind(*args, **kwargs)
+    if not allow_partial:
+        signature.bind(*args, **kwargs)
     ann_args = dict()
-    arg_i = 0
 
     for p in signature.parameters.values():
-        if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD, p.KEYWORD_ONLY):
-            if p.kind != p.KEYWORD_ONLY and arg_i < len(args):
-                # Either positional-only arguments or keyword arguments passed as such
-                ann_args[p.name] = dict(kind=p.kind, value=args[arg_i])
-            else:
-                # Either keyword-only arguments or positional arguments passed as such
-                if p.name in kwargs:
-                    ann_args[p.name] = dict(kind=p.kind, value=kwargs.pop(p.name))
-                elif not only_passed:
-                    ann_args[p.name] = dict(kind=p.kind, value=p.default)
-            arg_i += 1
+        if p.kind == p.POSITIONAL_ONLY:
+            if len(args) > 0:
+                ann_args[p.name] = dict(kind=p.kind, value=args[0])
+                args = args[1:]
+            elif not only_passed:
+                if allow_partial:
+                    ann_args[p.name] = dict(kind=p.kind)
+                else:
+                    raise TypeError(f"missing a required argument: '{p.name}'")
         elif p.kind == p.VAR_POSITIONAL:
-            # *args
-            if not only_passed or len(args[arg_i:]) > 0:
-                ann_args[p.name] = dict(kind=p.kind, value=args[arg_i:])
+            if len(args) > 0 or not only_passed:
+                ann_args[p.name] = dict(kind=p.kind, value=args)
+                args = ()
+        elif p.kind == p.POSITIONAL_OR_KEYWORD:
+            if len(args) > 0:
+                ann_args[p.name] = dict(kind=p.kind, value=args[0])
+                args = args[1:]
+            elif p.name in kwargs:
+                ann_args[p.name] = dict(kind=p.kind, value=kwargs.pop(p.name))
+            elif not only_passed:
+                if p.default is not p.empty:
+                    ann_args[p.name] = dict(kind=p.kind, value=p.default)
+                else:
+                    if allow_partial:
+                        ann_args[p.name] = dict(kind=p.kind)
+                    else:
+                        raise TypeError(f"missing a required argument: '{p.name}'")
+        elif p.kind == p.KEYWORD_ONLY:
+            if p.name in kwargs:
+                ann_args[p.name] = dict(kind=p.kind, value=kwargs.pop(p.name))
+            elif not only_passed:
+                ann_args[p.name] = dict(kind=p.kind, value=p.default)
         else:
-            # **kwargs
             if not only_passed or len(kwargs) > 0:
                 ann_args[p.name] = dict(kind=p.kind, value=kwargs)
     return ann_args
