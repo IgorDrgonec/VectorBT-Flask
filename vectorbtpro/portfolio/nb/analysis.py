@@ -743,6 +743,55 @@ def returns_nb(
 
 
 @register_jitted(cache=True)
+def get_asset_pnl_nb(
+    input_asset_value: float,
+    output_asset_value: float,
+    cash_flow: float,
+) -> float:
+    """Get asset PnL from the input and output asset value, and the cash flow."""
+    if is_close_nb(input_asset_value, 0):
+        return cash_flow + output_asset_value
+    if is_close_nb(output_asset_value, 0):
+        return cash_flow - input_asset_value
+    if np.sign(input_asset_value) != np.sign(output_asset_value):
+        return cash_flow - input_asset_value + output_asset_value
+    return output_asset_value + cash_flow - input_asset_value
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="init_position_value", axis=0),
+    arg_take_spec=dict(
+        init_position_value=ch.ArraySlicer(axis=0),
+        asset_value=ch.ArraySlicer(axis=1),
+        cash_flow=ch.ArraySlicer(axis=1),
+    ),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def asset_pnl_nb(
+    init_position_value: tp.Array1d,
+    asset_value: tp.Array2d,
+    cash_flow: tp.Array2d,
+) -> tp.Array2d:
+    """Get asset (realized and unrealized) PnL series per column/group."""
+    out = np.empty_like(cash_flow)
+    for col in prange(cash_flow.shape[1]):
+        for i in range(cash_flow.shape[0]):
+            if i == 0:
+                input_asset_value = 0.0
+                _cash_flow = cash_flow[i, col] - init_position_value[col]
+            else:
+                input_asset_value = asset_value[i - 1, col]
+                _cash_flow = cash_flow[i, col]
+            out[i, col] = get_asset_pnl_nb(
+                input_asset_value,
+                asset_value[i, col],
+                _cash_flow,
+            )
+    return out
+
+
+@register_jitted(cache=True)
 def get_asset_return_nb(
     input_asset_value: float,
     output_asset_value: float,

@@ -1946,6 +1946,7 @@ shortcut_config = ReadonlyConfig(
         "final_value": dict(obj_type="red_array"),
         "total_return": dict(obj_type="red_array"),
         "returns": dict(resample_func=returns_resample_func),
+        "asset_pnl": dict(resample_func="sum", resample_kwargs=dict(wrap_kwargs=dict(fillna=0.0))),
         "asset_returns": dict(resample_func=returns_resample_func),
         "market_value": dict(),
         "market_returns": dict(resample_func=returns_resample_func),
@@ -9343,6 +9344,53 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if daily_returns:
             returns = returns.vbt.returns(log_returns=log_returns).daily(jitted=jitted)
         return returns
+
+    @class_or_instancemethod
+    def get_asset_pnl(
+        cls_or_self,
+        group_by: tp.GroupByLike = None,
+        init_position_value: tp.Optional[tp.MaybeSeries] = None,
+        asset_value: tp.Optional[tp.SeriesFrame] = None,
+        cash_flow: tp.Optional[tp.SeriesFrame] = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """Get asset (realized and unrealized) PnL series per column/group."""
+        if not isinstance(cls_or_self, type):
+            if init_position_value is None:
+                init_position_value = cls_or_self.init_position_value
+            if asset_value is None:
+                asset_value = cls_or_self.resolve_shortcut_attr(
+                    "asset_value",
+                    group_by=group_by,
+                    jitted=jitted,
+                    chunked=chunked,
+                )
+            if cash_flow is None:
+                cash_flow = cls_or_self.resolve_shortcut_attr(
+                    "cash_flow",
+                    group_by=group_by,
+                    jitted=jitted,
+                    chunked=chunked,
+                )
+            if wrapper is None:
+                wrapper = cls_or_self.wrapper
+        else:
+            checks.assert_not_none(init_position_value)
+            checks.assert_not_none(asset_value)
+            checks.assert_not_none(cash_flow)
+            checks.assert_not_none(wrapper)
+
+        func = jit_reg.resolve_option(nb.asset_pnl_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        asset_pnl = func(
+            to_1d_array(init_position_value),
+            to_2d_array(asset_value),
+            to_2d_array(cash_flow),
+        )
+        return wrapper.wrap(asset_pnl, group_by=group_by, **resolve_dict(wrap_kwargs))
 
     @class_or_instancemethod
     def get_asset_returns(

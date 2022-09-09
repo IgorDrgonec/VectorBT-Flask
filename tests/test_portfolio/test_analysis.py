@@ -5446,6 +5446,91 @@ class TestPortfolio:
         )
         assert_frame_equal(pf_grouped.get_returns(chunked=True), pf_grouped.get_returns(chunked=False))
 
+    def test_asset_pnl(self):
+        result = pd.DataFrame(
+            np.array(
+                [
+                    [0.0, 0.0, -0.1201000000000001],
+                    [-0.10401999999999978, -1.10398, 0.8959800000000002],
+                    [0.9402999999999997, 0.0, 0.9402999999999997],
+                    [-0.007960000000000245, -2.30804, -0.007960000000000245],
+                    [-0.2004999999999999, -1.1994999999999996, 0.0],
+                ]
+            ),
+            index=close_na.index,
+            columns=close_na.columns,
+        )
+        assert_frame_equal(pf.asset_pnl, result)
+        assert_frame_equal(pf_grouped.get_asset_pnl(group_by=False), result)
+        assert_frame_equal(pf_shared.get_asset_pnl(group_by=False), result)
+        result = pd.DataFrame(
+            np.array(
+                [
+                    [-1.0, 0.8798999999999999],
+                    [-1.208, 0.8959800000000002],
+                    [0.9402999999999997, 0.9402999999999997],
+                    [-2.3160000000000003, -0.007960000000000245],
+                    [-1.3999999999999995, 0.0],
+                ]
+            ),
+            index=close_na.index,
+            columns=pd.Index(["first", "second"], dtype="object", name="group"),
+        )
+        assert_frame_equal(pf.get_asset_pnl(group_by=group_by), result)
+        assert_frame_equal(pf_grouped.asset_pnl, result)
+        assert_frame_equal(pf_shared.asset_pnl, result)
+        assert_frame_equal(
+            pf.asset_pnl,
+            vbt.Portfolio.get_asset_pnl(
+                init_position_value=pf.init_position_value,
+                cash_flow=pf.cash_flow,
+                asset_value=pf.asset_value,
+                wrapper=pf.wrapper,
+            ),
+        )
+        assert_frame_equal(
+            pf_grouped.asset_pnl,
+            vbt.Portfolio.get_asset_pnl(
+                init_position_value=pf_grouped.init_position_value,
+                cash_flow=pf_grouped.cash_flow,
+                asset_value=pf_grouped.asset_value,
+                wrapper=pf_grouped.wrapper,
+            ),
+        )
+        assert_frame_equal(
+            pf_shared.asset_pnl,
+            vbt.Portfolio.get_asset_pnl(
+                init_position_value=pf_shared.init_position_value,
+                cash_flow=pf_shared.cash_flow,
+                asset_value=pf_shared.asset_value,
+                wrapper=pf_shared.wrapper,
+            ),
+        )
+        assert_frame_equal(
+            pf.get_asset_pnl(jitted=dict(parallel=True)),
+            pf.get_asset_pnl(jitted=dict(parallel=False)),
+        )
+        assert_frame_equal(pf.get_asset_pnl(chunked=True), pf.get_asset_pnl(chunked=False))
+        size = pd.Series([0.0, 0.5, -0.5, -0.5, 0.5, 1.0, -2.0, 2.0])
+        pf2 = vbt.Portfolio.from_orders(1, size, fees=0.0)
+        assert_series_equal(pf2.asset_pnl, pd.Series([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
+        pf3 = vbt.Portfolio.from_orders(1, size, fees=0.01)
+        assert_series_equal(
+            pf3.asset_pnl,
+            pd.Series(
+                [
+                    0.0,
+                    -0.0050000000000000044,
+                    -0.0050000000000000044,
+                    -0.0050000000000000044,
+                    -0.0050000000000000044,
+                    -0.010000000000000009,
+                    -0.020000000000000018,
+                    -0.020000000000000018
+                ]
+            ),
+        )
+
     def test_asset_returns(self):
         result = pd.DataFrame(
             np.array(
