@@ -7,7 +7,6 @@ from datetime import datetime as _datetime, timedelta as _timedelta, time as _ti
 from functools import wraps
 from itertools import product, combinations
 
-import pandas as pd
 import pytest
 from numba import njit
 from numba.core.registry import CPUDispatcher
@@ -1806,6 +1805,21 @@ class TestParams:
             [4, 5, 5, 4, 5, 5, 4, 5, 5],
         ]
 
+    def test_find_params(self):
+        assert params.find_params_in_obj({
+            "a": 1,
+            "b": params.Param([1, 2, 3]),
+            "c": {
+                "d": 2,
+                "e": params.Param([1, 2, 3]),
+                "f": (3, params.Param([1, 2, 3]))
+            }
+        }) == {
+            "b": params.Param([1, 2, 3]),
+            ("c", "e"): params.Param([1, 2, 3]),
+            ("c", "f", 1): params.Param([1, 2, 3]),
+        }
+
     def test_parameterized(self):
         def f(a, *my_args, b=2, **my_kwargs):
             return a, my_args, b, my_kwargs
@@ -1825,11 +1839,27 @@ class TestParams:
         assert fp(vbt.Param([1, 2]))[0] == [(1, (), 2, {}), (2, (), 2, {})]
         assert_index_equal(fp(vbt.Param([1, 2]))[1], pd.Int64Index([1, 2], dtype='int64', name='a'))
         assert fp(1, vbt.Param([2, 3]))[0] == [(1, (2,), 2, {}), (1, (3,), 2, {})]
-        assert_index_equal(fp(1, vbt.Param([2, 3]))[1], pd.Int64Index([2, 3], dtype='int64', name='arg_0'))
+        assert_index_equal(fp(1, vbt.Param([2, 3]))[1], pd.Int64Index([2, 3], dtype='int64', name='my_args_0'))
         assert fp(1, b=vbt.Param([2, 3]))[0] == [(1, (), 2, {}), (1, (), 3, {})]
         assert_index_equal(fp(1, b=vbt.Param([2, 3]))[1], pd.Int64Index([2, 3], dtype='int64', name='b'))
         assert fp(1, c=vbt.Param([2, 3]))[0] == [(1, (), 2, {"c": 2}), (1, (), 2, {"c": 3})]
         assert_index_equal(fp(1, c=vbt.Param([2, 3]))[1], pd.Int64Index([2, 3], dtype='int64', name='c'))
+        kwargs = dict(c=dict(d=(2, dict(e=vbt.Param([3, 4])))), f=(5, vbt.Param([6, 7])))
+        assert fp(1, **kwargs)[0] == [
+            (1, (), 2, {"c": dict(d=(2, dict(e=3))), "f": (5, 6)}),
+            (1, (), 2, {"c": dict(d=(2, dict(e=3))), "f": (5, 7)}),
+            (1, (), 2, {"c": dict(d=(2, dict(e=4))), "f": (5, 6)}),
+            (1, (), 2, {"c": dict(d=(2, dict(e=4))), "f": (5, 7)}),
+        ]
+        assert_index_equal(
+            fp(1, **kwargs)[1],
+            pd.MultiIndex.from_tuples([
+                (3, 6),
+                (3, 7),
+                (4, 6),
+                (4, 7),
+            ], names=["c_d_1_e", "f_1"])
+        )
 
         param_configs = [dict(a=1)]
         assert fp(param_configs=param_configs)[0] == [(1, (), 2, {})]
@@ -1837,7 +1867,7 @@ class TestParams:
         param_configs = [dict(a=1, my_args=(2, 3))]
         assert fp(param_configs=param_configs)[0] == [(1, (2, 3), 2, {})]
         assert_index_equal(fp(param_configs=param_configs)[1], pd.Int64Index([0], dtype='int64', name='param_config'))
-        param_configs = [dict(a=1, arg_0=2, arg_1=3)]
+        param_configs = [dict(a=1, my_args_0=2, my_args_1=3)]
         assert fp(param_configs=param_configs)[0] == [(1, (2, 3), 2, {})]
         assert_index_equal(fp(param_configs=param_configs)[1], pd.Int64Index([0], dtype='int64', name='param_config'))
         param_configs = [dict(a=1, b=3)]

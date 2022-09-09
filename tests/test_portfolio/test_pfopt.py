@@ -988,7 +988,7 @@ class TestPortfolioOptimizer:
             prices.vbt.wrapper,
             lambda index_slice, mult: prices.iloc[index_slice].sum() * mult,
             vbt.Rep("index_slice"),
-            group_configs=[{"arg_1": 1}, {"arg_1": 2}],
+            group_configs=[{"args_1": 1}, {"args_1": 2}],
         )
         assert_index_equal(
             pf_opt.wrapper.grouper.group_by,
@@ -1292,7 +1292,7 @@ class TestPortfolioOptimizer:
             prices.vbt.wrapper,
             lambda index_point, mult: prices.iloc[index_point] * mult,
             vbt.Rep("index_point"),
-            group_configs=[dict(arg_1=1), dict(arg_1=2)]
+            group_configs=[dict(args_1=1), dict(args_1=2)]
         )
         assert_index_equal(
             pf_opt.wrapper.grouper.group_by,

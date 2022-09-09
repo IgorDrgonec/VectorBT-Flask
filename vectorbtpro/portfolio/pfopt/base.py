@@ -18,7 +18,7 @@ from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.random_ import set_seed_nb
 from vectorbtpro.utils.enum_ import map_enum_fields
-from vectorbtpro.utils.params import Param, combine_params
+from vectorbtpro.utils.params import Param, combine_params, find_params_in_obj, param_product_to_objs
 from vectorbtpro.base.indexes import combine_indexes, stack_indexes
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, to_dict
@@ -841,6 +841,9 @@ class PortfolioOptimizer(Analyzable):
         indexer_tolerance: tp.Union[None, str, Param] = row_points_defaults["indexer_tolerance"],
         skip_minus_one: tp.Union[bool, Param] = row_points_defaults["skip_minus_one"],
         index_points: tp.Union[None, tp.MaybeSequence[int], Param] = None,
+        search_max_len: tp.Optional[int] = None,
+        search_max_depth: tp.Optional[int] = None,
+        name_tuple_to_str: tp.Union[None, bool, tp.Callable] = None,
         group_configs: tp.Union[None, tp.Dict[tp.Hashable, tp.Kwargs], tp.Sequence[tp.Kwargs]] = None,
         pre_group_func: tp.Optional[tp.Callable] = None,
         jitted_loop: bool = False,
@@ -1017,7 +1020,7 @@ class PortfolioOptimizer(Analyzable):
                 group_config = dict(group_config)
                 if "args" in group_config:
                     for k, arg in enumerate(group_config.pop("args")):
-                        group_config[f"arg_{k}"] = arg
+                        group_config[f"args_{k}"] = arg
                 if "kwargs" in group_config:
                     for k, v in enumerate(group_config.pop("kwargs")):
                         group_config[k] = v
@@ -1046,38 +1049,30 @@ class PortfolioOptimizer(Analyzable):
             "indexer_tolerance": indexer_tolerance,
             "skip_minus_one": skip_minus_one,
             "index_points": index_points,
-            **{f"arg_{i}": args[i] for i in range(len(args))},
+            **{f"args_{i}": args[i] for i in range(len(args))},
             **kwargs,
         }
-        param_dct = {}
-        for k, v in paramable_kwargs.items():
-            if isinstance(v, Param):
-                param_dct[k] = v
+        param_dct = find_params_in_obj(
+            paramable_kwargs,
+            search_max_len=search_max_len,
+            search_max_depth=search_max_depth,
+        )
         param_columns = None
         if len(param_dct) > 0:
             param_product, param_columns = combine_params(
                 param_dct,
                 random_subset=random_subset,
                 stack_kwargs=stack_kwargs,
+                name_tuple_to_str=name_tuple_to_str,
             )
+            product_group_configs = param_product_to_objs(paramable_kwargs, param_product)
             if len(group_configs) == 0:
-                group_configs = []
-                for i in range(len(param_columns)):
-                    group_config = dict()
-                    for k, v in param_product.items():
-                        group_config[k] = v[i]
-                    group_configs.append(group_config)
+                group_configs = product_group_configs
             else:
                 new_group_configs = []
-                for i in range(len(param_columns)):
+                for i in range(len(product_group_configs)):
                     for group_config in group_configs:
-                        new_group_config = dict()
-                        for k, v in group_config.items():
-                            if k in param_product:
-                                raise ValueError(f"Parameter '{k}' is re-defined in a group config")
-                            new_group_config[k] = v
-                        for k, v in param_product.items():
-                            new_group_config[k] = v[i]
+                        new_group_config = merge_dicts(product_group_configs[i], group_config)
                         new_group_configs.append(new_group_config)
                 group_configs = new_group_configs
 
@@ -1119,8 +1114,8 @@ class PortfolioOptimizer(Analyzable):
             new_group_config = merge_dicts(groupable_kwargs, group_config)
             _args = ()
             while True:
-                if f"arg_{len(_args)}" in new_group_config:
-                    _args += (new_group_config.pop(f"arg_{len(_args)}"),)
+                if f"args_{len(_args)}" in new_group_config:
+                    _args += (new_group_config.pop(f"args_{len(_args)}"),)
                 else:
                     break
             new_group_config["args"] = _args
@@ -1132,9 +1127,6 @@ class PortfolioOptimizer(Analyzable):
         allocations = []
         if show_progress is None:
             show_progress = len(group_configs) > 1
-            show_progress_none = True
-        else:
-            show_progress_none = False
         with get_pbar(total=len(group_configs), show_progress=show_progress, **pbar_kwargs) as pbar:
             for g, group_config in enumerate(group_configs):
                 pbar.set_description(str(group_index[g]))
@@ -1537,6 +1529,9 @@ class PortfolioOptimizer(Analyzable):
         index_ranges: tp.Union[None, tp.MaybeSequence[tp.MaybeSequence[int]], Param] = None,
         index_loc: tp.Union[None, tp.MaybeSequence[int], Param] = None,
         alloc_wait: tp.Union[int, Param] = 1,
+        search_max_len: tp.Optional[int] = None,
+        search_max_depth: tp.Optional[int] = None,
+        name_tuple_to_str: tp.Union[None, bool, tp.Callable] = None,
         group_configs: tp.Union[None, tp.Dict[tp.Hashable, tp.Kwargs], tp.Sequence[tp.Kwargs]] = None,
         pre_group_func: tp.Optional[tp.Callable] = None,
         jitted_loop: bool = False,
@@ -1782,7 +1777,7 @@ class PortfolioOptimizer(Analyzable):
                     group_configs = list(group_configs)
                 if "args" in group_config:
                     for k, arg in enumerate(group_config.pop("args")):
-                        group_config[f"arg_{k}"] = arg
+                        group_config[f"args_{k}"] = arg
                 if "kwargs" in group_config:
                     for k, v in enumerate(group_config.pop("kwargs")):
                         group_config[k] = v
@@ -1817,38 +1812,30 @@ class PortfolioOptimizer(Analyzable):
             "index_ranges": index_ranges,
             "index_loc": index_loc,
             "alloc_wait": alloc_wait,
-            **{f"arg_{i}": args[i] for i in range(len(args))},
+            **{f"args_{i}": args[i] for i in range(len(args))},
             **kwargs,
         }
-        param_dct = {}
-        for k, v in paramable_kwargs.items():
-            if isinstance(v, Param):
-                param_dct[k] = v
+        param_dct = find_params_in_obj(
+            paramable_kwargs,
+            search_max_len=search_max_len,
+            search_max_depth=search_max_depth,
+        )
         param_columns = None
         if len(param_dct) > 0:
             param_product, param_columns = combine_params(
                 param_dct,
                 random_subset=random_subset,
                 stack_kwargs=stack_kwargs,
+                name_tuple_to_str=name_tuple_to_str,
             )
+            product_group_configs = param_product_to_objs(paramable_kwargs, param_product)
             if len(group_configs) == 0:
-                group_configs = []
-                for i in range(len(param_columns)):
-                    group_config = dict()
-                    for k, v in param_product.items():
-                        group_config[k] = v[i]
-                    group_configs.append(group_config)
+                group_configs = product_group_configs
             else:
                 new_group_configs = []
-                for i in range(len(param_columns)):
+                for i in range(len(product_group_configs)):
                     for group_config in group_configs:
-                        new_group_config = dict()
-                        for k, v in group_config.items():
-                            if k in param_product:
-                                raise ValueError(f"Parameter '{k}' is re-defined in a group config")
-                            new_group_config[k] = v
-                        for k, v in param_product.items():
-                            new_group_config[k] = v[i]
+                        new_group_config = merge_dicts(product_group_configs[i], group_config)
                         new_group_configs.append(new_group_config)
                 group_configs = new_group_configs
 
@@ -1889,10 +1876,11 @@ class PortfolioOptimizer(Analyzable):
         for group_config in group_configs:
             new_group_config = merge_dicts(groupable_kwargs, group_config)
             _args = ()
-            for k in list(new_group_config.keys()):
-                if k.startswith("arg_") and k[4:].isnumeric():
-                    arg_i = int(k[4:])
-                    _args = args[:arg_i] + (new_group_config.pop(k),) + args[arg_i + 1:]
+            while True:
+                if f"args_{len(_args)}" in new_group_config:
+                    _args += (new_group_config.pop(f"args_{len(_args)}"),)
+                else:
+                    break
             new_group_config["args"] = _args
             new_group_configs.append(new_group_config)
         group_configs = new_group_configs
@@ -1901,9 +1889,6 @@ class PortfolioOptimizer(Analyzable):
         allocations = []
         if show_progress is None:
             show_progress = len(group_configs) > 1
-            show_progress_none = True
-        else:
-            show_progress_none = False
         with get_pbar(total=len(group_configs), show_progress=show_progress, **pbar_kwargs) as pbar:
             for g, group_config in enumerate(group_configs):
                 pbar.set_description(str(group_index[g]))
@@ -2152,7 +2137,7 @@ class PortfolioOptimizer(Analyzable):
     ) -> PortfolioOptimizerT:
         """`PortfolioOptimizer.from_optimize_func` applied on `pypfopt_optimize`.
 
-        If a wrapper is not provided, parses the wrapper from the argument `prices` or `returns`."""
+        If a wrapper is not provided, parses the wrapper from `prices` or `returns`, if provided."""
         if wrapper is None:
             if "prices" in kwargs:
                 wrapper = ArrayWrapper.from_obj(kwargs["prices"])

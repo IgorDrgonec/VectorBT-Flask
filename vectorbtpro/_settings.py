@@ -289,11 +289,14 @@ ${config_doc}
 _settings["chunking"] = chunking
 
 params = ChildDict(
+    search_max_len=None,
+    search_max_depth=None,
     skip_single_param=True,
     template_context=Config(),
     random_subset=None,
-    merge_func=None,
-    merge_kwargs=Config(),
+    seed=None,
+    stack_kwargs=Config(),
+    name_tuple_to_str=True,
     execute_kwargs=Config(),
 )
 """_"""

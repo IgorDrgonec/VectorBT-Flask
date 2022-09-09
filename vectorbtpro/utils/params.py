@@ -159,11 +159,23 @@ def combine_params(
     random_subset: tp.Optional[int] = None,
     seed: tp.Optional[int] = None,
     stack_kwargs: tp.KwargsLike = None,
+    name_tuple_to_str: tp.Union[None, bool, tp.Callable] = None,
 ) -> tp.Tuple[dict, pd.Index]:
     """Combine a dictionary with parameters of the type `Param`.
 
     Returns a dictionary with combined parameters and an index."""
+    from vectorbtpro._settings import settings
     from vectorbtpro.base import indexes
+
+    params_cfg = settings["params"]
+
+    if random_subset is None:
+        random_subset = params_cfg["random_subset"]
+    if seed is None:
+        seed = params_cfg["seed"]
+    stack_kwargs = merge_dicts(params_cfg["stack_kwargs"], stack_kwargs)
+    if name_tuple_to_str is None:
+        name_tuple_to_str = params_cfg["name_tuple_to_str"]
 
     if stack_kwargs is None:
         stack_kwargs = {}
@@ -255,7 +267,138 @@ def combine_params(
         param_product = {k: [v[i] for i in range(n_params)] for k, v in param_product.items()}
         if param_index is not None:
             param_index = param_index[random_indices]
+
+    # Stringify index names
+    if isinstance(name_tuple_to_str, bool):
+        if name_tuple_to_str:
+            name_tuple_to_str = lambda name_tuple: "_".join(map(lambda x: str(x).strip().lower(), name_tuple))
+        else:
+            name_tuple_to_str = None
+    if name_tuple_to_str is not None:
+        found_tuple = False
+        new_names = []
+        for name in param_index.names:
+            if isinstance(name, tuple):
+                name = name_tuple_to_str(name)
+                found_tuple = True
+            new_names.append(name)
+        if found_tuple:
+            param_index.rename(new_names, inplace=True)
     return param_product, param_index
+
+
+def find_params_in_obj(
+    obj: tp.Any,
+    key: tp.Optional[tp.Hashable] = None,
+    search_max_len: tp.Optional[int] = None,
+    search_max_depth: tp.Optional[int] = None,
+    _depth: int = 0,
+) -> dict:
+    """Find values wrapped with `Param` in a recursive manner.
+
+    If a value is a dictionary or a tuple, applies `find_params_in_obj` on each element,
+    unless its length exceeds `search_max_len` or the current depth exceeds `search_max_depth`."""
+    from vectorbtpro._settings import settings
+
+    params_cfg = settings["params"]
+
+    if search_max_len is None:
+        search_max_len = params_cfg["search_max_len"]
+    if search_max_depth is None:
+        search_max_depth = params_cfg["search_max_depth"]
+
+    if isinstance(obj, Param):
+        return {key: obj}
+    if search_max_depth is None or _depth < search_max_depth:
+        if isinstance(obj, dict):
+            if search_max_len is None or len(obj) <= search_max_len:
+                found_dct = {}
+                for k, v in obj.items():
+                    new_key = k if key is None else (*key, k) if isinstance(key, tuple) else (key, k)
+                    found_dct.update(find_params_in_obj(
+                        v,
+                        key=new_key,
+                        search_max_len=search_max_len,
+                        search_max_depth=search_max_depth,
+                        _depth=_depth + 1,
+                    ))
+                return found_dct
+        if isinstance(obj, tuple):
+            if search_max_len is None or len(obj) <= search_max_len:
+                found_dct = {}
+                for i in range(len(obj)):
+                    new_key = i if key is None else (*key, i) if isinstance(key, tuple) else (key, i)
+                    found_dct.update(find_params_in_obj(
+                        obj[i],
+                        key=new_key,
+                        search_max_len=search_max_len,
+                        search_max_depth=search_max_depth,
+                        _depth=_depth + 1,
+                    ))
+                return found_dct
+    return {}
+
+
+def replace_param_set_in_obj(obj: tp.Any, param_dct: dict, key: tp.Optional[tp.Hashable] = None) -> tp.Any:
+    """Replace a single parameter set in an object in a recursive manner."""
+    if len(param_dct) == 0:
+        return obj
+    if key in param_dct:
+        return param_dct[key]
+    if isinstance(obj, dict):
+        new_obj = {}
+        for k in obj:
+            if k in param_dct:
+                new_obj[k] = param_dct[k]
+                del param_dct[k]
+            else:
+                replaced = False
+                for k2 in param_dct:
+                    if isinstance(k2, tuple) and k2[0] == k:
+                        new_k2 = k2[1:] if len(k2) > 2 else k2[1]
+                        param_dct[new_k2] = param_dct[k2]
+                        del param_dct[k2]
+                        new_key = k if key is None else (*key, k) if isinstance(key, tuple) else (key, k)
+                        new_obj[k] = replace_param_set_in_obj(obj[k], param_dct, new_key)
+                        replaced = True
+                        break
+                if not replaced:
+                    new_obj[k] = obj[k]
+        return new_obj
+    if isinstance(obj, tuple):
+        new_obj = []
+        for i in range(len(obj)):
+            if i in param_dct:
+                new_obj.append(param_dct[i])
+                del param_dct[i]
+            else:
+                replaced = False
+                for i2 in param_dct:
+                    if isinstance(i2, tuple) and i2[0] == i:
+                        new_i2 = i2[1:] if len(i2) > 2 else i2[1]
+                        param_dct[new_i2] = param_dct[i2]
+                        del param_dct[i2]
+                        new_key = i if key is None else (*key, i) if isinstance(key, tuple) else (key, i)
+                        new_obj.append(replace_param_set_in_obj(obj[i], param_dct, new_key))
+                        replaced = True
+                        break
+                if not replaced:
+                    new_obj.append(obj[i])
+        return tuple(new_obj)
+    return obj
+
+
+def param_product_to_objs(obj: tp.Any, param_product: dict) -> tp.List[dict]:
+    """Resolve parameter product into a list of objects based on the original object."""
+    if len(param_product) == 0:
+        return []
+    param_product_items = list(param_product.items())
+    n_values = len(param_product_items[0][1])
+    new_objs = []
+    for i in range(n_values):
+        param_dct = {k: v[i] for k, v in param_product.items()}
+        new_objs.append(replace_param_set_in_obj(obj, param_dct))
+    return new_objs
 
 
 def row_stack_merge_func(results: tp.List[tp.AnyArray], param_index: tp.Index) -> tp.MaybeTuple[tp.SeriesFrame]:
@@ -288,10 +431,13 @@ def column_stack_merge_func(results: tp.List[tp.AnyArray], param_index: tp.Index
 
 def parameterized(
     *args,
+    search_max_len: tp.Optional[int] = None,
+    search_max_depth: tp.Optional[int] = None,
     skip_single_param: tp.Optional[bool] = None,
     template_context: tp.Optional[tp.Mapping] = None,
     random_subset: tp.Optional[int] = None,
     stack_kwargs: tp.KwargsLike = None,
+    name_tuple_to_str: tp.Union[None, bool, tp.Callable] = None,
     merge_func: tp.Union[None, str, tp.Callable] = None,
     merge_kwargs: tp.KwargsLike = None,
     **execute_kwargs,
@@ -301,20 +447,26 @@ def parameterized(
 
     Does the following:
 
-    1. Searches for arguments wrapped with the class `Param`.
-    2. Uses `combine_params` to build parameter combinations.
-    3. Generates and resolves parameter configs by combining combinations from the step above over
-    `param_configs` that is optionally passed by the user.
-    4. Extracts arguments and keyword arguments from each parameter config.
-    5. Substitutes any templates
-    6. Passes each set of the function and its arguments to `vectorbtpro.utils.execution.execute` for execution.
-    7. Optionally, post-processes and merges the results by passing them and `**merge_kwargs` to `merge_func`.
+    1. Searches for values wrapped with the class `Param` in any nested dicts and tuples using `find_params_in_obj`
+    2. Uses `combine_params` to build parameter combinations
+    3. Maps parameter combinations to configs using `param_product_to_objs`
+    4. Generates and resolves parameter configs by combining combinations from the step above with
+    `param_configs` that is optionally passed by the user. User-defined `param_configs` have more priority.
+    5. Extracts arguments and keyword arguments from each parameter config
+    6. Substitutes any templates
+    7. Passes each set of the function and its arguments to `vectorbtpro.utils.execution.execute` for execution
+    8. Optionally, post-processes and merges the results by passing them and `**merge_kwargs` to `merge_func`
 
     Argument `param_configs` will be added as an extra argument to the function's signature.
     It accepts either a list of dictionaries with arguments named by their names in the signature,
     or a dictionary of dictionaries, where keys are config names. If a list is passed, each dictionary
     can also contain the key `_name` to give the config a name. Variable arguments can be passed
-    either in the rolled (`args=(...), kwargs={...}`) or unrolled (`arg_0=..., arg_1=..., some_kwarg=...`) format.
+    either in the rolled (`args=(...), kwargs={...}`) or unrolled (`args_0=..., args_1=..., some_kwarg=...`) format.
+
+    !!! important
+        Defining a parameter and listing the same argument in `param_configs` will prioritize
+        the config over the parameter, even though the parameter will still be visible in the final columns.
+        There are no checks implemented to raise an error when this happens!
 
     Any template in both `execute_kwargs` and `merge_kwargs` will be substituted. You can use
     the keys `param_configs`, `param_index`, all keys in `template_context`, and all arguments as found
@@ -460,15 +612,38 @@ def parameterized(
 
         @wraps(func)
         def wrapper(*args, **kwargs) -> tp.Any:
+            search_max_len = kwargs.pop("_search_max_len", wrapper.options["search_max_len"])
+            if search_max_len is None:
+                search_max_len = params_cfg["search_max_len"]
+            search_max_depth = kwargs.pop("_search_max_depth", wrapper.options["search_max_depth"])
+            if search_max_depth is None:
+                search_max_depth = params_cfg["search_max_depth"]
             skip_single_param = kwargs.pop("_skip_single_param", wrapper.options["skip_single_param"])
             if skip_single_param is None:
                 skip_single_param = params_cfg["skip_single_param"]
-            template_context = merge_dicts(wrapper.options["template_context"], kwargs.pop("_template_context", {}))
+            template_context = merge_dicts(
+                params_cfg["template_context"],
+                wrapper.options["template_context"],
+                kwargs.pop("_template_context", {})
+            )
             random_subset = kwargs.pop("_random_subset", wrapper.options["random_subset"])
-            stack_kwargs = merge_dicts(wrapper.options["stack_kwargs"], kwargs.pop("_stack_kwargs", {}))
+            if random_subset is None:
+                random_subset = params_cfg["random_subset"]
+            stack_kwargs = merge_dicts(
+                params_cfg["stack_kwargs"],
+                wrapper.options["stack_kwargs"],
+                kwargs.pop("_stack_kwargs", {})
+            )
+            name_tuple_to_str = kwargs.pop("_name_tuple_to_str", wrapper.options["name_tuple_to_str"])
+            if name_tuple_to_str is None:
+                name_tuple_to_str = params_cfg["name_tuple_to_str"]
             merge_func = kwargs.pop("_merge_func", wrapper.options["merge_func"])
             merge_kwargs = merge_dicts(wrapper.options["merge_kwargs"], kwargs.pop("_merge_kwargs", {}))
-            execute_kwargs = merge_dicts(wrapper.options["execute_kwargs"], kwargs.pop("_execute_kwargs", {}))
+            execute_kwargs = merge_dicts(
+                params_cfg["execute_kwargs"],
+                wrapper.options["execute_kwargs"],
+                kwargs.pop("_execute_kwargs", {})
+            )
             param_configs = kwargs.pop("param_configs", None)
             if param_configs is None:
                 param_configs = []
@@ -500,7 +675,7 @@ def parameterized(
                 param_config = dict(param_config)
                 if var_args_name is not None and var_args_name in param_config:
                     for k, arg in enumerate(param_config.pop(var_args_name)):
-                        param_config[f"arg_{k}"] = arg
+                        param_config[f"{var_args_name}_{k}"] = arg
                 if var_kwargs_name is not None and var_kwargs_name in param_config:
                     for k, v in param_config.pop(var_kwargs_name).items():
                         param_config[k] = v
@@ -518,41 +693,33 @@ def parameterized(
                 if "value" in v:
                     if v["kind"] == inspect.Parameter.VAR_POSITIONAL:
                         for i, arg in enumerate(v["value"]):
-                            paramable_kwargs[f"arg_{i}"] = arg
+                            paramable_kwargs[f"{var_args_name}_{i}"] = arg
                     elif v["kind"] == inspect.Parameter.VAR_KEYWORD:
                         for k2, v2 in v["value"].items():
                             paramable_kwargs[k2] = v2
                     else:
                         paramable_kwargs[k] = v["value"]
-            param_dct = {}
-            for k, v in paramable_kwargs.items():
-                if isinstance(v, Param):
-                    param_dct[k] = v
+            param_dct = find_params_in_obj(
+                paramable_kwargs,
+                search_max_len=search_max_len,
+                search_max_depth=search_max_depth,
+            )
             param_columns = None
             if len(param_dct) > 0:
                 param_product, param_columns = combine_params(
                     param_dct,
                     random_subset=random_subset,
                     stack_kwargs=stack_kwargs,
+                    name_tuple_to_str=name_tuple_to_str,
                 )
+                product_param_configs = param_product_to_objs(paramable_kwargs, param_product)
                 if len(param_configs) == 0:
-                    param_configs = []
-                    for i in range(len(param_columns)):
-                        param_config = dict()
-                        for k, v in param_product.items():
-                            param_config[k] = v[i]
-                        param_configs.append(param_config)
+                    param_configs = product_param_configs
                 else:
                     new_param_configs = []
-                    for i in range(len(param_columns)):
+                    for i in range(len(product_param_configs)):
                         for param_config in param_configs:
-                            new_param_config = dict()
-                            for k, v in param_config.items():
-                                if k in param_product:
-                                    raise ValueError(f"Parameter '{k}' is re-defined in a parameter config")
-                                new_param_config[k] = v
-                            for k, v in param_product.items():
-                                new_param_config[k] = v[i]
+                            new_param_config = merge_dicts(product_param_configs[i], param_config)
                             new_param_configs.append(new_param_config)
                     param_configs = new_param_configs
 
@@ -588,8 +755,8 @@ def parameterized(
                 if var_args_name is not None:
                     _args = ()
                     while True:
-                        if f"arg_{len(_args)}" in new_param_config:
-                            _args += (new_param_config.pop(f"arg_{len(_args)}"),)
+                        if f"{var_args_name}_{len(_args)}" in new_param_config:
+                            _args += (new_param_config.pop(f"{var_args_name}_{len(_args)}"),)
                         else:
                             break
                     new_param_config[var_args_name] = _args
@@ -646,10 +813,13 @@ def parameterized(
 
         wrapper.options = Config(
             dict(
+                search_max_len=search_max_len,
+                search_max_depth=search_max_depth,
                 skip_single_param=skip_single_param,
                 template_context=template_context,
                 random_subset=random_subset,
                 stack_kwargs=stack_kwargs,
+                name_tuple_to_str=name_tuple_to_str,
                 merge_func=merge_func,
                 merge_kwargs=merge_kwargs,
                 execute_kwargs=execute_kwargs,
