@@ -749,12 +749,6 @@ def get_asset_pnl_nb(
     cash_flow: float,
 ) -> float:
     """Get asset PnL from the input and output asset value, and the cash flow."""
-    if is_close_nb(input_asset_value, 0):
-        return cash_flow + output_asset_value
-    if is_close_nb(output_asset_value, 0):
-        return cash_flow - input_asset_value
-    if np.sign(input_asset_value) != np.sign(output_asset_value):
-        return cash_flow - input_asset_value + output_asset_value
     return output_asset_value + cash_flow - input_asset_value
 
 
@@ -801,10 +795,6 @@ def get_asset_return_nb(
     """Get asset return from the input and output asset value, and the cash flow."""
     if is_close_nb(input_asset_value, 0):
         return returns_nb_.get_return_nb(-output_asset_value, cash_flow, log_returns=log_returns)
-    if is_close_nb(output_asset_value, 0):
-        return returns_nb_.get_return_nb(input_asset_value, cash_flow, log_returns=log_returns)
-    if np.sign(input_asset_value) != np.sign(output_asset_value):
-        return returns_nb_.get_return_nb(input_asset_value - output_asset_value, cash_flow, log_returns=log_returns)
     return returns_nb_.get_return_nb(input_asset_value, output_asset_value + cash_flow, log_returns=log_returns)
 
 
