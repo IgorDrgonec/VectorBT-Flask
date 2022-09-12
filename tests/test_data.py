@@ -1,6 +1,7 @@
 import os
 from datetime import datetime, timedelta, timezone
 
+import pandas as pd
 import pytest
 
 import vectorbtpro as vbt
@@ -1237,6 +1238,46 @@ class TestData:
             ),
         )
 
+    def test_symbol_wrapper(self):
+        assert_index_equal(
+            MyData.fetch(0, shape=(5,), columns="feat0").symbol_wrapper.columns,
+            pd.Int64Index([0], dtype="int64", name="symbol"),
+        )
+        assert_index_equal(
+            MyData.fetch([0], shape=(5,), columns="feat0").symbol_wrapper.columns,
+            pd.Int64Index([0], dtype="int64", name="symbol"),
+        )
+        assert_index_equal(
+            MyData.fetch([0, 1], shape=(5,), columns="feat0").symbol_wrapper.columns,
+            pd.Int64Index([0, 1], dtype="int64", name="symbol"),
+        )
+        assert_index_equal(
+            MyData.fetch([0, 1, 2], shape=(5,), columns="feat0").get_symbol_wrapper(symbols=[0, 2]).columns,
+            pd.Int64Index([0, 2], dtype="int64", name="symbol"),
+        )
+        assert_index_equal(
+            MyData.fetch(0, symbol_classes="C1", shape=(5,), columns="feat0").symbol_wrapper.columns,
+            pd.MultiIndex.from_tuples([("C1", 0)], names=["symbol_class", "symbol"]),
+        )
+        assert_index_equal(
+            MyData.fetch(0, symbol_classes=dict(c1="C1", c2="C2"), shape=(5,), columns="feat0").symbol_wrapper.columns,
+            pd.MultiIndex.from_tuples([("C1", "C2", 0)], names=["c1", "c2", "symbol"]),
+        )
+        assert_index_equal(
+            MyData.fetch([0, 1], symbol_classes="C1", shape=(5,), columns="feat0").symbol_wrapper.columns,
+            pd.MultiIndex.from_tuples([("C1", 0), ("C1", 1)], names=["symbol_class", "symbol"]),
+        )
+        assert_index_equal(
+            MyData.fetch([0, 1], symbol_classes=["C1", "C2"], shape=(5,), columns="feat0").symbol_wrapper.columns,
+            pd.MultiIndex.from_tuples([("C1", 0), ("C2", 1)], names=["symbol_class", "symbol"]),
+        )
+        assert_index_equal(
+            MyData.fetch(
+                [0, 1], symbol_classes=[dict(c1="C1", c2="C2"), dict(c1="C3", c2="C4")], shape=(5,), columns="feat0"
+            ).symbol_wrapper.columns,
+            pd.MultiIndex.from_tuples([("C1", "C2", 0), ("C3", "C4", 1)], names=["c1", "c2", "symbol"]),
+        )
+
     def test_concat(self):
         index = pd.DatetimeIndex(
             [
@@ -1409,51 +1450,72 @@ class TestData:
         merged_data = MyData.merge(data01, data12, missing_columns="nan")
         assert_frame_equal(
             merged_data.data[0],
-            pd.DataFrame([
-                ['0_0_0', '0_1_0', '0_2_0', np.nan],
-                ['0_0_1', '0_1_1', '0_2_1', np.nan],
-                ['0_0_2', '0_1_2', '0_2_2', np.nan],
-                ['0_0_3', '0_1_3', '0_2_3', np.nan],
-                ['0_0_4', '0_1_4', '0_2_4', np.nan],
-            ], index=pd.DatetimeIndex([
-                '2020-01-01 00:00:00+00:00',
-                '2020-01-02 00:00:00+00:00',
-                '2020-01-03 00:00:00+00:00',
-                '2020-01-04 00:00:00+00:00',
-                '2020-01-05 00:00:00+00:00',
-            ], freq="d"), columns=pd.Index(['feat0', 'feat1', 'feat2', 'feat3'], dtype='object'))
+            pd.DataFrame(
+                [
+                    ["0_0_0", "0_1_0", "0_2_0", np.nan],
+                    ["0_0_1", "0_1_1", "0_2_1", np.nan],
+                    ["0_0_2", "0_1_2", "0_2_2", np.nan],
+                    ["0_0_3", "0_1_3", "0_2_3", np.nan],
+                    ["0_0_4", "0_1_4", "0_2_4", np.nan],
+                ],
+                index=pd.DatetimeIndex(
+                    [
+                        "2020-01-01 00:00:00+00:00",
+                        "2020-01-02 00:00:00+00:00",
+                        "2020-01-03 00:00:00+00:00",
+                        "2020-01-04 00:00:00+00:00",
+                        "2020-01-05 00:00:00+00:00",
+                    ],
+                    freq="d",
+                ),
+                columns=pd.Index(["feat0", "feat1", "feat2", "feat3"], dtype="object"),
+            ),
         )
         assert_frame_equal(
             merged_data.data[1],
-            pd.DataFrame([
-                ['1_0_0', '1_1_0', '1_2_0', np.nan],
-                ['1_0_1', '1_1_1', '1_2_1', np.nan],
-                ['1_0_2', '1_1_2', '1_0_0', '1_1_0'],
-                ['1_0_3', '1_1_3', '1_0_1', '1_1_1'],
-                ['1_0_4', '1_1_4', '1_0_2', '1_1_2'],
-            ], index=pd.DatetimeIndex([
-                '2020-01-01 00:00:00+00:00',
-                '2020-01-02 00:00:00+00:00',
-                '2020-01-03 00:00:00+00:00',
-                '2020-01-04 00:00:00+00:00',
-                '2020-01-05 00:00:00+00:00',
-            ], freq="d"), columns=pd.Index(['feat0', 'feat1', 'feat2', 'feat3'], dtype='object'))
+            pd.DataFrame(
+                [
+                    ["1_0_0", "1_1_0", "1_2_0", np.nan],
+                    ["1_0_1", "1_1_1", "1_2_1", np.nan],
+                    ["1_0_2", "1_1_2", "1_0_0", "1_1_0"],
+                    ["1_0_3", "1_1_3", "1_0_1", "1_1_1"],
+                    ["1_0_4", "1_1_4", "1_0_2", "1_1_2"],
+                ],
+                index=pd.DatetimeIndex(
+                    [
+                        "2020-01-01 00:00:00+00:00",
+                        "2020-01-02 00:00:00+00:00",
+                        "2020-01-03 00:00:00+00:00",
+                        "2020-01-04 00:00:00+00:00",
+                        "2020-01-05 00:00:00+00:00",
+                    ],
+                    freq="d",
+                ),
+                columns=pd.Index(["feat0", "feat1", "feat2", "feat3"], dtype="object"),
+            ),
         )
         assert_frame_equal(
             merged_data.data[2],
-            pd.DataFrame([
-                [np.nan, np.nan, np.nan, np.nan],
-                [np.nan, np.nan, np.nan, np.nan],
-                [np.nan, np.nan, '2_0_0', '2_1_0'],
-                [np.nan, np.nan, '2_0_1', '2_1_1'],
-                [np.nan, np.nan, '2_0_2', '2_1_2'],
-            ], index=pd.DatetimeIndex([
-                '2020-01-01 00:00:00+00:00',
-                '2020-01-02 00:00:00+00:00',
-                '2020-01-03 00:00:00+00:00',
-                '2020-01-04 00:00:00+00:00',
-                '2020-01-05 00:00:00+00:00',
-            ], freq="d"), columns=pd.Index(['feat0', 'feat1', 'feat2', 'feat3'], dtype='object'))
+            pd.DataFrame(
+                [
+                    [np.nan, np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, "2_0_0", "2_1_0"],
+                    [np.nan, np.nan, "2_0_1", "2_1_1"],
+                    [np.nan, np.nan, "2_0_2", "2_1_2"],
+                ],
+                index=pd.DatetimeIndex(
+                    [
+                        "2020-01-01 00:00:00+00:00",
+                        "2020-01-02 00:00:00+00:00",
+                        "2020-01-03 00:00:00+00:00",
+                        "2020-01-04 00:00:00+00:00",
+                        "2020-01-05 00:00:00+00:00",
+                    ],
+                    freq="d",
+                ),
+                columns=pd.Index(["feat0", "feat1", "feat2", "feat3"], dtype="object"),
+            ),
         )
 
     def test_to_csv(self, tmp_path):

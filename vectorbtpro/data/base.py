@@ -19,8 +19,10 @@ import pandas as pd
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_any_array, to_pd_array, to_2d_array
 from vectorbtpro.base.wrapping import ArrayWrapper
+from vectorbtpro.base.indexes import stack_indexes
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic import nb as generic_nb
+from vectorbtpro.data.decorators import attach_symbol_dict_methods
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig, copy_dict
@@ -69,6 +71,11 @@ class MetaData(type(Analyzable), type(DataWithColumns)):
     pass
 
 
+@attach_symbol_dict_methods([
+    "symbol_classes",
+    "fetch_kwargs",
+    "returned_kwargs",
+])
 class Data(Analyzable, DataWithColumns, metaclass=MetaData):
     """Class that downloads, updates, and manages data coming from a data source."""
 
@@ -133,6 +140,8 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             for s in symbols:
                 new_data[s] = kwargs["wrapper"].row_stack_and_wrap(*[obj.data[s] for obj in objs], group_by=False)
             kwargs["data"] = new_data
+        if "symbol_classes" not in kwargs:
+            kwargs["symbol_classes"] = objs[-1].symbol_classes
         if "fetch_kwargs" not in kwargs:
             kwargs["fetch_kwargs"] = objs[-1].fetch_kwargs
         if "returned_kwargs" not in kwargs:
@@ -191,6 +200,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
     _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Analyzable._expected_keys or set()) | {
         "data",
         "single_symbol",
+        "symbol_classes",
         "fetch_kwargs",
         "returned_kwargs",
         "last_index",
@@ -205,6 +215,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         wrapper: ArrayWrapper,
         data: symbol_dict,
         single_symbol: bool,
+        symbol_classes: symbol_dict,
         fetch_kwargs: symbol_dict,
         returned_kwargs: symbol_dict,
         last_index: symbol_dict,
@@ -216,6 +227,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
     ) -> None:
 
         checks.assert_instance_of(data, dict)
+        checks.assert_instance_of(symbol_classes, dict)
         checks.assert_instance_of(fetch_kwargs, dict)
         checks.assert_instance_of(returned_kwargs, dict)
         checks.assert_instance_of(last_index, dict)
@@ -229,6 +241,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             wrapper,
             data=data,
             single_symbol=single_symbol,
+            symbol_classes=symbol_classes,
             fetch_kwargs=fetch_kwargs,
             returned_kwargs=returned_kwargs,
             last_index=last_index,
@@ -241,6 +254,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
         self._data = symbol_dict(data)
         self._single_symbol = single_symbol
+        self._symbol_classes = symbol_dict(symbol_classes)
         self._fetch_kwargs = symbol_dict(fetch_kwargs)
         self._returned_kwargs = symbol_dict(returned_kwargs)
         self._last_index = symbol_dict(last_index)
@@ -276,6 +290,11 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
     def symbols(self) -> tp.List[tp.Symbol]:
         """List of symbols."""
         return list(self.data.keys())
+
+    @property
+    def symbol_classes(self) -> symbol_dict:
+        """Symbol classes of type `symbol_dict`."""
+        return self._symbol_classes
 
     @property
     def fetch_kwargs(self) -> symbol_dict:
@@ -500,28 +519,12 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             new_returned_kwargs = copy_dict(self.returned_kwargs)
         return self.replace(cls_=new_cls, fetch_kwargs=new_fetch_kwargs, returned_kwargs=new_returned_kwargs, **kwargs)
 
-    def update_fetch_kwargs(self: DataT, **kwargs) -> DataT:
-        """Update `Data.fetch_kwargs`.
-
-        Returns a new instance."""
-        new_fetch_kwargs = copy_dict(self.fetch_kwargs)
-        for s in self.symbols:
-            if s not in new_fetch_kwargs:
-                new_fetch_kwargs[s] = dict()
-        for k, v in kwargs.items():
-            if isinstance(v, symbol_dict):
-                for s, _v in v.items():
-                    new_fetch_kwargs[s][k] = _v
-            else:
-                for s in new_fetch_kwargs:
-                    new_fetch_kwargs[s][k] = v
-        return self.replace(fetch_kwargs=new_fetch_kwargs)
-
     @classmethod
     def from_data(
         cls: tp.Type[DataT],
         data: symbol_dict,
         single_symbol: bool = True,
+        symbol_classes: tp.Optional[symbol_dict] = None,
         tz_localize: tp.Optional[tp.TimezoneLike] = None,
         tz_convert: tp.Optional[tp.TimezoneLike] = None,
         missing_index: tp.Optional[str] = None,
@@ -538,6 +541,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         Args:
             data (dict): Dictionary of array-like objects keyed by symbol.
             single_symbol (bool): Whether there is only one symbol in `data`.
+            symbol_classes (symbol_dict): See `Data.symbol_classes`.
             tz_localize (timezone_like): See `Data.prepare_tzaware_index`.
             tz_convert (timezone_like): See `Data.prepare_tzaware_index`.
             missing_index (str): See `Data.align_index`.
@@ -565,6 +569,8 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
         if wrapper_kwargs is None:
             wrapper_kwargs = {}
+        if symbol_classes is None:
+            symbol_classes = symbol_dict()
         if fetch_kwargs is None:
             fetch_kwargs = symbol_dict()
         if returned_kwargs is None:
@@ -594,6 +600,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             wrapper,
             data,
             single_symbol=single_symbol,
+            symbol_classes=symbol_classes,
             fetch_kwargs=fetch_kwargs,
             returned_kwargs=returned_kwargs,
             last_index=last_index,
@@ -624,6 +631,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         cls: tp.Type[DataT],
         symbols: tp.Union[tp.Symbol, tp.Symbols] = None,
         *,
+        symbol_classes: tp.Optional[tp.MaybeSequence[tp.Union[tp.Hashable, dict]]] = None,
         tz_localize: tp.Optional[tp.TimezoneLike] = None,
         tz_convert: tp.Optional[tp.TimezoneLike] = None,
         missing_index: tp.Optional[str] = None,
@@ -642,6 +650,13 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
                 !!! note
                     Tuple is considered as a single symbol (tuple is a hashable).
+            symbol_classes (symbol_dict): See `Data.symbol_classes`.
+
+                Can be a hashable (single value), a dictionary (class names as keys and
+                class values as values), or a sequence of such.
+
+                !!! note
+                    Tuple is considered as a single class (tuple is a hashable).
             tz_localize (any): See `Data.from_data`.
             tz_convert (any): See `Data.from_data`.
             missing_index (str): See `Data.from_data`.
@@ -673,6 +688,23 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             raise TypeError("Symbols must be either a hashable or a sequence of hashable")
         else:
             single_symbol = False
+        if symbol_classes is not None:
+            if not isinstance(symbol_classes, symbol_dict):
+                new_symbol_classes = symbol_dict()
+                single_class = checks.is_hashable(symbol_classes) or isinstance(symbol_classes, dict)
+                if single_class:
+                    for symbol in symbols:
+                        if isinstance(symbol_classes, dict):
+                            new_symbol_classes[symbol] = symbol_classes
+                        else:
+                            new_symbol_classes[symbol] = {"symbol_class": symbol_classes}
+                else:
+                    for i, symbol in enumerate(symbols):
+                        _symbol_classes = symbol_classes[i]
+                        if not isinstance(_symbol_classes, dict):
+                            _symbol_classes = {"symbol_class": _symbol_classes}
+                        new_symbol_classes[symbol] = _symbol_classes
+                symbol_classes = new_symbol_classes
         show_symbol_progress = show_progress
         if show_symbol_progress is None:
             show_symbol_progress = data_cfg["show_progress"]
@@ -746,6 +778,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         return cls.from_data(
             data,
             single_symbol=single_symbol,
+            symbol_classes=symbol_classes,
             tz_localize=tz_localize,
             tz_convert=tz_convert,
             missing_index=missing_index,
@@ -988,9 +1021,12 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         self,
         symbols: tp.Optional[tp.Symbols] = None,
         level_name: str = "symbol",
+        stack_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> ArrayWrapper:
         """Get wrapper where columns are symbols."""
+        if stack_kwargs is None:
+            stack_kwargs = {}
         if symbols is None:
             symbols = self.symbols
             ndim = 1 if self.single_symbol else 2
@@ -1000,8 +1036,29 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             else:
                 symbols = [symbols]
                 ndim = 1
+        symbol_columns = pd.Index(symbols, name=level_name)
+        symbol_classes = []
+        all_have_symbol_classes = True
+        for symbol in symbols:
+            if symbol in self.symbol_classes:
+                classes = self.symbol_classes[symbol]
+                if len(classes) > 0:
+                    symbol_classes.append(classes)
+                else:
+                    all_have_symbol_classes = False
+            else:
+                all_have_symbol_classes = False
+        if len(symbol_classes) > 0 and not all_have_symbol_classes:
+            raise ValueError("Some symbols have symbol classes while others not")
+        if len(symbol_classes) > 0:
+            symbol_classes_frame = pd.DataFrame(symbol_classes)
+            if len(symbol_classes_frame.columns) == 1:
+                symbol_classes_columns = pd.Index(symbol_classes_frame.iloc[:, 0])
+            else:
+                symbol_classes_columns = pd.MultiIndex.from_frame(symbol_classes_frame)
+            symbol_columns = stack_indexes((symbol_classes_columns, symbol_columns), **stack_kwargs)
         return self.wrapper.replace(
-            columns=pd.Index(symbols, name=level_name),
+            columns=symbol_columns,
             ndim=ndim,
             grouper=None,
             **kwargs,
@@ -1012,9 +1069,14 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         """`Data.get_symbol_wrapper` with default arguments."""
         return self.get_symbol_wrapper()
 
-    def concat(self, symbols: tp.Optional[tp.Symbols] = None, level_name: str = "symbol") -> dict:
+    def concat(
+        self,
+        symbols: tp.Optional[tp.Symbols] = None,
+        level_name: str = "symbol",
+        stack_kwargs: tp.KwargsLike = None,
+    ) -> dict:
         """Return a dict of Series/DataFrames with symbols as columns, keyed by column name."""
-        symbol_wrapper = self.get_symbol_wrapper(symbols=symbols, level_name=level_name)
+        symbol_wrapper = self.get_symbol_wrapper(symbols=symbols, level_name=level_name, stack_kwargs=stack_kwargs)
         if symbols is None:
             symbols = self.symbols
 
@@ -1146,6 +1208,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         return self.replace(
             data=symbol_dict({k: v for k, v in self.data.items() if k in symbols}),
             single_symbol=single_symbol,
+            symbol_classes=symbol_dict({k: v for k, v in self.symbol_classes.items() if k in symbols}),
             fetch_kwargs=symbol_dict({k: v for k, v in self.fetch_kwargs.items() if k in symbols}),
             returned_kwargs=symbol_dict(
                 {k: v for k, v in self.returned_kwargs.items() if k in symbols},
@@ -1160,6 +1223,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         """Rename symbols using `rename` dict that maps old symbols and new symbols."""
         return self.replace(
             data={rename.get(k, k): v for k, v in self.data.items()},
+            symbol_classes={rename.get(k, k): v for k, v in self.symbol_classes.items()},
             fetch_kwargs={rename.get(k, k): v for k, v in self.fetch_kwargs.items()},
             returned_kwargs={rename.get(k, k): v for k, v in self.returned_kwargs.items()},
             last_index={rename.get(k, k): v for k, v in self.last_index.items()},
@@ -1184,6 +1248,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
         data = symbol_dict()
         single_symbol = True
+        symbol_classes = symbol_dict()
         fetch_kwargs = symbol_dict()
         returned_kwargs = symbol_dict()
         last_index = symbol_dict()
@@ -1199,6 +1264,8 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                     data[new_s] = instance.data[s].combine_first(data[new_s])
                 else:
                     data[new_s] = instance.data[s]
+                if s in instance.symbol_classes:
+                    symbol_classes[new_s] = instance.symbol_classes[s]
                 if s in instance.fetch_kwargs:
                     fetch_kwargs[new_s] = instance.fetch_kwargs[s]
                 if s in instance.returned_kwargs:
@@ -1209,6 +1276,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         return cls.from_data(
             data=data,
             single_symbol=single_symbol,
+            symbol_classes=symbol_classes,
             fetch_kwargs=fetch_kwargs,
             returned_kwargs=returned_kwargs,
             last_index=last_index,
