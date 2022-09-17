@@ -289,6 +289,7 @@ ${config_doc}
 _settings["chunking"] = chunking
 
 params = ChildDict(
+    search_except_types=None,
     search_max_len=None,
     search_max_depth=None,
     skip_single_param=True,
@@ -1286,8 +1287,31 @@ pfopt = ChildDict(
         sector_upper=None,
         discrete_allocation=False,
         allocation_method="lp_portfolio",
-        silence_warnings=False,
-        ignore_opt_errors=False,
+        silence_warnings=True,
+        ignore_opt_errors=True,
+    ),
+    riskfolio=Config(
+        factors=None,
+        port=None,
+        port_cls=None,
+        opt_method=None,
+        stats_methods=None,
+        model=None,
+        asset_classes=None,
+        constraints_method=None,
+        constraints=None,
+        views_method=None,
+        views=None,
+        solvers=None,
+        sol_params=None,
+        freq=None,
+        year_freq=None,
+        pre_opt=False,
+        pre_opt_kwargs=Config(),
+        pre_opt_as_w=False,
+        func_kwargs=Config(),
+        silence_warnings=True,
+        return_port=False,
     ),
     stats=Config(
         filters=dict(

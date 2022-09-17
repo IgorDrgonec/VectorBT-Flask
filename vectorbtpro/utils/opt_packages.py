@@ -38,6 +38,7 @@ opt_package_config = ReadonlyConfig(
         tvDatafeed=dict(name="TradingView Data Feed", link="https://github.com/StreamAlpha/tvdatafeed"),
         plotly_resampler=dict(name="Plotly Resampler", link="https://github.com/predict-idlab/plotly-resampler"),
         technical=dict(name="Technical", link="https://github.com/freqtrade/technical"),
+        riskfolio=dict(name="Riskfolio-Lib", link="https://github.com/dcajasn/Riskfolio-Lib"),
     )
 )
 """_"""

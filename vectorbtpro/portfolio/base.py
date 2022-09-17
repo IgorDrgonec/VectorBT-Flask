@@ -2139,7 +2139,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         elif grouping == "cash_sharing":
             obj_group_by = None if cash_sharing else False
         else:
-            raise ValueError(f"Grouping '{grouping}' not supported")
+            raise ValueError(f"Grouping '{grouping}' is not supported")
 
         if obj_type is None and checks.is_np_array(objs[0]):
             n_cols = wrapper.get_shape_2d(group_by=obj_group_by)[1]
@@ -2527,7 +2527,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         elif grouping == "cash_sharing":
             obj_group_by = None if cash_sharing else False
         else:
-            raise ValueError(f"Grouping '{grouping}' not supported")
+            raise ValueError(f"Grouping '{grouping}' is not supported")
 
         if obj_type is None and checks.is_np_array(obj):
             n_cols = wrapper.get_shape_2d(group_by=obj_group_by)[1]

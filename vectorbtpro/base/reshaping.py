@@ -1415,7 +1415,7 @@ def broadcast(
                 )
                 new_obj = bco.value.substitute(context, sub_id="broadcast")
             else:
-                raise TypeError(f"Special type {type(bco.value)} not supported")
+                raise TypeError(f"Special type {type(bco.value)} is not supported")
         else:
             new_obj = new_objs[k]
 

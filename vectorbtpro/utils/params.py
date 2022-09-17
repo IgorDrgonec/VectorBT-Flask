@@ -153,6 +153,12 @@ class Param:
     If None, converts `Param.value` to an index using 
     `vectorbtpro.base.indexes.index_from_values`."""
 
+    name: tp.Optional[tp.Hashable] = attr.ib(default=None)
+    """Name of the parameter.
+    
+    If None, defaults to the name of the index in `Param.keys`, or to the key in 
+    `param_dct` passed to `combine_params`."""
+
 
 def combine_params(
     param_dct: tp.Dict[tp.Hashable, Param],
@@ -211,13 +217,17 @@ def combine_params(
                 keys = value
         values = params_to_list(value, is_tuple=p.is_tuple, is_array_like=p.is_array_like)
         level_values[level][k] = values
+        if p.name is None:
+            index_name = k
+        else:
+            index_name = p.name
         if keys is None:
-            keys = indexes.index_from_values(values, name=k)
+            keys = indexes.index_from_values(values, name=index_name)
         else:
             if not isinstance(keys, pd.Index):
-                keys = pd.Index(keys, name=k)
+                keys = pd.Index(keys, name=index_name)
             elif keys.name is None:
-                keys = keys.rename(k)
+                keys = keys.rename(index_name)
         product_indexes[k] = keys
         curr_idx += 1
 
@@ -283,13 +293,17 @@ def combine_params(
                 found_tuple = True
             new_names.append(name)
         if found_tuple:
-            param_index.rename(new_names, inplace=True)
+            if isinstance(param_index, pd.MultiIndex):
+                param_index.rename(new_names, inplace=True)
+            else:
+                param_index.rename(new_names[0], inplace=True)
     return param_product, param_index
 
 
 def find_params_in_obj(
     obj: tp.Any,
     key: tp.Optional[tp.Hashable] = None,
+    search_except_types: tp.Optional[tp.Sequence[type]] = None,
     search_max_len: tp.Optional[int] = None,
     search_max_depth: tp.Optional[int] = None,
     _depth: int = 0,
@@ -302,6 +316,8 @@ def find_params_in_obj(
 
     params_cfg = settings["params"]
 
+    if search_except_types is None:
+        search_except_types = params_cfg["search_except_types"]
     if search_max_len is None:
         search_max_len = params_cfg["search_max_len"]
     if search_max_depth is None:
@@ -310,6 +326,8 @@ def find_params_in_obj(
     if isinstance(obj, Param):
         return {key: obj}
     if search_max_depth is None or _depth < search_max_depth:
+        if search_except_types is not None and checks.is_instance_of(obj, search_except_types):
+            return obj
         if isinstance(obj, dict):
             if search_max_len is None or len(obj) <= search_max_len:
                 found_dct = {}
@@ -318,12 +336,13 @@ def find_params_in_obj(
                     found_dct.update(find_params_in_obj(
                         v,
                         key=new_key,
+                        search_except_types=search_except_types,
                         search_max_len=search_max_len,
                         search_max_depth=search_max_depth,
                         _depth=_depth + 1,
                     ))
                 return found_dct
-        if isinstance(obj, tuple):
+        if isinstance(obj, (tuple, list)):
             if search_max_len is None or len(obj) <= search_max_len:
                 found_dct = {}
                 for i in range(len(obj)):
@@ -331,6 +350,7 @@ def find_params_in_obj(
                     found_dct.update(find_params_in_obj(
                         obj[i],
                         key=new_key,
+                        search_except_types=search_except_types,
                         search_max_len=search_max_len,
                         search_max_depth=search_max_depth,
                         _depth=_depth + 1,
@@ -365,7 +385,7 @@ def replace_param_set_in_obj(obj: tp.Any, param_dct: dict, key: tp.Optional[tp.H
                 if not replaced:
                     new_obj[k] = obj[k]
         return new_obj
-    if isinstance(obj, tuple):
+    if isinstance(obj, (tuple, list)):
         new_obj = []
         for i in range(len(obj)):
             if i in param_dct:
@@ -384,7 +404,9 @@ def replace_param_set_in_obj(obj: tp.Any, param_dct: dict, key: tp.Optional[tp.H
                         break
                 if not replaced:
                     new_obj.append(obj[i])
-        return tuple(new_obj)
+        if isinstance(obj, tuple):
+            return tuple(new_obj)
+        return new_obj
     return obj
 
 
@@ -431,6 +453,7 @@ def column_stack_merge_func(results: tp.List[tp.AnyArray], param_index: tp.Index
 
 def parameterized(
     *args,
+    search_except_types: tp.Optional[tp.Sequence[type]] = None,
     search_max_len: tp.Optional[int] = None,
     search_max_depth: tp.Optional[int] = None,
     skip_single_param: tp.Optional[bool] = None,
@@ -612,6 +635,9 @@ def parameterized(
 
         @wraps(func)
         def wrapper(*args, **kwargs) -> tp.Any:
+            search_except_types = kwargs.pop("_search_except_types", wrapper.options["search_except_types"])
+            if search_except_types is None:
+                search_except_types = params_cfg["search_except_types"]
             search_max_len = kwargs.pop("_search_max_len", wrapper.options["search_max_len"])
             if search_max_len is None:
                 search_max_len = params_cfg["search_max_len"]
@@ -701,6 +727,7 @@ def parameterized(
                         paramable_kwargs[k] = v["value"]
             param_dct = find_params_in_obj(
                 paramable_kwargs,
+                search_except_types=search_except_types,
                 search_max_len=search_max_len,
                 search_max_depth=search_max_depth,
             )
@@ -806,13 +833,14 @@ def parameterized(
                         merge_func = column_stack_merge_func
                         merge_kwargs = dict(param_index=param_index)
                     else:
-                        raise ValueError(f"Merge function '{merge_func}' not supported")
+                        raise ValueError(f"Merge function '{merge_func}' is not supported")
                 merge_kwargs = deep_substitute(merge_kwargs, template_context, sub_id="merge_kwargs")
                 return merge_func(results, **merge_kwargs)
             return results
 
         wrapper.options = Config(
             dict(
+                search_except_types=search_except_types,
                 search_max_len=search_max_len,
                 search_max_depth=search_max_depth,
                 skip_single_param=skip_single_param,

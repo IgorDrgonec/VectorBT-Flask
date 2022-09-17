@@ -53,6 +53,7 @@ RUN pip install --quiet --no-cache-dir \
     'plotly-resampler' \
     'quantstats>=0.0.37' \
     'PyPortfolioOpt>=1.5.1' \
+    'Riskfolio-Lib>=3.3.0' \
     'python-telegram-bot>=13.4' && \
     fix-permissions "${CONDA_DIR}" && \
     fix-permissions "/home/${NB_USER}"

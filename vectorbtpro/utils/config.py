@@ -99,7 +99,7 @@ def copy_dict(dct: InConfigLikeT, copy_mode: str = "shallow", nested: bool = Tru
         return {}
     copy_mode = copy_mode.lower()
     if copy_mode not in {"none", "shallow", "hybrid", "deep"}:
-        raise ValueError(f"Copy mode '{copy_mode}' not supported")
+        raise ValueError(f"Copy mode '{copy_mode}' is not supported")
 
     if copy_mode == "none":
         return dct

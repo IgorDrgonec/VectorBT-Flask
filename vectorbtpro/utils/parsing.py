@@ -6,8 +6,9 @@ import ast
 import inspect
 import re
 import sys
-import os
+import io
 import contextlib
+import warnings
 
 import attr
 
@@ -279,8 +280,21 @@ def supress_stdout(func: tp.Callable) -> tp.Callable:
     """Supress output from a function."""
 
     def wrapper(*a, **ka):
-        with open(os.devnull, "w") as devnull:
-            with contextlib.redirect_stdout(devnull):
-                return func(*a, **ka)
+        with contextlib.redirect_stdout(io.StringIO()):
+            return func(*a, **ka)
+
+    return wrapper
+
+
+def warn_stdout(func: tp.Callable) -> tp.Callable:
+    """Supress and convert to a warning output from a function."""
+
+    def wrapper(*a, **ka):
+        with contextlib.redirect_stdout(io.StringIO()) as f:
+            out = func(*a, **ka)
+        s = f.getvalue()
+        if len(s) > 0:
+            warnings.warn(s, stacklevel=2)
+        return out
 
     return wrapper

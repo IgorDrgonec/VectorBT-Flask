@@ -27,6 +27,7 @@ kaleido:                    plot, base
 plotly-resampler:           plot
 quantstats>=0.0.37:         stats, base
 PyPortfolioOpt>=1.5.1:      stats
+Riskfolio-Lib>=3.3.0:       stats
 universal-portfolios:       stats
 python-telegram-bot>=13.4:  notify
 dill:                       io, base

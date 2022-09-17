@@ -14,6 +14,11 @@ try:
     import pypfopt
 except:
     pypfopt_available = False
+riskfolio_available = True
+try:
+    import riskfolio as rp
+except:
+    riskfolio_available = False
 universal_available = True
 try:
     import universal
@@ -662,7 +667,7 @@ class TestPyPortfolioOpt:
 
             def deviation_risk_parity(w, cov_matrix):
                 diff = w * np.dot(cov_matrix, w) - (w * np.dot(cov_matrix, w)).reshape(-1, 1)
-                return (diff ** 2).sum().sum()
+                return (diff**2).sum().sum()
 
             ef = pypfopt.efficient_frontier.EfficientFrontier(
                 pypfopt.expected_returns.mean_historical_return(prices=prices),
@@ -683,8 +688,218 @@ class TestPyPortfolioOpt:
                 == ef.clean_weights()
             )
 
+    def test_riskfolio_optimize(self):
+        if riskfolio_available:
+            np.random.seed(42)
+            longer_returns = pd.DataFrame(
+                np.random.uniform(-0.1, 0.1, size=(100, 5)),
+                columns=["A", "B", "C", "D", "E"],
+            )
+            factor_returns = pd.DataFrame(
+                np.random.uniform(-0.1, 0.1, size=(100, 3)),
+                columns=["F", "G", "H"],
+            )
+            assert pfopt.riskfolio_optimize(longer_returns) == {
+                "A": 0.12676800514501807,
+                "B": 0.4760327891840394,
+                "C": 7.2644261969418e-10,
+                "D": 0.3971992047740059,
+                "E": 1.7049415731580372e-10,
+            }
+            assert pfopt.riskfolio_optimize(longer_returns, factors=factor_returns, model="FM") == {
+                "A": 0.1267680051458212,
+                "B": 0.4760327891836326,
+                "C": 7.264414768832996e-10,
+                "D": 0.3971992047736109,
+                "E": 1.704938888482468e-10,
+            }
+            assert pfopt.riskfolio_optimize(
+                longer_returns,
+                factors=factor_returns,
+                model="FM",
+                stats_methods=["assets_stats", "factors_stats"],
+            ) == {
+                "A": 0.1267680051458212,
+                "B": 0.4760327891836326,
+                "C": 7.264414768832996e-10,
+                "D": 0.3971992047736109,
+                "E": 1.704938888482468e-10,
+            }
+            assert pfopt.riskfolio_optimize(
+                longer_returns,
+                factors=factor_returns,
+                func_kwargs=dict(
+                    assets_stats=dict(),
+                    factors_stats=dict(),
+                    optimization=dict(model="FM"),
+                ),
+            ) == {
+                "A": 0.1267680051458212,
+                "B": 0.4760327891836326,
+                "C": 7.264414768832996e-10,
+                "D": 0.3971992047736109,
+                "E": 1.704938888482468e-10,
+            }
+            assert pfopt.riskfolio_optimize(
+                longer_returns,
+                factors=factor_returns,
+                func_kwargs=dict(
+                    optimization=dict(model="FM"),
+                ),
+            ) == {
+                "A": 0.1267680051458212,
+                "B": 0.4760327891836326,
+                "C": 7.264414768832996e-10,
+                "D": 0.3971992047736109,
+                "E": 1.704938888482468e-10,
+            }
+            assert pfopt.riskfolio_optimize(longer_returns, method_mu="hist", method_cov="hist", d=0.94) == {
+                "A": 0.12676800514501807,
+                "B": 0.4760327891840394,
+                "C": 7.2644261969418e-10,
+                "D": 0.3971992047740059,
+                "E": 1.7049415731580372e-10,
+            }
+            assert pfopt.riskfolio_optimize(longer_returns, port_cls="HCPortfolio") == {
+                "A": 0.19369278873359128,
+                "B": 0.20238981440998197,
+                "C": 0.20942969908552786,
+                "D": 0.19933866749954113,
+                "E": 0.19514903027135774,
+            }
+            assert pfopt.riskfolio_optimize(longer_returns, port_cls=rp.HCPortfolio) == {
+                "A": 0.19369278873359128,
+                "B": 0.20238981440998197,
+                "C": 0.20942969908552786,
+                "D": 0.19933866749954113,
+                "E": 0.19514903027135774,
+            }
+            assert pfopt.riskfolio_optimize(longer_returns, opt_method="rp") == {
+                "A": 0.22652553527275376,
+                "B": 0.20225103853474868,
+                "C": 0.21538322980670396,
+                "D": 0.1744225679341509,
+                "E": 0.18141762845164283,
+            }
+            assert pfopt.riskfolio_optimize(longer_returns, opt_method="rrp") == {
+                "A": 0.22652582481582162,
+                "B": 0.2022516322803447,
+                "C": 0.2153823193787835,
+                "D": 0.17442220639910935,
+                "E": 0.18141801712594077,
+            }
+            assert pfopt.riskfolio_optimize(longer_returns, opt_method="owa") == {
+                "A": 0.13634806044544748,
+                "B": 0.46540649778161475,
+                "C": 1.0038802647286919e-12,
+                "D": 0.39824544177166576,
+                "E": 2.6807396988462483e-13,
+            }
+            assert pfopt.riskfolio_optimize(
+                longer_returns, constraints=[dict(Type="Assets", Position="A", Sign="<=", Weight=0.1)]
+            ) == {
+                "A": 0.09999988709015002,
+                "B": 0.4869261339374733,
+                "C": 1.6951444542121246e-08,
+                "D": 0.4130739578334771,
+                "E": 4.187455131058068e-09,
+            }
+            assert pfopt.riskfolio_optimize(
+                longer_returns,
+                asset_classes=["C1", "C1", "C2", "C2", "C3"],
+                constraints=[dict(Type="Classes", Set="Class", Position="C1", Sign="<=", Weight=0.2)],
+            ) == {
+                "A": 2.7553253657466047e-09,
+                "B": 0.1999999954418845,
+                "C": 1.3301654710792048e-08,
+                "D": 0.7999999875008236,
+                "E": 1.0003118168811534e-09,
+            }
+            assert pfopt.riskfolio_optimize(
+                longer_returns,
+                asset_classes=pd.Index(["C1", "C1", "C2", "C2", "C3"], name="my_class"),
+                constraints=[dict(Type="Classes", Set="my_class", Position="C1", Sign="<=", Weight=0.2)],
+            ) == {
+                "A": 2.7553253657466047e-09,
+                "B": 0.1999999954418845,
+                "C": 1.3301654710792048e-08,
+                "D": 0.7999999875008236,
+                "E": 1.0003118168811534e-09,
+            }
+            assert pfopt.riskfolio_optimize(
+                longer_returns.vbt.stack_index(pd.Index(["C1", "C1", "C2", "C2", "C3"], name="my_class")),
+                constraints=[dict(Type="Classes", Set="my_class", Position="C1", Sign="<=", Weight=0.2)],
+            ) == {
+                ("C1", "A"): 2.7553253657466047e-09,
+                ("C1", "B"): 0.1999999954418845,
+                ("C2", "C"): 1.3301654710792048e-08,
+                ("C2", "D"): 0.7999999875008236,
+                ("C3", "E"): 1.0003118168811534e-09,
+            }
+            assert pfopt.riskfolio_optimize(
+                longer_returns, factors=factor_returns, model="FM", constraints=[dict(Factor="F", Sign="<=", Value=0.5)]
+            ) == {
+                "A": 0.12677262060399214,
+                "B": 0.47603049596901686,
+                "C": 1.7644613667926323e-10,
+                "D": 0.3971968832083084,
+                "E": 4.223652304226146e-11,
+            }
+            assert pfopt.riskfolio_optimize(
+                longer_returns,
+                port_cls="HCPortfolio",
+                constraints=[dict(Type="Assets", Position="A", Sign="<=", Weight=0.1)],
+            ) == {
+                "A": 0.1,
+                "B": 0.20238981440998197,
+                "C": 0.20942969908552786,
+                "D": 0.29303145623313237,
+                "E": 0.19514903027135774,
+            }
+            assert pfopt.riskfolio_optimize(
+                longer_returns,
+                model="BL",
+                asset_classes=["C1", "C1", "C2", "C2", "C3"],
+                views=[
+                    dict(Type="Classes", Set="Class", Position="C1", Sign="<=", Return=0.2),
+                    dict(Type="Classes", Set="Class", Position="C2", Sign="<=", Return=0.3),
+                ],
+                freq="1d",
+                year_freq="252d",
+                delta=None,
+                eq=True,
+            ) == {
+                "A": 0.19028479017478658,
+                "B": 0.1964263445744196,
+                "C": 0.3316412298128069,
+                "D": 0.2816476353359129,
+                "E": 1.0207392238984308e-10,
+            }
+            assert pfopt.riskfolio_optimize(
+                longer_returns,
+                pre_opt=True,
+                pre_opt_as_w=True,
+                model="BL",
+                asset_classes=["C1", "C1", "C2", "C2", "C3"],
+                views=[
+                    dict(Type="Classes", Set="Class", Position="C1", Sign="<=", Return=0.2),
+                    dict(Type="Classes", Set="Class", Position="C2", Sign="<=", Return=0.3),
+                ],
+                freq="1d",
+                year_freq="252d",
+                delta=None,
+                eq=True,
+            ) == {
+                "A": 0.027579416662377298,
+                "B": 0.485577412107038,
+                "C": 1.6032254651302998e-08,
+                "D": 0.4860571855320755,
+                "E": 0.0007859696662543658,
+            }
+
 
 # ############# PortfolioOptimizer ############# #
+
 
 class TestPortfolioOptimizer:
     def test_indexing(self):
@@ -694,9 +909,9 @@ class TestPortfolioOptimizer:
             group_configs=[
                 dict(on=[1, 3], _name="g1"),
                 dict(on=[2, 4], _name="g2"),
-            ]
+            ],
         )
-        pf_opt2 = pf_opt.loc["2020-01-03": "2020-01-04", "g2"]
+        pf_opt2 = pf_opt.loc["2020-01-03":"2020-01-04", "g2"]
         assert_index_equal(pf_opt2.wrapper.index, pf_opt.wrapper.index[2:4])
         assert_index_equal(pf_opt2.wrapper.columns, pf_opt.wrapper.columns[5:])
         assert_records_close(pf_opt2.alloc_records.values, np.array([(0, 0, 0)], dtype=alloc_point_dt))
@@ -708,7 +923,7 @@ class TestPortfolioOptimizer:
             group_configs=[
                 dict(index_ranges=[0, 1], _name="g1"),
                 dict(index_ranges=[2, 3], _name="g2"),
-            ]
+            ],
         )
         pf_opt2 = pf_opt.loc["2020-01-03":"2020-01-04", "g2"]
         assert_index_equal(pf_opt2.wrapper.index, pf_opt.wrapper.index[2:4])
@@ -720,10 +935,9 @@ class TestPortfolioOptimizer:
         def get_allocations(pf_opt):
             start_idx = pf_opt.alloc_records.values["start_idx"]
             end_idx = pf_opt.alloc_records.values["end_idx"]
-            return np.array([
-                prices.values[start_idx[i]:end_idx[i]].sum(axis=0)
-                for i in range(len(pf_opt.alloc_records.values))
-            ])
+            return np.array(
+                [prices.values[start_idx[i] : end_idx[i]].sum(axis=0) for i in range(len(pf_opt.alloc_records.values))]
+            )
 
         pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
@@ -770,9 +984,7 @@ class TestPortfolioOptimizer:
         pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             lambda index_slice: {
-                k: v
-                for k, v in prices.iloc[index_slice].sum().to_dict().items()
-                if k in prices.columns[:-1]
+                k: v for k, v in prices.iloc[index_slice].sum().to_dict().items() if k in prices.columns[:-1]
             },
             vbt.Rep("index_slice"),
         )
@@ -788,10 +1000,7 @@ class TestPortfolioOptimizer:
             allocations,
         )
         pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
-            prices.vbt.wrapper,
-            lambda index_slice: prices.iloc[index_slice].sum(),
-            vbt.Rep("index_slice"),
-            every="2D"
+            prices.vbt.wrapper, lambda index_slice: prices.iloc[index_slice].sum(), vbt.Rep("index_slice"), every="2D"
         )
         assert isinstance(pf_opt.alloc_records, vbt.AllocRanges)
         assert_records_close(
@@ -806,7 +1015,7 @@ class TestPortfolioOptimizer:
             prices.vbt.wrapper,
             lambda index_slice: prices.iloc[index_slice].sum(),
             vbt.Rep("index_slice"),
-            every=vbt.RepEval("'2D'")
+            every=vbt.RepEval("'2D'"),
         )
         assert isinstance(pf_opt.alloc_records, vbt.AllocRanges)
         assert_records_close(
@@ -838,7 +1047,7 @@ class TestPortfolioOptimizer:
             lambda index_slice: prices.iloc[index_slice].sum(),
             vbt.Rep("index_slice"),
             index_ranges=[(0, 2), (2, 4)],
-            index_loc=[2, 4]
+            index_loc=[2, 4],
         )
         assert isinstance(pf_opt.alloc_records, vbt.AllocRanges)
         assert_records_close(
@@ -854,7 +1063,7 @@ class TestPortfolioOptimizer:
             lambda index_slice: prices.iloc[index_slice].sum(),
             vbt.Rep("index_slice"),
             index_ranges=vbt.RepEval("[(0, 2), (2, 4)]"),
-            index_loc=vbt.RepEval("[2, 4]")
+            index_loc=vbt.RepEval("[2, 4]"),
         )
         assert isinstance(pf_opt.alloc_records, vbt.AllocRanges)
         assert_records_close(
@@ -867,7 +1076,7 @@ class TestPortfolioOptimizer:
         )
         pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
-            lambda i, index_ranges: prices.iloc[index_ranges[0][i]:index_ranges[1][i]].sum(),
+            lambda i, index_ranges: prices.iloc[index_ranges[0][i] : index_ranges[1][i]].sum(),
             vbt.Rep("i"),
             vbt.Rep("index_ranges"),
             every="2D",
@@ -959,23 +1168,17 @@ class TestPortfolioOptimizer:
         )
 
         pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
-            prices.vbt.wrapper,
-            lambda index_slice: prices.iloc[index_slice].sum(),
-            vbt.Rep("index_slice")
+            prices.vbt.wrapper, lambda index_slice: prices.iloc[index_slice].sum(), vbt.Rep("index_slice")
         )
         assert_index_equal(
             pf_opt.wrapper.grouper.group_by,
-            pd.Index(['group', 'group', 'group', 'group', 'group'], name="group"),
+            pd.Index(["group", "group", "group", "group", "group"], name="group"),
         )
         assert_index_equal(
             pf_opt.wrapper.columns,
-            pd.MultiIndex.from_tuples([
-                ('group', 'XOM'),
-                ('group', 'RRC'),
-                ('group', 'BBY'),
-                ('group',  'MA'),
-                ('group', 'PFE')],
-                names=['group', None]
+            pd.MultiIndex.from_tuples(
+                [("group", "XOM"), ("group", "RRC"), ("group", "BBY"), ("group", "MA"), ("group", "PFE")],
+                names=["group", None],
             ),
         )
         assert pf_opt.wrapper.grouped_ndim == 1
@@ -996,18 +1199,20 @@ class TestPortfolioOptimizer:
         )
         assert_index_equal(
             pf_opt.wrapper.columns,
-            pd.MultiIndex.from_tuples([
-                (0, 'XOM'),
-                (0, 'RRC'),
-                (0, 'BBY'),
-                (0, 'MA'),
-                (0, 'PFE'),
-                (1, 'XOM'),
-                (1, 'RRC'),
-                (1, 'BBY'),
-                (1, 'MA'),
-                (1, 'PFE')],
-                names=['group_config', None]
+            pd.MultiIndex.from_tuples(
+                [
+                    (0, "XOM"),
+                    (0, "RRC"),
+                    (0, "BBY"),
+                    (0, "MA"),
+                    (0, "PFE"),
+                    (1, "XOM"),
+                    (1, "RRC"),
+                    (1, "BBY"),
+                    (1, "MA"),
+                    (1, "PFE"),
+                ],
+                names=["group_config", None],
             ),
         )
         assert pf_opt.wrapper.grouped_ndim == 2
@@ -1034,10 +1239,7 @@ class TestPortfolioOptimizer:
     def test_from_allocate_func(self):
         def get_allocations(pf_opt):
             idx = pf_opt.alloc_records.values["alloc_idx"]
-            return np.array([
-                prices.values[idx[i]]
-                for i in range(len(pf_opt.alloc_records.values))
-            ])
+            return np.array([prices.values[idx[i]] for i in range(len(pf_opt.alloc_records.values))])
 
         pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
             prices.vbt.wrapper,
@@ -1084,9 +1286,7 @@ class TestPortfolioOptimizer:
         pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
             prices.vbt.wrapper,
             lambda index_point: {
-                k: v
-                for k, v in prices.iloc[index_point].to_dict().items()
-                if k in prices.columns[:-1]
+                k: v for k, v in prices.iloc[index_point].to_dict().items() if k in prices.columns[:-1]
             },
             vbt.Rep("index_point"),
         )
@@ -1102,10 +1302,7 @@ class TestPortfolioOptimizer:
             allocations,
         )
         pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
-            prices.vbt.wrapper,
-            lambda index_point: prices.iloc[index_point],
-            vbt.Rep("index_point"),
-            every="2D"
+            prices.vbt.wrapper, lambda index_point: prices.iloc[index_point], vbt.Rep("index_point"), every="2D"
         )
         assert isinstance(pf_opt.alloc_records, vbt.AllocPoints)
         assert_records_close(
@@ -1120,7 +1317,7 @@ class TestPortfolioOptimizer:
             prices.vbt.wrapper,
             lambda index_point: prices.iloc[index_point],
             vbt.Rep("index_point"),
-            every=vbt.RepEval("'2D'")
+            every=vbt.RepEval("'2D'"),
         )
         assert isinstance(pf_opt.alloc_records, vbt.AllocPoints)
         assert_records_close(
@@ -1135,7 +1332,7 @@ class TestPortfolioOptimizer:
             prices.vbt.wrapper,
             lambda index_point: prices.iloc[index_point],
             vbt.Rep("index_point"),
-            index_points=[2, 4]
+            index_points=[2, 4],
         )
         assert isinstance(pf_opt.alloc_records, vbt.AllocPoints)
         assert_records_close(
@@ -1150,7 +1347,7 @@ class TestPortfolioOptimizer:
             prices.vbt.wrapper,
             lambda index_point: prices.iloc[index_point],
             vbt.Rep("index_point"),
-            index_points=vbt.RepEval("[2, 4]")
+            index_points=vbt.RepEval("[2, 4]"),
         )
         assert isinstance(pf_opt.alloc_records, vbt.AllocPoints)
         assert_records_close(
@@ -1233,9 +1430,7 @@ class TestPortfolioOptimizer:
             vbt.RepEval("prices.values", context=dict(prices=prices)),
             every="2D",
             jitted_loop=True,
-            template_context=dict(
-                allocate_func=njit(lambda i, idx, prices: prices[idx])
-            ),
+            template_context=dict(allocate_func=njit(lambda i, idx, prices: prices[idx])),
         )
         assert isinstance(pf_opt.alloc_records, vbt.AllocPoints)
         assert_records_close(
@@ -1263,23 +1458,17 @@ class TestPortfolioOptimizer:
         )
 
         pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
-            prices.vbt.wrapper,
-            lambda index_point: prices.iloc[index_point],
-            vbt.Rep("index_point")
+            prices.vbt.wrapper, lambda index_point: prices.iloc[index_point], vbt.Rep("index_point")
         )
         assert_index_equal(
             pf_opt.wrapper.grouper.group_by,
-            pd.Index(['group', 'group', 'group', 'group', 'group'], name="group"),
+            pd.Index(["group", "group", "group", "group", "group"], name="group"),
         )
         assert_index_equal(
             pf_opt.wrapper.columns,
-            pd.MultiIndex.from_tuples([
-                ('group', 'XOM'),
-                ('group', 'RRC'),
-                ('group', 'BBY'),
-                ('group',  'MA'),
-                ('group', 'PFE')],
-                names=['group', None]
+            pd.MultiIndex.from_tuples(
+                [("group", "XOM"), ("group", "RRC"), ("group", "BBY"), ("group", "MA"), ("group", "PFE")],
+                names=["group", None],
             ),
         )
         assert pf_opt.wrapper.grouped_ndim == 1
@@ -1292,7 +1481,7 @@ class TestPortfolioOptimizer:
             prices.vbt.wrapper,
             lambda index_point, mult: prices.iloc[index_point] * mult,
             vbt.Rep("index_point"),
-            group_configs=[dict(args_1=1), dict(args_1=2)]
+            group_configs=[dict(args_1=1), dict(args_1=2)],
         )
         assert_index_equal(
             pf_opt.wrapper.grouper.group_by,
@@ -1300,18 +1489,20 @@ class TestPortfolioOptimizer:
         )
         assert_index_equal(
             pf_opt.wrapper.columns,
-            pd.MultiIndex.from_tuples([
-                (0, 'XOM'),
-                (0, 'RRC'),
-                (0, 'BBY'),
-                (0, 'MA'),
-                (0, 'PFE'),
-                (1, 'XOM'),
-                (1, 'RRC'),
-                (1, 'BBY'),
-                (1, 'MA'),
-                (1, 'PFE')],
-                names=['group_config', None]
+            pd.MultiIndex.from_tuples(
+                [
+                    (0, "XOM"),
+                    (0, "RRC"),
+                    (0, "BBY"),
+                    (0, "MA"),
+                    (0, "PFE"),
+                    (1, "XOM"),
+                    (1, "RRC"),
+                    (1, "BBY"),
+                    (1, "MA"),
+                    (1, "PFE"),
+                ],
+                names=["group_config", None],
             ),
         )
         assert pf_opt.wrapper.grouped_ndim == 2
@@ -1406,7 +1597,7 @@ class TestPortfolioOptimizer:
         )
         np.testing.assert_array_equal(
             pf_opt._allocations,
-            np.array([[1/5, 1/5, 1/5, 1/5, 1/5]]),
+            np.array([[1 / 5, 1 / 5, 1 / 5, 1 / 5, 1 / 5]]),
         )
 
     def test_from_random(self):
@@ -1421,13 +1612,17 @@ class TestPortfolioOptimizer:
         )
         np.testing.assert_array_equal(
             pf_opt._allocations,
-            np.array([[
-                0.13319702814025883,
-                0.33810081711389406,
-                0.26031768763785473,
-                0.2128998389048247,
-                0.05548462820316767,
-            ]]),
+            np.array(
+                [
+                    [
+                        0.13319702814025883,
+                        0.33810081711389406,
+                        0.26031768763785473,
+                        0.2128998389048247,
+                        0.05548462820316767,
+                    ]
+                ]
+            ),
         )
 
     def test_from_universal_algo(self):
@@ -1442,27 +1637,24 @@ class TestPortfolioOptimizer:
             )
             np.testing.assert_array_equal(
                 pf_opt._allocations,
-                np.array([[1/5, 1/5, 1/5, 1/5, 1/5]]),
+                np.array([[1 / 5, 1 / 5, 1 / 5, 1 / 5, 1 / 5]]),
             )
-            pf_opt = vbt.PortfolioOptimizer.from_universal_algo(
-                "CRP",
-                prices,
-                valid_only=False,
-                unique_only=False
-            )
+            pf_opt = vbt.PortfolioOptimizer.from_universal_algo("CRP", prices, valid_only=False, unique_only=False)
             assert_records_close(
                 pf_opt.alloc_records.values,
                 np.array([(0, 0, 0), (1, 0, 1), (2, 0, 2), (3, 0, 3), (4, 0, 4)], dtype=alloc_point_dt),
             )
             np.testing.assert_array_equal(
                 pf_opt._allocations,
-                np.array([
-                    [1 / 5, 1 / 5, 1 / 5, 1 / 5, 1 / 5],
-                    [1 / 5, 1 / 5, 1 / 5, 1 / 5, 1 / 5],
-                    [1 / 5, 1 / 5, 1 / 5, 1 / 5, 1 / 5],
-                    [1 / 5, 1 / 5, 1 / 5, 1 / 5, 1 / 5],
-                    [1 / 5, 1 / 5, 1 / 5, 1 / 5, 1 / 5],
-                ]),
+                np.array(
+                    [
+                        [1 / 5, 1 / 5, 1 / 5, 1 / 5, 1 / 5],
+                        [1 / 5, 1 / 5, 1 / 5, 1 / 5, 1 / 5],
+                        [1 / 5, 1 / 5, 1 / 5, 1 / 5, 1 / 5],
+                        [1 / 5, 1 / 5, 1 / 5, 1 / 5, 1 / 5],
+                        [1 / 5, 1 / 5, 1 / 5, 1 / 5, 1 / 5],
+                    ]
+                ),
             )
             pf_opt = vbt.PortfolioOptimizer.from_universal_algo(
                 universal.algos.CRP,
@@ -1521,29 +1713,34 @@ class TestPortfolioOptimizer:
             seed=42,
             on=[1, 3],
         )
-        target_arr = [[
-            0.13319702814025883,
-            0.33810081711389406,
-            0.26031768763785473,
-            0.2128998389048247,
-            0.05548462820316767,
-        ], [
-            0.06528491964469331,
-            0.02430844330237927,
-            0.3625014516740258,
-            0.2515713061862386,
-            0.29633387919266296,
-        ]]
+        target_arr = [
+            [
+                0.13319702814025883,
+                0.33810081711389406,
+                0.26031768763785473,
+                0.2128998389048247,
+                0.05548462820316767,
+            ],
+            [
+                0.06528491964469331,
+                0.02430844330237927,
+                0.3625014516740258,
+                0.2515713061862386,
+                0.29633387919266296,
+            ],
+        ]
         assert_frame_equal(
             pf_opt.get_allocations(squeeze_groups=False),
             pd.DataFrame(
                 target_arr,
-                index=pd.MultiIndex.from_arrays([
-                    pd.Index(["group", "group"], name="group"),
-                    prices.index[[1, 3]],
-                ]),
+                index=pd.MultiIndex.from_arrays(
+                    [
+                        pd.Index(["group", "group"], name="group"),
+                        prices.index[[1, 3]],
+                    ]
+                ),
                 columns=prices.columns,
-            )
+            ),
         )
         assert_frame_equal(
             pf_opt.get_allocations(squeeze_groups=True),
@@ -1551,40 +1748,52 @@ class TestPortfolioOptimizer:
                 target_arr,
                 index=prices.index[[1, 3]],
                 columns=prices.columns,
-            )
+            ),
         )
         pf_opt = vbt.PortfolioOptimizer.from_random(
             prices.vbt.wrapper,
             seed=42,
             group_configs=[dict(on=[1, 3], _name="g1"), dict(on=[2, 4], _name="g2")],
         )
-        target_arr = np.array([
-            [0.13319702814025883, 0.33810081711389406, 0.26031768763785473, 0.2128998389048247, 0.05548462820316767],
-            [0.06528491964469331, 0.02430844330237927, 0.3625014516740258, 0.2515713061862386, 0.29633387919266296],
-            [0.00928441856775223, 0.4374675865753444, 0.37546445396096845, 0.09577331138241256, 0.0820102295135221],
-            [0.10567348701744264, 0.17529742718559654, 0.302352663027335, 0.2488768479913802, 0.1677995747782457]
-        ])
+        target_arr = np.array(
+            [
+                [
+                    0.13319702814025883,
+                    0.33810081711389406,
+                    0.26031768763785473,
+                    0.2128998389048247,
+                    0.05548462820316767,
+                ],
+                [0.06528491964469331, 0.02430844330237927, 0.3625014516740258, 0.2515713061862386, 0.29633387919266296],
+                [0.00928441856775223, 0.4374675865753444, 0.37546445396096845, 0.09577331138241256, 0.0820102295135221],
+                [0.10567348701744264, 0.17529742718559654, 0.302352663027335, 0.2488768479913802, 0.1677995747782457],
+            ]
+        )
         assert_frame_equal(
             pf_opt.get_allocations(squeeze_groups=False),
             pd.DataFrame(
                 target_arr,
-                index=pd.MultiIndex.from_arrays([
-                    pd.Index(["g1", "g1", "g2", "g2"], name="group_config"),
-                    prices.index[[1, 3, 2, 4]],
-                ]),
+                index=pd.MultiIndex.from_arrays(
+                    [
+                        pd.Index(["g1", "g1", "g2", "g2"], name="group_config"),
+                        prices.index[[1, 3, 2, 4]],
+                    ]
+                ),
                 columns=prices.columns,
-            )
+            ),
         )
         assert_frame_equal(
             pf_opt.get_allocations(squeeze_groups=True),
             pd.DataFrame(
                 target_arr,
-                index=pd.MultiIndex.from_arrays([
-                    pd.Index(["g1", "g1", "g2", "g2"], name="group_config"),
-                    prices.index[[1, 3, 2, 4]],
-                ]),
+                index=pd.MultiIndex.from_arrays(
+                    [
+                        pd.Index(["g1", "g1", "g2", "g2"], name="group_config"),
+                        prices.index[[1, 3, 2, 4]],
+                    ]
+                ),
                 columns=prices.columns,
-            )
+            ),
         )
         pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
@@ -1596,12 +1805,14 @@ class TestPortfolioOptimizer:
             pf_opt.get_allocations(squeeze_groups=False),
             pd.DataFrame(
                 prices.sum().values[None],
-                index=pd.MultiIndex.from_arrays([
-                    pd.Index(["group"], name="group"),
-                    prices.index[[4]],
-                ]),
+                index=pd.MultiIndex.from_arrays(
+                    [
+                        pd.Index(["group"], name="group"),
+                        prices.index[[4]],
+                    ]
+                ),
                 columns=prices.columns,
-            )
+            ),
         )
         assert_frame_equal(
             pf_opt.get_allocations(squeeze_groups=True),
@@ -1609,7 +1820,7 @@ class TestPortfolioOptimizer:
                 prices.sum().values[None],
                 index=prices.index[[4]],
                 columns=prices.columns,
-            )
+            ),
         )
 
     def test_fill_allocations(self):
@@ -1618,26 +1829,31 @@ class TestPortfolioOptimizer:
             seed=42,
             on=[1, 3],
         )
-        target_arr = [[
-            0.13319702814025883,
-            0.33810081711389406,
-            0.26031768763785473,
-            0.2128998389048247,
-            0.05548462820316767,
-        ], [
-            0.06528491964469331,
-            0.02430844330237927,
-            0.3625014516740258,
-            0.2515713061862386,
-            0.29633387919266296,
-        ]]
+        target_arr = [
+            [
+                0.13319702814025883,
+                0.33810081711389406,
+                0.26031768763785473,
+                0.2128998389048247,
+                0.05548462820316767,
+            ],
+            [
+                0.06528491964469331,
+                0.02430844330237927,
+                0.3625014516740258,
+                0.2515713061862386,
+                0.29633387919266296,
+            ],
+        ]
         target_df = pd.DataFrame(
             np.nan,
             index=prices.index,
-            columns=pd.MultiIndex.from_arrays([
-                pd.Index(["group", "group", "group", "group", "group"], name="group"),
-                prices.columns,
-            ]),
+            columns=pd.MultiIndex.from_arrays(
+                [
+                    pd.Index(["group", "group", "group", "group", "group"], name="group"),
+                    prices.columns,
+                ]
+            ),
         )
         target_df.iloc[[1, 3]] = target_arr
         assert_frame_equal(
@@ -1659,30 +1875,34 @@ class TestPortfolioOptimizer:
             seed=42,
             group_configs=[dict(on=[1, 3], _name="g1"), dict(on=[2, 4], _name="g2")],
         )
-        target_arr = np.array([
-            [0.13319702814025883, 0.33810081711389406, 0.26031768763785473, 0.2128998389048247, 0.05548462820316767],
-            [0.06528491964469331, 0.02430844330237927, 0.3625014516740258, 0.2515713061862386, 0.29633387919266296],
-            [0.00928441856775223, 0.4374675865753444, 0.37546445396096845, 0.09577331138241256, 0.0820102295135221],
-            [0.10567348701744264, 0.17529742718559654, 0.302352663027335, 0.2488768479913802, 0.1677995747782457]
-        ])
+        target_arr = np.array(
+            [
+                [
+                    0.13319702814025883,
+                    0.33810081711389406,
+                    0.26031768763785473,
+                    0.2128998389048247,
+                    0.05548462820316767,
+                ],
+                [0.06528491964469331, 0.02430844330237927, 0.3625014516740258, 0.2515713061862386, 0.29633387919266296],
+                [0.00928441856775223, 0.4374675865753444, 0.37546445396096845, 0.09577331138241256, 0.0820102295135221],
+                [0.10567348701744264, 0.17529742718559654, 0.302352663027335, 0.2488768479913802, 0.1677995747782457],
+            ]
+        )
         target_df = pd.DataFrame(
             np.nan,
             index=prices.index,
-            columns=pd.MultiIndex.from_arrays([
-                pd.Index(["g1", "g1", "g1", "g1", "g1", "g2", "g2", "g2", "g2", "g2"], name="group_config"),
-                prices.columns.append(prices.columns),
-            ]),
+            columns=pd.MultiIndex.from_arrays(
+                [
+                    pd.Index(["g1", "g1", "g1", "g1", "g1", "g2", "g2", "g2", "g2", "g2"], name="group_config"),
+                    prices.columns.append(prices.columns),
+                ]
+            ),
         )
         target_df.iloc[[1, 3], 0:5] = target_arr[0:2]
         target_df.iloc[[2, 4], 5:10] = target_arr[2:4]
-        assert_frame_equal(
-            pf_opt.fill_allocations(squeeze_groups=False),
-            target_df
-        )
-        assert_frame_equal(
-            pf_opt.fill_allocations(squeeze_groups=True),
-            target_df
-        )
+        assert_frame_equal(pf_opt.fill_allocations(squeeze_groups=False), target_df)
+        assert_frame_equal(pf_opt.fill_allocations(squeeze_groups=True), target_df)
         pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             lambda index_slice: prices.iloc[index_slice].sum(),
@@ -1692,10 +1912,12 @@ class TestPortfolioOptimizer:
         target_df = pd.DataFrame(
             np.nan,
             index=prices.index,
-            columns=pd.MultiIndex.from_arrays([
-                pd.Index(["group", "group", "group", "group", "group"], name="group"),
-                prices.columns,
-            ]),
+            columns=pd.MultiIndex.from_arrays(
+                [
+                    pd.Index(["group", "group", "group", "group", "group"], name="group"),
+                    prices.columns,
+                ]
+            ),
         )
         target_df.iloc[[4]] = prices.sum().values
         assert_frame_equal(
@@ -1719,24 +1941,27 @@ class TestPortfolioOptimizer:
             seed=42,
             group_configs=[dict(on=[1, 3], _name="g1"), dict(on=[2, 4], _name="g2")],
         )
-        stats_index = pd.Index([
-            'Start',
-            'End',
-            'Period',
-            'Total Records',
-            'Mean Allocation: XOM',
-            'Mean Allocation: RRC',
-            'Mean Allocation: BBY',
-            'Mean Allocation: MA',
-            'Mean Allocation: PFE',
-        ], dtype='object')
+        stats_index = pd.Index(
+            [
+                "Start",
+                "End",
+                "Period",
+                "Total Records",
+                "Mean Allocation: XOM",
+                "Mean Allocation: RRC",
+                "Mean Allocation: BBY",
+                "Mean Allocation: MA",
+                "Mean Allocation: PFE",
+            ],
+            dtype="object",
+        )
         assert_series_equal(
             pf_opt.stats(),
             pd.Series(
                 [
-                    pd.Timestamp('2020-01-01 00:00:00'),
-                    pd.Timestamp('2020-01-05 00:00:00'),
-                    pd.Timedelta('5 days 00:00:00'),
+                    pd.Timestamp("2020-01-01 00:00:00"),
+                    pd.Timestamp("2020-01-05 00:00:00"),
+                    pd.Timedelta("5 days 00:00:00"),
                     2.0,
                     0.07835996334253675,
                     0.24379356854430356,
@@ -1745,16 +1970,16 @@ class TestPortfolioOptimizer:
                     0.1504070779218996,
                 ],
                 index=stats_index,
-                name="agg_stats"
-            )
+                name="agg_stats",
+            ),
         )
         assert_series_equal(
             pf_opt.stats(column="g1"),
             pd.Series(
                 [
-                    pd.Timestamp('2020-01-01 00:00:00'),
-                    pd.Timestamp('2020-01-05 00:00:00'),
-                    pd.Timedelta('5 days 00:00:00'),
+                    pd.Timestamp("2020-01-01 00:00:00"),
+                    pd.Timestamp("2020-01-05 00:00:00"),
+                    pd.Timedelta("5 days 00:00:00"),
                     2,
                     0.09924097389247608,
                     0.18120463020813665,
@@ -1763,8 +1988,8 @@ class TestPortfolioOptimizer:
                     0.17590925369791532,
                 ],
                 index=stats_index,
-                name="g1"
-            )
+                name="g1",
+            ),
         )
         assert_series_equal(pf_opt["g1"].stats(), pf_opt.stats(column="g1"))
         stats_df = pf_opt.stats(agg_func=None)
@@ -1779,26 +2004,29 @@ class TestPortfolioOptimizer:
             vbt.Rep("index_slice"),
             group_configs=[dict(index_ranges=[0, 2], _name="g1"), dict(index_ranges=[1, 3], _name="g2")],
         )
-        stats_index = pd.Index([
-            'Start',
-            'End',
-            'Period',
-            'Total Records',
-            'Coverage',
-            'Overlap Coverage',
-            'Mean Allocation: XOM',
-            'Mean Allocation: RRC',
-            'Mean Allocation: BBY',
-            'Mean Allocation: MA',
-            'Mean Allocation: PFE',
-        ], dtype='object')
+        stats_index = pd.Index(
+            [
+                "Start",
+                "End",
+                "Period",
+                "Total Records",
+                "Coverage",
+                "Overlap Coverage",
+                "Mean Allocation: XOM",
+                "Mean Allocation: RRC",
+                "Mean Allocation: BBY",
+                "Mean Allocation: MA",
+                "Mean Allocation: PFE",
+            ],
+            dtype="object",
+        )
         assert_series_equal(
             pf_opt.stats(),
             pd.Series(
                 [
-                    pd.Timestamp('2020-01-01 00:00:00'),
-                    pd.Timestamp('2020-01-05 00:00:00'),
-                    pd.Timedelta('5 days 00:00:00'),
+                    pd.Timestamp("2020-01-01 00:00:00"),
+                    pd.Timestamp("2020-01-05 00:00:00"),
+                    pd.Timedelta("5 days 00:00:00"),
                     1.0,
                     0.4,
                     0.0,
@@ -1809,16 +2037,16 @@ class TestPortfolioOptimizer:
                     27.5600615,
                 ],
                 index=stats_index,
-                name="agg_stats"
-            )
+                name="agg_stats",
+            ),
         )
         assert_series_equal(
             pf_opt.stats(column="g1"),
             pd.Series(
                 [
-                    pd.Timestamp('2020-01-01 00:00:00'),
-                    pd.Timestamp('2020-01-05 00:00:00'),
-                    pd.Timedelta('5 days 00:00:00'),
+                    pd.Timestamp("2020-01-01 00:00:00"),
+                    pd.Timestamp("2020-01-05 00:00:00"),
+                    pd.Timedelta("5 days 00:00:00"),
                     1,
                     0.4,
                     0.0,
@@ -1829,8 +2057,8 @@ class TestPortfolioOptimizer:
                     27.681569,
                 ],
                 index=stats_index,
-                name="g1"
-            )
+                name="g1",
+            ),
         )
         assert_series_equal(pf_opt["g1"].stats(), pf_opt.stats(column="g1"))
         stats_df = pf_opt.stats(agg_func=None)
@@ -1860,6 +2088,7 @@ class TestPortfolioOptimizer:
 
 
 # ############# Portfolio ############# #
+
 
 class TestPortfolio:
     def test_from_optimizer(self):
