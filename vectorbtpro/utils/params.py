@@ -215,6 +215,7 @@ def combine_params(
         elif isinstance(value, pd.Index):
             if keys is None:
                 keys = value
+            value = value.tolist()
         values = params_to_list(value, is_tuple=p.is_tuple, is_array_like=p.is_array_like)
         level_values[level][k] = values
         if p.name is None:
@@ -802,7 +803,7 @@ def parameterized(
             def _prepare_args():
                 for p, param_config in enumerate(param_configs):
                     _template_context = dict(template_context)
-                    _template_context["param_idx"] = p
+                    _template_context["config_idx"] = p
                     _ann_args = dict()
                     for k, v in ann_args.items():
                         v = dict(v)
