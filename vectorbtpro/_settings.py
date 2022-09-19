@@ -592,7 +592,7 @@ data = ChildDict(
             timeframe="1d",
             adjustment="raw",
             feed=None,
-            limit=10000,
+            limit=None,
         ),
         polygon=FrozenConfig(
             client=None,
