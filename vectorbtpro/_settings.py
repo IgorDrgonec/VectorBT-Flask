@@ -586,6 +586,7 @@ data = ChildDict(
                 api_key=None,
                 secret_key=None,
                 oauth_token=None,
+                paper=False,
             ),
             start=0,
             end="now UTC",
@@ -612,7 +613,7 @@ data = ChildDict(
             silence_warnings=False,
         ),
         alpha_vantage=FrozenConfig(
-            api_key=None,
+            apikey=None,
             api_meta=None,
             category=None,
             function=None,

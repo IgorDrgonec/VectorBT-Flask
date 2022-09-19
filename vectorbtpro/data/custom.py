@@ -13,7 +13,7 @@
 import time
 import traceback
 import warnings
-from functools import wraps, lru_cache, partial, partialmethod
+from functools import wraps, lru_cache, partial
 from pathlib import Path, PurePath
 from glob import glob
 import re
@@ -42,6 +42,7 @@ from vectorbtpro.utils.datetime_ import (
 from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.enum_ import map_enum_fields
+from vectorbtpro.utils.parsing import glob2re, get_func_arg_names
 
 try:
     from binance.client import Client as BinanceClientT
@@ -111,6 +112,16 @@ class CustomData(Data):
     def reset_custom_settings(cls) -> None:
         """`CustomData.reset_settings` with `key_id="custom"`."""
         cls.reset_settings(key_id="custom")
+
+    @staticmethod
+    def symbol_match(symbol: str, pattern: str, use_regex: bool = False):
+        """Return whether symbol matches pattern.
+
+        If `use_regex` is True, checks against a regular expression.
+        Otherwise, checks against a glob-style pattern."""
+        if use_regex:
+            return re.match(pattern, symbol)
+        return re.match(glob2re(pattern), symbol)
 
 
 # ############# Synthetic ############# #
@@ -418,17 +429,19 @@ class LocalData(CustomData):
         path: tp.PathLike,
         match_regex: tp.Optional[str] = None,
         sort_paths: bool = True,
+        recursive: bool = True,
         **kwargs,
     ) -> tp.List[Path]:
         """Get the list of all paths matching a path."""
-        path = Path(path)
+        if not isinstance(path, Path):
+            path = Path(path)
         if path.exists():
             if path.is_dir():
                 sub_paths = [p for p in path.iterdir() if p.is_file()]
             else:
                 sub_paths = [path]
         else:
-            sub_paths = list([Path(p) for p in glob(str(path), recursive=True)])
+            sub_paths = list([Path(p) for p in glob(str(path), recursive=recursive)])
         if match_regex is not None:
             sub_paths = [p for p in sub_paths if re.match(match_regex, str(p))]
         if sort_paths:
@@ -552,6 +565,19 @@ class CSVData(LocalData):
     """Subclass of `vectorbtpro.data.base.Data` for data that can be fetched and updated using `pd.read_csv`."""
 
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.csv")
+
+    @classmethod
+    def get_symbols(
+        cls,
+        path: tp.PathLike = ".",
+        **match_path_kwargs,
+    ) -> tp.List[str]:
+        """Get the list of symbols under a path."""
+        if not isinstance(path, Path):
+            path = Path(path)
+        if path.exists() and path.is_dir():
+            path = path / "**" / "*.csv"
+        return list(map(str, cls.match_path(path, **match_path_kwargs)))
 
     @classmethod
     def fetch_symbol(
@@ -678,6 +704,19 @@ class HDFData(LocalData):
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.hdf")
 
     @classmethod
+    def get_symbols(
+        cls,
+        path: tp.PathLike = ".",
+        **match_path_kwargs,
+    ) -> tp.List[str]:
+        """Get the list of symbols under a path."""
+        if not isinstance(path, Path):
+            path = Path(path)
+        if path.exists() and path.is_dir():
+            path = path / "**" / "*.h5"
+        return list(map(str, cls.match_path(path, **match_path_kwargs)))
+
+    @classmethod
     def split_hdf_path(
         cls,
         path: tp.PathLike,
@@ -705,6 +744,7 @@ class HDFData(LocalData):
         path: tp.PathLike,
         match_regex: tp.Optional[str] = None,
         sort_paths: bool = True,
+        recursive: bool = True,
         **kwargs,
     ) -> tp.List[Path]:
         """Override `LocalData.match_path` to return a list of HDF paths
@@ -736,7 +776,7 @@ class HDFData(LocalData):
                         raise HDFKeyNotFoundError(f"No HDF keys could be matched with {key}")
                     key_paths = [file_path / k for k in matching_keys]
             except HDFPathNotFoundError:
-                sub_paths = list([Path(p) for p in glob(str(path))])
+                sub_paths = list([Path(p) for p in glob(str(path), recursive=recursive)])
                 if len(sub_paths) == 0 and re.match(r".+\..+", str(path)):
                     base_path = None
                     base_ended = False
@@ -755,7 +795,7 @@ class HDFData(LocalData):
                                 base_path = part
                             else:
                                 base_path /= part
-                    sub_paths = list([Path(p) for p in glob(str(base_path))])
+                    sub_paths = list([Path(p) for p in glob(str(base_path), recursive=recursive)])
                     if key_path is not None:
                         sub_paths = [p / key_path for p in sub_paths]
                 key_paths = [p for sub_path in sub_paths for p in cls.match_path(sub_path, sort_paths=False, **kwargs)]
@@ -1093,6 +1133,29 @@ class BinanceData(RemoteData):
         return client
 
     @classmethod
+    def get_symbols(
+        cls,
+        pattern: tp.Optional[str] = None,
+        use_regex: bool = False,
+        client: tp.Optional[BinanceClientT] = None,
+        client_config: tp.KwargsLike = None,
+    ) -> tp.List[str]:
+        """Get the list of symbols.
+
+        Uses `CustomData.symbol_match` to check each symbol against `pattern`."""
+        if client_config is None:
+            client_config = {}
+        client = cls.resolve_client(client=client, **client_config)
+        all_symbols = []
+        for dct in client.get_exchange_info()["symbols"]:
+            symbol = dct["symbol"]
+            if pattern is not None:
+                if not cls.symbol_match(symbol, pattern, use_regex=use_regex):
+                    continue
+            all_symbols.append(symbol)
+        return sorted(all_symbols)
+
+    @classmethod
     def fetch_symbol(
         cls,
         symbol: str,
@@ -1328,6 +1391,28 @@ class CCXTData(RemoteData):
     """
 
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.ccxt")
+
+    @classmethod
+    def get_symbols(
+        cls,
+        pattern: tp.Optional[str] = None,
+        use_regex: bool = False,
+        exchange: tp.Optional[tp.Union[str, CCXTExchangeT]] = None,
+        exchange_config: tp.Optional[tp.KwargsLike] = None,
+    ) -> tp.List[str]:
+        """Get the list of symbols.
+
+        Uses `CustomData.symbol_match` to check each symbol against `pattern`."""
+        if exchange_config is None:
+            exchange_config = {}
+        exchange = cls.resolve_exchange(exchange=exchange, **exchange_config)
+        all_symbols = []
+        for symbol in exchange.load_markets():
+            if pattern is not None:
+                if not cls.symbol_match(symbol, pattern, use_regex=use_regex):
+                    continue
+            all_symbols.append(symbol)
+        return sorted(all_symbols)
 
     @classmethod
     def resolve_exchange(
@@ -1686,6 +1771,68 @@ class AlpacaData(RemoteData):
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.alpaca")
 
     @classmethod
+    def get_symbols(
+        cls,
+        pattern: tp.Optional[str] = None,
+        use_regex: bool = False,
+        status: tp.Optional[str] = None,
+        asset_class: tp.Optional[str] = None,
+        exchange: tp.Optional[str] = None,
+        trading_client: tp.Optional[AlpacaClientT] = None,
+        client_config: tp.KwargsLike = None,
+    ) -> tp.List[str]:
+        """Get the list of symbols.
+
+        Uses `CustomData.symbol_match` to check each symbol against `pattern`.
+
+        Arguments `status`, `asset_class`, and `exchange` can be strings, such as `asset_class="crypto"`.
+        For possible values, take a look into `alpaca.trading.enums`.
+
+        !!! note
+            If you get an authorization error, make sure that you either enable or disable
+            the `paper` flag in `client_config` depending upon the account whose credentials you used.
+            By default, the credentials are assumed to be of a live trading account (`paper=False`)."""
+        from vectorbtpro.utils.opt_packages import assert_can_import
+
+        assert_can_import("alpaca")
+        from alpaca.trading.client import TradingClient
+        from alpaca.trading.requests import GetAssetsRequest
+        from alpaca.trading.enums import AssetStatus, AssetClass, AssetExchange
+
+        alpaca_cfg = cls.get_settings(key_id="custom")
+
+        if client_config is None:
+            client_config = {}
+        has_client_config = len(client_config) > 0
+        client_config = merge_dicts(alpaca_cfg["client_config"], client_config)
+        if trading_client is None:
+            arg_names = get_func_arg_names(TradingClient.__init__)
+            client_config = {k: v for k, v in client_config.items() if k in arg_names}
+            trading_client = TradingClient(**client_config)
+        elif has_client_config:
+            raise ValueError("Cannot apply client_config on already created client")
+
+        if status is not None:
+            if isinstance(status, str):
+                status = getattr(AssetStatus, status.upper())
+        if asset_class is not None:
+            if isinstance(asset_class, str):
+                asset_class = getattr(AssetClass, asset_class.upper())
+        if exchange is not None:
+            if isinstance(exchange, str):
+                exchange = getattr(AssetExchange, exchange.upper())
+        search_params = GetAssetsRequest(status=status, asset_class=asset_class, exchange=exchange)
+        assets = trading_client.get_all_assets(search_params)
+        all_symbols = []
+        for asset in assets:
+            symbol = asset.symbol
+            if pattern is not None:
+                if not cls.symbol_match(symbol, pattern, use_regex=use_regex):
+                    continue
+            all_symbols.append(symbol)
+        return sorted(all_symbols)
+
+    @classmethod
     def resolve_client(
         cls,
         client: tp.Optional[AlpacaClientT] = None,
@@ -1714,8 +1861,12 @@ class AlpacaData(RemoteData):
         client_config = merge_dicts(alpaca_cfg["client_config"], client_config)
         if client is None:
             if client_type == "crypto":
+                arg_names = get_func_arg_names(CryptoHistoricalDataClient.__init__)
+                client_config = {k: v for k, v in client_config.items() if k in arg_names}
                 client = CryptoHistoricalDataClient(**client_config)
             elif client_type == "stocks":
+                arg_names = get_func_arg_names(StockHistoricalDataClient.__init__)
+                client_config = {k: v for k, v in client_config.items() if k in arg_names}
                 client = StockHistoricalDataClient(**client_config)
             else:
                 raise ValueError(f"Invalid client type '{client_type}'")
@@ -1934,6 +2085,32 @@ class PolygonData(RemoteData):
     """
 
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.polygon")
+
+    @classmethod
+    def get_symbols(
+        cls,
+        pattern: tp.Optional[str] = None,
+        use_regex: bool = False,
+        client: tp.Optional[PolygonClientT] = None,
+        client_config: tp.DictLike = None,
+        **list_tickers_kwargs,
+    ) -> tp.List[str]:
+        """Get the list of symbols.
+
+        Uses `CustomData.symbol_match` to check each symbol against `pattern`.
+
+        For supported keyword arguments, see `polygon.RESTClient.list_tickers`."""
+        if client_config is None:
+            client_config = {}
+        client = cls.resolve_client(client=client, **client_config)
+        all_symbols = []
+        for ticker in client.list_tickers(**list_tickers_kwargs):
+            symbol = ticker.ticker
+            if pattern is not None:
+                if not cls.symbol_match(symbol, pattern, use_regex=use_regex):
+                    continue
+            all_symbols.append(symbol)
+        return sorted(all_symbols)
 
     @classmethod
     def resolve_client(cls, client: tp.Optional[PolygonClientT] = None, **client_config) -> PolygonClientT:
@@ -2260,7 +2437,7 @@ class AlphaVantageData(RemoteData):
         >>> import vectorbtpro as vbt
 
         >>> vbt.AlphaVantageData.set_custom_settings(
-        ...     api_key="YOUR_KEY"
+        ...     apikey="YOUR_KEY"
         ... )
         ```
 
@@ -2294,6 +2471,22 @@ class AlphaVantageData(RemoteData):
     """
 
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.alpha_vantage")
+
+    @classmethod
+    def get_symbols(cls, keywords: str, apikey: tp.Optional[str] = None):
+        """Get the list of symbols by searching for keywords."""
+        alpha_vantage_cfg = cls.get_settings(key_id="custom")
+
+        if apikey is None:
+            apikey = alpha_vantage_cfg["apikey"]
+        query = dict()
+        query["function"] = "SYMBOL_SEARCH"
+        query["keywords"] = keywords
+        query["datatype"] = "csv"
+        query["apikey"] = apikey
+        url = "https://www.alphavantage.co/query?" + urllib.parse.urlencode(query)
+        df = pd.read_csv(url)
+        return sorted(df["symbol"].tolist())
 
     @classmethod
     @lru_cache()
@@ -2344,7 +2537,7 @@ class AlphaVantageData(RemoteData):
     def fetch_symbol(
         cls,
         symbol: str,
-        api_key: tp.Optional[str] = None,
+        apikey: tp.Optional[str] = None,
         api_meta: tp.Optional[dict] = None,
         category: tp.Optional[str] = None,
         function: tp.Optional[str] = None,
@@ -2371,7 +2564,7 @@ class AlphaVantageData(RemoteData):
             symbol (str): Symbol.
 
                 May combine symbol/from_currency and market/to_currency using an underscore.
-            api_key (str): API key.
+            apikey (str): API key.
             api_meta (dict): API meta.
 
                 If None, will use `AlphaVantageData.parse_api_meta` if `function` is not provided
@@ -2414,7 +2607,7 @@ class AlphaVantageData(RemoteData):
                 * "full" that returns the full-length time series
             match_params (bool): Whether to match parameters with the ones required by the endpoint.
 
-                Otherwise, uses only (resolved) `function`, `api_key`, `datatype="csv"`, and `params`.
+                Otherwise, uses only (resolved) `function`, `apikey`, `datatype="csv"`, and `params`.
             params: Additional keyword arguments passed as key/value pairs in the URL.
             read_csv_kwargs (dict): Keyword arguments passed to `pd.read_csv`.
             silence_warnings (bool): Whether to silence all warnings.
@@ -2423,8 +2616,8 @@ class AlphaVantageData(RemoteData):
         """
         alpha_vantage_cfg = cls.get_settings(key_id="custom")
 
-        if api_key is None:
-            api_key = alpha_vantage_cfg["api_key"]
+        if apikey is None:
+            apikey = alpha_vantage_cfg["apikey"]
         if api_meta is None:
             api_meta = alpha_vantage_cfg["api_meta"]
         if category is None:
@@ -2555,7 +2748,7 @@ class AlphaVantageData(RemoteData):
             matched_params = dict()
             matched_params["function"] = function
             matched_params["datatype"] = "csv"
-            matched_params["apikey"] = api_key
+            matched_params["apikey"] = apikey
             if "symbol" in args and "market" in args:
                 matched_params["symbol"] = symbol.split("_")[0]
                 matched_params["market"] = symbol.split("_")[1]
@@ -2592,7 +2785,7 @@ class AlphaVantageData(RemoteData):
         else:
             matched_params = dict(params)
             matched_params["function"] = function
-            matched_params["apikey"] = api_key
+            matched_params["apikey"] = apikey
             matched_params["datatype"] = "csv"
 
         # Collect and format the data
