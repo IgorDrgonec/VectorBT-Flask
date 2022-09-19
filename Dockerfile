@@ -23,8 +23,6 @@ RUN pip install --quiet --no-cache-dir \
     'jupyter-dash' \
     'plotly>=5.0.0' \
     'kaleido' && \
-    fix-permissions "${CONDA_DIR}" && \
-    fix-permissions "/home/${NB_USER}" && \
     jupyter lab build --minimize=False
 
 RUN pip install --quiet --no-cache-dir \
@@ -39,6 +37,7 @@ RUN pip install --quiet --no-cache-dir \
     'mypy_extensions' \
     'humanize' \
     'attrs>=19.2.0' \
+    'hyperopt' \
     'yfinance>=0.1.63' \
     'python-binance>=1.0.16' \
     'alpaca-py' \
@@ -48,16 +47,17 @@ RUN pip install --quiet --no-cache-dir \
     'tvdatafeed' \
     'ta' \
     'pandas_ta' \
-    'TA-Lib' \
+    'TA-Lib==0.4.21' \
     'technical' \
     'plotly-resampler' \
     'quantstats>=0.0.37' \
     'PyPortfolioOpt>=1.5.1' \
     'Riskfolio-Lib>=3.3.0' \
-    'python-telegram-bot>=13.4' && \
-    fix-permissions "${CONDA_DIR}" && \
-    fix-permissions "/home/${NB_USER}"
+    'python-telegram-bot>=13.4'
 
+RUN pip install --quiet --no-cache-dir --no-deps 'universal-portfolios'
+RUN pip install --quiet --no-cache-dir 'pandas_datareader'
+RUN conda install --quiet --yes -c conda-forge cvxopt
 
 ADD ./vectorbtpro ./vectorbtpro
 ADD setup.py ./

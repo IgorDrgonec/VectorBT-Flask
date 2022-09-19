@@ -18,6 +18,7 @@ technical:                  ta
 TA-Lib:                     ta, base
 Bottleneck:                 compute
 numexpr:                    compute, base
+hyperopt:                   optimize
 ray>=1.4.1:                 distribute
 dask:                       distribute, base
 matplotlib>=3.2.0:          plot, base
