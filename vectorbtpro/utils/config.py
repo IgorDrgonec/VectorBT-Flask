@@ -65,8 +65,8 @@ def get_dict_item(dct: dict, k: tp.Hashable) -> tp.Any:
     The key can be nested using the dot notation or tuple, and must be hashable."""
     if k in dct:
         return dct[k]
-    if isinstance(k, str) and '.' in k:
-        k = tuple(k.split('.'))
+    if isinstance(k, str) and "." in k:
+        k = tuple(k.split("."))
     if isinstance(k, tuple):
         if len(k) == 1:
             return dct[k[0]]
@@ -263,8 +263,15 @@ class PickleableDict(Pickleable, dict):
         return pickle.dumps(dct, **kwargs)
 
     @classmethod
-    def loads(cls: tp.Type[PickleableDictT], dumps: bytes, **kwargs) -> PickleableDictT:
-        """Unpickle from bytes."""
+    def loads(
+        cls: tp.Type[PickleableDictT],
+        dumps: bytes,
+        init_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> PickleableDictT:
+        """Unpickle from bytes.
+
+        Use `init_kwargs` to change the initialization arguments."""
         from vectorbtpro.utils.opt_packages import warn_cannot_import
 
         warn_cannot_import("dill")
@@ -277,7 +284,9 @@ class PickleableDict(Pickleable, dict):
         for k, v in config.items():
             if isinstance(v, DumpTuple):
                 config[k] = v.cls.loads(v.dumps, **kwargs)
-        return cls(**config)
+        if init_kwargs is None:
+            init_kwargs = {}
+        return cls(**{**config, **init_kwargs})
 
     def load_update(self, path: tp.Optional[tp.PathLike] = None, clear: bool = False, **kwargs) -> None:
         """Load dumps from a file and update this instance in-place."""
@@ -721,7 +730,7 @@ class Config(PickleableDict, Prettified):
         )
 
     @classmethod
-    def loads(cls: tp.Type[ConfigT], dumps: bytes, **kwargs) -> ConfigT:
+    def loads(cls: tp.Type[ConfigT], dumps: bytes, init_kwargs: tp.KwargsLike = None, **kwargs) -> ConfigT:
         """Unpickle from bytes."""
         from vectorbtpro.utils.opt_packages import warn_cannot_import
 
@@ -736,17 +745,20 @@ class Config(PickleableDict, Prettified):
             reset_dct_ = PickleableDict.loads(obj["reset_dct_"], **kwargs)
         else:
             reset_dct_ = None
-        return cls(
-            PickleableDict.loads(obj["dct"], **kwargs),
-            copy_kwargs_=obj["copy_kwargs_"],
-            reset_dct_=reset_dct_,
-            reset_dct_copy_kwargs_=obj["reset_dct_copy_kwargs_"],
-            frozen_keys_=obj["frozen_keys_"],
-            readonly_=obj["readonly_"],
-            nested_=obj["nested_"],
-            convert_children_=obj["convert_children_"],
-            as_attrs_=obj["as_attrs_"],
-        )
+        config = {
+            "copy_kwargs_": obj["copy_kwargs_"],
+            "reset_dct_": reset_dct_,
+            "reset_dct_copy_kwargs_": obj["reset_dct_copy_kwargs_"],
+            "frozen_keys_": obj["frozen_keys_"],
+            "readonly_": obj["readonly_"],
+            "nested_": obj["nested_"],
+            "convert_children_": obj["convert_children_"],
+            "as_attrs_": obj["as_attrs_"],
+            **PickleableDict.loads(obj["dct"], **kwargs),
+        }
+        if init_kwargs is None:
+            init_kwargs = {}
+        return cls(**{**config, **init_kwargs})
 
     def load_update(
         self,
@@ -1001,7 +1013,7 @@ class Configured(Cacheable, Pickleable, Prettified):
         return pickle.dumps((config_dumps, attr_dct_dumps), **kwargs)
 
     @classmethod
-    def loads(cls: tp.Type[ConfiguredT], dumps: bytes, **kwargs) -> ConfiguredT:
+    def loads(cls: tp.Type[ConfiguredT], dumps: bytes, init_kwargs: tp.KwargsLike = None, **kwargs) -> ConfiguredT:
         """Unpickle from bytes."""
         from vectorbtpro.utils.opt_packages import warn_cannot_import
 
@@ -1014,7 +1026,9 @@ class Configured(Cacheable, Pickleable, Prettified):
         config_dumps, attr_dct_dumps = pickle.loads(dumps, **kwargs)
         config = Config.loads(config_dumps, **kwargs)
         attr_dct = PickleableDict.loads(attr_dct_dumps, **kwargs)
-        new_instance = cls(**config)
+        if init_kwargs is None:
+            init_kwargs = {}
+        new_instance = cls(**{**config, **init_kwargs})
         for attr, obj in attr_dct.items():
             setattr(new_instance, attr, obj)
         return new_instance

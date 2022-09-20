@@ -214,28 +214,17 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         self,
         wrapper: ArrayWrapper,
         data: symbol_dict,
-        single_symbol: bool,
-        symbol_classes: symbol_dict,
-        fetch_kwargs: symbol_dict,
-        returned_kwargs: symbol_dict,
-        last_index: symbol_dict,
-        tz_localize: tp.Optional[tp.TimezoneLike],
-        tz_convert: tp.Optional[tp.TimezoneLike],
-        missing_index: str,
-        missing_columns: str,
+        single_symbol: bool = True,
+        symbol_classes: tp.Optional[symbol_dict] = None,
+        fetch_kwargs: tp.Optional[symbol_dict] = None,
+        returned_kwargs: tp.Optional[symbol_dict] = None,
+        last_index: tp.Optional[symbol_dict] = None,
+        tz_localize: tp.Optional[tp.TimezoneLike] = None,
+        tz_convert: tp.Optional[tp.TimezoneLike] = None,
+        missing_index: tp.Optional[str] = None,
+        missing_columns: tp.Optional[str] = None,
         **kwargs,
     ) -> None:
-
-        checks.assert_instance_of(data, dict)
-        checks.assert_instance_of(symbol_classes, dict)
-        checks.assert_instance_of(fetch_kwargs, dict)
-        checks.assert_instance_of(returned_kwargs, dict)
-        checks.assert_instance_of(last_index, dict)
-        for symbol, obj in data.items():
-            checks.assert_meta_equal(obj, data[list(data.keys())[0]])
-        if len(data) > 1:
-            single_symbol = False
-
         Analyzable.__init__(
             self,
             wrapper,
@@ -251,6 +240,24 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             missing_columns=missing_columns,
             **kwargs,
         )
+
+        if symbol_classes is None:
+            symbol_classes = {}
+        if fetch_kwargs is None:
+            fetch_kwargs = {}
+        if returned_kwargs is None:
+            returned_kwargs = {}
+        if last_index is None:
+            last_index = {}
+        checks.assert_instance_of(data, dict)
+        checks.assert_instance_of(symbol_classes, dict)
+        checks.assert_instance_of(fetch_kwargs, dict)
+        checks.assert_instance_of(returned_kwargs, dict)
+        checks.assert_instance_of(last_index, dict)
+        for symbol, obj in data.items():
+            checks.assert_meta_equal(obj, data[list(data.keys())[0]])
+        if len(data) > 1:
+            single_symbol = False
 
         self._data = symbol_dict(data)
         self._single_symbol = single_symbol
@@ -322,12 +329,12 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         return self._tz_convert
 
     @property
-    def missing_index(self) -> str:
+    def missing_index(self) -> tp.Optional[str]:
         """`missing_index` initially passed to `Data.fetch_symbol`."""
         return self._missing_index
 
     @property
-    def missing_columns(self) -> str:
+    def missing_columns(self) -> tp.Optional[str]:
         """`missing_columns` initially passed to `Data.fetch_symbol`."""
         return self._missing_columns
 
