@@ -1940,8 +1940,16 @@ shortcut_config = ReadonlyConfig(
         "net_exposure": dict(),
         "value": dict(),
         "allocations": dict(group_by_aware=False),
-        "longonly_allocations": dict(group_by_aware=False, method_kwargs=dict(direction="longonly")),
-        "shortonly_allocations": dict(group_by_aware=False, method_kwargs=dict(direction="shortonly")),
+        "longonly_allocations": dict(
+            method_name="get_allocations",
+            method_kwargs=dict(direction="longonly"),
+            group_by_aware=False,
+        ),
+        "shortonly_allocations": dict(
+            method_name="get_allocations",
+            method_kwargs=dict(direction="shortonly"),
+            group_by_aware=False,
+        ),
         "total_profit": dict(obj_type="red_array"),
         "final_value": dict(obj_type="red_array"),
         "total_return": dict(obj_type="red_array"),
