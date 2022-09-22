@@ -4498,72 +4498,104 @@ class TestBasic:
             ).sim,
         )
 
-    def test_ZIGZAG(self):
-        assert_frame_equal(
-            vbt.ZIGZAG.run(close_ts, up_th=[1, np.array([1])], down_th=0.5).pivots,
-            pd.DataFrame(
-                np.array([[-1, -1], [1, 1], [0, 0], [0, 0], [0, 0], [0, 0], [-1, -1]]),
-                index=close_ts.index,
-                columns=pd.MultiIndex.from_tuples([(1, 0.5), (1, 0.5)], names=["zigzag_up_th", "zigzag_down_th"]),
-            ),
-        )
-
     def test_PIVOTINFO(self):
         assert_frame_equal(
-            vbt.PIVOTINFO.run(close_ts, up_th=[1, np.array([1])], down_th=0.5).conf_pivot,
+            vbt.PIVOTINFO.run(close_ts, close_ts, up_th=[1, 2], down_th=0.5).conf_pivot,
             pd.DataFrame(
-                np.array([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [1, 1], [1, 1]]),
+                np.array([[0, 0], [-1, 0], [-1, -1], [-1, -1], [-1, -1], [1, 1], [1, 1]]),
                 index=close_ts.index,
-                columns=pd.MultiIndex.from_tuples([(1, 0.5), (1, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
+                columns=pd.MultiIndex.from_tuples([(1, 0.5), (2, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
             ),
         )
         assert_frame_equal(
-            vbt.PIVOTINFO.run(close_ts, up_th=[1, np.array([1])], down_th=0.5).conf_idx,
+            vbt.PIVOTINFO.run(close_ts, close_ts, up_th=[1, 2], down_th=0.5).conf_idx,
             pd.DataFrame(
-                np.array([[-1, -1], [-1, -1], [-1, -1], [-1, -1], [-1, -1], [3, 3], [3, 3]]),
+                np.array([[-1, -1], [0, -1], [0, 0], [0, 0], [0, 0], [3, 3], [3, 3]]),
                 index=close_ts.index,
-                columns=pd.MultiIndex.from_tuples([(1, 0.5), (1, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
+                columns=pd.MultiIndex.from_tuples([(1, 0.5), (2, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
             ),
         )
         assert_frame_equal(
-            vbt.PIVOTINFO.run(close_ts, up_th=[1, np.array([1])], down_th=0.5).conf_value,
+            vbt.PIVOTINFO.run(close_ts, close_ts, up_th=[1, 2], down_th=0.5).conf_value,
+            pd.DataFrame(
+                np.array([[np.nan, np.nan], [1.0, np.nan], [1.0, 1.0], [1.0, 1.0], [1.0, 1.0], [4.0, 4.0], [4.0, 4.0]]),
+                index=close_ts.index,
+                columns=pd.MultiIndex.from_tuples([(1, 0.5), (2, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
+            ),
+        )
+        assert_frame_equal(
+            vbt.PIVOTINFO.run(close_ts, close_ts, up_th=[1, 2], down_th=0.5).last_pivot,
+            pd.DataFrame(
+                np.array([[0, 0], [1, 0], [1, 1], [1, 1], [1, 1], [-1, -1], [-1, -1]]),
+                index=close_ts.index,
+                columns=pd.MultiIndex.from_tuples([(1, 0.5), (2, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
+            ),
+        )
+        assert_frame_equal(
+            vbt.PIVOTINFO.run(close_ts, close_ts, up_th=[1, 2], down_th=0.5).last_idx,
+            pd.DataFrame(
+                np.array([[-1, -1], [1, -1], [2, 2], [3, 3], [3, 3], [5, 5], [6, 6]]),
+                index=close_ts.index,
+                columns=pd.MultiIndex.from_tuples([(1, 0.5), (2, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
+            ),
+        )
+        assert_frame_equal(
+            vbt.PIVOTINFO.run(close_ts, close_ts, up_th=[1, 2], down_th=0.5).last_value,
+            pd.DataFrame(
+                np.array([[np.nan, np.nan], [2.0, np.nan], [3.0, 3.0], [4.0, 4.0], [4.0, 4.0], [2.0, 2.0], [1.0, 1.0]]),
+                index=close_ts.index,
+                columns=pd.MultiIndex.from_tuples([(1, 0.5), (2, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
+            ),
+        )
+        assert_frame_equal(
+            vbt.PIVOTINFO.run(close_ts, close_ts, up_th=[1, 2], down_th=0.5).pivots,
+            pd.DataFrame(
+                np.array([[-1, -1], [0, 0], [0, 0], [1, 1], [0, 0], [0, 0], [-1, -1]]),
+                index=close_ts.index,
+                columns=pd.MultiIndex.from_tuples([(1, 0.5), (2, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
+            ),
+        )
+        assert_frame_equal(
+            vbt.PIVOTINFO.run(close_ts, close_ts, up_th=[1, 2], down_th=0.5).modes,
+            pd.DataFrame(
+                np.array([[-1, -1], [1, 1], [1, 1], [1, 1], [-1, -1], [-1, -1], [-1, -1]]),
+                index=close_ts.index,
+                columns=pd.MultiIndex.from_tuples([(1, 0.5), (2, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
+            ),
+        )
+        assert_frame_equal(
+            vbt.PIVOTINFO.run(close_ts, close_ts, up_th=[1, 2], down_th=0.5).pivots_readable,
             pd.DataFrame(
                 np.array(
                     [
-                        [np.nan, np.nan],
-                        [np.nan, np.nan],
-                        [np.nan, np.nan],
-                        [np.nan, np.nan],
-                        [np.nan, np.nan],
-                        [4.0, 4.0],
-                        [4.0, 4.0],
+                        ["Valley", "Valley"],
+                        [None, None],
+                        [None, None],
+                        ["Peak", "Peak"],
+                        [None, None],
+                        [None, None],
+                        ["Valley", "Valley"],
                     ]
                 ),
                 index=close_ts.index,
-                columns=pd.MultiIndex.from_tuples([(1, 0.5), (1, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
+                columns=pd.MultiIndex.from_tuples([(1, 0.5), (2, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
             ),
         )
         assert_frame_equal(
-            vbt.PIVOTINFO.run(close_ts, up_th=[1, np.array([1])], down_th=0.5).last_pivot,
+            vbt.PIVOTINFO.run(close_ts, close_ts, up_th=[1, 2], down_th=0.5).modes_readable,
             pd.DataFrame(
-                np.array([[0, 0], [1, 1], [1, 1], [1, 1], [1, 1], [-1, -1], [-1, -1]]),
+                np.array(
+                    [
+                        ["Downtrend", "Downtrend"],
+                        ["Uptrend", "Uptrend"],
+                        ["Uptrend", "Uptrend"],
+                        ["Uptrend", "Uptrend"],
+                        ["Downtrend", "Downtrend"],
+                        ["Downtrend", "Downtrend"],
+                        ["Downtrend", "Downtrend"],
+                    ]
+                ),
                 index=close_ts.index,
-                columns=pd.MultiIndex.from_tuples([(1, 0.5), (1, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
-            ),
-        )
-        assert_frame_equal(
-            vbt.PIVOTINFO.run(close_ts, up_th=[1, np.array([1])], down_th=0.5).last_idx,
-            pd.DataFrame(
-                np.array([[-1, -1], [1, 1], [2, 2], [3, 3], [3, 3], [5, 5], [6, 6]]),
-                index=close_ts.index,
-                columns=pd.MultiIndex.from_tuples([(1, 0.5), (1, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
-            ),
-        )
-        assert_frame_equal(
-            vbt.PIVOTINFO.run(close_ts, up_th=[1, np.array([1])], down_th=0.5).last_value,
-            pd.DataFrame(
-                np.array([[np.nan, np.nan], [2.0, 2.0], [3.0, 3.0], [4.0, 4.0], [4.0, 4.0], [2.0, 2.0], [1.0, 1.0]]),
-                index=close_ts.index,
-                columns=pd.MultiIndex.from_tuples([(1, 0.5), (1, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
+                columns=pd.MultiIndex.from_tuples([(1, 0.5), (2, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
             ),
         )
