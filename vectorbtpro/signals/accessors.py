@@ -2218,11 +2218,17 @@ class SignalsAccessor(GenericAccessor):
 
     # ############# Plotting ############# #
 
-    def plot(self, yref: str = "y", **kwargs) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
+    def plot(
+        self,
+        yref: str = "y",
+        column: tp.Optional[tp.Label] = None,
+        **kwargs,
+    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
         """Plot signals.
 
         Args:
             yref (str): Y coordinate axis.
+            column (hashable): Column to plot.
             **kwargs: Keyword arguments passed to `vectorbtpro.generic.accessors.GenericAccessor.lineplot`.
 
         Usage:
@@ -2232,9 +2238,216 @@ class SignalsAccessor(GenericAccessor):
 
             ![](/assets/images/api/signals_df_plot.svg)
         """
+        if column is not None:
+            _self = self.select_col(column=column)
+        else:
+            _self = self
         default_layout = dict()
         default_layout["yaxis" + yref[1:]] = dict(tickmode="array", tickvals=[0, 1], ticktext=["false", "true"])
-        return self.obj.vbt.lineplot(**merge_dicts(default_layout, kwargs))
+        return _self.obj.vbt.lineplot(**merge_dicts(default_layout, kwargs))
+
+    def plot_as_markers(
+        self,
+        y: tp.Optional[tp.ArrayLike] = None,
+        column: tp.Optional[tp.Label] = None,
+        **kwargs,
+    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
+        """Plot Series as markers.
+
+        Args:
+            y (array_like): Y-axis values to plot markers on.
+            column (hashable): Column to plot.
+            **kwargs: Keyword arguments passed to `vectorbtpro.generic.accessors.GenericAccessor.scatterplot`.
+
+        Usage:
+            ```pycon
+            >>> ts = pd.Series([1, 2, 3, 2, 1], index=mask.index)
+            >>> fig = ts.vbt.lineplot()
+            >>> mask['b'].vbt.signals.plot_as_entries(y=ts, fig=fig)
+            >>> (~mask['b']).vbt.signals.plot_as_exits(y=ts, fig=fig)
+            ```
+
+            ![](/assets/images/api/signals_plot_as_markers.svg)
+        """
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
+
+        obj = self.obj
+        if isinstance(obj, pd.DataFrame):
+            obj = self.select_col_from_obj(obj, column=column)
+        if y is None:
+            y = pd.Series.vbt.empty_like(obj, 1)
+        else:
+            y = reshaping.to_pd_array(y)
+            if isinstance(y, pd.DataFrame):
+                y = self.select_col_from_obj(y, column=column)
+            obj, y = reshaping.broadcast(obj, y, columns_from="keep")
+            if y.name is None:
+                y = y.rename("Y")
+
+        def_kwargs = dict(
+            trace_kwargs=dict(
+                marker=dict(
+                    symbol="circle",
+                    color=plotting_cfg["contrast_color_schema"]["blue"],
+                    size=7,
+                ),
+                name=obj.name,
+            )
+        )
+        kwargs = merge_dicts(def_kwargs, kwargs)
+        if "marker_color" in kwargs["trace_kwargs"]:
+            marker_color = kwargs["trace_kwargs"]["marker_color"]
+        else:
+            marker_color = kwargs["trace_kwargs"]["marker"]["color"]
+        if isinstance(marker_color, str) and "rgba" not in marker_color:
+            line_color = adjust_lightness(marker_color)
+        else:
+            line_color = marker_color
+        kwargs = merge_dicts(
+            dict(
+                trace_kwargs=dict(
+                    marker=dict(
+                        line=dict(width=1, color=line_color),
+                    ),
+                ),
+            ),
+            kwargs,
+        )
+        return y[obj].vbt.scatterplot(**kwargs)
+
+    def plot_as_entries(
+        self,
+        y: tp.Optional[tp.ArrayLike] = None,
+        column: tp.Optional[tp.Label] = None,
+        **kwargs,
+    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
+        """Plot signals as entry markers.
+
+        See `SignalsSRAccessor.plot_as_markers`."""
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
+
+        return self.plot_as_markers(
+            y=y,
+            column=column,
+            **merge_dicts(
+                dict(
+                    trace_kwargs=dict(
+                        marker=dict(
+                            symbol="triangle-up",
+                            color=plotting_cfg["contrast_color_schema"]["green"],
+                            size=8,
+                        ),
+                        name="Entries",
+                    )
+                ),
+                kwargs,
+            ),
+        )
+
+    def plot_as_exits(
+        self,
+        y: tp.Optional[tp.ArrayLike] = None,
+        column: tp.Optional[tp.Label] = None,
+        **kwargs,
+    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
+        """Plot signals as exit markers.
+
+        See `SignalsSRAccessor.plot_as_markers`."""
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
+
+        return self.plot_as_markers(
+            y=y,
+            column=column,
+            **merge_dicts(
+                dict(
+                    trace_kwargs=dict(
+                        marker=dict(
+                            symbol="triangle-down",
+                            color=plotting_cfg["contrast_color_schema"]["red"],
+                            size=8,
+                        ),
+                        name="Exits",
+                    )
+                ),
+                kwargs,
+            ),
+        )
+
+    def plot_as_entry_marks(
+        self,
+        y: tp.Optional[tp.ArrayLike] = None,
+        column: tp.Optional[tp.Label] = None,
+        **kwargs,
+    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
+        """Plot signals as marked entry markers.
+
+        See `SignalsSRAccessor.plot_as_markers`."""
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
+
+        return self.plot_as_markers(
+            y=y,
+            column=column,
+            **merge_dicts(
+                dict(
+                    trace_kwargs=dict(
+                        marker=dict(
+                            symbol="circle",
+                            color="rgba(0, 0, 0, 0)",
+                            size=20,
+                            line=dict(
+                                color=plotting_cfg["contrast_color_schema"]["green"],
+                                width=2,
+                            ),
+                        ),
+                        name="Entry marks",
+                    )
+                ),
+                kwargs,
+            ),
+        )
+
+    def plot_as_exit_marks(
+        self,
+        y: tp.Optional[tp.ArrayLike] = None,
+        column: tp.Optional[tp.Label] = None,
+        **kwargs,
+    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
+        """Plot signals as marked exit markers.
+
+        See `SignalsSRAccessor.plot_as_markers`."""
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
+
+        return self.plot_as_markers(
+            y=y,
+            column=column,
+            **merge_dicts(
+                dict(
+                    trace_kwargs=dict(
+                        marker=dict(
+                            symbol="circle",
+                            color="rgba(0, 0, 0, 0)",
+                            size=20,
+                            line=dict(
+                                color=plotting_cfg["contrast_color_schema"]["red"],
+                                width=2,
+                            ),
+                        ),
+                        name="Exit marks",
+                    )
+                ),
+                kwargs,
+            ),
+        )
 
     @property
     def plots_defaults(self) -> tp.Kwargs:
@@ -2266,191 +2479,6 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
     def __init__(self, obj: tp.Series, **kwargs) -> None:
         GenericSRAccessor.__init__(self, obj, **kwargs)
         SignalsAccessor.__init__(self, obj, **kwargs)
-
-    def plot_as_markers(
-        self,
-        y: tp.Optional[tp.ArrayLike] = None,
-        **kwargs,
-    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
-        """Plot Series as markers.
-
-        Args:
-            y (array_like): Y-axis values to plot markers on.
-            **kwargs: Keyword arguments passed to `vectorbtpro.generic.accessors.GenericAccessor.scatterplot`.
-
-        Usage:
-            ```pycon
-            >>> ts = pd.Series([1, 2, 3, 2, 1], index=mask.index)
-            >>> fig = ts.vbt.lineplot()
-            >>> mask['b'].vbt.signals.plot_as_entries(y=ts, fig=fig)
-            >>> (~mask['b']).vbt.signals.plot_as_exits(y=ts, fig=fig)
-            ```
-
-            ![](/assets/images/api/signals_plot_as_markers.svg)
-        """
-        from vectorbtpro._settings import settings
-
-        plotting_cfg = settings["plotting"]
-
-        if y is None:
-            y = pd.Series.vbt.empty_like(self.obj, 1)
-        else:
-            y = reshaping.to_pd_array(y)
-
-        def_kwargs = dict(
-            trace_kwargs=dict(
-                marker=dict(
-                    symbol="circle",
-                    color=plotting_cfg["contrast_color_schema"]["blue"],
-                    size=7,
-                ),
-                name=self.wrapper.name,
-            )
-        )
-        kwargs = merge_dicts(def_kwargs, kwargs)
-        if "marker_color" in kwargs["trace_kwargs"]:
-            marker_color = kwargs["trace_kwargs"]["marker_color"]
-        else:
-            marker_color = kwargs["trace_kwargs"]["marker"]["color"]
-        if isinstance(marker_color, str) and "rgba" not in marker_color:
-            line_color = adjust_lightness(marker_color)
-        else:
-            line_color = marker_color
-        kwargs = merge_dicts(
-            dict(
-                trace_kwargs=dict(
-                    marker=dict(
-                        line=dict(width=1, color=line_color),
-                    ),
-                ),
-            ),
-            kwargs,
-        )
-        return y[self.obj].vbt.scatterplot(**kwargs)
-
-    def plot_as_entries(
-        self,
-        y: tp.Optional[tp.ArrayLike] = None,
-        **kwargs,
-    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
-        """Plot signals as entry markers.
-
-        See `SignalsSRAccessor.plot_as_markers`."""
-        from vectorbtpro._settings import settings
-
-        plotting_cfg = settings["plotting"]
-
-        return self.plot_as_markers(
-            y=y,
-            **merge_dicts(
-                dict(
-                    trace_kwargs=dict(
-                        marker=dict(
-                            symbol="triangle-up",
-                            color=plotting_cfg["contrast_color_schema"]["green"],
-                            size=8,
-                        ),
-                        name="Entries",
-                    )
-                ),
-                kwargs,
-            ),
-        )
-
-    def plot_as_exits(
-        self,
-        y: tp.Optional[tp.ArrayLike] = None,
-        **kwargs,
-    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
-        """Plot signals as exit markers.
-
-        See `SignalsSRAccessor.plot_as_markers`."""
-        from vectorbtpro._settings import settings
-
-        plotting_cfg = settings["plotting"]
-
-        return self.plot_as_markers(
-            y=y,
-            **merge_dicts(
-                dict(
-                    trace_kwargs=dict(
-                        marker=dict(
-                            symbol="triangle-down",
-                            color=plotting_cfg["contrast_color_schema"]["red"],
-                            size=8,
-                        ),
-                        name="Exits",
-                    )
-                ),
-                kwargs,
-            ),
-        )
-
-    def plot_as_entry_marks(
-        self,
-        y: tp.Optional[tp.ArrayLike] = None,
-        **kwargs,
-    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
-        """Plot signals as marked entry markers.
-
-        See `SignalsSRAccessor.plot_as_markers`."""
-        from vectorbtpro._settings import settings
-
-        plotting_cfg = settings["plotting"]
-
-        return self.plot_as_markers(
-            y=y,
-            **merge_dicts(
-                dict(
-                    trace_kwargs=dict(
-                        marker=dict(
-                            symbol="circle",
-                            color="rgba(0, 0, 0, 0)",
-                            size=20,
-                            line=dict(
-                                color=plotting_cfg["contrast_color_schema"]["green"],
-                                width=2,
-                            ),
-                        ),
-                        name="Entry marks",
-                    )
-                ),
-                kwargs,
-            ),
-        )
-
-    def plot_as_exit_marks(
-        self,
-        y: tp.Optional[tp.ArrayLike] = None,
-        **kwargs,
-    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
-        """Plot signals as marked exit markers.
-
-        See `SignalsSRAccessor.plot_as_markers`."""
-        from vectorbtpro._settings import settings
-
-        plotting_cfg = settings["plotting"]
-
-        return self.plot_as_markers(
-            y=y,
-            **merge_dicts(
-                dict(
-                    trace_kwargs=dict(
-                        marker=dict(
-                            symbol="circle",
-                            color="rgba(0, 0, 0, 0)",
-                            size=20,
-                            line=dict(
-                                color=plotting_cfg["contrast_color_schema"]["red"],
-                                width=2,
-                            ),
-                        ),
-                        name="Exit marks",
-                    )
-                ),
-                kwargs,
-            ),
-        )
 
 
 @register_df_vbt_accessor("signals")

@@ -745,6 +745,7 @@ class Config(PickleableDict, Prettified):
             reset_dct_ = PickleableDict.loads(obj["reset_dct_"], **kwargs)
         else:
             reset_dct_ = None
+        dct = PickleableDict.loads(obj["dct"], **kwargs)
         config = {
             "copy_kwargs_": obj["copy_kwargs_"],
             "reset_dct_": reset_dct_,
@@ -754,11 +755,15 @@ class Config(PickleableDict, Prettified):
             "nested_": obj["nested_"],
             "convert_children_": obj["convert_children_"],
             "as_attrs_": obj["as_attrs_"],
-            **PickleableDict.loads(obj["dct"], **kwargs),
         }
         if init_kwargs is None:
             init_kwargs = {}
-        return cls(**{**config, **init_kwargs})
+        for k, v in init_kwargs.items():
+            if k in config:
+                config[k] = v
+            else:
+                dct[k] = v
+        return cls(dct, **{**config, **init_kwargs})
 
     def load_update(
         self,

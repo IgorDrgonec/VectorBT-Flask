@@ -3935,6 +3935,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
     def plot(
         self,
+        column: tp.Optional[tp.Label] = None,
         trace_names: tp.TraceNames = None,
         x_labels: tp.Optional[tp.Labels] = None,
         return_fig: bool = True,
@@ -3951,17 +3952,21 @@ class GenericAccessor(BaseAccessor, Analyzable):
         """
         from vectorbtpro.generic.plotting import Scatter
 
+        if column is not None:
+            _self = self.select_col(column=column)
+        else:
+            _self = self
         if x_labels is None:
-            x_labels = self.wrapper.index
+            x_labels = _self.wrapper.index
         if trace_names is None:
-            if self.is_frame() or (self.is_series() and self.wrapper.name is not None):
-                trace_names = self.wrapper.columns
-        scatter = Scatter(data=self.to_2d_array(), trace_names=trace_names, x_labels=x_labels, **kwargs)
+            if _self.is_frame() or (_self.is_series() and _self.wrapper.name is not None):
+                trace_names = _self.wrapper.columns
+        scatter = Scatter(data=_self.to_2d_array(), trace_names=trace_names, x_labels=x_labels, **kwargs)
         if return_fig:
             return scatter.fig
         return scatter
 
-    def lineplot(self, **kwargs) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
+    def lineplot(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
         """`GenericAccessor.plot` with 'lines' mode.
 
         Usage:
@@ -3971,9 +3976,9 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
             ![](/assets/images/api/df_lineplot.svg)
         """
-        return self.plot(**merge_dicts(dict(trace_kwargs=dict(mode="lines")), kwargs))
+        return self.plot(column=column, **merge_dicts(dict(trace_kwargs=dict(mode="lines")), kwargs))
 
-    def scatterplot(self, **kwargs) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
+    def scatterplot(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
         """`GenericAccessor.plot` with 'markers' mode.
 
         Usage:
@@ -3983,10 +3988,11 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
             ![](/assets/images/api/df_scatterplot.svg)
         """
-        return self.plot(**merge_dicts(dict(trace_kwargs=dict(mode="markers")), kwargs))
+        return self.plot(column=column, **merge_dicts(dict(trace_kwargs=dict(mode="markers")), kwargs))
 
     def barplot(
         self,
+        column: tp.Optional[tp.Label] = None,
         trace_names: tp.TraceNames = None,
         x_labels: tp.Optional[tp.Labels] = None,
         return_fig: bool = True,
@@ -4003,18 +4009,23 @@ class GenericAccessor(BaseAccessor, Analyzable):
         """
         from vectorbtpro.generic.plotting import Bar
 
+        if column is not None:
+            _self = self.select_col(column=column)
+        else:
+            _self = self
         if x_labels is None:
-            x_labels = self.wrapper.index
+            x_labels = _self.wrapper.index
         if trace_names is None:
-            if self.is_frame() or (self.is_series() and self.wrapper.name is not None):
-                trace_names = self.wrapper.columns
-        bar = Bar(data=self.to_2d_array(), trace_names=trace_names, x_labels=x_labels, **kwargs)
+            if _self.is_frame() or (_self.is_series() and _self.wrapper.name is not None):
+                trace_names = _self.wrapper.columns
+        bar = Bar(data=_self.to_2d_array(), trace_names=trace_names, x_labels=x_labels, **kwargs)
         if return_fig:
             return bar.fig
         return bar
 
     def histplot(
         self,
+        column: tp.Optional[tp.Label] = None,
         trace_names: tp.TraceNames = None,
         group_by: tp.GroupByLike = None,
         return_fig: bool = True,
@@ -4031,19 +4042,25 @@ class GenericAccessor(BaseAccessor, Analyzable):
         """
         from vectorbtpro.generic.plotting import Histogram
 
-        if self.wrapper.grouper.is_grouped(group_by=group_by):
-            return self.flatten_grouped(group_by=group_by).vbt.histplot(trace_names=trace_names, **kwargs)
+        if column is not None:
+            _self = self.select_col(column=column)
+        else:
+            _self = self
+
+        if _self.wrapper.grouper.is_grouped(group_by=group_by):
+            return _self.flatten_grouped(group_by=group_by).vbt.histplot(trace_names=trace_names, **kwargs)
 
         if trace_names is None:
-            if self.is_frame() or (self.is_series() and self.wrapper.name is not None):
-                trace_names = self.wrapper.columns
-        hist = Histogram(data=self.to_2d_array(), trace_names=trace_names, **kwargs)
+            if _self.is_frame() or (_self.is_series() and _self.wrapper.name is not None):
+                trace_names = _self.wrapper.columns
+        hist = Histogram(data=_self.to_2d_array(), trace_names=trace_names, **kwargs)
         if return_fig:
             return hist.fig
         return hist
 
     def boxplot(
         self,
+        column: tp.Optional[tp.Label] = None,
         trace_names: tp.TraceNames = None,
         group_by: tp.GroupByLike = None,
         return_fig: bool = True,
@@ -4060,84 +4077,26 @@ class GenericAccessor(BaseAccessor, Analyzable):
         """
         from vectorbtpro.generic.plotting import Box
 
-        if self.wrapper.grouper.is_grouped(group_by=group_by):
-            return self.flatten_grouped(group_by=group_by).vbt.boxplot(trace_names=trace_names, **kwargs)
+        if column is not None:
+            _self = self.select_col(column=column)
+        else:
+            _self = self
+
+        if _self.wrapper.grouper.is_grouped(group_by=group_by):
+            return _self.flatten_grouped(group_by=group_by).vbt.boxplot(trace_names=trace_names, **kwargs)
 
         if trace_names is None:
-            if self.is_frame() or (self.is_series() and self.wrapper.name is not None):
-                trace_names = self.wrapper.columns
-        box = Box(data=self.to_2d_array(), trace_names=trace_names, **kwargs)
+            if _self.is_frame() or (_self.is_series() and _self.wrapper.name is not None):
+                trace_names = _self.wrapper.columns
+        box = Box(data=_self.to_2d_array(), trace_names=trace_names, **kwargs)
         if return_fig:
             return box.fig
         return box
 
-    @property
-    def plots_defaults(self) -> tp.Kwargs:
-        """Defaults for `GenericAccessor.plots`.
-
-        Merges `vectorbtpro.generic.plots_builder.PlotsBuilderMixin.plots_defaults` and
-        `plots` from `vectorbtpro._settings.generic`."""
-        from vectorbtpro._settings import settings
-
-        generic_plots_cfg = settings["generic"]["plots"]
-
-        return merge_dicts(Analyzable.plots_defaults.__get__(self), generic_plots_cfg)
-
-    _subplots: tp.ClassVar[Config] = Config(
-        dict(plot=dict(check_is_not_grouped=True, plot_func="plot", pass_trace_names=False, tags="generic")),
-    )
-
-    @property
-    def subplots(self) -> Config:
-        return self._subplots
-
-
-GenericAccessor.override_metrics_doc(__pdoc__)
-GenericAccessor.override_subplots_doc(__pdoc__)
-
-
-class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
-    """Accessor on top of data of any type. For Series only.
-
-    Accessible via `pd.Series.vbt`."""
-
-    def __init__(self, obj: tp.Series, mapping: tp.Optional[tp.MappingLike] = None, **kwargs) -> None:
-        BaseSRAccessor.__init__(self, obj, **kwargs)
-        GenericAccessor.__init__(self, obj, mapping=mapping, **kwargs)
-
-    def to_renko(
-        self,
-        brick_size: tp.ArrayLike,
-        relative: tp.ArrayLike = False,
-        start_value: tp.Optional[float] = None,
-        max_out_len: tp.Optional[int] = None,
-        return_uptrend: bool = False,
-        jitted: tp.JittedOption = None,
-        wrap_kwargs: tp.KwargsLike = None,
-    ) -> tp.Union[tp.Series, tp.Tuple[tp.Series, tp.Series]]:
-        """See `vectorbtpro.generic.nb.base.to_renko_1d_nb`."""
-        func = jit_reg.resolve_option(nb.to_renko_1d_nb, jitted)
-        arr_out, idx_out, uptrend_out = func(
-            self.to_1d_array(),
-            np.broadcast_to(brick_size, (self.wrapper.shape[0],)),
-            relative=np.broadcast_to(relative, (self.wrapper.shape[0],)),
-            start_value=start_value,
-            max_out_len=max_out_len,
-        )
-        new_index = self.wrapper.index[idx_out]
-        wrap_kwargs = merge_dicts(
-            dict(index=new_index),
-            wrap_kwargs,
-        )
-        sr_out = self.wrapper.wrap(arr_out, group_by=False, **wrap_kwargs)
-        if return_uptrend:
-            uptrend_out = self.wrapper.wrap(uptrend_out, group_by=False, **wrap_kwargs)
-            return sr_out, uptrend_out
-        return sr_out
-
     def plot_against(
         self,
         other: tp.ArrayLike,
+        column: tp.Optional[tp.Label] = None,
         trace_kwargs: tp.KwargsLike = None,
         other_trace_kwargs: tp.Union[str, tp.KwargsLike] = None,
         pos_trace_kwargs: tp.KwargsLike = None,
@@ -4151,6 +4110,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
 
         Args:
             other (array_like): Second array. Will broadcast.
+            column (hashable): Column to plot.
             trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter`.
             other_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `other`.
 
@@ -4181,17 +4141,29 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             neg_trace_kwargs = {}
         if hidden_trace_kwargs is None:
             hidden_trace_kwargs = {}
-        obj, other = reshaping.broadcast(self.obj, other, columns_from="keep")
-        checks.assert_instance_of(other, pd.Series)
+
+        obj = self.obj
+        if isinstance(obj, pd.DataFrame):
+            obj = self.select_col_from_obj(obj, column=column)
+        if other is None:
+            other = pd.Series.vbt.empty_like(obj, 1)
+        else:
+            other = reshaping.to_pd_array(other)
+            if isinstance(other, pd.DataFrame):
+                other = self.select_col_from_obj(other, column=column)
+            obj, other = reshaping.broadcast(obj, other, columns_from="keep")
+            if other.name is None:
+                other = other.rename("Other")
+
         if fig is None:
             fig = make_figure()
         fig.update_layout(**layout_kwargs)
 
         # TODO: Using masks feels hacky
-        pos_mask = self.obj > other
+        pos_mask = obj > other
         if pos_mask.any():
             # Fill positive area
-            pos_obj = self.obj.copy()
+            pos_obj = obj.copy()
             pos_obj[~pos_mask] = other[~pos_mask]
             other.vbt.lineplot(
                 trace_kwargs=merge_dicts(
@@ -4224,10 +4196,10 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
                 add_trace_kwargs=add_trace_kwargs,
                 fig=fig,
             )
-        neg_mask = self.obj < other
+        neg_mask = obj < other
         if neg_mask.any():
             # Fill negative area
-            neg_obj = self.obj.copy()
+            neg_obj = obj.copy()
             neg_obj[~neg_mask] = other[~neg_mask]
             other.vbt.lineplot(
                 trace_kwargs=merge_dicts(
@@ -4262,7 +4234,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             )
 
         # Plot main traces
-        self.lineplot(trace_kwargs=trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+        obj.vbt.lineplot(trace_kwargs=trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
         if other_trace_kwargs == "hidden":
             other_trace_kwargs = dict(
                 line=dict(color="rgba(0, 0, 0, 0)", width=0),
@@ -4277,6 +4249,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
     def overlay_with_heatmap(
         self,
         other: tp.ArrayLike,
+        column: tp.Optional[tp.Label] = None,
         trace_kwargs: tp.KwargsLike = None,
         heatmap_kwargs: tp.KwargsLike = None,
         add_trace_kwargs: tp.KwargsLike = None,
@@ -4287,6 +4260,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
 
         Args:
             other (array_like): Second array. Will broadcast.
+            column (hashable): Column to plot.
             trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter`.
             heatmap_kwargs (dict): Keyword arguments passed to `GenericDFAccessor.heatmap`.
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
@@ -4312,8 +4286,19 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         if add_trace_kwargs is None:
             add_trace_kwargs = {}
 
-        obj, other = reshaping.broadcast(self.obj, other, columns_from="keep")
-        checks.assert_instance_of(other, pd.Series)
+        obj = self.obj
+        if isinstance(obj, pd.DataFrame):
+            obj = self.select_col_from_obj(obj, column=column)
+        if other is None:
+            other = pd.Series.vbt.empty_like(obj, 1)
+        else:
+            other = reshaping.to_pd_array(other)
+            if isinstance(other, pd.DataFrame):
+                other = self.select_col_from_obj(other, column=column)
+            obj, other = reshaping.broadcast(obj, other, columns_from="keep")
+            if other.name is None:
+                other = other.rename("Other")
+
         if fig is None:
             fig = make_subplots(specs=[[{"secondary_y": True}]])
             if "width" in plotting_cfg["layout"]:
@@ -4321,7 +4306,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         fig.update_layout(**layout_kwargs)
 
         other.vbt.ts_heatmap(**heatmap_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
-        self.lineplot(
+        obj.vbt.lineplot(
             trace_kwargs=merge_dicts(dict(line=dict(color=plotting_cfg["color_schema"]["blue"])), trace_kwargs),
             add_trace_kwargs=merge_dicts(dict(secondary_y=True), add_trace_kwargs),
             fig=fig,
@@ -4330,6 +4315,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
 
     def heatmap(
         self,
+        column: tp.Optional[tp.Label] = None,
         x_level: tp.Optional[tp.Level] = None,
         y_level: tp.Optional[tp.Level] = None,
         symmetric: bool = False,
@@ -4345,7 +4331,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
     ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
         """Create a heatmap figure based on object's multi-index and values.
 
-        If index is not a multi-index, converts Series into a DataFrame and calls `GenericDFAccessor.heatmap`.
+        If index is not a multi-index, calls `GenericDFAccessor.heatmap`.
 
         If multi-index contains more than two levels or you want them in specific order,
         pass `x_level` and `y_level`, each (`int` if index or `str` if name) corresponding
@@ -4354,7 +4340,20 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         Creates `vectorbtpro.generic.plotting.Heatmap` and returns the figure.
 
         Usage:
-            * Plotting a figure:
+            * Plotting a figure based on a regular index:
+
+            ```pycon
+            >>> df = pd.DataFrame([
+            ...     [0, np.nan, np.nan],
+            ...     [np.nan, 1, np.nan],
+            ...     [np.nan, np.nan, 2]
+            ... ])
+            >>> df.vbt.heatmap()
+            ```
+
+            ![](/assets/images/api/df_heatmap.svg)
+
+            * Plotting a figure based on a multi-index:
 
             ```pycon
             >>> multi_index = pd.MultiIndex.from_tuples([
@@ -4377,22 +4376,29 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         from vectorbtpro.generic.plotting import Heatmap
 
         if not isinstance(self.wrapper.index, pd.MultiIndex):
-            return self.obj.to_frame().vbt.heatmap(
-                x_labels=x_labels,
-                y_labels=y_labels,
-                return_fig=return_fig,
-                fig=fig,
-                **kwargs,
-            )
+            if column is not None:
+                _self = self.select_col(column=column)
+            else:
+                _self = self
+            if x_labels is None:
+                x_labels = _self.wrapper.columns
+            if y_labels is None:
+                y_labels = _self.wrapper.index
+            heatmap = Heatmap(data=_self.to_2d_array(), x_labels=x_labels, y_labels=y_labels, **kwargs)
+            if return_fig:
+                return heatmap.fig
+            return heatmap
+        else:
+            self_col = self.select_col(column=column)
 
         (x_level, y_level), (slider_level,) = indexes.pick_levels(
-            self.wrapper.index,
+            self_col.wrapper.index,
             required_levels=(x_level, y_level),
             optional_levels=(slider_level,),
         )
 
-        x_level_vals = self.wrapper.index.get_level_values(x_level)
-        y_level_vals = self.wrapper.index.get_level_values(y_level)
+        x_level_vals = self_col.wrapper.index.get_level_values(x_level)
+        y_level_vals = self_col.wrapper.index.get_level_values(y_level)
         x_name = x_level_vals.name if x_level_vals.name is not None else "x"
         y_name = y_level_vals.name if y_level_vals.name is not None else "y"
         kwargs = merge_dicts(
@@ -4408,7 +4414,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
 
         if slider_level is None:
             # No grouping
-            df = self.unstack_to_df(index_levels=y_level, column_levels=x_level, symmetric=symmetric, sort=sort)
+            df = self_col.unstack_to_df(index_levels=y_level, column_levels=x_level, symmetric=symmetric, sort=sort)
             return df.vbt.heatmap(x_labels=x_labels, y_labels=y_labels, fig=fig, return_fig=return_fig, **kwargs)
 
         # Requires grouping
@@ -4416,7 +4422,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         if not return_fig:
             raise ValueError("Cannot use return_fig=False and slider_level simultaneously")
         _slider_labels = []
-        for i, (name, group) in enumerate(self.obj.groupby(level=slider_level)):
+        for i, (name, group) in enumerate(self_col.obj.groupby(level=slider_level)):
             if slider_labels is not None:
                 name = slider_labels[i]
             _slider_labels.append(name)
@@ -4446,20 +4452,32 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             step["args"][0]["visible"][i] = True
             steps.append(step)
         prefix = (
-            f"{self.wrapper.index.names[slider_level]}: "
-            if self.wrapper.index.names[slider_level] is not None
+            f"{self_col.wrapper.index.names[slider_level]}: "
+            if self_col.wrapper.index.names[slider_level] is not None
             else None
         )
         sliders = [dict(active=active, currentvalue={"prefix": prefix}, pad={"t": 50}, steps=steps)]
         fig.update_layout(sliders=sliders)
         return fig
 
-    def ts_heatmap(self, **kwargs) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
+    def ts_heatmap(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        is_y_category: bool = True,
+        **kwargs,
+    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
         """Heatmap of time-series data."""
-        return self.obj.to_frame().vbt.ts_heatmap(**kwargs)
+        if column is not None:
+            obj = self.select_col_from_obj(self.obj, column=column)
+        else:
+            obj = self.obj
+        if isinstance(obj, pd.Series):
+            obj = obj.to_frame()
+        return obj.transpose().iloc[::-1].vbt.heatmap(is_y_category=is_y_category, **kwargs)
 
     def volume(
         self,
+        column: tp.Optional[tp.Label] = None,
         x_level: tp.Optional[tp.Level] = None,
         y_level: tp.Optional[tp.Level] = None,
         z_level: tp.Optional[tp.Level] = None,
@@ -4504,15 +4522,17 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         """
         from vectorbtpro.generic.plotting import Volume
 
+        self_col = self.select_col(column=column)
+
         (x_level, y_level, z_level), (slider_level,) = indexes.pick_levels(
-            self.wrapper.index,
+            self_col.wrapper.index,
             required_levels=(x_level, y_level, z_level),
             optional_levels=(slider_level,),
         )
 
-        x_level_vals = self.wrapper.index.get_level_values(x_level)
-        y_level_vals = self.wrapper.index.get_level_values(y_level)
-        z_level_vals = self.wrapper.index.get_level_values(z_level)
+        x_level_vals = self_col.wrapper.index.get_level_values(x_level)
+        y_level_vals = self_col.wrapper.index.get_level_values(y_level)
+        z_level_vals = self_col.wrapper.index.get_level_values(z_level)
         # Labels are just unique level values
         if x_labels is None:
             x_labels = np.unique(x_level_vals)
@@ -4542,7 +4562,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         contains_nan = False
         if slider_level is None:
             # No grouping
-            v = self.unstack_to_array(levels=(x_level, y_level, z_level))
+            v = self_col.unstack_to_array(levels=(x_level, y_level, z_level))
             if fillna is not None:
                 v = np.nan_to_num(v, nan=fillna)
             if np.isnan(v).any():
@@ -4558,7 +4578,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             if not return_fig:
                 raise ValueError("Cannot use return_fig=False and slider_level simultaneously")
             _slider_labels = []
-            for i, (name, group) in enumerate(self.obj.groupby(level=slider_level)):
+            for i, (name, group) in enumerate(self_col.obj.groupby(level=slider_level)):
                 if slider_labels is not None:
                     name = slider_labels[i]
                 _slider_labels.append(name)
@@ -4586,8 +4606,8 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
                 step["args"][0]["visible"][i] = True
                 steps.append(step)
             prefix = (
-                f"{self.wrapper.index.names[slider_level]}: "
-                if self.wrapper.index.names[slider_level] is not None
+                f"{self_col.wrapper.index.names[slider_level]}: "
+                if self_col.wrapper.index.names[slider_level] is not None
                 else None
             )
             sliders = [dict(active=active, currentvalue={"prefix": prefix}, pad={"t": 50}, steps=steps)]
@@ -4602,6 +4622,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
 
     def qqplot(
         self,
+        column: tp.Optional[tp.Label] = None,
         sparams: tp.Union[tp.Iterable, tuple, None] = (),
         dist: str = "norm",
         plot_line: bool = True,
@@ -4622,7 +4643,8 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
 
             ![](/assets/images/api/sr_qqplot.svg)
         """
-        qq = stats.probplot(self.obj, sparams=sparams, dist=dist)
+        obj = self.select_col_from_obj(self.obj, column=column)
+        qq = stats.probplot(obj, sparams=sparams, dist=dist)
         fig = pd.Series(qq[0][1], index=qq[0][0]).vbt.scatterplot(fig=fig, **kwargs)
 
         if plot_line:
@@ -4652,6 +4674,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         error_type: tp.Union[int, str] = "absolute",
         max_error: tp.ArrayLike = np.nan,
         max_error_interp_mode: tp.Union[None, int, str] = None,
+        column: tp.Optional[tp.Label] = None,
         plot_obj: bool = True,
         fill_distance: bool = False,
         obj_trace_kwargs: tp.KwargsLike = None,
@@ -4708,10 +4731,10 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             fig = make_figure()
         fig.update_layout(**layout_kwargs)
 
-        obj = self.obj
+        obj = self.select_col_from_obj(self.obj, column=column)
         if plot_obj:
             # Plot object
-            fig = self.lineplot(
+            fig = obj.vbt.lineplot(
                 trace_kwargs=obj_trace_kwargs,
                 add_trace_kwargs=add_trace_kwargs,
                 fig=fig,
@@ -4895,6 +4918,70 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
 
         return fig
 
+    @property
+    def plots_defaults(self) -> tp.Kwargs:
+        """Defaults for `GenericAccessor.plots`.
+
+        Merges `vectorbtpro.generic.plots_builder.PlotsBuilderMixin.plots_defaults` and
+        `plots` from `vectorbtpro._settings.generic`."""
+        from vectorbtpro._settings import settings
+
+        generic_plots_cfg = settings["generic"]["plots"]
+
+        return merge_dicts(Analyzable.plots_defaults.__get__(self), generic_plots_cfg)
+
+    _subplots: tp.ClassVar[Config] = Config(
+        dict(plot=dict(check_is_not_grouped=True, plot_func="plot", pass_trace_names=False, tags="generic")),
+    )
+
+    @property
+    def subplots(self) -> Config:
+        return self._subplots
+
+
+GenericAccessor.override_metrics_doc(__pdoc__)
+GenericAccessor.override_subplots_doc(__pdoc__)
+
+
+class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
+    """Accessor on top of data of any type. For Series only.
+
+    Accessible via `pd.Series.vbt`."""
+
+    def __init__(self, obj: tp.Series, mapping: tp.Optional[tp.MappingLike] = None, **kwargs) -> None:
+        BaseSRAccessor.__init__(self, obj, **kwargs)
+        GenericAccessor.__init__(self, obj, mapping=mapping, **kwargs)
+
+    def to_renko(
+        self,
+        brick_size: tp.ArrayLike,
+        relative: tp.ArrayLike = False,
+        start_value: tp.Optional[float] = None,
+        max_out_len: tp.Optional[int] = None,
+        return_uptrend: bool = False,
+        jitted: tp.JittedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.Union[tp.Series, tp.Tuple[tp.Series, tp.Series]]:
+        """See `vectorbtpro.generic.nb.base.to_renko_1d_nb`."""
+        func = jit_reg.resolve_option(nb.to_renko_1d_nb, jitted)
+        arr_out, idx_out, uptrend_out = func(
+            self.to_1d_array(),
+            np.broadcast_to(brick_size, (self.wrapper.shape[0],)),
+            relative=np.broadcast_to(relative, (self.wrapper.shape[0],)),
+            start_value=start_value,
+            max_out_len=max_out_len,
+        )
+        new_index = self.wrapper.index[idx_out]
+        wrap_kwargs = merge_dicts(
+            dict(index=new_index),
+            wrap_kwargs,
+        )
+        sr_out = self.wrapper.wrap(arr_out, group_by=False, **wrap_kwargs)
+        if return_uptrend:
+            uptrend_out = self.wrapper.wrap(uptrend_out, group_by=False, **wrap_kwargs)
+            return sr_out, uptrend_out
+        return sr_out
+
 
 class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
     """Accessor on top of data of any type. For DataFrames only.
@@ -4999,46 +5086,6 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
                 **layout_kwargs,
             )
         return fig
-
-    def heatmap(
-        self,
-        x_labels: tp.Optional[tp.Labels] = None,
-        y_labels: tp.Optional[tp.Labels] = None,
-        return_fig: bool = True,
-        **kwargs,
-    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
-        """Create `vectorbtpro.generic.plotting.Heatmap` and return the figure.
-
-        Usage:
-            ```pycon
-            >>> df = pd.DataFrame([
-            ...     [0, np.nan, np.nan],
-            ...     [np.nan, 1, np.nan],
-            ...     [np.nan, np.nan, 2]
-            ... ])
-            >>> df.vbt.heatmap()
-            ```
-
-            ![](/assets/images/api/df_heatmap.svg)
-        """
-        from vectorbtpro.generic.plotting import Heatmap
-
-        if x_labels is None:
-            x_labels = self.wrapper.columns
-        if y_labels is None:
-            y_labels = self.wrapper.index
-        heatmap = Heatmap(data=self.to_2d_array(), x_labels=x_labels, y_labels=y_labels, **kwargs)
-        if return_fig:
-            return heatmap.fig
-        return heatmap
-
-    def ts_heatmap(
-        self,
-        is_y_category: bool = True,
-        **kwargs,
-    ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
-        """Heatmap of time-series data."""
-        return self.obj.transpose().iloc[::-1].vbt.heatmap(is_y_category=is_y_category, **kwargs)
 
     def plot_projections(
         self,

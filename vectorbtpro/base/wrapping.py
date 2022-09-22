@@ -2351,11 +2351,14 @@ class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
         _self = self.regroup(group_by, **kwargs)
 
         def _check_out_dim(out: WrappingT) -> WrappingT:
-            if _self.wrapper.grouper.is_grouped():
-                if out.wrapper.grouped_ndim != 1:
+            if out.wrapper.get_ndim() == 2:
+                if out.wrapper.get_shape_2d()[1] == 1:
+                    if out.column_only_select:
+                        return out.iloc[0]
+                    return out.iloc[:, 0]
+                if _self.wrapper.grouper.is_grouped():
                     raise TypeError("Could not select one group: multiple groups returned")
-            else:
-                if out.wrapper.ndim != 1:
+                else:
                     raise TypeError("Could not select one column: multiple columns returned")
             return out
 
@@ -2363,7 +2366,7 @@ class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
             if _self.wrapper.get_ndim() == 2 and _self.wrapper.get_shape_2d()[1] == 1:
                 column = 0
         if column is not None:
-            if _self.wrapper.grouper.is_grouped() and _self.group_select:
+            if _self.wrapper.grouper.is_grouped():
                 if _self.wrapper.grouped_ndim == 1:
                     raise TypeError("This object already contains one group of data")
                 if column not in _self.wrapper.get_columns():
@@ -2382,13 +2385,13 @@ class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
                         return _check_out_dim(_self.iloc[:, column])
                     raise KeyError(f"Column '{column}' not found")
             return _check_out_dim(_self[column])
-        if not _self.wrapper.grouper.is_grouped() and _self.group_select:
-            if _self.wrapper.ndim == 1:
+        if _self.wrapper.grouper.is_grouped():
+            if _self.wrapper.grouped_ndim == 1:
                 return _self
-            raise TypeError("Only one column is allowed. Use indexing or column argument.")
-        if _self.wrapper.grouped_ndim == 1:
+            raise TypeError("Only one group is allowed. Use indexing or column argument.")
+        if _self.wrapper.ndim == 1:
             return _self
-        raise TypeError("Only one group is allowed. Use indexing or column argument.")
+        raise TypeError("Only one column is allowed. Use indexing or column argument.")
 
     @class_or_instancemethod
     def select_col_from_obj(
@@ -2405,6 +2408,24 @@ class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
             wrapper = cls_or_self.wrapper
         if obj is None:
             return None
+
+        def _check_out_dim(out: tp.SeriesFrame, from_df: bool) -> tp.Series:
+            bad_shape = False
+            if from_df and isinstance(out, pd.DataFrame):
+                if len(out.columns) == 1:
+                    return out.iloc[:, 0]
+                bad_shape = True
+            if not from_df and isinstance(out, pd.Series):
+                if len(out) == 1:
+                    return out.iloc[0]
+                bad_shape = True
+            if bad_shape:
+                if wrapper.grouper.is_grouped():
+                    raise TypeError("Could not select one group: multiple groups returned")
+                else:
+                    raise TypeError("Could not select one column: multiple columns returned")
+            return out
+
         if column is None:
             if wrapper.get_ndim() == 2 and wrapper.get_shape_2d()[1] == 1:
                 column = 0
@@ -2423,8 +2444,8 @@ class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
                     if column not in wrapper.get_columns():
                         if isinstance(column, int):
                             if isinstance(obj, pd.DataFrame):
-                                return obj.iloc[:, column]
-                            return obj.iloc[column]
+                                return _check_out_dim(obj.iloc[:, column], True)
+                            return _check_out_dim(obj.iloc[column], False)
                         raise KeyError(f"Group '{column}' not found")
             else:
                 if wrapper.ndim == 1:
@@ -2432,10 +2453,12 @@ class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
                 if column not in wrapper.columns:
                     if isinstance(column, int):
                         if isinstance(obj, pd.DataFrame):
-                            return obj.iloc[:, column]
-                        return obj.iloc[column]
+                            return _check_out_dim(obj.iloc[:, column], True)
+                        return _check_out_dim(obj.iloc[column], False)
                     raise KeyError(f"Column '{column}' not found")
-            return obj[column]
+            if isinstance(obj, pd.DataFrame):
+                return _check_out_dim(obj[column], True)
+            return _check_out_dim(obj[column], False)
         if not wrapper.grouper.is_grouped():
             if wrapper.ndim == 1:
                 return obj
