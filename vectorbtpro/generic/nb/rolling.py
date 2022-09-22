@@ -815,7 +815,10 @@ def vidya_acc_nb(in_state: VidyaAIS) -> VidyaAOS:
     else:
         sh = window_pos_cumsum
         sl = window_neg_cumsum
-        cmo = np.abs((sh - sl) / (sh + sl))
+        if sh + sl == 0:
+            cmo = 0.0
+        else:
+            cmo = np.abs((sh - sl) / (sh + sl))
         if np.isnan(prev_vidya):
             prev_vidya = 0.0
         vidya = alpha * cmo * value + prev_vidya * (1 - alpha * cmo)
