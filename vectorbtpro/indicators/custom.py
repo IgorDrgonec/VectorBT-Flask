@@ -1778,14 +1778,14 @@ class _SUPERTREND(SUPERTREND):
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs
     ) -> tp.BaseFigure:
-        """Plot `MA.ma` against `MA.close`.
+        """Plot `SUPERTREND.superl` and `SUPERTREND.supers` against `SUPERTREND.close`.
 
         Args:
             column (str): Name of the column to plot.
-            plot_close (bool): Whether to plot `MA.close`.
-            close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MA.close`.
-            superl_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MA.superl`.
-            supers_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MA.supers`.
+            plot_close (bool): Whether to plot `SUPERTREND.close`.
+            close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `SUPERTREND.close`.
+            superl_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `SUPERTREND.superl`.
+            supers_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `SUPERTREND.supers`.
             add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments passed to `fig.update_layout`.
