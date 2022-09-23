@@ -4599,3 +4599,75 @@ class TestBasic:
                 columns=pd.MultiIndex.from_tuples([(1, 0.5), (2, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
             ),
         )
+
+    def test_SUPERTREND(self):
+        columns = pd.MultiIndex.from_tuples([
+            (2, 2),
+            (2, 3),
+            (3, 2),
+            (3, 3)
+        ], names=['supertrend_period', 'supertrend_multiplier'])
+        assert_frame_equal(
+            vbt.SUPERTREND.run(high_ts, low_ts, close_ts, period=[2, 3], multiplier=[2, 3], param_product=True).supert,
+            pd.DataFrame(
+                np.array([
+                    [np.nan, np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan, np.nan],
+                    [0.49999999999999956, -0.7500000000000009, np.nan, np.nan],
+                    [1.3499999999999996, 0.024999999999999467, 1.4222222222222216, 0.13333333333333242],
+                    [1.3499999999999996, 0.024999999999999467, 1.4222222222222216, 0.13333333333333242],
+                    [1.3499999999999996, 0.024999999999999467, 1.4222222222222216, 0.13333333333333242],
+                    [3.35625, 0.024999999999999467, 3.415637860082305, 0.13333333333333242]
+                ]),
+                index=close_ts.index,
+                columns=columns,
+            ),
+        )
+        assert_frame_equal(
+            vbt.SUPERTREND.run(high_ts, low_ts, close_ts, period=[2, 3], multiplier=[2, 3], param_product=True).superd,
+            pd.DataFrame(
+                np.array([
+                    [1, 1, 1, 1],
+                    [1, 1, 1, 1],
+                    [1, 1, 1, 1],
+                    [1, 1, 1, 1],
+                    [1, 1, 1, 1],
+                    [1, 1, 1, 1],
+                    [-1, 1, -1, 1]
+                ]),
+                index=close_ts.index,
+                columns=columns,
+            ),
+        )
+        assert_frame_equal(
+            vbt.SUPERTREND.run(high_ts, low_ts, close_ts, period=[2, 3], multiplier=[2, 3], param_product=True).superl,
+            pd.DataFrame(
+                np.array([
+                    [np.nan, np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan, np.nan],
+                    [0.49999999999999956, -0.7500000000000009, np.nan, np.nan],
+                    [1.3499999999999996, 0.024999999999999467, 1.4222222222222216, 0.13333333333333242],
+                    [1.3499999999999996, 0.024999999999999467, 1.4222222222222216, 0.13333333333333242],
+                    [1.3499999999999996, 0.024999999999999467, 1.4222222222222216, 0.13333333333333242],
+                    [np.nan, 0.024999999999999467, np.nan, 0.13333333333333242]
+                ]),
+                index=close_ts.index,
+                columns=columns,
+            ),
+        )
+        assert_frame_equal(
+            vbt.SUPERTREND.run(high_ts, low_ts, close_ts, period=[2, 3], multiplier=[2, 3], param_product=True).supers,
+            pd.DataFrame(
+                np.array([
+                    [np.nan, np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan, np.nan],
+                    [3.35625, np.nan, 3.415637860082305, np.nan]
+                ]),
+                index=close_ts.index,
+                columns=columns,
+            ),
+        )
