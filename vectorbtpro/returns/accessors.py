@@ -436,8 +436,7 @@ class ReturnsAccessor(GenericAccessor):
         func = jit_reg.resolve_option(nb.cum_returns_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         cumulative = func(self.to_2d_array(), start_value=start_value, log_returns=self.log_returns)
-        wrap_kwargs = resolve_dict(wrap_kwargs)
-        return self.wrapper.wrap(cumulative, group_by=False, **wrap_kwargs)
+        return self.wrapper.wrap(cumulative, group_by=False, **resolve_dict(wrap_kwargs))
 
     def total(
         self,
@@ -688,9 +687,11 @@ class ReturnsAccessor(GenericAccessor):
         ddof: tp.Optional[int] = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
-        **kwargs,
+        wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """Rolling version of `ReturnsAccessor.sharpe_ratio`."""
+        """Rolling version of `ReturnsAccessor.sharpe_ratio`.
+
+        Uses `vectorbtpro.returns.nb.rolling_sharpe_ratio_nb`."""
         if window is None:
             window = self.defaults["window"]
         if minp is None:
@@ -699,17 +700,10 @@ class ReturnsAccessor(GenericAccessor):
             risk_free = self.defaults["risk_free"]
         if ddof is None:
             ddof = self.defaults["ddof"]
-        chunked = ch.specialize_chunked_option(chunked, arg_take_spec=dict(args=ch.ArgsTaker(None, None)))
-        return (self - risk_free).vbt.rolling_apply(
-            window,
-            jit_reg.resolve_option(nb.sharpe_ratio_1d_nb, jitted),
-            self.ann_factor,
-            ddof,
-            minp=minp,
-            jitted=jitted,
-            chunked=chunked,
-            **kwargs,
-        )
+        func = jit_reg.resolve_option(nb.rolling_sharpe_ratio_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        out = func(self.to_2d_array() - risk_free, window, self.ann_factor, minp=minp, ddof=ddof)
+        return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
     def deflated_sharpe_ratio(
         self,
@@ -1090,8 +1084,7 @@ class ReturnsAccessor(GenericAccessor):
         rolling_tail_ratio = to_2d_array(self.rolling_tail_ratio(window, minp=minp, jitted=jitted, chunked=chunked))
         rolling_annualized = to_2d_array(self.rolling_annualized(window, minp=minp, jitted=jitted, chunked=chunked))
         out = rolling_tail_ratio * (1 + rolling_annualized)
-        wrap_kwargs = resolve_dict(wrap_kwargs)
-        return self.wrapper.wrap(out, group_by=False, **wrap_kwargs)
+        return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
     def value_at_risk(
         self,

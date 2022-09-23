@@ -17,9 +17,12 @@ from numba import prange
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.indexing import flex_select_auto_nb
+from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.generic import nb as generic_nb, enums as generic_enums
+from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.indicators.enums import Pivot, SuperTrendAIS, SuperTrendAOS
+from vectorbtpro.utils import chunking as ch
 
 
 @register_jitted(cache=True)
@@ -44,7 +47,7 @@ def ma_cache_nb(
 
 
 @register_jitted(cache=True)
-def ma_apply_nb(
+def ma_nb(
     close: tp.Array2d,
     window: int,
     wtype: int,
@@ -82,7 +85,7 @@ def msd_cache_nb(
 
 
 @register_jitted(cache=True)
-def msd_apply_nb(
+def msd_nb(
     close: tp.Array2d,
     window: int,
     wtype: int,
@@ -99,7 +102,7 @@ def msd_apply_nb(
 
 
 @register_jitted(cache=True)
-def bb_cache_nb(
+def bbands_cache_nb(
     close: tp.Array2d,
     windows: tp.List[int],
     wtypes: tp.List[int],
@@ -119,7 +122,7 @@ def bb_cache_nb(
 
 
 @register_jitted(cache=True)
-def bb_apply_nb(
+def bbands_nb(
     close: tp.Array2d,
     window: int,
     wtype: int,
@@ -141,6 +144,11 @@ def bb_apply_nb(
     return ma, ma + alpha * msd, ma - alpha * msd
 
 
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="close", axis=1),
+    arg_take_spec=dict(close=ch.ArraySlicer(axis=1)),
+    merge_func=base_ch.column_stack,
+)
 @register_jitted(cache=True, tags={"can_parallel"})
 def rsi_up_down_nb(close: tp.Array2d) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Calculate the `up` and `down` arrays for RSI."""
@@ -187,7 +195,7 @@ def rsi_cache_nb(
 
 
 @register_jitted(cache=True)
-def rsi_apply_nb(
+def rsi_nb(
     close: tp.Array2d,
     window: int,
     wtype: int,
@@ -234,7 +242,7 @@ def stoch_cache_nb(
 
 
 @register_jitted(cache=True)
-def stoch_apply_nb(
+def stoch_nb(
     high: tp.Array2d,
     low: tp.Array2d,
     close: tp.Array2d,
@@ -283,7 +291,7 @@ def macd_cache_nb(
 
 
 @register_jitted(cache=True)
-def macd_apply_nb(
+def macd_nb(
     close: tp.Array2d,
     fast_window: int,
     slow_window: int,
@@ -308,11 +316,20 @@ def macd_apply_nb(
     return macd_ts, signal_ts
 
 
-@register_jitted(cache=True)
-def true_range_nb(high: tp.Array2d, low: tp.Array2d, close: tp.Array2d) -> tp.Array2d:
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="high", axis=1),
+    arg_take_spec=dict(
+        high=ch.ArraySlicer(axis=1),
+        low=ch.ArraySlicer(axis=1),
+        close=ch.ArraySlicer(axis=1),
+    ),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def tr_nb(high: tp.Array2d, low: tp.Array2d, close: tp.Array2d) -> tp.Array2d:
     """Calculate true range."""
     tr = np.empty(high.shape, dtype=np.float_)
-    for col in range(high.shape[1]):
+    for col in prange(high.shape[1]):
         for i in range(high.shape[0]):
             prev_close = close[i - 1, col] if i > 0 else np.nan
             tr1 = high[i, col] - low[i, col]
@@ -334,7 +351,7 @@ def atr_cache_nb(
     per_column: bool = False,
 ) -> tp.Tuple[tp.Optional[tp.Array2d], tp.Optional[tp.Dict[int, tp.Array2d]]]:
     """Caching function for `vectorbtpro.indicators.custom.ATR`."""
-    tr = true_range_nb(high, low, close)
+    tr = tr_nb(high, low, close)
     if per_column:
         return None, None
 
@@ -347,7 +364,7 @@ def atr_cache_nb(
 
 
 @register_jitted(cache=True)
-def atr_apply_nb(
+def atr_nb(
     high: tp.Array2d,
     low: tp.Array2d,
     close: tp.Array2d,
@@ -363,16 +380,26 @@ def atr_apply_nb(
         h = hash((window, wtype))
         return tr, cache_dict[h]
     if tr is None:
-        tr = true_range_nb(high, low, close)
-    return tr, generic_nb.ma_nb(tr, window, wtype, adjust=adjust, minp=minp)
+        _tr = tr_nb(high, low, close)
+    else:
+        _tr = tr
+    return _tr, generic_nb.ma_nb(_tr, window, wtype, adjust=adjust, minp=minp)
 
 
-@register_jitted(cache=True)
-def obv_custom_nb(close: tp.Array2d, volume: tp.Array2d) -> tp.Array2d:
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="close", axis=1),
+    arg_take_spec=dict(
+        close=ch.ArraySlicer(axis=1),
+        volume=ch.ArraySlicer(axis=1),
+    ),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def obv_nb(close: tp.Array2d, volume: tp.Array2d) -> tp.Array2d:
     """Custom calculation function for `vectorbtpro.indicators.custom.OBV`."""
-    obv = np.empty_like(close)
-    cumsum = 0.0
-    for col in range(close.shape[1]):
+    obv = np.empty_like(close, dtype=np.float_)
+    for col in prange(close.shape[1]):
+        cumsum = 0.0
         for i in range(close.shape[0]):
             prev_close = close[i - 1, col] if i > 0 else np.nan
             if close[i, col] < prev_close:
@@ -405,7 +432,7 @@ def ols_cache_nb(
 
 
 @register_jitted(cache=True)
-def ols_apply_nb(
+def ols_nb(
     x: tp.Array2d,
     y: tp.Array2d,
     window: int,
@@ -417,24 +444,6 @@ def ols_apply_nb(
         h = hash(window)
         return cache_dict[h]
     return generic_nb.rolling_ols_nb(x, y, window, minp=minp)
-
-
-@register_jitted(cache=True)
-def ols_spread_nb(
-    x: tp.Array2d,
-    y: tp.Array2d,
-    window: int,
-    ddof: int = 0,
-    minp: tp.Optional[int] = None,
-) -> tp.Tuple[tp.Array2d, tp.Array2d]:
-    """Calculate the OLS spread and z-score."""
-    slope, intercept = generic_nb.rolling_ols_nb(x, y, window, minp=minp)
-    pred = intercept + slope * x
-    spread = y - pred
-    spread_mean = generic_nb.rolling_mean_nb(spread, window, minp=minp)
-    spread_std = generic_nb.rolling_std_nb(spread, window, ddof=ddof, minp=minp)
-    spread_zscore = (spread - spread_mean) / spread_std
-    return spread, spread_zscore
 
 
 @register_jitted(cache=True)
@@ -458,7 +467,7 @@ def ols_spread_cache_nb(
 
 
 @register_jitted(cache=True)
-def ols_spread_apply_nb(
+def ols_spread_nb(
     x: tp.Array2d,
     y: tp.Array2d,
     window: int,
@@ -470,36 +479,28 @@ def ols_spread_apply_nb(
     if cache_dict is not None:
         h = hash(window)
         return cache_dict[h]
-    return ols_spread_nb(x, y, window, ddof=ddof, minp=minp)
+    slope, intercept = generic_nb.rolling_ols_nb(x, y, window, minp=minp)
+    pred = intercept + slope * x
+    spread = y - pred
+    spread_mean = generic_nb.rolling_mean_nb(spread, window, minp=minp)
+    spread_std = generic_nb.rolling_std_nb(spread, window, ddof=ddof, minp=minp)
+    spread_zscore = (spread - spread_mean) / spread_std
+    return spread, spread_zscore
 
 
-@register_jitted(cache=True)
-def vwap_1d_nb(
-    high: tp.Array1d,
-    low: tp.Array1d,
-    close: tp.Array1d,
-    volume: tp.Array1d,
-    group_lens: tp.GroupLens,
-) -> tp.Array1d:
-    """Compute the volume-weighted average price (VWAP)."""
-    out = np.empty_like(volume, dtype=np.float_)
-
-    group_end_idxs = np.cumsum(group_lens)
-    group_start_idxs = group_end_idxs - group_lens
-    for group in range(len(group_lens)):
-        from_i = group_start_idxs[group]
-        to_i = group_end_idxs[group]
-        nom_cumsum = 0
-        denum_cumsum = 0
-        for i in range(from_i, to_i):
-            nom_cumsum += volume[i] * (high[i] + low[i] + close[i]) / 3
-            denum_cumsum += volume[i]
-            out[i] = nom_cumsum / denum_cumsum
-    return out
-
-
-@register_jitted(cache=True)
-def vwap_apply_nb(
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="high", axis=1),
+    arg_take_spec=dict(
+        high=ch.ArraySlicer(axis=1),
+        low=ch.ArraySlicer(axis=1),
+        close=ch.ArraySlicer(axis=1),
+        volume=ch.ArraySlicer(axis=1),
+        group_lens=None,
+    ),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def vwap_nb(
     high: tp.Array2d,
     low: tp.Array2d,
     close: tp.Array2d,
@@ -507,14 +508,14 @@ def vwap_apply_nb(
     group_lens: tp.GroupLens,
 ) -> tp.Array2d:
     """Apply function for `vectorbtpro.indicators.custom.VWAP`."""
-    out = np.empty_like(volume, dtype=np.float_)
-
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
-    for group in range(len(group_lens)):
-        from_i = group_start_idxs[group]
-        to_i = group_end_idxs[group]
-        for col in range(volume.shape[1]):
+    out = np.empty_like(volume, dtype=np.float_)
+
+    for col in prange(volume.shape[1]):
+        for group in range(len(group_lens)):
+            from_i = group_start_idxs[group]
+            to_i = group_end_idxs[group]
             nom_cumsum = 0
             denum_cumsum = 0
             for i in range(from_i, to_i):
@@ -525,8 +526,19 @@ def vwap_apply_nb(
     return out
 
 
-@register_jitted(cache=True)
-def pivot_info_apply_nb(
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="high", axis=1),
+    arg_take_spec=dict(
+        high=ch.ArraySlicer(axis=1),
+        low=ch.ArraySlicer(axis=1),
+        up_th=base_ch.FlexArraySlicer(axis=1),
+        down_th=base_ch.FlexArraySlicer(axis=1),
+        flex_2d=None,
+    ),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def pivot_info_nb(
     high: tp.Array2d,
     low: tp.Array2d,
     up_th: tp.FlexArray,
@@ -539,7 +551,7 @@ def pivot_info_apply_nb(
     last_pivot = np.empty(high.shape, dtype=np.int_)
     last_idx = np.empty(high.shape, dtype=np.int_)
 
-    for col in range(high.shape[1]):
+    for col in prange(high.shape[1]):
         _conf_pivot = 0
         _conf_idx = -1
         _conf_value = np.nan
@@ -601,11 +613,21 @@ def pivot_info_apply_nb(
     return conf_pivot, conf_idx, last_pivot, last_idx
 
 
-@register_jitted(cache=True)
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="high", axis=1),
+    arg_take_spec=dict(
+        high=ch.ArraySlicer(axis=1),
+        low=ch.ArraySlicer(axis=1),
+        last_pivot=ch.ArraySlicer(axis=1),
+        last_idx=ch.ArraySlicer(axis=1),
+    ),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(cache=True, tags={"can_parallel"})
 def pivot_value_nb(high: tp.Array2d, low: tp.Array2d, last_pivot: tp.Array2d, last_idx: tp.Array2d) -> tp.Array2d:
     """Get pivot value."""
     pivot_value = np.empty(high.shape, dtype=np.float_)
-    for col in range(high.shape[1]):
+    for col in prange(high.shape[1]):
         for i in range(high.shape[0]):
             if last_pivot[i, col] == Pivot.Peak:
                 pivot_value[i, col] = high[last_idx[i, col], col]
@@ -616,7 +638,16 @@ def pivot_value_nb(high: tp.Array2d, low: tp.Array2d, last_pivot: tp.Array2d, la
     return pivot_value
 
 
-@register_jitted(cache=True)
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="conf_pivot", axis=1),
+    arg_take_spec=dict(
+        conf_pivot=ch.ArraySlicer(axis=1),
+        conf_idx=ch.ArraySlicer(axis=1),
+        last_pivot=ch.ArraySlicer(axis=1),
+    ),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(cache=True, tags={"can_parallel"})
 def pivots_nb(
     conf_pivot: tp.Array2d,
     conf_idx: tp.Array2d,
@@ -627,7 +658,7 @@ def pivots_nb(
     !!! warning
         To be used in plotting. Do not use it as an indicator!"""
     pivots = np.zeros(conf_pivot.shape, dtype=np.int_)
-    for col in range(conf_pivot.shape[1]):
+    for col in prange(conf_pivot.shape[1]):
         last_conf_idx = -1
         for i in range(conf_pivot.shape[0]):
             if conf_idx[i, col] != last_conf_idx:
@@ -637,12 +668,17 @@ def pivots_nb(
     return pivots
 
 
-@register_jitted(cache=True)
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="pivots", axis=1),
+    arg_take_spec=dict(pivots=ch.ArraySlicer(axis=1)),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(cache=True, tags={"can_parallel"})
 def pivots_to_modes_nb(pivots: tp.Array2d) -> tp.Array2d:
     """Translate pivots into trend modes."""
     modes = np.zeros(pivots.shape, dtype=np.int_)
 
-    for col in range(pivots.shape[1]):
+    for col in prange(pivots.shape[1]):
         if pivots[0, col] != 0:
             mode = -pivots[0, col]
         else:
@@ -659,8 +695,8 @@ def pivots_to_modes_nb(pivots: tp.Array2d) -> tp.Array2d:
 
 
 @register_jitted(cache=True)
-def get_tr_one_nb(high: float, low: float, prev_close: float) -> float:
-    """Get TR for one element."""
+def get_tr_iter_nb(high: float, low: float, prev_close: float) -> float:
+    """Get TR at one iteration."""
     tr0 = abs(high - low)
     tr1 = abs(high - prev_close)
     tr2 = abs(low - prev_close)
@@ -672,15 +708,15 @@ def get_tr_one_nb(high: float, low: float, prev_close: float) -> float:
 
 
 @register_jitted(cache=True)
-def get_med_price_one_nb(high: float, low: float) -> float:
-    """Get median price for one element."""
+def get_med_price_iter_nb(high: float, low: float) -> float:
+    """Get median price at one iteration."""
     return (high + low) / 2
 
 
 @register_jitted(cache=True)
-def get_basic_bands_one_nb(high: float, low: float, atr: float, multiplier: float) -> tp.Tuple[float, float]:
-    """Get upper and lower bands for one element."""
-    med_price = get_med_price_one_nb(high, low)
+def get_basic_bands_iter_nb(high: float, low: float, atr: float, multiplier: float) -> tp.Tuple[float, float]:
+    """Get upper and lower bands at one iteration."""
+    med_price = get_med_price_iter_nb(high, low)
     matr = multiplier * atr
     upper = med_price + matr
     lower = med_price - matr
@@ -688,7 +724,7 @@ def get_basic_bands_one_nb(high: float, low: float, atr: float, multiplier: floa
 
 
 @register_jitted(cache=True)
-def get_final_bands_one_nb(
+def get_final_bands_iter_nb(
     close: float,
     upper: float,
     lower: float,
@@ -696,7 +732,7 @@ def get_final_bands_one_nb(
     prev_lower: float,
     prev_dir_: int,
 ) -> tp.Tuple[float, float, float, int, float, float]:
-    """Get final bands for one element."""
+    """Get final bands at one iteration."""
     if close > prev_upper:
         dir_ = 1
     elif close < prev_lower:
@@ -719,7 +755,7 @@ def get_final_bands_one_nb(
 
 @register_jitted(cache=True)
 def supertrend_acc_nb(in_state: SuperTrendAIS) -> SuperTrendAOS:
-    """Accumulator of `supertrend_apply_nb`.
+    """Accumulator of `supertrend_nb`.
 
     Takes a state of type `vectorbtpro.indicators.enums.SuperTrendAIS` and returns
     a state of type `vectorbtpro.indicators.enums.SuperTrendAOS`."""
@@ -737,7 +773,7 @@ def supertrend_acc_nb(in_state: SuperTrendAIS) -> SuperTrendAOS:
     period = in_state.period
     multiplier = in_state.multiplier
 
-    tr = get_tr_one_nb(high, low, prev_close)
+    tr = get_tr_iter_nb(high, low, prev_close)
     alpha = generic_nb.alpha_from_wilder_nb(period)
     ewm_mean_in_state = generic_enums.EWMMeanAIS(
         i=i,
@@ -751,11 +787,11 @@ def supertrend_acc_nb(in_state: SuperTrendAIS) -> SuperTrendAOS:
     )
     ewm_mean_out_state = generic_nb.ewm_mean_acc_nb(ewm_mean_in_state)
     atr = ewm_mean_out_state.value
-    upper, lower = get_basic_bands_one_nb(high, low, atr, multiplier)
+    upper, lower = get_basic_bands_iter_nb(high, low, atr, multiplier)
     if i == 0:
         trend, dir_, long, short = np.nan, 1, np.nan, np.nan
     else:
-        upper, lower, trend, dir_, long, short = get_final_bands_one_nb(
+        upper, lower, trend, dir_, long, short = get_final_bands_iter_nb(
             close,
             upper,
             lower,
@@ -776,8 +812,19 @@ def supertrend_acc_nb(in_state: SuperTrendAIS) -> SuperTrendAOS:
     )
 
 
-@register_jitted(cache=True)
-def supertrend_apply_nb(
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="high", axis=1),
+    arg_take_spec=dict(
+        high=ch.ArraySlicer(axis=1),
+        low=ch.ArraySlicer(axis=1),
+        close=ch.ArraySlicer(axis=1),
+        period=None,
+        multiplier=None,
+    ),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def supertrend_nb(
     high: tp.Array2d,
     low: tp.Array2d,
     close: tp.Array2d,
@@ -793,7 +840,7 @@ def supertrend_apply_nb(
     if close.shape[0] == 0:
         return trend, dir_, long, short
 
-    for col in range(close.shape[1]):
+    for col in prange(close.shape[1]):
         nobs = 0
         old_wt = 1.0
         weighted_avg = np.nan

@@ -6,6 +6,7 @@ Offers common financial risk and performance metrics as found in [empyrical](htt
 an adapter for quantstats, and other features based on returns."""
 
 from vectorbtpro.returns.accessors import ReturnsAccessor, ReturnsSRAccessor, ReturnsDFAccessor
+from vectorbtpro.returns.enums import *
 from vectorbtpro.utils.module_ import create__all__
 
 __blacklist__ = []

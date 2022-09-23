@@ -18,11 +18,15 @@ from numba import prange
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.base.indexing import flex_select_auto_nb
-from vectorbtpro.generic import nb as generic_nb
+from vectorbtpro.generic import nb as generic_nb, enums as generic_enums
 from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.registries.jit_registry import register_jitted
+from vectorbtpro.returns.enums import RollSharpeAIS, RollSharpeAOS
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.math_ import add_nb
+
+
+# ############# Metrics ############# #
 
 
 @register_jitted(cache=True)
@@ -826,3 +830,98 @@ def down_capture_rollmeta_nb(
         period=period,
         log_returns=log_returns,
     )
+
+
+# ############# Accumulators ############# #
+
+
+@register_jitted(cache=True)
+def rolling_sharpe_acc_nb(in_state: RollSharpeAIS) -> RollSharpeAOS:
+    """Accumulator of `rolling_sharpe_nb`.
+
+    Takes a state of type `vectorbtpro.returns.enums.RollSharpeAIS` and returns
+    a state of type `vectorbtpro.returns.enums.RollSharpeAOS`."""
+    mean_in_state = generic_enums.RollMeanAIS(
+        i=in_state.i,
+        value=in_state.ret,
+        pre_window_value=in_state.pre_window_ret,
+        cumsum=in_state.cumsum,
+        nancnt=in_state.nancnt,
+        window=in_state.window,
+        minp=in_state.minp
+    )
+    mean_out_state = generic_nb.rolling_mean_acc_nb(mean_in_state)
+    std_in_state = generic_enums.RollStdAIS(
+        i=in_state.i,
+        value=in_state.ret,
+        pre_window_value=in_state.pre_window_ret,
+        cumsum=in_state.cumsum,
+        cumsum_sq=in_state.cumsum_sq,
+        nancnt=in_state.nancnt,
+        window=in_state.window,
+        minp=in_state.minp,
+        ddof=in_state.ddof
+    )
+    std_out_state = generic_nb.rolling_std_acc_nb(std_in_state)
+    mean = mean_out_state.value
+    std = std_out_state.value
+    if std == 0:
+        sharpe = np.nan
+    else:
+        sharpe = mean / std * np.sqrt(in_state.ann_factor)
+
+    return RollSharpeAOS(
+        cumsum=std_out_state.cumsum,
+        cumsum_sq=std_out_state.cumsum_sq,
+        nancnt=std_out_state.nancnt,
+        value=sharpe
+    )
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="returns", axis=1),
+    arg_take_spec=dict(returns=ch.ArraySlicer(axis=1), window=None, ann_factor=None, minp=None, ddof=None),
+    merge_func=base_ch.column_stack,
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def rolling_sharpe_ratio_nb(
+    returns: tp.Array2d,
+    window: int,
+    ann_factor: float,
+    minp: tp.Optional[int] = None,
+    ddof: int = 0
+) -> tp.Array2d:
+    """Calculate rolling Sharpe ratio.
+
+    Uses `rolling_sharpe_acc_nb` at each iteration."""
+    if window is None:
+        window = returns.shape[0]
+    if minp is None:
+        minp = window
+    out = np.empty(returns.shape, dtype=np.float_)
+    if returns.shape[0] == 0:
+        return out
+    for col in prange(returns.shape[1]):
+        cumsum = 0.
+        cumsum_sq = 0.
+        nancnt = 0
+        for i in range(returns.shape[0]):
+            in_state = RollSharpeAIS(
+                i=i,
+                ret=returns[i, col],
+                pre_window_ret=returns[i - window, col] if i - window >= 0 else np.nan,
+                cumsum=cumsum,
+                cumsum_sq=cumsum_sq,
+                nancnt=nancnt,
+                window=window,
+                minp=minp,
+                ddof=ddof,
+                ann_factor=ann_factor
+            )
+            out_state = rolling_sharpe_acc_nb(in_state)
+            cumsum = out_state.cumsum
+            cumsum_sq = out_state.cumsum_sq
+            nancnt = out_state.nancnt
+            out[i, col] = out_state.value
+
+    return out

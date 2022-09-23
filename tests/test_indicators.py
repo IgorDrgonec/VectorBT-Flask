@@ -4314,7 +4314,7 @@ class TestBasic:
     def test_OBV(self):
         assert_series_equal(
             vbt.OBV.run(close_ts, volume_ts).obv,
-            pd.Series(np.array([4, 7, 9, 10, 8, 5, 1]), index=close_ts.index, name=close_ts.name),
+            pd.Series(np.array([4.0, 7.0, 9.0, 10.0, 8.0, 5.0, 1.0]), index=close_ts.index, name=close_ts.name),
         )
         with pytest.raises(Exception):
             vbt.OBV.run(close_ts, volume_ts, per_column=True)

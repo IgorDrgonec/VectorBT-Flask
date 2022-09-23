@@ -105,7 +105,7 @@ MA = IndicatorFactory(
     param_names=["window", "wtype"],
     output_names=["ma"],
 ).with_apply_func(
-    nb.ma_apply_nb,
+    nb.ma_nb,
     cache_func=nb.ma_cache_nb,
     cache_pass_per_column=True,
     kwargs_as_args=["adjust", "minp"],
@@ -211,7 +211,7 @@ MSD = IndicatorFactory(
     param_names=["window", "wtype"],
     output_names=["msd"],
 ).with_apply_func(
-    nb.msd_apply_nb,
+    nb.msd_nb,
     cache_func=nb.msd_cache_nb,
     cache_pass_per_column=True,
     kwargs_as_args=["adjust", "ddof", "minp"],
@@ -302,8 +302,8 @@ BBANDS = IndicatorFactory(
         bandwidth=lambda self: self.wrapper.wrap((self.upper.values - self.lower.values) / self.middle.values),
     ),
 ).with_apply_func(
-    nb.bb_apply_nb,
-    cache_func=nb.bb_cache_nb,
+    nb.bbands_nb,
+    cache_func=nb.bbands_cache_nb,
     cache_pass_per_column=True,
     kwargs_as_args=["adjust", "ddof", "minp"],
     param_settings=dict(
@@ -445,7 +445,7 @@ RSI = IndicatorFactory(
     param_names=["window", "wtype"],
     output_names=["rsi"],
 ).with_apply_func(
-    nb.rsi_apply_nb,
+    nb.rsi_nb,
     cache_func=nb.rsi_cache_nb,
     cache_pass_per_column=True,
     kwargs_as_args=["adjust", "minp"],
@@ -566,7 +566,7 @@ STOCH = IndicatorFactory(
     param_names=["fast_k_window", "slow_k_window", "slow_d_window", "wtype"],
     output_names=["fast_k", "slow_k", "slow_d"],
 ).with_apply_func(
-    nb.stoch_apply_nb,
+    nb.stoch_nb,
     cache_func=nb.stoch_cache_nb,
     cache_pass_per_column=True,
     kwargs_as_args=["adjust", "minp"],
@@ -717,7 +717,7 @@ MACD = IndicatorFactory(
         hist=lambda self: self.wrapper.wrap(self.macd.values - self.signal.values),
     ),
 ).with_apply_func(
-    nb.macd_apply_nb,
+    nb.macd_nb,
     cache_func=nb.macd_cache_nb,
     cache_pass_per_column=True,
     kwargs_as_args=["adjust", "minp"],
@@ -858,7 +858,7 @@ ATR = IndicatorFactory(
     param_names=["window", "wtype"],
     output_names=["tr", "atr"],
 ).with_apply_func(
-    nb.atr_apply_nb,
+    nb.atr_nb,
     cache_func=nb.atr_cache_nb,
     cache_pass_per_column=True,
     kwargs_as_args=["adjust", "minp"],
@@ -962,7 +962,7 @@ OBV = IndicatorFactory(
     input_names=["close", "volume"],
     param_names=[],
     output_names=["obv"],
-).with_custom_func(nb.obv_custom_nb)
+).with_custom_func(nb.obv_nb)
 
 
 class _OBV(OBV):
@@ -1043,7 +1043,7 @@ OLS = IndicatorFactory(
         angle=lambda self: self.wrapper.wrap(np.arctan(self.slope.values) * 180 / np.pi),
     ),
 ).with_apply_func(
-    nb.ols_apply_nb,
+    nb.ols_nb,
     cache_func=nb.ols_cache_nb,
     cache_pass_per_column=True,
     kwargs_as_args=["minp"],
@@ -1142,7 +1142,7 @@ OLSS = IndicatorFactory(
     param_names=["window"],
     output_names=["spread", "zscore"],
 ).with_apply_func(
-    nb.ols_spread_apply_nb,
+    nb.ols_spread_nb,
     cache_func=nb.ols_spread_cache_nb,
     cache_pass_per_column=True,
     kwargs_as_args=["ddof", "minp"],
@@ -1462,7 +1462,7 @@ VWAP = IndicatorFactory(
     param_names=["anchor"],
     output_names=["vwap"],
 ).with_apply_func(
-    nb.vwap_apply_nb,
+    nb.vwap_nb,
     param_settings=dict(
         anchor=dict(template=RepFunc(substitute_anchor)),
     ),
@@ -1602,7 +1602,7 @@ PIVOTINFO = IndicatorFactory(
         modes=dict(dtype=TrendMode, enum_unkval=0),
     ),
 ).with_apply_func(
-    nb.pivot_info_apply_nb,
+    nb.pivot_info_nb,
     param_settings=dict(
         up_th=flex_elem_param_config,
         down_th=flex_elem_param_config,
@@ -1761,7 +1761,7 @@ SUPERTREND = IndicatorFactory(
     input_names=["high", "low", "close"],
     param_names=["period", "multiplier"],
     output_names=["supert", "superd", "superl", "supers"],
-).with_apply_func(nb.supertrend_apply_nb, period=7, multiplier=3)
+).with_apply_func(nb.supertrend_nb, period=7, multiplier=3)
 
 
 class _SUPERTREND(SUPERTREND):
