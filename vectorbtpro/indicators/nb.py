@@ -17,9 +17,9 @@ from numba import prange
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.indexing import flex_select_auto_nb
-from vectorbtpro.generic import nb as generic_nb
+from vectorbtpro.generic import nb as generic_nb, enums as generic_enums
 from vectorbtpro.registries.jit_registry import register_jitted
-from vectorbtpro.indicators.enums import Pivot
+from vectorbtpro.indicators.enums import Pivot, SuperTrendAIS, SuperTrendAOS
 
 
 @register_jitted(cache=True)
@@ -656,3 +656,177 @@ def pivots_to_modes_nb(pivots: tp.Array2d) -> tp.Array2d:
                 modes[i, col] = mode
 
     return modes
+
+
+@register_jitted(cache=True)
+def get_tr_one_nb(high: float, low: float, prev_close: float) -> float:
+    """Get TR for one element."""
+    tr0 = abs(high - low)
+    tr1 = abs(high - prev_close)
+    tr2 = abs(low - prev_close)
+    if np.isnan(tr0) or np.isnan(tr1) or np.isnan(tr2):
+        tr = np.nan
+    else:
+        tr = max(tr0, tr1, tr2)
+    return tr
+
+
+@register_jitted(cache=True)
+def get_med_price_one_nb(high: float, low: float) -> float:
+    """Get median price for one element."""
+    return (high + low) / 2
+
+
+@register_jitted(cache=True)
+def get_basic_bands_one_nb(high: float, low: float, atr: float, multiplier: float) -> tp.Tuple[float, float]:
+    """Get upper and lower bands for one element."""
+    med_price = get_med_price_one_nb(high, low)
+    matr = multiplier * atr
+    upper = med_price + matr
+    lower = med_price - matr
+    return upper, lower
+
+
+@register_jitted(cache=True)
+def get_final_bands_one_nb(
+    close: float,
+    upper: float,
+    lower: float,
+    prev_upper: float,
+    prev_lower: float,
+    prev_dir_: int,
+) -> tp.Tuple[float, float, float, int, float, float]:
+    """Get final bands for one element."""
+    if close > prev_upper:
+        dir_ = 1
+    elif close < prev_lower:
+        dir_ = -1
+    else:
+        dir_ = prev_dir_
+        if dir_ > 0 and lower < prev_lower:
+            lower = prev_lower
+        if dir_ < 0 and upper > prev_upper:
+            upper = prev_upper
+
+    if dir_ > 0:
+        trend = long = lower
+        short = np.nan
+    else:
+        trend = short = upper
+        long = np.nan
+    return upper, lower, trend, dir_, long, short
+
+
+@register_jitted(cache=True)
+def supertrend_acc_nb(in_state: SuperTrendAIS) -> SuperTrendAOS:
+    """Accumulator of `supertrend_apply_nb`.
+
+    Takes a state of type `vectorbtpro.indicators.enums.SuperTrendAIS` and returns
+    a state of type `vectorbtpro.indicators.enums.SuperTrendAOS`."""
+    i = in_state.i
+    high = in_state.high
+    low = in_state.low
+    close = in_state.close
+    prev_close = in_state.prev_close
+    prev_upper = in_state.prev_upper
+    prev_lower = in_state.prev_lower
+    prev_dir_ = in_state.prev_dir_
+    nobs = in_state.nobs
+    weighted_avg = in_state.weighted_avg
+    old_wt = in_state.old_wt
+    period = in_state.period
+    multiplier = in_state.multiplier
+
+    tr = get_tr_one_nb(high, low, prev_close)
+    alpha = generic_nb.alpha_from_wilder_nb(period)
+    ewm_mean_in_state = generic_enums.EWMMeanAIS(
+        i=i,
+        value=tr,
+        old_wt=old_wt,
+        weighted_avg=weighted_avg,
+        nobs=nobs,
+        alpha=alpha,
+        minp=period,
+        adjust=False,
+    )
+    ewm_mean_out_state = generic_nb.ewm_mean_acc_nb(ewm_mean_in_state)
+    atr = ewm_mean_out_state.value
+    upper, lower = get_basic_bands_one_nb(high, low, atr, multiplier)
+    if i == 0:
+        trend, dir_, long, short = np.nan, 1, np.nan, np.nan
+    else:
+        upper, lower, trend, dir_, long, short = get_final_bands_one_nb(
+            close,
+            upper,
+            lower,
+            prev_upper,
+            prev_lower,
+            prev_dir_,
+        )
+    return SuperTrendAOS(
+        nobs=ewm_mean_out_state.nobs,
+        weighted_avg=ewm_mean_out_state.weighted_avg,
+        old_wt=ewm_mean_out_state.old_wt,
+        upper=upper,
+        lower=lower,
+        trend=trend,
+        dir_=dir_,
+        long=long,
+        short=short,
+    )
+
+
+@register_jitted(cache=True)
+def supertrend_apply_nb(
+    high: tp.Array2d,
+    low: tp.Array2d,
+    close: tp.Array2d,
+    period: int,
+    multiplier: float,
+) -> tp.Tuple[tp.Array2d, tp.Array2d, tp.Array2d, tp.Array2d]:
+    """Apply function for `vectorbtpro.indicators.custom.SUPERTREND`."""
+    trend = np.empty(close.shape, dtype=np.float_)
+    dir_ = np.empty(close.shape, dtype=np.int_)
+    long = np.empty(close.shape, dtype=np.float_)
+    short = np.empty(close.shape, dtype=np.float_)
+
+    if close.shape[0] == 0:
+        return trend, dir_, long, short
+
+    for col in range(close.shape[1]):
+        nobs = 0
+        old_wt = 1.0
+        weighted_avg = np.nan
+        prev_upper = np.nan
+        prev_lower = np.nan
+
+        for i in range(close.shape[0]):
+            in_state = SuperTrendAIS(
+                i=i,
+                high=high[i, col],
+                low=low[i, col],
+                close=close[i, col],
+                prev_close=close[i - 1, col] if i > 0 else np.nan,
+                prev_upper=prev_upper,
+                prev_lower=prev_lower,
+                prev_dir_=dir_[i - 1, col] if i > 0 else 1,
+                nobs=nobs,
+                weighted_avg=weighted_avg,
+                old_wt=old_wt,
+                period=period,
+                multiplier=multiplier,
+            )
+
+            out_state = supertrend_acc_nb(in_state)
+
+            nobs = out_state.nobs
+            weighted_avg = out_state.weighted_avg
+            old_wt = out_state.old_wt
+            prev_upper = out_state.upper
+            prev_lower = out_state.lower
+            trend[i, col] = out_state.trend
+            dir_[i, col] = out_state.dir_
+            long[i, col] = out_state.long
+            short[i, col] = out_state.short
+
+    return trend, dir_, long, short

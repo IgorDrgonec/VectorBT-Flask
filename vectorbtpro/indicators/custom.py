@@ -91,6 +91,7 @@ __all__ = [
     "PATSIM",
     "VWAP",
     "PIVOTINFO",
+    "SUPERTREND",
 ]
 
 # ############# MA ############# #
@@ -1565,26 +1566,34 @@ PIVOTINFO = IndicatorFactory(
     param_names=["up_th", "down_th"],
     output_names=["conf_pivot", "conf_idx", "last_pivot", "last_idx"],
     lazy_outputs=dict(
-        conf_value=lambda self: self.wrapper.wrap(nb.pivot_value_nb(
-            to_2d_array(self.high),
-            to_2d_array(self.low),
-            to_2d_array(self.conf_pivot),
-            to_2d_array(self.conf_idx),
-        )),
-        last_value=lambda self: self.wrapper.wrap(nb.pivot_value_nb(
-            to_2d_array(self.high),
-            to_2d_array(self.low),
-            to_2d_array(self.last_pivot),
-            to_2d_array(self.last_idx),
-        )),
-        pivots=lambda self: self.wrapper.wrap(nb.pivots_nb(
-            to_2d_array(self.conf_pivot),
-            to_2d_array(self.conf_idx),
-            to_2d_array(self.last_pivot),
-        )),
-        modes=lambda self: self.wrapper.wrap(nb.pivots_to_modes_nb(
-            to_2d_array(self.pivots),
-        )),
+        conf_value=lambda self: self.wrapper.wrap(
+            nb.pivot_value_nb(
+                to_2d_array(self.high),
+                to_2d_array(self.low),
+                to_2d_array(self.conf_pivot),
+                to_2d_array(self.conf_idx),
+            )
+        ),
+        last_value=lambda self: self.wrapper.wrap(
+            nb.pivot_value_nb(
+                to_2d_array(self.high),
+                to_2d_array(self.low),
+                to_2d_array(self.last_pivot),
+                to_2d_array(self.last_idx),
+            )
+        ),
+        pivots=lambda self: self.wrapper.wrap(
+            nb.pivots_nb(
+                to_2d_array(self.conf_pivot),
+                to_2d_array(self.conf_idx),
+                to_2d_array(self.last_pivot),
+            )
+        ),
+        modes=lambda self: self.wrapper.wrap(
+            nb.pivots_to_modes_nb(
+                to_2d_array(self.pivots),
+            )
+        ),
     ),
     attr_settings=dict(
         conf_pivot=dict(dtype=Pivot, enum_unkval=0),
@@ -1725,10 +1734,14 @@ class _PIVOTINFO(PIVOTINFO):
         pivots = self_col.pivots
         highs = self_col.high[pivots == Pivot.Peak]
         lows = self_col.low[pivots == Pivot.Valley]
-        fig = pd.concat((highs, lows)).sort_index().vbt.lineplot(
-            trace_kwargs=zigzag_trace_kwargs,
-            add_trace_kwargs=add_trace_kwargs,
-            fig=fig,
+        fig = (
+            pd.concat((highs, lows))
+            .sort_index()
+            .vbt.lineplot(
+                trace_kwargs=zigzag_trace_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                fig=fig,
+            )
         )
 
         return fig
@@ -1737,3 +1750,102 @@ class _PIVOTINFO(PIVOTINFO):
 setattr(PIVOTINFO, "__doc__", _PIVOTINFO.__doc__)
 setattr(PIVOTINFO, "plot", _PIVOTINFO.plot)
 setattr(PIVOTINFO, "plot_zigzag", _PIVOTINFO.plot_zigzag)
+
+
+# ############# SUPERTREND ############# #
+
+
+SUPERTREND = IndicatorFactory(
+    class_name="SUPERTREND",
+    short_name="supertrend",
+    input_names=["high", "low", "close"],
+    param_names=["period", "multiplier"],
+    output_names=["supert", "superd", "superl", "supers"],
+).with_apply_func(nb.supertrend_apply_nb, period=7, multiplier=3)
+
+
+class _SUPERTREND(SUPERTREND):
+    """Supertrend indicator."""
+
+    def plot(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        plot_close: bool = True,
+        close_trace_kwargs: tp.KwargsLike = None,
+        superl_trace_kwargs: tp.KwargsLike = None,
+        supers_trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs
+    ) -> tp.BaseFigure:
+        """Plot `MA.ma` against `MA.close`.
+
+        Args:
+            column (str): Name of the column to plot.
+            plot_close (bool): Whether to plot `MA.close`.
+            close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MA.close`.
+            superl_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MA.superl`.
+            supers_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MA.supers`.
+            add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
+            fig (Figure or FigureWidget): Figure to add traces to.
+            **layout_kwargs: Keyword arguments passed to `fig.update_layout`.
+
+        Usage:
+            ```pycon
+            >>> vbt.SUPERTREND.run(ohlcv['High'], ohlcv['Low'], ohlcv['Close']).plot()
+            ```
+
+            ![](/assets/images/api/SUPERTREND.svg)
+        """
+        from vectorbtpro.utils.figure import make_figure
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
+
+        self_col = self.select_col(column=column)
+
+        if fig is None:
+            fig = make_figure()
+        fig.update_layout(**layout_kwargs)
+
+        if close_trace_kwargs is None:
+            close_trace_kwargs = {}
+        if superl_trace_kwargs is None:
+            superl_trace_kwargs = {}
+        if supers_trace_kwargs is None:
+            supers_trace_kwargs = {}
+        close_trace_kwargs = merge_dicts(
+            dict(name="Close", line=dict(color=plotting_cfg["color_schema"]["blue"])),
+            close_trace_kwargs,
+        )
+        superl_trace_kwargs = merge_dicts(
+            dict(name="Long", line=dict(color=plotting_cfg["color_schema"]["green"])),
+            superl_trace_kwargs,
+        )
+        supers_trace_kwargs = merge_dicts(
+            dict(name="Short", line=dict(color=plotting_cfg["color_schema"]["red"])),
+            supers_trace_kwargs,
+        )
+
+        if plot_close:
+            fig = self_col.close.vbt.lineplot(
+                trace_kwargs=close_trace_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                fig=fig,
+            )
+        fig = self_col.superl.vbt.lineplot(
+            trace_kwargs=superl_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+        )
+        fig = self_col.supers.vbt.lineplot(
+            trace_kwargs=supers_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+        )
+
+        return fig
+
+
+setattr(SUPERTREND, "__doc__", _SUPERTREND.__doc__)
+setattr(SUPERTREND, "plot", _SUPERTREND.plot)
