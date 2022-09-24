@@ -3,10 +3,12 @@
 """Engines for executing functions."""
 
 import multiprocessing
+import gc
 
 from numba.core.registry import CPUDispatcher
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.registries.ca_registry import CAQueryDelegator
 from vectorbtpro.utils.config import merge_dicts, Configured
 from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.parsing import get_func_arg_names
@@ -42,6 +44,8 @@ class SequenceEngine(ExecutionEngine):
         show_progress: tp.Optional[bool] = None,
         progress_desc: tp.Optional[tp.Sequence] = None,
         pbar_kwargs: tp.KwargsLike = None,
+        clear_cache: tp.Optional[bool] = None,
+        collect_garbage: tp.Optional[bool] = None,
     ) -> None:
         from vectorbtpro._settings import settings
 
@@ -50,12 +54,25 @@ class SequenceEngine(ExecutionEngine):
         if show_progress is None:
             show_progress = sequence_cfg["show_progress"]
         pbar_kwargs = merge_dicts(pbar_kwargs, sequence_cfg["pbar_kwargs"])
+        if clear_cache is None:
+            clear_cache = sequence_cfg["clear_cache"]
+        if collect_garbage is None:
+            collect_garbage = sequence_cfg["collect_garbage"]
 
         self._show_progress = show_progress
         self._progress_desc = progress_desc
         self._pbar_kwargs = pbar_kwargs
+        self._clear_cache = clear_cache
+        self._collect_garbage = collect_garbage
 
-        ExecutionEngine.__init__(self, show_progress=show_progress, progress_desc=progress_desc, bar_kwargs=pbar_kwargs)
+        ExecutionEngine.__init__(
+            self,
+            show_progress=show_progress,
+            progress_desc=progress_desc,
+            bar_kwargs=pbar_kwargs,
+            clear_cache=clear_cache,
+            collect_garbage=collect_garbage,
+        )
 
     @property
     def show_progress(self) -> bool:
@@ -72,6 +89,16 @@ class SequenceEngine(ExecutionEngine):
         """Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`."""
         return self._pbar_kwargs
 
+    @property
+    def clear_cache(self) -> bool:
+        """Whether to clear vectorbt's cache after each iteration."""
+        return self._clear_cache
+
+    @property
+    def collect_garbage(self) -> bool:
+        """Whether to clear garbage after each iteration."""
+        return self._collect_garbage
+
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
         results = []
         if n_calls is None and hasattr(funcs_args, "__len__"):
@@ -85,6 +112,11 @@ class SequenceEngine(ExecutionEngine):
                         pbar.set_description(str(self.progress_desc[i]))
                 results.append(func(*args, **kwargs))
                 pbar.update(1)
+                if self.clear_cache:
+                    CAQueryDelegator().clear_cache()
+                if self.collect_garbage:
+                    gc.collect()
+
         return results
 
 
