@@ -61,10 +61,6 @@ try:
 except ImportError:
     PolygonClientT = tp.Any
 try:
-    from alpha_vantage.alphavantage import AlphaVantage as AlphaVantageT
-except ImportError:
-    AlphaVantageT = tp.Any
-try:
     from tvDatafeed import TvDatafeed as TvDatafeedT
 except ImportError:
     TvDatafeedT = tp.Any
